@@ -17,14 +17,14 @@ Each region follows a consistent pattern with CIDR blocks allocated per region:
 
 1. Each **region** is allocated a `/20` CIDR block within the cloud provider's address space
 2. Within each region, **availability zones** each receive a `/24` CIDR block
-3. Within each availability zone, specialized **subnet types** are created:
+3. Within each availability zone, specialized **subnet types** are created with non-overlapping CIDR ranges
 
-| Subnet Role | CIDR Size | IPs Available | Purpose |
-|-------------|-----------|---------------|---------|
-| Kubernetes | /24 | 254 | Kubernetes node networking |
-| Services | /26 | 62 | Application and service networking |
-| Endpoints | /27 | 30 | Private endpoints and service connections |
-| Transit | /28 | 14 | Transit gateways and network connections |
+| Subnet Role | CIDR Size | IP Range Example | IPs Available | Purpose |
+|-------------|-----------|------------------|---------------|---------|
+| Kubernetes | /24 | 10.101.0.0/24 | 254 | Kubernetes node networking |
+| Services | /26 | 10.101.0.128/26 | 62 | Application and service networking |
+| Endpoints | /27 | 10.101.0.192/27 | 30 | Private endpoints and service connections |
+| Transit | /28 | 10.101.0.224/28 | 14 | Transit gateways and network connections |
 
 ## AWS Region Allocations
 
@@ -60,19 +60,35 @@ Each region follows a consistent pattern with CIDR blocks allocated per region:
 
 ## Subnet Purpose Definitions
 
-1. **Kubernetes Subnets**: These subnets host Kubernetes node VMs and are sized to accommodate multiple node pools.
+1. **Kubernetes Subnets** (/24): These subnets host Kubernetes node VMs and are sized to accommodate multiple node pools. They use the first half of each AZ's address space (e.g., 10.101.0.0/24).
 
-2. **Services Subnets**: Used for dedicated services that run outside of Kubernetes, such as databases, caches, and application servers.
+2. **Services Subnets** (/26): Used for dedicated services that run outside of Kubernetes, such as databases, caches, and application servers. They use the third quarter of each AZ's address space (e.g., 10.101.0.128/26).
 
-3. **Endpoints Subnets**: Dedicated to private endpoints and service connections to PaaS services.
+3. **Endpoints Subnets** (/27): Dedicated to private endpoints and service connections to PaaS services. They use a portion of the last quarter of each AZ's address space (e.g., 10.101.0.192/27).
 
-4. **Transit Subnets**: Used for connectivity between networks, including transit gateways, VPN endpoints, and ExpressRoute connections.
+4. **Transit Subnets** (/28): Used for connectivity between networks, including transit gateways, VPN endpoints, and ExpressRoute connections. They use the final portion of each AZ's address space (e.g., 10.101.0.224/28).
+
+## Subnet Allocation Within Each AZ
+
+For each AZ, we follow this pattern to ensure no CIDR overlaps:
+
+```
+AZ CIDR: 10.101.X.0/24 (where X is the AZ identifier)
+
+- Kubernetes: 10.101.X.0/24    (uses the full AZ space for Kubernetes)
+- Services:   10.101.X.128/26  (uses the second half's first half)
+- Endpoints:  10.101.X.192/27  (uses the second half's second half's first half)
+- Transit:    10.101.X.224/28  (uses the second half's second half's second half)
+```
+
+This approach gives us non-overlapping subnet ranges within each AZ while still maintaining the hierarchy and logical organization.
 
 ## Implementation Notes
 
 1. All network security groups, firewalls, and ACLs should leverage the hierarchical structure
 2. New regions should follow this allocation pattern
 3. Pod and service CIDR blocks for Kubernetes should be isolated from VPC/VNet CIDR ranges
+4. All subnet CIDR blocks within an AZ must be non-overlapping to comply with Azure networking requirements
 
 ## Governance
 
