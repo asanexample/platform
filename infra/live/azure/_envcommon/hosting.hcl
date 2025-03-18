@@ -62,8 +62,9 @@ inputs = {
   storage_network_default_action = "Deny"
   storage_network_bypass = ["AzureServices"]
   
-  # Set permissions to allow access from endpoint subnets
-  storage_allowed_subnets = ["endpoint"]
+  # Set permissions to allow access from all endpoint subnets in all AZs
+  # This aligns with our new network topology with 3 AZs
+  storage_allowed_subnets = ["az1-endpoints", "az2-endpoints", "az3-endpoints"]
   
   # Common tags for all hosting instances
   tags = {
