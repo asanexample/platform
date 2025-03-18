@@ -1,0 +1,16 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+- When authoring new Terraform modules, optimize for these qualities
+
+- Single Responsibility Principle
+- Highly re-usable and generic
+- Always include inline explanatory code comments 
+- Always validate variables and make sure they have clear descriptions
+- Always use consistent naming conventions for everything. When it becomes necessary to invent new naming conventions, do so, but make sure to keep NAMING_CONVENTIONS.md updated with whatever changes you make
+- Always write tests for modules and make sure they pass.  We also need to make sure terragrunt init and terragrunt plan succeed.
+- If you don't have Azure credentials, use the command az login to authenticate with Azure.
+- Always user the latest versions of Terraform, Terraform Providers, and tools generally.  As of writing the latest version of the AzureRM provider is 4.23.0.

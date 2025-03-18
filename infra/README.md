@@ -1,0 +1,108 @@
+# Multi-Cloud Infrastructure as Code
+
+This repository contains Infrastructure as Code (IaC) for managing resources across multiple cloud providers (AWS, Azure, GCP) using Terraform with Terragrunt.
+
+## Repository Structure
+
+```
+infra/
+├── _envcommon/              # Common configurations for environments
+├── modules/                 # Reusable modules
+│   ├── aws/                 # AWS-specific modules
+│   ├── azure/               # Azure-specific modules
+│   ├── gcp/                 # GCP-specific modules
+│   └── common/              # Cross-cloud abstraction modules
+└── live/                    # Live infrastructure
+    ├── global/              # Global resources
+    └── aws/azure/gcp        # Per-cloud resources
+        └── env/region/      # Environment & region-specific
+```
+
+## Getting Started
+
+### Prerequisites
+
+- Terraform >= 1.6.0
+- Terragrunt >= 0.45.0
+- Azure CLI (for Azure resources)
+- AWS CLI (for AWS resources)
+- Google Cloud SDK (for GCP resources)
+
+### Environment Setup
+
+Set the required environment variables:
+
+```bash
+# Common
+export TF_VAR_environment="dev"
+export TF_VAR_cost_center="Engineering"
+export TF_VAR_owner="Platform Team"
+
+# Azure
+export TF_VAR_azure_subscription_id="your-subscription-id"
+export TF_VAR_azure_tenant_id="your-tenant-id"
+export TF_VAR_azure_region="eastus"
+
+# AWS (when needed)
+export TF_VAR_aws_region="us-east-1"
+
+# GCP (when needed)
+export TF_VAR_gcp_project_id="your-project-id"
+export TF_VAR_gcp_region="us-east1"
+```
+
+### Deployment
+
+To deploy a specific component:
+
+```bash
+cd infra/live/azure/dev/eastus/networking
+terragrunt plan
+terragrunt apply
+```
+
+To deploy all components in an environment:
+
+```bash
+cd infra/live/azure/dev
+terragrunt run-all plan
+terragrunt run-all apply
+```
+
+## Testing
+
+This repository uses Terraform's native testing framework for validating modules:
+
+```bash
+# Test a specific module
+cd infra/modules/azure/networking
+terraform test
+
+# Run all tests
+cd infra
+find . -name "*.tftest.hcl" -execdir terraform test \;
+```
+
+## Naming Conventions
+
+Resources follow this naming pattern:
+`{prefix}-{cloud}-{resource_type}-{env}-{region}-{name}`
+
+Examples:
+- `ctr-az-rg-dev-eastus-networking` (Azure resource group)
+- `ctr-aws-s3-prod-useast1-data` (AWS S3 bucket)
+
+## Tagging Strategy
+
+All resources are tagged with:
+- Environment
+- ManagedBy
+- Project
+- CostCenter
+- Owner
+
+Environment-specific resources may have additional tags.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details. 

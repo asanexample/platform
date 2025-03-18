@@ -1,0 +1,30 @@
+# Template for Azure hosting configuration in a new region
+# To add hosting to a new region, follow these steps:
+#
+# 1. Create a network.hcl file in the region directory with appropriate CIDR blocks:
+#    ```hcl
+#    # Network configuration for Azure [region] region
+#    
+#    locals {
+#      # VNet CIDR block for [region]
+#      address_space = ["10.17.X.0/23"]  # Replace X with appropriate value
+#      
+#      # Subnet configurations specific to [region]
+#      subnets = {
+#        "az1-node-subnet" = {
+#          address_prefixes  = ["10.17.X.0/26"]  # Replace X with appropriate value
+#          service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ContainerRegistry"]
+#        },
+#        "az1-endpoint-subnet" = {
+#          address_prefixes  = ["10.17.X.80/28"]  # Replace X with appropriate value
+#          service_endpoints = ["Microsoft.Storage", "Microsoft.Sql", "Microsoft.KeyVault"]
+#        }
+#      }
+#    }
+#    ```
+#
+# 2. Copy the hosting-shell.hcl.template to your region's hosting/terragrunt.hcl file.
+#    The shell is designed to be identical across all regions and will automatically
+#    pick up the network configuration from your region's network.hcl file.
+#
+# See existing regions like eastus, westus, or northeurope for examples.
