@@ -8,52 +8,54 @@ variables {
   location    = "eastus"
 }
 
-run "test_basic_hosting" {
+# ---------------------------------------------------------------------------------------------------------------------
+# SHARED RESOURCES HOSTING TEST
+# This test verifies the hosting module works with the naming module for shared resources
+# ---------------------------------------------------------------------------------------------------------------------
+run "test_shared_resources_hosting" {
   command = plan
 
   variables {
-    resource_group_name = "${var.test_prefix}-rg"
-    location            = var.location
-
+    # Naming module parameters
+    prefix        = "vip"
+    stage         = "dev"
+    region_abbv   = "eus"
+    
+    # No customer provided (for shared resources)
+    
+    # Required parameters
+    location      = var.location
+    
     # Network configuration
-    vnet_name     = "${var.test_prefix}-vnet"
-    address_space = ["10.0.0.0/16"]
+    address_space = ["10.1.0.0/16"]
     subnets = {
-      "frontend" = {
-        address_prefixes = ["10.0.1.0/24"]
+      "node" = {
+        address_prefixes = ["10.1.1.0/24"]
       },
-      "backend" = {
-        address_prefixes = ["10.0.2.0/24"]
+      "app" = {
+        address_prefixes = ["10.1.2.0/24"]
       },
-      "storage" = {
-        address_prefixes                          = ["10.0.3.0/24"]
-        service_endpoints                         = ["Microsoft.Storage"]
-        private_endpoint_network_policies_enabled = true
+      "endpoint" = {
+        address_prefixes  = ["10.1.3.0/24"]
+        service_endpoints = ["Microsoft.Storage"]
       }
     }
 
     # Storage configuration
-    storage_name_components = {
-      workload    = "hosting"
-      environment = "test"
-      instance    = "01"
-    }
     storage_account_tier     = "Standard"
     storage_replication_type = "LRS"
-    storage_allowed_subnets  = ["storage"]
-    storage_network_bypass   = ["AzureServices"]
+    storage_allowed_subnets  = ["endpoint"]
     storage_allow_public     = false
     storage_containers = {
-      "test-data" = {
-        name                  = "test-data"
+      "assets" = {
+        name                  = "assets"
         container_access_type = "private"
       }
     }
 
     tags = {
-      Environment = "Test"
-      Project     = "Module Testing"
-      Terraform   = "true"
+      Environment = "Dev"
+      ManagedBy   = "Terraform"
     }
   }
 
@@ -61,69 +63,81 @@ run "test_basic_hosting" {
     source = "../../../../modules/azure/hosting"
   }
 
-  # Check a variable access to satisfy Terraform's requirement
+  # Check that the naming module outputs are used
   assert {
-    condition     = var.location == "eastus"
-    error_message = "Location should be eastus"
+    condition     = output.resource_group_name == "vip-dev-rg-eus"
+    error_message = "Resource group name should use naming module pattern"
+  }
+
+  assert {
+    condition     = output.vnet_name == "vip-dev-vnet-eus"
+    error_message = "VNet name should use naming module pattern"
+  }
+
+  assert {
+    condition     = output.storage_account_name == "vipdevsaeus"
+    error_message = "Storage account name should use naming module pattern"
+  }
+
+  # Verify naming module output is available
+  assert {
+    condition     = output.naming != null
+    error_message = "Naming module output should be available"
   }
 }
 
-run "test_advanced_hosting" {
+# ---------------------------------------------------------------------------------------------------------------------
+# CUSTOMER-SPECIFIC RESOURCES HOSTING TEST
+# This test verifies the hosting module works with the naming module for customer-specific resources
+# ---------------------------------------------------------------------------------------------------------------------
+run "test_customer_specific_hosting" {
   command = plan
 
   variables {
-    resource_group_name = "${var.test_prefix}-adv-rg"
-    location            = var.location
-
+    # Naming module parameters
+    prefix        = "vip"
+    customer      = "contoso"
+    stage         = "test"
+    region_abbv   = "wus"
+    
+    # Required parameters
+    location      = "westus"
+    
     # Network configuration
-    vnet_name     = "${var.test_prefix}-adv-vnet"
-    address_space = ["10.1.0.0/16"]
+    address_space = ["10.2.0.0/16"]
     subnets = {
-      "app" = {
-        address_prefixes = ["10.1.1.0/24"]
+      "frontend" = {
+        address_prefixes = ["10.2.1.0/24"]
       },
-      "data" = {
-        address_prefixes                          = ["10.1.2.0/24"]
-        service_endpoints                         = ["Microsoft.Storage"]
-        private_endpoint_network_policies_enabled = true
+      "backend" = {
+        address_prefixes = ["10.2.2.0/24"]
+      },
+      "database" = {
+        address_prefixes  = ["10.2.3.0/24"]
+        service_endpoints = ["Microsoft.Storage", "Microsoft.Sql"]
       }
     }
 
     # Storage configuration
-    storage_name_components = {
-      workload    = "adv"
-      environment = "test"
-      instance    = "02"
-    }
     storage_account_tier     = "Premium"
     storage_replication_type = "ZRS"
-    storage_allowed_subnets  = ["data"]
+    storage_allowed_subnets  = ["database"]
     storage_allow_public     = true
     storage_containers = {
-      "web-assets" = {
-        name                  = "web-assets"
+      "public" = {
+        name                  = "public"
         container_access_type = "blob"
-        metadata = {
-          application = "test-app"
-        }
       },
-      "user-content" = {
-        name                  = "user-content"
+      "private" = {
+        name                  = "private"
         container_access_type = "private"
       }
     }
-    storage_cors_rules = [{
-      allowed_headers    = ["*"]
-      allowed_methods    = ["GET", "HEAD", "POST", "OPTIONS"]
-      allowed_origins    = ["https://example.com"]
-      exposed_headers    = ["x-custom-header"]
-      max_age_in_seconds = 3600
-    }]
 
     tags = {
       Environment = "Test"
-      Project     = "Advanced Config Testing"
-      Terraform   = "true"
+      Customer    = "Contoso Corp"
+      ManagedBy   = "Terraform"
     }
   }
 
@@ -131,9 +145,20 @@ run "test_advanced_hosting" {
     source = "../../../../modules/azure/hosting"
   }
 
-  # Check a variable access to satisfy Terraform's requirement
+  # Check that the naming module outputs are used with customer name
   assert {
-    condition     = var.location == "eastus"
-    error_message = "Location should be eastus"
+    condition     = output.resource_group_name == "vip-contoso-test-rg-wus"
+    error_message = "Resource group name should include customer name"
+  }
+
+  assert {
+    condition     = output.storage_account_name == "vipcontosotestsawus"
+    error_message = "Storage account name should include normalized customer name"
+  }
+
+  # Verify subnet naming
+  assert {
+    condition     = contains(keys(output.subnet_ids), "frontend")
+    error_message = "Subnet ID for frontend should be available"
   }
 } 

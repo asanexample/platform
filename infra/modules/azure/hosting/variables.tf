@@ -4,10 +4,34 @@
  * Variables for deploying both networking and storage in a single resource group.
  */
 
-# Shared variables
-variable "resource_group_name" {
-  description = "Name of the resource group to deploy resources in"
+# Naming variables
+variable "prefix" {
+  description = "Prefix to use for resource naming (usually 'vip')"
   type        = string
+  default     = "vip"
+}
+
+variable "customer" {
+  description = "Customer name to use in resource naming (optional for shared resources)"
+  type        = string
+  default     = null
+}
+
+variable "stage" {
+  description = "Environment stage (dev, test, prod, etc.)"
+  type        = string
+}
+
+variable "region_abbv" {
+  description = "Abbreviated Azure region name (e.g., eus, wus, etc.)"
+  type        = string
+}
+
+# Resource group variables - Deprecated, maintained for backward compatibility
+variable "resource_group_name" {
+  description = "DEPRECATED: Name of the resource group is now derived from the naming module"
+  type        = string
+  default     = null
 }
 
 variable "location" {
@@ -21,10 +45,11 @@ variable "tags" {
   default     = {}
 }
 
-# Network variables
+# Network variables - Deprecated, maintained for backward compatibility
 variable "vnet_name" {
-  description = "Name of the virtual network"
+  description = "DEPRECATED: Name of the virtual network is now derived from the naming module"
   type        = string
+  default     = null
 }
 
 variable "address_space" {
@@ -47,9 +72,9 @@ variable "dns_servers" {
   default     = []
 }
 
-# Storage variables
+# Storage variables - Deprecated, maintained for backward compatibility
 variable "storage_name_components" {
-  description = "Components to auto-generate the storage account name"
+  description = "DEPRECATED: Storage account name is now derived from the naming module"
   type = object({
     prefix      = optional(string, "app")
     environment = optional(string, "dev")
@@ -57,6 +82,12 @@ variable "storage_name_components" {
     instance    = optional(string, "001")
   })
   default = {}
+}
+
+variable "storage_account_name" {
+  description = "DEPRECATED: Storage account name is now derived from the naming module"
+  type        = string
+  default     = null
 }
 
 variable "storage_account_tier" {
@@ -114,16 +145,4 @@ variable "storage_cors_rules" {
     max_age_in_seconds = number
   }))
   default = []
-}
-
-variable "networking_module_source" {
-  description = "Source path for the networking module"
-  type        = string
-  default     = "../networking"
-}
-
-variable "storage_module_source" {
-  description = "Source path for the storage module"
-  type        = string
-  default     = "../storage"
 } 

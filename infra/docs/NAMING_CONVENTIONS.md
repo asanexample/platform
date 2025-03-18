@@ -151,6 +151,44 @@ locals {
 }
 ```
 
+## Standardized Naming Implementation
+
+The platform now enforces standardized naming through the use of the naming module, which centralizes all resource naming logic:
+
+```hcl
+module "naming" {
+  source      = "../../modules/azure/naming"
+  
+  prefix      = "vip"
+  customer    = "contoso"  # Optional, omitted for shared resources
+  stage       = "dev"
+  region_abbv = "eus"
+}
+
+# Use naming module outputs for resource names
+resource "azurerm_resource_group" "example" {
+  name     = module.naming.resource_group
+  location = "East US"
+}
+
+resource "azurerm_virtual_network" "example" {
+  name                = module.naming.virtual_network
+  resource_group_name = azurerm_resource_group.example.name
+  location            = azurerm_resource_group.example.location
+  address_space       = ["10.0.0.0/16"]
+}
+
+resource "azurerm_storage_account" "example" {
+  name                     = module.naming.storage_account
+  resource_group_name      = azurerm_resource_group.example.name
+  location                 = azurerm_resource_group.example.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+}
+```
+
+All infrastructure modules use the naming module internally. For example, the hosting module automatically generates standardized resource names based on the provided prefix, customer, stage, and region abbreviation inputs.
+
 ## Reference
 
 For CIDR allocation strategy details, see [CIDR Allocation Strategy](cidr-allocation.md). 

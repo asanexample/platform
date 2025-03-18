@@ -85,12 +85,37 @@ find . -name "*.tftest.hcl" -execdir terraform test \;
 
 ## Naming Conventions
 
-Resources follow this naming pattern:
-`{prefix}-{cloud}-{resource_type}-{env}-{region}-{name}`
+Resources follow standardized naming patterns using the Azure naming module. This ensures consistency across all resources and compliance with Azure's naming restrictions.
+
+### General Pattern
+For most resources: `{prefix}-{customer}-{stage}-{resource_type}-{region_abbv}`
+
+For shared resources (no customer): `{prefix}-{stage}-{resource_type}-{region_abbv}`
 
 Examples:
-- `ctr-az-rg-dev-eastus-networking` (Azure resource group)
-- `ctr-aws-s3-prod-useast1-data` (AWS S3 bucket)
+- `vip-contoso-dev-rg-eus` (Customer-specific Azure resource group)
+- `vip-prod-vnet-wus` (Shared Azure virtual network)
+- `vipcontosodevsaeus` (Storage account with special formatting)
+
+See the [NAMING_CONVENTIONS.md](docs/NAMING_CONVENTIONS.md) document for detailed naming rules and patterns.
+
+### Using the Naming Module
+
+All infrastructure modules now use the naming module internally, which enforces standardized naming:
+
+```hcl
+module "hosting" {
+  source = "../../modules/azure/hosting"
+  
+  # Naming parameters
+  prefix      = "vip"
+  customer    = "contoso"  # Optional
+  stage       = "dev"
+  region_abbv = "eus"
+  
+  # Other parameters...
+}
+```
 
 ## Tagging Strategy
 

@@ -11,6 +11,12 @@ include "common" {
   expose = true
 }
 
+# Include storage configuration
+include "storage" {
+  path   = "${dirname(find_in_parent_folders())}/live/azure/_envcommon/storage.hcl"
+  expose = true
+}
+
 # Include region-specific network configuration
 locals {
   # Read network configuration from network.hcl in the region directory

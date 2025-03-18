@@ -6,11 +6,11 @@ locals {
   
   # Subnet configurations specific to eastus
   subnets = {
-    "az1-node-subnet" = {
+    "node" = {
       address_prefixes  = ["10.17.0.0/26"]
       service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ContainerRegistry"]
     },
-    "az1-endpoint-subnet" = {
+    "endpoint" = {
       address_prefixes  = ["10.17.0.80/28"]
       service_endpoints = ["Microsoft.Storage", "Microsoft.Sql", "Microsoft.KeyVault"]
     }
