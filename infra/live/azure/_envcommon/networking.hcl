@@ -53,6 +53,8 @@ inputs = {
   # Network Security Group Rules
   # These are the default NSG rules that will be applied to all subnets
   default_nsg_rules = {
+    # Allow all traffic between resources within the same virtual network
+    # Critical for internal communication between services and components
     allow_vnet_inbound = {
       name                       = "allow_vnet_inbound"
       priority                   = 100
@@ -64,6 +66,10 @@ inputs = {
       source_address_prefix      = "VirtualNetwork"
       destination_address_prefix = "VirtualNetwork"
     }
+    
+    # Block all other inbound traffic that isn't explicitly allowed
+    # This is a security best practice (deny-by-default)
+    # Low priority (4096) ensures it runs after all other rules
     deny_all_inbound = {
       name                       = "deny_all_inbound"
       priority                   = 4096
@@ -75,6 +81,9 @@ inputs = {
       source_address_prefix      = "*"
       destination_address_prefix = "*"
     }
+    
+    # Allow all internal traffic between resources within the same virtual network
+    # Enables services to communicate with each other within the VNet
     allow_vnet_outbound = {
       name                       = "allow_vnet_outbound"
       priority                   = 100
@@ -86,6 +95,9 @@ inputs = {
       source_address_prefix      = "VirtualNetwork"
       destination_address_prefix = "VirtualNetwork"
     }
+    
+    # Allow resources to access internet destinations
+    # Enables services to reach external APIs, package repositories, etc.
     allow_internet_outbound = {
       name                       = "allow_internet_outbound"
       priority                   = 110
@@ -97,6 +109,10 @@ inputs = {
       source_address_prefix      = "*"
       destination_address_prefix = "Internet"
     }
+    
+    # Block all other outbound traffic that isn't explicitly allowed
+    # Security boundary to prevent unauthorized egress
+    # Low priority (4096) ensures it runs after all other rules
     deny_all_outbound = {
       name                       = "deny_all_outbound"
       priority                   = 4096
