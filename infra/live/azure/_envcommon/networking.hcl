@@ -28,24 +28,28 @@ include "naming" {
 # boundaries. This is combined with a Kubernetes-optimized subnet design that divides each region's address space
 # into availability zones with specialized subnet types.
 #
-# For the complete CIDR allocation strategy documentation, see: infra/docs/cidr-allocation.md
+# For the complete CIDR allocation strategy documentation, see: infra/docs/network-topology.md
 #
-# AZURE NETWORK ADDRESS SPACE
-# 10.16.0.0/12 - Azure Infrastructure
-#   10.17.0.0/16 - Azure Dev Environment
-#     10.17.0.0/23 - Azure Dev East US
-#     10.17.2.0/23 - Azure Dev West US
-#   10.18.0.0/16 - Azure Test Environment (Reserved)
-#   10.19.0.0/16 - Azure Production Environment (Reserved)
+# MULTI-CLOUD CIDR ALLOCATION
+# - AWS Infrastructure: 10.100.0.0/16
+# - Azure Infrastructure: 10.101.0.0/16
 #
-# REGIONAL NETWORK DESIGN
-# Each region follows a 3-AZ Kubernetes-optimized design:
-# - Each Availability Zone gets a /25 CIDR block
-# - Specialized subnet types within each AZ:
-#   - Node Subnets (/26): For Kubernetes worker nodes
-#   - Load Balancer Subnets (/28): For load balancers
-#   - Endpoint Subnets (/28): For private endpoints and service connections
-#   - Transit Subnets (/29): For transit gateways or routing
+# AZURE REGION ALLOCATIONS
+# - eastus:      10.101.0.0/20
+# - eastus2:     10.101.16.0/20
+# - westus:      10.101.32.0/20
+# - westus2:     10.101.48.0/20
+# - northeurope: 10.101.64.0/20
+# - westeurope:  10.101.80.0/20
+#
+# AVAILABILITY ZONE DESIGN
+# Each region follows a 3-AZ design with specialized subnet types:
+# - Each Availability Zone gets a /24 CIDR block
+# - Four subnet types within each AZ:
+#   - Kubernetes Subnets (/24): For Kubernetes worker nodes
+#   - Services Subnets (/26): For application services
+#   - Endpoints Subnets (/27): For private endpoints and service connections
+#   - Transit Subnets (/28): For transit gateways and network connections
 # ---------------------------------------------------------------------------------------------------------------------
 
 # Define common input variables for all network deployments

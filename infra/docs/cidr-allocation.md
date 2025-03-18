@@ -1,6 +1,8 @@
-# Hierarchical CIDR Allocation Strategy
+# Hierarchical CIDR Allocation Strategy [DEPRECATED]
 
-This document outlines our hierarchical CIDR allocation strategy for multi-cloud environments. The strategy combines hierarchical CIDR allocation for clear organizational boundaries with Kubernetes-optimized subnet designs for operational efficiency.
+> **IMPORTANT: This document is deprecated.** Please refer to the current network topology documentation at [network-topology.md](./network-topology.md).
+
+This document outlines our previous hierarchical CIDR allocation strategy for multi-cloud environments. The strategy combines hierarchical CIDR allocation for clear organizational boundaries with Kubernetes-optimized subnet designs for operational efficiency.
 
 ## Global Address Space Hierarchy
 
