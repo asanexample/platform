@@ -146,11 +146,12 @@ inputs = {
   default_nodepool_os_disk_size_gb = 128
   default_nodepool_node_labels = {
     "role" = "system"
-    "kubernetes.azure.com/scalesetpriority" = "regular"
+    "node-priority" = "regular"
   }
   
   # Tags
   tags = merge(local.tags, {
-    "network.cilium.io/managed-by" = "cilium"
+    "network-cilium-managed-by" = "cilium"
+    "cilium-version" = "1.14.2"
   })
 } 

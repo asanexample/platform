@@ -61,15 +61,23 @@ inputs = {
   region_abbv = local.region_abbv
   
   # AKS Reference
-  aks_cluster_id = "/subscriptions/${get_env("ARM_SUBSCRIPTION_ID", "00000000-0000-0000-0000-000000000000")}/resourceGroups/${dependency.aks_core.outputs.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${dependency.aks_core.outputs.name}"
+  aks_cluster_id = dependency.aks_core.outputs.id
   
   # App Node Pool Configuration
   app_node_pool_enabled = true
   app_node_pool_name = "apps"
   app_node_pool_vm_size = "Standard_D4s_v4"
   app_node_pool_node_count = 2
-  app_node_pool_availability_zones = ["1", "2", "3"]
-  app_node_pool_max_pods = 30
+  # Removed availability zones since westus region doesn't support them
+  app_node_pool_availability_zones = []
+  
+  # Set max_pods to a higher value since Cilium doesn't use the Azure CNI per-node IP allocation
+  # Cilium can support more pods per node as it uses its own IPAM
+  app_node_pool_max_pods = 110
+  
+  # Required for updating certain node pool properties without recreation
+  temporary_name_for_rotation = "tempapps"
+  
   app_node_pool_os_disk_size_gb = 128
   app_node_pool_os_disk_type = "Managed"
   app_node_pool_enable_auto_scaling = true
@@ -80,9 +88,15 @@ inputs = {
     "nodepool" = "apps"
     "app" = "true"
     "workload" = "general"
+    "node-priority" = "regular"
   }
+  
+  # No taints by default for the app node pool
   app_node_pool_node_taints = []
   
   # Tags
-  tags = local.tags
+  tags = merge(local.tags, {
+    "network-cilium-managed-by" = "cilium"
+    "cilium-version" = "1.14.2"
+  })
 } 

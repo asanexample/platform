@@ -31,6 +31,9 @@ resource "azurerm_kubernetes_cluster_node_pool" "app_node_pool" {
   node_labels     = var.app_node_pool_node_labels
   node_taints     = var.app_node_pool_node_taints
 
+  # Required for updating certain node pool properties without recreation
+  temporary_name_for_rotation = var.temporary_name_for_rotation
+
   # Auto-scaling configuration
   auto_scaling_enabled = var.app_node_pool_enable_auto_scaling
   min_count           = var.app_node_pool_enable_auto_scaling ? var.app_node_pool_min_count : null

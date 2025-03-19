@@ -92,13 +92,12 @@ variable "app_node_pool_availability_zones" {
 }
 
 variable "app_node_pool_max_pods" {
-  description = "Maximum number of pods that can run on a node in the application node pool"
+  description = "The maximum number of pods per node for the app node pool"
   type        = number
-  default     = 30
-
+  default     = 110  # Higher value for Cilium CNI (not constrained by Azure CNI limits)
   validation {
-    condition     = var.app_node_pool_max_pods >= 10 && var.app_node_pool_max_pods <= 250
-    error_message = "Maximum pods must be between 10 and 250."
+    condition     = var.app_node_pool_max_pods >= 30 && var.app_node_pool_max_pods <= 250
+    error_message = "The app node pool maximum pods must be between 30 and 250."
   }
 }
 
@@ -173,9 +172,15 @@ variable "app_node_pool_node_labels" {
 }
 
 variable "app_node_pool_node_taints" {
-  description = "Taints to apply to nodes in the application node pool"
+  description = "A list of Kubernetes taints which should be applied to nodes in the application node pool"
   type        = list(string)
   default     = []
+}
+
+variable "temporary_name_for_rotation" {
+  description = "Specifies the name of the temporary node pool used to cycle the node pool for updates"
+  type        = string
+  default     = null
 }
 
 # Tagging
