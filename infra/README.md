@@ -78,10 +78,25 @@ This repository uses Terraform's native testing framework for validating modules
 cd infra/modules/azure/networking
 terraform test
 
-# Run all tests
-cd infra
-find . -name "*.tftest.hcl" -execdir terraform test \;
+# Run all tests using the provided script
+./run_all_terraform_tests.sh
 ```
+
+The test script automatically runs tests for all Azure modules and provides a summary of results. Tests are designed to validate module configurations without creating actual resources.
+
+## Available Modules
+
+The following reusable modules are available:
+
+### Azure Modules
+
+- **Networking**: Virtual network, subnets, NSGs, and related networking resources
+- **Storage Account**: Azure Storage Accounts with configurable settings
+- **Storage Container**: Blob containers with access control and metadata
+- **Key Vault**: Azure Key Vault with RBAC/access policies, network rules, and private endpoints
+- **Hosting**: Combined networking and storage setup for application hosting
+- **Naming**: Standardized resource naming following Azure best practices
+- **Terraform State**: Backend storage for Terraform state files
 
 ## Naming Conventions
 

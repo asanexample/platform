@@ -10,6 +10,7 @@ This directory contains Terraform tests for the Azure infrastructure modules. Th
 | Storage Account | ✅ PASS | Storage account creation with various replication types and container configurations |
 | Storage Container | ✅ PASS | Container creation with both basic and advanced configurations including metadata |
 | Hosting | ✅ PASS | Combined networking and storage setup for application hosting |
+| Key Vault | ✅ PASS | Key vault creation with RBAC, access policies, network rules, and private endpoints |
 | Terraform State | ❌ REMOVED | Tests removed due to persistent provider configuration issues |
 
 ## Running Tests
@@ -21,6 +22,15 @@ cd modules/azure/<module-name>
 terraform init
 terraform test
 ```
+
+Alternatively, you can use the test runner script to run all tests:
+
+```bash
+# From the project root
+./run_all_terraform_tests.sh
+```
+
+This script will automatically run all tests in each test directory and provide a summary of results.
 
 ### Authentication
 
@@ -91,6 +101,14 @@ Tests basic storage container creation with various access types:
 - Container public access
 
 Tests also cover container creation with metadata and validate that the metadata is set correctly.
+
+### Key Vault Module
+Tests key vault creation with various configurations including:
+- Basic key vault with default settings
+- Key vault with access policies (RBAC disabled)
+- Key vault with network ACLs and IP restrictions
+- Key vault with auto-generated name based on naming conventions
+- Key vault with private endpoint and DNS integration
 
 ## Known Issues and Fixes
 

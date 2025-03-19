@@ -25,6 +25,7 @@ platform/
 │   │       ├── networking/         # Azure networking module
 │   │       ├── storage/            # Azure storage module
 │   │       ├── storage_container/  # Azure container module
+│   │       ├── key_vault/          # Azure Key Vault module
 │   │       ├── terraform_state/    # Azure Terraform state module
 │   │       └── hosting/            # Azure hosting module (networking + storage)
 │   ├── tests/               # Test configurations
@@ -64,12 +65,18 @@ The following modules have been implemented and tested:
    - Supports container-level access policies and metadata
    - Configures appropriate permissions for containers
 
-4. **Azure Terraform State Module**
+4. **Azure Key Vault Module**
+   - Creates and configures Azure Key Vault with flexible options
+   - Supports both RBAC and access policy authorization models
+   - Configurable network rules and private endpoint integration
+   - Implements security best practices like purge protection and soft delete
+
+5. **Azure Terraform State Module**
    - Specialized storage configuration optimized for Terraform state
    - Enforces best practices like versioning and proper retention policies
    - Configures secure access controls for state management
 
-5. **Azure Hosting Module**
+6. **Azure Hosting Module**
    - Combines networking and storage in a single module
    - Configures appropriate service endpoints for secure communication
    - Supports public and private container access with CORS configuration
@@ -117,10 +124,11 @@ To run tests for a module:
 cd infra/modules/azure/networking
 terraform test
 
-# Run all tests for all modules
-cd infra/tests
-terraform test
+# Run all tests for all modules using the provided script
+./run_all_terraform_tests.sh
 ```
+
+The test script will automatically run tests for all Azure modules and provide a summary of results.
 
 ## Contributing
 
