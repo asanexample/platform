@@ -1,121 +1,50 @@
-# Infrastructure Documentation
+# VIP Platform Documentation
 
-Welcome to the infrastructure documentation for our multi-cloud platform. This directory contains comprehensive documentation covering various aspects of our infrastructure design, deployment, and management.
+Welcome to the VIP Platform documentation. This comprehensive documentation covers all aspects of the multi-cloud infrastructure platform, including design principles, architectural patterns, implementation details, and operational guidance.
 
-## Documentation Index
+## Table of Contents
 
-| Document | Description |
-|----------|-------------|
-| [Getting Started](getting-started.md) | Guide for setting up local development environment |
-| [Architecture Overview](architecture.md) | High-level architecture and design decisions |
-| [AKS Configuration](aks-configuration.md) | AKS cluster setup and configurations |
-| [Cilium Integration](cilium-integration.md) | Guide for Cilium CNI integration with AKS and network configuration |
-| [Cilium Installation](cilium-installation.md) | Detailed instructions for installing and configuring Cilium CNI |
-| [CIDR Allocation](cidr-allocation.md) | Strategy for IP address allocation across cloud providers, environments, and regions |
-| [Multi-Region Deployment](multi-region-deployment.md) | Guide for deploying infrastructure across multiple regions for high availability and disaster recovery |
-| [Network CIDR Allocations](network-cidr-allocations.md) | Detailed breakdown of network CIDR allocations for each component |
-| [Network Topology](network-topology.md) | Overview of the network architecture, including VNets, subnets, and connectivity |
-| [Naming Conventions](naming-conventions.md) | Resource naming standards |
-| [Networking](networking.md) | Network architecture and configuration |
-| [Security](security.md) | Security practices and configurations |
-| [CI/CD Pipeline](cicd.md) | Continuous integration and deployment workflows |
-| [Monitoring](monitoring.md) | Monitoring and alerting configurations |
-| [Cost Management](cost-management.md) | Guidelines for managing cloud costs |
-| [Disaster Recovery](disaster-recovery.md) | Disaster recovery strategies and procedures |
+### Project Overview
+1. [Documentation Guide](00-documentation-guide.md)
+2. [Project Introduction](01-introduction.md)
+3. [Architecture Overview](02-architecture-overview.md)
 
-## Quick Start
+### Core Concepts
+4. [Infrastructure as Code Approach](03-infrastructure-as-code.md)
+5. [Multi-Cloud Strategy](04-multi-cloud-strategy.md)
+6. [Environment Management](05-environment-management.md)
 
-If you're new to this documentation, we recommend starting with:
+### Network Architecture
+7. [CIDR Allocation Strategy](06-cidr-allocation.md)
+8. [Network Topology](07-network-topology.md)
+9. [Kubernetes Network Design](08-kubernetes-network-design.md)
 
-1. [Getting Started](getting-started.md) - Initial setup requirements
-2. [Architecture Overview](architecture.md) - Understand the design
-3. [AKS Configuration](aks-configuration.md) - Learn AKS setup
-4. [Cilium Integration](cilium-integration.md) - Understand CNI approach
-5. [Networking](networking.md) - Network configuration
+### Security and Compliance
+10. [Security Architecture](09-security-architecture.md)
+11. [Compliance Framework](10-compliance-framework.md)
 
-## Infrastructure Components
+### Implementation Patterns
+12. [Naming Conventions](naming-conventions.md)
+13. [Tagging Strategy](11-tagging-strategy.md)
+14. [Module Design Principles](12-module-design.md)
 
-The platform infrastructure consists of the following key components:
+### Operations
+15. [Deployment Workflows](13-deployment-workflows.md)
+16. [Testing Strategy](14-testing-strategy.md)
+17. [Disaster Recovery](15-disaster-recovery.md)
 
-- **Core Infrastructure**
-  - Resource Groups
-  - Virtual Networks
-  - Subnets
-  - Network Security Groups
-  - Private DNS Zones
+### Reference
+18. [Available Modules](16-available-modules.md)
+19. [Troubleshooting Guide](17-troubleshooting.md)
 
-- **Compute Resources**
-  - AKS Clusters
-    - Node Pools
-    - Pod Identity
-    - CNI (Cilium)
-  - Azure Container Registry
-  - Virtual Machines (jumpboxes/bastion hosts)
+## Getting Started
 
-- **Storage**
-  - Azure Storage Accounts
-  - Azure Managed Disks
-  - Azure File Shares
+If you're new to the VIP Platform, we recommend starting with the [Project Introduction](01-introduction.md) and then proceeding to the [Architecture Overview](02-architecture-overview.md). These documents will give you a high-level understanding of the platform before diving into specific details.
 
-- **Identity and Access**
-  - Azure Active Directory
-  - Managed Identities
-  - RBAC Assignments
+## Contributing
 
-- **Networking**
-  - Load Balancers
-  - Application Gateway
-  - Network Security Groups
-  - Private Endpoints
-  - Virtual Network Peering
+To contribute to this documentation, please follow the guidelines in the [Documentation Guide](00-documentation-guide.md). All diagrams should be created according to the standards outlined in the [Diagram Guidelines](diagrams/README.md).
 
-- **Monitoring and Logging**
-  - Azure Monitor
-  - Log Analytics Workspace
-  - Application Insights
+## Support
 
-## Infrastructure as Code
-
-All infrastructure is managed using:
-
-- **Terraform**: For defining infrastructure components
-- **Terragrunt**: For managing Terraform configurations across environments
-- **Azure DevOps**: For CI/CD pipelines to deploy infrastructure
-
-## Common Tasks
-
-Here are quick links to documentation for common infrastructure tasks:
-
-- [Adding a new AKS node pool](aks-configuration.md#aks-node-pools-module)
-- [Configuring network security](network-topology.md#network-security)
-- [Setting up multi-region connectivity](multi-region-deployment.md#inter-region-connectivity)
-- [Implementing identity management](security.md#identity-and-access-management)
-- [Configuring Cilium](cilium-installation.md)
-- [Setting up monitoring](monitoring.md)
-- [Applying security patches](security.md#patching)
-
-## Contributing to Documentation
-
-When updating or adding documentation:
-
-1. Follow the established formatting and style
-2. Update the table of contents as needed
-3. Keep diagrams up to date with actual infrastructure
-4. Cross-reference related documentation
-5. Ensure all CIDR allocations are properly recorded
-
-## Additional Resources
-
-- [Root README](../../README.md) - The main project README
-- [NAMING_CONVENTIONS.md](../../NAMING_CONVENTIONS.md) - Global naming convention documentation
-- [IMPLEMENTATION.md](../../IMPLEMENTATION.md) - Implementation details and design decisions
-
-## Terraform Standards
-
-This infrastructure uses:
-- Terraform >= 1.0.0
-- Terragrunt >= 0.36.0
-- Terraform Registry modules where possible
-- Custom modules for organization-specific needs
-
-For detailed guidelines on Terraform best practices, see [Terraform Standards](terraform-standards.md). 
+If you have questions or need assistance, please contact the Platform Team. 

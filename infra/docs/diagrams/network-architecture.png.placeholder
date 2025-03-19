@@ -1,0 +1,12 @@
+This file is a placeholder for the network-architecture.png diagram.
+
+When creating this diagram, please follow these guidelines:
+1. The diagram should illustrate the comprehensive network architecture of the VIP Platform
+2. Include all VPCs/VNets, subnets, and their CIDR allocations
+3. Show connectivity between networks, including peering, transit gateways, and VPN connections
+4. Illustrate security groups, NACLs, and other network security controls
+5. Use the standard color scheme and symbols from our diagram guidelines
+6. Export as PNG with a resolution of at least 1200x800
+7. Include a legend explaining all symbols used
+
+Please replace this placeholder with the actual diagram when complete. 

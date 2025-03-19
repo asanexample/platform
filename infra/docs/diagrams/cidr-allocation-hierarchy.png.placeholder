@@ -1,0 +1,12 @@
+This file is a placeholder for the cidr-allocation-hierarchy.png diagram.
+
+When creating this diagram, please follow these guidelines:
+1. The diagram should illustrate the CIDR allocation hierarchy for the VIP Platform
+2. Show the top-level allocation and how it breaks down into regions, environments, and services
+3. Include actual CIDR ranges for each level of the hierarchy
+4. Use a tree or hierarchical structure to clearly show the parent-child relationships
+5. Use the standard color scheme and symbols from our diagram guidelines
+6. Export as PNG with a resolution of at least 1200x800
+7. Include a legend explaining the allocation strategy
+
+Please replace this placeholder with the actual diagram when complete. 
