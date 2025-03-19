@@ -306,4 +306,76 @@ Please follow these guidelines when contributing:
 
 ## License
 
-This project is proprietary and confidential. 
+This project is proprietary and confidential.
+
+## Makefile Usage
+
+A Makefile is provided at the root of the repository to simplify common operations:
+
+### Basic Usage
+
+```bash
+# Show all available commands
+make help
+
+# Initialize all modules in Azure dev westus region (default)
+make init
+
+# Plan all modules in Azure dev westus region (default)
+make plan
+
+# Apply all modules in Azure dev westus region (default)
+make apply
+```
+
+### Working with Different Environments, Regions, and Clouds
+
+```bash
+# Initialize modules in a specific environment/region/cloud
+make init ENV=prod REGION=eastus CLOUD=azure
+
+# Plan a specific environment
+make plan ENV=staging
+
+# Apply changes to a specific cloud/environment/region
+make apply CLOUD=aws ENV=dev REGION=us-east-1
+```
+
+### Working with Specific Modules
+
+```bash
+# Initialize a specific module
+make init-module MODULE=networking
+
+# Plan a specific module
+make plan-module MODULE=aks
+
+# Apply a specific module
+make apply-module MODULE=keyvault
+```
+
+### Cleaning Up
+
+```bash
+# Clean Terragrunt cache for current environment/region
+make clean
+
+# Clean all Terragrunt cache
+make clean-all
+```
+
+### Listing Available Options
+
+```bash
+# List available cloud providers
+make list-clouds
+
+# List available environments for the current cloud
+make list-envs
+
+# List available regions for the current cloud/environment
+make list-regions
+
+# List available modules for the current cloud/environment/region
+make list-modules
+``` 
