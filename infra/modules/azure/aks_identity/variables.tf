@@ -21,9 +21,9 @@ variable "prefix" {
 variable "customer" {
   description = "The customer identifier"
   type        = string
-  default     = "shared"
+  default     = null
   validation {
-    condition     = length(var.customer) <= 15
+    condition     = var.customer == null ? true : length(var.customer) <= 15
     error_message = "The customer identifier can be at most 15 characters."
   }
 }
