@@ -94,7 +94,7 @@ The following reusable modules are available:
 - **Storage Account**: Azure Storage Accounts with configurable settings
 - **Storage Container**: Blob containers with access control and metadata
 - **Key Vault**: Azure Key Vault with RBAC/access policies, network rules, and private endpoints
-- **Hosting**: Combined networking and storage setup for application hosting
+- **Hosting**: Combined networking, storage, and key vault setup for complete application hosting
 - **Naming**: Standardized resource naming following Azure best practices
 - **Terraform State**: Backend storage for Terraform state files
 

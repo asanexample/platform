@@ -1,14 +1,15 @@
 # Azure Hosting Module
 
-This Terraform module deploys both networking and storage resources within a single Azure resource group, providing a complete hosting infrastructure for applications. It integrates these components to ensure secure network access to storage resources.
+This Terraform module deploys networking, storage, and key vault resources within a single Azure resource group, providing a complete hosting infrastructure for applications. It integrates these components to ensure secure network access to resources.
 
 ## Features
 
 - **Standardized Naming**: Utilizes the naming module for consistent resource naming
-- **Consolidated Infrastructure**: Deploy network and storage resources in a single resource group
-- **Integrated Security**: Configure network access rules between VNet and storage
-- **Service Endpoints**: Automatically configure service endpoints for secure storage access
+- **Consolidated Infrastructure**: Deploy network, storage, and key vault resources in a single resource group
+- **Integrated Security**: Configure network access rules between VNet, storage, and key vault
+- **Service Endpoints**: Automatically configure service endpoints for secure access to PaaS services
 - **Public/Private Access Control**: Flexible configuration of public and private storage containers
+- **Secure Secret Management**: Key Vault integration with network security rules and access controls
 - **CORS Support**: Optional CORS configuration for web applications
 - **Customer-specific Resources**: Support for both shared and customer-specific resources
 
@@ -32,11 +33,11 @@ module "hosting" {
   subnets = {
     "app" = {
       address_prefixes  = ["10.0.1.0/24"]
-      service_endpoints = ["Microsoft.Storage"]
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault"]
     },
     "data" = {
       address_prefixes  = ["10.0.2.0/24"]
-      service_endpoints = ["Microsoft.Storage"]
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault"]
     }
   }
   
@@ -61,6 +62,12 @@ module "hosting" {
     }
   }
   storage_allow_public = true
+  
+  # Key Vault configuration
+  create_key_vault                 = true
+  key_vault_enable_rbac            = true
+  key_vault_allowed_subnets        = ["app"]
+  key_vault_private_endpoint_subnet = "data"
   
   tags = {
     Environment = "Development"
@@ -109,11 +116,11 @@ inputs = {
   subnets = {
     "app" = {
       address_prefixes  = ["10.0.1.0/24"]
-      service_endpoints = ["Microsoft.Storage"]
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault"]
     },
     "data" = {
       address_prefixes  = ["10.0.2.0/24"]
-      service_endpoints = ["Microsoft.Storage"]
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault"]
     }
   }
   
@@ -140,6 +147,12 @@ inputs = {
   
   # Allow public access for the public container
   storage_allow_public = true
+  
+  # Key Vault configuration
+  create_key_vault                 = true
+  key_vault_enable_rbac            = true
+  key_vault_allowed_subnets        = ["app"]
+  key_vault_private_endpoint_subnet = "data"
   
   tags = {
     Environment = local.env_vars.locals.environment
@@ -173,6 +186,17 @@ inputs = {
 | vnet_name | *DEPRECATED*: Name is now derived from the naming module | `string` | `null` | no |
 | storage_name_components | *DEPRECATED*: Storage account name is now derived from the naming module | `object` | `{}` | no |
 | storage_account_name | *DEPRECATED*: Storage account name is now derived from the naming module | `string` | `null` | no |
+| key_vault_enable_rbac | Whether to enable RBAC authorization for the key vault | `bool` | `true` | no |
+| key_vault_enable_disk_encryption | Whether to enable key vault for disk encryption | `bool` | `false` | no |
+| key_vault_purge_protection | Whether to enable purge protection for the key vault | `bool` | `true` | no |
+| key_vault_retention_days | Soft delete retention days for the key vault | `number` | `90` | no |
+| key_vault_sku | SKU name for the key vault | `string` | `"standard"` | no |
+| key_vault_public_access | Whether to enable public network access to the key vault | `bool` | `false` | no |
+| key_vault_allowed_subnets | List of subnet names that can access the key vault | `list(string)` | `null` | no |
+| key_vault_access_policies | Map of access policies for the key vault | `map(object)` | `{}` | no |
+| key_vault_private_endpoint_subnet | Subnet name for the key vault private endpoint | `string` | `""` | no |
+| key_vault_private_dns_zone_ids | List of private DNS zone IDs for the key vault private endpoint | `list(string)` | `[]` | no |
+| create_key_vault | Whether to create a key vault | `bool` | `false` | no |
 
 ## Outputs
 
@@ -188,6 +212,9 @@ inputs = {
 | primary_blob_endpoint | The primary blob endpoint URL |
 | containers | Map of created containers with their properties |
 | naming | Resource name outputs from the naming module |
+| key_vault_id | The ID of the key vault (if created) |
+| key_vault_name | The name of the key vault (if created) |
+| key_vault_uri | The URI of the key vault (if created) |
 
 ## Naming Module Integration
 
@@ -208,6 +235,7 @@ This module combines and integrates these individual modules:
 - [naming](../naming): Provides standardized resource naming
 - [networking](../networking): Creates the virtual network and subnets
 - [storage_account](../storage_account): Creates the storage account with containers
+- [key_vault](../key_vault): Creates a secure key vault for secret management
 
 ## License
 
