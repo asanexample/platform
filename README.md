@@ -155,7 +155,13 @@ Module tests are organized in the `infra/tests/modules/` directory, separate fro
 Run all tests with:
 
 ```bash
-./run_all_terraform_tests.sh
+make test
+```
+
+To run tests for a specific module:
+
+```bash
+make test-module MODULE=networking
 ```
 
 ## Documentation

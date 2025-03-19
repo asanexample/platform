@@ -39,6 +39,11 @@ init: ## Initialize all modules
 	@echo "Initializing $(CLOUD)/$(ENV)/$(REGION)..."
 	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all init
 
+.PHONY: init-upgrade
+init-upgrade: ## Initialize all modules and upgrade dependencies
+	@echo "Initializing $(CLOUD)/$(ENV)/$(REGION) with dependency upgrades..."
+	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all init -upgrade
+
 .PHONY: init-module
 init-module: ## Initialize a specific module
 	@if [ "$(MODULE)" = "all" ]; then \
@@ -47,6 +52,15 @@ init-module: ## Initialize a specific module
 	fi
 	@echo "Initializing module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION)..."
 	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt init
+
+.PHONY: init-upgrade-module
+init-upgrade-module: ## Initialize a specific module and upgrade dependencies
+	@if [ "$(MODULE)" = "all" ]; then \
+		echo "Error: Please specify a module with MODULE=<module-name>"; \
+		exit 1; \
+	fi
+	@echo "Initializing module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION) with dependency upgrades..."
+	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt init -upgrade
 
 .PHONY: plan
 plan: ## Plan all modules
@@ -222,4 +236,50 @@ apply-plan-module: ## Apply a plan file for a specific module
 		exit 1; \
 	fi
 	@echo "Applying plan file for module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION)..."
-	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt apply tfplan 
+	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt apply tfplan
+
+# Testing commands
+.PHONY: test
+test: ## Run all Terraform tests
+	@echo "Running all Terraform tests..."
+	@ALL_PASSED=true; \
+	TEST_DIRS=( \
+		"infra/tests/modules/azure/key_vault" \
+		"infra/tests/modules/azure/naming" \
+		"infra/tests/modules/azure/networking" \
+		"infra/tests/modules/azure/storage_account" \
+		"infra/tests/modules/azure/storage_container" \
+		"infra/tests/modules/azure/aks_core" \
+		"infra/tests/modules/azure/aks_identity" \
+		"infra/tests/modules/azure/aks_node_pools" \
+	); \
+	for dir in "$${TEST_DIRS[@]}"; do \
+		if [ -d "$$dir" ]; then \
+			echo "=== Running tests in $$dir ==="; \
+			(cd "$$dir" && terraform init -input=false && terraform test) || { ALL_PASSED=false; }; \
+		else \
+			echo "⚠️ Directory $$dir does not exist, skipping"; \
+		fi; \
+	done; \
+	echo "=== Test Results Summary ==="; \
+	if [ "$$ALL_PASSED" = true ]; then \
+		echo "✅ All tests passed"; \
+	else \
+		echo "❌ Some tests failed"; \
+		exit 1; \
+	fi
+
+.PHONY: test-module
+test-module: ## Run tests for a specific module
+	@if [ "$(MODULE)" = "all" ]; then \
+		echo "Error: Please specify a module with MODULE=<module-name>"; \
+		exit 1; \
+	fi
+	@TEST_DIR="infra/tests/modules/azure/$(MODULE)"; \
+	if [ -d "$$TEST_DIR" ]; then \
+		echo "=== Running tests in $$TEST_DIR ==="; \
+		cd "$$TEST_DIR" && terraform init -input=false && terraform test; \
+	else \
+		echo "Error: Test directory $$TEST_DIR does not exist"; \
+		exit 1; \
+	fi 

@@ -74,15 +74,14 @@ terragrunt run-all apply
 This repository uses Terraform's native testing framework for validating modules:
 
 ```bash
-# Test a specific module
-cd infra/modules/azure/networking
-terraform test
+# Run all tests
+make test
 
-# Run all tests using the provided script
-./run_all_terraform_tests.sh
+# Test a specific module
+make test-module MODULE=networking
 ```
 
-The test script automatically runs tests for all Azure modules and provides a summary of results. Tests are designed to validate module configurations without creating actual resources.
+The testing targets in the Makefile run tests for all Azure modules and provide a summary of results. Tests are designed to validate module configurations without creating actual resources.
 
 ## Available Modules
 

@@ -15,22 +15,17 @@ This directory contains Terraform tests for the Azure infrastructure modules. Th
 
 ## Running Tests
 
-To run the tests, you need to have Terraform installed and be authenticated with Azure. You can run the tests from the command line:
+To run the tests, you need to have Terraform installed and be authenticated with Azure. You can run the tests using the Makefile:
 
 ```bash
-cd modules/azure/<module-name>
-terraform init
-terraform test
+# Run all tests
+make test
+
+# Test a specific module
+make test-module MODULE=<module-name>
 ```
 
-Alternatively, you can use the test runner script to run all tests:
-
-```bash
-# From the project root
-./run_all_terraform_tests.sh
-```
-
-This script will automatically run all tests in each test directory and provide a summary of results.
+These Make targets will automatically run all tests in each test directory and provide a summary of results.
 
 ### Authentication
 
@@ -63,7 +58,7 @@ Our tests generally follow these patterns:
 ## Module-Specific Test Details
 
 ### Networking Module
-Tests basic VNET and subnet creation with different configurations including:
+Tests basic VNet and subnet creation with different configurations including:
 - Custom address spaces
 - Multiple subnet configurations
 - Security group rules
