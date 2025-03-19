@@ -50,7 +50,7 @@ dependency "networking" {
   # Mock outputs for plan and validation
   mock_outputs = {
     subnet_ids = {
-      "az1-endpoint-subnet" = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet/subnets/az1-endpoint-subnet"
+      "az1-endpoints" = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet/subnets/az1-endpoints"
     }
   }
 }
@@ -73,7 +73,7 @@ inputs = {
     default_action = "Deny"
     bypass = ["AzureServices"]
     virtual_network_subnet_ids = [
-      dependency.networking.outputs.subnet_ids["az1-endpoint-subnet"]
+      dependency.networking.outputs.subnet_ids["az1-endpoints"]
     ]
   }
   

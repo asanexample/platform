@@ -49,11 +49,12 @@ dependency "networking" {
   
   # Mock outputs for plan and validation
   mock_outputs = {
+    vnet_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet"
+    vnet_name = "mock-vnet"
     subnet_ids = {
-      "az1-node-subnet" = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet/subnets/az1-node-subnet"
+      "az1-kubernetes" = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet/subnets/az1-kubernetes"
     }
-    aks_private_dns_zone_id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.Network/privateDnsZones/privatelink.westus.azmk8s.io"
-    aks_nsg_id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.Network/networkSecurityGroups/mock-nsg"
+    aks_private_dns_zone_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/privateDnsZones/privatelink.westus.azmk8s.io"
   }
 }
 
@@ -62,9 +63,7 @@ dependency "aks_identity" {
   
   # Mock outputs for plan and validation
   mock_outputs = {
-    id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mock-identity"
-    principal_id = "mock-principal-id"
-    client_id = "mock-client-id"
+    aks_identity_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mock-identity"
   }
 }
 
@@ -102,7 +101,7 @@ inputs = {
   
   # Identity configuration - use the user-assigned identity
   identity_type = "UserAssigned"
-  user_assigned_identity_id = dependency.aks_identity.outputs.id
+  user_assigned_identity_id = dependency.aks_identity.outputs.aks_identity_id
   
   # Network profile configuration
   network_plugin = "azure"
@@ -111,7 +110,7 @@ inputs = {
   service_cidr = "10.0.0.0/16"
   dns_service_ip = "10.0.0.10"
   docker_bridge_cidr = "172.17.0.1/16"
-  subnet_id = dependency.networking.outputs.subnet_ids["az1-node-subnet"]
+  subnet_id = dependency.networking.outputs.subnet_ids["az1-kubernetes"]
   
   # Private cluster configuration
   private_cluster_enabled = true
