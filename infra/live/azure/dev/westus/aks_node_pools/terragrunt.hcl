@@ -39,7 +39,8 @@ dependency "aks_core" {
   
   # Mock outputs for plan and validation
   mock_outputs = {
-    id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.ContainerService/managedClusters/mock-aks"
+    name = "mock-aks"
+    resource_group_name = "mock-rg"
   }
 }
 
@@ -50,13 +51,6 @@ dependency "aks_identity" {
   }
 }
 
-dependency "aks_networking" {
-  config_path = "../aks_networking"
-  mock_outputs = {
-    private_dns_zone_id = null
-    network_security_group_id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.Network/networkSecurityGroups/mock-nsg"
-  }
-}
 
 # Specify inputs specific to this module
 inputs = {
@@ -67,7 +61,7 @@ inputs = {
   region_abbv = local.region_abbv
   
   # AKS Reference
-  aks_cluster_id = dependency.aks_core.outputs.id
+  aks_cluster_id = "/subscriptions/${get_env("ARM_SUBSCRIPTION_ID", "00000000-0000-0000-0000-000000000000")}/resourceGroups/${dependency.aks_core.outputs.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${dependency.aks_core.outputs.name}"
   
   # App Node Pool Configuration
   app_node_pool_enabled = true
