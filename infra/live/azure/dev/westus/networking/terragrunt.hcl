@@ -59,42 +59,65 @@ inputs = {
     # AZ1 subnets
     "az1-node-subnet" = {
       address_prefixes = ["10.9.0.0/20"]
+      service_endpoints = []
     }
     "az1-pod-subnet" = {
       address_prefixes = ["10.9.16.0/20"]
+      service_endpoints = []
     }
     "az1-endpoint-subnet" = {
       address_prefixes = ["10.9.32.0/24"]
+      service_endpoints = [
+        "Microsoft.KeyVault",
+        "Microsoft.Storage",
+        "Microsoft.Sql"
+      ]
     }
     
     # AZ2 subnets
     "az2-node-subnet" = {
       address_prefixes = ["10.9.64.0/20"]
+      service_endpoints = []
     }
     "az2-pod-subnet" = {
       address_prefixes = ["10.9.80.0/20"]
+      service_endpoints = []
     }
     "az2-endpoint-subnet" = {
       address_prefixes = ["10.9.96.0/24"]
+      service_endpoints = [
+        "Microsoft.KeyVault", 
+        "Microsoft.Storage",
+        "Microsoft.Sql"
+      ]
     }
     
     # AZ3 subnets
     "az3-node-subnet" = {
       address_prefixes = ["10.9.128.0/20"]
+      service_endpoints = []
     }
     "az3-pod-subnet" = {
       address_prefixes = ["10.9.144.0/20"]
+      service_endpoints = []
     }
     "az3-endpoint-subnet" = {
       address_prefixes = ["10.9.160.0/24"]
+      service_endpoints = [
+        "Microsoft.KeyVault",
+        "Microsoft.Storage", 
+        "Microsoft.Sql"
+      ]
     }
     
     # Shared subnets
     "gateway-subnet" = {
       address_prefixes = ["10.9.192.0/24"]
+      service_endpoints = []
     }
     "bastion-subnet" = {
       address_prefixes = ["10.9.193.0/24"]
+      service_endpoints = []
     }
   }
   

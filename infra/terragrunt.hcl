@@ -2,7 +2,7 @@
 // This file defines the global Terragrunt configuration that applies to all modules
 
 // Define remote state configuration using Azure Blob Storage
-// Disabled for initial testing - using local state
+// THIS IS COMMENTED OUT - WILL BE USED LATER WHEN MIGRATING TO AZURE REMOTE STATE
 /*
 remote_state {
   backend = "azurerm"
@@ -22,7 +22,12 @@ remote_state {
 }
 */
 
-// Use local backend for testing
+// CURRENTLY USING LOCAL STATE FOR DEVELOPMENT
+// To migrate to Azure remote state later:
+// 1. Create the Azure storage account and container
+// 2. Uncomment the Azure remote_state block above
+// 3. Comment out this local state block
+// 4. Run 'terragrunt init' and answer 'yes' to migrate state
 remote_state {
   backend = "local"
   
@@ -44,45 +49,34 @@ generate "providers" {
 terraform {
   required_version = ">= 1.6.0"
   required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
     azurerm = {
       source  = "hashicorp/azurerm"
       version = "4.23.0"
     }
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
     google = {
       source  = "hashicorp/google"
-      version = "~> 5.0"
+      version = "~> 5.45.0"
     }
   }
 }
 
 provider "azurerm" {
   features {}
-  
-  subscription_id = "${local.azure_subscription_id}"
-  tenant_id       = "${local.azure_tenant_id}"
-  
+  subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
   use_cli = true
 }
 
 provider "aws" {
-  region = "${local.aws_region}"
-  
-  default_tags {
-    tags = {
-      Environment = "${local.environment}"
-      ManagedBy   = "Terragrunt"
-      Project     = "Multi-Cloud Infrastructure"
-    }
-  }
+  region = "us-east-1"
 }
 
 provider "google" {
-  project = "${local.gcp_project_id}"
-  region  = "${local.gcp_region}"
+  project = "your-gcp-project"
+  region  = "us-central1"
 }
 EOF
 }
