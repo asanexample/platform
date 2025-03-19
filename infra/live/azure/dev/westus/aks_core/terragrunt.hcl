@@ -55,6 +55,27 @@ dependency "networking" {
   }
 }
 
+dependency "aks_identity" {
+  config_path = "../aks_identity"
+  
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mock-identity"
+    principal_id = "mock-principal-id"
+    client_id = "mock-client-id"
+  }
+}
+
+dependency "aks_networking" {
+  config_path = "../aks_networking"
+  
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    private_dns_zone_id = null
+    network_security_group_id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.Network/networkSecurityGroups/mock-nsg"
+  }
+}
+
 # Specify inputs specific to this module
 inputs = {
   # Naming
@@ -76,8 +97,9 @@ inputs = {
   workload_identity_enabled = true
   oidc_issuer_enabled = true
   
-  # Identity configuration - use system-assigned for simplicity
-  identity_type = "SystemAssigned"
+  # Identity configuration - use the user-assigned identity
+  identity_type = "UserAssigned"
+  identity_ids = [dependency.aks_identity.outputs.id]
   
   # Network profile configuration
   network_plugin = "azure"
@@ -90,6 +112,7 @@ inputs = {
   
   # Private cluster configuration
   private_cluster_enabled = true
+  private_dns_zone_id = dependency.aks_networking.outputs.private_dns_zone_id
   
   # Default node pool
   default_nodepool_name = "system"
