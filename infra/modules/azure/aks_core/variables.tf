@@ -156,6 +156,16 @@ variable "authorized_ip_ranges" {
   default     = null
 }
 
+variable "azure_active_directory_role_based_access_control" {
+  description = "Azure Active Directory RBAC configuration for AKS"
+  type = object({
+    managed                = bool
+    admin_group_object_ids = list(string)
+    azure_rbac_enabled     = bool
+  })
+  default = null
+}
+
 # ---------------------------------------------------------------------------------------------------------------------
 # DEFAULT NODE POOL
 # ---------------------------------------------------------------------------------------------------------------------

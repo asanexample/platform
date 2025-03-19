@@ -30,6 +30,17 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
   azure_policy_enabled  = true
   cost_analysis_enabled = true
 
+  # Azure AD integration
+  dynamic "azure_active_directory_role_based_access_control" {
+    for_each = var.azure_active_directory_role_based_access_control != null ? [1] : []
+    
+    content {
+      managed                = var.azure_active_directory_role_based_access_control.managed
+      admin_group_object_ids = var.azure_active_directory_role_based_access_control.admin_group_object_ids
+      azure_rbac_enabled     = var.azure_active_directory_role_based_access_control.azure_rbac_enabled
+    }
+  }
+
   # Apply tags
   tags = merge(var.tags, {
     name = local.cluster_name
