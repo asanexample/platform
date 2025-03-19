@@ -21,9 +21,9 @@ variable "prefix" {
 variable "customer" {
   description = "The customer identifier"
   type        = string
-  default     = "shared"
+  default     = null
   validation {
-    condition     = length(var.customer) <= 15
+    condition     = var.customer == null ? true : length(var.customer) <= 15
     error_message = "The customer identifier can be at most 15 characters."
   }
 }
@@ -45,11 +45,10 @@ variable "region_abbv" {
 }
 
 variable "name" {
-  description = "The name of the AKS cluster. If not specified, a name will be generated."
+  description = "The name of the AKS cluster"
   type        = string
-  default     = null
   validation {
-    condition     = var.name == null ? true : length(var.name) >= 3 && length(var.name) <= 24
+    condition     = length(var.name) >= 3 && length(var.name) <= 24
     error_message = "The name must be between 3 and 24 characters."
   }
 }
@@ -71,19 +70,19 @@ variable "location" {
   description = "The Azure location where the AKS cluster will be deployed"
   type        = string
   validation {
-    condition     = contains([
-      "australiacentral", "australiacentral2", "australiaeast", "australiasoutheast", 
-      "brazilsouth", "brazilsoutheast", 
-      "canadacentral", "canadaeast", 
-      "centralindia", "centralus", 
-      "eastasia", "eastus", "eastus2", 
-      "francecentral", "francesouth", 
-      "germanynorth", "germanywestcentral", 
-      "japaneast", "japanwest", 
-      "koreacentral", "koreasouth", 
-      "northcentralus", "northeurope", "norwayeast", "norwaywest", 
-      "southafricanorth", "southafricawest", "southcentralus", "southeastasia", "southindia", "swedencentral", "switzerlandnorth", "switzerlandwest", 
-      "uaecentral", "uaenorth", "uksouth", "ukwest", "usnorth", "uswest", "uswest2", "uswest3", 
+    condition = contains([
+      "australiacentral", "australiacentral2", "australiaeast", "australiasoutheast",
+      "brazilsouth", "brazilsoutheast",
+      "canadacentral", "canadaeast",
+      "centralindia", "centralus",
+      "eastasia", "eastus", "eastus2",
+      "francecentral", "francesouth",
+      "germanynorth", "germanywestcentral",
+      "japaneast", "japanwest",
+      "koreacentral", "koreasouth",
+      "northcentralus", "northeurope", "norwayeast", "norwaywest",
+      "southafricanorth", "southafricawest", "southcentralus", "southeastasia", "southindia", "swedencentral", "switzerlandnorth", "switzerlandwest",
+      "uaecentral", "uaenorth", "uksouth", "ukwest", "usnorth", "uswest", "uswest2", "uswest3",
       "westcentralus", "westeurope", "westindia", "westus", "westus2", "westus3"
     ], var.location)
     error_message = "Invalid Azure location. Please check available locations."
@@ -275,10 +274,10 @@ variable "network_plugin" {
 variable "network_policy" {
   description = "The network policy to use for the AKS cluster"
   type        = string
-  default     = "azure"
+  default     = null
   validation {
-    condition     = contains(["azure", "calico"], var.network_policy)
-    error_message = "The network policy must be one of: azure, calico."
+    condition     = var.network_policy == null ? true : contains(["azure", "calico", "none"], var.network_policy)
+    error_message = "The network policy must be one of: azure, calico, none, or null."
   }
 }
 
