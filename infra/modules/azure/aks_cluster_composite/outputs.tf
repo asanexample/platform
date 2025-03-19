@@ -65,9 +65,9 @@ output "cluster_ca_certificate" {
 }
 
 # Node pool outputs
-output "default_node_pool_id" {
-  description = "The ID of the default node pool"
-  value       = module.aks_core.default_node_pool_id
+output "default_node_pool_name" {
+  description = "The name of the default node pool"
+  value       = module.aks_core.default_node_pool_name
 }
 
 output "app_node_pool_id" {
@@ -109,4 +109,67 @@ output "identity" {
 output "fqdn" {
   description = "The FQDN of the AKS cluster"
   value       = module.aks_core.fqdn
+}
+
+# Identity module outputs
+output "aks_identity_id" {
+  description = "The ID of the user-assigned managed identity for the AKS cluster"
+  value       = module.aks_identity.aks_identity_id
+}
+
+output "aks_identity_client_id" {
+  description = "The client ID of the user-assigned managed identity for the AKS cluster"
+  value       = module.aks_identity.aks_identity_client_id
+}
+
+output "aks_identity_principal_id" {
+  description = "The principal ID of the user-assigned managed identity for the AKS cluster"
+  value       = module.aks_identity.aks_identity_principal_id
+}
+
+output "cert_manager_identity_id" {
+  description = "The ID of the user-assigned managed identity for cert-manager"
+  value       = module.aks_identity_update.cert_manager_identity_id
+}
+
+output "karpenter_identity_id" {
+  description = "The ID of the user-assigned managed identity for Karpenter"
+  value       = module.aks_identity_update.karpenter_identity_id
+}
+
+# Networking module outputs
+output "network_plugin_mode" {
+  description = "The network plugin mode used by the AKS cluster"
+  value       = module.aks_networking.network_plugin_mode
+}
+
+output "network_plugin" {
+  description = "The network plugin used by the AKS cluster"
+  value       = module.aks_networking.network_plugin
+}
+
+output "network_policy" {
+  description = "The network policy used by the AKS cluster"
+  value       = module.aks_networking.network_policy
+}
+
+output "pod_cidr" {
+  description = "The CIDR block used for pod IP addresses"
+  value       = module.aks_networking.pod_cidr
+}
+
+output "service_cidr" {
+  description = "The CIDR block used for service IP addresses"
+  value       = module.aks_networking.service_cidr
+}
+
+output "private_cluster_enabled" {
+  description = "Whether the AKS cluster is a private cluster"
+  value       = module.aks_networking.private_cluster_enabled
+}
+
+# Monitoring outputs
+output "diagnostic_setting_id" {
+  description = "The ID of the diagnostic setting for the AKS cluster"
+  value       = module.aks_monitoring.diagnostic_setting_id
 } 

@@ -90,6 +90,107 @@ variable "oidc_issuer_enabled" {
 
 # Network Configuration
 variable "network_plugin" {
+  description = "Network plugin to use for the AKS cluster (azure, kubenet, or none)"
+  type        = string
+  default     = "azure"
+}
+
+variable "network_plugin_mode" {
+  description = "Network plugin mode to use for the AKS cluster (overlay or transparent)"
+  type        = string
+  default     = "overlay"
+}
+
+variable "network_policy" {
+  description = "Network policy to use for the AKS cluster (azure, calico)"
+  type        = string
+  default     = "azure"
+}
+
+variable "network_data_plane" {
+  description = "Network data plane to use for the AKS cluster (azure, cilium)"
+  type        = string
+  default     = "azure"
+}
+
+variable "pod_cidr" {
+  description = "CIDR range for pods"
+  type        = string
+  default     = "10.244.0.0/16"
+}
+
+variable "service_cidr" {
+  description = "CIDR range for services"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "dns_service_ip" {
+  description = "IP address within the service CIDR for DNS service"
+  type        = string
+  default     = "10.0.0.10"
+}
+
+variable "docker_bridge_cidr" {
+  description = "CIDR range for the Docker bridge network"
+  type        = string
+  default     = "172.17.0.1/16"
+}
+
+variable "subnet_id" {
+  description = "ID of the subnet where the AKS cluster will be deployed"
+  type        = string
+  default     = null
+}
+
+variable "availability_zones" {
+  description = "A list of availability zones to deploy the AKS cluster across"
+  type        = list(string)
+  default     = ["1", "2", "3"]
+}
+
+variable "az_subnet_ids" {
+  description = "Map of availability zone to subnet ID where AKS nodes should be deployed (follows allocations.csv topology)"
+  type        = map(string)
+  default     = {}
+}
+
+variable "use_network_topology" {
+  description = "Whether to use the network topology defined in allocations.csv (if true, pod_cidr, service_cidr and dns_service_ip will be derived from the topology)"
+  type        = bool
+  default     = false
+}
+
+variable "network_topology_region" {
+  description = "The region to use for network topology lookup in allocations.csv (e.g., eastus, westus)"
+  type        = string
+  default     = ""
+}
+
+variable "private_cluster_enabled" {
+  description = "Enable private cluster for the AKS cluster"
+  type        = bool
+  default     = false
+}
+
+variable "private_dns_zone_id" {
+  description = "ID of the private DNS zone for the AKS cluster"
+  type        = string
+  default     = null
+}
+
+variable "private_cluster_public_fqdn_enabled" {
+  description = "Enable public FQDN for a private cluster"
+  type        = bool
+  default     = false
+}
+
+variable "authorized_ip_ranges" {
+  description = "List of authorized IP ranges for the AKS cluster API"
+  type        = list(string)
+  default     = []
+}
+
 # Default Node Pool
 variable "default_nodepool_name" {
   description = "Name of the default node pool"
@@ -122,11 +223,24 @@ variable "user_assigned_identity_id" {
   default     = null
 }
 
+# Monitoring Configuration
+variable "log_analytics_workspace_id" {
+  description = "ID of the Log Analytics workspace for AKS monitoring"
+  type        = string
+  default     = null
+}
+
 # Application Node Pool
 variable "app_node_pool_enabled" {
   description = "Enable application node pool"
   type        = bool
   default     = true
+}
+
+variable "app_node_pool_name" {
+  description = "Name of the application node pool"
+  type        = string
+  default     = "app"
 }
 
 variable "app_node_pool_vm_size" {

@@ -5,6 +5,17 @@
  * following the principles of separation of concerns and modularity.
  */
 
+# Set up networking topology based on allocations.csv
+locals {
+  # Use the provided subnet_id by default
+  primary_subnet_id = var.subnet_id
+  
+  # Just pass through the provided values
+  service_cidr = var.service_cidr
+  pod_cidr = var.pod_cidr
+  dns_service_ip = var.dns_service_ip
+}
+
 # Create identity resources for the AKS cluster
 module "aks_identity" {
   source = "../aks_identity"
@@ -54,11 +65,11 @@ module "aks_networking" {
   network_plugin_mode = var.network_plugin_mode
   network_policy     = var.network_policy
   network_data_plane = var.network_data_plane
-  pod_cidr          = var.pod_cidr
-  service_cidr      = var.service_cidr
-  dns_service_ip    = var.dns_service_ip
+  pod_cidr          = local.pod_cidr
+  service_cidr      = local.service_cidr
+  dns_service_ip    = local.dns_service_ip
   docker_bridge_cidr = var.docker_bridge_cidr
-  subnet_id         = var.subnet_id
+  subnet_id         = local.primary_subnet_id
   private_cluster_enabled = var.private_cluster_enabled
   private_dns_zone_id = var.private_dns_zone_id
   private_cluster_public_fqdn_enabled = var.private_cluster_public_fqdn_enabled
