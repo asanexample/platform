@@ -99,7 +99,7 @@ inputs = {
   
   # Identity configuration - use the user-assigned identity
   identity_type = "UserAssigned"
-  identity_ids = [dependency.aks_identity.outputs.id]
+  user_assigned_identity_id = dependency.aks_identity.outputs.id
   
   # Network profile configuration
   network_plugin = "azure"
