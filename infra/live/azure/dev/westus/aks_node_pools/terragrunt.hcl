@@ -41,6 +41,7 @@ dependency "aks_core" {
   mock_outputs = {
     name = "mock-aks"
     resource_group_name = "mock-rg"
+    id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.ContainerService/managedClusters/mock-aks"
   }
 }
 
