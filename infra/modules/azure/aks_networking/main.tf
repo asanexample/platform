@@ -45,11 +45,13 @@ resource "azurerm_private_dns_zone_virtual_network_link" "aks" {
 }
 
 # Get the route table if provided (assumed to exist already)
+/*
 data "azurerm_route_table" "aks" {
   count               = var.subnet_id != null && lookup(var.tags, "test_mode", "false") != "true" ? 1 : 0
   name                = "${var.cluster_name}-route-table"
   resource_group_name = var.node_resource_group
 }
+*/
 
 # Create network security group if needed
 resource "azurerm_network_security_group" "aks" {

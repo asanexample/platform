@@ -69,5 +69,5 @@ output "nsg_id" {
 
 output "route_table_id" {
   description = "The ID of the route table for AKS"
-  value       = var.subnet_id != null ? (length(data.azurerm_route_table.aks) > 0 ? data.azurerm_route_table.aks[0].id : null) : null
+  value       = null
 } 
