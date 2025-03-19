@@ -101,7 +101,6 @@ inputs = {
   
   # Azure AD integration - managed approach
   azure_active_directory_role_based_access_control = {
-    managed = true
     admin_group_object_ids = ["00000000-0000-0000-0000-000000000000"]  # Replace with actual AAD admin group IDs
     azure_rbac_enabled = true
   }
