@@ -19,9 +19,23 @@ include "root" {
   path = find_in_parent_folders()
 }
 
-# Configure terraform to use appropriate backend
+# Use _modules/hosting as the source
 terraform {
-  source = "${get_repo_root()}/infra/modules/azure/hosting"
+  source = "${get_repo_root()}/infra/live/azure/_modules/hosting"
+}
+
+# Set dependencies for the naming module
+dependency "naming" {
+  config_path = "${get_repo_root()}/infra/live/azure/_modules/naming"
+  
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    resource_group = "mock-rg"
+    storage_account = "mocksa"
+    key_vault = "mock-kv"
+    vnet = "mock-vnet"
+    aks_cluster = "mock-aks"
+  }
 }
 
 # Specify inputs specific to this environment
