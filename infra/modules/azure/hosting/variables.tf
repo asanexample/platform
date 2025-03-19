@@ -410,10 +410,4 @@ variable "aks_app_node_pool_node_count" {
   description = "Initial number of nodes in the application node pool"
   type        = number
   default     = 2
-}
-
-variable "deployment_mode" {
-  description = "The deployment mode to control phased deployments. Options: 'full', 'infrastructure', 'identity'"
-  type        = string
-  default     = "full"
 } 

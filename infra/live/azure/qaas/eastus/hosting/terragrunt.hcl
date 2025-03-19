@@ -7,8 +7,8 @@ locals {
   env           = local.common_vars.locals.env
   prefix        = local.common_vars.locals.prefix
   customer      = local.common_vars.locals.customer
-  region        = "northeurope"
-  region_abbv   = "neu"
+  region        = "eastus"
+  region_abbv   = "eus"
   tags          = local.common_vars.locals.tags
 }
 
@@ -34,49 +34,49 @@ inputs = {
   location = local.region
   
   # VNet configuration
-  address_space = ["10.11.0.0/16"]  # North Europe Dev
+  address_space = ["10.10.0.0/16"]  # East US QaaS
   
   # Subnets
   subnets = {
     # AZ1 subnets
     "az1-node-subnet" = {
-      address_prefixes = ["10.11.0.0/20"]
+      address_prefixes = ["10.10.0.0/20"]
     }
     "az1-pod-subnet" = {
-      address_prefixes = ["10.11.16.0/20"]
+      address_prefixes = ["10.10.16.0/20"]
     }
     "az1-endpoint-subnet" = {
-      address_prefixes = ["10.11.32.0/24"]
+      address_prefixes = ["10.10.32.0/24"]
     }
     
     # AZ2 subnets
     "az2-node-subnet" = {
-      address_prefixes = ["10.11.64.0/20"]
+      address_prefixes = ["10.10.64.0/20"]
     }
     "az2-pod-subnet" = {
-      address_prefixes = ["10.11.80.0/20"]
+      address_prefixes = ["10.10.80.0/20"]
     }
     "az2-endpoint-subnet" = {
-      address_prefixes = ["10.11.96.0/24"]
+      address_prefixes = ["10.10.96.0/24"]
     }
     
     # AZ3 subnets
     "az3-node-subnet" = {
-      address_prefixes = ["10.11.128.0/20"]
+      address_prefixes = ["10.10.128.0/20"]
     }
     "az3-pod-subnet" = {
-      address_prefixes = ["10.11.144.0/20"]
+      address_prefixes = ["10.10.144.0/20"]
     }
     "az3-endpoint-subnet" = {
-      address_prefixes = ["10.11.160.0/24"]
+      address_prefixes = ["10.10.160.0/24"]
     }
     
     # Shared subnets
     "gateway-subnet" = {
-      address_prefixes = ["10.11.192.0/24"]
+      address_prefixes = ["10.10.192.0/24"]
     }
     "bastion-subnet" = {
-      address_prefixes = ["10.11.193.0/24"]
+      address_prefixes = ["10.10.193.0/24"]
     }
   }
   

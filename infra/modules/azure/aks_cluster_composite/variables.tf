@@ -305,13 +305,6 @@ variable "private_route_table_name" {
   default     = null
 }
 
-# Two-phase deployment configuration (deprecated)
-variable "deployment_mode" {
-  description = "DEPRECATED: The deployment mode variable is no longer used with the unified identities approach. It's kept for backward compatibility."
-  type        = string
-  default     = "full"
-}
-
 # Tagging
 variable "tags" {
   description = "Tags to apply to all resources"

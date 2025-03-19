@@ -1,64 +1,120 @@
 # Terragrunt configuration for Azure hosting in eastus region
 
-# Include root configuration
+# Local variables for this configuration
+locals {
+  # Load common variables
+  common_vars = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  
+  # Extract commonly used variables
+  env           = local.common_vars.locals.env
+  prefix        = local.common_vars.locals.prefix
+  customer      = local.common_vars.locals.customer
+  region        = "eastus"
+  region_abbv   = "eus"
+  tags          = local.common_vars.locals.tags
+}
+
+# Include the root terragrunt.hcl configuration, which has settings common to all environments
 include "root" {
   path = find_in_parent_folders()
 }
 
-# Include common config for hosting
-include "common" {
-  path   = "${dirname(find_in_parent_folders())}/live/azure/_envcommon/hosting.hcl"
-  expose = true
+# Configure terraform to use appropriate backend
+terraform {
+  source = "${get_repo_root()}/infra/modules/azure/hosting"
 }
 
-# Include storage configuration
-include "storage" {
-  path   = "${dirname(find_in_parent_folders())}/live/azure/_envcommon/storage.hcl"
-  expose = true
-}
-
-# Include region-specific network configuration
-locals {
-  # Read network configuration from network.hcl in the region directory
-  network_config = read_terragrunt_config(find_in_parent_folders("network.hcl"))
-}
-
-# Inputs that are the same for all regions
+# Specify inputs specific to this environment
 inputs = {
-  # Forward network configuration from network.hcl
-  address_space = local.network_config.locals.address_space
-  subnets       = local.network_config.locals.subnets
+  # Naming/tagging
+  prefix      = local.prefix
+  customer    = local.customer
+  stage       = local.env
+  region_abbv = local.region_abbv
   
-  # Enable AKS cluster
-  create_aks_cluster = true
+  # Resource group
+  location = local.region
   
-  # AKS cluster configuration
-  aks_kubernetes_version = "1.29.0"
-  aks_dns_prefix         = "aks-eastus-dev"
+  # VNet configuration
+  address_space = ["10.8.0.0/16"]  # East US Dev
   
-  # Use network topology for AKS
-  aks_use_network_topology     = true
-  aks_network_topology_region  = "eastus"
-  
-  # Configure AKS to use the kubernetes subnets across all AZs
-  aks_az_subnet_names = {
-    "1" = "az1-kubernetes"
-    "2" = "az2-kubernetes" 
-    "3" = "az3-kubernetes"
+  # Subnets
+  subnets = {
+    # AZ1 subnets
+    "az1-node-subnet" = {
+      address_prefixes = ["10.8.0.0/20"]
+    }
+    "az1-pod-subnet" = {
+      address_prefixes = ["10.8.16.0/20"]
+    }
+    "az1-endpoint-subnet" = {
+      address_prefixes = ["10.8.32.0/24"]
+    }
+    
+    # AZ2 subnets
+    "az2-node-subnet" = {
+      address_prefixes = ["10.8.64.0/20"]
+    }
+    "az2-pod-subnet" = {
+      address_prefixes = ["10.8.80.0/20"]
+    }
+    "az2-endpoint-subnet" = {
+      address_prefixes = ["10.8.96.0/24"]
+    }
+    
+    # AZ3 subnets
+    "az3-node-subnet" = {
+      address_prefixes = ["10.8.128.0/20"]
+    }
+    "az3-pod-subnet" = {
+      address_prefixes = ["10.8.144.0/20"]
+    }
+    "az3-endpoint-subnet" = {
+      address_prefixes = ["10.8.160.0/24"]
+    }
+    
+    # Shared subnets
+    "gateway-subnet" = {
+      address_prefixes = ["10.8.192.0/24"]
+    }
+    "bastion-subnet" = {
+      address_prefixes = ["10.8.193.0/24"]
+    }
   }
   
-  # Use Azure CNI with overlay for optimal pod density
-  aks_network_plugin      = "azure"
-  aks_network_plugin_mode = "overlay"
-  aks_network_policy      = "azure"
+  # Storage account configuration
+  storage_account_tier       = "Standard"
+  storage_replication_type   = "LRS"
+  storage_allowed_subnets    = []
+  storage_allow_public       = true
   
-  # Configure node pools
-  aks_default_nodepool_name     = "system"
-  aks_default_nodepool_vm_size  = "Standard_D2s_v4"
-  aks_default_nodepool_count    = 1
+  # AKS configuration
+  create_aks_cluster            = true
+  aks_kubernetes_version        = "1.28.3"
+  aks_sku_tier                  = "Standard"
+  aks_network_plugin            = "azure"
+  aks_network_policy            = "calico"
+  aks_service_cidr              = "10.0.0.0/16"
+  aks_dns_service_ip            = "10.0.0.10"
+  aks_availability_zones        = ["1", "2", "3"]
+  aks_workload_identity_enabled = true
+  aks_oidc_issuer_enabled       = true
   
-  aks_app_node_pool_enabled     = true
-  aks_app_node_pool_name        = "app"
-  aks_app_node_pool_vm_size     = "Standard_D4s_v4"
-  aks_app_node_pool_node_count  = 2
+  # AKS node pools
+  aks_default_nodepool_vm_size = "Standard_D4s_v3"
+  aks_default_nodepool_count   = 3
+  
+  # AKS subnet mapping
+  aks_az_subnet_names = {
+    "1" = "az1-node-subnet"
+    "2" = "az2-node-subnet"
+    "3" = "az3-node-subnet"
+  }
+  
+  # Tags
+  tags = merge(local.tags, {
+    Environment = local.env
+    Region      = local.region
+    Component   = "Hosting"
+  })
 } 

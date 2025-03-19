@@ -117,8 +117,8 @@ output "aks_identity_principal_id" {
 }
 
 output "aks_karpenter_identity_id" {
-  description = "The ID of the Karpenter identity if created and in full mode"
-  value       = var.create_aks_cluster && var.deployment_mode == "full" ? module.aks_cluster[0].karpenter_identity.id : null
+  description = "The ID of the Karpenter identity if created"
+  value       = var.create_aks_cluster ? module.aks_cluster[0].karpenter_identity.id : null
 }
 
 # Naming module outputs (always available)
