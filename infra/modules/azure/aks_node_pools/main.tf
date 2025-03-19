@@ -31,7 +31,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "app_node_pool" {
   node_taints     = var.app_node_pool_node_taints
 
   # Auto-scaling configuration
-  enable_auto_scaling = var.app_node_pool_enable_auto_scaling
+  auto_scaling_enabled = var.app_node_pool_enable_auto_scaling
   min_count           = var.app_node_pool_enable_auto_scaling ? var.app_node_pool_min_count : null
   max_count           = var.app_node_pool_enable_auto_scaling ? var.app_node_pool_max_count : null
 
