@@ -1,182 +1,144 @@
-# AKS Cluster Composite Module
+# Azure AKS Cluster Composite Module
 
-This module creates a complete AKS cluster solution by integrating multiple specialized modules, following the principles of separation of concerns and modularity.
-
-## Architecture
-
-The composite module orchestrates the following specialized modules to create a complete AKS solution:
-
-1. **AKS Identity Module** - Creates and manages the identities required for the AKS cluster and workloads
-2. **AKS Networking Module** - Configures networking resources and settings for the cluster
-3. **AKS Core Module** - Creates the core AKS cluster resource with basic configuration
-4. **AKS Monitoring Module** - Configures logging, monitoring, and diagnostics
-5. **AKS Node Pools Module** - Configures additional node pools for workloads
-
-This modular approach provides several benefits:
-- Each component can be tested independently
-- Easier to maintain and update individual parts
-- Clearer separation of responsibilities
-- More focused modules with specific purposes
-- Improved testability and reusability
+This module combines multiple specialized AKS modules to create a complete Azure Kubernetes Service (AKS) cluster with all required components and configurations.
 
 ## Features
 
-- **Comprehensive Identity Management**
-  - User-assigned managed identities for the AKS cluster
-  - Workload identity federation for pods
-  - Federated credentials for external services
-  
-- **Advanced Networking Options**
-  - Support for Azure CNI and kubenet networking
-  - Private cluster configuration
-  - Network policy enforcement
-  - Flexible CIDR configuration
-
-- **Custom Node Pool Management**
-  - System and application node pools
-  - Auto-scaling configuration
-  - Node taints and labels
-  
-- **Integrated Monitoring**
-  - Log Analytics integration
-  - Diagnostic settings for key resources
-  - Azure Monitor for containers
-
-- **Security Best Practices**
-  - Azure RBAC integration
-  - Network security controls
-  - Private cluster options
+- One-stop solution for complete AKS cluster deployments
+- Combines core cluster, identity, networking, and node pool configurations
+- Implements best practices for secure and optimized AKS clusters
+- Provides unified interface while allowing customization of individual components
+- Simplified configuration with sensible defaults
 
 ## Usage
 
-### Basic Usage
-
 ```hcl
 module "aks_cluster" {
-  source = "../modules/azure/aks_cluster_composite"
+  source = "../../modules/azure/aks_cluster_composite"
+
+  # Basic settings
+  resource_group_name = "vip-rg-dev-eus-aks"
+  location            = "eastus"
+  cluster_name        = "vip-aks-dev-eus-k8s"
+  kubernetes_version  = "1.28.3"
   
-  # Naming
-  prefix      = "vip"
-  customer    = "example"
-  stage       = "dev"
-  region_abbv = "eus"
+  # Network settings
+  vnet_id             = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/vip-rg-dev-eus-net/providers/Microsoft.Network/virtualNetworks/vip-vnet-dev-eus-main"
+  subnet_ids = {
+    node_subnet_ids = [
+      "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/vip-rg-dev-eus-net/providers/Microsoft.Network/virtualNetworks/vip-vnet-dev-eus-main/subnets/az1-node-subnet",
+      "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/vip-rg-dev-eus-net/providers/Microsoft.Network/virtualNetworks/vip-vnet-dev-eus-main/subnets/az2-node-subnet",
+      "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/vip-rg-dev-eus-net/providers/Microsoft.Network/virtualNetworks/vip-vnet-dev-eus-main/subnets/az3-node-subnet"
+    ]
+    pod_subnet_ids = [
+      "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/vip-rg-dev-eus-net/providers/Microsoft.Network/virtualNetworks/vip-vnet-dev-eus-main/subnets/az1-pod-subnet",
+      "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/vip-rg-dev-eus-net/providers/Microsoft.Network/virtualNetworks/vip-vnet-dev-eus-main/subnets/az2-pod-subnet",
+      "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/vip-rg-dev-eus-net/providers/Microsoft.Network/virtualNetworks/vip-vnet-dev-eus-main/subnets/az3-pod-subnet"
+    ]
+  }
   
-  # Resource group
-  resource_group_name = azurerm_resource_group.aks_rg.name
-  location            = azurerm_resource_group.aks_rg.location
+  # Identity settings
+  identity_type       = "UserAssigned"
+  identity_name       = "vip-uami-dev-eus-aks"
   
-  # Network configuration
-  subnet_id           = azurerm_subnet.aks_subnet.id
-  network_plugin      = "azure"
-  network_plugin_mode = "overlay"
-  pod_cidr            = "10.244.0.0/16"
-  service_cidr        = "10.0.0.0/16"
-  dns_service_ip      = "10.0.0.10"
+  # Node pool settings
+  default_node_pool = {
+    name                = "system"
+    vm_size             = "Standard_D4s_v3"
+    availability_zones  = [1, 2, 3]
+    node_count          = 3
+    max_pods            = 30
+    os_disk_size_gb     = 128
+    os_disk_type        = "Ephemeral"
+    os_sku              = "Ubuntu"
+    enable_auto_scaling = true
+    min_count           = 3
+    max_count           = 6
+  }
   
-  # Monitoring
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.aks.id
+  # Additional node pools
+  additional_node_pools = {
+    app = {
+      vm_size             = "Standard_D8s_v3"
+      availability_zones  = [1, 2, 3]
+      node_count          = 3
+      enable_auto_scaling = true
+      min_count           = 3
+      max_count           = 9
+      node_labels = {
+        "workload" = "app"
+      }
+    }
+    batch = {
+      vm_size             = "Standard_D16s_v3"
+      availability_zones  = [1, 2, 3]
+      node_count          = 0
+      enable_auto_scaling = true
+      min_count           = 0
+      max_count           = 12
+      node_taints = [
+        "workload=batch:NoSchedule"
+      ]
+      node_labels = {
+        "workload" = "batch"
+      }
+    }
+  }
   
-  # Default tags
+  # Tags
   tags = {
-    Environment = "Development"
+    Environment = "dev"
     ManagedBy   = "Terraform"
-    Project     = "AKS Platform"
+    Component   = "AKS"
   }
 }
 ```
 
-### Advanced Configuration
+## Requirements
 
-```hcl
-module "production_aks" {
-  source = "../modules/azure/aks_cluster_composite"
-  
-  # Naming
-  prefix      = "vip"
-  customer    = "example"
-  stage       = "prod"
-  region_abbv = "eus"
-  
-  # Resource group
-  resource_group_name = azurerm_resource_group.aks_rg.name
-  location            = azurerm_resource_group.aks_rg.location
-  
-  # Cluster basics
-  kubernetes_version  = "1.28.0"
-  sku_tier            = "Standard"
-  
-  # Network configuration
-  subnet_id                  = azurerm_subnet.aks_subnet.id
-  network_plugin             = "azure"
-  network_plugin_mode        = "overlay"
-  network_policy             = "azure"
-  pod_cidr                   = "10.244.0.0/16"
-  service_cidr               = "10.0.0.0/16"
-  dns_service_ip             = "10.0.0.10"
-  private_cluster_enabled    = true
-  private_dns_zone_id        = azurerm_private_dns_zone.aks.id
-  authorized_ip_ranges       = ["203.0.113.0/24", "198.51.100.0/24"]
-  
-  # Default node pool
-  default_nodepool_name      = "system"
-  default_nodepool_vm_size   = "Standard_D4s_v4"
-  default_nodepool_count     = 3
-  
-  # App node pool
-  app_node_pool_enabled        = true
-  app_node_pool_name           = "apps"
-  app_node_pool_vm_size        = "Standard_D8s_v4"
-  app_node_pool_node_count     = 5
-  app_node_pool_max_pods       = 50
-  app_node_pool_os_disk_size_gb = 256
-  app_node_pool_enable_auto_scaling = true
-  app_node_pool_min_count      = 3
-  app_node_pool_max_count      = 10
-  app_node_pool_node_labels    = {
-    "workload-type" = "application"
-    "environment"   = "production"
-  }
-  
-  # Monitoring
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.aks.id
-  
-  # Default tags
-  tags = {
-    Environment = "Production"
-    ManagedBy   = "Terraform"
-    Project     = "AKS Platform"
-    CostCenter  = "IT-Cloud-Platform"
-  }
-}
-```
+| Name | Version |
+|------|---------|
+| terraform | >= 1.3.0 |
+| azurerm | >= 3.0.0 |
+| azuread | >= 2.0.0 |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| prefix | Prefix used in resource naming | `string` | `"vip"` | no |
-| customer | Customer name for resource naming | `string` | `"shared"` | no |
-| stage | Environment stage (dev, test, staging, prod) | `string` | `"dev"` | yes |
-| region_abbv | Abbreviated Azure region code | `string` | `"weu"` | no |
-| name | AKS cluster name (overrides auto-generated name) | `string` | `""` | no |
-| resource_group_name | Resource group name | `string` | n/a | yes |
-| location | Azure region | `string` | n/a | yes |
-| kubernetes_version | Kubernetes version | `string` | `null` | no |
-| sku_tier | AKS SKU tier (Free or Standard) | `string` | `"Free"` | no |
-| network_plugin | Network plugin (azure, kubenet) | `string` | `"azure"` | no |
-| subnet_id | Subnet ID for AKS deployment | `string` | n/a | yes |
-| log_analytics_workspace_id | Log Analytics workspace ID | `string` | n/a | yes |
-| private_cluster_enabled | Enable private cluster | `bool` | `false` | no |
+| resource_group_name | Name of the resource group | `string` | n/a | yes |
+| location | Azure region where resources will be created | `string` | n/a | yes |
+| cluster_name | Name of the AKS cluster | `string` | n/a | yes |
+| kubernetes_version | Kubernetes version | `string` | n/a | yes |
+| vnet_id | ID of the virtual network | `string` | n/a | yes |
+| subnet_ids | Map of subnet IDs for nodes and pods | `object({ node_subnet_ids = list(string), pod_subnet_ids = optional(list(string)) })` | n/a | yes |
+| identity_type | Type of identity to use for the AKS cluster | `string` | `"UserAssigned"` | no |
+| identity_name | Name of the user assigned identity (required when identity_type is UserAssigned) | `string` | `null` | no |
+| create_identity | Whether to create a new user assigned identity | `bool` | `true` | no |
+| existing_identity_id | ID of an existing user assigned identity | `string` | `null` | no |
+| default_node_pool | Configuration for the default node pool | `any` | See variables.tf | yes |
+| additional_node_pools | Map of additional node pools to create | `map(any)` | `{}` | no |
+| network_plugin | Network plugin to use (azure, kubenet, none) | `string` | `"azure"` | no |
+| network_policy | Network policy to use (calico, azure) | `string` | `"calico"` | no |
+| service_cidr | CIDR range for Kubernetes services | `string` | `"10.96.0.0/16"` | no |
+| dns_service_ip | IP address for Kubernetes DNS service | `string` | `"10.96.0.10"` | no |
+| outbound_type | Outbound traffic type | `string` | `"loadBalancer"` | no |
+| enable_workload_identity | Whether to enable workload identity | `bool` | `false` | no |
+| private_cluster_enabled | Whether to create a private cluster | `bool` | `false` | no |
+| tags | Tags to apply to all resources | `map(string)` | `{}` | no |
 
 ## Outputs
 
 | Name | Description |
 |------|-------------|
-| cluster_id | The AKS cluster ID |
-| cluster_name | The AKS cluster name |
-| kube_config | Kubernetes config to connect to the cluster |
-| kube_admin_config | Kubernetes admin config to connect to the cluster |
-| node_resource_group | The auto-generated resource group name for cluster resources |
+| id | The ID of the AKS cluster |
+| name | The name of the AKS cluster |
+| kubernetes_version | The Kubernetes version used |
+| fqdn | The FQDN of the AKS cluster |
+| private_fqdn | The private FQDN of the AKS cluster |
+| kube_config | The kubeconfig for the AKS cluster |
+| node_resource_group | The auto-generated resource group for cluster resources |
+| identity_principal_id | The principal ID of the AKS cluster identity |
 | kubelet_identity | The kubelet managed identity |
 | oidc_issuer_url | The OIDC issuer URL for the cluster |
 
@@ -187,5 +149,12 @@ For more information on each specialized module, refer to their individual docum
 - [AKS Core Module](../aks_core/README.md)
 - [AKS Identity Module](../aks_identity/README.md)
 - [AKS Networking Module](../aks_networking/README.md)
-- [AKS Monitoring Module](../aks_monitoring/README.md)
-- [AKS Node Pools Module](../aks_node_pools/README.md) 
+- [AKS Node Pools Module](../aks_node_pools/README.md)
+
+## License
+
+This module is proprietary and confidential.
+
+## Authors
+
+VIP Platform Team 
