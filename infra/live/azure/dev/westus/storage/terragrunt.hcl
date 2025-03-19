@@ -21,7 +21,7 @@ include "root" {
 
 # Use the actual Terraform module as the source
 terraform {
-  source = "${get_repo_root()}/infra/modules/azure/storage_account"
+  source = "../../../../../modules/azure/storage_account"
 }
 
 # Set dependencies for this module

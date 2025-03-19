@@ -39,7 +39,7 @@ include "root" {
 
 # Use the actual Terraform module as the source
 terraform {
-  source = "${get_parent_terragrunt_dir()}/../../../modules/azure/key_vault"
+  source = "../../../../../modules/azure/key_vault"
 }
 
 # Set dependencies for this module
@@ -62,7 +62,7 @@ dependency "resource_group" {
 }
 
 dependency "network" {
-  config_path = "../network"
+  config_path = "../networking"
   mock_outputs = {
     vnet_id                  = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet"
     vnet_name                = "mock-vnet"
