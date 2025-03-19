@@ -30,7 +30,7 @@ dependency "naming" {
   
   # Mock outputs for plan and validation
   mock_outputs = {
-    aks_node_pool = "mock-nodepool"
+    aks_cluster = "mock-aks"
   }
 }
 
@@ -40,7 +40,21 @@ dependency "aks_core" {
   # Mock outputs for plan and validation
   mock_outputs = {
     id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.ContainerService/managedClusters/mock-aks"
-    name = "mock-aks"
+  }
+}
+
+dependency "aks_identity" {
+  config_path = "../aks_identity"
+  mock_outputs = {
+    id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mock-identity"
+  }
+}
+
+dependency "aks_networking" {
+  config_path = "../aks_networking"
+  mock_outputs = {
+    private_dns_zone_id = null
+    network_security_group_id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.Network/networkSecurityGroups/mock-nsg"
   }
 }
 

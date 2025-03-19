@@ -11,11 +11,11 @@
 locals {
   # Determine subnet ID based on network topology or direct input
   use_topology_condition = var.use_network_topology && var.vnet_resource_group_name != null && var.network_topology_region != null
-  primary_subnet_id = local.use_topology_condition ? "/subscriptions/${data.azurerm_client_config.current.subscription_id}/resourceGroups/${var.vnet_resource_group_name}/providers/Microsoft.Network/virtualNetworks/${var.network_topology_region}-spoke-vnet/subnets/${var.network_topology_region}-spoke-aks-subnet" : var.subnet_id
+  primary_subnet_id      = local.use_topology_condition ? "/subscriptions/${data.azurerm_client_config.current.subscription_id}/resourceGroups/${var.vnet_resource_group_name}/providers/Microsoft.Network/virtualNetworks/${var.network_topology_region}-spoke-vnet/subnets/${var.network_topology_region}-spoke-aks-subnet" : var.subnet_id
 
   # Set up pod and service CIDR values
-  pod_cidr = var.pod_cidr
-  service_cidr = var.service_cidr
+  pod_cidr       = var.pod_cidr
+  service_cidr   = var.service_cidr
   dns_service_ip = var.dns_service_ip != "" ? var.dns_service_ip : cidrhost(var.service_cidr, 10)
 }
 
@@ -25,6 +25,7 @@ data "azurerm_client_config" "current" {}
 # Create identity resources for the AKS cluster and workloads
 module "identities" {
   source = "../identities"
+  count  = var.create_resources ? 1 : 0
 
   # Naming
   prefix      = var.prefix
@@ -42,10 +43,10 @@ module "identities" {
   # Identity configuration
   create_aks_identity      = true
   enable_workload_identity = var.workload_identity_enabled
-  
+
   # Disable federated credentials and role assignments in first phase
   create_federated_credentials = false
-  create_role_assignments = false
+  create_role_assignments      = false
 
   # Network configuration
   vnet_resource_group_name = var.vnet_resource_group_name
@@ -59,6 +60,7 @@ module "identities" {
 # Create networking resources for the AKS cluster
 module "aks_networking" {
   source = "../aks_networking"
+  count  = var.create_resources ? 1 : 0
 
   # Naming
   prefix      = var.prefix
@@ -71,7 +73,7 @@ module "aks_networking" {
   location            = var.location
 
   # Cluster information
-  cluster_name = var.name
+  cluster_name        = var.name
   node_resource_group = var.resource_group_name
 
   # Network configuration
@@ -96,6 +98,7 @@ module "aks_networking" {
 # Create the core AKS cluster
 module "aks_core" {
   source = "../aks_core"
+  count  = var.create_resources ? 1 : 0
 
   # Naming
   prefix      = var.prefix
@@ -123,20 +126,20 @@ module "aks_core" {
 
   # Identity - use the identity created by the identities module
   identity_type             = "UserAssigned"
-  user_assigned_identity_id = module.identities.aks_identity_id
+  user_assigned_identity_id = module.identities[0].aks_identity_id
 
   # Network profile
-  network_plugin      = module.aks_networking.network_plugin
-  network_policy      = module.aks_networking.network_policy
-  pod_cidr            = module.aks_networking.pod_cidr
-  service_cidr        = module.aks_networking.service_cidr
-  dns_service_ip      = module.aks_networking.dns_service_ip
-  docker_bridge_cidr  = module.aks_networking.docker_bridge_cidr
-  subnet_id           = module.aks_networking.subnet_id
+  network_plugin     = module.aks_networking[0].network_plugin
+  network_policy     = module.aks_networking[0].network_policy
+  pod_cidr           = module.aks_networking[0].pod_cidr
+  service_cidr       = module.aks_networking[0].service_cidr
+  dns_service_ip     = module.aks_networking[0].dns_service_ip
+  docker_bridge_cidr = module.aks_networking[0].docker_bridge_cidr
+  subnet_id          = module.aks_networking[0].subnet_id
 
   # Private cluster configuration
-  private_cluster_enabled             = module.aks_networking.private_cluster_enabled
-  private_dns_zone_id                 = module.aks_networking.private_dns_zone_id
+  private_cluster_enabled = module.aks_networking[0].private_cluster_enabled
+  private_dns_zone_id     = module.aks_networking[0].private_dns_zone_id
 
   # Tagging
   tags = var.tags
@@ -145,7 +148,7 @@ module "aks_core" {
 # Set up workload identities with the OIDC issuer URL from the cluster
 module "workload_identity_setup" {
   source = "../identities"
-  count  = var.workload_identity_enabled && var.oidc_issuer_enabled ? 1 : 0
+  count  = var.create_resources && var.workload_identity_enabled && var.oidc_issuer_enabled ? 1 : 0
 
   # Naming
   prefix      = var.prefix
@@ -158,19 +161,19 @@ module "workload_identity_setup" {
   location            = var.location
 
   # Cluster information
-  cluster_name = module.aks_core.name
+  cluster_name = module.aks_core[0].name
 
   # AKS Identity - don't create, use the existing one
   create_aks_identity = false
 
   # Workload identity configuration
   enable_workload_identity = true
-  aks_oidc_issuer_url      = module.aks_core.oidc_issuer_url
-  node_resource_group_id   = module.aks_core.node_resource_group_id
-  
+  aks_oidc_issuer_url      = module.aks_core[0].oidc_issuer_url
+  node_resource_group_id   = module.aks_core[0].node_resource_group_id
+
   # Enable federated credentials and role assignments in second phase
   create_federated_credentials = true
-  create_role_assignments = true
+  create_role_assignments      = true
 
   # Configure workload identities
   workload_identities = {
@@ -195,12 +198,10 @@ module "workload_identity_setup" {
   ]
 }
 
-# Create additional node pools
+# Create the app node pool if enabled
 module "aks_node_pools" {
   source = "../aks_node_pools"
-
-  # Only create if app node pool is enabled
-  count = var.app_node_pool_enabled ? 1 : 0
+  count  = var.create_resources && var.app_node_pool_enabled ? 1 : 0
 
   # Naming
   prefix      = var.prefix
@@ -209,10 +210,10 @@ module "aks_node_pools" {
   region_abbv = var.region_abbv
 
   # AKS cluster reference
-  aks_cluster_id = module.aks_core.id
+  aks_cluster_id = module.aks_core[0].id
 
   # App node pool configuration
-  app_node_pool_enabled = true
+  app_node_pool_enabled             = true
   app_node_pool_name                = var.app_node_pool_name
   app_node_pool_vm_size             = var.app_node_pool_vm_size
   app_node_pool_node_count          = var.app_node_pool_node_count

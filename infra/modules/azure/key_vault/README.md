@@ -9,6 +9,7 @@ This module creates an Azure Key Vault with configurable access policies, networ
 - Configurable network rules to restrict access
 - Optional private endpoint integration for secure network access
 - Flexible naming with support for auto-generation based on naming conventions
+- Support for unique naming with static suffix to avoid naming conflicts
 - Comprehensive validation of input parameters
 - Configurable SKU selection (standard or premium)
 - Implements best practices for key vault security:
@@ -27,6 +28,23 @@ module "key_vault" {
   resource_group_name = "my-resource-group"
   location            = "eastus"
   name                = "my-key-vault"
+  
+  tags = {
+    Environment = "Development"
+    Project     = "MyProject"
+  }
+}
+```
+
+### With Unique Name Using Static Suffix
+
+```hcl
+module "key_vault" {
+  source = "../../modules/azure/key_vault"
+
+  resource_group_name = "my-resource-group"
+  location            = "eastus"
+  name                = "vipdevwuskv01"  # Using a unique static suffix (01)
   
   tags = {
     Environment = "Development"
@@ -133,7 +151,6 @@ module "key_vault" {
   name                = "my-key-vault"
   
   private_endpoint = {
-    create               = true
     subnet_id            = "/subscriptions/.../resourceGroups/.../providers/Microsoft.Network/virtualNetworks/.../subnets/..."
     private_dns_zone_ids = ["/subscriptions/.../resourceGroups/.../providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net"]
   }
@@ -141,6 +158,52 @@ module "key_vault" {
   tags = {
     Environment = "Development"
     Project     = "MyProject"
+  }
+}
+```
+
+### AKS Integration Example
+
+```hcl
+module "key_vault" {
+  source = "../../modules/azure/key_vault"
+
+  resource_group_name = dependency.resource_group.outputs.name
+  location            = dependency.resource_group.outputs.location
+  
+  name = "vipdevwuskv01"  # Using a static unique suffix
+  
+  # Key Vault configuration
+  sku_name                     = "standard"
+  enabled_for_disk_encryption  = true
+  enable_rbac_authorization    = true
+  purge_protection_enabled     = true
+  soft_delete_retention_days   = 90
+  
+  # Network settings for secure access
+  network_acls = {
+    bypass                     = "AzureServices"
+    default_action             = "Deny"
+    ip_rules                   = []
+    virtual_network_subnet_ids = [
+      dependency.networking.outputs.subnet_ids["az1-endpoint-subnet"]
+    ]
+  }
+  
+  # Private endpoint configuration
+  private_endpoint = {
+    subnet_id            = dependency.networking.outputs.subnet_ids["az1-endpoint-subnet"]
+    private_dns_zone_ids = []
+  }
+  
+  tags = {
+    Component          = "KeyVault"
+    CostCenter         = "Engineering"
+    DataClassification = "Internal"
+    Environment        = "dev"
+    ManagedBy          = "Terragrunt"
+    Owner              = "Platform Team"
+    Project            = "Multi-Cloud Platform"
   }
 }
 ```
@@ -179,8 +242,6 @@ network_acls = {
 
 ```hcl
 private_endpoint = {
-  create               = false  # Whether to create a private endpoint
-  name                 = ""     # Name of the private endpoint (optional)
   subnet_id            = ""     # Subnet ID for the private endpoint
   private_dns_zone_ids = []     # List of private DNS zone IDs
 }
@@ -208,6 +269,42 @@ name_components = {
 | public_network_access_enabled | Whether public network access is enabled for the Key Vault |
 | access_policy_ids | IDs of the created access policies |
 | private_endpoint_ids | IDs of the created private endpoints |
+
+## Naming Strategies
+
+### Static Unique Suffix
+
+This approach uses a static unique suffix to ensure globally unique Key Vault names without changing on each apply:
+
+```hcl
+locals {
+  # Use a fixed unique suffix instead of timestamp
+  unique_suffix = "01"
+}
+
+inputs = {
+  # Use a fixed unique name that doesn't change on every apply
+  name = "vipdevwuskv${local.unique_suffix}"
+}
+```
+
+### Timestamp-Based Naming (Not Recommended for Production)
+
+An alternative approach for dev/test environments is to use a timestamp-based suffix, which ensures uniqueness but changes on each apply:
+
+```hcl
+locals {
+  # Generate a unique timestamp-based suffix for the Key Vault
+  timestamp_suffix = formatdate("hhmmss", timestamp())
+}
+
+inputs = {
+  # Use a custom Key Vault name with timestamp
+  name = "vipdeveuskv${local.timestamp_suffix}"
+}
+```
+
+Note: The timestamp approach is not recommended for production as it creates a new resource on each apply.
 
 ## Testing
 

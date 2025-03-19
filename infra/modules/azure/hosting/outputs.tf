@@ -85,40 +85,40 @@ output "key_vault_tenant_id" {
 
 # AKS Cluster outputs
 output "aks_cluster_id" {
-  description = "The ID of the AKS cluster if created"
-  value       = var.create_aks_cluster ? module.aks_cluster[0].id : null
+  description = "The AKS cluster ID"
+  value       = var.create_aks_cluster ? module.aks_cluster.id : null
 }
 
 output "aks_cluster_name" {
-  description = "The name of the AKS cluster if created"
-  value       = var.create_aks_cluster ? module.aks_cluster[0].name : null
+  description = "The AKS cluster name"
+  value       = var.create_aks_cluster ? module.aks_cluster.name : null
 }
 
-output "aks_host" {
-  description = "The AKS cluster host if AKS was created"
-  value       = var.create_aks_cluster ? module.aks_cluster[0].host : null
+output "aks_cluster_host" {
+  description = "The AKS cluster host"
+  value       = var.create_aks_cluster ? module.aks_cluster.host : null
   sensitive   = true
 }
 
-output "aks_kube_config" {
-  description = "The kubeconfig for the AKS cluster if AKS was created"
-  value       = var.create_aks_cluster ? module.aks_cluster[0].kube_config_raw : null
+output "aks_kube_config_raw" {
+  description = "The AKS kubeconfig raw"
+  value       = var.create_aks_cluster ? module.aks_cluster.kube_config_raw : null
   sensitive   = true
 }
 
 output "aks_oidc_issuer_url" {
-  description = "The OIDC issuer URL for the AKS cluster if AKS was created"
-  value       = var.create_aks_cluster ? module.aks_cluster[0].oidc_issuer_url : null
+  description = "The AKS OIDC issuer URL"
+  value       = var.create_aks_cluster ? module.aks_cluster.oidc_issuer_url : null
 }
 
 output "aks_identity_principal_id" {
-  description = "The principal ID of the AKS identity if created"
-  value       = var.create_aks_cluster ? module.aks_cluster[0].aks_identity_principal_id : null
+  description = "The AKS identity principal ID"
+  value       = var.create_aks_cluster ? module.aks_cluster.aks_identity_principal_id : null
 }
 
 output "aks_karpenter_identity_id" {
-  description = "The ID of the Karpenter identity if created"
-  value       = var.create_aks_cluster ? module.aks_cluster[0].karpenter_identity.id : null
+  description = "The ID of the Karpenter identity"
+  value       = var.create_aks_cluster ? module.aks_cluster.karpenter_identity.id : null
 }
 
 # Naming module outputs (always available)

@@ -58,12 +58,12 @@ variable "app_node_pool_name" {
   default     = "apps"
 
   validation {
-    condition     = length(var.app_node_pool_name) >= 1 && length(var.app_node_pool_name) <= 12
+    condition     = var.app_node_pool_name == null ? true : length(var.app_node_pool_name) >= 1 && length(var.app_node_pool_name) <= 12
     error_message = "Application node pool name must be between 1 and 12 characters."
   }
 
   validation {
-    condition     = can(regex("^[a-z][a-z0-9]*$", var.app_node_pool_name))
+    condition     = var.app_node_pool_name == null ? true : can(regex("^[a-z][a-z0-9]*$", var.app_node_pool_name))
     error_message = "Application node pool name can only include lowercase alphanumeric characters and must start with a letter."
   }
 }
@@ -166,7 +166,7 @@ variable "app_node_pool_mode" {
 variable "app_node_pool_node_labels" {
   description = "Labels to apply to nodes in the application node pool"
   type        = map(string)
-  default     = {
+  default = {
     "nodepool" = "apps"
     "app"      = "true"
   }

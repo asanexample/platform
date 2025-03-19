@@ -252,16 +252,16 @@ locals {
 
     # Load Balancer
     load_balancer = "${local.default_prefix}-${var.stage}-${local.resource_types.load_balancer}-${local.region_abbv}",
-    
+
     # AKS Node Pool (special format with no hyphens, 12 char limit)
     aks_node_pool = "${local.default_prefix}${var.stage}${local.resource_types.aks_node_pool}",
-    
+
     # Managed Prometheus for AKS
     managed_prometheus = "${local.default_prefix}-${var.stage}-${local.resource_types.managed_prometheus}-${local.region_abbv}",
-    
+
     # Container Insights for AKS
     container_insights = "${local.default_prefix}-${var.stage}-${local.resource_types.container_insights}-${local.region_abbv}",
-    
+
     # AKS Identity
     aks_identity = "${local.default_prefix}-${var.stage}-${local.resource_types.aks_identity}-${local.region_abbv}"
   }

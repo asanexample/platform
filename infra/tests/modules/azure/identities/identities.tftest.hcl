@@ -72,6 +72,8 @@ run "workload_identities" {
     
     # Workload identity configuration
     enable_workload_identity = true
+    create_federated_credentials = true
+    create_role_assignments = true
     aks_oidc_issuer_url      = "https://eastus.oic.prod-aks.azure.com/12345678-1234-1234-1234-1234567890ab/abcdef1234567890/"
     node_resource_group_id   = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/MC_test-identities-rg_test-aks-cluster_eastus"
     

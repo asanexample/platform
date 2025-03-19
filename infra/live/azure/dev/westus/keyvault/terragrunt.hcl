@@ -12,6 +12,24 @@ locals {
   region      = "westus"
   region_abbv = "wus"
   tags        = local.common_vars.locals.tags
+  
+  # Resource Group
+  resource_group_name = "vip-dev-wus-rg"
+  
+  # Use a fixed unique suffix instead of timestamp
+  unique_suffix = "01"
+  
+  # Network rules
+  network_acls = {
+    bypass                     = "AzureServices"
+    default_action             = "Deny"
+    ip_rules                   = []
+    virtual_network_subnet_ids = []
+  }
+  
+  # The value below is no longer needed as we're using a fixed name
+  # timestamp_suffix = replace(substr(timestamp(), 0, 16), "-", "")
+  # timestamp_suffix = replace(replace(substr(timestamp(), 0, 16), "-", ""), ":", "")
 }
 
 # Include the root terragrunt.hcl configuration
@@ -21,79 +39,77 @@ include "root" {
 
 # Use the actual Terraform module as the source
 terraform {
-  source = "${get_repo_root()}/infra/modules/azure/key_vault"
+  source = "${get_parent_terragrunt_dir()}/../../../modules/azure/key_vault"
 }
 
 # Set dependencies for this module
 dependency "naming" {
   config_path = "../naming"
-  
-  # Mock outputs for plan and validation
   mock_outputs = {
-    key_vault = "mock-kv"
+    key_vault          = "mock-key-vault"
+    key_vault_key      = "mock-key-vault-key"
+    private_dns_zone   = "mock-dns-zone"
+    private_endpoint   = "mock-private-endpoint"
+    disk_encryption_set = "mock-disk-encryption-set"
   }
 }
 
 dependency "resource_group" {
   config_path = "../resource_group"
-  
-  # Mock outputs for plan and validation
   mock_outputs = {
-    name = "mock-rg"
-    location = "westus"
+    resource_group_name = local.resource_group_name
   }
 }
 
-dependency "networking" {
-  config_path = "../networking"
-  
-  # Mock outputs for plan and validation
+dependency "network" {
+  config_path = "../network"
   mock_outputs = {
-    subnet_ids = {
-      "az1-endpoint-subnet" = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet/subnets/az1-endpoint-subnet"
-    }
+    vnet_id                  = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet"
+    vnet_name                = "mock-vnet"
+    subnet_ids               = { private_endpoints = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet/subnets/private-endpoints" }
+    vnet_subnet_ids          = ["/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet/subnets/private-endpoints"]
+    private_endpoints_subnet_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet/subnets/private-endpoints"
   }
 }
 
 # Specify inputs specific to this module
 inputs = {
-  # Resource group
-  resource_group_name = dependency.resource_group.outputs.name
-  location = dependency.resource_group.outputs.location
+  location            = "westus"
+  resource_group_name = dependency.resource_group.outputs.resource_group_name
   
-  # Key Vault name
-  key_vault_name = dependency.naming.outputs.key_vault
+  # Use a fixed unique name that doesn't change on every apply
+  name = "vipdevwuskv${local.unique_suffix}"
   
-  # Key Vault configuration
-  sku_name = "standard"
-  enabled_for_deployment = false
-  enabled_for_disk_encryption = true
-  enabled_for_template_deployment = false
+  # The line below was the previous naming approach using timestamp which caused recreation issues
+  # name = "vipdeveuskv${local.timestamp_suffix}"
+
+  # Enable RBAC authorization
   enable_rbac_authorization = true
-  purge_protection_enabled = true
-  soft_delete_retention_days = 90
-  
-  # Network settings
-  network_acls = {
-    bypass = "AzureServices"
-    default_action = "Deny"
-    ip_rules = []
-    virtual_network_subnet_ids = [
-      dependency.networking.outputs.subnet_ids["az1-endpoint-subnet"]
-    ]
-  }
-  
-  # Private endpoint configuration
+
+  # Create a disk encryption key
+  create_disk_encryption_key = true
+  disk_encryption_key_name = dependency.naming.outputs.key_vault_key
+
+  # Network rules
+  network_acls = local.network_acls
+
+  # Configure private endpoint
   private_endpoint = {
-    subnet_id = dependency.networking.outputs.subnet_ids["az1-endpoint-subnet"]
-    private_dns_zone_ids = []
+    name                = dependency.naming.outputs.private_endpoint
+    resource_group_name = dependency.resource_group.outputs.resource_group_name
+    subnet_id           = dependency.network.outputs.private_endpoints_subnet_id
+    private_dns_zone_ids = [
+      "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/dns-rg/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net"
+    ]
+    private_service_connection = {
+      name = "kv-private-link"
+      subresource_names = ["vault"]
+    }
   }
-  
-  # Initial secrets and access policies will be empty, to be filled by applications
-  secrets = {}
-  keys = {}
-  access_policies = {}
-  
+
   # Tags
-  tags = local.tags
+  tags = {
+    environment = "dev"
+    application = "VIP Platform"
+  }
 } 

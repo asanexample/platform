@@ -31,7 +31,7 @@ dependency "naming" {
   # Mock outputs for plan and validation
   mock_outputs = {
     aks_cluster = "mock-aks"
-    user_assigned_identity = "mock-identity"
+    aks_identity = "mock-identity"
   }
 }
 
@@ -52,7 +52,8 @@ inputs = {
   customer    = local.customer
   stage       = local.env
   region_abbv = local.region_abbv
-  aks_identity_name = dependency.naming.outputs.user_assigned_identity
+  aks_identity_name = dependency.naming.outputs.aks_identity
+  cluster_name = dependency.naming.outputs.aks_cluster
   
   # Resource details
   resource_group_name = dependency.resource_group.outputs.name

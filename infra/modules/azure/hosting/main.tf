@@ -151,24 +151,26 @@ module "key_vault" {
 
 # Create AKS cluster with the composite module
 module "aks_cluster" {
-  count  = var.create_aks_cluster ? 1 : 0
   source = "../aks_cluster_composite"
-  
+
+  # Use create_resources to control whether AKS resources are created
+  create_resources = var.create_aks_cluster
+
   # Naming
   prefix      = var.prefix
   customer    = var.customer
   stage       = var.stage
   region_abbv = var.region_abbv
-  
+
   # Resource group and location
   resource_group_name = azurerm_resource_group.hosting_rg.name
   location            = var.location
-  
+
   # Cluster configuration
   name               = var.aks_dns_prefix != null ? var.aks_dns_prefix : null
   kubernetes_version = var.aks_kubernetes_version
   sku_tier           = var.aks_sku_tier
-  
+
   # Network configuration
   network_plugin      = var.aks_network_plugin
   network_plugin_mode = var.aks_network_plugin_mode
@@ -178,21 +180,23 @@ module "aks_cluster" {
   service_cidr        = var.aks_service_cidr
   dns_service_ip      = var.aks_dns_service_ip
   docker_bridge_cidr  = var.aks_docker_bridge_cidr
-  
+
   # Subnet configuration
-  subnet_id = var.aks_subnet_name != null ? module.network.subnet_ids[var.aks_subnet_name] : null
-  
+  subnet_id = var.aks_subnet_name != null && var.aks_subnet_name != "" ? module.network.subnet_ids[var.aks_subnet_name] : null
+
   # Network topology configuration
-  use_network_topology  = var.aks_use_network_topology
+  use_network_topology     = var.aks_use_network_topology
   vnet_resource_group_name = var.resource_group_name
   network_topology_region  = startswith(var.location, "east") ? "eastus" : startswith(var.location, "west") ? "westus" : lower(replace(var.location, " ", ""))
-  
+
   # AZ-specific subnet configuration if available
   availability_zones = var.aks_availability_zones
-  az_subnet_ids = var.aks_az_subnet_names != null ? {
-    for az, subnet_name in var.aks_az_subnet_names :
-    az => module.network.subnet_ids[subnet_name]
-  } : {}
+  az_subnet_ids = var.aks_az_subnet_names != null ? (
+    length(coalesce(var.aks_az_subnet_names, {})) > 0 ? {
+      for az, subnet_name in var.aks_az_subnet_names :
+      az => module.network.subnet_ids[subnet_name]
+    } : {}
+  ) : {}
 
   # Identity and monitoring
   workload_identity_enabled  = var.aks_workload_identity_enabled

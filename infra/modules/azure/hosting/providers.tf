@@ -1,13 +1,13 @@
 /**
- * Provider requirements for the AKS Monitoring module
+ * Azure Hosting Module Provider Configuration
  */
 
 terraform {
-  required_version = ">= 1.3.0"
+  required_version = ">= 1.6.0"
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
       version = "4.23.0"
     }
   }
-} 
+}

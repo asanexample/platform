@@ -23,13 +23,13 @@ module "naming" {
 }
 
 locals {
-  # AKS identity name - use provided or generate based on cluster name
-  aks_identity_name = var.aks_identity_name != null ? var.aks_identity_name : "${var.cluster_name}-identity"
+  # AKS identity name - use provided, or use naming module if not provided
+  aks_identity_name = var.aks_identity_name != null ? var.aks_identity_name : module.naming.aks_identity
 
   # Create a map of workload identities with appropriate configuration
   workload_identities_map = {
     for name, config in var.workload_identities : name => {
-      name            = config.name != null ? config.name : "${var.cluster_name}-${name}"
+      name            = config.name != null ? config.name : "${module.naming.workload_identity}-${name}"
       namespace       = config.namespace
       service_account = config.service_account
       roles           = config.roles

@@ -254,6 +254,86 @@ Our tests cover:
 - Naming convention compliance
 - Security best practices
 
+## Troubleshooting
+
+### Common Issues and Solutions
+
+#### Key Vault Naming Conflicts
+
+**Issue**: Azure Key Vault names must be globally unique. Using dynamically generated names (like timestamp-based suffixes) causes the vault to be recreated on each apply.
+
+**Solution**: Use a static unique suffix in the Key Vault name:
+
+```hcl
+locals {
+  # Use a fixed unique suffix instead of timestamp
+  unique_suffix = "01"
+}
+
+inputs = {
+  # Use a fixed unique name that doesn't change on every apply
+  name = "vipdevwuskv${local.unique_suffix}"
+}
+```
+
+#### Incorrect Naming Module Attribute References
+
+**Issue**: Terragrunt configurations referencing non-existent attributes from the naming module (e.g., `user_assigned_identity` instead of `aks_identity`).
+
+**Solution**: Verify the correct output attribute names from the naming module:
+
+```bash
+cd infra/live/azure/dev/westus/naming
+terragrunt output
+```
+
+Then update the dependency references with the correct attribute names:
+
+```hcl
+# Correct reference
+dependency "naming" {
+  config_path = "../naming"
+  mock_outputs = {
+    aks_identity = "mock-identity"  # Correct attribute name
+  }
+}
+
+inputs = {
+  aks_identity_name = dependency.naming.outputs.aks_identity
+}
+```
+
+#### State Lock Issues
+
+**Issue**: Terraform state locks preventing operations when another process holds the lock.
+
+**Solution**: Check for running operations in other terminals. If needed, unlock the state:
+
+```bash
+terragrunt force-unlock <LOCK_ID>
+```
+
+If that fails, you may need to remove lock files manually (use with caution):
+
+```bash
+rm -f .terraform.tfstate.lock.info
+```
+
+#### Terragrunt Cache Clearing
+
+**Issue**: Corrupted or outdated Terragrunt cache causing unexpected errors.
+
+**Solution**: Clear the Terragrunt cache and state files before retrying:
+
+```bash
+# Find and remove Terragrunt cache directories
+find infra/live/azure/dev/westus -type d -name ".terragrunt-cache" -exec rm -rf {} \; 2>/dev/null || true
+
+# Remove Terraform state files
+find infra/live/azure/dev/westus -name ".terraform*" -exec rm -rf {} \;
+find infra/live/azure/dev/westus -name "terraform.tfstate*" -exec rm -rf {} \;
+```
+
 ## Security Practices
 
 This infrastructure implements the following security practices:

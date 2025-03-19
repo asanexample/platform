@@ -29,7 +29,7 @@ output "app_node_pool_os_disk_size_gb" {
 
 output "app_node_pool_auto_scaling_enabled" {
   description = "Whether auto-scaling is enabled for the application node pool"
-  value       = var.app_node_pool_enabled ? azurerm_kubernetes_cluster_node_pool.app_node_pool[0].enable_auto_scaling : null
+  value       = var.app_node_pool_enabled ? azurerm_kubernetes_cluster_node_pool.app_node_pool[0].auto_scaling_enabled : null
 }
 
 output "app_node_pool_min_count" {

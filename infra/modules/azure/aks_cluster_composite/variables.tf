@@ -310,4 +310,10 @@ variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)
   default     = {}
+}
+
+variable "create_resources" {
+  description = "Whether to create the AKS resources"
+  type        = bool
+  default     = true
 } 

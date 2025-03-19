@@ -72,7 +72,7 @@ variable "cluster_name" {
 }
 
 variable "aks_identity_name" {
-  description = "The name of the AKS cluster identity. If not provided, a name will be generated."
+  description = "The name of the user-assigned managed identity for AKS"
   type        = string
   default     = null
 }

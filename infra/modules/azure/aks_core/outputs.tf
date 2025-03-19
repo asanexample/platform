@@ -63,9 +63,9 @@ output "cluster_ca_certificate" {
   sensitive   = true
 }
 
-output "default_node_pool_id" {
-  description = "The ID of the default node pool"
-  value       = try(azurerm_kubernetes_cluster.aks_cluster.default_node_pool[0].id, null)
+output "default_node_pool_name" {
+  description = "The name of the default node pool"
+  value       = try(azurerm_kubernetes_cluster.aks_cluster.default_node_pool[0].name, null)
 }
 
 output "node_resource_group" {
