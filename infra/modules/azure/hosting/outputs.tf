@@ -1,33 +1,33 @@
 /**
- * # Hosting Module Outputs
- * 
- * Outputs from the hosting module, including both networking and storage resources.
+ * # Shared Infrastructure Outputs
+ *
+ * Outputs from a deployment of networking, storage, and key vault resources.
  */
 
-# Resource Group
+# Resource Group outputs
 output "resource_group_name" {
-  description = "Name of the resource group"
+  description = "Name of the created resource group"
   value       = azurerm_resource_group.hosting_rg.name
 }
 
 output "resource_group_id" {
-  description = "ID of the resource group"
+  description = "ID of the created resource group"
   value       = azurerm_resource_group.hosting_rg.id
 }
 
 output "location" {
-  description = "Location of the resource group"
+  description = "Azure region where resources were deployed"
   value       = azurerm_resource_group.hosting_rg.location
 }
 
-# Network Outputs
+# Network outputs
 output "vnet_id" {
-  description = "ID of the virtual network"
+  description = "ID of the created virtual network"
   value       = module.network.vnet_id
 }
 
 output "vnet_name" {
-  description = "Name of the virtual network"
+  description = "Name of the created virtual network"
   value       = module.network.vnet_name
 }
 
@@ -36,25 +36,51 @@ output "subnet_ids" {
   value       = module.network.subnet_ids
 }
 
-# Storage Outputs
+output "nsg_ids" {
+  description = "Map of Network Security Group names to IDs"
+  value       = module.network.nsg_ids
+}
+
+# Storage outputs
 output "storage_account_id" {
-  description = "ID of the storage account"
+  description = "ID of the created storage account"
   value       = module.storage_account.id
 }
 
 output "storage_account_name" {
-  description = "Name of the storage account"
+  description = "Name of the created storage account"
   value       = module.storage_account.name
 }
 
-output "primary_blob_endpoint" {
+output "storage_primary_blob_endpoint" {
   description = "Primary blob endpoint for the storage account"
   value       = module.storage_account.primary_blob_endpoint
 }
 
-output "containers" {
+output "storage_containers" {
   description = "Map of created containers with their properties"
   value       = module.storage_account.containers
+}
+
+# Key Vault outputs
+output "key_vault_id" {
+  description = "ID of the created Key Vault"
+  value       = var.create_key_vault ? module.key_vault[0].id : null
+}
+
+output "key_vault_name" {
+  description = "Name of the created Key Vault"
+  value       = var.create_key_vault ? module.key_vault[0].name : null
+}
+
+output "key_vault_uri" {
+  description = "URI of the created Key Vault"
+  value       = var.create_key_vault ? module.key_vault[0].uri : null
+}
+
+output "key_vault_tenant_id" {
+  description = "Tenant ID of the Key Vault"
+  value       = var.create_key_vault ? module.key_vault[0].tenant_id : null
 }
 
 # Naming module outputs (always available)

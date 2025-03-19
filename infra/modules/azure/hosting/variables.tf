@@ -1,7 +1,7 @@
 /**
  * # Shared Infrastructure Variables
  * 
- * Variables for deploying both networking and storage in a single resource group.
+ * Variables for deploying networking, storage, and key vault in a single resource group.
  */
 
 # Naming variables
@@ -145,4 +145,78 @@ variable "storage_cors_rules" {
     max_age_in_seconds = number
   }))
   default = []
+}
+
+# Key Vault variables
+variable "create_key_vault" {
+  description = "Whether to create a key vault as part of the hosting infrastructure"
+  type        = bool
+  default     = true
+}
+
+variable "key_vault_sku" {
+  description = "The SKU name of the key vault (standard or premium)"
+  type        = string
+  default     = "standard"
+}
+
+variable "key_vault_enable_rbac" {
+  description = "Whether to enable RBAC authorization for the key vault"
+  type        = bool
+  default     = true
+}
+
+variable "key_vault_enable_disk_encryption" {
+  description = "Whether to enable the key vault for disk encryption"
+  type        = bool
+  default     = false
+}
+
+variable "key_vault_purge_protection" {
+  description = "Whether to enable purge protection on the key vault"
+  type        = bool
+  default     = true
+}
+
+variable "key_vault_retention_days" {
+  description = "Soft delete retention days for the key vault (7-90 days)"
+  type        = number
+  default     = 90
+}
+
+variable "key_vault_public_access" {
+  description = "Whether to enable public network access to the key vault"
+  type        = bool
+  default     = false
+}
+
+variable "key_vault_allowed_subnets" {
+  description = "List of subnet names that are allowed to access the key vault"
+  type        = list(string)
+  default     = null
+}
+
+variable "key_vault_access_policies" {
+  description = "Map of access policies for the key vault (used only when RBAC is disabled)"
+  type = map(object({
+    tenant_id               = optional(string)
+    object_id               = string
+    key_permissions         = optional(list(string), [])
+    secret_permissions      = optional(list(string), [])
+    certificate_permissions = optional(list(string), [])
+    storage_permissions     = optional(list(string), [])
+  }))
+  default = {}
+}
+
+variable "key_vault_private_endpoint_subnet" {
+  description = "Subnet name for the key vault private endpoint (empty means no private endpoint)"
+  type        = string
+  default     = ""
+}
+
+variable "key_vault_private_dns_zone_ids" {
+  description = "List of private DNS zone IDs for the key vault private endpoint"
+  type        = list(string)
+  default     = []
 } 
