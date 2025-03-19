@@ -40,11 +40,6 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
     }
   }
 
-  # Apply tags
-  tags = merge(var.tags, {
-    name = local.cluster_name
-  })
-
   # System node pool configuration
   default_node_pool {
     name                = var.default_nodepool_name
@@ -56,8 +51,26 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
     auto_scaling_enabled = var.default_nodepool_enable_auto_scaling
     min_count           = var.default_nodepool_enable_auto_scaling ? var.default_nodepool_min_count : null
     max_count           = var.default_nodepool_enable_auto_scaling ? var.default_nodepool_max_count : null
+    vnet_subnet_id      = var.subnet_id
     tags                = var.tags
   }
+
+  # Network profile configuration - set to "none" to not install any CNI by default
+  # Cilium will be installed separately after cluster creation
+  network_profile {
+    network_plugin = var.network_plugin
+    network_policy = var.network_policy
+    service_cidr  = var.service_cidr
+    dns_service_ip = var.dns_service_ip
+    pod_cidr      = var.pod_cidr
+    outbound_type = "loadBalancer"
+    load_balancer_sku = "standard"
+  }
+
+  # Apply tags
+  tags = merge(var.tags, {
+    name = local.cluster_name
+  })
 
   # Configure cluster identity
   dynamic "identity" {

@@ -110,12 +110,21 @@ inputs = {
   user_assigned_identity_id = dependency.aks_identity.outputs.aks_identity_id
   
   # Network profile configuration
-  network_plugin = "azure"
-  network_policy = "azure"
-  pod_cidr = "10.244.0.0/16"
+  # No CNI will be installed by default; Cilium will be installed separately
+  network_plugin = "none"
+  
+  # Set network_policy to null to avoid conflicts with Cilium installation
+  network_policy = null
+  
+  # Service network configuration
   service_cidr = "10.0.0.0/16"
   dns_service_ip = "10.0.0.10"
   docker_bridge_cidr = "172.17.0.1/16"
+  
+  # Pod CIDR - will be managed by Cilium
+  pod_cidr = "10.244.0.0/16"
+  
+  # Subnet configuration
   subnet_id = dependency.networking.outputs.subnet_ids["az1-kubernetes"]
   
   # Private cluster configuration
@@ -129,12 +138,19 @@ inputs = {
   default_nodepool_enable_auto_scaling = true
   default_nodepool_min_count = 2
   default_nodepool_max_count = 3
-  default_nodepool_max_pods = 30
+  
+  # Set max_pods to a higher value since Cilium will be used
+  # Cilium can support more pods per node as it uses its own IPAM
+  default_nodepool_max_pods = 110
+  
   default_nodepool_os_disk_size_gb = 128
   default_nodepool_node_labels = {
     "role" = "system"
+    "kubernetes.azure.com/scalesetpriority" = "regular"
   }
   
   # Tags
-  tags = local.tags
+  tags = merge(local.tags, {
+    "network.cilium.io/managed-by" = "cilium"
+  })
 } 
