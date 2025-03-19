@@ -113,11 +113,11 @@ variable "network_rules" {
 variable "private_endpoint" {
   description = "Configuration for private endpoint if required"
   type = object({
-    create                = optional(bool, false)
-    name                  = optional(string, "")
-    subnet_id             = optional(string, "")
-    private_dns_zone_ids  = optional(list(string), [])
-    subresource_names     = optional(list(string), ["blob"])
+    create               = optional(bool, false)
+    name                 = optional(string, "")
+    subnet_id            = optional(string, "")
+    private_dns_zone_ids = optional(list(string), [])
+    subresource_names    = optional(list(string), ["blob"])
   })
   default = {}
   # For maximum security, use private endpoints to access storage over private network
@@ -127,18 +127,18 @@ variable "private_endpoint" {
 variable "lifecycle_rules" {
   description = "Lifecycle rules for blob storage"
   type = list(object({
-    name    = string
-    enabled = optional(bool, true)
+    name         = string
+    enabled      = optional(bool, true)
     prefix_match = optional(list(string), [])
-    
+
     delete_action = optional(object({
       days_after_modification_greater_than = number
     }), null)
-    
+
     tier_to_cool_action = optional(object({
       days_after_modification_greater_than = number
     }), null)
-    
+
     tier_to_archive_action = optional(object({
       days_after_modification_greater_than = number
     }), null)

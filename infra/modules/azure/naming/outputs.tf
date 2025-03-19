@@ -50,7 +50,7 @@ output "virtual_network" {
 
 output "subnet" {
   description = "Function to generate standardized subnet names with subnet type parameter."
-  value       = "${local.subnet_name}"
+  value       = local.subnet_name
 }
 
 output "subnet_node" {
@@ -90,7 +90,7 @@ output "subnet_gateway" {
 
 output "subnet_with_type" {
   description = "Generate a subnet name with a specific type."
-  value       = "${local.subnet_name}"
+  value       = local.subnet_name
 }
 
 output "front_door" {
@@ -178,8 +178,28 @@ output "load_balancer" {
   value       = local.validated_names.load_balancer
 }
 
+output "aks_node_pool" {
+  description = "Standardized name for an AKS node pool."
+  value       = local.validated_names.aks_node_pool
+}
+
+output "managed_prometheus" {
+  description = "Standardized name for an AKS managed Prometheus resource."
+  value       = local.validated_names.managed_prometheus
+}
+
+output "container_insights" {
+  description = "Standardized name for an AKS container insights resource."
+  value       = local.validated_names.container_insights
+}
+
+output "aks_identity" {
+  description = "Standardized name for an AKS managed identity."
+  value       = local.validated_names.aks_identity
+}
+
 output "resource_types" {
-  description = "Map of resource type abbreviations."
+  description = "All resource type abbreviations."
   value       = local.resource_types
 }
 

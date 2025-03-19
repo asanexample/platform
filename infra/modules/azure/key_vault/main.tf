@@ -98,4 +98,4 @@ resource "azurerm_private_endpoint" "key_vault" {
   }
 
   tags = local.tags
-} 
+}

@@ -10,10 +10,10 @@ terraform {
 
 provider "azurerm" {
   features {}
-  
+
   # Set the subscription ID from your Azure account
   subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  
+
   # Use CLI authentication
   # This uses the active Azure CLI session credentials
   use_cli = true

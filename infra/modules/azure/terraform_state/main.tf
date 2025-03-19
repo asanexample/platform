@@ -29,19 +29,19 @@ module "storage_account" {
   tags                = var.tags
 
   # ========== Terraform State-Specific Settings ==========
-  
+
   # Storage account configuration - enforcing best practices for state storage
-  account_kind              = "StorageV2"  # Modern storage account type with all features
-  account_tier              = "Standard"   # Standard performance tier is sufficient for state
-  
+  account_kind = "StorageV2" # Modern storage account type with all features
+  account_tier = "Standard"  # Standard performance tier is sufficient for state
+
   # Ensure at least ZRS replication for state durability
   # Zone-Redundant Storage provides higher durability than LRS
   # If user specifies something better than LRS (like GRS), use that instead
-  account_replication_type  = var.account_replication_type != "LRS" ? var.account_replication_type : "ZRS"
-  
+  account_replication_type = var.account_replication_type != "LRS" ? var.account_replication_type : "ZRS"
+
   # Always enable versioning for state history and recovery
-  blob_versioning_enabled   = true
-  
+  blob_versioning_enabled = true
+
   # Retention policies for state recovery
   # These settings ensure deleted state can be recovered for a reasonable period
   blob_delete_retention_days      = coalesce(var.blob_delete_retention_days, 7)
@@ -52,26 +52,26 @@ module "storage_account" {
   containers = merge(var.additional_containers, {
     "tfstate" = {
       name                  = local.tfstate_container_name
-      container_access_type = "private"  # Always private for security
+      container_access_type = "private" # Always private for security
     }
   })
-  
+
   # Security settings for Terraform state
   # These settings enforce proper security practices for state storage
-  allow_nested_items_to_be_public = false  # Never allow public access for state
-  blob_public_access_enabled      = false  # Disable public access at account level
-  shared_access_key_enabled       = true   # Required for Terraform backend to access state
-  min_tls_version                 = "TLS1_2"  # Enforce modern TLS
-  
+  allow_nested_items_to_be_public = false    # Never allow public access for state
+  blob_public_access_enabled      = false    # Disable public access at account level
+  shared_access_key_enabled       = true     # Required for Terraform backend to access state
+  min_tls_version                 = "TLS1_2" # Enforce modern TLS
+
   # Optional advanced features
   # These are useful for auditing and lifecycle management
-  change_feed_enabled     = var.change_feed_enabled      # Track changes to blobs
+  change_feed_enabled      = var.change_feed_enabled      # Track changes to blobs
   last_access_time_enabled = var.last_access_time_enabled # Track when blobs were last accessed
-  
+
   # Network and security settings - passed through from user configuration
   network_rules    = var.network_rules
   private_endpoint = var.private_endpoint
-  
+
   # Lifecycle management rules (optional)
   lifecycle_rules = var.lifecycle_rules
 } 
