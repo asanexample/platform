@@ -26,6 +26,7 @@ locals {
   vnet_name            = module.naming.virtual_network
   storage_account_name = module.naming.storage_account
   key_vault_name       = module.naming.key_vault
+  aks_cluster_name     = module.naming.aks_cluster
 
   # Create a map of subnet names using the naming module
   subnet_name_map = {
@@ -146,4 +147,79 @@ module "key_vault" {
   } : {}
 
   tags = var.tags
+}
+
+# Deploy AKS cluster if enabled
+module "aks_cluster" {
+  source = "../aks_cluster_composite"
+  count  = var.create_aks_cluster ? 1 : 0
+
+  # Naming
+  prefix      = var.prefix
+  customer    = var.customer
+  stage       = var.stage
+  region_abbv = var.region_abbv
+  name        = local.aks_cluster_name
+
+  # Resource group and location
+  resource_group_name = azurerm_resource_group.hosting_rg.name
+  location            = azurerm_resource_group.hosting_rg.location
+
+  # Basic cluster configuration
+  kubernetes_version = var.aks_kubernetes_version
+  sku_tier           = var.aks_sku_tier
+  dns_prefix         = var.aks_dns_prefix
+
+  # Network configuration
+  network_plugin      = var.aks_network_plugin
+  network_plugin_mode = var.aks_network_plugin_mode
+  network_policy      = var.aks_network_policy
+  network_data_plane  = var.aks_network_data_plane
+  
+  # Use the subnet ID from the networking module
+  subnet_id = var.aks_subnet_name != "" ? module.network.subnet_ids[var.aks_subnet_name] : null
+  
+  # Use network topology if specified
+  use_network_topology     = var.aks_use_network_topology
+  network_topology_region  = var.location
+  pod_cidr                 = var.aks_pod_cidr
+  service_cidr             = var.aks_service_cidr
+  dns_service_ip           = var.aks_dns_service_ip
+  docker_bridge_cidr       = var.aks_docker_bridge_cidr
+  
+  # Node pool configuration
+  default_nodepool_name  = var.aks_default_nodepool_name
+  default_nodepool_vm_size = var.aks_default_nodepool_vm_size
+  default_nodepool_count = var.aks_default_nodepool_count
+  
+  # App node pool configuration
+  app_node_pool_enabled = var.aks_app_node_pool_enabled
+  app_node_pool_name = var.aks_app_node_pool_name
+  app_node_pool_vm_size = var.aks_app_node_pool_vm_size
+  app_node_pool_node_count = var.aks_app_node_pool_node_count
+  
+  # AZ-specific subnet configuration if available
+  availability_zones = var.aks_availability_zones
+  az_subnet_ids = var.aks_az_subnet_names != null ? {
+    for az, subnet_name in var.aks_az_subnet_names :
+    az => module.network.subnet_ids[subnet_name]
+  } : {}
+  
+  # Identity and monitoring
+  workload_identity_enabled = var.aks_workload_identity_enabled
+  oidc_issuer_enabled = var.aks_oidc_issuer_enabled
+  local_account_disabled = var.aks_local_account_disabled
+  log_analytics_workspace_id = var.aks_log_analytics_workspace_id
+  
+  # Private cluster settings
+  private_cluster_enabled = var.aks_private_cluster_enabled
+  private_dns_zone_id = var.aks_private_dns_zone_id
+  private_cluster_public_fqdn_enabled = var.aks_private_cluster_public_fqdn_enabled
+  authorized_ip_ranges = var.aks_authorized_ip_ranges
+  
+  tags = var.tags
+  
+  depends_on = [
+    module.network
+  ]
 } 
