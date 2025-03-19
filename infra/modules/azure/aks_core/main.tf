@@ -39,7 +39,7 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
     max_pods            = var.default_nodepool_max_pods
     os_disk_size_gb     = var.default_nodepool_os_disk_size_gb
     node_labels         = var.default_nodepool_node_labels
-    enable_auto_scaling = var.default_nodepool_enable_auto_scaling
+    auto_scaling_enabled = var.default_nodepool_enable_auto_scaling
     min_count           = var.default_nodepool_enable_auto_scaling ? var.default_nodepool_min_count : null
     max_count           = var.default_nodepool_enable_auto_scaling ? var.default_nodepool_max_count : null
     tags                = var.tags
