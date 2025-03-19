@@ -1,6 +1,6 @@
-# VIP Platform Naming Conventions
+# Platform Naming Conventions
 
-This document outlines the standard naming conventions used across the VIP Platform infrastructure to ensure consistency across all resources and environments.
+This document outlines the standard naming conventions used across our multi-cloud platform infrastructure to ensure consistency across all resources and environments.
 
 ## General Structure
 
@@ -49,14 +49,6 @@ Where:
 | Private DNS Zone | pdns | privatelink.database.windows.net |
 | Front Door | fd | vip-fd-dev-global |
 | Log Analytics Workspace | law | vip-law-dev-eus-analytics |
-| Workload Identity | workid | vip-workid-dev-eus-customer |
-| Federated Credential | fedcred | vip-fedcred-dev-eus-customer |
-| Storage Account Private Endpoint | sape | vip-sape-dev-eus-customer |
-| Storage Account Private Service Connection | sapsc | vip-sapsc-dev-eus-customer |
-| Front Door Endpoint | fd-endpoint | vip-fd-endpoint-dev-eus-customer |
-| Front Door Origin Group | fd-og | vip-fd-og-dev-eus-customer |
-| Front Door Origin | fd-origin | vip-fd-origin-dev-eus-customer |
-| Front Door Route | fd-route | vip-fd-route-dev-eus-customer |
 
 ## Specific Resource Conventions
 
@@ -79,21 +71,6 @@ Storage accounts have a 24 character limit and cannot use hyphens. They follow t
 ```
 
 Example: `vipdeveussa001`
-
-### Customer-Specific Resources
-
-For customer-specific resources:
-```
-{prefix}-{resource_type}-{customer}-{env}-{region_abbv}
-```
-
-Example: `vip-kv-customer-dev-eus`
-
-### Container Names
-Container names are consistent across all deployments:
-- assets
-- public
-- pdf
 
 ### Deployment ID
 
@@ -134,6 +111,22 @@ All resources should include the following standard tags:
 | AutoShutdown | Auto-shutdown eligibility | "True", "False" |
 | CIDRHierarchy | For network resources, position in CIDR hierarchy | "Azure-Dev-EastUS" |
 | NetworkDesign | Network design pattern | "Kubernetes3AZ" |
+
+## Network Naming Hierarchy
+
+The network naming follows the hierarchical CIDR allocation:
+
+```
+# Format for Virtual Networks
+{prefix}-vnet-{env}-{region_abbv}-{purpose}
+
+# Format for Resource Groups
+{prefix}-rg-{env}-{region_abbv}-{component}
+```
+
+Examples:
+- `vip-vnet-dev-eus-main` (Main VNet in East US for dev)
+- `vip-rg-dev-eus-net` (Resource group for networking in East US dev)
 
 ## Implementation in Terraform
 
@@ -198,4 +191,4 @@ All infrastructure modules use the naming module internally. For example, the ho
 
 ## Reference
 
-For CIDR allocation strategy details, see [CIDR Allocation Strategy](infra/docs/cidr-allocation.md). 
+For CIDR allocation strategy details, see [CIDR Allocation Strategy](cidr-allocation.md). 

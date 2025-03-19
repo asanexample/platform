@@ -9,7 +9,9 @@ platform/
 ├── infra/                   # Infrastructure code
 │   ├── docs/                # Documentation
 │   │   ├── cidr-allocation.md  # CIDR allocation strategy
-│   │   └── NAMING_CONVENTIONS.md  # Naming conventions
+│   │   ├── naming-conventions.md  # Naming conventions
+│   │   ├── network-topology.md  # Network topology documentation
+│   │   └── multi-region-deployment.md  # Multi-region deployment guide
 │   ├── live/                # Live infrastructure code (Terragrunt)
 │   │   ├── _envcommon/      # Common environment configurations
 │   │   └── azure/           # Azure-specific configurations
@@ -28,7 +30,14 @@ platform/
 │   │       ├── key_vault/          # Azure Key Vault module
 │   │       ├── naming/             # Azure resource naming module
 │   │       ├── terraform_state/    # Azure Terraform state module
-│   │       └── hosting/            # Azure hosting module (networking + storage)
+│   │       ├── hosting/            # Azure hosting module (networking + storage)
+│   │       ├── aks_core/           # Azure AKS core cluster module
+│   │       ├── aks_cluster/        # Azure AKS cluster module
+│   │       ├── aks_cluster_composite/  # Azure AKS composite module
+│   │       ├── aks_identity/       # Azure AKS identity module
+│   │       ├── aks_networking/     # Azure AKS networking module
+│   │       ├── aks_node_pools/     # Azure AKS node pools module
+│   │       └── identities/         # Azure identities module
 │   ├── tests/               # Test configurations
 │   │   └── modules/         # Module tests
 │   │       └── azure/       # Azure module tests
@@ -37,7 +46,10 @@ platform/
 │   │           ├── storage_container/ # Container module tests
 │   │           ├── key_vault/       # Key Vault module tests
 │   │           ├── naming/          # Naming module tests
-│   │           └── hosting/         # Hosting module tests
+│   │           ├── hosting/         # Hosting module tests
+│   │           ├── aks_core/        # AKS core module tests
+│   │           ├── aks_identity/    # AKS identity module tests
+│   │           └── aks_networking/  # AKS networking module tests
 │   └── scripts/             # Utility scripts
 ├── run_all_terraform_tests.sh  # Script to run all Terraform tests
 ├── REQUIREMENTS.md          # Project requirements
@@ -55,6 +67,7 @@ platform/
 - **Security Best Practices**: Implementation of cloud provider security recommendations
 - **Standardized Naming**: Consistent resource naming across all environments
 - **Integrated Hosting Solution**: Combined networking and storage modules for application hosting
+- **AKS Cluster Support**: Kubernetes cluster deployment with multi-AZ node pools and workload identity
 
 ## Implemented Modules
 
@@ -109,6 +122,41 @@ The following modules have been implemented and tested:
    - Integrates key vault with network security and access controls
    - Optimized for web application hosting
    - Integrates with naming conventions for consistent resource naming
+
+8. **Azure AKS Core Module**
+   - Configures core Kubernetes cluster resources
+   - Implements secure default configurations
+   - Supports integration with Azure CNI networking
+   - Configures monitoring and logging
+   - Implements RBAC and Azure AD integration
+
+9. **Azure AKS Cluster Composite Module**
+   - Combines multiple AKS modules for simplified deployment
+   - Integrates core cluster, identity, networking, and node pools
+   - Provides a unified interface for complete AKS deployment
+   - Implements secure defaults and best practices
+   - Supports customization of all cluster components
+
+10. **Azure AKS Identity Module**
+    - Configures service principals or managed identities for AKS
+    - Implements workload identity federation
+    - Sets up appropriate RBAC permissions
+    - Integrates with Azure AD groups
+    - Supports pod-level identity assignments
+
+11. **Azure AKS Networking Module**
+    - Configures AKS-specific network resources
+    - Implements kubenet or Azure CNI networking
+    - Configures network policies and security
+    - Sets up appropriate DNS configuration
+    - Supports advanced networking features like network policy
+
+12. **Azure AKS Node Pools Module**
+    - Creates and configures node pools across availability zones
+    - Supports system and user node pools
+    - Configures auto-scaling and node sizes
+    - Implements taints and labels for workload assignment
+    - Supports spot instances for cost optimization
 
 ## Network Design
 
@@ -216,13 +264,17 @@ This infrastructure implements the following security practices:
 - **Secret Management**: Key Vault used for secure secret storage
 - **Network Access Controls**: Default-deny with explicit allow lists
 - **Private Endpoints**: Used for secure access to PaaS services
+- **Workload Identity Federation**: Secure pod-level authentication without stored credentials
 - **Compliance Validation**: Tests verify security configurations
 
-## Naming Conventions
+## Documentation
 
-Resources follow standardized naming patterns using the Azure naming module. This ensures consistency across all resources and compliance with Azure's naming restrictions.
+Detailed documentation is available in the `/infra/docs` directory:
 
-For details, see the [NAMING_CONVENTIONS.md](NAMING_CONVENTIONS.md) document.
+- [Naming Conventions](infra/docs/naming-conventions.md) - Resource naming standards
+- [CIDR Allocation](infra/docs/cidr-allocation.md) - Network addressing strategy
+- [Network Topology](infra/docs/network-topology.md) - Network design documentation
+- [Multi-Region Deployment](infra/docs/multi-region-deployment.md) - Guide for multi-region deployments
 
 ## Contributing
 
@@ -248,22 +300,9 @@ Please follow these guidelines when contributing:
 
 4. **Network Changes**:
    - Follow the established CIDR allocation strategy
-   - Document any changes to network architecture
-   - Consider impacts on existing infrastructure
-
-5. **Pull Requests**:
-   - Create feature branches from main
-   - Keep changes focused and small when possible
-   - Include test results in PR description
-   - Respond to review comments
-
-## Documentation
-
-- [Requirements](REQUIREMENTS.md) - Project requirements and specifications
-- [Implementation Plan](IMPLEMENTATION.md) - Phased implementation approach
-- [Naming Conventions](NAMING_CONVENTIONS.md) - Resource naming guidelines
-- [CIDR Allocation](infra/docs/cidr-allocation.md) - Network addressing strategy
-- [Module Documentation](infra/modules/) - Per-module documentation
+   - Document any deviations from standard allocations
+   - Ensure network changes don't break existing connectivity
+   - Verify network security groups maintain proper protection
 
 ## License
 

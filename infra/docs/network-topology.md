@@ -1,95 +1,266 @@
-# Network Topology and CIDR Allocation
+# Network Topology
 
-This document outlines our network topology and CIDR allocation strategy across multiple cloud providers based on the comprehensive allocations defined in `allocations.csv`.
+This document describes the network topology used in the multi-cloud platform, including design patterns, connectivity models, and security controls.
 
-## Multi-Cloud CIDR Allocation
+## Overview
 
-Our network addressing follows a hierarchical approach that provides clear IP address allocation across different cloud providers and environments:
+Our network architecture follows a hierarchical design optimized for Kubernetes workloads, with multi-AZ deployment in each region for high availability. The design emphasizes security, isolation, and scalability.
 
-| Account | Cloud Provider | CIDR Range | Purpose |
-|---------|---------------|------------|---------|
-| innovation-operations | AWS | 10.100.0.0/16 | Primary VPC for AWS environments |
-| innovation-operations | Azure | 10.101.0.0/16 | Primary VNet for Azure environments |
+## Core Network Design Principles
 
-## Regional Allocation Strategy
+1. **Hierarchical Address Space**: Clear CIDR hierarchy following our [CIDR Allocation Strategy](cidr-allocation.md)
+2. **Default Deny**: All network traffic is denied by default, with explicit allow rules
+3. **Defense in Depth**: Multiple security layers at network, subnet, and resource levels
+4. **Availability Zone Awareness**: Resources distributed across 3 AZs for high availability
+5. **Service Isolation**: Separate subnets for different service types
+6. **Private Access**: Private endpoints for Azure PaaS services
 
-Each region follows a consistent pattern with CIDR blocks allocated per region:
+## Azure Network Architecture
 
-1. Each **region** is allocated a `/20` CIDR block within the cloud provider's address space
-2. Within each region, **availability zones** each receive a `/24` CIDR block
-3. Within each availability zone, specialized **subnet types** are created with non-overlapping CIDR ranges
+### Virtual Network Design
 
-| Subnet Role | CIDR Size | IP Range Example | IPs Available | Purpose |
-|-------------|-----------|------------------|---------------|---------|
-| Kubernetes | /24 | 10.101.0.0/24 | 254 | Kubernetes node networking |
-| Services | /26 | 10.101.0.128/26 | 62 | Application and service networking |
-| Endpoints | /27 | 10.101.0.192/27 | 30 | Private endpoints and service connections |
-| Transit | /28 | 10.101.0.224/28 | 14 | Transit gateways and network connections |
-
-## AWS Region Allocations
-
-| Region | Region CIDR | AZs |
-|--------|-------------|-----|
-| us-east-1 | 10.100.0.0/20 | us-east-1a, us-east-1b, us-east-1c |
-| us-east-2 | 10.100.16.0/20 | us-east-2a, us-east-2b, us-east-2c |
-| us-west-1 | 10.100.32.0/20 | us-west-1a, us-west-1b |
-| us-west-2 | 10.100.48.0/20 | us-west-2a, us-west-2b, us-west-2c |
-| eu-west-1 | 10.100.64.0/20 | eu-west-1a, eu-west-1b, eu-west-1c |
-| eu-west-2 | 10.100.80.0/20 | eu-west-2a, eu-west-2b, eu-west-2c |
-| eu-west-3 | 10.100.96.0/20 | eu-west-3a, eu-west-3b, eu-west-3c |
-| eu-central-1 | 10.100.112.0/20 | eu-central-1a, eu-central-1b, eu-central-1c |
-| eu-north-1 | 10.100.128.0/20 | eu-north-1a, eu-north-1b, eu-north-1c |
-| ap-northeast-1 | 10.100.144.0/20 | ap-northeast-1a, ap-northeast-1b, ap-northeast-1c |
-| ap-southeast-1 | 10.100.160.0/20 | ap-southeast-1a, ap-southeast-1b, ap-southeast-1c |
-| ap-southeast-2 | 10.100.176.0/20 | ap-southeast-2a, ap-southeast-2b, ap-southeast-2c |
-| ap-south-1 | 10.100.192.0/20 | ap-south-1a, ap-south-1b, ap-south-1c |
-| sa-east-1 | 10.100.208.0/20 | sa-east-1a, sa-east-1b, sa-east-1c |
-| ca-central-1 | 10.100.224.0/20 | ca-central-1a, ca-central-1b, ca-central-1c |
-| af-south-1 | 10.100.240.0/20 | af-south-1a, af-south-1b, af-south-1c |
-
-## Azure Region Allocations
-
-| Region | Region CIDR | AZs |
-|--------|-------------|-----|
-| eastus | 10.101.0.0/20 | eastusa, eastusb, eastusc |
-| eastus2 | 10.101.16.0/20 | eastus2a, eastus2b, eastus2c |
-| westus | 10.101.32.0/20 | westusa, westusb, westusc |
-| westus2 | 10.101.48.0/20 | westus2a, westus2b, westus2c |
-| northeurope | 10.101.64.0/20 | northeuropea, northeuropeb, northeuropec |
-| westeurope | 10.101.80.0/20 | westeuropea, westeuropeb, westeuropec |
-
-## Subnet Purpose Definitions
-
-1. **Kubernetes Subnets** (/24): These subnets host Kubernetes node VMs and are sized to accommodate multiple node pools. They use the first half of each AZ's address space (e.g., 10.101.0.0/24).
-
-2. **Services Subnets** (/26): Used for dedicated services that run outside of Kubernetes, such as databases, caches, and application servers. They use the third quarter of each AZ's address space (e.g., 10.101.0.128/26).
-
-3. **Endpoints Subnets** (/27): Dedicated to private endpoints and service connections to PaaS services. They use a portion of the last quarter of each AZ's address space (e.g., 10.101.0.192/27).
-
-4. **Transit Subnets** (/28): Used for connectivity between networks, including transit gateways, VPN endpoints, and ExpressRoute connections. They use the final portion of each AZ's address space (e.g., 10.101.0.224/28).
-
-## Subnet Allocation Within Each AZ
-
-For each AZ, we follow this pattern to ensure no CIDR overlaps:
+Each region in each environment has its own dedicated virtual network with the following components:
 
 ```
-AZ CIDR: 10.101.X.0/24 (where X is the AZ identifier)
-
-- Kubernetes: 10.101.X.0/24    (uses the full AZ space for Kubernetes)
-- Services:   10.101.X.128/26  (uses the second half's first half)
-- Endpoints:  10.101.X.192/27  (uses the second half's second half's first half)
-- Transit:    10.101.X.224/28  (uses the second half's second half's second half)
+Virtual Network (10.x.0.0/16)
+├── Availability Zone 1 (10.x.0.0/18)
+│   ├── AKS Node Subnet (10.x.0.0/20)
+│   ├── AKS Pod Subnet (10.x.16.0/20)
+│   └── Private Endpoint Subnet (10.x.32.0/24)
+├── Availability Zone 2 (10.x.64.0/18)
+│   ├── AKS Node Subnet (10.x.64.0/20)
+│   ├── AKS Pod Subnet (10.x.80.0/20)
+│   └── Private Endpoint Subnet (10.x.96.0/24)
+├── Availability Zone 3 (10.x.128.0/18)
+│   ├── AKS Node Subnet (10.x.128.0/20)
+│   ├── AKS Pod Subnet (10.x.144.0/20)
+│   └── Private Endpoint Subnet (10.x.160.0/24)
+└── Shared Services (10.x.192.0/18)
+    ├── Gateway Subnet (10.x.192.0/24)
+    ├── Firewall Subnet (10.x.193.0/24)
+    ├── Bastion Subnet (10.x.194.0/24)
+    └── Management Subnet (10.x.195.0/24)
 ```
 
-This approach gives us non-overlapping subnet ranges within each AZ while still maintaining the hierarchy and logical organization.
+### Network Security Groups
 
-## Implementation Notes
+Each subnet has a dedicated NSG with appropriate security rules:
 
-1. All network security groups, firewalls, and ACLs should leverage the hierarchical structure
-2. New regions should follow this allocation pattern
-3. Pod and service CIDR blocks for Kubernetes should be isolated from VPC/VNet CIDR ranges
-4. All subnet CIDR blocks within an AZ must be non-overlapping to comply with Azure networking requirements
+| Subnet Type | Inbound Rules | Outbound Rules |
+|-------------|---------------|----------------|
+| AKS Node | Allow from Azure Load Balancer<br>Allow from AKS control plane<br>Allow from other node subnets | Allow to Internet<br>Allow to other node subnets<br>Allow to pod subnets |
+| AKS Pod | Allow from node subnets<br>Allow from other pod subnets | Allow to Internet<br>Allow to node subnets<br>Allow to other pod subnets |
+| Private Endpoint | Allow from VNET | Deny all |
+| Gateway | Allow HTTPS/443 from Internet | Allow to VNet |
+| Bastion | Allow HTTPS/443 from Internet<br>Allow SSH/22 from Internet | Allow to VNet |
+| Management | Allow from Bastion | Allow to Internet |
 
-## Governance
+### Service Endpoints
 
-The master source of truth for IP allocation is maintained in `allocations.csv`. This document serves as a guide and explanation, but the CSV should be consulted for the most current and specific allocations. 
+The following Azure service endpoints are enabled on appropriate subnets:
+
+| Subnet | Service Endpoints |
+|--------|-------------------|
+| AKS Node | Microsoft.Storage<br>Microsoft.KeyVault<br>Microsoft.ContainerRegistry |
+| AKS Pod | Microsoft.Storage<br>Microsoft.KeyVault<br>Microsoft.ContainerRegistry |
+| Private Endpoint | None |
+| Management | Microsoft.Storage<br>Microsoft.KeyVault |
+
+### Private Endpoints
+
+Private endpoints are used for secure access to the following PaaS services:
+
+1. Storage Accounts
+2. Key Vaults
+3. Container Registries
+4. Azure SQL Databases
+
+Each private endpoint is deployed in its respective AZ's Private Endpoint subnet and has its own private IP address within the VNET.
+
+## Multi-Region Connectivity
+
+For environments requiring multi-region connectivity, Global VNet Peering is used to connect VNets across regions:
+
+```
+           ┌─────────────────┐         ┌─────────────────┐
+           │  East US VNet   │◄───────►│  West US VNet   │
+           └─────────────────┘         └─────────────────┘
+                    ▲                          ▲
+                    │                          │
+                    ▼                          ▼
+           ┌─────────────────┐         ┌─────────────────┐
+           │ East US Private │         │ West US Private │
+           │    Endpoints    │         │    Endpoints    │
+           └─────────────────┘         └─────────────────┘
+```
+
+## Kubernetes Network Integration
+
+### Azure CNI Networking
+
+AKS clusters use Azure CNI networking with the following configuration:
+
+1. **Pod Subnets**: Dedicated subnets for pod IP addresses
+2. **Network Policy**: Calico network policy enabled for pod-to-pod traffic control
+3. **Standard Load Balancer**: Used for Kubernetes services
+4. **Internal Load Balancers**: For internal services (not exposed to internet)
+5. **NAT Gateway**: For outbound traffic from nodes and pods
+
+### Ingress Configuration
+
+For ingress to Kubernetes applications:
+
+1. **Internal Ingress**: NGINX Ingress Controllers with internal load balancers for apps that should only be accessible within the VNet
+2. **External Ingress**: Azure Front Door for global load balancing and WAF protection
+
+```
+Internet
+   │
+   ▼
+┌─────────────────┐
+│  Azure Front    │
+│     Door        │
+└─────────────────┘
+   │
+   ▼
+┌─────────────────┐
+│  AKS Ingress    │
+│  Controller     │
+└─────────────────┘
+   │
+   ▼
+┌─────────────────┐
+│  Kubernetes     │
+│  Services       │
+└─────────────────┘
+```
+
+## Network Monitoring and Diagnostics
+
+1. **Flow Logs**: NSG flow logs enabled and stored in Log Analytics
+2. **Diagnostic Settings**: All network resources have diagnostic settings enabled
+3. **Network Watcher**: Enabled for troubleshooting network issues
+4. **Traffic Analytics**: Configured for network traffic patterns analysis
+
+## Security Controls
+
+### Network Layer Security
+
+1. **NSGs**: Applied at subnet level with restrictive rules
+2. **Service Endpoints**: Enable direct access to Azure services without going over public internet
+3. **Private Endpoints**: For secure access to PaaS services
+4. **DDoS Protection**: Standard DDoS protection enabled on VNets
+
+### Application Layer Security
+
+1. **Web Application Firewall**: Enabled on Front Door and Application Gateway
+2. **TLS Termination**: TLS 1.2+ enforced at ingress points
+3. **Network Policy**: Calico network policy for pod-to-pod traffic control
+
+## Implementation in Terraform
+
+The network topology is implemented through the following modules:
+
+1. **Azure Networking Module**: Creates the VNet and subnet structure
+2. **AKS Networking Module**: Configures AKS-specific networking components
+3. **Private Endpoint Configurations**: In various resource modules (Storage, Key Vault, etc.)
+4. **Front Door Module**: For global load balancing and WAF
+
+Example Terraform configuration for the VNet structure:
+
+```hcl
+module "networking" {
+  source = "../../modules/azure/networking"
+  
+  # Basic settings
+  resource_group_name = "vip-rg-dev-eus-net"
+  location            = "eastus"
+  
+  # Network settings
+  vnet_name           = "vip-vnet-dev-eus-main"
+  address_space       = ["10.8.0.0/16"]  # Dev East US
+  
+  # AZ1 Subnets
+  az1_subnets = {
+    nodes = {
+      name             = "az1-node-subnet"
+      address_prefixes = ["10.8.0.0/20"]
+      service_endpoints = [
+        "Microsoft.Storage",
+        "Microsoft.KeyVault",
+        "Microsoft.ContainerRegistry"
+      ]
+    }
+    pods = {
+      name             = "az1-pod-subnet"
+      address_prefixes = ["10.8.16.0/20"]
+      service_endpoints = [
+        "Microsoft.Storage",
+        "Microsoft.KeyVault",
+        "Microsoft.ContainerRegistry"
+      ]
+    }
+    endpoints = {
+      name             = "az1-endpoint-subnet"
+      address_prefixes = ["10.8.32.0/24"]
+    }
+  }
+  
+  # Similar configurations for AZ2 and AZ3
+  # ...
+  
+  # Shared services subnets
+  shared_subnets = {
+    gateway = {
+      name             = "gateway-subnet"
+      address_prefixes = ["10.8.192.0/24"]
+    }
+    firewall = {
+      name             = "firewall-subnet"
+      address_prefixes = ["10.8.193.0/24"]
+    }
+    bastion = {
+      name             = "bastion-subnet"
+      address_prefixes = ["10.8.194.0/24"]
+    }
+    management = {
+      name             = "management-subnet"
+      address_prefixes = ["10.8.195.0/24"]
+      service_endpoints = [
+        "Microsoft.Storage",
+        "Microsoft.KeyVault"
+      ]
+    }
+  }
+  
+  # Tags
+  tags = {
+    Environment    = "dev"
+    CIDRHierarchy  = "Azure-Dev-EastUS"
+    NetworkDesign  = "Kubernetes3AZ"
+  }
+}
+```
+
+## Considerations for Multi-Cloud
+
+When extending to other cloud providers, similar networking patterns are followed with cloud-specific implementations:
+
+1. **AWS**: VPCs with subnets spread across multiple AZs
+2. **GCP**: VPC networks with subnets in multiple zones
+3. **Inter-cloud Connectivity**: Established via VPN or dedicated interconnects
+
+## Change Management
+
+Network changes follow strict change management procedures:
+
+1. Plan changes in lower environments first
+2. Document all changes to CIDR allocation
+3. Test connectivity before and after changes
+4. Implement changes during scheduled maintenance windows
+5. Maintain backup of network configurations
+
+## References
+
+- [CIDR Allocation Strategy](cidr-allocation.md) - Network addressing strategy
+- [Multi-Region Deployment](multi-region-deployment.md) - Guide for multi-region deployments 

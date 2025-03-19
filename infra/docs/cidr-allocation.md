@@ -1,93 +1,143 @@
-# Hierarchical CIDR Allocation Strategy [DEPRECATED]
+# CIDR Allocation Strategy
 
-> **IMPORTANT: This document is deprecated.** Please refer to the current network topology documentation at [network-topology.md](./network-topology.md).
+This document outlines the hierarchical CIDR allocation strategy used for the multi-cloud platform infrastructure, ensuring clear network boundaries and preventing IP address conflicts.
 
-This document outlines our previous hierarchical CIDR allocation strategy for multi-cloud environments. The strategy combines hierarchical CIDR allocation for clear organizational boundaries with Kubernetes-optimized subnet designs for operational efficiency.
+## Hierarchical Design
 
-## Global Address Space Hierarchy
-
-We use a hierarchical CIDR allocation approach to organize our address space:
+The CIDR allocation follows a hierarchical approach:
 
 ```
-10.0.0.0/8 (Organization-wide address space)
-│
-├── 10.0.0.0/12 - AWS Infrastructure
-│
-├── 10.16.0.0/12 - Azure Infrastructure
-│   │
-│   ├── 10.16.0.0/16 - Azure Management/Hub
-│   │
-│   ├── 10.17.0.0/16 - Azure Dev Environment
-│   │   │
-│   │   ├── 10.17.0.0/23 - Azure Dev East US
-│   │   │   ├── 10.17.0.0/25 - AZ1
-│   │   │   ├── 10.17.0.128/25 - AZ2
-│   │   │   └── 10.17.1.0/25 - AZ3
-│   │   │
-│   │   └── 10.17.2.0/23 - Azure Dev West US
-│   │       ├── 10.17.2.0/25 - AZ1
-│   │       ├── 10.17.2.128/25 - AZ2
-│   │       └── 10.17.3.0/25 - AZ3
-│   │
-│   ├── 10.18.0.0/16 - Azure Test Environment (Reserved)
-│   │
-│   └── 10.19.0.0/16 - Azure Production Environment (Reserved)
-│
-└── 10.32.0.0/12 - GCP Infrastructure (Reserved)
+Global Address Space
+├── Cloud Provider
+│   ├── Environment
+│   │   ├── Region
+│   │   │   ├── Availability Zone
+│   │   │   │   └── Subnet Purpose
 ```
 
-## Allocation Benefits
+## Global Address Space Allocation
 
-1. **Visual IP Recognition**: IPs can instantly be identified by environment
-   - 10.17.x.x = Azure Dev
-   - 10.19.x.x = Azure Prod (future)
+| Network Level | CIDR Block | Description |
+|---------------|------------|-------------|
+| Global | 10.0.0.0/8 | Complete address space for all environments |
 
-2. **Simplified Security Rules**: Broad security rules can use environment boundaries 
-   - Example: `allow from 10.16.0.0/16 to 10.17.0.0/16 port 443`
+## Cloud Provider Allocation
 
-3. **Future-Proofing**: Structure accommodates:
-   - Additional environments (staging, QA)
-   - New cloud providers
-   - New regions within existing environments
+| Cloud Provider | CIDR Block | Description |
+|----------------|------------|-------------|
+| Azure | 10.0.0.0/10 | Azure resources (10.0.0.0 - 10.63.255.255) |
+| AWS | 10.64.0.0/10 | AWS resources (10.64.0.0 - 10.127.255.255) |
+| GCP | 10.128.0.0/10 | GCP resources (10.128.0.0 - 10.191.255.255) |
+| On-premises | 10.192.0.0/10 | On-premises and future expansion (10.192.0.0 - 10.255.255.255) |
 
-## Kubernetes Network Design
+## Environment Allocation (Azure Example)
 
-Within each region, we follow a 3-AZ Kubernetes-optimized design:
+| Environment | CIDR Block | Description |
+|-------------|------------|-------------|
+| Shared | 10.0.0.0/13 | Shared infrastructure (10.0.0.0 - 10.7.255.255) |
+| Development | 10.8.0.0/13 | Development environment (10.8.0.0 - 10.15.255.255) |
+| Pre-production | 10.16.0.0/13 | Pre-production/staging (10.16.0.0 - 10.23.255.255) |
+| Production | 10.24.0.0/13 | Production environment (10.24.0.0 - 10.31.255.255) |
+| Demo | 10.32.0.0/13 | Demo environment (10.32.0.0 - 10.39.255.255) |
+| Reserved | 10.40.0.0/11 | Reserved for future use (10.40.0.0 - 10.63.255.255) |
 
-1. **Each Availability Zone (AZ) gets a /25 CIDR block**
-2. **Each AZ has specialized subnet types**:
-   - **Node Subnets** (/26): For Kubernetes worker nodes (62 IPs per AZ)
-   - **Load Balancer Subnets** (/28): For load balancers (14 IPs per AZ)
-   - **Endpoint Subnets** (/28): For private endpoints and service connections (14 IPs per AZ)
-   - **Transit Subnets** (/29): For transit gateways or routing (6 IPs per AZ)
-3. **Reserved space** in each AZ for future expansion
+## Regional Allocation (Azure Development Example)
 
-## Current Allocations
+| Region | CIDR Block | Description |
+|--------|------------|-------------|
+| East US | 10.8.0.0/16 | Development in East US |
+| West US | 10.9.0.0/16 | Development in West US |
+| North Europe | 10.10.0.0/16 | Development in North Europe |
+| West Europe | 10.11.0.0/16 | Development in West Europe |
 
-| Environment | Region | CIDR Range      | Usage                  |
-|-------------|--------|-----------------|------------------------|
-| Dev         | EastUS | 10.17.0.0/23    | Azure Dev EastUS VNet  |
-| Dev         | WestUS | 10.17.2.0/23    | Azure Dev WestUS VNet  |
+## Availability Zone Allocation (Azure Development East US Example)
 
-## Reserved Allocations
+| Availability Zone | CIDR Block | Description |
+|-------------------|------------|-------------|
+| Zone 1 | 10.8.0.0/18 | Resources in AZ1 |
+| Zone 2 | 10.8.64.0/18 | Resources in AZ2 |
+| Zone 3 | 10.8.128.0/18 | Resources in AZ3 |
+| Cross-zone | 10.8.192.0/18 | Resources across multiple zones |
 
-| Environment | Region | CIDR Range      | Status                 |
-|-------------|--------|-----------------|------------------------|
-| Dev         | EastUS | 10.17.1.128/25  | Reserved for expansion |
-| Dev         | WestUS | 10.17.3.128/25  | Reserved for expansion |
-| Test        | Global | 10.18.0.0/16    | Reserved for future    |
-| Prod        | Global | 10.19.0.0/16    | Reserved for future    |
-| All         | GCP    | 10.32.0.0/12    | Reserved for future    |
+## Subnet Allocation (Azure Development East US Zone 1 Example)
 
-## Implementation Notes
+| Subnet Purpose | CIDR Block | Size | Description |
+|----------------|------------|------|-------------|
+| AKS Node Subnet | 10.8.0.0/20 | /20 (4,096 IPs) | Kubernetes node subnet |
+| AKS Pod Subnet | 10.8.16.0/20 | /20 (4,096 IPs) | Kubernetes pod subnet |
+| Private Endpoints | 10.8.32.0/24 | /24 (256 IPs) | Azure private endpoints |
+| Gateway | 10.8.33.0/24 | /24 (256 IPs) | Application gateway |
+| Load Balancer | 10.8.34.0/24 | /24 (256 IPs) | Azure load balancer |
+| Reserved | 10.8.35.0/21 | /21 (2,048 IPs) | Reserved for future use |
 
-1. All network ACLs, security groups, and firewall rules should leverage the hierarchical structure wherever possible
-2. As new environments or regions are added, they should follow this allocation pattern
-3. When creating Kubernetes clusters, use CNIs like Cilium that create their own private pod networks
-4. Pod and service CIDR blocks should not overlap with our VPC CIDR ranges:
-   - Recommended Pod CIDR: 172.16.0.0/16
-   - Recommended Service CIDR: 172.17.0.0/16
+## Implementation in Terraform
 
-## Governance
+```hcl
+# Example VNet Configuration
+resource "azurerm_virtual_network" "example" {
+  name                = "vip-vnet-dev-eus-main"
+  location            = "eastus"
+  resource_group_name = azurerm_resource_group.example.name
+  address_space       = ["10.8.0.0/16"]  # East US Dev
+  
+  tags = {
+    Environment     = "dev"
+    CIDRHierarchy   = "Azure-Dev-EastUS"
+    NetworkDesign   = "Kubernetes3AZ"
+  }
+}
 
-This document should be reviewed before any new network allocation and updated as allocations change. All networking infrastructure-as-code should reference this document for CIDR allocation. 
+# Example Subnet Configuration for AZ1
+resource "azurerm_subnet" "az1_node" {
+  name                 = "az1-node-subnet"
+  resource_group_name  = azurerm_resource_group.example.name
+  virtual_network_name = azurerm_virtual_network.example.name
+  address_prefixes     = ["10.8.0.0/20"]
+}
+
+resource "azurerm_subnet" "az1_pods" {
+  name                 = "az1-pods-subnet"
+  resource_group_name  = azurerm_resource_group.example.name
+  virtual_network_name = azurerm_virtual_network.example.name
+  address_prefixes     = ["10.8.16.0/20"]
+}
+
+resource "azurerm_subnet" "az1_endpoints" {
+  name                 = "az1-endpoints-subnet"
+  resource_group_name  = azurerm_resource_group.example.name
+  virtual_network_name = azurerm_virtual_network.example.name
+  address_prefixes     = ["10.8.32.0/24"]
+}
+```
+
+## Network Connectivity Considerations
+
+1. **VNet Peering**: When connecting different virtual networks, ensure CIDR ranges don't overlap
+2. **Hub and Spoke**: Regional hub networks use dedicated address spaces separate from workload spokes
+3. **On-premises Connectivity**: Reserved specific blocks for on-premises networks to avoid conflicts
+4. **Transit Networks**: Dedicated transit networks use the cross-zone address space
+
+## Special Considerations
+
+1. **Multi-region Deployments**: Each region has its own dedicated address space
+2. **Expansion Planning**: Large reserved spaces allow for future growth
+3. **Subnet Sizing**: Subnets are sized based on expected resource counts with room for growth
+4. **Network Security Groups**: NSGs applied at subnet level with appropriate rules
+5. **Service Endpoints**: Configured for storage, Key Vault, and databases
+
+## Implementation Guidelines
+
+1. Always reference this document when allocating new networks
+2. Document any deviations from the standard allocation
+3. Reserve larger CIDR blocks than immediately needed to allow for expansion
+4. Use descriptive tags to identify networks according to this hierarchy
+5. Run IP overlap detection before creating new networks
+
+## Change Management
+
+Changes to the CIDR allocation strategy must be carefully managed to avoid disruption:
+
+1. Proposed changes must be documented and reviewed
+2. Changes should be implemented incrementally
+3. CIDR changes may require recreation of network resources
+4. Always maintain this document when changes are implemented 
