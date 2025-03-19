@@ -1,4 +1,38 @@
-# Azure AKS Networking Module
+# ⚠️ DEPRECATED - AKS Networking Module
+
+> **Important**: This module has been deprecated and its functionality has been consolidated into the main `networking` module. Please use the enhanced networking module instead.
+
+## Migration Guide
+
+To migrate from this module to the enhanced networking module:
+
+1. Update your terraform sources to point to the networking module
+2. Use the new AKS-specific parameters in the networking module:
+
+```hcl
+module "networking" {
+  source = "../../modules/azure/networking"
+  
+  # Regular networking parameters...
+  
+  # AKS Networking Parameters (replaces the aks_networking module)
+  enable_aks_networking = true
+  aks_subnet_name = "your-aks-subnet-name"
+  aks_cluster_name = "your-aks-cluster-name"
+  aks_private_cluster_enabled = true
+  aks_node_resource_group = "your-node-resource-group"
+}
+```
+
+## Why This Module is Deprecated
+
+This module was deprecated because:
+
+1. It caused resource conflicts with the main networking module
+2. Having networking logic split across multiple modules was causing confusion
+3. The Single Responsibility Principle suggests networking concerns should be consolidated
+
+## Original Documentation (For Reference Only)
 
 This module configures network resources and settings for Azure Kubernetes Service (AKS) clusters, implementing secure and optimized networking for Kubernetes workloads.
 

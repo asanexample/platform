@@ -1,6 +1,6 @@
 # Azure Networking Module
 
-This module creates a virtual network infrastructure in Azure with customizable subnet configurations and network security groups.
+This module creates a virtual network infrastructure in Azure with customizable subnet configurations and network security groups. It now also includes integrated AKS networking support.
 
 ## Features
 
@@ -11,8 +11,15 @@ This module creates a virtual network infrastructure in Azure with customizable 
 - Associates a network security group with each subnet
 - Supports custom DNS servers
 - Applies standardized tagging to all resources
+- **AKS Networking Support**:
+  - Creates private DNS zones for AKS private clusters
+  - Configures AKS-specific NSG rules for node subnet security
+  - Links private DNS zones to the virtual network
+  - Optimizes network settings for AKS deployments
 
 ## Usage
+
+### Basic Usage
 
 ```hcl
 module "networking" {
@@ -48,6 +55,49 @@ module "networking" {
 }
 ```
 
+### With AKS Networking
+
+```hcl
+module "networking" {
+  source = "../../modules/azure/networking"
+
+  resource_group_name = "my-resource-group"
+  location            = "eastus"
+  vnet_name           = "my-vnet"
+  
+  # VNet address space
+  address_space = ["10.0.0.0/16"]
+  
+  # Subnets configuration
+  subnets = {
+    "az1-node-subnet" = {
+      address_prefixes  = ["10.0.0.0/20"]
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault"]
+    },
+    "az1-pod-subnet" = {
+      address_prefixes  = ["10.0.16.0/20"]
+    },
+    "az1-endpoint-subnet" = {
+      address_prefixes  = ["10.0.32.0/24"]
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault"]
+    }
+  }
+  
+  # Enable AKS networking features
+  enable_aks_networking = true
+  aks_subnet_name = "az1-node-subnet"
+  aks_cluster_name = "my-aks-cluster"
+  aks_private_cluster_enabled = true
+  aks_node_resource_group = "my-aks-nodes-rg"
+  
+  # Tags
+  tags = {
+    Environment = "dev"
+    Project     = "example"
+  }
+}
+```
+
 ## Inputs
 
 | Name | Description | Type | Default | Required |
@@ -59,6 +109,12 @@ module "networking" {
 | subnets | Map of subnet names to configuration | `map(object)` | `{}` | no |
 | dns_servers | List of DNS servers to use with the virtual network | `list(string)` | `[]` | no |
 | tags | Tags to apply to all resources | `map(string)` | `{}` | no |
+| enable_aks_networking | Whether to enable AKS-specific networking features | `bool` | `false` | no |
+| aks_subnet_name | Name of the subnet to use for AKS nodes. Must match a key in the subnets map. | `string` | `null` | no |
+| aks_cluster_name | Name of the AKS cluster. Required if enable_aks_networking is true. | `string` | `null` | no |
+| aks_private_cluster_enabled | Whether the AKS cluster is private. This affects DNS zone creation. | `bool` | `false` | no |
+| aks_node_resource_group | Name of the resource group where AKS will create node resources | `string` | `null` | no |
+| aks_private_dns_zone_id | ID of an existing private DNS zone for AKS. If not provided, a new one will be created if needed. | `string` | `null` | no |
 
 ### Subnet Configuration
 
@@ -85,6 +141,28 @@ subnets = {
 | vnet_address_space | The address space of the virtual network |
 | subnet_ids | Map of subnet names to subnet IDs |
 | nsg_ids | Map of subnet names to network security group IDs |
+| aks_subnet_id | The ID of the subnet used for AKS nodes |
+| aks_private_dns_zone_id | The ID of the AKS private DNS zone if created |
+| aks_private_dns_zone_name | The name of the AKS private DNS zone if created |
+| aks_nsg_id | The ID of the network security group attached to the AKS subnet |
+| vnet_subnet_ids | List of all subnet IDs in the virtual network |
+| private_endpoints_subnet_id | The ID of the private endpoints subnet if it exists |
+
+## AKS Networking Features
+
+### Network Security Group Rules
+
+When AKS networking is enabled, the module adds the following NSG rules to the AKS subnet:
+
+1. **AllowAzureLoadBalancer**: Permits traffic from Azure Load Balancer, which is essential for AKS functionality.
+2. **DenyAllInbound**: A restrictive rule (priority 4096) that blocks unwanted inbound traffic by default.
+
+### Private DNS Zones
+
+For private AKS clusters, the module creates:
+
+1. A private DNS zone with the name pattern: `privatelink.{region}.azmk8s.io`
+2. A virtual network link that connects the DNS zone to your VNet
 
 ## Testing
 

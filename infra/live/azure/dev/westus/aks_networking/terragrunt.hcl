@@ -1,3 +1,25 @@
+# ⚠️ DEPRECATED - This module has been deprecated ⚠️
+# 
+# The AKS networking functionality has been consolidated into the main networking module.
+# Please use the networking module with AKS-specific parameters instead:
+#
+# Example:
+# ```hcl
+# # In networking/terragrunt.hcl
+# inputs = {
+#   # Regular networking parameters...
+#
+#   # AKS Networking Configuration
+#   enable_aks_networking = true
+#   aks_subnet_name = "az1-node-subnet"
+#   aks_cluster_name = dependency.naming.outputs.aks_cluster
+#   aks_private_cluster_enabled = true
+#   aks_node_resource_group = "${dependency.resource_group.outputs.name}-nodes"
+# }
+# ```
+#
+# This file is kept for reference only and should not be used.
+
 # Terragrunt configuration for Azure AKS Networking in westus region
 
 # Local variables for this configuration
@@ -55,7 +77,10 @@ dependency "networking" {
   }
 }
 
-# Specify inputs specific to this module
+# Skip this module during apply/plan since it's deprecated
+skip = true
+
+# Specify inputs specific to this module - kept for reference
 inputs = {
   # Naming
   prefix      = local.prefix

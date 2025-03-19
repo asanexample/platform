@@ -31,6 +31,7 @@ dependency "naming" {
   # Mock outputs for plan and validation
   mock_outputs = {
     virtual_network = "mock-vnet"
+    aks_cluster = "mock-aks"
   }
 }
 
@@ -100,6 +101,13 @@ inputs = {
       address_prefixes = ["10.9.193.0/24"]
     }
   }
+  
+  # AKS Networking Configuration - consolidating the aks_networking module
+  enable_aks_networking = true
+  aks_subnet_name = "az1-node-subnet"
+  aks_cluster_name = dependency.naming.outputs.aks_cluster
+  aks_private_cluster_enabled = true
+  aks_node_resource_group = "${dependency.resource_group.outputs.name}-nodes"
   
   # Tags
   tags = local.tags

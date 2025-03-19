@@ -176,4 +176,41 @@ variable "tags" {
     ]) || length(var.tags) == 0
     error_message = "Tag values must be 256 characters or less."
   }
+}
+
+# AKS Networking Configuration Parameters
+variable "enable_aks_networking" {
+  description = "Whether to enable AKS-specific networking features"
+  type        = bool
+  default     = false
+}
+
+variable "aks_subnet_name" {
+  description = "Name of the subnet to use for AKS nodes. Must match a key in the subnets map."
+  type        = string
+  default     = null
+}
+
+variable "aks_cluster_name" {
+  description = "Name of the AKS cluster. Required if enable_aks_networking is true."
+  type        = string
+  default     = null
+}
+
+variable "aks_private_cluster_enabled" {
+  description = "Whether the AKS cluster is private. This affects DNS zone creation."
+  type        = bool
+  default     = false
+}
+
+variable "aks_node_resource_group" {
+  description = "Name of the resource group where AKS will create node resources"
+  type        = string
+  default     = null
+}
+
+variable "aks_private_dns_zone_id" {
+  description = "ID of an existing private DNS zone for AKS. If not provided, a new one will be created if needed."
+  type        = string
+  default     = null
 } 

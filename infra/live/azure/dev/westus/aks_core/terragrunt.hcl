@@ -52,6 +52,8 @@ dependency "networking" {
     subnet_ids = {
       "az1-node-subnet" = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet/subnets/az1-node-subnet"
     }
+    aks_private_dns_zone_id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.Network/privateDnsZones/privatelink.westus.azmk8s.io"
+    aks_nsg_id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.Network/networkSecurityGroups/mock-nsg"
   }
 }
 
@@ -66,15 +68,16 @@ dependency "aks_identity" {
   }
 }
 
-dependency "aks_networking" {
-  config_path = "../aks_networking"
-  
-  # Mock outputs for plan and validation
-  mock_outputs = {
-    private_dns_zone_id = null
-    network_security_group_id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.Network/networkSecurityGroups/mock-nsg"
-  }
-}
+# This dependency is no longer needed but kept commented for reference
+# dependency "aks_networking" {
+#   config_path = "../aks_networking"
+#   
+#   # Mock outputs for plan and validation
+#   mock_outputs = {
+#     private_dns_zone_id = null
+#     network_security_group_id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.Network/networkSecurityGroups/mock-nsg"
+#   }
+# }
 
 # Specify inputs specific to this module
 inputs = {
@@ -112,7 +115,7 @@ inputs = {
   
   # Private cluster configuration
   private_cluster_enabled = true
-  private_dns_zone_id = dependency.aks_networking.outputs.private_dns_zone_id
+  private_dns_zone_id = dependency.networking.outputs.aks_private_dns_zone_id
   
   # Default node pool
   default_nodepool_name = "system"

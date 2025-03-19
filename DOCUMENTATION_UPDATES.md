@@ -85,6 +85,38 @@ find infra/live/azure/dev/westus -name "terraform.tfstate*" -exec rm -rf {} \;
 **Files Updated**:
 - `README.md` - Added troubleshooting section
 
+### 5. Networking Module Consolidation
+
+**Issue**: Duplicate management of network resources causing conflicts. The `networking` and `aks_networking` modules were both trying to manage the same subnet NSG associations, causing apply failures.
+
+**Solution**: Consolidated all networking features into a single module with optional AKS-specific capabilities:
+
+```hcl
+# In networking/terragrunt.hcl
+inputs = {
+  # Regular networking parameters...
+  
+  # AKS Networking Configuration
+  enable_aks_networking = true
+  aks_subnet_name = "az1-node-subnet"
+  aks_cluster_name = dependency.naming.outputs.aks_cluster
+  aks_private_cluster_enabled = true
+  aks_node_resource_group = "${dependency.resource_group.outputs.name}-nodes"
+}
+```
+
+**Files Updated**:
+- `infra/modules/azure/networking/variables.tf` - Added AKS-specific parameters
+- `infra/modules/azure/networking/main.tf` - Added AKS networking resources
+- `infra/modules/azure/networking/outputs.tf` - Added AKS-specific outputs
+- `infra/modules/azure/networking/README.md` - Updated documentation
+- `infra/live/azure/dev/westus/networking/terragrunt.hcl` - Added AKS networking parameters
+- `infra/live/azure/dev/westus/networking/README.md` - Added documentation for the new capabilities
+- `infra/live/azure/dev/westus/aks_networking/terragrunt.hcl` - Marked as deprecated with `skip = true`
+- `infra/live/azure/dev/westus/aks_networking/README.md` - Added deprecation notice
+- `infra/modules/azure/aks_networking/README.md` - Added deprecation notice
+- `infra/live/azure/dev/westus/aks_core/terragrunt.hcl` - Updated to use the consolidated networking module
+
 ## Recommendations for Future Development
 
 1. **Naming Convention Validation**:
@@ -100,4 +132,9 @@ find infra/live/azure/dev/westus -name "terraform.tfstate*" -exec rm -rf {} \;
 
 4. **State Management**:
    - Consider implementing a central remote state management approach using Azure Storage.
-   - Document state lock resolution procedures for team members. 
+   - Document state lock resolution procedures for team members.
+
+5. **Module Design**:
+   - Follow the Single Responsibility Principle by consolidating related functionality in a single module.
+   - Design modules to be flexible with optional features rather than creating separate modules for slight variations.
+   - Use flags and conditionals to enable/disable specific features within modules. 
