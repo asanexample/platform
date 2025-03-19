@@ -90,21 +90,13 @@ variable "network_plugin" {
 variable "network_plugin_mode" {
   description = "The network plugin mode to use for the AKS cluster. Valid for Azure CNI only."
   type        = string
-  default     = "overlay"
-  validation {
-    condition     = contains(["overlay", ""], var.network_plugin_mode)
-    error_message = "The network plugin mode must be either 'overlay' or empty string."
-  }
+  default     = null
 }
 
 variable "network_policy" {
   description = "The network policy to use for the AKS cluster"
   type        = string
-  default     = "none"
-  validation {
-    condition     = contains(["azure", "calico", "none"], var.network_policy)
-    error_message = "The network policy must be one of: azure, calico."
-  }
+  default     = null
 }
 
 variable "network_data_plane" {
