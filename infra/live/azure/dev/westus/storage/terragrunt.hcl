@@ -30,8 +30,17 @@ dependency "naming" {
   
   # Mock outputs for plan and validation
   mock_outputs = {
-    resource_group = "mock-rg"
     storage_account = "mocksa"
+  }
+}
+
+dependency "resource_group" {
+  config_path = "../resource_group"
+  
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    name = "mock-rg"
+    location = "westus"
   }
 }
 
@@ -49,8 +58,8 @@ dependency "networking" {
 # Specify inputs specific to this module
 inputs = {
   # Resource group
-  resource_group_name = dependency.naming.outputs.resource_group
-  location = local.region
+  resource_group_name = dependency.resource_group.outputs.name
+  location = dependency.resource_group.outputs.location
   
   # Storage account name
   name = dependency.naming.outputs.storage_account

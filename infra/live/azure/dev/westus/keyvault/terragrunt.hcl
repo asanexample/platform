@@ -30,8 +30,17 @@ dependency "naming" {
   
   # Mock outputs for plan and validation
   mock_outputs = {
-    resource_group = "mock-rg"
     key_vault = "mock-kv"
+  }
+}
+
+dependency "resource_group" {
+  config_path = "../resource_group"
+  
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    name = "mock-rg"
+    location = "westus"
   }
 }
 
@@ -49,8 +58,8 @@ dependency "networking" {
 # Specify inputs specific to this module
 inputs = {
   # Resource group
-  resource_group_name = dependency.naming.outputs.resource_group
-  location = local.region
+  resource_group_name = dependency.resource_group.outputs.name
+  location = dependency.resource_group.outputs.location
   
   # Key Vault name
   key_vault_name = dependency.naming.outputs.key_vault

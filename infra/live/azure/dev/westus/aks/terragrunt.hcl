@@ -19,9 +19,9 @@ include "root" {
   path = find_in_parent_folders()
 }
 
-# Use the actual Terraform module as the source
+# Use the simpler AKS cluster module as the source
 terraform {
-  source = "${get_repo_root()}/infra/modules/azure/aks_cluster_composite"
+  source = "${get_repo_root()}/infra/modules/azure/aks_cluster"
 }
 
 # Set dependencies for this module
@@ -30,8 +30,17 @@ dependency "naming" {
   
   # Mock outputs for plan and validation
   mock_outputs = {
-    resource_group = "mock-rg"
     aks_cluster = "mock-aks"
+  }
+}
+
+dependency "resource_group" {
+  config_path = "../resource_group"
+  
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    name = "mock-rg"
+    location = "westus"
   }
 }
 
@@ -69,11 +78,11 @@ dependency "keyvault" {
 # Specify inputs specific to this module
 inputs = {
   # Resource group and location
-  resource_group_name = dependency.naming.outputs.resource_group
-  location = local.region
+  resource_group_name = dependency.resource_group.outputs.name
+  location = dependency.resource_group.outputs.location
   
   # Cluster configuration
-  cluster_name = dependency.naming.outputs.aks_cluster
+  name = dependency.naming.outputs.aks_cluster
   kubernetes_version = "1.26.6"
   dns_prefix = "${local.prefix}-${local.env}-wus"
   
@@ -81,17 +90,14 @@ inputs = {
   identity_type = "SystemAssigned"
   
   # Network configuration
-  vnet_id = dependency.networking.outputs.vnet_id
-  subnet_id = dependency.networking.outputs.subnet_ids["az1-node-subnet"]
+  vnet_subnet_id = dependency.networking.outputs.subnet_ids["az1-node-subnet"]
+  nodepool_subnet_id = dependency.networking.outputs.subnet_ids["az1-node-subnet"]
   
-  # Network profile settings
-  network_profile = {
-    network_plugin = "azure"
-    network_policy = "azure"
-    load_balancer_sku = "standard"
-  }
-  
-  # Pod networking
+  # Network profile settings - use explicit empty strings
+  network_plugin = "azure"
+  network_plugin_mode = ""
+  network_policy = "azure"
+  network_data_plane = ""
   service_cidr = "10.0.0.0/16"
   dns_service_ip = "10.0.0.10"
   docker_bridge_cidr = "172.17.0.1/16"
@@ -99,7 +105,7 @@ inputs = {
   
   # Security settings
   private_cluster_enabled = true
-  authorized_ip_ranges = ["0.0.0.0/0"]  # This should be restricted in production
+  api_server_authorized_ip_ranges = ["0.0.0.0/0"]  # This should be restricted in production
   
   # Default node pool
   default_node_pool = {
@@ -114,16 +120,20 @@ inputs = {
     node_labels = {
       "role" = "system"
     }
+    vnet_subnet_id = dependency.networking.outputs.subnet_ids["az1-node-subnet"]
+  }
+
+  # RBAC settings
+  role_based_access_control_enabled = true
+  azure_active_directory_role_based_access_control = {
+    managed = true
+    admin_group_object_ids = []
+    azure_rbac_enabled = true
   }
   
-  # Additional node pools - empty to start
-  additional_node_pools = {}
-  
-  # Maintenance windows - empty to use system defaults
-  allowed_maintenance_windows = []
-  
-  # Admin group configuration
-  admin_group_object_ids = []
+  # Monitoring configuration - use null values
+  log_analytics_workspace_id = null
+  monitor_workspace_id = null
   
   # Tags
   tags = local.tags
