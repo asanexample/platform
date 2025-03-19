@@ -63,7 +63,7 @@ resource "azurerm_subnet_network_security_group_association" "nsg_association" {
 
 # Determine if we should add AKS-specific NSG rules
 locals {
-  configure_aks_nsg = var.enable_aks_networking && var.aks_subnet_name != null && contains(keys(var.subnets), var.aks_subnet_name)
+  configure_aks_nsg = var.enable_aks_networking && var.aks_subnet_name != null ? contains(keys(var.subnets), var.aks_subnet_name) : false
 }
 
 # Add AKS-specific NSG rules when enabled
