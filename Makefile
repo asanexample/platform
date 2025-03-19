@@ -9,6 +9,7 @@ ENV ?= dev
 REGION ?= westus
 CLOUD ?= azure
 MODULE ?= all
+NO_CONFIRM ?= false
 
 # Paths
 INFRA_DIR := $(CURDIR)/infra
@@ -21,7 +22,7 @@ CLOUD_ENV_REGION_DIR := $(CLOUD_ENV_DIR)/$(REGION)
 
 .PHONY: help
 help: ## Show this help message
-	@echo 'Usage: make [target] [ENV=env] [REGION=region] [CLOUD=cloud] [MODULE=module]'
+	@echo 'Usage: make [target] [ENV=env] [REGION=region] [CLOUD=cloud] [MODULE=module] [NO_CONFIRM=true]'
 	@echo ''
 	@echo 'Targets:'
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -31,6 +32,7 @@ help: ## Show this help message
 	@echo '  REGION: Region to target (default: westus)'
 	@echo '  CLOUD: Cloud provider to target (default: azure)'
 	@echo '  MODULE: Specific module to target (default: all)'
+	@echo '  NO_CONFIRM: Skip all confirmation prompts (default: false)'
 
 .PHONY: init
 init: ## Initialize all modules
@@ -63,7 +65,7 @@ plan-module: ## Plan a specific module
 .PHONY: apply
 apply: ## Apply all modules
 	@echo "Applying $(CLOUD)/$(ENV)/$(REGION)..."
-	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all apply
+	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all apply -auto-approve
 
 .PHONY: apply-module
 apply-module: ## Apply a specific module
@@ -72,13 +74,15 @@ apply-module: ## Apply a specific module
 		exit 1; \
 	fi
 	@echo "Applying module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION)..."
-	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt apply
+	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt apply -auto-approve
 
 .PHONY: destroy
 destroy: ## Destroy all modules (USE WITH CAUTION)
 	@echo "WARNING: You are about to destroy all resources in $(CLOUD)/$(ENV)/$(REGION)..."
-	@echo "Are you sure? [y/N] " && read ans && [ $${ans:-N} = y ]
-	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all destroy
+	@if [ "$(NO_CONFIRM)" != "true" ]; then \
+		echo "Are you sure? [y/N] " && read ans && [ $${ans:-N} = y ]; \
+	fi
+	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all destroy -auto-approve
 
 .PHONY: destroy-module
 destroy-module: ## Destroy a specific module (USE WITH CAUTION)
@@ -87,8 +91,10 @@ destroy-module: ## Destroy a specific module (USE WITH CAUTION)
 		exit 1; \
 	fi
 	@echo "WARNING: You are about to destroy module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION)..."
-	@echo "Are you sure? [y/N] " && read ans && [ $${ans:-N} = y ]
-	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt destroy
+	@if [ "$(NO_CONFIRM)" != "true" ]; then \
+		echo "Are you sure? [y/N] " && read ans && [ $${ans:-N} = y ]; \
+	fi
+	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt destroy -auto-approve
 
 .PHONY: clean
 clean: ## Clean Terragrunt cache
@@ -188,4 +194,32 @@ show-state-module: ## Show state for a specific module
 		exit 1; \
 	fi
 	@echo "State for module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION):"
-	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt state list 
+	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt state list
+
+.PHONY: plan-file
+plan-file: ## Create a plan file for all modules
+	@echo "Creating plan file for $(CLOUD)/$(ENV)/$(REGION)..."
+	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all plan -out=tfplan
+
+.PHONY: plan-file-module
+plan-file-module: ## Create a plan file for a specific module
+	@if [ "$(MODULE)" = "all" ]; then \
+		echo "Error: Please specify a module with MODULE=<module-name>"; \
+		exit 1; \
+	fi
+	@echo "Creating plan file for module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION)..."
+	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt plan -out=tfplan
+
+.PHONY: apply-plan
+apply-plan: ## Apply a plan file for all modules
+	@echo "Applying plan file for $(CLOUD)/$(ENV)/$(REGION)..."
+	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all apply tfplan
+
+.PHONY: apply-plan-module
+apply-plan-module: ## Apply a plan file for a specific module
+	@if [ "$(MODULE)" = "all" ]; then \
+		echo "Error: Please specify a module with MODULE=<module-name>"; \
+		exit 1; \
+	fi
+	@echo "Applying plan file for module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION)..."
+	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt apply tfplan 
