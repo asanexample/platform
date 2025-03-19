@@ -95,9 +95,16 @@ inputs = {
   # Cluster configuration
   kubernetes_version = "1.32"
   sku_tier = "Standard" # Required when cost_analysis_enabled is true
-  local_account_disabled = false
+  local_account_disabled = true  # Re-enable since we're integrating with AAD
   workload_identity_enabled = true
   oidc_issuer_enabled = true
+  
+  # Azure AD integration - managed approach
+  azure_active_directory_role_based_access_control = {
+    managed = true
+    admin_group_object_ids = ["00000000-0000-0000-0000-000000000000"]  # Replace with actual AAD admin group IDs
+    azure_rbac_enabled = true
+  }
   
   # Identity configuration - use the user-assigned identity
   identity_type = "UserAssigned"
