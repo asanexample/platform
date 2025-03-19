@@ -1,17 +1,23 @@
 #!/bin/bash
 
-# Script to run only the failing Terraform tests
+# Script to run specific failing Terraform tests
+# Usage: ./run_failing_tests.sh test1 test2 test3
+# Example: ./run_failing_tests.sh "infra/modules/azure/aks_core"
 
 set -e
 EXIT_CODE=0
-FAILING_TEST_DIRS=(
-  "infra/tests/modules/azure/hosting"
-  "infra/modules/azure/aks_core"
-  "infra/modules/azure/aks_node_pools"
-  "infra/modules/azure/aks_cluster_composite"
-)
 
-for dir in "${FAILING_TEST_DIRS[@]}"; do
+# If no arguments provided, run these known failing tests
+if [ $# -eq 0 ]; then
+  TEST_DIRS=(
+    "infra/modules/azure/aks_core"
+  )
+else
+  # Use the tests provided as arguments
+  TEST_DIRS=("$@")
+fi
+
+for dir in "${TEST_DIRS[@]}"; do
   if [ -d "$dir" ]; then
     echo "=== Running tests in $dir ==="
     

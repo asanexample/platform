@@ -6,8 +6,9 @@
  */
 
 # Generate a default app node pool name if not provided
+# AKS node pool names must be 1-12 characters, lowercase alphanumeric, and start with a letter
 locals {
-  app_node_pool_name = var.app_node_pool_name != null ? var.app_node_pool_name : "${var.prefix}-${var.stage}-${var.region_abbv}-app-pool"
+  app_node_pool_name = var.app_node_pool_name != null ? var.app_node_pool_name : "app${var.stage}${var.region_abbv}"
 }
 
 # Create application node pool if enabled

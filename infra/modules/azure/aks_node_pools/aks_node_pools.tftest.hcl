@@ -82,8 +82,8 @@ run "validate_generated_name" {
   }
 
   assert {
-    condition     = azurerm_kubernetes_cluster_node_pool.app_node_pool[0].name == "vipdevnp"
-    error_message = "Generated node pool name should follow naming convention from naming module"
+    condition     = azurerm_kubernetes_cluster_node_pool.app_node_pool[0].name == "appdeveus"
+    error_message = "Generated node pool name should follow naming convention"
   }
 }
 

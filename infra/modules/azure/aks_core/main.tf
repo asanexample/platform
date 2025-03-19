@@ -5,14 +5,18 @@
  * focused solely on the main cluster resource without additional components.
  */
 
-# Generate DNS prefix if not provided
+# Generate DNS prefix if not provided and cluster name for auto-generation
 locals {
-  dns_prefix = var.dns_prefix != null ? var.dns_prefix : lower(replace(var.name, "-", ""))
+  # Generate a default name if not provided
+  cluster_name = var.name != null ? var.name : "${var.prefix}-${var.stage}-aks-${var.region_abbv}"
+  
+  # Generate DNS prefix if not provided
+  dns_prefix = var.dns_prefix != null ? var.dns_prefix : lower(replace(local.cluster_name, "-", ""))
 }
 
 # Create the AKS cluster
 resource "azurerm_kubernetes_cluster" "aks_cluster" {
-  name                      = var.name
+  name                      = local.cluster_name
   location                  = var.location
   resource_group_name       = var.resource_group_name
   dns_prefix                = local.dns_prefix
@@ -28,7 +32,7 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
 
   # Apply tags
   tags = merge(var.tags, {
-    name = var.name
+    name = local.cluster_name
   })
 
   # System node pool configuration

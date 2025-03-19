@@ -47,9 +47,10 @@ variable "region_abbv" {
 variable "name" {
   description = "The name of the AKS cluster"
   type        = string
+  default     = null
   validation {
-    condition     = length(var.name) >= 3 && length(var.name) <= 24
-    error_message = "The name must be between 3 and 24 characters."
+    condition     = var.name == null ? true : length(var.name) >= 3 && length(var.name) <= 24
+    error_message = "The name must be between 3 and 24 characters or null for auto-generation."
   }
 }
 

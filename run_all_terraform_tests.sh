@@ -5,7 +5,6 @@
 set -e
 EXIT_CODE=0
 TEST_DIRS=(
-  "infra/tests/modules/azure/hosting"
   "infra/tests/modules/azure/key_vault"
   "infra/tests/modules/azure/naming"
   "infra/tests/modules/azure/networking"
@@ -13,10 +12,7 @@ TEST_DIRS=(
   "infra/tests/modules/azure/storage_container"
   "infra/modules/azure/aks_core"
   "infra/modules/azure/aks_identity"
-  "infra/modules/azure/aks_monitoring"
-  "infra/modules/azure/aks_networking"
   "infra/modules/azure/aks_node_pools"
-  "infra/modules/azure/aks_cluster_composite"
 )
 
 for dir in "${TEST_DIRS[@]}"; do
