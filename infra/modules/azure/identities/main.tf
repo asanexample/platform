@@ -36,12 +36,11 @@ locals {
     }
   }
 
-  # Normalize AKS OIDC information to handle null values gracefully
-  aks_oidc_issuer_url    = var.aks_oidc_issuer_url
-  node_resource_group_id = var.node_resource_group_id
+  # Flag to enable federated credentials - purely based on input variables
+  create_federated_credentials = var.enable_workload_identity && var.create_federated_credentials
 
-  # Determine if we can create federated credentials based on OIDC URL availability
-  can_create_federated_credentials = var.enable_workload_identity && local.aks_oidc_issuer_url != null
+  # Flag to enable role assignments - purely based on input variables
+  create_role_assignments = var.enable_workload_identity && var.create_role_assignments
 }
 
 # =============================================================================
@@ -107,18 +106,21 @@ resource "azurerm_user_assigned_identity" "workload_identities" {
   })
 }
 
-# Create federated credentials for workloads if OIDC is available
+# Create federated credentials for workloads if enabled via the input flag
 resource "azurerm_federated_identity_credential" "workload_credentials" {
-  for_each = {
-    for name, config in var.workload_identities : name => config
-    if local.can_create_federated_credentials
-  }
+  for_each = local.create_federated_credentials ? {
+    for name, config in var.workload_identities : "${name}-credential" => {
+      workload_name   = name
+      namespace       = config.namespace
+      service_account = config.service_account
+    }
+  } : {}
 
-  name                = "${each.value.name != null ? each.value.name : "${var.cluster_name}-${each.key}"}-fedcred"
+  name                = "${var.cluster_name}-${each.value.workload_name}-fedcred"
   resource_group_name = var.resource_group_name
   audience            = ["api://AzureADTokenExchange"]
-  issuer              = local.aks_oidc_issuer_url
-  parent_id           = azurerm_user_assigned_identity.workload_identities[each.key].id
+  issuer              = var.aks_oidc_issuer_url
+  parent_id           = azurerm_user_assigned_identity.workload_identities[each.value.workload_name].id
   subject             = "system:serviceaccount:${each.value.namespace}:${each.value.service_account}"
 }
 
@@ -126,24 +128,24 @@ resource "azurerm_federated_identity_credential" "workload_credentials" {
 # ROLE ASSIGNMENTS FOR WORKLOADS
 # =============================================================================
 
-# Assign roles to workload identities on the node resource group
-resource "azurerm_role_assignment" "workload_node_rg_roles" {
-  for_each = {
-    for item in flatten([
-      for name, config in var.workload_identities : [
-        for role in config.roles : {
-          workload_name = name
-          role_name     = role
-        }
-      ]
-    ]) : "${item.workload_name}-${item.role_name}" => item
-    if local.node_resource_group_id != null
-  }
-
-  scope                = local.node_resource_group_id
-  role_definition_name = each.value.role_name
-  principal_id         = azurerm_user_assigned_identity.workload_identities[each.value.workload_name].principal_id
+# Generate flattened list of role assignments
+locals {
+  role_assignment_pairs = local.create_role_assignments ? flatten([
+    for name, config in var.workload_identities : [
+      for role in config.roles : {
+        key           = "${name}-${role}"
+        workload_name = name
+        role_name     = role
+      }
+    ]
+  ]) : []
 }
 
-# Add additional role assignments for workloads as needed
-# For example, resource-specific role assignments would go here 
+# Assign roles to workload identities on the node resource group
+resource "azurerm_role_assignment" "workload_node_rg_roles" {
+  for_each = { for item in local.role_assignment_pairs : item.key => item }
+
+  scope                = var.node_resource_group_id
+  role_definition_name = each.value.role_name
+  principal_id         = azurerm_user_assigned_identity.workload_identities[each.value.workload_name].principal_id
+} 

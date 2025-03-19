@@ -85,40 +85,40 @@ output "key_vault_tenant_id" {
 
 # AKS Cluster outputs
 output "aks_cluster_id" {
-  description = "ID of the created AKS cluster"
-  value       = var.create_aks_cluster ? module.aks_cluster[0].cluster_id : null
+  description = "The ID of the AKS cluster if created"
+  value       = var.create_aks_cluster ? module.aks_cluster[0].id : null
 }
 
 output "aks_cluster_name" {
-  description = "Name of the created AKS cluster"
-  value       = var.create_aks_cluster ? module.aks_cluster[0].cluster_name : null
+  description = "The name of the AKS cluster if created"
+  value       = var.create_aks_cluster ? module.aks_cluster[0].name : null
 }
 
 output "aks_host" {
-  description = "Kubernetes host from the AKS cluster"
+  description = "The AKS cluster host if AKS was created"
   value       = var.create_aks_cluster ? module.aks_cluster[0].host : null
   sensitive   = true
 }
 
 output "aks_kube_config" {
-  description = "Raw Kubernetes config for the AKS cluster"
+  description = "The kubeconfig for the AKS cluster if AKS was created"
   value       = var.create_aks_cluster ? module.aks_cluster[0].kube_config_raw : null
   sensitive   = true
 }
 
 output "aks_oidc_issuer_url" {
-  description = "OIDC issuer URL for the AKS cluster"
+  description = "The OIDC issuer URL for the AKS cluster if AKS was created"
   value       = var.create_aks_cluster ? module.aks_cluster[0].oidc_issuer_url : null
 }
 
 output "aks_identity_principal_id" {
-  description = "Principal ID of the managed identity for the AKS cluster"
-  value       = var.create_aks_cluster ? module.aks_cluster[0].identity_principal_id : null
+  description = "The principal ID of the AKS identity if created"
+  value       = var.create_aks_cluster ? module.aks_cluster[0].aks_identity_principal_id : null
 }
 
 output "aks_karpenter_identity_id" {
-  description = "ID of the Karpenter identity created for the AKS cluster"
-  value       = var.create_aks_cluster ? module.aks_cluster[0].karpenter_identity_id : null
+  description = "The ID of the Karpenter identity if created and in full mode"
+  value       = var.create_aks_cluster && var.deployment_mode == "full" ? module.aks_cluster[0].karpenter_identity.id : null
 }
 
 # Naming module outputs (always available)

@@ -22,9 +22,10 @@ variable "prefix" {
 variable "customer" {
   description = "Customer name (used for resource naming)."
   type        = string
+  default     = null
 
   validation {
-    condition     = length(var.customer) >= 2 && length(var.customer) <= 10
+    condition     = var.customer == null ? true : length(var.customer) >= 2 && length(var.customer) <= 10
     error_message = "The customer name should be between 2 and 10 characters."
   }
 }
@@ -109,6 +110,18 @@ variable "subnet_id" {
 
 variable "enable_workload_identity" {
   description = "Whether to enable workload identity for the cluster."
+  type        = bool
+  default     = false
+}
+
+variable "create_federated_credentials" {
+  description = "Whether to create federated credentials for workload identities. Set to false for first phase deployment."
+  type        = bool
+  default     = false
+}
+
+variable "create_role_assignments" {
+  description = "Whether to create role assignments for workload identities. Set to false for first phase deployment."
   type        = bool
   default     = false
 }

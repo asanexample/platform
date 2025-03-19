@@ -51,13 +51,14 @@ variable "location" {
   type        = string
 }
 
-# Basic Cluster Configuration
+# DNS Information
 variable "dns_prefix" {
   description = "DNS prefix for the AKS cluster"
   type        = string
   default     = null
 }
 
+# Kubernetes Configuration
 variable "kubernetes_version" {
   description = "Kubernetes version to use for the AKS cluster"
   type        = string
@@ -65,9 +66,9 @@ variable "kubernetes_version" {
 }
 
 variable "local_account_disabled" {
-  description = "Disable local accounts for the AKS cluster"
+  description = "Whether to disable local accounts"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "sku_tier" {
@@ -77,121 +78,121 @@ variable "sku_tier" {
 }
 
 variable "workload_identity_enabled" {
-  description = "Enable workload identity for the AKS cluster"
+  description = "Whether to enable Azure Workload Identity"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "oidc_issuer_enabled" {
-  description = "Enable OIDC issuer for the AKS cluster"
+  description = "Whether to enable OIDC issuer"
   type        = bool
-  default     = true
+  default     = false
 }
 
 # Network Configuration
 variable "network_plugin" {
-  description = "Network plugin to use for the AKS cluster (azure, kubenet, or none)"
+  description = "The CNI plugin to use for networking (azure, kubenet, none)"
   type        = string
   default     = "azure"
 }
 
 variable "network_plugin_mode" {
-  description = "Network plugin mode to use for the AKS cluster (overlay or transparent)"
+  description = "The CNI network plugin mode (overlay or empty string)"
   type        = string
-  default     = "overlay"
+  default     = null
 }
 
 variable "network_policy" {
-  description = "Network policy to use for the AKS cluster (azure, calico)"
+  description = "The network policy to use (azure, calico, none)"
   type        = string
-  default     = "azure"
+  default     = null
 }
 
 variable "network_data_plane" {
-  description = "Network data plane to use for the AKS cluster (azure, cilium)"
+  description = "The network data plane to use (azurecni or cilium)"
   type        = string
-  default     = "azure"
+  default     = "azurecni"
 }
 
 variable "pod_cidr" {
-  description = "CIDR range for pods"
+  description = "The CIDR to use for pod IPs"
   type        = string
-  default     = "10.244.0.0/16"
+  default     = null
 }
 
 variable "service_cidr" {
-  description = "CIDR range for services"
+  description = "The CIDR to use for Kubernetes services"
   type        = string
   default     = "10.0.0.0/16"
 }
 
 variable "dns_service_ip" {
-  description = "IP address within the service CIDR for DNS service"
+  description = "IP address within the Kubernetes service address range that will be used for kube-dns"
   type        = string
-  default     = "10.0.0.10"
+  default     = ""
 }
 
 variable "docker_bridge_cidr" {
-  description = "CIDR range for the Docker bridge network"
+  description = "The CIDR to use for the Docker bridge"
   type        = string
   default     = "172.17.0.1/16"
 }
 
 variable "subnet_id" {
-  description = "ID of the subnet where the AKS cluster will be deployed"
+  description = "The subnet ID to use for the AKS cluster"
   type        = string
   default     = null
 }
 
 variable "availability_zones" {
-  description = "A list of availability zones to deploy the AKS cluster across"
+  description = "List of availability zones to use for the default node pool"
   type        = list(string)
-  default     = ["1", "2", "3"]
+  default     = []
 }
 
 variable "az_subnet_ids" {
-  description = "Map of availability zone to subnet ID where AKS nodes should be deployed (follows allocations.csv topology)"
+  description = "Map of availability zone to subnet ID for AKS node pools"
   type        = map(string)
   default     = {}
 }
 
 variable "use_network_topology" {
-  description = "Whether to use the network topology defined in allocations.csv (if true, pod_cidr, service_cidr and dns_service_ip will be derived from the topology)"
+  description = "Whether to use network topology for subnet allocation"
   type        = bool
   default     = false
 }
 
 variable "network_topology_region" {
-  description = "The region to use for network topology lookup in allocations.csv (e.g., eastus, westus)"
+  description = "The region to use for network topology (used for generating subnet names)"
   type        = string
-  default     = ""
+  default     = null
 }
 
 variable "private_cluster_enabled" {
-  description = "Enable private cluster for the AKS cluster"
+  description = "Whether to create a private AKS cluster"
   type        = bool
   default     = false
 }
 
 variable "private_dns_zone_id" {
-  description = "ID of the private DNS zone for the AKS cluster"
+  description = "The ID of the private DNS zone for the private AKS cluster"
   type        = string
   default     = null
 }
 
 variable "private_cluster_public_fqdn_enabled" {
-  description = "Enable public FQDN for a private cluster"
+  description = "Whether to enable public FQDN for the private AKS cluster"
   type        = bool
   default     = false
 }
 
 variable "authorized_ip_ranges" {
-  description = "List of authorized IP ranges for the AKS cluster API"
+  description = "List of authorized IP ranges for the AKS API server"
   type        = list(string)
-  default     = []
+  default     = null
 }
 
-# Default Node Pool
+# Default Node Pool Configuration
 variable "default_nodepool_name" {
   description = "Name of the default node pool"
   type        = string
@@ -201,97 +202,114 @@ variable "default_nodepool_name" {
 variable "default_nodepool_vm_size" {
   description = "VM size for the default node pool"
   type        = string
-  default     = "Standard_D2s_v4"
+  default     = "Standard_D2s_v5"
 }
 
 variable "default_nodepool_count" {
-  description = "Initial number of nodes in the default node pool"
+  description = "Number of nodes in the default node pool"
   type        = number
   default     = 1
 }
 
 # Identity Configuration
 variable "identity_type" {
-  description = "Type of identity to use for the AKS cluster"
+  description = "Type of identity to use for the AKS cluster (SystemAssigned, UserAssigned or SystemAssigned, UserAssigned)"
   type        = string
-  default     = "SystemAssigned"
+  default     = "UserAssigned"
 }
 
 variable "user_assigned_identity_id" {
-  description = "ID of the user-assigned managed identity for the AKS cluster"
+  description = "ID of the user-assigned identity to use for the AKS cluster (if identity_type is UserAssigned)"
   type        = string
   default     = null
 }
 
-# Monitoring Configuration
+# Log Analytics Configuration
 variable "log_analytics_workspace_id" {
-  description = "ID of the Log Analytics workspace for AKS monitoring"
+  description = "ID of the Log Analytics workspace to use for AKS monitoring"
   type        = string
   default     = null
 }
 
-# Application Node Pool
+# App Node Pool Configuration
 variable "app_node_pool_enabled" {
-  description = "Enable application node pool"
+  description = "Whether to create an additional node pool for applications"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "app_node_pool_name" {
-  description = "Name of the application node pool"
+  description = "Name of the app node pool"
   type        = string
   default     = "app"
 }
 
 variable "app_node_pool_vm_size" {
-  description = "VM size for the application node pool"
+  description = "VM size for the app node pool"
   type        = string
-  default     = "Standard_D4s_v4"
+  default     = "Standard_D4s_v5"
 }
 
 variable "app_node_pool_node_count" {
-  description = "Initial number of nodes in the application node pool"
+  description = "Number of nodes in the app node pool"
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "app_node_pool_max_pods" {
-  description = "Maximum number of pods that can run on a node in the application node pool"
+  description = "Maximum number of pods per node in the app node pool"
   type        = number
-  default     = 30
+  default     = 110
 }
 
 variable "app_node_pool_os_disk_size_gb" {
-  description = "OS disk size for nodes in the application node pool"
+  description = "OS disk size (in GB) for the app node pool VMs"
   type        = number
   default     = 128
 }
 
 variable "app_node_pool_enable_auto_scaling" {
-  description = "Enable auto-scaling for the application node pool"
+  description = "Whether to enable auto-scaling for the app node pool"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "app_node_pool_min_count" {
-  description = "Minimum node count for auto-scaling"
+  description = "Minimum number of nodes in the app node pool when auto-scaling is enabled"
   type        = number
   default     = 1
 }
 
 variable "app_node_pool_max_count" {
-  description = "Maximum node count for auto-scaling"
+  description = "Maximum number of nodes in the app node pool when auto-scaling is enabled"
   type        = number
   default     = 5
 }
 
 variable "app_node_pool_node_labels" {
-  description = "Labels to apply to nodes in the application node pool"
+  description = "Labels to apply to nodes in the app node pool"
   type        = map(string)
-  default     = {
-    "nodepool" = "apps"
-    "app"      = "true"
-  }
+  default     = {}
+}
+
+# VNet and Route Table Configuration
+variable "vnet_resource_group_name" {
+  description = "Name of the resource group containing the VNet and route tables"
+  type        = string
+  default     = null
+}
+
+variable "private_route_table_name" {
+  description = "Name of the private route table to assign to the AKS identity"
+  type        = string
+  default     = null
+}
+
+# Two-phase deployment configuration (deprecated)
+variable "deployment_mode" {
+  description = "DEPRECATED: The deployment mode variable is no longer used with the unified identities approach. It's kept for backward compatibility."
+  type        = string
+  default     = "full"
 }
 
 # Tagging

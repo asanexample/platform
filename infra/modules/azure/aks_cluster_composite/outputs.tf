@@ -114,27 +114,33 @@ output "fqdn" {
 # Identity module outputs
 output "aks_identity_id" {
   description = "The ID of the user-assigned managed identity for the AKS cluster"
-  value       = module.aks_identity.aks_identity_id
+  value       = module.identities.aks_identity_id
 }
 
 output "aks_identity_client_id" {
   description = "The client ID of the user-assigned managed identity for the AKS cluster"
-  value       = module.aks_identity.aks_identity_client_id
+  value       = module.identities.aks_identity_client_id
 }
 
 output "aks_identity_principal_id" {
   description = "The principal ID of the user-assigned managed identity for the AKS cluster"
-  value       = module.aks_identity.aks_identity_principal_id
+  value       = module.identities.aks_identity_principal_id
 }
 
-output "cert_manager_identity_id" {
-  description = "The ID of the user-assigned managed identity for cert-manager"
-  value       = module.aks_identity.cert_manager_identity_id
+# Workload identity outputs
+output "cert_manager_identity" {
+  description = "The cert-manager identity if created"
+  value       = var.workload_identity_enabled && var.oidc_issuer_enabled ? module.workload_identity_setup[0].cert_manager_identity : null
 }
 
-output "karpenter_identity_id" {
-  description = "The ID of the user-assigned managed identity for Karpenter"
-  value       = module.aks_identity.karpenter_identity_id
+output "karpenter_identity" {
+  description = "The Karpenter identity if created"
+  value       = var.workload_identity_enabled && var.oidc_issuer_enabled ? module.workload_identity_setup[0].karpenter_identity : null
+}
+
+output "workload_identities" {
+  description = "Map of all workload identities created by the module"
+  value       = var.workload_identity_enabled && var.oidc_issuer_enabled ? module.workload_identity_setup[0].workload_identities : {}
 }
 
 # Networking module outputs
