@@ -137,8 +137,8 @@ run "test_key_vault_with_network_acls" {
   
   # Verify public network access (we can't directly test network_acls in outputs)
   assert {
-    condition     = output.public_network_access_enabled == true
-    error_message = "Public network access should be enabled when private endpoint is not created"
+    condition     = output.public_network_access_enabled == false
+    error_message = "Public network access should be disabled when network ACLs are configured to deny access"
   }
 }
 
