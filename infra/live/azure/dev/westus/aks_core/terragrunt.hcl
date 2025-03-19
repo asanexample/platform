@@ -95,7 +95,7 @@ inputs = {
   # Cluster configuration
   kubernetes_version = "1.32"
   sku_tier = "Standard" # Required when cost_analysis_enabled is true
-  local_account_disabled = true
+  local_account_disabled = false
   workload_identity_enabled = true
   oidc_issuer_enabled = true
   
