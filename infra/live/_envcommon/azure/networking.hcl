@@ -18,6 +18,13 @@ locals {
   region_code_map = {
     "eastus" = "eus"
     "westus" = "wus"
+    "eastus2" = "eus2"
+    "westus2" = "wus2"
+    "centralus" = "cus"
+    "westus3" = "wus3"
+    "northeurope" = "neu"
+    "westeurope" = "weu"
+    "uksouth" = "uks"
   }
   
   # Get the region code for current region
@@ -27,20 +34,21 @@ locals {
   vnet_name = "vip-vnet-${local.environment}-${local.region_code}-main"
   rg_name   = "vip-rg-${local.environment}-${local.region_code}-net"
   
-  # Common network configuration that applies to all regions
-  common_subnet_config = {
-    "app-subnet" = {
-      address_prefixes  = ["10.1.1.0/24"]
-      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault"]
-    }
-    "data-subnet" = {
-      address_prefixes  = ["10.1.2.0/24"]
-      service_endpoints = ["Microsoft.Storage", "Microsoft.Sql"]
-    }
-    "mgmt-subnet" = {
-      address_prefixes  = ["10.1.3.0/24"]
-      service_endpoints = []
-    }
+  # Azure CIDR allocations per region according to allocations.csv
+  # IMPORTANT: These are reference values only and should be overridden in each regional configuration
+  # with the correct values from allocations.csv
+  azure_cidr_map = {
+    "eastus"      = "10.101.0.0/21"
+    "eastus2"     = "10.101.8.0/21"
+    "centralus"   = "10.101.16.0/21"
+    "westus"      = "10.101.24.0/21"
+    "westus2"     = "10.101.32.0/21"
+    "westus3"     = "10.101.40.0/21"
+    "canadacentral" = "10.101.48.0/21"
+    "brazilsouth" = "10.101.56.0/21"
+    "westeurope"  = "10.101.64.0/21"
+    "northeurope" = "10.101.72.0/21"
+    "uksouth"     = "10.101.80.0/21"
   }
   
   # Common tags for all resources
@@ -61,8 +69,13 @@ inputs = {
   location            = local.region
   vnet_name           = local.vnet_name
   
-  address_space       = ["10.1.0.0/16"]
-  subnets             = local.common_subnet_config
+  # DO NOT USE this default address space in production. Override with the proper regional CIDR
+  # from the azure_cidr_map above for the specific region you're deploying to
+  address_space       = ["10.1.0.0/16"]  # EXAMPLE ONLY - Override in regional configuration
+  
+  # Sample subnet config - should be replaced with proper subnets based on allocations.csv
+  subnets             = {}
+  
   dns_servers         = []
   tags                = local.common_tags
 } 

@@ -53,58 +53,68 @@ inputs = {
   
   # VNet configuration
   vnet_name = dependency.naming.outputs.virtual_network
-  address_space = ["10.9.0.0/16"]  # West US Dev
+  address_space = ["10.101.24.0/21"]  # Westus region CIDR per allocations.csv
   
-  # Subnets
+  # Subnets following allocations.csv
   subnets = {
-    # AZ1 subnets
-    "az1-node-subnet" = {
-      address_prefixes = ["10.9.0.0/20"]
-    }
-    "az1-pod-subnet" = {
-      address_prefixes = ["10.9.16.0/20"]
-    }
-    "az1-endpoint-subnet" = {
-      address_prefixes = ["10.9.32.0/24"]
-      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault"]
-    }
+    # AZ1 (westus-1) subnets
+    "az1-kubernetes" = {
+      address_prefixes  = ["10.101.24.0/26"]
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ContainerRegistry"]
+    },
+    "az1-services" = {
+      address_prefixes  = ["10.101.24.64/27"]
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.Sql"]
+    },
+    "az1-endpoints" = {
+      address_prefixes  = ["10.101.24.96/28"]
+      service_endpoints = ["Microsoft.Storage", "Microsoft.Sql", "Microsoft.KeyVault"]
+    },
+    "az1-transit" = {
+      address_prefixes  = ["10.101.24.112/29"]
+      service_endpoints = ["Microsoft.Storage"]
+    },
     
-    # AZ2 subnets
-    "az2-node-subnet" = {
-      address_prefixes = ["10.9.64.0/20"]
-    }
-    "az2-pod-subnet" = {
-      address_prefixes = ["10.9.80.0/20"]
-    }
-    "az2-endpoint-subnet" = {
-      address_prefixes = ["10.9.96.0/24"]
-      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault"]
-    }
+    # AZ2 (westus-2) subnets
+    "az2-kubernetes" = {
+      address_prefixes  = ["10.101.25.0/26"]
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ContainerRegistry"]
+    },
+    "az2-services" = {
+      address_prefixes  = ["10.101.25.64/27"]
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.Sql"]
+    },
+    "az2-endpoints" = {
+      address_prefixes  = ["10.101.25.96/28"]
+      service_endpoints = ["Microsoft.Storage", "Microsoft.Sql", "Microsoft.KeyVault"]
+    },
+    "az2-transit" = {
+      address_prefixes  = ["10.101.25.112/29"]
+      service_endpoints = ["Microsoft.Storage"]
+    },
     
-    # AZ3 subnets
-    "az3-node-subnet" = {
-      address_prefixes = ["10.9.128.0/20"]
-    }
-    "az3-pod-subnet" = {
-      address_prefixes = ["10.9.144.0/20"]
-    }
-    "az3-endpoint-subnet" = {
-      address_prefixes = ["10.9.160.0/24"]
-      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault"]
-    }
-    
-    # Shared subnets
-    "gateway-subnet" = {
-      address_prefixes = ["10.9.192.0/24"]
-    }
-    "bastion-subnet" = {
-      address_prefixes = ["10.9.193.0/24"]
+    # AZ3 (westus-3) subnets
+    "az3-kubernetes" = {
+      address_prefixes  = ["10.101.26.0/26"]
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ContainerRegistry"]
+    },
+    "az3-services" = {
+      address_prefixes  = ["10.101.26.64/27"]
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.Sql"]
+    },
+    "az3-endpoints" = {
+      address_prefixes  = ["10.101.26.96/28"]
+      service_endpoints = ["Microsoft.Storage", "Microsoft.Sql", "Microsoft.KeyVault"]
+    },
+    "az3-transit" = {
+      address_prefixes  = ["10.101.26.112/29"]
+      service_endpoints = ["Microsoft.Storage"]
     }
   }
   
-  # AKS Networking Configuration - consolidating the aks_networking module
+  # AKS Networking Configuration - updated to use the appropriate kubernetes subnet
   enable_aks_networking = true
-  aks_subnet_name = "az1-node-subnet"
+  aks_subnet_name = "az1-kubernetes"
   aks_cluster_name = dependency.naming.outputs.aks_cluster
   aks_private_cluster_enabled = true
   aks_node_resource_group = "${dependency.resource_group.outputs.name}-nodes"
