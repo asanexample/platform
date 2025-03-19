@@ -93,7 +93,7 @@ inputs = {
   dns_prefix = "${local.prefix}-${local.env}-wus"
   
   # Cluster configuration
-  kubernetes_version = "1.26.6"
+  kubernetes_version = "1.32"
   sku_tier = "Standard" # Required when cost_analysis_enabled is true
   local_account_disabled = true
   workload_identity_enabled = true
