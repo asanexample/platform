@@ -44,7 +44,7 @@ remote_state {
 // Generate provider configuration for each module
 generate "providers" {
   path      = "providers.tf"
-  if_exists = "skip"
+  if_exists = "overwrite_terragrunt"
   contents  = <<EOF
 terraform {
   required_version = ">= 1.6.0"
@@ -55,11 +55,11 @@ terraform {
     }
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = "5.91.0"
     }
     google = {
       source  = "hashicorp/google"
-      version = "~> 6.25.0"
+      version = "6.26.0"
     }
   }
 }
