@@ -14,6 +14,9 @@ locals {
   service_cidr = var.service_cidr
   pod_cidr = var.pod_cidr
   dns_service_ip = var.dns_service_ip
+  
+  # Identity naming
+  aks_identity_name = var.name != null ? "${var.name}-identity" : "${var.prefix}-${var.stage}-aks-${var.region_abbv}-identity"
 }
 
 # Create identity resources for the AKS cluster
@@ -121,39 +124,9 @@ module "aks_core" {
   ]
 }
 
-# Set up monitoring for the AKS cluster
-module "aks_monitoring" {
-  source = "../aks_monitoring"
-  
-  # Naming
-  prefix      = var.prefix
-  customer    = var.customer
-  stage       = var.stage
-  region_abbv = var.region_abbv
-  
-  # Resource group and location
-  resource_group_name = var.resource_group_name
-  location           = var.location
-  
-  # Cluster information
-  cluster_name = module.aks_core.name
-  cluster_id   = module.aks_core.id
-  
-  # Log Analytics workspace
-  log_analytics_workspace_id = var.log_analytics_workspace_id
-  
-  # Tagging
-  tags = var.tags
-  
-  # Dependencies
-  depends_on = [
-    module.aks_core
-  ]
-}
-
 # Update AKS identity module with OIDC issuer URL and node resource group
 module "aks_identity_update" {
-  source = "../aks_identity"
+  source = "../aks_identity_update"
 
   # Naming
   prefix      = var.prefix

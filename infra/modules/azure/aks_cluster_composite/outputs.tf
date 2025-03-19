@@ -129,12 +129,12 @@ output "aks_identity_principal_id" {
 
 output "cert_manager_identity_id" {
   description = "The ID of the user-assigned managed identity for cert-manager"
-  value       = module.aks_identity_update.cert_manager_identity_id
+  value       = module.aks_identity.cert_manager_identity_id
 }
 
 output "karpenter_identity_id" {
   description = "The ID of the user-assigned managed identity for Karpenter"
-  value       = module.aks_identity_update.karpenter_identity_id
+  value       = module.aks_identity.karpenter_identity_id
 }
 
 # Networking module outputs
@@ -166,10 +166,4 @@ output "service_cidr" {
 output "private_cluster_enabled" {
   description = "Whether the AKS cluster is a private cluster"
   value       = module.aks_networking.private_cluster_enabled
-}
-
-# Monitoring outputs
-output "diagnostic_setting_id" {
-  description = "The ID of the diagnostic setting for the AKS cluster"
-  value       = module.aks_monitoring.diagnostic_setting_id
 } 
