@@ -71,6 +71,17 @@ dependency "networking" {
   }
 }
 
+dependency "dns" {
+  config_path = "../dns"
+  
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    private_dns_zone_ids = {
+      "blob" = "mock-private-dns-zone-id"
+    }
+  }
+}
+
 # Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
   # Environment variables
@@ -101,12 +112,12 @@ inputs = {
   
   # Private endpoint configuration
   private_endpoint = {
-    create = true
-    name = dependency.naming.outputs.private_endpoint
-    subnet_id = dependency.networking.outputs.subnet_ids["az1-endpoints"]
-    subresource_names = ["blob"]
-    # Remove private_dns_zone_ids for now since they don't exist yet
-    private_dns_zone_ids = []
+    create                       = true
+    name                         = dependency.naming.outputs.private_endpoint
+    subnet_id                    = dependency.networking.outputs.subnet_ids["az1-endpoints"]
+    subresource_names            = ["blob"]
+    private_service_connection_name = "service-connection"
+    private_dns_zone_ids         = [dependency.dns.outputs.private_dns_zone_ids["blob"]]
   }
   
   # Containers
