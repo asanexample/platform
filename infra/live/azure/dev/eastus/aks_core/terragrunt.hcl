@@ -58,7 +58,7 @@ dependency "aks_identity" {
   
   # Mock outputs for plan and validation
   mock_outputs = {
-    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mock-identity"
+    aks_identity_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mock-identity"
   }
 }
 
@@ -67,9 +67,9 @@ inputs = {
   resource_group_name = dependency.resource_group.outputs.name
   location            = local.region
   cluster_name        = dependency.naming.outputs.aks_cluster
-  kubernetes_version  = "1.27"
+  kubernetes_version  = "1.32"
   identity_type       = "UserAssigned"
-  user_assigned_identity_id = dependency.aks_identity.outputs.id
+  user_assigned_identity_id = dependency.aks_identity.outputs.aks_identity_id
   subnet_id           = dependency.networking.outputs.subnet_ids["az1-kubernetes"]
   prefix              = local.prefix
   environment         = local.env
