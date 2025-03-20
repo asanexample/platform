@@ -680,8 +680,9 @@ inputs = {
   customer     = local.customer
   environment  = local.env
   region_abbv  = local.region_abbv
-  # Use the name of the AKS cluster directly
-  aks_cluster_id = \"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/\${dependency.resource_group.outputs.name}/providers/Microsoft.ContainerService/managedClusters/\${dependency.aks_core.outputs.name}\"
+  
+  # Use the actual ID from the AKS cluster output
+  aks_cluster_id = dependency.aks_core.outputs.id
   
   app_node_pool_enabled = true
   app_node_pool_vm_size = \"Standard_D4s_v3\"
