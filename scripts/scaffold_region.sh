@@ -628,6 +628,17 @@ inputs = {
   region_abbv         = local.region_abbv
   customer            = local.customer
   sku_tier            = \"Standard\"
+  local_account_disabled = true
+  workload_identity_enabled = true
+  oidc_issuer_enabled = true
+  
+  # Azure AD integration config (required for Kubernetes ≥ 1.25 with local_account_disabled)
+  azure_active_directory_role_based_access_control = {
+    managed                = true
+    admin_group_object_ids = [\"00000000-0000-0000-0000-000000000000\"]
+    azure_rbac_enabled     = true
+    tenant_id              = null
+  }
   default_nodepool_node_labels = {
     \"nodepool-type\" = \"system\"
     \"environment\"   = local.env
