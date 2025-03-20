@@ -2,11 +2,11 @@
 
 ## Overview
 
-The VIP Platform implements a specialized network design for Kubernetes clusters that optimizes for security, reliability, and performance. This design is integrated with the overall [CIDR Allocation Strategy](06-cidr-allocation.md) and aligns with cloud provider best practices for Kubernetes deployments.
+The VIP Platform uses a specialized network design for Kubernetes clusters to ensure proper isolation, security, and performance. This document outlines the network architecture, CIDR allocation, and configuration patterns for AKS, EKS, and GKE clusters across all supported environments.
 
 ## Design Principles
 
-The Kubernetes network design follows these key principles:
+The Kubernetes network design follows these core principles:
 
 1. **Multi-AZ Deployment**: Distribute Kubernetes resources across multiple availability zones for high availability.
 2. **Network Segmentation**: Separate different types of Kubernetes traffic using specialized subnets.
@@ -17,26 +17,68 @@ The Kubernetes network design follows these key principles:
 
 ## Network Architecture
 
-### Kubernetes Cluster Topology
+The Kubernetes network architecture consists of separate subnets for different functions distributed across availability zones:
 
-Each Kubernetes cluster follows a 3-AZ design pattern:
+```mermaid
+graph TD
+    subgraph "Kubernetes Network Architecture"
+    VNet[Virtual Network<br>10.200.0.0/21] --> AZ1[AZ1 Subnets]
+    VNet --> AZ2[AZ2 Subnets]
+    VNet --> AZ3[AZ3 Subnets]
+    
+    AZ1 --> AZ1_Node[Node Subnet<br>10.200.0.0/26]
+    AZ1 --> AZ1_Services[Services Subnet<br>10.200.0.64/27]
+    AZ1 --> AZ1_Endpoints[Endpoints Subnet<br>10.200.0.96/28]
+    AZ1 --> AZ1_Transit[Transit Subnet<br>10.200.0.112/29]
+    
+    AZ2 --> AZ2_Node[Node Subnet<br>10.200.1.0/26]
+    AZ2 --> AZ2_Services[Services Subnet<br>10.200.1.64/27]
+    AZ2 --> AZ2_Endpoints[Endpoints Subnet<br>10.200.1.96/28]
+    AZ2 --> AZ2_Transit[Transit Subnet<br>10.200.1.112/29]
+    
+    AZ3 --> AZ3_Node[Node Subnet<br>10.200.2.0/26]
+    AZ3 --> AZ3_Services[Services Subnet<br>10.200.2.64/27]
+    AZ3 --> AZ3_Endpoints[Endpoints Subnet<br>10.200.2.96/28]
+    AZ3 --> AZ3_Transit[Transit Subnet<br>10.200.2.112/29]
+    
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
+    classDef vnet fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef az fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef node fill:#fff8e1,stroke:#ff8f00,stroke-width:2px;
+    classDef service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
+    classDef endpoint fill:#ffebee,stroke:#c62828,stroke-width:2px;
+    classDef transit fill:#e0f2f1,stroke:#004d40,stroke-width:2px;
+    
+    class VNet vnet;
+    class AZ1,AZ2,AZ3 az;
+    class AZ1_Node,AZ2_Node,AZ3_Node node;
+    class AZ1_Services,AZ2_Services,AZ3_Services service;
+    class AZ1_Endpoints,AZ2_Endpoints,AZ3_Endpoints endpoint;
+    class AZ1_Transit,AZ2_Transit,AZ3_Transit transit;
+    end
+```
 
-![Kubernetes Cluster Network Topology](diagrams/kubernetes-network-topology.png)
+### Zone-Based Infrastructure
+
+The infrastructure is divided across three availability zones for high availability:
 
 - **Zone 1 Infrastructure**:
-  - Node Subnet: Worker nodes in AZ1
-  - Services Subnet: Load balancers in AZ1
-  - Endpoints Subnet: Private endpoints in AZ1
+  - Node Subnet: 10.200.0.0/26 (62 IPs)
+  - Services Subnet: 10.200.0.64/27 (30 IPs)
+  - Endpoints Subnet: 10.200.0.96/28 (14 IPs)
+  - Transit Subnet: 10.200.0.112/29 (6 IPs)
 
 - **Zone 2 Infrastructure**:
-  - Node Subnet: Worker nodes in AZ2
-  - Services Subnet: Load balancers in AZ2
-  - Endpoints Subnet: Private endpoints in AZ2
+  - Node Subnet: 10.200.1.0/26 (62 IPs)
+  - Services Subnet: 10.200.1.64/27 (30 IPs)
+  - Endpoints Subnet: 10.200.1.96/28 (14 IPs)
+  - Transit Subnet: 10.200.1.112/29 (6 IPs)
 
 - **Zone 3 Infrastructure**:
-  - Node Subnet: Worker nodes in AZ3
-  - Services Subnet: Load balancers in AZ3
-  - Endpoints Subnet: Private endpoints in AZ3
+  - Node Subnet: 10.200.2.0/26 (62 IPs)
+  - Services Subnet: 10.200.2.64/27 (30 IPs)
+  - Endpoints Subnet: 10.200.2.96/28 (14 IPs)
+  - Transit Subnet: 10.200.2.112/29 (6 IPs)
 
 ### Address Space Allocation
 

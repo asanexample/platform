@@ -8,7 +8,30 @@ The VIP Platform uses a hierarchical CIDR allocation strategy to organize IP add
 
 The CIDR allocation follows a hierarchical structure with the following levels:
 
-![CIDR Allocation Hierarchy](diagrams/cidr-allocation-hierarchy.png)
+```mermaid
+graph TD
+    subgraph "CIDR Allocation Hierarchy"
+    A[Top-Level Address Space] --> B[Cloud Provider Level]
+    B --> C[Environment Level]
+    C --> D[Region Level]
+    D --> E[Availability Zone Level]
+    E --> F[Subnet Level]
+    
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
+    classDef level0 fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef level1 fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef level2 fill:#fff8e1,stroke:#ff8f00,stroke-width:2px;
+    classDef level3 fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
+    classDef level4 fill:#ffebee,stroke:#c62828,stroke-width:2px;
+    
+    class A level0;
+    class B level1;
+    class C level2;
+    class D level3;
+    class E level4;
+    class F level4;
+    end
+```
 
 1. **Cloud Provider Level**: Distinct address blocks allocated for each cloud provider
 2. **Environment Level**: Subdivision for different environments (dev, test, prod)

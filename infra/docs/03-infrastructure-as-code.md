@@ -38,20 +38,44 @@ The minimum required Terragrunt version is 0.53.0.
 
 The VIP Platform follows a well-organized directory structure to manage infrastructure code:
 
-```
-infra/
-├── modules/                  # Reusable Terraform modules
-│   ├── aws/                  # AWS-specific modules
-│   ├── azure/                # Azure-specific modules
-│   ├── gcp/                  # GCP-specific modules
-│   └── common/               # Cross-cloud abstraction modules
-├── live/                     # Live infrastructure configurations
-│   ├── _envcommon/           # Common environment configurations
-│   ├── aws/azure/gcp         # Per-cloud resources
-│   │   └── env/region/       # Environment & region-specific
-│   └── global/               # Global resources
-├── tests/                    # Test configurations
-└── scripts/                  # Utility scripts
+```mermaid
+graph TD
+    infra[infra/] --> modules[modules/]
+    infra --> live[live/]
+    infra --> tests[tests/]
+    infra --> scripts[scripts/]
+    
+    modules --> aws[aws/]
+    modules --> azure[azure/]
+    modules --> gcp[gcp/]
+    modules --> common[common/]
+    
+    live --> envcommon[_envcommon/]
+    live --> cloud_resources[aws/azure/gcp]
+    live --> global[global/]
+    
+    cloud_resources --> env_region[env/region/]
+    
+    subgraph "Module Structure"
+        aws --> aws_mod[AWS-specific modules]
+        azure --> azure_mod[Azure-specific modules]
+        gcp --> gcp_mod[GCP-specific modules]
+        common --> common_mod[Cross-cloud modules]
+    end
+    
+    subgraph "Live Environment Structure"
+        env_region --> networking[networking/]
+        env_region --> storage[storage/]
+        env_region --> compute[compute/]
+    end
+    
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
+    classDef folder fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef module fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    
+    class infra,modules,live,tests,scripts folder;
+    class aws,azure,gcp,common,envcommon,cloud_resources,global,env_region folder;
+    class aws_mod,azure_mod,gcp_mod,common_mod,networking,storage,compute module;
 ```
 
 ### Modules Directory
@@ -65,29 +89,43 @@ The `modules` directory contains reusable Terraform modules organized by cloud p
 
 Each module follows a consistent structure:
 
-```
-module-name/
-├── main.tf               # Main resource definitions
-├── variables.tf          # Input variables
-├── outputs.tf            # Output values
-├── versions.tf           # Provider and terraform version constraints
-└── README.md             # Module documentation
+```mermaid
+graph TD
+    module[module-name/] --> main[main.tf]
+    module --> variables[variables.tf]
+    module --> outputs[outputs.tf]
+    module --> versions[versions.tf]
+    module --> readme[README.md]
+    
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
+    classDef folder fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef file fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    
+    class module folder;
+    class main,variables,outputs,versions,readme file;
 ```
 
 ### Tests Directory
 
 The `tests` directory contains all test configurations for validating infrastructure modules. Tests are organized to mirror the module structure:
 
-```
-tests/
-└── modules/
-    ├── aws/              # Tests for AWS modules
-    ├── azure/            # Tests for Azure modules
-    │   ├── networking/   # Tests for Azure networking module
-    │   ├── storage_account/ # Tests for Azure storage account module
-    │   └── ...
-    ├── gcp/              # Tests for GCP modules
-    └── common/           # Tests for common modules
+```mermaid
+graph TD
+    tests[tests/] --> modules_tests[modules/]
+    
+    modules_tests --> aws_tests[aws/]
+    modules_tests --> azure_tests[azure/]
+    modules_tests --> gcp_tests[gcp/]
+    modules_tests --> common_tests[common/]
+    
+    azure_tests --> networking_tests[networking/]
+    azure_tests --> storage_tests[storage_account/]
+    azure_tests --> other_tests[...]
+    
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
+    classDef folder fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    
+    class tests,modules_tests,aws_tests,azure_tests,gcp_tests,common_tests,networking_tests,storage_tests,other_tests folder;
 ```
 
 The tests directory contains:
@@ -107,17 +145,25 @@ The `live` directory contains the actual infrastructure configurations for diffe
 
 Each environment/region directory contains Terragrunt configurations for different infrastructure components:
 
-```
-live/azure/dev/westus/
-├── networking/           # Network infrastructure
-│   └── terragrunt.hcl    # Terragrunt configuration
-├── storage/              # Storage resources
-│   └── terragrunt.hcl    # Terragrunt configuration
-├── key_vault/            # Security resources
-│   └── terragrunt.hcl    # Terragrunt configuration
-├── aks_core/             # Kubernetes resources
-│   └── terragrunt.hcl    # Terragrunt configuration
-└── common.hcl            # Common variables for this environment
+```mermaid
+graph TD
+    live_dir[live/azure/dev/westus/] --> networking_dir[networking/]
+    live_dir --> storage_dir[storage/]
+    live_dir --> key_vault_dir[key_vault/]
+    live_dir --> aks_core_dir[aks_core/]
+    live_dir --> common_file[common.hcl]
+    
+    networking_dir --> networking_config[terragrunt.hcl]
+    storage_dir --> storage_config[terragrunt.hcl]
+    key_vault_dir --> key_vault_config[terragrunt.hcl]
+    aks_core_dir --> aks_core_config[terragrunt.hcl]
+    
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
+    classDef folder fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef file fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    
+    class live_dir,networking_dir,storage_dir,key_vault_dir,aks_core_dir folder;
+    class networking_config,storage_config,key_vault_config,aks_core_config,common_file file;
 ```
 
 ## Development Workflow
@@ -137,6 +183,37 @@ live/azure/dev/westus/
 2. **Apply Changes**: Apply changes with `terragrunt apply`
 3. **Validate Deployment**: Verify resources are created correctly
 4. **Run Tests**: Execute automated tests to validate infrastructure
+
+## Module Dependencies
+
+Terragrunt manages dependencies between modules to ensure proper deployment order. Below is an example of a typical dependency graph for Azure resources:
+
+```mermaid
+graph TD
+    naming[naming] --> resource_group[resource_group]
+    resource_group --> networking[networking]
+    resource_group --> key_vault[key_vault]
+    resource_group --> aks_identity[aks_identity]
+    networking --> aks_core[aks_core]
+    networking --> storage[storage]
+    networking --> key_vault
+    aks_identity --> aks_core
+    aks_core --> aks_node_pools[aks_node_pools]
+    
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
+    classDef base fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef network fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef compute fill:#fff8e1,stroke:#ff8f00,stroke-width:2px;
+    classDef storage fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
+    classDef security fill:#ffebee,stroke:#c62828,stroke-width:2px;
+    
+    class naming,resource_group base;
+    class networking,aks_core,aks_node_pools network;
+    class storage storage;
+    class key_vault,aks_identity security;
+```
+
+This dependency graph ensures that resources are created in the correct order, with foundational resources like resource groups created first, followed by networking resources, and finally application-specific resources.
 
 ## Example: Terragrunt Configuration
 
