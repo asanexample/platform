@@ -23,6 +23,7 @@ include "root" {
 terraform {
   source = "${get_repo_root()}/infra/modules/azure/aks_node_pools"
 }
+
 # Set dependencies for this module
 dependency "aks_core" {
   config_path = "../aks_core"
@@ -30,17 +31,17 @@ dependency "aks_core" {
   # Mock outputs for plan and validation
   mock_outputs = {
     id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.ContainerService/managedClusters/mock-aks"
-    name = "mock-aks"
+    name = "vip-dev-aks-east"
   }
 }
 
-# Add dependency for aks_identity
+# Add dependency for resource group
 dependency "resource_group" {
   config_path = "../resource_group"
   
   # Mock outputs for plan and validation
   mock_outputs = {
-    name = "mock-rg"
+    name = "vip-dev-rg-east"
   }
 }
 
@@ -50,8 +51,9 @@ inputs = {
   customer     = local.customer
   environment  = local.env
   region_abbv  = local.region_abbv
-  # Use the name of the AKS cluster directly
-  aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/${dependency.resource_group.outputs.name}/providers/Microsoft.ContainerService/managedClusters/${dependency.aks_core.outputs.name}"
+  
+  # Use the actual ID from the AKS cluster output instead of constructing it
+  aks_cluster_id = dependency.aks_core.outputs.id
   
   app_node_pool_enabled = true
   app_node_pool_vm_size = "Standard_D4s_v3"
