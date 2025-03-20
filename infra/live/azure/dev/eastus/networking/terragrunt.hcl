@@ -77,6 +77,9 @@ inputs = {
   # VNet configuration
   vnet_name = dependency.naming.outputs.virtual_network
   
+  # Address space from network.hcl
+  address_space = local.network_vars.locals.address_space
+  
   # DNS configuration
   dns_servers = []
   
