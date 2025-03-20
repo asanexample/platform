@@ -6,10 +6,22 @@ SHELL := /bin/bash
 
 # Default variables
 ENV ?= dev
-REGION ?= westus
-CLOUD ?= azure
+REGION ?=
+CLOUD ?=
 MODULE ?= all
 NO_CONFIRM ?= false
+
+# Check required parameters
+define check_required_params
+	@if [ -z "$(CLOUD)" ]; then \
+		echo "Error: CLOUD parameter is required. Example: make $(1) CLOUD=azure REGION=eastus"; \
+		exit 1; \
+	fi
+	@if [ -z "$(REGION)" ]; then \
+		echo "Error: REGION parameter is required. Example: make $(1) CLOUD=azure REGION=eastus"; \
+		exit 1; \
+	fi
+endef
 
 # Paths
 INFRA_DIR := $(CURDIR)/infra
@@ -29,23 +41,29 @@ help: ## Show this help message
 	@echo ''
 	@echo 'Variables:'
 	@echo '  ENV: Environment to target (default: dev)'
-	@echo '  REGION: Region to target (default: westus)'
-	@echo '  CLOUD: Cloud provider to target (default: azure)'
+	@echo '  REGION: Region to target (REQUIRED, no default)'
+	@echo '  CLOUD: Cloud provider to target (REQUIRED, no default)'
 	@echo '  MODULE: Specific module to target (default: all)'
 	@echo '  NO_CONFIRM: Skip all confirmation prompts (default: false)'
 
 .PHONY: init
 init: ## Initialize all modules
+	$(call check_required_params,"init")
 	@echo "Initializing $(CLOUD)/$(ENV)/$(REGION)..."
 	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all init
 
+.PHONY: init-region
+init-region: init ## Initialize all modules in a region (alias for init)
+
 .PHONY: init-upgrade
 init-upgrade: ## Initialize all modules and upgrade dependencies
+	$(call check_required_params,"init-upgrade")
 	@echo "Initializing $(CLOUD)/$(ENV)/$(REGION) with dependency upgrades..."
 	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all init -upgrade
 
 .PHONY: init-module
 init-module: ## Initialize a specific module
+	$(call check_required_params,"init-module")
 	@if [ "$(MODULE)" = "all" ]; then \
 		echo "Error: Please specify a module with MODULE=<module-name>"; \
 		exit 1; \
@@ -55,6 +73,7 @@ init-module: ## Initialize a specific module
 
 .PHONY: init-upgrade-module
 init-upgrade-module: ## Initialize a specific module and upgrade dependencies
+	$(call check_required_params,"init-upgrade-module")
 	@if [ "$(MODULE)" = "all" ]; then \
 		echo "Error: Please specify a module with MODULE=<module-name>"; \
 		exit 1; \
@@ -64,11 +83,16 @@ init-upgrade-module: ## Initialize a specific module and upgrade dependencies
 
 .PHONY: plan
 plan: ## Plan all modules
+	$(call check_required_params,"plan")
 	@echo "Planning $(CLOUD)/$(ENV)/$(REGION)..."
 	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all plan
 
+.PHONY: plan-region
+plan-region: plan ## Plan all modules in a region (alias for plan)
+
 .PHONY: plan-module
 plan-module: ## Plan a specific module
+	$(call check_required_params,"plan-module")
 	@if [ "$(MODULE)" = "all" ]; then \
 		echo "Error: Please specify a module with MODULE=<module-name>"; \
 		exit 1; \
@@ -78,11 +102,16 @@ plan-module: ## Plan a specific module
 
 .PHONY: apply
 apply: ## Apply all modules
+	$(call check_required_params,"apply")
 	@echo "Applying $(CLOUD)/$(ENV)/$(REGION)..."
 	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all apply -auto-approve
 
+.PHONY: apply-region
+apply-region: apply ## Apply all modules in a region (alias for apply)
+
 .PHONY: apply-module
 apply-module: ## Apply a specific module
+	$(call check_required_params,"apply-module")
 	@if [ "$(MODULE)" = "all" ]; then \
 		echo "Error: Please specify a module with MODULE=<module-name>"; \
 		exit 1; \
@@ -92,6 +121,7 @@ apply-module: ## Apply a specific module
 
 .PHONY: destroy
 destroy: ## Destroy all modules (USE WITH CAUTION)
+	$(call check_required_params,"destroy")
 	@echo "WARNING: You are about to destroy all resources in $(CLOUD)/$(ENV)/$(REGION)..."
 	@if [ "$(NO_CONFIRM)" != "true" ]; then \
 		echo "Are you sure? [y/N] " && read ans && [ $${ans:-N} = y ]; \
@@ -100,6 +130,7 @@ destroy: ## Destroy all modules (USE WITH CAUTION)
 
 .PHONY: destroy-module
 destroy-module: ## Destroy a specific module (USE WITH CAUTION)
+	$(call check_required_params,"destroy-module")
 	@if [ "$(MODULE)" = "all" ]; then \
 		echo "Error: Please specify a module with MODULE=<module-name>"; \
 		exit 1; \
@@ -112,6 +143,7 @@ destroy-module: ## Destroy a specific module (USE WITH CAUTION)
 
 .PHONY: clean
 clean: ## Clean Terragrunt cache
+	$(call check_required_params,"clean")
 	@echo "Cleaning Terragrunt cache in $(CLOUD)/$(ENV)/$(REGION)..."
 	@find $(CLOUD_ENV_REGION_DIR) -type d -name ".terragrunt-cache" -prune -exec rm -rf {} \; 2>/dev/null || true
 
@@ -136,11 +168,13 @@ clear-state: ## Clear all Terraform state files and locks to start fresh
 
 .PHONY: validate
 validate: ## Validate all modules
+	$(call check_required_params,"validate")
 	@echo "Validating $(CLOUD)/$(ENV)/$(REGION)..."
 	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all validate
 
 .PHONY: validate-module
 validate-module: ## Validate a specific module
+	$(call check_required_params,"validate-module")
 	@if [ "$(MODULE)" = "all" ]; then \
 		echo "Error: Please specify a module with MODULE=<module-name>"; \
 		exit 1; \
@@ -165,16 +199,25 @@ deps: ## Check for dependency updates
 
 .PHONY: list-modules
 list-modules: ## List available modules for a specific cloud/env/region
+	$(call check_required_params,"list-modules")
 	@echo "Available modules in $(CLOUD)/$(ENV)/$(REGION):"
 	@find $(CLOUD_ENV_REGION_DIR) -maxdepth 1 -mindepth 1 -type d -exec basename {} \; | sort
 
 .PHONY: list-regions
 list-regions: ## List available regions for a specific cloud/env
+	@if [ -z "$(CLOUD)" ]; then \
+		echo "Error: CLOUD parameter is required. Example: make list-regions CLOUD=azure"; \
+		exit 1; \
+	fi
 	@echo "Available regions in $(CLOUD)/$(ENV):"
 	@find $(CLOUD_ENV_DIR) -maxdepth 1 -mindepth 1 -type d -exec basename {} \; | sort
 
 .PHONY: list-envs
 list-envs: ## List available environments for a specific cloud
+	@if [ -z "$(CLOUD)" ]; then \
+		echo "Error: CLOUD parameter is required. Example: make list-envs CLOUD=azure"; \
+		exit 1; \
+	fi
 	@echo "Available environments in $(CLOUD):"
 	@find $(LIVE_DIR)/$(CLOUD) -maxdepth 1 -mindepth 1 -type d -exec basename {} \; | sort
 
@@ -198,11 +241,13 @@ login-aws: ## Login to AWS
 # Cloud-agnostic operations
 .PHONY: show-outputs
 show-outputs: ## Show outputs for all modules
+	$(call check_required_params,"show-outputs")
 	@echo "Outputs for $(CLOUD)/$(ENV)/$(REGION):"
 	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all output
 
 .PHONY: show-outputs-module
 show-outputs-module: ## Show outputs for a specific module
+	$(call check_required_params,"show-outputs-module")
 	@if [ "$(MODULE)" = "all" ]; then \
 		echo "Error: Please specify a module with MODULE=<module-name>"; \
 		exit 1; \
@@ -212,11 +257,13 @@ show-outputs-module: ## Show outputs for a specific module
 
 .PHONY: show-state
 show-state: ## Show state for all modules (limited info)
+	$(call check_required_params,"show-state")
 	@echo "State for $(CLOUD)/$(ENV)/$(REGION):"
 	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all state list
 
 .PHONY: show-state-module
 show-state-module: ## Show state for a specific module
+	$(call check_required_params,"show-state-module")
 	@if [ "$(MODULE)" = "all" ]; then \
 		echo "Error: Please specify a module with MODULE=<module-name>"; \
 		exit 1; \
@@ -226,11 +273,13 @@ show-state-module: ## Show state for a specific module
 
 .PHONY: plan-file
 plan-file: ## Create a plan file for all modules
+	$(call check_required_params,"plan-file")
 	@echo "Creating plan file for $(CLOUD)/$(ENV)/$(REGION)..."
 	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all plan -out=tfplan
 
 .PHONY: plan-file-module
 plan-file-module: ## Create a plan file for a specific module
+	$(call check_required_params,"plan-file-module")
 	@if [ "$(MODULE)" = "all" ]; then \
 		echo "Error: Please specify a module with MODULE=<module-name>"; \
 		exit 1; \
@@ -240,11 +289,13 @@ plan-file-module: ## Create a plan file for a specific module
 
 .PHONY: apply-plan
 apply-plan: ## Apply a plan file for all modules
+	$(call check_required_params,"apply-plan")
 	@echo "Applying plan file for $(CLOUD)/$(ENV)/$(REGION)..."
 	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all apply tfplan
 
 .PHONY: apply-plan-module
 apply-plan-module: ## Apply a plan file for a specific module
+	$(call check_required_params,"apply-plan-module")
 	@if [ "$(MODULE)" = "all" ]; then \
 		echo "Error: Please specify a module with MODULE=<module-name>"; \
 		exit 1; \
@@ -255,6 +306,14 @@ apply-plan-module: ## Apply a plan file for a specific module
 # Region scaffolding
 .PHONY: scaffold-region
 scaffold-region: ## Scaffold a new region from templates (Usage: make scaffold-region CLOUD=azure TARGET_REGION=eastus ENV=dev REGION_ABBV=east [DRY_RUN=true])
+	@if [ -z "$(CLOUD)" ]; then \
+		echo "Error: CLOUD parameter is required. Example: make scaffold-region CLOUD=azure TARGET_REGION=eastus ENV=dev"; \
+		exit 1; \
+	fi
+	@if [ -z "$(TARGET_REGION)" ]; then \
+		echo "Error: TARGET_REGION parameter is required. Example: make scaffold-region CLOUD=azure TARGET_REGION=eastus ENV=dev"; \
+		exit 1; \
+	fi
 	@echo "Scaffolding $(TARGET_REGION) region for $(CLOUD) in environment $(ENV)..."
 	@DRY_RUN_FLAG=""; \
 	if [ "$(DRY_RUN)" = "true" ]; then \
@@ -274,16 +333,19 @@ scaffold-region: ## Scaffold a new region from templates (Usage: make scaffold-r
 
 .PHONY: init-region
 init-region: ## Initialize all modules in a specific region
+	$(call check_required_params,"init-region")
 	@echo "Initializing all modules in $(CLOUD)/$(ENV)/$(REGION)..."
 	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all init
 
 .PHONY: plan-region
 plan-region: ## Plan all modules in a specific region
+	$(call check_required_params,"plan-region")
 	@echo "Planning all modules in $(CLOUD)/$(ENV)/$(REGION)..."
 	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all plan
 
 .PHONY: apply-region
 apply-region: ## Apply all modules in a specific region
+	$(call check_required_params,"apply-region")
 	@echo "Applying all modules in $(CLOUD)/$(ENV)/$(REGION)..."
 	@if [ "$(NO_CONFIRM)" != "true" ]; then \
 		echo "Are you sure you want to apply all modules in $(CLOUD)/$(ENV)/$(REGION)? [y/N] " && read ans && [ $${ans:-N} = y ]; \
@@ -323,7 +385,7 @@ test: ## Run all Terraform tests
 
 .PHONY: test-module
 test-module: ## Run tests for a specific module
-	@if [ "$(MODULE)" = "all" ]; then \
+	@if [ -z "$(MODULE)" ] || [ "$(MODULE)" = "all" ]; then \
 		echo "Error: Please specify a module with MODULE=<module-name>"; \
 		exit 1; \
 	fi
