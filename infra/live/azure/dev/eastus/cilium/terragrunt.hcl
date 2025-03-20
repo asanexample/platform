@@ -114,6 +114,15 @@ dependency "aks_core" {
   }
 }
 
+dependency "aks_node_pools" {
+  config_path = "../aks_node_pools"
+  
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    app_node_pool_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.ContainerService/managedClusters/mock-aks/agentPools/apps"
+  }
+}
+
 # Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
   # Environment variables
@@ -127,6 +136,12 @@ inputs = {
   kubernetes_client_certificate = dependency.aks_core.outputs.client_certificate
   kubernetes_client_key = dependency.aks_core.outputs.client_key
   kubernetes_cluster_ca_certificate = dependency.aks_core.outputs.cluster_ca_certificate
+  
+  # Add custom module dependency
+  module_depends_on = [dependency.aks_node_pools.outputs.app_node_pool_id]
+  
+  # Set longer timeout for Helm
+  helm_timeout = 1200  # 20 minutes
   
   # Any environment-specific overrides can be added here
   # set_values = {
