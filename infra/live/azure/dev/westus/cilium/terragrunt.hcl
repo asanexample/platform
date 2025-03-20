@@ -59,29 +59,9 @@ dependency "aks_core" {
   }
 }
 
-# Generate the required providers configuration
-generate "required_providers" {
-  path      = "required_providers.tf"
-  if_exists = "overwrite_terragrunt"
-  contents = <<EOF
-terraform {
-  required_providers {
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 2.23.0"
-    }
-    helm = {
-      source  = "hashicorp/helm"
-      version = "~> 2.11.0"
-    }
-  }
-}
-EOF
-}
-
 # Configure the Kubernetes provider
 generate "provider_k8s" {
-  path      = "provider_kubernetes.tf"
+  path      = "kubernetes_provider_override.tf"
   if_exists = "overwrite_terragrunt"
   contents = <<EOF
 provider "kubernetes" {
@@ -95,7 +75,7 @@ EOF
 
 # Configure the Helm provider
 generate "provider_helm" {
-  path      = "provider_helm.tf"
+  path      = "helm_provider_override.tf"
   if_exists = "overwrite_terragrunt"
   contents = <<EOF
 provider "helm" {
