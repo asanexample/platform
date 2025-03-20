@@ -34,6 +34,11 @@ include "root" {
   path = find_in_parent_folders()
 }
 
+# Include the common configuration for Naming
+include "naming_common" {
+  path = find_in_parent_folders("azure/_envcommon/naming.hcl")
+}
+
 # Use the appropriate Terraform module as the source
 terraform {
   # Use double-slash notation to ensure all relative module references work correctly
@@ -42,9 +47,12 @@ terraform {
 
 # Specify inputs specific to this module
 inputs = {
-  # Naming components
-  prefix      = local.prefix
-  customer    = local.customer
+  # Environment variables
   environment = local.env
+  customer = local.customer
+  prefix = local.prefix
   region_abbv = local.region_abbv
+  
+  # Tags
+  tags = local.tags
 } 

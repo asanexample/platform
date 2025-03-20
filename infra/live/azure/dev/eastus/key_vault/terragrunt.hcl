@@ -28,12 +28,6 @@ locals {
     local.region_vars.locals.region_tags
   )
   
-  # Resource Group
-  resource_group_name = "${local.prefix}-${local.env}-${local.region_abbv}-rg"
-  
-  # Use a fixed unique suffix instead of timestamp
-  unique_suffix = "01"
-  
   # Network rules
   network_acls = {
     bypass                     = "AzureServices"
@@ -41,10 +35,6 @@ locals {
     ip_rules                   = []
     virtual_network_subnet_ids = []
   }
-  
-  # The value below is no longer needed as we're using a fixed name
-  # timestamp_suffix = replace(substr(timestamp(), 0, 16), "-", "")
-  # timestamp_suffix = replace(replace(substr(timestamp(), 0, 16), "-", ""), ":", "")
 }
 
 # Include the root terragrunt.hcl configuration
@@ -52,10 +42,9 @@ include "root" {
   path = find_in_parent_folders()
 }
 
-# Use the appropriate Terraform module as the source
-terraform {
-  # Use double-slash notation to ensure all relative module references work correctly
-  source = "${find_in_parent_folders("infra")}/modules/azure//key_vault"
+# Include the common configuration for Key Vault
+include "key_vault_common" {
+  path = find_in_parent_folders("azure/_envcommon/key_vault.hcl")
 }
 
 # Set dependencies for this module
@@ -93,14 +82,11 @@ inputs = {
   region_abbv = local.region_abbv
   
   # Resource details
-  location            = local.region
+  location            = dependency.resource_group.outputs.location
   resource_group_name = dependency.resource_group.outputs.name
   
-  # Use a fixed unique name that doesn't change on every apply
-  name = "${local.prefix}${local.env}${local.region_abbv}kv${local.unique_suffix}"
-  
-  # The line below was the previous naming approach using timestamp which caused recreation issues
-  # name = "vipdeveuskv${local.timestamp_suffix}"
+  # Key vault name from naming module
+  name = dependency.naming.outputs.key_vault
 
   # Enable RBAC authorization
   enable_rbac_authorization = true
@@ -127,8 +113,5 @@ inputs = {
   }
 
   # Tags
-  tags = {
-    environment = "dev"
-    application = "VIP Platform"
-  }
+  tags = local.tags
 } 
