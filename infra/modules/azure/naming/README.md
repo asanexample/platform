@@ -3,7 +3,7 @@
 ## Description
 
 
-This module provides standardized resource naming capabilities for Azure resources based on VIP Platform conventions and Azure's naming restrictions. It ensures consistent naming across all resources and environments while adhering to Azure's resource-specific naming limitations.
+This module provides standardized resource naming capabilities for Azure resources based on your organization's conventions and Azure's naming restrictions. It ensures consistent naming across all resources and environments while adhering to Azure's resource-specific naming limitations.
 
 ## Features
 
@@ -13,16 +13,18 @@ This module provides standardized resource naming capabilities for Azure resourc
 - Support for special formatting requirements (e.g., storage accounts, container registry)
 - Optional customer parameter for shared/global resources
 - Subnet naming with predefined types
+- Configurable prefix to match your organization's naming standards
 
 ## Usage with Terraform
 
 ```hcl
 module "naming" {
   source      = "../../modules/azure/naming"
+  prefix      = "acme"     # Customize the prefix for your organization
   customer    = "contoso"
   stage       = "dev"
   region_abbv = "wus"
-  # prefix is optional, defaults to "vip"
+  # prefix defaults to "vip" if not specified
 }
 `
 # Then use the outputs to set resource names
@@ -66,6 +68,7 @@ terraform {
 
 inputs = {
   # Get variables from environment and region configuration
+  prefix      = local.common_vars.locals.prefix         # Your organization's prefix
   customer    = local.customer_vars.locals.customer
   stage       = local.environment_vars.locals.environment
   region_abbv = local.region_vars.locals.region_code
@@ -91,7 +94,7 @@ inputs = {
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|----------|
-| prefix | The prefix to use for all resources | string | "vip" | no |
+| prefix | The organization-specific prefix to use for all resources | string | "vip" | no |
 | customer | The customer name to use in resource naming | string | null | no |
 | stage | The environment stage (dev, preprod, prod, test, stg) | string | | yes |
 | region_abbv | The abbreviated Azure region name (e.g., wus, eus, neu) | string | | yes |
@@ -127,11 +130,11 @@ See the outputs.tf file for the complete list of outputs.
 
 This module enforces the following naming pattern for most resources:
 ```
-vip-{customer}-{stage}-{resource_type}-{region_abbv}
+{prefix}-{customer}-{stage}-{resource_type}-{region_abbv}
 ```
 
 Where:
-- `vip` is the default prefix (can be changed)
+- `prefix` is your organization's prefix (defaults to "vip" if not specified)
 - `customer` is the customer name (lowercase, with special characters removed)
 - `stage` is the environment (dev, preprod, prod)
 - `resource_type` is a short abbreviation for the resource
@@ -139,7 +142,7 @@ Where:
 
 For shared resources that aren't customer-specific, the customer part is omitted:
 ```
-vip-{stage}-{resource_type}-{region_abbv}
+{prefix}-{stage}-{resource_type}-{region_abbv}
 ```
 
 ### Special Cases
@@ -149,11 +152,11 @@ Some Azure resources have specific naming restrictions:
 **Storage Accounts**:
 - 24 character limit
 - No hyphens or special characters allowed
-- Format: `vip{customer}{stage}sa{region_abbv}`
+- Format: `{prefix}{customer}{stage}sa{region_abbv}`
 
 **Container Registry**:
 - No hyphens allowed
-- Format: `vip{customer}{stage}acr{region_abbv}`
+- Format: `{prefix}{customer}{stage}acr{region_abbv}`
 
 ## Validation
 
