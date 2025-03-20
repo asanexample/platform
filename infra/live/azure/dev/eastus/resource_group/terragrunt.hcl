@@ -1,4 +1,4 @@
-# Terragrunt configuration for Azure key_vault in eastus region
+# Terragrunt configuration for Azure resource_group in eastus region
 
 # Local variables for this configuration
 locals {
@@ -19,34 +19,24 @@ include "root" {
   path = find_in_parent_folders()
 }
 
-# Use the key_vault module
+# Use the resource_group module
 terraform {
-  source = "${get_repo_root()}/infra/modules/azure/key_vault"
+  source = "${get_repo_root()}/infra/modules/azure/resource_group"
 }
 # Set dependencies for this module
-dependency "resource_group" {
-  config_path = "../resource_group"
-  
-  # Mock outputs for plan and validation
-  mock_outputs = {
-    name = "mock-rg"
-  }
-}
-
 dependency "naming" {
   config_path = "../naming"
   
   # Mock outputs for plan and validation
   mock_outputs = {
-    key_vault = "mock-kv"
+    resource_group = "mock-rg"
   }
 }
 
 # Specify inputs specific to this module
 inputs = {
-  resource_group_name = dependency.resource_group.outputs.name
-  location            = local.region
-  key_vault_name      = dependency.naming.outputs.key_vault
-  tags                = local.tags
+  name     = dependency.naming.outputs.resource_group
+  location = local.region
+  tags     = local.tags
 }
 

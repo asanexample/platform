@@ -10,7 +10,7 @@ locals {
   prefix       = local.common_vars.locals.prefix
   customer     = local.common_vars.locals.customer
   region       = "eastus"
-  region_abbv  = "east"
+  region_abbv  = "eus"
   tags         = local.common_vars.locals.tags
   
   # Load network configuration from network.hcl

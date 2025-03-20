@@ -9,7 +9,7 @@ locals {
   subnets = {
     # AZ 1 (eastus-1) subnets
     "az1-kubernetes" = {
-      address_prefixes  = ["10.101.0.0/26"]
+      address_prefixes  = ["10.101.0.0/26"] 
       service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ContainerRegistry"]
     },
     "az1-services" = {

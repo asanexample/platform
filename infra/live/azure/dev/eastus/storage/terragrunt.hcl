@@ -1,4 +1,4 @@
-# Terragrunt configuration for Azure key_vault in eastus region
+# Terragrunt configuration for Azure storage in eastus region
 
 # Local variables for this configuration
 locals {
@@ -19,9 +19,9 @@ include "root" {
   path = find_in_parent_folders()
 }
 
-# Use the key_vault module
+# Use the storage module
 terraform {
-  source = "${get_repo_root()}/infra/modules/azure/key_vault"
+  source = "${get_repo_root()}/infra/modules/azure/storage_account"
 }
 # Set dependencies for this module
 dependency "resource_group" {
@@ -38,15 +38,15 @@ dependency "naming" {
   
   # Mock outputs for plan and validation
   mock_outputs = {
-    key_vault = "mock-kv"
+    storage_account = "mockstorageacct"
   }
 }
 
 # Specify inputs specific to this module
 inputs = {
-  resource_group_name = dependency.resource_group.outputs.name
-  location            = local.region
-  key_vault_name      = dependency.naming.outputs.key_vault
-  tags                = local.tags
+  resource_group_name  = dependency.resource_group.outputs.name
+  location             = local.region
+  storage_account_name = dependency.naming.outputs.storage_account
+  tags                 = local.tags
 }
 

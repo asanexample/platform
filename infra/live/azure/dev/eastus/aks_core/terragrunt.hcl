@@ -10,7 +10,7 @@ locals {
   prefix       = local.common_vars.locals.prefix
   customer     = local.common_vars.locals.customer
   region       = "eastus"
-  region_abbv  = "east"
+  region_abbv  = "eus"
   tags         = local.common_vars.locals.tags
 }
 
@@ -58,7 +58,7 @@ dependency "aks_identity" {
   
   # Mock outputs for plan and validation
   mock_outputs = {
-    aks_identity_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mock-identity"
+    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mock-identity"
   }
 }
 
@@ -69,7 +69,7 @@ inputs = {
   cluster_name        = dependency.naming.outputs.aks_cluster
   kubernetes_version  = "1.32"
   identity_type       = "UserAssigned"
-  user_assigned_identity_id = dependency.aks_identity.outputs.aks_identity_id
+  user_assigned_identity_id = dependency.aks_identity.outputs.id
   subnet_id           = dependency.networking.outputs.subnet_ids["az1-kubernetes"]
   prefix              = local.prefix
   environment         = local.env
@@ -87,7 +87,6 @@ inputs = {
     azure_rbac_enabled     = true
     tenant_id              = null
   }
-  
   default_nodepool_node_labels = {
     "nodepool-type" = "system"
     "environment"   = local.env

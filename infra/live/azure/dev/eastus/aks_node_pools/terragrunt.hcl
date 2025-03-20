@@ -10,7 +10,7 @@ locals {
   prefix       = local.common_vars.locals.prefix
   customer     = local.common_vars.locals.customer
   region       = "eastus"
-  region_abbv  = "east"
+  region_abbv  = "eus"
   tags         = local.common_vars.locals.tags
 }
 
@@ -23,7 +23,6 @@ include "root" {
 terraform {
   source = "${get_repo_root()}/infra/modules/azure/aks_node_pools"
 }
-
 # Set dependencies for this module
 dependency "aks_core" {
   config_path = "../aks_core"
@@ -31,7 +30,7 @@ dependency "aks_core" {
   # Mock outputs for plan and validation
   mock_outputs = {
     id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.ContainerService/managedClusters/mock-aks"
-    name = "vip-dev-aks-east"
+    name = "mock-aks"
   }
 }
 
@@ -41,7 +40,7 @@ dependency "resource_group" {
   
   # Mock outputs for plan and validation
   mock_outputs = {
-    name = "vip-dev-rg-east"
+    name = "mock-rg"
   }
 }
 
@@ -52,7 +51,7 @@ inputs = {
   environment  = local.env
   region_abbv  = local.region_abbv
   
-  # Use the actual ID from the AKS cluster output instead of constructing it
+  # Use the actual ID from the AKS cluster output
   aks_cluster_id = dependency.aks_core.outputs.id
   
   app_node_pool_enabled = true

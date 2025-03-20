@@ -1,4 +1,4 @@
-# Terragrunt configuration for Azure key_vault in eastus region
+# Terragrunt configuration for Azure aks_identity in eastus region
 
 # Local variables for this configuration
 locals {
@@ -19,9 +19,9 @@ include "root" {
   path = find_in_parent_folders()
 }
 
-# Use the key_vault module
+# Use the aks_identity module
 terraform {
-  source = "${get_repo_root()}/infra/modules/azure/key_vault"
+  source = "${get_repo_root()}/infra/modules/azure/aks_identity"
 }
 # Set dependencies for this module
 dependency "resource_group" {
@@ -38,7 +38,8 @@ dependency "naming" {
   
   # Mock outputs for plan and validation
   mock_outputs = {
-    key_vault = "mock-kv"
+    aks_identity = "mock-identity"
+    aks_cluster = "mock-aks"
   }
 }
 
@@ -46,7 +47,8 @@ dependency "naming" {
 inputs = {
   resource_group_name = dependency.resource_group.outputs.name
   location            = local.region
-  key_vault_name      = dependency.naming.outputs.key_vault
+  identity_name       = dependency.naming.outputs.aks_identity
+  cluster_name        = dependency.naming.outputs.aks_cluster
   tags                = local.tags
 }
 

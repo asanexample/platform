@@ -247,8 +247,8 @@ function create_region_hcl {
   # Generate region abbreviation based on cloud provider's naming pattern
   case "$cloud" in
     azure)
-      # For Azure, typically remove 'us' from the region name
-      region_abbv=$(echo "$region" | sed 's/us//g')
+      # For Azure, use first letter combined with first two letters of second segment (e.g., eastus -> eus, westus -> wus)
+      region_abbv=$(echo "$region" | sed -E 's/([a-z])[a-z]*([a-z])[a-z]*/\1\2/g')
       ;;
     aws)
       # For AWS, use the first letter of each segment
@@ -326,55 +326,55 @@ locals {
   subnets = {
     # AZ 1 (${region}-1) subnets
     "az1-kubernetes" = {
-      address_prefixes  = ["$(cidrsubnet "${cidr}" 5 0)"] # /26
+      address_prefixes  = ["${cidr%.*}.0/26"]
       service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ContainerRegistry"]
     },
     "az1-services" = {
-      address_prefixes  = ["$(cidrsubnet "${cidr}" 6 4)"] # /27
+      address_prefixes  = ["${cidr%.*}.64/27"]
       service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.Sql"]
     },
     "az1-endpoints" = {
-      address_prefixes  = ["$(cidrsubnet "${cidr}" 7 10)"] # /28
+      address_prefixes  = ["${cidr%.*}.96/28"]
       service_endpoints = ["Microsoft.Storage", "Microsoft.Sql", "Microsoft.KeyVault"]
     },
     "az1-transit" = {
-      address_prefixes  = ["$(cidrsubnet "${cidr}" 8 22)"] # /29
+      address_prefixes  = ["${cidr%.*}.112/29"]
       service_endpoints = ["Microsoft.Storage"]
     },
     
     # AZ 2 (${region}-2) subnets
     "az2-kubernetes" = {
-      address_prefixes  = ["$(cidrsubnet "${cidr}" 5 1)"] # /26
+      address_prefixes  = ["${cidr%.*}.1.0/26"]
       service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ContainerRegistry"]
     },
     "az2-services" = {
-      address_prefixes  = ["$(cidrsubnet "${cidr}" 6 5)"] # /27
+      address_prefixes  = ["${cidr%.*}.1.64/27"]
       service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.Sql"]
     },
     "az2-endpoints" = {
-      address_prefixes  = ["$(cidrsubnet "${cidr}" 7 11)"] # /28
+      address_prefixes  = ["${cidr%.*}.1.96/28"]
       service_endpoints = ["Microsoft.Storage", "Microsoft.Sql", "Microsoft.KeyVault"]
     },
     "az2-transit" = {
-      address_prefixes  = ["$(cidrsubnet "${cidr}" 8 23)"] # /29
+      address_prefixes  = ["${cidr%.*}.1.112/29"]
       service_endpoints = ["Microsoft.Storage"]
     },
     
     # AZ 3 (${region}-3) subnets
     "az3-kubernetes" = {
-      address_prefixes  = ["$(cidrsubnet "${cidr}" 5 2)"] # /26
+      address_prefixes  = ["${cidr%.*}.2.0/26"]
       service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ContainerRegistry"]
     },
     "az3-services" = {
-      address_prefixes  = ["$(cidrsubnet "${cidr}" 6 6)"] # /27
+      address_prefixes  = ["${cidr%.*}.2.64/27"]
       service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.Sql"]
     },
     "az3-endpoints" = {
-      address_prefixes  = ["$(cidrsubnet "${cidr}" 7 12)"] # /28
+      address_prefixes  = ["${cidr%.*}.2.96/28"]
       service_endpoints = ["Microsoft.Storage", "Microsoft.Sql", "Microsoft.KeyVault"]
     },
     "az3-transit" = {
-      address_prefixes  = ["$(cidrsubnet "${cidr}" 8 24)"] # /29
+      address_prefixes  = ["${cidr%.*}.2.112/29"]
       service_endpoints = ["Microsoft.Storage"]
     }
   }
