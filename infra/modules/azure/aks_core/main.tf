@@ -93,6 +93,9 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
     ignore_changes = [
       default_node_pool[0].node_count,
       kubernetes_version,
+      network_profile[0].pod_cidr,
+      network_profile[0].service_cidr,
+      network_profile[0].dns_service_ip
     ]
   }
 }
