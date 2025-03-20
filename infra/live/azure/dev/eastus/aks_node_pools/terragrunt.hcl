@@ -82,8 +82,8 @@ inputs = {
     name = "apps"
     vm_size = "Standard_D4s_v4"
     node_count = 2
-    # Removed availability zones since this region doesn't support them
-    availability_zones = []
+    # Use availability zones for high availability
+    availability_zones = ["1", "2", "3"]
     max_pods = 110
     os_disk_size_gb = 128
     os_disk_type = "Managed"
@@ -105,7 +105,7 @@ inputs = {
   
   # Override standard node pool availability zones for this region
   standard_node_pool = {
-    availability_zones = []
+    availability_zones = ["1", "2", "3"]
   }
   
   # Tags
