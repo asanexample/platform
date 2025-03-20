@@ -9,44 +9,15 @@ include "root" {
   path = find_in_parent_folders()
 }
 
+# Include the specialized Kubernetes provider configurations
+include "kubernetes_providers" {
+  path = "${dirname(find_in_parent_folders())}/_envcommon/kubernetes_providers.hcl"
+  expose = true
+}
+
 # Terraform module source for Cilium
 terraform {
   source = "${dirname(find_in_parent_folders())}/modules/azure/kubernetes/cilium"
-}
-
-# ---------------------------------------------------------------------------------------------------------------------
-# DEPENDENCIES AND PROVIDERS
-# These configurations manage the dependencies needed for Cilium and configure necessary providers
-# ---------------------------------------------------------------------------------------------------------------------
-
-# Configure the Kubernetes provider for Cilium to communicate with the AKS cluster
-generate "provider_k8s" {
-  path      = "kubernetes_provider_override.tf"
-  if_exists = "overwrite_terragrunt"
-  contents = <<EOF
-provider "kubernetes" {
-  host                   = var.kubernetes_host
-  client_certificate     = base64decode(var.kubernetes_client_certificate)
-  client_key             = base64decode(var.kubernetes_client_key)
-  cluster_ca_certificate = base64decode(var.kubernetes_cluster_ca_certificate)
-}
-EOF
-}
-
-# Configure the Helm provider for installing Cilium charts
-generate "provider_helm" {
-  path      = "helm_provider_override.tf"
-  if_exists = "overwrite_terragrunt"
-  contents = <<EOF
-provider "helm" {
-  kubernetes {
-    host                   = var.kubernetes_host
-    client_certificate     = base64decode(var.kubernetes_client_certificate)
-    client_key             = base64decode(var.kubernetes_client_key)
-    cluster_ca_certificate = base64decode(var.kubernetes_cluster_ca_certificate)
-  }
-}
-EOF
 }
 
 # ---------------------------------------------------------------------------------------------------------------------

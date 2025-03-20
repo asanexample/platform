@@ -59,36 +59,6 @@ dependency "aks_core" {
   }
 }
 
-# Configure the Kubernetes provider
-generate "provider_k8s" {
-  path      = "kubernetes_provider_override.tf"
-  if_exists = "overwrite_terragrunt"
-  contents = <<EOF
-provider "kubernetes" {
-  host                   = var.kubernetes_host
-  client_certificate     = base64decode(var.kubernetes_client_certificate)
-  client_key             = base64decode(var.kubernetes_client_key)
-  cluster_ca_certificate = base64decode(var.kubernetes_cluster_ca_certificate)
-}
-EOF
-}
-
-# Configure the Helm provider
-generate "provider_helm" {
-  path      = "helm_provider_override.tf"
-  if_exists = "overwrite_terragrunt"
-  contents = <<EOF
-provider "helm" {
-  kubernetes {
-    host                   = var.kubernetes_host
-    client_certificate     = base64decode(var.kubernetes_client_certificate)
-    client_key             = base64decode(var.kubernetes_client_key)
-    cluster_ca_certificate = base64decode(var.kubernetes_cluster_ca_certificate)
-  }
-}
-EOF
-}
-
 # Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
   # AKS credentials for provider configuration
