@@ -43,4 +43,4 @@ The following standard tags are applied to all resources:
 
 ## Next Steps
 
-Continue to [Module Design Principles](12-module-design.md) to understand how the VIP Platform modules are designed and implemented. 
+Continue to [Module Design Principles](13-module-design.md) to understand how the VIP Platform modules are designed and implemented. 

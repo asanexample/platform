@@ -1,75 +1,45 @@
-# Azure AKS Identity Terragrunt Configuration
+# Azure AKS Identity Module - West US (Dev)
 
-This directory contains the Terragrunt configuration for deploying Azure Kubernetes Service (AKS) identities in the West US region. The AKS identity module creates and manages user-assigned managed identities for AKS clusters.
+## Overview
+This module provisions and configures managed identities for Azure Kubernetes Service (AKS) in the West US region for the development environment. It creates and configures the necessary identities for AKS clusters and workloads.
 
-## Configuration Overview
+## Configuration Details
 
-The AKS identity is configured with:
+### Purpose
+Creates managed identities that:
+- Enable secure authentication between AKS and other Azure services
+- Support workload identity federation for Kubernetes applications
+- Implement proper RBAC and least privilege access
+- Eliminate the need for service principals with credentials
 
-- User-assigned managed identity for the AKS cluster
-- RBAC role assignments for AKS operations
-- Workload identity federation capability disabled (can be enabled when needed)
+### Dependencies
+- **naming**: Uses standardized resource names
+- **resource_group**: Deploys resources in the specified resource group
 
-## Naming Attributes
+### Key Configuration Settings
+- **Cluster Identity**:
+  - Type: User-assigned managed identity
+  - Permissions: Network Contributor, Managed Identity Operator
+- **Kubelet Identity**:
+  - Type: User-assigned managed identity
+  - Permissions: AcrPull
+- **Workload Identities**:
+  - Federated identity credential enabled
+  - OIDC issuer profile configuration
 
-The configuration uses the correct attribute from the naming module:
+### Role Assignments
+- Network permissions for VNet and subnet management
+- Container Registry pull permissions
+- Managed Identity operator permissions for managing other identities
 
-```hcl
-dependency "naming" {
-  config_path = "../naming"
-  
-  # Mock outputs for plan and validation
-  mock_outputs = {
-    aks_cluster = "mock-aks"
-    aks_identity = "mock-identity"  # Correct attribute name
-  }
-}
+## Usage Example
 
-inputs = {
-  # Identity naming
-  aks_identity_name = dependency.naming.outputs.aks_identity  # Correct attribute reference
-}
-```
-
-### Previous Issue (Now Fixed)
-
-There was a previous issue where the configuration incorrectly referenced `user_assigned_identity` and `user_managed_identity` attributes, which don't exist in the naming module outputs:
-
-```hcl
-# Incorrect (old code):
-mock_outputs = {
-  aks_cluster = "mock-aks"
-  user_assigned_identity = "mock-identity"  # This attribute doesn't exist
-}
-
-inputs = {
-  aks_identity_name = dependency.naming.outputs.user_assigned_identity  # Incorrect reference
-}
-```
-
-The fix ensures that the module correctly references `aks_identity` from the naming module, which is the proper attribute name for AKS identity resources.
-
-## Dependencies
-
-This module has dependencies on:
-
-- **naming**: For standardized resource naming
-- **resource_group**: For the resource group where the identity is deployed
-
-## Applying Changes
-
-To apply changes to the AKS identity configuration:
-
+To apply this module:
 ```bash
-cd infra/live/azure/dev/westus/aks_identity
-terragrunt plan
+cd aks_identity
 terragrunt apply
 ```
 
-## Outputs
-
-After deployment, the following outputs are available:
-
-- **aks_identity_id**: The full resource ID of the user-assigned identity
-- **aks_identity_client_id**: The client ID of the user-assigned identity
-- **aks_identity_principal_id**: The principal ID of the user-assigned identity 
+## Dependencies on this Module
+The following modules depend on outputs from this module:
+- aks_core 

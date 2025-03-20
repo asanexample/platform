@@ -61,4 +61,4 @@ The deployment workflows are guided by the following principles:
 
 ## Next Steps
 
-Continue to [Testing Strategy](14-testing-strategy.md) to understand how infrastructure is tested throughout the deployment lifecycle. 
+Continue to [Testing Strategy](15-testing-strategy.md) to understand how infrastructure is tested throughout the deployment lifecycle. 

@@ -1,168 +1,150 @@
 # Azure Networking Module
 
-This module creates a virtual network infrastructure in Azure with customizable subnet configurations and network security groups. It now also includes integrated AKS networking support.
+This module creates the core Azure networking components including virtual networks, subnets, and network security groups for AKS and related services.
 
 ## Features
 
-- Creates a resource group for networking resources
-- Deploys a virtual network with configurable address space
-- Creates multiple subnets with configurable address prefixes
-- Configures service endpoints for each subnet
-- Associates a network security group with each subnet
-- Supports custom DNS servers
-- Applies standardized tagging to all resources
-- **AKS Networking Support**:
-  - Creates private DNS zones for AKS private clusters
-  - Configures AKS-specific NSG rules for node subnet security
-  - Links private DNS zones to the virtual network
-  - Optimizes network settings for AKS deployments
+- Creates a Virtual Network with configurable address space
+- Creates multiple subnets with associated Network Security Groups
+- Configurable subnet delegations and service endpoints
+- Support for private endpoints and DNS zones
+- Compatible with Cilium CNI deployment on AKS
 
 ## Usage
-
-### Basic Usage
 
 ```hcl
 module "networking" {
   source = "../../modules/azure/networking"
-
-  resource_group_name = "my-resource-group"
-  location            = "eastus"
-  vnet_name           = "my-vnet"
   
-  # VNet address space
+  resource_group_name = azurerm_resource_group.example.name
+  location            = azurerm_resource_group.example.location
+  
+  # VNet configuration
+  name          = "vip-vnet-dev-eus-main"
   address_space = ["10.0.0.0/16"]
   
-  # Subnets configuration
+  # Subnet configuration
   subnets = {
-    "app-subnet" = {
-      address_prefixes  = ["10.0.1.0/24"]
-      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault"]
+    "az1-nodes" = {
+      address_prefix = "10.0.0.0/24"
+      security_rules = local.node_subnet_rules
     },
-    "data-subnet" = {
-      address_prefixes  = ["10.0.2.0/24"]
-      service_endpoints = ["Microsoft.Storage", "Microsoft.Sql"]
+    "az2-nodes" = {
+      address_prefix = "10.0.10.0/24"
+      security_rules = local.node_subnet_rules
+    },
+    "az3-nodes" = {
+      address_prefix = "10.0.20.0/24"
+      security_rules = local.node_subnet_rules
+    },
+    "endpoints" = {
+      address_prefix = "10.0.30.0/24"
+      security_rules = local.endpoint_subnet_rules
     }
   }
   
-  # DNS configuration (optional)
-  dns_servers = ["168.63.129.16"]
+  # DNS servers (optional)
+  dns_servers = null # Use Azure-provided DNS
   
-  # Tags (optional)
+  # Create private DNS zone for AKS
+  create_private_dns_zone = true
+  private_dns_zone_name   = "privatelink.eastus.azmk8s.io"
+  
+  # Apply tags
   tags = {
     Environment = "dev"
-    Project     = "example"
+    ManagedBy   = "Terraform"
   }
 }
 ```
 
-### With AKS Networking
+## Subnet Configuration for Cilium CNI
+
+When using Cilium as the CNI for AKS, consider the following subnet configurations:
+
+1. **Node Subnet Sizing**: Since Cilium uses its own IPAM (IP Address Management) and not Azure CNI, you can allocate smaller subnet sizes for nodes. Cilium manages pod IPs independently of the Azure subnet.
+
+2. **Security Rules**: Ensure the Node Subnet NSGs allow the following traffic:
+   - Inbound from other node subnets (for pod-to-pod communication)
+   - Outbound to all destinations 
+   - Inbound from Azure Load Balancer
+
+3. **MTU Considerations**: Cilium operates efficiently with an MTU of 1450, which works well with Azure's underlying infrastructure.
+
+Example NSG rules for Cilium compatibility:
 
 ```hcl
-module "networking" {
-  source = "../../modules/azure/networking"
-
-  resource_group_name = "my-resource-group"
-  location            = "eastus"
-  vnet_name           = "my-vnet"
-  
-  # VNet address space
-  address_space = ["10.0.0.0/16"]
-  
-  # Subnets configuration
-  subnets = {
-    "az1-node-subnet" = {
-      address_prefixes  = ["10.0.0.0/20"]
-      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault"]
+locals {
+  node_subnet_rules = [
+    {
+      name                       = "AllowAzureLoadBalancerInbound"
+      priority                   = 100
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "*"
+      source_port_range          = "*"
+      destination_port_range     = "*"
+      source_address_prefix      = "AzureLoadBalancer"
+      destination_address_prefix = "*"
     },
-    "az1-pod-subnet" = {
-      address_prefixes  = ["10.0.16.0/20"]
+    {
+      name                       = "AllowClusterCommunication"
+      priority                   = 110
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "*"
+      source_port_range          = "*"
+      destination_port_range     = "*"
+      source_address_prefix      = "VirtualNetwork"
+      destination_address_prefix = "VirtualNetwork"
     },
-    "az1-endpoint-subnet" = {
-      address_prefixes  = ["10.0.32.0/24"]
-      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault"]
+    {
+      name                       = "DenyAllInbound"
+      priority                   = 4096
+      direction                  = "Inbound"
+      access                     = "Deny"
+      protocol                   = "*"
+      source_port_range          = "*"
+      destination_port_range     = "*"
+      source_address_prefix      = "*"
+      destination_address_prefix = "*"
     }
-  }
-  
-  # Enable AKS networking features
-  enable_aks_networking = true
-  aks_subnet_name = "az1-node-subnet"
-  aks_cluster_name = "my-aks-cluster"
-  aks_private_cluster_enabled = true
-  aks_node_resource_group = "my-aks-nodes-rg"
-  
-  # Tags
-  tags = {
-    Environment = "dev"
-    Project     = "example"
-  }
+  ]
 }
 ```
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|----------|
-| resource_group_name | Name of the resource group to deploy the virtual network in | `string` | n/a | yes |
-| location | Azure region where resources will be deployed | `string` | n/a | yes |
-| vnet_name | Name of the virtual network to create | `string` | n/a | yes |
-| address_space | Address space for the virtual network | `list(string)` | `["10.0.0.0/16"]` | no |
-| subnets | Map of subnet names to configuration | `map(object)` | `{}` | no |
-| dns_servers | List of DNS servers to use with the virtual network | `list(string)` | `[]` | no |
+|------|-------------|------|---------|:--------:|
+| resource_group_name | The name of the resource group | `string` | n/a | yes |
+| location | The Azure region where resources will be created | `string` | n/a | yes |
+| name | The name of the virtual network | `string` | n/a | yes |
+| address_space | The address space for the virtual network | `list(string)` | n/a | yes |
+| subnets | Map of subnet configurations | `map(object)` | `{}` | no |
+| dns_servers | List of DNS servers to use for the virtual network | `list(string)` | `null` | no |
+| create_private_dns_zone | Whether to create a private DNS zone for AKS | `bool` | `false` | no |
+| private_dns_zone_name | The name of the private DNS zone for AKS | `string` | `null` | no |
 | tags | Tags to apply to all resources | `map(string)` | `{}` | no |
-| enable_aks_networking | Whether to enable AKS-specific networking features | `bool` | `false` | no |
-| aks_subnet_name | Name of the subnet to use for AKS nodes. Must match a key in the subnets map. | `string` | `null` | no |
-| aks_cluster_name | Name of the AKS cluster. Required if enable_aks_networking is true. | `string` | `null` | no |
-| aks_private_cluster_enabled | Whether the AKS cluster is private. This affects DNS zone creation. | `bool` | `false` | no |
-| aks_node_resource_group | Name of the resource group where AKS will create node resources | `string` | `null` | no |
-| aks_private_dns_zone_id | ID of an existing private DNS zone for AKS. If not provided, a new one will be created if needed. | `string` | `null` | no |
-
-### Subnet Configuration
-
-The `subnets` input accepts a map of subnet configurations with the following structure:
-
-```hcl
-subnets = {
-  "subnet-name" = {
-    address_prefixes  = ["10.0.1.0/24"]  # Required
-    service_endpoints = ["Microsoft.Storage"]  # Optional
-    delegation        = {}  # Optional
-  }
-}
-```
 
 ## Outputs
 
 | Name | Description |
 |------|-------------|
-| vnet_id | The ID of the virtual network |
-| vnet_name | The name of the virtual network |
-| vnet_resource_group_name | The name of the resource group containing the virtual network |
-| vnet_location | The location of the virtual network |
-| vnet_address_space | The address space of the virtual network |
-| subnet_ids | Map of subnet names to subnet IDs |
-| nsg_ids | Map of subnet names to network security group IDs |
-| aks_subnet_id | The ID of the subnet used for AKS nodes |
-| aks_private_dns_zone_id | The ID of the AKS private DNS zone if created |
-| aks_private_dns_zone_name | The name of the AKS private DNS zone if created |
-| aks_nsg_id | The ID of the network security group attached to the AKS subnet |
-| vnet_subnet_ids | List of all subnet IDs in the virtual network |
-| private_endpoints_subnet_id | The ID of the private endpoints subnet if it exists |
+| id | The ID of the virtual network |
+| name | The name of the virtual network |
+| resource_group_name | The name of the resource group containing the virtual network |
+| address_space | The address space of the virtual network |
+| subnet_ids | Map of subnet names to their respective IDs |
+| private_dns_zone_id | The ID of the private DNS zone for AKS (if created) |
+| network_security_group_ids | Map of NSG names to their respective IDs |
 
-## AKS Networking Features
+## Notes
 
-### Network Security Group Rules
-
-When AKS networking is enabled, the module adds the following NSG rules to the AKS subnet:
-
-1. **AllowAzureLoadBalancer**: Permits traffic from Azure Load Balancer, which is essential for AKS functionality.
-2. **DenyAllInbound**: A restrictive rule (priority 4096) that blocks unwanted inbound traffic by default.
-
-### Private DNS Zones
-
-For private AKS clusters, the module creates:
-
-1. A private DNS zone with the name pattern: `privatelink.{region}.azmk8s.io`
-2. A virtual network link that connects the DNS zone to your VNet
+- Network Security Groups are created per subnet with configurable rules
+- The module supports creation of an AKS private DNS zone for private clusters
+- Subnet NSG rules can be customized for different workloads
+- Compatible with the Azure CNI networking plugin for AKS, and optimized for subsequent Cilium CNI installation
 
 ## Testing
 
@@ -194,13 +176,6 @@ The tests validate:
 - Proper configuration of virtual networks and subnets
 - Correct association of network security groups
 - Proper handling of multiple subnet configurations
-
-### Test Implementation
-
-The tests use Terraform's built-in testing framework to validate:
-
-1. **Unit Tests (Plan Only)**: These tests use `command = plan` to validate configuration logic without creating resources.
-2. **Integration Tests (Optional)**: When run with proper credentials, the tests can deploy actual resources temporarily to validate functionality.
 
 ### CI/CD Integration
 

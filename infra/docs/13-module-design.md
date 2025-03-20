@@ -16,6 +16,7 @@ The module design is guided by the following principles:
 4. **Comprehensive Documentation**: Complete documentation for all module components.
 5. **Thorough Testing**: Comprehensive tests for all module functionality.
 6. **Cloud-Specific Implementations**: Separate implementations for different cloud providers.
+7. **Separation of Implementation and Tests**: Module tests are kept separate from module code.
 
 ## Module Structure
 
@@ -28,7 +29,10 @@ The module design is guided by the following principles:
 - `outputs.tf`: Output value definitions
 - `versions.tf`: Provider and terraform version constraints
 - `README.md`: Module documentation
-- `tests/`: Module tests
+
+### Test Files
+
+Module tests are located in the `infra/tests/modules` directory, not within the module directories themselves. For example, tests for the `infra/modules/azure/networking` module are located at `infra/tests/modules/azure/networking`.
 
 ## Variable Design
 
@@ -44,8 +48,10 @@ The module design is guided by the following principles:
 
 ## Testing Approach
 
-*Documentation on testing approach will be provided in a future update.*
+All modules must have comprehensive tests located in the corresponding directory under `infra/tests/modules/`. Tests are written using Terraform's built-in testing framework and should validate both the module's functionality and configuration options.
+
+For detailed information on testing, refer to the [Testing Strategy](15-testing-strategy.md) document.
 
 ## Next Steps
 
-Continue to [Deployment Workflows](13-deployment-workflows.md) to understand how infrastructure is deployed across environments. 
+Continue to [Deployment Workflows](14-deployment-workflows.md) to understand how infrastructure is deployed across environments. 

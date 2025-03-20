@@ -46,4 +46,4 @@ The platform is designed to support the following compliance standards:
 
 ## Next Steps
 
-Continue to [Tagging Strategy](11-tagging-strategy.md) to understand how resource tagging is used in the VIP Platform. 
+Continue to [Tagging Strategy](12-tagging-strategy.md) to understand how resource tagging is used in the VIP Platform. 

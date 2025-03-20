@@ -69,8 +69,8 @@ To start working with the VIP Platform:
 
 1. Review the [Architecture Overview](02-architecture-overview.md) to understand the overall design.
 2. Explore the [Infrastructure as Code Approach](03-infrastructure-as-code.md) to learn about the development patterns.
-3. Check the [Available Modules](16-available-modules.md) to see what infrastructure components are ready to use.
-4. Follow the [Deployment Workflows](13-deployment-workflows.md) guide to deploy infrastructure components.
+3. Check the [Available Modules](17-available-modules.md) to see what infrastructure components are ready to use.
+4. Follow the [Deployment Workflows](14-deployment-workflows.md) guide to deploy infrastructure components.
 
 ## Target Audience
 

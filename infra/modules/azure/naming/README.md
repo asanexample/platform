@@ -2,6 +2,7 @@
 
 ## Description
 
+
 This module provides standardized resource naming capabilities for Azure resources based on VIP Platform conventions and Azure's naming restrictions. It ensures consistent naming across all resources and environments while adhering to Azure's resource-specific naming limitations.
 
 ## Features
@@ -23,7 +24,7 @@ module "naming" {
   region_abbv = "wus"
   # prefix is optional, defaults to "vip"
 }
-
+`
 # Then use the outputs to set resource names
 resource "azurerm_resource_group" "example" {
   name     = module.naming.resource_group

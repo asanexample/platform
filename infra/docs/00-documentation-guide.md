@@ -25,18 +25,19 @@ The documentation is organized as follows:
    - [Compliance Framework](10-compliance-framework.md)
 
 5. **Implementation Patterns**
-   - [Naming Conventions](naming-conventions.md)
-   - [Tagging Strategy](11-tagging-strategy.md)
-   - [Module Design Principles](12-module-design.md)
+   - [Naming Conventions](11-naming-conventions.md)
+   - [Tagging Strategy](12-tagging-strategy.md)
+   - [Module Design Principles](13-module-design.md)
 
 6. **Operations**
-   - [Deployment Workflows](13-deployment-workflows.md)
-   - [Testing Strategy](14-testing-strategy.md)
-   - [Disaster Recovery](15-disaster-recovery.md)
+   - [Deployment Workflows](14-deployment-workflows.md)
+   - [Testing Strategy](15-testing-strategy.md)
+   - [Disaster Recovery](16-disaster-recovery.md)
 
 7. **Reference**
-   - [Available Modules](16-available-modules.md)
-   - [Troubleshooting Guide](17-troubleshooting.md)
+   - [Available Modules](17-available-modules.md)
+   - [Troubleshooting Guide](18-troubleshooting.md)
+   - [Cost Management Strategy](19-cost-management.md)
 
 ## How to Use This Documentation
 
@@ -44,8 +45,8 @@ Start with the [Introduction](01-introduction.md) and [Architecture Overview](02
 
 For developers working on infrastructure code:
 - Review the [Infrastructure as Code Approach](03-infrastructure-as-code.md)
-- Understand the [Naming Conventions](naming-conventions.md)
-- Learn about the [Module Design Principles](12-module-design.md)
+- Understand the [Naming Conventions](11-naming-conventions.md)
+- Learn about the [Module Design Principles](13-module-design.md)
 
 For network engineers and architects:
 - Focus on the [CIDR Allocation Strategy](06-cidr-allocation.md)
@@ -55,6 +56,11 @@ For network engineers and architects:
 For security professionals:
 - Read the [Security Architecture](09-security-architecture.md)
 - Review the [Compliance Framework](10-compliance-framework.md)
+
+For finance and operations teams:
+- Review the [Cost Management Strategy](19-cost-management.md)
+- Understand the [Tagging Strategy](12-tagging-strategy.md)
+- Learn about the [Environment Management](05-environment-management.md)
 
 ## Contributing to Documentation
 

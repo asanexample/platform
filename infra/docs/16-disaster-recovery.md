@@ -71,4 +71,4 @@ The DR strategy is guided by the following principles:
 
 ## Next Steps
 
-Continue to [Available Modules](16-available-modules.md) to understand the reusable infrastructure components available in the VIP Platform. 
+Continue to [Available Modules](17-available-modules.md) to understand the reusable infrastructure components available in the VIP Platform. 

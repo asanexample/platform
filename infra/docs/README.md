@@ -24,18 +24,19 @@ Welcome to the VIP Platform documentation. This comprehensive documentation cove
 11. [Compliance Framework](10-compliance-framework.md)
 
 ### Implementation Patterns
-12. [Naming Conventions](naming-conventions.md)
-13. [Tagging Strategy](11-tagging-strategy.md)
-14. [Module Design Principles](12-module-design.md)
+12. [Naming Conventions](11-naming-conventions.md)
+13. [Tagging Strategy](12-tagging-strategy.md)
+14. [Module Design Principles](13-module-design.md)
 
 ### Operations
-15. [Deployment Workflows](13-deployment-workflows.md)
-16. [Testing Strategy](14-testing-strategy.md)
-17. [Disaster Recovery](15-disaster-recovery.md)
+15. [Deployment Workflows](14-deployment-workflows.md)
+16. [Testing Strategy](15-testing-strategy.md)
+17. [Disaster Recovery](16-disaster-recovery.md)
 
 ### Reference
-18. [Available Modules](16-available-modules.md)
-19. [Troubleshooting Guide](17-troubleshooting.md)
+18. [Available Modules](17-available-modules.md)
+19. [Troubleshooting Guide](18-troubleshooting.md)
+20. [Cost Management Strategy](19-cost-management.md)
 
 ## Getting Started
 

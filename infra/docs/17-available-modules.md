@@ -101,4 +101,4 @@ The following Azure modules are available:
 
 ## Next Steps
 
-Continue to [Troubleshooting Guide](17-troubleshooting.md) to understand how to diagnose and resolve common issues. 
+Continue to [Troubleshooting Guide](18-troubleshooting.md) to understand how to diagnose and resolve common issues. 

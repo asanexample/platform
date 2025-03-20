@@ -16,6 +16,7 @@ The testing strategy is guided by the following principles:
 4. **Shift-Left Security**: Security testing integrated early in the development process.
 5. **Environment Parity**: Tests that reflect real-world deployment scenarios.
 6. **Clear Failure Reporting**: Easy identification of test failures and remediation steps.
+7. **Separation of Concerns**: Tests are separate from implementation code.
 
 ## Testing Types
 
@@ -51,7 +52,26 @@ The testing strategy is guided by the following principles:
 
 ## Test Implementation
 
-*Documentation on test implementation will be provided in a future update.*
+All module tests must be placed in the `infra/tests/modules` directory corresponding to the module being tested. Tests should never be colocated with the module implementation itself.
+
+For example, tests for the `infra/modules/azure/networking` module should be located at `infra/tests/modules/azure/networking`.
+
+### Test Directory Structure
+
+```
+infra/
+├── modules/             # Module implementation
+│   └── azure/
+│       ├── networking/
+│       ├── storage_account/
+│       └── ...
+└── tests/               # All test files
+    └── modules/
+        └── azure/
+            ├── networking/       # Tests for networking module
+            ├── storage_account/  # Tests for storage_account module
+            └── ...
+```
 
 ### Example Test
 
@@ -74,8 +94,13 @@ run "verify_resource_creation" {
 
 ## Test Automation
 
-*Documentation on test automation will be provided in a future update.*
+The repository includes scripts to automate test execution:
+
+- `run_all_terraform_tests.sh`: Runs all module tests
+- `run_failing_tests.sh`: Focuses on specific test directories
+
+All tests are run from the `infra/tests/modules` directory rather than from within module directories.
 
 ## Next Steps
 
-Continue to [Disaster Recovery](15-disaster-recovery.md) to understand how the VIP Platform handles business continuity and disaster recovery scenarios. 
+Continue to [Disaster Recovery](16-disaster-recovery.md) to understand how the VIP Platform handles business continuity and disaster recovery scenarios. 

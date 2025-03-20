@@ -71,10 +71,31 @@ module-name/
 ├── variables.tf          # Input variables
 ├── outputs.tf            # Output values
 ├── versions.tf           # Provider and terraform version constraints
-├── README.md             # Module documentation
-└── tests/                # Module tests
-    └── module-test.tftest.hcl  # Terraform test files
+└── README.md             # Module documentation
 ```
+
+### Tests Directory
+
+The `tests` directory contains all test configurations for validating infrastructure modules. Tests are organized to mirror the module structure:
+
+```
+tests/
+└── modules/
+    ├── aws/              # Tests for AWS modules
+    ├── azure/            # Tests for Azure modules
+    │   ├── networking/   # Tests for Azure networking module
+    │   ├── storage_account/ # Tests for Azure storage account module
+    │   └── ...
+    ├── gcp/              # Tests for GCP modules
+    └── common/           # Tests for common modules
+```
+
+The tests directory contains:
+- Unit tests for individual modules
+- Integration tests for combinations of modules
+- Compliance tests for security and best practices
+
+> **Important**: Tests must be placed in the `tests` directory, not within module directories, to maintain separation between implementation and test code.
 
 ### Live Directory
 
@@ -98,14 +119,6 @@ live/azure/dev/westus/
 │   └── terragrunt.hcl    # Terragrunt configuration
 └── common.hcl            # Common variables for this environment
 ```
-
-### Tests Directory
-
-The `tests` directory contains test configurations for validating infrastructure modules:
-
-- Unit tests for individual modules
-- Integration tests for combinations of modules
-- Compliance tests for security and best practices
 
 ## Development Workflow
 

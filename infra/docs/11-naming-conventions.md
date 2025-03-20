@@ -18,45 +18,45 @@ Where:
 
 ## Region Abbreviations
 
-| Azure Region | Abbreviation |
-|--------------|--------------|
-| East US | eus |
-| West US | wus |
-| Central US | cus |
-| North Europe | neu |
-| West Europe | weu |
-| Southeast Asia | sea |
-| Australia East | aue |
-| UK South | uks |
-| Canada Central | cac |
+| Azure Region   | Abbreviation |
+|----------------|--------------|
+| East US        | eus          |
+| West US        | wus          |
+| Central US     | cus          |
+| North Europe   | neu          |
+| West Europe    | weu          |
+| Southeast Asia | sea          |
+| Australia East | aue          |
+| UK South       | uks          |
+| Canada Central | cac          |
 
 ## Resource Type Abbreviations
 
-| Resource Type | Abbreviation | Example |
-|---------------|--------------|---------|
-| Resource Group | rg | vip-rg-dev-eus-net |
-| Virtual Network | vnet | vip-vnet-dev-eus-main |
-| Subnet | subnet | az1-node-subnet |
-| Network Security Group | nsg | az1-node-subnet-nsg |
-| Key Vault | kv | vip-kv-dev-eus-secrets |
-| Storage Account | sa | vipdeveussa001 (special format - see notes) |
-| Container Registry | acr | vipdevacr |
-| AKS Cluster | aks | vip-aks-dev-eus-k8s |
-| Public IP | pip | vip-pip-dev-eus-ingress |
-| Load Balancer | lb | vip-lb-dev-eus-app |
-| Application Gateway | agw | vip-agw-dev-eus-ingress |
-| Private Endpoint | pe | vip-pe-dev-eus-sql |
-| Private DNS Zone | pdns | privatelink.database.windows.net |
-| Front Door | fd | vip-fd-dev-global |
-| Log Analytics Workspace | law | vip-law-dev-eus-analytics |
-| Workload Identity | workid | vip-workid-dev-eus-customer |
-| Federated Credential | fedcred | vip-fedcred-dev-eus-customer |
-| Storage Account Private Endpoint | sape | vip-sape-dev-eus-customer |
-| Storage Account Private Service Connection | sapsc | vip-sapsc-dev-eus-customer |
-| Front Door Endpoint | fd-endpoint | vip-fd-endpoint-dev-eus-customer |
-| Front Door Origin Group | fd-og | vip-fd-og-dev-eus-customer |
-| Front Door Origin | fd-origin | vip-fd-origin-dev-eus-customer |
-| Front Door Route | fd-route | vip-fd-route-dev-eus-customer |
+| Resource Type                              | Abbreviation | Example                                     |
+|--------------------------------------------|--------------|---------------------------------------------|
+| Resource Group                             | rg           | vip-rg-dev-eus-net                          |
+| Virtual Network                            | vnet         | vip-vnet-dev-eus-main                       |
+| Subnet                                     | subnet       | az1-node-subnet                             |
+| Network Security Group                     | nsg          | az1-node-subnet-nsg                         |
+| Key Vault                                  | kv           | vip-kv-dev-eus-secrets                      |
+| Storage Account                            | sa           | vipdeveussa001 (special format - see notes) |
+| Container Registry                         | acr          | vipdevacr                                   |
+| AKS Cluster                                | aks          | vip-aks-dev-eus-k8s                         |
+| Public IP                                  | pip          | vip-pip-dev-eus-ingress                     |
+| Load Balancer                              | lb           | vip-lb-dev-eus-app                          |
+| Application Gateway                        | agw          | vip-agw-dev-eus-ingress                     |
+| Private Endpoint                           | pe           | vip-pe-dev-eus-sql                          |
+| Private DNS Zone                           | pdns         | privatelink.database.windows.net            |
+| Front Door                                 | fd           | vip-fd-dev-global                           |
+| Log Analytics Workspace                    | law          | vip-law-dev-eus-analytics                   |
+| Workload Identity                          | workid       | vip-workid-dev-eus-customer                 |
+| Federated Credential                       | fedcred      | vip-fedcred-dev-eus-customer                |
+| Storage Account Private Endpoint           | sape         | vip-sape-dev-eus-customer                   |
+| Storage Account Private Service Connection | sapsc        | vip-sapsc-dev-eus-customer                  |
+| Front Door Endpoint                        | fd-endpoint  | vip-fd-endpoint-dev-eus-customer            |
+| Front Door Origin Group                    | fd-og        | vip-fd-og-dev-eus-customer                  |
+| Front Door Origin                          | fd-origin    | vip-fd-origin-dev-eus-customer              |
+| Front Door Route                           | fd-route     | vip-fd-route-dev-eus-customer               |
 
 ## Specific Resource Conventions
 
@@ -123,17 +123,17 @@ The `deployment_id` is a special identifier used for customer applications:
 
 All resources should include the following standard tags:
 
-| Tag Name | Description | Example |
-|----------|-------------|---------|
-| Environment | Deployment environment | "dev", "test", "prod" |
-| ManagedBy | Tool managing the resource | "Terragrunt" |
-| Component | System component | "Networking", "Compute", "Storage" |
-| Project | Project name | "Multi-Cloud Platform" |
-| DataClassification | Data sensitivity | "Internal", "Confidential" |
-| Region | Azure region | "eastus", "westus" |
-| AutoShutdown | Auto-shutdown eligibility | "True", "False" |
-| CIDRHierarchy | For network resources, position in CIDR hierarchy | "Azure-Dev-EastUS" |
-| NetworkDesign | Network design pattern | "Kubernetes3AZ" |
+| Tag Name           | Description                                       | Example                            |
+|--------------------|---------------------------------------------------|------------------------------------|
+| Environment        | Deployment environment                            | "dev", "test", "prod"              |
+| ManagedBy          | Tool managing the resource                        | "Terragrunt"                       |
+| Component          | System component                                  | "Networking", "Compute", "Storage" |
+| Project            | Project name                                      | "Multi-Cloud Platform"             |
+| DataClassification | Data sensitivity                                  | "Internal", "Confidential"         |
+| Region             | Azure region                                      | "eastus", "westus"                 |
+| AutoShutdown       | Auto-shutdown eligibility                         | "True", "False"                    |
+| CIDRHierarchy      | For network resources, position in CIDR hierarchy | "Azure-Dev-EastUS"                 |
+| NetworkDesign      | Network design pattern                            | "Kubernetes3AZ"                    |
 
 ## Implementation in Terraform
 
@@ -198,4 +198,4 @@ All infrastructure modules use the naming module internally. For example, the ho
 
 ## Reference
 
-For CIDR allocation strategy details, see [CIDR Allocation Strategy](infra/docs/cidr-allocation.md). 
+For CIDR allocation strategy details, see [CIDR Allocation Strategy](06-cidr-allocation.md). 

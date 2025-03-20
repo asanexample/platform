@@ -2,7 +2,7 @@
 
 # Script to run specific failing Terraform tests
 # Usage: ./run_failing_tests.sh test1 test2 test3
-# Example: ./run_failing_tests.sh "infra/modules/azure/aks_core"
+# Example: ./run_failing_tests.sh "infra/tests/modules/azure/aks_core"
 
 set -e
 EXIT_CODE=0
@@ -10,7 +10,7 @@ EXIT_CODE=0
 # If no arguments provided, run these known failing tests
 if [ $# -eq 0 ]; then
   TEST_DIRS=(
-    "infra/modules/azure/aks_core"
+    "infra/tests/modules/azure/aks_core"
   )
 else
   # Use the tests provided as arguments

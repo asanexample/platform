@@ -321,7 +321,9 @@ This implementation plan incorporates a comprehensive testing approach using Ter
 
 ### 2. Test File Organization
 
-- Place test files (`.tftest.hcl`) alongside the modules they test
+- Place test files (`.tftest.hcl`) in the dedicated `infra/tests/modules` directory structure
+- Keep tests separate from module implementation code
+- Organize tests to mirror the module structure in the `infra/modules` directory
 - Create test suites that validate specific functionality or scenarios
 - Maintain common test fixtures and mock data in dedicated directories
 

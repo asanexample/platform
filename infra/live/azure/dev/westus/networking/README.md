@@ -1,88 +1,56 @@
-# Azure Networking for West US
+# Azure Networking Module - West US (Dev)
 
-This Terragrunt configuration deploys a virtual network with subnets for our Azure infrastructure in the West US region.
+## Overview
+This module provisions Azure networking infrastructure including Virtual Networks, subnets, and network security groups for the West US region. It follows a multi-availability zone design with specifically allocated CIDR ranges.
 
-## Configuration Overview
+## Configuration Details
 
-The networking configuration creates a multi-zone virtual network architecture optimized for AKS and supporting services:
+### Purpose
+Creates a complete networking foundation that:
+- Implements a secure network topology
+- Provisions subnets for different workload types across availability zones
+- Configures appropriate service endpoints for Azure services
+- Sets up networking for AKS private clusters
 
-- **Virtual Network**: Address space of `10.9.0.0/16`
-- **Subnet Structure**:
-  - AZ1, AZ2, and AZ3 zonal subnets for node pools, pods, and private endpoints
-  - Shared subnets for gateway and bastion services
-- **AKS Networking Integration**:
-  - Dedicated NSG rules for AKS node subnets
-  - Private DNS zone for private AKS clusters
-  - Proper network isolation for cluster components
+### Dependencies
+- **naming**: Uses standardized resource names
+- **resource_group**: Deploys resources in the specified resource group
 
-## Recent Changes
+### Network Architecture
+- **VNet CIDR**: 10.101.24.0/21 (West US region allocation)
+- **Subnets**:
+  - **AZ1 Subnets**:
+    - Kubernetes: 10.101.24.0/26
+    - Services: 10.101.24.64/27
+    - Endpoints: 10.101.24.96/28
+    - Transit: 10.101.24.112/29
+  - **AZ2 Subnets**:
+    - Kubernetes: 10.101.25.0/26
+    - Services: 10.101.25.64/27
+    - Endpoints: 10.101.25.96/28
+    - Transit: 10.101.25.112/29
+  - **AZ3 Subnets**:
+    - Kubernetes: 10.101.26.0/26
+    - Services: 10.101.26.64/27
+    - Endpoints: 10.101.26.96/28
+    - Transit: 10.101.26.112/29
 
-### Consolidated AKS Networking
+### Key Configuration Settings
+- AKS networking enabled for private clusters
+- Service endpoints configured for Storage, Key Vault, and other services
+- Network security groups with appropriate rules
 
-The AKS networking configuration has been consolidated into the main networking module, eliminating the need for a separate `aks_networking` module. This provides several benefits:
+## Usage Example
 
-- **Simplified Architecture**: All networking concerns are managed in a single module
-- **Eliminated Conflicts**: Resolved the conflict with multiple resources trying to manage the same subnet NSG associations
-- **Better Dependency Management**: Clearer dependency chain for AKS and related resources
-
-The previous `aks_networking` module has been deprecated and should not be used.
-
-## Dependencies
-
-- **Resource Group**: Uses the existing resource group
-- **Naming Module**: Gets standardized resource names from the naming module
-
-## Network Subnets
-
-| Subnet Name | CIDR Range | Purpose |
-|-------------|------------|---------|
-| az1-node-subnet | 10.9.0.0/20 | AKS worker nodes in AZ1 |
-| az1-pod-subnet | 10.9.16.0/20 | AKS pods in AZ1 |
-| az1-endpoint-subnet | 10.9.32.0/24 | Private endpoints in AZ1 |
-| az2-node-subnet | 10.9.64.0/20 | AKS worker nodes in AZ2 |
-| az2-pod-subnet | 10.9.80.0/20 | AKS pods in AZ2 |
-| az2-endpoint-subnet | 10.9.96.0/24 | Private endpoints in AZ2 |
-| az3-node-subnet | 10.9.128.0/20 | AKS worker nodes in AZ3 |
-| az3-pod-subnet | 10.9.144.0/20 | AKS pods in AZ3 |
-| az3-endpoint-subnet | 10.9.160.0/24 | Private endpoints in AZ3 |
-| gateway-subnet | 10.9.192.0/24 | Application gateway |
-| bastion-subnet | 10.9.193.0/24 | Azure Bastion |
-
-## AKS Networking Configuration
-
-The configuration enables AKS-specific networking features:
-
-```hcl
-# AKS Networking Configuration
-enable_aks_networking = true
-aks_subnet_name = "az1-node-subnet"
-aks_cluster_name = dependency.naming.outputs.aks_cluster
-aks_private_cluster_enabled = true
-aks_node_resource_group = "${dependency.resource_group.outputs.name}-nodes"
-```
-
-This creates:
-- AKS-specific NSG rules for the node subnet
-- A private DNS zone for AKS (`privatelink.westus.azmk8s.io`)
-- A virtual network link for the private DNS zone
-
-## Applying Changes
-
-To apply changes to this configuration:
-
+To apply this module:
 ```bash
-cd infra/live/azure/dev/westus/networking
+cd networking
 terragrunt apply
 ```
 
-## Outputs
-
-After deployment, you can access various outputs, including:
-
-- `vnet_id`: The ID of the virtual network
-- `subnet_ids`: Map of subnet names to subnet IDs
-- `aks_subnet_id`: The ID of the subnet used for AKS nodes
-- `aks_private_dns_zone_id`: The ID of the AKS private DNS zone
-- `private_endpoints_subnet_id`: The ID of the private endpoints subnet
-
-These outputs are used by other modules as dependencies. 
+## Dependencies on this Module
+The following modules depend on outputs from this module:
+- key_vault
+- storage
+- aks_core
+- aks_node_pools 
