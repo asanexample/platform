@@ -103,6 +103,9 @@ resource "null_resource" "update_kubeconfig" {
   depends_on = [azurerm_kubernetes_cluster.aks_cluster]
 
   provisioner "local-exec" {
-    command = "az aks get-credentials --resource-group ${var.resource_group_name} --name ${azurerm_kubernetes_cluster.aks_cluster.name} --overwrite-existing"
+    command = <<-EOT
+      az aks get-credentials --resource-group ${var.resource_group_name} --name ${azurerm_kubernetes_cluster.aks_cluster.name} --overwrite-existing
+      kubelogin convert-kubeconfig -l azurecli
+    EOT
   }
 } 
