@@ -4,14 +4,10 @@
 # used as defaults for all environments, which minimizes duplication across environments.
 # ---------------------------------------------------------------------------------------------------------------------
 
-# Include the root `terragrunt.hcl` configuration, which has settings common across all components
-include "root" {
-  path = find_in_parent_folders()
-}
-
 # Terraform module source for AKS Node Pools
 terraform {
-  source = "${dirname(find_in_parent_folders())}/modules/azure/aks_node_pools"
+  # Use double-slash notation to ensure all relative module references work correctly
+  source = "${find_in_parent_folders("infra")}/modules/azure//aks_node_pools"
 }
 
 # ---------------------------------------------------------------------------------------------------------------------

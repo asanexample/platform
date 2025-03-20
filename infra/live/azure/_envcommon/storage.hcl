@@ -1,40 +1,50 @@
-# ---------------------------------------------------------------------------------------------------------------------
-# COMMON STORAGE CONFIGURATION
-# This file defines standard storage settings for different environments
-# ---------------------------------------------------------------------------------------------------------------------
+# Common Terragrunt configuration for Azure Storage
 
-# This file is meant to be included in terragrunt.hcl files directly
+terraform {
+  # Use double-slash notation to ensure all relative module references work correctly
+  source = "${find_in_parent_folders("infra")}/modules/azure//storage_account"
+}
+
+locals {
+  # Extract the variables we need for easy access
+  base_source_url = find_in_parent_folders("infra")
+}
 
 inputs = {
-  # Standard containers to create in all environments
-  storage_containers = {
+  # Default Storage Account configuration
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+  account_kind             = "StorageV2"
+  access_tier              = "Hot"
+  
+  # Default container configuration
+  enable_blob_storage = true
+  containers = {
     "assets" = {
-      name                  = "assets"
+      name = "assets",
       container_access_type = "private"
     },
     "public" = {
-      name                  = "public"
-      container_access_type = get_env("TF_VAR_environment", "dev") == "prod" ? "private" : "blob"
+      name = "public",
+      container_access_type = "blob"
     },
     "pdf" = {
-      name                  = "pdf"
+      name = "pdf",
       container_access_type = "private"
     }
   }
   
-  # Storage account settings based on environment
-  storage_account_tier     = "Standard"
-  storage_replication_type = get_env("TF_VAR_environment", "dev") == "prod" ? "ZRS" : "LRS"
-  storage_allow_public     = get_env("TF_VAR_environment", "dev") == "prod" ? false : true
+  # Default network configuration
+  network_rules = {
+    default_action             = "Deny"
+    bypass                     = ["AzureServices"]
+    ip_rules                   = []
+    virtual_network_subnet_ids = []
+  }
   
-  # CORS settings for storage
-  storage_cors_rules = get_env("TF_VAR_environment", "dev") == "prod" ? [] : [
-    {
-      allowed_headers    = ["*"]
-      allowed_methods    = ["GET", "HEAD", "OPTIONS"]
-      allowed_origins    = ["*"]
-      exposed_headers    = ["Content-Length", "Content-Type"]
-      max_age_in_seconds = 3600
-    }
-  ]
+  # Default private endpoint configuration (will be overridden in specific env)
+  private_endpoint = {
+    create = true
+    subresource_names = ["blob"]
+  }
 } 

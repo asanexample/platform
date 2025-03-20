@@ -1,12 +1,13 @@
 # ---------------------------------------------------------------------------------------------------------------------
-# COMMON TERRAGRUNT CONFIGURATION FOR CILIUM CNI INSTALLATION
+# COMMON TERRAGRUNT CONFIGURATION FOR CILIUM CNI
 # This is the common component configuration for Cilium CNI. The common parameters defined in this file will be
 # used as defaults for all environments, which minimizes duplication across environments.
 # ---------------------------------------------------------------------------------------------------------------------
 
-# Terraform module source for Cilium - used if no specific implementation is provided
+# Terraform module source for Cilium
 terraform {
-  source = "${dirname(find_in_parent_folders())}/modules/azure/kubernetes/cilium"
+  # Use double-slash notation to ensure all relative module references work correctly
+  source = "${find_in_parent_folders("infra")}/modules/azure//kubernetes/cilium"
 }
 
 # ---------------------------------------------------------------------------------------------------------------------

@@ -5,7 +5,8 @@
 # ---------------------------------------------------------------------------------------------------------------------
 
 terraform {
-  source = "${dirname(find_in_parent_folders())}/modules/azure/naming"
+  # Use double-slash notation to ensure all relative module references work correctly
+  source = "${find_in_parent_folders("infra")}/modules/azure//naming"
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -20,30 +21,14 @@ locals {
   # Extract region information from region.hcl
   region_vars    = read_terragrunt_config(find_in_parent_folders("region.hcl"))
   region         = local.region_vars.locals.region
+  region_abbv    = local.region_vars.locals.region_abbv
   
-  # Map Azure regions to their standard abbreviations
-  region_code_map = {
-    "eastus"      = "eus"
-    "eastus2"     = "eus2"
-    "westus"      = "wus"
-    "westus2"     = "wus2" 
-    "centralus"   = "cus"
-    "northeurope" = "neu"
-    "westeurope"  = "weu"
-    "southeastasia" = "sea"
-    "eastasia"    = "eas"
-    "uksouth"     = "uks"
-    "ukwest"      = "ukw"
-    "francecentral" = "frc"
-  }
+  # Get common tags from the environment
+  common_vars    = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  prefix         = local.common_vars.locals.prefix
   
-  # Get the region code for the current region
-  region_code = lookup(local.region_code_map, local.region, "unknown")
-  
-  # Optional: extract customer information if available
-  # This is useful when deploying customer-specific resources
-  customer_vars = read_terragrunt_config(find_in_parent_folders("customer.hcl"), { locals = { customer = null } })
-  customer      = lookup(local.customer_vars.locals, "customer", null)
+  # Try to get customer information if available
+  customer       = try(local.common_vars.locals.customer, "")
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -51,8 +36,8 @@ locals {
 # These are the variables we need to pass to the module to build standardized resource names.
 # ---------------------------------------------------------------------------------------------------------------------
 inputs = {
-  prefix      = "vip"
+  prefix      = local.prefix
   customer    = local.customer
   environment = local.environment
-  region_abbv = local.region_code
+  region_abbv = local.region_abbv
 } 

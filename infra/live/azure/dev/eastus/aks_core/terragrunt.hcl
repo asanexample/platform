@@ -1,17 +1,32 @@
-# Terragrunt configuration for Azure aks_core in eastus region
+# Terragrunt configuration for Azure AKS Core in eastus region
 
 # Local variables for this configuration
 locals {
-  # Load common variables
-  common_vars = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  # Load hierarchical variables
+  env_vars     = read_terragrunt_config(find_in_parent_folders("env.hcl"))
+  region_vars  = read_terragrunt_config(find_in_parent_folders("region.hcl"))
+  network_vars = read_terragrunt_config(find_in_parent_folders("network.hcl"))
+  common_vars  = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  
+  # Merge all variables for convenience
+  all_vars = merge(
+    local.env_vars.locals,
+    local.region_vars.locals,
+    local.network_vars.locals,
+    local.common_vars.locals
+  )
   
   # Extract commonly used variables
-  env          = local.common_vars.locals.env
-  prefix       = local.common_vars.locals.prefix
-  customer     = local.common_vars.locals.customer
-  region       = "eastus"
-  region_abbv  = "eus"
-  tags         = local.common_vars.locals.tags
+  env         = local.env_vars.locals.environment
+  prefix      = local.common_vars.locals.prefix
+  customer    = local.common_vars.locals.customer
+  region      = local.region_vars.locals.region
+  region_abbv = local.region_vars.locals.region_abbv
+  tags        = merge(
+    local.common_vars.locals.tags, 
+    local.env_vars.locals.env_tags,
+    local.region_vars.locals.region_tags
+  )
 }
 
 # Include the root terragrunt.hcl configuration
@@ -19,83 +34,125 @@ include "root" {
   path = find_in_parent_folders()
 }
 
-# Use the aks_core module
-terraform {
-  source = "${get_repo_root()}/infra/modules/azure/aks_core"
-}
-# Set dependencies for this module
-dependency "resource_group" {
-  config_path = "../resource_group"
-  
-  # Mock outputs for plan and validation
-  mock_outputs = {
-    name = "mock-rg"
-  }
+# Include the common configuration for AKS Core
+include "aks_core_common" {
+  path = find_in_parent_folders("azure/_envcommon/aks_core.hcl")
 }
 
+# Set dependencies for this module
 dependency "naming" {
   config_path = "../naming"
-  
+
   # Mock outputs for plan and validation
   mock_outputs = {
     aks_cluster = "mock-aks"
   }
 }
 
-dependency "networking" {
-  config_path = "../networking"
-  
+dependency "resource_group" {
+  config_path = "../resource_group"
+
   # Mock outputs for plan and validation
   mock_outputs = {
-    subnet_ids = { 
+    name     = "mock-rg"
+    location = local.region
+  }
+}
+
+dependency "networking" {
+  config_path = "../networking"
+
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    vnet_id   = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet"
+    vnet_name = "mock-vnet"
+    subnet_ids = {
       "az1-kubernetes" = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet/subnets/az1-kubernetes"
     }
+    aks_private_dns_zone_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/privateDnsZones/privatelink.${local.region}.azmk8s.io"
   }
 }
 
 dependency "aks_identity" {
   config_path = "../aks_identity"
-  
+
   # Mock outputs for plan and validation
   mock_outputs = {
-    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mock-identity"
+    aks_identity_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mock-identity"
   }
 }
 
-# Specify inputs specific to this module
+# Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
+  # Environment variables
+  environment = local.env
+  customer = local.customer
+  prefix = local.prefix
+  region_abbv = local.region_abbv
+
+  # Resource details
+  name                = dependency.naming.outputs.aks_cluster
   resource_group_name = dependency.resource_group.outputs.name
-  location            = local.region
-  cluster_name        = dependency.naming.outputs.aks_cluster
-  kubernetes_version  = "1.32"
-  identity_type       = "UserAssigned"
-  user_assigned_identity_id = dependency.aks_identity.outputs.aks_identity_id
-  subnet_id           = dependency.networking.outputs.subnet_ids["az1-kubernetes"]
-  prefix              = local.prefix
-  environment         = local.env
-  region_abbv         = local.region_abbv
-  customer            = local.customer
-  sku_tier            = "Standard"
-  local_account_disabled = true
+  location            = dependency.resource_group.outputs.location
+  dns_prefix          = "${local.prefix}-${local.env}-${local.region_abbv}"
+
+  # Environment-specific overrides
+  kubernetes_version        = "1.32"
+  sku_tier                  = "Standard"
+  local_account_disabled    = true
   workload_identity_enabled = true
-  oidc_issuer_enabled = true
-  
-  # Azure AD integration config (required for Kubernetes ≥ 1.25 with local_account_disabled)
-  azure_active_directory_role_based_access_control = {
-    managed                = true
+  oidc_issuer_enabled       = true
+
+  # Azure AD integration for this environment
+  azure_ad_integration = {
+    enable                 = true
     admin_group_object_ids = ["00000000-0000-0000-0000-000000000000"]
     azure_rbac_enabled     = true
     tenant_id              = null
   }
-  default_nodepool_node_labels = {
-    "nodepool-type" = "system"
-    "environment"   = local.env
-    "region"        = local.region
-  }
-  network_plugin     = "azure"
-  network_policy     = "azure"
-  service_cidr       = "10.0.0.0/16"
-  dns_service_ip     = "10.0.0.10"
-  tags               = local.tags
-}
 
+  # Identity configuration
+  user_assigned_identity_id = dependency.aks_identity.outputs.aks_identity_id
+
+  # Network configuration specific to this environment
+  network_profile = {
+    network_plugin    = "none"
+    network_policy    = null
+    outbound_type     = "loadBalancer"
+    service_cidr      = "10.0.0.0/16"
+    dns_service_ip    = "10.0.0.10"
+    pod_cidr          = "10.244.0.0/16"
+    load_balancer_sku = "standard"
+  }
+
+  # Subnet and private cluster configuration
+  subnet_id           = dependency.networking.outputs.subnet_ids["az1-kubernetes"]
+  private_dns_zone_id = dependency.networking.outputs.aks_private_dns_zone_id
+
+  # Default node pool overrides
+  default_node_pool = {
+    name                = "system"
+    vm_size             = "Standard_D2s_v4"
+    enable_auto_scaling = true
+    node_count          = 2
+    min_count           = 2
+    max_count           = 3
+    availability_zones  = ["1", "2", "3"]
+    max_pods            = 110
+    os_disk_size_gb     = 128
+    node_labels = {
+      "role"          = "system"
+      "node-priority" = "regular"
+    }
+    node_taints       = []
+    os_disk_type      = "Managed"
+    os_sku            = "Ubuntu"
+    ultra_ssd_enabled = false
+  }
+
+  # Tags
+  tags = merge(local.tags, {
+    "network-cilium-managed-by" = "cilium"
+    "cilium-version"            = "1.17.2"
+  })
+} 

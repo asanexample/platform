@@ -4,9 +4,10 @@
 # used as defaults for all environments, which minimizes duplication across environments.
 # ---------------------------------------------------------------------------------------------------------------------
 
-# Terraform module source for resource groups
+# Terraform module source
 terraform {
-  source = "${dirname(find_in_parent_folders())}/modules/azure/resource_group"
+  # Use double-slash notation to ensure all relative module references work correctly
+  source = "${find_in_parent_folders("infra")}/modules/azure//resource_group"
 }
 
 # ---------------------------------------------------------------------------------------------------------------------

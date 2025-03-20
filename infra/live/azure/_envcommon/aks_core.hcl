@@ -1,17 +1,13 @@
 # ---------------------------------------------------------------------------------------------------------------------
-# COMMON TERRAGRUNT CONFIGURATION FOR AKS CORE CLUSTER
-# This is the common component configuration for AKS Core. The common parameters defined in this file will be
+# COMMON TERRAGRUNT CONFIGURATION FOR AKS CORE
+# This is the common component configuration for Azure Kubernetes Service. The common parameters defined in this file will be
 # used as defaults for all environments, which minimizes duplication across environments.
 # ---------------------------------------------------------------------------------------------------------------------
 
-# Include the root `terragrunt.hcl` configuration, which has settings common across all components
-include "root" {
-  path = find_in_parent_folders()
-}
-
-# Terraform module source for AKS Core
+# Terraform module source for AKS
 terraform {
-  source = "${dirname(find_in_parent_folders())}/modules/azure/aks_core"
+  # Use double-slash notation to ensure all relative module references work correctly
+  source = "${find_in_parent_folders("infra")}/modules/azure//aks_core"
 }
 
 # ---------------------------------------------------------------------------------------------------------------------

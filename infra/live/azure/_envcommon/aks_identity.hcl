@@ -4,14 +4,17 @@
 # used as defaults for all environments, which minimizes duplication across environments.
 # ---------------------------------------------------------------------------------------------------------------------
 
-# Include the root `terragrunt.hcl` configuration, which has settings common across all components
-include "root" {
-  path = find_in_parent_folders()
-}
+# Common Terragrunt configuration for Azure AKS Identity
 
-# Terraform module source for AKS Identity
 terraform {
-  source = "${dirname(find_in_parent_folders())}/modules/azure/aks_identity"
+  # Instead of just referencing the identities module, reference the parent directory
+  # This ensures all sibling modules (like naming) are available for relative imports
+  source = "${find_in_parent_folders("infra")}/modules/azure//identities"
+  
+  # Remove absolute paths, they're not portable
+  extra_arguments "common_vars" {
+    commands = ["init", "plan", "apply", "destroy"]
+  }
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -19,6 +22,9 @@ terraform {
 # These variables are used across all environments and regions
 # ---------------------------------------------------------------------------------------------------------------------
 locals {
+  # Extract the variables we need for easy access
+  base_source_url = find_in_parent_folders("infra")
+  
   # Extract environment from env.hcl
   environment_vars = read_terragrunt_config(find_in_parent_folders("env.hcl"))
   environment      = local.environment_vars.locals.environment
@@ -34,6 +40,10 @@ locals {
 
 # Default inputs that typically won't need to be overridden in specific environments
 inputs = {
+  # Default identity configuration
+  identity_type = "UserAssigned"
+  tags = {}
+  
   # The name and resource group will typically come from other modules in environment-specific configs
   
   # Default tags that should be applied to all AKS identity resources

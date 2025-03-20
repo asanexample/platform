@@ -4,129 +4,87 @@
 # used as defaults for all environments, which minimizes duplication across environments.
 # ---------------------------------------------------------------------------------------------------------------------
 
-# Include the root `terragrunt.hcl` configuration, which has settings common across all components
-include "root" {
-  path = find_in_parent_folders()
-}
-
-# Include the component configuration, which has settings that are common across environments
-include "env" {
-  path   = "${dirname(find_in_parent_folders())}/_envcommon/tags.hcl"
-  expose = true
-}
-
-# Include naming conventions
-include "naming" {
-  path   = "${dirname(find_in_parent_folders())}/_envcommon/naming.hcl"
-  expose = true
+# Terraform module source for networking
+terraform {
+  source = "${find_in_parent_folders("infra")}/modules/azure//networking"
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
-# GLOBAL NETWORK ARCHITECTURE & CIDR ALLOCATION
-# 
-# We follow a hierarchical CIDR allocation strategy for multi-cloud environments that provides clear organizational
-# boundaries. This is combined with a Kubernetes-optimized subnet design that divides each region's address space
-# into availability zones with specialized subnet types.
-#
-# For the complete CIDR allocation strategy documentation, see: infra/docs/network-topology.md
-#
-# MULTI-CLOUD CIDR ALLOCATION
-# - AWS Infrastructure: 10.100.0.0/16
-# - Azure Infrastructure: 10.101.0.0/16
-#
-# AZURE REGION ALLOCATIONS
-# - eastus:      10.101.0.0/20
-# - eastus2:     10.101.16.0/20
-# - westus:      10.101.32.0/20
-# - westus2:     10.101.48.0/20
-# - northeurope: 10.101.64.0/20
-# - westeurope:  10.101.80.0/20
-#
-# AVAILABILITY ZONE DESIGN
-# Each region follows a 3-AZ design with specialized subnet types:
-# - Each Availability Zone gets a /24 CIDR block
-# - Four subnet types within each AZ:
-#   - Kubernetes Subnets (/24): For Kubernetes worker nodes
-#   - Services Subnets (/26): For application services
-#   - Endpoints Subnets (/27): For private endpoints and service connections
-#   - Transit Subnets (/28): For transit gateways and network connections
+# SHARED VARIABLES AND GLOBAL NETWORK ARCHITECTURE
+# These variables establish the baseline networking configuration across all environments
 # ---------------------------------------------------------------------------------------------------------------------
-
-# Define common input variables for all network deployments
-inputs = {
-  # Network Security Group Rules
-  # These are the default NSG rules that will be applied to all subnets
-  default_nsg_rules = {
-    # Allow all traffic between resources within the same virtual network
-    # Critical for internal communication between services and components
-    allow_vnet_inbound = {
-      name                       = "allow_vnet_inbound"
-      priority                   = 100
-      direction                  = "Inbound"
-      access                     = "Allow"
-      protocol                   = "*"
-      source_port_range          = "*"
-      destination_port_range     = "*"
-      source_address_prefix      = "VirtualNetwork"
-      destination_address_prefix = "VirtualNetwork"
-    }
-    
-    # Block all other inbound traffic that isn't explicitly allowed
-    # This is a security best practice (deny-by-default)
-    # Low priority (4096) ensures it runs after all other rules
-    deny_all_inbound = {
-      name                       = "deny_all_inbound"
-      priority                   = 4096
-      direction                  = "Inbound"
-      access                     = "Deny"
-      protocol                   = "*"
-      source_port_range          = "*"
-      destination_port_range     = "*"
-      source_address_prefix      = "*"
-      destination_address_prefix = "*"
-    }
-    
-    # Allow all internal traffic between resources within the same virtual network
-    # Enables services to communicate with each other within the VNet
-    allow_vnet_outbound = {
-      name                       = "allow_vnet_outbound"
-      priority                   = 100
-      direction                  = "Outbound"
-      access                     = "Allow"
-      protocol                   = "*"
-      source_port_range          = "*"
-      destination_port_range     = "*"
-      source_address_prefix      = "VirtualNetwork"
-      destination_address_prefix = "VirtualNetwork"
-    }
-    
-    # Allow resources to access internet destinations
-    # Enables services to reach external APIs, package repositories, etc.
-    allow_internet_outbound = {
-      name                       = "allow_internet_outbound"
-      priority                   = 110
-      direction                  = "Outbound"
-      access                     = "Allow"
-      protocol                   = "*"
-      source_port_range          = "*"
-      destination_port_range     = "*"
-      source_address_prefix      = "*"
-      destination_address_prefix = "Internet"
-    }
-    
-    # Block all other outbound traffic that isn't explicitly allowed
-    # Security boundary to prevent unauthorized egress
-    # Low priority (4096) ensures it runs after all other rules
-    deny_all_outbound = {
-      name                       = "deny_all_outbound"
-      priority                   = 4096
-      direction                  = "Outbound"
-      access                     = "Deny"
-      protocol                   = "*"
-      source_port_range          = "*"
-      destination_port_range     = "*"
-      source_address_prefix      = "*"
-      destination_address_prefix = "*"
-    }
+locals {
+  # Extract environment from env.hcl
+  environment_vars = read_terragrunt_config(find_in_parent_folders("env.hcl"))
+  environment      = local.environment_vars.locals.environment
+  
+  # Extract region information from region.hcl
+  region_vars    = read_terragrunt_config(find_in_parent_folders("region.hcl"))
+  region         = local.region_vars.locals.region
+  
+  # Map of Azure regions to region codes for resource naming
+  region_code_map = {
+    "eastus"      = "eus"
+    "eastus2"     = "eus2"
+    "westus"      = "wus"
+    "westus2"     = "wus2" 
+    "centralus"   = "cus"
+    "northeurope" = "neu"
+    "westeurope"  = "weu"
+    "southeastasia" = "sea"
+    "eastasia"    = "eas"
+    "uksouth"     = "uks"
+    "ukwest"      = "ukw"
+    "francecentral" = "frc"
   }
+  
+  # Get the region code for current region
+  region_code = lookup(local.region_code_map, local.region, "unknown")
+  
+  # Global CIDR Allocation Strategy
+  # For complete documentation, see: infra/docs/06-cidr-allocation.md
+  azure_cidr_map = {
+    "eastus"      = "10.101.0.0/21"
+    "eastus2"     = "10.101.8.0/21"
+    "centralus"   = "10.101.16.0/21"
+    "westus"      = "10.101.24.0/21"
+    "westus2"     = "10.101.32.0/21"
+    "westus3"     = "10.101.40.0/21"
+    "canadacentral" = "10.101.48.0/21"
+    "brazilsouth" = "10.101.56.0/21"
+    "westeurope"  = "10.101.64.0/21"
+    "northeurope" = "10.101.72.0/21"
+    "uksouth"     = "10.101.80.0/21"
+  }
+  
+  # Get common tags from the environment
+  common_vars    = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  common_tags    = local.common_vars.locals.tags
+}
+
+# ---------------------------------------------------------------------------------------------------------------------
+# COMMON NETWORK CONFIGURATION DEFAULTS
+# These settings create baseline configurations that can be overridden by environment-specific values
+# ---------------------------------------------------------------------------------------------------------------------
+inputs = {
+  # The name and resource group will typically come from other modules in environment-specific configs
+  
+  # Default network settings
+  address_space         = [local.azure_cidr_map[local.region]]
+  dns_servers           = null
+  
+  # Default subnet configuration - will typically be overridden in environment-specific config
+  subnets               = {}
+  
+  # AKS-specific networking defaults
+  enable_aks_networking        = false
+  aks_subnet_name             = null
+  aks_cluster_name            = null
+  aks_private_cluster_enabled = true
+  aks_node_resource_group     = null
+  
+  # Default tags
+  tags = merge(local.common_tags, {
+    "ResourceType" = "Networking"
+  })
 } 

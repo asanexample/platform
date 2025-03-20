@@ -2,16 +2,31 @@
 
 # Local variables for this configuration
 locals {
-  # Load common variables
-  common_vars = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  # Load hierarchical variables
+  env_vars     = read_terragrunt_config(find_in_parent_folders("env.hcl"))
+  region_vars  = read_terragrunt_config(find_in_parent_folders("region.hcl"))
+  network_vars = read_terragrunt_config(find_in_parent_folders("network.hcl"))
+  common_vars  = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  
+  # Merge all variables for convenience
+  all_vars = merge(
+    local.env_vars.locals,
+    local.region_vars.locals,
+    local.network_vars.locals,
+    local.common_vars.locals
+  )
   
   # Extract commonly used variables
-  env          = local.common_vars.locals.env
-  prefix       = local.common_vars.locals.prefix
-  customer     = local.common_vars.locals.customer
-  region       = "eastus"
-  region_abbv  = "eus"
-  tags         = local.common_vars.locals.tags
+  env         = local.env_vars.locals.environment
+  prefix      = local.common_vars.locals.prefix
+  customer    = local.common_vars.locals.customer
+  region      = local.region_vars.locals.region
+  region_abbv = local.region_vars.locals.region_abbv
+  tags        = merge(
+    local.common_vars.locals.tags, 
+    local.env_vars.locals.env_tags,
+    local.region_vars.locals.region_tags
+  )
 }
 
 # Include the root terragrunt.hcl configuration
@@ -19,34 +34,87 @@ include "root" {
   path = find_in_parent_folders()
 }
 
-# Use the storage module
+# Use the actual Terraform module as the source
 terraform {
-  source = "${get_repo_root()}/infra/modules/azure/storage_account"
+  # Use double-slash notation to ensure all relative module references work correctly
+  source = "${find_in_parent_folders("infra")}/modules/azure//storage_account"
 }
+
 # Set dependencies for this module
+dependency "naming" {
+  config_path = "../naming"
+  
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    storage_account = "mocksa"
+  }
+}
+
 dependency "resource_group" {
   config_path = "../resource_group"
   
   # Mock outputs for plan and validation
   mock_outputs = {
     name = "mock-rg"
+    location = local.region
   }
 }
 
-dependency "naming" {
-  config_path = "../naming"
+dependency "networking" {
+  config_path = "../networking"
   
   # Mock outputs for plan and validation
   mock_outputs = {
-    storage_account = "mockstorageacct"
+    subnet_ids = {
+      "az1-endpoints" = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet/subnets/az1-endpoints"
+    }
   }
 }
 
-# Specify inputs specific to this module
+# Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
-  resource_group_name  = dependency.resource_group.outputs.name
-  location             = local.region
-  storage_account_name = dependency.naming.outputs.storage_account
-  tags                 = local.tags
-}
-
+  # Environment variables
+  environment = local.env
+  customer = local.customer
+  prefix = local.prefix
+  region_abbv = local.region_abbv
+  
+  # Resource group
+  resource_group_name = dependency.resource_group.outputs.name
+  location = dependency.resource_group.outputs.location
+  
+  # Storage account name
+  name = dependency.naming.outputs.storage_account
+  
+  # Storage account configuration
+  account_tier = "Standard"
+  account_replication_type = "LRS"
+  
+  # Network rules
+  network_rules = {
+    default_action = "Deny"
+    bypass = ["AzureServices"]
+    virtual_network_subnet_ids = [
+      dependency.networking.outputs.subnet_ids["az1-endpoints"]
+    ]
+  }
+  
+  # Containers
+  containers = {
+    "data" = {
+      name = "data"
+      container_access_type = "private"
+    }
+    "logs" = {
+      name = "logs"
+      container_access_type = "private"
+    }
+  }
+  
+  # Security settings
+  allow_nested_items_to_be_public = false
+  blob_public_access_enabled = false
+  
+  # Tags
+  tags = local.tags
+} 

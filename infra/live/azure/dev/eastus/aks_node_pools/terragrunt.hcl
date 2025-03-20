@@ -1,17 +1,32 @@
-# Terragrunt configuration for Azure aks_node_pools in eastus region
+# Terragrunt configuration for Azure AKS Node Pools in eastus region
 
 # Local variables for this configuration
 locals {
-  # Load common variables
-  common_vars = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  # Load hierarchical variables
+  env_vars     = read_terragrunt_config(find_in_parent_folders("env.hcl"))
+  region_vars  = read_terragrunt_config(find_in_parent_folders("region.hcl"))
+  network_vars = read_terragrunt_config(find_in_parent_folders("network.hcl"))
+  common_vars  = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  
+  # Merge all variables for convenience
+  all_vars = merge(
+    local.env_vars.locals,
+    local.region_vars.locals,
+    local.network_vars.locals,
+    local.common_vars.locals
+  )
   
   # Extract commonly used variables
-  env          = local.common_vars.locals.env
-  prefix       = local.common_vars.locals.prefix
-  customer     = local.common_vars.locals.customer
-  region       = "eastus"
-  region_abbv  = "eus"
-  tags         = local.common_vars.locals.tags
+  env         = local.env_vars.locals.environment
+  prefix      = local.common_vars.locals.prefix
+  customer    = local.common_vars.locals.customer
+  region      = local.region_vars.locals.region
+  region_abbv = local.region_vars.locals.region_abbv
+  tags        = merge(
+    local.common_vars.locals.tags, 
+    local.env_vars.locals.env_tags,
+    local.region_vars.locals.region_tags
+  )
 }
 
 # Include the root terragrunt.hcl configuration
@@ -19,69 +34,83 @@ include "root" {
   path = find_in_parent_folders()
 }
 
-# Use the aks_node_pools module
-terraform {
-  source = "${get_repo_root()}/infra/modules/azure/aks_node_pools"
+# Include the common configuration for AKS Node Pools
+include "aks_node_pools_common" {
+  path = find_in_parent_folders("azure/_envcommon/aks_node_pools.hcl")
 }
+
 # Set dependencies for this module
+dependency "naming" {
+  config_path = "../naming"
+  
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    aks_cluster = "mock-aks"
+  }
+}
+
 dependency "aks_core" {
   config_path = "../aks_core"
   
   # Mock outputs for plan and validation
   mock_outputs = {
-    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.ContainerService/managedClusters/mock-aks"
     name = "mock-aks"
+    resource_group_name = "mock-rg"
+    id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.ContainerService/managedClusters/mock-aks"
   }
 }
 
-# Add dependency for resource group
-dependency "resource_group" {
-  config_path = "../resource_group"
-  
-  # Mock outputs for plan and validation
+dependency "aks_identity" {
+  config_path = "../aks_identity"
   mock_outputs = {
-    name = "mock-rg"
+    id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mock-identity"
   }
 }
 
-# Add dependency for networking
-dependency "networking" {
-  config_path = "../networking"
-  
-  # Mock outputs for plan and validation
-  mock_outputs = {
-    subnet_ids = {
-      "az2-kubernetes" = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet/subnets/az2-kubernetes"
-    }
-  }
-}
-
-# Specify inputs specific to this module
+# Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
-  prefix       = local.prefix
-  customer     = local.customer
-  environment  = local.env
-  region_abbv  = local.region_abbv
+  # Required variables that were missing
+  environment = local.env
+  region_abbv = local.region_abbv
   
-  # Use the actual ID from the AKS cluster output
+  # AKS Reference
   aks_cluster_id = dependency.aks_core.outputs.id
   
-  app_node_pool_enabled = true
-  app_node_pool_vm_size = "Standard_D4s_v3"
-  app_node_pool_enable_auto_scaling = true
-  app_node_pool_min_count = 2
-  app_node_pool_max_count = 5
-  app_node_pool_os_disk_size_gb = 128
-  app_node_pool_os_disk_type = "Managed"
-  app_node_pool_max_pods = 30
-  app_node_pool_node_labels = {
-    "nodepool-type" = "app"
-    "environment" = local.env
-    "region" = local.region
+  # Environment-specific node pool configuration
+  app_node_pool = {
+    enabled = true
+    name = "apps"
+    vm_size = "Standard_D4s_v4"
+    node_count = 2
+    # Removed availability zones since this region doesn't support them
+    availability_zones = []
+    max_pods = 110
+    os_disk_size_gb = 128
+    os_disk_type = "Managed"
+    enable_auto_scaling = true
+    min_count = 2
+    max_count = 5
+    mode = "User"
+    node_labels = {
+      "nodepool" = "apps"
+      "app" = "true"
+      "workload" = "general"
+      "node-priority" = "regular"
+    }
+    node_taints = []
   }
   
-  app_node_pool_vnet_subnet_id = dependency.networking.outputs.subnet_ids["az2-kubernetes"]
+  # Required for updating certain node pool properties without recreation
+  temporary_name_for_rotation = "tempapps"
   
-  tags = local.tags
-}
-
+  # Override standard node pool availability zones for this region
+  standard_node_pool = {
+    availability_zones = []
+  }
+  
+  # Tags
+  tags = merge(local.tags, {
+    "network-cilium-managed-by" = "cilium"
+    "cilium-version" = "1.17.2"
+  })
+} 

@@ -1,18 +1,19 @@
 /**
  * # Azure Identities Module
  *
- * This module provides a unified approach to managing Azure identities for various workloads, 
- * particularly for AKS clusters. It handles:
- * - Creating the AKS cluster identity
- * - Creating workload identities with optional role assignments
- * - Setting up federated credential configurations
- * - Managing role assignments for networking, route tables, and other Azure resources
+ * This module creates identities for the AKS cluster.
  *
- * This module replaces the previous two-phase approach with a unified system where all identities
- * are managed in one place, with clear dependencies.
+ * Creates all managed identities for user-assigned identity based kubernetes clusters, along with the required role
+ * assignments, and permissions.
+ *
+ * - Kubernetes Cluster Identity
+ * - Kubernetes Kubelet Identity
+ * - Role Assignments
+ * - Key Vault Access Policies
  */
 
-# Use the naming module to generate standardized names
+# Using a relative path that works within Terraform modules
+# This is more portable than absolute paths
 module "naming" {
   source = "../naming"
 
