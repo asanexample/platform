@@ -14,6 +14,7 @@ This infrastructure is organized into self-contained modules with clear dependen
 - **aks_identity**: Creates managed identities for AKS
 - **aks_core**: Deploys the AKS cluster with system node pools
 - **aks_node_pools**: Creates additional node pools for the AKS cluster
+- **cilium**: Installs Cilium CNI on the AKS cluster for networking
 
 ## Module Dependencies
 
@@ -30,6 +31,7 @@ graph TD
     networking --> key_vault
     aks_identity --> aks_core
     aks_core --> aks_node_pools
+    aks_core --> cilium
 ```
 
 ## Configuration Files

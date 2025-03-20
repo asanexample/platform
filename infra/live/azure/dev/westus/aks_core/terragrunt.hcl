@@ -152,6 +152,6 @@ inputs = {
   # Tags
   tags = merge(local.tags, {
     "network-cilium-managed-by" = "cilium"
-    "cilium-version" = "1.14.2"
+    "cilium-version" = "1.17.2"
   })
 } 
