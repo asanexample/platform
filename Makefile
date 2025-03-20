@@ -120,6 +120,20 @@ clean-all: ## Clean all Terragrunt cache
 	@echo "Cleaning all Terragrunt cache..."
 	@find $(LIVE_DIR) -type d -name ".terragrunt-cache" -prune -exec rm -rf {} \; 2>/dev/null || true
 
+.PHONY: clear-state
+clear-state: ## Clear all Terraform state files and locks to start fresh
+	@echo "WARNING: You are about to delete all Terraform state and lock files. This is irreversible."
+	@if [ "$(NO_CONFIRM)" != "true" ]; then \
+		echo "Are you sure? This will remove all state tracking and cannot be undone. [y/N] " && read ans && [ $${ans:-N} = y ]; \
+	fi
+	@echo "Clearing all Terraform state files and locks..."
+	@find $(LIVE_DIR) -name "terraform.tfstate*" -type f -delete
+	@find $(LIVE_DIR) -name ".terraform.lock.hcl" -type f -delete
+	@find $(LIVE_DIR) -type d -name ".terraform" -prune -exec rm -rf {} \; 2>/dev/null || true
+	@find $(MODULES_DIR) -name ".terraform.lock.hcl" -type f -delete
+	@find $(MODULES_DIR) -type d -name ".terraform" -prune -exec rm -rf {} \; 2>/dev/null || true
+	@echo "All Terraform state files and locks have been removed. You can now start fresh."
+
 .PHONY: validate
 validate: ## Validate all modules
 	@echo "Validating $(CLOUD)/$(ENV)/$(REGION)..."
@@ -237,6 +251,44 @@ apply-plan-module: ## Apply a plan file for a specific module
 	fi
 	@echo "Applying plan file for module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION)..."
 	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt apply tfplan
+
+# Region scaffolding
+.PHONY: scaffold-region
+scaffold-region: ## Scaffold a new region from templates (Usage: make scaffold-region CLOUD=azure TARGET_REGION=eastus ENV=dev REGION_ABBV=east [DRY_RUN=true])
+	@echo "Scaffolding $(TARGET_REGION) region for $(CLOUD) in environment $(ENV)..."
+	@DRY_RUN_FLAG=""; \
+	if [ "$(DRY_RUN)" = "true" ]; then \
+		DRY_RUN_FLAG="--dry-run"; \
+	fi; \
+	REGION_ABBV_DEFAULT=$$(echo $(TARGET_REGION) | sed 's/\([a-z]*\).*/\1/'); \
+	REGION_ABBV_VALUE=$${REGION_ABBV:-$$REGION_ABBV_DEFAULT}; \
+	./scripts/scaffold_region.sh --cloud $(CLOUD) --target-region $(TARGET_REGION) --environment $(ENV) --region-abbv $$REGION_ABBV_VALUE $$DRY_RUN_FLAG
+	@echo ""
+	@echo "Successfully scaffolded $(TARGET_REGION) region for $(CLOUD)!"
+	@echo "Total modules to process: 8"
+	@echo "Next steps:"
+	@echo "1. Initialize the new region: make init-region ENV=$(ENV) REGION=$(TARGET_REGION) CLOUD=$(CLOUD)"
+	@echo "2. Plan the new region: make plan-region ENV=$(ENV) REGION=$(TARGET_REGION) CLOUD=$(CLOUD)"
+	@echo "3. Review the generated files and make any necessary adjustments"
+	@echo "4. Apply the infrastructure: make apply-region ENV=$(ENV) REGION=$(TARGET_REGION) CLOUD=$(CLOUD)"
+
+.PHONY: init-region
+init-region: ## Initialize all modules in a specific region
+	@echo "Initializing all modules in $(CLOUD)/$(ENV)/$(REGION)..."
+	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all init
+
+.PHONY: plan-region
+plan-region: ## Plan all modules in a specific region
+	@echo "Planning all modules in $(CLOUD)/$(ENV)/$(REGION)..."
+	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all plan
+
+.PHONY: apply-region
+apply-region: ## Apply all modules in a specific region
+	@echo "Applying all modules in $(CLOUD)/$(ENV)/$(REGION)..."
+	@if [ "$(NO_CONFIRM)" != "true" ]; then \
+		echo "Are you sure you want to apply all modules in $(CLOUD)/$(ENV)/$(REGION)? [y/N] " && read ans && [ $${ans:-N} = y ]; \
+	fi
+	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all apply -auto-approve
 
 # Testing commands
 .PHONY: test
