@@ -136,7 +136,7 @@ inputs = {
     min_count           = 2
     max_count           = 3
     availability_zones  = ["1", "2", "3"]
-    max_pods            = 110
+    max_pods            = 110  # With Cilium (network_plugin = "none"), pods get IPs from pod_cidr, not from the subnet
     os_disk_size_gb     = 128
     node_labels = {
       "role"          = "system"
