@@ -173,19 +173,31 @@ function get_cidr_for_region {
   local allocations_file="allocations.csv"
   
   if [ -f "$allocations_file" ]; then
-    # Try to find the region's CIDR in allocations.csv
-    # The pattern matching needs to be adjusted based on your CSV structure
-    local cidr=$(grep -i "${search_cloud}.*${search_env}.*${search_region}" "$allocations_file" | grep "Region CIDR" | head -1 | awk -F, '{print $3}')
+    # Try to find the region's CIDR by looking for the Region CIDR column
+    # This looks for the first match for the cloud+region combination and extracts the Region CIDR
+    local cidr=$(grep -i "${search_cloud}.*${search_region}" "$allocations_file" | grep "Region CIDR" | head -1 | awk -F, '{print $6}')
     
     if [ -n "$cidr" ]; then
       echo "$cidr"
       return
     fi
     
-    # Just log to stderr - don't include in the output
-    echo "Could not find CIDR for $region in $cloud for environment $env in allocations.csv" >&2
+    # Log to stderr - don't include in the output
+    echo "Could not find exact CIDR for $region in $cloud for environment $env in allocations.csv" >&2
+    echo "Trying fallback search for any environment..." >&2
+    
+    # Try a more generic search without environment-specific info
+    cidr=$(grep -i "${search_cloud}.*${search_region}" "$allocations_file" | grep "Region CIDR" | head -1 | awk -F, '{print $6}')
+    
+    if [ -n "$cidr" ]; then
+      echo "$cidr"
+      return
+    fi
+    
+    # Log to stderr - don't include in the output
+    echo "Could not find CIDR for $region in $cloud in allocations.csv" >&2
   else
-    # Just log to stderr - don't include in the output
+    # Log to stderr - don't include in the output
     echo "allocations.csv file not found at $allocations_file" >&2
   fi
   
@@ -193,9 +205,12 @@ function get_cidr_for_region {
   case "$cloud" in
     azure)
       case "$region" in
-        eastus) echo "10.200.0.0/21" ;;
-        westus) echo "10.200.8.0/21" ;;
-        *) echo "10.200.16.0/21" ;; # Default fallback for Azure
+        eastus) echo "10.101.0.0/21" ;;
+        westus) echo "10.101.24.0/21" ;;
+        centralus) echo "10.101.16.0/21" ;;
+        eastus2) echo "10.101.8.0/21" ;;
+        westus2) echo "10.101.32.0/21" ;;
+        *) echo "10.101.48.0/21" ;; # Default fallback for Azure
       esac
       ;;
     aws)
@@ -294,7 +309,86 @@ if [ -f "${ENV_DIR}/env.hcl" ]; then
 fi
 
 # Create network.hcl with appropriate CIDR blocks
-NETWORK_HCL_CONTENT=$(cat << EOF
+function create_network_hcl_azure() {
+  local region=$1
+  local cidr=$2
+  
+  # Generate network.hcl content for Azure using a more explicit subnet structure
+  cat << EOF
+# Network configuration for azure ${region} region based on allocations.csv
+
+locals {
+  # VNet CIDR block for ${region} region
+  address_space = ["${cidr}"]
+  
+  # Subnet configurations for ${region} region with three availability zones
+  # Each AZ has Kubernetes, Services, Endpoints, and Transit subnets
+  subnets = {
+    # AZ 1 (${region}-1) subnets
+    "az1-kubernetes" = {
+      address_prefixes  = ["$(cidrsubnet "${cidr}" 5 0)"] # /26
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ContainerRegistry"]
+    },
+    "az1-services" = {
+      address_prefixes  = ["$(cidrsubnet "${cidr}" 6 4)"] # /27
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.Sql"]
+    },
+    "az1-endpoints" = {
+      address_prefixes  = ["$(cidrsubnet "${cidr}" 7 10)"] # /28
+      service_endpoints = ["Microsoft.Storage", "Microsoft.Sql", "Microsoft.KeyVault"]
+    },
+    "az1-transit" = {
+      address_prefixes  = ["$(cidrsubnet "${cidr}" 8 22)"] # /29
+      service_endpoints = ["Microsoft.Storage"]
+    },
+    
+    # AZ 2 (${region}-2) subnets
+    "az2-kubernetes" = {
+      address_prefixes  = ["$(cidrsubnet "${cidr}" 5 1)"] # /26
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ContainerRegistry"]
+    },
+    "az2-services" = {
+      address_prefixes  = ["$(cidrsubnet "${cidr}" 6 5)"] # /27
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.Sql"]
+    },
+    "az2-endpoints" = {
+      address_prefixes  = ["$(cidrsubnet "${cidr}" 7 11)"] # /28
+      service_endpoints = ["Microsoft.Storage", "Microsoft.Sql", "Microsoft.KeyVault"]
+    },
+    "az2-transit" = {
+      address_prefixes  = ["$(cidrsubnet "${cidr}" 8 23)"] # /29
+      service_endpoints = ["Microsoft.Storage"]
+    },
+    
+    # AZ 3 (${region}-3) subnets
+    "az3-kubernetes" = {
+      address_prefixes  = ["$(cidrsubnet "${cidr}" 5 2)"] # /26
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ContainerRegistry"]
+    },
+    "az3-services" = {
+      address_prefixes  = ["$(cidrsubnet "${cidr}" 6 6)"] # /27
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.Sql"]
+    },
+    "az3-endpoints" = {
+      address_prefixes  = ["$(cidrsubnet "${cidr}" 7 12)"] # /28
+      service_endpoints = ["Microsoft.Storage", "Microsoft.Sql", "Microsoft.KeyVault"]
+    },
+    "az3-transit" = {
+      address_prefixes  = ["$(cidrsubnet "${cidr}" 8 24)"] # /29
+      service_endpoints = ["Microsoft.Storage"]
+    }
+  }
+}
+EOF
+}
+
+# Create network.hcl with appropriate CIDR blocks
+NETWORK_HCL_CONTENT=""
+if [ "$CLOUD" = "azure" ]; then
+  NETWORK_HCL_CONTENT=$(create_network_hcl_azure "$TARGET_REGION" "$TARGET_CIDR")
+else 
+  # The original network.hcl for non-Azure clouds
+  NETWORK_HCL_CONTENT=$(cat << EOF
 # Network configuration for ${CLOUD} ${TARGET_REGION} region
 
 locals {
@@ -325,6 +419,7 @@ locals {
 }
 EOF
 )
+fi
 
 if [ "$DRY_RUN" = "false" ]; then
   echo "$NETWORK_HCL_CONTENT" > "${TARGET_DIR}/network.hcl"
@@ -411,7 +506,71 @@ inputs = {
       ;;
     "networking")
       # Use a completely rewritten template for networking module
-      config="# Terragrunt configuration for Azure $module_name in ${TARGET_REGION} region
+      if [ "$CLOUD" = "azure" ]; then
+        # Azure-specific networking module configuration
+        config="# Terragrunt configuration for Azure $module_name in ${TARGET_REGION} region
+
+# Local variables for this configuration
+locals {
+  # Load common variables
+  common_vars = read_terragrunt_config(find_in_parent_folders(\"common.hcl\"))
+  
+  # Extract commonly used variables
+  env          = local.common_vars.locals.env
+  prefix       = local.common_vars.locals.prefix
+  customer     = local.common_vars.locals.customer
+  region       = \"${TARGET_REGION}\"
+  region_abbv  = \"${REGION_ABBV}\"
+  tags         = local.common_vars.locals.tags
+  
+  # Load network configuration from network.hcl
+  network_vars = read_terragrunt_config(find_in_parent_folders(\"network.hcl\"))
+  address_space = local.network_vars.locals.address_space
+  subnets       = local.network_vars.locals.subnets
+}
+
+# Include the root terragrunt.hcl configuration
+include \"root\" {
+  path = find_in_parent_folders()
+}
+
+# Use the ${module_name} module
+terraform {
+  source = \"\${get_repo_root()}/infra/modules/${CLOUD}/${actual_module_name}\"
+}
+
+# Set dependencies for this module
+dependency \"resource_group\" {
+  config_path = \"../resource_group\"
+  
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    name = \"mock-rg\"
+  }
+}
+
+dependency \"naming\" {
+  config_path = \"../naming\"
+  
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    virtual_network = \"mock-vnet\"
+  }
+}
+
+# Specify inputs specific to this module
+inputs = {
+  resource_group_name = dependency.resource_group.outputs.name
+  location            = local.region
+  vnet_name           = dependency.naming.outputs.virtual_network
+  address_space       = local.address_space
+  subnets             = local.subnets
+  tags                = local.tags
+}
+"
+      else
+        # Original template for non-Azure clouds
+        config="# Terragrunt configuration for Azure $module_name in ${TARGET_REGION} region
 
 # Local variables for this configuration
 locals {
@@ -484,6 +643,7 @@ inputs = {
   tags                = local.tags
 }
 "
+      fi
       ;;
     "key_vault")
       config+="# Set dependencies for this module
