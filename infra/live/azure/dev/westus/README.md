@@ -19,20 +19,17 @@ This infrastructure is organized into self-contained modules with clear dependen
 
 The modules have the following dependency hierarchy:
 
-```
-              naming
-                ↓
-          resource_group
-                ↓
-  |---------------|---------------|
-  ↓               ↓               ↓
-networking    aks_identity     key_vault
-  ↓               ↓               ↑
-  |               |               |
-  ↓               ↓              network
-storage         aks_core
-                  ↓
-             aks_node_pools
+```mermaid
+graph TD
+    naming --> resource_group
+    resource_group --> networking
+    resource_group --> aks_identity
+    resource_group --> key_vault
+    networking --> storage
+    networking --> aks_core
+    networking --> key_vault
+    aks_identity --> aks_core
+    aks_core --> aks_node_pools
 ```
 
 ## Configuration Files

@@ -59,7 +59,7 @@ dependency "resource_group" {
   }
 }
 
-dependency "network" {
+dependency "networking" {
   config_path = "../networking"
   mock_outputs = {
     vnet_id                  = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet"
@@ -93,7 +93,7 @@ inputs = {
   private_endpoint = {
     name                = dependency.naming.outputs.private_endpoint
     resource_group_name = dependency.resource_group.outputs.name
-    subnet_id           = dependency.network.outputs.subnet_ids["az1-endpoints"]
+    subnet_id           = dependency.networking.outputs.subnet_ids["az1-endpoints"]
     private_dns_zone_ids = [
       "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/dns-rg/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net"
     ]
