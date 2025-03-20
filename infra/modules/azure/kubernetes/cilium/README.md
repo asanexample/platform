@@ -11,8 +11,15 @@ The module is designed to work with AKS clusters that have `network_plugin` set 
 ## Prerequisites
 
 - An AKS cluster with `network_plugin` set to `"none"`
-- Helm provider configured with appropriate Kubernetes authentication
-- Kubernetes provider configured with appropriate authentication
+- Kubernetes and Helm providers (configured by Terragrunt when used with this project)
+
+## Provider Configuration
+
+This module requires the Kubernetes and Helm providers to be configured. When used with Terragrunt in this project, the provider configuration is automatically handled through generate blocks that create provider configuration files.
+
+The required provider configuration includes:
+- `kubernetes` provider with AKS cluster authentication details
+- `helm` provider with Kubernetes backend configured for AKS
 
 ## Usage
 
