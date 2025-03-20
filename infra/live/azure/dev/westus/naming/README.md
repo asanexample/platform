@@ -16,7 +16,7 @@ Centralizes naming standards and generates resource names that:
 
 ### Inputs
 - Automatically uses environment variables from `../common.hcl`
-- Uses fixed prefix: `vip`
+- Uses configurable prefix from `common.hcl` (defaults to `vip` if not specified)
 - Environment: `dev`
 - Region: `westus`
 
@@ -36,6 +36,8 @@ To apply this module:
 cd naming
 terragrunt apply
 ```
+
+To customize the prefix for your organization, modify the `prefix` variable in `common.hcl`.
 
 ## Dependencies on this Module
 The following modules depend on outputs from this module:
