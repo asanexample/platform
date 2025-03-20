@@ -128,6 +128,9 @@ destroy: ## Destroy all modules (USE WITH CAUTION)
 	fi
 	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all destroy -auto-approve
 
+.PHONY: destroy-region
+destroy-region: destroy ## Destroy all modules in a region (alias for destroy)
+
 .PHONY: destroy-module
 destroy-module: ## Destroy a specific module (USE WITH CAUTION)
 	$(call check_required_params,"destroy-module")
