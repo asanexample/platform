@@ -112,16 +112,14 @@ inputs = {
   # Identity configuration
   user_assigned_identity_id = dependency.aks_identity.outputs.aks_identity_id
 
-  # Network configuration specific to this environment
-  network_profile = {
-    network_plugin    = "none"  # No CNI installed - Cilium will be installed via Helm
-    network_policy    = null    # Not used with Cilium
-    outbound_type     = "loadBalancer"
-    service_cidr      = "10.0.0.0/16"
-    dns_service_ip    = "10.0.0.10"
-    pod_cidr          = "10.244.0.0/16"
-    load_balancer_sku = "standard"
-  }
+  # Network configuration specific to this environment - IMPORTANT: Setting network_plugin to "none" for Cilium
+  network_plugin    = "none"  # No CNI installed - Cilium will be installed via Helm
+  network_policy    = null    # Not used with Cilium
+  outbound_type     = "loadBalancer"
+  service_cidr      = "10.0.0.0/16"
+  dns_service_ip    = "10.0.0.10"
+  pod_cidr          = "10.244.0.0/16"
+  load_balancer_sku = "standard"
 
   # Subnet and private cluster configuration
   subnet_id           = dependency.networking.outputs.subnet_ids["az1-kubernetes"]

@@ -51,16 +51,14 @@ inputs = {
     max_pods            = 110
   }
   
-  # Network Profile - No CNI installed by default (Cilium will be installed via Helm)
-  network_profile = {
-    network_plugin      = "none"  # Required for Cilium
-    network_policy      = null    # Not used with Cilium
-    outbound_type       = "loadBalancer"
-    service_cidr        = null  # Must be provided in environment-specific configs
-    dns_service_ip      = null  # Must be provided in environment-specific configs
-    pod_cidr            = null  # Must be provided in environment-specific configs
-    load_balancer_sku   = "standard"
-  }
+  # Network Settings - No CNI installed by default (Cilium will be installed via Helm)
+  network_plugin    = "none"  # Required for Cilium
+  network_policy    = null    # Not used with Cilium
+  outbound_type     = "loadBalancer"
+  service_cidr      = null  # Must be provided in environment-specific configs
+  dns_service_ip    = null  # Must be provided in environment-specific configs
+  pod_cidr          = null  # Must be provided in environment-specific configs
+  load_balancer_sku = "standard"
   
   # Common cluster settings
   private_cluster_enabled = true
