@@ -627,6 +627,7 @@ inputs = {
   environment         = local.env
   region_abbv         = local.region_abbv
   customer            = local.customer
+  sku_tier            = \"Standard\"
   default_nodepool_node_labels = {
     \"nodepool-type\" = \"system\"
     \"environment\"   = local.env
