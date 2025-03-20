@@ -18,14 +18,15 @@ terraform {
 # Default inputs for all environments
 inputs = {
   # Kubernetes version
-  kubernetes_version = "1.27.7"
+  kubernetes_version = "1.32.0"  # By specifying minor version, Azure will automatically upgrade patch versions
   
-  # Azure AD Integration (recommended for all environments)
-  azure_ad_integration = {
-    enable                       = true
-    admin_group_object_ids       = []  # To be provided in environment-specific config
-    azure_rbac_enabled           = true
-    tenant_id                    = null # To be provided in environment-specific config
+  # Require Azure AD integration and disable local accounts
+  local_account_disabled = true
+  
+  # Azure AD Integration (required for all environments)
+  azure_active_directory_role_based_access_control = {
+    admin_group_object_ids = []  # To be provided in environment-specific config
+    azure_rbac_enabled     = true
   }
   
   # Default node pool configuration (can be overridden in environment-specific configs)
@@ -50,10 +51,10 @@ inputs = {
     max_pods            = 110
   }
   
-  # Network Profile (common for all environments)
+  # Network Profile - No CNI installed by default (Cilium will be installed via Helm)
   network_profile = {
     network_plugin      = "none"  # Required for Cilium
-    network_policy      = null
+    network_policy      = null    # Not used with Cilium
     outbound_type       = "loadBalancer"
     service_cidr        = null  # Must be provided in environment-specific configs
     dns_service_ip      = null  # Must be provided in environment-specific configs
@@ -71,6 +72,11 @@ inputs = {
   # Common feature flags
   network_contributor_role_enabled = true
   azure_policy_enabled             = true
+  
+  # Enable workload identity and OIDC issuer for pod-based authentication
+  workload_identity_enabled = true
+  oidc_issuer_enabled       = true
+  
   key_vault_secrets_provider = {
     enabled = true
     secret_rotation_enabled = true

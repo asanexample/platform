@@ -97,18 +97,16 @@ inputs = {
   dns_prefix          = "${local.prefix}-${local.env}-${local.region_abbv}"
 
   # Environment-specific overrides
-  kubernetes_version        = "1.32"
+  kubernetes_version        = "1.32.0"  # Specific version - Azure will automatically upgrade within this minor version
   sku_tier                  = "Standard"
-  local_account_disabled    = true
+  local_account_disabled    = true  # Require Azure AD integration
   workload_identity_enabled = true
   oidc_issuer_enabled       = true
 
   # Azure AD integration for this environment
-  azure_ad_integration = {
-    enable                 = true
-    admin_group_object_ids = ["00000000-0000-0000-0000-000000000000"]
+  azure_active_directory_role_based_access_control = {
+    admin_group_object_ids = ["00000000-0000-0000-0000-000000000000"]  # Replace with actual Azure AD group IDs in production
     azure_rbac_enabled     = true
-    tenant_id              = null
   }
 
   # Identity configuration
@@ -116,8 +114,8 @@ inputs = {
 
   # Network configuration specific to this environment
   network_profile = {
-    network_plugin    = "none"
-    network_policy    = null
+    network_plugin    = "none"  # No CNI installed - Cilium will be installed via Helm
+    network_policy    = null    # Not used with Cilium
     outbound_type     = "loadBalancer"
     service_cidr      = "10.0.0.0/16"
     dns_service_ip    = "10.0.0.10"
