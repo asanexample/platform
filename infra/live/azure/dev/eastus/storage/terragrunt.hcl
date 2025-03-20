@@ -34,10 +34,9 @@ include "root" {
   path = find_in_parent_folders()
 }
 
-# Use the actual Terraform module as the source
-terraform {
-  # Use double-slash notation to ensure all relative module references work correctly
-  source = "${find_in_parent_folders("infra")}/modules/azure//storage_account"
+# Include the common configuration for Storage
+include "storage_common" {
+  path = find_in_parent_folders("azure/_envcommon/storage.hcl")
 }
 
 # Set dependencies for this module
@@ -47,6 +46,7 @@ dependency "naming" {
   # Mock outputs for plan and validation
   mock_outputs = {
     storage_account = "mocksa"
+    private_endpoint = "mock-pe"
   }
 }
 
@@ -97,6 +97,16 @@ inputs = {
     virtual_network_subnet_ids = [
       dependency.networking.outputs.subnet_ids["az1-endpoints"]
     ]
+  }
+  
+  # Private endpoint configuration
+  private_endpoint = {
+    create = true
+    name = dependency.naming.outputs.private_endpoint
+    subnet_id = dependency.networking.outputs.subnet_ids["az1-endpoints"]
+    subresource_names = ["blob"]
+    # Remove private_dns_zone_ids for now since they don't exist yet
+    private_dns_zone_ids = []
   }
   
   # Containers
