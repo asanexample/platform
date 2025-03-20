@@ -295,7 +295,7 @@ fi
 
 # Create network.hcl with appropriate CIDR blocks
 NETWORK_HCL_CONTENT=$(cat << EOF
-# Network configuration for ${CLOUD} ${TARGET_REGION} region based on allocations.csv
+# Network configuration for ${CLOUD} ${TARGET_REGION} region
 
 locals {
   # VNet/VPC CIDR block for ${TARGET_REGION} region
@@ -349,7 +349,7 @@ create_module_config() {
   
   mkdir -p "$module_dir"
   
-  # Default configuration template
+  # Define a base configuration template with locals and include blocks
   local config="# Terragrunt configuration for Azure $module_name in ${TARGET_REGION} region
 
 # Local variables for this configuration
@@ -364,11 +364,6 @@ locals {
   region       = \"${TARGET_REGION}\"
   region_abbv  = \"${REGION_ABBV}\"
   tags         = local.common_vars.locals.tags
-  
-  # Load network configuration from network.hcl
-  network_vars = read_terragrunt_config(find_in_parent_folders(\"network.hcl\"))
-  address_space = local.network_vars.locals.address_space
-  subnets       = local.network_vars.locals.subnets
 }
 
 # Include the root terragrunt.hcl configuration
@@ -379,35 +374,6 @@ include \"root\" {
 # Use the ${module_name} module
 terraform {
   source = \"\${get_repo_root()}/infra/modules/${CLOUD}/${actual_module_name}\"
-}
-
-# Set dependencies for this module
-dependency \"resource_group\" {
-  config_path = \"../resource_group\"
-  
-  # Mock outputs for plan and validation
-  mock_outputs = {
-    name = \"mock-rg\"
-  }
-}
-
-dependency \"naming\" {
-  config_path = \"../naming\"
-  
-  # Mock outputs for plan and validation
-  mock_outputs = {
-    virtual_network = \"mock-vnet\"
-  }
-}
-
-# Specify inputs specific to this module
-inputs = {
-  resource_group_name = dependency.resource_group.outputs.name
-  location            = local.region
-  vnet_name           = dependency.naming.outputs.virtual_network
-  address_space       = local.address_space
-  subnets             = local.subnets
-  tags                = local.tags
 }
 "
 
@@ -444,7 +410,7 @@ inputs = {
 "
       ;;
     "networking")
-      # Use a completely rewritten template for networking module with only one locals block
+      # Use a completely rewritten template for networking module
       config="# Terragrunt configuration for Azure $module_name in ${TARGET_REGION} region
 
 # Local variables for this configuration
@@ -501,7 +467,20 @@ inputs = {
   location            = local.region
   vnet_name           = dependency.naming.outputs.virtual_network
   address_space       = local.address_space
-  subnets             = local.subnets
+  subnets = {
+    az1-kubernetes = {
+      address_prefixes = [local.subnets.az1.node]
+      service_endpoints = [\"Microsoft.Storage\", \"Microsoft.KeyVault\"]
+    }
+    az1-services = {
+      address_prefixes = [local.subnets.az1.services]
+      service_endpoints = [\"Microsoft.Storage\", \"Microsoft.KeyVault\"]
+    }
+    az1-endpoints = {
+      address_prefixes = [local.subnets.az1.endpoints]
+      service_endpoints = [\"Microsoft.Storage\", \"Microsoft.KeyVault\"]
+    }
+  }
   tags                = local.tags
 }
 "
@@ -581,6 +560,7 @@ dependency \"naming\" {
   # Mock outputs for plan and validation
   mock_outputs = {
     aks_identity = \"mock-identity\"
+    aks_cluster = \"mock-aks\"
   }
 }
 
@@ -589,6 +569,7 @@ inputs = {
   resource_group_name = dependency.resource_group.outputs.name
   location            = local.region
   identity_name       = dependency.naming.outputs.aks_identity
+  cluster_name        = dependency.naming.outputs.aks_cluster
   tags                = local.tags
 }
 "
@@ -618,7 +599,9 @@ dependency \"networking\" {
   
   # Mock outputs for plan and validation
   mock_outputs = {
-    subnet_ids = { \"az1-kubernetes\" = \"mock-subnet-id\" }
+    subnet_ids = { 
+      \"az1-kubernetes\" = \"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet/subnets/az1-kubernetes\"
+    }
   }
 }
 
@@ -627,7 +610,7 @@ dependency \"aks_identity\" {
   
   # Mock outputs for plan and validation
   mock_outputs = {
-    id = \"mock-identity-id\"
+    id = \"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mock-identity\"
   }
 }
 
@@ -637,9 +620,23 @@ inputs = {
   location            = local.region
   cluster_name        = dependency.naming.outputs.aks_cluster
   kubernetes_version  = \"1.27\"
-  identity_id         = dependency.aks_identity.outputs.id
+  identity_type       = \"UserAssigned\"
+  user_assigned_identity_id = dependency.aks_identity.outputs.id
   subnet_id           = dependency.networking.outputs.subnet_ids[\"az1-kubernetes\"]
-  tags                = local.tags
+  prefix              = local.prefix
+  environment         = local.env
+  region_abbv         = local.region_abbv
+  customer            = local.customer
+  default_nodepool_node_labels = {
+    \"nodepool-type\" = \"system\"
+    \"environment\"   = local.env
+    \"region\"        = local.region
+  }
+  network_plugin     = \"azure\"
+  network_policy     = \"azure\"
+  service_cidr       = \"10.0.0.0/16\"
+  dns_service_ip     = \"10.0.0.10\"
+  tags               = local.tags
 }
 "
       ;;
@@ -650,7 +647,7 @@ dependency \"aks_core\" {
   
   # Mock outputs for plan and validation
   mock_outputs = {
-    id = \"mock-aks-id\"
+    id = \"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.ContainerService/managedClusters/mock-aks\"
   }
 }
 
