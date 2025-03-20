@@ -30,29 +30,43 @@ dependency "aks_core" {
   # Mock outputs for plan and validation
   mock_outputs = {
     id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.ContainerService/managedClusters/mock-aks"
+    name = "mock-aks"
+  }
+}
+
+# Add dependency for aks_identity
+dependency "resource_group" {
+  config_path = "../resource_group"
+  
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    name = "mock-rg"
   }
 }
 
 # Specify inputs specific to this module
 inputs = {
-  aks_cluster_id = dependency.aks_core.outputs.id
-  environment    = local.env
-  region_abbv    = local.region_abbv
-  node_pools = {
-    "app" = {
-      vm_size             = "Standard_D4s_v3"
-      enable_auto_scaling = true
-      min_count           = 2
-      max_count           = 5
-      os_disk_size_gb     = 128
-      os_disk_type        = "Managed"
-      max_pods            = 30
-      node_labels = {
-        "nodepool-type" = "app"
-        "environment"   = local.env
-        "region"        = local.region
-      }
-    }
+  prefix       = local.prefix
+  customer     = local.customer
+  environment  = local.env
+  region_abbv  = local.region_abbv
+  # Use the name of the AKS cluster directly
+  aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/${dependency.resource_group.outputs.name}/providers/Microsoft.ContainerService/managedClusters/${dependency.aks_core.outputs.name}"
+  
+  app_node_pool_enabled = true
+  app_node_pool_vm_size = "Standard_D4s_v3"
+  app_node_pool_enable_auto_scaling = true
+  app_node_pool_min_count = 2
+  app_node_pool_max_count = 5
+  app_node_pool_os_disk_size_gb = 128
+  app_node_pool_os_disk_type = "Managed"
+  app_node_pool_max_pods = 30
+  app_node_pool_node_labels = {
+    "nodepool-type" = "app"
+    "environment" = local.env
+    "region" = local.region
   }
+  
+  tags = local.tags
 }
 
