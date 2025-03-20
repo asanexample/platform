@@ -17,9 +17,13 @@ variable "customer" {
   default     = null
 }
 
-variable "stage" {
-  description = "Environment stage (dev, test, prod, etc.)"
+variable "environment" {
+  description = "Environment (dev, test, prod, etc.)"
   type        = string
+  validation {
+    condition     = contains(["dev", "test", "staging", "prod"], var.environment)
+    error_message = "Environment must be one of: dev, test, staging, prod."
+  }
 }
 
 variable "region_abbv" {
@@ -410,4 +414,11 @@ variable "aks_app_node_pool_node_count" {
   description = "Initial number of nodes in the application node pool"
   type        = number
   default     = 2
+}
+
+# Creation control flags
+variable "create_monitoring_resources" {
+  description = "Whether to create monitoring resources"
+  type        = bool
+  default     = true
 } 

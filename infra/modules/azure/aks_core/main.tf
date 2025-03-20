@@ -8,7 +8,7 @@
 # Generate DNS prefix if not provided and cluster name for auto-generation
 locals {
   # Generate a default name if not provided
-  cluster_name = var.name != null ? var.name : "${var.prefix}-${var.stage}-aks-${var.region_abbv}"
+  cluster_name = var.name != null ? var.name : "${var.prefix}-${var.environment}-aks-${var.region_abbv}"
 
   # Generate DNS prefix if not provided
   dns_prefix = var.dns_prefix != null ? var.dns_prefix : lower(replace(local.cluster_name, "-", ""))

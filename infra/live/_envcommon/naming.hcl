@@ -53,6 +53,6 @@ locals {
 inputs = {
   prefix      = "vip"
   customer    = local.customer
-  stage       = local.environment
+  environment = local.environment
   region_abbv = local.region_code
 } 

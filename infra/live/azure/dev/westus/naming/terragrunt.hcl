@@ -29,6 +29,6 @@ inputs = {
   # Naming components
   prefix      = local.prefix
   customer    = local.customer
-  stage       = local.env
+  environment = local.env
   region_abbv = local.region_abbv
 } 

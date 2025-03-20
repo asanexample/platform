@@ -16,7 +16,7 @@ module "naming" {
 
   prefix      = var.prefix
   customer    = var.customer
-  stage       = var.stage
+  environment = var.environment
   region_abbv = var.region_abbv
 }
 
@@ -68,7 +68,7 @@ module "storage_account" {
   name_components = {
     # Default values for the storage module's internal reference
     prefix      = "tmp"
-    environment = var.stage
+    environment = var.environment
     region_abbv = var.region_abbv
     instance    = "01"
   }
@@ -110,7 +110,7 @@ module "key_vault" {
   name = local.key_vault_name
   name_components = {
     prefix      = var.prefix
-    environment = var.stage
+    environment = var.environment
     region_abbv = var.region_abbv
     instance    = "01"
   }
@@ -159,7 +159,7 @@ module "aks_cluster" {
   # Naming
   prefix      = var.prefix
   customer    = var.customer
-  stage       = var.stage
+  environment = var.environment
   region_abbv = var.region_abbv
 
   # Resource group and location
@@ -215,4 +215,25 @@ module "aks_cluster" {
   depends_on = [
     module.network
   ]
-} 
+}
+
+# Monitoring resources
+module "monitoring" {
+  count  = var.create_monitoring_resources ? 1 : 0
+  source = "../monitoring"
+
+  # Naming
+  prefix      = var.prefix
+  customer    = var.customer
+  environment = var.environment
+  region_abbv = var.region_abbv
+
+  # Resource group and location
+  resource_group_name = azurerm_resource_group.hosting_rg.name
+  location            = var.location
+
+  # Tags
+  tags = var.tags
+}
+
+# Add more references as needed 

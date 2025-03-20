@@ -30,13 +30,13 @@ variable "customer" {
   }
 }
 
-variable "stage" {
-  description = "Stage/environment name (used for resource naming, ex: dev, qa, prod)."
+variable "environment" {
+  description = "Environment name (used for resource naming, ex: dev, qa, prod)."
   type        = string
 
   validation {
-    condition     = contains(["dev", "qa", "prod"], var.stage)
-    error_message = "The stage should be one of: dev, qa, prod."
+    condition     = contains(["dev", "qa", "prod"], var.environment)
+    error_message = "The environment should be one of: dev, qa, prod."
   }
 }
 

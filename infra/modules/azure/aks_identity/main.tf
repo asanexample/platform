@@ -6,12 +6,12 @@
  */
 
 locals {
-  # Generate identity names if not provided
-  aks_identity_name                      = var.aks_identity_name != null ? var.aks_identity_name : "${var.prefix}-${var.stage}-aks-identity"
-  cert_manager_identity_name             = var.cert_manager_identity_name != null ? var.cert_manager_identity_name : "${var.prefix}-${var.stage}-cert-manager"
-  cert_manager_federated_credential_name = var.cert_manager_federated_credential_name != null ? var.cert_manager_federated_credential_name : "${var.prefix}-${var.stage}-cert-manager-fedcred"
-  karpenter_identity_name                = var.karpenter_identity_name != null ? var.karpenter_identity_name : "${var.prefix}-${var.stage}-karpenter"
-  karpenter_federated_credential_name    = var.karpenter_federated_credential_name != null ? var.karpenter_federated_credential_name : "${var.prefix}-${var.stage}-karpenter-fedcred"
+  # Generate default names if not provided
+  aks_identity_name                      = var.aks_identity_name != null ? var.aks_identity_name : "${var.prefix}-${var.environment}-aks-identity"
+  cert_manager_identity_name             = var.cert_manager_identity_name != null ? var.cert_manager_identity_name : "${var.prefix}-${var.environment}-cert-manager"
+  cert_manager_federated_credential_name = var.cert_manager_federated_credential_name != null ? var.cert_manager_federated_credential_name : "${var.prefix}-${var.environment}-cert-manager-fedcred"
+  karpenter_identity_name                = var.karpenter_identity_name != null ? var.karpenter_identity_name : "${var.prefix}-${var.environment}-karpenter"
+  karpenter_federated_credential_name    = var.karpenter_federated_credential_name != null ? var.karpenter_federated_credential_name : "${var.prefix}-${var.environment}-karpenter-fedcred"
 }
 
 # Create a user-assigned managed identity for the AKS cluster

@@ -170,104 +170,104 @@ locals {
 
   names = {
     # Resource Group
-    resource_group = "${local.default_prefix}${local.customer_part}-${var.stage}-${local.resource_types.resource_group}-${local.region_abbv}",
+    resource_group = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.resource_group}-${local.region_abbv}",
 
     # Storage Account (special format with no hyphens, 24 char limit)
-    storage_account = "${local.default_prefix}${local.normalized_customer}${var.stage}${local.resource_types.storage_account}${local.region_abbv}",
+    storage_account = "${local.default_prefix}${local.normalized_customer}${var.environment}${local.resource_types.storage_account}${local.region_abbv}",
 
     # Key Vault 
-    key_vault = "${local.default_prefix}${local.customer_part}-${var.stage}-${local.resource_types.key_vault}-${local.region_abbv}",
+    key_vault = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.key_vault}-${local.region_abbv}",
 
     # AKS Cluster
-    aks_cluster = "${local.default_prefix}-${var.stage}-${local.resource_types.aks_cluster}-${local.region_abbv}",
+    aks_cluster = "${local.default_prefix}-${var.environment}-${local.resource_types.aks_cluster}-${local.region_abbv}",
 
     # Workload Identity
-    workload_identity = "${local.default_prefix}${local.customer_part}-${var.stage}-${local.resource_types.workload_identity}-${local.region_abbv}",
+    workload_identity = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.workload_identity}-${local.region_abbv}",
 
     # Federated Identity
-    federated_identity = "${local.default_prefix}${local.customer_part}-${var.stage}-${local.resource_types.federated_identity}-${local.region_abbv}",
+    federated_identity = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.federated_identity}-${local.region_abbv}",
 
     # Log Analytics Workspace
-    log_analytics_workspace = "${local.default_prefix}-${var.stage}-${local.resource_types.log_analytics_workspace}-${local.region_abbv}",
+    log_analytics_workspace = "${local.default_prefix}-${var.environment}-${local.resource_types.log_analytics_workspace}-${local.region_abbv}",
 
     # App Service
-    app_service = "${local.default_prefix}${local.customer_part}-${var.stage}-${local.resource_types.app_service}-${local.region_abbv}",
+    app_service = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.app_service}-${local.region_abbv}",
 
     # Function App
-    function_app = "${local.default_prefix}${local.customer_part}-${var.stage}-${local.resource_types.function_app}-${local.region_abbv}",
+    function_app = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.function_app}-${local.region_abbv}",
 
     # Virtual Network
-    virtual_network = "${local.default_prefix}-${var.stage}-${local.resource_types.virtual_network}-${local.region_abbv}",
+    virtual_network = "${local.default_prefix}-${var.environment}-${local.resource_types.virtual_network}-${local.region_abbv}",
 
     # Subnet (base name)
-    subnet = "${local.default_prefix}-${var.stage}-${local.resource_types.subnet}",
+    subnet = "${local.default_prefix}-${var.environment}-${local.resource_types.subnet}",
 
     # Front Door
-    front_door = "${local.default_prefix}-${var.stage}-${local.resource_types.front_door}-${local.region_abbv}",
+    front_door = "${local.default_prefix}-${var.environment}-${local.resource_types.front_door}-${local.region_abbv}",
 
     # Front Door Endpoint
-    frontdoor_endpoint = "${local.default_prefix}${local.customer_part}-${var.stage}-${local.resource_types.frontdoor_endpoint}-${local.region_abbv}",
+    frontdoor_endpoint = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.frontdoor_endpoint}-${local.region_abbv}",
 
     # Container Registry (no hyphens)
-    container_registry = "${local.default_prefix}${local.normalized_customer}${var.stage}${local.resource_types.container_registry}${local.region_abbv}",
+    container_registry = "${local.default_prefix}${local.normalized_customer}${var.environment}${local.resource_types.container_registry}${local.region_abbv}",
 
     # Event Hub Namespace
-    event_hub_namespace = "${local.default_prefix}${local.customer_part}-${var.stage}-${local.resource_types.event_hub_namespace}-${local.region_abbv}",
+    event_hub_namespace = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.event_hub_namespace}-${local.region_abbv}",
 
     # Event Hub
-    event_hub = "${local.default_prefix}${local.customer_part}-${var.stage}-${local.resource_types.event_hub}-${local.region_abbv}",
+    event_hub = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.event_hub}-${local.region_abbv}",
 
     # Monitor Workspace 
-    monitor_workspace = "${local.default_prefix}-${var.stage}-${local.resource_types.monitor_workspace}-${local.region_abbv}",
+    monitor_workspace = "${local.default_prefix}-${var.environment}-${local.resource_types.monitor_workspace}-${local.region_abbv}",
 
     # Application Insights
-    application_insights = "${local.default_prefix}${local.customer_part}-${var.stage}-${local.resource_types.application_insights}-${local.region_abbv}",
+    application_insights = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.application_insights}-${local.region_abbv}",
 
     # App Configuration
-    app_configuration = "${local.default_prefix}${local.customer_part}-${var.stage}-${local.resource_types.app_configuration}-${local.region_abbv}",
+    app_configuration = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.app_configuration}-${local.region_abbv}",
 
     # SQL Server
-    sql_server = "${local.default_prefix}${local.customer_part}-${var.stage}-${local.resource_types.sql_server}-${local.region_abbv}",
+    sql_server = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.sql_server}-${local.region_abbv}",
 
     # SQL Database
-    sql_database = "${local.default_prefix}${local.customer_part}-${var.stage}-${local.resource_types.sql_database}-${local.region_abbv}",
+    sql_database = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.sql_database}-${local.region_abbv}",
 
     # Cosmos DB Account
-    cosmos_account = "${local.default_prefix}${local.customer_part}-${var.stage}-${local.resource_types.cosmos_account}-${local.region_abbv}",
+    cosmos_account = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.cosmos_account}-${local.region_abbv}",
 
     # Network Security Group
-    network_security_group = "${local.default_prefix}-${var.stage}-${local.resource_types.network_security_group}-${local.region_abbv}",
+    network_security_group = "${local.default_prefix}-${var.environment}-${local.resource_types.network_security_group}-${local.region_abbv}",
 
     # Route Table
-    route_table = "${local.default_prefix}-${var.stage}-${local.resource_types.route_table}-${local.region_abbv}",
+    route_table = "${local.default_prefix}-${var.environment}-${local.resource_types.route_table}-${local.region_abbv}",
 
     # Bastion Host
-    bastion_host = "${local.default_prefix}-${var.stage}-${local.resource_types.bastion_host}-${local.region_abbv}",
+    bastion_host = "${local.default_prefix}-${var.environment}-${local.resource_types.bastion_host}-${local.region_abbv}",
 
     # Private Endpoint
-    private_endpoint = "${local.default_prefix}${local.customer_part}-${var.stage}-${local.resource_types.private_endpoint}-${local.region_abbv}",
+    private_endpoint = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.private_endpoint}-${local.region_abbv}",
 
     # Public IP
-    public_ip = "${local.default_prefix}-${var.stage}-${local.resource_types.public_ip}-${local.region_abbv}",
+    public_ip = "${local.default_prefix}-${var.environment}-${local.resource_types.public_ip}-${local.region_abbv}",
 
     # Load Balancer
-    load_balancer = "${local.default_prefix}-${var.stage}-${local.resource_types.load_balancer}-${local.region_abbv}",
+    load_balancer = "${local.default_prefix}-${var.environment}-${local.resource_types.load_balancer}-${local.region_abbv}",
 
     # AKS Node Pool (special format with no hyphens, 12 char limit)
-    aks_node_pool = "${local.default_prefix}${var.stage}${local.resource_types.aks_node_pool}",
+    aks_node_pool = "${local.default_prefix}${var.environment}${local.resource_types.aks_node_pool}",
 
     # Managed Prometheus for AKS
-    managed_prometheus = "${local.default_prefix}-${var.stage}-${local.resource_types.managed_prometheus}-${local.region_abbv}",
+    managed_prometheus = "${local.default_prefix}-${var.environment}-${local.resource_types.managed_prometheus}-${local.region_abbv}",
 
     # Container Insights for AKS
-    container_insights = "${local.default_prefix}-${var.stage}-${local.resource_types.container_insights}-${local.region_abbv}",
+    container_insights = "${local.default_prefix}-${var.environment}-${local.resource_types.container_insights}-${local.region_abbv}",
 
     # AKS Identity
-    aks_identity = "${local.default_prefix}-${var.stage}-${local.resource_types.aks_identity}-${local.region_abbv}"
+    aks_identity = "${local.default_prefix}-${var.environment}-${local.resource_types.aks_identity}-${local.region_abbv}"
   }
 
   # Function to generate subnet names (workaround for HCL syntax limitations)
-  subnet_name = "${local.default_prefix}-${var.stage}-${local.resource_types.subnet}"
+  subnet_name = "${local.default_prefix}-${var.environment}-${local.resource_types.subnet}"
 
   # Common subnet types
   subnet_node     = "${local.subnet_name}-node-${local.region_abbv}"

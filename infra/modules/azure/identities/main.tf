@@ -18,7 +18,7 @@ module "naming" {
 
   prefix      = var.prefix
   customer    = var.customer
-  stage       = var.stage
+  environment = var.environment
   region_abbv = var.region_abbv
 }
 
