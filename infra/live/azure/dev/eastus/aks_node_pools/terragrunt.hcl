@@ -68,6 +68,8 @@ inputs = {
     "region" = local.region
   }
   
+  app_node_pool_vnet_subnet_id = dependency.networking.outputs.subnet_ids["az2-kubernetes"]
+  
   tags = local.tags
 }
 

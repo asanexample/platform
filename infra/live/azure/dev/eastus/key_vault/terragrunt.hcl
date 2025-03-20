@@ -44,9 +44,14 @@ dependency "naming" {
 
 # Specify inputs specific to this module
 inputs = {
-  resource_group_name = dependency.resource_group.outputs.name
-  location            = local.region
-  key_vault_name      = dependency.naming.outputs.key_vault
-  tags                = local.tags
+  resource_group_name     = dependency.resource_group.outputs.name
+  location                = local.region
+  sku_name                = "standard"
+  # Add timestamp to make key vault name globally unique
+  name                    = "vipdeveus${formatdate("MMddHHmm", timestamp())}kv"
+  purge_protection_enabled = true
+  enable_rbac_authorization = true
+  public_network_access_enabled = false
+  tags                    = merge(local.tags, { Component = "KeyVault" })
 }
 
