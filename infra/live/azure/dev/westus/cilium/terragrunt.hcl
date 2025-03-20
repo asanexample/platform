@@ -62,12 +62,12 @@ dependency "aks_core" {
 generate "provider_k8s" {
   path      = "provider_kubernetes.tf"
   if_exists = "overwrite_terragrunt"
-  contents  = <<EOF
+  contents = <<EOF
 provider "kubernetes" {
-  host                   = "${dependency.aks_core.outputs.host}"
-  client_certificate     = base64decode("${dependency.aks_core.outputs.client_certificate}")
-  client_key             = base64decode("${dependency.aks_core.outputs.client_key}")
-  cluster_ca_certificate = base64decode(yamldecode(base64decode(regex("certificate-authority-data: (\\S+)", "${dependency.aks_core.outputs.kube_config_raw}")[0]))["certificate-authority-data"])
+  host                   = dependency.aks_core.outputs.host
+  client_certificate     = base64decode(dependency.aks_core.outputs.client_certificate)
+  client_key             = base64decode(dependency.aks_core.outputs.client_key)
+  cluster_ca_certificate = base64decode(dependency.aks_core.outputs.client_certificate)
 }
 EOF
 }
@@ -75,13 +75,33 @@ EOF
 generate "provider_helm" {
   path      = "provider_helm.tf"
   if_exists = "overwrite_terragrunt"
-  contents  = <<EOF
+  contents = <<EOF
 provider "helm" {
   kubernetes {
-    host                   = "${dependency.aks_core.outputs.host}"
-    client_certificate     = base64decode("${dependency.aks_core.outputs.client_certificate}")
-    client_key             = base64decode("${dependency.aks_core.outputs.client_key}")
-    cluster_ca_certificate = base64decode(yamldecode(base64decode(regex("certificate-authority-data: (\\S+)", "${dependency.aks_core.outputs.kube_config_raw}")[0]))["certificate-authority-data"])
+    host                   = dependency.aks_core.outputs.host
+    client_certificate     = base64decode(dependency.aks_core.outputs.client_certificate)
+    client_key             = base64decode(dependency.aks_core.outputs.client_key)
+    cluster_ca_certificate = base64decode(dependency.aks_core.outputs.client_certificate)
+  }
+}
+EOF
+}
+
+# Generate required providers block to ensure no duplicates with versions.tf
+generate "required_providers" {
+  path      = "required_providers_override.tf"
+  if_exists = "overwrite_terragrunt"
+  contents = <<EOF
+terraform {
+  required_providers {
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.23.0"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.11.0"
+    }
   }
 }
 EOF
