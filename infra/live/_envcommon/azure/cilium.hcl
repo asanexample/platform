@@ -4,18 +4,7 @@
 # used as defaults for all environments, which minimizes duplication across environments.
 # ---------------------------------------------------------------------------------------------------------------------
 
-# Include the root `terragrunt.hcl` configuration, which has settings common across all components
-include "root" {
-  path = find_in_parent_folders()
-}
-
-# Include the specialized Kubernetes provider configurations
-include "kubernetes_providers" {
-  path = "${dirname(find_in_parent_folders())}/_envcommon/kubernetes_providers.hcl"
-  expose = true
-}
-
-# Terraform module source for Cilium
+# Terraform module source for Cilium - used if no specific implementation is provided
 terraform {
   source = "${dirname(find_in_parent_folders())}/modules/azure/kubernetes/cilium"
 }

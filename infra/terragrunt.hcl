@@ -1,12 +1,6 @@
 // Base Terragrunt configuration for all modules
 // This file defines the global Terragrunt configuration that applies to all modules
 
-// Include the common provider configurations
-include "providers" {
-  path = "${dirname(find_in_parent_folders())}/infra/live/_envcommon/providers.hcl"
-  expose = true
-}
-
 // Define remote state configuration using Azure Blob Storage
 // THIS IS COMMENTED OUT - WILL BE USED LATER WHEN MIGRATING TO AZURE REMOTE STATE
 /*
@@ -47,7 +41,7 @@ remote_state {
   }
 }
 
-// Generate Terraform configuration for required providers (versions)
+// Generate versions for required providers
 generate "versions" {
   path      = "versions.tf"
   if_exists = "overwrite_terragrunt"
@@ -68,6 +62,41 @@ terraform {
       version = "6.26.0"
     }
   }
+}
+EOF
+}
+
+// Generate core provider configurations
+generate "provider_azure" {
+  path      = "provider_azure.tf"
+  if_exists = "overwrite_terragrunt"
+  contents  = <<EOF
+provider "azurerm" {
+  features {}
+  subscription_id = "${local.azure_subscription_id}"
+  tenant_id       = "${local.azure_tenant_id}"
+  use_cli         = true
+}
+EOF
+}
+
+generate "provider_aws" {
+  path      = "provider_aws.tf"
+  if_exists = "overwrite_terragrunt"
+  contents  = <<EOF
+provider "aws" {
+  region = "${local.aws_region}"
+}
+EOF
+}
+
+generate "provider_gcp" {
+  path      = "provider_gcp.tf"
+  if_exists = "overwrite_terragrunt"
+  contents  = <<EOF
+provider "google" {
+  project = "${local.gcp_project_id}"
+  region  = "${local.gcp_region}"
 }
 EOF
 }

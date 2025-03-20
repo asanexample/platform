@@ -21,7 +21,37 @@ include "root" {
 
 # Include the common configuration for Cilium
 include "cilium_common" {
-  path = "${dirname(find_in_parent_folders())}/_envcommon/azure/cilium.hcl"
+  path = find_in_parent_folders("live/_envcommon/azure/cilium.hcl")
+}
+
+# Configure the Kubernetes provider
+generate "provider_kubernetes" {
+  path      = "kubernetes_provider.tf"
+  if_exists = "overwrite_terragrunt"
+  contents  = <<EOF
+provider "kubernetes" {
+  host                   = var.kubernetes_host
+  client_certificate     = base64decode(var.kubernetes_client_certificate)
+  client_key             = base64decode(var.kubernetes_client_key)
+  cluster_ca_certificate = base64decode(var.kubernetes_cluster_ca_certificate)
+}
+EOF
+}
+
+# Configure the Helm provider
+generate "provider_helm" {
+  path      = "helm_provider.tf"
+  if_exists = "overwrite_terragrunt"
+  contents  = <<EOF
+provider "helm" {
+  kubernetes {
+    host                   = var.kubernetes_host
+    client_certificate     = base64decode(var.kubernetes_client_certificate)
+    client_key             = base64decode(var.kubernetes_client_key)
+    cluster_ca_certificate = base64decode(var.kubernetes_cluster_ca_certificate)
+  }
+}
+EOF
 }
 
 # Set dependencies for this module

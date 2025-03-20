@@ -24,7 +24,7 @@ include "root" {
 
 # Include the common configuration for Networking
 include "networking_common" {
-  path = "${dirname(find_in_parent_folders())}/_envcommon/azure/networking.hcl"
+  path = find_in_parent_folders("live/_envcommon/azure/networking.hcl")
 }
 
 # Set dependencies for this module

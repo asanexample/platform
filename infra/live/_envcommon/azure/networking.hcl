@@ -4,11 +4,6 @@
 # used as defaults for all environments, which minimizes duplication across environments.
 # ---------------------------------------------------------------------------------------------------------------------
 
-# Include the root `terragrunt.hcl` configuration, which has settings common across all components
-include "root" {
-  path = find_in_parent_folders()
-}
-
 # Terraform module source for networking
 terraform {
   source = "${dirname(find_in_parent_folders())}/modules/azure/networking"
