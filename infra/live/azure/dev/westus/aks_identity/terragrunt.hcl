@@ -19,9 +19,9 @@ include "root" {
   path = find_in_parent_folders()
 }
 
-# Use the AKS identity module
-terraform {
-  source = "${get_repo_root()}/infra/modules/azure/aks_identity"
+# Include the common configuration for AKS Identity
+include "aks_identity_common" {
+  path = "${dirname(find_in_parent_folders())}/_envcommon/azure/aks_identity.hcl"
 }
 
 # Set dependencies for this module
@@ -45,13 +45,18 @@ dependency "resource_group" {
   }
 }
 
-# Specify inputs specific to this module
+dependency "networking" {
+  config_path = "../networking"
+  
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    vnet_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet"
+  }
+}
+
+# Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
-  # Naming
-  prefix      = local.prefix
-  customer    = local.customer
-  stage       = local.env
-  region_abbv = local.region_abbv
+  # Identity naming
   aks_identity_name = dependency.naming.outputs.aks_identity
   cluster_name = dependency.naming.outputs.aks_cluster
   
@@ -59,11 +64,16 @@ inputs = {
   resource_group_name = dependency.resource_group.outputs.name
   location = dependency.resource_group.outputs.location
   
-  # Configuration
+  # Environment-specific configuration
   create_workload_identities = false
   workload_identity_enabled = false
   oidc_issuer_enabled = false
   
-  # Tags
-  tags = local.tags
+  # Role assignments with specific scopes for this environment
+  role_assignments = {
+    "Network Contributor" = {
+      scope = dependency.networking.outputs.vnet_id
+      skip_service_principal_aad_check = true
+    }
+  }
 } 

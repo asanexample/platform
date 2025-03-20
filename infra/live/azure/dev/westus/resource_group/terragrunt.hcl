@@ -19,9 +19,9 @@ include "root" {
   path = find_in_parent_folders()
 }
 
-# Use the resource_group module as the source
-terraform {
-  source = "${get_repo_root()}/infra/modules/azure/resource_group"
+# Include the common configuration for Resource Groups
+include "resource_group_common" {
+  path = "${dirname(find_in_parent_folders())}/_envcommon/azure/resource_group.hcl"
 }
 
 # Set dependencies for this module
@@ -34,9 +34,7 @@ dependency "naming" {
   }
 }
 
-# Specify inputs specific to this module
+# Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
-  name     = dependency.naming.outputs.resource_group
-  location = local.region
-  tags     = local.tags
+  name = dependency.naming.outputs.resource_group
 } 

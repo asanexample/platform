@@ -5,6 +5,9 @@ locals {
   # Load common variables
   common_vars = read_terragrunt_config(find_in_parent_folders("common.hcl"))
   
+  # Load network configuration
+  network_vars = read_terragrunt_config(find_in_parent_folders("network.hcl"))
+  
   # Extract commonly used variables
   env         = local.common_vars.locals.env
   prefix      = local.common_vars.locals.prefix
@@ -19,9 +22,9 @@ include "root" {
   path = find_in_parent_folders()
 }
 
-# Use the AKS core module
-terraform {
-  source = "${get_repo_root()}/infra/modules/azure/aks_core"
+# Include the common configuration for AKS Core
+include "aks_core_common" {
+  path = "${dirname(find_in_parent_folders())}/_envcommon/azure/aks_core.hcl"
 }
 
 # Set dependencies for this module
@@ -67,86 +70,66 @@ dependency "aks_identity" {
   }
 }
 
-# This dependency is no longer needed but kept commented for reference
-# dependency "aks_networking" {
-#   config_path = "../aks_networking"
-#   
-#   # Mock outputs for plan and validation
-#   mock_outputs = {
-#     private_dns_zone_id = null
-#     network_security_group_id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.Network/networkSecurityGroups/mock-nsg"
-#   }
-# }
-
-# Specify inputs specific to this module
+# Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
-  # Naming
-  prefix      = local.prefix
-  customer    = local.customer
-  stage       = local.env
-  region_abbv = local.region_abbv
-  name        = dependency.naming.outputs.aks_cluster
-  
   # Resource details
+  name        = dependency.naming.outputs.aks_cluster
   resource_group_name = dependency.resource_group.outputs.name
   location = dependency.resource_group.outputs.location
   dns_prefix = "${local.prefix}-${local.env}-wus"
   
-  # Cluster configuration
+  # Environment-specific overrides
   kubernetes_version = "1.32"
-  sku_tier = "Standard" # Required when cost_analysis_enabled is true
-  local_account_disabled = true  # Re-enable since we're integrating with AAD
+  sku_tier = "Standard"
+  local_account_disabled = true
   workload_identity_enabled = true
   oidc_issuer_enabled = true
   
-  # Azure AD integration - managed approach
-  azure_active_directory_role_based_access_control = {
-    admin_group_object_ids = ["00000000-0000-0000-0000-000000000000"]  # Replace with actual AAD admin group IDs
+  # Azure AD integration for this environment
+  azure_ad_integration = {
+    enable = true
+    admin_group_object_ids = ["00000000-0000-0000-0000-000000000000"]
     azure_rbac_enabled = true
+    tenant_id = null
   }
   
-  # Identity configuration - use the user-assigned identity
-  identity_type = "UserAssigned"
+  # Identity configuration
   user_assigned_identity_id = dependency.aks_identity.outputs.aks_identity_id
   
-  # Network profile configuration
-  # No CNI will be installed by default; Cilium will be installed separately
-  network_plugin = "none"
+  # Network configuration specific to this environment
+  network_profile = {
+    network_plugin = "none"
+    network_policy = null
+    outbound_type = "loadBalancer"
+    service_cidr = "10.0.0.0/16"
+    dns_service_ip = "10.0.0.10"
+    pod_cidr = "10.244.0.0/16"
+    load_balancer_sku = "standard"
+  }
   
-  # Set network_policy to null to avoid conflicts with Cilium installation
-  network_policy = null
-  
-  # Service network configuration
-  service_cidr = "10.0.0.0/16"
-  dns_service_ip = "10.0.0.10"
-  docker_bridge_cidr = "172.17.0.1/16"
-  
-  # Pod CIDR - will be managed by Cilium
-  pod_cidr = "10.244.0.0/16"
-  
-  # Subnet configuration
+  # Subnet and private cluster configuration
   subnet_id = dependency.networking.outputs.subnet_ids["az1-kubernetes"]
-  
-  # Private cluster configuration
-  private_cluster_enabled = true
   private_dns_zone_id = dependency.networking.outputs.aks_private_dns_zone_id
   
-  # Default node pool
-  default_nodepool_name = "system"
-  default_nodepool_vm_size = "Standard_D2s_v4"
-  default_nodepool_count = 2
-  default_nodepool_enable_auto_scaling = true
-  default_nodepool_min_count = 2
-  default_nodepool_max_count = 3
-  
-  # Set max_pods to a higher value since Cilium will be used
-  # Cilium can support more pods per node as it uses its own IPAM
-  default_nodepool_max_pods = 110
-  
-  default_nodepool_os_disk_size_gb = 128
-  default_nodepool_node_labels = {
-    "role" = "system"
-    "node-priority" = "regular"
+  # Default node pool overrides
+  default_node_pool = {
+    name = "system"
+    vm_size = "Standard_D2s_v4"
+    enable_auto_scaling = true
+    node_count = 2
+    min_count = 2
+    max_count = 3
+    availability_zones = ["1", "2", "3"]
+    max_pods = 110
+    os_disk_size_gb = 128
+    node_labels = {
+      "role" = "system"
+      "node-priority" = "regular"
+    }
+    node_taints = []
+    os_disk_type = "Managed"
+    os_sku = "Ubuntu"
+    ultra_ssd_enabled = false
   }
   
   # Tags

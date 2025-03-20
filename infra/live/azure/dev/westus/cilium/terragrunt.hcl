@@ -19,9 +19,9 @@ include "root" {
   path = find_in_parent_folders()
 }
 
-# Use the Cilium module
-terraform {
-  source = "${get_repo_root()}/infra/modules/azure/kubernetes/cilium"
+# Include the common configuration for Cilium
+include "cilium_common" {
+  path = "${dirname(find_in_parent_folders())}/_envcommon/azure/cilium.hcl"
 }
 
 # Set dependencies for this module
@@ -89,34 +89,16 @@ provider "helm" {
 EOF
 }
 
-# Specify inputs specific to this module
+# Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
-  # Cilium configuration
-  namespace     = "kube-system"
-  chart_version = "1.17.2"
-  
   # AKS credentials for provider configuration
   kubernetes_host = dependency.aks_core.outputs.host
   kubernetes_client_certificate = dependency.aks_core.outputs.client_certificate
   kubernetes_client_key = dependency.aks_core.outputs.client_key
   kubernetes_cluster_ca_certificate = dependency.aks_core.outputs.cluster_ca_certificate
   
-  # Default Cilium settings
-  set_values = {
-    "aks.enabled"                 = "true"
-    "tunnel"                      = "vxlan"
-    "ipam.mode"                   = "kubernetes"
-    "kubeProxyReplacement"        = "strict"
-    "hubble.enabled"              = "true"
-    "hubble.relay.enabled"        = "true"
-    "hubble.ui.enabled"           = "true"
-    "operator.replicas"           = "2"
-    "nodeinit.enabled"            = "true"
-    "prometheus.enabled"          = "true"
-    "prometheus.serviceMonitor.enabled" = "false"
-  }
-  
-  # Other module parameters
-  helm_timeout = 1200
-  wait         = true
+  # Any environment-specific overrides can be added here
+  # set_values = {
+  #   # Environment-specific values will be merged with common values
+  # }
 } 

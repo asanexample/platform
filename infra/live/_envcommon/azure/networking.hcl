@@ -1,42 +1,53 @@
-# Common Terragrunt configuration for Azure networking across all regions
+# ---------------------------------------------------------------------------------------------------------------------
+# COMMON TERRAGRUNT CONFIGURATION FOR AZURE NETWORKING
+# This is the common component configuration for Azure networking. The common parameters defined in this file will be
+# used as defaults for all environments, which minimizes duplication across environments.
+# ---------------------------------------------------------------------------------------------------------------------
 
-# Specify the terraform module source
+# Include the root `terragrunt.hcl` configuration, which has settings common across all components
+include "root" {
+  path = find_in_parent_folders()
+}
+
+# Terraform module source for networking
 terraform {
   source = "${dirname(find_in_parent_folders())}/modules/azure/networking"
 }
 
-# Common locals that can be used across all regions
+# ---------------------------------------------------------------------------------------------------------------------
+# SHARED VARIABLES AND GLOBAL NETWORK ARCHITECTURE
+# These variables establish the baseline networking configuration across all environments
+# ---------------------------------------------------------------------------------------------------------------------
 locals {
-  # Extract environment and region
+  # Extract environment from env.hcl
   environment_vars = read_terragrunt_config(find_in_parent_folders("env.hcl"))
   environment      = local.environment_vars.locals.environment
   
-  region_vars      = read_terragrunt_config(find_in_parent_folders("region.hcl"))
-  region           = local.region_vars.locals.region
+  # Extract region information from region.hcl
+  region_vars    = read_terragrunt_config(find_in_parent_folders("region.hcl"))
+  region         = local.region_vars.locals.region
   
-  # Map of Azure region to region code for resource naming
+  # Map of Azure regions to region codes for resource naming
   region_code_map = {
-    "eastus" = "eus"
-    "westus" = "wus"
-    "eastus2" = "eus2"
-    "westus2" = "wus2"
-    "centralus" = "cus"
-    "westus3" = "wus3"
+    "eastus"      = "eus"
+    "eastus2"     = "eus2"
+    "westus"      = "wus"
+    "westus2"     = "wus2" 
+    "centralus"   = "cus"
     "northeurope" = "neu"
-    "westeurope" = "weu"
-    "uksouth" = "uks"
+    "westeurope"  = "weu"
+    "southeastasia" = "sea"
+    "eastasia"    = "eas"
+    "uksouth"     = "uks"
+    "ukwest"      = "ukw"
+    "francecentral" = "frc"
   }
   
   # Get the region code for current region
-  region_code = local.region_code_map[local.region]
+  region_code = lookup(local.region_code_map, local.region, "unknown")
   
-  # Define common naming pattern
-  vnet_name = "vip-vnet-${local.environment}-${local.region_code}-main"
-  rg_name   = "vip-rg-${local.environment}-${local.region_code}-net"
-  
-  # Azure CIDR allocations per region according to allocations.csv
-  # IMPORTANT: These are reference values only and should be overridden in each regional configuration
-  # with the correct values from allocations.csv
+  # Global CIDR Allocation Strategy
+  # For complete documentation, see: infra/docs/06-cidr-allocation.md
   azure_cidr_map = {
     "eastus"      = "10.101.0.0/21"
     "eastus2"     = "10.101.8.0/21"
@@ -51,31 +62,34 @@ locals {
     "uksouth"     = "10.101.80.0/21"
   }
   
-  # Common tags for all resources
-  common_tags = {
-    Environment        = local.environment
-    Region             = local.region
-    Component          = "Networking"
-    ManagedBy          = "Terragrunt"
-    Project            = "Multi-Cloud Platform"
-    AutoShutdown       = "True"
-    DataClassification = "Internal"
-  }
+  # Get common tags from the environment
+  common_vars    = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  common_tags    = local.common_vars.locals.tags
 }
 
-# Default inputs that can be overridden by region-specific configurations
+# ---------------------------------------------------------------------------------------------------------------------
+# COMMON NETWORK CONFIGURATION DEFAULTS
+# These settings create baseline configurations that can be overridden by environment-specific values
+# ---------------------------------------------------------------------------------------------------------------------
 inputs = {
-  resource_group_name = local.rg_name
-  location            = local.region
-  vnet_name           = local.vnet_name
+  # The name and resource group will typically come from other modules in environment-specific configs
   
-  # DO NOT USE this default address space in production. Override with the proper regional CIDR
-  # from the azure_cidr_map above for the specific region you're deploying to
-  address_space       = ["10.1.0.0/16"]  # EXAMPLE ONLY - Override in regional configuration
+  # Default network settings
+  address_space         = [local.azure_cidr_map[local.region]]
+  dns_servers           = null
   
-  # Sample subnet config - should be replaced with proper subnets based on allocations.csv
-  subnets             = {}
+  # Default subnet configuration - will typically be overridden in environment-specific config
+  subnets               = {}
   
-  dns_servers         = []
-  tags                = local.common_tags
+  # AKS-specific networking defaults
+  enable_aks_networking        = false
+  aks_subnet_name             = null
+  aks_cluster_name            = null
+  aks_private_cluster_enabled = true
+  aks_node_resource_group     = null
+  
+  # Default tags
+  tags = merge(local.common_tags, {
+    "ResourceType" = "Networking"
+  })
 } 

@@ -22,9 +22,9 @@ include "root" {
   path = find_in_parent_folders()
 }
 
-# Use the actual Terraform module as the source
-terraform {
-  source = "${get_repo_root()}/infra/modules/azure/networking"
+# Include the common configuration for Networking
+include "networking_common" {
+  path = "${dirname(find_in_parent_folders())}/_envcommon/azure/networking.hcl"
 }
 
 # Set dependencies for this module
@@ -48,26 +48,20 @@ dependency "resource_group" {
   }
 }
 
-# Specify inputs specific to this module
+# Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
   # Resource group
   resource_group_name = dependency.resource_group.outputs.name
-  location = dependency.resource_group.outputs.location
   
   # VNet configuration
   vnet_name = dependency.naming.outputs.virtual_network
-  address_space = local.network_vars.locals.address_space
   
   # Subnets from network.hcl
   subnets = local.network_vars.locals.subnets
   
-  # AKS Networking Configuration - updated to use the appropriate kubernetes subnet
+  # AKS Networking Configuration
   enable_aks_networking = true
   aks_subnet_name = "az1-kubernetes"
   aks_cluster_name = dependency.naming.outputs.aks_cluster
-  aks_private_cluster_enabled = true
   aks_node_resource_group = "${dependency.resource_group.outputs.name}-nodes"
-  
-  # Tags
-  tags = local.tags
 } 
