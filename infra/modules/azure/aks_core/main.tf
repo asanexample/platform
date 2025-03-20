@@ -9,7 +9,7 @@
 locals {
   # Generate a default name if not provided
   cluster_name = var.name != null ? var.name : "${var.prefix}-${var.stage}-aks-${var.region_abbv}"
-  
+
   # Generate DNS prefix if not provided
   dns_prefix = var.dns_prefix != null ? var.dns_prefix : lower(replace(local.cluster_name, "-", ""))
 }
@@ -33,7 +33,7 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
   # Azure AD integration
   dynamic "azure_active_directory_role_based_access_control" {
     for_each = var.azure_active_directory_role_based_access_control != null ? [1] : []
-    
+
     content {
       admin_group_object_ids = var.azure_active_directory_role_based_access_control.admin_group_object_ids
       azure_rbac_enabled     = var.azure_active_directory_role_based_access_control.azure_rbac_enabled
@@ -42,28 +42,28 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
 
   # System node pool configuration
   default_node_pool {
-    name                = var.default_nodepool_name
-    node_count          = var.default_nodepool_count
-    vm_size             = var.default_nodepool_vm_size
-    max_pods            = var.default_nodepool_max_pods
-    os_disk_size_gb     = var.default_nodepool_os_disk_size_gb
-    node_labels         = var.default_nodepool_node_labels
+    name                 = var.default_nodepool_name
+    node_count           = var.default_nodepool_count
+    vm_size              = var.default_nodepool_vm_size
+    max_pods             = var.default_nodepool_max_pods
+    os_disk_size_gb      = var.default_nodepool_os_disk_size_gb
+    node_labels          = var.default_nodepool_node_labels
     auto_scaling_enabled = var.default_nodepool_enable_auto_scaling
-    min_count           = var.default_nodepool_enable_auto_scaling ? var.default_nodepool_min_count : null
-    max_count           = var.default_nodepool_enable_auto_scaling ? var.default_nodepool_max_count : null
-    vnet_subnet_id      = var.subnet_id
-    tags                = var.tags
+    min_count            = var.default_nodepool_enable_auto_scaling ? var.default_nodepool_min_count : null
+    max_count            = var.default_nodepool_enable_auto_scaling ? var.default_nodepool_max_count : null
+    vnet_subnet_id       = var.subnet_id
+    tags                 = var.tags
   }
 
   # Network profile configuration - set to "none" to not install any CNI by default
   # Cilium will be installed separately after cluster creation
   network_profile {
-    network_plugin = var.network_plugin  # Set to "none" to use Cilium
-    network_policy = var.network_policy  # Set to null when using Cilium
-    service_cidr  = var.service_cidr
-    dns_service_ip = var.dns_service_ip
-    pod_cidr      = var.pod_cidr
-    outbound_type = var.outbound_type
+    network_plugin    = var.network_plugin # Set to "none" to use Cilium
+    network_policy    = var.network_policy # Set to null when using Cilium
+    service_cidr      = var.service_cidr
+    dns_service_ip    = var.dns_service_ip
+    pod_cidr          = var.pod_cidr
+    outbound_type     = var.outbound_type
     load_balancer_sku = "standard"
   }
 
