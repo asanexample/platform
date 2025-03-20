@@ -291,6 +291,16 @@ variable "network_policy" {
   }
 }
 
+variable "outbound_type" {
+  description = "The outbound (egress) routing method for the AKS cluster"
+  type        = string
+  default     = "loadBalancer"
+  validation {
+    condition     = contains(["loadBalancer", "userDefinedRouting", "managedNATGateway", "userAssignedNATGateway"], var.outbound_type)
+    error_message = "The outbound type must be one of: loadBalancer, userDefinedRouting, managedNATGateway, userAssignedNATGateway."
+  }
+}
+
 variable "pod_cidr" {
   description = "The CIDR for pod IPs when using kubenet"
   type        = string

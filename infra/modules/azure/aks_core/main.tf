@@ -58,12 +58,12 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
   # Network profile configuration - set to "none" to not install any CNI by default
   # Cilium will be installed separately after cluster creation
   network_profile {
-    network_plugin = var.network_plugin
-    network_policy = var.network_policy
+    network_plugin = var.network_plugin  # Set to "none" to use Cilium
+    network_policy = var.network_policy  # Set to null when using Cilium
     service_cidr  = var.service_cidr
     dns_service_ip = var.dns_service_ip
     pod_cidr      = var.pod_cidr
-    outbound_type = "loadBalancer"
+    outbound_type = var.outbound_type
     load_balancer_sku = "standard"
   }
 
