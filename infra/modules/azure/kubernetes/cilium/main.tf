@@ -1,69 +1,28 @@
 /**
  * # Cilium CNI Installation Module
  *
- * This module installs Cilium CNI using the Helm provider on an AKS cluster.
- * It's designed to work with clusters that have network_plugin set to "none" to allow Cilium
- * to take over the networking responsibilities.
+ * This module previously installed Cilium CNI using the Helm provider on an AKS cluster.
+ * It has been modified to remove the Helm chart installation as requested.
+ * Cilium installation will be handled outside of Terragrunt/Terraform.
  */
 
-# Cilium namespace
-resource "kubernetes_namespace" "cilium" {
-  metadata {
-    name = var.namespace
-    labels = merge(var.namespace_labels, {
-      name = var.namespace
-    })
-  }
+# Time sleep to allow the kubernetes API to settle after cluster creation
+resource "time_sleep" "wait_for_kubernetes" {
+  depends_on = [var.module_depends_on]
+  create_duration = "30s"
 }
 
-# Install Cilium using Helm
-resource "helm_release" "cilium" {
-  name       = "cilium"
-  namespace  = kubernetes_namespace.cilium.metadata[0].name
-  repository = "https://helm.cilium.io/"
-  chart      = "cilium"
-  version    = var.chart_version
-  timeout    = var.helm_timeout
-  wait       = var.wait
+# Local value to indicate Cilium installation has been removed
+locals {
+  cilium_message = "Cilium installation has been removed from Terraform management. It will be managed externally."
+}
 
-  values = [
-    var.values_file != "" ? file(var.values_file) : "",
-    var.values_content
-  ]
+# Output message for clarity
+output "message" {
+  value = local.cilium_message
+}
 
-  # Construct dynamic set values from the inputs
-  dynamic "set" {
-    for_each = var.set_values
-    content {
-      name  = set.key
-      value = set.value
-    }
-  }
-
-  # Default Cilium configuration values if none are provided
-  dynamic "set" {
-    for_each = var.set_values == {} ? {
-      "aks.enabled"                 = "true"
-      "tunnel"                      = "vxlan"
-      "ipam.mode"                   = "kubernetes"
-      "kubeProxyReplacement"        = "strict"
-      "k8sServiceHost"              = var.kubernetes_host
-      "k8sServicePort"              = var.kubernetes_port
-      "hubble.enabled"              = "true"
-      "hubble.relay.enabled"        = "true"
-      "hubble.ui.enabled"           = "true"
-      "operator.replicas"           = var.operator_replicas
-      "nodeinit.enabled"            = "true"
-      "prometheus.enabled"          = var.prometheus_enabled
-      "prometheus.serviceMonitor.enabled" = var.prometheus_service_monitor_enabled
-    } : {}
-    content {
-      name  = set.key
-      value = set.value
-    }
-  }
-
-  depends_on = [
-    kubernetes_namespace.cilium
-  ]
+output "cilium_namespace" {
+  value = var.namespace
+  description = "The namespace where Cilium would be installed"
 } 
