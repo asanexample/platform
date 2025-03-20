@@ -24,13 +24,15 @@ naming
   ↓
 resource_group
   ↓
-  |--------------|--------------|--------------|
-  ↓              ↓              ↓              ↓
-networking    key_vault      storage      aks_identity
-  |              |              |              ↓  
-  |--------------|--------------|------→ aks_core
-                                               ↓
-                                         aks_node_pools
+  |---------------------|---------------------|
+  ↓                     ↓                     ↓
+networking          aks_identity           key_vault
+  |                     |                     |
+  |---------------------|---------------------|
+  ↓                     ↓                     ↓
+storage ←------------→ aks_core
+                         ↓
+                    aks_node_pools
 ```
 
 ## Configuration Files

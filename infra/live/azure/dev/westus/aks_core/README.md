@@ -15,8 +15,9 @@ Creates a production-ready AKS cluster that:
 ### Dependencies
 - **naming**: Uses standardized resource names
 - **resource_group**: Deploys resources in the specified resource group
-- **network**: Uses network configuration for cluster networking
+- **networking**: Uses network configuration for cluster networking
 - **aks_identity**: Uses managed identity for the AKS cluster
+- **storage**: Uses storage for persistent volumes and cluster data
 
 ### Key Configuration Settings
 - **Cluster Configuration**:

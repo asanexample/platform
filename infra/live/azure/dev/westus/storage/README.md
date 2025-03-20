@@ -15,7 +15,7 @@ Creates a storage infrastructure that:
 ### Dependencies
 - **naming**: Uses standardized resource names
 - **resource_group**: Deploys resources in the specified resource group
-- **network**: Uses network configuration for service endpoints and private endpoints
+- **networking**: Uses network configuration for service endpoints and private endpoints
 
 ### Key Configuration Settings
 - **Storage Account Settings**:

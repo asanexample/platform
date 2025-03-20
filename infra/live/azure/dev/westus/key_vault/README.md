@@ -15,7 +15,7 @@ Creates a secure Azure Key Vault that:
 ### Dependencies
 - **naming**: Uses standardized resource names
 - **resource_group**: Deploys resources in the specified resource group
-- **network**: Uses network configuration for private endpoints
+- **networking**: Uses network configuration for private endpoints
 
 ### Key Configuration Settings
 - **Key Vault Name**: Uses fixed naming with a unique suffix (vipdevwuskv01)
