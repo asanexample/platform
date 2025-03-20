@@ -166,6 +166,88 @@ Used for development environments or where IP address space is constrained:
 - **Network Policy**: Limited options
 - **Service Connectivity**: Azure Load Balancer integration
 
+#### Cilium CNI (BYO CNI)
+
+For advanced networking capabilities and enhanced security:
+
+- **Network Plugin**: "none" (Bring Your Own CNI)
+- **CNI Implementation**: Cilium (installed post-cluster creation)
+- **Pod CIDR Allocation**: Managed by Cilium in separate address space
+- **Network Policy**: Cilium Network Policy (extends Kubernetes Network Policy)
+- **Service Connectivity**: Azure Load Balancer integration
+- **eBPF Features**: Advanced security, visibility, and performance capabilities
+
+Implementation approach:
+
+1. Create the AKS cluster with `network_plugin` set to "none":
+
+```hcl
+module "aks_core" {
+  source = "../../modules/azure/aks_core"
+  
+  # Basic cluster configuration
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  
+  # Network configuration
+  network_plugin      = "none"  # No CNI installed by Azure
+  service_cidr        = "10.241.0.0/16"
+  dns_service_ip      = "10.241.0.10"
+  # Note: Do not specify pod_cidr as it will be managed by Cilium
+  
+  # Other configuration...
+}
+```
+
+2. Install Cilium using the dedicated module:
+
+```hcl
+module "cilium" {
+  source = "../../modules/azure/kubernetes/cilium"
+  
+  # Required inputs for Kubernetes provider
+  kubernetes_host                   = module.aks_core.host
+  kubernetes_client_certificate     = module.aks_core.client_certificate
+  kubernetes_client_key             = module.aks_core.client_key
+  kubernetes_cluster_ca_certificate = module.aks_core.cluster_ca_certificate
+  
+  # Cilium configuration
+  chart_version = "1.17.2"
+  namespace     = "kube-system"
+  
+  # Cilium-specific settings
+  set_values = {
+    "aks.enabled"                 = "true"
+    "tunnel"                      = "vxlan"
+    "ipam.mode"                   = "kubernetes"
+    "kubeProxyReplacement"        = "strict"
+    "hubble.enabled"              = "true"
+    "hubble.relay.enabled"        = "true"
+    "hubble.ui.enabled"           = "true"
+    "operator.replicas"           = "2"
+    "nodeinit.enabled"            = "true"
+    "prometheus.enabled"          = "true"
+  }
+}
+```
+
+**Important Considerations for Cilium**:
+
+- **Immutable Properties**: When using Cilium, avoid specifying `pod_cidr` in the AKS configuration as this is an immutable property that would require cluster recreation if changed.
+- **Upgrade Process**: Cilium upgrades should be performed carefully, typically before AKS version upgrades.
+- **Feature Support**: Using BYO CNI mode may limit some AKS features; ensure compatibility with required platform capabilities.
+- **Observability**: Enable Hubble for enhanced network observability.
+- **Performance Tuning**: Consider Cilium-specific performance optimizations for production environments.
+
+**Benefits of Cilium CNI**:
+
+- Enhanced network policy with Layer 7 visibility (HTTP, gRPC, Kafka)
+- Improved security with eBPF-based enforcement
+- Better performance through direct routing and eBPF optimizations
+- Advanced observability with Hubble
+- Native multi-cluster support
+- Future-proof networking with Kubernetes and service mesh integration
+
 ### AWS EKS Networking
 
 #### VPC CNI

@@ -40,7 +40,39 @@ This guide provides solutions to common issues encountered when working with the
 
 ### Kubernetes Cluster Issues
 
-*Detailed troubleshooting steps for Kubernetes cluster issues will be provided in a future update.*
+#### AKS Cluster Recreation During Apply
+
+**Symptoms**: Running `terragrunt apply` or `terraform apply` indicates that the AKS cluster will be destroyed and recreated, even for seemingly minor changes.
+
+**Cause**: Changes to immutable AKS properties that require recreation rather than in-place updates. Common immutable properties include:
+
+- Location
+- Resource group name
+- DNS prefix
+- Network plugin type
+- Pod CIDR and Service CIDR
+- Virtual network/subnet IDs
+- Availability zones configuration
+- Node resource group name
+
+**Resolution**:
+1. **Identify the Trigger**: In the plan output, look for attributes marked with `# forces replacement`
+2. **Evaluate Necessity**: Determine if the change is truly needed; many configuration changes can be made through separate resources without touching immutable properties
+3. **Changing Network Settings**:
+   - If you need to change the Pod CIDR or network configuration, be aware that it will require cluster recreation
+   - For network plugin changes (e.g., from kubenet to Azure CNI or adding Cilium), always create a new cluster rather than modifying an existing one
+4. **Managing Properties**:
+   - For properties like `pod_cidr` that are typically managed implicitly by Azure, avoid explicitly setting them in Terraform unless necessary
+   - If a property like `pod_cidr` was added to configuration and causing recreation, remove it from the configuration to revert to Azure-managed defaults
+5. **State Manipulation** (Advanced):
+   - As a last resort, use `terraform state rm` to remove the AKS resource from state, then `terraform import` to bring it back without the problematic attribute
+   - This should be done with caution and proper backups of the state file
+
+**Prevention**:
+1. Fully design AKS clusters before creation, considering all network and identity requirements
+2. Use separate modules for aspects that might change (e.g., node pools, monitoring configurations)
+3. Document immutable properties in module READMEs to highlight their significance
+4. Always run `terraform plan` or `terragrunt plan` before applying changes to identify potential recreations
 
 ### Identity and Access Issues
 
