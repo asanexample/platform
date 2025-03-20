@@ -44,6 +44,18 @@ dependency "resource_group" {
   }
 }
 
+# Add dependency for networking
+dependency "networking" {
+  config_path = "../networking"
+  
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    subnet_ids = {
+      "az2-kubernetes" = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet/subnets/az2-kubernetes"
+    }
+  }
+}
+
 # Specify inputs specific to this module
 inputs = {
   prefix       = local.prefix
