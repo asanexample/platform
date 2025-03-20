@@ -54,42 +54,14 @@ dependency "aks_core" {
     host = "https://mock-aks-api-server.azure.com"
     client_certificate = "REDACTED"
     client_key = "REDACTED"
+    cluster_ca_certificate = "REDACTED"
     kube_config_raw = "REDACTED"
   }
 }
 
-# Configure the Kubernetes and Helm providers using outputs from AKS cluster
-generate "provider_k8s" {
-  path      = "provider_kubernetes.tf"
-  if_exists = "overwrite_terragrunt"
-  contents = <<EOF
-provider "kubernetes" {
-  host                   = dependency.aks_core.outputs.host
-  client_certificate     = base64decode(dependency.aks_core.outputs.client_certificate)
-  client_key             = base64decode(dependency.aks_core.outputs.client_key)
-  cluster_ca_certificate = base64decode(dependency.aks_core.outputs.client_certificate)
-}
-EOF
-}
-
-generate "provider_helm" {
-  path      = "provider_helm.tf"
-  if_exists = "overwrite_terragrunt"
-  contents = <<EOF
-provider "helm" {
-  kubernetes {
-    host                   = dependency.aks_core.outputs.host
-    client_certificate     = base64decode(dependency.aks_core.outputs.client_certificate)
-    client_key             = base64decode(dependency.aks_core.outputs.client_key)
-    cluster_ca_certificate = base64decode(dependency.aks_core.outputs.client_certificate)
-  }
-}
-EOF
-}
-
-# Generate required providers block to ensure no duplicates with versions.tf
+# Generate the required providers configuration
 generate "required_providers" {
-  path      = "required_providers_override.tf"
+  path      = "required_providers.tf"
   if_exists = "overwrite_terragrunt"
   contents = <<EOF
 terraform {
@@ -107,14 +79,47 @@ terraform {
 EOF
 }
 
+# Configure the Kubernetes provider
+generate "provider_k8s" {
+  path      = "provider_kubernetes.tf"
+  if_exists = "overwrite_terragrunt"
+  contents = <<EOF
+provider "kubernetes" {
+  host                   = var.kubernetes_host
+  client_certificate     = base64decode(var.kubernetes_client_certificate)
+  client_key             = base64decode(var.kubernetes_client_key)
+  cluster_ca_certificate = base64decode(var.kubernetes_cluster_ca_certificate)
+}
+EOF
+}
+
+# Configure the Helm provider
+generate "provider_helm" {
+  path      = "provider_helm.tf"
+  if_exists = "overwrite_terragrunt"
+  contents = <<EOF
+provider "helm" {
+  kubernetes {
+    host                   = var.kubernetes_host
+    client_certificate     = base64decode(var.kubernetes_client_certificate)
+    client_key             = base64decode(var.kubernetes_client_key)
+    cluster_ca_certificate = base64decode(var.kubernetes_cluster_ca_certificate)
+  }
+}
+EOF
+}
+
 # Specify inputs specific to this module
 inputs = {
   # Cilium configuration
   namespace     = "kube-system"
   chart_version = "1.17.2"
   
-  # AKS specific information
+  # AKS credentials for provider configuration
   kubernetes_host = dependency.aks_core.outputs.host
+  kubernetes_client_certificate = dependency.aks_core.outputs.client_certificate
+  kubernetes_client_key = dependency.aks_core.outputs.client_key
+  kubernetes_cluster_ca_certificate = dependency.aks_core.outputs.cluster_ca_certificate
   
   # Default Cilium settings
   set_values = {

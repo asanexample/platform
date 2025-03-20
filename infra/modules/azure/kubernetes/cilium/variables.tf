@@ -61,6 +61,24 @@ variable "kubernetes_port" {
   default     = "443"
 }
 
+variable "kubernetes_client_certificate" {
+  description = "Base64 encoded client certificate for Kubernetes authentication"
+  type        = string
+  default     = ""
+}
+
+variable "kubernetes_client_key" {
+  description = "Base64 encoded client key for Kubernetes authentication"
+  type        = string
+  default     = ""
+}
+
+variable "kubernetes_cluster_ca_certificate" {
+  description = "Base64 encoded cluster CA certificate for Kubernetes authentication"
+  type        = string
+  default     = ""
+}
+
 variable "operator_replicas" {
   description = "Number of replicas for Cilium operator"
   type        = string
