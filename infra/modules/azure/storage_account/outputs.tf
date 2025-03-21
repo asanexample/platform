@@ -9,25 +9,25 @@ output "name" {
 }
 
 output "primary_access_key" {
-  description = "Primary access key for the storage account"
+  description = "Primary access key for the storage account. DEPRECATED: Use Entra ID authentication instead of access keys."
   value       = azurerm_storage_account.this.primary_access_key
   sensitive   = true
 }
 
 output "primary_connection_string" {
-  description = "Primary connection string for the storage account"
+  description = "Primary connection string for the storage account. DEPRECATED: Use Entra ID authentication instead of connection strings."
   value       = azurerm_storage_account.this.primary_connection_string
   sensitive   = true
 }
 
 output "secondary_access_key" {
-  description = "Secondary access key for the storage account"
+  description = "Secondary access key for the storage account. DEPRECATED: Use Entra ID authentication instead of access keys."
   value       = azurerm_storage_account.this.secondary_access_key
   sensitive   = true
 }
 
 output "secondary_connection_string" {
-  description = "Secondary connection string for the storage account"
+  description = "Secondary connection string for the storage account. DEPRECATED: Use Entra ID authentication instead of connection strings."
   value       = azurerm_storage_account.this.secondary_connection_string
   sensitive   = true
 }
@@ -45,4 +45,9 @@ output "containers" {
 output "private_endpoint_ids" {
   description = "List of private endpoint IDs if created"
   value       = azurerm_private_endpoint.storage[*].id
+}
+
+output "role_assignments" {
+  description = "List of role assignment IDs created for Entra ID authentication"
+  value       = azurerm_role_assignment.this[*].id
 } 

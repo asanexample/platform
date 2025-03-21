@@ -50,4 +50,17 @@ inputs = {
     create = true
     subresource_names = ["blob"]
   }
+  
+  # Disable shared access keys in favor of Entra ID authentication
+  shared_access_key_enabled = false
+  
+  # Role assignments will need to be added in specific environment modules
+  # Example:
+  # role_assignments = [
+  #   {
+  #     principal_id         = "00000000-0000-0000-0000-000000000000" # Object ID of user, group, or service principal
+  #     role_definition_name = "Storage Blob Data Contributor"
+  #     description          = "Grant Blob Data Contributor role to DevOps team"
+  #   }
+  # ]
 } 

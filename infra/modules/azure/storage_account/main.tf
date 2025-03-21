@@ -210,4 +210,21 @@ resource "azurerm_private_endpoint" "storage" {
 
   # Apply all tags
   tags = local.tags
+}
+
+# Role assignments for Entra ID authentication
+# This creates RBAC role assignments for principals to access the storage account
+resource "azurerm_role_assignment" "this" {
+  count                = length(var.role_assignments)
+  principal_id         = var.role_assignments[count.index].principal_id
+  role_definition_name = var.role_assignments[count.index].role_definition_name
+  role_definition_id   = var.role_assignments[count.index].role_definition_id
+  scope                = var.role_assignments[count.index].scope != null ? var.role_assignments[count.index].scope : azurerm_storage_account.this.id
+  description          = var.role_assignments[count.index].description
+
+  # Skip deletion of role assignments by default when the resource is deleted
+  # This ensures that roles aren't unintentionally removed if the terraform resource is deleted
+  lifecycle {
+    prevent_destroy = true
+  }
 } 
