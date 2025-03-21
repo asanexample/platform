@@ -52,6 +52,16 @@ dependency "resource_group" {
   }
 }
 
+# Add dependency on storage account
+dependency "storage" {
+  config_path = "../storage"
+
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Storage/storageAccounts/mocksa"
+  }
+}
+
 # Terraform configuration source
 terraform {
   source = "${get_parent_terragrunt_dir()}/modules/azure/log_analytics"
@@ -92,6 +102,7 @@ inputs = {
     {
       name                       = "${dependency.naming.outputs.log_analytics_workspace}-diag"
       log_analytics_workspace_id = "self"  # Send logs to itself
+      storage_account_id         = dependency.storage.outputs.id  # Also send to storage
       
       enabled_log_categories = [
         "Audit"
@@ -104,6 +115,18 @@ inputs = {
       log_retention_days = 30
     }
   ]
+  
+  # Link storage account for long-term retention of different log types
+  linked_storage_accounts = {
+    # Logs from Azure services and custom logs
+    CustomLogs = [dependency.storage.outputs.id]
+    
+    # Alerts data
+    Alerts = [dependency.storage.outputs.id]
+    
+    # Alerts, saved searches, and workspaces
+    Query = [dependency.storage.outputs.id]
+  }
   
   # Tags
   tags = merge(local.tags, {

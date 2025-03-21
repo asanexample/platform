@@ -61,6 +61,9 @@ resource "azurerm_monitor_diagnostic_setting" "this" {
   
   # Handle the special "self" case for log_analytics_workspace_id
   log_analytics_workspace_id = each.value.log_analytics_workspace_id == "self" ? azurerm_log_analytics_workspace.this.id : each.value.log_analytics_workspace_id
+  
+  # Use storage account if provided
+  storage_account_id = each.value.storage_account_id
 
   # Configure logs - retention is handled by Log Analytics workspace settings
   dynamic "enabled_log" {

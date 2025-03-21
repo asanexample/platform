@@ -148,6 +148,7 @@ variable "diagnostic_settings" {
   type = list(object({
     name                       = string
     log_analytics_workspace_id = string
+    storage_account_id         = optional(string)
     enabled_log_categories     = list(string)
     metric_categories          = list(string)
     log_retention_days         = number
