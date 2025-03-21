@@ -121,7 +121,7 @@ variable "allow_nested_items_to_be_public" {
 }
 
 variable "shared_access_key_enabled" {
-  description = "Whether shared access key authentication is enabled"
+  description = "Whether shared access key authentication is enabled (not recommended, Entra ID authentication is preferred)"
   type        = bool
   default     = false
 }
