@@ -12,14 +12,14 @@
 | key_vault | Yes | Yes | Review tests and README |
 | kubernetes | N/A | N/A | Module appears to be empty or not implemented |
 | log_analytics | Yes | Yes | Review tests and README |
-| managed_grafana | No | No | Create tests and README |
-| monitor_workspace | No | No | Create tests and README |
+| managed_grafana | Yes | Yes | Complete ✓ |
+| monitor_workspace | Yes | Yes | Complete ✓ |
 | naming | Yes | Yes | Review tests and README |
 | networking | Yes | Yes | Review tests and README |
-| private_dns | No | No | Create tests and README |
+| private_dns | Yes | Yes | Complete ✓ |
 | resource_group | Yes | Yes | Complete ✓ |
 | storage_account | Yes | Yes | Complete ✓ |
-| storage_container | Yes | Yes | Review tests and README |
+| storage_container | Yes | Yes | Complete ✓ |
 | storage_roles | Yes | Yes | Complete ✓ |
 | terraform_state | No | Yes | Skipped per request |
 
@@ -50,13 +50,13 @@ For each module, we will:
 ## Implementation Plan
 
 ### Phase 1: High Priority Modules
-1. **AKS Modules** (aks_identity) - Core infrastructure
-2. **Kubernetes** - Containerization platform
-3. **Monitor Workspace/Managed Grafana** - Monitoring services
+1. ~~**AKS Modules** (aks_identity) - Core infrastructure~~ ✓
+2. ~~**Managed Grafana** - Monitoring service~~ ✓
+3. ~~**Monitor Workspace** - Monitoring foundation~~ ✓
 
 ### Phase 2: Medium Priority Modules
-1. **Private DNS** - Network services 
-2. **Storage Container** - Storage service components
+1. ~~**Private DNS** - Network services~~ ✓
+2. ~~**Storage Container** - Storage service components~~ ✓
 
 ## Important Notes
 
