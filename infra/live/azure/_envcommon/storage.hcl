@@ -42,6 +42,9 @@ inputs = {
     virtual_network_subnet_ids = []
   }
   
+  # Enable public network access by default
+  public_network_access_enabled = true
+  
   # Default private endpoint configuration (will be overridden in specific env)
   private_endpoint = {
     create = true

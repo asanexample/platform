@@ -101,6 +101,9 @@ inputs = {
   account_tier = "Standard"
   account_replication_type = "LRS"
   
+  # Enable public network access
+  public_network_access_enabled = true
+  
   # Network rules
   network_rules = {
     default_action = "Allow"

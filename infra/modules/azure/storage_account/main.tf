@@ -49,8 +49,8 @@ resource "azurerm_storage_account" "this" {
   allow_nested_items_to_be_public = var.allow_nested_items_to_be_public # Control public access permissions
   shared_access_key_enabled       = var.shared_access_key_enabled       # Enable/disable SAS key authentication
 
-  # Network access settings - automatically disable public access when using private endpoints
-  public_network_access_enabled = var.private_endpoint.create ? false : true
+  # Network access settings
+  public_network_access_enabled = var.public_network_access_enabled
 
   # Identity configuration for customer-managed keys
   dynamic "identity" {

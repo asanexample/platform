@@ -132,6 +132,12 @@ variable "blob_public_access_enabled" {
   default     = false
 }
 
+variable "public_network_access_enabled" {
+  description = "Whether public network access is enabled for the storage account (independent of private endpoint configuration)"
+  type        = bool
+  default     = true
+}
+
 variable "network_rules" {
   description = "Network rules for the storage account"
   type = object({
