@@ -69,7 +69,7 @@ terraform {
 # Specify inputs for this module
 inputs = {
   # Resource details
-  name                = dependency.naming.outputs.grafana != null ? dependency.naming.outputs.grafana : "${local.prefix}-${local.env}-grafana-${local.region_abbv}"
+  name                = "${local.prefix}-${local.env}-grafana-${local.region_abbv}"
   resource_group_name = dependency.resource_group.outputs.name
   location            = dependency.resource_group.outputs.location
   
