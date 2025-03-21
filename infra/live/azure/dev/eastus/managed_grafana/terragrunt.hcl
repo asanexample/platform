@@ -74,7 +74,7 @@ inputs = {
   location            = dependency.resource_group.outputs.location
   
   # Grafana configuration
-  grafana_major_version             = "11" # Latest version
+  grafana_major_version             = "10" # Supported version
   api_key_enabled                   = true
   deterministic_outbound_ip_enabled = true
   public_network_access_enabled     = true
