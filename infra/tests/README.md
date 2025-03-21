@@ -18,14 +18,20 @@ This directory contains Terraform tests for the Azure infrastructure modules. Th
 To run the tests, you need to have Terraform installed and be authenticated with Azure. You can run the tests using the Makefile:
 
 ```bash
-# Run all tests
+# Run all tests (auto-discovers all test directories)
 make test
 
 # Test a specific module
 make test-module MODULE=<module-name>
+
+# Test modules in a specific category
+make test-category CATEGORY=storage
+
+# Test modules matching a pattern
+make test-pattern PATTERN=aks
 ```
 
-These Make targets will automatically run all tests in each test directory and provide a summary of results.
+These Make targets will automatically run tests for the specified modules and provide a summary of results.
 
 ### Authentication
 

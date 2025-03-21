@@ -176,6 +176,18 @@ To run tests for a specific module:
 make test-module MODULE=networking
 ```
 
+To run tests for modules in a specific category:
+
+```bash
+make test-category CATEGORY=storage
+```
+
+To run tests for modules matching a pattern:
+
+```bash
+make test-pattern PATTERN=aks
+```
+
 ## Documentation
 
 Detailed documentation is available in the `/infra/docs` directory:
@@ -205,6 +217,12 @@ make clean               # Clean Terragrunt cache
 make init-module         # Initialize a specific module
 make plan-module         # Plan a specific module
 make apply-module        # Apply a specific module
+
+# Testing operations
+make test                # Run all tests (auto-discovers test directories)
+make test-module         # Test a specific module
+make test-category       # Test modules in a specific category
+make test-pattern        # Test modules matching a pattern
 
 # Advanced operations
 make init-upgrade        # Initialize with dependency upgrades

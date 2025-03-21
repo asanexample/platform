@@ -79,6 +79,12 @@ make test
 
 # Test a specific module
 make test-module MODULE=networking
+
+# Test modules in a specific category
+make test-category CATEGORY=storage
+
+# Test modules matching a pattern
+make test-pattern PATTERN=aks
 ```
 
 The testing targets in the Makefile run tests for all Azure modules and provide a summary of results. Tests are designed to validate module configurations without creating actual resources.

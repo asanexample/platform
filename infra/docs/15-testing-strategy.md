@@ -94,12 +94,45 @@ run "verify_resource_creation" {
 
 ## Test Automation
 
-The repository includes scripts to automate test execution:
+The repository includes Makefile targets to automate test execution:
 
-- `run_all_terraform_tests.sh`: Runs all module tests
-- `run_failing_tests.sh`: Focuses on specific test directories
+```bash
+# Run all tests (auto-discovers all test directories)
+make test
+
+# Test a specific module
+make test-module MODULE=networking
+
+# Test modules in a specific category
+make test-category CATEGORY=storage
+
+# Test modules matching a pattern
+make test-pattern PATTERN=aks
+```
 
 All tests are run from the `infra/tests/modules` directory rather than from within module directories.
+
+### Running Tests
+
+When running tests, the Makefile handles initialization, execution, and result summarization:
+
+1. For each test directory, Terraform is initialized and then tests are executed
+2. A summary of test results is displayed showing passing and failing tests
+3. The command exits with a non-zero status if any tests fail
+
+### Test Categories
+
+Tests can be organized and run by categories which helps when working on related modules:
+
+- **Storage**: Run all storage-related module tests with `make test-category CATEGORY=storage`
+- **Networking**: Run all networking-related module tests with `make test-category CATEGORY=network`
+- **Security**: Run all security-related module tests with `make test-category CATEGORY=security`
+
+### Test Patterns
+
+For more flexible filtering of tests, you can use the pattern matching approach:
+- `make test-pattern PATTERN=aks` to run all AKS-related tests
+- `make test-pattern PATTERN=container` to run all container-related tests
 
 ## Next Steps
 
