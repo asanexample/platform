@@ -110,6 +110,16 @@ variable "kubernetes_version" {
   default     = null
 }
 
+variable "automatic_channel_upgrade" {
+  description = "The upgrade channel for this Kubernetes Cluster. Possible values are patch, rapid, node-image and stable."
+  type        = string
+  default     = "stable"
+  validation {
+    condition     = var.automatic_channel_upgrade == null ? true : contains(["patch", "rapid", "node-image", "stable", "none"], var.automatic_channel_upgrade)
+    error_message = "The automatic_channel_upgrade must be one of: patch, rapid, node-image, stable, none."
+  }
+}
+
 variable "local_account_disabled" {
   description = "Whether local accounts are disabled for the AKS cluster"
   type        = bool

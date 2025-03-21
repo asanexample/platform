@@ -1,7 +1,7 @@
-# Azure Networking Module - West US (Dev)
+# Azure Networking Module - East US (Dev)
 
 ## Overview
-This module provisions Azure networking infrastructure including Virtual Networks, subnets, and network security groups for the West US region. It follows a multi-availability zone design with specifically allocated CIDR ranges.
+This module provisions Azure networking infrastructure including Virtual Networks, subnets, and network security groups for the East US region. It follows a multi-availability zone design with specifically allocated CIDR ranges.
 
 ## Configuration Details
 
@@ -17,28 +17,47 @@ Creates a complete networking foundation that:
 - **resource_group**: Deploys resources in the specified resource group
 
 ### Network Architecture
-- **VNet CIDR**: 10.101.24.0/21 (West US region allocation)
+- **VNet CIDR**: 10.0.0.0/16 (East US region allocation)
 - **Subnets**:
-  - **AZ1 Subnets**:
-    - Kubernetes: 10.101.24.0/26
-    - Services: 10.101.24.64/27
-    - Endpoints: 10.101.24.96/28
-    - Transit: 10.101.24.112/29
-  - **AZ2 Subnets**:
-    - Kubernetes: 10.101.25.0/26
-    - Services: 10.101.25.64/27
-    - Endpoints: 10.101.25.96/28
-    - Transit: 10.101.25.112/29
-  - **AZ3 Subnets**:
-    - Kubernetes: 10.101.26.0/26
-    - Services: 10.101.26.64/27
-    - Endpoints: 10.101.26.96/28
-    - Transit: 10.101.26.112/29
+  - **Node Subnets**:
+    - az1-nodes: 10.0.0.0/24
+    - az2-nodes: 10.0.10.0/24
+    - az3-nodes: 10.0.20.0/24
+  - **Shared Subnets**:
+    - endpoints: 10.0.30.0/24
+    - firewall: 10.0.31.0/26 (For Azure Firewall)
+    - bastion: 10.0.31.64/26 (For Azure Bastion)
+    - gateway: 10.0.31.128/26 (For VPN Gateway)
 
 ### Key Configuration Settings
-- AKS networking enabled for private clusters
-- Service endpoints configured for Storage, Key Vault, and other services
-- Network security groups with appropriate rules
+- **Network Security Groups**:
+  - Node subnet NSGs configured for AKS traffic
+  - Endpoint subnet NSGs allow Azure services traffic
+  - Custom security rules for specific workloads
+- **Private Endpoints**:
+  - Dedicated subnet for Azure Private Endpoints
+  - Private DNS zones for private endpoint resolution
+- **Service Endpoints**:
+  - Storage, Key Vault, Container Registry, and SQL
+  - Enhanced security through direct service connectivity
+- **Private Cluster Support**:
+  - Private DNS zone for AKS private cluster (privatelink.eastus.azmk8s.io)
+  - Private endpoint network policies
+
+## Network Security Approach
+- **Micro-segmentation**: Each node pool in a dedicated subnet
+- **Zero Trust**: Default deny with explicit allow rules
+- **Defense in Depth**: Multiple security layers (NSGs, private endpoints, service endpoints)
+- **East-West Traffic**: Allowed between node subnets for cluster communication
+- **North-South Traffic**: Controlled through load balancers and/or firewall rules
+
+## Implementation Details
+The networking module uses the [Azure Networking Module](/infra/modules/azure/networking) to create a comprehensive network foundation with zone-specific subnets. This design:
+
+- Improves fault isolation by aligning subnets with availability zones
+- Enables granular network security controls per subnet
+- Allows for future expansion with predictable CIDR allocations
+- Supports integration with hub-spoke topologies
 
 ## Usage Example
 
@@ -48,9 +67,16 @@ cd networking
 terragrunt apply
 ```
 
+To view the network structure after deployment:
+```bash
+cd networking
+terragrunt output subnet_ids
+```
+
 ## Dependencies on this Module
 The following modules depend on outputs from this module:
 - key_vault
 - storage
 - aks_core
-- aks_node_pools 
+- aks_node_pools
+- container_registry 

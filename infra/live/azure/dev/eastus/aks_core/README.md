@@ -1,7 +1,7 @@
-# Azure AKS Core Module - West US (Dev)
+# Azure AKS Core Module - East US (Dev)
 
 ## Overview
-This module provisions and configures the core Azure Kubernetes Service (AKS) cluster in the West US region for the development environment. It sets up a production-ready Kubernetes platform with appropriate security and networking configurations.
+This module provisions and configures the core Azure Kubernetes Service (AKS) cluster in the East US region for the development environment. It sets up a production-ready Kubernetes platform with appropriate security and networking configurations.
 
 ## Configuration Details
 
@@ -20,26 +20,49 @@ Creates a production-ready AKS cluster that:
 
 ### Key Configuration Settings
 - **Cluster Configuration**:
-  - Kubernetes Version: Latest stable version
+  - Kubernetes Version: 1.27.7 (Stable channel)
   - Private Cluster: Enabled
   - Network Plugin: Azure CNI
-  - Network Policy: Azure
+  - Network Policy: Azure (configured for eventual Cilium deployment)
   - Outbound Type: User-defined routing
 - **System Node Pool**:
-  - VM Size: Standard_D2s_v3
-  - Node Count: 1-3 (Auto-scaling enabled)
+  - VM Size: Standard_D4s_v3
+  - Node Count: 3-5 (Auto-scaling enabled)
   - Zone Redundancy: Enabled across 3 availability zones
+  - OS Disk Type: Ephemeral
   - OS Disk Size: 128 GB
   - Max Pods per Node: 30
 - **Security Features**:
-  - Microsoft Defender: Enabled
-  - Azure Policy: Enabled
-  - RBAC: Enabled
+  - Workload Identity: Enabled
+  - OIDC Issuer: Enabled
+  - RBAC: Enabled with Azure AD integration
   - Local accounts: Disabled
-  - Azure AD integration: Enabled
+  - Microsoft Defender for Containers: Enabled
 - **Monitoring**:
   - Azure Monitor: Enabled
-  - Log Analytics Integration: Enabled
+  - Log Analytics Integration: Enabled with dedicated workspace
+
+## Implementation Details
+The AKS Core module uses the [Azure AKS Module](/infra/modules/azure/aks) to create a standardized Kubernetes environment with:
+
+- System node pool configurations optimized for Kubernetes system components
+- Identity configuration using managed identities for enhanced security
+- Network integration with the VNet created by the networking module
+- Support for workload identity for pod-based authentication
+- Maintenance window configured for off-peak hours
+
+## Multi-AZ Design
+The cluster is designed with a multi-availability zone architecture:
+- System nodes distributed across 3 availability zones
+- Dedicated subnet for each availability zone to increase fault tolerance
+- Load balancer configured for zone-redundant operation
+
+## Post-Deployment Configuration
+After deployment, additional components are installed through Kubernetes manifests and Helm charts:
+- Cilium CNI (replaces Azure CNI for networking)
+- Cert-Manager for certificate management
+- External-DNS for DNS automation
+- Ingress controllers for traffic management
 
 ## Usage Example
 
@@ -49,6 +72,17 @@ cd aks_core
 terragrunt apply
 ```
 
+To view cluster credentials after deployment:
+```bash
+cd aks_core
+terragrunt output kube_config_raw > ~/.kube/config
+```
+
 ## Dependencies on this Module
 The following modules depend on outputs from this module:
 - aks_node_pools 
+
+## Maintenance and Updates
+The AKS cluster is configured with automatic upgrades through the "stable" channel. This ensures the cluster receives security patches and minor version updates automatically, while major version upgrades are handled manually.
+
+Maintenance windows are configured for Sundays between 00:00-03:00 UTC to minimize disruption to workloads. 

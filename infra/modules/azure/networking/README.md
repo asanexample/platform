@@ -9,6 +9,7 @@ This module creates the core Azure networking components including virtual netwo
 - Configurable subnet delegations and service endpoints
 - Support for private endpoints and DNS zones
 - Compatible with Cilium CNI deployment on AKS
+- Availability zone-aware subnet design
 
 ## Usage
 
@@ -121,7 +122,7 @@ locals {
 | location | The Azure region where resources will be created | `string` | n/a | yes |
 | name | The name of the virtual network | `string` | n/a | yes |
 | address_space | The address space for the virtual network | `list(string)` | n/a | yes |
-| subnets | Map of subnet configurations | `map(object)` | `{}` | no |
+| subnets | Map of subnet configurations | `map(object({address_prefix=string, security_rules=optional(list(object))}))` | `{}` | no |
 | dns_servers | List of DNS servers to use for the virtual network | `list(string)` | `null` | no |
 | create_private_dns_zone | Whether to create a private DNS zone for AKS | `bool` | `false` | no |
 | private_dns_zone_name | The name of the private DNS zone for AKS | `string` | `null` | no |
@@ -145,6 +146,13 @@ locals {
 - The module supports creation of an AKS private DNS zone for private clusters
 - Subnet NSG rules can be customized for different workloads
 - Compatible with the Azure CNI networking plugin for AKS, and optimized for subsequent Cilium CNI installation
+
+## Requirements
+
+| Name | Version |
+|------|---------|
+| terraform | >= 1.6.0 |
+| azurerm | 4.23.0 |
 
 ## Testing
 

@@ -12,9 +12,9 @@ terraform {
   source = "${find_in_parent_folders("infra")}/modules/azure//identities"
   
   # Remove absolute paths, they're not portable
-  extra_arguments "common_vars" {
-    commands = ["init", "plan", "apply", "destroy"]
-  }
+  # extra_arguments "common_vars" {
+  #   commands = ["init", "plan", "apply", "destroy"]
+  # }
 }
 
 # ---------------------------------------------------------------------------------------------------------------------

@@ -2,6 +2,18 @@
 
 This repository contains infrastructure-as-code for a multi-cloud platform using Terraform and Terragrunt, with a focus on security, reusability, and consistent implementation patterns.
 
+## Current Implementation Status
+
+The project is currently in active development with the following status:
+
+- **Azure Implementation**: Core modules implemented (networking, storage, AKS, Key Vault, identity)
+- **AWS Implementation**: Planned for future phases
+- **GCP Implementation**: Planned for future phases
+- **Development Environment**: Implemented for Azure
+- **Production Environment**: Planned for future phases
+
+The implementation is following the phased approach defined in [IMPLEMENTATION.md](IMPLEMENTATION.md).
+
 ## Project Structure
 
 ```
@@ -16,7 +28,7 @@ platform/
 │   ├── live/                # Live infrastructure code (Terragrunt)
 │   │   └── azure/           # Azure-specific configurations
 │   │       └── dev/         # Development environment
-│   │           └── westus/  # West US region
+│   │           └── eastus/  # East US region
 │   │               ├── aks_core/      # AKS cluster core
 │   │               ├── aks_identity/  # AKS managed identities
 │   │               ├── aks_node_pools/ # AKS node pools
@@ -26,7 +38,7 @@ platform/
 │   │               ├── resource_group/ # Resource groups
 │   │               └── storage/       # Storage accounts and containers
 │   ├── modules/             # Reusable Terraform modules
-│   │   └── azure/           # Azure-specific modules
+│   │   └── azure/           # Azure-specific modules (currently implemented)
 │   │       ├── aks_core/            # Azure AKS core cluster module
 │   │       ├── aks_identity/        # Azure AKS identity module
 │   │       ├── aks_node_pools/      # Azure AKS node pools module
@@ -42,7 +54,7 @@ platform/
 │   ├── terragrunt.hcl       # Root Terragrunt configuration
 │   └── tests/               # Test configurations
 │       └── modules/         # Module tests
-│           └── azure/       # Azure module tests
+│           └── azure/       # Azure module tests (currently implemented)
 │               ├── aks_core/         # AKS core module tests
 │               ├── aks_node_pools/   # AKS node pools module tests
 │               ├── hosting/          # Hosting module tests
@@ -71,27 +83,27 @@ platform/
 
 The platform includes the following core modules:
 
-1. **Azure Networking Module**
+1. **Azure Networking Module** (Implemented)
    - Creates virtual network with subnets optimized for Kubernetes workloads
    - Supports availability zone-aware subnet configuration
    - Configures network security groups with appropriate rules
 
-2. **Azure Storage Account Module**
+2. **Azure Storage Account Module** (Implemented)
    - Provides flexible storage account creation with network rules
    - Supports different replication types based on environment needs
    - Configures access controls and container management
 
-3. **Azure Key Vault Module**
+3. **Azure Key Vault Module** (Implemented)
    - Creates and configures Azure Key Vault with flexible options
    - Supports RBAC authorization model
    - Configurable network rules and security settings
 
-4. **Azure AKS Modules**
+4. **Azure AKS Modules** (Implemented)
    - **AKS Core**: Creates and configures the core Kubernetes cluster
    - **AKS Identity**: Manages service identities for Kubernetes
    - **AKS Node Pools**: Creates and configures node pools for workloads
 
-5. **Azure Naming Module**
+5. **Azure Naming Module** (Implemented)
    - Generates standardized resource names following organizational patterns
    - Ensures compliance with Azure naming restrictions
    - Provides consistent outputs for all resource types

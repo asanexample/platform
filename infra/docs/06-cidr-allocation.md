@@ -47,68 +47,68 @@ This hierarchy provides clear organizational boundaries and simplifies network p
 
 The top-level address allocations for cloud providers are:
 
-| Cloud Provider | CIDR Range | Description |
-|----------------|------------|-------------|
-| AWS | 10.100.0.0/16 | AWS infrastructure |
-| Azure | 10.200.0.0/16 | Azure infrastructure |
-| GCP | 10.300.0.0/16 | GCP infrastructure |
+| Cloud Provider | CIDR Range | Implementation Status |
+|----------------|------------|----------------------|
+| AWS | 10.100.0.0/16 | Planned |
+| Azure | 10.200.0.0/16 | Implemented |
+| GCP | 10.300.0.0/16 | Planned |
 
 ### Environment Allocation
 
 Within each cloud provider, environments are allocated specific ranges:
 
-| Cloud Provider | Environment | CIDR Range |
-|----------------|-------------|------------|
-| AWS | Development | 10.100.0.0/18 |
-| AWS | Testing | 10.100.64.0/18 |
-| AWS | Production | 10.100.128.0/18 |
-| Azure | Development | 10.200.0.0/18 |
-| Azure | Testing | 10.200.64.0/18 |
-| Azure | Production | 10.200.128.0/18 |
-| GCP | Development | 10.300.0.0/18 |
-| GCP | Testing | 10.300.64.0/18 |
-| GCP | Production | 10.300.128.0/18 |
+| Cloud Provider | Environment | CIDR Range | Implementation Status |
+|----------------|-------------|------------|----------------------|
+| Azure | Development | 10.200.0.0/18 | Implemented |
+| Azure | Testing | 10.200.64.0/18 | Planned |
+| Azure | Production | 10.200.128.0/18 | Planned |
+| AWS | Development | 10.100.0.0/18 | Planned |
+| AWS | Testing | 10.100.64.0/18 | Planned |
+| AWS | Production | 10.100.128.0/18 | Planned |
+| GCP | Development | 10.300.0.0/18 | Planned |
+| GCP | Testing | 10.300.64.0/18 | Planned |
+| GCP | Production | 10.300.128.0/18 | Planned |
 
 ### Region Allocation
 
 Each region within an environment receives a specific CIDR block:
 
-| Environment | Region | CIDR Range |
-|-------------|--------|------------|
-| Azure Dev | East US | 10.200.0.0/21 |
-| Azure Dev | West US | 10.200.8.0/21 |
-| Azure Dev | North Europe | 10.200.16.0/21 |
-| AWS Dev | us-east-1 | 10.100.0.0/21 |
-| AWS Dev | us-west-2 | 10.100.8.0/21 |
-| AWS Dev | eu-west-1 | 10.100.16.0/21 |
+| Environment | Region | CIDR Range | Implementation Status |
+|-------------|--------|------------|----------------------|
+| Azure Dev | East US | 10.200.0.0/21 | Implemented |
+| Azure Dev | West US | 10.200.8.0/21 | Planned |
+| Azure Dev | North Europe | 10.200.16.0/21 | Planned |
+| AWS Dev | us-east-1 | 10.100.0.0/21 | Planned |
+| AWS Dev | us-west-2 | 10.100.8.0/21 | Planned |
+| AWS Dev | eu-west-1 | 10.100.16.0/21 | Planned |
 
 ### Availability Zone Allocation
 
 Within each region, each availability zone gets a dedicated address space:
 
-| Region | Availability Zone | CIDR Range |
-|--------|-------------------|------------|
-| East US | Zone 1 | 10.200.0.0/24 |
-| East US | Zone 2 | 10.200.1.0/24 |
-| East US | Zone 3 | 10.200.2.0/24 |
-| West US | Zone 1 | 10.200.8.0/24 |
-| West US | Zone 2 | 10.200.9.0/24 |
-| West US | Zone 3 | 10.200.10.0/24 |
+| Region | Availability Zone | CIDR Range | Implementation Status |
+|--------|-------------------|------------|----------------------|
+| East US | Zone 1 | 10.200.0.0/24 | Implemented |
+| East US | Zone 2 | 10.200.1.0/24 | Implemented |
+| East US | Zone 3 | 10.200.2.0/24 | Implemented |
+| West US | Zone 1 | 10.200.8.0/24 | Planned |
+| West US | Zone 2 | 10.200.9.0/24 | Planned |
+| West US | Zone 3 | 10.200.10.0/24 | Planned |
 
 ### Subnet Allocation
 
 Each availability zone contains specialized subnets for different purposes:
 
-| AZ | Subnet Type | CIDR Range | Size | Purpose |
-|----|-------------|------------|------|---------|
-| Zone 1 | Node | 10.200.0.0/26 | /26 (62 IPs) | Kubernetes worker nodes |
-| Zone 1 | Services | 10.200.0.64/27 | /27 (30 IPs) | Load balancers and service endpoints |
-| Zone 1 | Endpoints | 10.200.0.96/28 | /28 (14 IPs) | Private service endpoints |
-| Zone 1 | Transit | 10.200.0.112/29 | /29 (6 IPs) | Transit connectivity |
-| Zone 2 | Node | 10.200.1.0/26 | /26 (62 IPs) | Kubernetes worker nodes |
-| Zone 2 | Services | 10.200.1.64/27 | /27 (30 IPs) | Load balancers and service endpoints |
-| Zone 2 | Endpoints | 10.200.1.96/28 | /28 (14 IPs) | Private service endpoints |
-| Zone 2 | Transit | 10.200.1.112/29 | /29 (6 IPs) | Transit connectivity |
+| AZ | Subnet Type | CIDR Range | Size | Purpose | Implementation Status |
+|----|-------------|------------|------|---------|----------------------|
+| Zone 1 | Node | 10.200.0.0/26 | /26 (62 IPs) | Kubernetes worker nodes | Implemented |
+| Zone 1 | Services | 10.200.0.64/27 | /27 (30 IPs) | Load balancers and service endpoints | Implemented |
+| Zone 1 | Endpoints | 10.200.0.96/28 | /28 (14 IPs) | Private service endpoints | Implemented |
+| Zone 1 | Transit | 10.200.0.112/29 | /29 (6 IPs) | Transit connectivity | Implemented |
+| Zone 2 | Node | 10.200.1.0/26 | /26 (62 IPs) | Kubernetes worker nodes | Implemented |
+| Zone 2 | Services | 10.200.1.64/27 | /27 (30 IPs) | Load balancers and service endpoints | Implemented |
+| Zone 2 | Endpoints | 10.200.1.96/28 | /28 (14 IPs) | Private service endpoints | Implemented |
+| Zone 2 | Transit | 10.200.1.112/29 | /29 (6 IPs) | Transit connectivity | Implemented |
 
 ## Subnet Types and Purposes
 
@@ -179,6 +179,8 @@ locals {
 }
 ```
 
+In the current implementation, these CIDR configurations are specified in the `network.hcl` file in the region directory (e.g., `infra/live/azure/dev/eastus/network.hcl`).
+
 ## Allocation File
 
 The platform maintains a comprehensive CSV file (`allocations.csv`) that documents all CIDR allocations across all cloud providers, environments, regions, and availability zones. This file serves as the source of truth for network planning and is used to:
@@ -220,6 +222,17 @@ The CIDR allocation strategy is specifically optimized for Kubernetes deployment
 4. **Multi-AZ Design**: Pods distributed across multiple availability zones
 
 See [Kubernetes Network Design](08-kubernetes-network-design.md) for more details on the Kubernetes-specific network configurations.
+
+## Current Implementation Status
+
+The CIDR allocation strategy is currently implemented for:
+- Azure Development environment in East US region
+- AKS clusters with node pools in multiple availability zones
+
+Future phases will extend the implementation to:
+- Additional Azure regions
+- Production and testing environments
+- AWS and GCP cloud providers
 
 ## Next Steps
 

@@ -37,6 +37,7 @@ Welcome to the VIP Platform documentation. This comprehensive documentation cove
 18. [Available Modules](17-available-modules.md)
 19. [Troubleshooting Guide](18-troubleshooting.md)
 20. [Cost Management Strategy](19-cost-management.md)
+21. [Region Scaffolding](20-region-scaffolding.md)
 
 ## Getting Started
 
