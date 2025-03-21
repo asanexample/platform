@@ -20,12 +20,6 @@ resource "azurerm_monitor_data_collection_endpoint" "prometheus" {
   kind                = "Linux"
   description         = "Data Collection Endpoint for Prometheus metrics"
   tags                = var.tags
-  
-  lifecycle {
-    ignore_changes = [
-      public_network_access
-    ]
-  }
 }
 
 # Data Collection Rule for AKS Prometheus metrics
