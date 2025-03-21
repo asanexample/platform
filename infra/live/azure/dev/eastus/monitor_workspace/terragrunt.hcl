@@ -54,7 +54,7 @@ dependency "resource_group" {
 
 # Terraform configuration for this module
 terraform {
-  source = "${get_parent_terragrunt_dir()}/infra/modules/azure/monitor_workspace"
+  source = "${get_repo_root()}/infra/modules/azure/monitor_workspace"
 }
 
 # Specify inputs for this module

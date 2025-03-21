@@ -38,4 +38,10 @@ variable "custom_name" {
   description = "Optional custom name to override the generated name."
   type        = string
   default     = null
+}
+
+variable "unique_seed" {
+  description = "Seed for unique naming generation"
+  type        = string
+  default     = ""
 } 

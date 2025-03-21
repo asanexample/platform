@@ -63,7 +63,7 @@ dependency "monitor_workspace" {
 
 # Terraform configuration for this module
 terraform {
-  source = "${get_parent_terragrunt_dir()}/infra/modules/azure/managed_grafana"
+  source = "${get_repo_root()}/infra/modules/azure/managed_grafana"
 }
 
 # Specify inputs for this module
