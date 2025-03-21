@@ -5,12 +5,12 @@
 | Module | Tests Present | README Present | Action Required |
 |--------|--------------|----------------|----------------|
 | aks_core | Yes | Yes | Review tests and README |
-| aks_identity | No | Yes | Create tests, review README |
+| aks_identity | Yes | Yes | Complete ✓ |
 | aks_node_pools | Yes | Yes | Review tests and README |
 | client_config | Yes | Yes | Complete ✓ |
 | identities | Yes | Yes | Review tests and README |
 | key_vault | Yes | Yes | Review tests and README |
-| kubernetes | No | No | Create tests and README |
+| kubernetes | N/A | N/A | Module appears to be empty or not implemented |
 | log_analytics | Yes | Yes | Review tests and README |
 | managed_grafana | No | No | Create tests and README |
 | monitor_workspace | No | No | Create tests and README |
