@@ -214,5 +214,6 @@ inputs = {
     "network-cilium-managed-by" = "cilium"
     "cilium-version"            = "1.17.2"
     "monitoring-level"          = "comprehensive"
+    "prometheus-enabled"        = "true"
   })
 } 
