@@ -17,6 +17,7 @@ Creates a production-ready AKS cluster that:
 - **resource_group**: Deploys resources in the specified resource group
 - **networking**: Uses network configuration for cluster networking
 - **aks_identity**: Uses managed identity for the AKS cluster
+- **log_analytics**: Uses Log Analytics workspace for diagnostics and monitoring
 
 ### Key Configuration Settings
 - **Cluster Configuration**:
@@ -38,9 +39,12 @@ Creates a production-ready AKS cluster that:
   - RBAC: Enabled with Azure AD integration
   - Local accounts: Disabled
   - Microsoft Defender for Containers: Enabled
-- **Monitoring**:
+- **Monitoring and Diagnostics**:
   - Azure Monitor: Enabled
   - Log Analytics Integration: Enabled with dedicated workspace
+  - Comprehensive Diagnostic Settings: Enabled for all log categories
+  - Kubernetes Control Plane Logs: Collected and analyzed
+  - Metrics Collection: All metrics captured for performance analysis
 
 ## Implementation Details
 The AKS Core module uses the [Azure AKS Module](/infra/modules/azure/aks) to create a standardized Kubernetes environment with:
@@ -50,12 +54,73 @@ The AKS Core module uses the [Azure AKS Module](/infra/modules/azure/aks) to cre
 - Network integration with the VNet created by the networking module
 - Support for workload identity for pod-based authentication
 - Maintenance window configured for off-peak hours
+- Comprehensive diagnostics for monitoring cluster health and performance
 
 ## Multi-AZ Design
 The cluster is designed with a multi-availability zone architecture:
 - System nodes distributed across 3 availability zones
 - Dedicated subnet for each availability zone to increase fault tolerance
 - Load balancer configured for zone-redundant operation
+
+## Monitoring and Diagnostics
+The cluster is configured with comprehensive monitoring and diagnostics:
+
+### Diagnostic Settings Configuration
+Monitoring and diagnostics are configured through the `terragrunt.hcl` file using the Log Analytics workspace from the log_analytics module dependency. This approach enables:
+
+- Centralized diagnostics configuration through Terragrunt
+- Integration with the Log Analytics workspace 
+- Consolidated monitoring of AKS and other Azure resources
+
+The diagnostic settings are applied directly in the `terragrunt.hcl` with this configuration:
+
+```hcl
+# AKS Diagnostic Settings
+diagnostic_settings = [
+  {
+    name                       = "${dependency.naming.outputs.aks_cluster}-diag"
+    log_analytics_workspace_id = dependency.log_analytics.outputs.id
+    
+    # Enable all log categories for comprehensive monitoring
+    enabled_log_categories = [
+      "kube-apiserver",
+      "kube-audit",
+      "kube-audit-admin",
+      "kube-controller-manager",
+      "kube-scheduler",
+      "cluster-autoscaler",
+      "cloud-controller-manager",
+      "guard",
+      "csi-azuredisk-controller",
+      "csi-azurefile-controller",
+      "csi-snapshot-controller"
+    ]
+    
+    # Enable all metrics
+    metric_categories = [
+      "AllMetrics"
+    ]
+    
+    # Log retention days
+    log_retention_days = 30
+  }
+]
+```
+
+This configuration ensures that all critical Kubernetes control plane logs are captured and stored in the Log Analytics workspace for analysis.
+
+### Diagnostic Categories
+- **Kubernetes API Server Logs**: Track all API requests and responses
+- **Kubernetes Audit Logs**: Capture all changes to cluster resources
+- **Control Plane Component Logs**: Monitor scheduler, controller manager, etc.
+- **Cluster Autoscaler Logs**: Track scaling decisions and events
+- **CSI Controller Logs**: Monitor storage operations and issues
+
+### Monitoring Capabilities
+- **Real-time Metrics**: CPU, memory, network, and disk usage
+- **Alert Configuration**: Automatic alerts for critical issues
+- **Dashboard Integration**: Pre-configured visualization in Azure Portal
+- **Log Queries**: Ability to run custom queries against collected logs
 
 ## Post-Deployment Configuration
 After deployment, additional components are installed through Kubernetes manifests and Helm charts:
@@ -76,6 +141,15 @@ To view cluster credentials after deployment:
 ```bash
 cd aks_core
 terragrunt output kube_config_raw > ~/.kube/config
+```
+
+To query diagnostic logs after deployment:
+```bash
+# View API server errors in the last hour
+az monitor log-analytics query \
+  --workspace $(terragrunt output log_analytics_workspace_id) \
+  --query "AzureDiagnostics | where Category == 'kube-apiserver' and TimeGenerated > ago(1h) and Level == 'Error' | project TimeGenerated, Log" \
+  --analytics-query
 ```
 
 ## Dependencies on this Module

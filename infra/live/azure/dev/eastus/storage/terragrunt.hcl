@@ -39,7 +39,7 @@ include "storage_common" {
   path = find_in_parent_folders("azure/_envcommon/storage.hcl")
 }
 
-# Set dependencies for this module
+# Set dependencies for this module (these will merge with the common inputs)
 dependency "naming" {
   config_path = "../naming"
   
@@ -77,7 +77,7 @@ dependency "dns" {
   # Mock outputs for plan and validation
   mock_outputs = {
     private_dns_zone_ids = {
-      "blob" = "mock-private-dns-zone-id"
+      "blob" = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/privateDnsZones/privatelink.blob.core.windows.net"
     }
   }
 }

@@ -15,7 +15,7 @@ variables {
   default_nodepool_name  = "system"
   default_nodepool_count = 1
   region_abbv            = "eus" 
-  stage                  = "dev"
+  environment            = "dev"
   prefix                 = "vip"
   customer               = "test"
   default_nodepool_vm_size = "Standard_D2s_v3"

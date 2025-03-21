@@ -22,6 +22,7 @@ modules/
 | [networking](azure/networking) | Provisions Azure networking components including VNets, subnets, and NSGs |
 | [container_registry](azure/container_registry) | Deploys Azure Container Registry with network and security controls |
 | [key_vault](azure/key_vault) | Provisions Key Vault with proper security and network isolation |
+| [log_analytics](azure/log_analytics) | Creates Log Analytics workspace for centralized monitoring and diagnostics |
 | [storage](azure/storage) | Creates Azure Storage accounts and containers with proper security controls |
 | [monitoring](azure/monitoring) | Sets up Azure Monitor and Log Analytics for infrastructure monitoring |
 | [resource_group](azure/resource_group) | Creates resource groups with standardized tagging |

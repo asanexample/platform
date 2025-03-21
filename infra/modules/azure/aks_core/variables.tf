@@ -351,6 +351,24 @@ variable "log_analytics_workspace_id" {
   default     = null
 }
 
+variable "diagnostic_settings" {
+  description = "A list of diagnostic settings to create for the AKS cluster"
+  type = list(object({
+    name                       = string
+    log_analytics_workspace_id = string
+    enabled_log_categories     = list(string)
+    metric_categories          = list(string)
+    log_retention_days         = number
+  }))
+  default = []
+}
+
+variable "create_kubeconfig" {
+  description = "Whether to create a local kubeconfig file"
+  type        = bool
+  default     = false
+}
+
 variable "enable_azure_policy" {
   description = "Whether Azure Policy is enabled for the AKS cluster"
   type        = bool

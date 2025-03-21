@@ -82,6 +82,17 @@ dependency "aks_identity" {
   }
 }
 
+# Add dependency on Log Analytics workspace for diagnostics
+dependency "log_analytics" {
+  config_path = "../log_analytics"
+
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.OperationalInsights/workspaces/mock-log-analytics"
+    name = "mock-log-analytics"
+  }
+}
+
 # Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
   # Environment variables
@@ -146,9 +157,48 @@ inputs = {
     ultra_ssd_enabled = false
   }
 
+  # Monitoring and diagnostics configuration
+  enable_log_analytics_workspace = true
+  log_analytics_workspace_id = dependency.log_analytics.outputs.id
+  
+  # Enable Microsoft Defender for Containers
+  microsoft_defender_enabled = true
+  
+  # AKS Diagnostic Settings
+  diagnostic_settings = [
+    {
+      name                       = "${dependency.naming.outputs.aks_cluster}-diag"
+      log_analytics_workspace_id = dependency.log_analytics.outputs.id
+      
+      # Enable all log categories for comprehensive monitoring
+      enabled_log_categories = [
+        "kube-apiserver",
+        "kube-audit",
+        "kube-audit-admin",
+        "kube-controller-manager",
+        "kube-scheduler",
+        "cluster-autoscaler",
+        "cloud-controller-manager",
+        "guard",
+        "csi-azuredisk-controller",
+        "csi-azurefile-controller",
+        "csi-snapshot-controller"
+      ]
+      
+      # Enable all metrics
+      metric_categories = [
+        "AllMetrics"
+      ]
+      
+      # Log retention days (if not using Log Analytics)
+      log_retention_days = 30
+    }
+  ]
+
   # Tags
   tags = merge(local.tags, {
     "network-cilium-managed-by" = "cilium"
     "cilium-version"            = "1.17.2"
+    "monitoring-level"          = "comprehensive"
   })
 } 

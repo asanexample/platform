@@ -14,7 +14,7 @@ run "basic_aks_identity" {
   variables {
     prefix      = "test"
     customer    = "example"
-    stage       = "dev"
+    environment = "dev"
     region_abbv = "eus"
     
     resource_group_name = "test-identities-rg"
@@ -40,8 +40,8 @@ run "basic_aks_identity" {
 
   # Verify AKS identity name
   assert {
-    condition     = azurerm_user_assigned_identity.aks_identity[0].name == "test-aks-cluster-identity"
-    error_message = "AKS identity name should be derived from cluster name when aks_identity_name is not provided"
+    condition     = azurerm_user_assigned_identity.aks_identity[0].name == "test-dev-aksid-eus"
+    error_message = "AKS identity name should follow the naming pattern from the naming module"
   }
 
   # Verify role assignments
@@ -62,7 +62,7 @@ run "workload_identities" {
   variables {
     prefix      = "test"
     customer    = "example"
-    stage       = "dev"
+    environment = "dev"
     region_abbv = "eus"
     
     resource_group_name = "test-identities-rg"
@@ -149,7 +149,7 @@ run "custom_identity_name" {
   variables {
     prefix      = "test"
     customer    = "example"
-    stage       = "dev"
+    environment = "dev"
     region_abbv = "eus"
     
     resource_group_name = "test-identities-rg"

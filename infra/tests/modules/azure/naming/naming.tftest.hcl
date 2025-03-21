@@ -13,7 +13,7 @@ run "basic_naming_with_customer" {
 
   variables {
     customer    = "contoso"
-    stage       = "dev"
+    environment = "dev"
     region_abbv = "eus"
   }
 
@@ -61,7 +61,7 @@ run "shared_resource_naming" {
 
   variables {
     # No customer provided
-    stage       = "prod"
+    environment = "prod"
     region_abbv = "wus"
   }
 
@@ -108,7 +108,7 @@ run "complex_naming_tests" {
 
   variables {
     customer    = "Contoso Corp."  # Contains spaces and punctuation
-    stage       = "dev"
+    environment = "dev"
     region_abbv = "eus2"
   }
 
@@ -152,7 +152,7 @@ run "custom_prefix_tests" {
   variables {
     prefix      = "ctr"
     customer    = "fabrikam"
-    stage       = "test"
+    environment = "test"
     region_abbv = "neu"
   }
 

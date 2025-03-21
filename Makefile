@@ -155,6 +155,18 @@ clean-all: ## Clean all Terragrunt cache
 	@echo "Cleaning all Terragrunt cache..."
 	@find $(LIVE_DIR) -type d -name ".terragrunt-cache" -prune -exec rm -rf {} \; 2>/dev/null || true
 
+.PHONY: delete-tfstate
+delete-tfstate: ## Delete all tfstate files recursively in all directories
+	@echo "WARNING: You are about to delete ALL Terraform state files recursively. This is IRREVERSIBLE."
+	@echo "This will remove all state tracking for all environments, clouds, and regions."
+	@if [ "$(NO_CONFIRM)" != "true" ]; then \
+		echo "Are you ABSOLUTELY sure? Type 'yes' to confirm: " && read ans && [ $$ans = "yes" ]; \
+	fi
+	@echo "Deleting all Terraform state files..."
+	@find $(INFRA_DIR) -name "*.tfstate" -o -name "*.tfstate.backup" -o -name "*.tfstate.d" -type f -delete
+	@find $(INFRA_DIR) -name "terraform.tfstate.lock.info" -type f -delete
+	@echo "All Terraform state files have been deleted."
+
 .PHONY: clear-state
 clear-state: ## Clear all Terraform state files and locks to start fresh
 	@echo "WARNING: You are about to delete all Terraform state and lock files. This is irreversible."

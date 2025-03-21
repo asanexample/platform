@@ -100,12 +100,46 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
 
 # Automatically update local kubeconfig with cluster credentials
 resource "null_resource" "update_kubeconfig" {
-  depends_on = [azurerm_kubernetes_cluster.aks_cluster]
+  count = var.create_kubeconfig ? 1 : 0
 
+  triggers = {
+    cluster_id = azurerm_kubernetes_cluster.aks_cluster.id
+  }
+
+  # Run the az aks get-credentials command to update the kubeconfig
   provisioner "local-exec" {
-    command = <<-EOT
-      az aks get-credentials --resource-group ${var.resource_group_name} --name ${azurerm_kubernetes_cluster.aks_cluster.name} --overwrite-existing
-      kubelogin convert-kubeconfig -l azurecli
-    EOT
+    command = "az aks get-credentials --name ${azurerm_kubernetes_cluster.aks_cluster.name} --resource-group ${var.resource_group_name} --overwrite-existing"
+  }
+}
+
+# Create Diagnostic Settings for the AKS Cluster
+resource "azurerm_monitor_diagnostic_setting" "this" {
+  count = length(var.diagnostic_settings) > 0 ? 1 : 0
+  
+  name               = var.diagnostic_settings[0].name
+  target_resource_id = azurerm_kubernetes_cluster.aks_cluster.id
+  log_analytics_workspace_id = var.diagnostic_settings[0].log_analytics_workspace_id
+
+  # Configure logs for each category
+  dynamic "enabled_log" {
+    for_each = toset(var.diagnostic_settings[0].enabled_log_categories)
+    
+    content {
+      category = enabled_log.value
+      # Retention is now handled separately via azurerm_storage_management_policy
+      # or by the Log Analytics workspace's retention_in_days setting
+    }
+  }
+
+  # Configure metrics for each category
+  dynamic "metric" {
+    for_each = toset(var.diagnostic_settings[0].metric_categories)
+    
+    content {
+      category = metric.value
+      enabled  = true
+      # Retention is now handled separately via azurerm_storage_management_policy
+      # or by the Log Analytics workspace's retention_in_days setting
+    }
   }
 } 

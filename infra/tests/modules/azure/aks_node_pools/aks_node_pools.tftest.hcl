@@ -10,7 +10,7 @@ variables {
   resource_group_name = "test-rg"
   location            = "eastus"
   aks_cluster_id      = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-aks"
-  stage               = "dev"
+  environment         = "dev"
   region_abbv         = "eus"
   app_node_pool_enabled = true
   app_node_pool_vm_size = "Standard_D2s_v3"
