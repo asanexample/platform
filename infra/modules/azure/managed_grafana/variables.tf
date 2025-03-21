@@ -16,7 +16,7 @@ variable "location" {
 variable "grafana_major_version" {
   description = "The major version of Grafana to deploy"
   type        = string
-  default     = "11" # Latest major version as of now
+  default     = "10" # Latest major version as of now
 }
 
 variable "api_key_enabled" {
