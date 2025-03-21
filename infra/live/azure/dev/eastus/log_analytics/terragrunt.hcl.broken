@@ -1,0 +1,120 @@
+# Terragrunt configuration for Azure Log Analytics in eastus region
+
+# Local variables for this configuration
+locals {
+  # Load hierarchical variables
+  env_vars     = read_terragrunt_config(find_in_parent_folders("env.hcl"))
+  region_vars  = read_terragrunt_config(find_in_parent_folders("region.hcl"))
+  common_vars  = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  
+  # Merge all variables for convenience
+  all_vars = merge(
+    local.env_vars.locals,
+    local.region_vars.locals,
+    local.common_vars.locals
+  )
+  
+  # Extract commonly used variables
+  env         = local.env_vars.locals.environment
+  prefix      = local.common_vars.locals.prefix
+  customer    = local.common_vars.locals.customer
+  region      = local.region_vars.locals.region
+  region_abbv = local.region_vars.locals.region_abbv
+  tags        = merge(
+    local.common_vars.locals.tags, 
+    local.env_vars.locals.env_tags,
+    local.region_vars.locals.region_tags
+  )
+    log_retention_days = 30
+      }
+
+# Include the root terragrunt.hcl configuration
+include "root" {
+  path = find_in_parent_folders()
+    log_retention_days = 30
+      }
+
+# Set dependencies for this module
+dependency "naming" {
+  config_path = "../naming"
+
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    log_analytics_workspace = "mock-law"
+      log_retention_days = 30
+      }
+    log_retention_days = 30
+      }
+
+dependency "resource_group" {
+  config_path = "../resource_group"
+
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    name     = "mock-rg"
+    location = local.region
+      log_retention_days = 30
+      }
+    log_retention_days = 30
+      }
+
+# Terraform configuration source
+terraform {
+  source = "${get_parent_terragrunt_dir()    log_retention_days = 30
+      }/modules/azure/log_analytics"
+    log_retention_days = 30
+      }
+
+# Module inputs
+inputs = {
+  # Resource details
+  name                = dependency.naming.outputs.log_analytics_workspace
+  resource_group_name = dependency.resource_group.outputs.name
+  location            = dependency.resource_group.outputs.location
+  
+  # Log Analytics configuration
+  sku                 = "PerGB2018"  # Standard pricing tier
+  retention_in_days   = 30           # Data retention period
+  
+  # Solution packs to install
+  solution_plans = [
+    {
+      solution_name = "ContainerInsights"  # For AKS monitoring
+        log_retention_days = 30
+      },
+    {
+      solution_name = "Security"           # For security monitoring
+        log_retention_days = 30
+      },
+    {
+      solution_name = "AzureActivity"      # For Azure Activity logs
+        log_retention_days = 30
+      }
+  ]
+  
+  # Diagnostics settings
+  diagnostic_settings = [
+    {
+      name                       = "${dependency.naming.outputs.log_analytics_workspace    log_retention_days = 30
+      }-diag"
+      log_analytics_workspace_id = "self"  # Send logs to itself
+      
+      enabled_log_categories = [
+        "Audit"
+      ]
+      
+      metric_categories = [
+        "AllMetrics"
+      ]
+        log_retention_days = 30
+      }
+  ]
+  
+  # Tags
+  tags = merge(local.tags, {
+    "component" = "monitoring"
+    "criticality" = "high"
+      log_retention_days = 30
+      })
+    log_retention_days = 30
+      } 
