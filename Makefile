@@ -346,55 +346,31 @@ scaffold-region: ## Scaffold a new region from templates (Usage: make scaffold-r
 	@echo "3. Review the generated files and make any necessary adjustments"
 	@echo "4. Apply the infrastructure: make apply-region ENV=$(ENV) REGION=$(TARGET_REGION) CLOUD=$(CLOUD)"
 
-.PHONY: init-region
-init-region: ## Initialize all modules in a specific region
-	$(call check_required_params,"init-region")
-	@echo "Initializing all modules in $(CLOUD)/$(ENV)/$(REGION)..."
-	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all init
-
-.PHONY: plan-region
-plan-region: ## Plan all modules in a specific region
-	$(call check_required_params,"plan-region")
-	@echo "Planning all modules in $(CLOUD)/$(ENV)/$(REGION)..."
-	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all plan
-
-.PHONY: apply-region
-apply-region: ## Apply all modules in a specific region
-	$(call check_required_params,"apply-region")
-	@echo "Applying all modules in $(CLOUD)/$(ENV)/$(REGION)..."
-	@if [ "$(NO_CONFIRM)" != "true" ]; then \
-		echo "Are you sure you want to apply all modules in $(CLOUD)/$(ENV)/$(REGION)? [y/N] " && read ans && [ $${ans:-N} = y ]; \
-	fi
-	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all apply -auto-approve
-
 # Testing commands
 .PHONY: test
-test: ## Run all Terraform tests
+test: ## Run all Terraform tests (auto-discovers test directories)
 	@echo "Running all Terraform tests..."
 	@ALL_PASSED=true; \
-	TEST_DIRS=( \
-		"infra/tests/modules/azure/key_vault" \
-		"infra/tests/modules/azure/naming" \
-		"infra/tests/modules/azure/networking" \
-		"infra/tests/modules/azure/storage_account" \
-		"infra/tests/modules/azure/storage_container" \
-		"infra/tests/modules/azure/aks_core" \
-		"infra/tests/modules/azure/aks_identity" \
-		"infra/tests/modules/azure/aks_node_pools" \
-	); \
-	for dir in "$${TEST_DIRS[@]}"; do \
-		if [ -d "$$dir" ]; then \
+	TEST_DIRS=$$(find "infra/tests/modules/azure" -maxdepth 1 -type d | sort); \
+	TOTAL_COUNT=0; \
+	PASSING_COUNT=0; \
+	for dir in $$TEST_DIRS; do \
+		if [ "$$dir" != "infra/tests/modules/azure" ]; then \
 			echo "=== Running tests in $$dir ==="; \
-			(cd "$$dir" && terraform init -input=false && terraform test) || { ALL_PASSED=false; }; \
-		else \
-			echo "⚠️ Directory $$dir does not exist, skipping"; \
+			TOTAL_COUNT=$$((TOTAL_COUNT + 1)); \
+			if (cd "$$dir" && terraform init -input=false && terraform test); then \
+				PASSING_COUNT=$$((PASSING_COUNT + 1)); \
+			else \
+				ALL_PASSED=false; \
+			fi; \
+			echo ""; \
 		fi; \
 	done; \
 	echo "=== Test Results Summary ==="; \
 	if [ "$$ALL_PASSED" = true ]; then \
-		echo "✅ All tests passed"; \
+		echo "✅ All $$TOTAL_COUNT modules passed"; \
 	else \
-		echo "❌ Some tests failed"; \
+		echo "❌ $$PASSING_COUNT out of $$TOTAL_COUNT modules passed"; \
 		exit 1; \
 	fi
 
@@ -410,5 +386,59 @@ test-module: ## Run tests for a specific module
 		cd "$$TEST_DIR" && terraform init -input=false && terraform test; \
 	else \
 		echo "Error: Test directory $$TEST_DIR does not exist"; \
+		exit 1; \
+	fi
+
+.PHONY: test-category
+test-category: ## Run tests for modules in a specific category (Usage: make test-category CATEGORY=storage)
+	@if [ -z "$(CATEGORY)" ]; then \
+		echo "Error: Please specify a category with CATEGORY=<category-name>"; \
+		exit 1; \
+	fi
+	@echo "Running tests for modules in category $(CATEGORY)..."
+	@ALL_PASSED=true; \
+	TEST_DIRS=$$(find "infra/tests/modules/azure" -maxdepth 1 -type d -name "*$(CATEGORY)*" -o -name "$(CATEGORY)*" -o -name "*_$(CATEGORY)" -o -name "*_$(CATEGORY)_*" | sort); \
+	if [ -z "$$TEST_DIRS" ]; then \
+		echo "Error: No test directories found matching category '$(CATEGORY)'"; \
+		exit 1; \
+	fi; \
+	for dir in $$TEST_DIRS; do \
+		if [ "$$dir" != "infra/tests/modules/azure" ]; then \
+			echo "=== Running tests in $$dir ==="; \
+			(cd "$$dir" && terraform init -input=false && terraform test) || { ALL_PASSED=false; }; \
+		fi; \
+	done; \
+	echo "=== Test Results Summary for Category $(CATEGORY) ==="; \
+	if [ "$$ALL_PASSED" = true ]; then \
+		echo "✅ All tests passed"; \
+	else \
+		echo "❌ Some tests failed"; \
+		exit 1; \
+	fi
+
+.PHONY: test-pattern
+test-pattern: ## Run tests for modules matching a pattern (Usage: make test-pattern PATTERN=storage)
+	@if [ -z "$(PATTERN)" ]; then \
+		echo "Error: Please specify a pattern with PATTERN=<pattern>"; \
+		exit 1; \
+	fi
+	@echo "Running tests for modules matching pattern '$(PATTERN)'..."
+	@ALL_PASSED=true; \
+	TEST_DIRS=$$(find "infra/tests/modules/azure" -maxdepth 1 -type d -name "*$(PATTERN)*" | sort); \
+	if [ -z "$$TEST_DIRS" ]; then \
+		echo "Error: No test directories found matching pattern '$(PATTERN)'"; \
+		exit 1; \
+	fi; \
+	for dir in $$TEST_DIRS; do \
+		if [ "$$dir" != "infra/tests/modules/azure" ]; then \
+			echo "=== Running tests in $$dir ==="; \
+			(cd "$$dir" && terraform init -input=false && terraform test) || { ALL_PASSED=false; }; \
+		fi; \
+	done; \
+	echo "=== Test Results Summary for Pattern $(PATTERN) ==="; \
+	if [ "$$ALL_PASSED" = true ]; then \
+		echo "✅ All tests passed"; \
+	else \
+		echo "❌ Some tests failed"; \
 		exit 1; \
 	fi 
