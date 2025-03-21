@@ -84,7 +84,10 @@ inputs = {
   prometheus_workspace_id = dependency.monitor_workspace.outputs.id
   
   # Azure AD admin groups - replace with actual Azure AD group IDs in production
-  admin_group_object_ids = ["00000000-0000-0000-0000-000000000000"]
+  admin_group_object_ids = []
+  
+  # Azure AD admin users - replace with actual Azure AD user IDs as needed
+  admin_user_object_ids = []
   
   # Tags
   tags = merge(local.tags, {

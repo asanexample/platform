@@ -54,6 +54,12 @@ variable "admin_group_object_ids" {
   default     = []
 }
 
+variable "admin_user_object_ids" {
+  description = "A list of Azure AD user object IDs to be assigned the Grafana Admin role"
+  type        = list(string)
+  default     = []
+}
+
 variable "tags" {
   description = "A mapping of tags to assign to the resource"
   type        = map(string)

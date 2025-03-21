@@ -5,6 +5,9 @@
  * Azure Managed Prometheus for AKS monitoring.
  */
 
+# Get current user/service principal
+data "azurerm_client_config" "current" {}
+
 resource "azurerm_dashboard_grafana" "grafana" {
   name                              = var.name
   resource_group_name               = var.resource_group_name
@@ -26,11 +29,27 @@ resource "azurerm_dashboard_grafana" "grafana" {
   tags = var.tags
 }
 
-# Create role assignments for admin groups
-resource "azurerm_role_assignment" "grafana_admin" {
-  count                = length(var.admin_group_object_ids)
+# Assign Grafana Admin role to the current user
+resource "azurerm_role_assignment" "current_user_admin" {
   scope                = azurerm_dashboard_grafana.grafana.id
   role_definition_name = "Grafana Admin"
-  principal_id         = var.admin_group_object_ids[count.index]
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
+# Create role assignments for additional admin groups
+resource "azurerm_role_assignment" "grafana_admin_groups" {
+  for_each             = toset(var.admin_group_object_ids)
+  scope                = azurerm_dashboard_grafana.grafana.id
+  role_definition_name = "Grafana Admin"
+  principal_id         = each.value
   principal_type       = "Group"
+}
+
+# Create role assignments for additional admin users
+resource "azurerm_role_assignment" "grafana_admin_users" {
+  for_each             = toset(var.admin_user_object_ids)
+  scope                = azurerm_dashboard_grafana.grafana.id
+  role_definition_name = "Grafana Admin"
+  principal_id         = each.value
+  principal_type       = "User"
 } 
