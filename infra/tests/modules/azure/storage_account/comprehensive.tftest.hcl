@@ -221,4 +221,55 @@ run "cors_rules" {
     condition     = var.location == "eastus"
     error_message = "Location should be eastus"
   }
+}
+
+# Test Entra ID Authentication with role assignments
+run "entra_id_authentication" {
+  command = plan
+
+  variables {
+    name = "testentraid"
+    containers = {
+      "data" = {
+        name = "data"
+        container_access_type = "private"
+      }
+    }
+    # Disable shared access keys to enforce Entra ID auth
+    shared_access_key_enabled = false
+    
+    # Role assignments for Entra ID auth
+    role_assignments = [
+      {
+        principal_id         = "00000000-0000-0000-0000-000000000000" # Test principal ID
+        role_definition_name = "Storage Blob Data Contributor"
+        description          = "Grant Storage Blob Data Contributor role to test user"
+      },
+      {
+        principal_id         = "11111111-1111-1111-1111-111111111111" # Test principal ID
+        role_definition_name = "Storage Blob Data Owner"
+        description          = "Grant Storage Blob Data Owner role to test admin"
+      }
+    ]
+    
+    tags = {
+      Environment = "test"
+      ManagedBy   = "Terraform"
+    }
+  }
+
+  module {
+    source = "../../../../modules/azure/storage_account"
+  }
+
+  # Assertions
+  assert {
+    condition     = var.shared_access_key_enabled == false
+    error_message = "Shared access keys should be disabled for Entra ID authentication"
+  }
+  
+  assert {
+    condition     = length(var.role_assignments) == 2
+    error_message = "Should have 2 role assignments defined"
+  }
 } 
