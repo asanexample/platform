@@ -289,4 +289,24 @@ locals {
       ) : name
     )
   }
+}
+
+# Generate monitor workspace (Prometheus) name
+module "monitor_workspace" {
+  source = "Azure/naming/azurerm"
+  suffix = [var.environment, var.region_abbv]
+  prefix = [var.prefix]
+  unique-include-numbers = false
+  unique-length = 0
+  unique-seed = var.unique_seed
+}
+
+# Generate Grafana name
+module "grafana" {
+  source = "Azure/naming/azurerm"
+  suffix = [var.environment, var.region_abbv]
+  prefix = [var.prefix]
+  unique-include-numbers = false
+  unique-length = 0
+  unique-seed = var.unique_seed
 } 

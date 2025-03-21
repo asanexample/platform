@@ -381,6 +381,31 @@ variable "enable_host_encryption" {
   default     = false
 }
 
+# Variables for Azure Monitor Addon with Prometheus integration
+variable "enable_prometheus_monitoring" {
+  description = "Enable Azure Monitor managed service for Prometheus"
+  type        = bool
+  default     = false
+}
+
+variable "prometheus_annotations_allowed" {
+  description = "List of Kubernetes annotations allowed for scraping by Azure Monitor"
+  type        = list(string)
+  default     = ["*"]
+}
+
+variable "prometheus_labels_allowed" {
+  description = "List of Kubernetes labels allowed for scraping by Azure Monitor"
+  type        = list(string)
+  default     = ["*"]
+}
+
+variable "prometheus_dcr_id" {
+  description = "The ID of the Prometheus data collection rule to associate with the AKS cluster"
+  type        = string
+  default     = null
+}
+
 # ---------------------------------------------------------------------------------------------------------------------
 # TAGGING
 # ---------------------------------------------------------------------------------------------------------------------

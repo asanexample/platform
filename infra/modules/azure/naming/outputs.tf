@@ -119,8 +119,8 @@ output "event_hub" {
 }
 
 output "monitor_workspace" {
-  description = "Standardized name for a Monitor Workspace."
-  value       = local.validated_names.monitor_workspace
+  description = "The generated name for the Azure Monitor workspace (Prometheus)"
+  value       = "${module.monitor_workspace.resource_name}-prometheus"
 }
 
 output "application_insights" {
@@ -211,4 +211,9 @@ output "names" {
 output "normalized_customer" {
   description = "Normalized customer name for use in resource naming."
   value       = local.normalized_customer
+}
+
+output "grafana" {
+  description = "The generated name for the Azure Grafana instance"
+  value       = "${module.grafana.resource_name}-grafana"
 } 
