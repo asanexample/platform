@@ -103,11 +103,13 @@ inputs = {
   
   # Network rules
   network_rules = {
-    default_action = "Deny"
+    default_action = "Allow"
     bypass = ["AzureServices"]
     virtual_network_subnet_ids = [
       dependency.networking.outputs.subnet_ids["az1-endpoints"]
     ]
+    # Uncomment and add specific IPs if needed in the future
+    # ip_rules = ["1.2.3.4", "5.6.7.8"]
   }
   
   # Private endpoint configuration
@@ -131,6 +133,30 @@ inputs = {
       container_access_type = "private"
     }
   }
+  
+  # Lifecycle management for logs
+  lifecycle_rules = [
+    {
+      name    = "logs-lifecycle"
+      enabled = true
+      prefix_match = ["logs/"]
+      
+      # Move logs to cool tier after 30 days
+      tier_to_cool_action = {
+        days_after_modification_greater_than = 30
+      }
+      
+      # Move logs to archive tier after 90 days
+      tier_to_archive_action = {
+        days_after_modification_greater_than = 90
+      }
+      
+      # Delete logs after 2 years (730 days)
+      delete_action = {
+        days_after_modification_greater_than = 730
+      }
+    }
+  ]
   
   # Security settings
   allow_nested_items_to_be_public = false

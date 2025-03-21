@@ -36,7 +36,7 @@ inputs = {
   
   # Default network configuration
   network_rules = {
-    default_action             = "Deny"
+    default_action             = "Allow"
     bypass                     = ["AzureServices"]
     ip_rules                   = []
     virtual_network_subnet_ids = []

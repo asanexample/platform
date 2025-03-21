@@ -135,7 +135,7 @@ variable "blob_public_access_enabled" {
 variable "network_rules" {
   description = "Network rules for the storage account"
   type = object({
-    default_action             = optional(string, "Deny")
+    default_action             = optional(string, "Allow")
     bypass                     = optional(list(string), ["AzureServices"])
     ip_rules                   = optional(list(string), [])
     virtual_network_subnet_ids = optional(list(string), [])
