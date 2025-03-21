@@ -351,6 +351,12 @@ variable "log_analytics_workspace_id" {
   default     = null
 }
 
+variable "prometheus_dcr_id" {
+  description = "The ID of the Azure Monitor data collection rule for Prometheus metrics"
+  type        = string
+  default     = null
+}
+
 variable "diagnostic_settings" {
   description = "A list of diagnostic settings to create for the AKS cluster"
   type = list(object({
@@ -379,31 +385,6 @@ variable "enable_host_encryption" {
   description = "Whether host encryption is enabled for the AKS cluster"
   type        = bool
   default     = false
-}
-
-# Variables for Azure Monitor Addon with Prometheus integration
-variable "enable_prometheus_monitoring" {
-  description = "Enable Azure Monitor managed service for Prometheus"
-  type        = bool
-  default     = false
-}
-
-variable "prometheus_annotations_allowed" {
-  description = "List of Kubernetes annotations allowed for scraping by Azure Monitor"
-  type        = list(string)
-  default     = ["*"]
-}
-
-variable "prometheus_labels_allowed" {
-  description = "List of Kubernetes labels allowed for scraping by Azure Monitor"
-  type        = list(string)
-  default     = ["*"]
-}
-
-variable "prometheus_dcr_id" {
-  description = "The ID of the Prometheus data collection rule to associate with the AKS cluster"
-  type        = string
-  default     = null
 }
 
 # ---------------------------------------------------------------------------------------------------------------------

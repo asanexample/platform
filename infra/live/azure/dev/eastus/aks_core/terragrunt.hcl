@@ -93,7 +93,7 @@ dependency "log_analytics" {
   }
 }
 
-# Add dependency on Monitor Workspace (for Prometheus)
+# Add dependency on Azure Monitor Workspace (Managed Prometheus)
 dependency "monitor_workspace" {
   config_path = "../monitor_workspace"
 
@@ -172,20 +172,11 @@ inputs = {
   enable_log_analytics_workspace = true
   log_analytics_workspace_id = dependency.log_analytics.outputs.id
   
+  # Connect to Azure Monitor Workspace (Managed Prometheus)
+  prometheus_dcr_id = dependency.monitor_workspace.outputs.dcr_id
+  
   # Enable Microsoft Defender for Containers
   microsoft_defender_enabled = true
-  
-  # Enable Container Insights (OMS agent)
-  oms_agent = {
-    log_analytics_workspace_id = dependency.log_analytics.outputs.id
-    msi_auth_for_monitoring = true
-  }
-  
-  # Enable Azure Monitor managed service for Prometheus
-  enable_prometheus_monitoring = true
-  prometheus_annotations_allowed = ["*"]
-  prometheus_labels_allowed = ["*"]
-  prometheus_dcr_id = dependency.monitor_workspace.outputs.dcr_id
   
   # AKS Diagnostic Settings
   diagnostic_settings = [
@@ -223,6 +214,5 @@ inputs = {
     "network-cilium-managed-by" = "cilium"
     "cilium-version"            = "1.17.2"
     "monitoring-level"          = "comprehensive"
-    "prometheus-enabled"        = "true"
   })
 } 

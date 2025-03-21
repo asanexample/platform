@@ -67,26 +67,6 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
     load_balancer_sku = "standard"
   }
 
-  # Configure Container Insights (OMS Agent)
-  dynamic "oms_agent" {
-    for_each = var.log_analytics_workspace_id != null ? [1] : []
-    
-    content {
-      log_analytics_workspace_id = var.log_analytics_workspace_id
-      msi_auth_for_monitoring_enabled = true
-    }
-  }
-
-  # Configure Azure Monitor Addon Profile for Prometheus integration
-  dynamic "monitor_metrics" {
-    for_each = var.enable_prometheus_monitoring ? [1] : []
-    
-    content {
-      annotations_allowed = join(",", var.prometheus_annotations_allowed)
-      labels_allowed      = join(",", var.prometheus_labels_allowed)
-    }
-  }
-
   # Apply tags
   tags = merge(var.tags, {
     name = local.cluster_name
@@ -164,9 +144,10 @@ resource "azurerm_monitor_diagnostic_setting" "this" {
   }
 }
 
-# Associate AKS cluster with Prometheus data collection rule if provided
+# Connect AKS to Azure Monitor Workspace (Managed Prometheus)
 resource "azurerm_monitor_data_collection_rule_association" "prometheus" {
-  count                   = var.prometheus_dcr_id != null ? 1 : 0
+  count = var.prometheus_dcr_id != null ? 1 : 0
+  
   name                    = "${azurerm_kubernetes_cluster.aks_cluster.name}-prometheus"
   target_resource_id      = azurerm_kubernetes_cluster.aks_cluster.id
   data_collection_rule_id = var.prometheus_dcr_id
