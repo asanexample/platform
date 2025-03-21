@@ -82,8 +82,8 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
     for_each = var.enable_prometheus_monitoring ? [1] : []
     
     content {
-      annotations_allowed = var.prometheus_annotations_allowed
-      labels_allowed      = var.prometheus_labels_allowed
+      annotations_allowed = join(",", var.prometheus_annotations_allowed)
+      labels_allowed      = join(",", var.prometheus_labels_allowed)
     }
   }
 
