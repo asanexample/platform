@@ -39,4 +39,34 @@ variable "containers" {
     ])
     error_message = "Container access type must be one of: blob, container, private."
   }
+}
+
+variable "role_assignments" {
+  description = "List of role assignments to create for containers"
+  type = list(object({
+    # Container key from var.containers to assign the role to
+    container_key = string
+    # Principal ID to give the role to (user, group, service principal, etc.)
+    principal_id = string
+    # The name of the role to assign (e.g., "Storage Blob Data Contributor")
+    role_definition_name = string
+    # Optional description for the role assignment
+    description = optional(string, null)
+    # Optional condition for the role assignment
+    condition = optional(string, null)
+    # Optional condition version for the role assignment
+    condition_version = optional(string, null)
+    # Optional principal type (ServicePrincipal, User, Group)
+    principal_type = optional(string, null)
+    # Optional skip service principal AAD check
+    skip_service_principal_aad_check = optional(bool, false)
+  }))
+  default = []
+  
+  validation {
+    condition = alltrue([
+      for ra in var.role_assignments : contains(keys(var.containers), ra.container_key)
+    ])
+    error_message = "Each role_assignment must reference a valid container_key from the containers variable."
+  }
 } 

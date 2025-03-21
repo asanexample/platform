@@ -33,4 +33,28 @@ resource "azurerm_storage_container" "containers" {
   # Custom metadata key-value pairs for the container
   # These can be used for organization, categorization, or application needs
   metadata = each.value.metadata
+}
+
+# Create role assignments for container-level access
+# This enables Entra ID (Azure AD) authentication for containers
+resource "azurerm_role_assignment" "container_role_assignments" {
+  for_each = {
+    for idx, ra in var.role_assignments : "${ra.container_key}-${ra.principal_id}-${ra.role_definition_name}" => ra
+  }
+
+  # Set the scope to the specific container
+  scope = azurerm_storage_container.containers[each.value.container_key].resource_manager_id
+
+  # Principal ID (user, group, service principal)
+  principal_id = each.value.principal_id
+
+  # Role definition name or ID
+  role_definition_name = each.value.role_definition_name
+
+  # Optional properties
+  description                       = each.value.description
+  condition                         = each.value.condition
+  condition_version                 = each.value.condition_version
+  principal_type                    = each.value.principal_type
+  skip_service_principal_aad_check  = each.value.skip_service_principal_aad_check
 } 

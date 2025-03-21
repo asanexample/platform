@@ -24,4 +24,19 @@ output "container_names" {
   value       = [for container in azurerm_storage_container.containers : container.name]
   # Provides a simple list of all container names created by this module
   # Useful for iteration or validation
+}
+
+output "container_resource_manager_ids" {
+  description = "Map of container names to their resource manager IDs for use with role assignments"
+  value = {
+    for name, container in azurerm_storage_container.containers : name => container.resource_manager_id
+  }
+  # Useful for role assignments using the resource manager ID
+  # Different from the standard ID which is used for general references
+}
+
+output "role_assignments" {
+  description = "Map of role assignments created for containers"
+  value       = azurerm_role_assignment.container_role_assignments
+  # Provides access to all role assignment properties for each container
 } 
