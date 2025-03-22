@@ -46,8 +46,3 @@ output "private_endpoint_ids" {
   description = "List of private endpoint IDs if created"
   value       = azurerm_private_endpoint.storage[*].id
 }
-
-output "role_assignments" {
-  description = "List of role assignment IDs created for Entra ID authentication"
-  value       = azurerm_role_assignment.this[*].id
-} 

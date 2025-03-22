@@ -120,7 +120,7 @@ output "event_hub" {
 
 output "monitor_workspace" {
   description = "The generated name for the Azure Monitor workspace (Prometheus)"
-  value       = "${module.monitor_workspace.resource_name}-prometheus"
+  value       = "${local.names.monitor_workspace}-prometheus"
 }
 
 output "application_insights" {
@@ -215,5 +215,5 @@ output "normalized_customer" {
 
 output "grafana" {
   description = "The generated name for the Azure Grafana instance"
-  value       = "${module.grafana.resource_name}-grafana"
+  value       = "${local.names.monitor_workspace}-grafana"
 } 

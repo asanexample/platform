@@ -178,25 +178,11 @@ inputs = {
   allow_nested_items_to_be_public = false
   blob_public_access_enabled = false
   
-  # Disable access keys in favor of Entra ID authentication
-  shared_access_key_enabled = false
+  # Enable access keys for provider authentication
+  shared_access_key_enabled = true
   
-  # Assign Storage Blob Data Contributor roles
-  # This grants current user and DevOps group access to storage
-  role_assignments = [
-    {
-      # Use the current user's object ID automatically
-      principal_id         = dependency.client_config.outputs.object_id
-      role_definition_name = "Storage Blob Data Contributor"
-      description          = "Grant Storage Blob Data Contributor role to the current user"
-    }
-    # Add additional role assignments as needed, for example for groups:
-    # {
-    #   principal_id         = "11111111-1111-1111-1111-111111111111" # DevOps team group object ID
-    #   role_definition_name = "Storage Blob Data Contributor"
-    #   description          = "Grant Storage Blob Data Contributor role to DevOps team"
-    # }
-  ]
+  # Role assignments removed - these are now managed by the storage_roles module
+  # to maintain separation of concerns and follow the single responsibility principle
   
   # Tags
   tags = local.tags

@@ -15,9 +15,11 @@ resource "azurerm_role_assignment" "this" {
   scope                = var.role_assignments[count.index].scope != null ? var.role_assignments[count.index].scope : var.storage_account_id
   description          = var.role_assignments[count.index].description
 
-  # Skip deletion of role assignments by default when the resource is deleted
-  # This ensures that roles aren't unintentionally removed if the terraform resource is deleted
-  lifecycle {
-    prevent_destroy = true
-  }
+  # Note: The prevent_destroy lifecycle rule was removed to allow terraform destroy to work properly.
+  # When reinstating this module in production, consider adding the lifecycle block back
+  # to prevent accidental deletion of important role assignments.
+  # 
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 } 

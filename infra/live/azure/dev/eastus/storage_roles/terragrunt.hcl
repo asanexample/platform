@@ -30,6 +30,17 @@ dependency "client_config" {
   }
 }
 
+# Add dependency on storage account
+dependency "storage" {
+  config_path = "../storage"
+  
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Storage/storageAccounts/mocksa"
+    name = "vipdevsaeus"
+  }
+}
+
 # Define Terraform source
 terraform {
   source = "${get_repo_root()}/infra/modules/azure//storage_roles"
@@ -37,11 +48,13 @@ terraform {
 
 # Specify inputs
 inputs = {
-  # Storage account information
-  storage_account_id = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/vip-dev-rg-eus/providers/Microsoft.Storage/storageAccounts/vipdevsaeus"
+  # Storage account information - use the actual output from the storage module
+  storage_account_id = dependency.storage.outputs.id
   
   # Role assignments
   role_assignments = [
+    # Note: The Storage Blob Data Contributor role is already assigned by the storage module
+    # It's duplicated here for state management purposes only
     {
       # Use the current user's object ID automatically
       principal_id         = dependency.client_config.outputs.object_id

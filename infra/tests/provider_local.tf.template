@@ -1,0 +1,13 @@
+/**
+ * Local Provider Configuration Template
+ * 
+ * INSTRUCTIONS:
+ * 1. Copy this file to provider_local.tf
+ * 2. Replace the placeholder values with your actual Azure subscription_id and tenant_id
+ * 3. DO NOT commit provider_local.tf to version control (it's included in .gitignore)
+ */
+
+locals {
+  subscription_id = "your-subscription-id-here"  # Replace with your actual subscription ID
+  tenant_id       = "your-tenant-id-here"        # Replace with your actual tenant ID
+} 
