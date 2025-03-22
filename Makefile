@@ -23,10 +23,20 @@ define check_required_params
 	fi
 endef
 
+# Check Azure CLI authentication
+define check_azure_auth
+	@echo "Checking Azure CLI login status..."
+	@az account show > /dev/null 2>&1 || { echo "Not logged in to Azure CLI. Please run 'make login-azure' first."; exit 1; }
+	@echo "Using Azure subscription: $$(az account show --query name -o tsv) ($$(az account show --query id -o tsv))"
+	@echo "Tenant ID: $$(az account show --query tenantId -o tsv)"
+endef
+
 # Paths
 INFRA_DIR := $(CURDIR)/infra
 LIVE_DIR := $(INFRA_DIR)/live
 MODULES_DIR := $(INFRA_DIR)/modules
+TESTS_DIR := $(INFRA_DIR)/tests
+AZURE_TESTS_DIR := $(TESTS_DIR)/modules/azure
 
 # Set specific paths based on inputs
 CLOUD_ENV_DIR := $(LIVE_DIR)/$(CLOUD)/$(ENV)
@@ -347,18 +357,38 @@ scaffold-region: ## Scaffold a new region from templates (Usage: make scaffold-r
 	@echo "4. Apply the infrastructure: make apply-region ENV=$(ENV) REGION=$(TARGET_REGION) CLOUD=$(CLOUD)"
 
 # Testing commands
+.PHONY: setup-test-credentials
+setup-test-credentials: ## Set up Azure credentials for Terraform tests
+	@echo "Setting up Azure credentials for tests..."
+	@infra/tests/setup_azure_credentials.sh
+
+.PHONY: prepare-test-modules
+prepare-test-modules: setup-test-credentials ## Prepare all test modules by initializing them
+	@echo "Preparing test modules in $(AZURE_TESTS_DIR)..."
+	@find "$(AZURE_TESTS_DIR)" -mindepth 1 -maxdepth 1 -type d | while read dir; do \
+		if [ -d "$$dir" ] && [ "$$(find "$$dir" -name "*.tftest.hcl" -type f | wc -l)" -gt 0 ]; then \
+			echo "Initializing $$dir..."; \
+			(cd "$$dir" && \
+			if [ ! -f main.tf ] && [ ! -f terraform.tf ]; then \
+				echo '# Empty terraform file to enable initialization' > terraform.tf; \
+			fi && \
+			terraform init -input=false -upgrade); \
+		fi; \
+	done
+	@echo "All test modules prepared successfully."
+
 .PHONY: test
-test: ## Run all Terraform tests (auto-discovers test directories)
+test: prepare-test-modules ## Run all Terraform tests (auto-discovers test directories)
 	@echo "Running all Terraform tests..."
 	@ALL_PASSED=true; \
-	TEST_DIRS=$$(find "infra/tests/modules/azure" -maxdepth 1 -type d | sort); \
+	TEST_DIRS=$$(find "$(AZURE_TESTS_DIR)" -maxdepth 1 -type d | sort); \
 	TOTAL_COUNT=0; \
 	PASSING_COUNT=0; \
 	for dir in $$TEST_DIRS; do \
-		if [ "$$dir" != "infra/tests/modules/azure" ]; then \
+		if [ "$$dir" != "$(AZURE_TESTS_DIR)" ]; then \
 			echo "=== Running tests in $$dir ==="; \
 			TOTAL_COUNT=$$((TOTAL_COUNT + 1)); \
-			if (cd "$$dir" && terraform init -input=false && terraform test); then \
+			if (cd "$$dir" && terraform test); then \
 				PASSING_COUNT=$$((PASSING_COUNT + 1)); \
 			else \
 				ALL_PASSED=false; \
@@ -375,37 +405,40 @@ test: ## Run all Terraform tests (auto-discovers test directories)
 	fi
 
 .PHONY: test-module
-test-module: ## Run tests for a specific module
+test-module: prepare-test-modules ## Run tests for a specific module
 	@if [ -z "$(MODULE)" ] || [ "$(MODULE)" = "all" ]; then \
 		echo "Error: Please specify a module with MODULE=<module-name>"; \
 		exit 1; \
 	fi
-	@TEST_DIR="infra/tests/modules/azure/$(MODULE)"; \
+	@TEST_DIR="$(AZURE_TESTS_DIR)/$(MODULE)"; \
 	if [ -d "$$TEST_DIR" ]; then \
 		echo "=== Running tests in $$TEST_DIR ==="; \
-		cd "$$TEST_DIR" && terraform init -input=false && terraform test; \
+		cd "$$TEST_DIR" && \
+		TF_VAR_subscription_id="$$TF_VAR_subscription_id" \
+		TF_VAR_tenant_id="$$TF_VAR_tenant_id" \
+		terraform test; \
 	else \
 		echo "Error: Test directory $$TEST_DIR does not exist"; \
 		exit 1; \
 	fi
 
 .PHONY: test-category
-test-category: ## Run tests for modules in a specific category (Usage: make test-category CATEGORY=storage)
+test-category: prepare-test-modules ## Run tests for modules in a specific category (Usage: make test-category CATEGORY=storage)
 	@if [ -z "$(CATEGORY)" ]; then \
 		echo "Error: Please specify a category with CATEGORY=<category-name>"; \
 		exit 1; \
 	fi
 	@echo "Running tests for modules in category $(CATEGORY)..."
 	@ALL_PASSED=true; \
-	TEST_DIRS=$$(find "infra/tests/modules/azure" -maxdepth 1 -type d -name "*$(CATEGORY)*" -o -name "$(CATEGORY)*" -o -name "*_$(CATEGORY)" -o -name "*_$(CATEGORY)_*" | sort); \
+	TEST_DIRS=$$(find "$(AZURE_TESTS_DIR)" -maxdepth 1 -type d -name "*$(CATEGORY)*" -o -name "$(CATEGORY)*" -o -name "*_$(CATEGORY)" -o -name "*_$(CATEGORY)_*" | sort); \
 	if [ -z "$$TEST_DIRS" ]; then \
 		echo "Error: No test directories found matching category '$(CATEGORY)'"; \
 		exit 1; \
 	fi; \
 	for dir in $$TEST_DIRS; do \
-		if [ "$$dir" != "infra/tests/modules/azure" ]; then \
+		if [ "$$dir" != "$(AZURE_TESTS_DIR)" ]; then \
 			echo "=== Running tests in $$dir ==="; \
-			(cd "$$dir" && terraform init -input=false && terraform test) || { ALL_PASSED=false; }; \
+			(cd "$$dir" && terraform test) || { ALL_PASSED=false; }; \
 		fi; \
 	done; \
 	echo "=== Test Results Summary for Category $(CATEGORY) ==="; \
@@ -417,22 +450,22 @@ test-category: ## Run tests for modules in a specific category (Usage: make test
 	fi
 
 .PHONY: test-pattern
-test-pattern: ## Run tests for modules matching a pattern (Usage: make test-pattern PATTERN=storage)
+test-pattern: prepare-test-modules ## Run tests for modules matching a pattern (Usage: make test-pattern PATTERN=storage)
 	@if [ -z "$(PATTERN)" ]; then \
 		echo "Error: Please specify a pattern with PATTERN=<pattern>"; \
 		exit 1; \
 	fi
 	@echo "Running tests for modules matching pattern '$(PATTERN)'..."
 	@ALL_PASSED=true; \
-	TEST_DIRS=$$(find "infra/tests/modules/azure" -maxdepth 1 -type d -name "*$(PATTERN)*" | sort); \
+	TEST_DIRS=$$(find "$(AZURE_TESTS_DIR)" -maxdepth 1 -type d -name "*$(PATTERN)*" | sort); \
 	if [ -z "$$TEST_DIRS" ]; then \
 		echo "Error: No test directories found matching pattern '$(PATTERN)'"; \
 		exit 1; \
 	fi; \
 	for dir in $$TEST_DIRS; do \
-		if [ "$$dir" != "infra/tests/modules/azure" ]; then \
+		if [ "$$dir" != "$(AZURE_TESTS_DIR)" ]; then \
 			echo "=== Running tests in $$dir ==="; \
-			(cd "$$dir" && terraform init -input=false && terraform test) || { ALL_PASSED=false; }; \
+			(cd "$$dir" && terraform test) || { ALL_PASSED=false; }; \
 		fi; \
 	done; \
 	echo "=== Test Results Summary for Pattern $(PATTERN) ==="; \
