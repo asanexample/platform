@@ -309,4 +309,11 @@ module "grafana" {
   unique-include-numbers = false
   unique-length = 0
   unique-seed = var.unique_seed
+}
+
+# Generate name for container registry
+# Container Registry names must be globally unique, 5-50 characters, alphanumeric only
+output "container_registry" {
+  description = "The name of the Container Registry."
+  value       = lower("${var.prefix}${var.environment}acr${var.region_abbv}")
 } 

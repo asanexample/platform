@@ -1,0 +1,32 @@
+# Common configuration for Azure Container Registry deployments across environments
+
+# Set the Terraform module source
+terraform {
+  source = "${local.base_source_url}?ref=main"
+}
+
+# Local variables for configuration
+locals {
+  # Base repository URL for modules - allows for using a different fork if needed
+  base_source_url = "git::git@github.com:your-org/platform.git//infra/modules/azure/container_registry"
+}
+
+# Common inputs for all environments
+inputs = {
+  # Common ACR configuration
+  admin_enabled = false  # Disable admin for security - use AKS integration instead
+  lock_resource = true   # Lock resource to prevent accidental deletion
+  
+  # Image retention policy (can be overridden per environment)
+  retention_policy_days = 30
+  
+  # AKS integration - enabled by default, can be overridden per environment
+  aks_integration_enabled = true  # Enable integration with AKS
+  enable_aks_acr_push     = false # Only enable pull access by default
+  
+  # Tags applied to all environments (merged with environment-specific tags)
+  tags = {
+    "module"     = "container-registry"
+    "managed-by" = "terraform"
+  }
+} 
