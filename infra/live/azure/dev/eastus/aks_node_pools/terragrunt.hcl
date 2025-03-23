@@ -100,6 +100,9 @@ inputs = {
     node_taints = []
   }
   
+  # Direct variable for min_count to ensure it's properly set
+  app_node_pool_min_count = 3
+  
   # Required for updating certain node pool properties without recreation
   temporary_name_for_rotation = "tempapps"
   
