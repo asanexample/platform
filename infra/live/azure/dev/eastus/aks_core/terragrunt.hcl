@@ -152,8 +152,8 @@ inputs = {
     name                = "system"
     vm_size             = "Standard_D2ds_v5"  # Updated to Ddv5 series
     enable_auto_scaling = true
-    node_count          = 2
-    min_count           = 2
+    node_count          = 3
+    min_count           = 3
     max_count           = 3
     availability_zones  = ["1", "2", "3"]
     max_pods            = 110  # With Cilium (network_plugin = "none"), pods get IPs from pod_cidr, not from the subnet

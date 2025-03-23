@@ -81,14 +81,14 @@ inputs = {
     enabled = true
     name = "apps"
     vm_size = "Standard_D8s_v5"
-    node_count = 2
+    node_count = 3
     # Use availability zones for high availability
     availability_zones = ["1", "2", "3"]
     max_pods = 110
     os_disk_size_gb = 128
     os_disk_type = "Managed"
     enable_auto_scaling = true
-    min_count = 2
+    min_count = 3
     max_count = 5
     mode = "User"
     node_labels = {
@@ -106,6 +106,8 @@ inputs = {
   # Override standard node pool availability zones for this region
   standard_node_pool = {
     availability_zones = ["1", "2", "3"]
+    node_count = 3
+    min_count = 3
   }
   
   # Tags

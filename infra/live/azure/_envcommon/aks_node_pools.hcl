@@ -7,7 +7,7 @@
 # Terraform module source for AKS Node Pools
 terraform {
   # Use double-slash notation to ensure all relative module references work correctly
-  source = "${find_in_parent_folders("infra")}/modules/azure//aks_node_pools"
+  source = "${get_repo_root()}/infra/modules/azure//aks_node_pools"
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -22,8 +22,8 @@ inputs = {
     name                = "standard"
     vm_size             = "Standard_D4s_v3"
     enable_auto_scaling = true
-    node_count          = 2
-    min_count           = 2
+    node_count          = 3
+    min_count           = 3
     max_count           = 10
     availability_zones  = ["1", "2", "3"]
     node_labels = {
