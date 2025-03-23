@@ -13,6 +13,9 @@ locals {
 
 # Common inputs for all environments
 inputs = {
+  # Creation control - create ACR by default
+  create_registry = true
+  
   # Common ACR configuration
   admin_enabled = false  # Disable admin for security - use AKS integration instead
   lock_resource = true   # Lock resource to prevent accidental deletion

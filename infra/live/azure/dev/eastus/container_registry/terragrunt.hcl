@@ -89,7 +89,7 @@ inputs = {
   name                = dependency.naming.outputs.container_registry
   resource_group_name = dependency.resource_group.outputs.name
   location            = dependency.resource_group.outputs.location
-
+  
   # Registry configuration - specific to this environment
   sku                           = "Standard"
   public_network_access_enabled = true

@@ -4,6 +4,13 @@
  * This file defines all input variables for the ACR module
  */
 
+# Creation control
+variable "create_registry" {
+  description = "Whether to create an Azure Container Registry. If false, all other resources will not be created."
+  type        = bool
+  default     = true
+}
+
 # Basic resource information
 variable "name" {
   description = "Name of the ACR resource. If not provided, a name will be generated using prefix, environment, and region."

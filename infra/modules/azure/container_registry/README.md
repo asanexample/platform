@@ -4,6 +4,7 @@ This Terraform module deploys an Azure Container Registry (ACR) instance with va
 
 ## Features
 
+- Optional provisioning - enabled by default, can be disabled via a single variable
 - Supports all ACR SKUs (Basic, Standard, Premium)
 - Configurable network access controls
 - Integration with AKS through RBAC
@@ -35,6 +36,19 @@ module "acr" {
     Environment = "Development"
     Project     = "MyProject"
   }
+}
+```
+
+### Disabling ACR Creation
+
+```hcl
+module "acr" {
+  source              = "../../modules/azure/container_registry"
+  create_registry     = false
+  resource_group_name = "my-resource-group"
+  location            = "eastus"
+  environment         = "dev"
+  region_abbv         = "eus"
 }
 ```
 
@@ -118,6 +132,7 @@ These role assignments enable AKS to pull images without requiring registry admi
 
 | Name | Description | Type | Default |
 |------|-------------|------|---------|
+| create_registry | Whether to create the ACR | bool | true |
 | name | Custom registry name | string | null (auto-generated) |
 | sku | ACR SKU (Basic, Standard, Premium) | string | "Standard" |
 | admin_enabled | Enable admin access | bool | false |
