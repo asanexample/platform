@@ -150,7 +150,7 @@ inputs = {
   # Default node pool overrides
   default_node_pool = {
     name                = "system"
-    vm_size             = "Standard_D2s_v4"
+    vm_size             = "Standard_D2ds_v5"  # Updated to Ddv5 series
     enable_auto_scaling = true
     node_count          = 2
     min_count           = 2
@@ -160,9 +160,10 @@ inputs = {
     os_disk_size_gb     = 128
     node_labels = {
       "role"          = "system"
-      "node-priority" = "regular"
+      "node-priority" = "high"
+      "kubernetes.azure.com/scalesetpriority" = "regular"
     }
-    node_taints       = []
+    only_critical_addons_enabled = true  # This will apply CriticalAddonsOnly=true:NoSchedule taint
     os_disk_type      = "Managed"
     os_sku            = "Ubuntu"
     ultra_ssd_enabled = false

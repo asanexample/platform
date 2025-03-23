@@ -257,6 +257,12 @@ variable "default_nodepool_node_labels" {
   default     = {}
 }
 
+variable "default_nodepool_only_critical_addons_enabled" {
+  description = "Whether to taint the default node pool with CriticalAddonsOnly=true:NoSchedule to ensure only critical addons are scheduled on it"
+  type        = bool
+  default     = false
+}
+
 # ---------------------------------------------------------------------------------------------------------------------
 # IDENTITY CONFIGURATION
 # ---------------------------------------------------------------------------------------------------------------------
