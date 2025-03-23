@@ -2,7 +2,7 @@
 
 terraform {
   # Use double-slash notation to ensure relative module references work correctly
-  source = "${find_in_parent_folders("infra")}/modules/azure//container_insights_dcr"
+  source = "${get_repo_root()}/infra/modules/azure//container_insights_dcr"
 }
 
 # Include common configuration from the root terragrunt.hcl file
@@ -12,28 +12,27 @@ include {
 
 # Get configuration variables using Terragrunt functions
 locals {
-  # Parse the JSON file once to improve performance
-  env_vars = jsondecode(file(find_in_parent_folders("env.json")))
+  # Load hierarchical variables
+  env_vars     = read_terragrunt_config(find_in_parent_folders("env.hcl"))
+  region_vars  = read_terragrunt_config(find_in_parent_folders("region.hcl"))
+  common_vars  = read_terragrunt_config(find_in_parent_folders("common.hcl"))
   
   # Extract environment details
-  env         = local.env_vars.environment
-  customer    = local.env_vars.customer
-  prefix      = local.env_vars.prefix
-  region_abbv = local.env_vars.region_abbv
-  region      = local.env_vars.region
+  env         = local.env_vars.locals.environment
+  customer    = try(local.common_vars.locals.customer, null)
+  prefix      = local.common_vars.locals.prefix
+  region_abbv = local.region_vars.locals.region_abbv
+  region      = local.region_vars.locals.region
   
   # Common tags
-  common_tags = {
-    Environment = local.env
-    Customer    = local.customer
-    ManagedBy   = "Terragrunt"
-    Project     = "Multi-Cloud Platform"
-  }
-  
-  # Merge environment-specific tags with common tags
-  tags = merge(local.common_tags, {
-    Component   = "Monitoring"
-  })
+  tags = merge(
+    local.common_vars.locals.tags,
+    local.env_vars.locals.env_tags,
+    local.region_vars.locals.region_tags,
+    {
+      Component = "Monitoring"
+    }
+  )
 }
 
 # Dependencies
