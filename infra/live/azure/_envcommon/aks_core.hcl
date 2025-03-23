@@ -7,7 +7,7 @@
 # Terraform module source for AKS
 terraform {
   # Use double-slash notation to ensure all relative module references work correctly
-  source = "${find_in_parent_folders("infra")}/modules/azure//aks_core"
+  source = "${get_repo_root()}/infra/modules/azure//aks_core"
 }
 
 # ---------------------------------------------------------------------------------------------------------------------

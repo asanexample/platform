@@ -105,7 +105,7 @@ output "frontdoor_endpoint" {
 
 output "container_registry" {
   description = "Standardized name for a Container Registry."
-  value       = local.validated_names.container_registry
+  value       = local.container_registry_name
 }
 
 output "event_hub_namespace" {

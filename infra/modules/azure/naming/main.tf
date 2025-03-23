@@ -311,9 +311,7 @@ module "grafana" {
   unique-seed = var.unique_seed
 }
 
-# Generate name for container registry
 # Container Registry names must be globally unique, 5-50 characters, alphanumeric only
-output "container_registry" {
-  description = "The name of the Container Registry."
-  value       = lower("${var.prefix}${var.environment}acr${var.region_abbv}")
+locals {
+  container_registry_name = lower("${var.prefix}${var.environment}acr${var.region_abbv}")
 } 
