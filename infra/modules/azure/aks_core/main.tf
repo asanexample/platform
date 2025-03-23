@@ -68,6 +68,14 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
     load_balancer_sku = "standard"
   }
 
+  # Enable Container Insights with Log Analytics workspace
+  dynamic "oms_agent" {
+    for_each = var.log_analytics_workspace_id != null ? [1] : []
+    content {
+      log_analytics_workspace_id = var.log_analytics_workspace_id
+    }
+  }
+
   # Apply tags
   tags = merge(var.tags, {
     name = local.cluster_name
