@@ -5,7 +5,7 @@ locals {
   address_space = ["10.104.0.0/16"]
   
   # Subnet configurations for eastus region with three availability zones
-  # Each AZ has Kubernetes, Services, Endpoints, and Transit subnets
+  # Each AZ has Kubernetes, Services, Endpoints, Transit, and Public subnets
   subnets = {
     # AZ 1 (eastus-1) subnets
     "az1-kubernetes" = {
@@ -21,7 +21,11 @@ locals {
       service_endpoints = ["Microsoft.Storage", "Microsoft.Sql", "Microsoft.KeyVault"]
     },
     "az1-transit" = {
-      address_prefixes  = ["10.104.0.112/29"]
+      address_prefixes  = ["10.104.0.128/29"]
+      service_endpoints = ["Microsoft.Storage"]
+    },
+    "az1-public" = {
+      address_prefixes  = ["10.104.0.112/28"]
       service_endpoints = ["Microsoft.Storage"]
     },
     
@@ -39,7 +43,11 @@ locals {
       service_endpoints = ["Microsoft.Storage", "Microsoft.Sql", "Microsoft.KeyVault"]
     },
     "az2-transit" = {
-      address_prefixes  = ["10.104.1.112/29"]
+      address_prefixes  = ["10.104.1.128/29"]
+      service_endpoints = ["Microsoft.Storage"]
+    },
+    "az2-public" = {
+      address_prefixes  = ["10.104.1.112/28"]
       service_endpoints = ["Microsoft.Storage"]
     },
     
@@ -57,7 +65,11 @@ locals {
       service_endpoints = ["Microsoft.Storage", "Microsoft.Sql", "Microsoft.KeyVault"]
     },
     "az3-transit" = {
-      address_prefixes  = ["10.104.2.112/29"]
+      address_prefixes  = ["10.104.2.128/29"]
+      service_endpoints = ["Microsoft.Storage"]
+    },
+    "az3-public" = {
+      address_prefixes  = ["10.104.2.112/28"]
       service_endpoints = ["Microsoft.Storage"]
     }
   }

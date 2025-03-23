@@ -616,8 +616,8 @@ run "monitor_workspace_naming_test" {
   }
 
   assert {
-    condition     = can(regex("^abc-dev-amw-eu$", output.monitor_workspace))
-    error_message = "Monitor Workspace name should match expected format (omitting customer)"
+    condition     = can(regex("^abc-dev-amw-eu-prometheus$", output.monitor_workspace))
+    error_message = "Monitor Workspace name should match expected format including prometheus suffix"
   }
 }
 

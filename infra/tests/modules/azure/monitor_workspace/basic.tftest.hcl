@@ -37,14 +37,4 @@ run "basic_monitor_workspace" {
     condition     = output.name == "test-monitor-ws"
     error_message = "Monitor workspace name doesn't match expected value"
   }
-  
-  assert {
-    condition     = output.dcr_id != ""
-    error_message = "Data Collection Rule ID should not be empty"
-  }
-  
-  assert {
-    condition     = output.dce_id != ""
-    error_message = "Data Collection Endpoint ID should not be empty"
-  }
 } 

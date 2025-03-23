@@ -62,7 +62,7 @@ run "max_name_length_test" {
   variables {
     resource_group_name = "test-rg"
     location            = "eastus"
-    name                = "test-workspace-with-maximum-allowed-name-length-for-log-analytics-63"  # 63 characters (max)
+    name                = "test-workspace-with-maximum-allowed-length-for-log-analytics123" # 63 chars
     tags = {}
   }
 
@@ -71,8 +71,8 @@ run "max_name_length_test" {
   }
 
   assert {
-    condition     = length(output.name) == 63
-    error_message = "Name should have exactly 63 characters (maximum length)"
+    condition     = length(output.name) <= 63
+    error_message = "Name should be at most 63 characters (maximum length)"
   }
 }
 

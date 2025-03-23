@@ -34,7 +34,7 @@ resource "azurerm_subnet" "subnet" {
         for_each = delegation.value
         content {
           name    = service_delegation.value.name
-          actions = lookup(service_delegation.value, "actions", null)
+          actions = lookup(service_delegation.value, "actions", null) != null ? toset([lookup(service_delegation.value, "actions", null)]) : null
         }
       }
     }
