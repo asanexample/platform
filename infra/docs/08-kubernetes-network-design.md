@@ -22,24 +22,27 @@ The Kubernetes network architecture consists of separate subnets for different f
 ```mermaid
 graph TD
     subgraph "Kubernetes Network Architecture"
-    VNet[Virtual Network<br>10.200.0.0/21] --> AZ1[AZ1 Subnets]
+    VNet[Virtual Network<br>10.104.0.0/16] --> AZ1[AZ1 Subnets]
     VNet --> AZ2[AZ2 Subnets]
     VNet --> AZ3[AZ3 Subnets]
     
-    AZ1 --> AZ1_Node[Node Subnet<br>10.200.0.0/26]
-    AZ1 --> AZ1_Services[Services Subnet<br>10.200.0.64/27]
-    AZ1 --> AZ1_Endpoints[Endpoints Subnet<br>10.200.0.96/28]
-    AZ1 --> AZ1_Transit[Transit Subnet<br>10.200.0.112/29]
+    AZ1 --> AZ1_Node[Node Subnet<br>10.104.0.0/26]
+    AZ1 --> AZ1_Services[Services Subnet<br>10.104.0.64/27]
+    AZ1 --> AZ1_Endpoints[Endpoints Subnet<br>10.104.0.96/28]
+    AZ1 --> AZ1_Transit[Transit Subnet<br>10.104.0.128/29]
+    AZ1 --> AZ1_Public[Public Subnet<br>10.104.0.112/28]
     
-    AZ2 --> AZ2_Node[Node Subnet<br>10.200.1.0/26]
-    AZ2 --> AZ2_Services[Services Subnet<br>10.200.1.64/27]
-    AZ2 --> AZ2_Endpoints[Endpoints Subnet<br>10.200.1.96/28]
-    AZ2 --> AZ2_Transit[Transit Subnet<br>10.200.1.112/29]
+    AZ2 --> AZ2_Node[Node Subnet<br>10.104.1.0/26]
+    AZ2 --> AZ2_Services[Services Subnet<br>10.104.1.64/27]
+    AZ2 --> AZ2_Endpoints[Endpoints Subnet<br>10.104.1.96/28]
+    AZ2 --> AZ2_Transit[Transit Subnet<br>10.104.1.128/29]
+    AZ2 --> AZ2_Public[Public Subnet<br>10.104.1.112/28]
     
-    AZ3 --> AZ3_Node[Node Subnet<br>10.200.2.0/26]
-    AZ3 --> AZ3_Services[Services Subnet<br>10.200.2.64/27]
-    AZ3 --> AZ3_Endpoints[Endpoints Subnet<br>10.200.2.96/28]
-    AZ3 --> AZ3_Transit[Transit Subnet<br>10.200.2.112/29]
+    AZ3 --> AZ3_Node[Node Subnet<br>10.104.2.0/26]
+    AZ3 --> AZ3_Services[Services Subnet<br>10.104.2.64/27]
+    AZ3 --> AZ3_Endpoints[Endpoints Subnet<br>10.104.2.96/28]
+    AZ3 --> AZ3_Transit[Transit Subnet<br>10.104.2.128/29]
+    AZ3 --> AZ3_Public[Public Subnet<br>10.104.2.112/28]
     
     classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
     classDef vnet fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
@@ -48,6 +51,7 @@ graph TD
     classDef service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
     classDef endpoint fill:#ffebee,stroke:#c62828,stroke-width:2px;
     classDef transit fill:#e0f2f1,stroke:#004d40,stroke-width:2px;
+    classDef public fill:#e8eaf6,stroke:#3f51b5,stroke-width:2px;
     
     class VNet vnet;
     class AZ1,AZ2,AZ3 az;
@@ -55,6 +59,7 @@ graph TD
     class AZ1_Services,AZ2_Services,AZ3_Services service;
     class AZ1_Endpoints,AZ2_Endpoints,AZ3_Endpoints endpoint;
     class AZ1_Transit,AZ2_Transit,AZ3_Transit transit;
+    class AZ1_Public,AZ2_Public,AZ3_Public public;
     end
 ```
 
@@ -63,22 +68,25 @@ graph TD
 The infrastructure is divided across three availability zones for high availability:
 
 - **Zone 1 Infrastructure**:
-  - Node Subnet: 10.200.0.0/26 (62 IPs)
-  - Services Subnet: 10.200.0.64/27 (30 IPs)
-  - Endpoints Subnet: 10.200.0.96/28 (14 IPs)
-  - Transit Subnet: 10.200.0.112/29 (6 IPs)
+  - Kubernetes Node Subnet: 10.104.0.0/26 (62 IPs)
+  - Services Subnet: 10.104.0.64/27 (30 IPs)
+  - Endpoints Subnet: 10.104.0.96/28 (14 IPs)
+  - Transit Subnet: 10.104.0.128/29 (6 IPs)
+  - Public Subnet: 10.104.0.112/28 (14 IPs)
 
 - **Zone 2 Infrastructure**:
-  - Node Subnet: 10.200.1.0/26 (62 IPs)
-  - Services Subnet: 10.200.1.64/27 (30 IPs)
-  - Endpoints Subnet: 10.200.1.96/28 (14 IPs)
-  - Transit Subnet: 10.200.1.112/29 (6 IPs)
+  - Kubernetes Node Subnet: 10.104.1.0/26 (62 IPs)
+  - Services Subnet: 10.104.1.64/27 (30 IPs)
+  - Endpoints Subnet: 10.104.1.96/28 (14 IPs)
+  - Transit Subnet: 10.104.1.128/29 (6 IPs)
+  - Public Subnet: 10.104.1.112/28 (14 IPs)
 
 - **Zone 3 Infrastructure**:
-  - Node Subnet: 10.200.2.0/26 (62 IPs)
-  - Services Subnet: 10.200.2.64/27 (30 IPs)
-  - Endpoints Subnet: 10.200.2.96/28 (14 IPs)
-  - Transit Subnet: 10.200.2.112/29 (6 IPs)
+  - Kubernetes Node Subnet: 10.104.2.0/26 (62 IPs)
+  - Services Subnet: 10.104.2.64/27 (30 IPs)
+  - Endpoints Subnet: 10.104.2.96/28 (14 IPs)
+  - Transit Subnet: 10.104.2.128/29 (6 IPs)
+  - Public Subnet: 10.104.2.112/28 (14 IPs)
 
 ### Address Space Allocation
 
@@ -89,89 +97,32 @@ Each Kubernetes cluster requires several CIDR ranges:
 3. **Service CIDR**: For Kubernetes service IP assignments
 4. **Load Balancer CIDRs**: For cloud load balancer IPs
 
-Example allocations for an AKS cluster in Azure:
+Example allocations for our AKS cluster in Azure:
 
 | CIDR Type | Address Range | Size | Purpose |
 |-----------|---------------|------|---------|
-| AZ1 Node Subnet | 10.200.0.0/26 | /26 (62 IPs) | Worker nodes in AZ1 |
-| AZ2 Node Subnet | 10.200.1.0/26 | /26 (62 IPs) | Worker nodes in AZ2 |
-| AZ3 Node Subnet | 10.200.2.0/26 | /26 (62 IPs) | Worker nodes in AZ3 |
+| AZ1 Node Subnet | 10.104.0.0/26 | /26 (62 IPs) | Worker nodes in AZ1 |
+| AZ2 Node Subnet | 10.104.1.0/26 | /26 (62 IPs) | Worker nodes in AZ2 |
+| AZ3 Node Subnet | 10.104.2.0/26 | /26 (62 IPs) | Worker nodes in AZ3 |
 | Pod CIDR | 10.240.0.0/16 | /16 (65,534 IPs) | Pod IP addresses |
 | Service CIDR | 10.241.0.0/16 | /16 (65,534 IPs) | Kubernetes service IPs |
-| AZ1 Services Subnet | 10.200.0.64/27 | /27 (30 IPs) | Load balancers in AZ1 |
-| AZ2 Services Subnet | 10.200.1.64/27 | /27 (30 IPs) | Load balancers in AZ2 |
-| AZ3 Services Subnet | 10.200.2.64/27 | /27 (30 IPs) | Load balancers in AZ3 |
+| AZ1 Public Subnet | 10.104.0.112/28 | /28 (14 IPs) | Load balancers in AZ1 |
+| AZ2 Public Subnet | 10.104.1.112/28 | /28 (14 IPs) | Load balancers in AZ2 |
+| AZ3 Public Subnet | 10.104.2.112/28 | /28 (14 IPs) | Load balancers in AZ3 |
+| AZ1 Services Subnet | 10.104.0.64/27 | /27 (30 IPs) | Databases and cloud resources in AZ1 |
+| AZ2 Services Subnet | 10.104.1.64/27 | /27 (30 IPs) | Databases and cloud resources in AZ2 |
+| AZ3 Services Subnet | 10.104.2.64/27 | /27 (30 IPs) | Databases and cloud resources in AZ3 |
 
-## Network Implementation Options
+## Network Implementation
 
-The VIP Platform supports multiple Kubernetes networking implementations depending on cloud provider and requirements:
+The VIP Platform currently uses Cilium CNI for Kubernetes networking, providing enhanced security, visibility, and performance through eBPF technology.
 
-### Azure AKS Networking
+### Cilium CNI Implementation
 
-#### Azure CNI Networking
-
-The primary networking mode for AKS clusters in production environments:
-
-- **Network Plugin**: Azure CNI
-- **Pod CIDR Allocation**: Pre-allocated from VNet address space
-- **Node-Pod Connectivity**: Direct within VNet
-- **Network Policy**: Calico or Azure Network Policy
-- **Service Connectivity**: Azure Load Balancer integration
-
-Implementation example:
-
-```hcl
-module "aks_networking" {
-  source = "../../modules/azure/aks_networking"
-  
-  resource_group_name = var.resource_group_name
-  location            = var.location
-  
-  # VNet Configuration
-  vnet_name           = "vip-vnet-${var.stage}-${var.region_abbv}"
-  address_space       = ["10.200.0.0/21"]
-  
-  # Subnet Configuration
-  subnets = {
-    "az1-node-subnet" = {
-      address_prefix = "10.200.0.0/26"
-      security_rules = ["allow_aks"]
-    }
-    "az2-node-subnet" = {
-      address_prefix = "10.200.1.0/26"
-      security_rules = ["allow_aks"]
-    }
-    "az3-node-subnet" = {
-      address_prefix = "10.200.2.0/26"
-      security_rules = ["allow_aks"]
-    }
-  }
-  
-  # AKS Network Configuration
-  network_plugin      = "azure"
-  network_policy      = "calico"
-  service_cidr        = "10.241.0.0/16"
-  dns_service_ip      = "10.241.0.10"
-  pod_cidr            = "10.240.0.0/16"
-}
-```
-
-#### Kubenet Networking
-
-Used for development environments or where IP address space is constrained:
-
-- **Network Plugin**: Kubenet
-- **Pod CIDR Allocation**: Uses separate address space with NAT
-- **Node-Pod Connectivity**: Through NAT and routing tables
-- **Network Policy**: Limited options
-- **Service Connectivity**: Azure Load Balancer integration
-
-#### Cilium CNI (BYO CNI)
-
-For advanced networking capabilities and enhanced security:
+Cilium is implemented using a "bring your own CNI" approach with the following configuration:
 
 - **Network Plugin**: "none" (Bring Your Own CNI)
-- **CNI Implementation**: Cilium (installed post-cluster creation)
+- **CNI Implementation**: Cilium
 - **Pod CIDR Allocation**: Managed by Cilium in separate address space
 - **Network Policy**: Cilium Network Policy (extends Kubernetes Network Policy)
 - **Service Connectivity**: Azure Load Balancer integration
@@ -179,65 +130,12 @@ For advanced networking capabilities and enhanced security:
 
 Implementation approach:
 
-1. Create the AKS cluster with `network_plugin` set to "none":
-
-```hcl
-module "aks_core" {
-  source = "../../modules/azure/aks_core"
-  
-  # Basic cluster configuration
-  resource_group_name = var.resource_group_name
-  location            = var.location
-  
-  # Network configuration
-  network_plugin      = "none"  # No CNI installed by Azure
-  service_cidr        = "10.241.0.0/16"
-  dns_service_ip      = "10.241.0.10"
-  # Note: Do not specify pod_cidr as it will be managed by Cilium
-  
-  # Other configuration...
-}
-```
-
-2. Install Cilium using the dedicated module:
-
-```hcl
-module "cilium" {
-  source = "../../modules/azure/kubernetes/cilium"
-  
-  # Required inputs for Kubernetes provider
-  kubernetes_host                   = module.aks_core.host
-  kubernetes_client_certificate     = module.aks_core.client_certificate
-  kubernetes_client_key             = module.aks_core.client_key
-  kubernetes_cluster_ca_certificate = module.aks_core.cluster_ca_certificate
-  
-  # Cilium configuration
-  chart_version = "1.17.2"
-  namespace     = "kube-system"
-  
-  # Cilium-specific settings
-  set_values = {
-    "aks.enabled"                 = "true"
-    "tunnel"                      = "vxlan"
-    "ipam.mode"                   = "kubernetes"
-    "kubeProxyReplacement"        = "strict"
-    "hubble.enabled"              = "true"
-    "hubble.relay.enabled"        = "true"
-    "hubble.ui.enabled"           = "true"
-    "operator.replicas"           = "2"
-    "nodeinit.enabled"            = "true"
-    "prometheus.enabled"          = "true"
-  }
-}
-```
-
-**Important Considerations for Cilium**:
-
-- **Immutable Properties**: When using Cilium, avoid specifying `pod_cidr` in the AKS configuration as this is an immutable property that would require cluster recreation if changed.
-- **Upgrade Process**: Cilium upgrades should be performed carefully, typically before AKS version upgrades.
-- **Feature Support**: Using BYO CNI mode may limit some AKS features; ensure compatibility with required platform capabilities.
-- **Observability**: Enable Hubble for enhanced network observability.
-- **Performance Tuning**: Consider Cilium-specific performance optimizations for production environments.
+1. Create the AKS cluster with `network_plugin` set to "none" to allow for BYO CNI
+2. Configure Cilium with appropriate settings for AKS:
+   - Enable AKS-specific integration
+   - Configure VXLAN tunneling
+   - Enable kube-proxy replacement
+   - Set up Hubble for observability
 
 **Benefits of Cilium CNI**:
 
@@ -247,38 +145,53 @@ module "cilium" {
 - Advanced observability with Hubble
 - Native multi-cluster support
 - Future-proof networking with Kubernetes and service mesh integration
+- Kube-proxy replacement for improved performance
+- Support for transparent encryption
 
-### AWS EKS Networking
+**Important Considerations for Cilium**:
 
-#### VPC CNI
+- **Immutable Properties**: When using Cilium, avoid specifying `pod_cidr` in the AKS configuration as this is an immutable property that would require cluster recreation if changed.
+- **Upgrade Process**: Cilium upgrades should be performed carefully, typically before AKS version upgrades.
+- **Feature Support**: Using BYO CNI mode may limit some AKS features; ensure compatibility with required platform capabilities.
+- **Observability**: Enable Hubble for enhanced network observability.
+- **Performance Tuning**: Consider Cilium-specific performance optimizations for production environments.
 
-Primary networking mode for EKS clusters:
+### Other Networking Options (Not Currently Used)
 
-- **Network Plugin**: Amazon VPC CNI
-- **Pod CIDR Allocation**: Secondary IP addresses from VPC
-- **Node-Pod Connectivity**: Direct within VPC
-- **Network Policy**: Calico
-- **Service Connectivity**: AWS Load Balancer integration
+While our current implementation uses Cilium, the platform is designed to support other networking options as well:
 
-#### Custom CNI Options
+#### Azure CNI Networking
 
-For specialized scenarios (Calico, Cilium, etc.):
+- **Network Plugin**: Azure CNI
+- **Pod CIDR Allocation**: Pre-allocated from VNet address space
+- **Node-Pod Connectivity**: Direct within VNet
+- **Network Policy**: Calico or Azure Network Policy
+- **Service Connectivity**: Azure Load Balancer integration
 
-- **Network Plugin**: Custom CNI
+#### Kubenet Networking
+
+- **Network Plugin**: Kubenet
+- **Pod CIDR Allocation**: Uses separate address space with NAT
+- **Node-Pod Connectivity**: Through NAT and routing tables
+- **Network Policy**: Limited options
+- **Service Connectivity**: Azure Load Balancer integration
+
+### Future Cloud Provider Support
+
+The networking design is prepared for future expansion to additional cloud providers:
+
+#### AWS EKS Networking (Planned)
+
+- **Network Plugin**: Custom CNI (Cilium planned)
 - **Pod CIDR Allocation**: Separate address space
-- **Network Policy**: Built into CNI
+- **Network Policy**: Cilium Network Policy
 - **Service Connectivity**: AWS Load Balancer integration
 
-### GCP GKE Networking
+#### GCP GKE Networking (Planned)
 
-#### VPC Native
-
-Primary networking mode for GKE clusters:
-
-- **Network Plugin**: VPC Native
-- **Pod CIDR Allocation**: Alias IP ranges
-- **Node-Pod Connectivity**: Direct within VPC
-- **Network Policy**: Calico
+- **Network Plugin**: Custom CNI (Cilium planned)
+- **Pod CIDR Allocation**: Separate address space
+- **Network Policy**: Cilium Network Policy
 - **Service Connectivity**: GCP Load Balancer integration
 
 ## Security Considerations
@@ -287,42 +200,51 @@ Primary networking mode for GKE clusters:
 
 Each subnet has specific security rules:
 
-- **Node Subnets**:
+- **Kubernetes Node Subnets**:
   - Allow API server communication
   - Allow node-to-node traffic
   - Allow monitoring traffic
-  - Deny unnecessary external access
+  - Allow Azure Load Balancer inbound
+  - Deny all other inbound traffic
+  - Allow outbound internet access for node operations
 
 - **Services Subnets**:
-  - Allow load balancer health probes
-  - Allow application traffic on specified ports
+  - Allow database and cloud service traffic on specified ports
+  - Allow monitoring traffic
   - Deny unnecessary external access
 
 - **Endpoints Subnets**:
   - Allow traffic to specific private endpoints
   - Deny all other traffic
 
+- **Public Subnets**:
+  - Allow load balancer health probes
+  - Allow application traffic on specified ports
+  - Implement throttling and DDoS protection
+
 ### Network Policies
 
-Kubernetes network policies implemented for pod-to-pod traffic control:
+Kubernetes network policies implemented via Cilium for pod-to-pod traffic control:
 
 1. **Default Deny**: Start with deny-all policy
 2. **Namespace Isolation**: Restrict traffic between namespaces
 3. **Application-Specific Policies**: Allow only required communication paths
 4. **Egress Control**: Limit outbound connections from pods
+5. **Layer 7 Filtering**: Control HTTP/gRPC/DNS traffic
 
 Example network policy:
 
 ```yaml
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
 metadata:
   name: default-deny-all
 spec:
-  podSelector: {}
-  policyTypes:
-  - Ingress
-  - Egress
+  endpointSelector: {}
+  ingress:
+  - {}
+  egress:
+  - {}
 ```
 
 ### Private Cluster Configuration
@@ -336,78 +258,61 @@ For production environments, Kubernetes API server access is restricted:
 
 ## Network Observability
 
-The platform implements comprehensive network monitoring:
+The platform implements comprehensive network monitoring through Cilium's Hubble:
 
 1. **Flow Logs**: Record network traffic for analysis and troubleshooting
 2. **Metrics Collection**: Gather performance metrics for pods, nodes, and services
 3. **Network Visualization**: Map pod-to-pod and pod-to-service communication
 4. **Anomaly Detection**: Identify unusual network patterns
+5. **Service Maps**: Visualize service dependencies
+6. **HTTP/gRPC Visibility**: Layer 7 traffic analysis
 
 ## Implementation in Terraform
 
-Network configuration is implemented using the `aks_networking` module:
+Network configuration is implemented using the `networking` module and the AKS-specific modules:
 
 ```hcl
-module "aks_networking" {
-  source = "../../modules/azure/aks_networking"
+module "networking" {
+  source = "../../modules/azure/networking"
   
   # Basic Information
   resource_group_name = var.resource_group_name
   location            = var.location
   
   # Network Configuration
-  vnet_name           = "vip-vnet-${var.stage}-${var.region_abbv}"
-  address_space       = ["10.200.0.0/21"]
-  dns_servers         = var.dns_servers
+  vnet_name           = dependency.naming.outputs.virtual_network
+  address_space       = ["10.104.0.0/16"]
   
   # Subnet Configuration
   subnets = {
-    "az1-node-subnet" = {
-      address_prefix = "10.200.0.0/26"
-      security_rules = ["allow_aks", "allow_ssh"]
-      route_table    = "aks-routes"
+    "az1-kubernetes" = {
+      address_prefixes  = ["10.104.0.0/26"]
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ContainerRegistry"]
+    },
+    "az1-services" = {
+      address_prefixes  = ["10.104.0.64/27"]
+      service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.Sql"]
+    },
+    "az1-endpoints" = {
+      address_prefixes  = ["10.104.0.96/28"]
+      service_endpoints = ["Microsoft.Storage", "Microsoft.Sql", "Microsoft.KeyVault"]
+    },
+    "az1-transit" = {
+      address_prefixes  = ["10.104.0.128/29"]
+      service_endpoints = ["Microsoft.Storage"]
+    },
+    "az1-public" = {
+      address_prefixes  = ["10.104.0.112/28"]
+      service_endpoints = ["Microsoft.Storage"]
     }
-    "az2-node-subnet" = {
-      address_prefix = "10.200.1.0/26"
-      security_rules = ["allow_aks", "allow_ssh"]
-      route_table    = "aks-routes"
-    }
-    "az3-node-subnet" = {
-      address_prefix = "10.200.2.0/26"
-      security_rules = ["allow_aks", "allow_ssh"]
-      route_table    = "aks-routes"
-    }
-    "az1-lb-subnet" = {
-      address_prefix = "10.200.0.64/27"
-      security_rules = ["allow_lb"]
-    }
-    "az2-lb-subnet" = {
-      address_prefix = "10.200.1.64/27"
-      security_rules = ["allow_lb"]
-    }
-    "az3-lb-subnet" = {
-      address_prefix = "10.200.2.64/27"
-      security_rules = ["allow_lb"]
-    }
+    # AZ2 and AZ3 subnets defined similarly
   }
   
   # AKS Specific Configuration
-  network_plugin      = "azure"
-  network_policy      = "calico"
-  service_cidr        = "10.241.0.0/16"
-  dns_service_ip      = "10.241.0.10"
-  pod_cidr            = "10.240.0.0/16"
-  outbound_type       = "userDefinedRouting"
-  private_cluster     = true
-  api_server_authorized_ip_ranges = ["10.0.0.0/8"]
-  
-  # Tags
-  tags = {
-    Environment = var.stage
-    ManagedBy   = "Terragrunt"
-    Component   = "Networking"
-    Project     = "VIP Platform"
-  }
+  enable_aks_networking = true
+  aks_subnet_name = "az1-kubernetes"
+  aks_cluster_name = dependency.naming.outputs.aks_cluster
+  aks_private_cluster_enabled = true
 }
 ```
 
@@ -420,42 +325,49 @@ module "aks_networking" {
 
 2. **Performance Optimization**:
    - Use accelerated networking/enhanced networking on worker nodes
-   - Configure appropriate MTU sizes for CNI
+   - Configure appropriate MTU sizes for Cilium
+   - Enable Cilium's kube-proxy replacement for optimized service handling
    - Place related pods in the same availability zone when possible
 
 3. **Security Guidelines**:
    - Use private clusters for production workloads
-   - Implement least-privilege network policies
+   - Implement least-privilege network policies with Cilium
+   - Leverage Cilium's Layer 7 policies for HTTP/gRPC/DNS traffic
    - Regularly audit network flows and security rules
 
 4. **Operational Recommendations**:
    - Document all CIDR allocations in the central allocation file
    - Implement automated validation of network configurations
    - Monitor IP address utilization in subnets
+   - Leverage Hubble for network observability and troubleshooting
 
 ## Troubleshooting Guide
 
 Common Kubernetes networking issues and solutions:
 
 1. **Pod-to-Pod Communication Issues**:
-   - Verify network policy configuration
+   - Check Cilium network policy configuration
+   - Verify Cilium agent status on nodes
+   - Examine Hubble flows for blocked traffic
    - Check node subnet NSG/security group rules
-   - Validate route tables and user-defined routes
 
 2. **Service Connectivity Problems**:
    - Verify service CIDR configuration
-   - Check kube-proxy status on nodes
-   - Verify load balancer subnet configuration
+   - Check Cilium's kube-proxy replacement functionality
+   - Verify endpoint connectivity
+   - Examine service definition and selectors
 
 3. **External Access Issues**:
    - Validate load balancer health probes
    - Check ingress controller configuration
    - Verify public IP allocations and DNS settings
+   - Examine public subnet NSG rules
 
 4. **Node Connectivity Issues**:
    - Check node subnet security rules
    - Verify kubelet configuration
    - Validate node-to-control-plane communication
+   - Check Cilium node-init status
 
 ## Next Steps
 
