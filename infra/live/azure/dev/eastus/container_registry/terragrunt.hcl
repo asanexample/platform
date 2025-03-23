@@ -45,7 +45,7 @@ dependency "naming" {
 
   # Mock outputs for plan and validation
   mock_outputs = {
-    container_registry = "mock-acr"
+    container_registry = "mockacr"
   }
 }
 
@@ -75,7 +75,7 @@ dependency "aks_core" {
 
 # Specify the Terraform module to use - this will be merged with the common configuration
 terraform {
-  source = "${get_parent_terragrunt_dir()}/../../modules/azure/container_registry"
+  source = "${get_repo_root()}/infra/modules/azure/container_registry"
 }
 
 # Inputs for the Container Registry module - these will be merged with common inputs

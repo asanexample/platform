@@ -70,7 +70,7 @@ run "advanced_aks_cluster" {
     }
     
     # Monitor workspace integration
-    log_analytics_workspace_id = "mock-monitor-workspace-id"
+    log_analytics_workspace_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.OperationalInsights/workspaces/test-monitor-workspace"
     
     # Comprehensive tagging
     tags = {
