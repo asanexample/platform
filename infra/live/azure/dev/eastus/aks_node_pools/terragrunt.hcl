@@ -80,7 +80,7 @@ inputs = {
   app_node_pool = {
     enabled = true
     name = "apps"
-    vm_size = "Standard_D4s_v4"
+    vm_size = "Standard_D8s_v5"
     node_count = 2
     # Use availability zones for high availability
     availability_zones = ["1", "2", "3"]
