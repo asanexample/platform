@@ -157,15 +157,10 @@ inputs = {
     ultra_ssd_enabled = false
   }
 
-  microsoft_defender_enabled = true
-  diagnostic_settings = [
-    {
-      name                       = "${dependency.naming.outputs.aks_cluster}-tf-diag"
-      log_analytics_workspace_id = dependency.log_analytics.outputs.id
-      enabled_log_categories     = ["kube-apiserver", "kube-audit", "kube-audit-admin", "kube-controller-manager", "kube-scheduler", "cluster-autoscaler", "guard"]
-      metric_categories          = ["AllMetrics"]
-    }
-  ]
+  prometheus_dcr_id = null
+  microsoft_defender_enabled = false
+  
+  # Diagnostic settings are already set up in Azure and will be managed outside of Terraform
   
   # RBAC role assignments for accessing AKS monitoring
   role_assignments = [
