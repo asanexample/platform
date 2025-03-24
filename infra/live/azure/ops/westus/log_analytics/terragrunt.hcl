@@ -84,16 +84,7 @@ inputs = {
     }
   ]
   
-  # Self-diagnostics - Send logs to itself
-  diagnostic_settings = [
-    {
-      name                       = "${dependency.naming.outputs.log_analytics_workspace}-self-diag-tf"
-      log_analytics_workspace_id = "self"  # Special value that will be replaced with the workspace's own ID
-      enabled_log_categories     = ["Audit"]
-      metric_categories          = ["AllMetrics"]
-      log_retention_days         = 60
-    }
-  ]
+  # Self-diagnostics are already set up in Azure and will be managed outside of Terraform
   
   # Tags
   tags = merge(local.tags, {
