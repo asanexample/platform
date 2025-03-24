@@ -107,19 +107,7 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
   }
 }
 
-# Automatically update local kubeconfig with cluster credentials
-resource "null_resource" "update_kubeconfig" {
-  count = var.create_kubeconfig ? 1 : 0
 
-  triggers = {
-    cluster_id = azurerm_kubernetes_cluster.aks_cluster.id
-  }
-
-  # Run the az aks get-credentials command to update the kubeconfig
-  provisioner "local-exec" {
-    command = "az aks get-credentials --name ${azurerm_kubernetes_cluster.aks_cluster.name} --resource-group ${var.resource_group_name} --overwrite-existing"
-  }
-}
 
 # Create Diagnostic Settings for the AKS Cluster
 resource "azurerm_monitor_diagnostic_setting" "this" {
@@ -150,6 +138,16 @@ resource "azurerm_monitor_diagnostic_setting" "this" {
       # Retention is now handled separately via azurerm_storage_management_policy
       # or by the Log Analytics workspace's retention_in_days setting
     }
+  }
+  
+  # Add lifecycle block to make diagnostic settings more resilient
+  lifecycle {
+    # Ignore changes to these fields to avoid unnecessary updates
+    ignore_changes = [
+      log_analytics_workspace_id,
+      enabled_log,
+      metric
+    ]
   }
 }
 

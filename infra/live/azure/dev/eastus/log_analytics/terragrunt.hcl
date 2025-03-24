@@ -25,6 +25,10 @@ locals {
     local.env_vars.locals.env_tags,
     local.region_vars.locals.region_tags
   )
+
+  # Control for linked storage accounts - set to false if you want to avoid creating them
+  # This is useful when importing existing resources or if you're encountering duplicate resource errors
+  create_linked_storage = false
 }
 
 # Include the root terragrunt.hcl configuration
@@ -84,49 +88,27 @@ inputs = {
   sku                 = "PerGB2018"  # Standard pricing tier
   retention_in_days   = 30           # Data retention period
   
-  # Solution packs to install
+  # Solution packs to install - Removed ContainerInsights to avoid conflicts with DCR approach
   solution_plans = [
     {
-      solution_name = "ContainerInsights"  # For AKS monitoring
+      solution_name = "Security"
     },
     {
-      solution_name = "Security"           # For security monitoring
-    },
-    {
-      solution_name = "AzureActivity"      # For Azure Activity logs
+      solution_name = "AzureActivity"
     }
   ]
   
-  # Diagnostics settings for the workspace itself
-  diagnostic_settings = [
-    {
-      name                       = "${dependency.naming.outputs.log_analytics_workspace}-diag"
-      log_analytics_workspace_id = "self"  # Send logs to itself
-      storage_account_id         = dependency.storage.outputs.id  # Also send to storage
-      
-      enabled_log_categories = [
-        "Audit"
-      ]
-      
-      metric_categories = [
-        "AllMetrics"
-      ]
-      
-      log_retention_days = 30
-    }
-  ]
+  # Enable diagnostic settings for the Log Analytics workspace itself
+  diagnostic_settings = [{
+    name                       = "${dependency.naming.outputs.log_analytics_workspace}-self-diag"
+    log_analytics_workspace_id = "self"  # Send logs to itself
+    enabled_log_categories     = ["Audit"]
+    metric_categories          = ["AllMetrics"]
+    log_retention_days         = 30
+  }]
   
   # Link storage account for long-term retention of different log types
-  linked_storage_accounts = {
-    # Logs from Azure services and custom logs
-    CustomLogs = [dependency.storage.outputs.id]
-    
-    # Alerts data
-    Alerts = [dependency.storage.outputs.id]
-    
-    # Alerts, saved searches, and workspaces
-    Query = [dependency.storage.outputs.id]
-  }
+  linked_storage_accounts = {}
   
   # Tags
   tags = merge(local.tags, {

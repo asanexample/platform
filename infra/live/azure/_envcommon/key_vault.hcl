@@ -2,7 +2,7 @@
 
 terraform {
   # Use double-slash notation to ensure all relative module references work correctly
-  source = "${find_in_parent_folders("infra")}/modules/azure//key_vault"
+  source = "${get_repo_root()}/infra/modules/azure//key_vault"
 }
 
 locals {

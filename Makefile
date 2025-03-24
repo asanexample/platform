@@ -1,5 +1,5 @@
 # Platform Infrastructure Makefile
-# This Makefile provides commands for working with the Terraform/Terragrunt infrastructure
+# Provides commands for working with Terraform/Terragrunt infrastructure
 
 # Default shell
 SHELL := /bin/bash
@@ -10,6 +10,17 @@ REGION ?=
 CLOUD ?=
 MODULE ?= all
 NO_CONFIRM ?= false
+
+# Paths
+INFRA_DIR := $(CURDIR)/infra
+LIVE_DIR := $(INFRA_DIR)/live
+MODULES_DIR := $(INFRA_DIR)/modules
+TESTS_DIR := $(INFRA_DIR)/tests
+AZURE_TESTS_DIR := $(TESTS_DIR)/modules/azure
+
+# Set specific paths based on inputs
+CLOUD_ENV_DIR := $(LIVE_DIR)/$(CLOUD)/$(ENV)
+CLOUD_ENV_REGION_DIR := $(CLOUD_ENV_DIR)/$(REGION)
 
 # Check required parameters
 define check_required_params
@@ -23,25 +34,25 @@ define check_required_params
 	fi
 endef
 
-# Check Azure CLI authentication
-define check_azure_auth
-	@echo "Checking Azure CLI login status..."
-	@az account show > /dev/null 2>&1 || { echo "Not logged in to Azure CLI. Please run 'make login-azure' first."; exit 1; }
-	@echo "Using Azure subscription: $$(az account show --query name -o tsv) ($$(az account show --query id -o tsv))"
-	@echo "Tenant ID: $$(az account show --query tenantId -o tsv)"
+# Azure helper function - safely export credentials from Azure CLI to environment
+define azure_credentials_export
+	AZURE_SUBSCRIPTION_ID=$$(az account show --query id -o tsv); \
+	AZURE_TENANT_ID=$$(az account show --query tenantId -o tsv); \
+	echo "Using Azure subscription: $$(az account show --query name -o tsv) ($$AZURE_SUBSCRIPTION_ID)"; \
+	echo "Tenant ID: $$AZURE_TENANT_ID"; \
+	export TF_VAR_azure_subscription_id="$$AZURE_SUBSCRIPTION_ID"; \
+	export TF_VAR_azure_tenant_id="$$AZURE_TENANT_ID"; \
+	$(1)
 endef
 
-# Paths
-INFRA_DIR := $(CURDIR)/infra
-LIVE_DIR := $(INFRA_DIR)/live
-MODULES_DIR := $(INFRA_DIR)/modules
-TESTS_DIR := $(INFRA_DIR)/tests
-AZURE_TESTS_DIR := $(TESTS_DIR)/modules/azure
+# Azure authentication check
+define azure_auth_check
+	@echo "Checking Azure CLI login status..."; \
+	az account show > /dev/null 2>&1 || { echo "Not logged in to Azure CLI. Please run 'make login-azure' first."; exit 1; }; \
+	$(call azure_credentials_export,$(1))
+endef
 
-# Set specific paths based on inputs
-CLOUD_ENV_DIR := $(LIVE_DIR)/$(CLOUD)/$(ENV)
-CLOUD_ENV_REGION_DIR := $(CLOUD_ENV_DIR)/$(REGION)
-
+# Display help information
 .PHONY: help
 help: ## Show this help message
 	@echo 'Usage: make [target] [ENV=env] [REGION=region] [CLOUD=cloud] [MODULE=module] [NO_CONFIRM=true]'
@@ -56,20 +67,25 @@ help: ## Show this help message
 	@echo '  MODULE: Specific module to target (default: all)'
 	@echo '  NO_CONFIRM: Skip all confirmation prompts (default: false)'
 
+# --- Initialize Operations ---
+
 .PHONY: init
 init: ## Initialize all modules
 	$(call check_required_params,"init")
-	@echo "Initializing $(CLOUD)/$(ENV)/$(REGION)..."
-	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all init
-
-.PHONY: init-region
-init-region: init ## Initialize all modules in a region (alias for init)
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all init); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all init; \
+	fi
 
 .PHONY: init-upgrade
 init-upgrade: ## Initialize all modules and upgrade dependencies
 	$(call check_required_params,"init-upgrade")
-	@echo "Initializing $(CLOUD)/$(ENV)/$(REGION) with dependency upgrades..."
-	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all init -upgrade
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all init -upgrade); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all init -upgrade; \
+	fi
 
 .PHONY: init-module
 init-module: ## Initialize a specific module
@@ -78,8 +94,11 @@ init-module: ## Initialize a specific module
 		echo "Error: Please specify a module with MODULE=<module-name>"; \
 		exit 1; \
 	fi
-	@echo "Initializing module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION)..."
-	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt init
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt init); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt init; \
+	fi
 
 .PHONY: init-upgrade-module
 init-upgrade-module: ## Initialize a specific module and upgrade dependencies
@@ -88,17 +107,22 @@ init-upgrade-module: ## Initialize a specific module and upgrade dependencies
 		echo "Error: Please specify a module with MODULE=<module-name>"; \
 		exit 1; \
 	fi
-	@echo "Initializing module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION) with dependency upgrades..."
-	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt init -upgrade
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt init -upgrade); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt init -upgrade; \
+	fi
+
+# --- Plan Operations ---
 
 .PHONY: plan
 plan: ## Plan all modules
 	$(call check_required_params,"plan")
-	@echo "Planning $(CLOUD)/$(ENV)/$(REGION)..."
-	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all plan
-
-.PHONY: plan-region
-plan-region: plan ## Plan all modules in a region (alias for plan)
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all plan); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all plan; \
+	fi
 
 .PHONY: plan-module
 plan-module: ## Plan a specific module
@@ -107,17 +131,22 @@ plan-module: ## Plan a specific module
 		echo "Error: Please specify a module with MODULE=<module-name>"; \
 		exit 1; \
 	fi
-	@echo "Planning module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION)..."
-	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt plan
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt plan); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt plan; \
+	fi
+
+# --- Apply Operations ---
 
 .PHONY: apply
 apply: ## Apply all modules
 	$(call check_required_params,"apply")
-	@echo "Applying $(CLOUD)/$(ENV)/$(REGION)..."
-	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all apply -auto-approve
-
-.PHONY: apply-region
-apply-region: apply ## Apply all modules in a region (alias for apply)
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all apply -auto-approve); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all apply -auto-approve; \
+	fi
 
 .PHONY: apply-module
 apply-module: ## Apply a specific module
@@ -126,20 +155,26 @@ apply-module: ## Apply a specific module
 		echo "Error: Please specify a module with MODULE=<module-name>"; \
 		exit 1; \
 	fi
-	@echo "Applying module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION)..."
-	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt apply -auto-approve
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt apply -auto-approve); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt apply -auto-approve; \
+	fi
+
+# --- Destroy Operations ---
 
 .PHONY: destroy
 destroy: ## Destroy all modules (USE WITH CAUTION)
 	$(call check_required_params,"destroy")
 	@echo "WARNING: You are about to destroy all resources in $(CLOUD)/$(ENV)/$(REGION)..."
 	@if [ "$(NO_CONFIRM)" != "true" ]; then \
-		echo "Are you sure? [y/N] " && read ans && [ $${ans:-N} = y ]; \
+		read -p "Are you sure? [y/N] " ans && [ $${ans:-N} = y ] || exit 1; \
 	fi
-	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all destroy -auto-approve
-
-.PHONY: destroy-region
-destroy-region: destroy ## Destroy all modules in a region (alias for destroy)
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all destroy -auto-approve); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all destroy -auto-approve; \
+	fi
 
 .PHONY: destroy-module
 destroy-module: ## Destroy a specific module (USE WITH CAUTION)
@@ -150,9 +185,133 @@ destroy-module: ## Destroy a specific module (USE WITH CAUTION)
 	fi
 	@echo "WARNING: You are about to destroy module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION)..."
 	@if [ "$(NO_CONFIRM)" != "true" ]; then \
-		echo "Are you sure? [y/N] " && read ans && [ $${ans:-N} = y ]; \
+		read -p "Are you sure? [y/N] " ans && [ $${ans:-N} = y ] || exit 1; \
 	fi
-	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt destroy -auto-approve
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt destroy -auto-approve); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt destroy -auto-approve; \
+	fi
+
+# --- Validation Operations ---
+
+.PHONY: validate
+validate: ## Validate all modules
+	$(call check_required_params,"validate")
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all validate); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all validate; \
+	fi
+
+.PHONY: validate-module
+validate-module: ## Validate a specific module
+	$(call check_required_params,"validate-module")
+	@if [ "$(MODULE)" = "all" ]; then \
+		echo "Error: Please specify a module with MODULE=<module-name>"; \
+		exit 1; \
+	fi
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt validate); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt validate; \
+	fi
+
+# --- State Operations ---
+
+.PHONY: show-state
+show-state: ## Show state for all modules
+	$(call check_required_params,"show-state")
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all state list); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all state list; \
+	fi
+
+.PHONY: show-state-module
+show-state-module: ## Show state for a specific module
+	$(call check_required_params,"show-state-module")
+	@if [ "$(MODULE)" = "all" ]; then \
+		echo "Error: Please specify a module with MODULE=<module-name>"; \
+		exit 1; \
+	fi
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt state list); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt state list; \
+	fi
+
+# --- Output Operations ---
+
+.PHONY: show-outputs
+show-outputs: ## Show outputs for all modules
+	$(call check_required_params,"show-outputs")
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all output); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all output; \
+	fi
+
+.PHONY: show-outputs-module
+show-outputs-module: ## Show outputs for a specific module
+	$(call check_required_params,"show-outputs-module")
+	@if [ "$(MODULE)" = "all" ]; then \
+		echo "Error: Please specify a module with MODULE=<module-name>"; \
+		exit 1; \
+	fi
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt output); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt output; \
+	fi
+
+# --- Plan File Operations ---
+
+.PHONY: plan-file
+plan-file: ## Create a plan file for all modules
+	$(call check_required_params,"plan-file")
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all plan -out=$(CLOUD_ENV_REGION_DIR)/tfplan); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all plan -out=$(CLOUD_ENV_REGION_DIR)/tfplan; \
+	fi
+
+.PHONY: plan-file-module
+plan-file-module: ## Create a plan file for a specific module
+	$(call check_required_params,"plan-file-module")
+	@if [ "$(MODULE)" = "all" ]; then \
+		echo "Error: Please specify a module with MODULE=<module-name>"; \
+		exit 1; \
+	fi
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt plan -out=$(CLOUD_ENV_REGION_DIR)/$(MODULE)/tfplan); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt plan -out=$(CLOUD_ENV_REGION_DIR)/$(MODULE)/tfplan; \
+	fi
+
+.PHONY: apply-plan
+apply-plan: ## Apply a plan file for all modules
+	$(call check_required_params,"apply-plan")
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all apply $(CLOUD_ENV_REGION_DIR)/tfplan); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all apply $(CLOUD_ENV_REGION_DIR)/tfplan; \
+	fi
+
+.PHONY: apply-plan-module
+apply-plan-module: ## Apply a plan file for a specific module
+	$(call check_required_params,"apply-plan-module")
+	@if [ "$(MODULE)" = "all" ]; then \
+		echo "Error: Please specify a module with MODULE=<module-name>"; \
+		exit 1; \
+	fi
+	@if [ "$(CLOUD)" = "azure" ]; then \
+		$(call azure_auth_check,cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt apply $(CLOUD_ENV_REGION_DIR)/$(MODULE)/tfplan); \
+	else \
+		cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt apply $(CLOUD_ENV_REGION_DIR)/$(MODULE)/tfplan; \
+	fi
+
+# --- Cleanup Operations ---
 
 .PHONY: clean
 clean: ## Clean Terragrunt cache
@@ -165,23 +324,11 @@ clean-all: ## Clean all Terragrunt cache
 	@echo "Cleaning all Terragrunt cache..."
 	@find $(LIVE_DIR) -type d -name ".terragrunt-cache" -prune -exec rm -rf {} \; 2>/dev/null || true
 
-.PHONY: delete-tfstate
-delete-tfstate: ## Delete all tfstate files recursively in all directories
-	@echo "WARNING: You are about to delete ALL Terraform state files recursively. This is IRREVERSIBLE."
-	@echo "This will remove all state tracking for all environments, clouds, and regions."
-	@if [ "$(NO_CONFIRM)" != "true" ]; then \
-		echo "Are you ABSOLUTELY sure? Type 'yes' to confirm: " && read ans && [ $$ans = "yes" ]; \
-	fi
-	@echo "Deleting all Terraform state files..."
-	@find $(INFRA_DIR) -name "*.tfstate" -o -name "*.tfstate.backup" -o -name "*.tfstate.d" -type f -delete
-	@find $(INFRA_DIR) -name "terraform.tfstate.lock.info" -type f -delete
-	@echo "All Terraform state files have been deleted."
-
 .PHONY: clear-state
 clear-state: ## Clear all Terraform state files and locks to start fresh
 	@echo "WARNING: You are about to delete all Terraform state and lock files. This is irreversible."
 	@if [ "$(NO_CONFIRM)" != "true" ]; then \
-		echo "Are you sure? This will remove all state tracking and cannot be undone. [y/N] " && read ans && [ $${ans:-N} = y ]; \
+		read -p "Are you sure? This will remove all state tracking and cannot be undone. [y/N] " ans && [ $${ans:-N} = y ] || exit 1; \
 	fi
 	@echo "Clearing all Terraform state files and locks..."
 	@find $(LIVE_DIR) -name "terraform.tfstate*" -type f -delete
@@ -191,21 +338,7 @@ clear-state: ## Clear all Terraform state files and locks to start fresh
 	@find $(MODULES_DIR) -type d -name ".terraform" -prune -exec rm -rf {} \; 2>/dev/null || true
 	@echo "All Terraform state files and locks have been removed. You can now start fresh."
 
-.PHONY: validate
-validate: ## Validate all modules
-	$(call check_required_params,"validate")
-	@echo "Validating $(CLOUD)/$(ENV)/$(REGION)..."
-	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all validate
-
-.PHONY: validate-module
-validate-module: ## Validate a specific module
-	$(call check_required_params,"validate-module")
-	@if [ "$(MODULE)" = "all" ]; then \
-		echo "Error: Please specify a module with MODULE=<module-name>"; \
-		exit 1; \
-	fi
-	@echo "Validating module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION)..."
-	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt validate
+# --- Utility Operations ---
 
 .PHONY: fmt
 fmt: ## Format all Terraform files
@@ -217,11 +350,6 @@ lint: ## Lint all Terraform files using tflint
 	@echo "Linting Terraform files..."
 	@find $(MODULES_DIR) -type d -maxdepth 2 -exec sh -c 'cd {} && echo "Linting {}" && tflint || true' \;
 
-.PHONY: deps
-deps: ## Check for dependency updates
-	@echo "Checking for dependency updates..."
-	@cd $(INFRA_DIR) && echo "TODO: Implement dependency checking"
-
 .PHONY: list-modules
 list-modules: ## List available modules for a specific cloud/env/region
 	$(call check_required_params,"list-modules")
@@ -232,6 +360,10 @@ list-modules: ## List available modules for a specific cloud/env/region
 list-regions: ## List available regions for a specific cloud/env
 	@if [ -z "$(CLOUD)" ]; then \
 		echo "Error: CLOUD parameter is required. Example: make list-regions CLOUD=azure"; \
+		exit 1; \
+	fi
+	@if [ -z "$(ENV)" ]; then \
+		echo "Error: ENV parameter is required. Example: make list-regions CLOUD=azure ENV=dev"; \
 		exit 1; \
 	fi
 	@echo "Available regions in $(CLOUD)/$(ENV):"
@@ -251,112 +383,8 @@ list-clouds: ## List available cloud providers
 	@echo "Available cloud providers:"
 	@find $(LIVE_DIR) -maxdepth 1 -mindepth 1 -type d -exec basename {} \; | sort
 
-# Azure-specific commands
-.PHONY: login-azure
-login-azure: ## Login to Azure
-	@echo "Logging in to Azure..."
-	@az login
+# --- Testing Operations ---
 
-# AWS-specific commands
-.PHONY: login-aws
-login-aws: ## Login to AWS
-	@echo "Configuring AWS credentials..."
-	@aws configure
-
-# Cloud-agnostic operations
-.PHONY: show-outputs
-show-outputs: ## Show outputs for all modules
-	$(call check_required_params,"show-outputs")
-	@echo "Outputs for $(CLOUD)/$(ENV)/$(REGION):"
-	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all output
-
-.PHONY: show-outputs-module
-show-outputs-module: ## Show outputs for a specific module
-	$(call check_required_params,"show-outputs-module")
-	@if [ "$(MODULE)" = "all" ]; then \
-		echo "Error: Please specify a module with MODULE=<module-name>"; \
-		exit 1; \
-	fi
-	@echo "Outputs for module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION):"
-	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt output
-
-.PHONY: show-state
-show-state: ## Show state for all modules (limited info)
-	$(call check_required_params,"show-state")
-	@echo "State for $(CLOUD)/$(ENV)/$(REGION):"
-	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all state list
-
-.PHONY: show-state-module
-show-state-module: ## Show state for a specific module
-	$(call check_required_params,"show-state-module")
-	@if [ "$(MODULE)" = "all" ]; then \
-		echo "Error: Please specify a module with MODULE=<module-name>"; \
-		exit 1; \
-	fi
-	@echo "State for module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION):"
-	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt state list
-
-.PHONY: plan-file
-plan-file: ## Create a plan file for all modules
-	$(call check_required_params,"plan-file")
-	@echo "Creating plan file for $(CLOUD)/$(ENV)/$(REGION)..."
-	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all plan -out=tfplan
-
-.PHONY: plan-file-module
-plan-file-module: ## Create a plan file for a specific module
-	$(call check_required_params,"plan-file-module")
-	@if [ "$(MODULE)" = "all" ]; then \
-		echo "Error: Please specify a module with MODULE=<module-name>"; \
-		exit 1; \
-	fi
-	@echo "Creating plan file for module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION)..."
-	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt plan -out=tfplan
-
-.PHONY: apply-plan
-apply-plan: ## Apply a plan file for all modules
-	$(call check_required_params,"apply-plan")
-	@echo "Applying plan file for $(CLOUD)/$(ENV)/$(REGION)..."
-	@cd $(CLOUD_ENV_REGION_DIR) && terragrunt run-all apply tfplan
-
-.PHONY: apply-plan-module
-apply-plan-module: ## Apply a plan file for a specific module
-	$(call check_required_params,"apply-plan-module")
-	@if [ "$(MODULE)" = "all" ]; then \
-		echo "Error: Please specify a module with MODULE=<module-name>"; \
-		exit 1; \
-	fi
-	@echo "Applying plan file for module $(MODULE) in $(CLOUD)/$(ENV)/$(REGION)..."
-	@cd $(CLOUD_ENV_REGION_DIR)/$(MODULE) && terragrunt apply tfplan
-
-# Region scaffolding
-.PHONY: scaffold-region
-scaffold-region: ## Scaffold a new region from templates (Usage: make scaffold-region CLOUD=azure TARGET_REGION=eastus ENV=dev REGION_ABBV=east [DRY_RUN=true])
-	@if [ -z "$(CLOUD)" ]; then \
-		echo "Error: CLOUD parameter is required. Example: make scaffold-region CLOUD=azure TARGET_REGION=eastus ENV=dev"; \
-		exit 1; \
-	fi
-	@if [ -z "$(TARGET_REGION)" ]; then \
-		echo "Error: TARGET_REGION parameter is required. Example: make scaffold-region CLOUD=azure TARGET_REGION=eastus ENV=dev"; \
-		exit 1; \
-	fi
-	@echo "Scaffolding $(TARGET_REGION) region for $(CLOUD) in environment $(ENV)..."
-	@DRY_RUN_FLAG=""; \
-	if [ "$(DRY_RUN)" = "true" ]; then \
-		DRY_RUN_FLAG="--dry-run"; \
-	fi; \
-	REGION_ABBV_DEFAULT=$$(echo $(TARGET_REGION) | sed 's/\([a-z]*\).*/\1/'); \
-	REGION_ABBV_VALUE=$${REGION_ABBV:-$$REGION_ABBV_DEFAULT}; \
-	./scripts/scaffold_region.sh --cloud $(CLOUD) --target-region $(TARGET_REGION) --environment $(ENV) --region-abbv $$REGION_ABBV_VALUE $$DRY_RUN_FLAG
-	@echo ""
-	@echo "Successfully scaffolded $(TARGET_REGION) region for $(CLOUD)!"
-	@echo "Total modules to process: 8"
-	@echo "Next steps:"
-	@echo "1. Initialize the new region: make init-region ENV=$(ENV) REGION=$(TARGET_REGION) CLOUD=$(CLOUD)"
-	@echo "2. Plan the new region: make plan-region ENV=$(ENV) REGION=$(TARGET_REGION) CLOUD=$(CLOUD)"
-	@echo "3. Review the generated files and make any necessary adjustments"
-	@echo "4. Apply the infrastructure: make apply-region ENV=$(ENV) REGION=$(TARGET_REGION) CLOUD=$(CLOUD)"
-
-# Testing commands
 .PHONY: setup-test-credentials
 setup-test-credentials: ## Set up Azure credentials for Terraform tests
 	@echo "Setting up Azure credentials for tests..."
@@ -413,65 +441,52 @@ test-module: prepare-test-modules ## Run tests for a specific module
 	@TEST_DIR="$(AZURE_TESTS_DIR)/$(MODULE)"; \
 	if [ -d "$$TEST_DIR" ]; then \
 		echo "=== Running tests in $$TEST_DIR ==="; \
-		cd "$$TEST_DIR" && \
-		TF_VAR_subscription_id="$$TF_VAR_subscription_id" \
-		TF_VAR_tenant_id="$$TF_VAR_tenant_id" \
-		terraform test; \
+		cd "$$TEST_DIR" && terraform test; \
 	else \
 		echo "Error: Test directory $$TEST_DIR does not exist"; \
 		exit 1; \
 	fi
 
-.PHONY: test-category
-test-category: prepare-test-modules ## Run tests for modules in a specific category (Usage: make test-category CATEGORY=storage)
-	@if [ -z "$(CATEGORY)" ]; then \
-		echo "Error: Please specify a category with CATEGORY=<category-name>"; \
-		exit 1; \
-	fi
-	@echo "Running tests for modules in category $(CATEGORY)..."
-	@ALL_PASSED=true; \
-	TEST_DIRS=$$(find "$(AZURE_TESTS_DIR)" -maxdepth 1 -type d -name "*$(CATEGORY)*" -o -name "$(CATEGORY)*" -o -name "*_$(CATEGORY)" -o -name "*_$(CATEGORY)_*" | sort); \
-	if [ -z "$$TEST_DIRS" ]; then \
-		echo "Error: No test directories found matching category '$(CATEGORY)'"; \
-		exit 1; \
-	fi; \
-	for dir in $$TEST_DIRS; do \
-		if [ "$$dir" != "$(AZURE_TESTS_DIR)" ]; then \
-			echo "=== Running tests in $$dir ==="; \
-			(cd "$$dir" && terraform test) || { ALL_PASSED=false; }; \
-		fi; \
-	done; \
-	echo "=== Test Results Summary for Category $(CATEGORY) ==="; \
-	if [ "$$ALL_PASSED" = true ]; then \
-		echo "✅ All tests passed"; \
-	else \
-		echo "❌ Some tests failed"; \
-		exit 1; \
-	fi
+# --- Cloud-specific commands ---
 
-.PHONY: test-pattern
-test-pattern: prepare-test-modules ## Run tests for modules matching a pattern (Usage: make test-pattern PATTERN=storage)
-	@if [ -z "$(PATTERN)" ]; then \
-		echo "Error: Please specify a pattern with PATTERN=<pattern>"; \
+.PHONY: login-azure
+login-azure: ## Login to Azure
+	@echo "Logging in to Azure..."
+	@az login
+
+.PHONY: login-aws
+login-aws: ## Login to AWS
+	@echo "Configuring AWS credentials..."
+	@aws configure
+
+# --- Region Scaffolding ---
+
+.PHONY: scaffold-region
+scaffold-region: ## Scaffold a new region (Usage: make scaffold-region CLOUD=azure TARGET_REGION=eastus ENV=dev)
+	@if [ -z "$(CLOUD)" ]; then \
+		echo "Error: CLOUD parameter is required. Example: make scaffold-region CLOUD=azure TARGET_REGION=eastus ENV=dev"; \
 		exit 1; \
 	fi
-	@echo "Running tests for modules matching pattern '$(PATTERN)'..."
-	@ALL_PASSED=true; \
-	TEST_DIRS=$$(find "$(AZURE_TESTS_DIR)" -maxdepth 1 -type d -name "*$(PATTERN)*" | sort); \
-	if [ -z "$$TEST_DIRS" ]; then \
-		echo "Error: No test directories found matching pattern '$(PATTERN)'"; \
+	@if [ -z "$(TARGET_REGION)" ]; then \
+		echo "Error: TARGET_REGION parameter is required. Example: make scaffold-region CLOUD=azure TARGET_REGION=eastus ENV=dev"; \
 		exit 1; \
+	fi
+	@if [ -z "$(ENV)" ]; then \
+		echo "Error: ENV parameter is required. Example: make scaffold-region CLOUD=azure TARGET_REGION=eastus ENV=dev"; \
+		exit 1; \
+	fi
+	@echo "Scaffolding $(TARGET_REGION) region for $(CLOUD) in environment $(ENV)..."
+	@DRY_RUN_FLAG=""; \
+	if [ "$(DRY_RUN)" = "true" ]; then \
+		DRY_RUN_FLAG="--dry-run"; \
 	fi; \
-	for dir in $$TEST_DIRS; do \
-		if [ "$$dir" != "$(AZURE_TESTS_DIR)" ]; then \
-			echo "=== Running tests in $$dir ==="; \
-			(cd "$$dir" && terraform test) || { ALL_PASSED=false; }; \
-		fi; \
-	done; \
-	echo "=== Test Results Summary for Pattern $(PATTERN) ==="; \
-	if [ "$$ALL_PASSED" = true ]; then \
-		echo "✅ All tests passed"; \
-	else \
-		echo "❌ Some tests failed"; \
-		exit 1; \
-	fi 
+	REGION_ABBV_DEFAULT=$$(echo $(TARGET_REGION) | sed 's/\([a-z]*\).*/\1/'); \
+	REGION_ABBV_VALUE=$${REGION_ABBV:-$$REGION_ABBV_DEFAULT}; \
+	./scripts/scaffold_region.sh --cloud $(CLOUD) --target-region $(TARGET_REGION) --environment $(ENV) --region-abbv $$REGION_ABBV_VALUE $$DRY_RUN_FLAG
+	@echo ""
+	@echo "Successfully scaffolded $(TARGET_REGION) region for $(CLOUD)!"
+	@echo "Next steps:"
+	@echo "1. Initialize the new region: make init ENV=$(ENV) REGION=$(TARGET_REGION) CLOUD=$(CLOUD)"
+	@echo "2. Plan the new region: make plan ENV=$(ENV) REGION=$(TARGET_REGION) CLOUD=$(CLOUD)"
+	@echo "3. Review the generated files and make any necessary adjustments"
+	@echo "4. Apply the infrastructure: make apply ENV=$(ENV) REGION=$(TARGET_REGION) CLOUD=$(CLOUD)" 

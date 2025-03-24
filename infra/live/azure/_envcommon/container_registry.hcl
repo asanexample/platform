@@ -2,13 +2,12 @@
 
 # Set the Terraform module source
 terraform {
-  source = "${local.base_source_url}?ref=main"
+  source = "${get_repo_root()}/infra/modules/azure/container_registry"
 }
 
 # Local variables for configuration
 locals {
-  # Base repository URL for modules - allows for using a different fork if needed
-  base_source_url = "git::git@github.com:your-org/platform.git//infra/modules/azure/container_registry"
+  # Not using any special source URL - using local repo
 }
 
 # Common inputs for all environments

@@ -39,7 +39,7 @@ include "aks_core_common" {
   path = find_in_parent_folders("azure/_envcommon/aks_core.hcl")
 }
 
-# Set dependencies for this module
+# Set dependencies for this module (these will merge with the common inputs)
 dependency "naming" {
   config_path = "../naming"
 
@@ -169,9 +169,6 @@ inputs = {
     ultra_ssd_enabled = false
   }
 
-  # Monitoring and diagnostics configuration
-  enable_log_analytics_workspace = true
-  log_analytics_workspace_id = dependency.log_analytics.outputs.id
   
   # Connect to Azure Monitor Workspace (Managed Prometheus)
   prometheus_dcr_id = dependency.monitor_workspace.outputs.dcr_id
@@ -179,36 +176,22 @@ inputs = {
   # Enable Microsoft Defender for Containers
   microsoft_defender_enabled = true
   
-  # AKS Diagnostic Settings
-  diagnostic_settings = [
-    {
-      name                       = "${dependency.naming.outputs.aks_cluster}-diag"
-      log_analytics_workspace_id = dependency.log_analytics.outputs.id
-      
-      # Enable all log categories for comprehensive monitoring
-      enabled_log_categories = [
-        "kube-apiserver",
-        "kube-audit",
-        "kube-audit-admin",
-        "kube-controller-manager",
-        "kube-scheduler",
-        "cluster-autoscaler",
-        "cloud-controller-manager",
-        "guard",
-        "csi-azuredisk-controller",
-        "csi-azurefile-controller",
-        "csi-snapshot-controller"
-      ]
-      
-      # Enable all metrics
-      metric_categories = [
-        "AllMetrics"
-      ]
-      
-      # Log retention days (if not using Log Analytics)
-      log_retention_days = 30
-    }
-  ]
+  # Enable diagnostic settings for AKS cluster
+  diagnostic_settings = [{
+    name                       = "${dependency.naming.outputs.aks_cluster}-diag"
+    log_analytics_workspace_id = dependency.log_analytics.outputs.id
+    enabled_log_categories     = [
+      "kube-apiserver",
+      "kube-audit",
+      "kube-audit-admin",
+      "kube-controller-manager",
+      "kube-scheduler",
+      "cluster-autoscaler",
+      "guard"
+    ]
+    metric_categories          = ["AllMetrics"]
+    log_retention_days         = 30
+  }]
 
   # Tags
   tags = merge(local.tags, {

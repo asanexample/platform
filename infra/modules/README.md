@@ -25,6 +25,7 @@ modules/
 | [log_analytics](azure/log_analytics) | Creates Log Analytics workspace for centralized monitoring and diagnostics |
 | [storage](azure/storage) | Creates Azure Storage accounts and containers with proper security controls |
 | [monitoring](azure/monitoring) | Sets up Azure Monitor and Log Analytics for infrastructure monitoring |
+| [container_insights_dcr](azure/container_insights_dcr) | Creates Data Collection Rules for Container Insights with Azure Monitor Agent |
 | [resource_group](azure/resource_group) | Creates resource groups with standardized tagging |
 | [naming](azure/naming) | Standardizes resource naming across deployments |
 

@@ -9,6 +9,10 @@
 # AKS node pool names must be 1-12 characters, lowercase alphanumeric, and start with a letter
 locals {
   app_node_pool_name = var.app_node_pool_name != null ? var.app_node_pool_name : "app${var.environment}${var.region_abbv}"
+  
+  # Conditionally set availability zones based on region support
+  # Some regions like 'westus' don't support availability zones for VMSS
+  use_availability_zones = var.use_availability_zones == null ? var.app_node_pool_availability_zones : (var.use_availability_zones ? var.app_node_pool_availability_zones : null)
 }
 
 # Create application node pool if enabled
@@ -20,8 +24,8 @@ resource "azurerm_kubernetes_cluster_node_pool" "app_node_pool" {
   vm_size               = var.app_node_pool_vm_size
   node_count            = var.app_node_pool_enable_auto_scaling ? null : var.app_node_pool_node_count
 
-  # Zone configuration
-  zones = var.app_node_pool_availability_zones
+  # Zone configuration - conditionally use availability zones
+  zones = local.use_availability_zones
 
   # Node pool configuration
   max_pods        = var.app_node_pool_max_pods

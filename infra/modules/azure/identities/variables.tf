@@ -31,12 +31,12 @@ variable "customer" {
 }
 
 variable "environment" {
-  description = "Environment name (used for resource naming, ex: dev, qa, prod)."
+  description = "Environment name (used for resource naming, ex: dev, qa, prod, ops)."
   type        = string
 
   validation {
-    condition     = contains(["dev", "qa", "prod"], var.environment)
-    error_message = "The environment should be one of: dev, qa, prod."
+    condition     = contains(["dev", "qa", "prod", "ops"], var.environment)
+    error_message = "The environment should be one of: dev, qa, prod, ops."
   }
 }
 

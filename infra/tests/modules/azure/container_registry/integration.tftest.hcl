@@ -23,6 +23,9 @@ run "module_integration" {
     location            = "eastus"
     name                = "mockintegrationacr"
     
+    # Enable ACR creation for test
+    create_registry = true
+    
     # Standard properties
     prefix      = "test"
     environment = "dev"

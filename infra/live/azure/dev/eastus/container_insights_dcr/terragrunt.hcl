@@ -10,6 +10,19 @@ include {
   path = find_in_parent_folders()
 }
 
+# Temporarily exclude this module to avoid conflicts during the initial apply
+# Comment this out after the initial apply succeeds
+skip = false
+
+# Set explicit dependency ordering for deployment
+dependencies {
+  paths = [
+    "../resource_group",
+    "../log_analytics",
+    "../aks_core"  # Make sure AKS is created before Container Insights DCR
+  ]
+}
+
 # Get configuration variables using Terragrunt functions
 locals {
   # Load hierarchical variables
@@ -72,7 +85,7 @@ inputs = {
   resource_group_name = dependency.resource_group.outputs.name
   location            = dependency.resource_group.outputs.location
   
-  # AKS cluster details
+  # AKS cluster details - Using the actual cluster name without additional suffixes
   cluster_name = dependency.aks_core.outputs.name
   cluster_id   = dependency.aks_core.outputs.id
   
@@ -81,20 +94,27 @@ inputs = {
   
   # Configure data collection settings
   interval                 = "1m"
-  namespace_filtering_mode = "Include"
-  namespaces               = ["kube-system"]
+  
+  # Since namespace filtering doesn't apply to all data and may exclude important components,
+  # we'll use the recommended approach of not filtering namespaces for comprehensive monitoring
+  namespace_filtering_mode = "Exclude"
+  namespaces               = []  # No namespaces to exclude
+  
   enable_container_log_v2  = true
   
-  # Data streams to collect
+  # Data streams to collect - Include all standard streams recommended by Microsoft
   data_streams = [
     "Microsoft-ContainerLogV2",
     "Microsoft-Perf",
     "Microsoft-KubeEvents",
     "Microsoft-KubePodInventory",
     "Microsoft-KubeNodeInventory",
-    "Microsoft-KubeServices"
+    "Microsoft-KubeServices",
+    "Microsoft-KubePVInventory"
   ]
   
-  # Tags
-  tags = local.tags
+  # Tags - update to standard monitoring tags without version suffixes
+  tags = merge(local.tags, {
+    "MonitoringType" = "AMA-ContainerInsights"
+  })
 } 

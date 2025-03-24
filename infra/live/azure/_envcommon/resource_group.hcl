@@ -7,7 +7,7 @@
 # Terraform module source
 terraform {
   # Use double-slash notation to ensure all relative module references work correctly
-  source = "${find_in_parent_folders("infra")}/modules/azure//resource_group"
+  source = "${get_repo_root()}/infra/modules/azure//resource_group"
 }
 
 # ---------------------------------------------------------------------------------------------------------------------

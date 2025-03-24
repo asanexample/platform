@@ -1,12 +1,13 @@
 # ---------------------------------------------------------------------------------------------------------------------
 # COMMON TERRAGRUNT CONFIGURATION FOR RESOURCE NAMING
-# This file defines the configuration for the Azure naming module that standardizes resource naming
-# across all environments and regions.
+# This is the common component configuration for resource naming. The common parameters defined in this file will be
+# used across all environments to ensure consistent resource naming following Azure best practices.
 # ---------------------------------------------------------------------------------------------------------------------
 
+# Terraform module source for Azure Naming 
 terraform {
   # Use double-slash notation to ensure all relative module references work correctly
-  source = "${find_in_parent_folders("infra")}/modules/azure//naming"
+  source = "${get_repo_root()}/infra/modules/azure//naming"
 }
 
 # ---------------------------------------------------------------------------------------------------------------------

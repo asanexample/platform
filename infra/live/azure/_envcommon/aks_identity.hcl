@@ -9,7 +9,7 @@
 terraform {
   # Instead of just referencing the identities module, reference the parent directory
   # This ensures all sibling modules (like naming) are available for relative imports
-  source = "${find_in_parent_folders("infra")}/modules/azure//identities"
+  source = "${get_repo_root()}/infra/modules/azure//identities"
   
   # Remove absolute paths, they're not portable
   # extra_arguments "common_vars" {

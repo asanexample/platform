@@ -7,7 +7,7 @@
 # Terraform module source for Cilium
 terraform {
   # Use double-slash notation to ensure all relative module references work correctly
-  source = "${find_in_parent_folders("infra")}/modules/azure//kubernetes/cilium"
+  source = "${get_repo_root()}/infra/modules/azure//kubernetes/cilium"
 }
 
 # ---------------------------------------------------------------------------------------------------------------------

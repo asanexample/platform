@@ -29,6 +29,7 @@ locals {
 
 # Create the Azure Container Registry
 resource "azurerm_container_registry" "acr" {
+  count                    = var.create_registry ? 1 : 0
   name                     = local.acr_name
   resource_group_name      = var.resource_group_name
   location                 = var.location
@@ -95,8 +96,8 @@ resource "azurerm_container_registry" "acr" {
 
 # Create role assignment for AKS to pull images from ACR (if AKS integration is enabled)
 resource "azurerm_role_assignment" "acr_pull" {
-  count                = var.aks_integration_enabled && var.aks_principal_id != null ? 1 : 0
-  scope                = azurerm_container_registry.acr.id
+  count                = var.create_registry && var.aks_integration_enabled && var.aks_principal_id != null ? 1 : 0
+  scope                = var.create_registry ? azurerm_container_registry.acr[0].id : ""
   role_definition_name = "AcrPull"
   principal_id         = var.aks_principal_id
   
@@ -106,8 +107,8 @@ resource "azurerm_role_assignment" "acr_pull" {
 
 # Optionally add a role assignment for pushing images to ACR
 resource "azurerm_role_assignment" "acr_push" {
-  count                = var.aks_integration_enabled && var.enable_aks_acr_push && var.aks_principal_id != null ? 1 : 0
-  scope                = azurerm_container_registry.acr.id
+  count                = var.create_registry && var.aks_integration_enabled && var.enable_aks_acr_push && var.aks_principal_id != null ? 1 : 0
+  scope                = var.create_registry ? azurerm_container_registry.acr[0].id : ""
   role_definition_name = "AcrPush"
   principal_id         = var.aks_principal_id
   
@@ -117,9 +118,9 @@ resource "azurerm_role_assignment" "acr_push" {
 
 # Lock the container registry if specified
 resource "azurerm_management_lock" "acr_lock" {
-  count      = var.lock_resource ? 1 : 0
+  count      = var.create_registry && var.lock_resource ? 1 : 0
   name       = "${local.acr_name}-lock"
-  scope      = azurerm_container_registry.acr.id
+  scope      = var.create_registry ? azurerm_container_registry.acr[0].id : ""
   lock_level = "CanNotDelete"
   notes      = "Locked to prevent accidental deletion of the container registry"
 } 

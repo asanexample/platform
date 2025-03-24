@@ -6,7 +6,7 @@
 
 # Terraform module source for networking
 terraform {
-  source = "${find_in_parent_folders("infra")}/modules/azure//networking"
+  source = "${get_repo_root()}/infra/modules/azure//networking"
 }
 
 # ---------------------------------------------------------------------------------------------------------------------

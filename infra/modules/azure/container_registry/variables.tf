@@ -41,12 +41,12 @@ variable "prefix" {
 }
 
 variable "environment" {
-  description = "The environment (e.g., dev, preprod, prod) for naming and tagging."
+  description = "The environment (e.g., dev, preprod, prod, ops) for naming and tagging."
   type        = string
   
   validation {
-    condition     = contains(["dev", "preprod", "prod", "test", "stg"], var.environment)
-    error_message = "Environment must be one of: dev, preprod, prod, test, stg."
+    condition     = contains(["dev", "preprod", "prod", "test", "stg", "ops"], var.environment)
+    error_message = "Environment must be one of: dev, preprod, prod, test, stg, ops."
   }
 }
 

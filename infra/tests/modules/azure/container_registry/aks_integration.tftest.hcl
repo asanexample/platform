@@ -20,6 +20,9 @@ run "aks_integration" {
     resource_group_name = "test-rg"
     location            = "eastus"
     
+    # Enable ACR creation for test
+    create_registry = true
+    
     # Name and standard properties
     name        = "testaksacr"
     prefix      = "test"
@@ -62,6 +65,9 @@ run "aks_integration_with_push" {
   variables {
     resource_group_name = "test-rg"
     location            = "eastus"
+    
+    # Enable ACR creation for test
+    create_registry = true
     
     # Name and standard properties
     name        = "testakspushacr"

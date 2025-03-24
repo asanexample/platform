@@ -26,6 +26,9 @@ run "basic_acr" {
     resource_group_name = "test-rg"
     location            = "eastus"
     
+    # Enable ACR creation for test
+    create_registry = true
+    
     # Use auto-generated name
     name        = null
     prefix      = "test"
