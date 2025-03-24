@@ -75,10 +75,19 @@ inputs = {
   retention_in_days = 60         # Increase retention for ops environment
   daily_quota_gb    = 5          # Set a daily quota limit of 5GB for the workspace
   
+  # RBAC role assignments for accessing the Log Analytics workspace
+  role_assignments = [
+    {
+      principal_id         = "403dc11a-5399-4f10-9515-91f048eea58a"  # Current user
+      role_definition_name = "Log Analytics Contributor"
+      description          = "Grants access to view and modify Log Analytics workspace"
+    }
+  ]
+  
   # Self-diagnostics - Send logs to itself
   diagnostic_settings = [
     {
-      name                       = "${dependency.naming.outputs.log_analytics_workspace}-self-diag"
+      name                       = "${dependency.naming.outputs.log_analytics_workspace}-self-diag-tf"
       log_analytics_workspace_id = "self"  # Special value that will be replaced with the workspace's own ID
       enabled_log_categories     = ["Audit"]
       metric_categories          = ["AllMetrics"]

@@ -157,9 +157,7 @@ inputs = {
     ultra_ssd_enabled = false
   }
 
-  # REMOVED integrations with Log Analytics and Monitor Workspace to break circular dependencies
-  prometheus_dcr_id = null
-  microsoft_defender_enabled = false
+  microsoft_defender_enabled = true
   diagnostic_settings = [
     {
       name                       = "${dependency.naming.outputs.aks_cluster}-tf-diag"
