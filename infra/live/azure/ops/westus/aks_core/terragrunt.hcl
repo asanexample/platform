@@ -82,6 +82,17 @@ dependency "aks_identity" {
   }
 }
 
+# Add dependency on Log Analytics workspace for monitoring
+dependency "log_analytics" {
+  config_path = "../log_analytics"
+
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.OperationalInsights/workspaces/mock-log-analytics"
+    name = "mock-log-analytics"
+  }
+}
+
 # Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
   # Environment variables
@@ -149,11 +160,31 @@ inputs = {
   # REMOVED integrations with Log Analytics and Monitor Workspace to break circular dependencies
   prometheus_dcr_id = null
   microsoft_defender_enabled = false
-  diagnostic_settings = []
+  diagnostic_settings = [
+    {
+      name                       = "${dependency.naming.outputs.aks_cluster}-tf-diag"
+      log_analytics_workspace_id = dependency.log_analytics.outputs.id
+      enabled_log_categories     = ["kube-apiserver", "kube-audit", "kube-audit-admin", "kube-controller-manager", "kube-scheduler", "cluster-autoscaler", "guard"]
+      metric_categories          = ["AllMetrics"]
+    }
+  ]
+  
+  # RBAC role assignments for accessing AKS monitoring
+  role_assignments = [
+    {
+      principal_id         = "403dc11a-5399-4f10-9515-91f048eea58a"  # Current user
+      role_definition_name = "Monitoring Reader"
+      description          = "Grants access to view AKS monitoring data"
+    }
+  ]
+
+  # Connect to Log Analytics Workspace
+  log_analytics_workspace_id = dependency.log_analytics.outputs.id
 
   # Tags
   tags = merge(local.tags, {
     "network-cilium-managed-by" = "cilium"
     "cilium-version"            = "1.17.2"
+    "monitoring-enabled"        = "true"
   })
 } 

@@ -370,7 +370,7 @@ variable "diagnostic_settings" {
     log_analytics_workspace_id = string
     enabled_log_categories     = list(string)
     metric_categories          = list(string)
-    log_retention_days         = number
+    log_retention_days         = optional(number)
   }))
   default = []
 }
@@ -398,7 +398,17 @@ variable "enable_host_encryption" {
 # ---------------------------------------------------------------------------------------------------------------------
 
 variable "tags" {
-  description = "Tags to apply to all resources"
+  description = "A map of tags to apply to all resources"
   type        = map(string)
   default     = {}
+}
+
+variable "role_assignments" {
+  description = "A list of role assignments to create for the AKS cluster"
+  type = list(object({
+    principal_id         = string
+    role_definition_name = string
+    description          = optional(string, null)
+  }))
+  default = []
 } 

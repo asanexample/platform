@@ -135,8 +135,6 @@ resource "azurerm_monitor_diagnostic_setting" "this" {
     content {
       category = metric.value
       enabled  = true
-      # Retention is now handled separately via azurerm_storage_management_policy
-      # or by the Log Analytics workspace's retention_in_days setting
     }
   }
   
@@ -159,4 +157,14 @@ resource "azurerm_monitor_data_collection_rule_association" "prometheus" {
   target_resource_id      = azurerm_kubernetes_cluster.aks_cluster.id
   data_collection_rule_id = var.prometheus_dcr_id
   description             = "Association between AKS cluster and Prometheus data collection rule"
+}
+
+# Create role assignments for the AKS cluster
+resource "azurerm_role_assignment" "this" {
+  for_each = { for idx, assignment in var.role_assignments : idx => assignment }
+
+  scope                = azurerm_kubernetes_cluster.aks_cluster.id
+  role_definition_name = each.value.role_definition_name
+  principal_id         = each.value.principal_id
+  description          = each.value.description
 } 
