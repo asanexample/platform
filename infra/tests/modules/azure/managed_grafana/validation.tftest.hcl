@@ -123,7 +123,7 @@ run "grafana_version_test" {
     resource_group_name     = "test-rg"
     location                = "eastus"
     prometheus_workspace_id = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Monitor/accounts/test-prometheus"
-    grafana_major_version   = "10"  # Updated to use a supported version
+    grafana_major_version   = "11"  # Updated to use a newer supported version
   }
 
   module {
@@ -132,7 +132,7 @@ run "grafana_version_test" {
 
   # Verify Grafana version is set correctly
   assert {
-    condition     = azurerm_dashboard_grafana.grafana.grafana_major_version == "10"
-    error_message = "Grafana version should be set to 10"
+    condition     = azurerm_dashboard_grafana.grafana.grafana_major_version == "11"
+    error_message = "Grafana version should be set to 11"
   }
 } 
