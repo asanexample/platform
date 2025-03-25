@@ -1,4 +1,4 @@
-# Terragrunt configuration for Azure Managed Grafana in eastus region
+# Terragrunt configuration for Azure Managed Grafana in westus region for ops environment
 
 # Local variables for this configuration
 locals {
@@ -22,7 +22,6 @@ locals {
   region_abbv = local.region_vars.locals.region_abbv
   tags        = merge(
     local.common_vars.locals.tags, 
-    local.env_vars.locals.env_tags,
     local.region_vars.locals.region_tags
   )
 }
@@ -74,7 +73,7 @@ inputs = {
   location            = dependency.resource_group.outputs.location
   
   # Grafana configuration
-  grafana_major_version             = "10" # Updated to latest supported version
+  grafana_major_version             = "10" # Latest supported version
   api_key_enabled                   = true
   deterministic_outbound_ip_enabled = true
   public_network_access_enabled     = true
@@ -89,5 +88,6 @@ inputs = {
   # Tags
   tags = merge(local.tags, {
     "monitoring-type" = "grafana"
+    "environment"     = local.env
   })
 } 
