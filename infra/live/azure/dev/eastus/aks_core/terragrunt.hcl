@@ -93,6 +93,20 @@ dependency "log_analytics" {
   }
 }
 
+dependency "prometheus_dcr" {
+  config_path = "../prometheus_dcr"
+  mock_outputs = {
+    dcr_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Insights/dataCollectionRules/mock-dcr-prometheus"
+  }
+}
+
+dependency "monitor_workspace" {
+  config_path = "../monitor_workspace"
+  mock_outputs = {
+    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Monitor/accounts/mock-monitor-workspace"
+  }
+}
+
 # Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
   # Environment variables
@@ -163,6 +177,11 @@ inputs = {
   
   # Connect to Log Analytics Workspace
   log_analytics_workspace_id = dependency.log_analytics.outputs.id
+  
+  # Enable Prometheus integration
+  enable_prometheus_integration = true
+  monitor_workspace_id = dependency.monitor_workspace.outputs.id
+  prometheus_dcr_id = dependency.prometheus_dcr.outputs.dcr_id
   
   # Enable diagnostic settings for the AKS cluster
   diagnostic_settings = [{

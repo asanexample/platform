@@ -56,6 +56,17 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
     tags                 = var.tags
   }
 
+  # Enable Microsoft Defender and Monitoring add-ons if specified
+  microsoft_defender {
+    log_analytics_workspace_id = var.log_analytics_workspace_id
+  }
+
+  # Enable Prometheus managed metrics collection
+  dynamic "monitor_metrics" {
+    for_each = var.enable_prometheus_integration ? [1] : []
+    content {}
+  }
+
   # Network profile configuration - set to "none" to not install any CNI by default
   # Cilium will be installed separately after cluster creation
   network_profile {
@@ -151,12 +162,26 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
 
 # Connect AKS to Azure Monitor Workspace (Managed Prometheus)
 resource "azurerm_monitor_data_collection_rule_association" "prometheus" {
-  count = var.prometheus_dcr_id != null ? 1 : 0
-  
+  count = var.enable_prometheus_integration && var.prometheus_dcr_id != null ? 1 : 0
+
   name                    = "${azurerm_kubernetes_cluster.aks_cluster.name}-prometheus"
   target_resource_id      = azurerm_kubernetes_cluster.aks_cluster.id
   data_collection_rule_id = var.prometheus_dcr_id
   description             = "Association between AKS cluster and Prometheus data collection rule"
+}
+
+# Grant the AKS Kubelet identity the Monitoring Metrics Publisher role on the Azure Monitor Workspace
+data "azurerm_role_definition" "monitoring_metrics_publisher" {
+  name = "Monitoring Metrics Publisher"
+}
+
+resource "azurerm_role_assignment" "prometheus_publisher" {
+  count = var.enable_prometheus_integration && var.monitor_workspace_id != null && azurerm_kubernetes_cluster.aks_cluster.kubelet_identity[0].object_id != null ? 1 : 0
+
+  scope              = var.monitor_workspace_id
+  role_definition_id = data.azurerm_role_definition.monitoring_metrics_publisher.id
+  principal_id       = azurerm_kubernetes_cluster.aks_cluster.kubelet_identity[0].object_id
+  description        = "Allow AKS Kubelet to publish metrics to the Azure Monitor Workspace for Prometheus"
 }
 
 # Create role assignments for the AKS cluster

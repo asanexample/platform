@@ -192,7 +192,7 @@ variable "default_nodepool_name" {
 variable "default_nodepool_vm_size" {
   description = "The VM size for the default node pool"
   type        = string
-  default     = "Standard_D2s_v3"
+  default     = "Standard_D4s_v4"
 }
 
 variable "default_nodepool_count" {
@@ -358,9 +358,21 @@ variable "log_analytics_workspace_id" {
 }
 
 variable "prometheus_dcr_id" {
-  description = "The ID of the Azure Monitor data collection rule for Prometheus metrics"
+  description = "The ID of the Azure Monitor data collection rule for Prometheus metrics. If null and enable_prometheus_integration is true, integration will not be configured."
   type        = string
   default     = null
+}
+
+variable "monitor_workspace_id" {
+  description = "The ID of the Azure Monitor Workspace where Prometheus metrics are sent. Required if enable_prometheus_integration is true."
+  type        = string
+  default     = null
+}
+
+variable "enable_prometheus_integration" {
+  description = "Whether to enable the Azure Monitor managed service for Prometheus integration."
+  type        = bool
+  default     = true
 }
 
 variable "diagnostic_settings" {

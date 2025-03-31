@@ -37,7 +37,7 @@ run "advanced_aks_cluster" {
     # Default node pool configuration
     default_nodepool_name            = "system"
     default_nodepool_count           = 1
-    default_nodepool_vm_size         = "Standard_D2s_v3"
+    default_nodepool_vm_size         = "Standard_D4s_v4"
     default_nodepool_max_pods        = 30
     default_nodepool_os_disk_size_gb = 128
     default_nodepool_node_labels     = {
