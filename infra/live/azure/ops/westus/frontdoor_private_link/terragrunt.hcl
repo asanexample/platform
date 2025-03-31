@@ -57,8 +57,14 @@ dependency "frontdoor_endpoint" {
 dependency "storage" {
   config_path = "../storage"
   mock_outputs = {
-    name                = "mockstorage"
-    resource_group_name = "mock-rg"
+    name = "mockstorage"
+  }
+}
+
+dependency "resource_group" {
+  config_path = "../resource_group"
+  mock_outputs = {
+    name = "mock-rg"
   }
 }
 
@@ -77,7 +83,7 @@ inputs = {
   
   # Storage account to connect to
   storage_account_name        = dependency.storage.outputs.name
-  storage_resource_group_name = dependency.storage.outputs.resource_group_name
+  storage_resource_group_name = dependency.resource_group.outputs.name
   use_blob_endpoint           = true
   
   # Origin configuration - more resilient settings for production
