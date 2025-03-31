@@ -4,7 +4,7 @@ This module deploys an Azure Front Door Profile in the Development environment (
 
 ## Configuration
 
-- **SKU**: Standard_AzureFrontDoor
+- **SKU**: Premium_AzureFrontDoor (supports Private Link)
 - **Response Timeout**: 60 seconds
 
 ## Dependencies

@@ -62,7 +62,7 @@ inputs = {
   resource_group_name = dependency.resource_group.outputs.name
   
   # Front Door settings
-  sku_name = "Standard_AzureFrontDoor"
+  sku_name = "Premium_AzureFrontDoor"
   response_timeout_seconds = 60
   
   # Tags
