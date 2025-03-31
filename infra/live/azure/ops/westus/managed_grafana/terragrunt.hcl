@@ -77,7 +77,7 @@ inputs = {
   api_key_enabled                   = true
   deterministic_outbound_ip_enabled = true
   public_network_access_enabled     = true
-  zone_redundancy_enabled           = true
+  zone_redundancy_enabled           = false # Disabled for westus as it's not supported
   
   # Azure AD admin groups - replace with actual Azure AD group IDs in production
   admin_group_object_ids = []
