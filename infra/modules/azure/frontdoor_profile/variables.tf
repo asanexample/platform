@@ -1,3 +1,9 @@
+variable "enabled" {
+  description = "Controls whether the Front Door profile is deployed"
+  type        = bool
+  default     = true
+}
+
 variable "name" {
   description = "The name of the Front Door profile"
   type        = string

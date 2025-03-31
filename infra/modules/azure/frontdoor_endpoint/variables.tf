@@ -1,3 +1,9 @@
+variable "enabled" {
+  description = "Controls whether the Front Door endpoint resources are deployed"
+  type        = bool
+  default     = true
+}
+
 variable "profile_id" {
   description = "The ID of the Front Door profile. If provided, profile_name and profile_resource_group_name are not required."
   type        = string

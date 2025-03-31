@@ -57,6 +57,9 @@ terraform {
 
 # Specify inputs specific to this module
 inputs = {
+  # Control deployment
+  enabled = false
+  
   # Resource details
   name                = dependency.naming.outputs.frontdoor_profile
   resource_group_name = dependency.resource_group.outputs.name

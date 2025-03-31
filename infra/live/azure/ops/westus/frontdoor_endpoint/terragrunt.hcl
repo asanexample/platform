@@ -57,6 +57,9 @@ terraform {
 
 # Specify inputs specific to this module
 inputs = {
+  # Conditional deployment based on profile
+  enabled = dependency.frontdoor_profile.outputs.enabled
+  
   # Front Door profile reference
   profile_id = dependency.frontdoor_profile.outputs.id
   

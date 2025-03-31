@@ -7,6 +7,7 @@ This module creates an Azure Front Door endpoint with an origin group. It provid
 - Creates a Front Door endpoint and origin group
 - Supports optional custom load balancing settings
 - Supports optional health probe configuration
+- Can be conditionally deployed using the `enabled` flag
 - Provides flexibility to reference an existing Front Door profile by ID or name/resource group
 
 ## Usage
@@ -14,6 +15,9 @@ This module creates an Azure Front Door endpoint with an origin group. It provid
 ```hcl
 module "frontdoor_endpoint" {
   source = "../../modules/azure/frontdoor_endpoint"
+
+  # Control deployment
+  enabled = true
 
   # Reference existing Front Door profile (use either profile_id OR profile_name + profile_resource_group_name)
   profile_id = module.frontdoor_profile.id
@@ -100,10 +104,30 @@ module "frontdoor_endpoint" {
 }
 ```
 
+### Disabled Endpoint Configuration
+
+```hcl
+module "frontdoor_endpoint" {
+  source = "../../modules/azure/frontdoor_endpoint"
+
+  # Disable deployment
+  enabled = false
+  
+  profile_id        = module.frontdoor_profile.id
+  endpoint_name     = "disabled-endpoint"
+  origin_group_name = "disabled-origin-group"
+  
+  tags = {
+    environment = "dev"
+  }
+}
+```
+
 ## Input Variables
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
+| enabled | Controls whether the Front Door endpoint resources are deployed | `bool` | `true` | no |
 | profile_id | The ID of the Front Door profile | `string` | `null` | no |
 | profile_name | The name of the Front Door profile | `string` | `null` | no |
 | profile_resource_group_name | The name of the resource group containing the Front Door profile | `string` | `null` | no |
@@ -124,6 +148,7 @@ module "frontdoor_endpoint" {
 | endpoint_host_name | The host name of the Front Door endpoint |
 | origin_group_id | The ID of the origin group |
 | origin_group_name | The name of the origin group |
+| enabled | Whether the Front Door endpoint is enabled |
 
 ## Requirements
 
