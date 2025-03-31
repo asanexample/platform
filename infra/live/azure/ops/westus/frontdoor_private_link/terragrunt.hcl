@@ -68,6 +68,9 @@ terraform {
 
 # Specify inputs specific to this module
 inputs = {
+  # Control deployment
+  module_enabled = dependency.frontdoor_endpoint.outputs.enabled
+  
   # Origin group reference
   origin_group_id = dependency.frontdoor_endpoint.outputs.origin_group_id
   

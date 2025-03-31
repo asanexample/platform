@@ -1,3 +1,9 @@
+variable "module_enabled" {
+  description = "Controls whether the Front Door Private Link module is deployed"
+  type        = bool
+  default     = true
+}
+
 variable "origin_group_id" {
   description = "The ID of the Front Door origin group. If provided, origin_group_name, profile_name, and profile_resource_group_name are not required."
   type        = string
