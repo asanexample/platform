@@ -226,12 +226,24 @@ locals {
     # Front Door
     front_door = "${local.default_prefix}-${var.environment}-${local.resource_types.front_door}-${local.region_abbv}",
 
+    # Front Door Profile
+    frontdoor_profile = "${local.default_prefix}-${var.environment}-${local.resource_types.frontdoor_profile}-${local.region_abbv}",
+
     # Front Door Endpoint
     frontdoor_endpoint = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.frontdoor_endpoint}-${local.region_abbv}",
 
+    # Front Door Origin Group
+    frontdoor_origin_group = "${local.default_prefix}-${var.environment}-${local.resource_types.frontdoor_origin_group}-${local.region_abbv}",
+
+    # Front Door Origin
+    frontdoor_origin = "${local.default_prefix}-${var.environment}-${local.resource_types.frontdoor_origin}-${local.region_abbv}",
+
+    # Front Door Route
+    frontdoor_route = "${local.default_prefix}-${var.environment}-${local.resource_types.frontdoor_route}-${local.region_abbv}",
+
     # Container Registry (no hyphens)
     container_registry = "${local.default_prefix}${local.normalized_customer}${var.environment}${local.resource_types.container_registry}${local.region_abbv}",
-
+    
     # Event Hub Namespace
     event_hub_namespace = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.event_hub_namespace}-${local.region_abbv}",
 
