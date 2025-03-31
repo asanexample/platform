@@ -176,12 +176,15 @@ data "azurerm_role_definition" "monitoring_metrics_publisher" {
 }
 
 resource "azurerm_role_assignment" "prometheus_publisher" {
-  count = var.enable_prometheus_integration && var.monitor_workspace_id != null && azurerm_kubernetes_cluster.aks_cluster.kubelet_identity[0].object_id != null ? 1 : 0
+  count = var.enable_prometheus_integration && var.monitor_workspace_id != null ? 1 : 0
 
   scope              = var.monitor_workspace_id
   role_definition_id = data.azurerm_role_definition.monitoring_metrics_publisher.id
   principal_id       = azurerm_kubernetes_cluster.aks_cluster.kubelet_identity[0].object_id
   description        = "Allow AKS Kubelet to publish metrics to the Azure Monitor Workspace for Prometheus"
+
+  # Skip applying this if the kubelet identity isn't ready yet
+  depends_on = [azurerm_kubernetes_cluster.aks_cluster]
 }
 
 # Create role assignments for the AKS cluster

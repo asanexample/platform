@@ -47,6 +47,7 @@ dependency "frontdoor_profile" {
   config_path = "../frontdoor_profile"
   mock_outputs = {
     id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Cdn/profiles/mock-fd"
+    enabled = false
   }
 }
 
