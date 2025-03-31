@@ -47,7 +47,7 @@ dependency "frontdoor_endpoint" {
   config_path = "../frontdoor_endpoint"
   mock_outputs = {
     endpoint_id       = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Cdn/profiles/mock-fd/endpoints/mock-endpoint"
-    origin_group_id   = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Cdn/profiles/mock-fd/origingroups/mock-og"
+    origin_group_id   = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Cdn/profiles/mock-fd/originGroups/mock-og"
     endpoint_name     = "mock-endpoint"
     origin_group_name = "mock-origin-group"
   }
