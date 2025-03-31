@@ -110,44 +110,44 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
 
 
 # Create Diagnostic Settings for the AKS Cluster
-resource "azurerm_monitor_diagnostic_setting" "this" {
-  count = length(var.diagnostic_settings) > 0 ? 1 : 0
+# resource "azurerm_monitor_diagnostic_setting" "this" {
+#   count = length(var.diagnostic_settings) > 0 ? 1 : 0
   
-  name               = var.diagnostic_settings[0].name
-  target_resource_id = azurerm_kubernetes_cluster.aks_cluster.id
-  log_analytics_workspace_id = var.diagnostic_settings[0].log_analytics_workspace_id
+#   name               = var.diagnostic_settings[0].name
+#   target_resource_id = azurerm_kubernetes_cluster.aks_cluster.id
+#   log_analytics_workspace_id = var.diagnostic_settings[0].log_analytics_workspace_id
 
-  # Configure logs for each category
-  dynamic "enabled_log" {
-    for_each = toset(var.diagnostic_settings[0].enabled_log_categories)
+#   # Configure logs for each category
+#   dynamic "enabled_log" {
+#     for_each = toset(var.diagnostic_settings[0].enabled_log_categories)
     
-    content {
-      category = enabled_log.value
-      # Retention is now handled separately via azurerm_storage_management_policy
-      # or by the Log Analytics workspace's retention_in_days setting
-    }
-  }
+#     content {
+#       category = enabled_log.value
+#       # Retention is now handled separately via azurerm_storage_management_policy
+#       # or by the Log Analytics workspace's retention_in_days setting
+#     }
+#   }
 
-  # Configure metrics for each category
-  dynamic "metric" {
-    for_each = toset(var.diagnostic_settings[0].metric_categories)
+#   # Configure metrics for each category
+#   dynamic "metric" {
+#     for_each = toset(var.diagnostic_settings[0].metric_categories)
     
-    content {
-      category = metric.value
-      enabled  = true
-    }
-  }
+#     content {
+#       category = metric.value
+#       enabled  = true
+#     }
+#   }
   
-  # Add lifecycle block to make diagnostic settings more resilient
-  lifecycle {
-    # Ignore changes to these fields to avoid unnecessary updates
-    ignore_changes = [
-      log_analytics_workspace_id,
-      enabled_log,
-      metric
-    ]
-  }
-}
+#   # Add lifecycle block to make diagnostic settings more resilient
+#   lifecycle {
+#     # Ignore changes to these fields to avoid unnecessary updates
+#     ignore_changes = [
+#       log_analytics_workspace_id,
+#       enabled_log,
+#       metric
+#     ]
+#   }
+# }
 
 # Connect AKS to Azure Monitor Workspace (Managed Prometheus)
 resource "azurerm_monitor_data_collection_rule_association" "prometheus" {

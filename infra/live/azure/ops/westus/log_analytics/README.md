@@ -1,10 +1,10 @@
-# Log Analytics Workspace for AKS Monitoring
+# Log Analytics Workspace for AKS Monitoring (Ops Environment)
 
-This directory contains the Terragrunt configuration for deploying an Azure Log Analytics Workspace in the eastus region for the dev environment. 
+This directory contains the Terragrunt configuration for deploying an Azure Log Analytics Workspace in the westus region for the ops environment.
 
 ## Purpose
 
-This Log Analytics Workspace serves as the foundation for monitoring the AKS cluster and other Azure resources. It collects and analyzes logs and telemetry data, providing insights into operational health, performance, and security.
+This Log Analytics Workspace serves as the foundation for monitoring the AKS cluster and other Azure resources in the operations environment. It provides enhanced retention and monitoring capabilities appropriate for a production-like environment.
 
 ## Features
 
@@ -13,6 +13,7 @@ This Log Analytics Workspace serves as the foundation for monitoring the AKS clu
 - Serves as a data store for diagnostic settings
 - Enables Container Insights for detailed Kubernetes monitoring
 - Includes Security solutions for enhanced security monitoring
+- **Extended 60-day log retention** for operations environment
 
 ## Integration Points
 
@@ -28,7 +29,7 @@ The Log Analytics Workspace integrates with:
 To deploy this Log Analytics Workspace:
 
 ```bash
-cd infra/live/azure/dev/eastus/log_analytics
+cd infra/live/azure/ops/westus/log_analytics
 terragrunt init
 terragrunt plan
 terragrunt apply

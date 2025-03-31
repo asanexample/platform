@@ -40,6 +40,7 @@ locals {
     network_security_group   = "nsg"
     application_gateway      = "agw"
     front_door               = "fd"
+    frontdoor_profile        = "fd"
     frontdoor_endpoint       = "fd-endpoint"
     frontdoor_origin_group   = "fd-og"
     frontdoor_origin         = "fd-origin"
@@ -118,6 +119,26 @@ locals {
       valid_chars = "^[a-zA-Z0-9\\-_\\.]+$"
     }
     front_door = {
+      max_length  = 64
+      valid_chars = "^[a-zA-Z0-9\\-]+$"
+    }
+    frontdoor_profile = {
+      max_length  = 64
+      valid_chars = "^[a-zA-Z0-9\\-]+$"
+    }
+    frontdoor_endpoint = {
+      max_length  = 64
+      valid_chars = "^[a-zA-Z0-9\\-]+$"
+    }
+    frontdoor_origin_group = {
+      max_length  = 64
+      valid_chars = "^[a-zA-Z0-9\\-]+$"
+    }
+    frontdoor_origin = {
+      max_length  = 64
+      valid_chars = "^[a-zA-Z0-9\\-]+$"
+    }
+    frontdoor_route = {
       max_length  = 64
       valid_chars = "^[a-zA-Z0-9\\-]+$"
     }

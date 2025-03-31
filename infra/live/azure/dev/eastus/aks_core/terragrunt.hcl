@@ -82,7 +82,7 @@ dependency "aks_identity" {
   }
 }
 
-# Add dependency on Log Analytics workspace for diagnostics
+# Add dependency on Log Analytics workspace for monitoring
 dependency "log_analytics" {
   config_path = "../log_analytics"
 
@@ -90,17 +90,6 @@ dependency "log_analytics" {
   mock_outputs = {
     id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.OperationalInsights/workspaces/mock-log-analytics"
     name = "mock-log-analytics"
-  }
-}
-
-# Add dependency on Azure Monitor Workspace (Managed Prometheus)
-dependency "monitor_workspace" {
-  config_path = "../monitor_workspace"
-
-  # Mock outputs for plan and validation
-  mock_outputs = {
-    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Monitor/accounts/mock-prometheus"
-    dcr_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Insights/dataCollectionRules/mock-prometheus-dcr"
   }
 }
 
@@ -168,15 +157,14 @@ inputs = {
     os_sku            = "Ubuntu"
     ultra_ssd_enabled = false
   }
-
-  
-  # Connect to Azure Monitor Workspace (Managed Prometheus)
-  prometheus_dcr_id = dependency.monitor_workspace.outputs.dcr_id
   
   # Enable Microsoft Defender for Containers
   microsoft_defender_enabled = true
   
-  # Enable diagnostic settings for AKS cluster
+  # Connect to Log Analytics Workspace
+  log_analytics_workspace_id = dependency.log_analytics.outputs.id
+  
+  # Enable diagnostic settings for the AKS cluster
   diagnostic_settings = [{
     name                       = "${dependency.naming.outputs.aks_cluster}-diag"
     log_analytics_workspace_id = dependency.log_analytics.outputs.id
@@ -192,12 +180,12 @@ inputs = {
     metric_categories          = ["AllMetrics"]
     log_retention_days         = 30
   }]
-
+  
   # Tags
   tags = merge(local.tags, {
     "network-cilium-managed-by" = "cilium"
     "cilium-version"            = "1.17.2"
     "monitoring-level"          = "comprehensive"
-    "prometheus-enabled"        = "true"
+    "monitoring-enabled"        = "true"
   })
 } 

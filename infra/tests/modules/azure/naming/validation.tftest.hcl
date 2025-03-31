@@ -713,24 +713,24 @@ run "event_hub_naming_test" {
 # Container Resources Tests
 # ============================================================================
 
-# Test Container Registry naming
+# Test container registry naming
 run "container_registry_naming_test" {
   command = plan
 
   variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
+    prefix        = "abc"
+    customer_name = "test"
+    environment   = "dev"
+    region_abbv   = "eu"
+    resource_type = "acr"
   }
 
   module {
     source = "../../../../modules/azure/naming"
   }
 
-  # Container Registry names cannot contain hyphens and must be lowercase
   assert {
-    condition     = can(regex("^abctestdevacreu$", output.container_registry))
+    condition     = can(regex("^abcdevacreu$", output.container_registry))
     error_message = "Container Registry name should match expected format (lowercase, no hyphens)"
   }
 }

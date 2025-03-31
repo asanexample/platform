@@ -117,10 +117,10 @@ resource "azurerm_role_assignment" "acr_push" {
 }
 
 # Lock the container registry if specified
-resource "azurerm_management_lock" "acr_lock" {
-  count      = var.create_registry && var.lock_resource ? 1 : 0
-  name       = "${local.acr_name}-lock"
-  scope      = var.create_registry ? azurerm_container_registry.acr[0].id : ""
-  lock_level = "CanNotDelete"
-  notes      = "Locked to prevent accidental deletion of the container registry"
-} 
+# resource "azurerm_management_lock" "acr_lock" {
+#   count      = var.create_registry && var.lock_resource ? 1 : 0
+#   name       = "${local.acr_name}-lock"
+#   scope      = var.create_registry ? azurerm_container_registry.acr[0].id : ""
+#   lock_level = "CanNotDelete"
+#   notes      = "Locked to prevent accidental deletion of the container registry"
+# } 

@@ -98,9 +98,29 @@ output "front_door" {
   value       = local.validated_names.front_door
 }
 
+output "frontdoor_profile" {
+  description = "Standardized name for a Front Door Profile."
+  value       = local.validated_names.frontdoor_profile
+}
+
 output "frontdoor_endpoint" {
   description = "Standardized name for a Front Door Endpoint."
   value       = local.validated_names.frontdoor_endpoint
+}
+
+output "frontdoor_origin_group" {
+  description = "Standardized name for a Front Door Origin Group."
+  value       = local.validated_names.frontdoor_origin_group
+}
+
+output "frontdoor_origin" {
+  description = "Standardized name for a Front Door Origin."
+  value       = local.validated_names.frontdoor_origin
+}
+
+output "frontdoor_route" {
+  description = "Standardized name for a Front Door Route."
+  value       = local.validated_names.frontdoor_route
 }
 
 output "container_registry" {

@@ -42,12 +42,19 @@ inputs = {
   internet_ingestion_enabled = true
   internet_query_enabled     = true
   
-  # Common solution plans across all environments - removing ContainerInsights to avoid conflicts with DCR
-  solution_plans = []
+  # Common solution plans across all environments
+  solution_plans = [
+    {
+      solution_name = "ContainerInsights"  # For AKS monitoring
+    },
+    {
+      solution_name = "Security"           # For security monitoring
+    }
+  ]
   
   # Default tags that should be applied to all Log Analytics workspaces
   tags = merge(local.common_tags, {
     "ResourceType" = "LogAnalyticsWorkspace"
-    "component"    = "monitoring"
+    "Component"    = "Monitoring"
   })
 } 

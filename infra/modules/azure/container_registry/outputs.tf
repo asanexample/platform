@@ -95,10 +95,10 @@ output "acr_push_role_assignment_id" {
   value       = var.create_registry && var.aks_integration_enabled && var.enable_aks_acr_push && var.aks_principal_id != null ? azurerm_role_assignment.acr_push[0].id : null
 }
 
-output "lock_id" {
-  description = "The ID of the resource lock (if enabled)."
-  value       = var.create_registry && var.lock_resource ? azurerm_management_lock.acr_lock[0].id : null
-}
+# output "lock_id" {
+#   description = "The ID of the resource lock (if enabled)."
+#   value       = var.create_registry && var.lock_resource ? azurerm_management_lock.acr_lock[0].id : null
+# }
 
 output "created" {
   description = "Indicates whether the ACR was created by this module."
