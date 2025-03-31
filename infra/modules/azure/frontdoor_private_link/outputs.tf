@@ -13,17 +13,12 @@ output "origin_host_name" {
   value       = azurerm_cdn_frontdoor_origin.this.host_name
 }
 
-output "private_link_id" {
-  description = "The ID of the private link"
-  value       = azurerm_cdn_frontdoor_origin.this.private_link[0].id
+output "private_link_target_id" {
+  description = "The target ID of the private link"
+  value       = data.azurerm_storage_account.this.id
 }
 
-output "private_link_status" {
-  description = "The status of the private link"
-  value       = azurerm_cdn_frontdoor_origin.this.private_link[0].status
-}
-
-output "private_link_approval_message" {
+output "private_link_request_message" {
   description = "The approval message used for the private link"
   value       = var.private_link_request_message
 }

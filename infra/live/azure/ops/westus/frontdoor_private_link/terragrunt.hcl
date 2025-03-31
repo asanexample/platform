@@ -73,7 +73,7 @@ inputs = {
   
   # Storage account to connect to
   storage_account_name        = dependency.storage.outputs.name
-  storage_resource_group_name = dependency.storage.outputs.resource_group
+  storage_resource_group_name = "vip-ops-rg-wus"
   use_blob_endpoint           = true
   
   # Origin configuration - more resilient settings for production
