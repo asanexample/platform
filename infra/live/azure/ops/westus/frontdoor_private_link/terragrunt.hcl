@@ -27,6 +27,11 @@ locals {
     local.env_vars.locals.env_tags,
     local.region_vars.locals.region_tags
   )
+  
+  # Default values to use when module is disabled
+  default_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Cdn/profiles/mock-fd"
+  mock_origin_group_id = "${local.default_id}/originGroups/mock-og"
+  mock_endpoint_id = "${local.default_id}/afdEndpoints/mock-endpoint"
 }
 
 # Include the root terragrunt.hcl configuration
@@ -46,11 +51,7 @@ dependency "naming" {
 dependency "frontdoor_endpoint" {
   config_path = "../frontdoor_endpoint"
   mock_outputs = {
-    endpoint_id       = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Cdn/profiles/mock-fd/afdEndpoints/mock-endpoint"
-    origin_group_id   = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Cdn/profiles/mock-fd/originGroups/mock-og"
-    endpoint_name     = "mock-endpoint"
-    origin_group_name = "mock-origin-group"
-    enabled           = false
+    enabled = false
   }
 }
 
@@ -78,8 +79,8 @@ inputs = {
   # Control deployment
   module_enabled = dependency.frontdoor_endpoint.outputs.enabled
   
-  # Origin group reference
-  origin_group_id = dependency.frontdoor_endpoint.outputs.origin_group_id
+  # Origin group reference - use placeholder value when module is disabled
+  origin_group_id = local.mock_origin_group_id
   
   # Storage account to connect to
   storage_account_name        = dependency.storage.outputs.name
@@ -94,7 +95,7 @@ inputs = {
   
   # Route configuration
   route_enabled       = true
-  endpoint_id         = dependency.frontdoor_endpoint.outputs.endpoint_id
+  endpoint_id         = local.mock_endpoint_id
   route_name          = dependency.naming.outputs.frontdoor_route
   patterns_to_match   = ["/*"]
   forwarding_protocol = "HttpsOnly"
