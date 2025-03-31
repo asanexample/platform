@@ -61,8 +61,8 @@ inputs = {
   # Conditional deployment based on profile
   enabled = dependency.frontdoor_profile.outputs.enabled
   
-  # Front Door profile reference
-  profile_id = dependency.frontdoor_profile.outputs.id
+  # Front Door profile reference - conditionally use id only when enabled
+  profile_id = dependency.frontdoor_profile.outputs.enabled ? dependency.frontdoor_profile.outputs.id : null
   
   # Endpoint and origin group names
   endpoint_name     = dependency.naming.outputs.frontdoor_endpoint
