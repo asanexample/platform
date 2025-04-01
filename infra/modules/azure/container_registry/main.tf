@@ -46,9 +46,9 @@ resource "azurerm_container_registry" "acr" {
     for_each = local.geo_replication_enabled ? var.geo_replication_locations : []
     
     content {
-      location                = georeplications.value.location
-      zone_redundancy_enabled = lookup(georeplications.value, "zone_redundancy_enabled", false)
-      tags                    = lookup(georeplications.value, "tags", {})
+      location                = georeplications.value
+      zone_redundancy_enabled = false
+      tags                    = {}
     }
   }
   
@@ -64,8 +64,8 @@ resource "azurerm_container_registry" "acr" {
         for_each = network_rule_set.value.ip_rules
         
         content {
-          action   = "Allow"
-          ip_range = ip_rule.value
+          action   = ip_rule.value.action
+          ip_range = ip_rule.value.ip_range
         }
       }
     }
