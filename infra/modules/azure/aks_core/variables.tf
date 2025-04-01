@@ -42,6 +42,10 @@ variable "region_abbv" {
   description = "The abbreviated region name"
   type        = string
   default     = "weu"
+  validation {
+    condition     = length(var.region_abbv) >= 2 && length(var.region_abbv) <= 6
+    error_message = "The region abbreviation must be between 2 and 6 characters."
+  }
 }
 
 variable "name" {
@@ -108,6 +112,10 @@ variable "kubernetes_version" {
   description = "The Kubernetes version for the AKS cluster"
   type        = string
   default     = null
+  validation {
+    condition     = var.kubernetes_version == null ? true : can(regex("^[0-9]+\\.[0-9]+\\.[0-9]+$", var.kubernetes_version))
+    error_message = "The Kubernetes version must be in the format X.Y.Z (e.g., 1.24.0)."
+  }
 }
 
 variable "automatic_channel_upgrade" {
@@ -146,6 +154,10 @@ variable "private_dns_zone_id" {
   description = "The ID of the Private DNS Zone for private cluster"
   type        = string
   default     = null
+  validation {
+    condition     = var.private_dns_zone_id == null ? true : length(var.private_dns_zone_id) > 20
+    error_message = "The private DNS zone ID must be a valid Azure resource ID."
+  }
 }
 
 variable "workload_identity_enabled" {
@@ -164,6 +176,12 @@ variable "authorized_ip_ranges" {
   description = "The IP ranges authorized for API server access"
   type        = list(string)
   default     = null
+  validation {
+    condition = var.authorized_ip_ranges == null ? true : alltrue([
+      for ip_range in var.authorized_ip_ranges : can(cidrnetmask(ip_range))
+    ])
+    error_message = "Each authorized IP range must be a valid CIDR notation (e.g., 10.0.0.0/24)."
+  }
 }
 
 variable "azure_active_directory_role_based_access_control" {
@@ -173,6 +191,12 @@ variable "azure_active_directory_role_based_access_control" {
     azure_rbac_enabled     = bool
   })
   default = null
+  validation {
+    condition = var.azure_active_directory_role_based_access_control == null ? true : (
+      length(var.azure_active_directory_role_based_access_control.admin_group_object_ids) > 0
+    )
+    error_message = "At least one admin group object ID must be provided when Azure AD RBAC is configured."
+  }
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -187,12 +211,24 @@ variable "default_nodepool_name" {
     condition     = length(var.default_nodepool_name) >= 1 && length(var.default_nodepool_name) <= 12
     error_message = "The default node pool name must be between 1 and 12 characters."
   }
+  validation {
+    condition     = can(regex("^[a-z0-9]+$", var.default_nodepool_name))
+    error_message = "The default node pool name must contain only lowercase alphanumeric characters."
+  }
 }
 
 variable "default_nodepool_vm_size" {
   description = "The VM size for the default node pool"
   type        = string
   default     = "Standard_D4s_v4"
+  validation {
+    condition     = length(var.default_nodepool_vm_size) > 0
+    error_message = "The VM size must not be empty."
+  }
+  validation {
+    condition     = can(regex("^Standard_", var.default_nodepool_vm_size))
+    error_message = "The VM size must start with 'Standard_'."
+  }
 }
 
 variable "default_nodepool_count" {
@@ -281,6 +317,10 @@ variable "user_assigned_identity_id" {
   description = "The ID of the user-assigned identity for the AKS cluster"
   type        = string
   default     = null
+  validation {
+    condition     = var.user_assigned_identity_id == null ? true : length(var.user_assigned_identity_id) > 20
+    error_message = "The user-assigned identity ID must be a valid Azure resource ID."
+  }
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -321,30 +361,50 @@ variable "pod_cidr" {
   description = "The CIDR for pod IPs when using kubenet"
   type        = string
   default     = null
+  validation {
+    condition     = var.pod_cidr == null ? true : can(cidrnetmask(var.pod_cidr))
+    error_message = "The pod CIDR must be a valid CIDR notation (e.g., 10.244.0.0/16)."
+  }
 }
 
 variable "service_cidr" {
   description = "The CIDR for Kubernetes services"
   type        = string
   default     = "10.0.0.0/16"
+  validation {
+    condition     = can(cidrnetmask(var.service_cidr))
+    error_message = "The service CIDR must be a valid CIDR notation (e.g., 10.0.0.0/16)."
+  }
 }
 
 variable "dns_service_ip" {
   description = "The IP address for the DNS service"
   type        = string
   default     = "10.0.0.10"
+  validation {
+    condition     = can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}$", var.dns_service_ip))
+    error_message = "The DNS service IP must be a valid IPv4 address."
+  }
 }
 
 variable "docker_bridge_cidr" {
   description = "The CIDR for the Docker bridge network"
   type        = string
   default     = "172.17.0.1/16"
+  validation {
+    condition     = can(cidrnetmask(var.docker_bridge_cidr))
+    error_message = "The Docker bridge CIDR must be a valid CIDR notation (e.g., 172.17.0.1/16)."
+  }
 }
 
 variable "subnet_id" {
   description = "The ID of the subnet where the AKS cluster will be deployed"
   type        = string
   default     = null
+  validation {
+    condition     = var.subnet_id == null ? true : length(var.subnet_id) > 20
+    error_message = "The subnet ID must be a valid Azure resource ID."
+  }
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -355,6 +415,10 @@ variable "log_analytics_workspace_id" {
   description = "The ID of the Log Analytics workspace for container insights"
   type        = string
   default     = null
+  validation {
+    condition     = var.log_analytics_workspace_id == null ? true : length(var.log_analytics_workspace_id) > 20
+    error_message = "The Log Analytics workspace ID must be a valid Azure resource ID."
+  }
 }
 
 variable "prometheus_dcr_id" {
