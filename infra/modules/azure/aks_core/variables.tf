@@ -9,37 +9,37 @@
 # ---------------------------------------------------------------------------------------------------------------------
 
 variable "prefix" {
-  description = "The prefix to use for generated resource names"
+  description = "Prefix for resource names"
   type        = string
   default     = "centric"
   validation {
-    condition     = length(var.prefix) <= 10
-    error_message = "The prefix can be at most 10 characters."
+    condition     = length(var.prefix) >= 3 && length(var.prefix) <= 10
+    error_message = "The prefix must be between 3 and 10 characters."
   }
 }
 
 variable "customer" {
-  description = "The customer identifier"
+  description = "Customer name for resource tagging"
   type        = string
   default     = null
   validation {
-    condition     = var.customer == null ? true : length(var.customer) <= 15
-    error_message = "The customer identifier can be at most 15 characters."
+    condition     = length(var.customer) >= 2 && length(var.customer) <= 50
+    error_message = "The customer name must be between 2 and 50 characters."
   }
 }
 
 variable "environment" {
-  description = "The environment (e.g., dev, test, prod, ops)"
+  description = "Environment name for resource tagging (dev, test, staging, prod, ops)"
   type        = string
   default     = "dev"
   validation {
     condition     = contains(["dev", "test", "staging", "prod", "ops"], var.environment)
-    error_message = "Environment must be one of: dev, test, staging, prod, ops."
+    error_message = "The environment must be one of: dev, test, staging, prod, ops."
   }
 }
 
 variable "region_abbv" {
-  description = "The abbreviated region name"
+  description = "Abbreviation for region (used in resource naming)"
   type        = string
   default     = "weu"
   validation {
@@ -49,12 +49,16 @@ variable "region_abbv" {
 }
 
 variable "name" {
-  description = "The name of the AKS cluster"
+  description = "Name of the AKS cluster resource"
   type        = string
   default     = null
   validation {
-    condition     = var.name == null ? true : length(var.name) >= 3 && length(var.name) <= 24
-    error_message = "The name must be between 3 and 24 characters or null for auto-generation."
+    condition     = length(var.name) >= 3 && length(var.name) <= 63
+    error_message = "The AKS cluster name must be between 3 and 63 characters."
+  }
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9-_]+$", var.name))
+    error_message = "The AKS cluster name can only include alphanumeric, hyphen, and underscore characters."
   }
 }
 
@@ -129,9 +133,13 @@ variable "automatic_channel_upgrade" {
 }
 
 variable "local_account_disabled" {
-  description = "Whether local accounts are disabled for the AKS cluster"
+  description = "If true, disable local accounts in Kubernetes"
   type        = bool
   default     = true
+  validation {
+    condition     = var.local_account_disabled != null
+    error_message = "The local_account_disabled value must be either true or false."
+  }
 }
 
 variable "sku_tier" {
@@ -161,15 +169,23 @@ variable "private_dns_zone_id" {
 }
 
 variable "workload_identity_enabled" {
-  description = "Whether workload identity is enabled for the AKS cluster"
+  description = "Enable or disable Workload Identity for the cluster"
   type        = bool
   default     = true
+  validation {
+    condition     = var.workload_identity_enabled != null
+    error_message = "The workload_identity_enabled value must be either true or false."
+  }
 }
 
 variable "oidc_issuer_enabled" {
-  description = "Whether OIDC issuer is enabled for the AKS cluster"
+  description = "Enable or disable the OIDC issuer URL"
   type        = bool
   default     = true
+  validation {
+    condition     = var.oidc_issuer_enabled != null
+    error_message = "The oidc_issuer_enabled value must be either true or false."
+  }
 }
 
 variable "authorized_ip_ranges" {
@@ -204,7 +220,7 @@ variable "azure_active_directory_role_based_access_control" {
 # ---------------------------------------------------------------------------------------------------------------------
 
 variable "default_nodepool_name" {
-  description = "The name of the default node pool"
+  description = "Name of the default node pool"
   type        = string
   default     = "system"
   validation {
@@ -213,28 +229,24 @@ variable "default_nodepool_name" {
   }
   validation {
     condition     = can(regex("^[a-z0-9]+$", var.default_nodepool_name))
-    error_message = "The default node pool name must contain only lowercase alphanumeric characters."
+    error_message = "The default node pool name can only include lowercase alphanumeric characters."
   }
 }
 
 variable "default_nodepool_vm_size" {
-  description = "The VM size for the default node pool"
+  description = "VM size for the default node pool"
   type        = string
-  default     = "Standard_D4s_v4"
+  default     = "Standard_D2s_v3"
   validation {
     condition     = length(var.default_nodepool_vm_size) > 0
-    error_message = "The VM size must not be empty."
-  }
-  validation {
-    condition     = can(regex("^Standard_", var.default_nodepool_vm_size))
-    error_message = "The VM size must start with 'Standard_'."
+    error_message = "The default node pool VM size must not be empty."
   }
 }
 
 variable "default_nodepool_count" {
-  description = "The node count for the default node pool"
+  description = "Initial node count for the default node pool"
   type        = number
-  default     = 2
+  default     = 1
   validation {
     condition     = var.default_nodepool_count >= 1 && var.default_nodepool_count <= 100
     error_message = "The default node pool count must be between 1 and 100."
@@ -248,7 +260,7 @@ variable "default_nodepool_enable_auto_scaling" {
 }
 
 variable "default_nodepool_min_count" {
-  description = "The minimum node count for the default node pool auto-scaling"
+  description = "Minimum node count for the default node pool"
   type        = number
   default     = 1
   validation {
@@ -258,12 +270,16 @@ variable "default_nodepool_min_count" {
 }
 
 variable "default_nodepool_max_count" {
-  description = "The maximum node count for the default node pool auto-scaling"
+  description = "Maximum node count for the default node pool"
   type        = number
   default     = 3
   validation {
     condition     = var.default_nodepool_max_count >= 1 && var.default_nodepool_max_count <= 100
     error_message = "The default node pool maximum count must be between 1 and 100."
+  }
+  validation {
+    condition     = var.default_nodepool_max_count >= var.default_nodepool_min_count
+    error_message = "The maximum node count must be greater than or equal to the minimum node count."
   }
 }
 
@@ -278,12 +294,12 @@ variable "default_nodepool_max_pods" {
 }
 
 variable "default_nodepool_os_disk_size_gb" {
-  description = "The OS disk size in GB for the default node pool"
+  description = "OS disk size in GB for the default node pool"
   type        = number
   default     = 128
   validation {
     condition     = var.default_nodepool_os_disk_size_gb >= 30 && var.default_nodepool_os_disk_size_gb <= 2048
-    error_message = "The default node pool OS disk size must be between 30 and 2048 GB."
+    error_message = "The OS disk size must be between 30 and 2048 GB."
   }
 }
 
@@ -304,7 +320,7 @@ variable "default_nodepool_only_critical_addons_enabled" {
 # ---------------------------------------------------------------------------------------------------------------------
 
 variable "identity_type" {
-  description = "The type of identity to use for the AKS cluster"
+  description = "The type of identity to use for the cluster"
   type        = string
   default     = "UserAssigned"
   validation {
