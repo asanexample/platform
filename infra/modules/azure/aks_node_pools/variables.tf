@@ -9,12 +9,28 @@ variable "prefix" {
   description = "The prefix to use for all resources. Defaults to 'vip' if not specified."
   type        = string
   default     = "vip"
+  validation {
+    condition     = length(var.prefix) >= 1 && length(var.prefix) <= 10
+    error_message = "The prefix must be between 1 and 10 characters."
+  }
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9-_]+$", var.prefix))
+    error_message = "The prefix can only include alphanumeric, hyphen, and underscore characters."
+  }
 }
 
 variable "customer" {
   description = "The customer name to use in resource naming. Optional for shared resources."
   type        = string
   default     = null
+  validation {
+    condition     = var.customer == null ? true : length(var.customer) >= 2 && length(var.customer) <= 15
+    error_message = "The customer name must be between 2 and 15 characters when provided."
+  }
+  validation {
+    condition     = var.customer == null ? true : can(regex("^[a-zA-Z0-9-_]+$", var.customer))
+    error_message = "The customer name can only include alphanumeric, hyphen, and underscore characters."
+  }
 }
 
 variable "environment" {
@@ -30,8 +46,12 @@ variable "region_abbv" {
   description = "The abbreviated Azure region name (e.g., wus, eus, neu)."
   type        = string
   validation {
-    condition     = length(var.region_abbv) <= 5
-    error_message = "Region abbreviation should not be longer than 5 characters."
+    condition     = length(var.region_abbv) >= 2 && length(var.region_abbv) <= 5
+    error_message = "Region abbreviation should be between 2 and 5 characters."
+  }
+  validation {
+    condition     = can(regex("^[a-z]+$", var.region_abbv))
+    error_message = "Region abbreviation should only contain lowercase letters."
   }
 }
 
@@ -50,6 +70,10 @@ variable "app_node_pool_enabled" {
   description = "Enable application node pool"
   type        = bool
   default     = true
+  validation {
+    condition     = var.app_node_pool_enabled != null
+    error_message = "The app_node_pool_enabled value must be either true or false."
+  }
 }
 
 variable "use_availability_zones" {
@@ -78,6 +102,14 @@ variable "app_node_pool_vm_size" {
   description = "VM size for the application node pool"
   type        = string
   default     = "Standard_D4s_v4"
+  validation {
+    condition     = length(var.app_node_pool_vm_size) > 0
+    error_message = "The VM size must not be empty."
+  }
+  validation {
+    condition     = can(regex("^Standard_", var.app_node_pool_vm_size))
+    error_message = "The VM size must start with 'Standard_'."
+  }
 }
 
 variable "app_node_pool_node_count" {
@@ -95,6 +127,12 @@ variable "app_node_pool_availability_zones" {
   description = "Availability zones for the application node pool"
   type        = list(string)
   default     = ["1", "2", "3"]
+  validation {
+    condition = alltrue([
+      for zone in var.app_node_pool_availability_zones : contains(["1", "2", "3"], zone)
+    ]) || length(var.app_node_pool_availability_zones) == 0
+    error_message = "Availability zones must be one or more of: 1, 2, 3."
+  }
 }
 
 variable "app_node_pool_max_pods" {
@@ -133,6 +171,10 @@ variable "app_node_pool_enable_auto_scaling" {
   description = "Enable auto-scaling for the application node pool"
   type        = bool
   default     = true
+  validation {
+    condition     = var.app_node_pool_enable_auto_scaling != null
+    error_message = "The app_node_pool_enable_auto_scaling value must be either true or false."
+  }
 }
 
 variable "app_node_pool_min_count" {
@@ -155,6 +197,10 @@ variable "app_node_pool_max_count" {
     condition     = var.app_node_pool_max_count >= 0 && var.app_node_pool_max_count <= 1000
     error_message = "Maximum node count must be between 0 and 1000."
   }
+  validation {
+    condition     = var.app_node_pool_max_count >= var.app_node_pool_min_count
+    error_message = "Maximum node count must be greater than or equal to minimum node count."
+  }
 }
 
 variable "app_node_pool_mode" {
@@ -175,18 +221,44 @@ variable "app_node_pool_node_labels" {
     "nodepool" = "apps"
     "app"      = "true"
   }
+  validation {
+    condition = alltrue([
+      for key in keys(var.app_node_pool_node_labels) : length(key) >= 1 && length(key) <= 63
+    ]) || length(var.app_node_pool_node_labels) == 0
+    error_message = "Node label keys must be between 1 and 63 characters."
+  }
+  validation {
+    condition = alltrue([
+      for value in values(var.app_node_pool_node_labels) : length(value) >= 1 && length(value) <= 63
+    ]) || length(var.app_node_pool_node_labels) == 0
+    error_message = "Node label values must be between 1 and 63 characters."
+  }
 }
 
 variable "app_node_pool_node_taints" {
   description = "A list of Kubernetes taints which should be applied to nodes in the application node pool"
   type        = list(string)
   default     = []
+  validation {
+    condition = alltrue([
+      for taint in var.app_node_pool_node_taints : can(regex("^[a-zA-Z0-9-_.]+=[a-zA-Z0-9-_.]+:(NoSchedule|PreferNoSchedule|NoExecute)$", taint))
+    ]) || length(var.app_node_pool_node_taints) == 0
+    error_message = "Node taints must be in the format 'key=value:effect' where effect is one of NoSchedule, PreferNoSchedule, or NoExecute."
+  }
 }
 
 variable "temporary_name_for_rotation" {
   description = "Specifies the name of the temporary node pool used to cycle the node pool for updates"
   type        = string
   default     = null
+  validation {
+    condition     = var.temporary_name_for_rotation == null ? true : length(var.temporary_name_for_rotation) >= 1 && length(var.temporary_name_for_rotation) <= 12
+    error_message = "Temporary node pool name must be between 1 and 12 characters when provided."
+  }
+  validation {
+    condition     = var.temporary_name_for_rotation == null ? true : can(regex("^[a-z][a-z0-9]*$", var.temporary_name_for_rotation))
+    error_message = "Temporary node pool name can only include lowercase alphanumeric characters and must start with a letter."
+  }
 }
 
 # Tagging
@@ -194,4 +266,16 @@ variable "tags" {
   description = "Tags to apply to the node pools"
   type        = map(string)
   default     = {}
+  validation {
+    condition = alltrue([
+      for key in keys(var.tags) : length(key) >= 1 && length(key) <= 512
+    ]) || length(var.tags) == 0
+    error_message = "Tag keys must be between 1 and 512 characters."
+  }
+  validation {
+    condition = alltrue([
+      for value in values(var.tags) : length(value) <= 256
+    ]) || length(var.tags) == 0
+    error_message = "Tag values must be 256 characters or less."
+  }
 } 
