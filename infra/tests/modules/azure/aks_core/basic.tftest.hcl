@@ -7,9 +7,15 @@
 
 # Provider configuration with actual Azure credentials
 provider "azurerm" {
-  features {}
+  features {
+    # This is required to make the microsoft_defender block work properly in tests
+    resource_group {
+      prevent_deletion_if_contains_resources = false
+    }
+  }
   subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
   tenant_id = "c945e155-be68-4477-b8d7-01939adbfe55"
+  resource_provider_registrations = "none"
 }
 
 # Variables for Azure credentials passed via environment variables
@@ -67,8 +73,8 @@ run "basic_aks_cluster" {
     # No Azure AD integration for basic test
     azure_active_directory_role_based_access_control = null
     
-    # No monitor workspace association for basic test
-    log_analytics_workspace_id = null
+    # Add Log Analytics Workspace ID for Microsoft Defender
+    log_analytics_workspace_id = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.OperationalInsights/workspaces/test-law"
     
     # Basic tags
     tags = {
