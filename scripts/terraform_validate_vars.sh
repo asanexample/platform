@@ -3,6 +3,11 @@
 
 # Set the base directory
 BASE_DIR="/Users/josh/centric/platform/infra/modules"
+if [ "$1" != "" ]; then
+  echo "Checking specific path: $1"
+  BASE_DIR=$(dirname "$1")
+  SPECIFIC_FILE=$(basename "$1")
+fi
 
 # Color codes for output
 RED='\033[0;31m'
@@ -15,7 +20,11 @@ echo -e "${BLUE}Scanning Terraform modules for variables that might need validat
 echo ""
 
 # Find all variables.tf files
-VARS_FILES=$(find $BASE_DIR -name "variables.tf")
+if [ -n "$SPECIFIC_FILE" ]; then
+  VARS_FILES=$(find "$BASE_DIR" -name "$SPECIFIC_FILE")
+else
+  VARS_FILES=$(find $BASE_DIR -name "variables.tf")
+fi
 
 # Counter for variables that need attention
 TOTAL_VARS=0
@@ -26,8 +35,23 @@ for FILE in $VARS_FILES; do
   MODULE_NAME=$(dirname $FILE | sed "s|$BASE_DIR/||")
   echo -e "${BLUE}Checking module: ${YELLOW}$MODULE_NAME${NC}"
   
-  # Extract variable blocks
-  VAR_BLOCKS=$(awk '/^variable/ { flag=1; block=""; level=0 } flag { block=block"\n"$0; if ($0 ~ /{/) level++; if ($0 ~ /}/) level--; if (level==0) { print block; flag=0 } }' $FILE)
+  # Extract variable blocks with improved parsing
+  VAR_BLOCKS=$(awk '
+    /^variable/ { 
+      flag=1; 
+      block=""; 
+      level=0;
+    } 
+    flag { 
+      block=block"\n"$0; 
+      if ($0 ~ /{/) level++; 
+      if ($0 ~ /}/) level--; 
+      if (level==0) { 
+        print block; 
+        flag=0;
+      } 
+    }
+  ' "$FILE")
   
   # Process each variable block
   while IFS= read -r VAR_BLOCK; do
@@ -38,8 +62,8 @@ for FILE in $VARS_FILES; do
     # Extract variable name
     VAR_NAME=$(echo "$VAR_BLOCK" | grep "^variable" | sed -E 's/variable "([^"]+)".*/\1/')
     
-    # Check if variable has validation
-    if echo "$VAR_BLOCK" | grep -q "validation"; then
+    # Check if variable has validation - improved detection
+    if echo "$VAR_BLOCK" | grep -q -E '(validation|^\s*validation\s*{)'; then
       ((VALIDATED_VARS++))
       continue
     fi
@@ -86,7 +110,12 @@ echo -e "${BLUE}Summary:${NC}"
 echo -e "  Total variables examined: ${TOTAL_VARS}"
 echo -e "  Variables with validation: ${GREEN}${VALIDATED_VARS}${NC}"
 echo -e "  Variables likely needing validation: ${RED}${MISSING_VALIDATION}${NC}"
-echo -e "  Validation coverage: ${YELLOW}$(( (VALIDATED_VARS * 100) / (TOTAL_VARS) ))%${NC}"
+if [ $TOTAL_VARS -gt 0 ]; then
+  echo -e "  Validation coverage: ${YELLOW}$(( (VALIDATED_VARS * 100) / (TOTAL_VARS) ))%${NC}"
+else
+  echo -e "  Validation coverage: ${YELLOW}0%${NC}"
+fi
+
 echo ""
 echo -e "${BLUE}Recommendations:${NC}"
 echo -e "  1. Review the variables highlighted above and add appropriate validation."
