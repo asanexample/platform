@@ -24,7 +24,7 @@ run "disabled_acr" {
     create_registry = false
     
     # Basic configuration that won't be used
-    name        = null
+    name        = "testdisabledacr"
     prefix      = "test"
     environment = "dev"
     region_abbv = "eus"

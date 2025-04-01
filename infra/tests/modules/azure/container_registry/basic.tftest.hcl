@@ -30,7 +30,7 @@ run "basic_acr" {
     create_registry = true
     
     # Use auto-generated name
-    name        = null
+    name        = "testdevacreus"
     prefix      = "test"
     environment = "dev"
     region_abbv = "eus"

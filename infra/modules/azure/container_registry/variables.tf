@@ -23,7 +23,7 @@ variable "name" {
   default     = null
 
   validation {
-    condition     = var.name == null || (length(var.name) >= 5 && length(var.name) <= 50 && can(regex("^[a-zA-Z0-9]*$", var.name)))
+    condition     = var.name == null ? true : (length(coalesce(var.name, "")) >= 5 && length(coalesce(var.name, "")) <= 50 && can(regex("^[a-zA-Z0-9]*$", var.name)))
     error_message = "ACR name must be 5-50 characters long and contain only alphanumeric characters."
   }
 }

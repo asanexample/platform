@@ -140,7 +140,7 @@ run "invalid_sku" {
 run "invalid_geo_replication_location" {
   command = plan
   variables {
-    sku                       = "Premium"
+    sku = "Premium"
     geo_replication_locations = ["eastus", "invalid-location"]
   }
 
@@ -156,7 +156,7 @@ run "invalid_network_rule_default_action" {
     sku = "Premium"
     network_rule_set = {
       default_action = "InvalidAction"
-      ip_rules       = []
+      ip_rules = []
     }
   }
 
@@ -174,7 +174,7 @@ run "invalid_network_rule_ip_format" {
       default_action = "Allow"
       ip_rules = [
         {
-          action   = "Allow"
+          action = "Allow"
           ip_range = "invalid-ip-format"
         }
       ]
@@ -190,9 +190,9 @@ run "invalid_network_rule_ip_format" {
 run "invalid_key_vault_key_id" {
   command = plan
   variables {
-    sku                = "Premium"
+    sku = "Premium"
     encryption_enabled = true
-    key_vault_key_id   = "invalid-key-vault-key-id"
+    key_vault_key_id = "invalid-key-vault-key-id"
   }
 
   module {
@@ -204,8 +204,8 @@ run "invalid_key_vault_key_id" {
 run "invalid_encryption_identity_id" {
   command = plan
   variables {
-    sku                    = "Premium"
-    encryption_enabled     = true
+    sku = "Premium"
+    encryption_enabled = true
     encryption_identity_id = "invalid-encryption-identity-id"
   }
 
@@ -218,7 +218,7 @@ run "invalid_encryption_identity_id" {
 run "invalid_retention_policy_days" {
   command = plan
   variables {
-    sku                   = "Premium"
+    sku = "Premium"
     retention_policy_days = 500
   }
 

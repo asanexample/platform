@@ -38,17 +38,17 @@ run "premium_acr" {
     data_endpoint_enabled   = true
     
     # Geo-replication
-    geo_replication_locations = [
-      {
-        location                = "westus"
-        zone_redundancy_enabled = true
-      }
-    ]
+    geo_replication_locations = ["westus"]
     
     # Network rules (Premium/Standard only)
     network_rule_set = {
       default_action = "Deny"
-      ip_rules       = ["203.0.113.0/24"]
+      ip_rules = [
+        {
+          action = "Allow"
+          ip_range = "203.0.113.0/24"
+        }
+      ]
     }
     
     # Image retention policy
