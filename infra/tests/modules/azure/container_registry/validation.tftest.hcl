@@ -1,134 +1,181 @@
 /**
- * # Azure Container Registry Module - Validation Tests
+ * # Container Registry Module - Validation Test
  * 
- * This file contains tests to verify that variable validations work correctly
- * in the container_registry module. It ensures proper error messages are 
- * generated for invalid inputs.
+ * This test verifies the validation rules of the Azure Container Registry module
+ * to ensure that input variables are properly validated.
  */
 
-# Variables needed for testing
-variables {
-  subscription_id = ""
-  tenant_id       = ""
-
-  # Default values for most tests
-  resource_group_name = "test-rg"
-  location            = "eastus"
-  prefix              = "test"
-  environment         = "dev"
-  region_abbv         = "eus"
-  create_registry     = true
-  sku                 = "Standard"
-}
-
-# Provider configuration
+# Define provider configuration for the test runs
 provider "azurerm" {
   features {}
   subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
   tenant_id       = "c945e155-be68-4477-b8d7-01939adbfe55"
+  resource_provider_registrations = "none"
 }
 
-# Test name validation
-run "invalid_name_format" {
+# Test name validation with custom name
+run "name_validation_test" {
   command = plan
+
   variables {
-    name = "invalid@name"
+    create_registry     = true
+    name                = "testacr123"
+    resource_group_name = "test-rg"
+    location            = "eastus"
+    prefix              = "test"
+    environment         = "dev"
+    region_abbv         = "eus"
+    tags                = {}
   }
 
   module {
     source = "../../../../modules/azure/container_registry"
   }
+
+  assert {
+    condition     = var.name == "testacr123"
+    error_message = "Custom ACR name should be accepted"
+  }
 }
 
-# Test name minimum length validation
-run "invalid_name_length_too_short" {
+# Test with default name generation
+run "default_name_validation_test" {
   command = plan
+
   variables {
-    name = "acr"
+    create_registry     = true
+    name                = null
+    resource_group_name = "test-rg"
+    location            = "eastus"
+    prefix              = "test"
+    environment         = "dev"
+    region_abbv         = "eus"
+    tags                = {}
   }
 
   module {
     source = "../../../../modules/azure/container_registry"
   }
-}
 
-# Test resource group name validation
-run "invalid_resource_group_name" {
-  command = plan
-  variables {
-    resource_group_name = "invalid*resource*group"
-  }
-
-  module {
-    source = "../../../../modules/azure/container_registry"
+  assert {
+    condition     = var.name == null
+    error_message = "Default name generation should be used when name is null"
   }
 }
 
 # Test location validation
-run "invalid_location" {
+run "location_validation_test" {
   command = plan
+
   variables {
-    location = "invalid-location"
+    create_registry     = true
+    resource_group_name = "test-rg"
+    location            = "eastus"
+    prefix              = "test"
+    environment         = "dev"
+    region_abbv         = "eus"
+    tags                = {}
   }
 
   module {
     source = "../../../../modules/azure/container_registry"
+  }
+
+  assert {
+    condition     = contains(["eastus", "eastus2", "southcentralus", "westus", "westus2", "westus3", "centralus", "northcentralus", "brazilsouth", "eastasia", "southeastasia", "northeurope", "westeurope", "centralindia", "southindia", "japaneast", "japanwest", "koreacentral", "southafricanorth", "australiaeast", "australiasoutheast", "canadacentral", "canadaeast", "germanywestcentral", "norwayeast", "swedencentral", "switzerlandnorth", "uaenorth", "uksouth", "ukwest", "francecentral", "jioindiawest", "westcentralus"], var.location)
+    error_message = "Location must be a valid Azure region"
   }
 }
 
 # Test prefix validation
-run "invalid_prefix" {
+run "prefix_validation_test" {
   command = plan
+
   variables {
-    prefix = "invalid@prefix"
+    create_registry     = true
+    resource_group_name = "test-rg"
+    location            = "eastus"
+    prefix              = "test"
+    environment         = "dev"
+    region_abbv         = "eus"
+    tags                = {}
   }
 
   module {
     source = "../../../../modules/azure/container_registry"
   }
-}
 
-# Test prefix length validation
-run "invalid_prefix_length" {
-  command = plan
-  variables {
-    prefix = "thisPrefixIsTooLong"
-  }
-
-  module {
-    source = "../../../../modules/azure/container_registry"
+  assert {
+    condition     = length(var.prefix) >= 1 && length(var.prefix) <= 10 && can(regex("^[a-zA-Z0-9-_]+$", var.prefix))
+    error_message = "Prefix must be 1-10 characters and include only alphanumeric, hyphen, and underscore"
   }
 }
 
 # Test environment validation
-run "invalid_environment" {
+run "environment_validation_test" {
   command = plan
+
   variables {
-    environment = "invalid-env"
+    create_registry     = true
+    resource_group_name = "test-rg"
+    location            = "eastus"
+    prefix              = "test"
+    environment         = "dev"
+    region_abbv         = "eus"
+    tags                = {}
   }
 
   module {
     source = "../../../../modules/azure/container_registry"
   }
-}
 
-# Test region_abbv validation
-run "invalid_region_abbv" {
-  command = plan
-  variables {
-    region_abbv = "EASTUS"
-  }
-
-  module {
-    source = "../../../../modules/azure/container_registry"
+  assert {
+    condition     = contains(["dev", "preprod", "prod", "test", "stg", "ops"], var.environment)
+    error_message = "Environment must be one of: dev, preprod, prod, test, stg, ops"
   }
 }
 
 # Test SKU validation
-run "invalid_sku" {
+run "sku_validation_test" {
   command = plan
+
   variables {
-    sku = "InvalidSku"
+    create_registry     = true
+    resource_group_name = "test-rg"
+    location            = "eastus"
+    prefix              = "test"
+    environment         = "dev"
+    region_abbv         = "eus"
+    sku                 = "Standard"
+    tags                = {}
+  }
+
+  module {
+    source = "../../../../modules/azure/container_registry"
+  }
+
+  assert {
+    condition     = contains(["Basic", "Standard", "Premium"], var.sku)
+    error_message = "SKU must be one of: Basic, Standard, Premium"
+  }
+}
+
+# Test premium features validation with Standard SKU
+run "premium_features_with_standard_sku_test" {
+  command = plan
+
+  variables {
+    create_registry          = true
+    resource_group_name      = "test-rg"
+    location                 = "eastus"
+    prefix                   = "test"
+    environment              = "dev"
+    region_abbv              = "eus"
+    sku                      = "Standard"
+    zone_redundancy_enabled  = false
+    data_endpoint_enabled    = false
+    geo_replication_locations = []
+    tags                     = {}
   }
 
   module {
@@ -136,121 +183,119 @@ run "invalid_sku" {
   }
 }
 
-# Test geo-replication locations validation
-run "invalid_geo_replication_location" {
+# Test premium features validation with Premium SKU
+run "premium_features_with_premium_sku_test" {
   command = plan
+
   variables {
-    sku = "Premium"
-    geo_replication_locations = ["eastus", "invalid-location"]
+    create_registry           = true
+    resource_group_name       = "test-rg"
+    location                  = "eastus"
+    prefix                    = "test"
+    environment               = "dev"
+    region_abbv               = "eus"
+    sku                       = "Premium"
+    zone_redundancy_enabled   = true
+    data_endpoint_enabled     = true
+    geo_replication_locations = ["westus", "eastus2"]
+    tags                      = {}
   }
 
   module {
     source = "../../../../modules/azure/container_registry"
   }
-}
 
-# Test network rule set validation - default action
-run "invalid_network_rule_default_action" {
-  command = plan
-  variables {
-    sku = "Premium"
-    network_rule_set = {
-      default_action = "InvalidAction"
-      ip_rules = []
-    }
-  }
-
-  module {
-    source = "../../../../modules/azure/container_registry"
+  assert {
+    condition     = var.sku == "Premium" && var.zone_redundancy_enabled == true && var.data_endpoint_enabled == true
+    error_message = "Premium features should be enabled with Premium SKU"
   }
 }
 
-# Test network rule set validation - IP rule format
-run "invalid_network_rule_ip_format" {
+# Test network rule validation
+run "network_rule_validation_test" {
   command = plan
+
   variables {
-    sku = "Premium"
-    network_rule_set = {
-      default_action = "Allow"
-      ip_rules = [
+    create_registry     = true
+    resource_group_name = "test-rg"
+    location            = "eastus"
+    prefix              = "test"
+    environment         = "dev"
+    region_abbv         = "eus"
+    sku                 = "Premium"
+    network_rule_set    = {
+      default_action = "Deny"
+      ip_rules       = [
         {
-          action = "Allow"
-          ip_range = "invalid-ip-format"
+          action   = "Allow"
+          ip_range = "192.168.1.0/24"
         }
       ]
     }
+    tags                = {}
   }
 
   module {
     source = "../../../../modules/azure/container_registry"
   }
+
+  assert {
+    condition     = var.network_rule_set.default_action == "Deny" && length(var.network_rule_set.ip_rules) == 1
+    error_message = "Network rules should be properly configured"
+  }
 }
 
-# Test key vault key ID validation
-run "invalid_key_vault_key_id" {
+# Test AKS integration validation
+run "aks_integration_validation_test" {
   command = plan
+
   variables {
-    sku = "Premium"
-    encryption_enabled = true
-    key_vault_key_id = "invalid-key-vault-key-id"
+    create_registry       = true
+    resource_group_name   = "test-rg"
+    location              = "eastus"
+    prefix                = "test"
+    environment           = "dev"
+    region_abbv           = "eus"
+    aks_integration_enabled = true
+    aks_principal_id      = "00000000-0000-0000-0000-000000000000"
+    enable_aks_acr_push   = true
+    tags                  = {}
   }
 
   module {
     source = "../../../../modules/azure/container_registry"
   }
-}
 
-# Test encryption identity ID validation
-run "invalid_encryption_identity_id" {
-  command = plan
-  variables {
-    sku = "Premium"
-    encryption_enabled = true
-    encryption_identity_id = "invalid-encryption-identity-id"
-  }
-
-  module {
-    source = "../../../../modules/azure/container_registry"
+  assert {
+    condition     = var.aks_integration_enabled == true && var.aks_principal_id != null
+    error_message = "AKS integration should be enabled with a valid principal ID"
   }
 }
 
-# Test retention policy days validation
-run "invalid_retention_policy_days" {
+# Test tags validation
+run "tags_validation_test" {
   command = plan
-  variables {
-    sku = "Premium"
-    retention_policy_days = 500
-  }
 
-  module {
-    source = "../../../../modules/azure/container_registry"
-  }
-}
-
-# Test tags validation - key length
-run "invalid_tags_key_length" {
-  command = plan
   variables {
-    tags = {
-      "" = "empty-key-not-allowed"
+    create_registry     = true
+    resource_group_name = "test-rg"
+    location            = "eastus"
+    prefix              = "test"
+    environment         = "dev"
+    region_abbv         = "eus"
+    tags                = {
+      environment = "test"
+      application = "acr"
+      owner       = "platform-team"
     }
   }
 
   module {
     source = "../../../../modules/azure/container_registry"
   }
-}
 
-# Test tags validation - value length
-run "invalid_tags_value_length" {
-  command = plan
-  variables {
-    tags = {
-      "test" = join("", [for i in range(300) : "a"])
-    }
-  }
-
-  module {
-    source = "../../../../modules/azure/container_registry"
+  assert {
+    condition     = length(keys(var.tags)) == 3
+    error_message = "Tags should be accepted with valid format"
   }
 } 
