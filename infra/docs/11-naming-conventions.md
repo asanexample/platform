@@ -199,71 +199,64 @@ locals {
 }
 ```
 
-### Standardized Naming Module
+### Terragrunt Implementation with Naming Module
 
-The platform enforces standardized naming through the use of the naming module, which centralizes all resource naming logic:
+The VIP Platform uses a centralized naming approach with Terragrunt to manage dependencies between the naming module and resource modules:
+
+1. **Dedicated Naming Module**: A specialized module that generates standardized resource names based on inputs.
+
+2. **Terragrunt Dependency Management**: Terragrunt manages dependencies between modules, passing naming outputs to resource modules.
 
 ```hcl
-module "naming" {
-  source      = "../../modules/azure/naming"
-  
-  prefix      = var.prefix
-  environment = var.environment
-  region_abbv = var.region_abbv
-  customer    = var.customer  # Optional, omitted for shared resources
+# Example naming module configuration in Terragrunt
+# File: infra/live/azure/dev/eastus/naming/terragrunt.hcl
+terraform {
+  source = "${get_repo_root()}/infra/modules/azure//naming"
 }
 
-# Resource Group
-module "resource_group" {
-  source = "../../modules/azure/resource_group"
-  
-  name     = module.naming.resource_group_name
-  location = var.location
-  
-  tags = local.tags
-}
-
-# Virtual Network
-module "networking" {
-  source = "../../modules/azure/networking"
-  
-  resource_group_name = module.resource_group.name
-  location            = module.resource_group.location
-  
-  name          = module.naming.virtual_network_name
-  address_space = ["10.0.0.0/16"]
-  
-  # ...other settings
-}
-
-# Storage Account
-module "storage_account" {
-  source = "../../modules/azure/storage_account"
-  
-  resource_group_name = module.resource_group.name
-  location            = module.resource_group.location
-  
-  name                     = module.naming.storage_account_name
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
-  
-  # ...other settings
-}
-
-# Key Vault
-module "key_vault" {
-  source = "../../modules/azure/key_vault"
-  
-  resource_group_name = module.resource_group.name
-  location            = module.resource_group.location
-  
-  name                = module.naming.key_vault_name
-  
-  # ...other settings
+inputs = {
+  prefix      = local.prefix
+  environment = local.env
+  region_abbv = local.region_abbv
+  customer    = local.customer
 }
 ```
 
-All infrastructure modules use the naming module internally. For example, the `aks_core` module automatically generates standardized resource names based on the provided prefix, customer, environment, and region abbreviation inputs.
+Resource modules don't use the naming module internally, but rather receive naming values through Terragrunt's dependency mechanism:
+
+```hcl
+# Example resource group configuration in Terragrunt
+# File: infra/live/azure/dev/eastus/resource_group/terragrunt.hcl
+
+# Set dependencies for this module
+dependency "naming" {
+  config_path = "../naming"
+  
+  # Mock outputs for plan and validation
+  mock_outputs = {
+    resource_group_name = "mock-rg"
+  }
+}
+
+# Specify inputs specific to this module
+inputs = {
+  # Resource configuration
+  name     = dependency.naming.outputs.resource_group_name
+  location = local.region
+  
+  # Tags and other inputs
+  tags = local.tags
+}
+```
+
+This approach provides several advantages:
+
+1. **Centralized Naming Conventions**: All resource names are generated from a single source of truth.
+2. **Separation of Concerns**: Resources modules focus on resource configuration, not naming logic.
+3. **Consistent Implementation**: The same naming patterns are applied across all environments.
+4. **Flexible Updates**: Naming conventions can be updated centrally without modifying resource modules.
+
+All infrastructure follows this pattern through Terragrunt's dependency management features.
 
 ## Reference
 
