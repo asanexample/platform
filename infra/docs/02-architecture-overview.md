@@ -146,7 +146,7 @@ The VIP Platform is built using the following core technologies:
 
 - **Terraform**: For infrastructure definition (v1.6.0+)
 - **Terragrunt**: For configuration management and DRY implementations (v0.53.0+)
-- **Azure**: Primary cloud provider (AzureRM provider 4.23.0)
+- **Azure**: Primary cloud provider (AzureRM provider 4.25.0)
 - **AWS**: Planned cloud provider (AWS provider 5.91.0)
 - **GCP**: Planned cloud provider (Google provider 6.26.0)
 - **Kubernetes**: Container orchestration

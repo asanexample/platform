@@ -163,13 +163,13 @@ module "aks_core" {
 | Name | Version |
 |------|---------|
 | terraform | >= 1.6.0 |
-| azurerm | 4.23.0 |
+| azurerm | 4.25.0 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| azurerm | 4.23.0 |
+| azurerm | 4.25.0 |
 
 ## Required Inputs
 

@@ -127,7 +127,7 @@ resource "azurerm_storage_account" "this" {
 
 # Note: Key auto-rotation for customer-managed keys is not implemented
 # because the 'azurerm_key_vault_key_managed_storage_account_auto_rotation' resource
-# is not available in provider version 4.23.0.
+# is not available in provider version 4.25.0.
 # When upgrading to a newer provider version, auto-rotation can be implemented
 # using the appropriate resource.
 

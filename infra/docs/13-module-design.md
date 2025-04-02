@@ -48,7 +48,7 @@ When configuring providers in modules, follow these guidelines to avoid conflict
      required_providers {
        azurerm = {
          source  = "hashicorp/azurerm"
-         version = "~> 4.23.0"
+         version = "~> 4.25.0"
        }
      }
    }
