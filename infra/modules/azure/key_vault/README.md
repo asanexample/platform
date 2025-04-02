@@ -1,82 +1,93 @@
 # Azure Key Vault Module
 
-This module creates an Azure Key Vault with configurable access policies, network rules, and private endpoints. It's designed to be flexible for use in various security scenarios including secret management, certificate management, and encryption key management.
+## Overview
+
+This module creates an Azure Key Vault with configurable access policies, network rules, and private endpoints. It provides a secure solution for storing and managing secrets, certificates, and keys with support for both RBAC and Access Policy authorization models.
 
 ## Features
 
-- Creates a fully configured Azure Key Vault
+- Creates a fully configured Azure Key Vault with flexible naming options
 - Supports both RBAC and access policy authorization models
-- Configurable network rules to restrict access
-- Optional private endpoint integration for secure network access
-- Flexible naming with support for auto-generation based on naming conventions
-- Support for unique naming with static suffix to avoid naming conflicts
-- Comprehensive validation of input parameters
-- Configurable SKU selection (standard or premium)
-- Implements best practices for key vault security:
-  - Purge protection enabled by default
-  - Soft-delete enabled with configurable retention
-  - Public network access disabled by default
+- Configures network rules to restrict access based on IP ranges and VNet integration
+- Implements private endpoint integration for secure network access
+- Enforces security best practices including purge protection and soft-delete
+- Provides flexible naming with support for auto-generation based on conventions
+- Supports unique naming with static suffix to avoid naming conflicts
+- Implements comprehensive validation of input parameters
+- Offers configurable SKU selection (standard or premium)
+- Enables disk encryption integration (optional)
 
 ## Usage
 
-### Basic Usage with RBAC Authorization (Default)
-
 ```hcl
 module "key_vault" {
   source = "../../modules/azure/key_vault"
 
-  resource_group_name = "my-resource-group"
-  location            = "eastus"
-  name                = "my-key-vault"
+  resource_group_name = module.resource_group.name
+  location            = module.resource_group.location
+  name                = "kv-platform-prod-01"
+  
+  sku_name                   = "standard"
+  enable_rbac_authorization  = true
+  purge_protection_enabled   = true
+  soft_delete_retention_days = 90
   
   tags = {
-    Environment = "Development"
-    Project     = "MyProject"
+    Environment = "Production"
+    ManagedBy   = "Terraform"
+    Project     = "Platform"
   }
 }
 ```
 
-### With Unique Name Using Static Suffix
+## Examples
+
+### Basic Key Vault with RBAC Authorization
 
 ```hcl
 module "key_vault" {
   source = "../../modules/azure/key_vault"
 
-  resource_group_name = "my-resource-group"
-  location            = "eastus"
-  name                = "vipdevwuskv01"  # Using a unique static suffix (01)
+  resource_group_name = module.resource_group.name
+  location            = module.resource_group.location
+  name                = "kv-platform-dev-01"
+  
+  # Default configuration uses RBAC authorization
   
   tags = {
     Environment = "Development"
-    Project     = "MyProject"
+    ManagedBy   = "Terraform"
   }
 }
 ```
 
-### With Access Policies (RBAC Disabled)
+### Key Vault with Access Policies
 
 ```hcl
 module "key_vault" {
   source = "../../modules/azure/key_vault"
 
-  resource_group_name = "my-resource-group"
-  location            = "eastus"
-  name                = "my-key-vault"
+  resource_group_name = module.resource_group.name
+  location            = module.resource_group.location
+  name                = "kv-platform-dev-02"
   
   enable_rbac_authorization = false
   
   access_policies = {
     "admin" = {
-      object_id = "00000000-0000-0000-0000-000000000000"  # Object ID of the admin principal
+      object_id = data.azuread_group.security_admins.object_id
       secret_permissions = [
         "Get", "List", "Set", "Delete", "Recover", "Backup", "Restore"
       ]
       key_permissions = [
         "Get", "List", "Create", "Delete", "Update"
       ]
-    }
-    "reader" = {
-      object_id = "11111111-1111-1111-1111-111111111111"  # Object ID of the reader principal
+      certificate_permissions = [
+        "Get", "List", "Create", "Delete", "Update", "Import"
+      ]
+    },
+    "app" = {
+      object_id = data.azuread_service_principal.app.object_id
       secret_permissions = [
         "Get", "List"
       ]
@@ -85,135 +96,117 @@ module "key_vault" {
   
   tags = {
     Environment = "Development"
-    Project     = "MyProject"
+    ManagedBy   = "Terraform"
   }
 }
 ```
 
-### With Auto-Generated Name
+### Key Vault with Network Restrictions and Private Endpoint
 
 ```hcl
 module "key_vault" {
   source = "../../modules/azure/key_vault"
 
-  resource_group_name = "my-resource-group"
-  location            = "eastus"
+  resource_group_name = module.resource_group.name
+  location            = module.resource_group.location
+  name                = "kv-platform-prod-03"
   
-  # Empty name triggers auto-generation
-  name = ""
-  
-  name_components = {
-    prefix      = "vip"
-    environment = "dev"
-    region_abbv = "eus"
-    instance    = "001"
-  }
-  
-  tags = {
-    Environment = "Development"
-    Project     = "MyProject"
-  }
-}
-```
-
-### With Network Restrictions
-
-```hcl
-module "key_vault" {
-  source = "../../modules/azure/key_vault"
-
-  resource_group_name = "my-resource-group"
-  location            = "eastus"
-  name                = "my-key-vault"
+  # Network access controls
+  public_network_access_enabled = false
   
   network_acls = {
     bypass                     = "AzureServices"
     default_action             = "Deny"
     ip_rules                   = ["203.0.113.0/24"]
-    virtual_network_subnet_ids = ["subnet-id-1", "subnet-id-2"]
+    virtual_network_subnet_ids = [module.networking.subnet_ids["endpoints"]]
   }
   
-  tags = {
-    Environment = "Development"
-    Project     = "MyProject"
-  }
-}
-```
-
-### With Private Endpoint
-
-```hcl
-module "key_vault" {
-  source = "../../modules/azure/key_vault"
-
-  resource_group_name = "my-resource-group"
-  location            = "eastus"
-  name                = "my-key-vault"
-  
+  # Private endpoint configuration
   private_endpoint = {
-    subnet_id            = "/subscriptions/.../resourceGroups/.../providers/Microsoft.Network/virtualNetworks/.../subnets/..."
-    private_dns_zone_ids = ["/subscriptions/.../resourceGroups/.../providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net"]
+    subnet_id            = module.networking.subnet_ids["endpoints"]
+    private_dns_zone_ids = [module.private_dns.zones["privatelink.vaultcore.azure.net"].id]
   }
   
   tags = {
-    Environment = "Development"
-    Project     = "MyProject"
+    Environment = "Production"
+    ManagedBy   = "Terraform"
+    Security    = "High"
   }
 }
 ```
 
-### AKS Integration Example
+### AKS Integration with Auto-Generated Name
 
 ```hcl
 module "key_vault" {
   source = "../../modules/azure/key_vault"
 
-  resource_group_name = dependency.resource_group.outputs.name
-  location            = dependency.resource_group.outputs.location
+  resource_group_name = module.resource_group.name
+  location            = module.resource_group.location
   
-  name = "vipdevwuskv01"  # Using a static unique suffix
+  # Auto-generate name based on components
+  name = ""
+  name_components = {
+    prefix      = "vip"
+    environment = "prod"
+    region_abbv = "eus"
+    instance    = "001"
+  }
   
   # Key Vault configuration
-  sku_name                     = "standard"
-  enabled_for_disk_encryption  = true
-  enable_rbac_authorization    = true
-  purge_protection_enabled     = true
-  soft_delete_retention_days   = 90
+  sku_name                   = "standard"
+  enabled_for_disk_encryption = true
+  enable_rbac_authorization  = true
+  purge_protection_enabled   = true
+  soft_delete_retention_days = 90
   
   # Network settings for secure access
   network_acls = {
     bypass                     = "AzureServices"
     default_action             = "Deny"
     ip_rules                   = []
-    virtual_network_subnet_ids = [
-      dependency.networking.outputs.subnet_ids["az1-endpoint-subnet"]
-    ]
+    virtual_network_subnet_ids = [module.networking.subnet_ids["aks-endpoints"]]
   }
   
   # Private endpoint configuration
   private_endpoint = {
-    subnet_id            = dependency.networking.outputs.subnet_ids["az1-endpoint-subnet"]
-    private_dns_zone_ids = []
+    subnet_id            = module.networking.subnet_ids["aks-endpoints"]
+    private_dns_zone_ids = [module.private_dns.zones["privatelink.vaultcore.azure.net"].id]
   }
   
   tags = {
     Component          = "KeyVault"
-    CostCenter         = "Engineering"
-    DataClassification = "Internal"
-    Environment        = "dev"
-    ManagedBy          = "Terragrunt"
-    Owner              = "Platform Team"
-    Project            = "Multi-Cloud Platform"
+    Environment        = "Production"
+    ManagedBy          = "Terraform"
+    Project            = "AKS Platform"
   }
 }
 ```
 
-## Inputs
+## Requirements
+
+| Name | Version |
+|------|---------|
+| terraform | >= 1.6.0 |
+| azurerm | >= 4.0.0 |
+
+## Providers
+
+| Name | Version |
+|------|---------|
+| azurerm | >= 4.0.0 |
+
+## Required Inputs
+
+| Name | Description | Type |
+|------|-------------|------|
+| resource_group_name | Name of the resource group to deploy the key vault in | `string` |
+| location | Azure region where the key vault will be deployed | `string` |
+
+## Optional Inputs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| resource_group_name | Name of the resource group to deploy the key vault in | `string` | n/a | yes |
-| location | Azure region where the key vault will be deployed | `string` | n/a | yes |
 | name | Name of the key vault (if custom naming is required) | `string` | `""` | no |
 | name_components | Components to auto-generate the key vault name if 'name' is not provided | `object` | `{}` | no |
 | sku_name | SKU name for the key vault (standard or premium) | `string` | `"standard"` | no |
@@ -224,10 +217,12 @@ module "key_vault" {
 | public_network_access_enabled | Whether public network access is enabled for the key vault | `bool` | `false` | no |
 | network_acls | Network ACLs for the key vault | `object` | `null` | no |
 | access_policies | Map of access policies for the key vault (used only when RBAC authorization is disabled) | `map(object)` | `{}` | no |
-| private_endpoint | Configuration for the private endpoint | `object` | See below | no |
+| private_endpoint | Configuration for the private endpoint | `object` | `{}` | no |
 | tags | Tags to apply to all resources | `map(string)` | `{}` | no |
 
-### Network ACLs Object
+### Nested Object Structures
+
+#### Network ACLs Object
 
 ```hcl
 network_acls = {
@@ -238,7 +233,7 @@ network_acls = {
 }
 ```
 
-### Private Endpoint Object
+#### Private Endpoint Object
 
 ```hcl
 private_endpoint = {
@@ -247,7 +242,7 @@ private_endpoint = {
 }
 ```
 
-### Name Components Object
+#### Name Components Object
 
 ```hcl
 name_components = {
@@ -270,6 +265,48 @@ name_components = {
 | access_policy_ids | IDs of the created access policies |
 | private_endpoint_ids | IDs of the created private endpoints |
 
+## Module Resources
+
+This module creates the following resources:
+- Azure Key Vault
+- Key Vault Access Policies (when RBAC is disabled)
+- Private Endpoint (optional)
+- Private DNS Zone Group (optional, for private endpoint)
+
+## Dependencies
+
+This module can depend on:
+- [resource_group](../resource_group) - For resource group creation
+- [networking](../networking) - For network integration, including subnet references for private endpoints
+- [private_dns](../private_dns) - For private endpoint DNS zone integration
+
+## Authentication and Authorization Models
+
+### RBAC Authorization (Recommended)
+
+Role-based access control (RBAC) is the recommended authorization model:
+
+- Set `enable_rbac_authorization = true` (default)
+- Use standard Azure RBAC roles for key vault management:
+  - Key Vault Administrator
+  - Key Vault Certificates Officer
+  - Key Vault Crypto Officer
+  - Key Vault Crypto Service Encryption User
+  - Key Vault Crypto User
+  - Key Vault Reader
+  - Key Vault Secrets Officer
+  - Key Vault Secrets User
+
+### Access Policy Authorization
+
+Traditional access policies can be used for backward compatibility:
+
+- Set `enable_rbac_authorization = false`
+- Define access policies using the `access_policies` variable
+- Specify permissions for secrets, keys, and certificates per principal
+
+**Note:** When `enable_rbac_authorization` is set to `true`, any `access_policies` configurations will be ignored.
+
 ## Naming Strategies
 
 ### Static Unique Suffix
@@ -282,47 +319,56 @@ locals {
   unique_suffix = "01"
 }
 
-inputs = {
+module "key_vault" {
   # Use a fixed unique name that doesn't change on every apply
-  name = "vipdevwuskv${local.unique_suffix}"
+  name = "kv-platform-prod-${local.unique_suffix}"
+  # ...
 }
 ```
 
-### Timestamp-Based Naming (Not Recommended for Production)
+### Auto-Generated Naming
 
-An alternative approach for dev/test environments is to use a timestamp-based suffix, which ensures uniqueness but changes on each apply:
+When no name is provided, the module generates a name using the following pattern:
 
-```hcl
-locals {
-  # Generate a unique timestamp-based suffix for the Key Vault
-  timestamp_suffix = formatdate("hhmmss", timestamp())
-}
-
-inputs = {
-  # Use a custom Key Vault name with timestamp
-  name = "vipdeveuskv${local.timestamp_suffix}"
-}
+```
+{prefix}{environment}{region_abbv}kv{instance}
 ```
 
-Note: The timestamp approach is not recommended for production as it creates a new resource on each apply.
+Example: `vipdeveuskv001`
+
+## Security Best Practices
+
+This module implements several security best practices:
+
+1. **Purge Protection** - Enabled by default to prevent accidental or malicious deletion
+2. **Soft-Delete** - Enabled with configurable retention period (default: 90 days)
+3. **Network Isolation** - Public network access disabled by default
+4. **Private Endpoints** - Support for private connectivity from virtual networks
+5. **RBAC Authorization** - Enabled by default for granular access control
+6. **SKU Selection** - Standard SKU by default, with option for Premium for HSM-backed keys
+
+## Notes
+
+1. Key vault names must be globally unique across Azure and must be between 3-24 characters.
+2. When a private endpoint is created, public network access will be automatically disabled.
+3. For production use, consider implementing the following:
+   - Use Premium SKU for HSM-backed keys for critical secrets
+   - Enable private endpoints and disable public network access
+   - Configure diagnostic settings for audit logging
+   - Implement key rotation policies for secrets and keys
+4. The default configuration follows security best practices with public network access disabled and purge protection enabled.
 
 ## Testing
 
-This module includes comprehensive Terraform tests that validate the module's functionality:
+This module includes Terraform tests that validate the module's functionality:
 
-### Pre-requisites for Testing
+### Prerequisites for Testing
 
 To run the tests locally, you need:
 
 1. Terraform 1.6.0 or higher
 2. Valid Azure credentials with permissions to create resources
-3. Environment variables for Azure authentication:
-   ```bash
-   export ARM_CLIENT_ID="your-client-id"
-   export ARM_CLIENT_SECRET="your-client-secret"
-   export ARM_SUBSCRIPTION_ID="your-subscription-id"
-   export ARM_TENANT_ID="your-tenant-id"
-   ```
+3. Environment variables for Azure authentication
 
 ### Running Tests
 
@@ -333,26 +379,6 @@ terraform init
 terraform test
 ```
 
-The tests validate:
-- Basic key vault creation with default settings
-- Key vault with access policies (RBAC disabled)
-- Key vault with network ACLs
-- Key vault with auto-generated name
-- Key vault with private endpoint
+## License
 
-## Naming Convention
-
-This module follows the naming convention defined in the [NAMING_CONVENTIONS.md](../../../../../NAMING_CONVENTIONS.md) file. When no name is provided, it generates a name using the following pattern:
-
-```
-{prefix}{environment}{region_abbv}kv{instance}
-```
-
-Example: `vipdeveuskv001`
-
-## Notes
-
-1. When `enable_rbac_authorization` is set to `true` (default), any `access_policies` configurations will be ignored.
-2. When a private endpoint is created (`private_endpoint.create = true`), public network access will be automatically disabled.
-3. The key vault name must be globally unique across Azure and must be between 3-24 characters.
-4. The default configuration follows security best practices with public network access disabled and purge protection enabled. 
+This module is licensed under the MIT License. 

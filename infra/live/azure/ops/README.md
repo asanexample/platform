@@ -1,6 +1,6 @@
-# Azure Development Environment
+# Azure Operations Environment
 
-This directory contains the Terragrunt configurations for the Azure development environment.
+This directory contains the Terragrunt configurations for the Azure operations environment.
 
 ## Environment Configuration
 
@@ -16,7 +16,7 @@ For backward compatibility, there is a symbolic link from `env.hcl` to `common.h
 ## Configuration Structure
 
 ```
-dev/
+ops/
 ├── common.hcl           # Main configuration file with all environment variables and tags
 ├── env.hcl -> common.hcl  # Symbolic link for backward compatibility
 └── [region]/            # Region-specific configurations
@@ -35,6 +35,7 @@ The environment includes a subscription name mapping that can be used to associa
 | qa/staging  | innovation-test           |
 | preprod     | innovation-preprod        |
 | prod        | innovation-prod           |
+| ops         | innovation-operations     |
 
 ## Usage
 

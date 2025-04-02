@@ -1,25 +1,25 @@
 # Azure Storage Container Module
 
-This Terraform module manages Azure Storage Containers for existing Storage Accounts. It provides a simple, flexible way to create and manage multiple containers with granular control over access types and metadata.
+## Overview
+
+This module manages Azure Storage Containers for existing Storage Accounts. It provides a flexible and secure way to create and manage multiple blob containers with granular access control, metadata support, and role-based access control.
 
 ## Features
 
-- **Independent Container Management**: Manage containers separately from storage accounts
-- **Bulk Container Creation**: Create multiple containers with a single module call
-- **Flexible Access Control**: Configure access type per container (private, blob, or container)
-- **Metadata Support**: Add optional metadata to containers for improved organization
-- **Name Validation**: Enforces Azure Storage container naming requirements
-- **Entra ID (Azure AD) Authentication**: Configure container-level role assignments with RBAC for secure access
+- Creates and manages multiple Azure Storage containers in a single module call
+- Configures container access types (private, blob, or container) for each container
+- Supports container metadata for improved organization and tagging
+- Enforces Azure Storage container naming requirements through validation
+- Enables Entra ID (Azure AD) authentication with container-level RBAC
+- Outputs container properties and resource IDs for downstream dependencies
 
 ## Usage
-
-### Basic Usage
 
 ```hcl
 module "blob_containers" {
   source = "../../modules/azure/storage_container"
 
-  storage_account_id = azurerm_storage_account.example.id
+  storage_account_id = module.storage_account.id
 
   containers = {
     "data" = {
@@ -31,16 +31,48 @@ module "blob_containers" {
       container_access_type = "blob"
     }
   }
+  
+  role_assignments = [
+    {
+      container_key        = "data"
+      principal_id         = "00000000-0000-0000-0000-000000000000"
+      role_definition_name = "Storage Blob Data Contributor"
+      description          = "Allows data team to read and write data"
+    }
+  ]
 }
 ```
 
-### With Metadata
+## Examples
+
+### Basic Storage Containers
 
 ```hcl
-module "blob_containers" {
+module "basic_containers" {
   source = "../../modules/azure/storage_container"
 
-  storage_account_id = azurerm_storage_account.example.id
+  storage_account_id = module.storage_account.id
+
+  containers = {
+    "logs" = {
+      name                  = "logs"
+      container_access_type = "private"
+    },
+    "backups" = {
+      name                  = "backups"
+      container_access_type = "private"
+    }
+  }
+}
+```
+
+### Containers with Metadata
+
+```hcl
+module "metadata_containers" {
+  source = "../../modules/azure/storage_container"
+
+  storage_account_id = module.storage_account.id
 
   containers = {
     "app-backups" = {
@@ -64,98 +96,76 @@ module "blob_containers" {
 }
 ```
 
-### With Entra ID (Azure AD) Role Assignments
+### RBAC with Container-level Access Control
 
 ```hcl
-module "blob_containers" {
+module "rbac_containers" {
   source = "../../modules/azure/storage_container"
 
-  storage_account_id = azurerm_storage_account.example.id
+  storage_account_id = module.storage_account.id
 
   containers = {
-    "data" = {
-      name                  = "data"
+    "finance" = {
+      name                  = "finance"
       container_access_type = "private"
     },
-    "logs" = {
-      name                  = "logs"
+    "marketing" = {
+      name                  = "marketing"
       container_access_type = "private"
     }
   }
 
   role_assignments = [
     {
-      container_key        = "data"
-      principal_id         = data.azurerm_client_config.current.object_id
+      container_key        = "finance"
+      principal_id         = data.azuread_group.finance_team.id
       role_definition_name = "Storage Blob Data Contributor"
-      description          = "Allows current user to read and write data in the container"
+      description          = "Finance team can read and write financial data"
     },
     {
-      container_key        = "logs"
-      principal_id         = azuread_service_principal.example.object_id
+      container_key        = "marketing"
+      principal_id         = data.azuread_group.marketing_team.id
+      role_definition_name = "Storage Blob Data Contributor"
+      description          = "Marketing team can read and write marketing assets"
+    },
+    {
+      container_key        = "marketing"
+      principal_id         = data.azuread_service_principal.cdn_service.id
       role_definition_name = "Storage Blob Data Reader"
       principal_type       = "ServicePrincipal"
-      description          = "Allows monitoring service to read logs"
+      description          = "CDN service can read marketing assets"
     }
   ]
 }
 ```
 
-### Using Outputs
+## Requirements
 
-```hcl
-module "blob_containers" {
-  source = "../../modules/azure/storage_container"
+| Name | Version |
+|------|---------|
+| terraform | >= 1.6.0 |
+| azurerm | >= 4.0.0 |
 
-  storage_account_id = azurerm_storage_account.example.id
+## Providers
 
-  containers = {
-    "images" = {
-      name                  = "images"
-      container_access_type = "blob"
-    }
-  }
-}
+| Name | Version |
+|------|---------|
+| azurerm | >= 4.0.0 |
 
-# Access container properties in other resources
-resource "azurerm_role_assignment" "container_contributor" {
-  scope                = module.blob_containers.container_resource_manager_ids["images"]
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = "00000000-0000-0000-0000-000000000000" # Example user/service principal ID
-}
-```
+## Required Inputs
 
-## Authentication Methods
+| Name | Description | Type |
+|------|-------------|------|
+| storage_account_id | ID of the Azure Storage Account where containers will be created | `string` |
+| containers | Map of container configurations to create | `map(object)` |
 
-### Entra ID (Azure AD) Authentication (Recommended)
-
-Entra ID (formerly Azure AD) authentication is the recommended approach for accessing blob storage. This method uses Azure role-based access control (RBAC) with role assignments for specific principals (users, groups, service principals). 
-
-Benefits:
-- Fine-grained access control at the container level
-- No shared secrets to manage
-- Integration with Azure's identity management
-- Supports conditional access policies
-
-Use the `role_assignments` variable to define container-level permissions. Common storage roles include:
-
-| Role Name | Description |
-|-----------|-------------|
-| Storage Blob Data Reader | Read-only access to blob container data and metadata |
-| Storage Blob Data Contributor | Read, write, and delete access to blob container data and metadata |
-| Storage Blob Data Owner | Full access including permissions management |
-
-### Shared Access Signatures (SAS)
-
-For scenarios requiring temporary access or when Entra ID is not suitable, you can generate SAS tokens separately after container creation.
-
-## Inputs
+## Optional Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|----------|
-| storage_account_id | ID of the Azure Storage Account where containers will be created | `string` | n/a | yes |
-| containers | Map of container configurations to create | `map(object)` | n/a | yes |
+|------|-------------|------|---------|:--------:|
 | role_assignments | List of role assignments to create for containers | `list(object)` | `[]` | no |
+
+### Container Configuration Object
 
 The `containers` object accepts the following properties:
 
@@ -168,6 +178,8 @@ containers = {
   }
 }
 ```
+
+### Role Assignment Configuration Object
 
 The `role_assignments` object accepts the following properties:
 
@@ -196,9 +208,61 @@ role_assignments = [
 | containers | Map of container names to their properties |
 | role_assignments | Map of role assignments created for containers |
 
-## Notes
+## Module Resources
 
-### Container Naming Rules
+This module creates the following resources:
+- Azure Storage Containers
+- Azure Role Assignments (optional)
+
+## Dependencies
+
+This module depends on:
+- [storage_account](../storage_account) - For the storage account ID
+
+## Authentication Methods
+
+### Entra ID (Azure AD) Authentication (Recommended)
+
+Entra ID (formerly Azure AD) authentication is the recommended approach for accessing blob storage. This method uses Azure role-based access control (RBAC) with role assignments for specific principals (users, groups, service principals). 
+
+Benefits:
+- Fine-grained access control at the container level
+- No shared secrets to manage
+- Integration with Azure's identity management
+- Supports conditional access policies
+
+Use the `role_assignments` variable to define container-level permissions. Common storage roles include:
+
+| Role Name | Description |
+|-----------|-------------|
+| Storage Blob Data Reader | Read-only access to blob container data and metadata |
+| Storage Blob Data Contributor | Read, write, and delete access to blob container data and metadata |
+| Storage Blob Data Owner | Full access including permissions management |
+
+### Shared Access Signatures (SAS)
+
+For scenarios requiring temporary access or when Entra ID is not suitable, you can generate SAS tokens separately after container creation.
+
+## Container Access Types
+
+The module supports the following container access types:
+
+- **private**: No anonymous access (default)
+- **blob**: Anonymous read access for blobs only
+- **container**: Anonymous read access for containers and blobs (least secure)
+
+## Security Best Practices
+
+For production environments, consider implementing the following security measures:
+
+1. **Use Private Access Type** - Use `private` access type for all containers unless public access is specifically required
+2. **Implement RBAC** - Use role assignments with the principle of least privilege
+3. **Use Conditional Access** - For sensitive data, consider using conditional access policies with Entra ID
+4. **Limit Public Access** - If public access is needed, prefer `blob` access over `container` access
+5. **Consider Azure CDN** - For public content, use Azure CDN rather than direct blob access
+6. **Audit Container Access** - Regularly review container access settings and permissions
+
+## Container Naming Rules
 
 Azure Storage container names must follow these rules:
 - Must be between 3 and 63 characters
@@ -206,31 +270,21 @@ Azure Storage container names must follow these rules:
 - Cannot start or end with a hyphen
 - Cannot contain consecutive hyphens
 
-### Container Access Types
+## Metadata Limitations
 
-- **private**: No anonymous access (default)
-- **blob**: Anonymous read access for blobs only
-- **container**: Anonymous read access for containers and blobs (least secure)
-
-### Security Best Practices
-
-- Use `private` access type whenever possible
-- Prefer Entra ID authentication with appropriate RBAC roles
-- For public content, prefer `blob` access over `container` access
-- Consider using Azure CDN for public content rather than direct blob access
-- Implement role-based access control (RBAC) for more granular permissions
-
-### Metadata Limitations
-
+When using container metadata, be aware of these limitations:
 - Metadata keys must be valid HTTP header names and are case-insensitive
 - Total size of all metadata cannot exceed 8KB
 - Avoid special characters in keys and values
 
-## Related Modules
+## Notes
 
-- [storage_account](../storage_account): Creates Azure Storage Accounts
-- [storage_roles](../storage_roles): Manages role assignments for storage accounts
+- This module only manages containers and not the storage account itself
+- For managing storage accounts, use the [storage_account](../storage_account) module
+- Role assignments require the deploying identity to have sufficient permissions on the storage account
+- Consider using storage lifecycle management policies for data retention requirements
+- For containers with private data, ensure proper security controls are in place
 
 ## License
 
-This module is licensed under the MIT License - see the LICENSE file for details. 
+This module is licensed under the MIT License. 

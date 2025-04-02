@@ -1,14 +1,16 @@
 # Azure AKS Identity Module
 
-This module creates and configures identities for Azure Kubernetes Service (AKS) clusters, implementing secure identity management and workload identity federation.
+## Overview
+
+This module creates and configures identities for Azure Kubernetes Service (AKS) clusters, implementing secure identity management and workload identity federation for authentication with Azure resources.
 
 ## Features
 
-- Configures managed identities or service principals for AKS clusters
+- Creates and manages user-assigned managed identities for AKS clusters
 - Implements workload identity federation for secure pod authentication
-- Sets up appropriate RBAC permissions for cluster identities
-- Supports Azure AD integration for identity management
-- Compatible with both system-assigned and user-assigned identities
+- Configures federated identity credentials for Kubernetes service accounts
+- Supports both system-assigned and user-assigned identity configurations
+- Enables OIDC issuer integration for modern authentication patterns
 
 ## Usage
 
@@ -17,19 +19,76 @@ module "aks_identity" {
   source = "../../modules/azure/aks_identity"
 
   # Basic settings
-  resource_group_name = "vip-rg-dev-eus-aks"
+  resource_group_name = "rg-aks-dev-eastus"
   location            = "eastus"
   
   # Identity settings
   identity_type       = "UserAssigned"
-  user_assigned_identity_name = "vip-uami-dev-eus-aks"
+  user_assigned_identity_name = "id-aks-dev-eastus"
   
-  # Optional: Workload Identity Federation settings
+  # Workload Identity Federation settings
   enable_workload_identity = true
   
   # Tags
   tags = {
-    Environment = "dev"
+    Environment = "Development"
+    ManagedBy   = "Terraform"
+    Component   = "AKS"
+  }
+}
+```
+
+## Examples
+
+### Basic User-Assigned Identity
+
+```hcl
+module "aks_identity" {
+  source = "../../modules/azure/aks_identity"
+
+  resource_group_name = "rg-aks-dev-eastus"
+  location            = "eastus"
+  identity_type       = "UserAssigned"
+  user_assigned_identity_name = "id-aks-dev-eastus"
+}
+```
+
+### Using Existing Identity
+
+```hcl
+module "aks_identity" {
+  source = "../../modules/azure/aks_identity"
+
+  resource_group_name = "rg-aks-dev-eastus"
+  location            = "eastus"
+  identity_type       = "UserAssigned"
+  create_user_assigned_identity = false
+  existing_user_assigned_identity_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-aks-dev-eastus"
+}
+```
+
+### Workload Identity Federation
+
+```hcl
+module "aks_identity" {
+  source = "../../modules/azure/aks_identity"
+
+  resource_group_name = "rg-aks-prod-eastus"
+  location            = "eastus"
+  identity_type       = "UserAssigned"
+  user_assigned_identity_name = "id-aks-prod-eastus"
+  
+  # Workload Identity settings
+  enable_workload_identity = true
+  oidc_issuer_enabled = true
+  workload_identity_enabled = true
+  
+  # Optional: Customize federation settings
+  federated_identity_credential_audiences = ["api://AzureADTokenExchange"]
+  federated_identity_credential_subject = "system:serviceaccount:default:workload-identity-sa"
+  
+  tags = {
+    Environment = "Production"
     ManagedBy   = "Terraform"
     Component   = "AKS"
   }
@@ -40,20 +99,32 @@ module "aks_identity" {
 
 | Name | Version |
 |------|---------|
-| terraform | >= 1.3.0 |
-| azurerm | >= 3.0.0 |
+| terraform | >= 1.6.0 |
+| azurerm | >= 4.0.0 |
 | azuread | >= 2.0.0 |
 
-## Inputs
+## Providers
+
+| Name | Version |
+|------|---------|
+| azurerm | >= 4.0.0 |
+| azuread | >= 2.0.0 |
+
+## Required Inputs
+
+| Name | Description | Type |
+|------|-------------|------|
+| resource_group_name | Name of the resource group where the identity will be created | `string` |
+| location | Azure region where resources will be created | `string` |
+
+## Optional Inputs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| resource_group_name | Name of the resource group | `string` | n/a | yes |
-| location | Azure region where resources will be created | `string` | n/a | yes |
-| identity_type | Type of identity to use for the AKS cluster (SystemAssigned, UserAssigned, SystemAssigned, UserAssigned) | `string` | `"UserAssigned"` | no |
-| user_assigned_identity_name | Name of the user assigned identity for AKS (required when identity_type contains UserAssigned) | `string` | `null` | no |
+| identity_type | Type of identity to use (SystemAssigned, UserAssigned, or Both) | `string` | `"UserAssigned"` | no |
+| user_assigned_identity_name | Name of the user assigned identity (required when identity_type contains UserAssigned) | `string` | `null` | no |
 | create_user_assigned_identity | Whether to create a new user assigned identity | `bool` | `true` | no |
-| existing_user_assigned_identity_id | ID of an existing user assigned identity (if create_user_assigned_identity is false) | `string` | `null` | no |
+| existing_user_assigned_identity_id | ID of an existing user assigned identity (when create_user_assigned_identity is false) | `string` | `null` | no |
 | enable_workload_identity | Whether to enable workload identity federation | `bool` | `false` | no |
 | oidc_issuer_enabled | Whether the OIDC issuer is enabled for workload identity | `bool` | `true` | no |
 | workload_identity_enabled | Whether the workload identity feature is enabled | `bool` | `true` | no |
@@ -73,57 +144,46 @@ module "aks_identity" {
 | kubelet_identity | The kubelet identity properties |
 | oidc_issuer_url | The OIDC issuer URL for workload identity |
 
-## Identity Types
+## Module Resources
+
+This module creates the following resources:
+- User-assigned managed identity (when create_user_assigned_identity is true)
+- Azure Federated Identity Credential (when enable_workload_identity is true)
+
+## Identity Types Explained
 
 This module supports different identity configurations for AKS clusters:
 
-1. **System-assigned managed identity**: Azure automatically creates an identity for the AKS cluster in Azure AD
-2. **User-assigned managed identity**: You provide a pre-created identity or have the module create one
-3. **Both system and user-assigned**: Combines both approaches for different purposes
+1. **System-assigned managed identity**: Azure automatically creates an identity for the AKS cluster in Azure AD. This is simpler to manage but has fewer customization options.
+
+2. **User-assigned managed identity**: You provide a pre-created identity or have the module create one. This provides more flexibility and allows for identity reuse across multiple resources.
+
+3. **Both system and user-assigned**: Combines both approaches, using system-assigned for core functionality and user-assigned for specific permissions or workloads.
 
 ## Workload Identity Federation
 
-When `enable_workload_identity` is set to `true`, the module configures workload identity federation, which allows:
+When `enable_workload_identity` is set to `true`, the module configures workload identity federation, allowing:
 
 - Kubernetes service accounts to authenticate directly with Azure AD
 - Pods to access Azure resources securely without storing credentials
 - Fine-grained access control through Azure RBAC
 
-### Configuring Workload Identity
+## Dependencies
 
-```hcl
-module "aks_identity" {
-  source = "../../modules/azure/aks_identity"
-
-  resource_group_name = "vip-rg-dev-eus-aks"
-  location            = "eastus"
-  
-  # Identity settings
-  identity_type       = "UserAssigned"
-  user_assigned_identity_name = "vip-uami-dev-eus-aks"
-  
-  # Workload Identity settings
-  enable_workload_identity = true
-  oidc_issuer_enabled = true
-  workload_identity_enabled = true
-  
-  # The federated identity credential settings will be used
-  # after the cluster is created with the OIDC issuer URL
-}
-```
-
-## Integration with Other Modules
+This module can depend on:
+- [resource_group](../resource_group) - For resource group creation
+- [naming](../naming) - For standardized resource naming
 
 This module is designed to work with:
+- [aks_core](../aks_core) - For the main AKS cluster configuration
 
-- [AKS Core Module](../aks_core/README.md): Provides the main AKS cluster configuration
-- [AKS Cluster Module](../aks_cluster/README.md): Combines multiple AKS modules
-- [AKS Cluster Composite Module](../aks_cluster_composite/README.md): Higher-level abstraction for AKS deployment
+## Notes
+
+- When using an existing identity, ensure it has all necessary permissions for AKS operation
+- For production workloads, using user-assigned identities is recommended for better security and management
+- Workload identity is the modern recommended approach for pod authentication with Azure resources
+- The `federated_identity_credential_issuer` requires the OIDC issuer URL from an existing AKS cluster
 
 ## License
 
-This module is proprietary and confidential.
-
-## Authors
-
-VIP Platform Team 
+This module is licensed under the MIT License. 

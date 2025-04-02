@@ -1,24 +1,27 @@
-# AKS Node Pools Module
+# Azure Kubernetes Service (AKS) Node Pools Module
 
-This module creates additional node pools for an existing Azure Kubernetes Service (AKS) cluster. It's designed to be used in conjunction with the AKS Core module, following the principle of separation of concerns.
+## Overview
+
+This module creates additional node pools for an existing Azure Kubernetes Service (AKS) cluster. It allows creating application-specific node pools with custom configurations, enabling workload isolation and optimization strategies.
 
 ## Features
 
 - Creates application-specific node pools for an existing AKS cluster
-- Uses standardized naming conventions via the naming module
-- Configurable auto-scaling capabilities
-- Support for node labels and taints
-- Customizable VM sizes, OS disk configurations, and pod limits
+- Supports multiple availability zones for high availability
+- Configurable auto-scaling for dynamic workload demands
+- Custom node labels and taints for workload targeting and isolation
+- Optimizable VM sizes, OS disk configurations, and pod limits
+- Compatible with the AKS Core module for complete cluster management
 
 ## Usage
 
 ```hcl
 module "aks_node_pools" {
-  source = "../modules/azure/aks_node_pools"
+  source = "../../modules/azure/aks_node_pools"
 
   # Naming
   prefix      = "vip"
-  stage       = "dev"
+  environment = "dev"
   region_abbv = "eus"
   
   # Reference to existing AKS cluster
@@ -47,32 +50,129 @@ module "aks_node_pools" {
   tags = {
     Environment = "Development"
     ManagedBy   = "Terraform"
+    Component   = "Kubernetes"
   }
 }
 ```
 
-## Dependencies
+## Examples
 
-This module depends on:
-- An existing AKS cluster (from the aks_core module)
-- The Azure naming module for resource naming
+### Basic Application Node Pool
+
+```hcl
+module "aks_node_pools" {
+  source = "../../modules/azure/aks_node_pools"
+
+  prefix      = "vip"
+  environment = "dev"
+  region_abbv = "eus"
+  aks_cluster_id = module.aks_core.id
+  
+  app_node_pool_enabled = true
+  app_node_pool_vm_size = "Standard_D4s_v4"
+  app_node_pool_node_count = 2
+}
+```
+
+### High-Performance Workload Node Pool
+
+```hcl
+module "aks_node_pools" {
+  source = "../../modules/azure/aks_node_pools"
+
+  prefix      = "vip"
+  environment = "prod"
+  region_abbv = "weu"
+  aks_cluster_id = module.aks_core.id
+  
+  app_node_pool_enabled = true
+  app_node_pool_name = "gpu"
+  app_node_pool_vm_size = "Standard_NC6s_v3"
+  app_node_pool_node_count = 2
+  app_node_pool_os_disk_size_gb = 256
+  app_node_pool_max_pods = 20
+  
+  app_node_pool_node_labels = {
+    "nodepool" = "gpu"
+    "accelerator" = "nvidia"
+  }
+  
+  app_node_pool_node_taints = [
+    "gpu=true:NoSchedule"
+  ]
+  
+  tags = {
+    Environment = "Production"
+    ManagedBy   = "Terraform"
+    Component   = "Kubernetes"
+    Workload    = "GPU"
+  }
+}
+```
+
+### Auto-Scaling Production Node Pool
+
+```hcl
+module "aks_node_pools" {
+  source = "../../modules/azure/aks_node_pools"
+
+  prefix      = "vip"
+  environment = "prod"
+  region_abbv = "eus"
+  aks_cluster_id = module.aks_core.id
+  
+  app_node_pool_enabled = true
+  app_node_pool_vm_size = "Standard_D8s_v4"
+  app_node_pool_node_count = 3
+  app_node_pool_availability_zones = ["1", "2", "3"]
+  app_node_pool_os_disk_size_gb = 256
+  app_node_pool_max_pods = 50
+  
+  app_node_pool_enable_auto_scaling = true
+  app_node_pool_min_count = 3
+  app_node_pool_max_count = 10
+  
+  app_node_pool_node_labels = {
+    "nodepool" = "apps"
+    "environment" = "production"
+    "criticality" = "high"
+  }
+  
+  tags = {
+    Environment = "Production"
+    ManagedBy   = "Terraform"
+    Component   = "Kubernetes"
+    CostCenter  = "Platform"
+  }
+}
+```
 
 ## Requirements
 
 | Name | Version |
 |------|---------|
-| terraform | >= 1.3.0 |
-| azurerm | 4.23.0 |
+| terraform | >= 1.6.0 |
+| azurerm | >= 4.0.0 |
 
-## Inputs
+## Providers
+
+| Name | Version |
+|------|---------|
+| azurerm | >= 4.0.0 |
+
+## Required Inputs
+
+| Name | Description | Type |
+|------|-------------|------|
+| aks_cluster_id | ID of the existing AKS cluster | `string` |
+
+## Optional Inputs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| prefix | Prefix to use for resource names | `string` | `"vip"` | no |
-| customer | Customer name for resource naming | `string` | `null` | no |
-| stage | Environment stage (dev, preprod, prod, test, stg) | `string` | n/a | yes |
-| region_abbv | Abbreviated Azure region name | `string` | n/a | yes |
-| aks_cluster_id | ID of the existing AKS cluster | `string` | n/a | yes |
+| prefix | Prefix for resource names | `string` | `"centric"` | no |
+| environment | Environment name for resource tagging (dev, test, staging, prod, ops) | `string` | `"dev"` | no |
+| region_abbv | Abbreviation for region (used in resource naming) | `string` | `"weu"` | no |
 | app_node_pool_enabled | Enable application node pool | `bool` | `true` | no |
 | app_node_pool_name | Application node pool name | `string` | `"apps"` | no |
 | app_node_pool_vm_size | VM size for application nodes | `string` | `"Standard_D4s_v4"` | no |
@@ -84,10 +184,10 @@ This module depends on:
 | app_node_pool_enable_auto_scaling | Enable auto-scaling | `bool` | `true` | no |
 | app_node_pool_min_count | Minimum node count | `number` | `1` | no |
 | app_node_pool_max_count | Maximum node count | `number` | `5` | no |
-| app_node_pool_mode | Node pool mode | `string` | `"User"` | no |
+| app_node_pool_mode | Node pool mode (User or System) | `string` | `"User"` | no |
 | app_node_pool_node_labels | Node labels | `map(string)` | `{"nodepool" = "apps", "app" = "true"}` | no |
 | app_node_pool_node_taints | Node taints | `list(string)` | `[]` | no |
-| tags | Resource tags | `map(string)` | `{}` | no |
+| tags | Tags to apply to resources | `map(string)` | `{}` | no |
 
 ## Outputs
 
@@ -104,8 +204,25 @@ This module depends on:
 | app_node_pool_mode | The mode of the node pool |
 | app_node_pool_node_labels | The node labels |
 
+## Module Resources
+
+This module creates the following resources:
+- Kubernetes node pool for an existing AKS cluster
+
+## Dependencies
+
+This module depends on:
+- [aks_core](../aks_core) - For the AKS cluster reference
+
 ## Notes
 
-- This module is designed to be used with AKS Core as part of a modular AKS deployment
-- For additional node pools, consider extending this module or creating a new one with similar patterns
-- The module follows the principle of separation of concerns by focusing solely on node pools 
+- This module is designed to be used with the AKS Core module as part of a modular AKS deployment
+- For multiple node pools of different types, call this module multiple times with different configurations
+- Consider using node labels and taints to control workload placement across node pools
+- Ensure node VM sizes are appropriate for your workload requirements
+- For production environments, using multiple availability zones is recommended for high availability
+- Use auto-scaling for workloads with variable resource demands to optimize costs
+
+## License
+
+This module is licensed under the MIT License. 
