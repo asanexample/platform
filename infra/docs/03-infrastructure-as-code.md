@@ -45,6 +45,7 @@ graph TD
     infra --> tests[tests/]
     infra --> scripts[scripts/]
     infra --> docs[docs/]
+    infra --> makefile[Makefile]
     
     modules --> aws[aws/]
     modules --> azure[azure/]
@@ -92,10 +93,12 @@ graph TD
     classDef folder fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
     classDef module fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
     classDef category fill:#fff8e1,stroke:#ff8f00,stroke-width:2px;
+    classDef file fill:#e0f7fa,stroke:#006064,stroke-width:2px;
     
     class infra,modules,live,tests,scripts,docs,aws,azure,gcp,common,envcommon,cloud_resources,env,region,components,diagrams,templates,guides folder;
     class base_modules,network_modules,compute_modules,storage_modules,security_modules,monitoring_modules,cdn_modules module;
     class base,networking,compute,storage,security,monitoring,cdn category;
+    class makefile file;
 ```
 
 ### Modules Directory
@@ -624,7 +627,20 @@ Our testing approach includes several levels of validation:
    - Maintain tests for all previously identified bugs
    - Include edge cases and boundary conditions
 
-Tests are run automatically in the CI/CD pipeline and also available for local execution using the provided `run_all_terraform_tests.sh` script.
+Tests are run using the project's Makefile with the following commands:
+
+```bash
+# Run all tests
+make test
+
+# Run tests for a specific module
+make test-module MODULE=azure/networking
+
+# Run tests with verbose output
+make test-verbose
+```
+
+The Makefile provides a standardized and consistent way to run tests across the codebase and is the preferred method for both local testing and CI/CD pipelines.
 
 ## Best Practices
 
