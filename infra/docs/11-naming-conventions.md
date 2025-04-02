@@ -16,6 +16,16 @@ Where:
 - `region_abbv` is the shortened region name (e.g., eus, wus)
 - `purpose` is optional and describes the specific purpose (e.g., "main", "secondary")
 
+## Environment Abbreviations
+
+| Environment | Abbreviation |
+|-------------|--------------|
+| Development | dev          |
+| Testing     | test         |
+| Staging     | staging      |
+| Production  | prod         |
+| Operations  | ops          |
+
 ## Region Abbreviations
 
 | Azure Region   | Abbreviation |
@@ -39,7 +49,7 @@ Where:
 | Subnet                                     | subnet       | az1-node-subnet                             |
 | Network Security Group                     | nsg          | az1-node-subnet-nsg                         |
 | Key Vault                                  | kv           | vip-kv-dev-eus-secrets                      |
-| Storage Account                            | sa           | vipdeveussa001 (special format - see notes) |
+| Storage Account                            | st           | vipdeveussa001 (special format - see notes) |
 | Container Registry                         | acr          | vipdevacr                                   |
 | AKS Cluster                                | aks          | vip-aks-dev-eus-k8s                         |
 | Public IP                                  | pip          | vip-pip-dev-eus-ingress                     |
@@ -47,16 +57,21 @@ Where:
 | Application Gateway                        | agw          | vip-agw-dev-eus-ingress                     |
 | Private Endpoint                           | pe           | vip-pe-dev-eus-sql                          |
 | Private DNS Zone                           | pdns         | privatelink.database.windows.net            |
-| Front Door                                 | fd           | vip-fd-dev-global                           |
-| Log Analytics Workspace                    | law          | vip-law-dev-eus-analytics                   |
-| Workload Identity                          | workid       | vip-workid-dev-eus-customer                 |
-| Federated Credential                       | fedcred      | vip-fedcred-dev-eus-customer                |
-| Storage Account Private Endpoint           | sape         | vip-sape-dev-eus-customer                   |
-| Storage Account Private Service Connection | sapsc        | vip-sapsc-dev-eus-customer                  |
+| Front Door Profile                         | fd           | vip-fd-dev-global                           |
 | Front Door Endpoint                        | fd-endpoint  | vip-fd-endpoint-dev-eus-customer            |
 | Front Door Origin Group                    | fd-og        | vip-fd-og-dev-eus-customer                  |
 | Front Door Origin                          | fd-origin    | vip-fd-origin-dev-eus-customer              |
 | Front Door Route                           | fd-route     | vip-fd-route-dev-eus-customer               |
+| Log Analytics Workspace                    | law          | vip-law-dev-eus-analytics                   |
+| Monitor Workspace                          | mw           | vip-mw-dev-eus-prometheus                   |
+| Data Collection Rule                       | dcr          | vip-dcr-dev-eus-prometheus                  |
+| Data Collection Endpoint                   | dce          | vip-dce-dev-eus-prometheus                  |
+| Managed Grafana                            | grafana      | vip-grafana-dev-eus-metrics                 |
+| User-Assigned Managed Identity             | id           | vip-id-dev-eus-aks                          |
+| Workload Identity                          | workid       | vip-workid-dev-eus-customer                 |
+| Federated Credential                       | fedcred      | vip-fedcred-dev-eus-customer                |
+| Storage Account Private Endpoint           | pe           | vip-pe-dev-eus-storage                      |
+| Storage Container                          | container    | assets, logs, data                          |
 
 ## Specific Resource Conventions
 
@@ -75,25 +90,48 @@ Examples:
 ### Storage Accounts
 Storage accounts have a 24 character limit and cannot use hyphens. They follow this pattern:
 ```
-{prefix}{env}{region_abbv}sa{instance}
+{prefix}{env}{region_abbv}st{instance}
 ```
 
-Example: `vipdeveussa001`
+Example: `vipdeveusstdata001`
+
+### Container Names
+Container names in Storage Accounts are consistent across all deployments:
+- assets
+- logs
+- data
+- backups
+- archives
 
 ### Customer-Specific Resources
 
 For customer-specific resources:
 ```
-{prefix}-{resource_type}-{customer}-{env}-{region_abbv}
+{prefix}-{resource_type}-{env}-{region_abbv}-{customer}
 ```
 
-Example: `vip-kv-customer-dev-eus`
+Example: `vip-kv-dev-eus-customer1`
 
-### Container Names
-Container names are consistent across all deployments:
-- assets
-- public
-- pdf
+### Role Assignments
+
+Role assignments for RBAC use a descriptive approach:
+```
+{resource}-{role}-{principal-type}
+```
+
+Examples:
+- `storage-contributor-developers`
+- `keyvault-reader-app`
+- `aks-admin-operations`
+
+### Private Link Resources
+
+Private link resources follow:
+```
+{prefix}-pe-{env}-{region_abbv}-{service}
+```
+
+Example: `vip-pe-dev-eus-keyvault`
 
 ### Deployment ID
 
@@ -126,7 +164,7 @@ All resources should include the following standard tags:
 | Tag Name           | Description                                       | Example                            |
 |--------------------|---------------------------------------------------|------------------------------------|
 | Environment        | Deployment environment                            | "dev", "test", "prod"              |
-| ManagedBy          | Tool managing the resource                        | "Terragrunt"                       |
+| ManagedBy          | Tool managing the resource                        | "Terraform"                        |
 | Component          | System component                                  | "Networking", "Compute", "Storage" |
 | Project            | Project name                                      | "Multi-Cloud Platform"             |
 | DataClassification | Data sensitivity                                  | "Internal", "Confidential"         |
@@ -134,8 +172,11 @@ All resources should include the following standard tags:
 | AutoShutdown       | Auto-shutdown eligibility                         | "True", "False"                    |
 | CIDRHierarchy      | For network resources, position in CIDR hierarchy | "Azure-Dev-EastUS"                 |
 | NetworkDesign      | Network design pattern                            | "Kubernetes3AZ"                    |
+| CreatedDate        | Date when the resource was created                | "2023-06-01"                       |
 
 ## Implementation in Terraform
+
+### Basic Naming Convention
 
 Use locals to construct resource names consistently:
 
@@ -154,48 +195,80 @@ locals {
   vnet_name = "${local.prefix}-vnet-${local.environment}-${local.region_abbv}-main"
   
   # Storage Account (no hyphens, 24 char limit)
-  storage_account_name = "${local.prefix}${local.environment}${local.region_abbv}sa001"
+  storage_account_name = "${local.prefix}${local.environment}${local.region_abbv}st001"
 }
 ```
 
-## Standardized Naming Implementation
+### Standardized Naming Module
 
-The platform now enforces standardized naming through the use of the naming module, which centralizes all resource naming logic:
+The platform enforces standardized naming through the use of the naming module, which centralizes all resource naming logic:
 
 ```hcl
 module "naming" {
   source      = "../../modules/azure/naming"
   
-  prefix      = "vip"
-  customer    = "contoso"  # Optional, omitted for shared resources
-  stage       = "dev"
-  region_abbv = "eus"
+  prefix      = var.prefix
+  environment = var.environment
+  region_abbv = var.region_abbv
+  customer    = var.customer  # Optional, omitted for shared resources
 }
 
-# Use naming module outputs for resource names
-resource "azurerm_resource_group" "example" {
-  name     = module.naming.resource_group
-  location = "East US"
+# Resource Group
+module "resource_group" {
+  source = "../../modules/azure/resource_group"
+  
+  name     = module.naming.resource_group_name
+  location = var.location
+  
+  tags = local.tags
 }
 
-resource "azurerm_virtual_network" "example" {
-  name                = module.naming.virtual_network
-  resource_group_name = azurerm_resource_group.example.name
-  location            = azurerm_resource_group.example.location
-  address_space       = ["10.0.0.0/16"]
+# Virtual Network
+module "networking" {
+  source = "../../modules/azure/networking"
+  
+  resource_group_name = module.resource_group.name
+  location            = module.resource_group.location
+  
+  name          = module.naming.virtual_network_name
+  address_space = ["10.0.0.0/16"]
+  
+  # ...other settings
 }
 
-resource "azurerm_storage_account" "example" {
-  name                     = module.naming.storage_account
-  resource_group_name      = azurerm_resource_group.example.name
-  location                 = azurerm_resource_group.example.location
+# Storage Account
+module "storage_account" {
+  source = "../../modules/azure/storage_account"
+  
+  resource_group_name = module.resource_group.name
+  location            = module.resource_group.location
+  
+  name                     = module.naming.storage_account_name
   account_tier             = "Standard"
   account_replication_type = "LRS"
+  
+  # ...other settings
+}
+
+# Key Vault
+module "key_vault" {
+  source = "../../modules/azure/key_vault"
+  
+  resource_group_name = module.resource_group.name
+  location            = module.resource_group.location
+  
+  name                = module.naming.key_vault_name
+  
+  # ...other settings
 }
 ```
 
-All infrastructure modules use the naming module internally. For example, the hosting module automatically generates standardized resource names based on the provided prefix, customer, stage, and region abbreviation inputs.
+All infrastructure modules use the naming module internally. For example, the `aks_core` module automatically generates standardized resource names based on the provided prefix, customer, environment, and region abbreviation inputs.
 
 ## Reference
 
-For CIDR allocation strategy details, see [CIDR Allocation Strategy](06-cidr-allocation.md). 
+For CIDR allocation strategy details, see [CIDR Allocation Strategy](06-cidr-allocation.md).
+
+For security naming considerations, see [Security Architecture](09-security-architecture.md).
+
+For multi-cloud naming strategies, see [Multi-Cloud Strategy](04-multi-cloud-strategy.md). 
