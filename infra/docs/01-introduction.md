@@ -24,21 +24,21 @@ The primary goals of the VIP Platform are:
 
 The VIP Platform includes:
 
-- **Hierarchical CIDR Allocation**: Well-structured address space organization for clear network boundaries.
+- **Hierarchical CIDR Allocation**: Well-structured address space organization for clear network boundaries. See [CIDR Allocation Strategy](06-cidr-allocation.md) for details.
 
-- **Multi-Environment Support**: Configurations for development, testing, and production environments.
+- **Multi-Environment Support**: Configurations for development, testing, and production environments. Learn more in [Environment Management](05-environment-management.md).
 
-- **Multi-Region Deployment**: Support for deploying to multiple regions across cloud providers.
+- **Multi-Region Deployment**: Support for deploying to multiple regions across cloud providers. Reference our [Region Scaffolding](20-region-scaffolding.md) documentation.
 
-- **Terragrunt Integration**: DRY approach for managing common configurations across environments.
+- **Terragrunt Integration**: DRY approach for managing common configurations across environments. Explore our [Infrastructure as Code Approach](03-infrastructure-as-code.md).
 
-- **Comprehensive Testing**: Automated tests for all infrastructure modules.
+- **Comprehensive Testing**: Automated tests for all infrastructure modules. See our [Testing Strategy](15-testing-strategy.md).
 
-- **Security Best Practices**: Implementation of cloud provider security recommendations and industry standards.
+- **Security Best Practices**: Implementation of cloud provider security recommendations and industry standards. Detailed in our [Security Architecture](09-security-architecture.md).
 
-- **Standardized Naming**: Consistent resource naming across all environments and cloud providers.
+- **Standardized Naming**: Consistent resource naming across all environments and cloud providers. Review our [Naming Conventions](11-naming-conventions.md).
 
-- **AKS Cluster Support**: Kubernetes cluster deployment with multi-AZ node pools and workload identity.
+- **AKS Cluster Support**: Kubernetes cluster deployment with multi-AZ node pools and workload identity. See our [AKS Core](../modules/azure/aks_core/README.md) and [AKS Node Pools](../modules/azure/aks_node_pools/README.md) modules.
 
 ## Project Structure
 
@@ -55,13 +55,15 @@ platform/
 │   │   └── gcp/             # GCP-specific configurations
 │   ├── modules/             # Reusable Terraform modules
 │   │   ├── aws/             # AWS-specific modules
-│   │   ├── azure/           # Azure-specific modules
+│   │   ├── azure/           # Azure-specific modules (see Available Modules documentation)
 │   │   ├── gcp/             # GCP-specific modules
 │   │   └── common/          # Cross-cloud abstraction modules
 │   ├── scripts/             # Utility scripts
 │   └── tests/               # Test configurations
 └── run_all_terraform_tests.sh  # Script to run all Terraform tests
 ```
+
+For a complete list of available modules, see [Available Modules](17-available-modules.md).
 
 ## Getting Started
 
@@ -71,6 +73,21 @@ To start working with the VIP Platform:
 2. Explore the [Infrastructure as Code Approach](03-infrastructure-as-code.md) to learn about the development patterns.
 3. Check the [Available Modules](17-available-modules.md) to see what infrastructure components are ready to use.
 4. Follow the [Deployment Workflows](14-deployment-workflows.md) guide to deploy infrastructure components.
+5. Review the [Module Design Principles](13-module-design.md) to understand how modules are structured.
+6. Understand our [Network Topology](07-network-topology.md) and [Kubernetes Network Design](08-kubernetes-network-design.md).
+
+### Common Tasks Reference
+
+| Task | Relevant Documentation |
+|------|------------------------|
+| Deploy a new environment | [Environment Management](05-environment-management.md), [Deployment Workflows](14-deployment-workflows.md) |
+| Add monitoring to AKS | [Monitor Workspace Module](../modules/azure/monitor_workspace/README.md), [Prometheus DCR Module](../modules/azure/prometheus_dcr/README.md) |
+| Set up a CDN | [Front Door Modules](../modules/azure/frontdoor_profile/README.md) |
+| Manage storage securely | [Storage Account Module](../modules/azure/storage_account/README.md), [Storage Roles Module](../modules/azure/storage_roles/README.md) |
+| Scale Kubernetes clusters | [AKS Node Pools Module](../modules/azure/aks_node_pools/README.md) |
+| Use private networking | [Private DNS Module](../modules/azure/private_dns/README.md), [Networking Module](../modules/azure/networking/README.md) |
+| Deploy container registry | [Container Registry Module](../modules/azure/container_registry/README.md) |
+| Implement disaster recovery | [Disaster Recovery](16-disaster-recovery.md) |
 
 ## Target Audience
 

@@ -193,6 +193,35 @@ module "managed_grafana" {
 - Consider creating Monitor Workspaces in the same region as your monitored resources for optimal performance
 - Monitor Workspaces have separate pricing from Log Analytics Workspaces
 
+## Implementation Notes
+
+### Performance Considerations
+- **Regional Alignment**: Deploy Monitor Workspaces in the same region as your monitored resources to minimize latency for metric collection
+- **Query Optimization**: For large-scale deployments, consider structuring your Prometheus metrics with efficient labels to improve query performance
+- **Retention Optimization**: Monitor Workspaces currently support a fixed 30-day retention period; design your backup and archival strategy accordingly
+
+### Architectural Recommendations
+- **Multi-Region Monitoring**: For global applications, use a Monitor Workspace in each major deployment region and connect them to a centralized Grafana instance
+- **Separation of Concerns**: Use different Monitor Workspaces for different environments (dev, test, prod) to maintain proper isolation
+- **Integration with Log Analytics**: Use both Monitor Workspaces (for metrics) and Log Analytics Workspaces (for logs) to build a comprehensive monitoring solution
+
+### Security Best Practices
+- **Network Security**: Restrict access to the Monitor Workspace query endpoint using appropriate network security controls
+- **RBAC Implementation**: Implement proper RBAC controls for accessing and querying metrics data
+- **Encryption**: Monitor Workspaces automatically encrypt data at rest with Microsoft-managed keys
+
+### Integration Patterns
+- **AKS Integration**: For AKS monitoring, pair this module with the prometheus_dcr module to collect Kubernetes metrics
+- **Application Insights**: Consider complementing metrics with Application Insights for application-level telemetry
+- **Alert Rules**: Define Azure Monitor alert rules that query your Monitor Workspace for proactive monitoring
+- **Dashboarding**: Create dedicated Grafana dashboards for visualizing critical metrics from your application components
+
+### Operational Monitoring
+- **Metric Cardinality**: Monitor the cardinality of your metrics to prevent performance issues and excessive costs
+- **Usage Monitoring**: Regularly monitor the volume of metrics ingested into your Monitor Workspace to manage costs
+- **Alert Tuning**: Regularly review and tune alert thresholds to reduce alert fatigue and improve signal-to-noise ratio
+- **Query Performance**: Monitor the performance of frequently executed queries and optimize as needed
+
 ## License
 
 This module is licensed under the MIT License. 

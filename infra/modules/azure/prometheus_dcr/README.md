@@ -205,6 +205,60 @@ The metrics are collected using the Azure Monitor agent on AKS nodes, which scra
 - For production environments, consider using custom names for better identification
 - The DCR and DCE are region-specific, so you may need to create multiple instances for multi-region deployments
 
+## Implementation Notes
+
+### Operational Considerations
+- **Metric Selection**: By default, this DCR collects all Prometheus metrics; consider using namespace or label filters to limit collection to only necessary metrics
+- **Scrape Interval**: The default scrape interval is 60 seconds; adjust this based on your application's requirements and cost considerations
+- **Resource Requirements**: The Azure Monitor agent consumes additional resources on your AKS nodes; ensure your node pools have sufficient capacity
+- **Quota Limits**: Be aware of Azure Monitor service limits for metrics ingestion rates and adjust your collection strategy accordingly
+
+### Troubleshooting Guidance
+- **Missing Metrics**: If metrics aren't appearing, verify:
+  1. The DCR association with the AKS cluster is active
+  2. The Azure Monitor agent pods are running in the kube-system namespace
+  3. Applications are exposing Prometheus metrics on the expected endpoints
+  4. Network connectivity between agent and applications is working
+- **High Latency**: If experiencing high metric latency:
+  1. Check if the Monitor Workspace is in the same region as your AKS cluster
+  2. Verify agent pods have adequate resources
+  3. Consider reducing the volume of metrics being collected
+
+### Scaling Recommendations
+- **Large Clusters**: For clusters with many nodes (>100), consider:
+  1. Using multiple smaller node pools to distribute monitoring agent load
+  2. Implementing metric collection sampling for high-volume metrics
+  3. Setting up dedicated node pools for system components including monitoring
+- **Multi-Cluster Configuration**: When monitoring multiple clusters:
+  1. Use a consistent naming convention for DCRs and DCEs across clusters
+  2. Consider using a dedicated Monitor Workspace for critical production clusters
+  3. Implement proper tagging to distinguish metrics from different clusters
+
+### Security Practices
+- **RBAC Controls**: Limit access to the DCR and DCE management to platform administrators only
+- **Network Security**: If using private AKS clusters, ensure the DCE can communicate with your cluster's private endpoints
+- **Data Segregation**: Use separate Monitor Workspaces for production and non-production environments to maintain data isolation
+- **Least Privilege**: The Azure Monitor agent requires specific permissions; avoid granting excessive permissions beyond what's needed
+
+### Integration with Monitoring Strategy
+- **Complete Observability**: Combine with:
+  1. Log Analytics Workspace for log collection
+  2. Application Insights for application telemetry
+  3. Azure Monitor Alerts for proactive notifications
+- **Dashboarding Strategy**: Create dedicated Grafana dashboards for:
+  1. Cluster health and performance
+  2. Application-specific metrics
+  3. Business KPIs derived from application metrics
+- **Cost Management**: Regularly review:
+  1. Metric volume and ingestion rates
+  2. Unnecessary metrics being collected
+  3. Opportunities to aggregate or downsample metrics before ingestion
+
+### Related Documentation
+- [Azure Monitor Managed Service for Prometheus](https://docs.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-enable)
+- [Prometheus Scraping Configuration](https://prometheus.io/docs/prometheus/latest/configuration/configuration/)
+- [Prometheus Query Language (PromQL)](https://prometheus.io/docs/prometheus/latest/querying/basics/)
+
 ## License
 
 This module is licensed under the MIT License. 
