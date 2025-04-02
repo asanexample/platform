@@ -86,7 +86,7 @@ inputs = {
   resource_group_name = dependency.resource_group.outputs.name
   
   # Key vault name from naming module
-  name = dependency.naming.outputs.key_vault
+  name = "${dependency.naming.outputs.key_vault}-1"
 
   # Enable RBAC authorization
   enable_rbac_authorization = true

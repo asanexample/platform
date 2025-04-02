@@ -39,7 +39,7 @@ include "networking_common" {
   path = find_in_parent_folders("azure/_envcommon/networking.hcl")
 }
 
-# Set dependencies for this module
+# Set dependencies for this module (these will merge with the common inputs)
 dependency "naming" {
   config_path = "../naming"
   
@@ -64,7 +64,6 @@ dependency "resource_group" {
 inputs = {
   # Environment variables
   environment = local.env
-  customer = local.customer
   prefix = local.prefix
   region_abbv = local.region_abbv
   

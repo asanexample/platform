@@ -17,11 +17,11 @@ locals {
   # Extract commonly used variables
   env         = local.env_vars.locals.environment
   prefix      = local.common_vars.locals.prefix
-  customer    = local.common_vars.locals.customer
   region      = local.region_vars.locals.region
   region_abbv = local.region_vars.locals.region_abbv
   tags        = merge(
     local.common_vars.locals.tags, 
+    local.env_vars.locals.env_tags,
     local.region_vars.locals.region_tags
   )
 }

@@ -77,7 +77,6 @@ inputs = {
   
   # Environment variables
   environment = local.env
-  customer = local.customer
   prefix = local.prefix
   region_abbv = local.region_abbv
   

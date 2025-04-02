@@ -19,7 +19,6 @@ locals {
   # Extract commonly used variables
   env         = local.env_vars.locals.environment
   prefix      = local.common_vars.locals.prefix
-  customer    = local.common_vars.locals.customer
   region      = local.region_vars.locals.region
   region_abbv = local.region_vars.locals.region_abbv
   tags        = merge(
@@ -69,11 +68,12 @@ dependency "aks_identity" {
 
 # Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
-  # Required variables that were missing
+  # Environment variables
   environment = local.env
+  prefix = local.prefix
   region_abbv = local.region_abbv
   
-  # AKS Reference
+  # Required variables that were missing
   aks_cluster_id = dependency.aks_core.outputs.id
   
   # Disable availability zones for westus region as it doesn't support zones for VMSS

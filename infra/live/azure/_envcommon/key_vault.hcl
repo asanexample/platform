@@ -16,7 +16,7 @@ inputs = {
   enabled_for_deployment          = true
   enabled_for_template_deployment = true
   soft_delete_retention_days      = 90
-  purge_protection_enabled        = true
+  purge_protection_enabled        = false
   sku_name                        = "standard"
   
   # Default network ACLs

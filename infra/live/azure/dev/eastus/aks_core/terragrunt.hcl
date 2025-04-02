@@ -111,14 +111,13 @@ dependency "monitor_workspace" {
 inputs = {
   # Environment variables
   environment = local.env
-  customer = local.customer
   prefix = local.prefix
   region_abbv = local.region_abbv
 
   # Resource details
-  name                = dependency.naming.outputs.aks_cluster
   resource_group_name = dependency.resource_group.outputs.name
   location            = dependency.resource_group.outputs.location
+  name                = dependency.naming.outputs.aks_cluster
   dns_prefix          = "${local.prefix}-${local.env}-${local.region_abbv}"
 
   # Environment-specific overrides
