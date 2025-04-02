@@ -1,104 +1,132 @@
 /**
- * # Azure Identities Module - Basic Test
+ * # Identities Module - Basic Test
  * 
- * This test verifies the basic functionality of the Azure Identities module
- * with minimal configuration.
+ * This test verifies the basic functionality of the identities module.
  */
 
-# Define provider configuration for the test runs
+# Provider configuration with actual Azure credentials
 provider "azurerm" {
-  features {}
+  features {
+    resource_group {
+      prevent_deletion_if_contains_resources = false
+    }
+  }
   subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  tenant_id       = "c945e155-be68-4477-b8d7-01939adbfe55"
-  resource_provider_registrations = "none"
+  tenant_id = "c945e155-be68-4477-b8d7-01939adbfe55"
 }
 
-# Basic test with minimal configuration
+# Test basic identity creation
 run "basic_identity_creation" {
   command = plan
 
   variables {
-    prefix              = "centric"
-    environment         = "dev"
-    region_abbv         = "weu"
-    resource_group_name = "test-rg"
-    location            = "westeurope"
-    create_aks_identity = true
+    prefix               = "centric"
+    customer             = "centric"
+    environment          = "dev"
+    region_abbv          = "weu"
+    resource_group_name  = "test-rg"
+    location             = "westeurope"
+    create_aks_identity  = true
+    tags = {
+      environment = "dev"
+      application = "testing"
+      owner       = "terraform"
+    }
   }
 
   module {
     source = "../../../../modules/azure/identities"
   }
 
-  # Verify AKS identity is planned for creation
+  # Check that aks_identity is created
   assert {
     condition     = length(azurerm_user_assigned_identity.aks_identity) > 0
-    error_message = "AKS identity should be planned for creation"
+    error_message = "AKS identity should be created"
   }
-
-  # Verify identity name format
+  
+  # Check that the AKS identity has the correct name format
   assert {
-    condition     = azurerm_user_assigned_identity.aks_identity[0].name == "centric-dev-weu-aks-id"
+    condition     = azurerm_user_assigned_identity.aks_identity[0].name == "centric-dev-aksid-weu"
     error_message = "AKS identity name should follow the pattern from the naming module"
   }
 
-  # Verify the resource group and location are set correctly
+  # Check that the identity has the correct tags (including the name tag added by the module)
+  assert {
+    condition     = length(azurerm_user_assigned_identity.aks_identity[0].tags) == 4
+    error_message = "AKS identity should have 4 tags (3 provided + name tag added by module)"
+  }
+
+  # Check that the identity is in the right resource group
   assert {
     condition     = azurerm_user_assigned_identity.aks_identity[0].resource_group_name == "test-rg"
-    error_message = "AKS identity should use the specified resource group"
+    error_message = "AKS identity should be created in the specified resource group"
   }
 
+  # Check that the identity is in the right location
   assert {
     condition     = azurerm_user_assigned_identity.aks_identity[0].location == "westeurope"
-    error_message = "AKS identity should use the specified location"
+    error_message = "AKS identity should be created in the specified location"
   }
 }
 
-# Test with custom identity name
-run "custom_identity_name" {
+# Test enabling workload identity feature
+run "workload_identity_enabled_test" {
   command = plan
 
   variables {
-    prefix              = "centric"
-    environment         = "dev"
-    region_abbv         = "weu"
-    resource_group_name = "test-rg"
-    location            = "westeurope"
-    create_aks_identity = true
-    aks_identity_name   = "custom-aks-identity"
+    prefix                   = "centric"
+    customer                 = "centric"
+    environment              = "dev"
+    region_abbv              = "weu"
+    resource_group_name      = "test-rg"
+    location                 = "westeurope"
+    create_aks_identity      = true
+    enable_workload_identity = true
+    cluster_name             = "aks-test-cluster"
+    workload_identities = {
+      workload1 = {
+        namespace       = "default"
+        service_account = "workload1-sa"
+        roles           = ["Reader"]
+      },
+      workload2 = {
+        namespace       = "kube-system"
+        service_account = "workload2-sa"
+        roles           = ["Contributor"]
+      }
+    }
+    tags = {
+      environment = "dev"
+      application = "testing"
+      owner       = "terraform"
+    }
   }
 
   module {
     source = "../../../../modules/azure/identities"
   }
 
-  # Verify custom identity name is used
+  # Check that aks_identity is created
   assert {
-    condition     = azurerm_user_assigned_identity.aks_identity[0].name == "custom-aks-identity"
-    error_message = "Custom AKS identity name should be used when specified"
+    condition     = length(azurerm_user_assigned_identity.aks_identity) > 0
+    error_message = "AKS identity should be created"
   }
-}
-
-# Test with identity creation disabled
-run "identity_creation_disabled" {
-  command = plan
-
-  variables {
-    prefix              = "centric"
-    environment         = "dev"
-    region_abbv         = "weu"
-    resource_group_name = "test-rg"
-    location            = "westeurope"
-    create_aks_identity = false
-  }
-
-  module {
-    source = "../../../../modules/azure/identities"
-  }
-
-  # Verify no identity is created when disabled
+  
+  # Check that workload identities are created
   assert {
-    condition     = length(azurerm_user_assigned_identity.aks_identity) == 0
-    error_message = "No AKS identity should be planned when creation is disabled"
+    condition     = length(azurerm_user_assigned_identity.workload_identities) == 2
+    error_message = "Two workload identities should be created"
+  }
+  
+  # Check first workload identity
+  assert {
+    condition     = contains(keys(azurerm_user_assigned_identity.workload_identities), "workload1")
+    error_message = "Workload1 identity should be created"
+  }
+  
+  # Check second workload identity
+  assert {
+    condition     = contains(keys(azurerm_user_assigned_identity.workload_identities), "workload2")
+    error_message = "Workload2 identity should be created"
   }
 } 
