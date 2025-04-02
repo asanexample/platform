@@ -44,6 +44,7 @@ graph TD
     infra --> live[live/]
     infra --> tests[tests/]
     infra --> scripts[scripts/]
+    infra --> docs[docs/]
     
     modules --> aws[aws/]
     modules --> azure[azure/]
@@ -52,30 +53,49 @@ graph TD
     
     live --> envcommon[_envcommon/]
     live --> cloud_resources[aws/azure/gcp]
-    live --> global[global/]
+    cloud_resources --> env[environments/]
+    env --> region[regions/]
+    region --> components[components/]
     
-    cloud_resources --> env_region[env/region/]
+    docs --> guides[numbered guides]
+    docs --> templates[README-TEMPLATES/]
+    docs --> diagrams[diagrams/]
     
-    subgraph "Module Structure"
-        aws --> aws_mod[AWS-specific modules]
-        azure --> azure_mod[Azure-specific modules]
-        gcp --> gcp_mod[GCP-specific modules]
-        common --> common_mod[Cross-cloud modules]
+    subgraph "Module Categories"
+        azure --> base[Base Modules]
+        azure --> networking[Networking Modules]
+        azure --> compute[Compute Modules]
+        azure --> storage[Storage Modules]
+        azure --> security[Security Modules]
+        azure --> monitoring[Monitoring Modules]
+        azure --> cdn[CDN Modules]
+    end
+    
+    subgraph "Azure Modules"
+        base --> base_modules[naming, resource_group, client_config]
+        networking --> network_modules[networking, private_dns]
+        compute --> compute_modules[aks_core, aks_node_pools, aks_identity, container_registry]
+        storage --> storage_modules[storage_account, storage_container, storage_roles]
+        security --> security_modules[key_vault, identities]
+        monitoring --> monitoring_modules[log_analytics, monitor_workspace, prometheus_dcr, managed_grafana]
+        cdn --> cdn_modules[frontdoor_profile, frontdoor_endpoint, frontdoor_private_link]
     end
     
     subgraph "Live Environment Structure"
-        env_region --> networking[networking/]
-        env_region --> storage[storage/]
-        env_region --> compute[compute/]
+        components --> networking_config[networking/]
+        components --> storage_config[storage/]
+        components --> compute_config[aks/]
+        components --> monitoring_config[monitoring/]
     end
     
     classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
     classDef folder fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
     classDef module fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef category fill:#fff8e1,stroke:#ff8f00,stroke-width:2px;
     
-    class infra,modules,live,tests,scripts folder;
-    class aws,azure,gcp,common,envcommon,cloud_resources,global,env_region folder;
-    class aws_mod,azure_mod,gcp_mod,common_mod,networking,storage,compute module;
+    class infra,modules,live,tests,scripts,docs,aws,azure,gcp,common,envcommon,cloud_resources,env,region,components,diagrams,templates,guides folder;
+    class base_modules,network_modules,compute_modules,storage_modules,security_modules,monitoring_modules,cdn_modules module;
+    class base,networking,compute,storage,security,monitoring,cdn category;
 ```
 
 ### Modules Directory
@@ -87,6 +107,43 @@ The `modules` directory contains reusable Terraform modules organized by cloud p
 - **GCP Modules**: Specific to GCP resources and patterns
 - **Common Modules**: Cloud-agnostic patterns and abstractions
 
+Azure modules are organized into logical categories:
+
+1. **Base Modules**:
+   - `naming`: Resource naming conventions
+   - `resource_group`: Resource group management
+   - `client_config`: Current Azure client information
+
+2. **Networking Modules**:
+   - `networking`: Virtual networks, subnets, NSGs
+   - `private_dns`: Private DNS zones for service integration
+
+3. **Compute Modules**:
+   - `aks_core`: AKS cluster creation and management
+   - `aks_node_pools`: Additional AKS node pools
+   - `aks_identity`: Managed identities for AKS
+   - `container_registry`: Azure Container Registry
+
+4. **Storage Modules**:
+   - `storage_account`: Azure Storage Account management
+   - `storage_container`: Blob containers
+   - `storage_roles`: Storage-specific RBAC assignments
+
+5. **Security Modules**:
+   - `key_vault`: Secret management
+   - `identities`: User-assigned managed identities
+
+6. **Monitoring Modules**:
+   - `log_analytics`: Log aggregation and analysis
+   - `monitor_workspace`: Metrics storage (Prometheus)
+   - `prometheus_dcr`: Prometheus data collection rules
+   - `managed_grafana`: Metrics visualization
+
+7. **CDN Modules**:
+   - `frontdoor_profile`: CDN profile management
+   - `frontdoor_endpoint`: User-facing endpoints
+   - `frontdoor_private_link`: Secure backend connections
+
 Each module follows a consistent structure:
 
 ```mermaid
@@ -94,15 +151,15 @@ graph TD
     module[module-name/] --> main[main.tf]
     module --> variables[variables.tf]
     module --> outputs[outputs.tf]
-    module --> versions[versions.tf]
     module --> readme[README.md]
+    module --> optional[optional *.tf files]
     
     classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
     classDef folder fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
     classDef file fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
     
     class module folder;
-    class main,variables,outputs,versions,readme file;
+    class main,variables,outputs,readme,optional file;
 ```
 
 ### Tests Directory
@@ -194,11 +251,35 @@ graph TD
     resource_group --> networking[networking]
     resource_group --> key_vault[key_vault]
     resource_group --> aks_identity[aks_identity]
+    resource_group --> storage_account[storage_account]
+    resource_group --> container_registry[container_registry]
+    resource_group --> log_analytics[log_analytics]
+    resource_group --> monitor_workspace[monitor_workspace]
+    
     networking --> aks_core[aks_core]
-    networking --> storage[storage]
+    networking --> storage_account
     networking --> key_vault
+    networking --> private_dns[private_dns]
+    networking --> frontdoor_private_link[frontdoor_private_link]
+    
     aks_identity --> aks_core
     aks_core --> aks_node_pools[aks_node_pools]
+    
+    client_config[client_config] --> key_vault
+    client_config --> storage_roles[storage_roles]
+    
+    storage_account --> storage_container[storage_container]
+    storage_account --> storage_roles
+    
+    monitor_workspace --> prometheus_dcr[prometheus_dcr]
+    monitor_workspace --> managed_grafana[managed_grafana]
+    
+    log_analytics --> aks_core
+    
+    prometheus_dcr --> aks_core
+    
+    frontdoor_profile[frontdoor_profile] --> frontdoor_endpoint[frontdoor_endpoint]
+    frontdoor_profile --> frontdoor_private_link
     
     classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
     classDef base fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
@@ -206,11 +287,16 @@ graph TD
     classDef compute fill:#fff8e1,stroke:#ff8f00,stroke-width:2px;
     classDef storage fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
     classDef security fill:#ffebee,stroke:#c62828,stroke-width:2px;
+    classDef monitoring fill:#e0f7fa,stroke:#006064,stroke-width:2px;
+    classDef cdn fill:#fff3e0,stroke:#e65100,stroke-width:2px;
     
-    class naming,resource_group base;
-    class networking,aks_core,aks_node_pools network;
-    class storage storage;
+    class naming,resource_group,client_config base;
+    class networking,private_dns network;
+    class aks_core,aks_node_pools,container_registry compute;
+    class storage_account,storage_container,storage_roles storage;
     class key_vault,aks_identity security;
+    class log_analytics,monitor_workspace,prometheus_dcr,managed_grafana monitoring;
+    class frontdoor_profile,frontdoor_endpoint,frontdoor_private_link cdn;
 ```
 
 This dependency graph ensures that resources are created in the correct order, with foundational resources like resource groups created first, followed by networking resources, and finally application-specific resources.
@@ -267,13 +353,29 @@ A typical module implementation looks like:
 ```hcl
 # main.tf
 
+locals {
+  vnet_name = var.name != null ? var.name : "vnet-${var.environment}-${var.region_abbv}"
+  tags = merge(var.tags, {
+    ManagedBy = "Terraform"
+    Module    = "networking"
+  })
+}
+
 resource "azurerm_virtual_network" "vnet" {
-  name                = var.vnet_name
+  name                = local.vnet_name
   location            = var.location
   resource_group_name = var.resource_group_name
   address_space       = var.address_space
   
-  tags = var.tags
+  dynamic "ddos_protection_plan" {
+    for_each = var.ddos_protection_plan_id != null ? [1] : []
+    content {
+      id     = var.ddos_protection_plan_id
+      enable = true
+    }
+  }
+  
+  tags = local.tags
 }
 
 resource "azurerm_subnet" "subnet" {
@@ -283,6 +385,18 @@ resource "azurerm_subnet" "subnet" {
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.vnet.name
   address_prefixes     = [each.value.address_prefix]
+  service_endpoints    = try(each.value.service_endpoints, [])
+  
+  dynamic "delegation" {
+    for_each = try(each.value.delegation, null) != null ? [1] : []
+    content {
+      name = each.value.delegation.name
+      service_delegation {
+        name    = each.value.delegation.service_name
+        actions = each.value.delegation.actions
+      }
+    }
+  }
 }
 
 resource "azurerm_network_security_group" "nsg" {
@@ -292,7 +406,27 @@ resource "azurerm_network_security_group" "nsg" {
   location            = var.location
   resource_group_name = var.resource_group_name
   
-  tags = var.tags
+  dynamic "security_rule" {
+    for_each = try(flatten([
+      for rule_name in each.value.security_rules : [
+        var.security_rules[rule_name]
+      ]
+    ]), [])
+    
+    content {
+      name                       = security_rule.value.name
+      priority                   = security_rule.value.priority
+      direction                  = security_rule.value.direction
+      access                     = security_rule.value.access
+      protocol                   = security_rule.value.protocol
+      source_port_range          = try(security_rule.value.source_port_range, "*")
+      destination_port_range     = try(security_rule.value.destination_port_range, "*")
+      source_address_prefix      = try(security_rule.value.source_address_prefix, "*")
+      destination_address_prefix = try(security_rule.value.destination_address_prefix, "*")
+    }
+  }
+  
+  tags = local.tags
 }
 
 resource "azurerm_subnet_network_security_group_association" "nsg_association" {
@@ -300,6 +434,115 @@ resource "azurerm_subnet_network_security_group_association" "nsg_association" {
   
   subnet_id                 = azurerm_subnet.subnet[each.key].id
   network_security_group_id = azurerm_network_security_group.nsg[each.key].id
+}
+
+# variables.tf
+
+variable "name" {
+  description = "The name of the virtual network (generated if not provided)"
+  type        = string
+  default     = null
+}
+
+variable "resource_group_name" {
+  description = "The name of the resource group"
+  type        = string
+  
+  validation {
+    condition     = length(var.resource_group_name) >= 3 && length(var.resource_group_name) <= 63
+    error_message = "Resource group name must be between 3 and 63 characters."
+  }
+}
+
+variable "location" {
+  description = "The Azure region where resources will be created"
+  type        = string
+}
+
+variable "address_space" {
+  description = "The address spaces for the virtual network"
+  type        = list(string)
+}
+
+variable "subnets" {
+  description = "Map of subnet objects to create"
+  type = map(object({
+    address_prefix    = string
+    security_rules    = optional(list(string), [])
+    service_endpoints = optional(list(string), [])
+    delegation = optional(object({
+      name         = string
+      service_name = string
+      actions      = list(string)
+    }))
+  }))
+  default = {}
+}
+
+variable "security_rules" {
+  description = "Map of security rules that can be referenced by subnets"
+  type = map(object({
+    name                       = string
+    priority                   = number
+    direction                  = string
+    access                     = string
+    protocol                   = string
+    source_port_range          = optional(string)
+    destination_port_range     = optional(string)
+    source_address_prefix      = optional(string)
+    destination_address_prefix = optional(string)
+  }))
+  default = {}
+}
+
+variable "ddos_protection_plan_id" {
+  description = "The ID of the DDoS protection plan to associate with the virtual network"
+  type        = string
+  default     = null
+}
+
+variable "environment" {
+  description = "Environment name (dev, test, staging, prod)"
+  type        = string
+  default     = "dev"
+}
+
+variable "region_abbv" {
+  description = "Abbreviation for Azure region (used in resource naming)"
+  type        = string
+  default     = "eus"
+}
+
+variable "tags" {
+  description = "Tags to apply to all resources"
+  type        = map(string)
+  default     = {}
+}
+
+# outputs.tf
+
+output "id" {
+  description = "The ID of the virtual network"
+  value       = azurerm_virtual_network.vnet.id
+}
+
+output "name" {
+  description = "The name of the virtual network"
+  value       = azurerm_virtual_network.vnet.name
+}
+
+output "subnet_ids" {
+  description = "Map of subnet names to subnet IDs"
+  value = {
+    for k, v in azurerm_subnet.subnet : k => v.id
+  }
+}
+
+output "nsg_ids" {
+  description = "Map of subnet names to NSG IDs"
+  value = {
+    for k, v in azurerm_network_security_group.nsg : k => v.id
+  }
 }
 ```
 
@@ -309,6 +552,12 @@ The VIP Platform uses Terraform's built-in testing framework to validate module 
 
 ```hcl
 # Example test file: networking/tests/basic.tftest.hcl
+
+run "prepare_workspace" {
+  module {
+    source = "../"
+  }
+}
 
 variables {
   vnet_name           = "test-vnet"
@@ -337,7 +586,45 @@ run "verify_vnet_creation" {
     error_message = "Expected 1 subnet to be created"
   }
 }
+
+run "verify_subnet_security" {
+  command = apply
+  
+  assert {
+    condition     = length(azurerm_network_security_group.nsg) == 1
+    error_message = "Expected 1 NSG to be created"
+  }
+  
+  assert {
+    condition     = length(azurerm_subnet_network_security_group_association.nsg_association) == 1
+    error_message = "Expected 1 NSG association to be created"
+  }
+}
 ```
+
+### Comprehensive Testing Strategy
+
+Our testing approach includes several levels of validation:
+
+1. **Unit Tests**: Validate individual modules in isolation
+   - Verify resource creation
+   - Test input validation rules
+   - Confirm outputs match expectations
+
+2. **Integration Tests**: Test combinations of modules working together
+   - Verify dependencies are correctly managed
+   - Test end-to-end flows like networking to compute
+
+3. **Compliance Tests**: Ensure security and best practices
+   - Validate network security rules
+   - Check for required tags
+   - Verify encryption settings
+
+4. **Regression Tests**: Prevent reintroduction of fixed issues
+   - Maintain tests for all previously identified bugs
+   - Include edge cases and boundary conditions
+
+Tests are run automatically in the CI/CD pipeline and also available for local execution using the provided `run_all_terraform_tests.sh` script.
 
 ## Best Practices
 
