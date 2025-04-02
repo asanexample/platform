@@ -4,16 +4,17 @@
 
 # Required variables
 variable "name" {
-  description = "The name of the Log Analytics Workspace"
+  description = "The name of the Log Analytics Workspace. If null, a name should be provided by Terragrunt using the naming module."
   type        = string
+  default     = null
   
   validation {
-    condition     = length(var.name) >= 4 && length(var.name) <= 63
+    condition     = var.name == null ? true : length(var.name) >= 4 && length(var.name) <= 63
     error_message = "The name must be between 4 and 63 characters."
   }
   
   validation {
-    condition     = can(regex("^[a-zA-Z0-9-_]+$", var.name))
+    condition     = var.name == null ? true : can(regex("^[a-zA-Z0-9-_]+$", var.name))
     error_message = "The name can only contain alphanumeric characters, hyphens, and underscores."
   }
 }
@@ -158,12 +159,6 @@ variable "environment" {
   default     = "dev"
 }
 
-variable "customer" {
-  description = "The customer name or identifier"
-  type        = string
-  default     = null
-}
-
 variable "prefix" {
   description = "The prefix to apply to resource names"
   type        = string
@@ -174,4 +169,10 @@ variable "region_abbv" {
   description = "The abbreviated name of the Azure region"
   type        = string
   default     = "eus"
+}
+
+variable "customer" {
+  description = "Customer name (used in resource naming for multi-tenant resources)"
+  type        = string
+  default     = null
 } 

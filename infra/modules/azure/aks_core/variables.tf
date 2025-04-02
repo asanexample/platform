@@ -18,16 +18,6 @@ variable "prefix" {
   }
 }
 
-variable "customer" {
-  description = "Customer name for resource tagging"
-  type        = string
-  default     = null
-  validation {
-    condition     = length(var.customer) >= 2 && length(var.customer) <= 50
-    error_message = "The customer name must be between 2 and 50 characters."
-  }
-}
-
 variable "environment" {
   description = "Environment name for resource tagging (dev, test, staging, prod, ops)"
   type        = string
@@ -49,15 +39,15 @@ variable "region_abbv" {
 }
 
 variable "name" {
-  description = "Name of the AKS cluster resource"
+  description = "Name of the AKS cluster resource. If null, a name should be provided by Terragrunt using the naming module."
   type        = string
   default     = null
   validation {
-    condition     = length(var.name) >= 3 && length(var.name) <= 63
+    condition     = var.name == null ? true : length(var.name) >= 3 && length(var.name) <= 63
     error_message = "The AKS cluster name must be between 3 and 63 characters."
   }
   validation {
-    condition     = can(regex("^[a-zA-Z0-9-_]+$", var.name))
+    condition     = var.name == null ? true : can(regex("^[a-zA-Z0-9-_]+$", var.name))
     error_message = "The AKS cluster name can only include alphanumeric, hyphen, and underscore characters."
   }
 }

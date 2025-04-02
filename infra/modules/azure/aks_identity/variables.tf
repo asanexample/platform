@@ -9,27 +9,13 @@
 # ---------------------------------------------------------------------------------------------------------------------
 
 variable "prefix" {
-  description = "The prefix to use for generated resource names"
+  description = "The prefix to use for all resources"
   type        = string
-  default     = "centric"
-  validation {
-    condition     = length(var.prefix) <= 10
-    error_message = "The prefix can be at most 10 characters."
-  }
-}
-
-variable "customer" {
-  description = "The customer identifier"
-  type        = string
-  default     = null
-  validation {
-    condition     = var.customer == null ? true : length(var.customer) <= 15
-    error_message = "The customer identifier can be at most 15 characters."
-  }
+  default     = "vip"
 }
 
 variable "environment" {
-  description = "The environment (e.g., dev, test, prod, ops)"
+  description = "The environment (e.g. dev, test, prod)"
   type        = string
   default     = "dev"
   validation {

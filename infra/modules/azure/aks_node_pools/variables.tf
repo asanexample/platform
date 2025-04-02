@@ -6,39 +6,22 @@
 
 # Naming module variables
 variable "prefix" {
-  description = "The prefix to use for all resources. Defaults to 'vip' if not specified."
+  description = "Prefix for resource names"
   type        = string
-  default     = "vip"
+  default     = "centric"
   validation {
-    condition     = length(var.prefix) >= 1 && length(var.prefix) <= 10
-    error_message = "The prefix must be between 1 and 10 characters."
-  }
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9-_]+$", var.prefix))
-    error_message = "The prefix can only include alphanumeric, hyphen, and underscore characters."
-  }
-}
-
-variable "customer" {
-  description = "The customer name to use in resource naming. Optional for shared resources."
-  type        = string
-  default     = null
-  validation {
-    condition     = var.customer == null ? true : length(var.customer) >= 2 && length(var.customer) <= 15
-    error_message = "The customer name must be between 2 and 15 characters when provided."
-  }
-  validation {
-    condition     = var.customer == null ? true : can(regex("^[a-zA-Z0-9-_]+$", var.customer))
-    error_message = "The customer name can only include alphanumeric, hyphen, and underscore characters."
+    condition     = length(var.prefix) >= 3 && length(var.prefix) <= 10
+    error_message = "The prefix must be between 3 and 10 characters."
   }
 }
 
 variable "environment" {
-  description = "The environment (e.g., dev, preprod, prod, ops)."
+  description = "Environment name for resource tagging (dev, test, staging, prod, ops)"
   type        = string
+  default     = "dev"
   validation {
-    condition     = contains(["dev", "preprod", "prod", "test", "stg", "ops"], var.environment)
-    error_message = "Environment must be one of: dev, preprod, prod, test, stg, ops."
+    condition     = contains(["dev", "test", "staging", "prod", "ops"], var.environment)
+    error_message = "The environment must be one of: dev, test, staging, prod, ops."
   }
 }
 

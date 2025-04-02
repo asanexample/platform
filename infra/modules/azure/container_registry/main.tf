@@ -52,10 +52,10 @@ resource "azurerm_container_registry" "acr" {
     }
   }
   
-  # Network rule set - only available in Standard and Premium tiers
+  # Network rule set - only available in Premium tier
   # Limited to IP rules for now as subnet integration requires more complex setup
   dynamic "network_rule_set" {
-    for_each = var.sku != "Basic" && var.network_rule_set != null ? [var.network_rule_set] : []
+    for_each = var.sku == "Premium" && var.network_rule_set != null ? [var.network_rule_set] : []
     
     content {
       default_action = network_rule_set.value.default_action

@@ -65,6 +65,7 @@ locals {
     managed_prometheus       = "prom"
     container_insights       = "ci"
     aks_identity             = "aksid"
+    managed_grafana          = "grafana"
   }
 
   # Azure resource naming restrictions
@@ -296,7 +297,10 @@ locals {
     container_insights = "${local.default_prefix}-${var.environment}-${local.resource_types.container_insights}-${local.region_abbv}",
 
     # AKS Identity
-    aks_identity = "${local.default_prefix}-${var.environment}-${local.resource_types.aks_identity}-${local.region_abbv}"
+    aks_identity = "${local.default_prefix}-${var.environment}-${local.resource_types.aks_identity}-${local.region_abbv}",
+    
+    # Managed Grafana
+    managed_grafana = "${local.default_prefix}-${var.environment}-${local.resource_types.managed_grafana}-${local.region_abbv}"
   }
 
   # Function to generate subnet names (workaround for HCL syntax limitations)

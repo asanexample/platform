@@ -6,11 +6,12 @@
 
 # Required variables
 variable "name" {
-  description = "The name of the Azure Managed Grafana instance"
+  description = "The name of the Azure Managed Grafana instance. If null, a name should be provided by Terragrunt using the naming module."
   type        = string
+  default     = null
   
   validation {
-    condition     = length(var.name) >= 1 && length(var.name) <= 63
+    condition     = var.name == null ? true : length(var.name) >= 1 && length(var.name) <= 63
     error_message = "The name must be between 1 and 63 characters."
   }
 }
@@ -113,4 +114,29 @@ variable "tags" {
   description = "A mapping of tags to assign to the resource"
   type        = map(string)
   default     = {}
+}
+
+# Variables for naming module
+variable "prefix" {
+  description = "Prefix for resource names"
+  type        = string
+  default     = "centric"
+}
+
+variable "environment" {
+  description = "Environment name for resource naming (dev, test, staging, prod, ops)"
+  type        = string
+  default     = "dev"
+}
+
+variable "region_abbv" {
+  description = "Abbreviation for Azure region (used in resource naming)"
+  type        = string
+  default     = "eus"
+}
+
+variable "customer" {
+  description = "Customer name (used in resource naming for multi-tenant resources)"
+  type        = string
+  default     = null
 } 

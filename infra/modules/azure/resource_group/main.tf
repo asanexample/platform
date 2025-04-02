@@ -8,6 +8,7 @@
 
 # Create an Azure Resource Group
 resource "azurerm_resource_group" "rg" {
+  # Name will be provided by Terragrunt using the naming module
   name     = var.name
   location = var.location
   tags     = var.tags

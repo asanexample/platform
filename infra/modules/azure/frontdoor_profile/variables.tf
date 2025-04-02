@@ -5,10 +5,11 @@ variable "enabled" {
 }
 
 variable "name" {
-  description = "The name of the Front Door profile"
+  description = "The name of the Front Door profile. If null, a name should be provided by Terragrunt using the naming module."
   type        = string
+  default     = null
   validation {
-    condition     = can(regex("^[a-zA-Z0-9][a-zA-Z0-9-]{1,78}[a-zA-Z0-9]$", var.name))
+    condition     = var.name == null ? true : can(regex("^[a-zA-Z0-9][a-zA-Z0-9-]{1,78}[a-zA-Z0-9]$", var.name))
     error_message = "The name must be between 3 and 80 characters long, can contain alphanumerics and hyphens, must start and end with alphanumeric."
   }
 }
@@ -45,4 +46,29 @@ variable "tags" {
   description = "A mapping of tags to assign to the resource"
   type        = map(string)
   default     = {}
+}
+
+# Variables for naming module
+variable "prefix" {
+  description = "Prefix for resource names"
+  type        = string
+  default     = "centric"
+}
+
+variable "environment" {
+  description = "Environment name for resource naming (dev, test, staging, prod, ops)"
+  type        = string
+  default     = "dev"
+}
+
+variable "region_abbv" {
+  description = "Abbreviation for Azure region (used in resource naming)"
+  type        = string
+  default     = "eus"
+}
+
+variable "customer" {
+  description = "Customer name (used in resource naming for multi-tenant resources)"
+  type        = string
+  default     = null
 } 

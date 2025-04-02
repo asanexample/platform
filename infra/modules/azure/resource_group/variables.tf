@@ -5,16 +5,17 @@
  */
 
 variable "name" {
-  description = "Name of the resource group"
+  description = "Name of the resource group. If null, a name should be provided by Terragrunt using the naming module."
   type        = string
+  default     = null
 
   validation {
-    condition     = length(var.name) >= 1 && length(var.name) <= 90
+    condition     = var.name == null ? true : length(var.name) >= 1 && length(var.name) <= 90
     error_message = "Resource group name must be between 1 and 90 characters."
   }
 
   validation {
-    condition     = can(regex("^[a-zA-Z0-9-_.()]+$", var.name))
+    condition     = var.name == null ? true : can(regex("^[a-zA-Z0-9-_.()]+$", var.name))
     error_message = "Resource group name can only include alphanumeric, hyphen, underscore, parentheses, and period characters."
   }
 }
@@ -42,4 +43,29 @@ variable "tags" {
   description = "Tags to apply to the resource group"
   type        = map(string)
   default     = {}
+}
+
+# Variables for naming module
+variable "prefix" {
+  description = "Prefix for resource names"
+  type        = string
+  default     = "centric"
+}
+
+variable "environment" {
+  description = "Environment name for resource naming (dev, test, staging, prod, ops)"
+  type        = string
+  default     = "dev"
+}
+
+variable "region_abbv" {
+  description = "Abbreviation for Azure region (used in resource naming)"
+  type        = string
+  default     = "eus"
+}
+
+variable "customer" {
+  description = "Customer name (used in resource naming for multi-tenant resources)"
+  type        = string
+  default     = null
 } 

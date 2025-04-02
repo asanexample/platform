@@ -152,7 +152,7 @@ variable "geo_replication_locations" {
 
 # Network configuration
 variable "network_rule_set" {
-  description = "The network rule set for the ACR (Premium SKU only)"
+  description = "The network rule set for the ACR (Premium SKU only). Only specify this when using Premium SKU. For Basic or Standard SKU, leave at the default value."
   type = object({
     default_action = string
     ip_rules = list(object({
