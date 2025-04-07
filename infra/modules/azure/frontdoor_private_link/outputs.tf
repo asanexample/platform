@@ -15,7 +15,7 @@ output "origin_host_name" {
 
 output "private_link_target_id" {
   description = "The target ID of the private link"
-  value       = var.module_enabled ? data.azurerm_storage_account.this[0].id : null
+  value       = var.module_enabled ? var.storage_account_id : null
 }
 
 output "private_link_request_message" {

@@ -50,21 +50,30 @@ dependency "naming" {
 dependency "frontdoor_endpoint" {
   config_path = "../frontdoor_endpoint"
   mock_outputs = {
-    enabled = false
+    endpoint_id       = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Cdn/profiles/mock-fd/afdEndpoints/mock-endpoint"
+    origin_group_id   = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Cdn/profiles/mock-fd/originGroups/mock-og"
+    endpoint_name     = "mock-endpoint"
+    origin_group_name = "mock-origin-group"
+    enabled           = true
   }
 }
 
 dependency "storage" {
   config_path = "../storage"
+  # Mock outputs for plan and validation
   mock_outputs = {
-    name = "mockstorage"
+    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Storage/storageAccounts/mocksa"
+    name = "mocksa"
+    primary_blob_endpoint = "https://mocksa.blob.core.windows.net/"
   }
+  mock_outputs_allowed_terraform_commands = ["validate", "plan"]
 }
 
 dependency "resource_group" {
   config_path = "../resource_group"
   mock_outputs = {
-    name = "mock-rg"
+    name     = "mock-rg"
+    location = "westus"
   }
 }
 
@@ -76,25 +85,26 @@ terraform {
 # Specify inputs specific to this module
 inputs = {
   # Control deployment
-  module_enabled = dependency.frontdoor_endpoint.outputs.enabled
+  module_enabled = lookup(dependency.frontdoor_endpoint.outputs, "enabled", true)
   
-  # Origin group reference - use placeholder value when module is disabled
-  origin_group_id = local.mock_origin_group_id
+  # Origin group reference
+  origin_group_id = try(dependency.frontdoor_endpoint.outputs.origin_group_id, local.mock_origin_group_id)
   
-  # Storage account to connect to
-  storage_account_name        = dependency.storage.outputs.name
-  storage_resource_group_name = dependency.resource_group.outputs.name
-  use_blob_endpoint           = true
+  # Storage Integration
+  storage_account_name         = dependency.storage.outputs.name
+  storage_resource_group_name  = dependency.resource_group.outputs.name
+  storage_account_id           = dependency.storage.outputs.id
+  storage_primary_blob_host    = trimsuffix(trimprefix(dependency.storage.outputs.primary_blob_endpoint, "https://"), "/")
+  storage_primary_web_host     = trimsuffix(trimprefix(dependency.storage.outputs.primary_blob_endpoint, "https://"), "/")
+  storage_location             = dependency.resource_group.outputs.location
   
-  # Origin configuration - more resilient settings for production
+  # Origin configuration
   origin_name                  = dependency.naming.outputs.frontdoor_origin
-  priority                     = 1
-  weight                       = 1000
   private_link_request_message = "Request access for Front Door Origin from ${local.env} environment"
   
   # Route configuration
   route_enabled       = true
-  endpoint_id         = local.mock_endpoint_id
+  endpoint_id         = try(dependency.frontdoor_endpoint.outputs.endpoint_id, local.mock_endpoint_id)
   route_name          = dependency.naming.outputs.frontdoor_route
   patterns_to_match   = ["/*"]
   forwarding_protocol = "HttpsOnly"

@@ -202,4 +202,24 @@ variable "cache_settings" {
     condition     = contains(["IgnoreQueryString", "UseQueryString", "IncludeSpecifiedQueryStrings", "ExcludeSpecifiedQueryStrings"], var.cache_settings.query_string_caching_behavior)
     error_message = "Query string caching behavior must be one of IgnoreQueryString, UseQueryString, IncludeSpecifiedQueryStrings, or ExcludeSpecifiedQueryStrings."
   }
+}
+
+variable "storage_primary_blob_host" {
+  description = "The primary blob host of the storage account (e.g., storageaccount.blob.core.windows.net)"
+  type        = string
+}
+
+variable "storage_primary_web_host" {
+  description = "The primary web host of the storage account (e.g., storageaccount.web.core.windows.net)"
+  type        = string
+}
+
+variable "storage_location" {
+  description = "The Azure region where the storage account is located"
+  type        = string
+}
+
+variable "storage_account_id" {
+  description = "The resource ID of the storage account"
+  type        = string
 } 

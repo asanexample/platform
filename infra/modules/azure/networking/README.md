@@ -1,4 +1,9 @@
-# Azure Networking Module
+/**
+ * # Azure Networking Module
+ *
+ * This module creates an Azure virtual network with subnets and network security groups.
+ * It also supports AKS-specific networking features when enabled.
+ */
 
 ## Overview
 
@@ -333,4 +338,19 @@ terraform test
 
 ## License
 
-This module is licensed under the MIT License. 
+This module is licensed under the MIT License.
+
+## AKS Network Security Group Rules
+
+When `enable_aks_networking` is set to `true` and `aks_subnet_name` is provided, the module will automatically
+create the following network security group rules:
+
+1. **AllowAzureLoadBalancer**: Allows inbound traffic from Azure Load Balancer
+2. **DenyAllInbound**: Denies all other inbound traffic (lowest priority rule)
+3. **AllowCiliumHealth**: Allows TCP port 4240 for Cilium agent health checks
+4. **AllowVXLAN**: Allows UDP port 8472 for VXLAN overlay networking (used by Cilium)
+5. **AllowNodeCommunication**: Allows traffic between all Kubernetes subnets (essential for multi-AZ clusters)
+
+The Cilium-specific rules are required for proper functioning of the Cilium CNI in AKS clusters,
+especially when using the network_plugin = "none" setting and installing Cilium as the CNI provider.
+Without these rules, Cilium components may experience TLS handshake failures and communication issues. 

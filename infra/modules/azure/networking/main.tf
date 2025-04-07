@@ -51,9 +51,12 @@ resource "azurerm_network_security_group" "nsg" {
   tags                = var.tags
 }
 
-# Associate Network Security Groups with subnets
+# Associate Network Security Groups with subnets, excluding AzureFirewallSubnet
 resource "azurerm_subnet_network_security_group_association" "nsg_association" {
-  for_each = var.subnets
+  for_each = {
+    for k, v in var.subnets : k => v
+    if k != "AzureFirewallSubnet" # Exclude AzureFirewallSubnet as it doesn't support NSG associations
+  }
 
   subnet_id                 = azurerm_subnet.subnet[each.key].id
   network_security_group_id = azurerm_network_security_group.nsg[each.key].id
@@ -92,6 +95,57 @@ resource "azurerm_network_security_rule" "aks_deny_inbound" {
   source_port_range           = "*"
   destination_port_range      = "*"
   source_address_prefix       = "*"
+  destination_address_prefix  = "*"
+  resource_group_name         = var.resource_group_name
+  network_security_group_name = azurerm_network_security_group.nsg[var.aks_subnet_name].name
+}
+
+# Allow Cilium agent health checks
+resource "azurerm_network_security_rule" "aks_allow_cilium_health" {
+  count                       = local.configure_aks_nsg ? 1 : 0
+  name                        = "AllowCiliumHealth"
+  priority                    = 110
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "4240"
+  source_address_prefixes     = var.address_space  # Allow from all VNet address space
+  destination_address_prefix  = "*"
+  resource_group_name         = var.resource_group_name
+  network_security_group_name = azurerm_network_security_group.nsg[var.aks_subnet_name].name
+}
+
+# Allow VXLAN tunnel traffic for Cilium overlay
+resource "azurerm_network_security_rule" "aks_allow_vxlan" {
+  count                       = local.configure_aks_nsg ? 1 : 0
+  name                        = "AllowVXLAN"
+  priority                    = 120
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Udp"
+  source_port_range           = "*"
+  destination_port_range      = "8472"
+  source_address_prefixes     = var.address_space  # Allow from all VNet address space
+  destination_address_prefix  = "*"
+  resource_group_name         = var.resource_group_name
+  network_security_group_name = azurerm_network_security_group.nsg[var.aks_subnet_name].name
+}
+
+# Allow node-to-node traffic for all protocols within all kubernetes subnets
+resource "azurerm_network_security_rule" "aks_allow_node_communication" {
+  count                       = local.configure_aks_nsg ? 1 : 0
+  name                        = "AllowNodeCommunication"
+  priority                    = 130
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "*"
+  source_port_range           = "*"
+  destination_port_range      = "*"
+  source_address_prefixes     = [
+    for subnet_name, subnet in var.subnets : 
+    subnet.address_prefixes[0] if can(regex("kubernetes$", subnet_name))
+  ]
   destination_address_prefix  = "*"
   resource_group_name         = var.resource_group_name
   network_security_group_name = azurerm_network_security_group.nsg[var.aks_subnet_name].name

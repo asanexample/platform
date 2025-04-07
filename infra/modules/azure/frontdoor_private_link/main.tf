@@ -6,23 +6,9 @@
  * The deployment can be controlled using the `module_enabled` variable.
  */
 
-# Get origin group if origin_group_id is not provided
-data "azurerm_cdn_frontdoor_origin_group" "this" {
-  count               = var.module_enabled && var.origin_group_id == null ? 1 : 0
-  name                = var.origin_group_name
-  profile_name        = var.profile_name
-  resource_group_name = var.profile_resource_group_name
-}
-
-# Get storage account details
-data "azurerm_storage_account" "this" {
-  count               = var.module_enabled ? 1 : 0
-  name                = var.storage_account_name
-  resource_group_name = var.storage_resource_group_name
-}
-
 locals {
-  origin_group_id = var.module_enabled ? (var.origin_group_id != null ? var.origin_group_id : data.azurerm_cdn_frontdoor_origin_group.this[0].id) : null
+  # Use the provided origin_group_id directly
+  origin_group_id = var.module_enabled ? var.origin_group_id : null
 }
 
 # Create origin with private link
@@ -33,16 +19,16 @@ resource "azurerm_cdn_frontdoor_origin" "this" {
   enabled                  = var.enabled
 
   certificate_name_check_enabled = var.certificate_name_check_enabled
-  host_name                      = var.use_blob_endpoint ? data.azurerm_storage_account.this[0].primary_blob_host : data.azurerm_storage_account.this[0].primary_web_host
-  origin_host_header             = var.use_blob_endpoint ? data.azurerm_storage_account.this[0].primary_blob_host : data.azurerm_storage_account.this[0].primary_web_host
+  host_name                      = var.use_blob_endpoint ? var.storage_primary_blob_host : var.storage_primary_web_host
+  origin_host_header             = var.use_blob_endpoint ? var.storage_primary_blob_host : var.storage_primary_web_host
   priority                       = var.priority
   weight                         = var.weight
 
   private_link {
     request_message        = var.private_link_request_message
     target_type            = var.use_blob_endpoint ? "blob" : "web"
-    location               = data.azurerm_storage_account.this[0].location
-    private_link_target_id = data.azurerm_storage_account.this[0].id
+    location               = var.storage_location
+    private_link_target_id = var.storage_account_id
   }
 }
 

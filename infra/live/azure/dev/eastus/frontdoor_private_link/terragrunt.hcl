@@ -60,9 +60,21 @@ dependency "frontdoor_endpoint" {
 
 dependency "storage" {
   config_path = "../storage"
+
+  # Mock outputs for plan and validation
   mock_outputs = {
-    name           = "mockstorage"
-    resource_group = "mock-rg"
+    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Storage/storageAccounts/mocksa"
+    name = "mocksa"
+    primary_blob_endpoint = "https://mocksa.blob.core.windows.net/"
+  }
+  mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+}
+
+dependency "resource_group" {
+  config_path = "../resource_group"
+  mock_outputs = {
+    name     = "mock-rg"
+    location = "eastus"
   }
 }
 
@@ -79,10 +91,13 @@ inputs = {
   # Origin group reference
   origin_group_id = try(dependency.frontdoor_endpoint.outputs.origin_group_id, local.mock_origin_group_id)
   
-  # Storage account to connect to
-  storage_account_name        = dependency.storage.outputs.name
-  storage_resource_group_name = "vip-dev-rg-eus"
-  use_blob_endpoint           = true
+  # Storage Integration
+  storage_account_name         = dependency.storage.outputs.name
+  storage_resource_group_name  = dependency.resource_group.outputs.name
+  storage_account_id           = dependency.storage.outputs.id
+  storage_primary_blob_host    = trimsuffix(trimprefix(dependency.storage.outputs.primary_blob_endpoint, "https://"), "/")
+  storage_primary_web_host     = trimsuffix(trimprefix(dependency.storage.outputs.primary_blob_endpoint, "https://"), "/")
+  storage_location             = dependency.resource_group.outputs.location
   
   # Origin configuration
   origin_name                  = dependency.naming.outputs.frontdoor_origin

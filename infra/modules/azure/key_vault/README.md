@@ -17,6 +17,23 @@ This module creates an Azure Key Vault with configurable access policies, networ
 - Offers configurable SKU selection (standard or premium)
 - Enables disk encryption integration (optional)
 
+## Future Enhancements
+
+The following enhancements are planned for future versions of this module:
+
+- **Key Rotation**: Automated key rotation procedures with configurable rotation schedules
+- **Backup and Recovery**: Built-in backup and recovery procedures for Key Vault contents
+- **Customer-Managed Keys**: Support for using customer-managed keys to encrypt Key Vault data
+- **Managed HSM Support**: Implementation of Key Vault Managed HSM for enhanced key protection
+- **Certificate Management**: Automated certificate lifecycle management including renewal
+- **RBAC Role Assignment**: Explicit RBAC role assignments for users, groups, and service principals
+- **Enhanced Network Rules**: More granular control over network access with improved security
+- **Multi-Key Vault Strategy**: Implementation patterns for managing multiple Key Vaults for different security tiers
+- **Azure Policy Integration**: Policy assignments to enforce consistent Key Vault configurations
+- **Secrets Versioning Strategy**: Implementation for managing secret versions consistently
+- **Integration with Azure DevOps**: Secure pipeline integration for retrieving secrets during deployments
+- **Integration with AKS**: Implementing secure pod access to Key Vault using workload identity
+
 ## Usage
 
 ```hcl
