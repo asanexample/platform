@@ -503,6 +503,21 @@ Tasks are also evaluated using an impact vs. effort matrix to determine implemen
 |   ⏳    |    P0    |  High  |  High  | Baseline network foundation for cross-region connectivity   | Network setup to support failover between regions and DR scenarios                                   |
 |   ⏳    |    P2    | Medium | Medium | Network monitoring for cross-region traffic                 | Monitoring and analytics for traffic between regions                                                 |
 
+#### 4.2 Batch Processing Infrastructure
+
+| Status | Priority | Impact | Effort | Task                                        | Description                                                                                 |
+|:------:|:--------:|:------:|:------:|---------------------------------------------|---------------------------------------------------------------------------------------------|
+|   ⏳    |    P0    |  High  |  High  | Azure Batch account architecture            | Implementation of regional Azure Batch accounts with appropriate network integration         |
+|   ⏳    |    P0    |  High  | Medium | Batch pool configuration framework          | Reusable components for configuring and managing Batch pools across environments             |
+|   ⏳    |    P0    |  High  | Medium | Private endpoint integration for Batch      | Configuration of private endpoints for secure access to Batch services                       |
+|   ⏳    |    P1    | Medium | Medium | Batch node security hardening               | Security configuration for compute nodes in Batch pools                                      |
+|   ⏳    |    P1    | Medium | Medium | Batch job monitoring integration            | Integration of Batch job telemetry with centralized monitoring system                        |
+|   ⏳    |    P1    | Medium | Medium | Batch autoscaling configuration             | Implementation of automatic scaling for Batch pools based on workload                        |
+|   ⏳    |    P1    | Medium |  High  | Kubernetes-to-Batch integration             | Capabilities for Kubernetes workloads to schedule and monitor Batch jobs                     |
+|   ⏳    |    P2    | Medium | Medium | Batch job templates                         | Reusable job definitions for common batch processing scenarios                               |
+|   ⏳    |    P2    | Medium | Medium | Batch cost optimization                     | Strategies for optimizing costs of Batch computing through spot VMs and scheduling           |
+|   ⏳    |    P2    | Medium | Medium | Multi-tenant Batch isolation                | Implementation of proper isolation between customer workloads in shared Batch infrastructure |
+
 ### 5. Customer Environments
 
 #### 5.1 Customer Onboarding Automation
@@ -809,23 +824,3 @@ Tasks are also evaluated using an impact vs. effort matrix to determine implemen
 |   ⏳    |    P2    | Medium | Medium | DR evidence collection     | Procedures for collecting evidence of DR compliance         |
 |   ⏳    |    P2    | Medium | Medium | DR external reporting      | Reporting on DR capabilities to external stakeholders       |
 |   ⏳    |    P3    |  Low   | Medium | DR compliance automation   | Automation of DR compliance monitoring and reporting        |
-
-### Priority Breakdown
-
-- P0 (Critical): 150 tasks (35.5%)
-- P1 (High): 145 tasks (34.4%)
-- P2 (Medium): 108 tasks (25.6%)
-- P3 (Low): 19 tasks (4.5%)
-
-### Impact & Effort Analysis
-
-- High Impact: 204 tasks (48.3%)
-- Medium Impact: 195 tasks (46.2%)
-- Low Impact: 23 tasks (5.5%)
-
-- High Effort: 81 tasks (19.2%)
-- Medium Effort: 328 tasks (77.7%)
-- Low Effort: 13 tasks (3.1%)
-
-### Quick Wins (High Impact, Low Effort): 13 tasks (3.1%)
-### Major Projects (High Impact, High Effort): 71 tasks (16.8%)
