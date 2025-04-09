@@ -9,6 +9,8 @@ locals {
   prefix            = "vip"
   customer          = null
   subscription_name = "innovation-test"
+  subscription_id   = "9dc5edc4-8c4e-41a1-a4f8-2183c4e91954"  # Innovation-Operations subscription ID
+  tenant_id         = "c945e155-be68-4477-b8d7-01939adbfe55"  # Azure tenant ID
   
   # Common tags
   tags = {

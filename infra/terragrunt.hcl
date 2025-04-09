@@ -2,8 +2,6 @@
 // This file defines the global Terragrunt configuration that applies to all modules
 
 // Define remote state configuration using Azure Blob Storage
-// THIS IS COMMENTED OUT - WILL BE USED LATER WHEN MIGRATING TO AZURE REMOTE STATE
-/*
 remote_state {
   backend = "azurerm"
   
@@ -13,14 +11,15 @@ remote_state {
   }
   
   config = {
+    subscription_id      = "9dc5edc4-8c4e-41a1-a4f8-2183c4e91954" // Innovation-Operations subscription
+    tenant_id            = "c945e155-be68-4477-b8d7-01939adbfe55"
     resource_group_name  = "terraform-state-rg"
-    storage_account_name = "tfstatemulticloud${get_env("TF_VAR_environment", "dev")}"
-    container_name       = "${path_relative_to_include()}"
+    storage_account_name = "tfstatemulticloud"
+    container_name       = "terraformstate"
     key                  = "${path_relative_to_include()}/terraform.tfstate"
     use_azuread_auth     = true
   }
 }
-*/
 
 // CURRENTLY USING LOCAL STATE FOR DEVELOPMENT
 // To migrate to Azure remote state later:
@@ -28,6 +27,7 @@ remote_state {
 // 2. Uncomment the Azure remote_state block above
 // 3. Comment out this local state block
 // 4. Run 'terragrunt init' and answer 'yes' to migrate state
+/*
 remote_state {
   backend = "local"
   
@@ -40,6 +40,7 @@ remote_state {
     path = "${path_relative_to_include()}/terraform.tfstate"
   }
 }
+*/
 
 // Generate versions for required providers
 generate "versions" {
@@ -75,7 +76,6 @@ provider "azurerm" {
   features {}
   subscription_id = "${local.azure_subscription_id}"
   tenant_id       = "${local.azure_tenant_id}"
-  use_cli         = true
 }
 EOF
 }
@@ -118,15 +118,18 @@ locals {
   # Extract environment, region, and other global variables
   environment = get_env("TF_VAR_environment", "dev")
   
+  # Get environment-specific variables from env.hcl
+  environment_vars = read_terragrunt_config(find_in_parent_folders("env.hcl", "${get_terragrunt_dir()}/dummy.hcl"))
+  
   # Default region settings for each cloud provider
   aws_region          = get_env("TF_VAR_aws_region", "us-east-1")
   azure_region        = get_env("TF_VAR_azure_region", "eastus")
   gcp_region          = get_env("TF_VAR_gcp_region", "us-east1")
   
-  # Account/subscription IDs
-  azure_subscription_id = get_env("TF_VAR_azure_subscription_id", "db4f1d99-0ec0-44eb-90de-41975f9bb68b")
-  azure_tenant_id       = get_env("TF_VAR_azure_tenant_id", "c945e155-be68-4477-b8d7-01939adbfe55")
-  gcp_project_id        = get_env("TF_VAR_gcp_project_id", "")
+  # Account/subscription IDs - both subscription_id and tenant_id must be in env.hcl
+  azure_subscription_id = local.environment_vars.locals.subscription_id
+  azure_tenant_id       = local.environment_vars.locals.tenant_id
+  gcp_project_id        = try(local.environment_vars.locals.gcp_project_id, "")
   
   # Organization details
   cost_center = get_env("TF_VAR_cost_center", "Engineering")

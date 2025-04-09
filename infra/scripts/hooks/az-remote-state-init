@@ -1,0 +1,69 @@
+#!/bin/bash
+set -e
+
+# Extract parameters
+resource_group_name=$1
+storage_account_name=$2
+container_name=$3
+location=$4
+
+echo "Checking if storage account $storage_account_name exists..."
+STORAGE_EXISTS=$(az storage account show --name $storage_account_name --query name --output tsv 2>/dev/null || echo "")
+
+if [ -z "$STORAGE_EXISTS" ]; then
+  echo "Creating resource group $resource_group_name if it doesn't exist..."
+  if ! az group show --name $resource_group_name --output none 2>/dev/null; then
+    az group create --name $resource_group_name --location $location
+  fi
+  
+  echo "Creating storage account $storage_account_name..."
+  az storage account create \
+    --name $storage_account_name \
+    --resource-group $resource_group_name \
+    --sku Standard_LRS \
+    --encryption-services blob \
+    --allow-blob-public-access false \
+    --min-tls-version TLS1_2 \
+    --tags Purpose=TerraformState Environment=Management
+
+  echo "Creating container $container_name..."
+  STORAGE_KEY=$(az storage account keys list --account-name $storage_account_name --resource-group $resource_group_name --query "[0].value" -o tsv)
+  az storage container create \
+    --name $container_name \
+    --account-name $storage_account_name \
+    --account-key "$STORAGE_KEY" \
+    --public-access off
+  
+  echo "Configuring storage account security..."
+  az storage account update \
+    --name $storage_account_name \
+    --resource-group $resource_group_name \
+    --https-only true
+    
+  # Enable diagnostic settings
+  echo "Configuring diagnostic settings..."
+  STORAGE_ID=$(az storage account show --name $storage_account_name --resource-group $resource_group_name --query id -o tsv)
+  az monitor diagnostic-settings create \
+    --name "diag-${storage_account_name}" \
+    --resource "$STORAGE_ID" \
+    --logs '[{"category": "StorageRead", "enabled": true}, {"category": "StorageWrite", "enabled": true}, {"category": "StorageDelete", "enabled": true}]' \
+    --metrics '[{"category": "Transaction", "enabled": true}]' \
+    --export-to-resource-specific true \
+    --storage-account "$STORAGE_ID" || echo "Could not enable diagnostics settings. Please enable manually."
+  
+  echo "State storage initialized successfully!"
+else
+  echo "Storage account already exists. Skipping initialization."
+fi
+
+echo "Ensuring container $container_name exists..."
+STORAGE_KEY=$(az storage account keys list --account-name $storage_account_name --resource-group $resource_group_name --query "[0].value" -o tsv)
+if ! az storage container show --name $container_name --account-name $storage_account_name --account-key "$STORAGE_KEY" --output none 2>/dev/null; then
+  az storage container create \
+    --name $container_name \
+    --account-name $storage_account_name \
+    --account-key "$STORAGE_KEY" \
+    --public-access off
+fi
+
+echo "Remote state configuration is ready!" 
