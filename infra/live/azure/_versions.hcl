@@ -39,10 +39,12 @@ locals {
     frontdoor_private_link = "${local.source_base}/azure//frontdoor_private_link"
 
     # Observability
-    log_analytics     = "${local.source_base}/azure//log_analytics"
-    monitor_workspace = "${local.source_base}/azure//monitor_workspace"
-    managed_grafana   = "${local.source_base}/azure//managed_grafana"
-    prometheus_dcr    = "${local.source_base}/azure//prometheus_dcr"
+    log_analytics       = "${local.source_base}/azure//log_analytics"
+    monitor_workspace   = "${local.source_base}/azure//monitor_workspace"
+    managed_grafana     = "${local.source_base}/azure//managed_grafana"
+    prometheus_dcr      = "${local.source_base}/azure//prometheus_dcr"
+    monitor_alerts      = "${local.source_base}/azure//monitor_alerts"
+    diagnostic_settings = "${local.source_base}/azure//diagnostic_settings"
 
     # Composite stacks
     stack_base = "${local.source_base}/azure//stack_base"

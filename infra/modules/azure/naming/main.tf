@@ -67,6 +67,10 @@ locals {
     container_insights       = "ci"
     aks_identity             = "aksid"
     managed_grafana          = "graf"
+    action_group             = "ag"
+    metric_alert             = "ma"
+    activity_log_alert       = "ala"
+    diagnostic_setting       = "diag"
   }
 
   # Azure resource naming restrictions
@@ -186,6 +190,22 @@ locals {
       max_length  = 128
       valid_chars = "^[a-zA-Z0-9\\-_]+$"
     }
+    action_group = {
+      max_length  = 260
+      valid_chars = "^[a-zA-Z0-9\\-_]+$"
+    }
+    metric_alert = {
+      max_length  = 260
+      valid_chars = "^[a-zA-Z0-9\\-_]+$"
+    }
+    activity_log_alert = {
+      max_length  = 260
+      valid_chars = "^[a-zA-Z0-9\\-_]+$"
+    }
+    diagnostic_setting = {
+      max_length  = 260
+      valid_chars = "^[a-zA-Z0-9\\-_]+$"
+    }
   }
 
   # CAF-aligned naming: {type}-{workload}-{env}-{region}
@@ -228,6 +248,10 @@ locals {
     container_insights      = "${local.resource_types.container_insights}-${local.default_workload}-${var.environment}-${local.region_abbv}"
     aks_identity            = "${local.resource_types.aks_identity}-${local.default_workload}-${var.environment}-${local.region_abbv}"
     managed_grafana         = "${local.resource_types.managed_grafana}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    action_group            = "${local.resource_types.action_group}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    metric_alert            = "${local.resource_types.metric_alert}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    activity_log_alert      = "${local.resource_types.activity_log_alert}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    diagnostic_setting      = "${local.resource_types.diagnostic_setting}-${local.default_workload}-${var.environment}-${local.region_abbv}"
   }
 
   # Subnet naming helpers

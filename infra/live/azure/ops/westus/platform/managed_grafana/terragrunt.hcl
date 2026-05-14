@@ -33,9 +33,16 @@ dependency "resource_group" {
 dependency "log_analytics" {
   config_path = "../log_analytics"
 
-  # Mock outputs for plan and validation
   mock_outputs = {
     id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.OperationalInsights/workspaces/mock-law"
+  }
+}
+
+dependency "monitor_workspace" {
+  config_path = "../monitor_workspace"
+
+  mock_outputs = {
+    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Monitor/accounts/mock-monitor-workspace"
   }
 }
 
@@ -60,7 +67,8 @@ inputs = {
   public_network_access_enabled     = true
   zone_redundancy_enabled           = false # Disabled for westus as it's not supported
 
-  # Azure AD admin groups - replace with actual Azure AD group IDs in production
+  prometheus_workspace_id = dependency.monitor_workspace.outputs.id
+
   admin_group_object_ids = []
 
   # Azure AD admin users - replace with actual Azure AD user IDs as needed

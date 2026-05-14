@@ -34,6 +34,14 @@ dependency "log_analytics" {
   }
 }
 
+dependency "monitor_workspace" {
+  config_path = "../monitor_workspace"
+
+  mock_outputs = {
+    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Monitor/accounts/mock-monitor-workspace"
+  }
+}
+
 terraform {
   source = "${get_repo_root()}/infra/modules/azure/managed_grafana"
 }
@@ -50,6 +58,8 @@ inputs = {
   deterministic_outbound_ip_enabled = true
   public_network_access_enabled     = true
   zone_redundancy_enabled           = true
+
+  prometheus_workspace_id = dependency.monitor_workspace.outputs.id
 
   admin_group_object_ids = []
   admin_user_object_ids  = []

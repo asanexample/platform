@@ -69,7 +69,20 @@ dependency "log_analytics" {
   }
 }
 
-# Specify inputs specific to this module (these will merge with the common inputs)
+dependency "prometheus_dcr" {
+  config_path = "../prometheus_dcr"
+  mock_outputs = {
+    dcr_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Insights/dataCollectionRules/mock-dcr-prometheus"
+  }
+}
+
+dependency "monitor_workspace" {
+  config_path = "../monitor_workspace"
+  mock_outputs = {
+    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Monitor/accounts/mock-monitor-workspace"
+  }
+}
+
 inputs = {
   create = true
 
@@ -134,10 +147,26 @@ inputs = {
     ultra_ssd_enabled = false
   }
 
-  prometheus_dcr_id = null
-  microsoft_defender_enabled = false
+  microsoft_defender_enabled     = true
+  enable_prometheus_integration = true
+  monitor_workspace_id          = dependency.monitor_workspace.outputs.id
+  prometheus_dcr_id             = dependency.prometheus_dcr.outputs.dcr_id
 
-  # Diagnostic settings are already set up in Azure and will be managed outside of Terraform
+  diagnostic_settings = [{
+    name                       = "${dependency.naming.outputs.aks_cluster}-diag"
+    log_analytics_workspace_id = dependency.log_analytics.outputs.id
+    enabled_log_categories = [
+      "kube-apiserver",
+      "kube-audit",
+      "kube-audit-admin",
+      "kube-controller-manager",
+      "kube-scheduler",
+      "cluster-autoscaler",
+      "guard"
+    ]
+    metric_categories  = ["AllMetrics"]
+    log_retention_days = 30
+  }]
 
   # RBAC role assignments for accessing AKS monitoring
   role_assignments = [
@@ -155,6 +184,7 @@ inputs = {
   tags = merge(include.base.locals.tags, {
     "network-cilium-managed-by" = "cilium"
     "cilium-version"            = "1.17.2"
+    "monitoring-level"          = "comprehensive"
     "monitoring-enabled"        = "true"
   })
 }

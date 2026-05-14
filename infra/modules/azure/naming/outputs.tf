@@ -232,3 +232,23 @@ output "grafana" {
   description = "Standardized name for an Azure Managed Grafana instance."
   value       = "${local.names.managed_grafana}"
 }
+
+output "action_group" {
+  description = "Standardized name for an Azure Monitor Action Group."
+  value       = local.validated_names.action_group
+}
+
+output "metric_alert" {
+  description = "Standardized name for an Azure Monitor Metric Alert."
+  value       = local.validated_names.metric_alert
+}
+
+output "activity_log_alert" {
+  description = "Standardized name for an Azure Monitor Activity Log Alert."
+  value       = local.validated_names.activity_log_alert
+}
+
+output "diagnostic_setting" {
+  description = "Standardized name for an Azure Diagnostic Setting."
+  value       = local.validated_names.diagnostic_setting
+}
