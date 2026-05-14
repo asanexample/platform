@@ -18,8 +18,7 @@ locals {
   
   # Extract commonly used variables
   env         = local.env_vars.locals.environment
-  prefix      = local.common_vars.locals.prefix
-  customer    = local.common_vars.locals.customer
+  workload    = local.common_vars.locals.workload
   region      = local.region_vars.locals.region
   region_abbv = local.region_vars.locals.region_abbv
   tags        = merge(
@@ -74,8 +73,7 @@ EOF
 inputs = {
   # Environment variables
   environment = local.env
-  customer    = local.customer
-  prefix      = local.prefix
+  workload    = local.workload
   region_abbv = local.region_abbv
 
   # Resource details

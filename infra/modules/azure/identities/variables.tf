@@ -4,29 +4,24 @@
  * This file contains all the variables needed for the Azure Identities module.
  */
 
+variable "create" {
+  description = "Whether to create resources in this module"
+  type        = bool
+  default     = true
+}
+
 # -----------------------------------------------------------------------------
 # NAMING AND GENERAL VARIABLES
 # -----------------------------------------------------------------------------
 
-variable "prefix" {
-  description = "Naming prefix for resources."
+variable "workload" {
+  description = "Workload identifier for resource naming."
   type        = string
-  default     = ""
+  default     = "platform"
 
   validation {
-    condition     = length(var.prefix) <= 10
-    error_message = "The prefix should not be longer than 10 characters."
-  }
-}
-
-variable "customer" {
-  description = "Customer name (used for resource naming)."
-  type        = string
-  default     = null
-
-  validation {
-    condition     = var.customer == null ? true : length(var.customer) >= 2 && length(var.customer) <= 10
-    error_message = "The customer name should be between 2 and 10 characters."
+    condition     = length(var.workload) <= 10
+    error_message = "The workload should not be longer than 10 characters."
   }
 }
 

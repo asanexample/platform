@@ -1,13 +1,12 @@
-variable "prefix" {
-  description = "The prefix to use for all resources. Defaults to 'vip' if not specified."
+variable "workload" {
+  description = "The workload identifier used in resource naming (e.g., platform, data, hipaa, pci)."
   type        = string
-  default     = "vip"
-}
+  default     = "platform"
 
-variable "customer" {
-  description = "The customer name to use in resource naming. Optional for shared resources."
-  type        = string
-  default     = null
+  validation {
+    condition     = length(var.workload) >= 2 && length(var.workload) <= 10
+    error_message = "Workload must be between 2 and 10 characters."
+  }
 }
 
 variable "environment" {
@@ -44,4 +43,4 @@ variable "unique_seed" {
   description = "Seed for unique naming generation"
   type        = string
   default     = ""
-} 
+}

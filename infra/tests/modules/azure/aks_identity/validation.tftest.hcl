@@ -11,13 +11,13 @@ provider "azurerm" {
   tenant_id = "c945e155-be68-4477-b8d7-01939adbfe55"
 }
 
-# Test prefix validation
-run "prefix_validation_test" {
+# Test workload validation
+run "workload_validation_test" {
   command = plan
 
   variables {
-    # Short prefix (within limit)
-    prefix              = "t"
+    # Short workload (within limit)
+    workload            = "op"
     environment         = "dev"
     region_abbv         = "eus"
     resource_group_name = "test-rg"
@@ -35,8 +35,8 @@ run "prefix_validation_test" {
   }
 
   assert {
-    condition     = var.prefix == "t"
-    error_message = "Prefix should be accepted at minimum length"
+    condition     = var.workload == "op"
+    error_message = "Workload should be accepted at minimum length"
   }
 }
 
@@ -45,7 +45,7 @@ run "environment_validation_test" {
   command = plan
 
   variables {
-    prefix              = "test"
+    workload            = "platform"
     environment         = "prod"  # Valid environment
     region_abbv         = "eus"
     resource_group_name = "test-rg"
@@ -68,41 +68,12 @@ run "environment_validation_test" {
   }
 }
 
-# Test customer validation
-run "customer_validation_test" {
-  command = plan
-
-  variables {
-    prefix              = "test"
-    environment         = "dev"
-    region_abbv         = "eus"
-    customer            = "customername123"  # Valid customer name (15 chars)
-    resource_group_name = "test-rg"
-    location            = "eastus"
-    cluster_name        = "test-dev-aks-eus"
-    create_workload_identities = false
-    # Avoid route table lookup
-    private_route_table_name = null
-    vnet_resource_group_name = null
-    tags = {}
-  }
-
-  module {
-    source = "../../../../modules/azure/aks_identity"
-  }
-
-  assert {
-    condition     = var.customer == "customername123"
-    error_message = "Customer name should be accepted with valid value"
-  }
-}
-
 # Test resource group name validation
 run "resource_group_validation_test" {
   command = plan
 
   variables {
-    prefix              = "test"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "eus"
     resource_group_name = "test-resource-group-with-valid-name"  # Valid resource group name
@@ -130,7 +101,7 @@ run "workload_identity_validation_test" {
   command = plan
 
   variables {
-    prefix              = "test"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "eus"
     resource_group_name = "test-rg"
@@ -164,7 +135,7 @@ run "region_abbv_validation_test" {
   command = plan
 
   variables {
-    prefix              = "test"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "eus"  # Valid region abbreviation
     resource_group_name = "test-rg"
@@ -192,7 +163,7 @@ run "identity_name_validation_test" {
   command = plan
 
   variables {
-    prefix              = "test"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "eus"
     resource_group_name = "test-rg"
@@ -224,7 +195,7 @@ run "oidc_url_validation_test" {
   command = plan
 
   variables {
-    prefix              = "test"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "eus"
     resource_group_name = "test-rg"
@@ -258,7 +229,7 @@ run "subnet_id_validation_test" {
   command = plan
 
   variables {
-    prefix              = "test"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "eus"
     resource_group_name = "test-rg"
@@ -290,7 +261,7 @@ run "tags_validation_test" {
   command = plan
 
   variables {
-    prefix              = "test"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "eus"
     resource_group_name = "test-rg"

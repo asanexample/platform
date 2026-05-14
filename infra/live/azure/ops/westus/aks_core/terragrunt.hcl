@@ -1,32 +1,8 @@
-# Terragrunt configuration for Azure AKS Core in eastus region
+# Terragrunt configuration for Azure AKS Core in westus region
 
-# Local variables for this configuration
-locals {
-  # Load hierarchical variables
-  env_vars     = read_terragrunt_config(find_in_parent_folders("env.hcl"))
-  region_vars  = read_terragrunt_config(find_in_parent_folders("region.hcl"))
-  network_vars = read_terragrunt_config(find_in_parent_folders("network.hcl"))
-  common_vars  = read_terragrunt_config(find_in_parent_folders("common.hcl"))
-  
-  # Merge all variables for convenience
-  all_vars = merge(
-    local.env_vars.locals,
-    local.region_vars.locals,
-    local.network_vars.locals,
-    local.common_vars.locals
-  )
-  
-  # Extract commonly used variables
-  env         = local.env_vars.locals.environment
-  prefix      = local.common_vars.locals.prefix
-  customer    = local.common_vars.locals.customer
-  region      = local.region_vars.locals.region
-  region_abbv = local.region_vars.locals.region_abbv
-  tags        = merge(
-    local.common_vars.locals.tags, 
-    local.env_vars.locals.env_tags,
-    local.region_vars.locals.region_tags
-  )
+include "base" {
+  path   = find_in_parent_folders("azure/_base.hcl")
+  expose = true
 }
 
 # Include the root terragrunt.hcl configuration
@@ -55,7 +31,7 @@ dependency "resource_group" {
   # Mock outputs for plan and validation
   mock_outputs = {
     name     = "mock-rg"
-    location = local.region
+    location = include.base.locals.region
   }
 }
 
@@ -69,7 +45,7 @@ dependency "networking" {
     subnet_ids = {
       "az1-kubernetes" = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet/subnets/az1-kubernetes"
     }
-    aks_private_dns_zone_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/privateDnsZones/privatelink.${local.region}.azmk8s.io"
+    aks_private_dns_zone_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/privateDnsZones/privatelink.${include.base.locals.region}.azmk8s.io"
   }
 }
 
@@ -95,16 +71,18 @@ dependency "log_analytics" {
 
 # Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
+  create = true
+
   # Environment variables
-  environment = local.env
-  prefix = local.prefix
-  region_abbv = local.region_abbv
+  environment = include.base.locals.env
+  workload = include.base.locals.workload
+  region_abbv = include.base.locals.region_abbv
 
   # Resource details
   name                = dependency.naming.outputs.aks_cluster
   resource_group_name = dependency.resource_group.outputs.name
   location            = dependency.resource_group.outputs.location
-  dns_prefix          = "${local.prefix}-${local.env}-${local.region_abbv}"
+  dns_prefix          = "${include.base.locals.workload}-${include.base.locals.env}-${include.base.locals.region_abbv}"
 
   # Environment-specific overrides
   kubernetes_version        = "1.32.0"  # Specific version - Azure will automatically upgrade within this minor version
@@ -158,9 +136,9 @@ inputs = {
 
   prometheus_dcr_id = null
   microsoft_defender_enabled = false
-  
+
   # Diagnostic settings are already set up in Azure and will be managed outside of Terraform
-  
+
   # RBAC role assignments for accessing AKS monitoring
   role_assignments = [
     {
@@ -174,9 +152,9 @@ inputs = {
   log_analytics_workspace_id = dependency.log_analytics.outputs.id
 
   # Tags
-  tags = merge(local.tags, {
+  tags = merge(include.base.locals.tags, {
     "network-cilium-managed-by" = "cilium"
     "cilium-version"            = "1.17.2"
     "monitoring-enabled"        = "true"
   })
-} 
+}

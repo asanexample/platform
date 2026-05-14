@@ -1,32 +1,8 @@
-# Terragrunt configuration for Azure AKS Identity in eastus region
+# Terragrunt configuration for Azure AKS Identity in westus region
 
-# Local variables for this configuration
-locals {
-  # Load hierarchical variables
-  env_vars     = read_terragrunt_config(find_in_parent_folders("env.hcl"))
-  region_vars  = read_terragrunt_config(find_in_parent_folders("region.hcl"))
-  network_vars = read_terragrunt_config(find_in_parent_folders("network.hcl"))
-  common_vars  = read_terragrunt_config(find_in_parent_folders("common.hcl"))
-  
-  # Merge all variables for convenience
-  all_vars = merge(
-    local.env_vars.locals,
-    local.region_vars.locals,
-    local.network_vars.locals,
-    local.common_vars.locals
-  )
-  
-  # Extract commonly used variables
-  env         = local.env_vars.locals.environment
-  prefix      = local.common_vars.locals.prefix
-  customer    = local.common_vars.locals.customer
-  region      = local.region_vars.locals.region
-  region_abbv = local.region_vars.locals.region_abbv
-  tags        = merge(
-    local.common_vars.locals.tags, 
-    local.env_vars.locals.env_tags,
-    local.region_vars.locals.region_tags
-  )
+include "base" {
+  path   = find_in_parent_folders("azure/_base.hcl")
+  expose = true
 }
 
 # Include the root terragrunt.hcl configuration
@@ -42,7 +18,7 @@ include "aks_identity_common" {
 # Set dependencies for this module
 dependency "naming" {
   config_path = "../naming"
-  
+
   # Mock outputs for plan and validation
   mock_outputs = {
     aks_cluster = "mock-aks"
@@ -52,17 +28,17 @@ dependency "naming" {
 
 dependency "resource_group" {
   config_path = "../resource_group"
-  
+
   # Mock outputs for plan and validation
   mock_outputs = {
     name = "mock-rg"
-    location = local.region
+    location = include.base.locals.region
   }
 }
 
 dependency "networking" {
   config_path = "../networking"
-  
+
   # Mock outputs for plan and validation
   mock_outputs = {
     vnet_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet"
@@ -71,24 +47,26 @@ dependency "networking" {
 
 # Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
+  create = true
+
   # Identity naming
   aks_identity_name = dependency.naming.outputs.aks_identity
   cluster_name = dependency.naming.outputs.aks_cluster
-  
+
   # Environment variables
-  environment = local.env
-  prefix = local.prefix
-  region_abbv = local.region_abbv
-  
+  environment = include.base.locals.env
+  workload = include.base.locals.workload
+  region_abbv = include.base.locals.region_abbv
+
   # Resource details
   resource_group_name = dependency.resource_group.outputs.name
   location = dependency.resource_group.outputs.location
-  
+
   # Environment-specific configuration
   create_workload_identities = false
   workload_identity_enabled = false
   oidc_issuer_enabled = false
-  
+
   # Role assignments with specific scopes for this environment
   role_assignments = {
     "Network Contributor" = {
@@ -96,4 +74,4 @@ inputs = {
       skip_service_principal_aad_check = true
     }
   }
-} 
+}

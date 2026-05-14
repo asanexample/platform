@@ -14,7 +14,7 @@
 # Each container has its own settings for access type and metadata
 resource "azurerm_storage_container" "containers" {
   # Iterate through each container definition in the input map
-  for_each = var.containers
+  for_each = var.create ? var.containers : {}
 
   # Container name - must follow Azure naming rules
   # (3-63 chars, lowercase alphanumeric and dashes)
@@ -38,9 +38,9 @@ resource "azurerm_storage_container" "containers" {
 # Create role assignments for container-level access
 # This enables Entra ID (Azure AD) authentication for containers
 resource "azurerm_role_assignment" "container_role_assignments" {
-  for_each = {
+  for_each = var.create ? {
     for idx, ra in var.role_assignments : "${ra.container_key}-${ra.principal_id}-${ra.role_definition_name}" => ra
-  }
+  } : {}
 
   # Set the scope to the specific container
   scope = azurerm_storage_container.containers[each.value.container_key].resource_manager_id

@@ -8,7 +8,7 @@
 # Role assignments for Entra ID authentication
 # This creates RBAC role assignments for principals to access the storage account
 resource "azurerm_role_assignment" "this" {
-  count                = length(var.role_assignments)
+  count                = var.create ? length(var.role_assignments) : 0
   principal_id         = var.role_assignments[count.index].principal_id
   role_definition_name = var.role_assignments[count.index].role_definition_name
   role_definition_id   = var.role_assignments[count.index].role_definition_id

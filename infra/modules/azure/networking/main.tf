@@ -7,6 +7,7 @@
 
 # Create the virtual network
 resource "azurerm_virtual_network" "vnet" {
+  count               = var.create ? 1 : 0
   name                = var.vnet_name
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -17,11 +18,11 @@ resource "azurerm_virtual_network" "vnet" {
 
 # Create a subnet for each entry in the subnets map
 resource "azurerm_subnet" "subnet" {
-  for_each = var.subnets
+  for_each = var.create ? var.subnets : {}
 
   name                 = each.key
   resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.vnet.name
+  virtual_network_name = azurerm_virtual_network.vnet[0].name
   address_prefixes     = each.value.address_prefixes
 
   service_endpoints = each.value.service_endpoints
@@ -43,7 +44,7 @@ resource "azurerm_subnet" "subnet" {
 
 # Create a network security group for each subnet
 resource "azurerm_network_security_group" "nsg" {
-  for_each = var.subnets
+  for_each = var.create ? var.subnets : {}
 
   name                = "${each.key}-nsg"
   location            = var.location
@@ -53,10 +54,10 @@ resource "azurerm_network_security_group" "nsg" {
 
 # Associate Network Security Groups with subnets, excluding AzureFirewallSubnet
 resource "azurerm_subnet_network_security_group_association" "nsg_association" {
-  for_each = {
+  for_each = var.create ? {
     for k, v in var.subnets : k => v
     if k != "AzureFirewallSubnet" # Exclude AzureFirewallSubnet as it doesn't support NSG associations
-  }
+  } : {}
 
   subnet_id                 = azurerm_subnet.subnet[each.key].id
   network_security_group_id = azurerm_network_security_group.nsg[each.key].id
@@ -66,7 +67,7 @@ resource "azurerm_subnet_network_security_group_association" "nsg_association" {
 
 # Determine if we should add AKS-specific NSG rules
 locals {
-  configure_aks_nsg = var.enable_aks_networking && var.aks_subnet_name != null ? contains(keys(var.subnets), var.aks_subnet_name) : false
+  configure_aks_nsg = var.create && var.enable_aks_networking && var.aks_subnet_name != null ? contains(keys(var.subnets), var.aks_subnet_name) : false
 }
 
 # Add AKS-specific NSG rules when enabled
@@ -153,7 +154,7 @@ resource "azurerm_network_security_rule" "aks_allow_node_communication" {
 
 # Create a private DNS zone for AKS if private cluster is enabled and DNS zone ID is not provided
 resource "azurerm_private_dns_zone" "aks" {
-  count               = var.enable_aks_networking && var.aks_private_cluster_enabled && var.aks_private_dns_zone_id == null ? 1 : 0
+  count               = var.create && var.enable_aks_networking && var.aks_private_cluster_enabled && var.aks_private_dns_zone_id == null ? 1 : 0
   name                = "privatelink.${var.location}.azmk8s.io"
   resource_group_name = var.resource_group_name
 
@@ -164,11 +165,11 @@ resource "azurerm_private_dns_zone" "aks" {
 
 # Link the DNS zone to the VNet if creating a private DNS zone
 resource "azurerm_private_dns_zone_virtual_network_link" "aks" {
-  count                 = var.enable_aks_networking && var.aks_private_cluster_enabled && var.aks_private_dns_zone_id == null ? 1 : 0
+  count                 = var.create && var.enable_aks_networking && var.aks_private_cluster_enabled && var.aks_private_dns_zone_id == null ? 1 : 0
   name                  = "${var.aks_cluster_name}-link"
   resource_group_name   = var.resource_group_name
   private_dns_zone_name = azurerm_private_dns_zone.aks[0].name
-  virtual_network_id    = azurerm_virtual_network.vnet.id
+  virtual_network_id    = azurerm_virtual_network.vnet[0].id
 
   tags = merge(var.tags, {
     name = "${var.aks_cluster_name}-link"

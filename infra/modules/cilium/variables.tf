@@ -16,10 +16,10 @@ variable "environment" {
   default     = "dev"
 }
 
-variable "prefix" {
-  description = "Prefix to use for resource naming"
+variable "workload" {
+  description = "Workload identifier for resource naming"
   type        = string
-  default     = ""
+  default     = "platform"
 }
 
 variable "region_abbv" {

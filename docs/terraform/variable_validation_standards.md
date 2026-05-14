@@ -9,6 +9,71 @@ This document outlines the standard validation patterns for variables in Terrafo
 3. **Optional variables should have a default value**
 4. **Critical variables should have appropriate validation**
 
+## Naming Conventions for Boolean and Optional Variables
+
+### Resource Creation Toggle: `create`
+
+Use a variable named `create` (type `bool`, default `true`) to control whether a module's primary resource is created. This replaces older patterns like `enabled` or `create_resource`.
+
+```hcl
+variable "create" {
+  description = "Whether to create the resource"
+  type        = bool
+  default     = true
+}
+```
+
+Modules should gate top-level resources on `var.create` using `count = var.create ? 1 : 0` (or `for_each` equivalent). This gives callers a uniform way to disable any module without removing its Terragrunt config.
+
+### Sub-Feature Flags: `enable_*`
+
+Use the `enable_` prefix for booleans that toggle optional sub-features within a module. These are distinct from the top-level `create` toggle.
+
+```hcl
+variable "enable_diagnostics" {
+  description = "Whether to enable diagnostic settings on the resource"
+  type        = bool
+  default     = false
+}
+
+variable "enable_private_endpoint" {
+  description = "Whether to create a private endpoint for the resource"
+  type        = bool
+  default     = false
+}
+```
+
+### Optional String Defaults: Use `null`, Not `""`
+
+Optional string variables should default to `null`, not `""`. This allows downstream `dynamic` blocks and conditional expressions to distinguish "not provided" from "provided as empty string", and avoids spurious diffs when a value is truly optional.
+
+```hcl
+# Correct
+variable "custom_domain" {
+  description = "Custom domain name for the resource. Leave unset to skip."
+  type        = string
+  default     = null
+}
+
+# Incorrect -- avoid this pattern
+variable "custom_domain" {
+  description = "Custom domain name for the resource"
+  type        = string
+  default     = ""
+}
+```
+
+When a variable defaults to `null`, condition guards should use `!= null` rather than `!= ""`:
+
+```hcl
+resource "azurerm_example" "this" {
+  count       = var.custom_domain != null ? 1 : 0
+  domain_name = var.custom_domain
+}
+```
+
+**Exception**: Variables that participate in string interpolation where `null` would produce the literal string `"null"` may use `""` as the default, but this should be documented in the variable description.
+
 ## Common Variable Types and Validation Patterns
 
 ### Resource Group Name
@@ -57,17 +122,17 @@ variable "location" {
 
 ```hcl
 variable "name" {
-  description = "Name of the storage account"
+  description = "Name of the storage account. Set to null to use auto-generation logic."
   type        = string
-  default     = ""  # If using auto-generation logic
+  default     = null  # Prefer null over "" for optional strings
 
   validation {
-    condition     = var.name == "" || (length(var.name) >= 3 && length(var.name) <= 24)
+    condition     = var.name == null || (length(var.name) >= 3 && length(var.name) <= 24)
     error_message = "Storage account name must be between 3 and 24 characters when provided."
   }
 
   validation {
-    condition     = var.name == "" || can(regex("^[a-z0-9]+$", var.name))
+    condition     = var.name == null || can(regex("^[a-z0-9]+$", var.name))
     error_message = "Storage account name can only include lowercase letters and numbers, with no hyphens or special characters."
   }
 }
@@ -77,17 +142,17 @@ variable "name" {
 
 ```hcl
 variable "name" {
-  description = "Name of the key vault"
+  description = "Name of the key vault. Set to null to use auto-generation logic."
   type        = string
-  default     = ""  # If using auto-generation logic
+  default     = null  # Prefer null over "" for optional strings
 
   validation {
-    condition     = var.name == "" || (length(var.name) >= 3 && length(var.name) <= 24)
+    condition     = var.name == null || (length(var.name) >= 3 && length(var.name) <= 24)
     error_message = "Key vault name must be between 3 and 24 characters when provided."
   }
 
   validation {
-    condition     = var.name == "" || can(regex("^[a-zA-Z0-9-]+$", var.name))
+    condition     = var.name == null || can(regex("^[a-zA-Z0-9-]+$", var.name))
     error_message = "Key vault name can only include alphanumeric characters and hyphens."
   }
 }
@@ -259,4 +324,7 @@ When implementing a new module or reviewing an existing one, ensure:
 3. Map and list objects with nested elements include proper validation for each element
 4. Complex object structures have validation for their key attributes
 5. Optional variables include sensible defaults
-6. Variable descriptions are clear and explain the purpose and constraints 
+6. Variable descriptions are clear and explain the purpose and constraints
+7. The top-level resource creation toggle is named `create` (bool, default `true`)
+8. Sub-feature flags use the `enable_` prefix (e.g., `enable_diagnostics`)
+9. Optional string variables default to `null`, not `""` 

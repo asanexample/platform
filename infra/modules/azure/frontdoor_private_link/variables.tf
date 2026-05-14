@@ -1,4 +1,4 @@
-variable "module_enabled" {
+variable "create" {
   description = "Controls whether the Front Door Private Link module is deployed"
   type        = bool
   default     = true

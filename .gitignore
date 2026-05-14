@@ -55,4 +55,9 @@ terraform.rc
 # Log files
 *.log 
 
-vip-tf-modules
+# Terragrunt rendered config (generated artifact)
+**/terragrunt_rendered.json
+
+# OS files
+.DS_Store
+**/.DS_Store

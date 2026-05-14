@@ -182,6 +182,33 @@ k8s-deploy-charts: ## Deploy Helm charts to Kubernetes cluster
 	@find charts -name "Chart.yaml" -print0 | xargs -0 -n1 dirname | sort | xargs -I{} sh -c 'echo "Installing {}..." && helm upgrade --install $$(basename {}) {} --create-namespace --namespace $$(basename {})-system'
 
 #----------------------------------------------
+# Documentation
+#----------------------------------------------
+
+.PHONY: docs
+docs: ## Regenerate terraform-docs for all modules
+	@echo "$(GREEN)Regenerating module documentation...$(NC)"
+	@find infra/modules -name "*.tf" -exec dirname {} \; | sort -u | while read dir; do \
+		echo "  $(YELLOW)$$dir$(NC)"; \
+		terraform-docs markdown table "$$dir" 2>/dev/null || true; \
+	done
+	@echo "$(GREEN)Done.$(NC)"
+
+.PHONY: docs-module
+docs-module: ## Regenerate terraform-docs for a single module (MODULE=networking)
+	@echo "$(GREEN)Regenerating docs for $(MODULE)...$(NC)"
+	@terraform-docs markdown table infra/modules/$(CLOUD)/$(MODULE)
+
+.PHONY: docs-check
+docs-check: ## Check if terraform-docs are up to date (CI use)
+	@echo "$(GREEN)Checking module documentation...$(NC)"
+	@find infra/modules -name "*.tf" -exec dirname {} \; | sort -u | while read dir; do \
+		terraform-docs markdown table --output-check "$$dir" 2>/dev/null || \
+		(echo "$(RED)OUTDATED: $$dir$(NC)" && exit 1); \
+	done
+	@echo "$(GREEN)All module docs are up to date.$(NC)"
+
+#----------------------------------------------
 # Utility operations
 #----------------------------------------------
 

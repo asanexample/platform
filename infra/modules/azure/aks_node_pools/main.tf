@@ -17,7 +17,7 @@ locals {
 
 # Create application node pool if enabled
 resource "azurerm_kubernetes_cluster_node_pool" "app_node_pool" {
-  count = var.app_node_pool_enabled ? 1 : 0
+  count = var.create && var.app_node_pool_enabled ? 1 : 0
 
   name                  = local.app_node_pool_name
   kubernetes_cluster_id = var.aks_cluster_id

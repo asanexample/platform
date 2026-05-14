@@ -1,29 +1,8 @@
 # Terragrunt configuration for Azure Managed Grafana in westus region for ops environment
 
-# Local variables for this configuration
-locals {
-  # Load hierarchical variables
-  env_vars     = read_terragrunt_config(find_in_parent_folders("env.hcl"))
-  region_vars  = read_terragrunt_config(find_in_parent_folders("region.hcl"))
-  common_vars  = read_terragrunt_config(find_in_parent_folders("common.hcl"))
-  
-  # Merge all variables for convenience
-  all_vars = merge(
-    local.env_vars.locals,
-    local.region_vars.locals,
-    local.common_vars.locals
-  )
-  
-  # Extract commonly used variables
-  env         = local.env_vars.locals.environment
-  prefix      = local.common_vars.locals.prefix
-  region      = local.region_vars.locals.region
-  region_abbv = local.region_vars.locals.region_abbv
-  tags        = merge(
-    local.common_vars.locals.tags, 
-    local.env_vars.locals.env_tags,
-    local.region_vars.locals.region_tags
-  )
+include "base" {
+  path   = find_in_parent_folders("azure/_base.hcl")
+  expose = true
 }
 
 # Include the root terragrunt.hcl configuration
@@ -47,7 +26,7 @@ dependency "resource_group" {
   # Mock outputs for plan and validation
   mock_outputs = {
     name     = "mock-rg"
-    location = local.region
+    location = include.base.locals.region
   }
 }
 
@@ -67,27 +46,29 @@ terraform {
 
 # Specify inputs for this module
 inputs = {
+  create = true
+
   # Resource details
-  name                = "${local.prefix}-${local.env}-grafana-${local.region_abbv}"
+  name                = "${include.base.locals.workload}-${include.base.locals.env}-grafana-${include.base.locals.region_abbv}"
   resource_group_name = dependency.resource_group.outputs.name
   location            = dependency.resource_group.outputs.location
-  
+
   # Grafana configuration
   grafana_major_version             = "10" # Latest supported version
   api_key_enabled                   = true
   deterministic_outbound_ip_enabled = true
   public_network_access_enabled     = true
   zone_redundancy_enabled           = false # Disabled for westus as it's not supported
-  
+
   # Azure AD admin groups - replace with actual Azure AD group IDs in production
   admin_group_object_ids = []
-  
+
   # Azure AD admin users - replace with actual Azure AD user IDs as needed
   admin_user_object_ids = []
-  
+
   # Tags
-  tags = merge(local.tags, {
+  tags = merge(include.base.locals.tags, {
     "monitoring-type" = "grafana"
-    "environment"     = local.env
+    "environment"     = include.base.locals.env
   })
-} 
+}

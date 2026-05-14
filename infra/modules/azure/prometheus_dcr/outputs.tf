@@ -4,20 +4,25 @@
 
 output "dcr_id" {
   description = "The ID of the created Data Collection Rule."
-  value       = azurerm_monitor_data_collection_rule.this.id
+  value       = var.create ? azurerm_monitor_data_collection_rule.this[0].id : null
 }
 
 output "dcr_name" {
   description = "The name of the created Data Collection Rule."
-  value       = azurerm_monitor_data_collection_rule.this.name
+  value       = var.create ? azurerm_monitor_data_collection_rule.this[0].name : null
 }
 
 output "dce_id" {
   description = "The ID of the created Data Collection Endpoint."
-  value       = azurerm_monitor_data_collection_endpoint.this.id
+  value       = var.create ? azurerm_monitor_data_collection_endpoint.this[0].id : null
 }
 
 output "dce_name" {
   description = "The name of the created Data Collection Endpoint."
-  value       = azurerm_monitor_data_collection_endpoint.this.name
+  value       = var.create ? azurerm_monitor_data_collection_endpoint.this[0].name : null
+}
+
+output "create" {
+  description = "Whether resources were created"
+  value       = var.create
 } 

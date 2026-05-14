@@ -11,7 +11,7 @@ remote_state {
   }
   
   config = {
-    subscription_id      = "9dc5edc4-8c4e-41a1-a4f8-2183c4e91954" // Innovation-Operations subscription
+    subscription_id      = "9dc5edc4-8c4e-41a1-a4f8-2183c4e91954" // Operations subscription
     tenant_id            = "c945e155-be68-4477-b8d7-01939adbfe55"
     resource_group_name  = "terraform-state-rg"
     storage_account_name = "tfstatemulticloud"
@@ -136,8 +136,8 @@ locals {
   owner       = get_env("TF_VAR_owner", "Platform Team")
   
   # Standard naming convention helpers
-  # Format: {prefix}-{cloud}-{resource_type}-{env}-{region}-{name}
-  # Example: ctr-az-rg-dev-eastus-networking
+  # Format: {resource_type}-{workload}-{env}-{region}-{name}
+  # Example: rg-platform-dev-eus-networking
   
   # Common tags that will be applied to all resources
   common_tags = {

@@ -13,12 +13,12 @@ provider "azurerm" {
   resource_provider_registrations = "none"
 }
 
-# Test prefix validation
-run "prefix_validation_test" {
+# Test workload validation
+run "workload_validation_test" {
   command = plan
 
   variables {
-    prefix         = "test"
+    workload       = "platform"
     environment    = "dev"
     region_abbv    = "eus"
     aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
@@ -31,8 +31,8 @@ run "prefix_validation_test" {
   }
 
   assert {
-    condition     = var.prefix == "test"
-    error_message = "Prefix should be valid with proper format"
+    condition     = var.workload == "platform"
+    error_message = "Workload should be valid with proper format"
   }
 }
 
@@ -41,7 +41,7 @@ run "region_abbv_validation_test" {
   command = plan
 
   variables {
-    prefix         = "test"
+    workload       = "platform"
     environment    = "dev"
     region_abbv    = "eus"  # Valid region abbreviation
     aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
@@ -64,7 +64,7 @@ run "min_name_length_test" {
   command = plan
 
   variables {
-    prefix         = "test"
+    workload       = "platform"
     environment    = "dev"
     region_abbv    = "eus"
     aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
@@ -88,7 +88,7 @@ run "max_name_length_test" {
   command = plan
 
   variables {
-    prefix         = "test"
+    workload       = "platform"
     environment    = "dev"
     region_abbv    = "eus"
     aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
@@ -113,7 +113,7 @@ run "valid_node_pool_mode_test" {
   command = plan
 
   variables {
-    prefix         = "test"
+    workload       = "platform"
     environment    = "dev"
     region_abbv    = "eus"
     aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
@@ -138,7 +138,7 @@ run "valid_node_count_test" {
   command = plan
 
   variables {
-    prefix         = "test"
+    workload       = "platform"
     environment    = "dev"
     region_abbv    = "eus"
     aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
@@ -163,7 +163,7 @@ run "vm_size_validation_test" {
   command = plan
 
   variables {
-    prefix         = "test"
+    workload       = "platform"
     environment    = "dev"
     region_abbv    = "eus"
     aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
@@ -188,7 +188,7 @@ run "availability_zones_validation_test" {
   command = plan
 
   variables {
-    prefix         = "test"
+    workload       = "platform"
     environment    = "dev"
     region_abbv    = "eus"
     aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
@@ -213,7 +213,7 @@ run "autoscaling_validation_test" {
   command = plan
 
   variables {
-    prefix         = "test"
+    workload       = "platform"
     environment    = "dev"
     region_abbv    = "eus"
     aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
@@ -239,7 +239,7 @@ run "min_max_count_validation_test" {
   command = plan
 
   variables {
-    prefix         = "test"
+    workload       = "platform"
     environment    = "dev"
     region_abbv    = "eus"
     aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
@@ -265,7 +265,7 @@ run "node_labels_validation_test" {
   command = plan
 
   variables {
-    prefix         = "test"
+    workload       = "platform"
     environment    = "dev"
     region_abbv    = "eus"
     aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
@@ -294,7 +294,7 @@ run "node_taints_validation_test" {
   command = plan
 
   variables {
-    prefix         = "test"
+    workload       = "platform"
     environment    = "dev"
     region_abbv    = "eus"
     aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
@@ -323,7 +323,7 @@ run "tags_validation_test" {
   command = plan
 
   variables {
-    prefix         = "test"
+    workload       = "platform"
     environment    = "dev"
     region_abbv    = "eus"
     aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"

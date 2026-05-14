@@ -14,7 +14,7 @@ data "azurerm_client_config" "current" {}
 # ACR names must be globally unique, lowercase, and alphanumeric only
 locals {
   # Generate default name if not provided
-  acr_name = var.name != null ? var.name : lower("${var.prefix}${var.environment}acr${var.region_abbv}")
+  acr_name = var.name != null ? var.name : lower("${var.workload}${var.environment}acr${var.region_abbv}")
   
   # Default network rule set if none provided
   default_network_rule_set = {
@@ -29,7 +29,7 @@ locals {
 
 # Create the Azure Container Registry
 resource "azurerm_container_registry" "acr" {
-  count                    = var.create_registry ? 1 : 0
+  count                    = var.create && var.create_registry ? 1 : 0
   name                     = local.acr_name
   resource_group_name      = var.resource_group_name
   location                 = var.location
@@ -96,8 +96,8 @@ resource "azurerm_container_registry" "acr" {
 
 # Create role assignment for AKS to pull images from ACR (if AKS integration is enabled)
 resource "azurerm_role_assignment" "acr_pull" {
-  count                = var.create_registry && var.aks_integration_enabled && var.aks_principal_id != null ? 1 : 0
-  scope                = var.create_registry ? azurerm_container_registry.acr[0].id : ""
+  count                = var.create && var.create_registry && var.aks_integration_enabled && var.aks_principal_id != null ? 1 : 0
+  scope                = azurerm_container_registry.acr[0].id
   role_definition_name = "AcrPull"
   principal_id         = var.aks_principal_id
   
@@ -107,8 +107,8 @@ resource "azurerm_role_assignment" "acr_pull" {
 
 # Optionally add a role assignment for pushing images to ACR
 resource "azurerm_role_assignment" "acr_push" {
-  count                = var.create_registry && var.aks_integration_enabled && var.enable_aks_acr_push && var.aks_principal_id != null ? 1 : 0
-  scope                = var.create_registry ? azurerm_container_registry.acr[0].id : ""
+  count                = var.create && var.create_registry && var.aks_integration_enabled && var.enable_aks_acr_push && var.aks_principal_id != null ? 1 : 0
+  scope                = azurerm_container_registry.acr[0].id
   role_definition_name = "AcrPush"
   principal_id         = var.aks_principal_id
   

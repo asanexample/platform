@@ -1,216 +1,118 @@
 # Azure Managed Grafana Module
 
-## Overview
-
-This module creates an Azure Managed Grafana instance, providing a fully managed service for data visualization and analytics. It integrates with Azure Monitor, Prometheus workspaces, and Microsoft Entra ID (Azure AD) for authentication and authorization.
-
-## Features
-
-- Creates an Azure Managed Grafana dashboard instance with configurable settings
-- Configures identity with System Assigned Managed Identity
-- Integrates with Azure Monitor Prometheus workspaces
-- Supports Microsoft Entra ID (Azure AD) group and user role assignments
-- Controls security features including API keys and public network access
-- Configurable Grafana version and zone redundancy options
-- Supports consistent tagging and naming conventions
+Creates an Azure Managed Grafana instance for visualizing metrics from Azure Monitor and Prometheus data sources.
 
 ## Usage
 
 ```hcl
-module "grafana" {
-  source = "../../modules/azure/managed_grafana"
+module "managed_grafana" {
+  source = "../managed_grafana"
 
-  name                = "grafana-monitoring-prod-eastus"
-  resource_group_name = "rg-monitoring-prod-eastus"
-  location            = "eastus"
-  
+  create = true
+
+  resource_group_name    = "rg-platform-prod-eus"
+  location               = "eastus"
+  name                   = "grafana-platform-prod-eus"
+  grafana_major_version  = "10"
+  zone_redundancy_enabled = true
+
+  prometheus_workspace_id = module.monitor_workspace.id
+
+  admin_group_object_ids = ["11111111-1111-1111-1111-111111111111"]
+
   tags = {
-    Environment = "Production"
-    ManagedBy   = "Terraform"
-    Component   = "Monitoring"
+    Environment = "prod"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
 
 ## Examples
 
-### Basic Development Grafana Instance
+### Disabled
 
 ```hcl
-module "grafana" {
-  source = "../../modules/azure/managed_grafana"
+module "managed_grafana" {
+  source = "../managed_grafana"
+  create = false
+}
+```
 
-  name                = "grafana-monitoring-dev-eastus"
-  resource_group_name = "rg-monitoring-dev-eastus"
-  location            = "eastus"
-  
-  # Development settings
+### Dev instance with public access
+
+```hcl
+module "managed_grafana" {
+  source = "../managed_grafana"
+
+  create = true
+
+  resource_group_name           = "rg-platform-dev-eus"
+  location                      = "eastus"
+  name                          = "grafana-platform-dev-eus"
+  grafana_major_version         = "10"
+  zone_redundancy_enabled       = false
   api_key_enabled               = true
   public_network_access_enabled = true
-  zone_redundancy_enabled       = false
-  grafana_major_version         = "10"
-  
+
   tags = {
-    Environment = "Development"
-    ManagedBy   = "Terraform"
+    Environment = "dev"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
 
-### Production with Prometheus Integration and Access Control
+<!-- BEGIN_TF_DOCS -->
+## Resources
 
-```hcl
-module "grafana" {
-  source = "../../modules/azure/managed_grafana"
+| Name | Type |
+| ---- | ---- |
+| [azurerm_dashboard_grafana.grafana](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/dashboard_grafana) | resource |
+| [azurerm_role_assignment.grafana_admin_groups](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
+| [azurerm_role_assignment.grafana_admin_users](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
 
-  name                = "grafana-monitoring-prod-eastus"
-  resource_group_name = "rg-monitoring-prod-eastus"
-  location            = "eastus"
-  
-  # Integration with Azure Monitor Prometheus
-  azure_monitor_workspace_integrations = [
-    {
-      workspace_id = module.monitor_workspace.id
-    }
-  ]
-  
-  # Microsoft Entra ID integration for access control
-  admin_group_object_ids = [
-    "11111111-1111-1111-1111-111111111111",  # Monitoring Admins Group
-  ]
-  
-  admin_user_object_ids = [
-    "22222222-2222-2222-2222-222222222222",  # DevOps Admin User
-  ]
-  
-  # Production security settings
-  api_key_enabled               = false
-  public_network_access_enabled = true
-  zone_redundancy_enabled       = true
-  grafana_major_version         = "10"
-  
-  tags = {
-    Environment = "Production"
-    ManagedBy   = "Terraform"
-    Component   = "Monitoring"
-    CostCenter  = "Platform"
-  }
-}
-```
-
-### Enhanced Security with Private Access
-
-```hcl
-module "grafana" {
-  source = "../../modules/azure/managed_grafana"
-
-  name                = "grafana-monitoring-prod-eastus"
-  resource_group_name = "rg-monitoring-prod-eastus"
-  location            = "eastus"
-  
-  # Security settings
-  api_key_enabled               = false
-  public_network_access_enabled = false  # Restrict to private endpoints only
-  deterministic_outbound_ip_enabled = true
-  zone_redundancy_enabled       = true
-  
-  tags = {
-    Environment = "Production"
-    ManagedBy   = "Terraform"
-    Component   = "Monitoring"
-    Security    = "High"
-  }
-}
-```
-
-## Requirements
-
-| Name | Version |
-|------|---------|
-| terraform | >= 1.6.0 |
-| azurerm | >= 4.0.0 |
-
-## Providers
-
-| Name | Version |
-|------|---------|
-| azurerm | >= 4.0.0 |
-
-## Required Inputs
-
-| Name | Description | Type |
-|------|-------------|------|
-| name | The name of the Azure Managed Grafana instance | `string` |
-| resource_group_name | The name of the resource group where the Grafana instance will be created | `string` |
-| location | The Azure region where the Grafana instance will be created | `string` |
-
-## Optional Inputs
+## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
-| azure_monitor_workspace_integrations | List of Azure Monitor workspace integrations | `list(object)` | `[]` | no |
-| api_key_enabled | Whether to enable API key authentication for the Grafana instance | `bool` | `true` | no |
-| deterministic_outbound_ip_enabled | Whether to enable deterministic outbound IPs for the Grafana instance | `bool` | `false` | no |
-| public_network_access_enabled | Whether to enable public network access for the Grafana instance | `bool` | `true` | no |
-| zone_redundancy_enabled | Whether to enable zone redundancy for the Grafana instance | `bool` | `true` | no |
-| grafana_major_version | The major version of Grafana to use (must be "9" or "10") | `string` | `"9"` | no |
-| auto_generated_domain_name_label_scope | The scope for the auto-generated domain name label | `string` | `"TenantReuse"` | no |
+| ---- | ----------- | ---- | ------- | :------: |
+| location | The Azure region where the Grafana instance will be created | `string` | n/a | yes |
+| resource_group_name | The name of the resource group where the Grafana instance will be created | `string` | n/a | yes |
 | admin_group_object_ids | List of Microsoft Entra group Object IDs that will have the Grafana Admin role | `list(string)` | `[]` | no |
 | admin_user_object_ids | List of Microsoft Entra user Object IDs that will have the Grafana Admin role | `list(string)` | `[]` | no |
-| tags | Tags to apply to all resources | `map(string)` | `{}` | no |
+| api_key_enabled | Whether to enable API key authentication for the Grafana instance | `bool` | `true` | no |
+| auto_generated_domain_name_label_scope | The scope for the auto-generated domain name label | `string` | `"TenantReuse"` | no |
+| create | Whether to create resources in this module | `bool` | `true` | no |
+| deterministic_outbound_ip_enabled | Whether to enable deterministic outbound IPs for the Grafana instance | `bool` | `false` | no |
+| environment | Environment name for resource naming (dev, test, staging, prod, ops) | `string` | `"dev"` | no |
+| grafana_major_version | The major version of Grafana to use | `string` | `"10"` | no |
+| name | The name of the Azure Managed Grafana instance. If null, a name should be provided by Terragrunt using the naming module. | `string` | `null` | no |
+| workload | Workload name for resource names | `string` | `"platform"` | no |
+| prometheus_workspace_id | The resource ID of the Azure Monitor workspace to integrate with Grafana | `string` | `null` | no |
+| public_network_access_enabled | Whether to enable public network access for the Grafana instance | `bool` | `true` | no |
+| region_abbv | Abbreviation for Azure region (used in resource naming) | `string` | `"eus"` | no |
+| tags | A mapping of tags to assign to the resource | `map(string)` | `{}` | no |
+| zone_redundancy_enabled | Whether to enable zone redundancy for the Grafana instance | `bool` | `true` | no |
 
 ## Outputs
 
 | Name | Description |
-|------|-------------|
-| id | The ID of the Azure Managed Grafana instance |
-| name | The name of the Azure Managed Grafana instance |
-| resource_group_name | The name of the resource group where the Grafana instance is deployed |
+| ---- | ----------- |
+| create | Whether resources were created |
 | endpoint | The endpoint URL of the Azure Managed Grafana instance |
 | grafana_version | The version of Grafana being used |
+| id | The ID of the Azure Managed Grafana instance |
 | identity | The identity of the Azure Managed Grafana instance |
-
-## Module Resources
-
-This module creates the following resources:
-- Azure Managed Grafana instance
-- Microsoft Entra ID (Azure AD) role assignments (when configured)
+| name | The name of the Azure Managed Grafana instance |
+| resource_group_name | The name of the resource group where the Grafana instance is deployed |
+<!-- END_TF_DOCS -->
 
 ## Dependencies
 
-This module can depend on:
-- [resource_group](../resource_group) - For resource group creation
-- [monitor_workspace](../monitor_workspace) - For Prometheus integration
-
-## Microsoft Entra ID Integration
-
-Azure Managed Grafana uses Microsoft Entra ID for authentication and authorization. This module allows you to configure:
-
-1. **Admin Groups**: Microsoft Entra ID groups that will have administrator privileges in Grafana
-2. **Admin Users**: Microsoft Entra ID users that will have administrator privileges in Grafana
-
-The module automatically assigns the appropriate roles using the provided Object IDs.
-
-## Azure Monitor Integration
-
-Azure Managed Grafana can be integrated with Azure Monitor workspaces to visualize metrics from:
-
-- Azure Monitor metrics
-- Azure Monitor Log Analytics
-- Azure Monitor Prometheus
-
-This integration enables native querying of these data sources without additional configuration.
+- [naming](../naming) — Provides standardized resource names
+- [resource_group](../resource_group) — Provides the resource group to deploy into
+- [monitor_workspace](../monitor_workspace) — Provides the Prometheus workspace ID for metrics integration
 
 ## Notes
 
-- Azure Managed Grafana is a managed service, so you do not need to manage the underlying infrastructure
-- For high availability in production, enable zone redundancy
-- API keys should be disabled in production environments for enhanced security
-- When integrating with Azure Monitor, ensure the Grafana instance has the appropriate permissions
-- The Grafana major version determines which features are available
-- The endpoint URL is used to access the Grafana dashboard
-- Consider using private endpoints for enhanced security in production environments
-
-## License
-
-This module is licensed under the MIT License. 
+- Uses a system-assigned managed identity; ensure it has `Monitoring Reader` on connected Monitor Workspaces.
+- Disable API keys in production (`api_key_enabled = false`).
+- Enable zone redundancy in production for high availability.

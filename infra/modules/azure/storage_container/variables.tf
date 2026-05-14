@@ -1,8 +1,14 @@
 /**
- * This module allows the management of containers within an Azure Storage Account. 
+ * This module allows the management of containers within an Azure Storage Account.
  * It supports creating multiple containers with different access types and metadata.
  * It's designed to decouple container management from storage account lifecycle.
  */
+
+variable "create" {
+  description = "Whether to create resources in this module"
+  type        = bool
+  default     = true
+}
 
 variable "storage_account_id" {
   description = "ID of the Azure Storage Account where containers will be created"

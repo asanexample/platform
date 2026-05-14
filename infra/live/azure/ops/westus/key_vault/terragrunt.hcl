@@ -1,33 +1,11 @@
-# Terragrunt configuration for Azure Key Vault in eastus region
+# Terragrunt configuration for Azure Key Vault in westus region
 
-# Local variables for this configuration
+include "base" {
+  path   = find_in_parent_folders("azure/_base.hcl")
+  expose = true
+}
+
 locals {
-  # Load hierarchical variables
-  env_vars     = read_terragrunt_config(find_in_parent_folders("env.hcl"))
-  region_vars  = read_terragrunt_config(find_in_parent_folders("region.hcl"))
-  network_vars = read_terragrunt_config(find_in_parent_folders("network.hcl"))
-  common_vars  = read_terragrunt_config(find_in_parent_folders("common.hcl"))
-  
-  # Merge all variables for convenience
-  all_vars = merge(
-    local.env_vars.locals,
-    local.region_vars.locals,
-    local.network_vars.locals,
-    local.common_vars.locals
-  )
-  
-  # Extract commonly used variables
-  env         = local.env_vars.locals.environment
-  prefix      = local.common_vars.locals.prefix
-  customer    = local.common_vars.locals.customer
-  region      = local.region_vars.locals.region
-  region_abbv = local.region_vars.locals.region_abbv
-  tags        = merge(
-    local.common_vars.locals.tags, 
-    local.env_vars.locals.env_tags,
-    local.region_vars.locals.region_tags
-  )
-  
   # Network rules
   network_acls = {
     bypass                     = "AzureServices"
@@ -60,7 +38,7 @@ dependency "resource_group" {
   config_path = "../resource_group"
   mock_outputs = {
     name = "mock-rg"
-    location = local.region
+    location = include.base.locals.region
   }
 }
 
@@ -75,16 +53,17 @@ dependency "networking" {
 
 # Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
+  create = true
+
   # Environment variables
-  environment = local.env
-  customer = local.customer
-  prefix = local.prefix
-  region_abbv = local.region_abbv
-  
+  environment = include.base.locals.env
+  workload = include.base.locals.workload
+  region_abbv = include.base.locals.region_abbv
+
   # Resource details
   location            = dependency.resource_group.outputs.location
   resource_group_name = dependency.resource_group.outputs.name
-  
+
   # Key vault name from naming module
   name = "${dependency.naming.outputs.key_vault}-1"
 
@@ -113,5 +92,5 @@ inputs = {
   }
 
   # Tags
-  tags = local.tags
-} 
+  tags = include.base.locals.tags
+}

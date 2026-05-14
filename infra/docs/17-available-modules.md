@@ -6,6 +6,8 @@ The VIP Platform includes a collection of reusable Terraform modules for deployi
 
 ## Azure Modules
 
+All 19 resource-creating Azure modules implement the `create` toggle pattern (`variable "create" { type = bool, default = true }`). Setting `create = false` disables all resource creation in the module and returns safe null/empty defaults from outputs. The two data-source-only modules (`client_config`, `naming`) do not need this toggle.
+
 The following modules are currently implemented for Azure:
 
 ### Azure Networking Module
@@ -30,7 +32,7 @@ module "networking" {
   resource_group_name = azurerm_resource_group.example.name
   location            = azurerm_resource_group.example.location
   
-  name          = "vip-vnet-dev-eus-main"
+  name          = "vnet-platform-dev-eus-main"
   address_space = ["10.0.0.0/16"]
   
   subnets = {
@@ -77,7 +79,7 @@ module "storage" {
   resource_group_name = azurerm_resource_group.example.name
   location            = azurerm_resource_group.example.location
   
-  name                     = "vipstdeveus001"
+  name                     = "platformstdeveus001"
   account_tier             = "Standard"
   account_replication_type = "LRS"
   
@@ -115,7 +117,7 @@ module "key_vault" {
   resource_group_name = azurerm_resource_group.example.name
   location            = azurerm_resource_group.example.location
   
-  name            = "vip-kv-dev-eus-001"
+  name            = "kv-platform-dev-eus-001"
   sku_name        = "standard"
   
   network_acls = {
@@ -155,8 +157,8 @@ module "aks_core" {
   resource_group_name = azurerm_resource_group.example.name
   location            = azurerm_resource_group.example.location
   
-  name                = "vip-aks-dev-eus-001"
-  dns_prefix          = "vip-aks-dev"
+  name                = "aks-platform-dev-eus-001"
+  dns_prefix          = "aks-platform-dev"
   kubernetes_version  = "1.29"
   
   default_node_pool = {
@@ -248,7 +250,7 @@ The Azure Resource Group module creates and configures resource groups:
 module "resource_group" {
   source = "../../modules/azure/resource_group"
   
-  name     = "vip-rg-dev-eus-networking"
+  name     = "rg-platform-dev-eus-networking"
   location = "eastus"
   
   lock_level = "CanNotDelete"  # Only for production
@@ -277,7 +279,7 @@ The Azure Naming module provides standardized resource naming conventions:
 module "naming" {
   source = "../../modules/azure/naming"
   
-  prefix      = "vip"
+  workload    = "platform"
   environment = "dev"
   region      = "eastus"
   instance    = "001"
@@ -768,17 +770,178 @@ module "frontdoor_private_link" {
 }
 ```
 
+### Azure Stack Base Module (Composite)
+
+**Location**: `/infra/modules/azure/stack_base`
+
+The Azure Stack Base module is a composite module that wires together `resource_group`, `networking`, and `key_vault` into a single deployable unit. It does not create resources directly -- it delegates to its child modules and threads configuration through:
+
+- Resource group creation with standard naming and tagging
+- Virtual network with configurable subnets and optional AKS networking
+- Optional Key Vault provisioned alongside the core infrastructure
+- Cross-cloud interface outputs (`network_id`, `network_name`, `subnet_ids`, `kubernetes_subnet_id`)
+- Full `create` toggle support -- disabling it disables all child modules
+
+**Example Usage**:
+
+```hcl
+module "stack_base" {
+  source = "../../modules/azure/stack_base"
+
+  create      = true
+  name        = "platform-base-dev-eus"
+  location    = "eastus"
+  environment = "dev"
+  workload    = "platform"
+  region_abbv = "eus"
+
+  address_space = ["10.0.0.0/16"]
+  subnets = {
+    "nodes" = {
+      address_prefixes = ["10.0.0.0/22"]
+    }
+    "endpoints" = {
+      address_prefixes  = ["10.0.4.0/24"]
+      service_endpoints = ["Microsoft.KeyVault"]
+    }
+  }
+
+  enable_aks_networking = true
+  aks_subnet_name      = "nodes"
+  aks_cluster_name     = "aks-dev-eus-001"
+
+  enable_key_vault = true
+  key_vault_sku    = "standard"
+
+  tags = {
+    Environment = "dev"
+    ManagedBy   = "Terraform"
+  }
+}
+```
+
 ## AWS Modules
 
-AWS modules are planned for future implementation phases. This section will be updated once AWS modules are available.
+### AWS Networking Module
+
+**Location**: `/infra/modules/aws/networking`
+
+The AWS Networking module creates the core networking components for an AWS environment:
+
+- VPC with configurable CIDR blocks and DNS support
+- Public and private subnets across availability zones
+- Internet Gateway for public subnet routing
+- NAT Gateways for private subnet outbound access
+- Public and private route tables with proper associations
+- Optional EKS-specific networking (security groups, subnet tags)
+- Cross-cloud interface outputs (`network_id`, `network_name`, `subnet_ids`, `kubernetes_subnet_id`, `create`)
+
+**Example Usage**:
+
+```hcl
+module "networking" {
+  source = "../../modules/aws/networking"
+
+  create      = true
+  vpc_name    = "vpc-platform-dev-use1"
+  environment = "dev"
+  workload    = "platform"
+  region_abbv = "use1"
+
+  address_space = ["10.0.0.0/16"]
+
+  subnets = {
+    "public-az1" = {
+      address_prefixes  = ["10.0.0.0/24"]
+      availability_zone = "us-east-1a"
+      public            = true
+    }
+    "private-kubernetes" = {
+      address_prefixes  = ["10.0.10.0/22"]
+      availability_zone = "us-east-1a"
+    }
+  }
+
+  enable_eks_networking = true
+  eks_cluster_name      = "eks-dev-use1-001"
+
+  tags = {
+    Environment = "dev"
+    ManagedBy   = "Terraform"
+  }
+}
+```
 
 ## GCP Modules
 
-GCP modules are planned for future implementation phases. This section will be updated once GCP modules are available.
+### GCP Networking Module
 
-## Common Modules
+**Location**: `/infra/modules/gcp/networking`
 
-Common cross-cloud abstraction modules are planned for future implementation phases. This section will be updated once common modules are available.
+The GCP Networking module creates the core networking components for a Google Cloud environment:
+
+- VPC network with auto-created subnets disabled for full control
+- Regional subnets with configurable CIDR ranges
+- Secondary IP ranges for GKE pods and services
+- Cloud Router and Cloud NAT for outbound internet access (optional)
+- Firewall rules for internal communication and health checks
+- Optional GKE-specific networking configuration
+- Cross-cloud interface outputs (`network_id`, `network_name`, `subnet_ids`, `kubernetes_subnet_id`, `create`)
+
+**Example Usage**:
+
+```hcl
+module "networking" {
+  source = "../../modules/gcp/networking"
+
+  create       = true
+  project_id   = "platform-dev"
+  network_name = "vpc-platform-dev-usc1"
+  environment  = "dev"
+  workload     = "platform"
+  region_abbv  = "usc1"
+
+  address_space = ["10.0.0.0/16"]
+
+  subnets = {
+    "nodes" = {
+      address_prefixes = ["10.0.0.0/22"]
+      region           = "us-central1"
+    }
+    "endpoints" = {
+      address_prefixes = ["10.0.4.0/24"]
+      region           = "us-central1"
+    }
+  }
+
+  enable_gke_networking = true
+  gke_cluster_name      = "gke-dev-usc1-001"
+  gke_pod_cidr          = "10.1.0.0/16"
+  gke_service_cidr      = "10.2.0.0/20"
+
+  enable_cloud_nat = true
+
+  labels = {
+    environment = "dev"
+    managed_by  = "terraform"
+  }
+}
+```
+
+## Cross-Cloud Feature Parity
+
+Rather than separate abstraction modules, the platform achieves cross-cloud compatibility through a shared output interface on per-cloud modules. The table below summarizes the current state of networking modules across clouds:
+
+| Capability                  | Azure              | AWS                | GCP                |
+|-----------------------------|--------------------|--------------------|------------------  |
+| VPC / VNet creation         | Implemented        | Implemented        | Implemented        |
+| Subnet management           | Implemented        | Implemented        | Implemented        |
+| Internet gateway / routing  | Implemented        | Implemented        | Implemented        |
+| NAT gateway                 | Implemented        | Implemented        | Implemented (Cloud NAT) |
+| Kubernetes networking       | Implemented (AKS)  | Implemented (EKS)  | Implemented (GKE)  |
+| Cross-cloud interface outputs | Implemented      | Implemented        | Implemented        |
+| `create` toggle             | Implemented        | Implemented        | Implemented        |
+| Composite stacks            | Implemented (`stack_base`) | Planned     | Planned            |
 
 ## Module Usage Guidelines
 

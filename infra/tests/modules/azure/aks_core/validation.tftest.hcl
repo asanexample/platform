@@ -18,12 +18,12 @@ provider "azurerm" {
   resource_provider_registrations = "none"
 }
 
-# Test prefix validation
-run "prefix_validation_test" {
+# Test workload validation
+run "workload_validation_test" {
   command = plan
 
   variables {
-    prefix              = "centric"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "weu"
     resource_group_name = "test-rg"
@@ -77,8 +77,8 @@ run "prefix_validation_test" {
   }
 
   assert {
-    condition     = var.prefix == "centric"
-    error_message = "Prefix should be valid with proper format"
+    condition     = var.workload == "platform"
+    error_message = "Workload should be valid with proper format"
   }
 }
 
@@ -87,7 +87,7 @@ run "environment_validation_test" {
   command = plan
 
   variables {
-    prefix              = "centric"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "weu"
     resource_group_name = "test-rg"
@@ -151,7 +151,7 @@ run "region_abbv_validation_test" {
   command = plan
 
   variables {
-    prefix              = "centric"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "weu"
     resource_group_name = "test-rg"
@@ -215,7 +215,7 @@ run "name_validation_test" {
   command = plan
 
   variables {
-    prefix              = "centric"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "weu"
     name                = "test-aks-cluster"
@@ -280,7 +280,7 @@ run "resource_group_validation_test" {
   command = plan
 
   variables {
-    prefix              = "centric"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "weu"
     resource_group_name = "test-resource-group"
@@ -344,7 +344,7 @@ run "location_validation_test" {
   command = plan
 
   variables {
-    prefix              = "centric"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "weu"
     resource_group_name = "test-rg"
@@ -408,7 +408,7 @@ run "dns_prefix_validation_test" {
   command = plan
 
   variables {
-    prefix              = "centric"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "weu"
     resource_group_name = "test-rg"
@@ -473,7 +473,7 @@ run "kubernetes_version_validation_test" {
   command = plan
 
   variables {
-    prefix              = "centric"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "weu"
     resource_group_name = "test-rg"
@@ -537,7 +537,7 @@ run "automatic_channel_upgrade_validation_test" {
   command = plan
 
   variables {
-    prefix                    = "centric"
+    workload                  = "platform"
     environment               = "dev"
     region_abbv               = "weu"
     resource_group_name       = "test-rg"
@@ -602,7 +602,7 @@ run "sku_tier_validation_test" {
   command = plan
 
   variables {
-    prefix              = "centric"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "weu"
     resource_group_name = "test-rg"
@@ -666,7 +666,7 @@ run "identity_features_validation_test" {
   command = plan
 
   variables {
-    prefix                  = "centric"
+    workload                = "platform"
     environment             = "dev"
     region_abbv             = "weu"
     resource_group_name     = "test-rg"
@@ -728,7 +728,7 @@ run "authorized_ip_ranges_validation_test" {
   command = plan
 
   variables {
-    prefix              = "centric"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "weu"
     resource_group_name = "test-rg"
@@ -793,7 +793,7 @@ run "default_nodepool_validation_test" {
   command = plan
 
   variables {
-    prefix              = "centric"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "weu"
     resource_group_name = "test-rg"
@@ -859,7 +859,7 @@ run "network_config_validation_test" {
   command = plan
 
   variables {
-    prefix              = "centric"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "weu"
     resource_group_name = "test-rg"
@@ -921,7 +921,7 @@ run "monitoring_integration_validation_test" {
   command = plan
 
   variables {
-    prefix              = "centric"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "weu"
     resource_group_name = "test-rg"
@@ -988,7 +988,7 @@ run "tags_validation_test" {
   command = plan
 
   variables {
-    prefix              = "centric"
+    workload            = "platform"
     environment         = "dev"
     region_abbv         = "weu"
     resource_group_name = "test-rg"

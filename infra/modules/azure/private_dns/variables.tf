@@ -1,3 +1,9 @@
+variable "create" {
+  description = "Whether to create resources in this module"
+  type        = bool
+  default     = true
+}
+
 variable "resource_group_name" {
   description = "The name of the resource group in which to create the private DNS zones"
   type        = string

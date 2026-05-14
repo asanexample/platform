@@ -120,14 +120,58 @@ Template files can include the following placeholder variables:
 
 ## What Gets Scaffolded
 
-The scaffolding process:
+At minimum, a new region requires three things inside its directory:
+
+1. **`region.hcl`** -- region name and abbreviation
+2. **`network.hcl`** -- CIDR blocks and subnet allocations
+3. **Module directories** with `terragrunt.hcl` files that include `_base.hcl`
+
+The scaffolding tool creates all of these automatically. The full list of generated artifacts:
 
 1. Creates the target region directory with the appropriate structure
 2. Generates `region.hcl` with the correct region name and abbreviation
-3. Creates or reuses `env.hcl` for environment-specific configuration
+3. Creates or reuses `env.hcl` for environment-specific configuration (via symlink to `common.hcl`)
 4. Generates `network.hcl` with appropriate CIDR blocks and subnet allocations
-5. Creates module directories with terragrunt.hcl files that include proper dependencies and inputs
+5. Creates module directories with `terragrunt.hcl` files that include proper dependencies and inputs
 6. Generates a README.md file with information about the modules and deployment order
+
+### How `_base.hcl` Is Inherited
+
+Every generated module `terragrunt.hcl` includes the cloud's `_base.hcl`:
+
+```hcl
+include "base" {
+  path   = find_in_parent_folders("azure/_base.hcl")
+  expose = true
+}
+```
+
+Because `_base.hcl` uses `find_in_parent_folders()` to locate `env.hcl`, `region.hcl`, `network.hcl`, `common.hcl`, and `_versions.hcl`, all of these are resolved automatically from the new region's position in the directory tree. No manual wiring is required.
+
+### Config Hierarchy for a Scaffolded Region
+
+When a new region is scaffolded, the following configuration files are resolved by `_base.hcl`:
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `common.hcl` | `infra/live/{cloud}/common.hcl` | Cloud-wide defaults, subscription map |
+| `_versions.hcl` | `infra/live/{cloud}/_versions.hcl` | Module source paths and Helm chart version pins |
+| `env.hcl` | `infra/live/{cloud}/{env}/env.hcl` (symlink to `common.hcl`) | Environment config (subscription, tags) |
+| `region.hcl` | `infra/live/{cloud}/{env}/{region}/region.hcl` | Region name and abbreviation |
+| `network.hcl` | `infra/live/{cloud}/{env}/{region}/network.hcl` | CIDR blocks and subnet allocations |
+
+### Safety Validations Kick In Automatically
+
+Once a region is scaffolded, the safety validations in `_base.hcl` apply immediately to every module in that region:
+
+- **Path-environment check**: verifies the directory path matches the configured environment in `env.hcl`
+- **Subscription mapping check**: verifies `subscription_id` in `env.hcl` matches `environment_subscription_map` in `common.hcl`
+
+These assertions fire at Terragrunt parse time. If a region directory is placed under the wrong environment or inherits a mismatched `env.hcl`, the error is caught before any plan or apply runs.
+
+### Multi-Cloud Scaffolding
+
+AWS (`infra/live/aws/`) and GCP (`infra/live/gcp/`) follow the same structural pattern as Azure: each cloud has its own `_base.hcl`, `common.hcl`, and environment/region directories. Scaffolding a region for any cloud produces the same set of files (`region.hcl`, `network.hcl`, module directories), and the cloud's `_base.hcl` resolves the hierarchy identically.
 
 ## After Scaffolding
 

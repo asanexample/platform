@@ -7,14 +7,14 @@ This repository contains infrastructure-as-code for a multi-cloud platform using
 The project is currently in active development with the following status:
 
 - **Azure Implementation**: 
-  - Core modules implemented (networking, storage, AKS, Key Vault, identity)
-  - Monitoring modules implemented (Log Analytics, Monitor Workspace, Prometheus DCR)
-  - Frontend modules implemented (Front Door Profile, Endpoint, Private Link)
-  - Container Registry and related services implemented
-- **AWS Implementation**: Planned for future phases
-- **GCP Implementation**: Planned for future phases
+  - 21 modules implemented (networking, storage, AKS, Key Vault, identity, monitoring, Front Door, DNS)
+  - Composite stack module (`stack_base`) for single-unit base infrastructure deployment
+  - All resource-creating modules support `create` toggle for selective deployment
+- **AWS Implementation**: Networking module implemented with cross-cloud interface
+- **GCP Implementation**: Networking module implemented with cross-cloud interface
+- **Cross-Cloud Interface**: Shared output contract (`network_id`, `subnet_ids`, `kubernetes_subnet_id`) across all clouds
 - **Development Environment**: Implemented for Azure in East US region
-- **Operations Environment**: Implemented for Azure in West US region
+- **Operations Environment**: Implemented for Azure in West US region, AWS in US East 1, GCP in US East 1
 - **Production Environment**: Planned for future phases
 
 The implementation is following the phased approach defined in [IMPLEMENTATION.md](IMPLEMENTATION.md).
@@ -31,7 +31,16 @@ platform/
 │   │   ├── ...                        # Additional documentation
 │   │   └── README.md                  # Documentation index
 │   ├── live/                # Live infrastructure code (Terragrunt)
-│   │   └── azure/           # Azure-specific configurations
+│   │   ├── aws/             # AWS configurations
+│   │   │   ├── _base.hcl    # Shared base config (same pattern as Azure)
+│   │   │   ├── _versions.hcl # Module sources and version pins
+│   │   │   └── ops/us-east-1/ # Operations environment
+│   │   ├── gcp/             # GCP configurations
+│   │   │   ├── _base.hcl    # Shared base config
+│   │   │   └── ops/us-east1/  # Operations environment
+│   │   └── azure/           # Azure configurations
+│   │       ├── _base.hcl    # Shared base config (eliminates boilerplate)
+│   │       ├── _versions.hcl # Centralized module sources and Helm version pins
 │   │       ├── _envcommon/  # Common configurations across environments
 │   │       ├── dev/         # Development environment
 │   │       │   └── eastus/  # East US region
@@ -75,7 +84,14 @@ platform/
 │   │               ├── storage/              # Storage accounts and containers
 │   │               └── storage_roles/        # Storage account RBAC
 │   ├── modules/             # Reusable Terraform modules
-│   │   └── azure/           # Azure-specific modules
+│   │   ├── aws/             # AWS modules
+│   │   │   └── networking/  # VPC, subnets, IGW, NAT, route tables
+│   │   ├── gcp/             # GCP modules
+│   │   │   └── networking/  # VPC, subnets, Cloud Router, Cloud NAT
+│   │   ├── cilium/          # Cloud-agnostic Cilium CNI (Helm)
+│   │   ├── argocd/          # Cloud-agnostic ArgoCD (Helm)
+│   │   ├── argocd-bootstrap/ # ArgoCD bootstrap apps
+│   │   └── azure/           # Azure modules
 │   │       ├── aks_core/              # Azure AKS core cluster module
 │   │       ├── aks_identity/          # Azure AKS identity module
 │   │       ├── aks_node_pools/        # Azure AKS node pools module
@@ -95,6 +111,7 @@ platform/
 │   │       ├── prometheus_dcr/        # Prometheus data collection rule module
 │   │       ├── resource_group/        # Azure resource group module
 │   │       ├── storage_account/       # Azure storage account module
+│   │       ├── stack_base/            # Composite: resource_group + networking + key_vault
 │   │       ├── storage_container/     # Azure container module
 │   │       └── storage_roles/         # Storage account RBAC module
 │   ├── terragrunt.hcl       # Root Terragrunt configuration
@@ -110,17 +127,20 @@ platform/
 
 ## Features
 
-- **Hierarchical CIDR Allocation**: Well-structured address space organization (see [CIDR Allocation Strategy](infra/docs/06-cidr-allocation.md))
+- **Multi-Cloud Architecture**: AWS, Azure, and GCP with cross-cloud interface contract for cloud-agnostic downstream modules
+- **Hierarchical CIDR Allocation**: Well-structured address space organization across all clouds (see [CIDR Allocation Strategy](infra/docs/06-cidr-allocation.md))
 - **Multi-Environment Support**: Configurable for development, operations, and production environments
-- **Multi-Region Deployment**: Support for deploying to multiple Azure regions (East US, West US)
-- **Terragrunt Integration**: DRY approach using Terragrunt to manage common configurations
+- **Multi-Region Deployment**: Support for deploying to multiple regions per cloud provider
+- **DRY Terragrunt Configuration**: Shared `_base.hcl` eliminates boilerplate; `_versions.hcl` centralizes module sources and Helm chart version pins
+- **Environment Safety Validations**: Automatic path-env consistency checks and subscription/account mapping verification prevent cross-environment deployment accidents
+- **Universal Create Toggles**: Every resource-creating module supports `create = true/false` for selective deployment without config removal
+- **Composite Module Pattern**: Stack modules (e.g., `stack_base`) compose multiple modules into single deployable units
 - **Comprehensive Testing**: Modules include automated tests in a dedicated tests directory
-- **Security Best Practices**: Implementation of Azure security recommendations including private endpoints
+- **Security Best Practices**: Private endpoints, RBAC, network isolation, and AKS workload identity
 - **Standardized Naming**: Consistent resource naming across all environments via a dedicated naming module
-- **AKS Cluster Support**: Kubernetes cluster deployment with node pools and workload identity
+- **AKS Cluster Support**: Kubernetes cluster deployment with Cilium CNI, node pools, and workload identity
 - **Monitoring & Observability**: Integrated monitoring with Log Analytics, Prometheus, and Grafana
 - **Front Door Integration**: Global content delivery and security with Azure Front Door
-- **Private Network Topology**: Private networking with private endpoints for enhanced security
 - **Standardized Documentation**: Comprehensive documentation with standardized templates
 
 ## Core Modules
@@ -172,6 +192,23 @@ The platform includes the following core modules:
    - Configures private DNS zones for internal name resolution
    - Integrates with virtual networks for resolution within VNets
    - Supports private endpoints for Azure PaaS services
+
+10. **Azure Base Stack (Composite)**
+    - Composes resource_group + networking + key_vault into a single deployable unit
+    - Demonstrates the composite module pattern for multi-module stacks
+
+11. **AWS Networking Module**
+    - VPC, subnets, Internet Gateway, NAT Gateway, route tables
+    - Cross-cloud interface outputs matching Azure networking module
+
+12. **GCP Networking Module**
+    - VPC, subnets, Cloud Router, Cloud NAT, firewall rules
+    - Cross-cloud interface outputs matching Azure and AWS networking modules
+
+13. **Cloud-Agnostic Modules**
+    - **Cilium**: CNI deployment via Helm (works with AKS, EKS, GKE)
+    - **ArgoCD**: GitOps deployment via Helm
+    - **ArgoCD Bootstrap**: Bootstrap applications (cert-manager, external-dns, external-secrets)
 
 ## Getting Started
 

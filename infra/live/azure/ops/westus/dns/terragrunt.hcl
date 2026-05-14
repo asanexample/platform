@@ -1,28 +1,12 @@
 # Terragrunt configuration for Azure Private DNS Zones
 
-# Local variables for this configuration
-locals {
-  # Load env, region, and common configuration
-  env_vars    = read_terragrunt_config(find_in_parent_folders("env.hcl"))
-  region_vars = read_terragrunt_config(find_in_parent_folders("region.hcl"))
-  common_vars = read_terragrunt_config(find_in_parent_folders("common.hcl"))
-
-  # Merge all variables for convenience
-  merged = merge(
-    local.env_vars.locals,
-    local.region_vars.locals,
-    local.common_vars.locals,
-  )
-
-  # Extract commonly used variables
-  env      = local.merged.env
-  prefix   = local.merged.prefix
-  region   = local.merged.region
-  tags     = local.merged.tags
+include "base" {
+  path   = find_in_parent_folders("azure/_base.hcl")
+  expose = true
 }
 
 # Include the root terragrunt.hcl configuration
-include {
+include "root" {
   path = find_in_parent_folders()
 }
 
@@ -56,31 +40,33 @@ terraform {
 }
 
 inputs = {
+  create = true
+
   resource_group_name = dependency.resource_group.outputs.name
-  
+
   private_dns_zones = {
     blob = {
       name                      = "privatelink.blob.core.windows.net"
       vnet_id                   = dependency.networking.outputs.vnet_id
       vnet_resource_group_name  = dependency.resource_group.outputs.name
       registration_enabled      = false
-      virtual_network_link_name = "${local.prefix}-blob-link"
+      virtual_network_link_name = "${include.base.locals.workload}-blob-link"
     },
     file = {
       name                      = "privatelink.file.core.windows.net"
       vnet_id                   = dependency.networking.outputs.vnet_id
       vnet_resource_group_name  = dependency.resource_group.outputs.name
       registration_enabled      = false
-      virtual_network_link_name = "${local.prefix}-file-link"
+      virtual_network_link_name = "${include.base.locals.workload}-file-link"
     },
     vault = {
       name                      = "privatelink.vaultcore.azure.net"
       vnet_id                   = dependency.networking.outputs.vnet_id
       vnet_resource_group_name  = dependency.resource_group.outputs.name
       registration_enabled      = false
-      virtual_network_link_name = "${local.prefix}-vault-link"
+      virtual_network_link_name = "${include.base.locals.workload}-vault-link"
     }
   }
-  
-  tags = local.tags
-} 
+
+  tags = include.base.locals.tags
+}

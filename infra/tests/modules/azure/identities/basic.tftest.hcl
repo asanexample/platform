@@ -20,8 +20,7 @@ run "basic_identity_creation" {
   command = plan
 
   variables {
-    prefix               = "centric"
-    customer             = "centric"
+    workload             = "platform"
     environment          = "dev"
     region_abbv          = "weu"
     resource_group_name  = "test-rg"
@@ -46,8 +45,8 @@ run "basic_identity_creation" {
   
   # Check that the AKS identity has the correct name format
   assert {
-    condition     = azurerm_user_assigned_identity.aks_identity[0].name == "centric-dev-aksid-weu"
-    error_message = "AKS identity name should follow the pattern from the naming module"
+    condition     = azurerm_user_assigned_identity.aks_identity[0].name == "aksid-platform-dev-weu"
+    error_message = "AKS identity name should follow CAF pattern: aksid-{workload}-{env}-{region}"
   }
 
   # Check that the identity has the correct tags (including the name tag added by the module)
@@ -74,8 +73,7 @@ run "workload_identity_enabled_test" {
   command = plan
 
   variables {
-    prefix                   = "centric"
-    customer                 = "centric"
+    workload                 = "platform"
     environment              = "dev"
     region_abbv              = "weu"
     resource_group_name      = "test-rg"

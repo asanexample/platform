@@ -1,31 +1,8 @@
-# Terragrunt configuration for Azure AKS Node Pools in eastus region
+# Terragrunt configuration for Azure AKS Node Pools in westus region
 
-# Local variables for this configuration
-locals {
-  # Load hierarchical variables
-  env_vars     = read_terragrunt_config(find_in_parent_folders("env.hcl"))
-  region_vars  = read_terragrunt_config(find_in_parent_folders("region.hcl"))
-  network_vars = read_terragrunt_config(find_in_parent_folders("network.hcl"))
-  common_vars  = read_terragrunt_config(find_in_parent_folders("common.hcl"))
-  
-  # Merge all variables for convenience
-  all_vars = merge(
-    local.env_vars.locals,
-    local.region_vars.locals,
-    local.network_vars.locals,
-    local.common_vars.locals
-  )
-  
-  # Extract commonly used variables
-  env         = local.env_vars.locals.environment
-  prefix      = local.common_vars.locals.prefix
-  region      = local.region_vars.locals.region
-  region_abbv = local.region_vars.locals.region_abbv
-  tags        = merge(
-    local.common_vars.locals.tags, 
-    local.env_vars.locals.env_tags,
-    local.region_vars.locals.region_tags
-  )
+include "base" {
+  path   = find_in_parent_folders("azure/_base.hcl")
+  expose = true
 }
 
 # Include the root terragrunt.hcl configuration
@@ -41,7 +18,7 @@ include "aks_node_pools_common" {
 # Set dependencies for this module
 dependency "naming" {
   config_path = "../naming"
-  
+
   # Mock outputs for plan and validation
   mock_outputs = {
     aks_cluster = "mock-aks"
@@ -50,7 +27,7 @@ dependency "naming" {
 
 dependency "aks_core" {
   config_path = "../aks_core"
-  
+
   # Mock outputs for plan and validation
   mock_outputs = {
     name = "mock-aks"
@@ -68,17 +45,19 @@ dependency "aks_identity" {
 
 # Specify inputs specific to this module (these will merge with the common inputs)
 inputs = {
+  create = true
+
   # Environment variables
-  environment = local.env
-  prefix = local.prefix
-  region_abbv = local.region_abbv
-  
+  environment = include.base.locals.env
+  workload = include.base.locals.workload
+  region_abbv = include.base.locals.region_abbv
+
   # Required variables that were missing
   aks_cluster_id = dependency.aks_core.outputs.id
-  
+
   # Disable availability zones for westus region as it doesn't support zones for VMSS
   use_availability_zones = false
-  
+
   # Environment-specific node pool configuration
   app_node_pool = {
     enabled = true
@@ -102,23 +81,23 @@ inputs = {
     }
     node_taints = []
   }
-  
+
   # Direct variable for min_count to ensure it's properly set
   app_node_pool_min_count = 3
-  
+
   # Required for updating certain node pool properties without recreation
   temporary_name_for_rotation = "tempapps"
-  
+
   # Override standard node pool availability zones for this region
   standard_node_pool = {
     availability_zones = ["1", "2", "3"]
     node_count = 3
     min_count = 3
   }
-  
+
   # Tags
-  tags = merge(local.tags, {
+  tags = merge(include.base.locals.tags, {
     "network-cilium-managed-by" = "cilium"
     "cilium-version" = "1.17.2"
   })
-} 
+}

@@ -108,14 +108,14 @@ The following reusable modules are available:
 Resources follow standardized naming patterns using the Azure naming module. This ensures consistency across all resources and compliance with Azure's naming restrictions.
 
 ### General Pattern
-For most resources: `{prefix}-{customer}-{stage}-{resource_type}-{region_abbv}`
+CAF-aligned: `{type}-{workload}-{env}-{region}`
 
-For shared resources (no customer): `{prefix}-{stage}-{resource_type}-{region_abbv}`
+For no-hyphen resources (storage accounts, container registries): `{type}{abbreviated_workload}{env}{region}`
 
 Examples:
-- `vip-contoso-dev-rg-eus` (Customer-specific Azure resource group)
-- `vip-prod-vnet-wus` (Shared Azure virtual network)
-- `vipcontosodevsaeus` (Storage account with special formatting)
+- `rg-platform-dev-eus` (Azure resource group)
+- `vnet-platform-prod-wus` (Azure virtual network)
+- `stplatdeveus` (Storage account, no hyphens, abbreviated workload)
 
 See the [NAMING_CONVENTIONS.md](docs/NAMING_CONVENTIONS.md) document for detailed naming rules and patterns.
 
@@ -124,16 +124,12 @@ See the [NAMING_CONVENTIONS.md](docs/NAMING_CONVENTIONS.md) document for detaile
 All infrastructure modules now use the naming module internally, which enforces standardized naming:
 
 ```hcl
-module "hosting" {
-  source = "../../modules/azure/hosting"
+module "naming" {
+  source = "../../modules/azure/naming"
   
-  # Naming parameters
-  prefix      = "vip"
-  customer    = "contoso"  # Optional
-  stage       = "dev"
+  workload    = "platform"
+  environment = "dev"
   region_abbv = "eus"
-  
-  # Other parameters...
 }
 ```
 

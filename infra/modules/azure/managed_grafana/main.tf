@@ -7,6 +7,7 @@
 
 # Create the Grafana Dashboard
 resource "azurerm_dashboard_grafana" "grafana" {
+  count                         = var.create ? 1 : 0
   # Name will be provided by Terragrunt using the naming module if null
   name                          = var.name
   resource_group_name           = var.resource_group_name
@@ -34,9 +35,9 @@ resource "azurerm_dashboard_grafana" "grafana" {
 
 # Create role assignments for admin groups
 resource "azurerm_role_assignment" "grafana_admin_groups" {
-  for_each = toset(var.admin_group_object_ids)
+  for_each = var.create ? toset(var.admin_group_object_ids) : toset([])
 
-  scope                = azurerm_dashboard_grafana.grafana.id
+  scope                = azurerm_dashboard_grafana.grafana[0].id
   role_definition_name = "Grafana Admin"
   principal_id         = each.value
   principal_type       = "Group"
@@ -44,9 +45,9 @@ resource "azurerm_role_assignment" "grafana_admin_groups" {
 
 # Create role assignments for admin users
 resource "azurerm_role_assignment" "grafana_admin_users" {
-  for_each = toset(var.admin_user_object_ids)
+  for_each = var.create ? toset(var.admin_user_object_ids) : toset([])
 
-  scope                = azurerm_dashboard_grafana.grafana.id
+  scope                = azurerm_dashboard_grafana.grafana[0].id
   role_definition_name = "Grafana Admin"
   principal_id         = each.value
   principal_type       = "User"

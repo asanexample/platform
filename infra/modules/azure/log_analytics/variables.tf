@@ -2,6 +2,12 @@
  * Input variables for the Log Analytics Workspace module
  */
 
+variable "create" {
+  description = "Whether to create resources in this module"
+  type        = bool
+  default     = true
+}
+
 # Required variables
 variable "name" {
   description = "The name of the Log Analytics Workspace. If null, a name should be provided by Terragrunt using the naming module."
@@ -159,20 +165,14 @@ variable "environment" {
   default     = "dev"
 }
 
-variable "prefix" {
-  description = "The prefix to apply to resource names"
+variable "workload" {
+  description = "The workload identifier to apply to resource names"
   type        = string
-  default     = "vip"
+  default     = "platform"
 }
 
 variable "region_abbv" {
   description = "The abbreviated name of the Azure region"
   type        = string
   default     = "eus"
-}
-
-variable "customer" {
-  description = "Customer name (used in resource naming for multi-tenant resources)"
-  type        = string
-  default     = null
 } 

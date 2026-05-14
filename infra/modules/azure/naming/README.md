@@ -1,173 +1,113 @@
-# Azure Resource Naming Module
+# Azure Naming Module
 
-## Description
+Generates standardized Azure resource names following organizational conventions and Azure naming restrictions.
 
-
-This module provides standardized resource naming capabilities for Azure resources based on your organization's conventions and Azure's naming restrictions. It ensures consistent naming across all resources and environments while adhering to Azure's resource-specific naming limitations.
-
-## Features
-
-- Standardized naming patterns for all Azure resources
-- Automatic validation against Azure naming restrictions
-- Truncation of names that exceed maximum allowed lengths
-- Support for special formatting requirements (e.g., storage accounts, container registry)
-- Optional customer parameter for shared/global resources
-- Subnet naming with predefined types
-- Configurable prefix to match your organization's naming standards
-
-## Usage with Terraform
+## Usage
 
 ```hcl
 module "naming" {
-  source      = "../../modules/azure/naming"
-  prefix      = "acme"     # Customize the prefix for your organization
-  customer    = "contoso"
-  stage       = "dev"
-  region_abbv = "wus"
-  # prefix defaults to "vip" if not specified
+  source = "../naming"
+
+  workload    = "platform"
+  environment = "dev"
+  region_abbv = "eus"
 }
-`
-# Then use the outputs to set resource names
-resource "azurerm_resource_group" "example" {
+
+# Reference generated names
+resource "azurerm_resource_group" "this" {
   name     = module.naming.resource_group
-  location = "West US"
-}
-
-resource "azurerm_storage_account" "example" {
-  name                     = module.naming.storage_account
-  resource_group_name      = azurerm_resource_group.example.name
-  location                 = azurerm_resource_group.example.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
-}
-
-# Use predefined subnet types
-resource "azurerm_subnet" "node_pool" {
-  name                 = module.naming.subnet_node
-  resource_group_name  = azurerm_resource_group.example.name
-  virtual_network_name = azurerm_virtual_network.example.name
-  address_prefixes     = ["10.0.1.0/24"]
-}
-
-# Use custom subnet type (by appending to base name)
-resource "azurerm_subnet" "custom" {
-  name                 = "${module.naming.subnet}-custom-${module.naming.region_abbv}"
-  resource_group_name  = azurerm_resource_group.example.name
-  virtual_network_name = azurerm_virtual_network.example.name
-  address_prefixes     = ["10.0.2.0/24"]
+  location = "eastus"
 }
 ```
 
-## Usage with Terragrunt
+## Examples
+
+### Shared (non-customer) resources
 
 ```hcl
-# In _envcommon/naming.hcl
-terraform {
-  source = "${dirname(find_in_parent_folders())}/modules/azure/naming"
-}
+module "naming" {
+  source = "../naming"
 
-inputs = {
-  # Get variables from environment and region configuration
-  prefix      = local.common_vars.locals.prefix         # Your organization's prefix
-  customer    = local.customer_vars.locals.customer
-  stage       = local.environment_vars.locals.environment
-  region_abbv = local.region_vars.locals.region_code
-}
-
-# In a resource configuration file (e.g., networking.hcl)
-dependency "naming" {
-  config_path = "../naming"
-}
-
-inputs = {
-  resource_group_name = dependency.naming.outputs.resource_group
-  vnet_name           = dependency.naming.outputs.virtual_network
-  subnet_names = {
-    app     = dependency.naming.outputs.subnet_app
-    db      = dependency.naming.outputs.subnet_db
-    private = "${dependency.naming.outputs.subnet}-private-${local.region_code}"
-  }
+  workload    = "platform"
+  environment = "ops"
+  region_abbv = "wus"
 }
 ```
+
+<!-- BEGIN_TF_DOCS -->
+
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|----------|
-| prefix | The organization-specific prefix to use for all resources | string | "vip" | no |
-| customer | The customer name to use in resource naming | string | null | no |
-| stage | The environment stage (dev, preprod, prod, test, stg) | string | | yes |
-| region_abbv | The abbreviated Azure region name (e.g., wus, eus, neu) | string | | yes |
-| resource_type | Optional resource type for custom naming | string | null | no |
-| custom_name | Optional custom name to override the generated name | string | null | no |
+| ---- | ----------- | ---- | ------- | :------: |
+| environment | The environment (e.g., dev, preprod, prod, ops). | `string` | n/a | yes |
+| region_abbv | The abbreviated Azure region name (e.g., wus, eus, neu). | `string` | n/a | yes |
+| custom_name | Optional custom name to override the generated name. | `string` | `null` | no |
+| workload | The workload name to use for all resources. Defaults to 'platform' if not specified. | `string` | `"platform"` | no |
+| resource_type | Optional resource type for custom naming. | `string` | `null` | no |
+| unique_seed | Seed for unique naming generation | `string` | `""` | no |
 
 ## Outputs
 
-The module provides standardized names for many Azure resources, including:
+| Name | Description |
+| ---- | ----------- |
+| aks_cluster | Standardized name for an Azure Kubernetes Service cluster. |
+| aks_identity | Standardized name for an AKS managed identity. |
+| aks_node_pool | Standardized name for an AKS node pool. |
+| app_configuration | Standardized name for an App Configuration. |
+| app_service | Standardized name for an App Service. |
+| application_insights | Standardized name for Application Insights. |
+| bastion_host | Standardized name for a Bastion Host. |
+| container_insights | Standardized name for an AKS container insights resource. |
+| container_registry | Standardized name for a Container Registry. |
+| cosmos_account | Standardized name for a Cosmos DB Account. |
+| event_hub | Standardized name for an Event Hub. |
+| event_hub_namespace | Standardized name for an Event Hub Namespace. |
+| federated_identity | Standardized name for a federated identity. |
+| front_door | Standardized name for a Front Door. |
+| frontdoor_endpoint | Standardized name for a Front Door Endpoint. |
+| frontdoor_origin | Standardized name for a Front Door Origin. |
+| frontdoor_origin_group | Standardized name for a Front Door Origin Group. |
+| frontdoor_profile | Standardized name for a Front Door Profile. |
+| frontdoor_route | Standardized name for a Front Door Route. |
+| function_app | Standardized name for a Function App. |
+| grafana | The generated name for the Azure Grafana instance |
+| key_vault | Standardized name for an Azure Key Vault. |
+| load_balancer | Standardized name for a Load Balancer. |
+| log_analytics_workspace | Standardized name for a Log Analytics Workspace. |
+| managed_prometheus | Standardized name for an AKS managed Prometheus resource. |
+| monitor_workspace | The generated name for the Azure Monitor workspace (Prometheus) |
+| names | Map of all generated resource names. |
+| network_security_group | Standardized name for a Network Security Group. |
+| normalized_customer | Normalized customer name for use in resource naming. |
+| private_endpoint | Standardized name for a Private Endpoint. |
+| public_ip | Standardized name for a Public IP. |
+| resource_group | Standardized name for an Azure Resource Group. |
+| resource_types | All resource type abbreviations. |
+| route_table | Standardized name for a Route Table. |
+| sql_database | Standardized name for a SQL Database. |
+| sql_server | Standardized name for a SQL Server. |
+| storage_account | Standardized name for an Azure Storage Account. |
+| subnet | Function to generate standardized subnet names with subnet type parameter. |
+| subnet_api | Standardized name for an API subnet. |
+| subnet_app | Standardized name for an application subnet. |
+| subnet_db | Standardized name for a database subnet. |
+| subnet_endpoint | Standardized name for a private endpoint subnet. |
+| subnet_gateway | Standardized name for a gateway subnet. |
+| subnet_node | Standardized name for a node subnet. |
+| subnet_service | Standardized name for a service subnet. |
+| subnet_with_type | Generate a subnet name with a specific type. |
+| virtual_network | Standardized name for a Virtual Network. |
+| workload_identity | Standardized name for a workload identity. |
+<!-- END_TF_DOCS -->
 
-- `resource_group`
-- `storage_account`
-- `key_vault`
-- `aks_cluster`
-- `virtual_network`
-- `subnet` (base name)
-- `subnet_node`, `subnet_app`, `subnet_api`, `subnet_db`, `subnet_endpoint`, etc.
-- `front_door`
-- `container_registry`
-- `event_hub_namespace`
-- `monitor_workspace`
-- `application_insights`
-- `sql_server`, `sql_database`
-- `cosmos_account`
-- `network_security_group`
-- `bastion_host`
-- `public_ip`
-- ...and many more
+## Dependencies
 
-See the outputs.tf file for the complete list of outputs.
+None -- this is a data-only module that other modules depend on.
 
-## Naming Conventions
+## Notes
 
-This module enforces the following naming pattern for most resources:
-```
-{prefix}-{customer}-{stage}-{resource_type}-{region_abbv}
-```
-
-Where:
-- `prefix` is your organization's prefix (defaults to "vip" if not specified)
-- `customer` is the customer name (lowercase, with special characters removed)
-- `stage` is the environment (dev, preprod, prod)
-- `resource_type` is a short abbreviation for the resource
-- `region_abbv` is the shortened region name (e.g., wus, eus)
-
-For shared resources that aren't customer-specific, the customer part is omitted:
-```
-{prefix}-{stage}-{resource_type}-{region_abbv}
-```
-
-### Special Cases
-
-Some Azure resources have specific naming restrictions:
-
-**Storage Accounts**:
-- 24 character limit
-- No hyphens or special characters allowed
-- Format: `{prefix}{customer}{stage}sa{region_abbv}`
-
-**Container Registry**:
-- No hyphens allowed
-- Format: `{prefix}{customer}{stage}acr{region_abbv}`
-
-## Validation
-
-This module automatically applies the following validations:
-- Name length restrictions for each resource type
-- Removing characters not allowed in specific resources
-- Truncating names that exceed maximum allowed lengths
-
-## Azure Naming Rules
-
-The module integrates Azure's naming rules and limitations, including:
-- Character restrictions for each resource type
-- Length limitations
-- Special formatting requirements 
+- This module has no `create` variable; it is a data-only module that always produces outputs.
+- Storage account and container registry names have special formatting (no hyphens, character limits) handled automatically.
+- When `customer` is omitted, the customer segment is excluded from generated names.

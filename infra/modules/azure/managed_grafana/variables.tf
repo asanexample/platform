@@ -1,8 +1,14 @@
 /**
  * # Input Variables for Azure Managed Grafana Module
- * 
+ *
  * This file defines all the variables used by the Azure Managed Grafana module.
  */
+
+variable "create" {
+  description = "Whether to create resources in this module"
+  type        = bool
+  default     = true
+}
 
 # Required variables
 variable "name" {
@@ -117,10 +123,10 @@ variable "tags" {
 }
 
 # Variables for naming module
-variable "prefix" {
-  description = "Prefix for resource names"
+variable "workload" {
+  description = "Workload identifier for resource names"
   type        = string
-  default     = "centric"
+  default     = "platform"
 }
 
 variable "environment" {
@@ -133,10 +139,4 @@ variable "region_abbv" {
   description = "Abbreviation for Azure region (used in resource naming)"
   type        = string
   default     = "eus"
-}
-
-variable "customer" {
-  description = "Customer name (used in resource naming for multi-tenant resources)"
-  type        = string
-  default     = null
 } 

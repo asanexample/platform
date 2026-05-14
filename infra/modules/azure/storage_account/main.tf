@@ -9,7 +9,7 @@
 locals {
   # Generate storage account name if not provided
   # Azure storage account names must be between 3-24 characters and use only lowercase letters and numbers
-  storage_account_name = var.name != "" ? var.name : "${var.name_components.prefix}${var.name_components.environment}${var.name_components.region_abbv}sa${var.name_components.instance}"
+  storage_account_name = var.name != null ? var.name : "${var.name_components.workload}${var.name_components.environment}${var.name_components.region_abbv}sa${var.name_components.instance}"
 
   # Set private endpoint name if not specified
   # Default format follows naming convention: <storage-account-name>-pe
@@ -33,6 +33,7 @@ locals {
 # Main storage account resource
 # Configures the core storage account with all specified properties
 resource "azurerm_storage_account" "this" {
+  count               = var.create ? 1 : 0
   # Basic properties
   name                = local.storage_account_name
   resource_group_name = var.resource_group_name
@@ -135,10 +136,10 @@ resource "azurerm_storage_account" "this" {
 # This resource automates tiering and deletion of blobs based on configured rules
 resource "azurerm_storage_management_policy" "lifecycle" {
   # Only create lifecycle policy when rules are specified
-  count = length(var.lifecycle_rules) > 0 ? 1 : 0
+  count = var.create && length(var.lifecycle_rules) > 0 ? 1 : 0
 
   # Connect policy to the storage account
-  storage_account_id = azurerm_storage_account.this.id
+  storage_account_id = azurerm_storage_account.this[0].id
 
   # Create a rule for each lifecycle rule in the input variables
   dynamic "rule" {
@@ -175,16 +176,16 @@ resource "azurerm_storage_management_policy" "lifecycle" {
 # Storage containers within the account
 # Optional creation based on the create_containers flag
 resource "azurerm_storage_container" "containers" {
-  for_each              = var.create_containers ? var.containers : {} # Skip if create_containers is false
+  for_each              = var.create && var.create_containers ? var.containers : {} # Skip if create_containers is false or create is false
   name                  = each.value.name                             # Container name
-  storage_account_id    = azurerm_storage_account.this.id             # Parent storage account
+  storage_account_id    = azurerm_storage_account.this[0].id          # Parent storage account
   container_access_type = each.value.container_access_type            # Access level (private, blob, container)
 }
 
 # Private endpoint for the storage account
 # Only created when specified in the private_endpoint variable
 resource "azurerm_private_endpoint" "storage" {
-  count               = var.private_endpoint.create ? 1 : 0 # Only create if requested
+  count               = var.create && var.private_endpoint.create ? 1 : 0 # Only create if requested
   name                = local.private_endpoint_name         # Endpoint name
   location            = var.location                        # Must be in same region as storage
   resource_group_name = var.resource_group_name             # Resource group
@@ -193,7 +194,7 @@ resource "azurerm_private_endpoint" "storage" {
   # Connection to the storage account
   private_service_connection {
     name                           = "${local.private_endpoint_name}-connection" # Connection name
-    private_connection_resource_id = azurerm_storage_account.this.id             # Target resource
+    private_connection_resource_id = azurerm_storage_account.this[0].id           # Target resource
     is_manual_connection           = false                                       # Auto-approved connection
     subresource_names              = var.private_endpoint.subresource_names      # Target subresources (blob, queue, etc)
   }

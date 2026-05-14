@@ -1,3 +1,9 @@
+variable "create" {
+  description = "Whether to create resources in this module"
+  type        = bool
+  default     = true
+}
+
 variable "resource_group_name" {
   description = "Name of the resource group to deploy the virtual network in"
   type        = string

@@ -18,7 +18,7 @@ run "basic_aks_identity" {
 
   variables {
     # Basic naming
-    prefix      = "test"
+    workload    = "platform"
     environment = "dev"
     region_abbv = "eus"
     
@@ -55,8 +55,8 @@ run "basic_aks_identity" {
 
   # Only validate input variables in plan mode
   assert {
-    condition     = var.prefix == "test"
-    error_message = "Prefix not set correctly"
+    condition     = var.workload == "platform"
+    error_message = "Workload not set correctly"
   }
   
   assert {
