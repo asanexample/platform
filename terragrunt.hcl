@@ -3,10 +3,11 @@
 # Local variables for this configuration
 locals {
   # Load hierarchical variables
-  env_vars     = read_terragrunt_config(find_in_parent_folders("env.hcl"))
-  region_vars  = read_terragrunt_config(find_in_parent_folders("region.hcl"))
-  network_vars = read_terragrunt_config(find_in_parent_folders("network.hcl"))
-  common_vars  = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  env_vars      = read_terragrunt_config(find_in_parent_folders("env.hcl"))
+  region_vars   = read_terragrunt_config(find_in_parent_folders("region.hcl"))
+  network_vars  = read_terragrunt_config(find_in_parent_folders("network.hcl"))
+  workload_vars = read_terragrunt_config(find_in_parent_folders("workload.hcl"))
+  common_vars   = read_terragrunt_config(find_in_parent_folders("common.hcl"))
   
   # Merge all variables for convenience
   all_vars = merge(
@@ -18,13 +19,14 @@ locals {
   
   # Extract commonly used variables
   env         = local.env_vars.locals.environment
-  workload    = local.common_vars.locals.workload
+  workload    = local.workload_vars.locals.workload
   region      = local.region_vars.locals.region
   region_abbv = local.region_vars.locals.region_abbv
   tags        = merge(
-    local.common_vars.locals.tags, 
+    local.common_vars.locals.tags,
     local.env_vars.locals.env_tags,
-    local.region_vars.locals.region_tags
+    local.region_vars.locals.region_tags,
+    local.workload_vars.locals.workload_tags,
   )
 }
 

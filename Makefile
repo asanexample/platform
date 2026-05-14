@@ -6,6 +6,7 @@
 # Default values
 ENV ?= dev
 REGION ?= eastus
+WORKLOAD ?= platform
 MODULE ?= all
 CLOUD ?= azure
 COMMAND ?= plan
@@ -17,6 +18,7 @@ INFRA_DIR := infra
 LIVE_DIR := $(INFRA_DIR)/live/$(CLOUD)
 ENV_DIR := $(LIVE_DIR)/$(ENV)
 REGION_DIR := $(ENV_DIR)/$(REGION)
+WORKLOAD_DIR := $(REGION_DIR)/$(WORKLOAD)
 MODULES_DIR := $(INFRA_DIR)/modules/$(CLOUD)
 TESTS_DIR := $(INFRA_DIR)/tests/modules/$(CLOUD)
 
@@ -65,31 +67,31 @@ check-azure-auth: ## Check Azure authentication status
 #----------------------------------------------
 
 .PHONY: init
-init: check-azure-auth ## Initialize all modules in the specified environment/region
-	@echo "$(GREEN)Initializing all modules in $(ENV)/$(REGION)...$(NC)"
-	@cd $(REGION_DIR) && terragrunt run-all init --terragrunt-non-interactive
+init: check-azure-auth ## Initialize all modules in the specified environment/region/workload
+	@echo "$(GREEN)Initializing all modules in $(ENV)/$(REGION)/$(WORKLOAD)...$(NC)"
+	@cd $(WORKLOAD_DIR) && terragrunt run-all init --terragrunt-non-interactive
 
 .PHONY: plan
-plan: check-azure-auth ## Plan all modules in the specified environment/region
-	@echo "$(GREEN)Planning all modules in $(ENV)/$(REGION)...$(NC)"
-	@cd $(REGION_DIR) && terragrunt run-all plan --terragrunt-non-interactive
+plan: check-azure-auth ## Plan all modules in the specified environment/region/workload
+	@echo "$(GREEN)Planning all modules in $(ENV)/$(REGION)/$(WORKLOAD)...$(NC)"
+	@cd $(WORKLOAD_DIR) && terragrunt run-all plan --terragrunt-non-interactive
 
 .PHONY: apply
-apply: check-azure-auth ## Apply all modules in the specified environment/region
-	@echo "$(GREEN)Applying all modules in $(ENV)/$(REGION)...$(NC)"
-	@cd $(REGION_DIR) && terragrunt run-all apply --terragrunt-non-interactive --terragrunt-log-level info
+apply: check-azure-auth ## Apply all modules in the specified environment/region/workload
+	@echo "$(GREEN)Applying all modules in $(ENV)/$(REGION)/$(WORKLOAD)...$(NC)"
+	@cd $(WORKLOAD_DIR) && terragrunt run-all apply --terragrunt-non-interactive --terragrunt-log-level info
 
 .PHONY: destroy
-destroy: check-azure-auth ## Destroy all modules in the specified environment/region (USE WITH CAUTION)
-	@echo "$(RED)WARNING: This will destroy all infrastructure in $(ENV)/$(REGION)$(NC)"
+destroy: check-azure-auth ## Destroy all modules in the specified environment/region/workload (USE WITH CAUTION)
+	@echo "$(RED)WARNING: This will destroy all infrastructure in $(ENV)/$(REGION)/$(WORKLOAD)$(NC)"
 	@echo "Are you sure? [y/N]" && read ans && [ $${ans:-N} = y ]
-	@echo "$(RED)Destroying all modules in $(ENV)/$(REGION)...$(NC)"
-	@cd $(REGION_DIR) && terragrunt run-all destroy --terragrunt-non-interactive
+	@echo "$(RED)Destroying all modules in $(ENV)/$(REGION)/$(WORKLOAD)...$(NC)"
+	@cd $(WORKLOAD_DIR) && terragrunt run-all destroy --terragrunt-non-interactive
 
 .PHONY: output
-output: check-azure-auth ## Show outputs for all modules in the specified environment/region
-	@echo "$(GREEN)Showing outputs for modules in $(ENV)/$(REGION)...$(NC)"
-	@cd $(REGION_DIR) && terragrunt run-all output --terragrunt-non-interactive
+output: check-azure-auth ## Show outputs for all modules in the specified environment/region/workload
+	@echo "$(GREEN)Showing outputs for modules in $(ENV)/$(REGION)/$(WORKLOAD)...$(NC)"
+	@cd $(WORKLOAD_DIR) && terragrunt run-all output --terragrunt-non-interactive
 
 #----------------------------------------------
 # Module specific operations
@@ -97,30 +99,30 @@ output: check-azure-auth ## Show outputs for all modules in the specified enviro
 
 .PHONY: init-module
 init-module: check-azure-auth ## Initialize a specific module
-	@echo "$(GREEN)Initializing module $(MODULE) in $(ENV)/$(REGION)...$(NC)"
-	@cd $(REGION_DIR)/$(MODULE) && terragrunt init --terragrunt-non-interactive
+	@echo "$(GREEN)Initializing module $(MODULE) in $(ENV)/$(REGION)/$(WORKLOAD)...$(NC)"
+	@cd $(WORKLOAD_DIR)/$(MODULE) && terragrunt init --terragrunt-non-interactive
 
 .PHONY: plan-module
 plan-module: check-azure-auth ## Plan a specific module
-	@echo "$(GREEN)Planning module $(MODULE) in $(ENV)/$(REGION)...$(NC)"
-	@cd $(REGION_DIR)/$(MODULE) && terragrunt plan --terragrunt-non-interactive
+	@echo "$(GREEN)Planning module $(MODULE) in $(ENV)/$(REGION)/$(WORKLOAD)...$(NC)"
+	@cd $(WORKLOAD_DIR)/$(MODULE) && terragrunt plan --terragrunt-non-interactive
 
 .PHONY: apply-module
 apply-module: check-azure-auth ## Apply a specific module
-	@echo "$(GREEN)Applying module $(MODULE) in $(ENV)/$(REGION)...$(NC)"
-	@cd $(REGION_DIR)/$(MODULE) && terragrunt apply --terragrunt-non-interactive
+	@echo "$(GREEN)Applying module $(MODULE) in $(ENV)/$(REGION)/$(WORKLOAD)...$(NC)"
+	@cd $(WORKLOAD_DIR)/$(MODULE) && terragrunt apply --terragrunt-non-interactive
 
 .PHONY: destroy-module
 destroy-module: check-azure-auth ## Destroy a specific module (USE WITH CAUTION)
-	@echo "$(RED)WARNING: This will destroy module $(MODULE) in $(ENV)/$(REGION)$(NC)"
+	@echo "$(RED)WARNING: This will destroy module $(MODULE) in $(ENV)/$(REGION)/$(WORKLOAD)$(NC)"
 	@echo "Are you sure? [y/N]" && read ans && [ $${ans:-N} = y ]
-	@echo "$(RED)Destroying module $(MODULE) in $(ENV)/$(REGION)...$(NC)"
-	@cd $(REGION_DIR)/$(MODULE) && terragrunt destroy --terragrunt-non-interactive
+	@echo "$(RED)Destroying module $(MODULE) in $(ENV)/$(REGION)/$(WORKLOAD)...$(NC)"
+	@cd $(WORKLOAD_DIR)/$(MODULE) && terragrunt destroy --terragrunt-non-interactive
 
 .PHONY: output-module
 output-module: check-azure-auth ## Show outputs for a specific module
-	@echo "$(GREEN)Showing outputs for module $(MODULE) in $(ENV)/$(REGION)...$(NC)"
-	@cd $(REGION_DIR)/$(MODULE) && terragrunt output --terragrunt-non-interactive
+	@echo "$(GREEN)Showing outputs for module $(MODULE) in $(ENV)/$(REGION)/$(WORKLOAD)...$(NC)"
+	@cd $(WORKLOAD_DIR)/$(MODULE) && terragrunt output --terragrunt-non-interactive
 
 #----------------------------------------------
 # Testing

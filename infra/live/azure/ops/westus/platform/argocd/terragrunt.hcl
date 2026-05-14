@@ -27,7 +27,7 @@ include "root" {
 
 # Terraform source - use relative path from this directory to the module
 terraform {
-  source = "../../../../../modules/argocd"
+  source = "../../../../../../modules/argocd"
 
   # Tell terraform to continue on errors during apply
   after_hook "suppress_errors" {

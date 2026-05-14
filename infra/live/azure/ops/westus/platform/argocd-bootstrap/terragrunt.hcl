@@ -112,7 +112,7 @@ EOF
 
 # Use the centralized module for bootstrap implementation
 terraform {
-  source = "../../../../../modules/argocd-bootstrap"
+  source = "../../../../../../modules/argocd-bootstrap"
 }
 
 # Inputs for the bootstrap module
