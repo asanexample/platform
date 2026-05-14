@@ -210,16 +210,24 @@ Each environment/region directory contains Terragrunt configurations for differe
 
 ```mermaid
 graph TD
-    live_dir[live/azure/dev/westus/] --> networking_dir[networking/]
-    live_dir --> storage_dir[storage/]
-    live_dir --> key_vault_dir[key_vault/]
-    live_dir --> aks_core_dir[aks_core/]
+    live_dir[live/azure/dev/westus/] --> workload_dir_platform[platform/]
+    live_dir --> workload_dir_hipaa[hipaa/]
     live_dir --> common_file[common.hcl]
+    
+    workload_dir_platform --> workload_hcl_platform[workload.hcl]
+    workload_dir_platform --> networking_dir[networking/]
+    workload_dir_platform --> storage_dir[storage/]
+    workload_dir_platform --> aks_core_dir[aks_core/]
+    
+    workload_dir_hipaa --> workload_hcl_hipaa[workload.hcl]
+    workload_dir_hipaa --> hipaa_networking[networking/]
+    workload_dir_hipaa --> hipaa_aks[aks_core/]
     
     networking_dir --> networking_config[terragrunt.hcl]
     storage_dir --> storage_config[terragrunt.hcl]
-    key_vault_dir --> key_vault_config[terragrunt.hcl]
     aks_core_dir --> aks_core_config[terragrunt.hcl]
+    hipaa_networking --> hipaa_net_config[terragrunt.hcl]
+    hipaa_aks --> hipaa_aks_config[terragrunt.hcl]
     
     classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
     classDef folder fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
@@ -337,10 +345,29 @@ The full configuration hierarchy from broadest to narrowest scope:
 | Environment | `infra/live/azure/{env}/env.hcl` | Subscription, env tags, shutdown policies |
 | Region | `infra/live/azure/{env}/{region}/region.hcl` | Region info |
 | Region | `infra/live/azure/{env}/{region}/network.hcl` | Authoritative CIDR allocations |
+| Workload | `infra/live/azure/{env}/{region}/{workload}/workload.hcl` | Workload name, compliance tier, workload tags |
 | Defaults | `infra/live/azure/_envcommon/*.hcl` | Module defaults shared across environments |
-| Module | `infra/live/azure/{env}/{region}/{module}/terragrunt.hcl` | Final overrides |
+| Module | `infra/live/azure/{env}/{region}/{workload}/{module}/terragrunt.hcl` | Final overrides |
 
 At each level, later layers override earlier ones for tags and inputs.
+
+### Workload Configuration: `workload.hcl`
+
+Each workload directory contains a `workload.hcl` that declares the workload's identity and compliance posture:
+
+```hcl
+# infra/live/azure/prod/westus/hipaa/workload.hcl
+locals {
+  workload        = "hipaa"
+  compliance_tier = "hipaa"
+  workload_tags = {
+    Workload       = "hipaa"
+    ComplianceTier = "hipaa"
+  }
+}
+```
+
+`_base.hcl` loads `workload.hcl` via `find_in_parent_folders()` and merges `workload_tags` into the tag hierarchy. The `compliance_tier` value drives cluster topology decisions (shared vCluster vs. dedicated cluster) and security control selection.
 
 ## Centralized Version Management: `_versions.hcl`
 

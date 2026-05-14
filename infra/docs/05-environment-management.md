@@ -106,6 +106,38 @@ SAFETY: env 'dev' expects subscription 'db4f1d99-...' but env.hcl has '9dc5edc4-
 
 Together these validations guarantee that every module deploys into the correct environment and subscription, even if configuration files are copy-pasted between directories.
 
+## Workload Isolation
+
+Within each environment and region, resources are further isolated by **workload**. Each workload directory contains a `workload.hcl` that declares the workload name, compliance tier, and workload-specific tags. The full directory path becomes:
+
+```
+infra/live/{cloud}/{env}/{region}/{workload}/{module}/terragrunt.hcl
+```
+
+### Subscription Topology
+
+Subscriptions are organized by workload purpose, not by team:
+
+| Management Group | Subscription | Purpose |
+|------------------|-------------|---------|
+| platform | platform-connectivity-{prod,nonprod} | Hub networking, DNS, firewall |
+| platform | platform-shared-{prod,nonprod} | Shared clusters, observability, ACR |
+| platform | platform-data-{prod,nonprod} | Shared data services |
+| regulated | regulated-hipaa-prod | HIPAA-isolated compute and data |
+| regulated | regulated-pci-prod | PCI CDE isolated compute and data |
+
+Standard-tier workloads (platform, connectivity, data) share clusters via vCluster. HIPAA and PCI workloads get dedicated clusters and isolated VNets within their own subscriptions.
+
+### State Management per Workload
+
+Terraform state is isolated per workload and environment using path-based keys:
+
+```
+{cloud}/{env}/{region}/{workload}/{module}/terraform.tfstate
+```
+
+Each workload gets its own state namespace, preventing cross-workload state collisions and limiting the blast radius of any state corruption. The root `terragrunt.hcl` generates this key automatically from the directory path.
+
 ## Promotion Workflow
 
 Infrastructure changes flow through environments in order: **dev** (or **ops** for shared tooling) then **test/qa** then **prod**. Each promotion is a separate Terragrunt apply against the target environment's directory tree. Because module sources are currently pinned to the monorepo HEAD (see `_versions.hcl`), all environments share the same module code. When the platform moves to registry-based modules, version pins in `_versions.hcl` will allow independent promotion per environment.

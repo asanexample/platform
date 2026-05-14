@@ -36,8 +36,9 @@ The Terraform modules are organized to support the multi-cloud strategy:
 
 Currently implemented modules by cloud:
 - **Azure**: Networking, storage, AKS clusters and node pools, Key Vault, resource groups, naming, monitoring, CDN, identities, composite stacks (`stack_base`)
-- **AWS**: Networking (VPC, subnets, NAT gateways, route tables, EKS security groups)
-- **GCP**: Networking (VPC, subnets, Cloud Router, Cloud NAT)
+- **AWS**: Networking (VPC, subnets, NAT gateways, route tables, EKS security groups), naming
+- **GCP**: Networking (VPC, subnets, Cloud Router, Cloud NAT), naming
+- **Cloud-agnostic**: vCluster (virtual Kubernetes clusters), policy (Kyverno placeholder)
 
 ### Cross-Cloud Interface Pattern
 
@@ -52,6 +53,18 @@ All networking modules across clouds expose a shared set of output names, enabli
 | `create` | Whether resources were created | Whether resources were created | Whether resources were created |
 
 Each cloud module also exposes cloud-specific outputs (e.g., AWS: `vpc_cidr_block`, `nat_gateway_ids`; GCP: `vpc_self_link`, `cloud_nat_id`) alongside the shared interface.
+
+### Unified Naming Module Contract
+
+In addition to the networking interface, all three cloud naming modules (`azure/naming`, `aws/naming`, `gcp/naming`) share a unified input contract:
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `workload` | `string` | Workload identifier (e.g., `platform`, `data`, `hipaa`) |
+| `environment` | `string` | Environment name (e.g., `dev`, `prod`, `ops`) |
+| `region_abbv` | `string` | Cloud-specific abbreviated region (e.g., `eus`, `use1`, `usc1`) |
+
+Each module generates cloud-appropriate names following the CAF-aligned pattern `{type}-{workload}-{env}-{region}`, with cloud-specific accommodations for character limits, casing rules, and globally-unique resources. This shared contract means Terragrunt live configs can pass the same `workload`, `environment`, and `region_abbv` locals to any cloud's naming module without modification.
 
 ### Terragrunt Configuration
 
@@ -77,6 +90,7 @@ The following matrix tracks implementation status across cloud providers:
 | Feature | Azure | AWS | GCP |
 |---------|-------|-----|-----|
 | Networking | Implemented | Implemented | Implemented |
+| Naming | Implemented | Implemented | Implemented |
 | Live config hierarchy | Implemented | Implemented | Implemented |
 | `_base.hcl` shared config | Implemented | Implemented | Implemented |
 | Storage | Implemented | Planned | Planned |
@@ -86,6 +100,8 @@ The following matrix tracks implementation status across cloud providers:
 | Monitoring | Implemented | Planned | Planned |
 | CDN | Implemented | Planned | Planned |
 | Composite stacks | Implemented (`stack_base`) | Planned | Planned |
+| vCluster | Cloud-agnostic | Cloud-agnostic | Cloud-agnostic |
+| Policy (Kyverno) | Cloud-agnostic | Cloud-agnostic | Cloud-agnostic |
 
 ## Migration Considerations
 

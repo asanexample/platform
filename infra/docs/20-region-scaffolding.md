@@ -124,7 +124,7 @@ At minimum, a new region requires three things inside its directory:
 
 1. **`region.hcl`** -- region name and abbreviation
 2. **`network.hcl`** -- CIDR blocks and subnet allocations
-3. **Module directories** with `terragrunt.hcl` files that include `_base.hcl`
+3. **Workload directories** each containing a `workload.hcl` and module directories with `terragrunt.hcl` files
 
 The scaffolding tool creates all of these automatically. The full list of generated artifacts:
 
@@ -132,8 +132,9 @@ The scaffolding tool creates all of these automatically. The full list of genera
 2. Generates `region.hcl` with the correct region name and abbreviation
 3. Creates or reuses `env.hcl` for environment-specific configuration (via symlink to `common.hcl`)
 4. Generates `network.hcl` with appropriate CIDR blocks and subnet allocations
-5. Creates module directories with `terragrunt.hcl` files that include proper dependencies and inputs
-6. Generates a README.md file with information about the modules and deployment order
+5. Creates workload directories (e.g., `platform/`, `connectivity/`) each containing a `workload.hcl`
+6. Creates module directories inside each workload with `terragrunt.hcl` files that include proper dependencies and inputs
+7. Generates a README.md file with information about the modules and deployment order
 
 ### How `_base.hcl` Is Inherited
 
@@ -159,6 +160,41 @@ When a new region is scaffolded, the following configuration files are resolved 
 | `env.hcl` | `infra/live/{cloud}/{env}/env.hcl` (symlink to `common.hcl`) | Environment config (subscription, tags) |
 | `region.hcl` | `infra/live/{cloud}/{env}/{region}/region.hcl` | Region name and abbreviation |
 | `network.hcl` | `infra/live/{cloud}/{env}/{region}/network.hcl` | CIDR blocks and subnet allocations |
+| `workload.hcl` | `infra/live/{cloud}/{env}/{region}/{workload}/workload.hcl` | Workload name, compliance tier, workload tags |
+
+### Creating Workload Directories
+
+Each workload directory must contain a `workload.hcl` that declares the workload name, compliance tier, and any workload-specific tags:
+
+```hcl
+# infra/live/azure/prod/westus/platform/workload.hcl
+locals {
+  workload        = "platform"
+  compliance_tier = "standard"
+  workload_tags = {
+    Workload       = "platform"
+    ComplianceTier = "standard"
+  }
+}
+```
+
+The scaffolding tool generates a `workload.hcl` for each workload. For regulated workloads (HIPAA, PCI), the template sets the appropriate compliance tier and the module list is adjusted to include dedicated cluster and isolation resources.
+
+Module directories are created inside the workload directory:
+
+```
+infra/live/azure/prod/westus/
+  platform/
+    workload.hcl
+    networking/terragrunt.hcl
+    aks_core/terragrunt.hcl
+    ...
+  hipaa/
+    workload.hcl
+    networking/terragrunt.hcl
+    aks_core/terragrunt.hcl
+    ...
+```
 
 ### Safety Validations Kick In Automatically
 

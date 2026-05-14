@@ -28,6 +28,8 @@ Where:
 
 ## Region Abbreviations
 
+### Azure Regions
+
 | Azure Region   | Abbreviation |
 |----------------|--------------|
 | East US        | eus          |
@@ -40,7 +42,26 @@ Where:
 | UK South       | uks          |
 | Canada Central | cac          |
 
-## Resource Type Abbreviations
+### AWS Regions
+
+| AWS Region      | Abbreviation |
+|-----------------|--------------|
+| us-east-1       | use1         |
+| us-west-2       | usw2         |
+| eu-west-1       | euw1         |
+| eu-central-1    | euc1         |
+| ap-southeast-1  | apse1        |
+
+### GCP Regions
+
+| GCP Region       | Abbreviation |
+|------------------|--------------|
+| us-central1      | usc1         |
+| us-east1         | use1         |
+| europe-west1     | euw1         |
+| asia-southeast1  | asse1        |
+
+## Azure Resource Type Abbreviations
 
 | Resource Type                              | Abbreviation | Example                                     |
 |--------------------------------------------|--------------|---------------------------------------------|
@@ -72,6 +93,57 @@ Where:
 | Federated Credential                       | fedcred      | fedcred-platform-dev-eus-customer           |
 | Storage Account Private Endpoint           | pe           | pe-platform-dev-eus-storage                 |
 | Storage Container                          | container    | assets, logs, data                          |
+
+## AWS Resource Type Abbreviations
+
+AWS names follow the same `{type}-{workload}-{env}-{region}` pattern. For tight-constraint or globally-unique resources (S3, ECR, ALB, NLB, TG), names are collapsed: `{type}{abbv_workload}{env}{region}`.
+
+| Resource Type              | Abbreviation | Example                                |
+|----------------------------|--------------|----------------------------------------|
+| VPC                        | vpc          | vpc-platform-dev-use1                  |
+| Subnet                     | snet         | snet-platform-dev-use1                 |
+| Internet Gateway           | igw          | igw-platform-dev-use1                  |
+| NAT Gateway                | natgw        | natgw-platform-dev-use1                |
+| Route Table                | rtb          | rtb-platform-dev-use1                  |
+| Security Group             | sg           | sg-platform-dev-use1                   |
+| EKS Cluster                | eks          | eks-platform-dev-use1                  |
+| S3 Bucket                  | s3           | s3platdevuse1 (lowercase, globally unique) |
+| ECR Repository             | ecr          | ecrplatdevuse1                         |
+| ALB                        | alb          | alb-plat-dev-use1 (32 char max)        |
+| NLB                        | nlb          | nlb-plat-dev-use1                      |
+| Target Group               | tg           | tg-plat-dev-use1                       |
+| Lambda                     | lmb          | lmb-platform-dev-use1                  |
+| RDS                        | rds          | rds-platform-dev-use1                  |
+| DynamoDB                   | ddb          | ddb-platform-dev-use1                  |
+| IAM Role                   | role         | role-platform-dev-use1                 |
+| IAM Policy                 | pol          | pol-platform-dev-use1                  |
+| KMS Key                    | kms          | kms-platform-dev-use1                  |
+| Secrets Manager            | sm           | sm-platform-dev-use1                   |
+| EFS                        | efs          | efs-platform-dev-use1                  |
+
+## GCP Resource Type Abbreviations
+
+GCP names follow the same `{type}-{workload}-{env}-{region}` pattern. All GCP resource names must be lowercase. For tight-constraint or globally-unique resources (GCS, service accounts), names are collapsed: `{type}{abbv_workload}{env}{region}`.
+
+| Resource Type              | Abbreviation | Example                                |
+|----------------------------|--------------|----------------------------------------|
+| VPC Network                | vpc          | vpc-platform-dev-usc1                  |
+| Subnet                     | snet         | snet-platform-dev-usc1                 |
+| GKE Cluster                | gke          | gke-platform-dev-usc1 (40 char max)    |
+| Cloud Storage Bucket       | gcs          | gcsplatdevusc1 (lowercase, globally unique) |
+| Artifact Registry          | gcr          | gcrplatdevusc1                         |
+| Firewall Rule              | fw           | fw-platform-dev-usc1                   |
+| Cloud Router               | rtr          | rtr-platform-dev-usc1                  |
+| Cloud NAT                  | nat          | nat-platform-dev-usc1                  |
+| Load Balancer              | lb           | lb-platform-dev-usc1                   |
+| Cloud SQL                  | sql          | sql-platform-dev-usc1                  |
+| Memorystore                | redis        | redis-platform-dev-usc1                |
+| Pub/Sub Topic              | pst          | pst-platform-dev-usc1                  |
+| KMS Key Ring               | kr           | kr-platform-dev-usc1                   |
+| Service Account            | sa           | sa-plat-dev-usc1 (30 char max)         |
+| Cloud Run                  | run          | run-platform-dev-usc1                  |
+| Compute Engine             | gce          | gce-platform-dev-usc1                  |
+| Cloud Function             | gcf          | gcf-platform-dev-usc1                  |
 
 ## Specific Resource Conventions
 
@@ -250,7 +322,7 @@ locals {
 
 ### Terragrunt Implementation with Naming Module
 
-The VIP Platform uses a centralized naming approach with Terragrunt to manage dependencies between the naming module and resource modules:
+The VIP Platform uses a centralized naming approach with Terragrunt to manage dependencies between the naming module and resource modules. All three cloud naming modules (`azure/naming`, `aws/naming`, `gcp/naming`) share the same input contract -- `workload`, `environment`, `region_abbv` -- so Terragrunt live configs can pass the same locals regardless of cloud provider.
 
 1. **Dedicated Naming Module**: A specialized module that generates standardized resource names based on inputs.
 

@@ -53,7 +53,52 @@ The deployment workflows are guided by the following principles:
 
 ## Deployment Tools
 
-*Documentation on deployment tools will be provided in a future update.*
+### Makefile Workflows
+
+The platform uses a Makefile to wrap Terragrunt commands. All targets accept `ENV`, `REGION`, and `WORKLOAD` parameters to select the target directory under `infra/live/{cloud}/{env}/{region}/{workload}/`.
+
+**Plan a full workload stack**:
+
+```bash
+make plan ENV=dev REGION=eastus WORKLOAD=platform
+```
+
+**Apply a single module within a workload**:
+
+```bash
+make apply-module ENV=dev REGION=eastus WORKLOAD=platform MODULE=aks_core
+```
+
+**Destroy a module**:
+
+```bash
+make destroy-module ENV=dev REGION=eastus WORKLOAD=platform MODULE=networking
+```
+
+### Directory Structure
+
+The live configuration follows this path convention:
+
+```
+infra/live/{cloud}/{env}/{region}/{workload}/{module}/terragrunt.hcl
+```
+
+For example:
+
+```
+infra/live/azure/dev/eastus/platform/aks_core/terragrunt.hcl
+infra/live/aws/ops/us-east-1/platform/networking/terragrunt.hcl
+infra/live/gcp/ops/us-central1/platform/networking/terragrunt.hcl
+```
+
+The `WORKLOAD` parameter selects which workload directory to target, enabling multiple workloads (e.g., `platform`, `data`, `hipaa`) within the same environment and region.
+
+### Cluster Topology
+
+The platform follows a shared-cluster model with virtual clusters:
+
+- **Shared clusters with vCluster**: Most teams receive a virtual cluster on a shared host cluster, providing lightweight isolation with minimal overhead.
+- **Dedicated clusters**: Reserved for workloads with HIPAA or PCI compliance requirements that mandate hard isolation boundaries.
 
 ## Operational Considerations
 

@@ -820,7 +820,118 @@ module "stack_base" {
 }
 ```
 
+## Cloud-Agnostic Modules
+
+### vCluster Module
+
+**Location**: `/infra/modules/vcluster`
+
+The vCluster module deploys virtual Kubernetes clusters on a host cluster using Helm. Virtual clusters provide lightweight, isolated Kubernetes control planes that share the underlying host cluster's compute, enabling multi-tenant Kubernetes without dedicated hardware.
+
+- Deploys vCluster via the official Loft Helm chart
+- Configurable resource sync between host and virtual cluster (nodes, ingresses, storage classes)
+- Isolation settings including network policies, limit ranges, and resource quotas
+- Optional ingress exposure for the virtual cluster API server
+- Configurable resource limits for the syncer container
+- Custom Helm values passthrough
+- `create` toggle support
+
+**Key Variables**: `cluster_name`, `namespace`, `chart_version`, `vcluster_version`, `values`, `resource_limits`, `sync`, `isolation`, `ingress`, `storage_class`, `tags`
+
+**Example Usage**:
+
+```hcl
+module "vcluster" {
+  source = "../../modules/vcluster"
+
+  create       = true
+  cluster_name = "team-alpha"
+  namespace    = "vc-team-alpha"
+  environment  = "dev"
+  region_abbv  = "eus"
+
+  isolation = {
+    network_policy = true
+    resource_quota = { enabled = true }
+    limit_range    = { enabled = true }
+  }
+
+  sync = {
+    ingresses       = true
+    storage_classes = true
+  }
+
+  tags = {
+    Environment = "dev"
+    ManagedBy   = "Terraform"
+  }
+}
+```
+
+### Policy Module (Kyverno)
+
+**Location**: `/infra/modules/policy`
+
+The Policy module installs Kyverno (a Kubernetes-native policy engine) via Helm and provides a framework for applying compliance guardrails as ClusterPolicy resources. This is currently a placeholder with the Helm installation wired up; compliance-tier-specific policies (standard, HIPAA, PCI) will be added in a future iteration.
+
+- Installs Kyverno via Helm with atomic deploys
+- Compliance tier selection (`standard`, `hipaa`, `pci`) for future policy sets
+- Supports injecting additional custom ClusterPolicy resources as YAML
+- `create` toggle support
+
+**Key Variables**: `compliance_tier`, `chart_version`, `namespace`, `additional_policies`, `tags`
+
+**Example Usage**:
+
+```hcl
+module "policy" {
+  source = "../../modules/policy"
+
+  create          = true
+  environment     = "prod"
+  compliance_tier = "hipaa"
+  chart_version   = "3.3.7"
+
+  additional_policies = {
+    "require-labels" = file("${path.module}/policies/require-labels.yaml")
+  }
+
+  tags = {
+    Environment = "prod"
+    ManagedBy   = "Terraform"
+  }
+}
+```
+
 ## AWS Modules
+
+### AWS Naming Module
+
+**Location**: `/infra/modules/aws/naming`
+
+The AWS Naming module provides standardized, CAF-aligned resource names for AWS infrastructure. It shares the same input contract (`workload`, `environment`, `region_abbv`) as the Azure and GCP naming modules for cross-cloud consistency.
+
+- Generates names for 22+ AWS resource types (VPC, EKS, S3, RDS, Lambda, IAM, etc.)
+- Enforces AWS naming constraints (max length, valid characters, case rules)
+- Abbreviated workload form for tight-constraint resources (S3, ECR, ALB, NLB, TG)
+- Optional `unique_seed` for globally unique names (S3 buckets)
+- Subnet helper outputs: `subnet_public`, `subnet_private`, `subnet_data`, `subnet_intra`
+
+**Example Usage**:
+
+```hcl
+module "naming" {
+  source = "../../modules/aws/naming"
+
+  workload    = "platform"
+  environment = "dev"
+  region_abbv = "use1"
+}
+
+# Outputs: module.naming.vpc  => "vpc-platform-dev-use1"
+#          module.naming.eks  => "eks-platform-dev-use1"
+#          module.naming.s3   => "s3platdevuse1"
+```
 
 ### AWS Networking Module
 
@@ -873,6 +984,35 @@ module "networking" {
 ```
 
 ## GCP Modules
+
+### GCP Naming Module
+
+**Location**: `/infra/modules/gcp/naming`
+
+The GCP Naming module provides standardized, CAF-aligned resource names for GCP infrastructure. It shares the same input contract (`workload`, `environment`, `region_abbv`) as the Azure and AWS naming modules for cross-cloud consistency.
+
+- Generates names for 19+ GCP resource types (VPC, GKE, GCS, Cloud SQL, Cloud Run, etc.)
+- Enforces GCP naming constraints (max length, lowercase-only, valid characters)
+- Abbreviated workload form for tight-constraint resources (GCS, service accounts)
+- Optional `unique_seed` for globally unique names (GCS buckets)
+- Optional `project_id` for project-scoped naming
+- Subnet helper outputs: `subnet_public`, `subnet_private`, `subnet_data`, `subnet_gke`, `subnet_proxy`
+
+**Example Usage**:
+
+```hcl
+module "naming" {
+  source = "../../modules/gcp/naming"
+
+  workload    = "platform"
+  environment = "dev"
+  region_abbv = "usc1"
+}
+
+# Outputs: module.naming.vpc  => "vpc-platform-dev-usc1"
+#          module.naming.gke  => "gke-platform-dev-usc1"
+#          module.naming.gcs  => "gcsplatdevusc1"
+```
 
 ### GCP Networking Module
 
@@ -939,9 +1079,12 @@ Rather than separate abstraction modules, the platform achieves cross-cloud comp
 | Internet gateway / routing  | Implemented        | Implemented        | Implemented        |
 | NAT gateway                 | Implemented        | Implemented        | Implemented (Cloud NAT) |
 | Kubernetes networking       | Implemented (AKS)  | Implemented (EKS)  | Implemented (GKE)  |
+| Naming module               | Implemented        | Implemented        | Implemented        |
 | Cross-cloud interface outputs | Implemented      | Implemented        | Implemented        |
 | `create` toggle             | Implemented        | Implemented        | Implemented        |
 | Composite stacks            | Implemented (`stack_base`) | Planned     | Planned            |
+| vCluster                    | Cloud-agnostic (implemented)  | --          | --                 |
+| Policy (Kyverno)            | Cloud-agnostic (placeholder) | --          | --                 |
 
 ## Module Usage Guidelines
 
