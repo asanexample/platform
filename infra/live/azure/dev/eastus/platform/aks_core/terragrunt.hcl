@@ -112,11 +112,11 @@ inputs = {
 
   default_node_pool = {
     name                         = "system"
-    vm_size                      = "Standard_D2ds_v5"
+    vm_size                      = "Standard_D4ds_v5"
     enable_auto_scaling          = true
     node_count                   = 3
     min_count                    = 3
-    max_count                    = 3
+    max_count                    = 5
     availability_zones           = ["1", "2", "3"]
     max_pods                     = 110
     os_disk_size_gb              = 128

@@ -129,11 +129,11 @@ inputs = {
   # Default node pool overrides
   default_node_pool = {
     name                = "system"
-    vm_size             = "Standard_D2ds_v5"  # Updated to Ddv5 series
+    vm_size             = "Standard_D4ds_v5"
     enable_auto_scaling = true
     node_count          = 3
     min_count           = 3
-    max_count           = 3
+    max_count           = 5
     max_pods            = 110  # With Cilium (network_plugin = "none"), pods get IPs from pod_cidr, not from the subnet
     os_disk_size_gb     = 128
     node_labels = {
