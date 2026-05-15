@@ -1,17 +1,26 @@
 // Base Terragrunt configuration for all modules
 // This file defines the global Terragrunt configuration that applies to all modules
 
-// Define remote state configuration using Azure Blob Storage
+// Use OpenTofu instead of Terraform
+terraform_binary = "tofu"
+
+// Cloud-aware remote state: route AWS to S3, everything else to Azure Blob Storage
 remote_state {
-  backend = "azurerm"
-  
+  backend = local._cloud == "aws" ? "s3" : "azurerm"
+
   generate = {
     path      = "backend.tf"
     if_exists = "overwrite_terragrunt"
   }
-  
-  config = {
-    subscription_id      = "9dc5edc4-8c4e-41a1-a4f8-2183c4e91954" // Operations subscription
+
+  config = local._cloud == "aws" ? {
+    bucket         = "tfstate-mgmt-851725353202"
+    key            = "${path_relative_to_include()}/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "terraform-locks"
+  } : {
+    subscription_id      = "9dc5edc4-8c4e-41a1-a4f8-2183c4e91954"
     tenant_id            = "c945e155-be68-4477-b8d7-01939adbfe55"
     resource_group_name  = "terraform-state-rg"
     storage_account_name = "tfstatemulticloud"
@@ -115,6 +124,10 @@ inputs = {
 
 // Helper functions for standardized resource naming
 locals {
+  # Detect cloud provider from directory path (live/aws/... vs live/azure/...)
+  _path_parts_cloud = split("/", path_relative_to_include())
+  _cloud            = try(local._path_parts_cloud[1], "azure")
+
   # Extract environment, region, and other global variables
   environment = get_env("TF_VAR_environment", "dev")
   
@@ -127,8 +140,8 @@ locals {
   gcp_region          = get_env("TF_VAR_gcp_region", "us-east1")
   
   # Account/subscription IDs - both subscription_id and tenant_id must be in env.hcl
-  azure_subscription_id = local.environment_vars.locals.subscription_id
-  azure_tenant_id       = local.environment_vars.locals.tenant_id
+  azure_subscription_id = try(local.environment_vars.locals.subscription_id, "")
+  azure_tenant_id       = try(local.environment_vars.locals.tenant_id, "")
   gcp_project_id        = try(local.environment_vars.locals.gcp_project_id, "")
   
   # Organization details

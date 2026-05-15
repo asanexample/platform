@@ -13,8 +13,8 @@ variable "environment" {
   description = "The environment (e.g., dev, preprod, prod, ops)."
   type        = string
   validation {
-    condition     = contains(["dev", "preprod", "prod", "test", "stg", "ops"], var.environment)
-    error_message = "Environment must be one of: dev, preprod, prod, test, stg, ops."
+    condition     = contains(["dev", "preprod", "prod", "test", "stg", "ops", "mgmt"], var.environment)
+    error_message = "Environment must be one of: dev, preprod, prod, test, stg, ops, mgmt."
   }
 }
 
