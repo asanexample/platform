@@ -85,7 +85,7 @@ platform/
 | `naming` | Resource naming conventions |
 | `networking` | VPC, subnets, Internet Gateway, NAT Gateway, route tables |
 | `organizations` | AWS Organizations, OUs, accounts, 8 enterprise SCPs (baseline-guardrails, protect-security-services, enforce-encryption, deny-regions, protect-data-and-network, require-tagging, restrict-iam-users, hipaa-eligible-services) |
-| `state_bootstrap` | S3 bucket + DynamoDB table for Terraform remote state |
+| `state_bootstrap` | S3 bucket + DynamoDB table for OpenTofu remote state |
 
 ### Azure (24 modules)
 
