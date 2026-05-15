@@ -3,12 +3,12 @@
 ## 1. Overall Architecture
 
 1. Use Terraform with Terragrunt for infrastructure management across AWS, Azure, and GCP
-2. Centralize state management in Azure Blob Storage with proper locking
+2. Cloud-aware state management: Azure Blob Storage for Azure modules, S3 with DynamoDB locking for AWS modules, with automatic routing based on directory path
 3. Implement a hybrid monorepo approach organizing code by:
    - Reusable modules by cloud provider
    - Live infrastructure by cloud/environment/region
    - Common configurations for DRY principles
-4. Support separate environments (dev, ops, preprod, demo prod) across multiple regions
+4. Support separate environments (dev, ops, mgmt, preprod, demo prod) across multiple regions
 5. Separate customer-specific resources from shared infrastructure
 6. Implement a hierarchical CIDR allocation strategy for clear addressing boundaries
 7. Design network architecture optimized for Kubernetes with 3-AZ support in each region
@@ -20,10 +20,18 @@
    infra/
    ├── modules/                 # Reusable modules
    │   ├── azure/               # Azure-specific modules
-   │   ├── aws/                 # AWS-specific modules (placeholder)
-   │   ├── gcp/                 # GCP-specific modules (placeholder)
+   │   ├── aws/                 # AWS-specific modules
+   │   │   ├── naming/          # AWS naming module
+   │   │   ├── networking/      # AWS networking module
+   │   │   ├── organizations/   # AWS Organizations & SCPs
+   │   │   └── state_bootstrap/ # S3 + DynamoDB state backend
+   │   ├── gcp/                 # GCP-specific modules
+   │   │   ├── naming/          # GCP naming module
+   │   │   └── networking/      # GCP networking module
    │   ├── kubernetes/          # Kubernetes-specific modules
    │   ├── cilium/              # Cilium CNI modules
+   │   ├── policy/              # OPA/Gatekeeper policy engine
+   │   ├── vcluster/            # Virtual Kubernetes clusters
    │   └── common/              # Cross-cloud abstractions
    ├── live/                    # Live infrastructure
    │   ├── global/              # Global resources
@@ -33,7 +41,13 @@
    │   │   │   └── eastus/      # Region-specific
    │   │   └── ops/             # Operations environment
    │   │       └── westus/      # Region-specific
-   │   ├── aws/                 # AWS resources (placeholder)
+   │   ├── aws/                 # AWS resources
+   │   │   ├── mgmt/            # Management account
+   │   │   │   └── global/
+   │   │   │       ├── organizations/    # AWS Organizations
+   │   │   │       └── state-bootstrap/  # State backend
+   │   │   └── ops/             # Operations environment
+   │   │       └── us-east-1/   # Region-specific
    │   └── gcp/                 # GCP resources (placeholder)
    ├── docs/                    # Documentation
    │   └── diagrams/            # Architecture diagrams
@@ -60,6 +74,10 @@
 6. Service endpoints and private links used for all PaaS services
 7. Subnet-level access controls implemented for storage accounts and other sensitive resources
 8. Private networking for AKS clusters with appropriate network security groups
+9. Enterprise Service Control Policies (SCPs) enforcing security guardrails across AWS Organizations
+10. Region restriction, encryption enforcement, root user protection, and security service protection via SCPs
+11. Compliance coverage for SOC2, HIPAA, PCI-DSS, ISO 27001, NIST 800-53, and CIS AWS Foundations benchmarks
+12. IMDSv2 enforcement and IAM user restriction via SCPs
 
 ## 4. CI/CD & Workflow
 
@@ -118,6 +136,10 @@
 4. Onboarding guides available for team members
 5. CIDR allocation documentation maintained
 6. Naming conventions and tagging strategy fully documented
+7. Architecture Decision Records (ADRs) for major design decisions
+8. Compliance control mapping documentation
+9. Incident response and SCP troubleshooting runbooks
+10. New team member onboarding guide
 
 ## 11. Implemented Modules
 
@@ -231,6 +253,46 @@ The following modules have been implemented and tested:
     - Implements advanced networking features
     - Configures network policies and security
 
+### AWS Infrastructure
+23. **AWS Naming Module**
+    - Generates standardized resource names for AWS
+    - Ensures compliance with AWS naming restrictions
+
+24. **AWS Networking Module**
+    - Creates VPC, subnets, Internet Gateway, NAT Gateway, and route tables
+    - Cross-cloud interface outputs for consistent networking abstractions
+
+25. **AWS Organizations Module**
+    - Manages AWS Organizations with OUs, accounts, and 8 enterprise SCPs (baseline-guardrails, protect-security-services, enforce-encryption, deny-regions, protect-data-and-network, require-tagging, restrict-iam-users, hipaa-eligible-services)
+    - Supports greenfield and brownfield deployment
+
+26. **AWS State Bootstrap Module**
+    - Creates S3 bucket + DynamoDB table for Terraform remote state
+    - Uses local backend to solve chicken-and-egg problem
+
+### GCP Infrastructure
+27. **GCP Naming Module**
+    - Generates standardized resource names for GCP
+    - Ensures compliance with GCP naming restrictions
+
+### Cross-Cloud
+28. **Policy Module**
+    - OPA/Gatekeeper policy engine for Kubernetes
+    - Enforces organizational policies across clusters
+
+29. **vCluster Module**
+    - Virtual Kubernetes clusters for tenant isolation
+    - Lightweight multi-tenancy solution
+
+### Azure (Additional)
+30. **Diagnostic Settings Module**
+    - Comprehensive logging setup for Azure services
+    - Configures diagnostic settings for audit and monitoring
+
+31. **Monitor Alerts Module**
+    - Alert rule definitions for proactive monitoring
+    - Configures action groups and notification channels
+
 Each module includes comprehensive tests using Terraform's built-in testing framework. The tests validate the module's functionality, ensuring that resources are created correctly and with the proper configurations.
 
 ## 12. Implementation Status
@@ -240,8 +302,8 @@ Each module includes comprehensive tests using Terraform's built-in testing fram
   - Monitoring modules implemented (Log Analytics, Monitor Workspace, Prometheus DCR)
   - Frontend modules implemented (Front Door Profile, Endpoint, Private Link)
   - Container Registry and related services implemented
-- **AWS Implementation**: Planned for future phases
-- **GCP Implementation**: Planned for future phases
+- **AWS Implementation**: Organizations module with enterprise SCPs, S3 state backend, VPC networking, naming module implemented. Management account (mgmt) environment configured. Operations environment scaffolded.
+- **GCP Implementation**: Networking and naming modules implemented. Operations environment scaffolded.
 - **Development Environment**: Implemented for Azure in East US region
 - **Operations Environment**: Implemented for Azure in West US region
 - **Production Environment**: Planned for future phases

@@ -1,293 +1,232 @@
 # Multi-Cloud Platform Infrastructure
 
-This repository contains infrastructure-as-code for a multi-cloud platform using Terraform and Terragrunt, with a focus on security, reusability, and consistent implementation patterns.
-
-## Current Implementation Status
-
-The project is currently in active development with the following status:
-
-- **Azure Implementation**: 
-  - 21 modules implemented (networking, storage, AKS, Key Vault, identity, monitoring, Front Door, DNS)
-  - Composite stack module (`stack_base`) for single-unit base infrastructure deployment
-  - All resource-creating modules support `create` toggle for selective deployment
-- **AWS Implementation**: Networking module implemented with cross-cloud interface
-- **GCP Implementation**: Networking module implemented with cross-cloud interface
-- **Cross-Cloud Interface**: Shared output contract (`network_id`, `subnet_ids`, `kubernetes_subnet_id`) across all clouds
-- **Development Environment**: Implemented for Azure in East US region
-- **Operations Environment**: Implemented for Azure in West US region, AWS in US East 1, GCP in US East 1
-- **Production Environment**: Planned for future phases
-
-The implementation is following the phased approach defined in [IMPLEMENTATION.md](IMPLEMENTATION.md).
+This repository contains infrastructure-as-code for a multi-cloud platform using OpenTofu and Terragrunt, spanning AWS, Azure, and GCP. It emphasizes security, reusability, and consistent implementation patterns across all three clouds.
 
 ## Project Structure
 
 ```
 platform/
-├── infra/                   # Infrastructure code
-│   ├── docs/                # Documentation
-│   │   ├── 00-documentation-guide.md  # Documentation standards
-│   │   ├── 01-introduction.md         # Project introduction
-│   │   ├── 02-architecture-overview.md # Architecture overview
-│   │   ├── ...                        # Additional documentation
-│   │   └── README.md                  # Documentation index
-│   ├── live/                # Live infrastructure code (Terragrunt)
-│   │   ├── aws/             # AWS configurations
-│   │   │   ├── _base.hcl    # Shared base config (same pattern as Azure)
-│   │   │   ├── _versions.hcl # Module sources and version pins
-│   │   │   └── ops/us-east-1/ # Operations environment
-│   │   ├── gcp/             # GCP configurations
-│   │   │   ├── _base.hcl    # Shared base config
-│   │   │   └── ops/us-east1/  # Operations environment
-│   │   └── azure/           # Azure configurations
-│   │       ├── _base.hcl    # Shared base config (eliminates boilerplate)
-│   │       ├── _versions.hcl # Centralized module sources and Helm version pins
-│   │       ├── _envcommon/  # Common configurations across environments
-│   │       ├── dev/         # Development environment
-│   │       │   └── eastus/  # East US region
-│   │       │       ├── aks_core/             # AKS cluster core
-│   │       │       ├── aks_identity/         # AKS managed identities
-│   │       │       ├── aks_node_pools/       # AKS node pools
-│   │       │       ├── client_config/        # Azure client configuration
-│   │       │       ├── container_registry/   # Container registry
-│   │       │       ├── dns/                  # Private DNS zones
-│   │       │       ├── frontdoor_endpoint/   # Front Door endpoints
-│   │       │       ├── frontdoor_private_link/ # Front Door private link
-│   │       │       ├── frontdoor_profile/    # Front Door profile
-│   │       │       ├── key_vault/            # Azure Key Vault
-│   │       │       ├── log_analytics/        # Log Analytics workspace
-│   │       │       ├── managed_grafana/      # Managed Grafana
-│   │       │       ├── monitor_workspace/    # Monitor workspace for Prometheus
-│   │       │       ├── naming/               # Resource naming
-│   │       │       ├── networking/           # Network infrastructure
-│   │       │       ├── prometheus_dcr/       # Prometheus data collection rule
-│   │       │       ├── resource_group/       # Resource groups
-│   │       │       ├── storage/              # Storage accounts and containers
-│   │       │       └── storage_roles/        # Storage account RBAC
-│   │       └── ops/         # Operations environment
-│   │           └── westus/  # West US region
-│   │               ├── aks_core/             # AKS cluster core
-│   │               ├── aks_identity/         # AKS managed identities
-│   │               ├── aks_node_pools/       # AKS node pools
-│   │               ├── client_config/        # Azure client configuration
-│   │               ├── container_registry/   # Container registry
-│   │               ├── dns/                  # Private DNS zones
-│   │               ├── frontdoor_endpoint/   # Front Door endpoints
-│   │               ├── frontdoor_private_link/ # Front Door private link
-│   │               ├── frontdoor_profile/    # Front Door profile
-│   │               ├── key_vault/            # Azure Key Vault
-│   │               ├── log_analytics/        # Log Analytics workspace
-│   │               ├── managed_grafana/      # Managed Grafana
-│   │               ├── monitor_workspace/    # Monitor workspace for Prometheus
-│   │               ├── naming/               # Resource naming
-│   │               ├── networking/           # Network infrastructure
-│   │               ├── resource_group/       # Resource groups
-│   │               ├── storage/              # Storage accounts and containers
-│   │               └── storage_roles/        # Storage account RBAC
-│   ├── modules/             # Reusable Terraform modules
-│   │   ├── aws/             # AWS modules
-│   │   │   └── networking/  # VPC, subnets, IGW, NAT, route tables
-│   │   ├── gcp/             # GCP modules
-│   │   │   └── networking/  # VPC, subnets, Cloud Router, Cloud NAT
-│   │   ├── cilium/          # Cloud-agnostic Cilium CNI (Helm)
-│   │   ├── argocd/          # Cloud-agnostic ArgoCD (Helm)
-│   │   ├── argocd-bootstrap/ # ArgoCD bootstrap apps
-│   │   └── azure/           # Azure modules
-│   │       ├── aks_core/              # Azure AKS core cluster module
-│   │       ├── aks_identity/          # Azure AKS identity module
-│   │       ├── aks_node_pools/        # Azure AKS node pools module
-│   │       ├── client_config/         # Azure client configuration module
-│   │       ├── container_registry/    # Azure Container Registry module
-│   │       ├── frontdoor_endpoint/    # Front Door endpoint module
-│   │       ├── frontdoor_private_link/ # Front Door private link module
-│   │       ├── frontdoor_profile/     # Front Door profile module
-│   │       ├── identities/            # Azure identities module
-│   │       ├── key_vault/             # Azure Key Vault module
-│   │       ├── log_analytics/         # Log Analytics workspace module
-│   │       ├── managed_grafana/       # Managed Grafana module
-│   │       ├── monitor_workspace/     # Monitor workspace module
-│   │       ├── naming/                # Azure resource naming module
-│   │       ├── networking/            # Azure networking module
-│   │       ├── private_dns/           # Private DNS zones module
-│   │       ├── prometheus_dcr/        # Prometheus data collection rule module
-│   │       ├── resource_group/        # Azure resource group module
-│   │       ├── storage_account/       # Azure storage account module
-│   │       ├── stack_base/            # Composite: resource_group + networking + key_vault
-│   │       ├── storage_container/     # Azure container module
-│   │       └── storage_roles/         # Storage account RBAC module
-│   ├── terragrunt.hcl       # Root Terragrunt configuration
-│   └── tests/               # Test configurations
-│       ├── helpers/         # Test helper functions
-│       ├── modules/         # Module tests
-│       │   └── azure/       # Azure module tests
-│       └── setup/           # Test setup configurations
-├── Makefile                 # Infrastructure operations automation
-├── scripts/                 # Utility scripts for the repository
-└── IMPLEMENTATION.md        # Implementation plan
+├── infra/                       # Infrastructure code
+│   ├── docs/                    # Operational documentation (20+ docs)
+│   │   ├── 00-documentation-guide.md
+│   │   ├── 01-introduction.md
+│   │   ├── 02-architecture-overview.md
+│   │   ├── ...
+│   │   ├── 20-region-scaffolding.md
+│   │   └── README.md
+│   ├── live/                    # Live infrastructure (Terragrunt)
+│   │   ├── aws/
+│   │   │   ├── _base.hcl        # AWS base config
+│   │   │   ├── _versions.hcl    # Module sources and version pins
+│   │   │   ├── mgmt/global/     # Management account
+│   │   │   │   ├── organizations/   # AWS Organizations + SCPs
+│   │   │   │   └── state-bootstrap/ # S3 + DynamoDB remote state
+│   │   │   └── ops/us-east-1/   # Operations (networking + naming)
+│   │   ├── azure/
+│   │   │   ├── _base.hcl        # Azure base config
+│   │   │   ├── _versions.hcl    # Module sources and Helm version pins
+│   │   │   ├── _envcommon/      # Shared configs across environments
+│   │   │   ├── dev/eastus/      # Development (full stack)
+│   │   │   └── ops/westus/      # Operations (full stack)
+│   │   └── gcp/
+│   │       ├── _base.hcl        # GCP base config
+│   │       └── ops/us-east1/    # Operations (networking + naming)
+│   ├── modules/                 # Reusable modules
+│   │   ├── aws/                 # 4 modules: naming, networking, organizations, state_bootstrap
+│   │   ├── azure/               # 24 modules (see below)
+│   │   ├── gcp/                 # 2 modules: naming, networking
+│   │   ├── argocd/              # GitOps deployment via Helm
+│   │   ├── argocd-bootstrap/    # Bootstrap applications
+│   │   ├── cilium/              # CNI deployment via Helm
+│   │   ├── policy/              # OPA/Gatekeeper policy engine
+│   │   └── vcluster/            # Virtual Kubernetes clusters
+│   ├── terragrunt.hcl           # Root Terragrunt configuration
+│   └── tests/                   # Test configurations
+│       ├── helpers/
+│       ├── modules/azure/
+│       └── setup/
+├── docs/                        # AWS Organizations & compliance docs
+│   ├── adrs/                    # 6 architecture decision records
+│   ├── architecture/            # Config hierarchy, AWS Org design
+│   ├── compliance/              # SOC2/HIPAA/PCI-DSS/NIST/CIS mapping
+│   ├── runbooks/                # Operational runbooks
+│   ├── troubleshooting/         # Troubleshooting guides
+│   ├── onboarding.md
+│   └── user-guide.md
+├── Makefile                     # Infrastructure operations automation
+├── scripts/                     # Utility scripts
+├── charts/                      # Helm charts
+└── terragrunt.hcl               # Root Terragrunt config (cloud-aware state routing)
 ```
 
 ## Features
 
-- **Multi-Cloud Architecture**: AWS, Azure, and GCP with cross-cloud interface contract for cloud-agnostic downstream modules
-- **Hierarchical CIDR Allocation**: Well-structured address space organization across all clouds (see [CIDR Allocation Strategy](infra/docs/06-cidr-allocation.md))
-- **Multi-Environment Support**: Configurable for development, operations, and production environments
-- **Multi-Region Deployment**: Support for deploying to multiple regions per cloud provider
-- **DRY Terragrunt Configuration**: Shared `_base.hcl` eliminates boilerplate; `_versions.hcl` centralizes module sources and Helm chart version pins
+- **Multi-Cloud Architecture**: AWS, Azure, and GCP with cross-cloud interface contract (`network_id`, `subnet_ids`, `kubernetes_subnet_id`) for cloud-agnostic downstream modules
+- **AWS Organizations**: Full org management with OUs (Platform, Workloads/Preprod, Workloads/Prod, Workloads/Regulated), multiple accounts, and 8 enterprise SCPs
+- **Enterprise Security Controls**: SCPs enforcing encryption, region restrictions, IMDSv2, root user protection, security service protection (CloudTrail, GuardDuty, Security Hub, Config, Access Analyzer), tagging requirements, and HIPAA-eligible service restrictions
+- **Cloud-Aware State Management**: S3 backend for AWS (mgmt account 851725353202), Azure Blob Storage for Azure — root `terragrunt.hcl` detects cloud from directory path and routes automatically
+- **7-Layer Config Hierarchy**: Root `terragrunt.hcl` > cloud `_base.hcl` > `_versions.hcl` > env `common.hcl` > region > workload > module
 - **Environment Safety Validations**: Automatic path-env consistency checks and subscription/account mapping verification prevent cross-environment deployment accidents
+- **Hierarchical CIDR Allocation**: Well-structured address space across all clouds (see [CIDR Allocation Strategy](infra/docs/06-cidr-allocation.md))
 - **Universal Create Toggles**: Every resource-creating module supports `create = true/false` for selective deployment without config removal
 - **Composite Module Pattern**: Stack modules (e.g., `stack_base`) compose multiple modules into single deployable units
-- **Comprehensive Testing**: Modules include automated tests in a dedicated tests directory
-- **Security Best Practices**: Private endpoints, RBAC, network isolation, and AKS workload identity
-- **Standardized Naming**: Consistent resource naming across all environments via a dedicated naming module
-- **AKS Cluster Support**: Kubernetes cluster deployment with Cilium CNI, node pools, and workload identity
-- **Monitoring & Observability**: Integrated monitoring with Log Analytics, Prometheus, and Grafana
-- **Front Door Integration**: Global content delivery and security with Azure Front Door
-- **Standardized Documentation**: Comprehensive documentation with standardized templates
+- **AKS Cluster Support**: Kubernetes clusters with Cilium CNI, node pools, workload identity, and ArgoCD GitOps
+- **Monitoring & Observability**: Log Analytics, Prometheus, Managed Grafana, diagnostic settings, and monitor alerts
+- **Front Door Integration**: Global content delivery and security with Azure Front Door, private link backends
+- **Standardized Naming**: Consistent resource naming across all clouds via dedicated naming modules
+- **Compliance Documentation**: Mapping to SOC2, HIPAA, PCI-DSS, NIST, and CIS frameworks
 
-## Core Modules
+## Modules
 
-The platform includes the following core modules:
+### AWS (4 modules)
 
-1. **Azure Resource Naming Module**
-   - Generates standardized resource names following organizational patterns
-   - Ensures compliance with Azure naming restrictions
-   - Provides consistent outputs for all resource types
+| Module | Description |
+|--------|-------------|
+| `naming` | Resource naming conventions |
+| `networking` | VPC, subnets, Internet Gateway, NAT Gateway, route tables |
+| `organizations` | AWS Organizations, OUs, accounts, 8 enterprise SCPs (baseline-guardrails, protect-security-services, enforce-encryption, deny-regions, protect-data-and-network, require-tagging, restrict-iam-users, hipaa-eligible-services) |
+| `state_bootstrap` | S3 bucket + DynamoDB table for Terraform remote state |
 
-2. **Azure Networking Module**
-   - Creates virtual network with subnets optimized for Kubernetes workloads
-   - Supports availability zone-aware subnet configuration
-   - Configures network security groups with appropriate rules
+### Azure (24 modules)
 
-3. **Azure Storage Modules**
-   - **Storage Account**: Provides flexible storage account creation with network rules
-   - **Storage Container**: Manages blob containers within storage accounts
-   - **Storage Roles**: Configures RBAC permissions for storage resources
+| Module | Description |
+|--------|-------------|
+| `aks_core` | AKS cluster core configuration |
+| `aks_identity` | AKS managed identities |
+| `aks_node_pools` | AKS node pool management |
+| `client_config` | Azure client configuration data |
+| `container_registry` | Azure Container Registry with private networking |
+| `diagnostic_settings` | Azure Monitor diagnostic settings |
+| `frontdoor_endpoint` | Front Door endpoint configuration |
+| `frontdoor_private_link` | Front Door private link connectivity |
+| `frontdoor_profile` | Front Door CDN profile |
+| `identities` | Azure managed identities |
+| `key_vault` | Azure Key Vault with RBAC authorization |
+| `log_analytics` | Log Analytics workspace |
+| `managed_grafana` | Azure Managed Grafana |
+| `monitor_alerts` | Azure Monitor alert rules |
+| `monitor_workspace` | Azure Monitor workspace for Prometheus |
+| `naming` | Resource naming conventions |
+| `networking` | Virtual network, subnets, NSGs |
+| `private_dns` | Private DNS zones |
+| `prometheus_dcr` | Prometheus data collection rules |
+| `resource_group` | Resource group management |
+| `stack_base` | Composite: resource_group + networking + key_vault |
+| `storage_account` | Storage account with network rules |
+| `storage_container` | Blob container management |
+| `storage_roles` | Storage RBAC permissions |
 
-4. **Azure Key Vault Module**
-   - Creates and configures Azure Key Vault with flexible options
-   - Supports RBAC authorization model
-   - Configurable network rules and security settings
+### GCP (2 modules)
 
-5. **Azure AKS Modules**
-   - **AKS Core**: Creates and configures the core Kubernetes cluster
-   - **AKS Identity**: Manages service identities for Kubernetes
-   - **AKS Node Pools**: Creates and configures node pools for workloads
+| Module | Description |
+|--------|-------------|
+| `naming` | Resource naming conventions |
+| `networking` | VPC, subnets, Cloud Router, Cloud NAT |
 
-6. **Azure Container Registry Module**
-   - Configures Azure Container Registry for container image storage
-   - Supports private networking and RBAC configuration
-   - Integrates with AKS for image pull capabilities
+### Cross-Cloud (5 modules)
 
-7. **Azure Front Door Modules**
-   - **Front Door Profile**: Creates the CDN profile for global distribution
-   - **Front Door Endpoint**: Configures endpoints for content delivery
-   - **Front Door Private Link**: Enables private connectivity to backends
+| Module | Description |
+|--------|-------------|
+| `cilium` | CNI deployment via Helm (works with AKS, EKS, GKE) |
+| `argocd` | GitOps deployment via Helm |
+| `argocd-bootstrap` | Bootstrap applications (cert-manager, external-dns, external-secrets) |
+| `policy` | OPA/Gatekeeper policy engine |
+| `vcluster` | Virtual Kubernetes clusters |
 
-8. **Azure Monitoring Modules**
-   - **Log Analytics**: Creates Log Analytics workspace for centralized logging
-   - **Monitor Workspace**: Configures Azure Monitor workspace for Prometheus metrics
-   - **Prometheus DCR**: Sets up data collection rules for Prometheus metrics
-   - **Managed Grafana**: Deploys Azure Managed Grafana for visualization
+## Live Environments
 
-9. **Azure DNS Module**
-   - Configures private DNS zones for internal name resolution
-   - Integrates with virtual networks for resolution within VNets
-   - Supports private endpoints for Azure PaaS services
+| Path | Cloud | Purpose |
+|------|-------|---------|
+| `aws/mgmt/global/` | AWS | Management account: state-bootstrap + organizations |
+| `aws/ops/us-east-1/` | AWS | Operations: networking + naming |
+| `azure/dev/eastus/` | Azure | Development: full stack (AKS, monitoring, Front Door, DNS, storage, etc.) |
+| `azure/ops/westus/` | Azure | Operations: full stack + ArgoCD |
+| `azure/_envcommon/` | Azure | Shared configurations across environments |
+| `gcp/ops/us-east1/` | GCP | Operations: networking + naming |
 
-10. **Azure Base Stack (Composite)**
-    - Composes resource_group + networking + key_vault into a single deployable unit
-    - Demonstrates the composite module pattern for multi-module stacks
+## AWS Organizations
 
-11. **AWS Networking Module**
-    - VPC, subnets, Internet Gateway, NAT Gateway, route tables
-    - Cross-cloud interface outputs matching Azure networking module
-
-12. **GCP Networking Module**
-    - VPC, subnets, Cloud Router, Cloud NAT, firewall rules
-    - Cross-cloud interface outputs matching Azure and AWS networking modules
-
-13. **Cloud-Agnostic Modules**
-    - **Cilium**: CNI deployment via Helm (works with AKS, EKS, GKE)
-    - **ArgoCD**: GitOps deployment via Helm
-    - **ArgoCD Bootstrap**: Bootstrap applications (cert-manager, external-dns, external-secrets)
+- **Organization**: `o-a4kjvito7o`, management account `851725353202`
+- **Accounts**: platform (`829808296602`), preprod (`620830101009`)
+- **OU structure**: Platform, Workloads/{Preprod, Prod, Regulated}
+- **SCPs**: 7 default + 1 optional HIPAA SCP, covering root user lockdown, region restrictions, encryption enforcement, security service protection, tagging requirements, and IAM user restrictions
 
 ## Getting Started
 
 ### Prerequisites
 
-- Terraform >= 1.6.0
-- Terragrunt >= 0.53.0
-- Azure CLI with authenticated session
+- OpenTofu >= 1.6.0
+- Terragrunt >= 0.55.0
+- AWS CLI (for AWS environments)
+- Azure CLI (for Azure environments)
+- Google Cloud SDK (for GCP environments)
 
-### Environment Setup
-
-Authenticate using Azure CLI:
+### Authentication
 
 ```bash
+# AWS
+aws configure
+# or use SSO
+aws sso login --profile your-profile
+
+# Azure
 az login
 az account set --subscription "your-subscription-id"
+
+# GCP
+gcloud auth application-default login
+gcloud config set project your-project-id
 ```
 
 ### Deployment
 
-The project includes a comprehensive Makefile to simplify operations:
+The project includes a Makefile to simplify operations:
 
 ```bash
-# Initialize all modules
-make init
+# Show available commands
+make help
 
-# Plan all modules
-make plan
+# Plan all modules in an environment
+make plan CLOUD=azure ENV=dev REGION=eastus
 
-# Apply all modules
-make apply
-```
+# Apply all modules in an environment
+make apply CLOUD=azure ENV=ops REGION=westus
 
-Working with specific modules:
+# Work with a specific module
+make plan-module MODULE=networking CLOUD=azure ENV=dev REGION=eastus
+make apply-module MODULE=aks_core CLOUD=azure ENV=ops REGION=westus
 
-```bash
-# Initialize a specific module
-make init-module MODULE=networking
+# Work with AWS
+make plan CLOUD=aws ENV=mgmt REGION=global
+make plan CLOUD=aws ENV=ops REGION=us-east-1
 
-# Plan a specific module
-make plan-module MODULE=aks_core
+# Validate OpenTofu code
+make validate
 
-# Apply a specific module
-make apply-module MODULE=key_vault
-```
+# Check tool versions
+make version
 
-Environment and region configuration:
-
-```bash
-# Work with different environments/regions
-make plan ENV=dev REGION=eastus
-make plan ENV=ops REGION=westus
+# Clean Terragrunt cache
+make clean
 ```
 
 ## Testing
 
-Module tests are organized in the `infra/tests/modules/` directory, separate from the module code. This ensures clear separation between implementation and testing.
-
-Run all tests with:
+Module tests are organized in `infra/tests/modules/`, separate from module code:
 
 ```bash
+# Run all tests
 make test
-```
 
-To run tests for a specific module:
-
-```bash
+# Run tests for a specific module
 make test-module MODULE=networking
-```
-
-To run tests for all modules in a specific category:
-
-```bash
-make test-category CATEGORY=storage
 ```
 
 ## Documentation
 
-Detailed documentation is available in the `/infra/docs` directory:
+### Operational Docs (`infra/docs/`)
+
+20+ documents covering architecture, security, networking, and operations:
 
 - [Documentation Guide](infra/docs/00-documentation-guide.md)
 - [Project Introduction](infra/docs/01-introduction.md)
@@ -299,38 +238,24 @@ Detailed documentation is available in the `/infra/docs` directory:
 - [Network Topology](infra/docs/07-network-topology.md)
 - [Kubernetes Network Design](infra/docs/08-kubernetes-network-design.md)
 - [Security Architecture](infra/docs/09-security-architecture.md)
+- [Compliance Framework](infra/docs/10-compliance-framework.md)
 - [Naming Conventions](infra/docs/11-naming-conventions.md)
+- [Tagging Strategy](infra/docs/12-tagging-strategy.md)
+- [Module Design](infra/docs/13-module-design.md)
+- [Deployment Workflows](infra/docs/14-deployment-workflows.md)
+- [Testing Strategy](infra/docs/15-testing-strategy.md)
+- [Disaster Recovery](infra/docs/16-disaster-recovery.md)
+- [Available Modules](infra/docs/17-available-modules.md)
+- [Troubleshooting](infra/docs/18-troubleshooting.md)
+- [Cost Management](infra/docs/19-cost-management.md)
+- [Region Scaffolding](infra/docs/20-region-scaffolding.md)
 
-For a complete list of documentation, see the [Documentation Table of Contents](infra/docs/README.md).
+Full index: [Documentation Table of Contents](infra/docs/README.md)
 
-## Makefile Commands
+### AWS Organizations & Compliance Docs (`docs/`)
 
-The Makefile provides the following commands:
-
-```bash
-# Basic operations
-make init                # Initialize all modules
-make plan                # Plan all modules
-make apply               # Apply all modules
-make validate            # Validate all modules
-make clean               # Clean Terragrunt cache
-
-# Module-specific operations
-make init-module         # Initialize a specific module
-make plan-module         # Plan a specific module
-make apply-module        # Apply a specific module
-
-# Environment-specific operations
-make plan ENV=ops REGION=westus   # Plan ops environment in West US region
-make apply ENV=dev REGION=eastus  # Apply dev environment in East US region
-
-# Testing operations
-make test                # Run all tests
-make test-module         # Test a specific module
-
-# Documentation operations
-make docs-check          # Check documentation completeness
-make docs-generate       # Generate documentation index
-```
-
-For a complete list of commands, run `make help`. 
+- **ADRs**: [Multi-cloud structure](docs/adrs/001-multi-cloud-terragrunt-structure.md), [AWS state storage](docs/adrs/002-aws-state-storage.md), [SCP design](docs/adrs/003-scp-design-philosophy.md), [Account management](docs/adrs/004-account-management-strategy.md), [OU hierarchy](docs/adrs/005-ou-hierarchy-design.md), [State bootstrap pattern](docs/adrs/006-state-bootstrap-pattern.md)
+- **Architecture**: [AWS Organizations](docs/architecture/aws-organizations.md), [Config hierarchy](docs/architecture/config-hierarchy.md)
+- **Compliance**: [SCP control mapping](docs/compliance/scp-control-mapping.md) (SOC2, HIPAA, PCI-DSS, NIST, CIS)
+- **Runbooks**: [Add AWS account](docs/runbooks/add-aws-account.md), [Modify SCPs](docs/runbooks/modify-scps.md), [SCP incident response](docs/runbooks/incident-scp-blocking.md)
+- **Guides**: [Onboarding](docs/onboarding.md), [User guide](docs/user-guide.md), [Troubleshooting](docs/troubleshooting/aws-organizations.md)
