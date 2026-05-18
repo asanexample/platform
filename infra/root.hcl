@@ -156,8 +156,8 @@ locals {
   gcp_region   = get_env("TF_VAR_gcp_region", "us-east1")
 
   # Account/subscription IDs
-  aws_account_id       = try(local.environment_vars.locals.account_id, "")
-  aws_assume_role      = local._cloud == "aws" && local.aws_account_id != "" ? local.aws_account_id != get_aws_account_id() : false
+  aws_account_id        = try(local.environment_vars.locals.account_id, "")
+  aws_assume_role       = local._cloud == "aws" && local.aws_account_id != "" ? local.aws_account_id != get_aws_account_id() : false
   azure_subscription_id = try(local.environment_vars.locals.subscription_id, "")
   azure_tenant_id       = try(local.environment_vars.locals.tenant_id, "")
   gcp_project_id        = try(local.environment_vars.locals.gcp_project_id, "")
