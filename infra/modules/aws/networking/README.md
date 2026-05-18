@@ -1,82 +1,81 @@
 # AWS Networking Module
 
-Creates an AWS VPC with subnets, internet gateway, NAT gateways, and route tables.
+Creates an AWS VPC with subnets, internet gateway, NAT gateways, route tables, S3 gateway endpoint, and VPC flow logs. Supports three network topologies: private (default), public, and airgapped.
+
+## Network Topologies
+
+| Topology | IGW | NAT | Use case |
+|----------|-----|-----|----------|
+| **Private** (default) | Yes | Yes | Production workloads — nodes in private subnets, NAT for internet egress |
+| **Public** | Yes | No | Dev/sandbox — nodes get public IPs directly, no NAT cost |
+| **Airgapped** | No | No | Regulated/isolated — no internet access, requires VPC endpoints |
 
 ## Usage
+
+### Private topology with single NAT (recommended for non-prod)
 
 ```hcl
 module "networking" {
   source = "../networking"
 
-  create        = true
-  vpc_name      = "vpc-platform-dev-use1"
+  vpc_name      = "platform-use1-vpc"
   address_space = ["10.100.0.0/16"]
-  environment   = "dev"
+  environment   = "platform"
   workload      = "platform"
   region_abbv   = "use1"
 
   subnets = {
+    "az1-kubernetes" = {
+      address_prefixes  = ["10.100.0.0/26"]
+      availability_zone = "us-east-1a"
+    }
     "az1-public" = {
-      address_prefixes  = ["10.100.0.0/24"]
+      address_prefixes  = ["10.100.0.224/28"]
       availability_zone = "us-east-1a"
       public            = true
     }
-    "az1-kubernetes" = {
-      address_prefixes  = ["10.100.10.0/24"]
-      availability_zone = "us-east-1a"
-    }
   }
 
+  create_nat_gateways = true
+  single_nat_gateway  = true
+
   enable_eks_networking = true
-  eks_cluster_name      = "eks-platform-dev-use1"
+  eks_cluster_name      = "platform-use1-eks"
+
+  enable_flow_logs        = true
+  flow_log_retention_days = 30
 
   tags = {
-    Environment = "dev"
+    Environment = "platform"
     ManagedBy   = "Terragrunt"
   }
 }
 ```
 
-## Examples
-
-### Disabled
-
-```hcl
-module "networking" {
-  source   = "../networking"
-  create   = false
-  vpc_name = ""
-  environment = "dev"
-  workload    = "platform"
-  region_abbv = "use1"
-}
-```
-
-### VPC without EKS networking
+### Public topology (no NAT cost)
 
 ```hcl
 module "networking" {
   source = "../networking"
 
-  vpc_name      = "vpc-platform-dev-use1"
-  address_space = ["10.100.0.0/16"]
-  environment   = "dev"
-  workload      = "platform"
-  region_abbv   = "use1"
+  vpc_name            = "dev-use1-vpc"
+  create_nat_gateways = false
+  # kubernetes subnets marked public = true in network.hcl
+  # ...
+}
+```
 
-  subnets = {
-    "az1-public" = {
-      address_prefixes  = ["10.100.0.0/24"]
-      availability_zone = "us-east-1a"
-      public            = true
-    }
-    "az1-private" = {
-      address_prefixes  = ["10.100.10.0/24"]
-      availability_zone = "us-east-1a"
-    }
-  }
+### Airgapped topology
 
-  tags = { Environment = "dev" }
+```hcl
+module "networking" {
+  source = "../networking"
+
+  vpc_name                = "regulated-use1-vpc"
+  create_internet_gateway = false
+  create_nat_gateways     = false
+  # All subnets are private, VPC endpoints required for AWS API access
+  # ...
 }
 ```
 
@@ -92,66 +91,69 @@ This module exposes cloud-agnostic outputs so downstream modules can consume net
 | `kubernetes_subnet_id` | First subnet matching `*kubernetes` |
 | `create` | Whether resources were created |
 
-<!-- BEGIN_TF_DOCS -->
 ## Resources
 
 | Name | Type |
 | ---- | ---- |
-| [aws_eip.nat](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eip) | resource |
-| [aws_internet_gateway.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/internet_gateway) | resource |
-| [aws_nat_gateway.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/nat_gateway) | resource |
-| [aws_route.private_nat](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route) | resource |
-| [aws_route.public_internet](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route) | resource |
-| [aws_route_table.private](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table) | resource |
-| [aws_route_table.public](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table) | resource |
-| [aws_route_table_association.private](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table_association) | resource |
-| [aws_route_table_association.public](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table_association) | resource |
-| [aws_security_group.eks](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group) | resource |
-| [aws_security_group_rule.eks_egress](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group_rule) | resource |
-| [aws_security_group_rule.eks_self](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group_rule) | resource |
-| [aws_subnet.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/subnet) | resource |
-| [aws_vpc.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc) | resource |
-| [aws_vpc_ipv4_cidr_block_association.secondary](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc_ipv4_cidr_block_association) | resource |
+| `aws_vpc.this` | VPC |
+| `aws_vpc_ipv4_cidr_block_association.secondary` | Secondary CIDR blocks |
+| `aws_internet_gateway.this` | Internet gateway (when `create_internet_gateway = true`) |
+| `aws_subnet.this` | Subnets |
+| `aws_eip.nat` | Elastic IPs for NAT gateways |
+| `aws_nat_gateway.this` | NAT gateways (when `create_nat_gateways = true`) |
+| `aws_route_table.public` | Public route table |
+| `aws_route_table.private` | Private route tables (one per private subnet) |
+| `aws_route.public_internet` | Public internet route via IGW |
+| `aws_route.private_nat` | Private NAT routes |
+| `aws_route_table_association.public` | Public subnet route table associations |
+| `aws_route_table_association.private` | Private subnet route table associations |
+| `aws_vpc_endpoint.s3` | S3 gateway endpoint (free, always created) |
+| `aws_security_group.eks` | EKS security group (when `enable_eks_networking = true`) |
+| `aws_flow_log.this` | VPC flow log (when `enable_flow_logs = true`) |
+| `aws_cloudwatch_log_group.flow_log` | Flow log CloudWatch log group |
+| `aws_iam_role.flow_log` | Flow log IAM role |
+| `aws_iam_role_policy.flow_log` | Flow log IAM policy |
 
 ## Inputs
 
-| Name | Description | Type | Default | Required |
-| ---- | ----------- | ---- | ------- | :------: |
-| environment | Environment name (e.g. ops, dev, staging, prod) | `string` | n/a | yes |
-| workload | Workload name for resources | `string` | n/a | yes |
-| region_abbv | Abbreviated region name for resource naming | `string` | n/a | yes |
-| vpc_name | Name of the VPC to create | `string` | n/a | yes |
-| address_space | CIDR blocks for the VPC | `list(string)` | <pre>[<br/>  "10.0.0.0/16"<br/>]</pre> | no |
-| create | Whether to create resources in this module | `bool` | `true` | no |
-| eks_cluster_name | Name of the EKS cluster. Used for subnet tagging when enable_eks_networking is true. | `string` | `null` | no |
-| enable_eks_networking | Whether to enable EKS-specific networking features (security groups, subnet tags) | `bool` | `false` | no |
-| subnets | Map of subnet names to configuration | <pre>map(object({<br/>    address_prefixes  = list(string)<br/>    availability_zone = optional(string)<br/>    public            = optional(bool, false)<br/>  }))</pre> | `{}` | no |
-| tags | Tags to apply to all resources | `map(string)` | `{}` | no |
+| Name | Description | Type | Default |
+| ---- | ----------- | ---- | ------- |
+| `create` | Whether to create resources | `bool` | `true` |
+| `vpc_name` | Name of the VPC | `string` | (required) |
+| `address_space` | CIDR blocks for the VPC | `list(string)` | `["10.0.0.0/16"]` |
+| `subnets` | Map of subnet names to configuration | `map(object)` | `{}` |
+| `environment` | Environment name | `string` | (required) |
+| `workload` | Workload identifier | `string` | (required) |
+| `region_abbv` | Abbreviated region name | `string` | (required) |
+| `tags` | Tags to apply to all resources | `map(string)` | `{}` |
+| `create_internet_gateway` | Create an IGW (false for airgapped) | `bool` | `true` |
+| `create_nat_gateways` | Create NAT gateways (false for public/airgapped) | `bool` | `true` |
+| `single_nat_gateway` | Use one NAT gateway instead of per-AZ | `bool` | `false` |
+| `enable_eks_networking` | Enable EKS subnet tags and security group | `bool` | `false` |
+| `eks_cluster_name` | EKS cluster name for subnet tagging | `string` | `null` |
+| `enable_flow_logs` | Enable VPC Flow Logs | `bool` | `true` |
+| `flow_log_destination` | Flow log destination: `cloud-watch-logs` or `s3` | `string` | `"cloud-watch-logs"` |
+| `flow_log_retention_days` | CloudWatch log group retention (ignored for S3) | `number` | `30` |
+| `flow_log_s3_bucket_arn` | S3 bucket ARN (required when destination is `s3`) | `string` | `null` |
 
 ## Outputs
 
 | Name | Description |
 | ---- | ----------- |
-| create | Whether resources were created |
-| eks_security_group_id | The ID of the EKS security group if created |
-| internet_gateway_id | The ID of the internet gateway |
-| kubernetes_subnet_id | The ID of the first kubernetes subnet (for EKS node groups) |
-| nat_gateway_ids | Map of public subnet names to NAT gateway IDs |
-| network_id | The ID of the network (VPC ID) |
-| network_name | The name of the network (VPC name) |
-| private_route_table_ids | Map of private subnet names to route table IDs |
-| public_route_table_id | The ID of the public route table |
-| subnet_ids | Map of subnet names to subnet IDs |
-| vpc_cidr_block | The primary CIDR block of the VPC |
-| vpc_id | The ID of the VPC (alias for network_id) |
-<!-- END_TF_DOCS -->
+| `network_id` / `vpc_id` | VPC ID |
+| `network_name` | VPC name |
+| `vpc_cidr_block` | Primary CIDR block |
+| `subnet_ids` | Map of subnet names to IDs |
+| `kubernetes_subnet_id` | First kubernetes subnet ID |
+| `internet_gateway_id` | IGW ID (null if airgapped) |
+| `nat_gateway_ids` | Map of NAT gateway IDs |
+| `public_route_table_id` | Public route table ID |
+| `private_route_table_ids` | Map of private route table IDs |
+| `eks_security_group_id` | EKS security group ID |
+| `s3_endpoint_id` | S3 gateway endpoint ID |
+| `flow_log_id` | VPC flow log ID |
+| `flow_log_group_name` | CloudWatch log group name |
 
 ## Dependencies
 
 None — this is a foundational networking module.
-
-## Notes
-
-- Public subnets are tagged for EKS auto-discovery (`kubernetes.io/role/elb`) when `enable_eks_networking = true`.
-- Private subnets ending in `kubernetes` are tagged with `kubernetes.io/role/internal-elb` for internal load balancer placement.
-- One NAT gateway is created per public subnet; each private subnet routes through the NAT in its availability zone.

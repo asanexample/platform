@@ -47,7 +47,7 @@ output "vpc_cidr_block" {
 
 output "internet_gateway_id" {
   description = "The ID of the internet gateway"
-  value       = var.create ? aws_internet_gateway.this[0].id : null
+  value       = var.create && var.create_internet_gateway ? aws_internet_gateway.this[0].id : null
 }
 
 output "nat_gateway_ids" {
@@ -57,7 +57,7 @@ output "nat_gateway_ids" {
 
 output "public_route_table_id" {
   description = "The ID of the public route table"
-  value       = var.create ? aws_route_table.public[0].id : null
+  value       = var.create && var.create_internet_gateway ? aws_route_table.public[0].id : null
 }
 
 output "private_route_table_ids" {
@@ -68,4 +68,19 @@ output "private_route_table_ids" {
 output "eks_security_group_id" {
   description = "The ID of the EKS security group if created"
   value       = var.create && var.enable_eks_networking ? try(aws_security_group.eks[0].id, null) : null
+}
+
+output "s3_endpoint_id" {
+  description = "The ID of the S3 gateway endpoint"
+  value       = var.create ? aws_vpc_endpoint.s3[0].id : null
+}
+
+output "flow_log_id" {
+  description = "The ID of the VPC flow log"
+  value       = var.create && var.enable_flow_logs ? aws_flow_log.this[0].id : null
+}
+
+output "flow_log_group_name" {
+  description = "The CloudWatch log group name for VPC flow logs"
+  value       = local.enable_cw_flow_logs ? aws_cloudwatch_log_group.flow_log[0].name : null
 }

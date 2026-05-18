@@ -2,139 +2,136 @@
 
 ## Overview
 
-The VIP Platform implements a comprehensive network topology that spans multiple cloud providers, regions, and environments. This document describes the network architecture, connectivity patterns, and security boundaries implemented in the platform.
-
-The current implementation focuses on Azure, with AWS and GCP planned for future phases. The architecture follows a hierarchical CIDR allocation strategy that ensures clear network boundaries and proper isolation between different segments of the infrastructure.
+The platform implements a multi-cloud, multi-account network topology with per-environment VPCs/VNets. Each environment gets a dedicated /16 CIDR block, and each region within an environment is allocated a /21 block subdivided into 6 specialized subnet tiers across 3 availability zones.
 
 ## Design Principles
 
-The network topology is designed according to the following principles:
+1. **Multi-Cloud Connectivity**: Non-overlapping CIDRs across AWS, Azure, and GCP enable cross-cloud VPN and interconnect.
+2. **Multi-Account Isolation**: Each AWS account has its own VPC — no shared networking between environments.
+3. **Topology Flexibility**: Three supported topologies — private (NAT), public (direct IGW), and airgapped (no internet).
+4. **Availability Zone Awareness**: Resources distributed across multiple AZs for high availability.
+5. **Service Segmentation**: Specialized subnet tiers for different workload types.
 
-1. **Multi-Cloud Connectivity**: Seamless connectivity across AWS, Azure, and GCP.
-2. **Multi-Region Support**: Support for resources distributed across multiple geographic regions.
-3. **Security by Default**: Default-deny approach with explicit permissions only where needed.
-4. **Availability Zone Awareness**: Resources distributed across multiple availability zones for high availability.
-5. **Service Segmentation**: Network segmentation for different service types and security requirements.
+## Network Topologies
 
-## Network Components
+The networking module supports three distinct topologies, configurable per environment:
 
-### Virtual Networks / VPCs
+### Private (Default)
 
-In each cloud provider, separate virtual networks (VNets in Azure, VPCs in AWS/GCP) are created for different environments:
+Standard for production workloads. Nodes in private subnets, NAT gateways provide internet egress.
 
-- Development VNet/VPC
-- Testing VNet/VPC (planned)
-- Production VNet/VPC (planned)
+```
+Internet ─── IGW ─── Public Subnets (ALBs, NAT GWs)
+                          │
+                     NAT Gateway
+                          │
+              Private Subnets (EKS nodes, services)
+                          │
+                    S3 Gateway Endpoint (free, direct to S3)
+```
 
-Each virtual network is allocated a distinct CIDR range according to our hierarchical allocation strategy. For Azure, this follows the pattern:
+### Public
 
-| Environment | CIDR Range | Implementation Status |
-|-------------|------------|----------------------|
-| Development | 10.104.0.0/16 | Implemented (eastus) |
-| Testing | 10.200.64.0/18 | Planned |
-| Production | 10.200.128.0/18 | Planned |
+For dev/sandbox environments where cost matters more than isolation. Nodes get public IPs directly.
 
-### Subnets
+```
+Internet ─── IGW ─── Public Subnets (EKS nodes, ALBs)
+                          │
+                    S3 Gateway Endpoint
+```
 
-Each VNet/VPC contains specialized subnets distributed across availability zones. The platform uses a consistent subnet structure across all regions and environments:
+### Airgapped
 
-#### Kubernetes Node Subnets
-- **Purpose**: Host AKS worker nodes
-- **Size**: /26 (62 usable IPs per AZ)
-- **Example**: 10.104.0.0/26 (AZ1), 10.104.1.0/26 (AZ2), 10.104.2.0/26 (AZ3)
-- **Service Endpoints**: Storage, KeyVault, ContainerRegistry
-- **Security**: NSGs with AKS-specific rules
+For regulated/isolated workloads. No internet access. Requires VPC endpoints for all AWS API access.
 
-#### Service Subnets
-- **Purpose**: Host databases and other cloud resources requiring IP addresses
-- **Size**: /27 (30 usable IPs per AZ)
-- **Example**: 10.104.0.64/27 (AZ1), 10.104.1.64/27 (AZ2), 10.104.2.64/27 (AZ3)
-- **Service Endpoints**: Storage, KeyVault, SQL
-- **Security**: Controlled ingress/egress with appropriate NSGs
+```
+              Private Subnets (all resources)
+                          │
+                VPC Endpoints (STS, ECR, S3, EC2, ELB, CloudWatch, ...)
+```
 
-#### Endpoint Subnets
-- **Purpose**: Host private endpoints for PaaS services
-- **Size**: /28 (14 usable IPs per AZ)
-- **Example**: 10.104.0.96/28 (AZ1), 10.104.1.96/28 (AZ2), 10.104.2.96/28 (AZ3)
-- **Service Endpoints**: Storage, SQL, KeyVault
-- **Security**: Highly restricted access with tight NSG rules
+## Subnet Tiers
 
-#### Transit Subnets
-- **Purpose**: Enable connectivity between different network segments
-- **Size**: /29 (6 usable IPs per AZ)
-- **Example**: 10.104.0.128/29 (AZ1), 10.104.1.128/29 (AZ2), 10.104.2.128/29 (AZ3)
-- **Service Endpoints**: Storage
-- **Security**: Tightly controlled routing and security rules
+Each AZ contains 6 specialized subnets:
 
-#### Public Subnets
-- **Purpose**: Host load balancers and other public-facing resources
-- **Size**: /28 (14 usable IPs per AZ)
-- **Example**: 10.104.0.112/28 (AZ1), 10.104.1.112/28 (AZ2), 10.104.2.112/28 (AZ3)
-- **Service Endpoints**: Storage
-- **Security**: Public-facing but with strict NSG rules
+| Tier | Size | Purpose |
+|------|------|---------|
+| **Kubernetes** | /26 (62 IPs) | EKS worker nodes. Tagged for EKS auto-discovery. |
+| **Endpoints** | /26 (62 IPs) | VPC interface endpoints, private link resources. |
+| **Firewall** | /26 (62 IPs) | AWS Network Firewall endpoints (reserved for future use). |
+| **Services** | /27 (30 IPs) | Internal services, NLBs, managed service endpoints. |
+| **Public** | /28 (14 IPs) | IGW-routed resources: ALBs, NAT gateways, bastion hosts. |
+| **Transit** | /29 (6 IPs) | Transit Gateway attachments, VPN termination points. |
 
-### Security Controls
+Subnets are computed from `vpc_cidr` + `azs` using `cidrsubnet()` in each environment's `network.hcl`. No manual CIDR math required — onboarding a new environment is a one-line change.
 
-The network topology implements several security controls:
+## Multi-Account Architecture
 
-1. **Network Security Groups (NSGs)**: Every subnet has an associated NSG that controls inbound and outbound traffic.
-   - AKS-specific NSGs include rules to allow Azure Load Balancer traffic and deny all other inbound traffic by default.
-   - Service-specific NSGs implement least-privilege access rules.
+### AWS
 
-2. **Service Endpoints**: Subnets leverage Azure Service Endpoints to secure connectivity to PaaS services:
-   - Storage service endpoints on all subnets
-   - KeyVault endpoints on Kubernetes, Services, and Endpoints subnets
-   - SQL endpoints on Services and Endpoints subnets
-   - ContainerRegistry endpoints on Kubernetes subnets
+| Account | Environment | VPC CIDR | Purpose |
+|---------|-------------|----------|---------|
+| Management (851725353202) | mgmt | None | Organizations, Identity Center, state backend |
+| Platform (829808296602) | platform | `10.100.0.0/16` | Platform dev, CI/CD, shared services |
+| Preprod (620830101009) | preprod | `10.101.0.0/16` | Pre-production workloads |
+| Prod (554518885123) | prod | `10.102.0.0/16` | Production workloads |
 
-3. **Private Endpoints**: Dedicated Endpoint subnets in each AZ host private endpoints to Azure services, removing exposure to the public internet.
+### Cross-Account Connectivity (Planned)
 
-4. **Default Deny**: All NSGs follow a default-deny approach with explicit allow rules only for required traffic.
+Transit Gateway will connect VPCs when cross-account communication is needed:
 
-### Connectivity
+```
+            Transit Gateway
+           /       |        \
+    Platform    Preprod      Prod
+   10.100/16   10.101/16   10.102/16
+```
 
-The VIP Platform implements a hub-and-spoke networking model:
+Each VPC attaches via its transit subnets (/29 per AZ). TGW route tables control which environments can reach each other.
 
-- **Regional Hub VNets**: Planned for centralized connectivity and security services
-- **Spoke VNets**: Current implementation with environment-specific resources
-- **VNet Peering**: Used for connectivity between VNets within a region
-- **Private DNS Zones**: For name resolution of private endpoints and private AKS clusters
-- **Azure Private Link**: For secure connectivity to PaaS services
+## Cross-Cloud Connectivity (Planned)
 
-For AKS clusters, the platform supports:
-- **Private Clusters**: API servers accessible only from within the VNet
-- **Private DNS Zones**: Automatically created for AKS private clusters (privatelink.{region}.azmk8s.io)
-- **AKS Egress Control**: Support for both outbound NAT and user-defined routing
-- **Load Balancers**: Hosted in public subnets for external access to services
+Site-to-Site VPN between clouds, terminating in transit subnets:
+
+```
+AWS (10.100-102/16) ──── VPN ──── Azure (10.104-106/16)
+                                       │
+                                  VPN ──── GCP (10.108-110/16)
+```
+
+Summary routes: AWS `10.100.0.0/14`, Azure `10.104.0.0/14`, GCP `10.108.0.0/14`.
+
+## Security Controls
+
+- **VPC Flow Logs**: Enabled by default on all VPCs (CloudWatch or S3 destination). Required for compliance.
+- **S3 Gateway Endpoint**: Automatically created on every VPC (free). Keeps S3 traffic off the NAT/internet path.
+- **EKS Security Group**: Created when EKS networking is enabled. Self-referencing inbound, all outbound.
+- **Subnet tagging**: Kubernetes and public subnets auto-tagged for EKS load balancer discovery.
+- **Private route tables**: One per private subnet for granular routing control.
 
 ## Kubernetes Network Integration
 
-Kubernetes clusters are deployed with the following network configurations:
+Kubernetes clusters use Cilium CNI with overlay networking:
 
-1. **Network Plugin**: Cilium CNI for enhanced security and networking capabilities
-2. **Pod/Service CIDRs**:
-   - Pod CIDR: 10.240.0.0/16
-   - Service CIDR: 10.241.0.0/16
-   - DNS Service IP: 10.241.0.10
+| Setting | Value |
+|---------|-------|
+| Network plugin | Cilium (installed post-cluster) |
+| Pod CIDR | `10.240.0.0/16` (overlay, not routed on VPC) |
+| Service CIDR | `10.241.0.0/16` (cluster-internal) |
+| DNS Service IP | `10.241.0.10` |
 
-3. **Multi-AZ Deployment**: AKS clusters span multiple availability zones with node pools distributed across dedicated subnets in each AZ.
+Cross-cluster communication uses Cilium ClusterMesh, not L3 routing.
 
-4. **Network Policies**: Support for Cilium Network Policies providing advanced security features, traffic visibility, and enhanced performance through eBPF.
+## Cost Considerations
 
-## Implementation Status
-
-The current network topology implementation includes:
-- Azure Development environment in East US region
-- Three availability zones with the full subnet structure in each AZ
-- NSGs and service endpoints for all subnets
-- AKS-specific network configurations with multi-AZ support
-
-Future phases will extend the implementation to:
-- Additional Azure regions
-- Production and testing environments
-- AWS and GCP cloud providers
-- Hub-and-spoke connectivity with global transit options
+| Resource | Cost | Notes |
+|----------|------|-------|
+| VPC, subnets, route tables, IGW | Free | — |
+| NAT Gateway | ~$32/month each | Use `single_nat_gateway = true` for non-prod |
+| S3 Gateway Endpoint | Free | Always created |
+| VPC Flow Logs (CloudWatch) | ~$2-5/month | Depends on volume |
+| VPC Flow Logs (S3) | ~$1-3/month | Cheaper for high-volume |
 
 ## Next Steps
 
-Continue to [Kubernetes Network Design](08-kubernetes-network-design.md) to understand how Kubernetes networking is implemented within this network topology. 
+Continue to [Kubernetes Network Design](08-kubernetes-network-design.md) for Kubernetes-specific networking details.

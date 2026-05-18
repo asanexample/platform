@@ -1,20 +1,46 @@
-/**
- * # AWS Networking Module
- *
- * This module creates an AWS VPC with subnets, internet gateway, NAT gateways,
- * and route tables. It also supports EKS-specific networking features when enabled.
- *
- * Cross-cloud interface: This module exposes the same logical outputs as the
- * Azure networking module (network_id, subnet_ids, etc.) to support the
- * multi-cloud abstraction pattern.
- */
+locals {
+  create = var.create
+
+  public_subnets = local.create ? {
+    for k, v in var.subnets : k => v if lookup(v, "public", false)
+  } : {}
+
+  private_subnets = local.create ? {
+    for k, v in var.subnets : k => v if !lookup(v, "public", false)
+  } : {}
+
+  nat_subnets = local.create && var.create_nat_gateways ? (
+    var.single_nat_gateway
+    ? { for k, v in local.public_subnets : k => v if k == keys(local.public_subnets)[0] }
+    : local.public_subnets
+  ) : {}
+
+  # Map each private subnet to its NAT gateway (same-AZ preferred, first NAT as fallback)
+  private_subnet_nat_map = {
+    for k, v in local.private_subnets : k => (
+      var.single_nat_gateway
+      ? try(keys(local.nat_subnets)[0], null)
+      : try(
+        [for pk, pv in local.nat_subnets : pk if lookup(pv, "availability_zone", "") == lookup(v, "availability_zone", "no-match")][0],
+        try(keys(local.nat_subnets)[0], null)
+      )
+    )
+  }
+
+  configure_eks_sg = local.create && var.enable_eks_networking
+
+  enable_cw_flow_logs = local.create && var.enable_flow_logs && var.flow_log_destination == "cloud-watch-logs"
+  enable_s3_flow_logs = local.create && var.enable_flow_logs && var.flow_log_destination == "s3"
+}
+
+data "aws_region" "current" {}
 
 # ---------------------------------------------------------------------------
 # VPC
 # ---------------------------------------------------------------------------
 
 resource "aws_vpc" "this" {
-  count = var.create ? 1 : 0
+  count = local.create ? 1 : 0
 
   cidr_block           = var.address_space[0]
   enable_dns_support   = true
@@ -23,9 +49,8 @@ resource "aws_vpc" "this" {
   tags = merge(var.tags, { Name = var.vpc_name })
 }
 
-# Secondary CIDR blocks (if more than one address_space entry is provided)
 resource "aws_vpc_ipv4_cidr_block_association" "secondary" {
-  for_each = var.create ? {
+  for_each = local.create ? {
     for idx, cidr in slice(var.address_space, 1, length(var.address_space)) : idx => cidr
   } : {}
 
@@ -38,7 +63,7 @@ resource "aws_vpc_ipv4_cidr_block_association" "secondary" {
 # ---------------------------------------------------------------------------
 
 resource "aws_internet_gateway" "this" {
-  count = var.create ? 1 : 0
+  count = local.create && var.create_internet_gateway ? 1 : 0
 
   vpc_id = aws_vpc.this[0].id
 
@@ -50,7 +75,7 @@ resource "aws_internet_gateway" "this" {
 # ---------------------------------------------------------------------------
 
 resource "aws_subnet" "this" {
-  for_each = var.create ? var.subnets : {}
+  for_each = local.create ? var.subnets : {}
 
   vpc_id            = aws_vpc.this[0].id
   cidr_block        = each.value.address_prefixes[0]
@@ -61,7 +86,6 @@ resource "aws_subnet" "this" {
   tags = merge(
     var.tags,
     { Name = each.key },
-    # Tag kubernetes subnets for EKS auto-discovery when enabled
     var.enable_eks_networking && can(regex("kubernetes$", each.key)) ? {
       "kubernetes.io/role/internal-elb"                                    = "1"
       "kubernetes.io/cluster/${coalesce(var.eks_cluster_name, "unknown")}" = "shared"
@@ -74,30 +98,19 @@ resource "aws_subnet" "this" {
 }
 
 # ---------------------------------------------------------------------------
-# Elastic IPs for NAT Gateways
+# NAT Gateways
 # ---------------------------------------------------------------------------
 
-# One NAT gateway per AZ that has a public subnet
-locals {
-  public_subnets = var.create ? {
-    for k, v in var.subnets : k => v if lookup(v, "public", false)
-  } : {}
-}
-
 resource "aws_eip" "nat" {
-  for_each = local.public_subnets
+  for_each = local.nat_subnets
 
   domain = "vpc"
 
   tags = merge(var.tags, { Name = "${var.vpc_name}-nat-${each.key}" })
 }
 
-# ---------------------------------------------------------------------------
-# NAT Gateways (one per public subnet)
-# ---------------------------------------------------------------------------
-
 resource "aws_nat_gateway" "this" {
-  for_each = local.public_subnets
+  for_each = local.nat_subnets
 
   allocation_id = aws_eip.nat[each.key].id
   subnet_id     = aws_subnet.this[each.key].id
@@ -111,9 +124,8 @@ resource "aws_nat_gateway" "this" {
 # Route Tables
 # ---------------------------------------------------------------------------
 
-# Public route table — routes internet traffic through the IGW
 resource "aws_route_table" "public" {
-  count = var.create ? 1 : 0
+  count = local.create && var.create_internet_gateway ? 1 : 0
 
   vpc_id = aws_vpc.this[0].id
 
@@ -121,35 +133,18 @@ resource "aws_route_table" "public" {
 }
 
 resource "aws_route" "public_internet" {
-  count = var.create ? 1 : 0
+  count = local.create && var.create_internet_gateway ? 1 : 0
 
   route_table_id         = aws_route_table.public[0].id
   destination_cidr_block = "0.0.0.0/0"
   gateway_id             = aws_internet_gateway.this[0].id
 }
 
-# Associate public subnets with the public route table
 resource "aws_route_table_association" "public" {
-  for_each = local.public_subnets
+  for_each = local.create && var.create_internet_gateway ? local.public_subnets : {}
 
   subnet_id      = aws_subnet.this[each.key].id
   route_table_id = aws_route_table.public[0].id
-}
-
-# Private route tables — one per AZ, routing through the NAT gateway in that AZ
-locals {
-  private_subnets = var.create ? {
-    for k, v in var.subnets : k => v if !lookup(v, "public", false)
-  } : {}
-
-  # Map each private subnet to its nearest public subnet (same AZ) for NAT routing
-  # Falls back to the first public subnet if no AZ match is found
-  private_subnet_nat_map = {
-    for k, v in local.private_subnets : k => try(
-      [for pk, pv in local.public_subnets : pk if lookup(pv, "availability_zone", "") == lookup(v, "availability_zone", "no-match")][0],
-      try(keys(local.public_subnets)[0], null)
-    )
-  }
 }
 
 resource "aws_route_table" "private" {
@@ -163,7 +158,7 @@ resource "aws_route_table" "private" {
 resource "aws_route" "private_nat" {
   for_each = {
     for k, v in local.private_subnets : k => v
-    if local.private_subnet_nat_map[k] != null
+    if local.private_subnet_nat_map[k] != null && var.create_nat_gateways
   }
 
   route_table_id         = aws_route_table.private[each.key].id
@@ -179,12 +174,27 @@ resource "aws_route_table_association" "private" {
 }
 
 # ---------------------------------------------------------------------------
-# EKS Networking — Security Group
+# S3 Gateway Endpoint (free — reduces NAT costs for S3 traffic)
 # ---------------------------------------------------------------------------
 
-locals {
-  configure_eks_sg = var.create && var.enable_eks_networking
+resource "aws_vpc_endpoint" "s3" {
+  count = local.create ? 1 : 0
+
+  vpc_id            = aws_vpc.this[0].id
+  service_name      = "com.amazonaws.${data.aws_region.current.id}.s3"
+  vpc_endpoint_type = "Gateway"
+
+  route_table_ids = compact(concat(
+    var.create_internet_gateway ? [aws_route_table.public[0].id] : [],
+    [for k, v in aws_route_table.private : v.id],
+  ))
+
+  tags = merge(var.tags, { Name = "${var.vpc_name}-s3-endpoint" })
 }
+
+# ---------------------------------------------------------------------------
+# EKS Security Group
+# ---------------------------------------------------------------------------
 
 resource "aws_security_group" "eks" {
   count = local.configure_eks_sg ? 1 : 0
@@ -218,4 +228,68 @@ resource "aws_security_group_rule" "eks_egress" {
   protocol          = "-1"
   cidr_blocks       = ["0.0.0.0/0"]
   description       = "Allow all outbound traffic"
+}
+
+# ---------------------------------------------------------------------------
+# VPC Flow Logs
+# ---------------------------------------------------------------------------
+
+resource "aws_flow_log" "this" {
+  count = local.create && var.enable_flow_logs ? 1 : 0
+
+  vpc_id               = aws_vpc.this[0].id
+  traffic_type         = "ALL"
+  log_destination_type = var.flow_log_destination
+  log_destination      = var.flow_log_destination == "s3" ? var.flow_log_s3_bucket_arn : aws_cloudwatch_log_group.flow_log[0].arn
+  iam_role_arn         = var.flow_log_destination == "cloud-watch-logs" ? aws_iam_role.flow_log[0].arn : null
+
+  tags = merge(var.tags, { Name = "${var.vpc_name}-flow-log" })
+}
+
+resource "aws_cloudwatch_log_group" "flow_log" {
+  count = local.enable_cw_flow_logs ? 1 : 0
+
+  name              = "/aws/vpc/flow-log/${var.vpc_name}"
+  retention_in_days = var.flow_log_retention_days
+
+  tags = var.tags
+}
+
+resource "aws_iam_role" "flow_log" {
+  count = local.enable_cw_flow_logs ? 1 : 0
+
+  name_prefix = "${var.vpc_name}-flow-log-"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "vpc-flow-logs.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy" "flow_log" {
+  count = local.enable_cw_flow_logs ? 1 : 0
+
+  name_prefix = "flow-log-"
+  role        = aws_iam_role.flow_log[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogGroups",
+        "logs:DescribeLogStreams",
+      ]
+      Resource = "*"
+    }]
+  })
 }
