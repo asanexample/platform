@@ -94,7 +94,16 @@ generate "provider_aws" {
   path      = "provider_aws.tf"
   if_exists = "overwrite_terragrunt"
   contents = (
-    local._cloud == "aws" ? <<EOF
+    local._cloud == "aws" && local.aws_assume_role ? <<EOF
+provider "aws" {
+  region = "${local.aws_region}"
+
+  assume_role {
+    role_arn = "arn:aws:iam::${local.aws_account_id}:role/OrganizationAccountAccessRole"
+  }
+}
+EOF
+    : local._cloud == "aws" ? <<EOF
 provider "aws" {
   region = "${local.aws_region}"
 }
@@ -146,7 +155,9 @@ locals {
   azure_region = get_env("TF_VAR_azure_region", "eastus")
   gcp_region   = get_env("TF_VAR_gcp_region", "us-east1")
 
-  # Account/subscription IDs - both subscription_id and tenant_id must be in env.hcl
+  # Account/subscription IDs
+  aws_account_id       = try(local.environment_vars.locals.account_id, "")
+  aws_assume_role      = local._cloud == "aws" && local.aws_account_id != "" ? local.aws_account_id != get_aws_account_id() : false
   azure_subscription_id = try(local.environment_vars.locals.subscription_id, "")
   azure_tenant_id       = try(local.environment_vars.locals.tenant_id, "")
   gcp_project_id        = try(local.environment_vars.locals.gcp_project_id, "")
