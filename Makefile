@@ -176,12 +176,17 @@ az-create-state-resources: check-azure-auth ## Create Azure resources for Terraf
 .PHONY: test-aws
 test-aws: ## Run all AWS Terratest tests (requires AWS credentials)
 	@echo "$(GREEN)Running AWS Terratest suite...$(NC)"
-	@cd $(INFRA_DIR)/tests/aws && go test -v -timeout 30m ./...
+	@cd $(INFRA_DIR)/tests/aws && go test -v -timeout 45m ./...
 
 .PHONY: test-aws-networking
 test-aws-networking: ## Run AWS networking Terratest tests
 	@echo "$(GREEN)Running AWS networking tests...$(NC)"
 	@cd $(INFRA_DIR)/tests/aws && go test -v -timeout 30m ./networking/...
+
+.PHONY: test-aws-eks
+test-aws-eks: ## Run AWS EKS Terratest tests
+	@echo "$(GREEN)Running AWS EKS tests...$(NC)"
+	@cd $(INFRA_DIR)/tests/aws && go test -v -timeout 45m ./eks/...
 
 #----------------------------------------------
 # Kubernetes operations
