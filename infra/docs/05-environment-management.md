@@ -51,7 +51,7 @@ The platform uses Terragrunt's configuration hierarchy to manage environment-spe
 
 | Layer | File(s) | Scope |
 |-------|---------|-------|
-| Root | `infra/terragrunt.hcl` | Remote state, providers, global tags |
+| Root | `infra/root.hcl` | Remote state, providers, global tags |
 | Cloud | `infra/live/azure/common.hcl` | Cloud-wide defaults (prefix, project tags, subscription map) |
 | Versions | `infra/live/azure/_versions.hcl` | Module source paths and Helm chart version pins |
 | Environment | `infra/live/azure/{env}/env.hcl` | Subscription, env tags, shutdown policies |

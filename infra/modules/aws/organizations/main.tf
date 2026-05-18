@@ -10,9 +10,13 @@ locals {
     "arn:aws:iam::*:role/${role}"
   ]
 
-  ou_parent_map = { for k, v in var.organizational_units :
-    k => v.parent == null ? local.root_id : aws_organizations_organizational_unit.this[v.parent].id
-  }
+  top_level_ous = { for k, v in var.organizational_units : k => v if v.parent == null }
+  child_ous     = { for k, v in var.organizational_units : k => v if v.parent != null }
+
+  all_ou_ids = merge(
+    { for k, v in aws_organizations_organizational_unit.top_level : k => v.id },
+    { for k, v in aws_organizations_organizational_unit.child : k => v.id },
+  )
 
   effective_scps = var.service_control_policies != null ? var.service_control_policies : local.default_scps
 
@@ -36,7 +40,7 @@ locals {
     for target, policies in var.scp_attachments : [
       for policy in policies : {
         key       = "${target}/${policy}"
-        target_id = target == "root" ? local.root_id : aws_organizations_organizational_unit.this[target].id
+        target_id = target == "root" ? local.root_id : local.all_ou_ids[target]
         policy_id = aws_organizations_policy.this[policy].id
       }
     ]
@@ -55,10 +59,18 @@ resource "aws_organizations_organization" "this" {
   lifecycle { prevent_destroy = true }
 }
 
-resource "aws_organizations_organizational_unit" "this" {
-  for_each  = local.create ? var.organizational_units : {}
+resource "aws_organizations_organizational_unit" "top_level" {
+  for_each  = local.create ? local.top_level_ous : {}
   name      = each.key
-  parent_id = local.ou_parent_map[each.key]
+  parent_id = local.root_id
+  tags      = var.tags
+  lifecycle { prevent_destroy = true }
+}
+
+resource "aws_organizations_organizational_unit" "child" {
+  for_each  = local.create ? local.child_ous : {}
+  name      = element(split("/", each.key), length(split("/", each.key)) - 1)
+  parent_id = aws_organizations_organizational_unit.top_level[each.value.parent].id
   tags      = var.tags
   lifecycle { prevent_destroy = true }
 }
@@ -67,7 +79,7 @@ resource "aws_organizations_account" "this" {
   for_each          = local.create ? var.accounts : {}
   name              = each.key
   email             = each.value.email
-  parent_id         = each.value.ou != null ? aws_organizations_organizational_unit.this[each.value.ou].id : local.root_id
+  parent_id         = each.value.ou != null ? local.all_ou_ids[each.value.ou] : local.root_id
   close_on_deletion = false
   tags              = var.tags
   lifecycle { ignore_changes = [role_name] }

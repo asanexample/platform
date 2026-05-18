@@ -12,7 +12,7 @@
 # Then reference values as: include.base.locals.<name>
 #
 # CONFIG HIERARCHY (broadest -> narrowest scope):
-#   1. Root         infra/terragrunt.hcl              Remote state, providers, global tags
+#   1. Root         infra/root.hcl              Remote state, providers, global tags
 #   2. Cloud        infra/live/aws/common.hcl          Cloud-wide defaults (workload, project tags)
 #   3. Environment  infra/live/aws/{env}/env.hcl       Account ID, env tags, policies
 #   4. Region       infra/live/aws/{env}/{region}/     region.hcl (region info), network.hcl (CIDRs)
@@ -26,10 +26,12 @@ locals {
   # ---------------------------------------------------------------------------
   # Load hierarchical configuration files
   # ---------------------------------------------------------------------------
-  env_vars     = read_terragrunt_config(find_in_parent_folders("env.hcl"))
-  region_vars  = read_terragrunt_config(find_in_parent_folders("region.hcl"))
-  network_vars = read_terragrunt_config(find_in_parent_folders("network.hcl"))
-  common_vars  = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  env_vars      = read_terragrunt_config(find_in_parent_folders("env.hcl"))
+  region_vars   = read_terragrunt_config(find_in_parent_folders("region.hcl"))
+  network_vars  = read_terragrunt_config(find_in_parent_folders("network.hcl"))
+  workload_vars = read_terragrunt_config(find_in_parent_folders("workload.hcl"))
+  common_vars   = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  version_vars  = read_terragrunt_config(find_in_parent_folders("aws/_versions.hcl"))
 
   # Flat merge of all config layers (useful for ad-hoc lookups)
   all_vars = merge(
@@ -37,24 +39,33 @@ locals {
     local.env_vars.locals,
     local.region_vars.locals,
     local.network_vars.locals,
+    local.workload_vars.locals,
   )
 
   # ---------------------------------------------------------------------------
   # Commonly used scalars
   # ---------------------------------------------------------------------------
-  env         = local.env_vars.locals.environment
-  workload    = local.common_vars.locals.workload
-  region      = local.region_vars.locals.region
-  region_abbv = local.region_vars.locals.region_abbv
-  account_id  = local.env_vars.locals.account_id
+  env             = local.env_vars.locals.environment
+  workload        = local.workload_vars.locals.workload
+  compliance_tier = local.workload_vars.locals.compliance_tier
+  region          = local.region_vars.locals.region
+  region_abbv     = local.region_vars.locals.region_abbv
+  account_id      = local.env_vars.locals.account_id
 
   # ---------------------------------------------------------------------------
-  # Composed tags: common -> environment -> region (later layers win)
+  # Module sources and version pins (from _versions.hcl)
+  # ---------------------------------------------------------------------------
+  module_source = local.version_vars.locals.module_source
+  helm_versions = local.version_vars.locals.helm_versions
+
+  # ---------------------------------------------------------------------------
+  # Composed tags: common -> environment -> region -> workload (later layers win)
   # ---------------------------------------------------------------------------
   tags = merge(
     local.common_vars.locals.tags,
     local.env_vars.locals.env_tags,
     local.region_vars.locals.region_tags,
+    local.workload_vars.locals.workload_tags,
   )
 
   # ---------------------------------------------------------------------------

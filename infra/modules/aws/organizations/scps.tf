@@ -191,6 +191,30 @@ data "aws_iam_policy_document" "enforce_encryption" {
   }
 
   statement {
+    sid       = "DenyUnencryptedEbsOnLaunch"
+    effect    = "Deny"
+    actions   = ["ec2:RunInstances"]
+    resources = ["arn:aws:ec2:*:*:volume/*"]
+    condition {
+      test     = "Bool"
+      variable = "ec2:Encrypted"
+      values   = ["false"]
+    }
+  }
+
+  statement {
+    sid       = "DenyUnencryptedS3Uploads"
+    effect    = "Deny"
+    actions   = ["s3:PutObject"]
+    resources = ["*"]
+    condition {
+      test     = "Null"
+      variable = "s3:x-amz-server-side-encryption"
+      values   = ["true"]
+    }
+  }
+
+  statement {
     sid       = "DenyUnencryptedRds"
     effect    = "Deny"
     actions   = ["rds:CreateDBInstance"]

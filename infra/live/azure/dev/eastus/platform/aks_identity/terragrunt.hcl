@@ -6,7 +6,7 @@ include "base" {
 }
 
 include "root" {
-  path = find_in_parent_folders()
+  path = find_in_parent_folders("root.hcl")
 }
 
 include "aks_identity_common" {

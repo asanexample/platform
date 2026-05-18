@@ -133,7 +133,7 @@ intentional exception to the general rule of "never commit state files" because:
 
 The S3 bucket and DynamoDB table are "infrastructure about infrastructure." Their metadata is not
 sensitive. The bucket name (`tfstate-mgmt-851725353202`) and table name (`terraform-locks`) are
-already visible in the root `terragrunt.hcl` and in the `_base.hcl` configuration. Committing the
+already visible in the root `root.hcl` and in the `_base.hcl` configuration. Committing the
 state file adds no information that is not already public within the repository.
 
 Committing the state file provides:

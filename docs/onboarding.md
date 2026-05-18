@@ -122,7 +122,7 @@ allowing per-environment customization.
 
 The layers, from broadest to narrowest scope:
 
-1. **Root** (`infra/terragrunt.hcl`) -- Remote state backends, provider versions, global tags
+1. **Root** (`infra/root.hcl`) -- Remote state backends, provider versions, global tags
 2. **Cloud** (`infra/live/aws/common.hcl`) -- Cloud-wide defaults, account mapping, project tags
 3. **Environment** (`infra/live/aws/{env}/common.hcl`) -- Account IDs, environment tags, classification
 4. **Region** (`infra/live/aws/{env}/{region}/region.hcl`) -- Region name, abbreviation, region-specific tags

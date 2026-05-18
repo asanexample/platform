@@ -12,7 +12,7 @@
 # Then reference values as: include.base.locals.<name>
 #
 # CONFIG HIERARCHY (broadest → narrowest scope):
-#   1. Root         infra/terragrunt.hcl              Remote state, providers, global tags
+#   1. Root         infra/root.hcl              Remote state, providers, global tags
 #   2. Cloud        infra/live/azure/common.hcl        Cloud-wide defaults (workload, project tags)
 #   3. Environment  infra/live/azure/{env}/env.hcl     Subscription, env tags, shutdown policies
 #   4. Region       infra/live/azure/{env}/{region}/    region.hcl (region info), network.hcl (CIDRs)

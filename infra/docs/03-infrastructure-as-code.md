@@ -340,7 +340,7 @@ The full configuration hierarchy from broadest to narrowest scope:
 
 | Level | File | Purpose |
 |-------|------|---------|
-| Root | `infra/terragrunt.hcl` | Remote state, providers, global tags |
+| Root | `infra/root.hcl` | Remote state, providers, global tags |
 | Cloud | `infra/live/azure/common.hcl` | Cloud-wide defaults (prefix, project tags) |
 | Environment | `infra/live/azure/{env}/env.hcl` | Subscription, env tags, shutdown policies |
 | Region | `infra/live/azure/{env}/{region}/region.hcl` | Region info |

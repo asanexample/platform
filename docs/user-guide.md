@@ -602,7 +602,7 @@ dependency, because the state backend must be configured before any module
 can initialize:
 
 ```hcl
-# infra/terragrunt.hcl (root)
+# infra/root.hcl (root)
 remote_state {
   backend = "s3"
   config = {

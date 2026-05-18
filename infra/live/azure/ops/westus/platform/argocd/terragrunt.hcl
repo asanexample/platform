@@ -20,9 +20,9 @@ locals {
   domain_name = "argocd-${include.base.locals.env}-${include.base.locals.region_abbv}.example.com"
 }
 
-# Include the root terragrunt.hcl configuration
+# Include the root configuration (root.hcl)
 include "root" {
-  path = find_in_parent_folders()
+  path = find_in_parent_folders("root.hcl")
 }
 
 # Terraform source - use relative path from this directory to the module

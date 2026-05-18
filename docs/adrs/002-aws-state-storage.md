@@ -58,9 +58,9 @@ AWS infrastructure state is stored in **S3 with DynamoDB locking** in the AWS ma
 Azure and GCP state continues to use Azure Blob Storage. Each cloud's state lives in its own
 cloud-native backend.
 
-### Cloud-Aware Routing in Root `terragrunt.hcl`
+### Cloud-Aware Routing in Root `root.hcl`
 
-The root `terragrunt.hcl` uses **path-based detection** to route state to the correct backend:
+The root `root.hcl` uses **path-based detection** to route state to the correct backend:
 
 ```hcl
 locals {
@@ -145,7 +145,7 @@ because:
   for any module is trivial: look at its path relative to the repo root.
 - **Fully managed bootstrap.** The state bucket and lock table are tracked in IaC with proper
   encryption, versioning, and access controls. Drift is detectable.
-- **Single routing logic.** The path-based cloud detection in root `terragrunt.hcl` is a single
+- **Single routing logic.** The path-based cloud detection in root `root.hcl` is a single
   conditional expression. Adding a new cloud requires one additional branch.
 
 ### Negative

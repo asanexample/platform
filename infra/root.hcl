@@ -4,7 +4,10 @@
 // Use OpenTofu instead of Terraform
 terraform_binary = "tofu"
 
-// Cloud-aware remote state: route AWS to S3, everything else to Azure Blob Storage
+// Cloud-aware remote state routing.
+// AWS modules → S3 + DynamoDB locking (bucket created by state-bootstrap module).
+// Azure/GCP modules → Azure Blob Storage (shared ops subscription).
+// The state-bootstrap module overrides this with a local backend.
 remote_state {
   backend = local._cloud == "aws" ? "s3" : "azurerm"
 
@@ -30,43 +33,27 @@ remote_state {
   }
 }
 
-// CURRENTLY USING LOCAL STATE FOR DEVELOPMENT
-// To migrate to Azure remote state later:
-// 1. Create the Azure storage account and container
-// 2. Uncomment the Azure remote_state block above
-// 3. Comment out this local state block
-// 4. Run 'terragrunt init' and answer 'yes' to migrate state
-/*
-remote_state {
-  backend = "local"
-  
-  generate = {
-    path      = "backend.tf"
-    if_exists = "overwrite_terragrunt"
-  }
-  
-  config = {
-    path = "${path_relative_to_include()}/terraform.tfstate"
-  }
-}
-*/
-
-// Generate versions for required providers
+// Cloud-aware provider generation.
+// Each cloud gets only its own provider — avoids cross-cloud auth failures.
 generate "versions" {
   path      = "versions.tf"
   if_exists = "overwrite_terragrunt"
-  contents  = <<EOF
+  contents = (
+    local._cloud == "aws" ? <<EOF
 terraform {
   required_version = ">= 1.6.0"
   required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "4.25.0"
-    }
     aws = {
       source  = "hashicorp/aws"
       version = "5.91.0"
     }
+  }
+}
+EOF
+    : local._cloud == "gcp" ? <<EOF
+terraform {
+  required_version = ">= 1.6.0"
+  required_providers {
     google = {
       source  = "hashicorp/google"
       version = "6.26.0"
@@ -74,40 +61,60 @@ terraform {
   }
 }
 EOF
+    : <<EOF
+terraform {
+  required_version = ">= 1.6.0"
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "4.25.0"
+    }
+  }
+}
+EOF
+  )
 }
 
-// Generate core provider configurations
 generate "provider_azure" {
   path      = "provider_azure.tf"
   if_exists = "overwrite_terragrunt"
-  contents  = <<EOF
+  contents = (
+    local._cloud == "azure" ? <<EOF
 provider "azurerm" {
   features {}
   subscription_id = "${local.azure_subscription_id}"
   tenant_id       = "${local.azure_tenant_id}"
 }
 EOF
+    : ""
+  )
 }
 
 generate "provider_aws" {
   path      = "provider_aws.tf"
   if_exists = "overwrite_terragrunt"
-  contents  = <<EOF
+  contents = (
+    local._cloud == "aws" ? <<EOF
 provider "aws" {
   region = "${local.aws_region}"
 }
 EOF
+    : ""
+  )
 }
 
 generate "provider_gcp" {
   path      = "provider_gcp.tf"
   if_exists = "overwrite_terragrunt"
-  contents  = <<EOF
+  contents = (
+    local._cloud == "gcp" ? <<EOF
 provider "google" {
   project = "${local.gcp_project_id}"
   region  = "${local.gcp_region}"
 }
 EOF
+    : ""
+  )
 }
 
 // Shared inputs that apply to all modules

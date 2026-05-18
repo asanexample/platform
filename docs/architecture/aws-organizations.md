@@ -185,7 +185,7 @@ infra/live/aws/mgmt/global/organizations/terragrunt.hcl
     |       |-- composes tags: common -> env -> region -> workload
     |       |-- runs safety assertions (env path, account ID)
     |
-    |-- include "root" --> infra/terragrunt.hcl
+    |-- include "root" --> infra/root.hcl
     |       |-- detects cloud = "aws" from path
     |       |-- configures S3 backend (bucket: tfstate-mgmt-851725353202)
     |       |-- generates provider_aws.tf (region: us-east-1)

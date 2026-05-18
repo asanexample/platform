@@ -15,12 +15,15 @@ output "root_id" {
 
 output "ou_ids" {
   description = "Map of OU names to their IDs."
-  value       = { for k, v in aws_organizations_organizational_unit.this : k => v.id }
+  value       = local.all_ou_ids
 }
 
 output "ou_arns" {
   description = "Map of OU names to their ARNs."
-  value       = { for k, v in aws_organizations_organizational_unit.this : k => v.arn }
+  value = merge(
+    { for k, v in aws_organizations_organizational_unit.top_level : k => v.arn },
+    { for k, v in aws_organizations_organizational_unit.child : k => v.arn },
+  )
 }
 
 output "account_ids" {

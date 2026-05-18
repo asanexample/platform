@@ -95,7 +95,7 @@ Each layer has a well-defined scope and override semantics (later layers win for
 
 | Layer | File | Scope | Examples |
 |-------|------|-------|---------|
-| 1. Root | `infra/terragrunt.hcl` | Global | Remote state routing, provider generation, common tags, OpenTofu binary |
+| 1. Root | `infra/root.hcl` | Global | Remote state routing, provider generation, common tags, OpenTofu binary |
 | 2. Cloud | `infra/live/{cloud}/common.hcl` | Cloud-wide | Project name, default workload, environment-to-account-ID safety map |
 | 3. Environment | `infra/live/{cloud}/{env}/env.hcl` | Per-account | Account ID, environment name, data classification, env-specific tags |
 | 4. Region | `infra/live/{cloud}/{env}/{region}/region.hcl` + `network.hcl` | Per-region | Region name/abbreviation, VPC CIDRs, region tags |

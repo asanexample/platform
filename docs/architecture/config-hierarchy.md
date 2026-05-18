@@ -29,7 +29,7 @@ hierarchy. Each layer can define variables that are consumed by layers above it
 override earlier (broader) layers when tags or inputs are merged.
 
 ```
-Layer 1 (broadest)    infra/terragrunt.hcl
+Layer 1 (broadest)    infra/root.hcl
     |                     Remote state, providers, global tags, cloud detection
     |
 Layer 2               infra/live/{cloud}/common.hcl
@@ -96,7 +96,7 @@ infra/
 
 ## Layer-by-Layer Reference
 
-### Layer 1: Root (`infra/terragrunt.hcl`)
+### Layer 1: Root (`infra/root.hcl`)
 
 The root configuration file applies to every module in every cloud. It provides:
 
@@ -399,9 +399,9 @@ find_in_parent_folders("aws/_base.hcl"):
   organizations/  --> global/  --> mgmt/  --> aws/
   Found: infra/live/aws/_base.hcl
 
-find_in_parent_folders():   (no argument = root terragrunt.hcl)
+find_in_parent_folders():   (no argument = root config (root.hcl))
   organizations/  --> global/  --> mgmt/  --> aws/  --> live/  --> infra/
-  Found: infra/terragrunt.hcl
+  Found: infra/root.hcl
 
 find_in_parent_folders("env.hcl"):     (called from within _base.hcl)
   _base.hcl is at infra/live/aws/, but path resolution is relative to
@@ -439,7 +439,7 @@ find_in_parent_folders("azure/_base.hcl"):
 
 find_in_parent_folders():
   aks_core/  --> platform/  --> eastus/  --> dev/  --> azure/  --> live/  --> infra/
-  Found: infra/terragrunt.hcl
+  Found: infra/root.hcl
 
 find_in_parent_folders("env.hcl"):     (or "common.hcl" for env layer)
   aks_core/  --> platform/  --> eastus/  --> dev/

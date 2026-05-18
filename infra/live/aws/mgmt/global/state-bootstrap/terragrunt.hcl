@@ -4,10 +4,12 @@ include "base" {
 }
 
 include "root" {
-  path = find_in_parent_folders()
+  path = find_in_parent_folders("root.hcl")
 }
 
-# Override remote_state to use local backend (bootstrapping)
+# Override remote_state to local backend — this module creates the S3 bucket
+# that all other modules store their state in. Chicken-and-egg: it can't use
+# a bucket that doesn't exist yet.
 remote_state {
   backend = "local"
   generate = {

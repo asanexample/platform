@@ -4,7 +4,7 @@ include "base" {
 }
 
 include "root" {
-  path = find_in_parent_folders()
+  path = find_in_parent_folders("root.hcl")
 }
 
 terraform {
@@ -27,7 +27,8 @@ inputs = {
   }
 
   accounts = {
-    "platform" = { email = "josh+platform@deeden.org", ou = "Platform" }
-    "preprod"  = { email = "josh+preprod@deeden.org",  ou = "Workloads/Preprod" }
+    "Platform" = { email = "josh+platform@deeden.org", ou = "Platform" }
+    "Preprod"  = { email = "josh+preprod@deeden.org",  ou = "Workloads/Preprod" }
+    "Prod"     = { email = "josh+prod@deeden.org",     ou = "Workloads/Prod" }
   }
 }

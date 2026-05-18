@@ -12,9 +12,9 @@ locals {
   mock_endpoint_id = "${local.default_id}/afdEndpoints/mock-endpoint"
 }
 
-# Include the root terragrunt.hcl configuration
+# Include the root configuration (root.hcl)
 include "root" {
-  path = find_in_parent_folders()
+  path = find_in_parent_folders("root.hcl")
 }
 
 # Set dependencies for this module

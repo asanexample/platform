@@ -5,9 +5,9 @@ include "base" {
   expose = true
 }
 
-# Include the root terragrunt.hcl configuration
+# Include the root configuration (root.hcl)
 include "root" {
-  path = find_in_parent_folders()
+  path = find_in_parent_folders("root.hcl")
 }
 
 # Set dependencies for this module
