@@ -24,7 +24,7 @@ func testRegion() string {
 }
 
 func testRoleARN() string {
-	if r := os.Getenv("TEST_ROLE_ARN"); r != "" {
+	if r, ok := os.LookupEnv("TEST_ROLE_ARN"); ok {
 		return r
 	}
 	return "arn:aws:iam::157263244316:role/OrganizationAccountAccessRole"
