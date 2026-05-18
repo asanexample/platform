@@ -27,7 +27,7 @@ func testRoleARN() string {
 	if r := os.Getenv("TEST_ROLE_ARN"); r != "" {
 		return r
 	}
-	return "arn:aws:iam::829808296602:role/OrganizationAccountAccessRole"
+	return "arn:aws:iam::157263244316:role/OrganizationAccountAccessRole"
 }
 
 func copyModuleToTemp(t *testing.T) string {

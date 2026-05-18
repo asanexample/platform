@@ -34,6 +34,9 @@ locals {
     # DNS
     route53 = "${local.source_base}/aws//route53"
 
+    # CI/CD
+    github_oidc = "${local.source_base}/aws//github_oidc"
+
     # Governance & compliance
     organizations   = "${local.source_base}/aws//organizations"
     identity_center = "${local.source_base}/aws//identity_center"

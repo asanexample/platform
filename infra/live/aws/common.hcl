@@ -23,6 +23,7 @@ locals {
   environment_account_map = {
     "platform" = "829808296602"
     "mgmt"     = "851725353202"
+    "test"     = "157263244316"
     "preprod"  = "620830101009"
     "prod"     = "554518885123"
   }
