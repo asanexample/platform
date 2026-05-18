@@ -1,79 +1,14 @@
-/**
- * # Naming Module - Validation Test
- * 
- * This test verifies validation conditions for the naming module.
- */
+# Naming Module - Validation Tests
+#
+# Verifies CAF-aligned naming: {type}-{workload}-{env}-{region}
+# For no-hyphen resources: {type}{abbreviated_workload}{env}{region}
 
-# Test valid prefix
-run "prefix_validation_test" {
+# Test basic resource group naming
+run "resource_group_naming_test" {
   command = plan
 
   variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = output.resource_group == "abc-test-dev-rg-eu"
-    error_message = "Resource group name should match expected format"
-  }
-}
-
-# Test valid customer name
-run "customer_name_validation_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "centric"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = output.resource_group == "abc-centric-dev-rg-eu"
-    error_message = "Resource group with valid customer name should match expected format"
-  }
-}
-
-# Test valid environment
-run "environment_validation_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "prod"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = output.resource_group == "abc-test-prod-rg-eu"
-    error_message = "Resource group with valid environment should match expected format"
-  }
-}
-
-# Test valid region abbreviation
-run "region_abbv_validation_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "test"
+    workload    = "platform"
     environment = "dev"
     region_abbv = "eus"
   }
@@ -83,20 +18,19 @@ run "region_abbv_validation_test" {
   }
 
   assert {
-    condition     = output.resource_group == "abc-test-dev-rg-eus"
-    error_message = "Resource group with valid region abbreviation should match expected format"
+    condition     = output.resource_group == "rg-platform-dev-eus"
+    error_message = "Resource group name should be rg-platform-dev-eus"
   }
 }
 
-# Test resource group naming
-run "resource_group_naming_test" {
+# Test with different workload
+run "workload_variation_test" {
   command = plan
 
   variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
+    workload    = "hipaa"
+    environment = "prod"
+    region_abbv = "eus"
   }
 
   module {
@@ -104,20 +38,24 @@ run "resource_group_naming_test" {
   }
 
   assert {
-    condition     = can(regex("^abc-test-dev-rg-eu$", output.resource_group))
-    error_message = "Resource group name should match expected format"
+    condition     = output.resource_group == "rg-hipaa-prod-eus"
+    error_message = "Resource group name should be rg-hipaa-prod-eus"
+  }
+
+  assert {
+    condition     = output.aks_cluster == "aks-hipaa-prod-eus"
+    error_message = "AKS cluster name should be aks-hipaa-prod-eus"
   }
 }
 
-# Test storage account naming - should be lowercase, no hyphens
+# Test storage account naming (no hyphens, abbreviated workload)
 run "storage_account_naming_test" {
   command = plan
 
   variables {
-    prefix      = "abc"
-    customer    = "test"
+    workload    = "platform"
     environment = "dev"
-    region_abbv = "eu"
+    region_abbv = "eus"
   }
 
   module {
@@ -125,8 +63,28 @@ run "storage_account_naming_test" {
   }
 
   assert {
-    condition     = can(regex("^abctestdevsaeu$", output.storage_account))
-    error_message = "Storage account name should match expected format (lowercase, no hyphens)"
+    condition     = output.storage_account == "stplatdeveus"
+    error_message = "Storage account should be stplatdeveus (no hyphens, abbreviated workload)"
+  }
+}
+
+# Test key vault naming (abbreviated workload for 24-char limit)
+run "key_vault_naming_test" {
+  command = plan
+
+  variables {
+    workload    = "platform"
+    environment = "dev"
+    region_abbv = "eus"
+  }
+
+  module {
+    source = "../../../../modules/azure/naming"
+  }
+
+  assert {
+    condition     = output.key_vault == "kv-plat-dev-eus"
+    error_message = "Key vault should be kv-plat-dev-eus (abbreviated workload)"
   }
 }
 
@@ -135,10 +93,9 @@ run "aks_cluster_naming_test" {
   command = plan
 
   variables {
-    prefix      = "abc"
-    customer    = "test"
+    workload    = "platform"
     environment = "dev"
-    region_abbv = "eu"
+    region_abbv = "eus"
   }
 
   module {
@@ -146,8 +103,28 @@ run "aks_cluster_naming_test" {
   }
 
   assert {
-    condition     = can(regex("^abc-dev-aks-eu$", output.aks_cluster))
-    error_message = "AKS cluster name should match expected format"
+    condition     = output.aks_cluster == "aks-platform-dev-eus"
+    error_message = "AKS cluster should be aks-platform-dev-eus"
+  }
+}
+
+# Test AKS node pool naming (no hyphens, 12 char limit)
+run "aks_node_pool_naming_test" {
+  command = plan
+
+  variables {
+    workload    = "platform"
+    environment = "dev"
+    region_abbv = "eus"
+  }
+
+  module {
+    source = "../../../../modules/azure/naming"
+  }
+
+  assert {
+    condition     = output.aks_node_pool == "npplatdev"
+    error_message = "AKS node pool should be npplatdev (no hyphens, abbreviated)"
   }
 }
 
@@ -156,10 +133,9 @@ run "aks_identity_naming_test" {
   command = plan
 
   variables {
-    prefix      = "abc"
-    customer    = "test"
+    workload    = "platform"
     environment = "dev"
-    region_abbv = "eu"
+    region_abbv = "eus"
   }
 
   module {
@@ -167,45 +143,19 @@ run "aks_identity_naming_test" {
   }
 
   assert {
-    condition     = can(regex("^abc-dev-aksid-eu$", output.aks_identity))
-    error_message = "AKS identity name should match expected format"
+    condition     = output.aks_identity == "aksid-platform-dev-eus"
+    error_message = "AKS identity should be aksid-platform-dev-eus"
   }
 }
-
-# Test workload identity naming
-run "workload_identity_naming_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = can(regex("^abc-test-dev-workid-eu$", output.workload_identity))
-    error_message = "Workload identity name should match expected format"
-  }
-}
-
-# ============================================================================
-# Network Resources Tests
-# ============================================================================
 
 # Test virtual network naming
 run "virtual_network_naming_test" {
   command = plan
 
   variables {
-    prefix      = "abc"
-    customer    = "test"
+    workload    = "platform"
     environment = "dev"
-    region_abbv = "eu"
+    region_abbv = "eus"
   }
 
   module {
@@ -213,20 +163,19 @@ run "virtual_network_naming_test" {
   }
 
   assert {
-    condition     = can(regex("^abc-dev-vnet-eu$", output.virtual_network))
-    error_message = "Virtual network name should match expected format (omitting customer)"
+    condition     = output.virtual_network == "vnet-platform-dev-eus"
+    error_message = "Virtual network should be vnet-platform-dev-eus"
   }
 }
 
-# Test subnet naming pattern
+# Test subnet base naming
 run "subnet_naming_test" {
   command = plan
 
   variables {
-    prefix      = "abc"
-    customer    = "test"
+    workload    = "platform"
     environment = "dev"
-    region_abbv = "eu"
+    region_abbv = "eus"
   }
 
   module {
@@ -234,8 +183,8 @@ run "subnet_naming_test" {
   }
 
   assert {
-    condition     = can(regex("^abc-dev-subnet$", output.subnet))
-    error_message = "Subnet name base should match expected format (omitting customer)"
+    condition     = output.subnet == "snet-platform-dev"
+    error_message = "Subnet base should be snet-platform-dev"
   }
 }
 
@@ -244,10 +193,9 @@ run "specialized_subnet_naming_test" {
   command = plan
 
   variables {
-    prefix      = "abc"
-    customer    = "test"
+    workload    = "platform"
     environment = "dev"
-    region_abbv = "eu"
+    region_abbv = "eus"
   }
 
   module {
@@ -255,38 +203,18 @@ run "specialized_subnet_naming_test" {
   }
 
   assert {
-    condition     = can(regex("^abc-dev-subnet-node-eu$", output.subnet_node))
-    error_message = "Node subnet name should match expected format (omitting customer)"
+    condition     = output.subnet_node == "snet-platform-dev-node-eus"
+    error_message = "Node subnet should be snet-platform-dev-node-eus"
   }
 
   assert {
-    condition     = can(regex("^abc-dev-subnet-api-eu$", output.subnet_api))
-    error_message = "API subnet name should match expected format (omitting customer)"
+    condition     = output.subnet_endpoint == "snet-platform-dev-endpoint-eus"
+    error_message = "Endpoint subnet should be snet-platform-dev-endpoint-eus"
   }
 
   assert {
-    condition     = can(regex("^abc-dev-subnet-app-eu$", output.subnet_app))
-    error_message = "App subnet name should match expected format (omitting customer)"
-  }
-
-  assert {
-    condition     = can(regex("^abc-dev-subnet-db-eu$", output.subnet_db))
-    error_message = "Database subnet name should match expected format (omitting customer)"
-  }
-
-  assert {
-    condition     = can(regex("^abc-dev-subnet-endpoint-eu$", output.subnet_endpoint))
-    error_message = "Endpoint subnet name should match expected format (omitting customer)"
-  }
-
-  assert {
-    condition     = can(regex("^abc-dev-subnet-service-eu$", output.subnet_service))
-    error_message = "Service subnet name should match expected format (omitting customer)"
-  }
-
-  assert {
-    condition     = can(regex("^abc-dev-subnet-gateway-eu$", output.subnet_gateway))
-    error_message = "Gateway subnet name should match expected format (omitting customer)"
+    condition     = output.subnet_gateway == "snet-platform-dev-gateway-eus"
+    error_message = "Gateway subnet should be snet-platform-dev-gateway-eus"
   }
 }
 
@@ -295,10 +223,9 @@ run "network_security_group_naming_test" {
   command = plan
 
   variables {
-    prefix      = "abc"
-    customer    = "test"
+    workload    = "platform"
     environment = "dev"
-    region_abbv = "eu"
+    region_abbv = "eus"
   }
 
   module {
@@ -306,20 +233,19 @@ run "network_security_group_naming_test" {
   }
 
   assert {
-    condition     = can(regex("^abc-dev-nsg-eu$", output.network_security_group))
-    error_message = "Network security group name should match expected format (omitting customer)"
+    condition     = output.network_security_group == "nsg-platform-dev-eus"
+    error_message = "NSG should be nsg-platform-dev-eus"
   }
 }
 
-# Test route table naming
-run "route_table_naming_test" {
+# Test log analytics workspace naming
+run "log_analytics_workspace_naming_test" {
   command = plan
 
   variables {
-    prefix      = "abc"
-    customer    = "test"
+    workload    = "platform"
     environment = "dev"
-    region_abbv = "eu"
+    region_abbv = "eus"
   }
 
   module {
@@ -327,20 +253,19 @@ run "route_table_naming_test" {
   }
 
   assert {
-    condition     = can(regex("^abc-dev-rt-eu$", output.route_table))
-    error_message = "Route table name should match expected format (omitting customer)"
+    condition     = output.log_analytics_workspace == "law-platform-dev-eus"
+    error_message = "Log Analytics should be law-platform-dev-eus"
   }
 }
 
-# Test load balancer naming
-run "load_balancer_naming_test" {
+# Test container registry naming (no hyphens)
+run "container_registry_naming_test" {
   command = plan
 
   variables {
-    prefix      = "abc"
-    customer    = "test"
+    workload    = "platform"
     environment = "dev"
-    region_abbv = "eu"
+    region_abbv = "eus"
   }
 
   module {
@@ -348,20 +273,19 @@ run "load_balancer_naming_test" {
   }
 
   assert {
-    condition     = can(regex("^abc-dev-lb-eu$", output.load_balancer))
-    error_message = "Load balancer name should match expected format (omitting customer)"
+    condition     = output.container_registry == "acrplatdeveus"
+    error_message = "Container registry should be acrplatdeveus (no hyphens, abbreviated)"
   }
 }
 
-# Test public IP naming
-run "public_ip_naming_test" {
+# Test front door naming
+run "front_door_naming_test" {
   command = plan
 
   variables {
-    prefix      = "abc"
-    customer    = "test" 
+    workload    = "platform"
     environment = "dev"
-    region_abbv = "eu"
+    region_abbv = "eus"
   }
 
   module {
@@ -369,24 +293,59 @@ run "public_ip_naming_test" {
   }
 
   assert {
-    condition     = can(regex("^abc-dev-pip-eu$", output.public_ip))
-    error_message = "Public IP name should match expected format (omitting customer)"
+    condition     = output.front_door == "fd-platform-dev-eus"
+    error_message = "Front door should be fd-platform-dev-eus"
   }
 }
 
-# ============================================================================
-# Database Resources Tests
-# ============================================================================
+# Test front door endpoint naming
+run "frontdoor_endpoint_naming_test" {
+  command = plan
+
+  variables {
+    workload    = "platform"
+    environment = "dev"
+    region_abbv = "eus"
+  }
+
+  module {
+    source = "../../../../modules/azure/naming"
+  }
+
+  assert {
+    condition     = output.frontdoor_endpoint == "fde-platform-dev-eus"
+    error_message = "Front door endpoint should be fde-platform-dev-eus"
+  }
+}
+
+# Test monitor workspace naming (includes -prometheus suffix)
+run "monitor_workspace_naming_test" {
+  command = plan
+
+  variables {
+    workload    = "platform"
+    environment = "dev"
+    region_abbv = "eus"
+  }
+
+  module {
+    source = "../../../../modules/azure/naming"
+  }
+
+  assert {
+    condition     = output.monitor_workspace == "amw-platform-dev-eus-prometheus"
+    error_message = "Monitor workspace should be amw-platform-dev-eus-prometheus"
+  }
+}
 
 # Test SQL server naming
 run "sql_server_naming_test" {
   command = plan
 
   variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
+    workload    = "data"
+    environment = "prod"
+    region_abbv = "eus"
   }
 
   module {
@@ -394,41 +353,19 @@ run "sql_server_naming_test" {
   }
 
   assert {
-    condition     = can(regex("^abc-test-dev-sql-eu$", output.sql_server))
-    error_message = "SQL server name should match expected format"
+    condition     = output.sql_server == "sql-data-prod-eus"
+    error_message = "SQL server should be sql-data-prod-eus"
   }
 }
 
-# Test SQL database naming
-run "sql_database_naming_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = can(regex("^abc-test-dev-sqldb-eu$", output.sql_database))
-    error_message = "SQL database name should match expected format"
-  }
-}
-
-# Test Cosmos DB account naming
+# Test cosmos account naming
 run "cosmos_account_naming_test" {
   command = plan
 
   variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
+    workload    = "data"
+    environment = "prod"
+    region_abbv = "eus"
   }
 
   module {
@@ -436,381 +373,19 @@ run "cosmos_account_naming_test" {
   }
 
   assert {
-    condition     = can(regex("^abc-test-dev-cosmos-eu$", output.cosmos_account))
-    error_message = "Cosmos DB account name should match expected format"
+    condition     = output.cosmos_account == "cosmos-data-prod-eus"
+    error_message = "Cosmos account should be cosmos-data-prod-eus"
   }
 }
 
-# ============================================================================
-# App Services Resources Tests
-# ============================================================================
-
-# Test App Service naming
-run "app_service_naming_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = can(regex("^abc-test-dev-app-eu$", output.app_service))
-    error_message = "App Service name should match expected format"
-  }
-}
-
-# Test Function App naming
-run "function_app_naming_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = can(regex("^abc-test-dev-func-eu$", output.function_app))
-    error_message = "Function App name should match expected format"
-  }
-}
-
-# Test App Configuration naming
-run "app_configuration_naming_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = can(regex("^abc-test-dev-appconf-eu$", output.app_configuration))
-    error_message = "App Configuration name should match expected format"
-  }
-}
-
-# ============================================================================
-# Security Resources Tests
-# ============================================================================
-
-# Test Key Vault naming
-run "key_vault_naming_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = can(regex("^abc-test-dev-kv-eu$", output.key_vault))
-    error_message = "Key Vault name should match expected format"
-  }
-}
-
-# Test Private Endpoint naming
-run "private_endpoint_naming_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc" 
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = can(regex("^abc-test-dev-pe-eu$", output.private_endpoint))
-    error_message = "Private Endpoint name should match expected format"
-  }
-}
-
-# ============================================================================
-# Monitoring Resources Tests
-# ============================================================================
-
-# Test Log Analytics Workspace naming
-run "log_analytics_workspace_naming_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = can(regex("^abc-dev-law-eu$", output.log_analytics_workspace))
-    error_message = "Log Analytics Workspace name should match expected format (omitting customer)"
-  }
-}
-
-# Test Application Insights naming
-run "application_insights_naming_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = can(regex("^abc-test-dev-ai-eu$", output.application_insights))
-    error_message = "Application Insights name should match expected format"
-  }
-}
-
-# Test Monitor Workspace naming
-run "monitor_workspace_naming_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = can(regex("^abc-dev-amw-eu-prometheus$", output.monitor_workspace))
-    error_message = "Monitor Workspace name should match expected format including prometheus suffix"
-  }
-}
-
-# Test Managed Prometheus naming
-run "managed_prometheus_naming_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = can(regex("^abc-dev-prom-eu$", output.managed_prometheus))
-    error_message = "Managed Prometheus name should match expected format (omitting customer)"
-  }
-}
-
-# Test Container Insights naming
-run "container_insights_naming_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = can(regex("^abc-dev-ci-eu$", output.container_insights))
-    error_message = "Container Insights name should match expected format (omitting customer)"
-  }
-}
-
-# ============================================================================
-# Integration Resources Tests
-# ============================================================================
-
-# Test Event Hub Namespace naming
-run "event_hub_namespace_naming_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = can(regex("^abc-test-dev-ehns-eu$", output.event_hub_namespace))
-    error_message = "Event Hub Namespace name should match expected format"
-  }
-}
-
-# Test Event Hub naming
-run "event_hub_naming_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = can(regex("^abc-test-dev-eh-eu$", output.event_hub))
-    error_message = "Event Hub name should match expected format"
-  }
-}
-
-# ============================================================================
-# Container Resources Tests
-# ============================================================================
-
-# Test container registry naming
-run "container_registry_naming_test" {
-  command = plan
-
-  variables {
-    prefix        = "abc"
-    customer_name = "test"
-    environment   = "dev"
-    region_abbv   = "eu"
-    resource_type = "acr"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = can(regex("^abcdevacreu$", output.container_registry))
-    error_message = "Container Registry name should match expected format (lowercase, no hyphens)"
-  }
-}
-
-# Test AKS Node Pool naming
-run "aks_node_pool_naming_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = can(regex("^abcdevnp$", output.aks_node_pool))
-    error_message = "AKS Node Pool name should match expected format (no hyphens, truncated)"
-  }
-}
-
-# ============================================================================
-# Edge Networking Resources Tests
-# ============================================================================
-
-# Test Front Door naming
-run "front_door_naming_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = can(regex("^abc-dev-fd-eu$", output.front_door))
-    error_message = "Front Door name should match expected format (omitting customer)"
-  }
-}
-
-# Test Front Door Endpoint naming
-run "frontdoor_endpoint_naming_test" {
-  command = plan
-
-  variables {
-    prefix      = "abc"
-    customer    = "test"
-    environment = "dev"
-    region_abbv = "eu"
-  }
-
-  module {
-    source = "../../../../modules/azure/naming"
-  }
-
-  assert {
-    condition     = can(regex("^abc-test-dev-fd-endpoint-eu$", output.frontdoor_endpoint))
-    error_message = "Front Door Endpoint name should match expected format"
-  }
-}
-
-# Test Bastion Host naming
+# Test bastion host naming
 run "bastion_host_naming_test" {
   command = plan
 
   variables {
-    prefix      = "abc"
-    customer    = "test"
+    workload    = "platform"
     environment = "dev"
-    region_abbv = "eu"
+    region_abbv = "eus"
   }
 
   module {
@@ -818,7 +393,72 @@ run "bastion_host_naming_test" {
   }
 
   assert {
-    condition     = can(regex("^abc-dev-bastion-eu$", output.bastion_host))
-    error_message = "Bastion Host name should match expected format (omitting customer)"
+    condition     = output.bastion_host == "bas-platform-dev-eus"
+    error_message = "Bastion host should be bas-platform-dev-eus"
   }
-} 
+}
+
+# Test private endpoint naming
+run "private_endpoint_naming_test" {
+  command = plan
+
+  variables {
+    workload    = "platform"
+    environment = "dev"
+    region_abbv = "eus"
+  }
+
+  module {
+    source = "../../../../modules/azure/naming"
+  }
+
+  assert {
+    condition     = output.private_endpoint == "pe-platform-dev-eus"
+    error_message = "Private endpoint should be pe-platform-dev-eus"
+  }
+}
+
+# Test workload abbreviation for unknown workload (falls back to first 4 chars)
+run "unknown_workload_abbreviation_test" {
+  command = plan
+
+  variables {
+    workload    = "custom"
+    environment = "dev"
+    region_abbv = "eus"
+  }
+
+  module {
+    source = "../../../../modules/azure/naming"
+  }
+
+  assert {
+    condition     = output.storage_account == "stcustdeveus"
+    error_message = "Unknown workload should abbreviate to first 4 chars: stcustdeveus"
+  }
+}
+
+# Test all environment values work
+run "ops_environment_test" {
+  command = plan
+
+  variables {
+    workload    = "platform"
+    environment = "ops"
+    region_abbv = "wus"
+  }
+
+  module {
+    source = "../../../../modules/azure/naming"
+  }
+
+  assert {
+    condition     = output.resource_group == "rg-platform-ops-wus"
+    error_message = "Resource group should be rg-platform-ops-wus"
+  }
+
+  assert {
+    condition     = output.aks_cluster == "aks-platform-ops-wus"
+    error_message = "AKS cluster should be aks-platform-ops-wus"
+  }
+}

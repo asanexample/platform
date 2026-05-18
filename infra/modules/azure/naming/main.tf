@@ -1,28 +1,29 @@
-/**
- * # Azure Resource Naming Module
- *
- * This module provides standardized naming functions for Azure resources based on
- * Azure's naming restrictions and VIP Platform conventions.
- *
- * The module helps ensure consistency across all resources and compliance with
- * Azure-specific naming requirements.
- */
-
 locals {
-  # Default prefix for all resources (can be overridden)
-  default_prefix = var.prefix != null ? var.prefix : "vip"
+  # Workload name and abbreviated form for tight-constraint resources
+  default_workload = var.workload
 
-  # Clean the customer name to ensure it's valid for all resource types
-  # Removes special characters and converts to lowercase
-  normalized_customer = var.customer != null ? lower(replace(var.customer, "/[^a-zA-Z0-9]/", "")) : ""
+  workload_abbreviations = {
+    platform     = "plat"
+    connectivity = "conn"
+    data         = "data"
+    hipaa        = "hipa"
+    pci          = "pci"
+    shared       = "shrd"
+    mgmt         = "mgmt"
+  }
 
-  # Region abbreviation mapping (if needed for consistency)
+  abbreviated_workload = lookup(
+    local.workload_abbreviations,
+    local.default_workload,
+    substr(local.default_workload, 0, 4)
+  )
+
   region_abbv = var.region_abbv
 
   # Resource type abbreviations
   resource_types = {
     resource_group           = "rg"
-    storage_account          = "sa"
+    storage_account          = "st"
     key_vault                = "kv"
     aks_cluster              = "aks"
     workload_identity        = "workid"
@@ -36,15 +37,15 @@ locals {
     service_bus_queue        = "sbq"
     service_bus_topic        = "sbt"
     virtual_network          = "vnet"
-    subnet                   = "subnet"
+    subnet                   = "snet"
     network_security_group   = "nsg"
     application_gateway      = "agw"
     front_door               = "fd"
     frontdoor_profile        = "fd"
-    frontdoor_endpoint       = "fd-endpoint"
-    frontdoor_origin_group   = "fd-og"
-    frontdoor_origin         = "fd-origin"
-    frontdoor_route          = "fd-route"
+    frontdoor_endpoint       = "fde"
+    frontdoor_origin_group   = "fdog"
+    frontdoor_origin         = "fdo"
+    frontdoor_route          = "fdr"
     user_assigned_identity   = "id"
     container_registry       = "acr"
     storage_account_endpoint = "sape"
@@ -55,7 +56,7 @@ locals {
     cosmos_account           = "cosmos"
     monitor_workspace        = "amw"
     application_insights     = "ai"
-    bastion_host             = "bastion"
+    bastion_host             = "bas"
     route_table              = "rt"
     private_endpoint         = "pe"
     private_dns_zone         = "pdns"
@@ -65,7 +66,11 @@ locals {
     managed_prometheus       = "prom"
     container_insights       = "ci"
     aks_identity             = "aksid"
-    managed_grafana          = "grafana"
+    managed_grafana          = "graf"
+    action_group             = "ag"
+    metric_alert             = "ma"
+    activity_log_alert       = "ala"
+    diagnostic_setting       = "diag"
   }
 
   # Azure resource naming restrictions
@@ -185,128 +190,72 @@ locals {
       max_length  = 128
       valid_chars = "^[a-zA-Z0-9\\-_]+$"
     }
+    action_group = {
+      max_length  = 260
+      valid_chars = "^[a-zA-Z0-9\\-_]+$"
+    }
+    metric_alert = {
+      max_length  = 260
+      valid_chars = "^[a-zA-Z0-9\\-_]+$"
+    }
+    activity_log_alert = {
+      max_length  = 260
+      valid_chars = "^[a-zA-Z0-9\\-_]+$"
+    }
+    diagnostic_setting = {
+      max_length  = 260
+      valid_chars = "^[a-zA-Z0-9\\-_]+$"
+    }
   }
 
-  # Generate standard resource names using consistent format
-  customer_part = var.customer != null ? "-${var.customer}" : ""
-
+  # CAF-aligned naming: {type}-{workload}-{env}-{region}
+  # For no-hyphen resources: {type}{abbreviated_workload}{env}{region}
   names = {
-    # Resource Group
-    resource_group = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.resource_group}-${local.region_abbv}",
-
-    # Storage Account (special format with no hyphens, 24 char limit)
-    storage_account = "${local.default_prefix}${local.normalized_customer}${var.environment}${local.resource_types.storage_account}${local.region_abbv}",
-
-    # Key Vault 
-    key_vault = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.key_vault}-${local.region_abbv}",
-
-    # AKS Cluster
-    aks_cluster = "${local.default_prefix}-${var.environment}-${local.resource_types.aks_cluster}-${local.region_abbv}",
-
-    # Workload Identity
-    workload_identity = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.workload_identity}-${local.region_abbv}",
-
-    # Federated Identity
-    federated_identity = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.federated_identity}-${local.region_abbv}",
-
-    # Log Analytics Workspace
-    log_analytics_workspace = "${local.default_prefix}-${var.environment}-${local.resource_types.log_analytics_workspace}-${local.region_abbv}",
-
-    # App Service
-    app_service = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.app_service}-${local.region_abbv}",
-
-    # Function App
-    function_app = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.function_app}-${local.region_abbv}",
-
-    # Virtual Network
-    virtual_network = "${local.default_prefix}-${var.environment}-${local.resource_types.virtual_network}-${local.region_abbv}",
-
-    # Subnet (base name)
-    subnet = "${local.default_prefix}-${var.environment}-${local.resource_types.subnet}",
-
-    # Front Door
-    front_door = "${local.default_prefix}-${var.environment}-${local.resource_types.front_door}-${local.region_abbv}",
-
-    # Front Door Profile
-    frontdoor_profile = "${local.default_prefix}-${var.environment}-${local.resource_types.frontdoor_profile}-${local.region_abbv}",
-
-    # Front Door Endpoint
-    frontdoor_endpoint = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.frontdoor_endpoint}-${local.region_abbv}",
-
-    # Front Door Origin Group
-    frontdoor_origin_group = "${local.default_prefix}-${var.environment}-${local.resource_types.frontdoor_origin_group}-${local.region_abbv}",
-
-    # Front Door Origin
-    frontdoor_origin = "${local.default_prefix}-${var.environment}-${local.resource_types.frontdoor_origin}-${local.region_abbv}",
-
-    # Front Door Route
-    frontdoor_route = "${local.default_prefix}-${var.environment}-${local.resource_types.frontdoor_route}-${local.region_abbv}",
-
-    # Container Registry (no hyphens)
-    container_registry = "${local.default_prefix}${local.normalized_customer}${var.environment}${local.resource_types.container_registry}${local.region_abbv}",
-    
-    # Event Hub Namespace
-    event_hub_namespace = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.event_hub_namespace}-${local.region_abbv}",
-
-    # Event Hub
-    event_hub = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.event_hub}-${local.region_abbv}",
-
-    # Monitor Workspace 
-    monitor_workspace = "${local.default_prefix}-${var.environment}-${local.resource_types.monitor_workspace}-${local.region_abbv}",
-
-    # Application Insights
-    application_insights = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.application_insights}-${local.region_abbv}",
-
-    # App Configuration
-    app_configuration = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.app_configuration}-${local.region_abbv}",
-
-    # SQL Server
-    sql_server = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.sql_server}-${local.region_abbv}",
-
-    # SQL Database
-    sql_database = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.sql_database}-${local.region_abbv}",
-
-    # Cosmos DB Account
-    cosmos_account = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.cosmos_account}-${local.region_abbv}",
-
-    # Network Security Group
-    network_security_group = "${local.default_prefix}-${var.environment}-${local.resource_types.network_security_group}-${local.region_abbv}",
-
-    # Route Table
-    route_table = "${local.default_prefix}-${var.environment}-${local.resource_types.route_table}-${local.region_abbv}",
-
-    # Bastion Host
-    bastion_host = "${local.default_prefix}-${var.environment}-${local.resource_types.bastion_host}-${local.region_abbv}",
-
-    # Private Endpoint
-    private_endpoint = "${local.default_prefix}${local.customer_part}-${var.environment}-${local.resource_types.private_endpoint}-${local.region_abbv}",
-
-    # Public IP
-    public_ip = "${local.default_prefix}-${var.environment}-${local.resource_types.public_ip}-${local.region_abbv}",
-
-    # Load Balancer
-    load_balancer = "${local.default_prefix}-${var.environment}-${local.resource_types.load_balancer}-${local.region_abbv}",
-
-    # AKS Node Pool (special format with no hyphens, 12 char limit)
-    aks_node_pool = "${local.default_prefix}${var.environment}${local.resource_types.aks_node_pool}",
-
-    # Managed Prometheus for AKS
-    managed_prometheus = "${local.default_prefix}-${var.environment}-${local.resource_types.managed_prometheus}-${local.region_abbv}",
-
-    # Container Insights for AKS
-    container_insights = "${local.default_prefix}-${var.environment}-${local.resource_types.container_insights}-${local.region_abbv}",
-
-    # AKS Identity
-    aks_identity = "${local.default_prefix}-${var.environment}-${local.resource_types.aks_identity}-${local.region_abbv}",
-    
-    # Managed Grafana
-    managed_grafana = "${local.default_prefix}-${var.environment}-${local.resource_types.managed_grafana}-${local.region_abbv}"
+    resource_group          = "${local.resource_types.resource_group}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    storage_account         = "${local.resource_types.storage_account}${local.abbreviated_workload}${var.environment}${local.region_abbv}"
+    key_vault               = "${local.resource_types.key_vault}-${local.abbreviated_workload}-${var.environment}-${local.region_abbv}"
+    aks_cluster             = "${local.resource_types.aks_cluster}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    workload_identity       = "${local.resource_types.workload_identity}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    federated_identity      = "${local.resource_types.federated_identity}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    log_analytics_workspace = "${local.resource_types.log_analytics_workspace}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    app_service             = "${local.resource_types.app_service}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    function_app            = "${local.resource_types.function_app}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    virtual_network         = "${local.resource_types.virtual_network}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    subnet                  = "${local.resource_types.subnet}-${local.default_workload}-${var.environment}"
+    front_door              = "${local.resource_types.front_door}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    frontdoor_profile       = "${local.resource_types.frontdoor_profile}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    frontdoor_endpoint      = "${local.resource_types.frontdoor_endpoint}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    frontdoor_origin_group  = "${local.resource_types.frontdoor_origin_group}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    frontdoor_origin        = "${local.resource_types.frontdoor_origin}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    frontdoor_route         = "${local.resource_types.frontdoor_route}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    container_registry      = "${local.resource_types.container_registry}${local.abbreviated_workload}${var.environment}${local.region_abbv}"
+    event_hub_namespace     = "${local.resource_types.event_hub_namespace}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    event_hub               = "${local.resource_types.event_hub}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    monitor_workspace       = "${local.resource_types.monitor_workspace}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    application_insights    = "${local.resource_types.application_insights}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    app_configuration       = "${local.resource_types.app_configuration}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    sql_server              = "${local.resource_types.sql_server}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    sql_database            = "${local.resource_types.sql_database}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    cosmos_account          = "${local.resource_types.cosmos_account}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    network_security_group  = "${local.resource_types.network_security_group}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    route_table             = "${local.resource_types.route_table}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    bastion_host            = "${local.resource_types.bastion_host}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    private_endpoint        = "${local.resource_types.private_endpoint}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    public_ip               = "${local.resource_types.public_ip}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    load_balancer           = "${local.resource_types.load_balancer}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    aks_node_pool           = "${local.resource_types.aks_node_pool}${local.abbreviated_workload}${var.environment}"
+    managed_prometheus      = "${local.resource_types.managed_prometheus}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    container_insights      = "${local.resource_types.container_insights}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    aks_identity            = "${local.resource_types.aks_identity}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    managed_grafana         = "${local.resource_types.managed_grafana}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    action_group            = "${local.resource_types.action_group}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    metric_alert            = "${local.resource_types.metric_alert}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    activity_log_alert      = "${local.resource_types.activity_log_alert}-${local.default_workload}-${var.environment}-${local.region_abbv}"
+    diagnostic_setting      = "${local.resource_types.diagnostic_setting}-${local.default_workload}-${var.environment}-${local.region_abbv}"
   }
 
-  # Function to generate subnet names (workaround for HCL syntax limitations)
-  subnet_name = "${local.default_prefix}-${var.environment}-${local.resource_types.subnet}"
-
-  # Common subnet types
+  # Subnet naming helpers
+  subnet_name     = "${local.resource_types.subnet}-${local.default_workload}-${var.environment}"
   subnet_node     = "${local.subnet_name}-node-${local.region_abbv}"
   subnet_api      = "${local.subnet_name}-api-${local.region_abbv}"
   subnet_app      = "${local.subnet_name}-app-${local.region_abbv}"
@@ -330,25 +279,25 @@ locals {
 
 # Generate monitor workspace (Prometheus) name
 module "monitor_workspace" {
-  source = "Azure/naming/azurerm"
-  suffix = [var.environment, var.region_abbv]
-  prefix = [var.prefix]
+  source                 = "Azure/naming/azurerm"
+  suffix                 = [var.environment, var.region_abbv]
+  prefix                 = [var.workload]
   unique-include-numbers = false
-  unique-length = 0
-  unique-seed = var.unique_seed
+  unique-length          = 0
+  unique-seed            = var.unique_seed
 }
 
 # Generate Grafana name
 module "grafana" {
-  source = "Azure/naming/azurerm"
-  suffix = [var.environment, var.region_abbv]
-  prefix = [var.prefix]
+  source                 = "Azure/naming/azurerm"
+  suffix                 = [var.environment, var.region_abbv]
+  prefix                 = [var.workload]
   unique-include-numbers = false
-  unique-length = 0
-  unique-seed = var.unique_seed
+  unique-length          = 0
+  unique-seed            = var.unique_seed
 }
 
 # Container Registry names must be globally unique, 5-50 characters, alphanumeric only
 locals {
-  container_registry_name = lower("${var.prefix}${var.environment}acr${var.region_abbv}")
-} 
+  container_registry_name = lower("${local.resource_types.container_registry}${local.abbreviated_workload}${var.environment}${var.region_abbv}")
+}

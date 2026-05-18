@@ -18,17 +18,17 @@ terraform {
 # Default inputs for all environments
 inputs = {
   # Kubernetes version
-  kubernetes_version = "1.32.0"  # By specifying minor version, Azure will automatically upgrade patch versions
-  
+  kubernetes_version = "1.32.0" # By specifying minor version, Azure will automatically upgrade patch versions
+
   # Require Azure AD integration and disable local accounts
   local_account_disabled = true
-  
+
   # Azure AD Integration (required for all environments)
   azure_active_directory_role_based_access_control = {
-    admin_group_object_ids = []  # To be provided in environment-specific config
+    admin_group_object_ids = [] # To be provided in environment-specific config
     azure_rbac_enabled     = true
   }
-  
+
   # Default node pool configuration (can be overridden in environment-specific configs)
   default_node_pool = {
     name                = "system"
@@ -43,44 +43,44 @@ inputs = {
       "environment"   = "system"
       "nodepoolos"    = "linux"
     }
-    node_taints         = []
-    os_disk_size_gb     = 100
-    os_disk_type        = "Managed"
-    os_sku              = "Ubuntu"
-    ultra_ssd_enabled   = false
-    max_pods            = 110
+    node_taints       = []
+    os_disk_size_gb   = 100
+    os_disk_type      = "Managed"
+    os_sku            = "Ubuntu"
+    ultra_ssd_enabled = false
+    max_pods          = 110
   }
-  
+
   # Network Settings - No CNI installed by default (Cilium will be installed via Helm)
-  network_plugin    = "none"  # Required for Cilium
-  network_policy    = null    # Not used with Cilium
+  network_plugin    = "none" # Required for Cilium
+  network_policy    = null   # Not used with Cilium
   outbound_type     = "loadBalancer"
-  service_cidr      = null  # Must be provided in environment-specific configs
-  dns_service_ip    = null  # Must be provided in environment-specific configs
-  pod_cidr          = null  # Must be provided in environment-specific configs
+  service_cidr      = null # Must be provided in environment-specific configs
+  dns_service_ip    = null # Must be provided in environment-specific configs
+  pod_cidr          = null # Must be provided in environment-specific configs
   load_balancer_sku = "standard"
-  
+
   # Common cluster settings
   private_cluster_enabled = true
-  sku_tier                = "Free"  # Use "Standard" for production
-  
+  sku_tier                = "Free" # Use "Standard" for production
+
   # Identity type should be consistent across environments
   identity_type = "UserAssigned"
-  
+
   # Common feature flags
   network_contributor_role_enabled = true
   azure_policy_enabled             = true
-  
+
   # Enable workload identity and OIDC issuer for pod-based authentication
   workload_identity_enabled = true
   oidc_issuer_enabled       = true
-  
+
   key_vault_secrets_provider = {
-    enabled = true
+    enabled                 = true
     secret_rotation_enabled = true
     rotation_poll_interval  = "2m"
   }
-  
+
   # Common maintenance window (customize per environment if needed)
   maintenance_window = {
     allowed = [

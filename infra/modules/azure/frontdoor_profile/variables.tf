@@ -1,4 +1,4 @@
-variable "enabled" {
+variable "create" {
   description = "Controls whether the Front Door profile is deployed"
   type        = bool
   default     = true
@@ -49,10 +49,10 @@ variable "tags" {
 }
 
 # Variables for naming module
-variable "prefix" {
-  description = "Prefix for resource names"
+variable "workload" {
+  description = "Workload identifier for resource names"
   type        = string
-  default     = "centric"
+  default     = "platform"
 }
 
 variable "environment" {
@@ -65,10 +65,4 @@ variable "region_abbv" {
   description = "Abbreviation for Azure region (used in resource naming)"
   type        = string
   default     = "eus"
-}
-
-variable "customer" {
-  description = "Customer name (used in resource naming for multi-tenant resources)"
-  type        = string
-  default     = null
 } 

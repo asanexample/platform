@@ -28,12 +28,12 @@ run "create_mock_profile" {
 run "basic_frontdoor_endpoint" {
   command = plan
   variables {
-    enabled                  = true
-    endpoint_name            = "test-endpoint"
-    origin_group_name        = "test-origin-group"
-    profile_name             = "mock-fd-profile"
+    enabled                     = true
+    endpoint_name               = "test-endpoint"
+    origin_group_name           = "test-origin-group"
+    profile_name                = "mock-fd-profile"
     profile_resource_group_name = "test-rg"
-    profile_id               = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Cdn/profiles/mock-fd-profile" 
+    profile_id                  = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Cdn/profiles/mock-fd-profile"
     tags = {
       environment = "test"
     }

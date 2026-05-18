@@ -55,7 +55,7 @@ locals {
     prometheus = {
       enabled = var.prometheus_enabled
       serviceMonitor = {
-        enabled = false  # Disable ServiceMonitor
+        enabled = false # Disable ServiceMonitor
       }
     }
 
@@ -63,7 +63,7 @@ locals {
       prometheus = {
         enabled = var.operator_prometheus_enabled
         serviceMonitor = {
-          enabled = false  # Disable ServiceMonitor
+          enabled = false # Disable ServiceMonitor
         }
       }
       resources = {
@@ -80,33 +80,33 @@ locals {
 
     # Hubble configuration
     hubble = {
-      enabled = var.hubble_enabled
+      enabled       = var.hubble_enabled
       listenAddress = var.hubble_listen_address
       metrics = {
-        enabled = var.hubble_metrics_enabled
+        enabled           = var.hubble_metrics_enabled
         enableOpenMetrics = var.hubble_metrics_enable_open_metrics
         serviceMonitor = {
-          enabled = false  # Disable ServiceMonitor
+          enabled = false # Disable ServiceMonitor
         }
       }
       relay = {
         enabled = var.hubble_relay_enabled
         serviceMonitor = {
-          enabled = false  # Disable ServiceMonitor
+          enabled = false # Disable ServiceMonitor
         }
       }
       ui = {
         enabled = var.hubble_ui_enabled
         serviceMonitor = {
-          enabled = false  # Disable ServiceMonitor
+          enabled = false # Disable ServiceMonitor
         }
       }
       tls = {
         auto = {
-          enabled = var.hubble_tls_auto_enabled
-          method = var.hubble_tls_auto_method
+          enabled              = var.hubble_tls_auto_enabled
+          method               = var.hubble_tls_auto_method
           certValidityDuration = var.hubble_tls_cert_validity_duration
-          schedule = var.hubble_tls_schedule
+          schedule             = var.hubble_tls_schedule
         }
       }
     }

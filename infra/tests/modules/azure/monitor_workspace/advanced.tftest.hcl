@@ -1,8 +1,8 @@
 # Define provider configuration for the test runs
 provider "azurerm" {
   features {}
-  subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  tenant_id       = "c945e155-be68-4477-b8d7-01939adbfe55"
+  subscription_id                 = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
+  tenant_id                       = "c945e155-be68-4477-b8d7-01939adbfe55"
   resource_provider_registrations = "none"
 }
 
@@ -38,17 +38,17 @@ run "custom_tags_test" {
     condition     = azurerm_monitor_workspace.this.tags.Environment == "Test"
     error_message = "Monitor Workspace should have the Environment tag set"
   }
-  
+
   assert {
     condition     = azurerm_monitor_workspace.this.tags.CostCenter == "IT"
     error_message = "Monitor Workspace should have the CostCenter tag set"
   }
-  
+
   assert {
     condition     = azurerm_monitor_workspace.this.tags.ApplicationName == "Monitoring"
     error_message = "Monitor Workspace should have the ApplicationName tag set"
   }
-  
+
   assert {
     condition     = azurerm_monitor_workspace.this.tags.Component == "Prometheus"
     error_message = "Monitor Workspace should have the Component tag set"
@@ -95,7 +95,7 @@ run "output_values_test" {
     condition     = length(azurerm_monitor_workspace.this) > 0
     error_message = "Monitor Workspace resource should be planned for creation"
   }
-  
+
   # Verify basic properties are set correctly
   assert {
     condition     = azurerm_monitor_workspace.this.name == "test-monitor-workspace"

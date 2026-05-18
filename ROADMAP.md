@@ -3,6 +3,7 @@
 | Date       | Version | Author    | Description of Changes   |
 |------------|---------|-----------|--------------------------|
 | 2025-04-08 | 0.1     | J. Deeden | Initial draft of roadmap |
+| 2025-05-15 | 0.2     | J. Deeden | Updated for AWS Organizations, SCPs, and state management |
 
 
 # Multi-Cloud Infrastructure Roadmap
@@ -61,7 +62,7 @@ Our multi-cloud infrastructure is organized in three distinct tiers:
 | 1: Azure Foundation          | Month 1   | Networking, Identity, Security            | 🔄 In Progress | • Core networking modules<br>• Identity framework<br>• Security baseline<br>• Key Vault infrastructure   |
 | 2: Azure Kubernetes          | Month 2   | AKS, Monitoring, Content Delivery         | 🔄 In Progress | • AKS clusters<br>• Monitoring stack<br>• Front Door implementation<br>• CI/CD pipelines                 |
 | 3: Production Readiness      | Month 3   | Multi-Region Deployment, Final Validation | 🔄 In Progress | • Production environment<br>• Multi-region connectivity<br>• Disaster recovery<br>• Operational runbooks |
-| 4: AWS Implementation        | TBD       | AWS Core Services, EKS                    | ⏳ Not Started  | • AWS VPC, IAM, S3<br>• EKS clusters<br>• AWS monitoring                                                 |
+| 4: AWS Implementation        | TBD       | AWS Core Services, EKS                    | 🔄 In Progress  | • AWS Organizations + SCPs<br>• S3 state backend<br>• VPC networking<br>• Naming module                   |
 | 5: GCP Implementation        | TBD       | GCP Core Services, GKE                    | ⏳ Not Started  | • GCP VPC, IAM, GCS<br>• GKE clusters<br>• GCP monitoring                                                |
 | 6: Multi-Cloud Orchestration | TBD       | Cross-Cloud Services, Unified Management  | ⏳ Not Started  | • Cross-cloud networking<br>• Unified monitoring<br>• Centralized identity                               |
 
@@ -163,7 +164,7 @@ These metrics will be tracked throughout the implementation phases and reported 
 | Cloud Operations  | Josh Deeden (Lead)<br>Team of 1 | • Platform implementation<br>• Module development<br>• Technical documentation        | Weekly team meetings                                 |
 | Security Team     | ???                             | • Security requirements<br>• Compliance validation<br>• Security testing              | Bi-weekly reviews                                    |
 | IT Team           | ???                             | • DC operations<br>• Networking support                                               | Bi-weekly sync meetings<br>Monthly planning sessions |
-| Innovation Team   | David Knape                     | • Platform consumers<br>• Requirements input<br>• User acceptance testing             | Weekly sync                                          |
+| Platform Team     | David Knape                     | • Platform consumers<br>• Requirements input<br>• User acceptance testing             | Weekly sync                                          |
 
 ### Decision Making Framework
 - Strategic decisions: Executive Sponsor + Architecture Review Board
@@ -227,11 +228,11 @@ Tasks are also evaluated using an impact vs. effort matrix to determine implemen
 |   ⏳    |    P3    |  Low   |  Low   | Set up pull request and issue templates                           | Create standardized templates to improve documentation of changes and issue reporting                 |
 |   ⏳    |    P3    |  Low   |  Low   | Configure code owners                                             | Implement CODEOWNERS file to automatically assign reviewers based on code paths                       |
 |   ⏳    |    P2    | Medium |  Low   | Document branching strategy                                       | Define and document GitFlow or other branching model for feature development and releases             |
-|   🔄   |    P0    |  High  |  High  | Set up remote state configuration                                 | Configure remote state storage with proper access controls and encryption                             |
-|   🔄   |    P0    |  High  | Medium | Configure backend state locking                                   | Implement state locking mechanisms to prevent concurrent modifications                                |
-|   🔄   |    P0    |  High  | Medium | Terraform state backup automation                                 | Implementation of automated procedures to back up Terraform state files                               |
-|   🔄   |    P1    | Medium | Medium | State file versioning strategy                                    | Approach for managing multiple versions of state files with proper retention policies                 |
-|   🔄   |    P0    |  High  | Medium | State recovery procedures documentation                           | Detailed documentation of steps for recovering from corrupted or lost state files                     |
+|   ✅    |    P0    |  High  |  High  | Set up remote state configuration                                 | Azure Blob for Azure, S3 for AWS with cloud-aware routing                                            |
+|   ✅    |    P0    |  High  | Medium | Configure backend state locking                                   | DynamoDB for AWS, Azure Blob lease for Azure                                                          |
+|   🔄   |    P0    |  High  | Medium | Terraform state backup automation                                 | S3 versioning enabled, Azure Blob versioning enabled                                                  |
+|   ✅    |    P1    | Medium | Medium | State file versioning strategy                                    | S3 bucket versioning + Azure Blob versioning                                                          |
+|   ✅    |    P0    |  High  | Medium | State recovery procedures documentation                           | docs/runbooks/ and docs/troubleshooting/                                                              |
 |   🔄   |    P0    |  High  | Medium | Scheduled backup job configuration                                | Setup of scheduled jobs to perform regular state backups to secure storage                            |
 |   🔄   |    P1    | Medium | Medium | Testing of state restoration process                              | Regular validation of backup restoration processes to ensure recoverability                           |
 |   ⏳    |    P1    | Medium | Medium | Emergency access procedure                                        | Process for secure emergency access to state files during critical incidents                          |
@@ -241,10 +242,10 @@ Tasks are also evaluated using an impact vs. effort matrix to determine implemen
 | Status | Priority | Impact | Effort | Task                                  | Description                                                                                    |
 |:------:|:--------:|:------:|:------:|---------------------------------------|------------------------------------------------------------------------------------------------|
 |   🔄   |    P0    |  High  |  High  | Unified policy framework              | Comprehensive policy engine implementation (OPA/Gatekeeper) for all compliance needs           |
-|   🔄   |    P0    |  High  | Medium | Policy-as-code implementation         | Infrastructure for defining, testing, and enforcing policies through code                      |
-|   🔄   |    P0    |  High  |  High  | Security controls implementation      | Development and deployment of technical security controls across all infrastructure components |
+|   🔄   |    P0    |  High  | Medium | Policy-as-code implementation         | SCPs implemented for AWS; OPA/Gatekeeper policy module exists                                  |
+|   ✅    |    P0    |  High  |  High  | Security controls implementation      | 8 enterprise SCPs deployed: baseline-guardrails, protect-security-services, enforce-encryption, deny-regions, protect-data-and-network, require-tagging, restrict-iam-users, hipaa-eligible-services |
 |   🔄   |    P0    |  High  | Medium | Audit logging                         | Configuration of comprehensive audit logging for security events and administrative actions    |
-|   🔄   |    P0    |  High  | Medium | Compliance documentation              | Creation of documentation demonstrating adherence to security and compliance requirements      |
+|   ✅    |    P0    |  High  | Medium | Compliance documentation              | docs/compliance/scp-control-mapping.md covers SOC2, HIPAA, PCI-DSS, ISO 27001, NIST 800-53, CIS |
 |   ⏳    |    P0    |  High  |  High  | Centralized compliance reporting      | Single platform for compliance monitoring, reporting, and remediation across all environments  |
 |   ⏳    |    P0    |  High  | Medium | Vulnerability management process      | Establishment of procedures for identifying, prioritizing, and remediating vulnerabilities     |
 |   ⏳    |    P0    |  High  | Medium | Security posture monitoring           | Continuous monitoring of security configuration and compliance status                          |
@@ -503,6 +504,21 @@ Tasks are also evaluated using an impact vs. effort matrix to determine implemen
 |   ⏳    |    P0    |  High  |  High  | Baseline network foundation for cross-region connectivity   | Network setup to support failover between regions and DR scenarios                                   |
 |   ⏳    |    P2    | Medium | Medium | Network monitoring for cross-region traffic                 | Monitoring and analytics for traffic between regions                                                 |
 
+#### 4.2 Batch Processing Infrastructure
+
+| Status | Priority | Impact | Effort | Task                                        | Description                                                                                 |
+|:------:|:--------:|:------:|:------:|---------------------------------------------|---------------------------------------------------------------------------------------------|
+|   ⏳    |    P0    |  High  |  High  | Azure Batch account architecture            | Implementation of regional Azure Batch accounts with appropriate network integration         |
+|   ⏳    |    P0    |  High  | Medium | Batch pool configuration framework          | Reusable components for configuring and managing Batch pools across environments             |
+|   ⏳    |    P0    |  High  | Medium | Private endpoint integration for Batch      | Configuration of private endpoints for secure access to Batch services                       |
+|   ⏳    |    P1    | Medium | Medium | Batch node security hardening               | Security configuration for compute nodes in Batch pools                                      |
+|   ⏳    |    P1    | Medium | Medium | Batch job monitoring integration            | Integration of Batch job telemetry with centralized monitoring system                        |
+|   ⏳    |    P1    | Medium | Medium | Batch autoscaling configuration             | Implementation of automatic scaling for Batch pools based on workload                        |
+|   ⏳    |    P1    | Medium |  High  | Kubernetes-to-Batch integration             | Capabilities for Kubernetes workloads to schedule and monitor Batch jobs                     |
+|   ⏳    |    P2    | Medium | Medium | Batch job templates                         | Reusable job definitions for common batch processing scenarios                               |
+|   ⏳    |    P2    | Medium | Medium | Batch cost optimization                     | Strategies for optimizing costs of Batch computing through spot VMs and scheduling           |
+|   ⏳    |    P2    | Medium | Medium | Multi-tenant Batch isolation                | Implementation of proper isolation between customer workloads in shared Batch infrastructure |
+
 ### 5. Customer Environments
 
 #### 5.1 Customer Onboarding Automation
@@ -611,8 +627,8 @@ Tasks are also evaluated using an impact vs. effort matrix to determine implemen
 |:------:|:--------:|:------:|:------:|---------------------------------------------|---------------------------------------------------------------------------------------------|
 |   ⏳    |    P0    |  High  |  High  | Unified documentation platform              | Implementation of centralized documentation system with structured templates and processes  |
 |   ⏳    |    P0    |  High  | Medium | Documentation lifecycle management          | Standardized processes for creating, reviewing, updating, and retiring documentation        |
-|   ⏳    |    P0    |  High  | Medium | Technical documentation standards framework | Centralized standards for all documentation types across the platform                       |
-|   ⏳    |    P0    |  High  | Medium | Runbook framework development               | Standardized approach for developing operational runbooks across all platform areas         |
+|   ✅    |    P0    |  High  | Medium | Technical documentation standards framework | docs/terraform/variable_validation_standards.md + infra/docs/00-documentation-guide.md      |
+|   ✅    |    P0    |  High  | Medium | Runbook framework development               | docs/runbooks/ with 3 runbooks: add-aws-account, modify-scps, incident-scp-blocking       |
 |   ⏳    |    P1    | Medium | Medium | Knowledge transfer framework                | Structured approach for sharing knowledge between team members                              |
 |   ⏳    |    P1    | Medium | Medium | Documentation review cycles                 | Regular reviews to ensure documentation remains accurate and relevant                       |
 |   ⏳    |    P1    | Medium | Medium | Training materials development              | Creation of learning resources for platform users and administrators                        |
@@ -809,23 +825,3 @@ Tasks are also evaluated using an impact vs. effort matrix to determine implemen
 |   ⏳    |    P2    | Medium | Medium | DR evidence collection     | Procedures for collecting evidence of DR compliance         |
 |   ⏳    |    P2    | Medium | Medium | DR external reporting      | Reporting on DR capabilities to external stakeholders       |
 |   ⏳    |    P3    |  Low   | Medium | DR compliance automation   | Automation of DR compliance monitoring and reporting        |
-
-### Priority Breakdown
-
-- P0 (Critical): 150 tasks (35.5%)
-- P1 (High): 145 tasks (34.4%)
-- P2 (Medium): 108 tasks (25.6%)
-- P3 (Low): 19 tasks (4.5%)
-
-### Impact & Effort Analysis
-
-- High Impact: 204 tasks (48.3%)
-- Medium Impact: 195 tasks (46.2%)
-- Low Impact: 23 tasks (5.5%)
-
-- High Effort: 81 tasks (19.2%)
-- Medium Effort: 328 tasks (77.7%)
-- Low Effort: 13 tasks (3.1%)
-
-### Quick Wins (High Impact, Low Effort): 13 tasks (3.1%)
-### Major Projects (High Impact, High Effort): 71 tasks (16.8%)

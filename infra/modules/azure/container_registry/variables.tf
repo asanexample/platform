@@ -1,8 +1,14 @@
 /**
  * Variables for the Azure Container Registry Module
- * 
+ *
  * This file defines all input variables for the ACR module
  */
+
+variable "create" {
+  description = "Whether to create resources in this module"
+  type        = bool
+  default     = true
+}
 
 # Creation control
 variable "create_registry" {
@@ -49,13 +55,13 @@ variable "location" {
 }
 
 # Naming convention variables
-variable "prefix" {
-  description = "The prefix to use for resource names"
+variable "workload" {
+  description = "The workload identifier to use for resource names"
   type        = string
 
   validation {
-    condition     = length(var.prefix) >= 1 && length(var.prefix) <= 10 && can(regex("^[a-zA-Z0-9-_]+$", var.prefix))
-    error_message = "The prefix must be 1-10 characters and can include alphanumeric, hyphen, and underscore characters."
+    condition     = length(var.workload) >= 1 && length(var.workload) <= 10 && can(regex("^[a-zA-Z0-9-_]+$", var.workload))
+    error_message = "The workload must be 1-10 characters and can include alphanumeric, hyphen, and underscore characters."
   }
 }
 

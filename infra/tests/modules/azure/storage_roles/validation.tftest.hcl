@@ -8,7 +8,7 @@
 provider "azurerm" {
   features {}
   subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  tenant_id = "c945e155-be68-4477-b8d7-01939adbfe55"
+  tenant_id       = "c945e155-be68-4477-b8d7-01939adbfe55"
 }
 
 # Setup resources needed for testing
@@ -52,8 +52,8 @@ run "valid_role_definition_id_test" {
     storage_account_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Storage/storageAccounts/teststorageaccount"
     role_assignments = [
       {
-        principal_id        = "00000000-0000-0000-0000-000000000000" # Mock principal ID
-        role_definition_id  = "00000000-0000-0000-0000-000000000000" # Mock role definition ID
+        principal_id       = "00000000-0000-0000-0000-000000000000" # Mock principal ID
+        role_definition_id = "00000000-0000-0000-0000-000000000000" # Mock role definition ID
       }
     ]
   }

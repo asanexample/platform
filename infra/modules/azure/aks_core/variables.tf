@@ -4,17 +4,23 @@
  * Core module responsible for creating the base AKS cluster with essential components.
  */
 
+variable "create" {
+  description = "Whether to create resources in this module"
+  type        = bool
+  default     = true
+}
+
 # ---------------------------------------------------------------------------------------------------------------------
 # NAMING AND GENERAL VARIABLES
 # ---------------------------------------------------------------------------------------------------------------------
 
-variable "prefix" {
-  description = "Prefix for resource names"
+variable "workload" {
+  description = "Workload identifier for resource names"
   type        = string
-  default     = "centric"
+  default     = "platform"
   validation {
-    condition     = length(var.prefix) >= 3 && length(var.prefix) <= 10
-    error_message = "The prefix must be between 3 and 10 characters."
+    condition     = length(var.workload) >= 3 && length(var.workload) <= 10
+    error_message = "The workload must be between 3 and 10 characters."
   }
 }
 

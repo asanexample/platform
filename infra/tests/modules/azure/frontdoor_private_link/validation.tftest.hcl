@@ -19,14 +19,14 @@ run "disabled_test" {
   command = plan
 
   variables {
-    module_enabled = false
-    origin_group_id = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Cdn/profiles/mock-fd-profile/originGroups/test-origin-group"
-    storage_account_name = "teststorageaccount"
+    module_enabled              = false
+    origin_group_id             = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Cdn/profiles/mock-fd-profile/originGroups/test-origin-group"
+    storage_account_name        = "teststorageaccount"
     storage_resource_group_name = "test-rg"
-    origin_name = "test-origin"
-    route_enabled = true
-    route_name = "test-route"
-    endpoint_id = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Cdn/profiles/mock-fd-profile/endpoints/test-endpoint"
+    origin_name                 = "test-origin"
+    route_enabled               = true
+    route_name                  = "test-route"
+    endpoint_id                 = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Cdn/profiles/mock-fd-profile/endpoints/test-endpoint"
   }
 
   module {
@@ -45,14 +45,14 @@ run "origin_group_by_name_test" {
   command = plan
 
   variables {
-    module_enabled = false # Disable actual resource creation
-    origin_group_name = "test-origin-group"
-    profile_name = "mock-fd-profile"
+    module_enabled              = false # Disable actual resource creation
+    origin_group_name           = "test-origin-group"
+    profile_name                = "mock-fd-profile"
     profile_resource_group_name = "test-rg"
-    storage_account_name = "teststorageaccount"
+    storage_account_name        = "teststorageaccount"
     storage_resource_group_name = "test-rg"
-    origin_name = "test-origin"
-    route_enabled = false
+    origin_name                 = "test-origin"
+    route_enabled               = false
   }
 
   module {
@@ -71,12 +71,12 @@ run "route_disabled_test" {
   command = plan
 
   variables {
-    module_enabled = false # Disable actual resource creation
-    origin_group_id = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Cdn/profiles/mock-fd-profile/originGroups/test-origin-group"
-    storage_account_name = "teststorageaccount"
+    module_enabled              = false # Disable actual resource creation
+    origin_group_id             = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Cdn/profiles/mock-fd-profile/originGroups/test-origin-group"
+    storage_account_name        = "teststorageaccount"
     storage_resource_group_name = "test-rg"
-    origin_name = "test-origin"
-    route_enabled = false
+    origin_name                 = "test-origin"
+    route_enabled               = false
   }
 
   module {
@@ -95,14 +95,14 @@ run "output_test" {
   command = plan
 
   variables {
-    module_enabled = false # Disable actual resource creation
-    origin_group_id = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Cdn/profiles/mock-fd-profile/originGroups/test-origin-group"
-    storage_account_name = "teststorageaccount"
+    module_enabled              = false # Disable actual resource creation
+    origin_group_id             = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Cdn/profiles/mock-fd-profile/originGroups/test-origin-group"
+    storage_account_name        = "teststorageaccount"
     storage_resource_group_name = "test-rg"
-    origin_name = "test-origin"
-    route_enabled = true
-    route_name = "test-route"
-    endpoint_id = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Cdn/profiles/mock-fd-profile/endpoints/test-endpoint"
+    origin_name                 = "test-origin"
+    route_enabled               = true
+    route_name                  = "test-route"
+    endpoint_id                 = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Cdn/profiles/mock-fd-profile/endpoints/test-endpoint"
   }
 
   module {

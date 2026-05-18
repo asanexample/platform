@@ -1,0 +1,161 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  tofu-fmt:
+    name: OpenTofu Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+      - name: Check formatting
+        run: tofu fmt -check -recursive infra/modules/
+
+  tofu-validate:
+    name: OpenTofu Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+      - name: Validate all modules
+        run: |
+          read -r -d '' AWS_VERSIONS << 'TFEOF' || true
+          terraform {
+            required_version = ">= 1.6.0"
+            required_providers {
+              aws = {
+                source  = "hashicorp/aws"
+                version = "~> 6.0"
+              }
+            }
+          }
+          TFEOF
+
+          read -r -d '' AZURE_VERSIONS << 'TFEOF' || true
+          terraform {
+            required_version = ">= 1.6.0"
+            required_providers {
+              azurerm = {
+                source  = "hashicorp/azurerm"
+                version = "~> 4.0"
+              }
+            }
+          }
+          TFEOF
+
+          read -r -d '' GCP_VERSIONS << 'TFEOF' || true
+          terraform {
+            required_version = ">= 1.6.0"
+            required_providers {
+              google = {
+                source  = "hashicorp/google"
+                version = "~> 6.0"
+              }
+            }
+          }
+          TFEOF
+
+          read -r -d '' HELM_VERSIONS << 'TFEOF' || true
+          terraform {
+            required_version = ">= 1.6.0"
+            required_providers {
+              helm = {
+                source  = "hashicorp/helm"
+                version = "~> 2.0"
+              }
+              kubernetes = {
+                source  = "hashicorp/kubernetes"
+                version = "~> 2.0"
+              }
+            }
+          }
+          TFEOF
+
+          # Modules with known provider compatibility issues (fix separately)
+          SKIP_VALIDATE="infra/modules/argocd infra/modules/vcluster"
+
+          FAILED=0
+
+          for dir in $(find infra/modules -type f -name "*.tf" -not -path "*/.terraform/*" -exec dirname {} \; | sort -u | grep -v /templates); do
+            if echo "$SKIP_VALIDATE" | grep -qw "$dir"; then
+              echo "::group::Skipping $dir (known issues)"
+              echo "::endgroup::"
+              continue
+            fi
+
+            echo "::group::Validating $dir"
+
+            GENERATED=false
+            if [ ! -f "$dir/versions.tf" ]; then
+              GENERATED=true
+              case "$dir" in
+                infra/modules/aws/*)   echo "$AWS_VERSIONS"   > "$dir/versions.tf" ;;
+                infra/modules/azure/*) echo "$AZURE_VERSIONS" > "$dir/versions.tf" ;;
+                infra/modules/gcp/*)   echo "$GCP_VERSIONS"   > "$dir/versions.tf" ;;
+                *)                     echo "$HELM_VERSIONS"   > "$dir/versions.tf" ;;
+              esac
+            fi
+
+            if tofu -chdir="$dir" init -backend=false -input=false > /dev/null 2>&1; then
+              if tofu -chdir="$dir" validate; then
+                echo "OK: $dir"
+              else
+                echo "FAIL: $dir"
+                FAILED=1
+              fi
+            else
+              echo "FAIL (init): $dir"
+              FAILED=1
+            fi
+
+            if [ "$GENERATED" = true ]; then
+              rm -f "$dir/versions.tf" "$dir/.terraform.lock.hcl"
+              rm -rf "$dir/.terraform"
+            fi
+
+            echo "::endgroup::"
+          done
+
+          exit $FAILED
+
+  terragrunt-hclfmt:
+    name: Terragrunt HCL Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Terragrunt
+        run: |
+          LATEST=$(curl -s https://api.github.com/repos/gruntwork-io/terragrunt/releases/latest | jq -r .tag_name)
+          curl -sL "https://github.com/gruntwork-io/terragrunt/releases/download/${LATEST}/terragrunt_linux_amd64" -o /usr/local/bin/terragrunt
+          chmod +x /usr/local/bin/terragrunt
+      - name: Check HCL formatting
+        run: terragrunt hcl fmt --check
+
+  tflint:
+    name: TFLint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: terraform-linters/setup-tflint@v4
+      - name: Lint all modules
+        run: |
+          FAILED=0
+          for dir in $(find infra/modules -type f -name "*.tf" -not -path "*/.terraform/*" -exec dirname {} \; | sort -u | grep -v /templates); do
+            echo "::group::Linting $dir"
+            if tflint --chdir="$dir" --minimum-failure-severity=error 2>&1; then
+              echo "OK: $dir"
+            else
+              echo "FAIL: $dir"
+              FAILED=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $FAILED

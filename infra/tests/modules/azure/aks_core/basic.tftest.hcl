@@ -13,15 +13,15 @@ provider "azurerm" {
       prevent_deletion_if_contains_resources = false
     }
   }
-  subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  tenant_id = "c945e155-be68-4477-b8d7-01939adbfe55"
+  subscription_id                 = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
+  tenant_id                       = "c945e155-be68-4477-b8d7-01939adbfe55"
   resource_provider_registrations = "none"
 }
 
 # Variables for Azure credentials passed via environment variables
 variables {
   subscription_id = ""
-  tenant_id = ""
+  tenant_id       = ""
 }
 
 # Basic test for AKS cluster creation with minimal configuration
@@ -31,34 +31,34 @@ run "basic_aks_cluster" {
   variables {
     resource_group_name = "test-rg"
     location            = "eastus"
-    
+
     # Use auto-generated name
     name        = null
     prefix      = "test"
     environment = "dev"
     region_abbv = "eus"
-    
+
     # Basic cluster configuration
     kubernetes_version     = "1.28.5"
     local_account_disabled = true
     sku_tier               = "Free"
-    
+
     # Workload identity settings
     workload_identity_enabled = true
     oidc_issuer_enabled       = true
-    
+
     # Default node pool configuration
     default_nodepool_name            = "system"
     default_nodepool_count           = 1
     default_nodepool_vm_size         = "Standard_D4s_v4"
     default_nodepool_max_pods        = 30
     default_nodepool_os_disk_size_gb = 128
-    default_nodepool_node_labels     = {
+    default_nodepool_node_labels = {
       "nodepool-type" = "system"
       "environment"   = "dev"
     }
     default_nodepool_enable_auto_scaling = false
-    
+
     # Network configuration
     network_plugin     = "azure"
     network_policy     = "azure"
@@ -66,16 +66,16 @@ run "basic_aks_cluster" {
     service_cidr       = "10.0.0.0/16"
     pod_cidr           = "10.244.0.0/16"
     docker_bridge_cidr = "172.17.0.1/16"
-    
+
     # Identity type
     identity_type = "SystemAssigned"
-    
+
     # No Azure AD integration for basic test
     azure_active_directory_role_based_access_control = null
-    
+
     # Add Log Analytics Workspace ID for Microsoft Defender
     log_analytics_workspace_id = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.OperationalInsights/workspaces/test-law"
-    
+
     # Basic tags
     tags = {
       environment = "test"

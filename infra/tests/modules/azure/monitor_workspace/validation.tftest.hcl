@@ -1,8 +1,8 @@
 # Define provider configuration for the test runs
 provider "azurerm" {
   features {}
-  subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  tenant_id       = "c945e155-be68-4477-b8d7-01939adbfe55"
+  subscription_id                 = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
+  tenant_id                       = "c945e155-be68-4477-b8d7-01939adbfe55"
   resource_provider_registrations = "none"
 }
 
@@ -78,7 +78,7 @@ run "long_name_test" {
 # Test creating multiple resources (idempotency)
 run "multiple_runs_test" {
   command = plan
-  
+
   variables {
     name                = "test-monitor-workspace"
     resource_group_name = "test-rg"
@@ -88,7 +88,7 @@ run "multiple_runs_test" {
   module {
     source = "../../../../modules/azure/monitor_workspace"
   }
-  
+
   # Verify the resource is created as expected
   assert {
     condition     = azurerm_monitor_workspace.this.name == "test-monitor-workspace"

@@ -9,7 +9,7 @@
 provider "azurerm" {
   features {}
   subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  tenant_id = "c945e155-be68-4477-b8d7-01939adbfe55"
+  tenant_id       = "c945e155-be68-4477-b8d7-01939adbfe55"
 }
 
 # Setup resources needed for testing
@@ -33,13 +33,13 @@ run "get_client_config" {
 # Test advanced container creation with multiple containers and role assignments
 run "advanced_container_test" {
   command = plan
-  
+
   variables {
     storage_account_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Storage/storageAccounts/teststorageaccount"
-    
+
     containers = {
       "data" = {
-        name                 = "data"
+        name                  = "data"
         container_access_type = "private"
         metadata = {
           "environment" = "test"
@@ -47,7 +47,7 @@ run "advanced_container_test" {
         }
       },
       "logs" = {
-        name                 = "logs"
+        name                  = "logs"
         container_access_type = "private"
         metadata = {
           "retention" = "30days"
@@ -55,15 +55,15 @@ run "advanced_container_test" {
         }
       },
       "public" = {
-        name                 = "public"
+        name                  = "public"
         container_access_type = "blob"
         metadata = {
-          "access" = "read-only"
+          "access"  = "read-only"
           "content" = "public-docs"
         }
       }
     }
-    
+
     role_assignments = [
       {
         container_key        = "data"

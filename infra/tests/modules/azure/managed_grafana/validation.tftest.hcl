@@ -8,7 +8,7 @@
 provider "azurerm" {
   features {}
   subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  tenant_id = "c945e155-be68-4477-b8d7-01939adbfe55"
+  tenant_id       = "c945e155-be68-4477-b8d7-01939adbfe55"
 }
 
 # Test basic configuration with default values
@@ -16,9 +16,9 @@ run "basic_configuration_test" {
   command = plan
 
   variables {
-    name                = "test-grafana"
-    resource_group_name = "test-rg"
-    location            = "eastus"
+    name                    = "test-grafana"
+    resource_group_name     = "test-rg"
+    location                = "eastus"
     prometheus_workspace_id = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Monitor/accounts/test-prometheus"
   }
 
@@ -31,13 +31,13 @@ run "basic_configuration_test" {
     condition     = azurerm_dashboard_grafana.grafana.name == "test-grafana"
     error_message = "Grafana resource should be created with the correct name"
   }
-  
+
   # Verify Grafana has the correct properties
   assert {
     condition     = azurerm_dashboard_grafana.grafana.resource_group_name == "test-rg"
     error_message = "Grafana resource should be in the correct resource group"
   }
-  
+
   # Verify Prometheus integration is configured
   assert {
     condition     = azurerm_dashboard_grafana.grafana.azure_monitor_workspace_integrations[0].resource_id == var.prometheus_workspace_id
@@ -123,7 +123,7 @@ run "grafana_version_test" {
     resource_group_name     = "test-rg"
     location                = "eastus"
     prometheus_workspace_id = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Monitor/accounts/test-prometheus"
-    grafana_major_version   = "11"  # Updated to use a newer supported version
+    grafana_major_version   = "11" # Updated to use a newer supported version
   }
 
   module {

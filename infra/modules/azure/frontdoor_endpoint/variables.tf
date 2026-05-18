@@ -1,4 +1,4 @@
-variable "enabled" {
+variable "create" {
   description = "Controls whether the Front Door endpoint resources are deployed"
   type        = bool
   default     = true

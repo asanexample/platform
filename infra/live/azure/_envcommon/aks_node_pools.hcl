@@ -31,14 +31,14 @@ inputs = {
       "environment"   = "standard"
       "nodepoolos"    = "linux"
     }
-    node_taints         = []
-    os_disk_size_gb     = 128
-    os_disk_type        = "Managed"
-    os_sku              = "Ubuntu"
-    ultra_ssd_enabled   = false
-    max_pods            = 110
+    node_taints       = []
+    os_disk_size_gb   = 128
+    os_disk_type      = "Managed"
+    os_sku            = "Ubuntu"
+    ultra_ssd_enabled = false
+    max_pods          = 110
   }
-  
+
   # Common performance node pool configuration
   performance_node_pool = {
     name                = "perf"
@@ -54,14 +54,14 @@ inputs = {
       "nodepoolos"    = "linux"
       "highcpu"       = "true"
     }
-    node_taints         = ["workloadtype=performance:NoSchedule"]
-    os_disk_size_gb     = 256
-    os_disk_type        = "Managed"
-    os_sku              = "Ubuntu"
-    ultra_ssd_enabled   = true
-    max_pods            = 110
+    node_taints       = ["workloadtype=performance:NoSchedule"]
+    os_disk_size_gb   = 256
+    os_disk_type      = "Managed"
+    os_sku            = "Ubuntu"
+    ultra_ssd_enabled = true
+    max_pods          = 110
   }
-  
+
   # Common spot node pool configuration
   spot_node_pool = {
     name                = "spot"
@@ -76,23 +76,23 @@ inputs = {
       "environment"   = "spot"
       "nodepoolos"    = "linux"
     }
-    node_taints         = ["kubernetes.azure.com/scalesetpriority=spot:NoSchedule"]
-    os_disk_size_gb     = 128
-    os_disk_type        = "Managed"
-    os_sku              = "Ubuntu"
-    ultra_ssd_enabled   = false
-    max_pods            = 110
-    spot_enabled        = true
-    spot_max_price      = -1 # Default to current on-demand price
-    eviction_policy     = "Delete"
+    node_taints       = ["kubernetes.azure.com/scalesetpriority=spot:NoSchedule"]
+    os_disk_size_gb   = 128
+    os_disk_type      = "Managed"
+    os_sku            = "Ubuntu"
+    ultra_ssd_enabled = false
+    max_pods          = 110
+    spot_enabled      = true
+    spot_max_price    = -1 # Default to current on-demand price
+    eviction_policy   = "Delete"
   }
-  
+
   # Common settings for all node pools
   common_node_pool_settings = {
-    workload_runtime      = "OCIContainer"
-    enable_host_encryption = false
-    enable_node_public_ip = false
-    orchestrator_version  = null # Will use the same version as the cluster
+    workload_runtime             = "OCIContainer"
+    enable_host_encryption       = false
+    enable_node_public_ip        = false
+    orchestrator_version         = null # Will use the same version as the cluster
     proximity_placement_group_id = null
   }
 } 

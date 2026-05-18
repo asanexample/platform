@@ -8,7 +8,7 @@
 provider "azurerm" {
   features {}
   subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  tenant_id = "c945e155-be68-4477-b8d7-01939adbfe55"
+  tenant_id       = "c945e155-be68-4477-b8d7-01939adbfe55"
 }
 
 # Test workload identity creation with specific configuration
@@ -16,15 +16,15 @@ run "workload_identity_creation_test" {
   command = plan
 
   variables {
-    prefix                 = "abc"
-    customer               = "test"
-    environment            = "dev"
-    region_abbv            = "eus"
-    resource_group_name    = "test-rg"
-    location               = "eastus"
-    create_aks_identity    = true
+    prefix                   = "abc"
+    customer                 = "test"
+    environment              = "dev"
+    region_abbv              = "eus"
+    resource_group_name      = "test-rg"
+    location                 = "eastus"
+    create_aks_identity      = true
     enable_workload_identity = true
-    cluster_name           = "test-aks-cluster"
+    cluster_name             = "test-aks-cluster"
     workload_identities = {
       "app1" = {
         namespace       = "app1-ns"
@@ -41,9 +41,9 @@ run "workload_identity_creation_test" {
     # Using a hardcoded value for OIDC URL since this is a test
     aks_oidc_issuer_url = "https://oidc.test.aks.test.az.com/"
     # Using a hardcoded value for node resource group ID since this is a test
-    node_resource_group_id = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/MC_test-rg_test-aks_eastus"
+    node_resource_group_id       = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/MC_test-rg_test-aks_eastus"
     create_federated_credentials = true
-    create_role_assignments = true
+    create_role_assignments      = true
   }
 
   module {
@@ -91,15 +91,15 @@ run "federated_credentials_disabled_test" {
   command = plan
 
   variables {
-    prefix                 = "abc"
-    customer               = "test"
-    environment            = "dev"
-    region_abbv            = "eus"
-    resource_group_name    = "test-rg"
-    location               = "eastus"
-    create_aks_identity    = true
+    prefix                   = "abc"
+    customer                 = "test"
+    environment              = "dev"
+    region_abbv              = "eus"
+    resource_group_name      = "test-rg"
+    location                 = "eastus"
+    create_aks_identity      = true
     enable_workload_identity = true
-    cluster_name           = "test-aks-cluster"
+    cluster_name             = "test-aks-cluster"
     workload_identities = {
       "app1" = {
         namespace       = "app1-ns"
@@ -108,7 +108,7 @@ run "federated_credentials_disabled_test" {
       }
     }
     create_federated_credentials = false
-    create_role_assignments = false
+    create_role_assignments      = false
   }
 
   module {
@@ -133,14 +133,14 @@ run "subnet_permissions_test" {
   command = plan
 
   variables {
-    prefix                 = "abc"
-    customer               = "test"
-    environment            = "dev"
-    region_abbv            = "eus"
-    resource_group_name    = "test-rg"
-    location               = "eastus"
-    create_aks_identity    = true
-    subnet_id              = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Network/virtualNetworks/test-vnet/subnets/test-subnet"
+    prefix              = "abc"
+    customer            = "test"
+    environment         = "dev"
+    region_abbv         = "eus"
+    resource_group_name = "test-rg"
+    location            = "eastus"
+    create_aks_identity = true
+    subnet_id           = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Network/virtualNetworks/test-vnet/subnets/test-subnet"
   }
 
   module {

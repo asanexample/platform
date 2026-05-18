@@ -20,19 +20,19 @@ run "advanced_log_analytics" {
   command = plan
 
   variables {
-    resource_group_name = "rg-test-log-analytics"
-    location           = "eastus"
-    name              = "log-test-advanced"
-    retention_in_days = 90
-    sku               = "PerGB2018"
-    daily_quota_gb    = 5
+    resource_group_name        = "rg-test-log-analytics"
+    location                   = "eastus"
+    name                       = "log-test-advanced"
+    retention_in_days          = 90
+    sku                        = "PerGB2018"
+    daily_quota_gb             = 5
     internet_ingestion_enabled = false
-    internet_query_enabled = false
+    internet_query_enabled     = false
     role_assignments = [
       {
         role_definition_name = "Monitoring Contributor"
-        principal_id        = "00000000-0000-0000-0000-000000000000"
-        principal_type      = "ServicePrincipal"
+        principal_id         = "00000000-0000-0000-0000-000000000000"
+        principal_type       = "ServicePrincipal"
       }
     ]
     tags = {
@@ -54,7 +54,7 @@ run "advanced_log_analytics" {
 
   # In plan mode, verify inputs are correctly set
   assert {
-    condition     = var.name == "log-test-advanced" 
+    condition     = var.name == "log-test-advanced"
     error_message = "Name should be 'log-test-advanced'"
   }
 

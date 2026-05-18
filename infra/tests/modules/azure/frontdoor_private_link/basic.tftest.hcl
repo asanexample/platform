@@ -37,19 +37,19 @@ run "create_test_resources" {
 # Run a basic test of the Front Door Private Link module
 run "basic_private_link_web" {
   command = plan
-  
+
   # Set module_enabled to false to prevent actual Azure resource creation
   # This allows us to test the module configuration without creating resources
   variables {
-    module_enabled = false  # Disable actual resource creation
-    
+    module_enabled = false # Disable actual resource creation
+
     # Use the mock resources created in the previous step
-    origin_group_id = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Cdn/profiles/mock-fd-profile/originGroups/test-origin-group"
-    storage_account_name = "teststorageaccount"
+    origin_group_id             = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Cdn/profiles/mock-fd-profile/originGroups/test-origin-group"
+    storage_account_name        = "teststorageaccount"
     storage_resource_group_name = "test-rg"
-    origin_name = "test-origin"
-    use_blob_endpoint = false # Use web endpoint
-    route_enabled = false # Don't create a route
+    origin_name                 = "test-origin"
+    use_blob_endpoint           = false # Use web endpoint
+    route_enabled               = false # Don't create a route
   }
 
   module {

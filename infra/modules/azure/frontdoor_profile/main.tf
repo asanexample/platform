@@ -3,11 +3,11 @@
  *
  * This module creates an Azure Front Door profile, which is the parent resource
  * for Front Door endpoints, origin groups, and other Front Door components.
- * The deployment can be controlled using the `enabled` variable.
+ * The deployment can be controlled using the `create` variable.
  */
 
 resource "azurerm_cdn_frontdoor_profile" "this" {
-  count                    = var.enabled ? 1 : 0
+  count = var.create ? 1 : 0
   # Name will be provided by Terragrunt using the naming module if null
   name                     = var.name
   resource_group_name      = var.resource_group_name

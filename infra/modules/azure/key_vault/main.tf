@@ -12,7 +12,7 @@ data "azurerm_client_config" "current" {}
 
 locals {
   # Generate key vault name if not provided using naming components
-  key_vault_name = var.name != "" ? var.name : "${var.name_components.prefix}${var.name_components.environment}${var.name_components.region_abbv}kv${var.name_components.instance}"
+  key_vault_name = var.name != null ? var.name : "${var.name_components.workload}${var.name_components.environment}${var.name_components.region_abbv}kv${var.name_components.instance}"
 
   # Set private endpoint name if not specified
   # Default format follows naming convention: <key-vault-name>-pe
@@ -30,6 +30,7 @@ locals {
 
 # Create the Key Vault
 resource "azurerm_key_vault" "key_vault" {
+  count               = var.create ? 1 : 0
   name                = local.key_vault_name
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -60,9 +61,9 @@ resource "azurerm_key_vault" "key_vault" {
 
 # Add access policies if RBAC is not enabled
 resource "azurerm_key_vault_access_policy" "policies" {
-  for_each = var.enable_rbac_authorization ? {} : var.access_policies
+  for_each = var.create ? (var.enable_rbac_authorization ? {} : var.access_policies) : {}
 
-  key_vault_id = azurerm_key_vault.key_vault.id
+  key_vault_id = azurerm_key_vault.key_vault[0].id
   tenant_id    = each.value.tenant_id != null ? each.value.tenant_id : data.azurerm_client_config.current.tenant_id
   object_id    = each.value.object_id
 
@@ -74,7 +75,7 @@ resource "azurerm_key_vault_access_policy" "policies" {
 
 # Private endpoint for the key vault
 resource "azurerm_private_endpoint" "key_vault" {
-  count               = var.private_endpoint.create ? 1 : 0
+  count               = var.create && var.private_endpoint.create ? 1 : 0
   name                = local.private_endpoint_name
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -83,7 +84,7 @@ resource "azurerm_private_endpoint" "key_vault" {
   # Connection to the key vault
   private_service_connection {
     name                           = "${local.private_endpoint_name}-connection"
-    private_connection_resource_id = azurerm_key_vault.key_vault.id
+    private_connection_resource_id = azurerm_key_vault.key_vault[0].id
     is_manual_connection           = false
     subresource_names              = ["vault"]
   }

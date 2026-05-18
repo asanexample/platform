@@ -1,262 +1,135 @@
 # Azure Container Registry Module
 
-## Overview
-
-This module creates and configures an Azure Container Registry (ACR) instance with comprehensive configuration options for security, networking, and integration with Azure Kubernetes Service (AKS). The module supports all ACR SKUs and their respective features.
-
-## Features
-
-- Flexible deployment with optional provisioning toggle
-- Support for all ACR SKUs (Basic, Standard, Premium)
-- Network access controls and security configurations
-- AKS integration through Azure RBAC
-- Premium features including geo-replication and zone redundancy
-- Encryption configuration with customer-managed keys
-- Resource locking to prevent accidental deletion
-- Image retention policy management
-- Standardized naming and tagging conventions
+Creates an Azure Container Registry with optional AKS pull/push integration.
 
 ## Usage
 
 ```hcl
-module "acr" {
-  source              = "../../modules/azure/container_registry"
-  resource_group_name = "rg-platform-dev-eastus"
+module "container_registry" {
+  source = "../container_registry"
+
+  create              = true
+  create_registry     = true
+  resource_group_name = module.resource_group.name
   location            = "eastus"
+  workload            = "platform"
   environment         = "dev"
   region_abbv         = "eus"
-  
-  # Optional: Specify a custom name (otherwise auto-generated)
-  # name = "acrdeveus001"
-  
-  # Default SKU is Standard
-  sku = "Standard"
-  
-  # Basic network security
-  public_network_access_enabled = true
-  
+  sku                 = "Standard"
+
+  aks_integration_enabled = true
+  aks_principal_id        = module.aks_core.kubelet_identity.object_id
+
   tags = {
-    Environment = "Development"
-    ManagedBy   = "Terraform"
-    Component   = "ContainerRegistry"
+    Environment = "dev"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
 
 ## Examples
 
-### Basic Registry (Development Environment)
+### Disabled
 
 ```hcl
-module "acr" {
-  source              = "../../modules/azure/container_registry"
-  resource_group_name = "rg-platform-dev-eastus"
+module "container_registry" {
+  source = "../container_registry"
+
+  create              = false
+  resource_group_name = "placeholder"
   location            = "eastus"
+  workload            = "platform"
   environment         = "dev"
   region_abbv         = "eus"
-  
-  sku = "Standard"
-  
-  tags = {
-    Environment = "Development"
-    ManagedBy   = "Terraform"
-  }
 }
 ```
 
-### Production Registry with Premium Features
+### Registry disabled but module still called
 
 ```hcl
-module "acr" {
-  source              = "../../modules/azure/container_registry"
-  resource_group_name = "rg-platform-prod-eastus"
+module "container_registry" {
+  source = "../container_registry"
+
+  create              = true
+  create_registry     = false
+  resource_group_name = module.resource_group.name
   location            = "eastus"
-  environment         = "prod"
+  workload            = "platform"
+  environment         = "dev"
   region_abbv         = "eus"
-  
-  sku                     = "Premium"
-  zone_redundancy_enabled = true
-  
-  # Network security configuration
-  public_network_access_enabled = false
-  network_rule_set = {
-    default_action = "Deny"
-    ip_rules       = ["203.0.113.0/24", "198.51.100.0/24"]
-  }
-  
-  # Geo-replication for disaster recovery
-  geo_replication_locations = [
-    {
-      location                = "westus"
-      zone_redundancy_enabled = true
-    }
-  ]
-  
-  # Retention policy for images (90 days)
-  retention_policy_days = 90
-  
-  # Prevent accidental deletion
-  lock_resource = true
-  
-  tags = {
-    Environment = "Production"
-    ManagedBy   = "Terraform"
-    Component   = "ContainerRegistry"
-    CostCenter  = "Platform"
-  }
 }
 ```
 
-### AKS Integration with Secure Network Configuration
+<!-- BEGIN_TF_DOCS -->
+## Resources
 
-```hcl
-module "acr" {
-  source              = "../../modules/azure/container_registry"
-  resource_group_name = "rg-platform-prod-eastus"
-  location            = "eastus"
-  environment         = "prod"
-  region_abbv         = "eus"
-  
-  sku = "Premium"
-  
-  # AKS integration
-  aks_integration_enabled = true
-  aks_principal_id        = module.aks.kubelet_identity.object_id
-  enable_aks_acr_push     = false  # Only allow pull operations
-  
-  # Network security
-  public_network_access_enabled = false
-  network_rule_set = {
-    default_action = "Deny"
-    ip_rules       = ["203.0.113.0/24"]
-  }
-  
-  # Enhanced security
-  admin_enabled = false
-  encryption_enabled = true
-  key_vault_key_id = module.key_vault.keys["acr-encryption"].id
-  encryption_identity_id = module.identity.id
-  
-  tags = {
-    Environment = "Production"
-    ManagedBy   = "Terraform"
-    Component   = "ContainerRegistry"
-    Security    = "High"
-  }
-}
-```
+| Name | Type |
+| ---- | ---- |
+| [azurerm_container_registry.acr](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/container_registry) | resource |
+| [azurerm_role_assignment.acr_pull](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
+| [azurerm_role_assignment.acr_push](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
 
-## Requirements
-
-| Name | Version |
-|------|---------|
-| terraform | >= 1.6.0 |
-| azurerm | >= 4.0.0 |
-
-## Providers
-
-| Name | Version |
-|------|---------|
-| azurerm | >= 4.0.0 |
-
-## Required Inputs
-
-| Name | Description | Type |
-|------|-------------|------|
-| resource_group_name | The name of the resource group where the registry will be created | `string` |
-| location | Azure region where the registry will be deployed | `string` |
-| environment | Environment name for resource tagging and naming (dev, test, staging, prod) | `string` |
-| region_abbv | Abbreviation for region (used in resource naming) | `string` |
-
-## Optional Inputs
+## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
+| ---- | ----------- | ---- | ------- | :------: |
+| environment | The environment for the resources | `string` | n/a | yes |
+| location | The location for the ACR | `string` | n/a | yes |
+| workload | The workload name to use for resource names | `string` | n/a | yes |
+| region_abbv | The abbreviation for the Azure region | `string` | n/a | yes |
+| resource_group_name | The resource group name for the ACR | `string` | n/a | yes |
+| admin_enabled | Whether to enable the admin user for the ACR | `bool` | `false` | no |
+| aks_integration_enabled | Whether to enable AKS integration for the ACR | `bool` | `false` | no |
+| aks_principal_id | The principal ID of the AKS cluster to integrate with the ACR (required if aks_integration_enabled is true) | `string` | `null` | no |
+| create | Whether to create resources in this module | `bool` | `true` | no |
 | create_registry | Whether to create the Azure Container Registry | `bool` | `true` | no |
-| name | Custom name for the registry (auto-generated if not provided) | `string` | `null` | no |
-| sku | The SKU of the container registry (Basic, Standard, Premium) | `string` | `"Standard"` | no |
-| admin_enabled | Whether admin authentication is enabled | `bool` | `false` | no |
-| public_network_access_enabled | Whether public network access is enabled | `bool` | `true` | no |
-| zone_redundancy_enabled | Whether zone redundancy is enabled (Premium SKU only) | `bool` | `false` | no |
-| data_endpoint_enabled | Whether to enable dedicated data endpoints (Premium SKU only) | `bool` | `false` | no |
-| geo_replication_locations | Locations for geo-replication (Premium SKU only) | `list(object)` | `[]` | no |
-| network_rule_set | Network rules for controlling access (Standard/Premium SKU only) | `object` | `null` | no |
-| encryption_enabled | Whether to enable encryption with customer-managed keys (Premium SKU only) | `bool` | `false` | no |
-| key_vault_key_id | The ID of the Key Vault key for encryption | `string` | `null` | no |
-| encryption_identity_id | The ID of the user-assigned identity for encryption | `string` | `null` | no |
-| lock_resource | Whether to apply a deletion lock to prevent accidental deletion | `bool` | `false` | no |
-| retention_policy_days | Number of days to retain images (0 means disabled) | `number` | `0` | no |
-| aks_integration_enabled | Whether to enable AKS integration | `bool` | `false` | no |
-| aks_principal_id | The principal ID of the AKS identity for RBAC | `string` | `null` | no |
-| enable_aks_acr_push | Whether to grant AKS push access (in addition to pull) | `bool` | `false` | no |
-| tags | Tags to apply to all resources | `map(string)` | `{}` | no |
+| data_endpoint_enabled | Whether to enable the data endpoint for the ACR (Premium SKU only) | `bool` | `false` | no |
+| enable_aks_acr_push | Whether to enable AKS to push images to the ACR (if aks_integration_enabled is true) | `bool` | `false` | no |
+| encryption_enabled | Whether to enable encryption for the ACR (Premium SKU only) | `bool` | `false` | no |
+| encryption_identity_id | The ID of the user-assigned identity to use for encryption (Premium SKU only, required if encryption_enabled is true) | `string` | `null` | no |
+| geo_replication_locations | The list of locations for geo-replication of the ACR (Premium SKU only) | `list(string)` | `[]` | no |
+| key_vault_key_id | The ID of the Key Vault key to use for encryption (Premium SKU only, required if encryption_enabled is true) | `string` | `null` | no |
+| lock_resource | Whether to lock the resource to prevent accidental deletion | `bool` | `false` | no |
+| name | The name of the Azure Container Registry. If null, will use prefix, environment, and region_abbv to create a name | `string` | `null` | no |
+| network_rule_set | The network rule set for the ACR (Premium SKU only). Only specify this when using Premium SKU. For Basic or Standard SKU, leave at the default value. | <pre>object({<br/>    default_action = string<br/>    ip_rules = list(object({<br/>      action   = string<br/>      ip_range = string<br/>    }))<br/>  })</pre> | <pre>{<br/>  "default_action": "Allow",<br/>  "ip_rules": []<br/>}</pre> | no |
+| public_network_access_enabled | Whether to enable public network access for the ACR | `bool` | `true` | no |
+| retention_policy_days | The number of days to retain images for in the ACR (Premium SKU only, 0 to disable) | `number` | `0` | no |
+| sku | The SKU of the ACR (Basic, Standard, Premium) | `string` | `"Standard"` | no |
+| tags | The tags to assign to the resources | `map(string)` | `{}` | no |
+| zone_redundancy_enabled | Whether to enable zone redundancy for the ACR (Premium SKU only) | `bool` | `false` | no |
 
 ## Outputs
 
 | Name | Description |
-|------|-------------|
-| id | The ID of the Azure Container Registry |
-| name | The name of the Azure Container Registry |
-| login_server | The login server URL (e.g., myregistry.azurecr.io) |
-| admin_username | The admin username (if admin authentication is enabled) |
-| admin_password | The admin password (if admin authentication is enabled) |
-| identity | The managed identity details |
-| resource_group_name | The name of the resource group containing the registry |
-| location | The location of the registry |
-| sku | The SKU of the registry |
-| admin_enabled | Whether admin authentication is enabled |
-| public_network_access_enabled | Whether public network access is enabled |
-| zone_redundancy_enabled | Whether zone redundancy is enabled |
-| network_rule_set | The network rule set configuration |
-| geo_replications | The geo-replication configuration |
-| encryption_enabled | Whether encryption is enabled |
-| acr_pull_role_assignment_id | The ID of the AcrPull role assignment |
-| acr_push_role_assignment_id | The ID of the AcrPush role assignment |
-| lock_id | The ID of the resource lock (if enabled) |
-
-## Module Resources
-
-This module creates the following resources:
-- Azure Container Registry
-- Role assignments for AKS integration (when enabled)
-- Resource lock (when enabled)
+| ---- | ----------- |
+| acr_pull_role_assignment_id | The ID of the AcrPull role assignment (if AKS integration is enabled). |
+| acr_push_role_assignment_id | The ID of the AcrPush role assignment (if AKS integration and push are enabled). |
+| admin_enabled | Whether admin access is enabled. |
+| admin_password | The Admin Password for the Container Registry. |
+| admin_username | The Admin Username for the Container Registry. |
+| create | Whether resources were created |
+| created | Indicates whether the ACR was created by this module. |
+| encryption_enabled | Whether encryption is enabled. |
+| geo_replications | The geo-replications of the ACR. |
+| id | The ID of the Azure Container Registry. |
+| identity | The managed identity assigned to the Container Registry. |
+| location | The Azure region where the ACR exists. |
+| login_server | The URL that can be used to log into the container registry. |
+| name | The name of the Azure Container Registry. |
+| network_rule_set | The network rule set for the ACR. |
+| public_network_access_enabled | Whether public network access is enabled. |
+| resource_group_name | The name of the resource group in which the ACR exists. |
+| sku | The SKU of the Azure Container Registry. |
+| zone_redundancy_enabled | Whether zone redundancy is enabled. |
+<!-- END_TF_DOCS -->
 
 ## Dependencies
 
-This module can depend on:
-- [resource_group](../resource_group) - For resource group creation
-- [aks_core](../aks_core) - For AKS integration
-- [key_vault](../key_vault) - For encryption with customer-managed keys
-- [identities](../identities) - For user-assigned identity for encryption
-
-## Security Best Practices
-
-This module implements several security best practices:
-
-1. **RBAC Integration**: Uses Azure RBAC instead of admin credentials for AKS integration
-2. **Network Restrictions**: Supports network access control with IP rules
-3. **Limited Admin Access**: Admin access is disabled by default
-4. **Encryption**: Support for customer-managed keys (Premium SKU)
-5. **Resource Locking**: Optional resource locks to prevent accidental deletion
-
-## AKS Integration
-
-The module supports integration with AKS in two ways:
-
-1. **AcrPull Role**: Grants the AKS cluster identity pull access to the registry
-2. **AcrPush Role** (Optional): Can grant the AKS cluster identity push access to the registry
-
-These role assignments enable AKS to pull images without requiring registry admin credentials, which is more secure and follows Azure best practices.
+- [naming](../naming) -- standardized resource names
+- [resource_group](../resource_group) -- resource group for the registry
 
 ## Notes
 
-- The Basic SKU does not support network rules, geo-replication, or encryption
-- Premium SKU is required for geo-replication, zone redundancy, and customer-managed keys
-- Network rules require Standard or Premium SKU
-- Virtual Network rules are not supported in this module version; use IP rules instead
-- Image retention policy only applies to untagged manifests
-- When using geo-replication, consider using Premium SKU with zone redundancy for production workloads
-
-## License
-
-This module is licensed under the MIT License. 
+- Has a separate `create_registry` variable alongside `create`; `create` gates the entire module while `create_registry` gates only the ACR resource.
+- Admin authentication is disabled by default; use AKS RBAC integration (`aks_integration_enabled`) instead.
+- Premium SKU is required for geo-replication, zone redundancy, and customer-managed key encryption.

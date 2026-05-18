@@ -2,6 +2,12 @@
  * Variables for the Prometheus DCR module.
  */
 
+variable "create" {
+  description = "Whether to create resources in this module"
+  type        = bool
+  default     = true
+}
+
 variable "name" {
   description = "Optional base name for the DCR (e.g., 'dcr-prometheus'). Defaults will be generated if null."
   type        = string

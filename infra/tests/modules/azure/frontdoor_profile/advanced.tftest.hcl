@@ -35,7 +35,7 @@ run "custom_settings_test" {
     condition     = azurerm_cdn_frontdoor_profile.this[0].sku_name == "Premium_AzureFrontDoor"
     error_message = "Front Door Profile should use the specified Premium SKU"
   }
-  
+
   # Verify custom response timeout
   assert {
     condition     = azurerm_cdn_frontdoor_profile.this[0].response_timeout_seconds == 60
@@ -48,10 +48,10 @@ run "custom_tags_test" {
   command = plan
 
   variables {
-    name                = "test-fd-profile"
-    resource_group_name = "test-rg"
-    enabled             = true
-    sku_name            = "Standard_AzureFrontDoor"
+    name                     = "test-fd-profile"
+    resource_group_name      = "test-rg"
+    enabled                  = true
+    sku_name                 = "Standard_AzureFrontDoor"
     response_timeout_seconds = 120
     tags = {
       Environment     = "Test"
@@ -70,17 +70,17 @@ run "custom_tags_test" {
     condition     = azurerm_cdn_frontdoor_profile.this[0].tags.Environment == "Test"
     error_message = "Front Door Profile should have the Environment tag set"
   }
-  
+
   assert {
     condition     = azurerm_cdn_frontdoor_profile.this[0].tags.CostCenter == "IT"
     error_message = "Front Door Profile should have the CostCenter tag set"
   }
-  
+
   assert {
     condition     = azurerm_cdn_frontdoor_profile.this[0].tags.ApplicationName == "FrontDoor"
     error_message = "Front Door Profile should have the ApplicationName tag set"
   }
-  
+
   assert {
     condition     = azurerm_cdn_frontdoor_profile.this[0].tags.Component == "CDN"
     error_message = "Front Door Profile should have the Component tag set"
@@ -92,10 +92,10 @@ run "disabled_profile_test" {
   command = plan
 
   variables {
-    name                = "test-fd-profile"
-    resource_group_name = "test-rg"
-    enabled             = false
-    sku_name            = "Standard_AzureFrontDoor"
+    name                     = "test-fd-profile"
+    resource_group_name      = "test-rg"
+    enabled                  = false
+    sku_name                 = "Standard_AzureFrontDoor"
     response_timeout_seconds = 120
   }
 
@@ -115,10 +115,10 @@ run "output_values_test" {
   command = plan
 
   variables {
-    name                = "test-fd-profile"
-    resource_group_name = "test-rg"
-    enabled             = true
-    sku_name            = "Standard_AzureFrontDoor"
+    name                     = "test-fd-profile"
+    resource_group_name      = "test-rg"
+    enabled                  = true
+    sku_name                 = "Standard_AzureFrontDoor"
     response_timeout_seconds = 120
   }
 
@@ -131,7 +131,7 @@ run "output_values_test" {
     condition     = length(azurerm_cdn_frontdoor_profile.this) > 0
     error_message = "Front Door Profile should be created when enabled"
   }
-  
+
   assert {
     condition     = azurerm_cdn_frontdoor_profile.this[0].name == "test-fd-profile"
     error_message = "Front Door Profile name should match the input"

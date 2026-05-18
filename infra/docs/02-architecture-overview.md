@@ -51,6 +51,48 @@ The VIP Platform is organized into the following logical layers:
    - Cost management
    - Automation and CI/CD integration
 
+## Workload Hierarchy
+
+Infrastructure is organized by **workload** -- a logical grouping of related resources that share a compliance tier and lifecycle. The Terragrunt directory structure reflects this:
+
+```
+infra/live/{cloud}/{env}/{region}/{workload}/{module}/terragrunt.hcl
+```
+
+Each workload directory contains a `workload.hcl` that declares:
+
+- **workload name** -- e.g., `platform`, `connectivity`, `hipaa`, `pci`
+- **compliance_tier** -- `standard`, `hipaa`, or `pci` (drives cluster topology and security controls)
+- **workload_tags** -- additional tags merged into every resource in the workload
+
+Workloads map to subscriptions organized by purpose, not team:
+
+```
+platform/
+  platform-connectivity-{prod,nonprod}  -- hub networking, DNS, firewall
+  platform-shared-{prod,nonprod}        -- shared clusters, observability, ACR
+  platform-data-{prod,nonprod}          -- shared data services
+regulated/
+  regulated-hipaa-prod                  -- HIPAA-isolated compute + data
+  regulated-pci-prod                    -- PCI CDE isolated compute + data
+```
+
+## Compliance Tiers
+
+The compliance tier declared in `workload.hcl` determines cluster topology, network isolation, and security controls:
+
+| Tier | Workloads | Shared Cluster? | Dedicated VNet? | Extra Controls |
+|------|-----------|-----------------|-----------------|----------------|
+| Standard (SOC2) | platform, connectivity, data | Yes (vCluster) | Spoke peered to hub | RBAC, private endpoints, audit logging |
+| HIPAA | hipaa | Dedicated cluster | Isolated VNet | CMK encryption, 365-day logs, host encryption, private cluster |
+| PCI | pci | Dedicated cluster | CDE-segmented VNet | All HIPAA controls + WAF, IDS, deny-all default network policy |
+
+## Cluster Topology and vCluster Multi-Tenancy
+
+Standard-tier workloads share physical AKS clusters. Tenant isolation is achieved via **vCluster** -- CNCF-certified virtual clusters that provide dedicated API servers, control planes, and CRDs without the cost of dedicated infrastructure. Each team or service gets its own vCluster inside the shared host cluster.
+
+HIPAA and PCI workloads receive **dedicated physical clusters** with hardened configurations matching their compliance tier.
+
 ## Physical Architecture
 
 The physical implementation follows a multi-region, multi-cloud approach:

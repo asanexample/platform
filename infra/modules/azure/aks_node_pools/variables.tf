@@ -1,17 +1,23 @@
 /**
  * Variables for the AKS Node Pools module
- * 
+ *
  * This module focuses on creating node pools for an existing AKS cluster
  */
 
+variable "create" {
+  description = "Whether to create resources in this module"
+  type        = bool
+  default     = true
+}
+
 # Naming module variables
-variable "prefix" {
-  description = "Prefix for resource names"
+variable "workload" {
+  description = "Workload identifier for resource names"
   type        = string
-  default     = "centric"
+  default     = "platform"
   validation {
-    condition     = length(var.prefix) >= 3 && length(var.prefix) <= 10
-    error_message = "The prefix must be between 3 and 10 characters."
+    condition     = length(var.workload) >= 3 && length(var.workload) <= 10
+    error_message = "The workload must be between 3 and 10 characters."
   }
 }
 
@@ -121,7 +127,7 @@ variable "app_node_pool_availability_zones" {
 variable "app_node_pool_max_pods" {
   description = "The maximum number of pods per node for the app node pool"
   type        = number
-  default     = 110  # Higher value for Cilium CNI (not constrained by Azure CNI limits)
+  default     = 110 # Higher value for Cilium CNI (not constrained by Azure CNI limits)
   validation {
     condition     = var.app_node_pool_max_pods >= 30 && var.app_node_pool_max_pods <= 250
     error_message = "The app node pool maximum pods must be between 30 and 250."

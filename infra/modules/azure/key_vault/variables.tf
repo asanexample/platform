@@ -1,3 +1,9 @@
+variable "create" {
+  description = "Whether to create resources in this module"
+  type        = bool
+  default     = true
+}
+
 variable "resource_group_name" {
   description = "Name of the resource group to deploy the key vault in"
   type        = string
@@ -35,15 +41,15 @@ variable "location" {
 variable "name" {
   description = "Name of the key vault (if custom naming is required). If not provided, it will be auto-generated based on naming components."
   type        = string
-  default     = ""
+  default     = null
 
   validation {
-    condition     = var.name == "" || (length(var.name) >= 3 && length(var.name) <= 24)
+    condition     = var.name == null || (length(var.name) >= 3 && length(var.name) <= 24)
     error_message = "Key vault name must be between 3 and 24 characters when provided."
   }
 
   validation {
-    condition     = var.name == "" || can(regex("^[a-zA-Z0-9-]+$", var.name))
+    condition     = var.name == null || can(regex("^[a-zA-Z0-9-]+$", var.name))
     error_message = "Key vault name can only include alphanumeric characters and hyphens."
   }
 }
@@ -51,7 +57,7 @@ variable "name" {
 variable "name_components" {
   description = "Components to auto-generate the key vault name if 'name' is not provided"
   type = object({
-    prefix      = optional(string, "vip")
+    workload    = optional(string, "platform")
     environment = optional(string, "dev")
     region_abbv = optional(string, "eus")
     instance    = optional(string, "001")

@@ -17,8 +17,7 @@
 module "naming" {
   source = "../naming"
 
-  prefix      = var.prefix
-  customer    = var.customer
+  workload    = var.workload
   environment = var.environment
   region_abbv = var.region_abbv
 }
@@ -38,10 +37,10 @@ locals {
   }
 
   # Flag to enable federated credentials - purely based on input variables
-  create_federated_credentials = var.enable_workload_identity && var.create_federated_credentials
+  create_federated_credentials = var.create && var.enable_workload_identity && var.create_federated_credentials
 
   # Flag to enable role assignments - purely based on input variables
-  create_role_assignments = var.enable_workload_identity && var.create_role_assignments
+  create_role_assignments = var.create && var.enable_workload_identity && var.create_role_assignments
 }
 
 # =============================================================================
@@ -50,7 +49,7 @@ locals {
 
 # Create a user-assigned managed identity for the AKS cluster
 resource "azurerm_user_assigned_identity" "aks_identity" {
-  count               = var.create_aks_identity ? 1 : 0
+  count               = var.create && var.create_aks_identity ? 1 : 0
   resource_group_name = var.resource_group_name
   location            = var.location
   name                = local.aks_identity_name
@@ -62,14 +61,14 @@ resource "azurerm_user_assigned_identity" "aks_identity" {
 
 # Fetch the private route table if specified for network permissions
 data "azurerm_route_table" "private" {
-  count               = var.private_route_table_name != null && var.vnet_resource_group_name != null ? 1 : 0
+  count               = var.create && var.private_route_table_name != null && var.vnet_resource_group_name != null ? 1 : 0
   name                = var.private_route_table_name
   resource_group_name = var.vnet_resource_group_name
 }
 
 # Grant the AKS identity permissions to manage the route table
 resource "azurerm_role_assignment" "aks_network_contributor" {
-  count                = var.create_aks_identity && var.private_route_table_name != null && var.vnet_resource_group_name != null ? 1 : 0
+  count                = var.create && var.create_aks_identity && var.private_route_table_name != null && var.vnet_resource_group_name != null ? 1 : 0
   scope                = data.azurerm_route_table.private[0].id
   role_definition_name = "Network Contributor"
   principal_id         = azurerm_user_assigned_identity.aks_identity[0].principal_id
@@ -77,7 +76,7 @@ resource "azurerm_role_assignment" "aks_network_contributor" {
 
 # Grant the AKS identity permissions to manage the subnet if provided
 resource "azurerm_role_assignment" "aks_subnet_network_contributor" {
-  count                = var.create_aks_identity && var.subnet_id != null ? 1 : 0
+  count                = var.create && var.create_aks_identity && var.subnet_id != null ? 1 : 0
   scope                = var.subnet_id
   role_definition_name = "Network Contributor"
   principal_id         = azurerm_user_assigned_identity.aks_identity[0].principal_id
@@ -85,7 +84,7 @@ resource "azurerm_role_assignment" "aks_subnet_network_contributor" {
 
 # Grant the AKS identity permissions to manage itself
 resource "azurerm_role_assignment" "aks_managed_identity_operator" {
-  count                = var.create_aks_identity ? 1 : 0
+  count                = var.create && var.create_aks_identity ? 1 : 0
   scope                = azurerm_user_assigned_identity.aks_identity[0].id
   role_definition_name = "Managed Identity Operator"
   principal_id         = azurerm_user_assigned_identity.aks_identity[0].principal_id
@@ -97,7 +96,7 @@ resource "azurerm_role_assignment" "aks_managed_identity_operator" {
 
 # Create user-assigned identities for workloads
 resource "azurerm_user_assigned_identity" "workload_identities" {
-  for_each            = var.enable_workload_identity ? var.workload_identities : {}
+  for_each            = var.create && var.enable_workload_identity ? var.workload_identities : {}
   resource_group_name = var.resource_group_name
   location            = var.location
   name                = each.value.name != null ? each.value.name : "${var.cluster_name}-${each.key}"

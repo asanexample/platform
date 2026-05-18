@@ -16,17 +16,58 @@ The platform is designed to support the following compliance standards:
 4. **HIPAA**: For healthcare information (where applicable)
 5. **PCI-DSS**: For payment card industry data security (where applicable)
 
-## Control Implementation
+## Three-Tier Compliance Model
 
-*Detailed documentation on control implementation will be provided in a future update.*
+The platform implements a tiered compliance model driven by the `compliance_tier` value in each workload's `workload.hcl`. Each tier inherits all controls from the tier below it.
+
+### Tier 1: Standard (SOC2)
+
+Applies to: `platform`, `connectivity`, `data` workloads.
+
+| Control Area | Implementation |
+|-------------|----------------|
+| Compute isolation | Shared AKS clusters with vCluster virtual clusters |
+| Network | Spoke VNet peered to hub; NSGs on all subnets |
+| Identity | Azure RBAC; workload identity; managed identities |
+| Encryption | Azure-managed keys (SSE); TLS 1.2+ in transit |
+| Endpoints | Private endpoints for all PaaS services |
+| Logging | 90-day log retention; Container Insights; audit logs forwarded to Log Analytics |
+| Policy | Kyverno baseline policies (image provenance, pod security, resource limits) |
+
+### Tier 2: HIPAA
+
+Applies to: `hipaa` workload. Inherits all Standard controls, plus:
+
+| Control Area | Implementation |
+|-------------|----------------|
+| Compute isolation | Dedicated AKS cluster (no shared tenancy) |
+| Network | Isolated VNet (no default hub peering); private cluster API server |
+| Encryption | Customer-managed keys (CMK) for all data at rest; host encryption on all nodes |
+| Logging | 365-day log retention; immutable audit trail |
+| Access | JIT access for operations; break-glass procedures documented |
+| Data handling | PHI labeling enforced via Kyverno; no PHI in non-HIPAA workloads |
+
+### Tier 3: PCI
+
+Applies to: `pci` workload. Inherits all HIPAA controls, plus:
+
+| Control Area | Implementation |
+|-------------|----------------|
+| Network | CDE-segmented VNet; deny-all default network policy; WAF on all ingress |
+| Monitoring | IDS/IPS enabled; real-time alerting on policy violations |
+| Access | MFA for all CDE access; quarterly access reviews |
+| Segmentation | Annual penetration test of segmentation controls |
+| Policy | Kyverno strict policies: mandatory network policies per namespace, deny privileged escalation |
+
+## Control Implementation
 
 ### Technical Controls
 
-- Access control mechanisms
-- Encryption implementation
-- Logging and monitoring
-- Network security
-- Secure configuration
+- **Access control**: RBAC at Azure, Kubernetes, and namespace levels; workload identity federation
+- **Encryption**: SSE with platform-managed or customer-managed keys depending on tier; TLS everywhere
+- **Logging and monitoring**: Centralized Log Analytics; Prometheus/Grafana stack; retention scaled by tier
+- **Network security**: NSGs, private endpoints, network policies; segmentation validated per tier
+- **Secure configuration**: Kyverno admission policies; Azure Policy assignments; CIS benchmark scanning
 
 ### Administrative Controls
 
@@ -38,11 +79,21 @@ The platform is designed to support the following compliance standards:
 
 ## Compliance Validation
 
-*Documentation on compliance validation mechanisms will be provided in a future update.*
+Compliance is validated through:
+
+1. **Kyverno audit reports** -- policy violations are surfaced as Kubernetes events and forwarded to Log Analytics
+2. **Terraform plan review** -- compliance-relevant changes (encryption, network rules, RBAC) are flagged in PR checks
+3. **Periodic scanning** -- CIS benchmarks and cloud security posture management tools run on a schedule
+4. **State drift detection** -- Terragrunt detects configuration drift and alerts on non-compliant resources
 
 ## Implementation in Terraform
 
-*Documentation on implementing compliance controls in Terraform will be provided in a future update.*
+Compliance controls are encoded in Terraform modules and enforced via the workload hierarchy:
+
+- The `compliance_tier` variable propagates from `workload.hcl` through `_base.hcl` into every module
+- Modules use `compliance_tier` to conditionally enable controls (e.g., CMK encryption, private cluster, log retention)
+- Golden-path modules provide pre-configured, compliant defaults for each tier
+- Self-service workload creation uses `workload.hcl` templates that set the appropriate tier and inherit all required controls
 
 ## Next Steps
 

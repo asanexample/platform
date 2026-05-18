@@ -4,14 +4,20 @@
  * This module creates and configures user-assigned managed identities for AKS clusters and workloads.
  */
 
+variable "create" {
+  description = "Whether to create resources in this module"
+  type        = bool
+  default     = true
+}
+
 # ---------------------------------------------------------------------------------------------------------------------
 # NAMING AND GENERAL VARIABLES
 # ---------------------------------------------------------------------------------------------------------------------
 
-variable "prefix" {
-  description = "The prefix to use for all resources"
+variable "workload" {
+  description = "The workload identifier to use for all resources"
   type        = string
-  default     = "vip"
+  default     = "platform"
 }
 
 variable "environment" {

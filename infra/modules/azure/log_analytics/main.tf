@@ -7,6 +7,7 @@
 
 # Create the Log Analytics Workspace
 resource "azurerm_log_analytics_workspace" "this" {
+  count = var.create ? 1 : 0
   # Name will be provided by Terragrunt using the naming module if null
   name                = var.name
   location            = var.location
@@ -17,19 +18,19 @@ resource "azurerm_log_analytics_workspace" "this" {
 
   internet_ingestion_enabled = var.internet_ingestion_enabled
   internet_query_enabled     = var.internet_query_enabled
-  
+
   tags = var.tags
 }
 
 # Install solution packs if specified
 resource "azurerm_log_analytics_solution" "this" {
-  for_each = { for solution in var.solution_plans : solution.solution_name => solution }
+  for_each = var.create ? { for solution in var.solution_plans : solution.solution_name => solution } : {}
 
   solution_name         = each.value.solution_name
   location              = var.location
   resource_group_name   = var.resource_group_name
-  workspace_resource_id = azurerm_log_analytics_workspace.this.id
-  workspace_name        = azurerm_log_analytics_workspace.this.name
+  workspace_resource_id = azurerm_log_analytics_workspace.this[0].id
+  workspace_name        = azurerm_log_analytics_workspace.this[0].name
 
   plan {
     publisher = "Microsoft"
@@ -53,7 +54,7 @@ resource "azurerm_log_analytics_solution" "this" {
 #   # Configure logs for each category
 #   dynamic "enabled_log" {
 #     for_each = toset(each.value.enabled_log_categories)
-    
+
 #     content {
 #       category = enabled_log.value
 #     }
@@ -62,7 +63,7 @@ resource "azurerm_log_analytics_solution" "this" {
 #   # Configure metrics for each category
 #   dynamic "metric" {
 #     for_each = toset(each.value.metric_categories)
-    
+
 #     content {
 #       category = metric.value
 #       enabled  = true
@@ -72,9 +73,9 @@ resource "azurerm_log_analytics_solution" "this" {
 
 # Create role assignments for the Log Analytics workspace
 resource "azurerm_role_assignment" "this" {
-  for_each = { for idx, assignment in var.role_assignments : idx => assignment }
+  for_each = var.create ? { for idx, assignment in var.role_assignments : idx => assignment } : {}
 
-  scope                = azurerm_log_analytics_workspace.this.id
+  scope                = azurerm_log_analytics_workspace.this[0].id
   role_definition_name = each.value.role_definition_name
   principal_id         = each.value.principal_id
   description          = each.value.description

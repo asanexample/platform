@@ -4,14 +4,14 @@ This document outlines the standard naming conventions used across the VIP Platf
 
 ## General Structure
 
-Most resources follow this pattern:
+Most resources follow the CAF-aligned pattern:
 ```
-{prefix}-{resource_type}-{env}-{region_abbv}-{purpose}
+{type}-{workload}-{env}-{region_abbv}-{purpose}
 ```
 
 Where:
-- `prefix` is our standard organization prefix (e.g., "vip")
-- `resource_type` is a short abbreviation for the resource (see table below)
+- `type` is a short abbreviation for the resource (see table below)
+- `workload` is our standard workload identifier (default: "platform")
 - `env` is the environment (dev, test, prod)
 - `region_abbv` is the shortened region name (e.g., eus, wus)
 - `purpose` is optional and describes the specific purpose (e.g., "main", "secondary")
@@ -28,6 +28,8 @@ Where:
 
 ## Region Abbreviations
 
+### Azure Regions
+
 | Azure Region   | Abbreviation |
 |----------------|--------------|
 | East US        | eus          |
@@ -40,44 +42,114 @@ Where:
 | UK South       | uks          |
 | Canada Central | cac          |
 
-## Resource Type Abbreviations
+### AWS Regions
+
+| AWS Region      | Abbreviation |
+|-----------------|--------------|
+| us-east-1       | use1         |
+| us-west-2       | usw2         |
+| eu-west-1       | euw1         |
+| eu-central-1    | euc1         |
+| ap-southeast-1  | apse1        |
+
+### GCP Regions
+
+| GCP Region       | Abbreviation |
+|------------------|--------------|
+| us-central1      | usc1         |
+| us-east1         | use1         |
+| europe-west1     | euw1         |
+| asia-southeast1  | asse1        |
+
+## Azure Resource Type Abbreviations
 
 | Resource Type                              | Abbreviation | Example                                     |
 |--------------------------------------------|--------------|---------------------------------------------|
-| Resource Group                             | rg           | vip-rg-dev-eus-net                          |
-| Virtual Network                            | vnet         | vip-vnet-dev-eus-main                       |
+| Resource Group                             | rg           | rg-platform-dev-eus-net                     |
+| Virtual Network                            | vnet         | vnet-platform-dev-eus-main                  |
 | Subnet                                     | subnet       | az1-node-subnet                             |
 | Network Security Group                     | nsg          | az1-node-subnet-nsg                         |
-| Key Vault                                  | kv           | vip-kv-dev-eus-secrets                      |
-| Storage Account                            | st           | vipdeveussa001 (special format - see notes) |
-| Container Registry                         | acr          | vipdevacr                                   |
-| AKS Cluster                                | aks          | vip-aks-dev-eus-k8s                         |
-| Public IP                                  | pip          | vip-pip-dev-eus-ingress                     |
-| Load Balancer                              | lb           | vip-lb-dev-eus-app                          |
-| Application Gateway                        | agw          | vip-agw-dev-eus-ingress                     |
-| Private Endpoint                           | pe           | vip-pe-dev-eus-sql                          |
+| Key Vault                                  | kv           | kv-platform-dev-eus-secrets                 |
+| Storage Account                            | st           | platformdeveussa001 (special format - see notes) |
+| Container Registry                         | acr          | platformdevacr                              |
+| AKS Cluster                                | aks          | aks-platform-dev-eus-k8s                    |
+| Public IP                                  | pip          | pip-platform-dev-eus-ingress                |
+| Load Balancer                              | lb           | lb-platform-dev-eus-app                     |
+| Application Gateway                        | agw          | agw-platform-dev-eus-ingress                |
+| Private Endpoint                           | pe           | pe-platform-dev-eus-sql                     |
 | Private DNS Zone                           | pdns         | privatelink.database.windows.net            |
-| Front Door Profile                         | fd           | vip-fd-dev-global                           |
-| Front Door Endpoint                        | fd-endpoint  | vip-fd-endpoint-dev-eus-customer            |
-| Front Door Origin Group                    | fd-og        | vip-fd-og-dev-eus-customer                  |
-| Front Door Origin                          | fd-origin    | vip-fd-origin-dev-eus-customer              |
-| Front Door Route                           | fd-route     | vip-fd-route-dev-eus-customer               |
-| Log Analytics Workspace                    | law          | vip-law-dev-eus-analytics                   |
-| Monitor Workspace                          | mw           | vip-mw-dev-eus-prometheus                   |
-| Data Collection Rule                       | dcr          | vip-dcr-dev-eus-prometheus                  |
-| Data Collection Endpoint                   | dce          | vip-dce-dev-eus-prometheus                  |
-| Managed Grafana                            | grafana      | vip-grafana-dev-eus-metrics                 |
-| User-Assigned Managed Identity             | id           | vip-id-dev-eus-aks                          |
-| Workload Identity                          | workid       | vip-workid-dev-eus-customer                 |
-| Federated Credential                       | fedcred      | vip-fedcred-dev-eus-customer                |
-| Storage Account Private Endpoint           | pe           | vip-pe-dev-eus-storage                      |
+| Front Door Profile                         | fd           | fd-platform-dev-global                      |
+| Front Door Endpoint                        | fd-endpoint  | fd-endpoint-platform-dev-eus-customer       |
+| Front Door Origin Group                    | fd-og        | fd-og-platform-dev-eus-customer             |
+| Front Door Origin                          | fd-origin    | fd-origin-platform-dev-eus-customer         |
+| Front Door Route                           | fd-route     | fd-route-platform-dev-eus-customer          |
+| Log Analytics Workspace                    | law          | law-platform-dev-eus-analytics              |
+| Monitor Workspace                          | mw           | mw-platform-dev-eus-prometheus              |
+| Data Collection Rule                       | dcr          | dcr-platform-dev-eus-prometheus             |
+| Data Collection Endpoint                   | dce          | dce-platform-dev-eus-prometheus             |
+| Managed Grafana                            | grafana      | grafana-platform-dev-eus-metrics            |
+| User-Assigned Managed Identity             | id           | id-platform-dev-eus-aks                     |
+| Workload Identity                          | workid       | workid-platform-dev-eus-customer            |
+| Federated Credential                       | fedcred      | fedcred-platform-dev-eus-customer           |
+| Storage Account Private Endpoint           | pe           | pe-platform-dev-eus-storage                 |
 | Storage Container                          | container    | assets, logs, data                          |
+
+## AWS Resource Type Abbreviations
+
+AWS names follow the same `{type}-{workload}-{env}-{region}` pattern. For tight-constraint or globally-unique resources (S3, ECR, ALB, NLB, TG), names are collapsed: `{type}{abbv_workload}{env}{region}`.
+
+| Resource Type              | Abbreviation | Example                                |
+|----------------------------|--------------|----------------------------------------|
+| VPC                        | vpc          | vpc-platform-dev-use1                  |
+| Subnet                     | snet         | snet-platform-dev-use1                 |
+| Internet Gateway           | igw          | igw-platform-dev-use1                  |
+| NAT Gateway                | natgw        | natgw-platform-dev-use1                |
+| Route Table                | rtb          | rtb-platform-dev-use1                  |
+| Security Group             | sg           | sg-platform-dev-use1                   |
+| EKS Cluster                | eks          | eks-platform-dev-use1                  |
+| S3 Bucket                  | s3           | s3platdevuse1 (lowercase, globally unique) |
+| ECR Repository             | ecr          | ecrplatdevuse1                         |
+| ALB                        | alb          | alb-plat-dev-use1 (32 char max)        |
+| NLB                        | nlb          | nlb-plat-dev-use1                      |
+| Target Group               | tg           | tg-plat-dev-use1                       |
+| Lambda                     | lmb          | lmb-platform-dev-use1                  |
+| RDS                        | rds          | rds-platform-dev-use1                  |
+| DynamoDB                   | ddb          | ddb-platform-dev-use1                  |
+| IAM Role                   | role         | role-platform-dev-use1                 |
+| IAM Policy                 | pol          | pol-platform-dev-use1                  |
+| KMS Key                    | kms          | kms-platform-dev-use1                  |
+| Secrets Manager            | sm           | sm-platform-dev-use1                   |
+| EFS                        | efs          | efs-platform-dev-use1                  |
+
+## GCP Resource Type Abbreviations
+
+GCP names follow the same `{type}-{workload}-{env}-{region}` pattern. All GCP resource names must be lowercase. For tight-constraint or globally-unique resources (GCS, service accounts), names are collapsed: `{type}{abbv_workload}{env}{region}`.
+
+| Resource Type              | Abbreviation | Example                                |
+|----------------------------|--------------|----------------------------------------|
+| VPC Network                | vpc          | vpc-platform-dev-usc1                  |
+| Subnet                     | snet         | snet-platform-dev-usc1                 |
+| GKE Cluster                | gke          | gke-platform-dev-usc1 (40 char max)    |
+| Cloud Storage Bucket       | gcs          | gcsplatdevusc1 (lowercase, globally unique) |
+| Artifact Registry          | gcr          | gcrplatdevusc1                         |
+| Firewall Rule              | fw           | fw-platform-dev-usc1                   |
+| Cloud Router               | rtr          | rtr-platform-dev-usc1                  |
+| Cloud NAT                  | nat          | nat-platform-dev-usc1                  |
+| Load Balancer              | lb           | lb-platform-dev-usc1                   |
+| Cloud SQL                  | sql          | sql-platform-dev-usc1                  |
+| Memorystore                | redis        | redis-platform-dev-usc1                |
+| Pub/Sub Topic              | pst          | pst-platform-dev-usc1                  |
+| KMS Key Ring               | kr           | kr-platform-dev-usc1                   |
+| Service Account            | sa           | sa-plat-dev-usc1 (30 char max)         |
+| Cloud Run                  | run          | run-platform-dev-usc1                  |
+| Compute Engine             | gce          | gce-platform-dev-usc1                  |
+| Cloud Function             | gcf          | gcf-platform-dev-usc1                  |
 
 ## Specific Resource Conventions
 
 ### Availability Zone Resources
 
-For resources distributed across availability zones, prefix with the AZ number:
+For resources distributed across availability zones, prepend the AZ number:
 ```
 az{number}-{resource_type}-{purpose}
 ```
@@ -90,10 +162,10 @@ Examples:
 ### Storage Accounts
 Storage accounts have a 24 character limit and cannot use hyphens. They follow this pattern:
 ```
-{prefix}{env}{region_abbv}st{instance}
+{workload}{env}{region_abbv}st{instance}
 ```
 
-Example: `vipdeveusstdata001`
+Example: `platformdeveusstdata001`
 
 ### Container Names
 Container names in Storage Accounts are consistent across all deployments:
@@ -107,10 +179,10 @@ Container names in Storage Accounts are consistent across all deployments:
 
 For customer-specific resources:
 ```
-{prefix}-{resource_type}-{env}-{region_abbv}-{customer}
+{type}-{workload}-{env}-{region_abbv}-{customer}
 ```
 
-Example: `vip-kv-dev-eus-customer1`
+Example: `kv-platform-dev-eus-customer1`
 
 ### Role Assignments
 
@@ -128,10 +200,10 @@ Examples:
 
 Private link resources follow:
 ```
-{prefix}-pe-{env}-{region_abbv}-{service}
+pe-{workload}-{env}-{region_abbv}-{service}
 ```
 
-Example: `vip-pe-dev-eus-keyvault`
+Example: `pe-platform-dev-eus-keyvault`
 
 ### Deployment ID
 
@@ -174,6 +246,55 @@ All resources should include the following standard tags:
 | NetworkDesign      | Network design pattern                            | "Kubernetes3AZ"                    |
 | CreatedDate        | Date when the resource was created                | "2023-06-01"                       |
 
+## Variable Naming Conventions
+
+All Terraform modules follow these standard variable naming conventions:
+
+### Resource Toggle: `create`
+
+Every resource-creating module includes a `variable "create"` (type `bool`, default `true`) that controls whether the module provisions any resources. This is the standard toggle name across all 19 resource-creating modules.
+
+- Resources use `count = var.create ? 1 : 0` or `for_each = var.create ? ... : {}`.
+- Outputs return `null` (for scalars) or `{}` (for maps) when `create = false`.
+
+```hcl
+variable "create" {
+  description = "Whether to create resources in this module"
+  type        = bool
+  default     = true
+}
+```
+
+### Optional String Defaults: `null`
+
+Optional string variables default to `null`, not `""`. This allows clean conditional logic with `!= null` checks and avoids ambiguity between "not set" and "set to empty string".
+
+```hcl
+variable "name" {
+  description = "The name of the resource (generated if not provided)"
+  type        = string
+  default     = null
+}
+```
+
+### Sub-Feature Flags: `enable_*`
+
+Boolean variables that control optional sub-features within a module use the `enable_` prefix. These are distinct from the top-level `create` toggle.
+
+```hcl
+variable "enable_eks_networking" {
+  description = "Whether to create EKS-specific networking resources"
+  type        = bool
+  default     = false
+}
+
+variable "enable_cloud_nat" {
+  description = "Whether to create a Cloud NAT gateway"
+  type        = bool
+  default     = true
+}
+```
+
 ## Implementation in Terraform
 
 ### Basic Naming Convention
@@ -182,26 +303,26 @@ Use locals to construct resource names consistently:
 
 ```hcl
 locals {
-  prefix        = "vip"
+  workload      = "platform"
   environment   = "dev"
   region        = "eastus"
   region_abbv   = "eus"
   component     = "net"
   
   # Resource Group
-  resource_group_name = "${local.prefix}-rg-${local.environment}-${local.region_abbv}-${local.component}"
+  resource_group_name = "rg-${local.workload}-${local.environment}-${local.region_abbv}-${local.component}"
   
   # Virtual Network
-  vnet_name = "${local.prefix}-vnet-${local.environment}-${local.region_abbv}-main"
+  vnet_name = "vnet-${local.workload}-${local.environment}-${local.region_abbv}-main"
   
   # Storage Account (no hyphens, 24 char limit)
-  storage_account_name = "${local.prefix}${local.environment}${local.region_abbv}st001"
+  storage_account_name = "${local.workload}${local.environment}${local.region_abbv}st001"
 }
 ```
 
 ### Terragrunt Implementation with Naming Module
 
-The VIP Platform uses a centralized naming approach with Terragrunt to manage dependencies between the naming module and resource modules:
+The VIP Platform uses a centralized naming approach with Terragrunt to manage dependencies between the naming module and resource modules. All three cloud naming modules (`azure/naming`, `aws/naming`, `gcp/naming`) share the same input contract -- `workload`, `environment`, `region_abbv` -- so Terragrunt live configs can pass the same locals regardless of cloud provider.
 
 1. **Dedicated Naming Module**: A specialized module that generates standardized resource names based on inputs.
 
@@ -215,10 +336,9 @@ terraform {
 }
 
 inputs = {
-  prefix      = local.prefix
+  workload    = local.workload
   environment = local.env
   region_abbv = local.region_abbv
-  customer    = local.customer
 }
 ```
 

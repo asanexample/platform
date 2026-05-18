@@ -18,18 +18,15 @@ locals {
   # Extract environment from env.hcl
   environment_vars = read_terragrunt_config(find_in_parent_folders("env.hcl"))
   environment      = local.environment_vars.locals.environment
-  
+
   # Extract region information from region.hcl
-  region_vars    = read_terragrunt_config(find_in_parent_folders("region.hcl"))
-  region         = local.region_vars.locals.region
-  region_abbv    = local.region_vars.locals.region_abbv
-  
+  region_vars = read_terragrunt_config(find_in_parent_folders("region.hcl"))
+  region      = local.region_vars.locals.region
+  region_abbv = local.region_vars.locals.region_abbv
+
   # Get common tags from the environment
-  common_vars    = read_terragrunt_config(find_in_parent_folders("common.hcl"))
-  prefix         = local.common_vars.locals.prefix
-  
-  # Try to get customer information if available
-  customer       = try(local.common_vars.locals.customer, "")
+  common_vars = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  workload    = local.common_vars.locals.workload
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -37,8 +34,7 @@ locals {
 # These are the variables we need to pass to the module to build standardized resource names.
 # ---------------------------------------------------------------------------------------------------------------------
 inputs = {
-  prefix      = local.prefix
-  customer    = local.customer
+  workload    = local.workload
   environment = local.environment
   region_abbv = local.region_abbv
 } 

@@ -314,6 +314,56 @@ Security is integrated into each Terraform module:
 - RBAC-based access policies
 - Soft-delete and purge protection enabled
 
+## Compliance Tier Enforcement
+
+Security controls are applied based on the `compliance_tier` declared in each workload's `workload.hcl`. The tier determines the isolation model and mandatory controls:
+
+### Standard (SOC2)
+
+- Shared AKS clusters with **vCluster** isolation (CNCF-certified virtual clusters)
+- Spoke VNets peered to a central hub
+- RBAC, private endpoints, and audit logging enabled by default
+
+### HIPAA
+
+- **Dedicated AKS cluster** (no shared tenancy)
+- Isolated VNet with no hub peering by default
+- Customer-managed key (CMK) encryption for all data at rest
+- Host encryption enabled on all node pools
+- Private cluster (no public API server endpoint)
+- 365-day log retention
+
+### PCI
+
+- **Dedicated AKS cluster** with all HIPAA controls, plus:
+- CDE-segmented VNet with strict boundary controls
+- WAF enforced on all ingress paths
+- IDS/IPS enabled
+- Deny-all default network policy (explicit allow required)
+
+## vCluster Isolation Model
+
+Standard-tier workloads share physical clusters. Tenant isolation is provided by **vCluster**, which gives each team a virtual Kubernetes cluster with its own API server, control plane, and resource namespace. vClusters are CNCF-certified and provide:
+
+- API server isolation (separate authentication and authorization)
+- Resource quotas and limit ranges per virtual cluster
+- Network policy isolation between virtual clusters
+- Independent CRD management
+
+HIPAA and PCI workloads bypass vCluster entirely and run on dedicated physical clusters.
+
+## Kyverno Policy Guardrails
+
+[Kyverno](https://kyverno.io/) is deployed as a policy engine on all clusters to enforce security guardrails at admission time:
+
+- **Image provenance**: Only images from approved registries (ACR) are admitted
+- **Pod security**: Enforce restricted pod security standards (no privileged containers, no host networking)
+- **Label requirements**: Workload and compliance-tier labels required on all namespaces
+- **Network policy enforcement**: Every namespace must have a default-deny network policy (mandatory for PCI, recommended for all tiers)
+- **Resource limits**: All pods must declare resource requests and limits
+
+Policies are deployed as Kyverno `ClusterPolicy` resources and are version-controlled alongside infrastructure code.
+
 ## Future Security Enhancements
 
 While the current implementation provides a solid security foundation, future enhancements will include:

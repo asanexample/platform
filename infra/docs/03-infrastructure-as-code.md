@@ -147,6 +147,9 @@ Azure modules are organized into logical categories:
    - `frontdoor_endpoint`: User-facing endpoints
    - `frontdoor_private_link`: Secure backend connections
 
+8. **Composite Modules**:
+   - `stack_base`: Composes resource_group + networking + key_vault into a single deployable stack
+
 Each module follows a consistent structure:
 
 ```mermaid
@@ -207,16 +210,24 @@ Each environment/region directory contains Terragrunt configurations for differe
 
 ```mermaid
 graph TD
-    live_dir[live/azure/dev/westus/] --> networking_dir[networking/]
-    live_dir --> storage_dir[storage/]
-    live_dir --> key_vault_dir[key_vault/]
-    live_dir --> aks_core_dir[aks_core/]
+    live_dir[live/azure/dev/westus/] --> workload_dir_platform[platform/]
+    live_dir --> workload_dir_hipaa[hipaa/]
     live_dir --> common_file[common.hcl]
+    
+    workload_dir_platform --> workload_hcl_platform[workload.hcl]
+    workload_dir_platform --> networking_dir[networking/]
+    workload_dir_platform --> storage_dir[storage/]
+    workload_dir_platform --> aks_core_dir[aks_core/]
+    
+    workload_dir_hipaa --> workload_hcl_hipaa[workload.hcl]
+    workload_dir_hipaa --> hipaa_networking[networking/]
+    workload_dir_hipaa --> hipaa_aks[aks_core/]
     
     networking_dir --> networking_config[terragrunt.hcl]
     storage_dir --> storage_config[terragrunt.hcl]
-    key_vault_dir --> key_vault_config[terragrunt.hcl]
     aks_core_dir --> aks_core_config[terragrunt.hcl]
+    hipaa_networking --> hipaa_net_config[terragrunt.hcl]
+    hipaa_aks --> hipaa_aks_config[terragrunt.hcl]
     
     classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
     classDef folder fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
@@ -304,25 +315,94 @@ graph TD
 
 This dependency graph ensures that resources are created in the correct order, with foundational resources like resource groups created first, followed by networking resources, and finally application-specific resources.
 
+## Shared Configuration: `_base.hcl`
+
+Each cloud provider directory contains a `_base.hcl` file (e.g., `infra/live/azure/_base.hcl`) that centralizes the boilerplate every module-level `terragrunt.hcl` would otherwise repeat. By including `_base.hcl`, a module config eliminates roughly 30 lines of repeated configuration loading.
+
+`_base.hcl` loads and merges the full config hierarchy:
+
+1. `common.hcl` -- cloud-wide defaults (prefix, project tags)
+2. `env.hcl` -- environment-level settings (subscription, env tags)
+3. `region.hcl` -- region info (location, abbreviation)
+4. `network.hcl` -- authoritative CIDR allocations for the region
+5. `_versions.hcl` -- centralized module sources and Helm chart pins
+
+It exposes commonly used scalars (`env`, `prefix`, `customer`, `region`, `region_abbv`), composed tags (merged across common/env/region layers), and the `module_source` and `helm_versions` maps from `_versions.hcl`.
+
+`_base.hcl` also includes safety validations:
+
+- **Environment path check**: Verifies the directory path environment segment matches the value declared in `env.hcl`.
+- **Subscription ID check**: Verifies the subscription ID in `env.hcl` matches the expected value from the `environment_subscription_map` in `common.hcl`.
+
+### Config Hierarchy
+
+The full configuration hierarchy from broadest to narrowest scope:
+
+| Level | File | Purpose |
+|-------|------|---------|
+| Root | `infra/root.hcl` | Remote state, providers, global tags |
+| Cloud | `infra/live/azure/common.hcl` | Cloud-wide defaults (prefix, project tags) |
+| Environment | `infra/live/azure/{env}/env.hcl` | Subscription, env tags, shutdown policies |
+| Region | `infra/live/azure/{env}/{region}/region.hcl` | Region info |
+| Region | `infra/live/azure/{env}/{region}/network.hcl` | Authoritative CIDR allocations |
+| Workload | `infra/live/azure/{env}/{region}/{workload}/workload.hcl` | Workload name, compliance tier, workload tags |
+| Defaults | `infra/live/azure/_envcommon/*.hcl` | Module defaults shared across environments |
+| Module | `infra/live/azure/{env}/{region}/{workload}/{module}/terragrunt.hcl` | Final overrides |
+
+At each level, later layers override earlier ones for tags and inputs.
+
+### Workload Configuration: `workload.hcl`
+
+Each workload directory contains a `workload.hcl` that declares the workload's identity and compliance posture:
+
+```hcl
+# infra/live/azure/prod/westus/hipaa/workload.hcl
+locals {
+  workload        = "hipaa"
+  compliance_tier = "hipaa"
+  workload_tags = {
+    Workload       = "hipaa"
+    ComplianceTier = "hipaa"
+  }
+}
+```
+
+`_base.hcl` loads `workload.hcl` via `find_in_parent_folders()` and merges `workload_tags` into the tag hierarchy. The `compliance_tier` value drives cluster topology decisions (shared vCluster vs. dedicated cluster) and security control selection.
+
+## Centralized Version Management: `_versions.hcl`
+
+Each cloud provider directory contains a `_versions.hcl` file (e.g., `infra/live/azure/_versions.hcl`) that centralizes all module source paths and Helm chart version pins. `_base.hcl` loads this file and exposes `module_source` and `helm_versions` maps.
+
+All module source paths use `get_repo_root()` as the base, providing a single place to update if the project migrates to a Terraform registry or git-tag-based versioning. Helm chart versions are pinned here so every environment deploys the same chart version unless explicitly overridden.
+
+Modules reference their source via:
+
+```hcl
+terraform {
+  source = include.base.locals.module_source.networking
+}
+```
+
 ## Example: Terragrunt Configuration
 
-A typical Terragrunt configuration file (`terragrunt.hcl`) looks like:
+A typical module-level `terragrunt.hcl` uses the `include "base"` pattern to pull in shared configuration:
 
 ```hcl
 include "root" {
   path = find_in_parent_folders()
 }
 
+include "base" {
+  path   = find_in_parent_folders("azure/_base.hcl")
+  expose = true
+}
+
 include "env" {
   path = find_in_parent_folders("env.hcl")
 }
 
-include "region" {
-  path = find_in_parent_folders("region.hcl")
-}
-
 terraform {
-  source = "${get_path_to_repo_root()}/infra/modules/azure/networking"
+  source = include.base.locals.module_source.networking
 }
 
 dependency "resource_group" {
@@ -348,6 +428,8 @@ inputs = {
   }
 }
 ```
+
+Values from `_base.hcl` are accessed as `include.base.locals.*` -- for example, `include.base.locals.env`, `include.base.locals.tags`, `include.base.locals.module_source.aks_core`.
 
 ## Example: Module Structure
 

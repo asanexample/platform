@@ -49,7 +49,7 @@ output "virtual_network" {
 }
 
 output "subnet" {
-  description = "Function to generate standardized subnet names with subnet type parameter."
+  description = "Base subnet name for generating type-specific subnet names."
   value       = local.subnet_name
 }
 
@@ -89,7 +89,7 @@ output "subnet_gateway" {
 }
 
 output "subnet_with_type" {
-  description = "Generate a subnet name with a specific type."
+  description = "Base subnet name for appending custom type suffixes."
   value       = local.subnet_name
 }
 
@@ -139,7 +139,7 @@ output "event_hub" {
 }
 
 output "monitor_workspace" {
-  description = "The generated name for the Azure Monitor workspace (Prometheus)"
+  description = "Standardized name for an Azure Monitor workspace (Prometheus)."
   value       = "${local.names.monitor_workspace}-prometheus"
 }
 
@@ -228,12 +228,27 @@ output "names" {
   value       = local.validated_names
 }
 
-output "normalized_customer" {
-  description = "Normalized customer name for use in resource naming."
-  value       = local.normalized_customer
+output "grafana" {
+  description = "Standardized name for an Azure Managed Grafana instance."
+  value       = local.names.managed_grafana
 }
 
-output "grafana" {
-  description = "The generated name for the Azure Grafana instance"
-  value       = "${local.names.monitor_workspace}-grafana"
-} 
+output "action_group" {
+  description = "Standardized name for an Azure Monitor Action Group."
+  value       = local.validated_names.action_group
+}
+
+output "metric_alert" {
+  description = "Standardized name for an Azure Monitor Metric Alert."
+  value       = local.validated_names.metric_alert
+}
+
+output "activity_log_alert" {
+  description = "Standardized name for an Azure Monitor Activity Log Alert."
+  value       = local.validated_names.activity_log_alert
+}
+
+output "diagnostic_setting" {
+  description = "Standardized name for an Azure Diagnostic Setting."
+  value       = local.validated_names.diagnostic_setting
+}

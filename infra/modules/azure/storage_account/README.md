@@ -1,315 +1,152 @@
 # Azure Storage Account Module
 
-## Overview
-
-This module creates an Azure Storage Account with configurable settings, optional blob containers, and robust security controls. It supports modern authentication methods, network access controls, and follows Azure best practices for storage management.
-
-## Features
-
-- Creates an Azure Storage Account with configurable settings
-- Optionally creates blob containers within the storage account
-- Configures network rules and access policies
-- Supports CORS configuration for web applications
-- Supports Entra ID (Azure AD) authentication with RBAC role assignments
-- Enforces secure defaults with modern authentication methods
-- Applies consistent tagging
+Creates a storage account with lifecycle rules, optional containers, and optional private endpoint.
 
 ## Usage
 
 ```hcl
 module "storage_account" {
-  source = "../../modules/azure/storage_account"
+  source = "../storage_account"
 
-  resource_group_name = module.resource_group.name
-  location            = module.resource_group.location
-  
-  # Storage account settings
-  name_components = {
-    prefix      = "myapp"
-    environment = "dev"
-    region_abbv = "eus"
-    instance    = "001"
-  }
-  
-  # Optional settings
+  create = true
+
+  resource_group_name = "rg-platform-prod-eus"
+  location            = "eastus"
+  name                = "platformprodeus001"
+
   account_tier             = "Standard"
-  account_replication_type = "LRS"
-  
-  # Container definitions (optional)
-  containers = {
-    "data" = {
-      name                  = "data"
-      container_access_type = "private"
-    },
-    "public" = {
-      name                  = "public"
-      container_access_type = "blob"
-    }
-  }
-  
-  # Disable shared access keys to enforce Entra ID authentication
+  account_replication_type = "ZRS"
   shared_access_key_enabled = false
-  
-  # Role assignments for Entra ID authentication
-  role_assignments = [
+
+  lifecycle_rules = [
     {
-      principal_id         = "00000000-0000-0000-0000-000000000000" # Object ID of user, group, or service principal
-      role_definition_name = "Storage Blob Data Contributor"
-      description          = "Grant Blob Data Contributor role to user"
+      name    = "archive-old-blobs"
+      enabled = true
+      tier_to_cool_action = {
+        days_after_modification_greater_than = 30
+      }
+      delete_action = {
+        days_after_modification_greater_than = 365
+      }
     }
   ]
-  
-  # Tags
+
+  private_endpoint = {
+    create               = true
+    subnet_id            = module.networking.subnet_ids["endpoints"]
+    private_dns_zone_ids = [module.private_dns.private_dns_zone_ids["blob"]]
+  }
+
   tags = {
-    Environment = "Development"
-    Project     = "MyProject"
-    ManagedBy   = "Terraform"
+    Environment = "prod"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
 
 ## Examples
 
-### Basic Storage Account
+### Disabled
 
 ```hcl
-module "basic_storage" {
-  source = "../../modules/azure/storage_account"
+module "storage_account" {
+  source = "../storage_account"
+  create = false
+}
+```
 
-  resource_group_name = module.resource_group.name
-  location            = module.resource_group.location
-  
+### Auto-generated name
+
+```hcl
+module "storage_account" {
+  source = "../storage_account"
+
+  create = true
+
+  resource_group_name = "rg-platform-dev-eus"
+  location            = "eastus"
+
   name_components = {
-    prefix      = "basic"
+    workload    = "platform"
     environment = "dev"
     region_abbv = "eus"
+    instance    = "001"
   }
-  
+
   tags = {
-    Environment = "Development"
-    ManagedBy   = "Terraform"
+    Environment = "dev"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
 
-### Production Storage with Enhanced Security
+<!-- BEGIN_TF_DOCS -->
+## Resources
 
-```hcl
-module "secure_storage" {
-  source = "../../modules/azure/storage_account"
+| Name | Type |
+| ---- | ---- |
+| [azurerm_private_endpoint.storage](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_endpoint) | resource |
+| [azurerm_storage_account.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_account) | resource |
+| [azurerm_storage_container.containers](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_container) | resource |
+| [azurerm_storage_management_policy.lifecycle](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_management_policy) | resource |
 
-  resource_group_name = module.resource_group.name
-  location            = module.resource_group.location
-  
-  name = "securestorageprod"
-  
-  account_tier             = "Standard"
-  account_replication_type = "GRS"
-  account_kind             = "StorageV2"
-  
-  # Enforce HTTPS and latest TLS version
-  min_tls_version             = "TLS1_2"
-  enable_https_traffic_only   = true
-  
-  # Disable public network access
-  public_network_access_enabled = false
-  
-  # Disable shared access keys
-  shared_access_key_enabled = false
-  
-  # Configure private endpoint
-  private_endpoint = {
-    subnet_id          = module.networking.subnet_ids["endpoints"]
-    private_dns_zone_id = module.private_dns.zone_ids["privatelink.blob.core.windows.net"]
-  }
-  
-  # Define lifecycle rules for cost optimization
-  lifecycle_rules = [
-    {
-      name    = "archive-after-90-days"
-      enabled = true
-      base_blob = {
-        tier_to_archive_after_days = 90
-        delete_after_days          = 365
-      }
-    }
-  ]
-  
-  tags = {
-    Environment        = "Production"
-    ManagedBy          = "Terraform"
-    DataClassification = "Confidential"
-    CostCenter         = "IT-12345"
-  }
-}
-```
-
-### Web Application Storage with CORS
-
-```hcl
-module "webapp_storage" {
-  source = "../../modules/azure/storage_account"
-
-  resource_group_name = module.resource_group.name
-  location            = module.resource_group.location
-  
-  name_components = {
-    prefix      = "webapp"
-    environment = "prod"
-    region_abbv = "eus"
-  }
-  
-  account_tier             = "Standard"
-  account_replication_type = "ZRS"
-  
-  containers = {
-    "assets" = {
-      name                  = "assets"
-      container_access_type = "blob"
-    },
-    "uploads" = {
-      name                  = "uploads"
-      container_access_type = "private"
-    }
-  }
-  
-  # Configure CORS for web access
-  cors_rules = [
-    {
-      allowed_origins    = ["https://mywebapp.com", "https://www.mywebapp.com"]
-      allowed_methods    = ["GET", "PUT", "POST"]
-      allowed_headers    = ["*"]
-      exposed_headers    = ["Content-Length", "Content-Type"]
-      max_age_in_seconds = 3600
-    }
-  ]
-  
-  # Network rules to restrict access
-  network_rules = {
-    default_action = "Deny"
-    ip_rules       = ["203.0.113.0/24"]
-    virtual_network_subnet_ids = [module.networking.subnet_ids["web"]]
-    bypass         = ["AzureServices"]
-  }
-  
-  tags = {
-    Environment = "Production"
-    ManagedBy   = "Terraform"
-    Application = "WebApp"
-  }
-}
-```
-
-## Requirements
-
-| Name | Version |
-|------|---------|
-| terraform | >= 1.6.0 |
-| azurerm | >= 4.0.0 |
-
-## Providers
-
-| Name | Version |
-|------|---------|
-| azurerm | >= 4.0.0 |
-
-## Required Inputs
-
-| Name | Description | Type |
-|------|-------------|------|
-| resource_group_name | Name of the resource group to create resources in | `string` |
-| location | Azure region where resources will be created | `string` |
-
-## Optional Inputs
+## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
-| name | Name of the storage account (if not provided, auto-generated) | `string` | `""` | no |
-| name_components | Components to build the storage account name | `object` | `{}` | no |
-| account_tier | Tier of the storage account (Standard or Premium) | `string` | `"Standard"` | no |
+| ---- | ----------- | ---- | ------- | :------: |
+| location | Azure region where resources will be deployed | `string` | n/a | yes |
+| resource_group_name | Name of the resource group to deploy the storage account in | `string` | n/a | yes |
+| access_tier | Access tier for the storage account | `string` | `"Hot"` | no |
+| account_kind | Kind of storage account to create | `string` | `"StorageV2"` | no |
 | account_replication_type | Replication type for the storage account | `string` | `"LRS"` | no |
-| account_kind | Kind of storage account | `string` | `"StorageV2"` | no |
-| containers | Map of containers to create | `map(object)` | `{}` | no |
-| network_rules | Network rules configuration | `object` | `{}` | no |
-| public_network_access_enabled | Whether public network access is allowed | `bool` | `true` | no |
-| shared_access_key_enabled | Whether shared access key authentication is enabled | `bool` | `false` | no |
-| private_endpoint | Private endpoint configuration | `object` | `{}` | no |
-| role_assignments | List of role assignments for Entra ID auth | `list(object)` | `[]` | no |
-| lifecycle_rules | Lifecycle management rules for the storage account | `list(object)` | `[]` | no |
-| cors_rules | CORS rules for the storage account | `list(object)` | `[]` | no |
+| account_tier | Tier of storage account to create | `string` | `"Standard"` | no |
+| allow_nested_items_to_be_public | Whether nested items (blobs, containers) can be set to public access | `bool` | `false` | no |
+| blob_delete_retention_days | Number of days to retain deleted blobs. If specified, must be between 1 and 365. | `number` | `null` | no |
+| blob_public_access_enabled | Whether public access is allowed to containers and blobs | `bool` | `false` | no |
+| blob_versioning_enabled | Whether blob versioning is enabled | `bool` | `false` | no |
+| change_feed_enabled | Whether the change feed is enabled | `bool` | `false` | no |
+| container_delete_retention_days | Number of days to retain deleted containers. If specified, must be between 1 and 365. | `number` | `null` | no |
+| containers | List of containers to create in the storage account | <pre>map(object({<br/>    name                  = string<br/>    container_access_type = optional(string, "private")<br/>  }))</pre> | `{}` | no |
+| cors_rules | CORS rules for the storage account blob service | <pre>list(object({<br/>    allowed_origins    = list(string) # List of origin domains that are permitted to make requests<br/>    allowed_methods    = list(string) # HTTP methods that are allowed (GET, PUT, POST, DELETE, HEAD, OPTIONS)<br/>    allowed_headers    = list(string) # HTTP request headers that are supported<br/>    exposed_headers    = list(string) # Response headers that browsers are allowed to access<br/>    max_age_in_seconds = number       # How long browsers should cache CORS preflight response<br/>  }))</pre> | `[]` | no |
+| create | Whether to create resources in this module | `bool` | `true` | no |
+| create_containers | Whether to create containers as part of this module. Set to false if you want to manage containers separately. | `bool` | `true` | no |
+| customer_managed_key | Customer-managed key configuration for storage account encryption | <pre>object({<br/>    key_vault_key_id             = string                 # ID of the key vault key used for encryption<br/>    user_assigned_identity_id    = optional(string, null) # ID of user-assigned managed identity with key access<br/>    use_system_assigned_identity = optional(bool, false)  # Whether to use system-assigned identity instead<br/><br/>    # Optional key auto-rotation settings<br/>    key_rotation = optional(object({<br/>      auto_rotation_enabled  = optional(bool, false) # Whether key auto-rotation is enabled<br/>      rotation_interval_days = optional(number, 90)  # Number of days before auto-rotating the key<br/>    }), {})<br/>  })</pre> | `null` | no |
+| last_access_time_enabled | Whether last access time tracking is enabled | `bool` | `false` | no |
+| lifecycle_rules | Lifecycle rules for blob storage | <pre>list(object({<br/>    name         = string<br/>    enabled      = optional(bool, true)<br/>    prefix_match = optional(list(string), [])<br/><br/>    delete_action = optional(object({<br/>      days_after_modification_greater_than = number<br/>    }), null)<br/><br/>    tier_to_cool_action = optional(object({<br/>      days_after_modification_greater_than = number<br/>    }), null)<br/><br/>    tier_to_archive_action = optional(object({<br/>      days_after_modification_greater_than = number<br/>    }), null)<br/>  }))</pre> | `[]` | no |
+| min_tls_version | Minimum TLS version required by the storage account | `string` | `"TLS1_2"` | no |
+| name | Name of the storage account (if custom naming is required). If not provided, it will be auto-generated based on prefix, environment, region and instance components. | `string` | `null` | no |
+| name_components | Components to auto-generate the storage account name if 'name' is not provided | <pre>object({<br/>    workload    = optional(string, "platform")<br/>    environment = optional(string, "dev")<br/>    region_abbv = optional(string, "eus")<br/>    instance    = optional(string, "001")<br/>  })</pre> | `{}` | no |
+| network_rules | Network rules for the storage account | <pre>object({<br/>    default_action             = optional(string, "Allow")<br/>    bypass                     = optional(list(string), ["AzureServices"])<br/>    ip_rules                   = optional(list(string), [])<br/>    virtual_network_subnet_ids = optional(list(string), [])<br/>  })</pre> | `{}` | no |
+| private_endpoint | Configuration for private endpoint if required | <pre>object({<br/>    create               = optional(bool, false)<br/>    name                 = optional(string, "")<br/>    subnet_id            = optional(string, "")<br/>    private_dns_zone_ids = optional(list(string), [])<br/>    subresource_names    = optional(list(string), ["blob"])<br/>  })</pre> | `{}` | no |
+| public_network_access_enabled | Whether public network access is enabled for the storage account (independent of private endpoint configuration) | `bool` | `true` | no |
+| role_assignments | List of role assignments to create for Entra ID authentication. Should contain principal_id, role_definition_name or role_definition_id, and scope (optional). | <pre>list(object({<br/>    principal_id         = string<br/>    role_definition_name = optional(string, null)<br/>    role_definition_id   = optional(string, null)<br/>    description          = optional(string, null)<br/>    scope                = optional(string, null) # Defaults to storage account resource ID<br/>  }))</pre> | `[]` | no |
+| shared_access_key_enabled | Whether shared access key authentication is enabled (not recommended, Entra ID authentication is preferred) | `bool` | `false` | no |
 | tags | Tags to apply to all resources | `map(string)` | `{}` | no |
 
 ## Outputs
 
 | Name | Description |
-|------|-------------|
+| ---- | ----------- |
+| containers | Map of created containers with their properties |
+| create | Whether resources were created |
 | id | ID of the created storage account |
 | name | Name of the created storage account |
-| primary_access_key | Primary access key for the storage account (deprecated, use Entra ID instead) |
-| primary_connection_string | Primary connection string for the storage account (deprecated, use Entra ID instead) |
+| primary_access_key | Primary access key for the storage account. DEPRECATED: Use Entra ID authentication instead of access keys. |
 | primary_blob_endpoint | Primary blob endpoint for the storage account |
-| containers | Map of created containers with their properties |
-| private_endpoint_ids | IDs of the created private endpoints |
-| role_assignments | IDs of the created role assignments |
-
-## Module Resources
-
-This module creates the following resources:
-- Azure Storage Account
-- Storage Containers (optional)
-- Private Endpoints (optional)
-- Role Assignments for RBAC (optional)
+| primary_connection_string | Primary connection string for the storage account. DEPRECATED: Use Entra ID authentication instead of connection strings. |
+| private_endpoint_ids | List of private endpoint IDs if created |
+| secondary_access_key | Secondary access key for the storage account. DEPRECATED: Use Entra ID authentication instead of access keys. |
+| secondary_connection_string | Secondary connection string for the storage account. DEPRECATED: Use Entra ID authentication instead of connection strings. |
+<!-- END_TF_DOCS -->
 
 ## Dependencies
 
-This module can depend on:
-- [resource_group](../resource_group) - For resource group creation
-- [networking](../networking) - For private endpoint subnet references
-- [private_dns](../private_dns) - For private endpoint DNS zone integration
-
-## Authentication Methods
-
-This module supports two authentication methods:
-
-### Entra ID (Azure AD) Authentication (Recommended)
-
-By default, the module is configured to use Entra ID authentication:
-
-- `shared_access_key_enabled` is set to `false` by default
-- Role assignments can be provided via the `role_assignments` variable
-- Common roles for blob storage include:
-  - "Storage Blob Data Owner" - Full access to Azure Storage blob containers and data
-  - "Storage Blob Data Contributor" - Read, write, and delete access to blob containers and data
-  - "Storage Blob Data Reader" - Read access to blob containers and data
-
-### Shared Access Key Authentication (Legacy)
-
-This method is not recommended for production use:
-
-- Set `shared_access_key_enabled = true` to enable access keys
-- Access keys are exposed in the module outputs but are marked as sensitive
-- Consider using SAS tokens with limited permissions if required
-
-## Security Best Practices
-
-For production deployments, consider implementing the following security measures:
-
-1. **Use Entra ID Authentication** - Disable shared access keys and use RBAC
-2. **Implement Network Restrictions** - Use private endpoints or network rules
-3. **Enable Encryption** - Use customer-managed keys for enhanced control
-4. **Configure Lifecycle Management** - Implement tiering and retention policies
-5. **Implement Monitoring** - Enable diagnostic settings and alerts
-6. **Enforce TLS 1.2+** - Require secure connections with modern TLS
+- [naming](../naming) — Provides standardized resource names
+- [resource_group](../resource_group) — Provides the resource group to deploy into
+- [networking](../networking) — Provides subnet IDs for private endpoints
 
 ## Notes
 
-- Storage account names must be globally unique across all of Azure
-- The auto-generated name follows the pattern `{prefix}{environment}{region_abbv}{instance}`
-- For production environments, consider using geo-redundant storage (GRS or GZRS)
-- Use lifecycle management policies to optimize storage costs
-- Private endpoints are recommended for production environments
-- Role assignments require proper permissions for the deploying identity
-
-## License
-
-This module is licensed under the MIT License. 
+- Storage account names must be globally unique, 3-24 characters, lowercase letters and numbers only (no hyphens).
+- Private endpoint is optional; set `private_endpoint.create = true` to enable.
+- Shared access keys are disabled by default; Entra ID authentication is preferred.

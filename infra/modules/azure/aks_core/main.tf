@@ -8,7 +8,7 @@
 # Generate DNS prefix if not provided and cluster name for auto-generation
 locals {
   # Generate a default name if not provided
-  cluster_name = var.name != null ? var.name : "${var.prefix}-${var.environment}-aks-${var.region_abbv}"
+  cluster_name = var.name != null ? var.name : "${var.workload}-${var.environment}-aks-${var.region_abbv}"
 
   # Generate DNS prefix if not provided
   dns_prefix = var.dns_prefix != null ? var.dns_prefix : lower(replace(local.cluster_name, "-", ""))
@@ -16,6 +16,7 @@ locals {
 
 # Create the AKS cluster
 resource "azurerm_kubernetes_cluster" "aks_cluster" {
+  count                     = var.create ? 1 : 0
   name                      = local.cluster_name
   location                  = var.location
   resource_group_name       = var.resource_group_name
@@ -42,18 +43,18 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
 
   # System node pool configuration
   default_node_pool {
-    name                 = var.default_nodepool_name
-    node_count           = var.default_nodepool_count
-    vm_size              = var.default_nodepool_vm_size
-    max_pods             = var.default_nodepool_max_pods
-    os_disk_size_gb      = var.default_nodepool_os_disk_size_gb
-    node_labels          = var.default_nodepool_node_labels
+    name                         = var.default_nodepool_name
+    node_count                   = var.default_nodepool_count
+    vm_size                      = var.default_nodepool_vm_size
+    max_pods                     = var.default_nodepool_max_pods
+    os_disk_size_gb              = var.default_nodepool_os_disk_size_gb
+    node_labels                  = var.default_nodepool_node_labels
     only_critical_addons_enabled = var.default_nodepool_only_critical_addons_enabled
-    auto_scaling_enabled = var.default_nodepool_enable_auto_scaling
-    min_count            = var.default_nodepool_enable_auto_scaling ? var.default_nodepool_min_count : null
-    max_count            = var.default_nodepool_enable_auto_scaling ? var.default_nodepool_max_count : null
-    vnet_subnet_id       = var.subnet_id
-    tags                 = var.tags
+    auto_scaling_enabled         = var.default_nodepool_enable_auto_scaling
+    min_count                    = var.default_nodepool_enable_auto_scaling ? var.default_nodepool_min_count : null
+    max_count                    = var.default_nodepool_enable_auto_scaling ? var.default_nodepool_max_count : null
+    vnet_subnet_id               = var.subnet_id
+    tags                         = var.tags
   }
 
   # Enable Microsoft Defender and Monitoring add-ons if specified
@@ -123,7 +124,7 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
 # Create Diagnostic Settings for the AKS Cluster
 # resource "azurerm_monitor_diagnostic_setting" "this" {
 #   count = length(var.diagnostic_settings) > 0 ? 1 : 0
-  
+
 #   name               = var.diagnostic_settings[0].name
 #   target_resource_id = azurerm_kubernetes_cluster.aks_cluster.id
 #   log_analytics_workspace_id = var.diagnostic_settings[0].log_analytics_workspace_id
@@ -131,7 +132,7 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
 #   # Configure logs for each category
 #   dynamic "enabled_log" {
 #     for_each = toset(var.diagnostic_settings[0].enabled_log_categories)
-    
+
 #     content {
 #       category = enabled_log.value
 #       # Retention is now handled separately via azurerm_storage_management_policy
@@ -142,13 +143,13 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
 #   # Configure metrics for each category
 #   dynamic "metric" {
 #     for_each = toset(var.diagnostic_settings[0].metric_categories)
-    
+
 #     content {
 #       category = metric.value
 #       enabled  = true
 #     }
 #   }
-  
+
 #   # Add lifecycle block to make diagnostic settings more resilient
 #   lifecycle {
 #     # Ignore changes to these fields to avoid unnecessary updates
@@ -162,10 +163,10 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
 
 # Connect AKS to Azure Monitor Workspace (Managed Prometheus)
 resource "azurerm_monitor_data_collection_rule_association" "prometheus" {
-  count = var.enable_prometheus_integration && var.prometheus_dcr_id != null ? 1 : 0
+  count = var.create && var.enable_prometheus_integration && var.prometheus_dcr_id != null ? 1 : 0
 
-  name                    = "${azurerm_kubernetes_cluster.aks_cluster.name}-prometheus"
-  target_resource_id      = azurerm_kubernetes_cluster.aks_cluster.id
+  name                    = "${azurerm_kubernetes_cluster.aks_cluster[0].name}-prometheus"
+  target_resource_id      = azurerm_kubernetes_cluster.aks_cluster[0].id
   data_collection_rule_id = var.prometheus_dcr_id
   description             = "Association between AKS cluster and Prometheus data collection rule"
 }
@@ -176,11 +177,11 @@ data "azurerm_role_definition" "monitoring_metrics_publisher" {
 }
 
 resource "azurerm_role_assignment" "prometheus_publisher" {
-  count = var.enable_prometheus_integration && var.monitor_workspace_id != null ? 1 : 0
+  count = var.create && var.enable_prometheus_integration && var.monitor_workspace_id != null ? 1 : 0
 
   scope              = var.monitor_workspace_id
   role_definition_id = data.azurerm_role_definition.monitoring_metrics_publisher.id
-  principal_id       = azurerm_kubernetes_cluster.aks_cluster.kubelet_identity[0].object_id
+  principal_id       = azurerm_kubernetes_cluster.aks_cluster[0].kubelet_identity[0].object_id
   description        = "Allow AKS Kubelet to publish metrics to the Azure Monitor Workspace for Prometheus"
 
   # Skip applying this if the kubelet identity isn't ready yet
@@ -189,9 +190,9 @@ resource "azurerm_role_assignment" "prometheus_publisher" {
 
 # Create role assignments for the AKS cluster
 resource "azurerm_role_assignment" "this" {
-  for_each = { for idx, assignment in var.role_assignments : idx => assignment }
+  for_each = var.create ? { for idx, assignment in var.role_assignments : idx => assignment } : {}
 
-  scope                = azurerm_kubernetes_cluster.aks_cluster.id
+  scope                = azurerm_kubernetes_cluster.aks_cluster[0].id
   role_definition_name = each.value.role_definition_name
   principal_id         = each.value.principal_id
   description          = each.value.description

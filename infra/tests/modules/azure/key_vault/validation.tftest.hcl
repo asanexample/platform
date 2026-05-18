@@ -14,7 +14,7 @@ provider "azurerm" {
     }
   }
   subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  tenant_id = "c945e155-be68-4477-b8d7-01939adbfe55"
+  tenant_id       = "c945e155-be68-4477-b8d7-01939adbfe55"
 }
 
 # Test with maximum SKU and maximum soft delete retention
@@ -25,25 +25,25 @@ run "max_retention_test" {
     resource_group_name = "test-rg"
     location            = "eastus"
     name                = "test-max-retention-vault"
-    
+
     # Maximum SKU and retention configuration
     sku_name                   = "premium"
-    soft_delete_retention_days = 90  # Maximum allowed
+    soft_delete_retention_days = 90 # Maximum allowed
     purge_protection_enabled   = true
-    
+
     # Basic required settings
     enable_rbac_authorization = true
-    
+
     name_components = {
-      prefix       = "tst"
-      environment  = "dev"
-      region_abbv  = "eus"
-      instance     = "01"
+      prefix      = "tst"
+      environment = "dev"
+      region_abbv = "eus"
+      instance    = "01"
     }
-    
+
     # No network ACLs or access policies
-    network_acls     = null
-    access_policies  = {}  # Empty map instead of empty list
+    network_acls    = null
+    access_policies = {} # Empty map instead of empty list
     private_endpoint = {
       create              = false
       name                = ""
@@ -70,25 +70,25 @@ run "min_retention_test" {
     resource_group_name = "test-rg"
     location            = "eastus"
     name                = "test-min-retention-vault"
-    
+
     # Minimum retention configuration
     sku_name                   = "standard"
-    soft_delete_retention_days = 7  # Minimum allowed
+    soft_delete_retention_days = 7 # Minimum allowed
     purge_protection_enabled   = false
-    
+
     # Basic required settings
     enable_rbac_authorization = true
-    
+
     name_components = {
-      prefix       = "tst"
-      environment  = "dev"
-      region_abbv  = "eus"
-      instance     = "01"
+      prefix      = "tst"
+      environment = "dev"
+      region_abbv = "eus"
+      instance    = "01"
     }
-    
+
     # No network ACLs or access policies
-    network_acls     = null
-    access_policies  = {}  # Empty map instead of empty list
+    network_acls    = null
+    access_policies = {} # Empty map instead of empty list
     private_endpoint = {
       create              = false
       name                = ""
@@ -115,24 +115,24 @@ run "max_name_length_test" {
     resource_group_name = "test-rg"
     location            = "eastus"
     # Key vault name max length is 24 characters
-    name                = "testmaxlengthkeyvaultnam"
-    
+    name = "testmaxlengthkeyvaultnam"
+
     # Basic configuration
     sku_name                   = "standard"
     soft_delete_retention_days = 7
     purge_protection_enabled   = false
     enable_rbac_authorization  = true
-    
+
     name_components = {
-      prefix       = "tst"
-      environment  = "dev"
-      region_abbv  = "eus"
-      instance     = "01"
+      prefix      = "tst"
+      environment = "dev"
+      region_abbv = "eus"
+      instance    = "01"
     }
-    
+
     # No network ACLs or access policies
-    network_acls     = null
-    access_policies  = {}  # Empty map instead of empty list
+    network_acls    = null
+    access_policies = {} # Empty map instead of empty list
     private_endpoint = {
       create              = false
       name                = ""
@@ -164,10 +164,10 @@ run "rbac_and_policies_test" {
     resource_group_name = "test-rg"
     location            = "eastus"
     name                = "test-rbac-policies-vault"
-    
+
     # Enable RBAC but also provide access policies
     enable_rbac_authorization = true
-    
+
     # These access policies should be ignored when RBAC is enabled
     access_policies = {
       test_user = {
@@ -178,21 +178,21 @@ run "rbac_and_policies_test" {
         storage_permissions     = []
       }
     }
-    
+
     # Basic configuration
     sku_name                   = "standard"
     soft_delete_retention_days = 7
     purge_protection_enabled   = false
-    
+
     name_components = {
-      prefix       = "tst"
-      environment  = "dev"
-      region_abbv  = "eus"
-      instance     = "01"
+      prefix      = "tst"
+      environment = "dev"
+      region_abbv = "eus"
+      instance    = "01"
     }
-    
+
     # No network ACLs
-    network_acls     = null
+    network_acls = null
     private_endpoint = {
       create              = false
       name                = ""

@@ -1,0 +1,83 @@
+global:
+  domain: "${domain}"
+  image:
+    tag: ""  # use default from chart
+
+configs:
+  params:
+    server.insecure: ${insecure}
+    
+  cm:
+    # General Argo CD configuration
+    url: "https://${domain}"
+    application.instanceLabelKey: argocd.argoproj.io/instance
+    timeout.reconciliation: 180s
+    
+    # Resource exclusions
+    resource.exclusions: |
+      - apiGroups:
+        - cilium.io
+        kinds:
+        - CiliumIdentity
+        clusters:
+        - "*"
+
+  rbac:
+    policy.default: role:readonly
+    policy.csv: |
+      p, role:org-admin, applications, *, */*, allow
+      p, role:org-admin, clusters, get, *, allow
+      p, role:org-admin, repositories, get, *, allow
+      p, role:org-admin, repositories, create, *, allow
+      p, role:org-admin, repositories, update, *, allow
+      p, role:org-admin, repositories, delete, *, allow
+      p, role:org-admin, logs, get, *, allow
+      p, role:org-admin, exec, create, */*, allow
+      g, org-admin, role:org-admin
+
+controller:
+  replicas: ${controller_replicas}
+  
+server:
+  replicas: ${server_replicas}
+  service:
+    type: ${service_type}
+  %{ if insecure }
+  extraArgs:
+    - --insecure
+  %{ endif }
+
+repoServer:
+  replicas: ${repo_server_replicas}
+  autoscaling:
+    enabled: true
+    minReplicas: ${repo_server_replicas}
+    maxReplicas: 5
+
+applicationSet:
+  enabled: true
+  replicas: ${app_set_replicas}
+
+notifications:
+  enabled: ${enable_notifications}
+  replicas: ${notifications_replicas}
+
+dex:
+  enabled: ${enable_dex}
+
+redis:
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+
+%{ if admin_password != "" }
+# Admin password is explicitly set
+configs:
+  secret:
+    argocdServerAdminPassword: ${admin_password}
+    argocdServerAdminPasswordMtime: "2023-01-01T00:00:00Z"
+%{ endif } 

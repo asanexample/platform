@@ -150,9 +150,15 @@ Transit subnets enable connectivity between different network segments:
 - Security: Tightly controlled routing
 - Configuration: Specific route tables and security rules
 
+## Authoritative CIDR Sources
+
+Each region's `network.hcl` file is the authoritative source of CIDR allocations for that region. These files live alongside the region's `region.hcl` (e.g., `infra/live/azure/dev/eastus/network.hcl`) and are loaded by `_base.hcl` into every module's configuration.
+
+> **Note**: The `azure_cidr_map` that previously existed in `_envcommon/networking.hcl` has been removed. Region-level `network.hcl` files are now the single source of truth for CIDR values, not a centralized map.
+
 ## Implementation in Terraform
 
-The CIDR allocation strategy is implemented in Terraform using structured variable definitions:
+The CIDR allocation strategy is implemented in each region's `network.hcl` using structured variable definitions:
 
 ```hcl
 locals {
@@ -179,11 +185,9 @@ locals {
 }
 ```
 
-In the current implementation, these CIDR configurations are specified in the `network.hcl` file in the region directory (e.g., `infra/live/azure/dev/eastus/network.hcl`).
-
 ## Allocation File
 
-The platform maintains a comprehensive CSV file (`allocations.csv`) that documents all CIDR allocations across all cloud providers, environments, regions, and availability zones. This file serves as the source of truth for network planning and is used to:
+The platform maintains a master planning reference CSV file (`allocations.csv` at the repository root) that documents all CIDR allocations across all cloud providers, environments, regions, and availability zones. This file serves as the master planning reference and is used to:
 
 1. Document all allocated address spaces
 2. Prevent IP range overlaps

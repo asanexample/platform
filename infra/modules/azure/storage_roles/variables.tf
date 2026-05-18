@@ -1,3 +1,9 @@
+variable "create" {
+  description = "Whether to create resources in this module"
+  type        = bool
+  default     = true
+}
+
 variable "storage_account_id" {
   description = "ID of the storage account to assign roles for"
   type        = string

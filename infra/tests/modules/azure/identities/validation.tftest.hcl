@@ -1,6 +1,6 @@
 /**
  * # Identities Module - Validation Test
- * 
+ *
  * This test verifies validation conditions for the identities module.
  */
 
@@ -8,21 +8,20 @@
 provider "azurerm" {
   features {}
   subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  tenant_id = "c945e155-be68-4477-b8d7-01939adbfe55"
+  tenant_id       = "c945e155-be68-4477-b8d7-01939adbfe55"
 }
 
-# Test prefix validation
-run "prefix_validation_test" {
+# Test workload validation
+run "workload_validation_test" {
   command = plan
 
   variables {
-    prefix               = "abc"
-    customer             = "test"
-    environment          = "dev"
-    region_abbv          = "eus"
-    resource_group_name  = "test-rg"
-    location             = "eastus"
-    create_aks_identity  = true
+    workload            = "platform"
+    environment         = "dev"
+    region_abbv         = "eus"
+    resource_group_name = "test-rg"
+    location            = "eastus"
+    create_aks_identity = true
   }
 
   module {
@@ -32,13 +31,13 @@ run "prefix_validation_test" {
   # Check that aks_identity is created
   assert {
     condition     = length(azurerm_user_assigned_identity.aks_identity) > 0
-    error_message = "AKS identity should be created with valid prefix"
+    error_message = "AKS identity should be created with valid workload"
   }
-  
-  # Check that the AKS identity has the correct name format with prefix
+
+  # Check that the AKS identity has the correct CAF name format
   assert {
-    condition     = can(regex("^abc-dev-aksid-eus$", azurerm_user_assigned_identity.aks_identity[0].name))
-    error_message = "AKS identity name should follow the pattern: prefix-env-aksid-region"
+    condition     = can(regex("^aksid-platform-dev-eus$", azurerm_user_assigned_identity.aks_identity[0].name))
+    error_message = "AKS identity name should follow CAF pattern: aksid-{workload}-{env}-{region}"
   }
 }
 
@@ -47,13 +46,12 @@ run "environment_validation_test" {
   command = plan
 
   variables {
-    prefix               = "abc"
-    customer             = "test"
-    environment          = "prod"  # Valid environment (prod, dev, qa)
-    region_abbv          = "eus"
-    resource_group_name  = "test-rg"
-    location             = "eastus"
-    create_aks_identity  = true
+    workload            = "platform"
+    environment         = "prod"
+    region_abbv         = "eus"
+    resource_group_name = "test-rg"
+    location            = "eastus"
+    create_aks_identity = true
   }
 
   module {
@@ -65,26 +63,25 @@ run "environment_validation_test" {
     condition     = length(azurerm_user_assigned_identity.aks_identity) > 0
     error_message = "AKS identity should be created with valid environment"
   }
-  
+
   # Check that the AKS identity has the correct name format with environment
   assert {
-    condition     = can(regex("^abc-prod-aksid-eus$", azurerm_user_assigned_identity.aks_identity[0].name))
-    error_message = "AKS identity name should follow the pattern: prefix-env-aksid-region"
+    condition     = can(regex("^aksid-platform-prod-eus$", azurerm_user_assigned_identity.aks_identity[0].name))
+    error_message = "AKS identity name should follow CAF pattern: aksid-{workload}-{env}-{region}"
   }
 }
 
-# Test customer name validation - valid name
-run "customer_validation_test" {
+# Test different workload name
+run "workload_variation_test" {
   command = plan
 
   variables {
-    prefix               = "abc"
-    customer             = "centric"  # Valid customer name (2-10 chars)
-    environment          = "dev"
-    region_abbv          = "eus"
-    resource_group_name  = "test-rg"
-    location             = "eastus"
-    create_aks_identity  = true
+    workload            = "hipaa"
+    environment         = "dev"
+    region_abbv         = "eus"
+    resource_group_name = "test-rg"
+    location            = "eastus"
+    create_aks_identity = true
   }
 
   module {
@@ -94,13 +91,13 @@ run "customer_validation_test" {
   # Check that aks_identity is created
   assert {
     condition     = length(azurerm_user_assigned_identity.aks_identity) > 0
-    error_message = "AKS identity should be created with valid customer name"
+    error_message = "AKS identity should be created with valid workload name"
   }
-  
-  # Check that the AKS identity has the correct name format (customer name is in prefix, not in final name)
+
+  # Check that the AKS identity has the correct name format
   assert {
-    condition     = can(regex("^abc-dev-aksid-eus$", azurerm_user_assigned_identity.aks_identity[0].name))
-    error_message = "AKS identity name should follow the pattern: prefix-env-aksid-region"
+    condition     = can(regex("^aksid-hipaa-dev-eus$", azurerm_user_assigned_identity.aks_identity[0].name))
+    error_message = "AKS identity name should follow CAF pattern: aksid-{workload}-{env}-{region}"
   }
 }
 
@@ -109,13 +106,12 @@ run "disable_aks_identity_test" {
   command = plan
 
   variables {
-    prefix               = "abc"
-    customer             = "test"
-    environment          = "dev"
-    region_abbv          = "eus"
-    resource_group_name  = "test-rg"
-    location             = "eastus"
-    create_aks_identity  = false  # Disable AKS identity creation
+    workload            = "platform"
+    environment         = "dev"
+    region_abbv         = "eus"
+    resource_group_name = "test-rg"
+    location            = "eastus"
+    create_aks_identity = false
   }
 
   module {
@@ -134,14 +130,13 @@ run "workload_identity_disabled_test" {
   command = plan
 
   variables {
-    prefix               = "abc"
-    customer             = "test"
-    environment          = "dev"
-    region_abbv          = "eus"
-    resource_group_name  = "test-rg"
-    location             = "eastus"
-    create_aks_identity  = true
-    enable_workload_identity = false  # Default behavior
+    workload                 = "platform"
+    environment              = "dev"
+    region_abbv              = "eus"
+    resource_group_name      = "test-rg"
+    location                 = "eastus"
+    create_aks_identity      = true
+    enable_workload_identity = false
   }
 
   module {
@@ -160,14 +155,13 @@ run "custom_aks_identity_name_test" {
   command = plan
 
   variables {
-    prefix               = "abc"
-    customer             = "test"
-    environment          = "dev"
-    region_abbv          = "eus"
-    resource_group_name  = "test-rg"
-    location             = "eastus"
-    create_aks_identity  = true
-    aks_identity_name    = "custom-aks-identity"  # Custom identity name
+    workload            = "platform"
+    environment         = "dev"
+    region_abbv         = "eus"
+    resource_group_name = "test-rg"
+    location            = "eastus"
+    create_aks_identity = true
+    aks_identity_name   = "custom-aks-identity"
   }
 
   module {
@@ -179,4 +173,4 @@ run "custom_aks_identity_name_test" {
     condition     = azurerm_user_assigned_identity.aks_identity[0].name == "custom-aks-identity"
     error_message = "AKS identity should use the custom name when provided"
   }
-} 
+}

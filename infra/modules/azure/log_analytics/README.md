@@ -1,260 +1,121 @@
-# Azure Log Analytics Workspace Module
+# Azure Log Analytics Module
 
-## Overview
-
-This module creates an Azure Log Analytics Workspace with essential configurations for centralized logging, monitoring, and analytics across Azure resources. It provides comprehensive monitoring capabilities, particularly for Azure Kubernetes Service (AKS) clusters and other Azure services.
-
-## Features
-
-- Creates a Log Analytics Workspace with configurable retention and SKU
-- Supports installation of solution packs (ContainerInsights, Security, etc.)
-- Configures diagnostic settings for the workspace itself
-- Controllable data ingestion limits through daily quotas
-- Configurable network access settings for ingestion and querying
-- Provides all necessary outputs for integration with other Azure services
+Creates a Log Analytics workspace with optional solution packs, diagnostic settings, and role assignments for centralized logging and monitoring.
 
 ## Usage
 
 ```hcl
 module "log_analytics" {
-  source = "../../modules/azure/log_analytics"
+  source = "../log_analytics"
 
-  name                = "law-monitoring-prod-eastus"
-  resource_group_name = "rg-monitoring-prod-eastus"
+  create = true
+
+  resource_group_name = "rg-platform-prod-eus"
   location            = "eastus"
+  name                = "law-platform-prod-eus"
   sku                 = "PerGB2018"
-  retention_in_days   = 30
+  retention_in_days   = 90
 
   solution_plans = [
-    {
-      solution_name = "ContainerInsights"
-    },
-    {
-      solution_name = "Security"
-    }
+    { solution_name = "ContainerInsights" },
+    { solution_name = "Security" }
   ]
-  
-  diagnostic_settings = [
+
+  role_assignments = [
     {
-      name                       = "diag-law-monitoring"
-      log_analytics_workspace_id = "self"
-      enabled_log_categories     = ["Audit"]
-      metric_categories          = ["AllMetrics"]
-      log_retention_days         = 30
+      principal_id         = data.azuread_group.platform_team.id
+      role_definition_name = "Log Analytics Contributor"
+      description          = "Platform team workspace access"
     }
   ]
 
   tags = {
-    Environment = "Production"
-    ManagedBy   = "Terraform"
-    Component   = "Monitoring"
+    Environment = "prod"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
 
 ## Examples
 
-### Basic Development Workspace
+### Disabled
 
 ```hcl
 module "log_analytics" {
-  source = "../../modules/azure/log_analytics"
+  source = "../log_analytics"
+  create = false
+}
+```
 
-  name                = "law-monitoring-dev-eastus"
-  resource_group_name = "rg-monitoring-dev-eastus"
+### Minimal dev workspace
+
+```hcl
+module "log_analytics" {
+  source = "../log_analytics"
+
+  create = true
+
+  resource_group_name = "rg-platform-dev-eus"
   location            = "eastus"
-  sku                 = "PerGB2018"
+  name                = "law-platform-dev-eus"
   retention_in_days   = 30
-  
+
   tags = {
-    Environment = "Development"
-    ManagedBy   = "Terraform"
+    Environment = "dev"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
 
-### Production Workspace with Solutions and Quotas
+<!-- BEGIN_TF_DOCS -->
+## Resources
 
-```hcl
-module "log_analytics" {
-  source = "../../modules/azure/log_analytics"
+| Name | Type |
+| ---- | ---- |
+| [azurerm_log_analytics_solution.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/log_analytics_solution) | resource |
+| [azurerm_log_analytics_workspace.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/log_analytics_workspace) | resource |
+| [azurerm_role_assignment.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
 
-  name                    = "law-monitoring-prod-eastus"
-  resource_group_name     = "rg-monitoring-prod-eastus"
-  location                = "eastus"
-  sku                     = "PerGB2018"
-  retention_in_days       = 90
-  daily_quota_gb          = 100
-  internet_ingestion_enabled = true
-  internet_query_enabled     = true
-
-  solution_plans = [
-    {
-      solution_name = "ContainerInsights"
-    },
-    {
-      solution_name = "Security"
-    },
-    {
-      solution_name = "ServiceMap"
-    },
-    {
-      solution_name = "NetworkMonitoring"
-    }
-  ]
-  
-  tags = {
-    Environment = "Production"
-    ManagedBy   = "Terraform"
-    Component   = "Monitoring"
-    CostCenter  = "Platform"
-  }
-}
-```
-
-### Workspace with Private Access Configuration
-
-```hcl
-module "log_analytics" {
-  source = "../../modules/azure/log_analytics"
-
-  name                    = "law-monitoring-prod-eastus"
-  resource_group_name     = "rg-monitoring-prod-eastus"
-  location                = "eastus"
-  sku                     = "PerGB2018"
-  retention_in_days       = 90
-  
-  # Restrict to private network only
-  internet_ingestion_enabled = false
-  internet_query_enabled     = false
-  
-  tags = {
-    Environment = "Production"
-    ManagedBy   = "Terraform"
-    Security    = "High"
-  }
-}
-```
-
-## Requirements
-
-| Name | Version |
-|------|---------|
-| terraform | >= 1.6.0 |
-| azurerm | >= 4.0.0 |
-
-## Providers
-
-| Name | Version |
-|------|---------|
-| azurerm | >= 4.0.0 |
-
-## Required Inputs
-
-| Name | Description | Type |
-|------|-------------|------|
-| name | The name of the Log Analytics Workspace | `string` |
-| resource_group_name | The name of the resource group where the workspace will be created | `string` |
-| location | The Azure region where the workspace will be created | `string` |
-
-## Optional Inputs
+## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
-| sku | The SKU of the workspace (Free, PerGB2018, Premium, Standard, Standalone, Unlimited, CapacityReservation) | `string` | `"PerGB2018"` | no |
-| retention_in_days | The number of days to retain logs (30-730) | `number` | `30` | no |
-| daily_quota_gb | The daily data ingestion quota in GB | `number` | `null` | no |
-| internet_ingestion_enabled | Whether to enable internet ingestion | `bool` | `true` | no |
-| internet_query_enabled | Whether to enable internet query | `bool` | `true` | no |
-| solution_plans | A list of solution plans to install | `list(object)` | `[]` | no |
-| diagnostic_settings | A list of diagnostic settings for the workspace | `list(object)` | `[]` | no |
-| tags | Tags to apply to all resources | `map(string)` | `{}` | no |
+| ---- | ----------- | ---- | ------- | :------: |
+| location | The Azure region where the Log Analytics Workspace will be created | `string` | n/a | yes |
+| resource_group_name | The name of the resource group where the Log Analytics Workspace will be created | `string` | n/a | yes |
+| create | Whether to create resources in this module | `bool` | `true` | no |
+| daily_quota_gb | The workspace daily quota for ingestion in GB. Must be a positive number or null. | `number` | `null` | no |
+| diagnostic_settings | A list of diagnostic settings to create for the Log Analytics Workspace | <pre>list(object({<br/>    name                       = string<br/>    log_analytics_workspace_id = string<br/>    enabled_log_categories     = list(string)<br/>    metric_categories          = list(string)<br/>    log_retention_days         = number<br/>  }))</pre> | `[]` | no |
+| environment | The environment name (dev, prod, etc.) | `string` | `"dev"` | no |
+| internet_ingestion_enabled | Whether to enable internet ingestion for the Log Analytics Workspace | `bool` | `true` | no |
+| internet_query_enabled | Whether to enable internet query for the Log Analytics Workspace | `bool` | `true` | no |
+| name | The name of the Log Analytics Workspace. If null, a name should be provided by Terragrunt using the naming module. | `string` | `null` | no |
+| workload | The workload name to apply to resource names | `string` | `"platform"` | no |
+| region_abbv | The abbreviated name of the Azure region | `string` | `"eus"` | no |
+| retention_in_days | The number of days to retain logs in the Log Analytics Workspace | `number` | `30` | no |
+| role_assignments | A list of role assignments to create for the Log Analytics Workspace | <pre>list(object({<br/>    principal_id   = string<br/>    role_definition_name = string<br/>    description    = optional(string, null)<br/>  }))</pre> | `[]` | no |
+| sku | The SKU of the Log Analytics Workspace (PerGB2018, Free, PerNode, Premium, Standard, Standalone, Unlimited, or CapacityReservation) | `string` | `"PerGB2018"` | no |
+| solution_plans | A list of solution plans to install on the Log Analytics Workspace | <pre>list(object({<br/>    solution_name = string<br/>    publisher     = optional(string, "Microsoft")<br/>    product       = optional(string, null)<br/>  }))</pre> | `[]` | no |
+| tags | A map of tags to apply to the Log Analytics Workspace | `map(string)` | `{}` | no |
 
 ## Outputs
 
 | Name | Description |
-|------|-------------|
+| ---- | ----------- |
+| create | Whether resources were created |
 | id | The ID of the Log Analytics Workspace |
 | name | The name of the Log Analytics Workspace |
-| primary_shared_key | The primary shared key (sensitive) |
-| secondary_shared_key | The secondary shared key (sensitive) |
-| workspace_id | The workspace ID |
-| solutions | The list of installed solutions |
-
-## Module Resources
-
-This module creates the following resources:
-- Azure Log Analytics Workspace
-- Log Analytics Solutions (optional)
-- Diagnostic Settings (optional)
+| primary_shared_key | The primary shared key for the Log Analytics Workspace |
+| secondary_shared_key | The secondary shared key for the Log Analytics Workspace |
+| solutions | The solutions installed on the Log Analytics Workspace |
+| workspace_id | The workspace ID for the Log Analytics Workspace |
+<!-- END_TF_DOCS -->
 
 ## Dependencies
 
-This module has no dependencies on other modules.
-
-## Integration with Other Services
-
-### AKS Integration
-
-To connect the Log Analytics Workspace to your AKS cluster:
-
-```hcl
-module "aks" {
-  source = "../../modules/azure/aks_core"
-  
-  # ... other configuration ...
-  
-  log_analytics_workspace_id = module.log_analytics.id
-  
-  diagnostic_settings = [{
-    name                       = "aks-diag"
-    log_analytics_workspace_id = module.log_analytics.id
-    enabled_log_categories     = ["kube-apiserver", "kube-audit", "kube-controller-manager"]
-    metric_categories          = ["AllMetrics"]
-    log_retention_days         = 30
-  }]
-}
-```
-
-### Virtual Machine Monitoring
-
-To enable VM insights:
-
-```hcl
-module "log_analytics" {
-  source = "../../modules/azure/log_analytics"
-
-  # ... basic configuration ...
-
-  solution_plans = [
-    {
-      solution_name = "VMInsights"
-    }
-  ]
-}
-```
-
-## Solution Pack Information
-
-| Solution Name | Description |
-|---------------|-------------|
-| ContainerInsights | Monitoring solution for AKS and containers |
-| Security | Security and compliance monitoring |
-| ServiceMap | Service dependency mapping |
-| VMInsights | Virtual machine performance and dependency monitoring |
-| NetworkMonitoring | Network traffic and connection monitoring |
-| KeyVaultAnalytics | Azure Key Vault monitoring |
-| Updates | System update assessment and management |
+- [naming](../naming) — Provides standardized resource names
+- [resource_group](../resource_group) — Provides the resource group to deploy into
 
 ## Notes
 
-- The recommended SKU for production is `PerGB2018`
-- Log retention must be between 30 and 730 days
-- For high-security environments, consider disabling internet ingestion and query
-- Daily quota helps control costs but may result in data loss if exceeded
-- Each solution pack increases the cost of the workspace based on data ingestion
-- For cost-effective monitoring, focus on relevant logs and metrics
-
-## License
-
-This module is licensed under the MIT License. 
+- `daily_quota_gb` helps control costs but data is dropped once the quota is hit for the day.
+- Log retention must be between 30 and 730 days.

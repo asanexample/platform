@@ -3,7 +3,7 @@
 locals {
   # VNet CIDR block for westus region - from allocations.csv
   address_space = ["10.101.24.0/21"]
-  
+
   # Subnet configurations for westus region with three availability zones
   # Each AZ has Kubernetes, Services, Endpoints, Firewall, Transit, and Public subnets
   subnets = {
@@ -20,7 +20,7 @@ locals {
       address_prefixes  = ["10.101.24.64/26"]
       service_endpoints = ["Microsoft.Storage", "Microsoft.Sql", "Microsoft.KeyVault"]
     },
-    "AzureFirewallSubnet" = { 
+    "AzureFirewallSubnet" = {
       address_prefixes  = ["10.101.24.128/26"]
       service_endpoints = ["Microsoft.Storage"]
     },
@@ -32,7 +32,7 @@ locals {
       address_prefixes  = ["10.101.24.224/28"]
       service_endpoints = ["Microsoft.Storage"]
     },
-    
+
     # AZ 2 (westus-2) subnets
     "az2-kubernetes" = {
       address_prefixes  = ["10.101.25.0/26"]
@@ -58,7 +58,7 @@ locals {
       address_prefixes  = ["10.101.25.224/28"]
       service_endpoints = ["Microsoft.Storage"]
     },
-    
+
     # AZ 3 (westus-3) subnets
     "az3-kubernetes" = {
       address_prefixes  = ["10.101.26.0/26"]
