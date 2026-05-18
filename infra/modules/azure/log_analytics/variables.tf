@@ -13,12 +13,12 @@ variable "name" {
   description = "The name of the Log Analytics Workspace. If null, a name should be provided by Terragrunt using the naming module."
   type        = string
   default     = null
-  
+
   validation {
     condition     = var.name == null ? true : length(var.name) >= 4 && length(var.name) <= 63
     error_message = "The name must be between 4 and 63 characters."
   }
-  
+
   validation {
     condition     = var.name == null ? true : can(regex("^[a-zA-Z0-9-_]+$", var.name))
     error_message = "The name can only contain alphanumeric characters, hyphens, and underscores."
@@ -28,7 +28,7 @@ variable "name" {
 variable "location" {
   description = "The Azure region where the Log Analytics Workspace will be created"
   type        = string
-  
+
   validation {
     condition = contains([
       "eastus", "eastus2", "westus", "westus2", "centralus", "southcentralus",
@@ -47,7 +47,7 @@ variable "location" {
 variable "resource_group_name" {
   description = "The name of the resource group where the Log Analytics Workspace will be created"
   type        = string
-  
+
   validation {
     condition     = length(var.resource_group_name) >= 1 && length(var.resource_group_name) <= 90
     error_message = "The resource group name must be between 1 and 90 characters."
@@ -59,7 +59,7 @@ variable "sku" {
   description = "The SKU of the Log Analytics Workspace (PerGB2018, Free, PerNode, Premium, Standard, Standalone, Unlimited, or CapacityReservation)"
   type        = string
   default     = "PerGB2018"
-  
+
   validation {
     condition     = contains(["PerGB2018", "Free", "PerNode", "Premium", "Standard", "Standalone", "Unlimited", "CapacityReservation"], var.sku)
     error_message = "The SKU must be one of: PerGB2018, Free, PerNode, Premium, Standard, Standalone, Unlimited, or CapacityReservation."
@@ -70,7 +70,7 @@ variable "retention_in_days" {
   description = "The number of days to retain logs in the Log Analytics Workspace"
   type        = number
   default     = 30
-  
+
   validation {
     condition     = var.retention_in_days >= 30 && var.retention_in_days <= 730
     error_message = "The retention period must be between 30 and 730 days."
@@ -108,13 +108,13 @@ variable "solution_plans" {
     product       = optional(string, null)
   }))
   default = []
-  
+
   validation {
     condition = alltrue([
-      for plan in var.solution_plans : 
+      for plan in var.solution_plans :
       contains([
-        "ContainerInsights", "Security", "SecurityInsights", "AzureActivity", 
-        "AgentHealthAssessment", "DnsAnalytics", "KeyVaultAnalytics", 
+        "ContainerInsights", "Security", "SecurityInsights", "AzureActivity",
+        "AgentHealthAssessment", "DnsAnalytics", "KeyVaultAnalytics",
         "ServiceMap", "SQLAssessment", "Updates", "VMInsights"
       ], plan.solution_name)
     ])
@@ -143,12 +143,12 @@ variable "tags" {
 variable "role_assignments" {
   description = "A list of role assignments to create for the Log Analytics Workspace"
   type = list(object({
-    principal_id   = string
+    principal_id         = string
     role_definition_name = string
-    description    = optional(string, null)
+    description          = optional(string, null)
   }))
   default = []
-  
+
   validation {
     condition = alltrue([
       for assignment in var.role_assignments :

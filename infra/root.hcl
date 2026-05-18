@@ -22,7 +22,7 @@ remote_state {
     region         = "us-east-1"
     encrypt        = true
     dynamodb_table = "terraform-locks"
-  } : {
+    } : {
     subscription_id      = "9dc5edc4-8c4e-41a1-a4f8-2183c4e91954"
     tenant_id            = "c945e155-be68-4477-b8d7-01939adbfe55"
     resource_group_name  = "terraform-state-rg"
@@ -137,28 +137,28 @@ locals {
 
   # Extract environment, region, and other global variables
   environment = get_env("TF_VAR_environment", "dev")
-  
+
   # Get environment-specific variables from env.hcl
   environment_vars = read_terragrunt_config(find_in_parent_folders("env.hcl", "${get_terragrunt_dir()}/dummy.hcl"))
-  
+
   # Default region settings for each cloud provider
-  aws_region          = get_env("TF_VAR_aws_region", "us-east-1")
-  azure_region        = get_env("TF_VAR_azure_region", "eastus")
-  gcp_region          = get_env("TF_VAR_gcp_region", "us-east1")
-  
+  aws_region   = get_env("TF_VAR_aws_region", "us-east-1")
+  azure_region = get_env("TF_VAR_azure_region", "eastus")
+  gcp_region   = get_env("TF_VAR_gcp_region", "us-east1")
+
   # Account/subscription IDs - both subscription_id and tenant_id must be in env.hcl
   azure_subscription_id = try(local.environment_vars.locals.subscription_id, "")
   azure_tenant_id       = try(local.environment_vars.locals.tenant_id, "")
   gcp_project_id        = try(local.environment_vars.locals.gcp_project_id, "")
-  
+
   # Organization details
   cost_center = get_env("TF_VAR_cost_center", "Engineering")
   owner       = get_env("TF_VAR_owner", "Platform Team")
-  
+
   # Standard naming convention helpers
   # Format: {resource_type}-{workload}-{env}-{region}-{name}
   # Example: rg-platform-dev-eus-networking
-  
+
   # Common tags that will be applied to all resources
   common_tags = {
     Environment = local.environment

@@ -21,7 +21,7 @@ dependency "naming" {
 
   # Mock outputs for plan and validation
   mock_outputs = {
-    aks_cluster = "mock-aks"
+    aks_cluster  = "mock-aks"
     aks_identity = "mock-identity"
   }
 }
@@ -31,7 +31,7 @@ dependency "resource_group" {
 
   # Mock outputs for plan and validation
   mock_outputs = {
-    name = "mock-rg"
+    name     = "mock-rg"
     location = include.base.locals.region
   }
 }
@@ -51,26 +51,26 @@ inputs = {
 
   # Identity naming
   aks_identity_name = dependency.naming.outputs.aks_identity
-  cluster_name = dependency.naming.outputs.aks_cluster
+  cluster_name      = dependency.naming.outputs.aks_cluster
 
   # Environment variables
   environment = include.base.locals.env
-  workload = include.base.locals.workload
+  workload    = include.base.locals.workload
   region_abbv = include.base.locals.region_abbv
 
   # Resource details
   resource_group_name = dependency.resource_group.outputs.name
-  location = dependency.resource_group.outputs.location
+  location            = dependency.resource_group.outputs.location
 
   # Environment-specific configuration
   create_workload_identities = false
-  workload_identity_enabled = false
-  oidc_issuer_enabled = false
+  workload_identity_enabled  = false
+  oidc_issuer_enabled        = false
 
   # Role assignments with specific scopes for this environment
   role_assignments = {
     "Network Contributor" = {
-      scope = dependency.networking.outputs.vnet_id
+      scope                            = dependency.networking.outputs.vnet_id
       skip_service_principal_aad_check = true
     }
   }

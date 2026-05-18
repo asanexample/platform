@@ -279,22 +279,22 @@ locals {
 
 # Generate monitor workspace (Prometheus) name
 module "monitor_workspace" {
-  source                  = "Azure/naming/azurerm"
-  suffix                  = [var.environment, var.region_abbv]
-  prefix                  = [var.workload]
-  unique-include-numbers  = false
-  unique-length           = 0
-  unique-seed             = var.unique_seed
+  source                 = "Azure/naming/azurerm"
+  suffix                 = [var.environment, var.region_abbv]
+  prefix                 = [var.workload]
+  unique-include-numbers = false
+  unique-length          = 0
+  unique-seed            = var.unique_seed
 }
 
 # Generate Grafana name
 module "grafana" {
-  source                  = "Azure/naming/azurerm"
-  suffix                  = [var.environment, var.region_abbv]
-  prefix                  = [var.workload]
-  unique-include-numbers  = false
-  unique-length           = 0
-  unique-seed             = var.unique_seed
+  source                 = "Azure/naming/azurerm"
+  suffix                 = [var.environment, var.region_abbv]
+  prefix                 = [var.workload]
+  unique-include-numbers = false
+  unique-length          = 0
+  unique-seed            = var.unique_seed
 }
 
 # Container Registry names must be globally unique, 5-50 characters, alphanumeric only

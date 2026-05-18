@@ -42,8 +42,8 @@ dependency "aks_core" {
   # Mock outputs for plan and validation
   mock_outputs = {
     kubelet_identity = {
-      client_id = "00000000-0000-0000-0000-000000000000"
-      object_id = "00000000-0000-0000-0000-000000000000"
+      client_id                 = "00000000-0000-0000-0000-000000000000"
+      object_id                 = "00000000-0000-0000-0000-000000000000"
       user_assigned_identity_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mock-identity"
     }
   }
@@ -60,7 +60,7 @@ inputs = {
 
   # Environment variables
   environment = include.base.locals.env
-  workload = include.base.locals.workload
+  workload    = include.base.locals.workload
   region_abbv = include.base.locals.region_abbv
 
   # Resource details
@@ -77,8 +77,8 @@ inputs = {
 
   # Tags specific to this environment - will be merged with common tags
   tags = merge(include.base.locals.tags, {
-    purpose      = "container-registry"
-    application  = "kubernetes-workloads"
-    integration  = "aks"
+    purpose     = "container-registry"
+    application = "kubernetes-workloads"
+    integration = "aks"
   })
 }

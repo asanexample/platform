@@ -8,7 +8,7 @@
 provider "azurerm" {
   features {}
   subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  tenant_id = "c945e155-be68-4477-b8d7-01939adbfe55"
+  tenant_id       = "c945e155-be68-4477-b8d7-01939adbfe55"
 }
 
 # Setup resources needed for testing
@@ -28,7 +28,7 @@ run "valid_container_name_test" {
     storage_account_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Storage/storageAccounts/teststorageaccount"
     containers = {
       "valid-container" = {
-        name                 = "valid-container" # Valid name with lowercase letters, numbers, and dashes
+        name                  = "valid-container" # Valid name with lowercase letters, numbers, and dashes
         container_access_type = "private"
       }
     }
@@ -52,15 +52,15 @@ run "valid_access_type_test" {
     storage_account_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Storage/storageAccounts/teststorageaccount"
     containers = {
       "blob-access" = {
-        name                 = "blob-access"
+        name                  = "blob-access"
         container_access_type = "blob" # Valid access type
       },
       "container-access" = {
-        name                 = "container-access"
+        name                  = "container-access"
         container_access_type = "container" # Valid access type
       },
       "private-access" = {
-        name                 = "private-access"
+        name                  = "private-access"
         container_access_type = "private" # Valid access type (default)
       }
     }
@@ -84,13 +84,13 @@ run "valid_role_assignment_test" {
     storage_account_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Storage/storageAccounts/teststorageaccount"
     containers = {
       "data" = {
-        name                 = "data"
+        name                  = "data"
         container_access_type = "private"
       }
     }
     role_assignments = [
       {
-        container_key        = "data" # Valid container key that exists in containers
+        container_key        = "data"                                 # Valid container key that exists in containers
         principal_id         = "00000000-0000-0000-0000-000000000000" # Mock principal ID
         role_definition_name = "Storage Blob Data Contributor"
       }

@@ -31,8 +31,8 @@ terraform {
 
   # Tell terraform to continue on errors during apply
   after_hook "suppress_errors" {
-    commands = ["plan", "apply"]
-    execute  = ["echo", "Errors suppressed"]
+    commands     = ["plan", "apply"]
+    execute      = ["echo", "Errors suppressed"]
     run_on_error = true
   }
 }
@@ -164,7 +164,7 @@ inputs = {
   kubernetes_cluster_ca_certificate = dependency.aks.outputs.cluster_ca_certificate
 
   # Set a longer wait time for CRDs to be properly registered
-  helm_timeout     = 1800  # Increase timeout to 30 minutes
+  helm_timeout = 1800 # Increase timeout to 30 minutes
 
   # Tagging - use sanitized tags for Kubernetes labels
   namespace_labels = merge(local.k8s_tags, {

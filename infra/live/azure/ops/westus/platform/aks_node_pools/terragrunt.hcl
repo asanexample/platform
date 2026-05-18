@@ -30,9 +30,9 @@ dependency "aks_core" {
 
   # Mock outputs for plan and validation
   mock_outputs = {
-    name = "mock-aks"
+    name                = "mock-aks"
     resource_group_name = "mock-rg"
-    id = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.ContainerService/managedClusters/mock-aks"
+    id                  = "/subscriptions/mock-id/resourceGroups/mock-rg/providers/Microsoft.ContainerService/managedClusters/mock-aks"
   }
 }
 
@@ -49,7 +49,7 @@ inputs = {
 
   # Environment variables
   environment = include.base.locals.env
-  workload = include.base.locals.workload
+  workload    = include.base.locals.workload
   region_abbv = include.base.locals.region_abbv
 
   # Required variables that were missing
@@ -60,23 +60,23 @@ inputs = {
 
   # Environment-specific node pool configuration
   app_node_pool = {
-    enabled = true
-    name = "apps"
-    vm_size = "Standard_D8s_v5"
+    enabled    = true
+    name       = "apps"
+    vm_size    = "Standard_D8s_v5"
     node_count = 3
     # Use availability zones for high availability
-    availability_zones = ["1", "2", "3"]
-    max_pods = 110
-    os_disk_size_gb = 128
-    os_disk_type = "Managed"
+    availability_zones  = ["1", "2", "3"]
+    max_pods            = 110
+    os_disk_size_gb     = 128
+    os_disk_type        = "Managed"
     enable_auto_scaling = true
-    min_count = 3
-    max_count = 5
-    mode = "User"
+    min_count           = 3
+    max_count           = 5
+    mode                = "User"
     node_labels = {
-      "nodepool" = "apps"
-      "app" = "true"
-      "workload" = "general"
+      "nodepool"      = "apps"
+      "app"           = "true"
+      "workload"      = "general"
       "node-priority" = "regular"
     }
     node_taints = []
@@ -91,13 +91,13 @@ inputs = {
   # Override standard node pool availability zones for this region
   standard_node_pool = {
     availability_zones = ["1", "2", "3"]
-    node_count = 3
-    min_count = 3
+    node_count         = 3
+    min_count          = 3
   }
 
   # Tags
   tags = merge(include.base.locals.tags, {
     "network-cilium-managed-by" = "cilium"
-    "cilium-version" = "1.17.2"
+    "cilium-version"            = "1.17.2"
   })
 }

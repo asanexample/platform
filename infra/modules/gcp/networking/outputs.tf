@@ -21,7 +21,7 @@ output "subnet_ids" {
 
 output "kubernetes_subnet_id" {
   description = "The ID of the first kubernetes subnet (cross-cloud: matches Azure aks_subnet_id)"
-  value = var.create && local.kubernetes_subnet_key != null ? google_compute_subnetwork.this[local.kubernetes_subnet_key].id : null
+  value       = var.create && local.kubernetes_subnet_key != null ? google_compute_subnetwork.this[local.kubernetes_subnet_key].id : null
 }
 
 output "create" {

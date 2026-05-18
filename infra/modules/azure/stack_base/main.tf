@@ -26,8 +26,8 @@ module "networking" {
   dns_servers         = []
 
   enable_aks_networking = var.enable_aks_networking
-  aks_subnet_name      = var.aks_subnet_name
-  aks_cluster_name     = var.aks_cluster_name
+  aks_subnet_name       = var.aks_subnet_name
+  aks_cluster_name      = var.aks_cluster_name
 
   tags = var.tags
 }

@@ -28,7 +28,7 @@ inputs = {
 
   accounts = {
     "Platform" = { email = "josh+platform@deeden.org", ou = "Platform" }
-    "Preprod"  = { email = "josh+preprod@deeden.org",  ou = "Workloads/Preprod" }
-    "Prod"     = { email = "josh+prod@deeden.org",     ou = "Workloads/Prod" }
+    "Preprod"  = { email = "josh+preprod@deeden.org", ou = "Workloads/Preprod" }
+    "Prod"     = { email = "josh+prod@deeden.org", ou = "Workloads/Prod" }
   }
 }

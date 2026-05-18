@@ -11,9 +11,9 @@ inputs = {
   dns_servers = null
   subnets     = {}
 
-  enable_aks_networking        = false
-  aks_subnet_name              = null
-  aks_cluster_name             = null
-  aks_private_cluster_enabled  = true
-  aks_node_resource_group      = null
+  enable_aks_networking       = false
+  aks_subnet_name             = null
+  aks_cluster_name            = null
+  aks_private_cluster_enabled = true
+  aks_node_resource_group     = null
 } 

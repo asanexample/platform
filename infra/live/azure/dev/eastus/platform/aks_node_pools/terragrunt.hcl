@@ -69,8 +69,8 @@ inputs = {
     node_taints = []
   }
 
-  app_node_pool_min_count      = 3
-  temporary_name_for_rotation  = "tempapps"
+  app_node_pool_min_count     = 3
+  temporary_name_for_rotation = "tempapps"
 
   standard_node_pool = {
     availability_zones = ["1", "2", "3"]

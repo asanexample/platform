@@ -34,7 +34,7 @@ dependency "naming" {
 
   # Mock outputs for plan and validation
   mock_outputs = {
-    storage_account = "mocksa"
+    storage_account  = "mocksa"
     private_endpoint = "mock-pe"
   }
 }
@@ -44,7 +44,7 @@ dependency "resource_group" {
 
   # Mock outputs for plan and validation
   mock_outputs = {
-    name = "mock-rg"
+    name     = "mock-rg"
     location = include.base.locals.region
   }
 }
@@ -77,18 +77,18 @@ inputs = {
 
   # Environment variables
   environment = include.base.locals.env
-  workload = include.base.locals.workload
+  workload    = include.base.locals.workload
   region_abbv = include.base.locals.region_abbv
 
   # Resource group
   resource_group_name = dependency.resource_group.outputs.name
-  location = dependency.resource_group.outputs.location
+  location            = dependency.resource_group.outputs.location
 
   # Storage account name
   name = dependency.naming.outputs.storage_account
 
   # Storage account configuration
-  account_tier = "Standard"
+  account_tier             = "Standard"
   account_replication_type = "LRS"
 
   # Enable public network access
@@ -97,7 +97,7 @@ inputs = {
   # Network rules
   network_rules = {
     default_action = "Allow"
-    bypass = ["AzureServices"]
+    bypass         = ["AzureServices"]
     virtual_network_subnet_ids = [
       dependency.networking.outputs.subnet_ids["az1-endpoints"]
     ]
@@ -107,22 +107,22 @@ inputs = {
 
   # Private endpoint configuration
   private_endpoint = {
-    create                       = true
-    name                         = dependency.naming.outputs.private_endpoint
-    subnet_id                    = dependency.networking.outputs.subnet_ids["az1-endpoints"]
-    subresource_names            = ["blob"]
+    create                          = true
+    name                            = dependency.naming.outputs.private_endpoint
+    subnet_id                       = dependency.networking.outputs.subnet_ids["az1-endpoints"]
+    subresource_names               = ["blob"]
     private_service_connection_name = "service-connection"
-    private_dns_zone_ids         = [dependency.dns.outputs.private_dns_zone_ids["blob"]]
+    private_dns_zone_ids            = [dependency.dns.outputs.private_dns_zone_ids["blob"]]
   }
 
   # Containers
   containers = {
     "data" = {
-      name = "data"
+      name                  = "data"
       container_access_type = "private"
     }
     "logs" = {
-      name = "logs"
+      name                  = "logs"
       container_access_type = "private"
     }
   }
@@ -130,8 +130,8 @@ inputs = {
   # Lifecycle management for logs
   lifecycle_rules = [
     {
-      name    = "logs-lifecycle"
-      enabled = true
+      name         = "logs-lifecycle"
+      enabled      = true
       prefix_match = ["logs/"]
 
       # Move logs to cool tier after 30 days
@@ -153,7 +153,7 @@ inputs = {
 
   # Security settings
   allow_nested_items_to_be_public = false
-  blob_public_access_enabled = false
+  blob_public_access_enabled      = false
 
   # Enable access keys for provider authentication
   shared_access_key_enabled = true

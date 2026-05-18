@@ -18,21 +18,21 @@ locals {
   # Extract environment from env.hcl
   environment_vars = read_terragrunt_config(find_in_parent_folders("env.hcl"))
   environment      = local.environment_vars.locals.environment
-  
+
   # Extract region information from region.hcl
-  region_vars    = read_terragrunt_config(find_in_parent_folders("region.hcl"))
-  region         = local.region_vars.locals.region
-  
+  region_vars = read_terragrunt_config(find_in_parent_folders("region.hcl"))
+  region      = local.region_vars.locals.region
+
   # Get common tags from the environment
-  common_vars    = read_terragrunt_config(find_in_parent_folders("common.hcl"))
-  common_tags    = local.common_vars.locals.tags
+  common_vars = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  common_tags = local.common_vars.locals.tags
 }
 
 # Default inputs that typically won't need to be overridden in specific environments
 inputs = {
   # The name will typically come from the naming module in environment-specific configs
   location = local.region
-  
+
   # Default tags that should be applied to all resource groups
   tags = merge(local.common_tags, {
     "ResourceType" = "ResourceGroup"

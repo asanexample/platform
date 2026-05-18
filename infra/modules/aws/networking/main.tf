@@ -63,11 +63,11 @@ resource "aws_subnet" "this" {
     { Name = each.key },
     # Tag kubernetes subnets for EKS auto-discovery when enabled
     var.enable_eks_networking && can(regex("kubernetes$", each.key)) ? {
-      "kubernetes.io/role/internal-elb"                        = "1"
+      "kubernetes.io/role/internal-elb"                                    = "1"
       "kubernetes.io/cluster/${coalesce(var.eks_cluster_name, "unknown")}" = "shared"
     } : {},
     var.enable_eks_networking && lookup(each.value, "public", false) ? {
-      "kubernetes.io/role/elb"                                 = "1"
+      "kubernetes.io/role/elb"                                             = "1"
       "kubernetes.io/cluster/${coalesce(var.eks_cluster_name, "unknown")}" = "shared"
     } : {},
   )

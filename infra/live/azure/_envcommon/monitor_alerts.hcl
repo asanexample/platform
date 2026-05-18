@@ -18,13 +18,13 @@ inputs = {
 
   action_groups = {
     platform-critical = {
-      short_name = "plat-crit"
-      email_receivers = []
+      short_name        = "plat-crit"
+      email_receivers   = []
       webhook_receivers = []
     }
     platform-warning = {
-      short_name = "plat-warn"
-      email_receivers = []
+      short_name        = "plat-warn"
+      email_receivers   = []
       webhook_receivers = []
     }
   }

@@ -33,7 +33,7 @@ locals {
 # Main storage account resource
 # Configures the core storage account with all specified properties
 resource "azurerm_storage_account" "this" {
-  count               = var.create ? 1 : 0
+  count = var.create ? 1 : 0
   # Basic properties
   name                = local.storage_account_name
   resource_group_name = var.resource_group_name
@@ -177,24 +177,24 @@ resource "azurerm_storage_management_policy" "lifecycle" {
 # Optional creation based on the create_containers flag
 resource "azurerm_storage_container" "containers" {
   for_each              = var.create && var.create_containers ? var.containers : {} # Skip if create_containers is false or create is false
-  name                  = each.value.name                             # Container name
-  storage_account_id    = azurerm_storage_account.this[0].id          # Parent storage account
-  container_access_type = each.value.container_access_type            # Access level (private, blob, container)
+  name                  = each.value.name                                           # Container name
+  storage_account_id    = azurerm_storage_account.this[0].id                        # Parent storage account
+  container_access_type = each.value.container_access_type                          # Access level (private, blob, container)
 }
 
 # Private endpoint for the storage account
 # Only created when specified in the private_endpoint variable
 resource "azurerm_private_endpoint" "storage" {
   count               = var.create && var.private_endpoint.create ? 1 : 0 # Only create if requested
-  name                = local.private_endpoint_name         # Endpoint name
-  location            = var.location                        # Must be in same region as storage
-  resource_group_name = var.resource_group_name             # Resource group
-  subnet_id           = var.private_endpoint.subnet_id      # Subnet to place the private endpoint in
+  name                = local.private_endpoint_name                       # Endpoint name
+  location            = var.location                                      # Must be in same region as storage
+  resource_group_name = var.resource_group_name                           # Resource group
+  subnet_id           = var.private_endpoint.subnet_id                    # Subnet to place the private endpoint in
 
   # Connection to the storage account
   private_service_connection {
     name                           = "${local.private_endpoint_name}-connection" # Connection name
-    private_connection_resource_id = azurerm_storage_account.this[0].id           # Target resource
+    private_connection_resource_id = azurerm_storage_account.this[0].id          # Target resource
     is_manual_connection           = false                                       # Auto-approved connection
     subresource_names              = var.private_endpoint.subresource_names      # Target subresources (blob, queue, etc)
   }

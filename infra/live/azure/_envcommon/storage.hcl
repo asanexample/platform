@@ -16,24 +16,24 @@ inputs = {
   account_replication_type = "LRS"
   account_kind             = "StorageV2"
   access_tier              = "Hot"
-  
+
   # Default container configuration
   enable_blob_storage = true
   containers = {
     "assets" = {
-      name = "assets",
+      name                  = "assets",
       container_access_type = "private"
     },
     "public" = {
-      name = "public",
+      name                  = "public",
       container_access_type = "blob"
     },
     "pdf" = {
-      name = "pdf",
+      name                  = "pdf",
       container_access_type = "private"
     }
   }
-  
+
   # Default network configuration
   network_rules = {
     default_action             = "Allow"
@@ -41,19 +41,19 @@ inputs = {
     ip_rules                   = []
     virtual_network_subnet_ids = []
   }
-  
+
   # Enable public network access by default
   public_network_access_enabled = true
-  
+
   # Default private endpoint configuration (will be overridden in specific env)
   private_endpoint = {
-    create = true
+    create            = true
     subresource_names = ["blob"]
   }
-  
+
   # Disable shared access keys in favor of Entra ID authentication
   shared_access_key_enabled = false
-  
+
   # Role assignments will need to be added in specific environment modules
   # Example:
   # role_assignments = [

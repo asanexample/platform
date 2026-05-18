@@ -109,16 +109,16 @@ inputs = {
   gateway_api_enabled    = false
   kube_proxy_replacement = false
 
-  node_port_enabled                = true
-  external_ips_enabled             = true
-  socket_lb_host_namespace_only    = true
+  node_port_enabled             = true
+  external_ips_enabled          = true
+  socket_lb_host_namespace_only = true
 
-  prometheus_enabled             = false
-  operator_prometheus_enabled    = false
-  hubble_enabled                 = false
-  hubble_relay_enabled           = false
-  hubble_ui_enabled              = false
-  hubble_metrics_enabled         = []
+  prometheus_enabled                 = false
+  operator_prometheus_enabled        = false
+  hubble_enabled                     = false
+  hubble_relay_enabled               = false
+  hubble_ui_enabled                  = false
+  hubble_metrics_enabled             = []
   hubble_metrics_enable_open_metrics = false
 
   resources_limits_cpu      = "1000m"

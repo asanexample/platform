@@ -51,13 +51,13 @@ inputs = {
 
   # Environment-specific overrides - use higher retention for ops environment
   sku               = "PerGB2018"
-  retention_in_days = 60         # Increase retention for ops environment
-  daily_quota_gb    = 5          # Set a daily quota limit of 5GB for the workspace
+  retention_in_days = 60 # Increase retention for ops environment
+  daily_quota_gb    = 5  # Set a daily quota limit of 5GB for the workspace
 
   # RBAC role assignments for accessing the Log Analytics workspace
   role_assignments = [
     {
-      principal_id         = "403dc11a-5399-4f10-9515-91f048eea58a"  # Current user
+      principal_id         = "403dc11a-5399-4f10-9515-91f048eea58a" # Current user
       role_definition_name = "Log Analytics Contributor"
       description          = "Grants access to view and modify Log Analytics workspace"
     }

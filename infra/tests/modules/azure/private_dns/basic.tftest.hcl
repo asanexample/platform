@@ -9,7 +9,7 @@
 provider "azurerm" {
   features {}
   subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  tenant_id = "c945e155-be68-4477-b8d7-01939adbfe55"
+  tenant_id       = "c945e155-be68-4477-b8d7-01939adbfe55"
 }
 
 # Basic test for private DNS zone creation with minimal configuration
@@ -18,7 +18,7 @@ run "basic_private_dns_zones" {
 
   variables {
     resource_group_name = "test-rg"
-    
+
     # Basic private DNS zone configuration
     private_dns_zones = {
       "privatelink.database.windows.net" = {
@@ -36,7 +36,7 @@ run "basic_private_dns_zones" {
         virtual_network_link_name = "blob-vnet-link"
       }
     }
-    
+
     # Basic tags
     tags = {
       environment = "test"
@@ -53,12 +53,12 @@ run "basic_private_dns_zones" {
     condition     = length(output.private_dns_zone_ids) == 2
     error_message = "Expected 2 private DNS zones to be created"
   }
-  
+
   assert {
     condition     = lookup(output.private_dns_zone_ids, "privatelink.database.windows.net", "") != ""
     error_message = "Database private DNS zone ID should not be empty"
   }
-  
+
   assert {
     condition     = lookup(output.private_dns_zone_ids, "privatelink.blob.core.windows.net", "") != ""
     error_message = "Blob storage private DNS zone ID should not be empty"

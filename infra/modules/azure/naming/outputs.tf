@@ -230,7 +230,7 @@ output "names" {
 
 output "grafana" {
   description = "Standardized name for an Azure Managed Grafana instance."
-  value       = "${local.names.managed_grafana}"
+  value       = local.names.managed_grafana
 }
 
 output "action_group" {

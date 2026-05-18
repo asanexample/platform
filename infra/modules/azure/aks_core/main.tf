@@ -43,18 +43,18 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
 
   # System node pool configuration
   default_node_pool {
-    name                 = var.default_nodepool_name
-    node_count           = var.default_nodepool_count
-    vm_size              = var.default_nodepool_vm_size
-    max_pods             = var.default_nodepool_max_pods
-    os_disk_size_gb      = var.default_nodepool_os_disk_size_gb
-    node_labels          = var.default_nodepool_node_labels
+    name                         = var.default_nodepool_name
+    node_count                   = var.default_nodepool_count
+    vm_size                      = var.default_nodepool_vm_size
+    max_pods                     = var.default_nodepool_max_pods
+    os_disk_size_gb              = var.default_nodepool_os_disk_size_gb
+    node_labels                  = var.default_nodepool_node_labels
     only_critical_addons_enabled = var.default_nodepool_only_critical_addons_enabled
-    auto_scaling_enabled = var.default_nodepool_enable_auto_scaling
-    min_count            = var.default_nodepool_enable_auto_scaling ? var.default_nodepool_min_count : null
-    max_count            = var.default_nodepool_enable_auto_scaling ? var.default_nodepool_max_count : null
-    vnet_subnet_id       = var.subnet_id
-    tags                 = var.tags
+    auto_scaling_enabled         = var.default_nodepool_enable_auto_scaling
+    min_count                    = var.default_nodepool_enable_auto_scaling ? var.default_nodepool_min_count : null
+    max_count                    = var.default_nodepool_enable_auto_scaling ? var.default_nodepool_max_count : null
+    vnet_subnet_id               = var.subnet_id
+    tags                         = var.tags
   }
 
   # Enable Microsoft Defender and Monitoring add-ons if specified
@@ -124,7 +124,7 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
 # Create Diagnostic Settings for the AKS Cluster
 # resource "azurerm_monitor_diagnostic_setting" "this" {
 #   count = length(var.diagnostic_settings) > 0 ? 1 : 0
-  
+
 #   name               = var.diagnostic_settings[0].name
 #   target_resource_id = azurerm_kubernetes_cluster.aks_cluster.id
 #   log_analytics_workspace_id = var.diagnostic_settings[0].log_analytics_workspace_id
@@ -132,7 +132,7 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
 #   # Configure logs for each category
 #   dynamic "enabled_log" {
 #     for_each = toset(var.diagnostic_settings[0].enabled_log_categories)
-    
+
 #     content {
 #       category = enabled_log.value
 #       # Retention is now handled separately via azurerm_storage_management_policy
@@ -143,13 +143,13 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
 #   # Configure metrics for each category
 #   dynamic "metric" {
 #     for_each = toset(var.diagnostic_settings[0].metric_categories)
-    
+
 #     content {
 #       category = metric.value
 #       enabled  = true
 #     }
 #   }
-  
+
 #   # Add lifecycle block to make diagnostic settings more resilient
 #   lifecycle {
 #     # Ignore changes to these fields to avoid unnecessary updates

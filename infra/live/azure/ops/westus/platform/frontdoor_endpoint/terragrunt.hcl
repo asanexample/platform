@@ -14,7 +14,7 @@ include "root" {
 dependency "naming" {
   config_path = "../naming"
   mock_outputs = {
-    frontdoor_endpoint    = "mock-fd-endpoint"
+    frontdoor_endpoint     = "mock-fd-endpoint"
     frontdoor_origin_group = "mock-fd-og"
   }
 }
@@ -22,7 +22,7 @@ dependency "naming" {
 dependency "frontdoor_profile" {
   config_path = "../frontdoor_profile"
   mock_outputs = {
-    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Cdn/profiles/mock-fd"
+    id     = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Cdn/profiles/mock-fd"
     create = false
   }
 }

@@ -18,15 +18,15 @@ locals {
   # Extract environment from env.hcl
   environment_vars = read_terragrunt_config(find_in_parent_folders("env.hcl"))
   environment      = local.environment_vars.locals.environment
-  
+
   # Extract region information from region.hcl
-  region_vars    = read_terragrunt_config(find_in_parent_folders("region.hcl"))
-  region         = local.region_vars.locals.region
-  region_abbv    = local.region_vars.locals.region_abbv
-  
+  region_vars = read_terragrunt_config(find_in_parent_folders("region.hcl"))
+  region      = local.region_vars.locals.region
+  region_abbv = local.region_vars.locals.region_abbv
+
   # Get common tags from the environment
-  common_vars    = read_terragrunt_config(find_in_parent_folders("common.hcl"))
-  workload       = local.common_vars.locals.workload
+  common_vars = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  workload    = local.common_vars.locals.workload
 }
 
 # ---------------------------------------------------------------------------------------------------------------------

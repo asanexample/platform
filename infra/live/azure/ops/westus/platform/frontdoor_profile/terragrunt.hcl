@@ -21,7 +21,7 @@ dependency "naming" {
 dependency "resource_group" {
   config_path = "../resource_group"
   mock_outputs = {
-    name = "mock-rg"
+    name     = "mock-rg"
     location = include.base.locals.region
   }
 }
@@ -41,7 +41,7 @@ inputs = {
   resource_group_name = dependency.resource_group.outputs.name
 
   # Front Door settings
-  sku_name = "Premium_AzureFrontDoor" # Using Premium SKU for production
+  sku_name                 = "Premium_AzureFrontDoor" # Using Premium SKU for production
   response_timeout_seconds = 120
 
   # Tags

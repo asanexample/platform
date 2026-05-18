@@ -64,10 +64,10 @@ run "standard_sku_test" {
   command = plan
 
   variables {
-    name                = "test-fd-profile"
-    resource_group_name = "test-rg"
-    enabled             = true
-    sku_name            = "Standard_AzureFrontDoor"
+    name                     = "test-fd-profile"
+    resource_group_name      = "test-rg"
+    enabled                  = true
+    sku_name                 = "Standard_AzureFrontDoor"
     response_timeout_seconds = 120
   }
 
@@ -87,10 +87,10 @@ run "premium_sku_test" {
   command = plan
 
   variables {
-    name                = "test-fd-profile"
-    resource_group_name = "test-rg"
-    enabled             = true
-    sku_name            = "Premium_AzureFrontDoor"
+    name                     = "test-fd-profile"
+    resource_group_name      = "test-rg"
+    enabled                  = true
+    sku_name                 = "Premium_AzureFrontDoor"
     response_timeout_seconds = 120
   }
 
@@ -110,10 +110,10 @@ run "long_name_test" {
   command = plan
 
   variables {
-    name                = "test-frontdoor-profile-with-a-longer-name-that-is-valid-within-Azure-constraints"
-    resource_group_name = "test-rg"
-    enabled             = true
-    sku_name            = "Standard_AzureFrontDoor"
+    name                     = "test-frontdoor-profile-with-a-longer-name-that-is-valid-within-Azure-constraints"
+    resource_group_name      = "test-rg"
+    enabled                  = true
+    sku_name                 = "Standard_AzureFrontDoor"
     response_timeout_seconds = 120
   }
 

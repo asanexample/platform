@@ -7,7 +7,7 @@
 # Create cert-manager application
 resource "kubernetes_manifest" "cert_manager" {
   count = length(var.bootstrap_applications) > 0 ? 1 : 0
-  
+
   manifest = {
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "Application"
@@ -22,7 +22,7 @@ resource "kubernetes_manifest" "cert_manager" {
       project = var.project
       source = {
         repoURL        = "https://charts.jetstack.io"
-        chart          = "cert-manager" 
+        chart          = "cert-manager"
         targetRevision = "v1.12.0"
         helm = {
           values = "installCRDs: true"
@@ -34,8 +34,8 @@ resource "kubernetes_manifest" "cert_manager" {
       }
       syncPolicy = {
         automated = {
-          prune     = true
-          selfHeal  = true
+          prune    = true
+          selfHeal = true
         }
         syncOptions = ["CreateNamespace=true"]
       }
@@ -46,7 +46,7 @@ resource "kubernetes_manifest" "cert_manager" {
 # Create external-dns application
 resource "kubernetes_manifest" "external_dns" {
   count = length(var.bootstrap_applications) > 0 ? 1 : 0
-  
+
   manifest = {
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "Application"
@@ -61,7 +61,7 @@ resource "kubernetes_manifest" "external_dns" {
       project = var.project
       source = {
         repoURL        = "https://kubernetes-sigs.github.io/external-dns"
-        chart          = "external-dns" 
+        chart          = "external-dns"
         targetRevision = "1.13.1"
       }
       destination = {
@@ -70,8 +70,8 @@ resource "kubernetes_manifest" "external_dns" {
       }
       syncPolicy = {
         automated = {
-          prune     = true
-          selfHeal  = true
+          prune    = true
+          selfHeal = true
         }
         syncOptions = ["CreateNamespace=true"]
       }
@@ -82,7 +82,7 @@ resource "kubernetes_manifest" "external_dns" {
 # Create external-secrets application
 resource "kubernetes_manifest" "external_secrets" {
   count = length(var.bootstrap_applications) > 0 ? 1 : 0
-  
+
   manifest = {
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "Application"
@@ -97,7 +97,7 @@ resource "kubernetes_manifest" "external_secrets" {
       project = var.project
       source = {
         repoURL        = "https://charts.external-secrets.io"
-        chart          = "external-secrets" 
+        chart          = "external-secrets"
         targetRevision = "0.9.5"
       }
       destination = {
@@ -106,8 +106,8 @@ resource "kubernetes_manifest" "external_secrets" {
       }
       syncPolicy = {
         automated = {
-          prune     = true
-          selfHeal  = true
+          prune    = true
+          selfHeal = true
         }
         syncOptions = ["CreateNamespace=true"]
       }

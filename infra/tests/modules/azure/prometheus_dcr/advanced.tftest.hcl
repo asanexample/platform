@@ -1,8 +1,8 @@
 # Define provider configuration for the test runs
 provider "azurerm" {
   features {}
-  subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  tenant_id       = "c945e155-be68-4477-b8d7-01939adbfe55"
+  subscription_id                 = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
+  tenant_id                       = "c945e155-be68-4477-b8d7-01939adbfe55"
   resource_provider_registrations = "none"
 }
 
@@ -21,7 +21,7 @@ run "custom_names_test" {
     resource_group_name  = "test-rg"
     location             = "eastus"
     monitor_workspace_id = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Monitor/accounts/test-monitor"
-    
+
     name     = "custom-dcr-name"
     dce_name = "custom-dce-name"
   }
@@ -48,8 +48,8 @@ run "custom_tags_test" {
   command = plan
 
   variables {
-    resource_group_name = "test-rg"
-    location            = "eastus"
+    resource_group_name  = "test-rg"
+    location             = "eastus"
     monitor_workspace_id = "/subscriptions/db4f1d99-0ec0-44eb-90de-41975f9bb68b/resourceGroups/test-rg/providers/Microsoft.Monitor/accounts/test-prometheus"
     tags = {
       Environment     = "Test"
@@ -68,7 +68,7 @@ run "custom_tags_test" {
     condition     = length(azurerm_monitor_data_collection_rule.this) > 0
     error_message = "DCR should be planned for creation"
   }
-  
+
   # Verify DCE is planned to be created
   assert {
     condition     = length(azurerm_monitor_data_collection_endpoint.this) > 0

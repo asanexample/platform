@@ -7,9 +7,9 @@ include "base" {
 
 locals {
   # Default values to use when module is disabled
-  default_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Cdn/profiles/mock-fd"
+  default_id           = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Cdn/profiles/mock-fd"
   mock_origin_group_id = "${local.default_id}/originGroups/mock-og"
-  mock_endpoint_id = "${local.default_id}/afdEndpoints/mock-endpoint"
+  mock_endpoint_id     = "${local.default_id}/afdEndpoints/mock-endpoint"
 }
 
 # Include the root configuration (root.hcl)
@@ -41,8 +41,8 @@ dependency "storage" {
   config_path = "../storage"
   # Mock outputs for plan and validation
   mock_outputs = {
-    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Storage/storageAccounts/mocksa"
-    name = "mocksa"
+    id                    = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Storage/storageAccounts/mocksa"
+    name                  = "mocksa"
     primary_blob_endpoint = "https://mocksa.blob.core.windows.net/"
   }
   mock_outputs_allowed_terraform_commands = ["validate", "plan"]
@@ -70,12 +70,12 @@ inputs = {
   origin_group_id = try(dependency.frontdoor_endpoint.outputs.origin_group_id, local.mock_origin_group_id)
 
   # Storage Integration
-  storage_account_name         = dependency.storage.outputs.name
-  storage_resource_group_name  = dependency.resource_group.outputs.name
-  storage_account_id           = dependency.storage.outputs.id
-  storage_primary_blob_host    = trimsuffix(trimprefix(dependency.storage.outputs.primary_blob_endpoint, "https://"), "/")
-  storage_primary_web_host     = trimsuffix(trimprefix(dependency.storage.outputs.primary_blob_endpoint, "https://"), "/")
-  storage_location             = dependency.resource_group.outputs.location
+  storage_account_name        = dependency.storage.outputs.name
+  storage_resource_group_name = dependency.resource_group.outputs.name
+  storage_account_id          = dependency.storage.outputs.id
+  storage_primary_blob_host   = trimsuffix(trimprefix(dependency.storage.outputs.primary_blob_endpoint, "https://"), "/")
+  storage_primary_web_host    = trimsuffix(trimprefix(dependency.storage.outputs.primary_blob_endpoint, "https://"), "/")
+  storage_location            = dependency.resource_group.outputs.location
 
   # Origin configuration
   origin_name                  = dependency.naming.outputs.frontdoor_origin
@@ -93,7 +93,7 @@ inputs = {
   cache_settings = {
     query_string_caching_behavior = "IgnoreQueryString"
     compression_enabled           = true
-    content_types_to_compress     = [
+    content_types_to_compress = [
       "application/json",
       "text/html",
       "text/css",

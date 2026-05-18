@@ -26,7 +26,7 @@ resource "helm_release" "argocd" {
   chart            = "argo-cd"
   version          = var.chart_version
   namespace        = var.namespace
-  create_namespace = var.create_namespace  # Allow Helm to create the namespace if needed
+  create_namespace = var.create_namespace # Allow Helm to create the namespace if needed
   atomic           = true
   cleanup_on_fail  = true
   replace          = true
@@ -34,18 +34,18 @@ resource "helm_release" "argocd" {
 
   values = [
     templatefile("${path.module}/templates/values.yaml", {
-      domain                  = var.domain
-      high_availability       = var.high_availability
-      insecure                = var.insecure
-      service_type            = var.service_type
-      controller_replicas     = var.high_availability ? 2 : 1
-      server_replicas         = var.high_availability ? 2 : 1
-      repo_server_replicas    = var.high_availability ? 2 : 1
-      app_set_replicas        = var.high_availability ? 2 : 1
-      notifications_replicas  = var.high_availability ? 2 : 1
-      enable_dex              = var.enable_dex
-      enable_notifications    = var.enable_notifications
-      admin_password          = var.admin_password
+      domain                 = var.domain
+      high_availability      = var.high_availability
+      insecure               = var.insecure
+      service_type           = var.service_type
+      controller_replicas    = var.high_availability ? 2 : 1
+      server_replicas        = var.high_availability ? 2 : 1
+      repo_server_replicas   = var.high_availability ? 2 : 1
+      app_set_replicas       = var.high_availability ? 2 : 1
+      notifications_replicas = var.high_availability ? 2 : 1
+      enable_dex             = var.enable_dex
+      enable_notifications   = var.enable_notifications
+      admin_password         = var.admin_password
     })
   ]
 

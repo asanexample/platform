@@ -90,7 +90,7 @@ resource "azurerm_monitor_activity_log_alert" "this" {
     dynamic "service_health" {
       for_each = each.value.criteria.service_health != null ? [each.value.criteria.service_health] : []
       content {
-        events   = service_health.value.events
+        events    = service_health.value.events
         locations = service_health.value.locations
         services  = service_health.value.services
       }

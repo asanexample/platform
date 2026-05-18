@@ -10,10 +10,10 @@ data "aws_iam_policy_document" "baseline_guardrails" {
   }
 
   statement {
-    sid       = "DenyRootUserActions"
-    effect    = "Deny"
+    sid         = "DenyRootUserActions"
+    effect      = "Deny"
     not_actions = ["sts:GetSessionToken"]
-    resources = ["*"]
+    resources   = ["*"]
     condition {
       test     = "StringLike"
       variable = "aws:PrincipalArn"

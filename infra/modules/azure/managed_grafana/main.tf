@@ -7,16 +7,16 @@
 
 # Create the Grafana Dashboard
 resource "azurerm_dashboard_grafana" "grafana" {
-  count                         = var.create ? 1 : 0
+  count = var.create ? 1 : 0
   # Name will be provided by Terragrunt using the naming module if null
-  name                          = var.name
-  resource_group_name           = var.resource_group_name
-  location                      = var.location
-  api_key_enabled               = var.api_key_enabled
-  deterministic_outbound_ip_enabled = var.deterministic_outbound_ip_enabled
-  public_network_access_enabled = var.public_network_access_enabled
-  zone_redundancy_enabled       = var.zone_redundancy_enabled
-  grafana_major_version         = var.grafana_major_version
+  name                                   = var.name
+  resource_group_name                    = var.resource_group_name
+  location                               = var.location
+  api_key_enabled                        = var.api_key_enabled
+  deterministic_outbound_ip_enabled      = var.deterministic_outbound_ip_enabled
+  public_network_access_enabled          = var.public_network_access_enabled
+  zone_redundancy_enabled                = var.zone_redundancy_enabled
+  grafana_major_version                  = var.grafana_major_version
   auto_generated_domain_name_label_scope = var.auto_generated_domain_name_label_scope
   identity {
     type = "SystemAssigned"

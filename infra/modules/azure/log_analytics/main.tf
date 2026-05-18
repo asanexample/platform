@@ -7,7 +7,7 @@
 
 # Create the Log Analytics Workspace
 resource "azurerm_log_analytics_workspace" "this" {
-  count               = var.create ? 1 : 0
+  count = var.create ? 1 : 0
   # Name will be provided by Terragrunt using the naming module if null
   name                = var.name
   location            = var.location
@@ -18,7 +18,7 @@ resource "azurerm_log_analytics_workspace" "this" {
 
   internet_ingestion_enabled = var.internet_ingestion_enabled
   internet_query_enabled     = var.internet_query_enabled
-  
+
   tags = var.tags
 }
 
@@ -54,7 +54,7 @@ resource "azurerm_log_analytics_solution" "this" {
 #   # Configure logs for each category
 #   dynamic "enabled_log" {
 #     for_each = toset(each.value.enabled_log_categories)
-    
+
 #     content {
 #       category = enabled_log.value
 #     }
@@ -63,7 +63,7 @@ resource "azurerm_log_analytics_solution" "this" {
 #   # Configure metrics for each category
 #   dynamic "metric" {
 #     for_each = toset(each.value.metric_categories)
-    
+
 #     content {
 #       category = metric.value
 #       enabled  = true

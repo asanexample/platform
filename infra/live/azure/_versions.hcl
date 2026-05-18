@@ -50,8 +50,8 @@ locals {
     stack_base = "${local.source_base}/azure//stack_base"
 
     # DNS & identity
-    private_dns = "${local.source_base}/azure//private_dns"
-    identities  = "${local.source_base}/azure//identities"
+    private_dns        = "${local.source_base}/azure//private_dns"
+    identities         = "${local.source_base}/azure//identities"
     container_registry = "${local.source_base}/azure//container_registry"
 
     # Cloud-agnostic (Kubernetes add-ons)

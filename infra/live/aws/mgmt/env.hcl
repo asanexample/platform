@@ -1,9 +1,9 @@
 locals {
-  env               = "mgmt"
-  environment       = "mgmt"
-  workload          = "management"
-  account_alias     = "management-aws"
-  account_id        = "851725353202"
+  env           = "mgmt"
+  environment   = "mgmt"
+  workload      = "management"
+  account_alias = "management-aws"
+  account_id    = "851725353202"
 
   tags = {
     Environment        = local.environment

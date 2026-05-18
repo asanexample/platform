@@ -22,7 +22,7 @@ dependency "naming" {
   # Mock outputs for plan and validation
   mock_outputs = {
     virtual_network = "mock-vnet"
-    aks_cluster = "mock-aks"
+    aks_cluster     = "mock-aks"
   }
 }
 
@@ -31,7 +31,7 @@ dependency "resource_group" {
 
   # Mock outputs for plan and validation
   mock_outputs = {
-    name = "mock-rg"
+    name     = "mock-rg"
     location = include.base.locals.region
   }
 }
@@ -42,7 +42,7 @@ inputs = {
 
   # Environment variables
   environment = include.base.locals.env
-  workload = include.base.locals.workload
+  workload    = include.base.locals.workload
   region_abbv = include.base.locals.region_abbv
 
   # Resource group
@@ -64,9 +64,9 @@ inputs = {
   subnets = include.base.locals.network_vars.locals.subnets
 
   # AKS Networking Configuration
-  enable_aks_networking = true
-  aks_subnet_name = "az1-kubernetes"
-  aks_cluster_name = dependency.naming.outputs.aks_cluster
+  enable_aks_networking   = true
+  aks_subnet_name         = "az1-kubernetes"
+  aks_cluster_name        = dependency.naming.outputs.aks_cluster
   aks_node_resource_group = "${dependency.resource_group.outputs.name}-nodes"
 
   tags = merge(include.base.locals.tags, {

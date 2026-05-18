@@ -4,7 +4,7 @@
 locals {
   # Project variables
   workload = "platform"
-  
+
   # Common tags
   tags = {
     ManagedBy          = "Terragrunt"
@@ -13,7 +13,7 @@ locals {
     CostCenter         = "Engineering"
     Owner              = "Platform Team"
   }
-  
+
   # Azure global configuration
   azure_config = {
     cli_default_timeout_minutes = 30

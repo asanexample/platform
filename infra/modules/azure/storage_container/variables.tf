@@ -68,7 +68,7 @@ variable "role_assignments" {
     skip_service_principal_aad_check = optional(bool, false)
   }))
   default = []
-  
+
   validation {
     condition = alltrue([
       for ra in var.role_assignments : contains(keys(var.containers), ra.container_key)

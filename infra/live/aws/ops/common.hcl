@@ -4,11 +4,11 @@
 
 locals {
   # Environment variables
-  env               = "ops"
-  environment       = "ops"
-  workload          = "platform"
-  account_alias     = "innovation-operations-aws"
-  account_id        = "111111111111"
+  env           = "ops"
+  environment   = "ops"
+  workload      = "platform"
+  account_alias = "innovation-operations-aws"
+  account_id    = "111111111111"
 
   # Common tags
   tags = {

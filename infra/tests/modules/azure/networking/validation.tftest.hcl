@@ -7,14 +7,14 @@
 # Variables for Azure provider
 variables {
   subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b" # Default value
-  tenant_id = "c945e155-be68-4477-b8d7-01939adbfe55" # Default value
+  tenant_id       = "c945e155-be68-4477-b8d7-01939adbfe55" # Default value
 }
 
 # Provider configuration with actual Azure credentials
 provider "azurerm" {
   features {}
   subscription_id = var.subscription_id
-  tenant_id = var.tenant_id
+  tenant_id       = var.tenant_id
 }
 
 # Test valid vnet name
@@ -188,7 +188,7 @@ run "dns_servers_validation_test" {
       }
     }
     dns_servers = ["192.168.1.1", "192.168.1.2"] # Valid DNS servers
-    tags = {}
+    tags        = {}
   }
 
   module {

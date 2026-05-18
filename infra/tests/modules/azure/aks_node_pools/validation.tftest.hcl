@@ -8,8 +8,8 @@
 # Provider configuration with Azure credentials
 provider "azurerm" {
   features {}
-  subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  tenant_id = "c945e155-be68-4477-b8d7-01939adbfe55"
+  subscription_id                 = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
+  tenant_id                       = "c945e155-be68-4477-b8d7-01939adbfe55"
   resource_provider_registrations = "none"
 }
 
@@ -18,12 +18,12 @@ run "workload_validation_test" {
   command = plan
 
   variables {
-    workload       = "platform"
-    environment    = "dev"
-    region_abbv    = "eus"
-    aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
+    workload                          = "platform"
+    environment                       = "dev"
+    region_abbv                       = "eus"
+    aks_cluster_id                    = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
     app_node_pool_enable_auto_scaling = false
-    tags = {}
+    tags                              = {}
   }
 
   module {
@@ -41,12 +41,12 @@ run "region_abbv_validation_test" {
   command = plan
 
   variables {
-    workload       = "platform"
-    environment    = "dev"
-    region_abbv    = "eus"  # Valid region abbreviation
-    aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
+    workload                          = "platform"
+    environment                       = "dev"
+    region_abbv                       = "eus" # Valid region abbreviation
+    aks_cluster_id                    = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
     app_node_pool_enable_auto_scaling = false
-    tags = {}
+    tags                              = {}
   }
 
   module {
@@ -64,13 +64,13 @@ run "min_name_length_test" {
   command = plan
 
   variables {
-    workload       = "platform"
-    environment    = "dev"
-    region_abbv    = "eus"
-    aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
-    app_node_pool_name = "a"  # Minimum length is 1 character
+    workload                          = "platform"
+    environment                       = "dev"
+    region_abbv                       = "eus"
+    aks_cluster_id                    = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
+    app_node_pool_name                = "a" # Minimum length is 1 character
     app_node_pool_enable_auto_scaling = false
-    tags = {}
+    tags                              = {}
   }
 
   module {
@@ -88,14 +88,14 @@ run "max_name_length_test" {
   command = plan
 
   variables {
-    workload       = "platform"
-    environment    = "dev"
-    region_abbv    = "eus"
-    aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
-    app_node_pool_name = "test"
-    app_node_pool_os_disk_type = "Ephemeral"  # Valid disk type
+    workload                          = "platform"
+    environment                       = "dev"
+    region_abbv                       = "eus"
+    aks_cluster_id                    = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
+    app_node_pool_name                = "test"
+    app_node_pool_os_disk_type        = "Ephemeral" # Valid disk type
     app_node_pool_enable_auto_scaling = false
-    tags = {}
+    tags                              = {}
   }
 
   module {
@@ -113,14 +113,14 @@ run "valid_node_pool_mode_test" {
   command = plan
 
   variables {
-    workload       = "platform"
-    environment    = "dev"
-    region_abbv    = "eus"
-    aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
-    app_node_pool_name = "test"
-    app_node_pool_mode = "System"  # Valid mode
+    workload                          = "platform"
+    environment                       = "dev"
+    region_abbv                       = "eus"
+    aks_cluster_id                    = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
+    app_node_pool_name                = "test"
+    app_node_pool_mode                = "System" # Valid mode
     app_node_pool_enable_auto_scaling = false
-    tags = {}
+    tags                              = {}
   }
 
   module {
@@ -138,14 +138,14 @@ run "valid_node_count_test" {
   command = plan
 
   variables {
-    workload       = "platform"
-    environment    = "dev"
-    region_abbv    = "eus"
-    aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
-    app_node_pool_name = "test"
-    app_node_pool_node_count = 1  # Minimum valid count
+    workload                          = "platform"
+    environment                       = "dev"
+    region_abbv                       = "eus"
+    aks_cluster_id                    = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
+    app_node_pool_name                = "test"
+    app_node_pool_node_count          = 1 # Minimum valid count
     app_node_pool_enable_auto_scaling = false
-    tags = {}
+    tags                              = {}
   }
 
   module {
@@ -163,14 +163,14 @@ run "vm_size_validation_test" {
   command = plan
 
   variables {
-    workload       = "platform"
-    environment    = "dev"
-    region_abbv    = "eus"
-    aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
-    app_node_pool_name = "test"
-    app_node_pool_vm_size = "Standard_D4s_v3"  # Valid VM size starting with Standard_
+    workload                          = "platform"
+    environment                       = "dev"
+    region_abbv                       = "eus"
+    aks_cluster_id                    = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
+    app_node_pool_name                = "test"
+    app_node_pool_vm_size             = "Standard_D4s_v3" # Valid VM size starting with Standard_
     app_node_pool_enable_auto_scaling = false
-    tags = {}
+    tags                              = {}
   }
 
   module {
@@ -188,14 +188,14 @@ run "availability_zones_validation_test" {
   command = plan
 
   variables {
-    workload       = "platform"
-    environment    = "dev"
-    region_abbv    = "eus"
-    aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
-    app_node_pool_name = "test"
-    app_node_pool_availability_zones = ["1", "2"]  # Valid zones
+    workload                          = "platform"
+    environment                       = "dev"
+    region_abbv                       = "eus"
+    aks_cluster_id                    = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
+    app_node_pool_name                = "test"
+    app_node_pool_availability_zones  = ["1", "2"] # Valid zones
     app_node_pool_enable_auto_scaling = false
-    tags = {}
+    tags                              = {}
   }
 
   module {
@@ -213,15 +213,15 @@ run "autoscaling_validation_test" {
   command = plan
 
   variables {
-    workload       = "platform"
-    environment    = "dev"
-    region_abbv    = "eus"
-    aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
-    app_node_pool_name = "test"
+    workload                          = "platform"
+    environment                       = "dev"
+    region_abbv                       = "eus"
+    aks_cluster_id                    = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
+    app_node_pool_name                = "test"
     app_node_pool_enable_auto_scaling = true
-    app_node_pool_min_count = 1
-    app_node_pool_max_count = 5
-    tags = {}
+    app_node_pool_min_count           = 1
+    app_node_pool_max_count           = 5
+    tags                              = {}
   }
 
   module {
@@ -239,15 +239,15 @@ run "min_max_count_validation_test" {
   command = plan
 
   variables {
-    workload       = "platform"
-    environment    = "dev"
-    region_abbv    = "eus"
-    aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
-    app_node_pool_name = "test"
+    workload                          = "platform"
+    environment                       = "dev"
+    region_abbv                       = "eus"
+    aks_cluster_id                    = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
+    app_node_pool_name                = "test"
     app_node_pool_enable_auto_scaling = true
-    app_node_pool_min_count = 2
-    app_node_pool_max_count = 10
-    tags = {}
+    app_node_pool_min_count           = 2
+    app_node_pool_max_count           = 10
+    tags                              = {}
   }
 
   module {
@@ -265,11 +265,11 @@ run "node_labels_validation_test" {
   command = plan
 
   variables {
-    workload       = "platform"
-    environment    = "dev"
-    region_abbv    = "eus"
-    aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
-    app_node_pool_name = "test"
+    workload                          = "platform"
+    environment                       = "dev"
+    region_abbv                       = "eus"
+    aks_cluster_id                    = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
+    app_node_pool_name                = "test"
     app_node_pool_enable_auto_scaling = false
     # Valid node labels
     app_node_pool_node_labels = {
@@ -294,11 +294,11 @@ run "node_taints_validation_test" {
   command = plan
 
   variables {
-    workload       = "platform"
-    environment    = "dev"
-    region_abbv    = "eus"
-    aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
-    app_node_pool_name = "test"
+    workload                          = "platform"
+    environment                       = "dev"
+    region_abbv                       = "eus"
+    aks_cluster_id                    = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
+    app_node_pool_name                = "test"
     app_node_pool_enable_auto_scaling = false
     # Valid node taints
     app_node_pool_node_taints = [
@@ -323,11 +323,11 @@ run "tags_validation_test" {
   command = plan
 
   variables {
-    workload       = "platform"
-    environment    = "dev"
-    region_abbv    = "eus"
-    aks_cluster_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
-    app_node_pool_name = "test"
+    workload                          = "platform"
+    environment                       = "dev"
+    region_abbv                       = "eus"
+    aks_cluster_id                    = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ContainerService/managedClusters/test-dev-aks-eus"
+    app_node_pool_name                = "test"
     app_node_pool_enable_auto_scaling = false
     # Valid tags
     tags = {

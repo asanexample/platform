@@ -25,9 +25,9 @@ run "validate_retention_period" {
 
   variables {
     resource_group_name = "rg-test-log-analytics"
-    location           = "eastus"
-    name              = "log-test-validation"
-    retention_in_days = 20  # Invalid: Less than minimum 30 days
+    location            = "eastus"
+    name                = "log-test-validation"
+    retention_in_days   = 20 # Invalid: Less than minimum 30 days
   }
 
   expect_failures = [
@@ -45,9 +45,9 @@ run "validate_sku" {
 
   variables {
     resource_group_name = "rg-test-log-analytics"
-    location           = "eastus"
-    name              = "log-test-validation"
-    sku               = "InvalidSKU"  # Invalid: Not in allowed list
+    location            = "eastus"
+    name                = "log-test-validation"
+    sku                 = "InvalidSKU" # Invalid: Not in allowed list
   }
 
   expect_failures = [
@@ -65,9 +65,9 @@ run "validate_daily_quota" {
 
   variables {
     resource_group_name = "rg-test-log-analytics"
-    location           = "eastus"
-    name              = "log-test-validation"
-    daily_quota_gb    = -5  # Invalid: Negative value
+    location            = "eastus"
+    name                = "log-test-validation"
+    daily_quota_gb      = -5 # Invalid: Negative value
   }
 
   expect_failures = [
@@ -85,12 +85,12 @@ run "validate_role_assignments" {
 
   variables {
     resource_group_name = "rg-test-log-analytics"
-    location           = "eastus"
-    name              = "log-test-validation"
+    location            = "eastus"
+    name                = "log-test-validation"
     role_assignments = [
       {
-        role_definition_name = ""  # Invalid: Empty string
-        principal_id = "00000000-0000-0000-0000-000000000000"
+        role_definition_name = "" # Invalid: Empty string
+        principal_id         = "00000000-0000-0000-0000-000000000000"
       }
     ]
   }

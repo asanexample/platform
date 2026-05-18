@@ -9,7 +9,7 @@
 provider "azurerm" {
   features {}
   subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  tenant_id = "c945e155-be68-4477-b8d7-01939adbfe55"
+  tenant_id       = "c945e155-be68-4477-b8d7-01939adbfe55"
 }
 
 # Advanced test for storage account with containers, network rules, and CORS
@@ -19,63 +19,63 @@ run "advanced_storage_account" {
   variables {
     resource_group_name = "test-rg"
     location            = "eastus"
-    
+
     # Explicit name
     name = "teststorageadv2023"
-    
+
     # Advanced storage account configuration
     account_kind             = "StorageV2"
     account_tier             = "Standard"
     account_replication_type = "ZRS"
     access_tier              = "Cool"
-    
+
     # Security settings
     min_tls_version                 = "TLS1_2"
     allow_nested_items_to_be_public = false
     shared_access_key_enabled       = true
     blob_public_access_enabled      = false
     public_network_access_enabled   = true
-    
+
     # Container configuration
     create_containers = true
     containers = {
       data = {
-        name = "data",
+        name                  = "data",
         container_access_type = "private"
       },
       logs = {
-        name = "logs",
+        name                  = "logs",
         container_access_type = "private"
       }
     }
-    
+
     # Network rules
     network_rules = {
-      default_action = "Deny"
-      bypass = ["AzureServices", "Logging", "Metrics"]
-      ip_rules = ["203.0.113.0/24", "198.51.100.0/24"]
+      default_action             = "Deny"
+      bypass                     = ["AzureServices", "Logging", "Metrics"]
+      ip_rules                   = ["203.0.113.0/24", "198.51.100.0/24"]
       virtual_network_subnet_ids = []
     }
-    
+
     # CORS configuration
     cors_rules = [
       {
-        allowed_headers = ["*"]
-        allowed_methods = ["GET", "PUT", "POST"]
-        allowed_origins = ["https://example.com", "https://test.example.com"]
-        exposed_headers = ["Content-Length", "Content-Type"]
+        allowed_headers    = ["*"]
+        allowed_methods    = ["GET", "PUT", "POST"]
+        allowed_origins    = ["https://example.com", "https://test.example.com"]
+        exposed_headers    = ["Content-Length", "Content-Type"]
         max_age_in_seconds = 200
       }
     ]
-    
+
     # Lifecycle rules
     lifecycle_rules = [
       {
-        name = "deleteAfter30Days"
+        name    = "deleteAfter30Days"
         enabled = true
         filters = {
           prefix_match = ["logs/"]
-          blob_types = ["blockBlob"]
+          blob_types   = ["blockBlob"]
         }
         actions = {
           base_blob = {
@@ -84,12 +84,12 @@ run "advanced_storage_account" {
         }
       }
     ]
-    
+
     # Versioning and delete retention
-    blob_versioning_enabled = true
-    blob_delete_retention_days = 7
+    blob_versioning_enabled         = true
+    blob_delete_retention_days      = 7
     container_delete_retention_days = 7
-    
+
     # Tags
     tags = {
       environment = "test"

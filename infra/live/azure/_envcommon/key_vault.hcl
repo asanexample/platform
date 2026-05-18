@@ -18,7 +18,7 @@ inputs = {
   soft_delete_retention_days      = 90
   purge_protection_enabled        = true
   sku_name                        = "standard"
-  
+
   # Default network ACLs
   network_acls = {
     bypass                     = "AzureServices"
@@ -26,9 +26,9 @@ inputs = {
     ip_rules                   = []
     virtual_network_subnet_ids = []
   }
-  
+
   # Default private endpoint configuration (will be overridden in specific env)
-  enable_private_endpoint  = true
-  create_private_dns_zone  = true
-  private_dns_zone_name    = "privatelink.vaultcore.azure.net"
+  enable_private_endpoint = true
+  create_private_dns_zone = true
+  private_dns_zone_name   = "privatelink.vaultcore.azure.net"
 } 

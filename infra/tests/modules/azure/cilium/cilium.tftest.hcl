@@ -55,22 +55,22 @@ run "basic_cilium_installation" {
 # Advanced Cilium configuration test
 run "advanced_cilium_configuration" {
   variables {
-    cluster_name                   = "test-aks-cluster"
-    resource_group_name            = "test-resource-group"
-    helm_chart_version             = "1.17.2"
-    aksbyocni_enabled              = true
-    gateway_api_enabled            = true
-    hubble_enabled                 = true
-    hubble_relay_enabled           = true
-    hubble_ui_enabled              = true
-    prometheus_enabled             = true
+    cluster_name                       = "test-aks-cluster"
+    resource_group_name                = "test-resource-group"
+    helm_chart_version                 = "1.17.2"
+    aksbyocni_enabled                  = true
+    gateway_api_enabled                = true
+    hubble_enabled                     = true
+    hubble_relay_enabled               = true
+    hubble_ui_enabled                  = true
+    prometheus_enabled                 = true
     prometheus_service_monitor_enabled = true
-    operator_prometheus_enabled    = true
-    kube_proxy_replacement         = "false"
-    resources_limits_cpu           = "1000m"
-    resources_limits_memory        = "1Gi"
-    operator_resources_limits_cpu  = "500m"
-    operator_resources_limits_memory = "512Mi"
+    operator_prometheus_enabled        = true
+    kube_proxy_replacement             = "false"
+    resources_limits_cpu               = "1000m"
+    resources_limits_memory            = "1Gi"
+    operator_resources_limits_cpu      = "500m"
+    operator_resources_limits_memory   = "512Mi"
   }
 
   # Test that advanced configuration settings are correctly applied

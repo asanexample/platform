@@ -12,7 +12,7 @@ provider "azurerm" {
     }
   }
   subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  tenant_id = "c945e155-be68-4477-b8d7-01939adbfe55"
+  tenant_id       = "c945e155-be68-4477-b8d7-01939adbfe55"
 }
 
 # Test basic identity creation
@@ -20,12 +20,12 @@ run "basic_identity_creation" {
   command = plan
 
   variables {
-    workload             = "platform"
-    environment          = "dev"
-    region_abbv          = "weu"
-    resource_group_name  = "test-rg"
-    location             = "westeurope"
-    create_aks_identity  = true
+    workload            = "platform"
+    environment         = "dev"
+    region_abbv         = "weu"
+    resource_group_name = "test-rg"
+    location            = "westeurope"
+    create_aks_identity = true
     tags = {
       environment = "dev"
       application = "testing"
@@ -42,7 +42,7 @@ run "basic_identity_creation" {
     condition     = length(azurerm_user_assigned_identity.aks_identity) > 0
     error_message = "AKS identity should be created"
   }
-  
+
   # Check that the AKS identity has the correct name format
   assert {
     condition     = azurerm_user_assigned_identity.aks_identity[0].name == "aksid-platform-dev-weu"
@@ -109,19 +109,19 @@ run "workload_identity_enabled_test" {
     condition     = length(azurerm_user_assigned_identity.aks_identity) > 0
     error_message = "AKS identity should be created"
   }
-  
+
   # Check that workload identities are created
   assert {
     condition     = length(azurerm_user_assigned_identity.workload_identities) == 2
     error_message = "Two workload identities should be created"
   }
-  
+
   # Check first workload identity
   assert {
     condition     = contains(keys(azurerm_user_assigned_identity.workload_identities), "workload1")
     error_message = "Workload1 identity should be created"
   }
-  
+
   # Check second workload identity
   assert {
     condition     = contains(keys(azurerm_user_assigned_identity.workload_identities), "workload2")

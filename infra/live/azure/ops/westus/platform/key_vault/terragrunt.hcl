@@ -29,15 +29,15 @@ include "key_vault_common" {
 dependency "naming" {
   config_path = "../naming"
   mock_outputs = {
-    key_vault          = "mock-key-vault"
-    private_endpoint   = "mock-private-endpoint"
+    key_vault        = "mock-key-vault"
+    private_endpoint = "mock-private-endpoint"
   }
 }
 
 dependency "resource_group" {
   config_path = "../resource_group"
   mock_outputs = {
-    name = "mock-rg"
+    name     = "mock-rg"
     location = include.base.locals.region
   }
 }
@@ -45,9 +45,9 @@ dependency "resource_group" {
 dependency "networking" {
   config_path = "../networking"
   mock_outputs = {
-    vnet_id                  = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet"
-    vnet_name                = "mock-vnet"
-    subnet_ids               = { "az1-endpoints" = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet/subnets/az1-endpoints" }
+    vnet_id    = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet"
+    vnet_name  = "mock-vnet"
+    subnet_ids = { "az1-endpoints" = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock-rg/providers/Microsoft.Network/virtualNetworks/mock-vnet/subnets/az1-endpoints" }
   }
 }
 
@@ -57,7 +57,7 @@ inputs = {
 
   # Environment variables
   environment = include.base.locals.env
-  workload = include.base.locals.workload
+  workload    = include.base.locals.workload
   region_abbv = include.base.locals.region_abbv
 
   # Resource details
@@ -72,7 +72,7 @@ inputs = {
 
   # Create a disk encryption key
   create_disk_encryption_key = true
-  disk_encryption_key_name = "disk-encryption-key"
+  disk_encryption_key_name   = "disk-encryption-key"
 
   # Network rules
   network_acls = local.network_acls
@@ -86,7 +86,7 @@ inputs = {
       "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/dns-rg/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net"
     ]
     private_service_connection = {
-      name = "kv-private-link"
+      name              = "kv-private-link"
       subresource_names = ["vault"]
     }
   }

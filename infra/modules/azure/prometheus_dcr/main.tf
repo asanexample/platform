@@ -20,12 +20,12 @@ resource "azurerm_monitor_data_collection_endpoint" "this" {
 
 # Create the Data Collection Rule (DCR)
 resource "azurerm_monitor_data_collection_rule" "this" {
-  count               = var.create ? 1 : 0
-  name                = local.dcr_name
-  resource_group_name = var.resource_group_name
-  location            = var.location
+  count                       = var.create ? 1 : 0
+  name                        = local.dcr_name
+  resource_group_name         = var.resource_group_name
+  location                    = var.location
   data_collection_endpoint_id = azurerm_monitor_data_collection_endpoint.this[0].id
-  kind                = "Linux" # Required for Prometheus
+  kind                        = "Linux" # Required for Prometheus
 
   data_sources {
     prometheus_forwarder {

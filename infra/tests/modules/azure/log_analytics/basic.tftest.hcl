@@ -21,10 +21,10 @@ run "basic_log_analytics" {
 
   variables {
     resource_group_name = "rg-test-log-analytics"
-    location           = "eastus"
-    name              = "log-test"
-    retention_in_days = 30
-    sku               = "PerGB2018"
+    location            = "eastus"
+    name                = "log-test"
+    retention_in_days   = 30
+    sku                 = "PerGB2018"
   }
 
   module {

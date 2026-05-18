@@ -9,7 +9,7 @@
 provider "azurerm" {
   features {}
   subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  tenant_id = "c945e155-be68-4477-b8d7-01939adbfe55"
+  tenant_id       = "c945e155-be68-4477-b8d7-01939adbfe55"
 }
 
 # Setup resources needed for testing
@@ -29,11 +29,11 @@ run "setup_containers" {
     storage_account_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Storage/storageAccounts/teststorageaccount"
     containers = {
       "data" = {
-        name                 = "data"
+        name                  = "data"
         container_access_type = "private"
       },
       "logs" = {
-        name                 = "logs"
+        name                  = "logs"
         container_access_type = "private"
       }
     }
@@ -75,10 +75,10 @@ run "advanced_role_assignment_test" {
       },
       {
         # Logs container-level Contributor role with role definition ID
-        principal_id         = run.get_client_config.object_id
-        role_definition_id   = "/subscriptions/${run.get_client_config.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe" # Storage Blob Data Contributor
-        description          = "Full access to logs container"
-        scope                = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Storage/storageAccounts/teststorageaccount/blobServices/default/containers/logs"
+        principal_id       = run.get_client_config.object_id
+        role_definition_id = "/subscriptions/${run.get_client_config.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe" # Storage Blob Data Contributor
+        description        = "Full access to logs container"
+        scope              = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Storage/storageAccounts/teststorageaccount/blobServices/default/containers/logs"
       }
     ]
   }

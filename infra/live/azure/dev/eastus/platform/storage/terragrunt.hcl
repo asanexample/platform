@@ -87,12 +87,12 @@ inputs = {
   }
 
   private_endpoint = {
-    create                         = true
-    name                           = dependency.naming.outputs.private_endpoint
-    subnet_id                      = dependency.networking.outputs.subnet_ids["az1-endpoints"]
-    subresource_names              = ["blob"]
+    create                          = true
+    name                            = dependency.naming.outputs.private_endpoint
+    subnet_id                       = dependency.networking.outputs.subnet_ids["az1-endpoints"]
+    subresource_names               = ["blob"]
     private_service_connection_name = "service-connection"
-    private_dns_zone_ids           = [dependency.dns.outputs.private_dns_zone_ids["blob"]]
+    private_dns_zone_ids            = [dependency.dns.outputs.private_dns_zone_ids["blob"]]
   }
 
   containers = {
@@ -102,9 +102,9 @@ inputs = {
 
   lifecycle_rules = [
     {
-      name         = "logs-lifecycle"
-      enabled      = true
-      prefix_match = ["logs/"]
+      name                   = "logs-lifecycle"
+      enabled                = true
+      prefix_match           = ["logs/"]
       tier_to_cool_action    = { days_after_modification_greater_than = 30 }
       tier_to_archive_action = { days_after_modification_greater_than = 90 }
       delete_action          = { days_after_modification_greater_than = 730 }

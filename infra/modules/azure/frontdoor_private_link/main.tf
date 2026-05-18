@@ -13,10 +13,10 @@ locals {
 
 # Create origin with private link
 resource "azurerm_cdn_frontdoor_origin" "this" {
-  count                    = var.create ? 1 : 0
-  name                     = var.origin_name
+  count                         = var.create ? 1 : 0
+  name                          = var.origin_name
   cdn_frontdoor_origin_group_id = local.origin_group_id
-  enabled                  = var.enabled
+  enabled                       = var.enabled
 
   certificate_name_check_enabled = var.certificate_name_check_enabled
   host_name                      = var.use_blob_endpoint ? var.storage_primary_blob_host : var.storage_primary_web_host
@@ -34,12 +34,12 @@ resource "azurerm_cdn_frontdoor_origin" "this" {
 
 # Create route if route_enabled is true
 resource "azurerm_cdn_frontdoor_route" "this" {
-  count                     = var.create && var.route_enabled ? 1 : 0
-  name                      = var.route_name
-  cdn_frontdoor_endpoint_id = var.endpoint_id
-  cdn_frontdoor_origin_ids  = [azurerm_cdn_frontdoor_origin.this[0].id]
+  count                         = var.create && var.route_enabled ? 1 : 0
+  name                          = var.route_name
+  cdn_frontdoor_endpoint_id     = var.endpoint_id
+  cdn_frontdoor_origin_ids      = [azurerm_cdn_frontdoor_origin.this[0].id]
   cdn_frontdoor_origin_group_id = local.origin_group_id
-  enabled                   = true
+  enabled                       = true
 
   forwarding_protocol    = var.forwarding_protocol
   https_redirect_enabled = var.https_redirect_enabled

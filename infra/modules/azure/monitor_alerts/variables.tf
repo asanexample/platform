@@ -75,14 +75,14 @@ variable "action_groups" {
 variable "metric_alerts" {
   description = "Metric-based alert rules"
   type = map(object({
-    description        = optional(string, "")
-    severity           = optional(number, 2)
-    enabled            = optional(bool, true)
-    scopes             = list(string)
-    frequency          = optional(string, "PT5M")
-    window_size        = optional(string, "PT15M")
-    action_group_keys  = list(string)
-    auto_mitigate      = optional(bool, true)
+    description       = optional(string, "")
+    severity          = optional(number, 2)
+    enabled           = optional(bool, true)
+    scopes            = list(string)
+    frequency         = optional(string, "PT5M")
+    window_size       = optional(string, "PT15M")
+    action_group_keys = list(string)
+    auto_mitigate     = optional(bool, true)
 
     criteria = list(object({
       metric_namespace = string
@@ -126,7 +126,7 @@ variable "activity_log_alerts" {
       resource_type  = optional(string, null)
 
       service_health = optional(object({
-        events   = optional(list(string), ["Incident", "Maintenance"])
+        events    = optional(list(string), ["Incident", "Maintenance"])
         locations = optional(list(string), [])
         services  = optional(list(string), [])
       }), null)

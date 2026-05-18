@@ -9,7 +9,7 @@
 # AKS node pool names must be 1-12 characters, lowercase alphanumeric, and start with a letter
 locals {
   app_node_pool_name = var.app_node_pool_name != null ? var.app_node_pool_name : "app${var.environment}${var.region_abbv}"
-  
+
   # Conditionally set availability zones based on region support
   # Some regions like 'westus' don't support availability zones for VMSS
   use_availability_zones = var.use_availability_zones == null ? var.app_node_pool_availability_zones : (var.use_availability_zones ? var.app_node_pool_availability_zones : null)
@@ -40,8 +40,8 @@ resource "azurerm_kubernetes_cluster_node_pool" "app_node_pool" {
 
   # Auto-scaling configuration
   auto_scaling_enabled = var.app_node_pool_enable_auto_scaling
-  min_count           = var.app_node_pool_enable_auto_scaling ? var.app_node_pool_min_count : null
-  max_count           = var.app_node_pool_enable_auto_scaling ? var.app_node_pool_max_count : null
+  min_count            = var.app_node_pool_enable_auto_scaling ? var.app_node_pool_min_count : null
+  max_count            = var.app_node_pool_enable_auto_scaling ? var.app_node_pool_max_count : null
 
   # Apply tags
   tags = var.tags

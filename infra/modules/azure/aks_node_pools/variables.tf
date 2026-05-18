@@ -127,7 +127,7 @@ variable "app_node_pool_availability_zones" {
 variable "app_node_pool_max_pods" {
   description = "The maximum number of pods per node for the app node pool"
   type        = number
-  default     = 110  # Higher value for Cilium CNI (not constrained by Azure CNI limits)
+  default     = 110 # Higher value for Cilium CNI (not constrained by Azure CNI limits)
   validation {
     condition     = var.app_node_pool_max_pods >= 30 && var.app_node_pool_max_pods <= 250
     error_message = "The app node pool maximum pods must be between 30 and 250."

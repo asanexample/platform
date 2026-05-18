@@ -8,7 +8,7 @@
 provider "azurerm" {
   features {}
   subscription_id = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
-  tenant_id = "c945e155-be68-4477-b8d7-01939adbfe55"
+  tenant_id       = "c945e155-be68-4477-b8d7-01939adbfe55"
 }
 
 # Test workload validation
@@ -17,17 +17,17 @@ run "workload_validation_test" {
 
   variables {
     # Short workload (within limit)
-    workload            = "op"
-    environment         = "dev"
-    region_abbv         = "eus"
-    resource_group_name = "test-rg"
-    location            = "eastus"
-    cluster_name        = "test-dev-aks-eus"
+    workload                   = "op"
+    environment                = "dev"
+    region_abbv                = "eus"
+    resource_group_name        = "test-rg"
+    location                   = "eastus"
+    cluster_name               = "test-dev-aks-eus"
     create_workload_identities = false
     # Avoid route table lookup
     private_route_table_name = null
     vnet_resource_group_name = null
-    tags = {}
+    tags                     = {}
   }
 
   module {
@@ -45,17 +45,17 @@ run "environment_validation_test" {
   command = plan
 
   variables {
-    workload            = "platform"
-    environment         = "prod"  # Valid environment
-    region_abbv         = "eus"
-    resource_group_name = "test-rg"
-    location            = "eastus"
-    cluster_name        = "test-prod-aks-eus"
+    workload                   = "platform"
+    environment                = "prod" # Valid environment
+    region_abbv                = "eus"
+    resource_group_name        = "test-rg"
+    location                   = "eastus"
+    cluster_name               = "test-prod-aks-eus"
     create_workload_identities = false
     # Avoid route table lookup
     private_route_table_name = null
     vnet_resource_group_name = null
-    tags = {}
+    tags                     = {}
   }
 
   module {
@@ -73,17 +73,17 @@ run "resource_group_validation_test" {
   command = plan
 
   variables {
-    workload            = "platform"
-    environment         = "dev"
-    region_abbv         = "eus"
-    resource_group_name = "test-resource-group-with-valid-name"  # Valid resource group name
-    location            = "eastus"
-    cluster_name        = "test-dev-aks-eus"
+    workload                   = "platform"
+    environment                = "dev"
+    region_abbv                = "eus"
+    resource_group_name        = "test-resource-group-with-valid-name" # Valid resource group name
+    location                   = "eastus"
+    cluster_name               = "test-dev-aks-eus"
     create_workload_identities = false
     # Avoid route table lookup
     private_route_table_name = null
     vnet_resource_group_name = null
-    tags = {}
+    tags                     = {}
   }
 
   module {
@@ -107,17 +107,17 @@ run "workload_identity_validation_test" {
     resource_group_name = "test-rg"
     location            = "eastus"
     cluster_name        = "test-dev-aks-eus"
-    
+
     # All three conditions must be met for workload identities to be created
     create_workload_identities = true
     workload_identity_enabled  = true
     oidc_issuer_enabled        = true
     oidc_issuer_url            = "https://eastus.oic.dev-aks-0000000.hcp.eastus.azmk8s.io/0000000-0000-0000-0000-000000000000/"
-    
+
     # Avoid route table lookup
     private_route_table_name = null
     vnet_resource_group_name = null
-    tags = {}
+    tags                     = {}
   }
 
   module {
@@ -135,17 +135,17 @@ run "region_abbv_validation_test" {
   command = plan
 
   variables {
-    workload            = "platform"
-    environment         = "dev"
-    region_abbv         = "eus"  # Valid region abbreviation
-    resource_group_name = "test-rg"
-    location            = "eastus"
-    cluster_name        = "test-dev-aks-eus"
+    workload                   = "platform"
+    environment                = "dev"
+    region_abbv                = "eus" # Valid region abbreviation
+    resource_group_name        = "test-rg"
+    location                   = "eastus"
+    cluster_name               = "test-dev-aks-eus"
     create_workload_identities = false
     # Avoid route table lookup
     private_route_table_name = null
     vnet_resource_group_name = null
-    tags = {}
+    tags                     = {}
   }
 
   module {
@@ -163,21 +163,21 @@ run "identity_name_validation_test" {
   command = plan
 
   variables {
-    workload            = "platform"
-    environment         = "dev"
-    region_abbv         = "eus"
-    resource_group_name = "test-rg"
-    location            = "eastus"
-    cluster_name        = "test-dev-aks-eus"
+    workload                   = "platform"
+    environment                = "dev"
+    region_abbv                = "eus"
+    resource_group_name        = "test-rg"
+    location                   = "eastus"
+    cluster_name               = "test-dev-aks-eus"
     create_workload_identities = false
-    
+
     # Custom identity name (valid format)
-    aks_identity_name   = "test-dev-aks-identity"
-    
+    aks_identity_name = "test-dev-aks-identity"
+
     # Avoid route table lookup
     private_route_table_name = null
     vnet_resource_group_name = null
-    tags = {}
+    tags                     = {}
   }
 
   module {
@@ -201,17 +201,17 @@ run "oidc_url_validation_test" {
     resource_group_name = "test-rg"
     location            = "eastus"
     cluster_name        = "test-dev-aks-eus"
-    
+
     create_workload_identities = true
     workload_identity_enabled  = true
     oidc_issuer_enabled        = true
     # Valid OIDC URL starting with https://
-    oidc_issuer_url            = "https://eastus.oic.dev-aks-0000000.hcp.eastus.azmk8s.io/0000000-0000-0000-0000-000000000000/"
-    
+    oidc_issuer_url = "https://eastus.oic.dev-aks-0000000.hcp.eastus.azmk8s.io/0000000-0000-0000-0000-000000000000/"
+
     # Avoid route table lookup
     private_route_table_name = null
     vnet_resource_group_name = null
-    tags = {}
+    tags                     = {}
   }
 
   module {
@@ -229,21 +229,21 @@ run "subnet_id_validation_test" {
   command = plan
 
   variables {
-    workload            = "platform"
-    environment         = "dev"
-    region_abbv         = "eus"
-    resource_group_name = "test-rg"
-    location            = "eastus"
-    cluster_name        = "test-dev-aks-eus"
+    workload                   = "platform"
+    environment                = "dev"
+    region_abbv                = "eus"
+    resource_group_name        = "test-rg"
+    location                   = "eastus"
+    cluster_name               = "test-dev-aks-eus"
     create_workload_identities = false
-    
+
     # Valid subnet ID format
     subnet_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Network/virtualNetworks/test-vnet/subnets/aks-subnet"
-    
+
     # Avoid route table lookup
     private_route_table_name = null
     vnet_resource_group_name = null
-    tags = {}
+    tags                     = {}
   }
 
   module {
@@ -261,14 +261,14 @@ run "tags_validation_test" {
   command = plan
 
   variables {
-    workload            = "platform"
-    environment         = "dev"
-    region_abbv         = "eus"
-    resource_group_name = "test-rg"
-    location            = "eastus"
-    cluster_name        = "test-dev-aks-eus"
+    workload                   = "platform"
+    environment                = "dev"
+    region_abbv                = "eus"
+    resource_group_name        = "test-rg"
+    location                   = "eastus"
+    cluster_name               = "test-dev-aks-eus"
     create_workload_identities = false
-    
+
     # Valid tags
     tags = {
       environment = "test"
@@ -276,7 +276,7 @@ run "tags_validation_test" {
       owner       = "platform-team"
       costcenter  = "12345"
     }
-    
+
     # Avoid route table lookup
     private_route_table_name = null
     vnet_resource_group_name = null

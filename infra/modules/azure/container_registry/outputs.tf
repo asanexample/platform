@@ -33,7 +33,7 @@ output "admin_password" {
 
 output "identity" {
   description = "The managed identity assigned to the Container Registry."
-  value       = var.create && var.create_registry ? {
+  value = var.create && var.create_registry ? {
     principal_id = azurerm_container_registry.acr[0].identity[0].principal_id
     tenant_id    = azurerm_container_registry.acr[0].identity[0].tenant_id
     type         = azurerm_container_registry.acr[0].identity[0].type

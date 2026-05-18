@@ -52,9 +52,9 @@ resource "azurerm_role_assignment" "container_role_assignments" {
   role_definition_name = each.value.role_definition_name
 
   # Optional properties
-  description                       = each.value.description
-  condition                         = each.value.condition
-  condition_version                 = each.value.condition_version
-  principal_type                    = each.value.principal_type
-  skip_service_principal_aad_check  = each.value.skip_service_principal_aad_check
+  description                      = each.value.description
+  condition                        = each.value.condition
+  condition_version                = each.value.condition_version
+  principal_type                   = each.value.principal_type
+  skip_service_principal_aad_check = each.value.skip_service_principal_aad_check
 } 

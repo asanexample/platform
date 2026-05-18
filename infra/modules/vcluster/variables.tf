@@ -95,10 +95,10 @@ variable "isolation" {
 variable "ingress" {
   description = "Ingress configuration for vCluster API server exposure"
   type = object({
-    enabled          = optional(bool, false)
-    host             = optional(string, "")
-    ingress_class    = optional(string, "")
-    tls_secret       = optional(string, "")
+    enabled       = optional(bool, false)
+    host          = optional(string, "")
+    ingress_class = optional(string, "")
+    tls_secret    = optional(string, "")
   })
   default = null
 }

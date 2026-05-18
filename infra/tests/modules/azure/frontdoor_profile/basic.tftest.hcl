@@ -19,10 +19,10 @@ run "basic_frontdoor_profile" {
   command = plan
 
   variables {
-    name                = "test-fd-profile"
-    resource_group_name = "test-rg"
-    enabled             = true
-    sku_name            = "Standard_AzureFrontDoor"
+    name                     = "test-fd-profile"
+    resource_group_name      = "test-rg"
+    enabled                  = true
+    sku_name                 = "Standard_AzureFrontDoor"
     response_timeout_seconds = 120
   }
 
@@ -41,13 +41,13 @@ run "basic_frontdoor_profile" {
     condition     = azurerm_cdn_frontdoor_profile.this[0].resource_group_name == "test-rg"
     error_message = "Front Door Profile should be in the correct resource group"
   }
-  
+
   # Verify default SKU is Standard_AzureFrontDoor
   assert {
     condition     = azurerm_cdn_frontdoor_profile.this[0].sku_name == "Standard_AzureFrontDoor"
     error_message = "Front Door Profile should use Standard_AzureFrontDoor SKU by default"
   }
-  
+
   # Verify default response timeout
   assert {
     condition     = azurerm_cdn_frontdoor_profile.this[0].response_timeout_seconds == 120

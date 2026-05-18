@@ -111,7 +111,7 @@ resource "azurerm_network_security_rule" "aks_allow_cilium_health" {
   protocol                    = "Tcp"
   source_port_range           = "*"
   destination_port_range      = "4240"
-  source_address_prefixes     = var.address_space  # Allow from all VNet address space
+  source_address_prefixes     = var.address_space # Allow from all VNet address space
   destination_address_prefix  = "*"
   resource_group_name         = var.resource_group_name
   network_security_group_name = azurerm_network_security_group.nsg[var.aks_subnet_name].name
@@ -127,7 +127,7 @@ resource "azurerm_network_security_rule" "aks_allow_vxlan" {
   protocol                    = "Udp"
   source_port_range           = "*"
   destination_port_range      = "8472"
-  source_address_prefixes     = var.address_space  # Allow from all VNet address space
+  source_address_prefixes     = var.address_space # Allow from all VNet address space
   destination_address_prefix  = "*"
   resource_group_name         = var.resource_group_name
   network_security_group_name = azurerm_network_security_group.nsg[var.aks_subnet_name].name
@@ -135,16 +135,16 @@ resource "azurerm_network_security_rule" "aks_allow_vxlan" {
 
 # Allow node-to-node traffic for all protocols within all kubernetes subnets
 resource "azurerm_network_security_rule" "aks_allow_node_communication" {
-  count                       = local.configure_aks_nsg ? 1 : 0
-  name                        = "AllowNodeCommunication"
-  priority                    = 130
-  direction                   = "Inbound"
-  access                      = "Allow"
-  protocol                    = "*"
-  source_port_range           = "*"
-  destination_port_range      = "*"
-  source_address_prefixes     = [
-    for subnet_name, subnet in var.subnets : 
+  count                  = local.configure_aks_nsg ? 1 : 0
+  name                   = "AllowNodeCommunication"
+  priority               = 130
+  direction              = "Inbound"
+  access                 = "Allow"
+  protocol               = "*"
+  source_port_range      = "*"
+  destination_port_range = "*"
+  source_address_prefixes = [
+    for subnet_name, subnet in var.subnets :
     subnet.address_prefixes[0] if can(regex("kubernetes$", subnet_name))
   ]
   destination_address_prefix  = "*"

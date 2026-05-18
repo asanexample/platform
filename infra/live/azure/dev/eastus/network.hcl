@@ -3,7 +3,7 @@
 locals {
   # VNet CIDR block for eastus region - from allocations.csv
   address_space = ["10.104.0.0/16"]
-  
+
   # Subnet configurations for eastus region with three availability zones
   # Each AZ has Kubernetes, Services, Endpoints, Firewall, Transit, and Public subnets
   subnets = {
@@ -32,7 +32,7 @@ locals {
       address_prefixes  = ["10.104.0.224/28"]
       service_endpoints = ["Microsoft.Storage"]
     },
-    
+
     # AZ 2 (eastus-2) subnets
     "az2-kubernetes" = {
       address_prefixes  = ["10.104.1.0/26"]
@@ -58,7 +58,7 @@ locals {
       address_prefixes  = ["10.104.1.224/28"]
       service_endpoints = ["Microsoft.Storage"]
     },
-    
+
     # AZ 3 (eastus-3) subnets
     "az3-kubernetes" = {
       address_prefixes  = ["10.104.2.0/26"]

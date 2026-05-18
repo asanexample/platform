@@ -150,7 +150,7 @@ variable "operator_prometheus_enabled" {
 variable "tls" {
   description = "TLS configuration for Cilium"
   type        = any
-  default     = {
+  default = {
     enabled = false
   }
 }
@@ -159,7 +159,7 @@ variable "tls" {
 variable "debug" {
   description = "Debug configuration for Cilium"
   type        = any
-  default     = {
+  default = {
     enabled = false
   }
 }
@@ -175,8 +175,8 @@ variable "identityAllocationMode" {
 variable "cni" {
   description = "CNI configuration for Cilium"
   type        = any
-  default     = {
-    exclusive = false
+  default = {
+    exclusive    = false
     chainingMode = null
   }
 }
@@ -197,7 +197,7 @@ variable "hubble_listen_address" {
 variable "hubble_metrics_enabled" {
   description = "List of Hubble metrics to enable"
   type        = list(string)
-  default     = [
+  default = [
     "dns",
     "drop",
     "tcp",
