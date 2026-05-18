@@ -78,6 +78,12 @@ variable "access_entries" {
   default = {}
 }
 
+variable "bootstrap_self_managed_addons" {
+  description = "Whether EKS should install default networking add-ons (vpc-cni, kube-proxy). Set false for Cilium BYOCNI."
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)

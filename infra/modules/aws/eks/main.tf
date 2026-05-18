@@ -69,7 +69,7 @@ resource "aws_eks_cluster" "this" {
   role_arn = aws_iam_role.cluster[0].arn
   version  = var.kubernetes_version
 
-  bootstrap_self_managed_addons = false
+  bootstrap_self_managed_addons = var.bootstrap_self_managed_addons
 
   vpc_config {
     subnet_ids              = var.subnet_ids
