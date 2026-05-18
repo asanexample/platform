@@ -58,6 +58,10 @@ terraform.rc
 # Terragrunt rendered config (generated artifact)
 **/terragrunt_rendered.json
 
+# Go test binaries
+*.test
+__debug_bin*
+
 # OS files
 .DS_Store
 **/.DS_Store

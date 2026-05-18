@@ -170,6 +170,20 @@ az-create-state-resources: check-azure-auth ## Create Azure resources for Terraf
 	az storage container create --name terraformstate --account-name tfstatemulticloud
 
 #----------------------------------------------
+# AWS Testing (Terratest)
+#----------------------------------------------
+
+.PHONY: test-aws
+test-aws: ## Run all AWS Terratest tests (requires AWS credentials)
+	@echo "$(GREEN)Running AWS Terratest suite...$(NC)"
+	@cd $(INFRA_DIR)/tests/aws && go test -v -timeout 30m ./...
+
+.PHONY: test-aws-networking
+test-aws-networking: ## Run AWS networking Terratest tests
+	@echo "$(GREEN)Running AWS networking tests...$(NC)"
+	@cd $(INFRA_DIR)/tests/aws && go test -v -timeout 30m ./networking/...
+
+#----------------------------------------------
 # Kubernetes operations
 #----------------------------------------------
 
