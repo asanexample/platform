@@ -54,16 +54,16 @@ inputs = {
 
   account_assignments = [
     # Admins get AdministratorAccess on all accounts
-    { account_id = include.base.locals.account_id,                                permission_set = "AdministratorAccess", group = "Admins" },
-    { account_id = dependency.organizations.outputs.account_ids["Platform"],      permission_set = "AdministratorAccess", group = "Admins" },
-    { account_id = dependency.organizations.outputs.account_ids["Preprod"],       permission_set = "AdministratorAccess", group = "Admins" },
-    { account_id = dependency.organizations.outputs.account_ids["Prod"],          permission_set = "AdministratorAccess", group = "Admins" },
+    { account_id = include.base.locals.account_id, permission_set = "AdministratorAccess", group = "Admins" },
+    { account_id = dependency.organizations.outputs.account_ids["Platform"], permission_set = "AdministratorAccess", group = "Admins" },
+    { account_id = dependency.organizations.outputs.account_ids["Preprod"], permission_set = "AdministratorAccess", group = "Admins" },
+    { account_id = dependency.organizations.outputs.account_ids["Prod"], permission_set = "AdministratorAccess", group = "Admins" },
     # ReadOnly gets ReadOnlyAccess on all accounts
-    { account_id = include.base.locals.account_id,                                permission_set = "ReadOnlyAccess", group = "ReadOnly" },
-    { account_id = dependency.organizations.outputs.account_ids["Platform"],      permission_set = "ReadOnlyAccess", group = "ReadOnly" },
-    { account_id = dependency.organizations.outputs.account_ids["Preprod"],       permission_set = "ReadOnlyAccess", group = "ReadOnly" },
-    { account_id = dependency.organizations.outputs.account_ids["Prod"],          permission_set = "ReadOnlyAccess", group = "ReadOnly" },
+    { account_id = include.base.locals.account_id, permission_set = "ReadOnlyAccess", group = "ReadOnly" },
+    { account_id = dependency.organizations.outputs.account_ids["Platform"], permission_set = "ReadOnlyAccess", group = "ReadOnly" },
+    { account_id = dependency.organizations.outputs.account_ids["Preprod"], permission_set = "ReadOnlyAccess", group = "ReadOnly" },
+    { account_id = dependency.organizations.outputs.account_ids["Prod"], permission_set = "ReadOnlyAccess", group = "ReadOnly" },
     # Developers get PowerUserAccess on Preprod
-    { account_id = dependency.organizations.outputs.account_ids["Preprod"],       permission_set = "PowerUserAccess", group = "Developers" },
+    { account_id = dependency.organizations.outputs.account_ids["Preprod"], permission_set = "PowerUserAccess", group = "Developers" },
   ]
 }
