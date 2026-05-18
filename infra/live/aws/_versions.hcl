@@ -36,6 +36,7 @@ locals {
 
     # Governance & compliance
     organizations   = "${local.source_base}/aws//organizations"
+    identity_center = "${local.source_base}/aws//identity_center"
     cloudtrail      = "${local.source_base}/aws//cloudtrail"
     budgets         = "${local.source_base}/aws//budgets"
     state_bootstrap = "${local.source_base}/aws//state_bootstrap"
