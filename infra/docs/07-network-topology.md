@@ -61,7 +61,7 @@ Each AZ contains 6 specialized subnets:
 | **Firewall** | /26 (62 IPs) | AWS Network Firewall endpoints (reserved for future use). |
 | **Services** | /27 (30 IPs) | Internal services, NLBs, managed service endpoints. |
 | **Public** | /28 (14 IPs) | IGW-routed resources: ALBs, NAT gateways, bastion hosts. |
-| **Transit** | /29 (6 IPs) | Transit Gateway attachments, VPN termination points. |
+| **Transit** | /28 (14 IPs) | Transit Gateway attachments, VPN termination points. |
 
 Subnets are computed from `vpc_cidr` + `azs` using `cidrsubnet()` in each environment's `network.hcl`. No manual CIDR math required — onboarding a new environment is a one-line change.
 

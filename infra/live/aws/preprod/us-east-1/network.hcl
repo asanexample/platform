@@ -8,7 +8,7 @@ locals {
     firewall   = { newbits = 2, netnum = 2, public = false }  # /26 (62 IPs)
     services   = { newbits = 3, netnum = 6, public = false }  # /27 (30 IPs)
     public     = { newbits = 4, netnum = 14, public = true }  # /28 (14 IPs)
-    transit    = { newbits = 5, netnum = 30, public = false } # /29 (6 IPs)
+    transit    = { newbits = 4, netnum = 15, public = false } # /28 (14 IPs)
   }
 
   subnets = merge([
