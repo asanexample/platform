@@ -31,9 +31,15 @@ go test -v -run TestNetworking_PrivateTopology -timeout 30m ./networking/...
 
 ## Cost
 
-Each full test run creates and destroys real AWS resources. Estimated cost: ~$0.10-0.20 per run (NAT gateway hourly charges). Tests clean up after themselves via `defer terraform.Destroy`.
+Each full test run creates and destroys real AWS resources. Estimated cost per run:
+- Networking: ~$0.10-0.20 (NAT gateway hourly charges)
+- EKS: ~$0.50-1.00 (EKS cluster $0.10/hr + NAT + EC2 node)
+
+Tests clean up after themselves via `defer terraform.Destroy`.
 
 ## Test Cases
+
+### Networking
 
 | Test | Topology | Time | What it validates |
 |------|----------|------|-------------------|
@@ -42,3 +48,10 @@ Each full test run creates and destroys real AWS resources. Estimated cost: ~$0.
 | `TestNetworking_AirgappedTopology` | Airgapped | ~1 min | No IGW, no NAT, no public RT, S3 endpoint only |
 | `TestNetworking_Disabled` | N/A | ~5 sec | `create=false` produces zero resources (plan-only) |
 | `TestNetworking_MultiAZNAT` | Private + per-AZ NAT | ~4-5 min | 2 NATs, AZ-correct routing |
+
+### EKS
+
+| Test | Scenario | Time | What it validates |
+|------|----------|------|-------------------|
+| `TestEKS_BasicCluster` | Full cluster + node group | ~12-15 min | Cluster ACTIVE, OIDC provider, KMS encryption, node group, outputs |
+| `TestEKS_Disabled` | N/A | ~5 sec | `create=false` produces zero resources (plan-only) |

@@ -9,6 +9,28 @@ variable "create" {
   default     = true
 }
 
+variable "cloud_provider" {
+  description = "Cloud provider for platform-specific CNI config"
+  type        = string
+  default     = "azure"
+  validation {
+    condition     = contains(["azure", "aws", "gcp"], var.cloud_provider)
+    error_message = "cloud_provider must be 'azure', 'aws', or 'gcp'"
+  }
+}
+
+variable "k8s_service_host" {
+  description = "Kubernetes API server hostname (required for BYOCNI — in-cluster service IP unreachable before CNI exists)"
+  type        = string
+  default     = ""
+}
+
+variable "k8s_service_port" {
+  description = "Kubernetes API server port"
+  type        = string
+  default     = "443"
+}
+
 # Environment variables
 variable "environment" {
   description = "Environment name (e.g., dev, test, prod)"
@@ -28,15 +50,15 @@ variable "region_abbv" {
   default     = ""
 }
 
-# AKS Cluster details
 variable "cluster_name" {
-  description = "Name of the AKS cluster"
+  description = "Name of the Kubernetes cluster"
   type        = string
 }
 
 variable "resource_group_name" {
-  description = "Name of the resource group containing the AKS cluster"
+  description = "Name of the Azure resource group (only required for Azure)"
   type        = string
+  default     = ""
 }
 
 # Tags
@@ -250,19 +272,6 @@ variable "hubble_tls_schedule" {
   description = "Cron schedule for Hubble TLS certificate generation"
   type        = string
   default     = "0 0 1 */4 *"
-}
-
-# AKS BYOCNI configuration
-variable "aksbyocni_enabled" {
-  description = "Enable AKS BYOCNI integration"
-  type        = bool
-  default     = true
-}
-
-variable "nodeinit_enabled" {
-  description = "Enable node initialization DaemonSet"
-  type        = bool
-  default     = true
 }
 
 # Resource limits
