@@ -165,10 +165,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: terraform-docs/gh-actions@v1
-        with:
-          find-dir: infra/modules
-          fail-on-diff: true
+      - name: Check terraform-docs freshness
+        run: |
+          curl -sSLo ./terraform-docs.tar.gz https://terraform-docs.io/dl/v0.19.0/terraform-docs-v0.19.0-linux-amd64.tar.gz
+          tar -xzf terraform-docs.tar.gz terraform-docs
+          chmod +x terraform-docs
+          FAILED=0
+          for readme in $(grep -rl "BEGIN_TF_DOCS" infra/modules/); do
+            dir=$(dirname "$readme")
+            ./terraform-docs markdown table --output-file README.md --output-mode inject "$dir" > /dev/null 2>&1
+            if ! git diff --quiet "$dir/README.md"; then
+              echo "STALE: $dir/README.md (run: terraform-docs markdown table --output-file README.md --output-mode inject $dir)"
+              FAILED=1
+            fi
+          done
+          exit $FAILED
 
   tflint:
     name: TFLint
