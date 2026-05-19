@@ -5,7 +5,7 @@ locals {
 data "aws_ssm_parameter" "al2023" {
   count = local.create ? 1 : 0
 
-  name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64"
+  name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
 }
 
 # ---------------------------------------------------------------------------
@@ -101,4 +101,17 @@ resource "aws_instance" "bastion" {
   }
 
   tags = merge(var.tags, { Name = var.name })
+}
+
+resource "aws_vpc_security_group_ingress_rule" "eks_api" {
+  count = local.create && var.cluster_security_group_id != "" ? 1 : 0
+
+  security_group_id            = var.cluster_security_group_id
+  description                  = "HTTPS from SSM bastion"
+  ip_protocol                  = "tcp"
+  from_port                    = 443
+  to_port                      = 443
+  referenced_security_group_id = aws_security_group.bastion[0].id
+
+  tags = var.tags
 }

@@ -40,15 +40,20 @@ EKS_ENDPOINT=$(aws eks describe-cluster \
 
 EKS_HOST="${EKS_ENDPOINT#https://}"
 
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+CLUSTER_ARN="arn:aws:eks:${REGION}:${ACCOUNT_ID}:cluster/${CLUSTER_NAME}"
+
+aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$REGION" 2>/dev/null || true
+kubectl config set-cluster "$CLUSTER_ARN" \
+  --server="https://localhost:${LOCAL_PORT}" \
+  --tls-server-name="$EKS_HOST" 2>/dev/null
+
 echo "Cluster:  $CLUSTER_NAME"
 echo "Endpoint: $EKS_HOST"
 echo "Instance: $INSTANCE_ID"
 echo "Tunnel:   localhost:$LOCAL_PORT -> $EKS_HOST:443"
 echo ""
-echo "Configure kubectl:"
-echo "  aws eks update-kubeconfig --name $CLUSTER_NAME --region $REGION"
-echo "  kubectl config set-cluster arn:aws:eks:${REGION}:*:cluster/${CLUSTER_NAME} --server=https://localhost:${LOCAL_PORT}"
-echo ""
+echo "kubeconfig updated — kubectl is ready to use in another terminal."
 echo "Press Ctrl+C to close the tunnel."
 
 aws ssm start-session \

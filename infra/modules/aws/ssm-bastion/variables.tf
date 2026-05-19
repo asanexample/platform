@@ -25,6 +25,12 @@ variable "instance_type" {
   default     = "t3.nano"
 }
 
+variable "cluster_security_group_id" {
+  description = "EKS cluster security group ID — when set, adds an ingress rule allowing HTTPS from the bastion"
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)
