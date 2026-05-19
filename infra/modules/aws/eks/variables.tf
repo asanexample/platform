@@ -44,6 +44,12 @@ variable "public_access_cidrs" {
   default     = ["0.0.0.0/0"]
 }
 
+variable "enabled_cluster_log_types" {
+  description = "EKS control plane log types to enable"
+  type        = list(string)
+  default     = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+}
+
 variable "enable_secrets_encryption" {
   description = "Enable KMS envelope encryption for Kubernetes secrets"
   type        = bool

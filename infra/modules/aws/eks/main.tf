@@ -70,6 +70,7 @@ resource "aws_eks_cluster" "this" {
   version  = var.kubernetes_version
 
   bootstrap_self_managed_addons = false
+  enabled_cluster_log_types     = var.enabled_cluster_log_types
 
   vpc_config {
     subnet_ids              = var.subnet_ids
