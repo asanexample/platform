@@ -18,6 +18,13 @@ locals {
       ipam                       = { mode = "eni" }
       egressMasqueradeInterfaces = "eth0"
       routingMode                = "native"
+      hubble = {
+        tls = {
+          auto = {
+            method = "helm"
+          }
+        }
+      }
     })
     azure = yamlencode({
       aksbyocni = { enabled = true }

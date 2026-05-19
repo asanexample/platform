@@ -18,6 +18,7 @@ locals {
     # Compute
     eks            = "${local.source_base}/aws//eks"
     eks_node_group = "${local.source_base}/aws//eks-node-group"
+    ssm_bastion    = "${local.source_base}/aws//ssm-bastion"
 
     # IAM
     iam_roles = "${local.source_base}/aws//iam_roles"
