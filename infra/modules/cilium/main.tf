@@ -177,4 +177,4 @@ resource "helm_release" "cilium" {
       local.k8s_api_values_yaml,
     ]))
   }
-} 
+}

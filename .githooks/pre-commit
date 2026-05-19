@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+FAILED=0
+
+# Collect staged files
+STAGED_TF=$(git diff --cached --name-only --diff-filter=ACM -- '*.tf')
+STAGED_HCL=$(git diff --cached --name-only --diff-filter=ACM -- '*.hcl')
+
+# 1. tofu fmt — check staged .tf files under infra/modules/
+MODULE_TF=$(echo "$STAGED_TF" | grep '^infra/modules/' || true)
+if [ -n "$MODULE_TF" ]; then
+  DIRS=$(echo "$MODULE_TF" | xargs -n1 dirname | sort -u)
+  for dir in $DIRS; do
+    if ! tofu fmt -check -diff "$dir" > /dev/null 2>&1; then
+      echo "tofu fmt: $dir needs formatting (run: tofu fmt $dir)"
+      FAILED=1
+    fi
+  done
+fi
+
+# 2. terragrunt hcl fmt — check staged .hcl files
+if [ -n "$STAGED_HCL" ]; then
+  for file in $STAGED_HCL; do
+    if ! terragrunt hcl fmt --check --file "$file" > /dev/null 2>&1; then
+      echo "terragrunt hcl fmt: $file needs formatting (run: terragrunt hcl fmt --file $file)"
+      FAILED=1
+    fi
+  done
+fi
+
+# 3. tofu validate — check staged modules that changed
+if [ -n "$MODULE_TF" ]; then
+  DIRS=$(echo "$MODULE_TF" | xargs -n1 dirname | sort -u)
+  for dir in $DIRS; do
+    if [ -f "$dir/versions.tf" ] || [ -f "$dir/main.tf" ]; then
+      if tofu -chdir="$dir" init -backend=false -input=false > /dev/null 2>&1; then
+        if ! tofu -chdir="$dir" validate > /dev/null 2>&1; then
+          echo "tofu validate: $dir failed validation"
+          FAILED=1
+        fi
+      fi
+    fi
+  done
+fi
+
+if [ "$FAILED" -ne 0 ]; then
+  echo ""
+  echo "Pre-commit checks failed. Fix the issues above and try again."
+  exit 1
+fi
