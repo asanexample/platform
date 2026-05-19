@@ -12,34 +12,30 @@ locals {
     if length(replace(lower(k), "/[^a-z0-9_.-]/", "_")) <= 63 && length(replace(lower(v), "/[^a-z0-9_.-]/", "_")) <= 63
   }
 
-  is_aws   = var.cloud_provider == "aws"
-  is_azure = var.cloud_provider == "azure"
-  is_gcp   = var.cloud_provider == "gcp"
+  cloud_values_yaml = {
+    aws = yamlencode({
+      eni                        = { enabled = true }
+      ipam                       = { mode = "eni" }
+      egressMasqueradeInterfaces = "eth0"
+      routingMode                = "native"
+    })
+    azure = yamlencode({
+      aksbyocni = { enabled = true }
+      nodeinit  = { enabled = true }
+    })
+    gcp = yamlencode({
+      gke         = { enabled = true }
+      ipam        = { mode = "kubernetes" }
+      routingMode = "native"
+    })
+  }
 
-  eks_values = local.is_aws ? {
-    eni                        = { enabled = true }
-    ipam                       = { mode = "eni" }
-    egressMasqueradeInterfaces = "eth0"
-    routingMode                = "native"
-  } : {}
-
-  aks_values = local.is_azure ? {
-    aksbyocni = { enabled = true }
-    nodeinit  = { enabled = true }
-  } : {}
-
-  gke_values = local.is_gcp ? {
-    gke         = { enabled = true }
-    ipam        = { mode = "kubernetes" }
-    routingMode = "native"
-  } : {}
-
-  k8s_api_values = var.k8s_service_host != "" ? {
+  k8s_api_values_yaml = var.k8s_service_host != "" ? yamlencode({
     k8sServiceHost = var.k8s_service_host
     k8sServicePort = var.k8s_service_port
-  } : {}
+  }) : yamlencode({})
 
-  cilium_values = merge({
+  cilium_values = {
     # Gateway API support
     gatewayAPI = {
       enabled = var.gateway_api_enabled
@@ -149,7 +145,7 @@ locals {
 
     # Labels from tags
     podLabels = local.k8s_labels
-  }, local.eks_values, local.aks_values, local.gke_values, local.k8s_api_values)
+  }
 }
 
 # Install Cilium using Helm
@@ -168,12 +164,17 @@ resource "helm_release" "cilium" {
   replace          = true
 
   values = [
-    yamlencode(local.cilium_values)
+    yamlencode(local.cilium_values),
+    local.cloud_values_yaml[var.cloud_provider],
+    local.k8s_api_values_yaml,
   ]
 
-  # Add configHash to trigger updates when the configuration changes
   set {
     name  = "configHash"
-    value = sha256(yamlencode(local.cilium_values))
+    value = sha256(join("", [
+      yamlencode(local.cilium_values),
+      local.cloud_values_yaml[var.cloud_provider],
+      local.k8s_api_values_yaml,
+    ]))
   }
 } 
