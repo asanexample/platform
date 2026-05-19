@@ -1,0 +1,20 @@
+default: true
+
+# Allow long lines — terraform-docs tables and URLs make strict wrapping impractical
+MD013: false
+
+# Allow duplicate headings in different sections (e.g., "Usage" in multiple files)
+MD024:
+  siblings_only: true
+
+# Allow inline HTML (terraform-docs markers, badges)
+MD033: false
+
+# Allow bare URLs
+MD034: false
+
+# Disable table column style — terraform-docs generates compact tables
+MD060: false
+
+# Disable table column count — terraform-docs defaults with pipe chars trigger false positives
+MD056: false

@@ -299,11 +299,13 @@ The following IAM permissions are required for the principal running this
 module:
 
 **For `create_organization = true`:**
+
 - `organizations:CreateOrganization`
 - `organizations:EnableAWSServiceAccess`
 - `organizations:EnablePolicyType`
 
 **For all deployments:**
+
 - `organizations:DescribeOrganization`
 - `organizations:ListRoots`
 - `organizations:CreateOrganizationalUnit`

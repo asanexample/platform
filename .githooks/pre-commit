@@ -29,7 +29,34 @@ if [ -n "$STAGED_HCL" ]; then
   done
 fi
 
-# 3. tofu validate — check staged modules that changed
+# 3. markdownlint — check staged .md files
+STAGED_MD=$(git diff --cached --name-only --diff-filter=ACM -- '*.md')
+if [ -n "$STAGED_MD" ]; then
+  if command -v markdownlint-cli2 > /dev/null 2>&1; then
+    if ! echo "$STAGED_MD" | xargs markdownlint-cli2 > /dev/null 2>&1; then
+      echo "markdownlint: markdown lint errors found (run: markdownlint-cli2 <files>)"
+      FAILED=1
+    fi
+  fi
+fi
+
+# 4. terraform-docs — check staged modules have up-to-date docs
+if [ -n "$MODULE_TF" ]; then
+  if command -v terraform-docs > /dev/null 2>&1; then
+    DIRS=$(echo "$MODULE_TF" | xargs -n1 dirname | sort -u)
+    for dir in $DIRS; do
+      if [ -f "$dir/README.md" ] && grep -q "BEGIN_TF_DOCS" "$dir/README.md" 2>/dev/null; then
+        terraform-docs markdown table --output-file README.md --output-mode inject "$dir" > /dev/null 2>&1
+        if ! git diff --quiet "$dir/README.md" 2>/dev/null; then
+          echo "terraform-docs: $dir/README.md is out of date (auto-updated, re-stage it)"
+          git add "$dir/README.md"
+        fi
+      fi
+    done
+  fi
+fi
+
+# 5. tofu validate — check staged modules that changed
 if [ -n "$MODULE_TF" ]; then
   DIRS=$(echo "$MODULE_TF" | xargs -n1 dirname | sort -u)
   for dir in $DIRS; do
