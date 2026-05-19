@@ -139,6 +139,37 @@ jobs:
       - name: Check HCL formatting
         run: terragrunt hcl fmt --check
 
+  markdown-lint:
+    name: Markdown Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Lint changed markdown files
+        run: |
+          npm install -g markdownlint-cli2
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FILES=$(git diff --name-only --diff-filter=ACM origin/${{ github.base_ref }}...HEAD -- '*.md' | grep -v '.terraform/' | grep -v '.terragrunt-cache/' || true)
+          else
+            FILES=$(git diff --name-only --diff-filter=ACM HEAD~1 -- '*.md' | grep -v '.terraform/' | grep -v '.terragrunt-cache/' || true)
+          fi
+          if [ -n "$FILES" ]; then
+            echo "$FILES" | xargs markdownlint-cli2
+          else
+            echo "No changed markdown files to lint."
+          fi
+
+  terraform-docs:
+    name: Terraform Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: terraform-docs/gh-actions@v1
+        with:
+          find-dir: infra/modules
+          fail-on-diff: true
+
   tflint:
     name: TFLint
     runs-on: ubuntu-latest

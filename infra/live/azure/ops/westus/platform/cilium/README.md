@@ -1,43 +1,61 @@
-# Cilium CNI Deployment
-
-This directory contains the Terragrunt configuration for deploying Cilium CNI on the AKS cluster in the `ops/westus` environment.
+# Cilium CNI - West US (Platform)
 
 ## Overview
 
-Cilium is a CNI (Container Network Interface) that provides networking, security, and observability for Kubernetes clusters. This configuration deploys Cilium as the CNI for the AKS cluster using the "Bring Your Own CNI" (BYOCNI) approach.
+Deploys Cilium as the CNI for the AKS cluster via Helm in the platform environment, West US region.
 
-## Dependencies
+## Configuration Details
 
-This module depends on:
-- `../aks_core` - The core AKS cluster configuration 
+### Purpose
 
-## Key Features Configured
+- Installs Cilium into the BYOCNI AKS cluster with Azure-native settings
+- Configures CRD-based identity allocation for network policy enforcement
+- Enables TLS and debug mode for secure communication and diagnostics
 
-- **TLS Enabled**: TLS is enabled for secure communication
-- **Debug Mode**: Debug mode is enabled to help diagnose any issues
-- **AKS BYOCNI Mode**: Configured to work with AKS Bring Your Own CNI mode
-- **Identity Allocation**: Using CRD identity allocation mode for better reliability
-- **Resource Limits**: Configured with appropriate resource limits for both agent and operator
+### Dependencies
+
+- **aks_core**: provides cluster name, resource group, API host, and CA certificate for Helm and Kubernetes provider authentication
+
+### Key Configuration Settings
+
+- **Cilium**:
+  - cloud_provider: `azure`
+  - CNI chaining mode: `none` (exclusive)
+  - Identity allocation: CRD-based
+  - TLS: enabled
+  - Debug: enabled
+  - Chart version: pinned via shared `helm_versions.cilium`
+
+- **Networking Features**:
+  - NodePort: enabled
+  - External IPs: enabled
+  - Gateway API: disabled
+  - kube-proxy replacement: disabled
+  - Socket LB: host namespace only
+
+- **Observability**:
+  - Prometheus: disabled
+  - Hubble: disabled (relay, UI, and metrics all off)
+
+- **Resources**:
+  - Agent: 100m-1000m CPU, 128Mi-1Gi memory
+  - Operator: 50m-500m CPU, 64Mi-512Mi memory
+
+- **Provider Auth**:
+  - Helm and Kubernetes providers use exec-based auth via `kubelogin` with Azure CLI
 
 ## Usage
 
-To apply this configuration:
-
 ```bash
-cd infra/live/azure/ops/westus/cilium
+cd infra/live/azure/ops/westus/platform/cilium
 terragrunt plan
 terragrunt apply
 ```
 
-## Troubleshooting
+## Dependencies on this Configuration
 
-If you encounter networking issues after deployment, check:
-- The Cilium agent and operator pods in the kube-system namespace
-- TLS handshake errors in the logs
-- Node initialization status
+- **aks_node_pools**: nodes require the CNI to be installed before reaching a Ready state
 
-Common commands for troubleshooting:
-```bash
-kubectl get pods -n kube-system -l k8s-app=cilium
-kubectl logs -n kube-system -l k8s-app=cilium
-``` 
+## Implementation Notes
+
+The Helm and Kubernetes providers authenticate using `kubelogin` with the `azurecli` login mode. The AKS cluster must be configured with `network_plugin = "none"` (BYOCNI mode) before Cilium is deployed. This environment was renamed from "ops" to "platform"; the directory path still reflects the original name.
