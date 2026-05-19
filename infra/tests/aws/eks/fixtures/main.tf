@@ -83,6 +83,7 @@ module "eks" {
   endpoint_private_access   = true
   endpoint_public_access    = true
   enable_secrets_encryption = var.enable_secrets_encryption
+  enabled_cluster_log_types = []
 
   access_entries = var.access_entries
   tags           = var.tags
