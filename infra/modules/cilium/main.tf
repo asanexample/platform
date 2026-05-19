@@ -170,7 +170,7 @@ resource "helm_release" "cilium" {
   ]
 
   set {
-    name  = "configHash"
+    name = "configHash"
     value = sha256(join("", [
       yamlencode(local.cilium_values),
       local.cloud_values_yaml[var.cloud_provider],
