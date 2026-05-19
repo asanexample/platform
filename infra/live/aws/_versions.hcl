@@ -16,7 +16,8 @@ locals {
     naming     = "${local.source_base}/aws//naming"
 
     # Compute
-    eks = "${local.source_base}/aws//eks"
+    eks            = "${local.source_base}/aws//eks"
+    eks_node_group = "${local.source_base}/aws//eks-node-group"
 
     # IAM
     iam_roles = "${local.source_base}/aws//iam_roles"

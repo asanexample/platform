@@ -48,17 +48,6 @@ locals {
   kubernetes_subnet_ids = var.create ? [
     for name, id in module.networking.subnet_ids : id if can(regex("kubernetes$", name))
   ] : []
-
-  node_groups = var.create_node_group ? {
-    system = {
-      subnet_ids     = local.kubernetes_subnet_ids
-      instance_types = ["t3.medium"]
-      desired_size   = 1
-      max_size       = 2
-      min_size       = 1
-      labels         = { "node-role" = "system" }
-    }
-  } : {}
 }
 
 module "networking" {
@@ -95,7 +84,6 @@ module "eks" {
   endpoint_public_access    = true
   enable_secrets_encryption = var.enable_secrets_encryption
 
-  node_groups    = local.node_groups
   access_entries = var.access_entries
   tags           = var.tags
 
@@ -151,6 +139,28 @@ resource "helm_release" "cilium" {
   depends_on = [module.eks]
 }
 
+module "node_groups" {
+  source = "../../../../modules/aws/eks-node-group"
+
+  create       = var.create && var.create_node_group
+  cluster_name = var.cluster_name
+
+  node_groups = {
+    system = {
+      subnet_ids     = local.kubernetes_subnet_ids
+      instance_types = ["t3.medium"]
+      desired_size   = 1
+      max_size       = 2
+      min_size       = 1
+      labels         = { "node-role" = "system" }
+    }
+  }
+
+  tags = var.tags
+
+  depends_on = [helm_release.cilium]
+}
+
 output "cluster_id" {
   value = module.eks.cluster_id
 }
@@ -184,11 +194,11 @@ output "oidc_provider_url" {
 }
 
 output "node_role_arn" {
-  value = module.eks.node_role_arn
+  value = module.node_groups.node_role_arn
 }
 
 output "node_group_names" {
-  value = module.eks.node_group_names
+  value = module.node_groups.node_group_names
 }
 
 output "kms_key_arn" {

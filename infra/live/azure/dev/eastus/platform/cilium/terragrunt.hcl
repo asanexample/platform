@@ -103,8 +103,7 @@ inputs = {
 
   identityAllocationMode = "crd"
 
-  aksbyocni_enabled = true
-  nodeinit_enabled  = true
+  cloud_provider = "azure"
 
   gateway_api_enabled    = false
   kube_proxy_replacement = false

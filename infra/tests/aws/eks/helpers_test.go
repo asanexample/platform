@@ -55,6 +55,7 @@ func copyFixtureToTemp(t *testing.T) string {
 
 		content := string(data)
 		content = strings.ReplaceAll(content, "../../../../modules/aws/networking", filepath.Join(modulesBase, "aws", "networking"))
+		content = strings.ReplaceAll(content, "../../../../modules/aws/eks-node-group", filepath.Join(modulesBase, "aws", "eks-node-group"))
 		content = strings.ReplaceAll(content, "../../../../modules/aws/eks", filepath.Join(modulesBase, "aws", "eks"))
 
 		err = os.WriteFile(filepath.Join(tmpDir, entry.Name()), []byte(content), 0644)

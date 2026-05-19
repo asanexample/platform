@@ -1,9 +1,13 @@
+locals {
+  create = var.create && length(var.node_groups) > 0
+}
+
 # ---------------------------------------------------------------------------
 # IAM — Node Role
 # ---------------------------------------------------------------------------
 
 resource "aws_iam_role" "node" {
-  count = local.create && length(var.node_groups) > 0 ? 1 : 0
+  count = local.create ? 1 : 0
 
   name_prefix = "${var.cluster_name}-node-"
 
@@ -20,21 +24,21 @@ resource "aws_iam_role" "node" {
 }
 
 resource "aws_iam_role_policy_attachment" "node_worker" {
-  count = local.create && length(var.node_groups) > 0 ? 1 : 0
+  count = local.create ? 1 : 0
 
   role       = aws_iam_role.node[0].name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
 }
 
 resource "aws_iam_role_policy_attachment" "node_ecr" {
-  count = local.create && length(var.node_groups) > 0 ? 1 : 0
+  count = local.create ? 1 : 0
 
   role       = aws_iam_role.node[0].name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
 resource "aws_iam_role_policy_attachment" "node_ssm" {
-  count = local.create && length(var.node_groups) > 0 ? 1 : 0
+  count = local.create ? 1 : 0
 
   role       = aws_iam_role.node[0].name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
@@ -45,9 +49,9 @@ resource "aws_iam_role_policy_attachment" "node_ssm" {
 # ---------------------------------------------------------------------------
 
 resource "aws_eks_node_group" "this" {
-  for_each = local.create ? var.node_groups : {}
+  for_each = var.create ? var.node_groups : {}
 
-  cluster_name    = aws_eks_cluster.this[0].name
+  cluster_name    = var.cluster_name
   node_group_name = each.key
   node_role_arn   = aws_iam_role.node[0].arn
   subnet_ids      = each.value.subnet_ids

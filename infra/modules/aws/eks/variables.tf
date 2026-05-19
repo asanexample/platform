@@ -50,22 +50,6 @@ variable "enable_secrets_encryption" {
   default     = true
 }
 
-variable "node_groups" {
-  description = "Managed node group definitions"
-  type = map(object({
-    subnet_ids      = list(string)
-    instance_types  = list(string)
-    desired_size    = number
-    max_size        = number
-    min_size        = number
-    capacity_type   = optional(string, "ON_DEMAND")
-    ami_type        = optional(string, "AL2023_x86_64_STANDARD")
-    max_unavailable = optional(number, 1)
-    labels          = optional(map(string), {})
-  }))
-  default = {}
-}
-
 variable "access_entries" {
   description = "IAM principal to Kubernetes access policy mappings"
   type = map(object({

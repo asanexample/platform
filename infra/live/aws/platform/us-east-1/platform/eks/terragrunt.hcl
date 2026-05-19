@@ -31,25 +31,6 @@ inputs = {
   endpoint_private_access = true
   endpoint_public_access  = true
 
-  node_groups = {
-    system = {
-      subnet_ids     = [for name, id in dependency.networking.outputs.subnet_ids : id if can(regex("kubernetes$", name))]
-      instance_types = ["t3.large"]
-      desired_size   = 2
-      max_size       = 4
-      min_size       = 2
-      labels         = { "node-role" = "system" }
-    }
-    workload = {
-      subnet_ids     = [for name, id in dependency.networking.outputs.subnet_ids : id if can(regex("kubernetes$", name))]
-      instance_types = ["t3.large"]
-      desired_size   = 2
-      max_size       = 6
-      min_size       = 1
-      labels         = { "node-role" = "workload" }
-    }
-  }
-
   access_entries = {
     admin = {
       principal_arn = "arn:aws:iam::${include.base.locals.account_id}:role/OrganizationAccountAccessRole"

@@ -38,16 +38,6 @@ output "oidc_provider_url" {
   value       = local.create ? replace(aws_eks_cluster.this[0].identity[0].oidc[0].issuer, "https://", "") : null
 }
 
-output "node_role_arn" {
-  description = "The ARN of the IAM role used by node groups"
-  value       = local.create && length(var.node_groups) > 0 ? aws_iam_role.node[0].arn : null
-}
-
-output "node_group_names" {
-  description = "Map of node group names to their status"
-  value       = local.create ? { for k, v in aws_eks_node_group.this : k => v.status } : {}
-}
-
 output "kms_key_arn" {
   description = "The ARN of the KMS key used for secrets encryption"
   value       = local.create_kms ? aws_kms_key.eks[0].arn : null

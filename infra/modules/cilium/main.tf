@@ -1,7 +1,7 @@
 /**
  * # Cilium Helm Module
  *
- * This module deploys Cilium CNI on AKS using Helm.
+ * Deploys Cilium CNI via Helm. Supports Azure (AKS), AWS (EKS), and GCP (GKE).
  */
 
 locals {
@@ -12,7 +12,34 @@ locals {
     if length(replace(lower(k), "/[^a-z0-9_.-]/", "_")) <= 63 && length(replace(lower(v), "/[^a-z0-9_.-]/", "_")) <= 63
   }
 
-  cilium_values = {
+  is_aws   = var.cloud_provider == "aws"
+  is_azure = var.cloud_provider == "azure"
+  is_gcp   = var.cloud_provider == "gcp"
+
+  eks_values = local.is_aws ? {
+    eni                        = { enabled = true }
+    ipam                       = { mode = "eni" }
+    egressMasqueradeInterfaces = "eth0"
+    routingMode                = "native"
+  } : {}
+
+  aks_values = local.is_azure ? {
+    aksbyocni = { enabled = true }
+    nodeinit  = { enabled = true }
+  } : {}
+
+  gke_values = local.is_gcp ? {
+    gke         = { enabled = true }
+    ipam        = { mode = "kubernetes" }
+    routingMode = "native"
+  } : {}
+
+  k8s_api_values = var.k8s_service_host != "" ? {
+    k8sServiceHost = var.k8s_service_host
+    k8sServicePort = var.k8s_service_port
+  } : {}
+
+  cilium_values = merge({
     # Gateway API support
     gatewayAPI = {
       enabled = var.gateway_api_enabled
@@ -32,9 +59,6 @@ locals {
 
     # CNI configuration
     cni = var.cni
-
-    # Service capabilities
-    # k8sServiceHost and k8sServicePort are now provided by variables
 
     # Enable NodePort
     nodePort = {
@@ -111,16 +135,6 @@ locals {
       }
     }
 
-    # AKS BYOCNI configuration
-    aksbyocni = {
-      enabled = var.aksbyocni_enabled
-    }
-
-    # Node initialization
-    nodeinit = {
-      enabled = var.nodeinit_enabled
-    }
-
     # Resource limits
     resources = {
       limits = {
@@ -135,7 +149,7 @@ locals {
 
     # Labels from tags
     podLabels = local.k8s_labels
-  }
+  }, local.eks_values, local.aks_values, local.gke_values, local.k8s_api_values)
 }
 
 # Install Cilium using Helm
@@ -149,7 +163,7 @@ resource "helm_release" "cilium" {
   create_namespace = false
   timeout          = var.helm_timeout
   wait             = var.helm_wait
-  atomic           = true
+  atomic           = var.helm_wait
   cleanup_on_fail  = true
   replace          = true
 
