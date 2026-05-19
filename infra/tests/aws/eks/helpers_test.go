@@ -175,6 +175,14 @@ func outputOrEmpty(t *testing.T, opts *terraform.Options, name string) string {
 	return out
 }
 
+func copyVars(src map[string]interface{}) map[string]interface{} {
+	dst := make(map[string]interface{}, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
 func testVPCCIDR(index int) string {
 	return fmt.Sprintf("10.201.%d.0/24", index)
 }

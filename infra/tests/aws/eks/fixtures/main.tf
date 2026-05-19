@@ -34,11 +34,6 @@ variable "create_node_group" {
   default = false
 }
 
-variable "bootstrap_self_managed_addons" {
-  type    = bool
-  default = true
-}
-
 variable "access_entries" {
   type    = any
   default = {}
@@ -95,17 +90,65 @@ module "eks" {
 
   additional_security_group_ids = var.create ? compact([module.networking.eks_security_group_id]) : []
 
-  kubernetes_version            = var.kubernetes_version
-  endpoint_private_access       = true
-  endpoint_public_access        = true
-  enable_secrets_encryption     = var.enable_secrets_encryption
-  bootstrap_self_managed_addons = var.bootstrap_self_managed_addons
+  kubernetes_version        = var.kubernetes_version
+  endpoint_private_access   = true
+  endpoint_public_access    = true
+  enable_secrets_encryption = var.enable_secrets_encryption
 
   node_groups    = local.node_groups
   access_entries = var.access_entries
   tags           = var.tags
 
   depends_on = [module.networking]
+}
+
+locals {
+  eks_endpoint_host = var.create ? replace(module.eks.cluster_endpoint, "https://", "") : ""
+}
+
+resource "helm_release" "cilium" {
+  count = var.create ? 1 : 0
+
+  name             = "cilium"
+  repository       = "https://helm.cilium.io/"
+  chart            = "cilium"
+  version          = "1.17.2"
+  namespace        = "kube-system"
+  create_namespace = false
+  timeout          = 600
+  wait             = false
+
+  set {
+    name  = "eni.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "ipam.mode"
+    value = "eni"
+  }
+
+  set {
+    name  = "egressMasqueradeInterfaces"
+    value = "eth0"
+  }
+
+  set {
+    name  = "routingMode"
+    value = "native"
+  }
+
+  set {
+    name  = "k8sServiceHost"
+    value = local.eks_endpoint_host
+  }
+
+  set {
+    name  = "k8sServicePort"
+    value = "443"
+  }
+
+  depends_on = [module.eks]
 }
 
 output "cluster_id" {
