@@ -88,7 +88,7 @@ module "cilium" {
 ```
 
 <!-- BEGIN_TF_DOCS -->
-# Cilium Helm Module
+## Cilium Helm Module
 
 Deploys Cilium CNI via Helm. Supports Azure (AKS), AWS (EKS), and GCP (GKE).
 
