@@ -220,14 +220,12 @@ variable "hubble_metrics_enabled" {
   description = "List of Hubble metrics to enable"
   type        = list(string)
   default = [
-    "dns",
-    "drop",
+    "dns:labelsContext=source_namespace,destination_namespace",
+    "drop:labelsContext=source_namespace,destination_namespace",
     "tcp",
     "flow",
     "port-distribution",
     "icmp",
-    "dns:labelsContext=source_namespace,destination_namespace",
-    "drop:labelsContext=source_namespace,destination_namespace",
     "httpV2:sourceContext=workload-name|pod-name|reserved-identity;destinationContext=workload-name|pod-name|reserved-identity;labelsContext=source_namespace,destination_namespace,traffic_direction"
   ]
 }

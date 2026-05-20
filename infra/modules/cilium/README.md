@@ -88,7 +88,7 @@ module "cilium" {
 ```
 
 <!-- BEGIN_TF_DOCS -->
-# Cilium Helm Module
+## Cilium Helm Module
 
 Deploys Cilium CNI via Helm. Supports Azure (AKS), AWS (EKS), and GCP (GKE).
 
@@ -134,7 +134,7 @@ No modules.
 | <a name="input_hubble_enabled"></a> [hubble\_enabled](#input\_hubble\_enabled) | Enable Hubble | `bool` | `true` | no |
 | <a name="input_hubble_listen_address"></a> [hubble\_listen\_address](#input\_hubble\_listen\_address) | Hubble listen address | `string` | `":4244"` | no |
 | <a name="input_hubble_metrics_enable_open_metrics"></a> [hubble\_metrics\_enable\_open\_metrics](#input\_hubble\_metrics\_enable\_open\_metrics) | Enable OpenMetrics format for Hubble metrics | `bool` | `false` | no |
-| <a name="input_hubble_metrics_enabled"></a> [hubble\_metrics\_enabled](#input\_hubble\_metrics\_enabled) | List of Hubble metrics to enable | `list(string)` | <pre>[<br/>  "dns",<br/>  "drop",<br/>  "tcp",<br/>  "flow",<br/>  "port-distribution",<br/>  "icmp",<br/>  "dns:labelsContext=source_namespace,destination_namespace",<br/>  "drop:labelsContext=source_namespace,destination_namespace",<br/>  "httpV2:sourceContext=workload-name|pod-name|reserved-identity;destinationContext=workload-name|pod-name|reserved-identity;labelsContext=source_namespace,destination_namespace,traffic_direction"<br/>]</pre> | no |
+| <a name="input_hubble_metrics_enabled"></a> [hubble\_metrics\_enabled](#input\_hubble\_metrics\_enabled) | List of Hubble metrics to enable | `list(string)` | <pre>[<br/>  "dns:labelsContext=source_namespace,destination_namespace",<br/>  "drop:labelsContext=source_namespace,destination_namespace",<br/>  "tcp",<br/>  "flow",<br/>  "port-distribution",<br/>  "icmp",<br/>  "httpV2:sourceContext=workload-name|pod-name|reserved-identity;destinationContext=workload-name|pod-name|reserved-identity;labelsContext=source_namespace,destination_namespace,traffic_direction"<br/>]</pre> | no |
 | <a name="input_hubble_relay_enabled"></a> [hubble\_relay\_enabled](#input\_hubble\_relay\_enabled) | Enable Hubble Relay | `bool` | `true` | no |
 | <a name="input_hubble_tls_auto_enabled"></a> [hubble\_tls\_auto\_enabled](#input\_hubble\_tls\_auto\_enabled) | Enable automatic TLS certificate generation for Hubble | `bool` | `true` | no |
 | <a name="input_hubble_tls_auto_method"></a> [hubble\_tls\_auto\_method](#input\_hubble\_tls\_auto\_method) | Method to auto-generate TLS certificates (cronJob or certmanager) | `string` | `"cronJob"` | no |
