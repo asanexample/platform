@@ -44,6 +44,13 @@ resource "aws_iam_role_policy_attachment" "node_ssm" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
+resource "aws_iam_role_policy_attachment" "node_cni" {
+  count = local.create ? 1 : 0
+
+  role       = aws_iam_role.node[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+}
+
 # ---------------------------------------------------------------------------
 # Managed Node Groups
 # ---------------------------------------------------------------------------
@@ -77,5 +84,6 @@ resource "aws_eks_node_group" "this" {
     aws_iam_role_policy_attachment.node_worker,
     aws_iam_role_policy_attachment.node_ecr,
     aws_iam_role_policy_attachment.node_ssm,
+    aws_iam_role_policy_attachment.node_cni,
   ]
 }
