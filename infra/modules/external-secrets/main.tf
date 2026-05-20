@@ -122,12 +122,5 @@ resource "helm_release" "external_secrets" {
     yamlencode(local.external_secrets_values),
   ]
 
-  set = [
-    {
-      name  = "configHash"
-      value = sha256(yamlencode(local.external_secrets_values))
-    },
-  ]
-
   depends_on = [aws_iam_role.external_secrets]
 }

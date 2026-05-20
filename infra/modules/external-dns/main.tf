@@ -122,12 +122,5 @@ resource "helm_release" "external_dns" {
     yamlencode(local.external_dns_values),
   ]
 
-  set = [
-    {
-      name  = "configHash"
-      value = sha256(yamlencode(local.external_dns_values))
-    },
-  ]
-
   depends_on = [aws_iam_role.external_dns]
 }

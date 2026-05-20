@@ -126,12 +126,5 @@ resource "helm_release" "cert_manager" {
     yamlencode(local.cert_manager_values),
   ]
 
-  set = [
-    {
-      name  = "configHash"
-      value = sha256(yamlencode(local.cert_manager_values))
-    },
-  ]
-
   depends_on = [aws_iam_role.cert_manager]
 }
