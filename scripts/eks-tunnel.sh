@@ -40,10 +40,22 @@ EKS_ENDPOINT=$(aws eks describe-cluster \
 
 EKS_HOST="${EKS_ENDPOINT#https://}"
 
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-CLUSTER_ARN="arn:aws:eks:${REGION}:${ACCOUNT_ID}:cluster/${CLUSTER_NAME}"
+CALLER_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$REGION" 2>/dev/null || true
+CLUSTER_ARN=$(aws eks describe-cluster \
+  --name "$CLUSTER_NAME" \
+  --region "$REGION" \
+  --query "cluster.arn" \
+  --output text)
+
+CLUSTER_ACCOUNT_ID=$(echo "$CLUSTER_ARN" | cut -d: -f5)
+
+UPDATE_ARGS="--name $CLUSTER_NAME --region $REGION"
+if [ "$CALLER_ACCOUNT_ID" != "$CLUSTER_ACCOUNT_ID" ]; then
+  UPDATE_ARGS="$UPDATE_ARGS --role-arn arn:aws:iam::${CLUSTER_ACCOUNT_ID}:role/OrganizationAccountAccessRole"
+fi
+
+aws eks update-kubeconfig $UPDATE_ARGS
 kubectl config set-cluster "$CLUSTER_ARN" \
   --server="https://localhost:${LOCAL_PORT}" \
   --tls-server-name="$EKS_HOST" 2>/dev/null

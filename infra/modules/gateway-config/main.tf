@@ -3,6 +3,25 @@ locals {
 }
 
 # ---------------------------------------------------------------------------
+# GatewayClass — Cilium
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_manifest" "gateway_class" {
+  count = local.create ? 1 : 0
+
+  manifest = {
+    apiVersion = "gateway.networking.k8s.io/v1"
+    kind       = "GatewayClass"
+    metadata = {
+      name = "cilium"
+    }
+    spec = {
+      controllerName = "io.cilium/gateway-controller"
+    }
+  }
+}
+
+# ---------------------------------------------------------------------------
 # ClusterIssuer — Let's Encrypt production via Route53 DNS01
 # ---------------------------------------------------------------------------
 
@@ -93,7 +112,7 @@ resource "kubernetes_manifest" "gateway" {
     }
   }
 
-  depends_on = [kubernetes_manifest.cluster_issuer]
+  depends_on = [kubernetes_manifest.gateway_class, kubernetes_manifest.cluster_issuer]
 }
 
 # ---------------------------------------------------------------------------

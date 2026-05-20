@@ -32,6 +32,10 @@ inputs = {
   endpoint_public_access  = true
   public_access_cidrs     = ["0.0.0.0/0"] # TODO: restrict to VPN/office/CI IPs before production workloads
 
+  eks_addons = {
+    coredns = {}
+  }
+
   access_entries = {
     admin = {
       principal_arn = "arn:aws:iam::${include.base.locals.account_id}:role/OrganizationAccountAccessRole"
