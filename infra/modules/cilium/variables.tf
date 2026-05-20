@@ -119,6 +119,12 @@ variable "gateway_api_enabled" {
   default     = true
 }
 
+variable "gateway_api_crd_version" {
+  description = "Gateway API CRD version to install (experimental channel). Set to empty string to skip CRD installation."
+  type        = string
+  default     = "v1.2.1"
+}
+
 variable "kube_proxy_replacement" {
   description = "KubeProxy replacement mode (false, 'strict', 'partial', 'probe')"
   type        = string
