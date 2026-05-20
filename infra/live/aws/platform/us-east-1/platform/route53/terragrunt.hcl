@@ -14,5 +14,12 @@ terraform {
 inputs = {
   create      = true
   domain_name = "aws.refplat.org"
-  tags        = include.base.locals.tags
+
+  caa_records = [
+    "0 issue \"letsencrypt.org\"",
+    "0 issuewild \"letsencrypt.org\"",
+    "0 iodef \"mailto:josh@deeden.org\"",
+  ]
+
+  tags = include.base.locals.tags
 }

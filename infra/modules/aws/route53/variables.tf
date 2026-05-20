@@ -21,6 +21,12 @@ variable "force_destroy" {
   default     = false
 }
 
+variable "caa_records" {
+  description = "CAA records restricting which CAs can issue certificates (e.g. '0 issue \"letsencrypt.org\"')"
+  type        = list(string)
+  default     = []
+}
+
 variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)
