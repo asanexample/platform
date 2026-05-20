@@ -53,6 +53,7 @@ locals {
     cert_manager     = "${local.source_base}/cert-manager"
     external_dns     = "${local.source_base}/external-dns"
     external_secrets = "${local.source_base}/external-secrets"
+    gateway_config   = "${local.source_base}/gateway-config"
     policy           = "${local.source_base}/policy"
   }
 
