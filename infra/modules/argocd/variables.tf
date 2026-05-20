@@ -1,92 +1,197 @@
-/**
- * # ArgoCD Module Variables
- */
-
-variable "create_namespace" {
-  description = "Whether to create the ArgoCD namespace"
+variable "create" {
+  description = "Controls whether ArgoCD resources should be created"
   type        = bool
   default     = true
 }
 
-variable "namespace" {
-  description = "The namespace to deploy ArgoCD into"
+variable "cluster_name" {
+  description = "Name of the EKS cluster (used for IAM role naming)"
   type        = string
-  default     = "argocd"
 }
 
-variable "namespace_labels" {
-  description = "Labels to apply to the ArgoCD namespace"
+variable "tags" {
+  description = "Tags to apply to all resources"
   type        = map(string)
   default     = {}
 }
 
-variable "release_name" {
-  description = "The name of the Helm release"
+# ---------------------------------------------------------------------------
+# IRSA
+# ---------------------------------------------------------------------------
+
+variable "oidc_provider_arn" {
+  description = "ARN of the EKS OIDC provider for IRSA. Empty string disables IRSA."
+  type        = string
+  default     = ""
+}
+
+variable "oidc_provider_url" {
+  description = "OIDC provider URL (without https:// prefix) for IRSA trust policy"
+  type        = string
+  default     = ""
+}
+
+variable "extra_iam_policy_arns" {
+  description = "Additional IAM policy ARNs to attach to the ArgoCD IRSA role"
+  type        = list(string)
+  default     = []
+}
+
+# ---------------------------------------------------------------------------
+# Helm
+# ---------------------------------------------------------------------------
+
+variable "helm_release_name" {
+  description = "Name of the Helm release"
   type        = string
   default     = "argocd"
 }
 
-variable "chart_version" {
-  description = "The version of the ArgoCD Helm chart to deploy"
+variable "helm_repository" {
+  description = "Repository URL for the ArgoCD Helm chart"
   type        = string
-  default     = "5.51.4" # Update this to the latest stable version as needed
+  default     = "https://argoproj.github.io/argo-helm"
+}
+
+variable "helm_chart" {
+  description = "Name of the Helm chart"
+  type        = string
+  default     = "argo-cd"
+}
+
+variable "helm_chart_version" {
+  description = "Version of the ArgoCD Helm chart"
+  type        = string
+  default     = "9.5.14"
+}
+
+variable "namespace" {
+  description = "Kubernetes namespace to install ArgoCD into"
+  type        = string
+  default     = "argocd"
 }
 
 variable "helm_timeout" {
   description = "Timeout for Helm operations in seconds"
   type        = number
-  default     = 1200
+  default     = 900
 }
 
-variable "domain" {
-  description = "The domain to use for ArgoCD"
-  type        = string
-  default     = ""
+variable "helm_wait" {
+  description = "Whether to wait for Helm release to complete"
+  type        = bool
+  default     = true
 }
+
+# ---------------------------------------------------------------------------
+# ArgoCD configuration
+# ---------------------------------------------------------------------------
 
 variable "high_availability" {
-  description = "Whether to deploy ArgoCD in high availability mode"
+  description = "Deploy ArgoCD in HA mode (2 replicas per component)"
   type        = bool
   default     = false
 }
 
-variable "insecure" {
-  description = "Whether to run the ArgoCD server in insecure mode"
+variable "server_insecure" {
+  description = "Run ArgoCD server without TLS (for use behind a TLS-terminating proxy or port-forward)"
   type        = bool
-  default     = false
+  default     = true
 }
 
-variable "service_type" {
-  description = "The Kubernetes service type to use for the ArgoCD server"
+variable "server_service_type" {
+  description = "Kubernetes service type for the ArgoCD server"
   type        = string
   default     = "ClusterIP"
 }
 
-variable "enable_dex" {
-  description = "Whether to enable the Dex server for SSO"
-  type        = bool
-  default     = true
-}
-
-variable "enable_notifications" {
-  description = "Whether to enable the ArgoCD notifications controller"
-  type        = bool
-  default     = true
-}
-
-variable "admin_password" {
-  description = "The password to use for the admin user. If not set, a random password will be generated."
+variable "reconciliation_timeout" {
+  description = "How often ArgoCD re-syncs applications"
   type        = string
-  default     = ""
-  sensitive   = true
+  default     = "180s"
 }
 
-variable "additional_set_values" {
-  description = "Additional values to set on the Helm release"
-  type = list(object({
-    name  = string
-    value = string
-    type  = optional(string)
-  }))
-  default = []
-} 
+variable "dex_enabled" {
+  description = "Enable Dex SSO server"
+  type        = bool
+  default     = false
+}
+
+variable "notifications_enabled" {
+  description = "Enable ArgoCD notifications controller"
+  type        = bool
+  default     = false
+}
+
+variable "applicationset_enabled" {
+  description = "Enable ApplicationSet controller"
+  type        = bool
+  default     = true
+}
+
+# ---------------------------------------------------------------------------
+# RBAC
+# ---------------------------------------------------------------------------
+
+variable "rbac_default_policy" {
+  description = "Default RBAC policy (role:readonly, role:admin, or empty)"
+  type        = string
+  default     = "role:readonly"
+}
+
+variable "rbac_policy_csv" {
+  description = "RBAC policy rules in ArgoCD CSV format"
+  type        = string
+  default     = <<-CSV
+    p, role:org-admin, applications, *, */*, allow
+    p, role:org-admin, clusters, get, *, allow
+    p, role:org-admin, repositories, *, *, allow
+    p, role:org-admin, logs, get, *, allow
+    p, role:org-admin, exec, create, */*, allow
+    g, org-admin, role:org-admin
+  CSV
+}
+
+# ---------------------------------------------------------------------------
+# Repositories and credentials
+# ---------------------------------------------------------------------------
+
+variable "repositories" {
+  description = "Repository credentials for ArgoCD (map of repo objects)"
+  type        = any
+  default     = {}
+}
+
+variable "credential_templates" {
+  description = "Credential templates for repo pattern matching"
+  type        = any
+  default     = {}
+}
+
+# ---------------------------------------------------------------------------
+# Projects and resource exclusions
+# ---------------------------------------------------------------------------
+
+variable "projects" {
+  description = "ArgoCD project definitions"
+  type        = any
+  default     = {}
+}
+
+variable "resource_exclusions" {
+  description = "Resources ArgoCD should ignore (list of {apiGroups, kinds, clusters})"
+  type        = any
+  default = [
+    {
+      apiGroups = ["cilium.io"]
+      kinds     = ["CiliumIdentity"]
+      clusters  = ["*"]
+    }
+  ]
+}
+
+variable "argocd_cm_extra" {
+  description = "Additional key-value pairs to merge into argocd-cm ConfigMap"
+  type        = map(string)
+  default     = {}
+}
