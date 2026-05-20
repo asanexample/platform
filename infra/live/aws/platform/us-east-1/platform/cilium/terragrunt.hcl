@@ -20,11 +20,11 @@ generate "helm_provider" {
   if_exists = "overwrite_terragrunt"
   contents  = <<-EOF
     provider "helm" {
-      kubernetes {
+      kubernetes = {
         host                   = "${dependency.eks.outputs.cluster_endpoint}"
         cluster_ca_certificate = base64decode("${dependency.eks.outputs.cluster_certificate_authority}")
 
-        exec {
+        exec = {
           api_version = "client.authentication.k8s.io/v1beta1"
           command     = "aws"
           args        = ["eks", "get-token", "--cluster-name", "${dependency.eks.outputs.cluster_id}", "--region", "${include.base.locals.region}", "--role-arn", "arn:aws:iam::${include.base.locals.account_id}:role/OrganizationAccountAccessRole"]

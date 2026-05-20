@@ -37,7 +37,7 @@ remote_state {
 // Each cloud gets only its own provider — avoids cross-cloud auth failures.
 generate "versions" {
   path      = "versions.tf"
-  if_exists = "overwrite_terragrunt"
+  if_exists = "skip"
   contents = (
     local._cloud == "aws" ? <<EOF
 terraform {
@@ -46,6 +46,14 @@ terraform {
     aws = {
       source  = "hashicorp/aws"
       version = "6.45.0"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = ">= 3.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = ">= 2.35.0"
     }
   }
 }

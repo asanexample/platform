@@ -176,12 +176,14 @@ resource "helm_release" "cilium" {
     local.k8s_api_values_yaml,
   ]
 
-  set {
-    name = "configHash"
-    value = sha256(join("", [
-      yamlencode(local.cilium_values),
-      local.cloud_values_yaml[var.cloud_provider],
-      local.k8s_api_values_yaml,
-    ]))
-  }
+  set = [
+    {
+      name = "configHash"
+      value = sha256(join("", [
+        yamlencode(local.cilium_values),
+        local.cloud_values_yaml[var.cloud_provider],
+        local.k8s_api_values_yaml,
+      ]))
+    },
+  ]
 }
