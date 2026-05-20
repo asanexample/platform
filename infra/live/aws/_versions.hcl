@@ -56,7 +56,7 @@ locals {
   # Helm chart version pins — single source of truth across environments
   helm_versions = {
     cilium           = "1.17.2"
-    argocd           = "7.8.13"
+    argocd           = "9.5.14"
     cert_manager     = "1.17.1"
     external_dns     = "1.16.1"
     external_secrets = "0.14.3"
