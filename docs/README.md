@@ -25,6 +25,7 @@ hierarchy that promotes consistency across environments.
 | Document | Description |
 |----------|-------------|
 | [Runbooks](runbooks/) | Step-by-step operational procedures for common tasks |
+| [EKS Cluster Access](runbooks/eks-cluster-access.md) | kubectl setup for platform engineers and developers |
 | [User Guide](user-guide.md) | Greenfield and brownfield deployments, day-2 operations |
 | [Troubleshooting](troubleshooting/) | Solutions to known issues and error patterns |
 
@@ -33,6 +34,7 @@ hierarchy that promotes consistency across environments.
 | Document | Description |
 |----------|-------------|
 | [ADRs](adrs/) | Architecture Decision Records explaining key design choices |
+| [ADR-007: IAM Role Model](adrs/007-iam-role-model.md) | Purpose-built IAM roles replacing OrganizationAccountAccessRole |
 | [Compliance Framework](compliance/) | Regulatory mappings, SCP rationale, and audit evidence |
 
 ## Reference
@@ -48,7 +50,7 @@ hierarchy that promotes consistency across environments.
 
 ## Repository Layout (Quick Reference)
 
-```
+```text
 docs/               You are here -- user-facing documentation
 infra/modules/      Reusable OpenTofu modules (aws/, azure/, gcp/, shared)
 infra/live/         Terragrunt live configurations per cloud/env/region/workload

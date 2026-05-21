@@ -13,16 +13,17 @@ Multi-cloud IaC platform using OpenTofu + Terragrunt. Targets AWS and Azure (GCP
 Full dependency graph:
 
 ```text
-networking -> eks -> cilium -> node-groups -> ssm-bastion
-                                  |
-              route53 ────────────┤
-              eks-addons ─────────┤ (eks, cilium, nodes)
-              cert-manager ───────┤ (eks, nodes, r53)
-              external-dns ───────┤ (eks, nodes, r53)
-              external-secrets ───┤ (eks, nodes)
-                                  |
-              argocd ─────────────┤ (eks, nodes)
-              gateway-config ─────┘ (eks, cilium, cert-manager, ext-dns, argocd, r53)
+iam-roles ──┐
+             ├─> eks -> cilium -> node-groups -> ssm-bastion
+networking ─┘                        |
+              route53 ───────────────┤
+              eks-addons ────────────┤ (eks, cilium, nodes)
+              cert-manager ──────────┤ (eks, nodes, r53)
+              external-dns ──────────┤ (eks, nodes, r53)
+              external-secrets ──────┤ (eks, nodes)
+                                     |
+              argocd ────────────────┤ (eks, nodes)
+              gateway-config ────────┘ (eks, cilium, cert-manager, ext-dns, argocd, r53)
 ```
 
 EKS uses BYOCNI (`bootstrap_self_managed_addons = false`), so Cilium must be deployed before node groups can join the cluster. EKS managed add-ons (coredns) are in a separate `eks-addons` unit that depends on cilium + node-groups, since addon pods need the CNI to schedule.
@@ -101,7 +102,22 @@ git config core.hooksPath .githooks
 | PreProd    | 620830101009 |
 | Prod       | 554518885123 |
 
-Cross-account access via `OrganizationAccountAccessRole`.
+Cross-account access uses purpose-built IAM roles (see IAM Roles below). `OrganizationAccountAccessRole` retained as break-glass only.
+
+## IAM Roles
+
+| Role | Account | Purpose |
+|------|---------|---------|
+| **PlatformAdmin** | Platform (829808296602) | kubectl, SSM tunnel, cluster debugging |
+| **PlatformDeployer** | Platform (829808296602) | Terragrunt apply, Helm/K8s providers |
+| **DeveloperAccess** | Platform (829808296602) | Namespace-scoped kubectl for developers |
+| **TerraformStateAccess** | Management (851725353202) | S3 state bucket + DynamoDB lock table |
+| **OrganizationAccountAccessRole** | All accounts | Break-glass only |
+
+- Terragrunt providers assume **PlatformDeployer** (via root.hcl)
+- Helm/K8s exec auth uses **PlatformDeployer** (via `include.base.locals.deployer_role_arn`)
+- kubectl uses **PlatformAdmin** (`aws eks update-kubeconfig --role-arn ...PlatformAdmin`)
+- State backend uses **TerraformStateAccess** (via root.hcl remote_state `role_arn`)
 
 ## Architecture Decisions
 

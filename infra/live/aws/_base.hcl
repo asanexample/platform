@@ -59,6 +59,11 @@ locals {
   helm_versions = local.version_vars.locals.helm_versions
 
   # ---------------------------------------------------------------------------
+  # IAM role ARNs
+  # ---------------------------------------------------------------------------
+  deployer_role_arn = "arn:aws:iam::${local.account_id}:role/PlatformDeployer"
+
+  # ---------------------------------------------------------------------------
   # Composed tags: common -> environment -> region -> workload (later layers win)
   # ---------------------------------------------------------------------------
   tags = merge(
