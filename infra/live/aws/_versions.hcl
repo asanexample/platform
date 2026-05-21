@@ -35,7 +35,8 @@ locals {
     cloudwatch_alarms = "${local.source_base}/aws//cloudwatch_alarms"
 
     # DNS
-    route53 = "${local.source_base}/aws//route53"
+    route53        = "${local.source_base}/aws//route53"
+    dns_delegation = "${local.source_base}/cloudflare//dns_delegation"
 
     # CI/CD
     github_oidc = "${local.source_base}/aws//github_oidc"
