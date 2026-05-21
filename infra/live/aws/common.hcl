@@ -14,6 +14,9 @@ locals {
     Owner              = "Platform Team"
   }
 
+  # External DNS delegation
+  cloudflare_zone_id = "373f3d8528f115c9583798ec11b6ed1e"
+
   # Azure global configuration (not applicable for AWS)
   azure_config = {}
 
