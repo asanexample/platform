@@ -50,10 +50,7 @@ CLUSTER_ARN=$(aws eks describe-cluster \
 
 CLUSTER_ACCOUNT_ID=$(echo "$CLUSTER_ARN" | cut -d: -f5)
 
-UPDATE_ARGS="--name $CLUSTER_NAME --region $REGION"
-if [ "$CALLER_ACCOUNT_ID" != "$CLUSTER_ACCOUNT_ID" ]; then
-  UPDATE_ARGS="$UPDATE_ARGS --role-arn arn:aws:iam::${CLUSTER_ACCOUNT_ID}:role/OrganizationAccountAccessRole"
-fi
+UPDATE_ARGS="--name $CLUSTER_NAME --region $REGION --role-arn arn:aws:iam::${CLUSTER_ACCOUNT_ID}:role/PlatformAdmin"
 
 aws eks update-kubeconfig $UPDATE_ARGS
 kubectl config set-cluster "$CLUSTER_ARN" \

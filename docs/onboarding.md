@@ -23,32 +23,51 @@ patch releases are fine.
 
 ### AWS Credentials
 
-You need credentials that can assume the `OrganizationAccountAccessRole` in
-the management account (`851725353202`). This role is provisioned by AWS
-Organizations and has administrative access to the organization.
+Access is managed through AWS IAM Identity Center (SSO). You need two profiles
+configured -- one for infrastructure provisioning (management account) and one
+for cluster access (platform account).
 
-Configure your credentials using one of these methods:
+Add the following to `~/.aws/config`:
 
-```bash
-# Option A: Named profile (recommended)
-aws configure --profile mgmt
-export AWS_PROFILE=mgmt
+```ini
+[sso-session centric]
+sso_start_url = https://d-9067aa6520.awsapps.com/start
+sso_region = us-east-1
+sso_registration_scopes = sso:account:access
 
-# Option B: Environment variables
-export AWS_ACCESS_KEY_ID="AKIA..."
-export AWS_SECRET_ACCESS_KEY="..."
-export AWS_DEFAULT_REGION="us-east-1"
+[profile management]
+sso_session = centric
+sso_account_id = 851725353202
+sso_role_name = AdministratorAccess
 
-# Option C: SSO (if configured)
-aws sso login --profile mgmt
+[profile platform]
+sso_session = centric
+sso_account_id = 829808296602
+sso_role_name = AdministratorAccess
 ```
 
-Verify your access:
+Developers should also add:
+
+```ini
+[profile platform-dev]
+sso_session = centric
+sso_account_id = 829808296602
+sso_role_name = PowerUserAccess
+```
+
+Log in and verify:
 
 ```bash
-aws sts get-caller-identity
-# Expected: Account 851725353202, Role OrganizationAccountAccessRole (or similar)
+# For Terragrunt operations
+aws sso login --profile management
+AWS_PROFILE=management aws sts get-caller-identity
+
+# For cluster access
+aws sso login --profile platform
+AWS_PROFILE=platform aws sts get-caller-identity
 ```
+
+See [EKS Cluster Access](runbooks/eks-cluster-access.md) for kubectl setup.
 
 ### Verify Tool Versions
 
@@ -62,7 +81,7 @@ aws --version     # Should print aws-cli/2.x
 
 ## Repository Structure
 
-```
+```text
 .
 ├── docs/                              # User-facing documentation (you are here)
 │   ├── README.md                      # Documentation index
@@ -100,7 +119,7 @@ aws --version     # Should print aws-cli/2.x
 │   │   │   │   └── global/
 │   │   │   │       ├── state-bootstrap/   # Remote state backend (deploy first)
 │   │   │   │       └── organizations/     # AWS Org, OUs, accounts, SCPs
-│   │   │   └── ops/                   # Operations account (829808296602)
+│   │   │   └── platform/              # Platform account (829808296602)
 │   │   ├── azure/                     # Azure environments (dev, ops)
 │   │   └── gcp/                       # GCP environments (ops)
 │   │
@@ -234,6 +253,7 @@ terragrunt plan
 ```
 
 Review the plan output carefully. Look for:
+
 - Resources being **destroyed** (marked with `-`)
 - Resources being **replaced** (marked with `-/+`)
 - Any changes to SCPs or OU structure
@@ -241,6 +261,7 @@ Review the plan output carefully. Look for:
 ### 3. Review
 
 Open a pull request with your changes. The PR should include:
+
 - The Terragrunt/OpenTofu files you changed
 - A copy of the plan output in the PR description
 - Justification for the change

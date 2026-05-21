@@ -266,6 +266,7 @@ terragrunt apply
 ```
 
 Expected resources created:
+
 - S3 bucket `tfstate-mgmt-851725353202` with versioning, KMS encryption, and public access block
 - DynamoDB table `terraform-locks` with PAY_PER_REQUEST billing and `LockID` hash key
 
@@ -285,6 +286,7 @@ terragrunt apply
 ```
 
 Expected resources created:
+
 - AWS Organization with `ALL` features
 - 5 organizational units (Platform, Workloads, Workloads/Preprod, Workloads/Prod, Workloads/Regulated)
 - 2 member accounts (platform, preprod)
@@ -434,7 +436,7 @@ accounts = {
 }
 ```
 
-2. Plan and review:
+1. Plan and review:
 
 ```bash
 cd infra/live/aws/mgmt/global/organizations
@@ -442,7 +444,7 @@ terragrunt plan
 # Expected: + aws_organizations_account.this["prod"]
 ```
 
-3. Apply:
+1. Apply:
 
 ```bash
 terragrunt apply
@@ -581,17 +583,36 @@ inputs = {
 
 ### Account-Level Provider Configuration
 
-To deploy resources into a member account, configure the AWS provider to
-assume the `OrganizationAccountAccessRole`:
+To deploy resources into a member account, the AWS provider assumes the
+`PlatformDeployer` role. This is configured globally in `root.hcl` and
+referenced via `include.base.locals.deployer_role_arn` in Helm/K8s providers:
 
 ```hcl
+# root.hcl — provider automatically assumes PlatformDeployer
 provider "aws" {
   region = "us-east-1"
   assume_role {
-    role_arn = "arn:aws:iam::${dependency.org.outputs.account_ids["platform"]}:role/OrganizationAccountAccessRole"
+    role_arn = "arn:aws:iam::${local.aws_account_id}:role/PlatformDeployer"
   }
 }
 ```
+
+### IAM Roles
+
+The platform uses purpose-built IAM roles instead of the default
+`OrganizationAccountAccessRole`. See [ADR-007](adrs/007-iam-role-model.md)
+for the design rationale.
+
+| Role | Account | Purpose |
+|------|---------|---------|
+| **PlatformAdmin** | Platform | kubectl, SSM tunnel, cluster debugging |
+| **PlatformDeployer** | Platform | Terragrunt apply, Helm/K8s providers |
+| **DeveloperAccess** | Platform | Namespace-scoped kubectl for developers |
+| **TerraformStateAccess** | Management | S3 state + DynamoDB lock table |
+| **OrganizationAccountAccessRole** | All accounts | Break-glass only |
+
+For cluster access procedures, see the
+[EKS Cluster Access runbook](runbooks/eks-cluster-access.md).
 
 ### State Bootstrap Integration
 
@@ -657,7 +678,7 @@ remote_state {
 
 **Default `organization_aws_service_access_principals`:**
 
-```
+```text
 cloudtrail.amazonaws.com, config.amazonaws.com, guardduty.amazonaws.com,
 securityhub.amazonaws.com, access-analyzer.amazonaws.com, sso.amazonaws.com,
 tagpolicies.tag.amazonaws.com

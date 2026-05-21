@@ -17,7 +17,7 @@ inputs = {
   tags                = include.base.locals.tags
   allowed_regions     = ["us-east-1", "us-west-2"]
   required_tags       = ["Environment", "ManagedBy", "Owner"]
-  exempt_roles        = ["OrganizationAccountAccessRole", "github-actions-terratest"]
+  exempt_roles        = ["OrganizationAccountAccessRole", "github-actions-terratest", "PlatformDeployer"]
 
   organizational_units = {
     "Platform"            = { parent = null }
