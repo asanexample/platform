@@ -12,8 +12,9 @@ terraform {
 }
 
 inputs = {
-  create      = true
-  domain_name = "aws.refplat.org"
+  create        = true
+  domain_name   = "aws.refplat.org"
+  force_destroy = true
 
   caa_records = [
     "0 issue \"letsencrypt.org\"",
