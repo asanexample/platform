@@ -10,13 +10,54 @@ Multi-cloud IaC platform using OpenTofu + Terragrunt. Targets AWS and Azure (GCP
 
 ## Deployment Ordering (AWS)
 
-Each step depends on the previous:
+Full dependency graph:
 
 ```text
-networking -> eks -> cilium -> node-groups -> ssm-bastion -> argocd
+networking -> eks -> cilium -> node-groups -> ssm-bastion
+                                  |
+              route53 ────────────┤
+              eks-addons ─────────┤ (eks, cilium, nodes)
+              cert-manager ───────┤ (eks, nodes, r53)
+              external-dns ───────┤ (eks, nodes, r53)
+              external-secrets ───┤ (eks, nodes)
+                                  |
+              argocd ─────────────┤ (eks, nodes)
+              gateway-config ─────┘ (eks, cilium, cert-manager, ext-dns, argocd, r53)
 ```
 
-EKS uses BYOCNI (`bootstrap_self_managed_addons = false`), so Cilium must be deployed before node groups can join the cluster.
+EKS uses BYOCNI (`bootstrap_self_managed_addons = false`), so Cilium must be deployed before node groups can join the cluster. EKS managed add-ons (coredns) are in a separate `eks-addons` unit that depends on cilium + node-groups, since addon pods need the CNI to schedule.
+
+### Apply order
+
+```bash
+# From infra/live/aws/platform/us-east-1/platform/
+terragrunt run --all apply    # handles DAG automatically
+```
+
+### Destroy order
+
+```bash
+# Option 1: automatic (handles DAG in reverse)
+# To skip route53: add --filter '!./route53'
+terragrunt run --all destroy --filter-allow-destroy -- -auto-approve
+
+# Option 2: manual (if run-all fails or you need to skip units)
+# Destroy leaf nodes first, work backwards:
+cd gateway-config && terragrunt destroy -auto-approve && cd ..
+cd argocd && terragrunt destroy -auto-approve && cd ..
+cd ssm-bastion && terragrunt destroy -auto-approve && cd ..
+cd cert-manager && terragrunt destroy -auto-approve && cd ..
+cd external-dns && terragrunt destroy -auto-approve && cd ..
+cd external-secrets && terragrunt destroy -auto-approve && cd ..
+cd eks-addons && terragrunt destroy -auto-approve && cd ..
+cd node-groups && terragrunt destroy -auto-approve && cd ..
+cd cilium && terragrunt destroy -auto-approve && cd ..
+cd eks && terragrunt destroy -auto-approve && cd ..
+cd networking && terragrunt destroy -auto-approve && cd ..
+# route53 — destroy separately if needed
+```
+
+All dependency blocks have `mock_outputs` so destroy works even if upstream dependencies are already gone.
 
 ## Key Commands
 
@@ -68,3 +109,4 @@ Cross-account access via `OrganizationAccountAccessRole`.
 - **SSM Session Manager** for private cluster access (no VPN needed).
 - **Hubble TLS** uses `helm` method on AWS to avoid post-install hook chicken-and-egg issues with BYOCNI.
 - **Node groups separated** from the EKS module to enforce deployment ordering (Cilium must be ready first).
+- **EKS add-ons separated** into `eks-addons` unit — with BYOCNI, addon pods (coredns) can't schedule until CNI + nodes are ready, so they must be deployed after cilium and node-groups.

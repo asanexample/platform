@@ -13,14 +13,27 @@ terraform {
 
 dependency "networking" {
   config_path = "../networking"
+
+  mock_outputs = {
+    subnet_ids = {}
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
 dependency "eks" {
   config_path = "../eks"
+
+  mock_outputs = {
+    cluster_id = "mock-cluster"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
 dependency "cilium" {
   config_path = "../cilium"
+
+  mock_outputs                            = {}
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
 inputs = {

@@ -167,7 +167,7 @@ resource "null_resource" "gateway_api_crds" {
   }
 
   provisioner "local-exec" {
-    command = "kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/${var.gateway_api_crd_version}/experimental-install.yaml"
+    command = "${var.kubeconfig_path != "" ? "kubectl --kubeconfig=${var.kubeconfig_path}" : "kubectl"} apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/${var.gateway_api_crd_version}/experimental-install.yaml"
   }
 }
 
