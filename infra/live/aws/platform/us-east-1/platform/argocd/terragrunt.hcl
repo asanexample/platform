@@ -62,5 +62,44 @@ inputs = {
 
   high_availability = false
 
+  dex_enabled = true
+  rbac_scopes = "[groups]"
+
+  rbac_policy_csv = <<-CSV
+    p, role:org-admin, applications, *, */*, allow
+    p, role:org-admin, clusters, get, *, allow
+    p, role:org-admin, repositories, *, *, allow
+    p, role:org-admin, logs, get, *, allow
+    p, role:org-admin, exec, create, */*, allow
+    g, org-admin, role:org-admin
+    p, role:developer, applications, get, */*, allow
+    p, role:developer, applications, sync, */*, allow
+    p, role:developer, logs, get, *, allow
+    g, a4b884e8-f021-7042-5f38-65d571afff7c, role:admin
+    g, a4c85418-d071-7051-9bee-c5a90ee7963e, role:developer
+    g, c4b87428-8051-7073-9af0-a31f4b94daac, role:readonly
+  CSV
+
+  argocd_cm_extra = {
+    "url" = "https://argocd.aws.refplat.org"
+    "dex.config" = yamlencode({
+      connectors = [{
+        type = "saml"
+        id   = "aws-sso"
+        name = "AWS SSO"
+        config = {
+          ssoURL             = include.base.locals.all_vars.argocd_sso_url
+          caData             = include.base.locals.all_vars.argocd_sso_ca_data
+          redirectURI        = "https://argocd.aws.refplat.org/api/dex/callback"
+          entityIssuer       = "https://argocd.aws.refplat.org/api/dex/callback"
+          nameIDPolicyFormat = "emailAddress"
+          usernameAttr       = "email"
+          emailAttr          = "email"
+          groupsAttr         = "groups"
+        }
+      }]
+    })
+  }
+
   tags = include.base.locals.tags
 }

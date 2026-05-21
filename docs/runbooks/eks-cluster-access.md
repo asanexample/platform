@@ -2,8 +2,9 @@
 
 > **Roles:** PlatformAdmin, PlatformDeployer, DeveloperAccess
 > **Related ADR:** [007-iam-role-model](../adrs/007-iam-role-model.md)
+> **See also:** [ArgoCD SSO](argocd-sso.md) for web UI access
 >
-> **Last reviewed:** 2026-05-20
+> **Last reviewed:** 2026-05-21
 
 ---
 

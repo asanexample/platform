@@ -26,6 +26,7 @@ hierarchy that promotes consistency across environments.
 |----------|-------------|
 | [Runbooks](runbooks/) | Step-by-step operational procedures for common tasks |
 | [EKS Cluster Access](runbooks/eks-cluster-access.md) | kubectl setup for platform engineers and developers |
+| [ArgoCD SSO](runbooks/argocd-sso.md) | SSO setup, troubleshooting, and group-based RBAC |
 | [User Guide](user-guide.md) | Greenfield and brownfield deployments, day-2 operations |
 | [Troubleshooting](troubleshooting/) | Solutions to known issues and error patterns |
 

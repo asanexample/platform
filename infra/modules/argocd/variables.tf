@@ -152,6 +152,12 @@ variable "rbac_policy_csv" {
   CSV
 }
 
+variable "rbac_scopes" {
+  description = "OIDC scopes to inspect for RBAC (e.g., '[groups]' for Dex group claims)"
+  type        = string
+  default     = ""
+}
+
 # ---------------------------------------------------------------------------
 # Repositories and credentials
 # ---------------------------------------------------------------------------
