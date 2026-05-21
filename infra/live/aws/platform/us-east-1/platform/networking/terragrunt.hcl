@@ -9,6 +9,13 @@ include "root" {
 
 terraform {
   source = include.base.locals.module_source.networking
+
+  # Shell hooks run with the caller's AWS credentials (management account),
+  # not the provider's assumed role. Must STS assume-role into the platform account.
+  before_hook "cleanup_orphaned_log_group" {
+    commands = ["apply"]
+    execute  = ["bash", "-c", "CREDS=$(aws sts assume-role --role-arn 'arn:aws:iam::${include.base.locals.account_id}:role/OrganizationAccountAccessRole' --role-session-name tg-hook --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' --output text) && read -r AKI SAK ST <<< \"$CREDS\" && AWS_ACCESS_KEY_ID=$AKI AWS_SECRET_ACCESS_KEY=$SAK AWS_SESSION_TOKEN=$ST aws logs delete-log-group --log-group-name '/aws/vpc/flow-log/${include.base.locals.env}-${include.base.locals.region_abbv}-vpc' --region ${include.base.locals.region} 2>/dev/null; exit 0"]
+  }
 }
 
 inputs = {

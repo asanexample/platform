@@ -148,3 +148,18 @@ resource "aws_eks_access_policy_association" "this" {
 
   depends_on = [aws_eks_access_entry.this]
 }
+
+# ---------------------------------------------------------------------------
+# EKS Managed Add-ons
+# ---------------------------------------------------------------------------
+
+resource "aws_eks_addon" "this" {
+  for_each = local.create ? var.eks_addons : {}
+
+  cluster_name                = aws_eks_cluster.this[0].name
+  addon_name                  = each.key
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  tags = var.tags
+}

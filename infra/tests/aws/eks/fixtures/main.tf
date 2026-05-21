@@ -39,6 +39,11 @@ variable "access_entries" {
   default = {}
 }
 
+variable "eks_addons" {
+  type    = any
+  default = {}
+}
+
 variable "tags" {
   type    = map(string)
   default = {}
@@ -86,6 +91,7 @@ module "eks" {
   enabled_cluster_log_types = []
 
   access_entries = var.access_entries
+  eks_addons     = var.eks_addons
   tags           = var.tags
 
   depends_on = [module.networking]

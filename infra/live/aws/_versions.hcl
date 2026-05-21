@@ -17,6 +17,7 @@ locals {
 
     # Compute
     eks            = "${local.source_base}/aws//eks"
+    eks_addons     = "${local.source_base}/aws//eks-addons"
     eks_node_group = "${local.source_base}/aws//eks-node-group"
     ssm_bastion    = "${local.source_base}/aws//ssm-bastion"
 
@@ -53,6 +54,7 @@ locals {
     cert_manager     = "${local.source_base}/cert-manager"
     external_dns     = "${local.source_base}/external-dns"
     external_secrets = "${local.source_base}/external-secrets"
+    gateway_config   = "${local.source_base}/gateway-config"
     policy           = "${local.source_base}/policy"
   }
 

@@ -13,10 +13,21 @@ terraform {
 
 dependency "networking" {
   config_path = "../networking"
+
+  mock_outputs = {
+    vpc_id     = "vpc-mock"
+    subnet_ids = {}
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
 dependency "eks" {
   config_path = "../eks"
+
+  mock_outputs = {
+    cluster_security_group_id = "sg-mock"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
 inputs = {

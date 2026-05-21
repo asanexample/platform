@@ -95,6 +95,46 @@ func TestEKS_BasicCluster(t *testing.T) {
 	assert.NotEmpty(t, terraform.Output(t, opts2, "vpc_id"))
 }
 
+func TestEKS_AddonsInPlan(t *testing.T) {
+	t.Parallel()
+
+	uniqueID := random.UniqueId()
+	tmpDir := copyFixtureToTemp(t)
+
+	vpcCIDR := testVPCCIDR(0)
+
+	subnets := map[string]interface{}{
+		"az1-kubernetes": map[string]interface{}{
+			"address_prefixes":  []string{subnetCIDR(0, "0/26")},
+			"availability_zone": testRegion() + "a",
+			"public":            false,
+		},
+	}
+
+	vars := map[string]interface{}{
+		"create":        true,
+		"vpc_name":      "test-" + uniqueID + "-vpc",
+		"cluster_name":  "test-" + uniqueID + "-eks",
+		"address_space": []string{vpcCIDR},
+		"subnets":       subnets,
+		"eks_addons": map[string]interface{}{
+			"coredns": map[string]interface{}{},
+		},
+		"tags": map[string]string{"TestRun": uniqueID},
+	}
+
+	opts := newTerraformOptions(t, tmpDir, vars)
+	opts.PlanFilePath = tmpDir + "/plan.out"
+	planStruct := terraform.InitAndPlanAndShowWithStruct(t, opts)
+
+	addonKey := "module.eks.aws_eks_addon.this[\"coredns\"]"
+	assert.Contains(t, planStruct.ResourcePlannedValuesMap, addonKey,
+		"plan should include aws_eks_addon for coredns")
+
+	addonResource := planStruct.ResourcePlannedValuesMap[addonKey]
+	assert.Equal(t, "coredns", addonResource.AttributeValues["addon_name"])
+}
+
 func TestEKS_Disabled(t *testing.T) {
 	t.Parallel()
 

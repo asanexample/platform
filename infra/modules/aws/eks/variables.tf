@@ -68,6 +68,14 @@ variable "access_entries" {
   default = {}
 }
 
+variable "eks_addons" {
+  description = "EKS managed add-ons to install (e.g. coredns, kube-proxy)"
+  type = map(object({
+    most_recent = optional(bool, true)
+  }))
+  default = {}
+}
+
 variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)

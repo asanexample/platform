@@ -55,6 +55,12 @@ variable "cluster_name" {
   type        = string
 }
 
+variable "kubeconfig_path" {
+  description = "Path to a kubeconfig file for kubectl operations. If empty, uses the default kubeconfig."
+  type        = string
+  default     = ""
+}
+
 variable "resource_group_name" {
   description = "Name of the Azure resource group (only required for Azure)"
   type        = string
@@ -117,6 +123,12 @@ variable "gateway_api_enabled" {
   description = "Enable Gateway API support"
   type        = bool
   default     = true
+}
+
+variable "gateway_api_crd_version" {
+  description = "Gateway API CRD version to install (experimental channel). Set to empty string to skip CRD installation."
+  type        = string
+  default     = "v1.2.1"
 }
 
 variable "kube_proxy_replacement" {

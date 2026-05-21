@@ -11,6 +11,10 @@ locals {
   cert_manager_values = {
     installCRDs = true
 
+    config = {
+      enableGatewayAPI = true
+    }
+
     global = {
       podLabels = local.k8s_labels
     }

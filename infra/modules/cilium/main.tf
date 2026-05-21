@@ -155,6 +155,22 @@ locals {
   }
 }
 
+# ---------------------------------------------------------------------------
+# Gateway API CRDs — required before Cilium can reconcile Gateway resources
+# ---------------------------------------------------------------------------
+
+resource "null_resource" "gateway_api_crds" {
+  count = var.create && var.gateway_api_enabled && var.gateway_api_crd_version != "" ? 1 : 0
+
+  triggers = {
+    version = var.gateway_api_crd_version
+  }
+
+  provisioner "local-exec" {
+    command = "${var.kubeconfig_path != "" ? "kubectl --kubeconfig=${var.kubeconfig_path}" : "kubectl"} apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/${var.gateway_api_crd_version}/experimental-install.yaml"
+  }
+}
+
 # Install Cilium using Helm
 resource "helm_release" "cilium" {
   count            = var.create ? 1 : 0

@@ -13,14 +13,31 @@ terraform {
 
 dependency "eks" {
   config_path = "../eks"
+
+  mock_outputs = {
+    cluster_id                    = "mock-cluster"
+    cluster_endpoint              = "https://mock-endpoint"
+    cluster_certificate_authority = "bW9jaw=="
+    oidc_provider_arn             = "arn:aws:iam::000000000000:oidc-provider/mock"
+    oidc_provider_url             = "oidc.eks.mock.amazonaws.com/id/mock"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
 dependency "node_groups" {
   config_path = "../node-groups"
+
+  mock_outputs                            = {}
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
 dependency "route53" {
   config_path = "../route53"
+
+  mock_outputs = {
+    zone_arn = "arn:aws:route53:::hostedzone/MOCK"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
 generate "helm_provider" {
