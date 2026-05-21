@@ -69,6 +69,31 @@ AWS_PROFILE=platform aws sts get-caller-identity
 
 See [EKS Cluster Access](runbooks/eks-cluster-access.md) for kubectl setup.
 
+### ArgoCD Access
+
+ArgoCD is the platform's continuous delivery tool, available at
+`https://argocd.aws.refplat.org`.
+
+**Login:** Click "Log in via SSO" on the login page. You will be redirected to
+AWS Identity Center. Authenticate with your Identity Center credentials and
+you will be returned to ArgoCD with permissions based on your group membership:
+
+| Identity Center Group | ArgoCD Access |
+|----------------------|---------------|
+| Admins | Full admin -- manage all apps, clusters, and repositories |
+| Developers | Sync and view applications, view logs |
+| ReadOnly | Read-only access to all resources |
+
+**Admin password:** The local `admin` account is available as break-glass only.
+Retrieve the password with:
+
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath="{.data.password}" | base64 -d
+```
+
+See [ArgoCD SSO](runbooks/argocd-sso.md) for setup and troubleshooting.
+
 ### Verify Tool Versions
 
 ```bash

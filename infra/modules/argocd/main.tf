@@ -30,10 +30,13 @@ locals {
         var.argocd_cm_extra,
       )
 
-      rbac = {
-        "policy.default" = var.rbac_default_policy
-        "policy.csv"     = var.rbac_policy_csv
-      }
+      rbac = merge(
+        {
+          "policy.default" = var.rbac_default_policy
+          "policy.csv"     = var.rbac_policy_csv
+        },
+        var.rbac_scopes != "" ? { "scopes" = var.rbac_scopes } : {},
+      )
 
       repositories        = var.repositories
       credentialTemplates = var.credential_templates
