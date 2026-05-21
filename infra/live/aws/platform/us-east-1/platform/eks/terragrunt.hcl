@@ -13,6 +13,13 @@ terraform {
 
 dependency "networking" {
   config_path = "../networking"
+
+  mock_outputs = {
+    vpc_id                = "vpc-mock"
+    subnet_ids            = {}
+    eks_security_group_id = "sg-mock"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
 inputs = {
@@ -32,9 +39,7 @@ inputs = {
   endpoint_public_access  = true
   public_access_cidrs     = ["0.0.0.0/0"] # TODO: restrict to VPN/office/CI IPs before production workloads
 
-  eks_addons = {
-    coredns = {}
-  }
+  eks_addons = {}
 
   access_entries = {
     admin = {
