@@ -57,6 +57,7 @@ locals {
     external_secrets = "${local.source_base}/external-secrets"
     gateway_config   = "${local.source_base}/gateway-config"
     tailscale        = "${local.source_base}/tailscale"
+    tailscale_admin  = "${local.source_base}/tailscale-admin"
     policy           = "${local.source_base}/policy"
   }
 
