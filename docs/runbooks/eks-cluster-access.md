@@ -10,11 +10,52 @@
 
 ## Table of Contents
 
-1. [Platform Engineer: kubectl Setup](#platform-engineer-kubectl-setup)
-2. [Developer: Namespace-Scoped kubectl](#developer-namespace-scoped-kubectl)
-3. [Private Cluster Access via SSM Tunnel](#private-cluster-access-via-ssm-tunnel)
-4. [Break-Glass Access](#break-glass-access)
-5. [Troubleshooting](#troubleshooting)
+1. [Tailscale VPN Access (Recommended)](#tailscale-vpn-access-recommended)
+2. [Platform Engineer: kubectl Setup](#platform-engineer-kubectl-setup)
+3. [Developer: Namespace-Scoped kubectl](#developer-namespace-scoped-kubectl)
+4. [Private Cluster Access via SSM Tunnel](#private-cluster-access-via-ssm-tunnel)
+5. [Break-Glass Access](#break-glass-access)
+6. [Troubleshooting](#troubleshooting)
+
+---
+
+## Tailscale VPN Access (Recommended)
+
+Tailscale provides always-on mesh VPN access to the private EKS cluster.
+No tunnel management required — once connected, kubectl works directly.
+
+### One-Time Setup
+
+1. Install Tailscale: https://tailscale.com/download
+1. Log in to the team tailnet (get an invite from the platform team)
+1. Configure kubeconfig:
+
+```bash
+aws sso login --profile platform
+
+AWS_PROFILE=platform aws eks update-kubeconfig \
+  --name platform-use1-eks \
+  --region us-east-1 \
+  --role-arn arn:aws:iam::829808296602:role/PlatformAdmin
+```
+
+1. Verify access:
+
+```bash
+kubectl get nodes
+```
+
+### How It Works
+
+The Tailscale Operator runs on EKS as a subnet router, advertising the
+VPC CIDR (`10.100.0.0/16`) to the tailnet. Split DNS routes
+`*.eks.amazonaws.com` queries to the VPC DNS resolver. Your laptop routes
+EKS API traffic through the Tailscale mesh to the private endpoint.
+
+### Fallback
+
+If Tailscale is unavailable, use the [SSM tunnel](#private-cluster-access-via-ssm-tunnel)
+as a fallback.
 
 ---
 

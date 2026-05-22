@@ -23,6 +23,7 @@ networking ─┘                        |
               external-secrets ──────┤ (eks, nodes)
                                      |
               argocd ────────────────┤ (eks, nodes)
+              tailscale ─────────────┤ (eks, nodes, ext-secrets)
               gateway-config ────────┘ (eks, cilium, cert-manager, ext-dns, argocd, r53)
 ```
 
@@ -45,6 +46,7 @@ terragrunt run --all destroy --filter-allow-destroy -- -auto-approve
 # Option 2: manual (if run-all fails or you need to skip units)
 # Destroy leaf nodes first, work backwards:
 cd gateway-config && terragrunt destroy -auto-approve && cd ..
+cd tailscale && terragrunt destroy -auto-approve && cd ..
 cd argocd && terragrunt destroy -auto-approve && cd ..
 cd ssm-bastion && terragrunt destroy -auto-approve && cd ..
 cd cert-manager && terragrunt destroy -auto-approve && cd ..
@@ -127,3 +129,4 @@ Cross-account access uses purpose-built IAM roles (see IAM Roles below). `Organi
 - **Node groups separated** from the EKS module to enforce deployment ordering (Cilium must be ready first).
 - **EKS add-ons separated** into `eks-addons` unit — with BYOCNI, addon pods (coredns) can't schedule until CNI + nodes are ready, so they must be deployed after cilium and node-groups.
 - **ArgoCD SSO via Dex + SAML** for AWS. Dex is built into ArgoCD's Helm chart and acts as a SAML-to-OIDC bridge. The SAML app in Identity Center is created manually (Terraform AWS provider doesn't support custom SAML apps). Group claims in the SAML assertion map to ArgoCD RBAC roles. The ArgoCD module remains cloud-agnostic — all SSO config is injected via `argocd_cm_extra` in the live unit.
+- **Tailscale Operator** for developer VPN access to private EKS. Runs as a subnet router advertising the VPC CIDR (`10.100.0.0/16`) to the tailnet. OAuth credentials sourced from AWS Secrets Manager via Terragrunt `run_cmd()`. Module is cloud-agnostic; only the live unit's credential fetch is AWS-specific.
