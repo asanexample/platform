@@ -29,7 +29,7 @@ Developer laptop (Tailscale client)
 1. [Full Setup from Scratch](#full-setup-from-scratch)
 1. [Rebuilding After Teardown](#rebuilding-after-teardown)
 1. [Developer Onboarding](#developer-onboarding)
-1. [Terraform Provider Migration](#terraform-provider-migration)
+1. [Tailscale Admin Module](#tailscale-admin-module)
 1. [Troubleshooting](#troubleshooting)
 1. [Key Details](#key-details)
 
@@ -70,8 +70,12 @@ have no internet egress.
 
 ## Full Setup from Scratch
 
-Follow these steps to set up Tailscale from zero. Steps 1-5 are manual
-(Tailscale admin console + AWS CLI). Steps 6-7 are Terragrunt.
+Follow these steps to set up Tailscale from zero. Steps 1-2 are manual
+(one-time bootstrap). Steps 3-4 are handled by the `tailscale-admin`
+Terragrunt unit. Steps 5-6 deploy the K8s operator.
+
+> **If rebuilding**: skip to [Rebuilding After Teardown](#rebuilding-after-teardown).
+> Steps 2-5 below are already automated by `tailscale-admin`.
 
 ### Step 1: Create Tailscale Account
 
@@ -200,17 +204,18 @@ kubectl get nodes
 
 ## Rebuilding After Teardown
 
-If the cluster was destroyed and rebuilt, follow these steps. The Tailscale
-account, ACL policy, OAuth client, and Secrets Manager secret persist across
-cluster teardowns -- you only need to redo the Terragrunt deployment.
+If the cluster was destroyed and rebuilt, follow these steps. The
+`tailscale-admin` unit (ACL policy, split DNS, OAuth client, Secrets Manager
+secret) persists across cluster teardowns -- you only need to redeploy the
+K8s operator.
 
 ### Pre-flight Checks
 
-1. **Tailscale split DNS**: Remove `us-east-1.eks.amazonaws.com` entry from
-   Tailscale DNS settings before rebuilding. If left in place, the split DNS
+1. **Tailscale split DNS**: Temporarily destroy the `tailscale-admin` unit
+   (or remove the split DNS entry manually) before rebuilding. Split DNS
    routes queries to `10.100.0.2` (VPC DNS) which is unreachable until the
    subnet router is back online, breaking EKS DNS resolution for Tailscale
-   clients.
+   clients. Re-apply `tailscale-admin` after the subnet router is online.
 
 1. **EKS public endpoint**: Temporarily enable public access during rebuild
    so Terragrunt can reach the API:
@@ -281,32 +286,35 @@ No tunnel, no port forwarding -- just works.
 
 ---
 
-## Terraform Provider Migration
+## Tailscale Admin Module
 
-The Tailscale Terraform provider (`tailscale/tailscale`, v0.29.1+) can
-automate manual steps 2, 3, and 5 above:
+The `tailscale-admin` Terragrunt unit manages tailnet-level configuration
+via the Tailscale Terraform provider (`tailscale/tailscale` v0.29.1+).
+This automates what were previously manual admin console steps:
 
-| Manual Step | Provider Resource |
-|-------------|-------------------|
-| ACL policy | `tailscale_acl` |
-| Split DNS | `tailscale_dns_split_nameservers` |
-| OAuth client | `tailscale_oauth_client` |
-| Route approval | `tailscale_device_subnet_routes` (or `autoApprovers` in ACL) |
+| What | Provider Resource | Module Path |
+|------|-------------------|-------------|
+| ACL policy | `tailscale_acl` | `infra/modules/tailscale-admin/main.tf` |
+| Split DNS | `tailscale_dns_split_nameservers` | `infra/modules/tailscale-admin/main.tf` |
+| OAuth client | `tailscale_oauth_client` | `infra/modules/tailscale-admin/main.tf` |
+| OAuth secret | `aws_secretsmanager_secret` | `infra/modules/tailscale-admin/main.tf` |
 
-This would eliminate all manual Tailscale admin console steps except
-creating the initial account. The provider authenticates via API key or
-OAuth client credentials (`TAILSCALE_API_KEY` or
-`TAILSCALE_OAUTH_CLIENT_ID` + `TAILSCALE_OAUTH_CLIENT_SECRET`).
+The unit has **no cluster dependencies** -- it manages the tailnet, not the
+K8s operator. The OAuth credentials it creates are written to Secrets Manager
+at `platform/tailscale/oauth`, which the `tailscale` K8s unit reads.
 
-Device lifecycle (removing stale machines after teardown) is not supported
-as a Terraform resource -- use `tailscale api delete device` or the admin
-console.
+### Authentication
 
-**Recommended approach:** Add a `tailscale-admin` Terragrunt unit that uses
-the Tailscale provider to manage ACLs + split DNS. Keep the K8s operator
-deployment in the existing `tailscale` unit. This separates tailnet-level
-config (which persists across cluster rebuilds) from cluster-level resources
-(which are destroyed with the cluster).
+The provider authenticates via an API key stored in Secrets Manager at
+`platform/tailscale/api-key`. This is the only remaining manual bootstrap
+step (one-time, in Tailscale admin > Settings > Keys).
+
+### Remaining Manual Steps
+
+- Creating the Tailscale account (one-time)
+- Creating the API key for the Terraform provider (one-time)
+- Removing stale devices after cluster teardown (admin console or
+  `tailscale api delete device`)
 
 ---
 
