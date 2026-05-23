@@ -251,6 +251,40 @@ terragrunt apply
 
 State for this module is stored remotely in the S3 bucket created in Step 1.
 
+### Step 3: Deploy the Platform Stack
+
+With the management account set up, deploy the full platform stack (EKS,
+networking, Cilium, ArgoCD, Tailscale, and all supporting services) using the
+bootstrap script:
+
+```bash
+# Prerequisites:
+#   - AWS SSO login completed (aws sso login --profile management)
+#   - CLOUDFLARE_API_TOKEN exported
+
+./scripts/bootstrap-platform.sh
+```
+
+The script deploys all 16 Terragrunt units in dependency order with parallel
+execution where possible. It handles the private endpoint bootstrap problem
+(temporarily enables public access, locks down after Tailscale is deployed)
+and prompts for two manual steps:
+
+1. **Tailscale account setup** -- create an account, generate an API key, and
+   store it in Secrets Manager
+2. **ArgoCD SAML app** -- create a SAML application in AWS Identity Center
+   (SSO URL and CA cert are pre-configured in `infra/live/aws/common.hcl`)
+
+The script is idempotent -- if it fails partway through, re-run it and it
+picks up where it left off.
+
+To tear down the entire stack:
+
+```bash
+./scripts/teardown-platform.sh                  # preserves Route53 zone
+./scripts/teardown-platform.sh --include-route53  # destroys everything
+```
+
 ---
 
 ## How to Make a Change

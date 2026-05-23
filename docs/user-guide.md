@@ -293,22 +293,60 @@ Expected resources created:
 - 7 Service Control Policies (baseline-guardrails, protect-security-services, enforce-encryption, deny-regions, protect-data-and-network, require-tagging, restrict-iam-users)
 - SCP attachments to root and OUs
 
-### Step 3: Verify
+### Step 3: Deploy the Platform Stack
+
+With the management account configured, deploy the full platform stack using
+the bootstrap script. This deploys all 16 Terragrunt units (networking, EKS,
+Cilium, node groups, Tailscale, ArgoCD, and all supporting services) in
+dependency order.
 
 ```bash
-# List the organization
-aws organizations describe-organization
+# Prerequisites:
+#   - AWS SSO login completed
+#   - CLOUDFLARE_API_TOKEN exported
+./scripts/bootstrap-platform.sh
+```
 
-# List OUs under root
+The script prompts for two manual steps during execution:
+
+1. **Tailscale account setup** (after node groups are deployed) -- create an
+   account, generate an API key, store it in Secrets Manager
+2. **ArgoCD SAML app** (after Tailscale is deployed) -- create a SAML app in
+   Identity Center. SSO URL and CA cert are pre-configured in
+   `infra/live/aws/common.hcl`
+
+The script is idempotent. Re-running after a failure picks up where it left
+off -- already-applied units complete in seconds with no changes.
+
+### Step 4: Verify
+
+```bash
+# Verify management account
+aws organizations describe-organization
 ROOT_ID=$(aws organizations list-roots --query 'Roots[0].Id' --output text)
 aws organizations list-organizational-units-for-parent --parent-id "$ROOT_ID"
-
-# List accounts
 aws organizations list-accounts
-
-# List SCPs
 aws organizations list-policies --filter SERVICE_CONTROL_POLICY
+
+# Verify platform stack (connect to Tailscale first)
+kubectl get nodes
+kubectl get pods -A
 ```
+
+### Teardown
+
+To destroy the full platform stack:
+
+```bash
+./scripts/teardown-platform.sh                  # preserves Route53 zone
+./scripts/teardown-platform.sh --include-route53  # destroys everything
+```
+
+The teardown script requires typing `DESTROY` to confirm. It enables the
+public EKS endpoint before destroying K8s resources (since Tailscale is
+destroyed first), then waits 5 minutes for DNS propagation. Route53 is
+preserved by default because destroying the zone requires re-creating the
+Cloudflare NS delegation.
 
 ---
 

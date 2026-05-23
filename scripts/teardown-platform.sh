@@ -41,31 +41,39 @@ if [[ "$confirmation" != "DESTROY" ]]; then
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Pre-flight — Enable public endpoint for API access during teardown
+# Phase 1 — Destroy Tailscale and gateway-config while VPN is still active
 #
-# If the EKS API is private-only, Terragrunt can't reach it to destroy K8s
-# resources (Helm releases, kubernetes_manifests). Re-apply with public
-# access enabled, then wait for the endpoint update + DNS propagation.
+# The EKS API is private-only. Tailscale provides access via split DNS and
+# subnet routing. We must destroy K8s resources that depend on Tailscale CRDs
+# BEFORE removing VPN access. Gateway-config is a leaf node, so destroy it
+# here too.
 # ─────────────────────────────────────────────────────────────────────────────
 
-log_warn "Pre-flight: Enabling public endpoint for teardown access..."
+log_info "Destroying gateway-config and tailscale (while VPN is active)..."
+run_tg "$UNIT_DIR/gateway-config" destroy
+run_tg "$UNIT_DIR/tailscale" destroy
+run_tg "$UNIT_DIR/tailscale-admin" destroy
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 2 — Switch to public endpoint
+#
+# With Tailscale destroyed, the split DNS route is gone and the VPN tunnel
+# is down. Enable the public API endpoint so Terragrunt can reach the
+# cluster for the remaining destroys.
+# ─────────────────────────────────────────────────────────────────────────────
+
+log_warn "Enabling public endpoint for remaining teardown..."
 run_tg "$UNIT_DIR/eks" apply -var 'endpoint_public_access=true'
 
 log_warn "Waiting 5 minutes for endpoint update + DNS propagation..."
 sleep 300
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Destroy — reverse dependency order
+# Phase 3 — Destroy remaining K8s services via public endpoint
 # ─────────────────────────────────────────────────────────────────────────────
 
-log_info "Destroying leaf nodes..."
-run_tg "$UNIT_DIR/gateway-config" destroy
-
-log_info "Destroying tailscale and argocd..."
-run_tg_destroy_parallel "$UNIT_DIR/tailscale" "$UNIT_DIR/argocd"
-
-log_info "Destroying tailscale-admin..."
-run_tg "$UNIT_DIR/tailscale-admin" destroy
+log_info "Destroying argocd..."
+run_tg "$UNIT_DIR/argocd" destroy
 
 log_info "Destroying platform services..."
 run_tg_destroy_parallel "$UNIT_DIR/cert-manager" "$UNIT_DIR/external-dns" "$UNIT_DIR/external-secrets"
