@@ -8,7 +8,12 @@
 #   - Management account state backend already provisioned
 #
 # Usage:
-#   ./scripts/bootstrap-platform.sh
+#   ./scripts/bootstrap-platform.sh [-y|--yes]
+#
+# Options:
+#   -y, --yes    Non-interactive mode. Skips manual step prompts (assumes
+#                prerequisites like Tailscale API key and ArgoCD SAML app
+#                are already configured). Fails if they are not.
 
 set -euo pipefail
 
@@ -17,8 +22,20 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$REPO_ROOT/scripts/lib/common.sh"
 
 UNIT_DIR="$REPO_ROOT/infra/live/aws/platform/us-east-1/platform"
+CLUSTER_NAME="platform-use1-eks"
+REGION="us-east-1"
+INTERACTIVE=true
+
+for arg in "$@"; do
+  case "$arg" in
+    -y|--yes) INTERACTIVE=false ;;
+  esac
+done
 
 log_info "=== AWS Platform Bootstrap ==="
+if [[ "$INTERACTIVE" == false ]]; then
+  log_info "Running in non-interactive mode (--yes)"
+fi
 log_info ""
 
 check_prerequisites
@@ -73,7 +90,10 @@ run_tg_parallel "$UNIT_DIR/eks-addons" "$UNIT_DIR/ssm-bastion"
 # Phase 7 — Manual: Tailscale account + API key
 # ─────────────────────────────────────────────────────────────────────────────
 
-prompt_manual_step "Tailscale Account Setup" <<'INSTRUCTIONS'
+if secret_exists "platform/tailscale/api-key"; then
+  log_success "Phase 7/14: Tailscale API key already in Secrets Manager — skipping."
+elif [[ "$INTERACTIVE" == true ]]; then
+  prompt_manual_step "Tailscale Account Setup" <<'INSTRUCTIONS'
 1. Create a Tailscale account at https://login.tailscale.com
 
 2. Generate an API key:
@@ -88,8 +108,12 @@ prompt_manual_step "Tailscale Account Setup" <<'INSTRUCTIONS'
 
    If the secret already exists, use put-secret-value instead.
 INSTRUCTIONS
-
-validate_secret "platform/tailscale/api-key"
+  validate_secret "platform/tailscale/api-key"
+else
+  log_error "Phase 7/14: Secret platform/tailscale/api-key not found and --yes was passed."
+  log_error "Create the secret first, then re-run."
+  exit 1
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 8 — Tailscale admin (ACL policy + OAuth client)
@@ -118,17 +142,25 @@ run_tg_parallel "$UNIT_DIR/cert-manager" "$UNIT_DIR/external-dns" "$UNIT_DIR/ext
 # the chart (which registers the CRDs), then stage 2 creates the CR instances.
 # ─────────────────────────────────────────────────────────────────────────────
 
-log_info "Phase 10/14: Deploying Tailscale operator (stage 1: Helm chart)..."
-run_tg "$UNIT_DIR/tailscale" apply -target='helm_release.tailscale_operator[0]'
+if k8s_crd_exists "connectors.tailscale.com"; then
+  log_info "Phase 10/14: Tailscale CRDs already registered — running full apply..."
+  run_tg "$UNIT_DIR/tailscale"
+else
+  log_info "Phase 10/14: Deploying Tailscale operator (stage 1: Helm chart)..."
+  run_tg "$UNIT_DIR/tailscale" apply -target='helm_release.tailscale_operator[0]'
 
-log_info "Phase 10/14: Deploying Tailscale operator (stage 2: Connector + split DNS)..."
-run_tg "$UNIT_DIR/tailscale"
+  log_info "Phase 10/14: Deploying Tailscale operator (stage 2: Connector + split DNS)..."
+  run_tg "$UNIT_DIR/tailscale"
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 11 — Manual: ArgoCD SAML app in Identity Center
 # ─────────────────────────────────────────────────────────────────────────────
 
-prompt_manual_step "ArgoCD SSO Setup" <<'INSTRUCTIONS'
+if grep -q 'argocd_sso_url.*portal\.sso' "$REPO_ROOT/infra/live/aws/common.hcl" 2>/dev/null; then
+  log_success "Phase 11/14: ArgoCD SSO URL found in common.hcl — skipping."
+elif [[ "$INTERACTIVE" == true ]]; then
+  prompt_manual_step "ArgoCD SSO Setup" <<'INSTRUCTIONS'
 Create a SAML application in AWS Identity Center:
 
 1. AWS SSO Console → Applications → Add application
@@ -142,11 +174,15 @@ Create a SAML application in AWS Identity Center:
    - groups  → ${user:groups} (unspecified)
 7. Assign users/groups to the application
 
-The SSO URL and CA cert are already in infra/live/aws/common.hcl.
-Update those values if they have changed.
-
-If this SAML app already exists, press Enter to continue.
+After creating the app, update infra/live/aws/common.hcl with:
+  argocd_sso_url     = "<SSO URL from the SAML app>"
+  argocd_sso_ca_data = "<base64-encoded CA certificate>"
 INSTRUCTIONS
+else
+  log_error "Phase 11/14: ArgoCD SSO URL not found in common.hcl and --yes was passed."
+  log_error "Create the SAML app and update common.hcl first, then re-run."
+  exit 1
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 12 — ArgoCD
@@ -170,8 +206,12 @@ run_tg "$UNIT_DIR/gateway-config"
 # After this, all API access goes through Tailscale VPN.
 # ─────────────────────────────────────────────────────────────────────────────
 
-log_info "Phase 14/14: Locking down EKS to private-only endpoint..."
-run_tg "$UNIT_DIR/eks"
+if eks_endpoint_is_private_only "$CLUSTER_NAME" "$REGION"; then
+  log_success "Phase 14/14: EKS endpoint is already private-only — skipping."
+else
+  log_info "Phase 14/14: Locking down EKS to private-only endpoint..."
+  run_tg "$UNIT_DIR/eks"
+fi
 
 echo ""
 log_success "=== Bootstrap complete! ==="

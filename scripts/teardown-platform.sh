@@ -7,7 +7,11 @@
 # to destroy it as well.
 #
 # Usage:
-#   ./scripts/teardown-platform.sh [--include-route53]
+#   ./scripts/teardown-platform.sh [-y|--yes] [--include-route53]
+#
+# Options:
+#   -y, --yes          Skip the DESTROY confirmation prompt
+#   --include-route53  Also destroy the Route53 hosted zone
 
 set -euo pipefail
 
@@ -16,10 +20,22 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$REPO_ROOT/scripts/lib/common.sh"
 
 UNIT_DIR="$REPO_ROOT/infra/live/aws/platform/us-east-1/platform"
+CLUSTER_NAME="platform-use1-eks"
+REGION="us-east-1"
 INCLUDE_ROUTE53=false
-[[ "${1:-}" == "--include-route53" ]] && INCLUDE_ROUTE53=true
+INTERACTIVE=true
+
+for arg in "$@"; do
+  case "$arg" in
+    -y|--yes) INTERACTIVE=false ;;
+    --include-route53) INCLUDE_ROUTE53=true ;;
+  esac
+done
 
 log_info "=== AWS Platform Teardown ==="
+if [[ "$INTERACTIVE" == false ]]; then
+  log_info "Running in non-interactive mode (--yes)"
+fi
 log_info ""
 
 check_prerequisites
@@ -32,12 +48,17 @@ log_warn "This will DESTROY all platform resources in us-east-1."
 if [[ "$INCLUDE_ROUTE53" == true ]]; then
   log_warn "Route53 hosted zone WILL be destroyed (--include-route53)."
 fi
-echo ""
-log_warn "Type DESTROY to confirm:"
-read -r confirmation
-if [[ "$confirmation" != "DESTROY" ]]; then
-  log_error "Aborted."
-  exit 1
+
+if [[ "$INTERACTIVE" == true ]]; then
+  echo ""
+  log_warn "Type DESTROY to confirm:"
+  read -r confirmation
+  if [[ "$confirmation" != "DESTROY" ]]; then
+    log_error "Aborted."
+    exit 1
+  fi
+else
+  log_warn "Skipping confirmation (--yes)"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -49,46 +70,55 @@ fi
 # here too.
 # ─────────────────────────────────────────────────────────────────────────────
 
-log_info "Destroying gateway-config and tailscale (while VPN is active)..."
-run_tg "$UNIT_DIR/gateway-config" destroy
-run_tg "$UNIT_DIR/tailscale" destroy
-run_tg "$UNIT_DIR/tailscale-admin" destroy
+if eks_cluster_exists "$CLUSTER_NAME" "$REGION"; then
+  log_info "Destroying gateway-config and tailscale (while VPN is active)..."
+  run_tg "$UNIT_DIR/gateway-config" destroy
+  run_tg "$UNIT_DIR/tailscale" destroy
+  run_tg "$UNIT_DIR/tailscale-admin" destroy
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Phase 2 — Switch to public endpoint
-#
-# With Tailscale destroyed, the split DNS route is gone and the VPN tunnel
-# is down. Enable the public API endpoint so Terragrunt can reach the
-# cluster for the remaining destroys.
-# ─────────────────────────────────────────────────────────────────────────────
+  # ───────────────────────────────────────────────────────────────────────────
+  # Phase 2 — Switch to public endpoint
+  #
+  # With Tailscale destroyed, the split DNS route is gone and the VPN tunnel
+  # is down. Enable the public API endpoint so Terragrunt can reach the
+  # cluster for the remaining destroys.
+  # ───────────────────────────────────────────────────────────────────────────
 
-log_warn "Enabling public endpoint for remaining teardown..."
-run_tg "$UNIT_DIR/eks" apply -var 'endpoint_public_access=true'
+  if eks_endpoint_is_public "$CLUSTER_NAME" "$REGION"; then
+    log_success "Public endpoint already enabled — skipping wait."
+  else
+    log_warn "Enabling public endpoint for remaining teardown..."
+    run_tg "$UNIT_DIR/eks" apply -var 'endpoint_public_access=true'
 
-log_warn "Waiting 5 minutes for endpoint update + DNS propagation..."
-sleep 300
+    log_warn "Waiting 5 minutes for endpoint update + DNS propagation..."
+    sleep 300
+  fi
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Phase 3 — Destroy remaining K8s services via public endpoint
-# ─────────────────────────────────────────────────────────────────────────────
+  # ───────────────────────────────────────────────────────────────────────────
+  # Phase 3 — Destroy remaining K8s services via public endpoint
+  # ───────────────────────────────────────────────────────────────────────────
 
-log_info "Destroying argocd..."
-run_tg "$UNIT_DIR/argocd" destroy
+  log_info "Destroying argocd..."
+  run_tg "$UNIT_DIR/argocd" destroy
 
-log_info "Destroying platform services..."
-run_tg_destroy_parallel "$UNIT_DIR/cert-manager" "$UNIT_DIR/external-dns" "$UNIT_DIR/external-secrets"
+  log_info "Destroying platform services..."
+  run_tg_destroy_parallel "$UNIT_DIR/cert-manager" "$UNIT_DIR/external-dns" "$UNIT_DIR/external-secrets"
 
-log_info "Destroying EKS addons and SSM bastion..."
-run_tg_destroy_parallel "$UNIT_DIR/eks-addons" "$UNIT_DIR/ssm-bastion"
+  log_info "Destroying EKS addons and SSM bastion..."
+  run_tg_destroy_parallel "$UNIT_DIR/eks-addons" "$UNIT_DIR/ssm-bastion"
 
-log_info "Destroying node groups..."
-run_tg "$UNIT_DIR/node-groups" destroy
+  log_info "Destroying node groups..."
+  run_tg "$UNIT_DIR/node-groups" destroy
 
-log_info "Destroying Cilium..."
-run_tg "$UNIT_DIR/cilium" destroy
+  log_info "Destroying Cilium..."
+  run_tg "$UNIT_DIR/cilium" destroy
 
-log_info "Destroying EKS cluster..."
-run_tg "$UNIT_DIR/eks" destroy
+  log_info "Destroying EKS cluster..."
+  run_tg "$UNIT_DIR/eks" destroy
+else
+  log_warn "EKS cluster not found — skipping K8s resource teardown."
+  run_tg "$UNIT_DIR/tailscale-admin" destroy
+fi
 
 log_info "Destroying Cloudflare DNS delegation..."
 run_tg "$UNIT_DIR/cloudflare-dns" destroy

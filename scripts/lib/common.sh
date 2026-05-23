@@ -137,3 +137,41 @@ validate_secret() {
   fi
   log_success "  Secret '$secret_id' exists."
 }
+
+# secret_exists <secret-id>
+#   Returns 0 if the secret exists, 1 otherwise.
+secret_exists() {
+  aws secretsmanager describe-secret --secret-id "$1" \
+    --region us-east-1 --query 'Name' --output text &>/dev/null
+}
+
+# eks_cluster_exists <cluster-name> <region>
+#   Returns 0 if the EKS cluster exists, 1 otherwise.
+eks_cluster_exists() {
+  aws eks describe-cluster --name "$1" --region "$2" \
+    --query 'cluster.name' --output text &>/dev/null 2>&1
+}
+
+# eks_endpoint_is_public <cluster-name> <region>
+#   Returns 0 if the EKS public endpoint is enabled.
+eks_endpoint_is_public() {
+  local val
+  val=$(aws eks describe-cluster --name "$1" --region "$2" \
+    --query 'cluster.resourcesVpcConfig.endpointPublicAccess' --output text 2>/dev/null)
+  [[ "$val" == "True" ]]
+}
+
+# eks_endpoint_is_private_only <cluster-name> <region>
+#   Returns 0 if public access is disabled (private-only).
+eks_endpoint_is_private_only() {
+  local val
+  val=$(aws eks describe-cluster --name "$1" --region "$2" \
+    --query 'cluster.resourcesVpcConfig.endpointPublicAccess' --output text 2>/dev/null)
+  [[ "$val" == "False" ]]
+}
+
+# k8s_crd_exists <crd-name>
+#   Returns 0 if the CRD is registered in the cluster.
+k8s_crd_exists() {
+  kubectl get crd "$1" --request-timeout=5s &>/dev/null 2>&1
+}
