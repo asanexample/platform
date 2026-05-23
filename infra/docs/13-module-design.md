@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the principles and best practices for designing Terraform modules within the VIP Platform. Properly structured modules are essential for maintainability, reusability, and consistency across infrastructure deployments.
+This document outlines the principles and best practices for designing infrastructure modules within the VIP Platform. Properly structured modules are essential for maintainability, reusability, and consistency across infrastructure deployments.
 
 ## Design Principles
 
@@ -19,12 +19,12 @@ VIP Platform modules follow these core design principles:
 
 All modules follow a consistent structure:
 
-```
+```text
 modules/azure/example_module/
 ├── main.tf           # Primary resources
 ├── variables.tf      # Input variables
 ├── outputs.tf        # Output values
-├── versions.tf       # Required Terraform and provider versions
+├── versions.tf       # Required OpenTofu and provider versions
 ├── README.md         # Module documentation
 ├── examples/         # Usage examples
 │   └── basic/        # Basic implementation example
@@ -216,7 +216,7 @@ Consistent variable naming makes modules predictable for callers:
 
 - **`create`** -- Top-level toggle that gates all resource creation in the module. Always a `bool`, always defaults to `true`.
 - **`enable_*`** -- Sub-feature toggles within a module that control optional functionality (e.g., `enable_aks_networking`, `enable_cloud_nat`, `enable_key_vault`). These allow fine-grained control without splitting into separate modules.
-- **`null` for optional strings** -- Optional string variables should default to `null` rather than `""`. This lets downstream logic distinguish "not set" from "set to empty" and avoids unexpected empty-string behavior in Terraform conditionals.
+- **`null` for optional strings** -- Optional string variables should default to `null` rather than `""`. This lets downstream logic distinguish "not set" from "set to empty" and avoids unexpected empty-string behavior in OpenTofu conditionals.
 
 ```hcl
 variable "create" {
@@ -311,7 +311,7 @@ locals {
 }
 ```
 
-This approach provides a single place to update module sources when migrating from monorepo-relative paths to a Terraform registry with semver tags. Environment-level overrides are supported by defining a local `_versions.hcl` at the environment tier.
+This approach provides a single place to update module sources when migrating from monorepo-relative paths to an OpenTofu registry with semver tags. Environment-level overrides are supported by defining a local `_versions.hcl` at the environment tier.
 
 ## Input Variables
 
@@ -408,4 +408,4 @@ Avoid these common module design mistakes:
 
 ## Next Steps
 
-Continue to [Deployment Workflows](14-deployment-workflows.md) to understand how modules are deployed in various environments. 
+Continue to [Deployment Workflows](14-deployment-workflows.md) to understand how modules are deployed in various environments.

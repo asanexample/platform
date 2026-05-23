@@ -5,11 +5,13 @@ This document outlines the standard naming conventions used across the VIP Platf
 ## General Structure
 
 Most resources follow the CAF-aligned pattern:
-```
+
+```text
 {type}-{workload}-{env}-{region_abbv}-{purpose}
 ```
 
 Where:
+
 - `type` is a short abbreviation for the resource (see table below)
 - `workload` is our standard workload identifier (default: "platform")
 - `env` is the environment (dev, test, prod)
@@ -150,25 +152,31 @@ GCP names follow the same `{type}-{workload}-{env}-{region}` pattern. All GCP re
 ### Availability Zone Resources
 
 For resources distributed across availability zones, prepend the AZ number:
-```
+
+```text
 az{number}-{resource_type}-{purpose}
 ```
 
 Examples:
+
 - `az1-node-subnet` (Subnet for nodes in AZ1)
 - `az2-lb-subnet` (Subnet for load balancers in AZ2)
 - `az3-endpoint-subnet` (Subnet for private endpoints in AZ3)
 
 ### Storage Accounts
+
 Storage accounts have a 24 character limit and cannot use hyphens. They follow this pattern:
-```
+
+```text
 {workload}{env}{region_abbv}st{instance}
 ```
 
 Example: `platformdeveusstdata001`
 
 ### Container Names
+
 Container names in Storage Accounts are consistent across all deployments:
+
 - assets
 - logs
 - data
@@ -178,7 +186,8 @@ Container names in Storage Accounts are consistent across all deployments:
 ### Customer-Specific Resources
 
 For customer-specific resources:
-```
+
+```text
 {type}-{workload}-{env}-{region_abbv}-{customer}
 ```
 
@@ -187,11 +196,13 @@ Example: `kv-platform-dev-eus-customer1`
 ### Role Assignments
 
 Role assignments for RBAC use a descriptive approach:
-```
+
+```text
 {resource}-{role}-{principal-type}
 ```
 
 Examples:
+
 - `storage-contributor-developers`
 - `keyvault-reader-app`
 - `aks-admin-operations`
@@ -199,7 +210,8 @@ Examples:
 ### Private Link Resources
 
 Private link resources follow:
-```
+
+```text
 pe-{workload}-{env}-{region_abbv}-{service}
 ```
 
@@ -210,7 +222,8 @@ Example: `pe-platform-dev-eus-keyvault`
 The `deployment_id` is a special identifier used for customer applications:
 
 - Format: Often (but not always) follows a pattern of customer name and environment
-  ```
+
+  ```text
   {customer}-{env}
   ```
 
@@ -236,7 +249,7 @@ All resources should include the following standard tags:
 | Tag Name           | Description                                       | Example                            |
 |--------------------|---------------------------------------------------|------------------------------------|
 | Environment        | Deployment environment                            | "dev", "test", "prod"              |
-| ManagedBy          | Tool managing the resource                        | "Terraform"                        |
+| ManagedBy          | Tool managing the resource                        | "Terragrunt"                       |
 | Component          | System component                                  | "Networking", "Compute", "Storage" |
 | Project            | Project name                                      | "Multi-Cloud Platform"             |
 | DataClassification | Data sensitivity                                  | "Internal", "Confidential"         |
@@ -384,4 +397,4 @@ For CIDR allocation strategy details, see [CIDR Allocation Strategy](06-cidr-all
 
 For security naming considerations, see [Security Architecture](09-security-architecture.md).
 
-For multi-cloud naming strategies, see [Multi-Cloud Strategy](04-multi-cloud-strategy.md). 
+For multi-cloud naming strategies, see [Multi-Cloud Strategy](04-multi-cloud-strategy.md).

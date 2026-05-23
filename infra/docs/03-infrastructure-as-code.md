@@ -2,760 +2,252 @@
 
 ## Overview
 
-The VIP Platform adopts a comprehensive Infrastructure as Code (IaC) approach using Terraform and Terragrunt to define, deploy, and manage all cloud resources. This approach ensures consistency, repeatability, and maintainability across all environments and cloud providers.
+All infrastructure is defined in OpenTofu modules managed by Terragrunt.
+No resources are created manually. The codebase is organized into
+reusable modules, cloud-specific live configurations, and automated tests.
 
-## Core Technologies
+## Tools
 
-### Terraform
+| Tool | Role |
+|------|------|
+| [OpenTofu](https://opentofu.org/) >= 1.6.0 | Infrastructure definition and provisioning (open-source Terraform fork) |
+| [Terragrunt](https://terragrunt.gruntwork.io/) | DRY configuration, remote state, dependency orchestration, provider generation |
+| [Terratest](https://terratest.gruntwork.io/) | Go-based infrastructure testing (AWS) |
+| `terraform test` | Native `.tftest.hcl` testing (Azure) |
 
-[Terraform](https://www.terraform.io/) is an open-source IaC tool that allows us to define infrastructure resources using a declarative configuration language. The platform uses Terraform for:
-
-- Defining cloud resources using HCL (HashiCorp Configuration Language)
-- Managing infrastructure state
-- Planning and applying infrastructure changes
-- Testing infrastructure configurations
-- Validating security and compliance requirements
-
-The minimum required Terraform version for this project is 1.6.0, which provides essential features like:
-
-- Enhanced testing capabilities
-- Improved validation functionality
-- Enhanced provider abstraction
-
-### Terragrunt
-
-[Terragrunt](https://terragrunt.gruntwork.io/) is a thin wrapper for Terraform that provides additional features to enhance the Terraform experience. We use Terragrunt for:
-
-- Keeping Terraform configurations DRY (Don't Repeat Yourself)
-- Managing remote state configuration
-- Implementing dependencies between Terraform modules
-- Executing commands across multiple Terraform modules
-- Providing consistent environment-specific variables
-
-The minimum required Terragrunt version is 0.53.0.
+All modules use the `tofu` binary, not `terraform`. This is configured in
+`infra/root.hcl`.
 
 ## Project Structure
 
-The VIP Platform follows a well-organized directory structure to manage infrastructure code:
-
-```mermaid
-graph TD
-    infra[infra/] --> modules[modules/]
-    infra --> live[live/]
-    infra --> tests[tests/]
-    infra --> scripts[scripts/]
-    infra --> docs[docs/]
-    infra --> makefile[Makefile]
-    
-    modules --> aws[aws/]
-    modules --> azure[azure/]
-    modules --> gcp[gcp/]
-    modules --> common[common/]
-    
-    live --> envcommon[_envcommon/]
-    live --> cloud_resources[aws/azure/gcp]
-    cloud_resources --> env[environments/]
-    env --> region[regions/]
-    region --> components[components/]
-    
-    docs --> guides[numbered guides]
-    docs --> templates[README-TEMPLATES/]
-    docs --> diagrams[diagrams/]
-    
-    subgraph "Module Categories"
-        azure --> base[Base Modules]
-        azure --> networking[Networking Modules]
-        azure --> compute[Compute Modules]
-        azure --> storage[Storage Modules]
-        azure --> security[Security Modules]
-        azure --> monitoring[Monitoring Modules]
-        azure --> cdn[CDN Modules]
-    end
-    
-    subgraph "Azure Modules"
-        base --> base_modules[naming, resource_group, client_config]
-        networking --> network_modules[networking, private_dns]
-        compute --> compute_modules[aks_core, aks_node_pools, aks_identity, container_registry]
-        storage --> storage_modules[storage_account, storage_container, storage_roles]
-        security --> security_modules[key_vault, identities]
-        monitoring --> monitoring_modules[log_analytics, monitor_workspace, prometheus_dcr, managed_grafana]
-        cdn --> cdn_modules[frontdoor_profile, frontdoor_endpoint, frontdoor_private_link]
-    end
-    
-    subgraph "Live Environment Structure"
-        components --> networking_config[networking/]
-        components --> storage_config[storage/]
-        components --> compute_config[aks/]
-        components --> monitoring_config[monitoring/]
-    end
-    
-    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
-    classDef folder fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
-    classDef module fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
-    classDef category fill:#fff8e1,stroke:#ff8f00,stroke-width:2px;
-    classDef file fill:#e0f7fa,stroke:#006064,stroke-width:2px;
-    
-    class infra,modules,live,tests,scripts,docs,aws,azure,gcp,common,envcommon,cloud_resources,env,region,components,diagrams,templates,guides folder;
-    class base_modules,network_modules,compute_modules,storage_modules,security_modules,monitoring_modules,cdn_modules module;
-    class base,networking,compute,storage,security,monitoring,cdn category;
-    class makefile file;
+```text
+infra/
+├── modules/                        # Reusable modules
+│   ├── aws/                        # AWS-specific (12 modules)
+│   │   ├── eks/
+│   │   ├── networking/
+│   │   ├── organizations/
+│   │   └── ...
+│   ├── azure/                      # Azure-specific (24 modules)
+│   │   ├── aks_core/
+│   │   ├── networking/
+│   │   └── ...
+│   ├── gcp/                        # GCP-specific (2 modules)
+│   │   ├── naming/
+│   │   └── networking/
+│   ├── cloudflare/                 # DNS delegation
+│   ├── cilium/                     # Shared: CNI
+│   ├── argocd/                     # Shared: GitOps
+│   ├── cert-manager/               # Shared: TLS
+│   ├── external-dns/               # Shared: DNS sync
+│   ├── external-secrets/           # Shared: secret injection
+│   ├── tailscale/                  # Shared: VPN operator
+│   ├── tailscale-admin/            # Shared: tailnet config
+│   ├── gateway-config/             # Shared: ingress
+│   ├── policy/                     # Shared: Kyverno
+│   └── vcluster/                   # Shared: virtual clusters
+├── live/                           # Environment-specific configs
+│   ├── aws/
+│   │   ├── _base.hcl              # Config composer
+│   │   ├── _versions.hcl          # Module sources + Helm pins
+│   │   ├── common.hcl             # Cloud-level defaults
+│   │   ├── mgmt/                  # Management account
+│   │   ├── platform/              # Platform account
+│   │   ├── preprod/               # Pre-production
+│   │   └── prod/                  # Production
+│   ├── azure/
+│   │   ├── _base.hcl
+│   │   ├── _versions.hcl
+│   │   ├── _envcommon/            # Shared module defaults
+│   │   ├── dev/
+│   │   └── ops/
+│   └── gcp/
+│       ├── _base.hcl
+│       └── ops/                   # Scaffolded, not deployed
+├── tests/
+│   ├── aws/                       # Terratest (Go)
+│   └── modules/azure/             # Native .tftest.hcl
+└── docs/                          # This documentation
 ```
 
-### Modules Directory
+### Modules vs Live
 
-The `modules` directory contains reusable Terraform modules organized by cloud provider:
+**Modules** (`infra/modules/`) are reusable, parameterized components.
+They accept variables, create resources, and produce outputs. Modules
+are cloud-agnostic where possible (Cilium, ArgoCD) or cloud-specific
+where necessary (EKS, AKS).
 
-- **AWS Modules**: Specific to AWS resources and patterns
-- **Azure Modules**: Specific to Azure resources and patterns
-- **GCP Modules**: Specific to GCP resources and patterns
-- **Common Modules**: Cloud-agnostic patterns and abstractions
+**Live configs** (`infra/live/`) are environment-specific Terragrunt
+units that compose modules with concrete values. Each `terragrunt.hcl`
+selects a module source, declares dependencies, and passes inputs.
 
-Azure modules are organized into logical categories:
+### Shared vs Cloud-Specific Modules
 
-1. **Base Modules**:
-   - `naming`: Resource naming conventions
-   - `resource_group`: Resource group management
-   - `client_config`: Current Azure client information
+Shared modules (top level of `infra/modules/`) deploy Helm charts or
+Kubernetes manifests that work on any cluster. They accept OAuth
+credentials, IRSA role ARNs, or other identity primitives as variables
+-- the live unit handles sourcing these from cloud-specific stores.
 
-2. **Networking Modules**:
-   - `networking`: Virtual networks, subnets, NSGs
-   - `private_dns`: Private DNS zones for service integration
+Cloud-specific modules live under `infra/modules/{aws,azure,gcp}/` and
+use cloud-native resources (VPCs, AKS clusters, IAM roles, etc.).
 
-3. **Compute Modules**:
-   - `aks_core`: AKS cluster creation and management
-   - `aks_node_pools`: Additional AKS node pools
-   - `aks_identity`: Managed identities for AKS
-   - `container_registry`: Azure Container Registry
+## Configuration Hierarchy
 
-4. **Storage Modules**:
-   - `storage_account`: Azure Storage Account management
-   - `storage_container`: Blob containers
-   - `storage_roles`: Storage-specific RBAC assignments
+Terragrunt uses a 7-layer configuration hierarchy that composes values
+from broad defaults down to module-specific overrides:
 
-5. **Security Modules**:
-   - `key_vault`: Secret management
-   - `identities`: User-assigned managed identities
-
-6. **Monitoring Modules**:
-   - `log_analytics`: Log aggregation and analysis
-   - `monitor_workspace`: Metrics storage (Prometheus)
-   - `prometheus_dcr`: Prometheus data collection rules
-   - `managed_grafana`: Metrics visualization
-
-7. **CDN Modules**:
-   - `frontdoor_profile`: CDN profile management
-   - `frontdoor_endpoint`: User-facing endpoints
-   - `frontdoor_private_link`: Secure backend connections
-
-8. **Composite Modules**:
-   - `stack_base`: Composes resource_group + networking + key_vault into a single deployable stack
-
-Each module follows a consistent structure:
-
-```mermaid
-graph TD
-    module[module-name/] --> main[main.tf]
-    module --> variables[variables.tf]
-    module --> outputs[outputs.tf]
-    module --> readme[README.md]
-    module --> optional[optional *.tf files]
-    
-    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
-    classDef folder fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
-    classDef file fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
-    
-    class module folder;
-    class main,variables,outputs,readme,optional file;
+```text
+root.hcl          → State backend, providers, OpenTofu binary
+common.hcl        → Cloud-wide tags, account/subscription maps
+_versions.hcl     → Module source paths, Helm chart version pins
+env.hcl           → Account ID, environment name, env tags
+region.hcl        → Region name, AZs
+workload.hcl      → Workload name, compliance tier
+terragrunt.hcl    → Module source, dependencies, inputs
 ```
 
-### Tests Directory
+`_base.hcl` loads all layers, merges tags, runs safety validations
+(environment path matches env.hcl, account ID matches safety map), and
+exposes composed values to modules via `include.base.locals.*`.
 
-The `tests` directory contains all test configurations for validating infrastructure modules. Tests are organized to mirror the module structure:
+For the full breakdown, see
+[Terragrunt Configuration Hierarchy](../../docs/architecture/config-hierarchy.md).
 
-```mermaid
-graph TD
-    tests[tests/] --> modules_tests[modules/]
-    
-    modules_tests --> aws_tests[aws/]
-    modules_tests --> azure_tests[azure/]
-    modules_tests --> gcp_tests[gcp/]
-    modules_tests --> common_tests[common/]
-    
-    azure_tests --> networking_tests[networking/]
-    azure_tests --> storage_tests[storage_account/]
-    azure_tests --> other_tests[...]
-    
-    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
-    classDef folder fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
-    
-    class tests,modules_tests,aws_tests,azure_tests,gcp_tests,common_tests,networking_tests,storage_tests,other_tests folder;
+## Module Structure
+
+Every module follows the same file layout:
+
+```text
+module-name/
+├── main.tf           # Resources and locals
+├── variables.tf      # Input variables
+├── outputs.tf        # Output values
+└── versions.tf       # Required providers
 ```
 
-The tests directory contains:
-- Unit tests for individual modules
-- Integration tests for combinations of modules
-- Compliance tests for security and best practices
+Key conventions:
 
-> **Important**: Tests must be placed in the `tests` directory, not within module directories, to maintain separation between implementation and test code.
+- **`create` toggle** -- every module accepts a `var.create` boolean
+  (default `true`) that gates all resources via `count`. This allows
+  disabling a module without removing its live unit.
+- **`tags` variable** -- `map(string)`, default `{}`. Resources merge
+  `var.tags` with a resource-specific `Name` tag.
+- **No hardcoded providers** -- modules declare required providers in
+  `versions.tf` but never configure them. Provider configuration is
+  generated by Terragrunt.
 
-### Live Directory
+For design patterns and anti-patterns, see
+[Module Design](13-module-design.md).
 
-The `live` directory contains the actual infrastructure configurations for different environments and regions:
+## Version Management
 
-- **_envcommon**: Common configurations shared across environments
-- **Global**: Global resources not tied to specific regions
-- **AWS/Azure/GCP**: Cloud-specific resources organized by environment and region
+`_versions.hcl` (one per cloud) is the single source of truth for module
+sources and Helm chart versions:
 
-Each environment/region directory contains Terragrunt configurations for different infrastructure components:
+```hcl
+module_source = {
+  networking = "${local.source_base}/aws//networking"
+  eks        = "${local.source_base}/aws//eks"
+  cilium     = "${local.source_base}/cilium"
+  # ...
+}
 
-```mermaid
-graph TD
-    live_dir[live/azure/dev/westus/] --> workload_dir_platform[platform/]
-    live_dir --> workload_dir_hipaa[hipaa/]
-    live_dir --> common_file[common.hcl]
-    
-    workload_dir_platform --> workload_hcl_platform[workload.hcl]
-    workload_dir_platform --> networking_dir[networking/]
-    workload_dir_platform --> storage_dir[storage/]
-    workload_dir_platform --> aks_core_dir[aks_core/]
-    
-    workload_dir_hipaa --> workload_hcl_hipaa[workload.hcl]
-    workload_dir_hipaa --> hipaa_networking[networking/]
-    workload_dir_hipaa --> hipaa_aks[aks_core/]
-    
-    networking_dir --> networking_config[terragrunt.hcl]
-    storage_dir --> storage_config[terragrunt.hcl]
-    aks_core_dir --> aks_core_config[terragrunt.hcl]
-    hipaa_networking --> hipaa_net_config[terragrunt.hcl]
-    hipaa_aks --> hipaa_aks_config[terragrunt.hcl]
-    
-    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
-    classDef folder fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
-    classDef file fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
-    
-    class live_dir,networking_dir,storage_dir,key_vault_dir,aks_core_dir folder;
-    class networking_config,storage_config,key_vault_config,aks_core_config,common_file file;
+helm_versions = {
+  cilium             = "1.17.2"
+  argocd             = "9.5.14"
+  cert_manager       = "1.17.1"
+  # ...
+}
 ```
+
+All sources use `get_repo_root()` so paths resolve correctly regardless
+of working directory. When the project migrates to a registry, only
+`_versions.hcl` needs to change.
+
+## Dependency Management
+
+Terragrunt `dependency` blocks define the deployment graph. Each
+dependency declares `mock_outputs` so that `destroy` works even when
+upstream dependencies are already gone:
+
+```hcl
+dependency "eks" {
+  config_path = "../eks"
+  mock_outputs = {
+    cluster_endpoint = "https://mock"
+    cluster_ca       = "mock-ca"
+    cluster_id       = "mock-cluster"
+  }
+}
+```
+
+`terragrunt run --all apply` resolves the full DAG and deploys in
+order. `terragrunt run --all destroy` reverses the graph.
+
+See the AWS and Azure dependency graphs in
+[Architecture Overview](02-architecture-overview.md).
+
+## State Management
+
+State is routed automatically by `root.hcl` based on the cloud directory:
+
+| Cloud | Backend | Location |
+|-------|---------|----------|
+| AWS | S3 + DynamoDB | `tfstate-mgmt-851725353202`, `terraform-locks` |
+| Azure/GCP | Azure Blob | `tfstatemulticloud`, `terraformstate` container |
+
+State keys mirror the directory structure:
+`live/aws/platform/us-east-1/platform/eks/terraform.tfstate`.
+
+For details, see
+[Configuration Hierarchy: Cloud-Aware Remote State Routing](../../docs/architecture/config-hierarchy.md#cloud-aware-remote-state-routing).
 
 ## Development Workflow
 
-### Module Development
-
-1. **Create Module Template**: Start with a standardized module template
-2. **Define Interfaces**: Clearly define input variables and outputs
-3. **Write Tests**: Create tests to validate module functionality
-4. **Implement Module**: Develop the module implementation
-5. **Test and Validate**: Run tests to ensure module works as expected
-6. **Document**: Create comprehensive README documentation
-
-### Infrastructure Deployment
-
-1. **Plan Changes**: Review proposed changes with `terragrunt plan`
-2. **Apply Changes**: Apply changes with `terragrunt apply`
-3. **Validate Deployment**: Verify resources are created correctly
-4. **Run Tests**: Execute automated tests to validate infrastructure
-
-## Module Dependencies
-
-Terragrunt manages dependencies between modules to ensure proper deployment order. Below is an example of a typical dependency graph for Azure resources:
-
-```mermaid
-graph TD
-    naming[naming] --> resource_group[resource_group]
-    resource_group --> networking[networking]
-    resource_group --> key_vault[key_vault]
-    resource_group --> aks_identity[aks_identity]
-    resource_group --> storage_account[storage_account]
-    resource_group --> container_registry[container_registry]
-    resource_group --> log_analytics[log_analytics]
-    resource_group --> monitor_workspace[monitor_workspace]
-    
-    networking --> aks_core[aks_core]
-    networking --> storage_account
-    networking --> key_vault
-    networking --> private_dns[private_dns]
-    networking --> frontdoor_private_link[frontdoor_private_link]
-    
-    aks_identity --> aks_core
-    aks_core --> aks_node_pools[aks_node_pools]
-    
-    client_config[client_config] --> key_vault
-    client_config --> storage_roles[storage_roles]
-    
-    storage_account --> storage_container[storage_container]
-    storage_account --> storage_roles
-    
-    monitor_workspace --> prometheus_dcr[prometheus_dcr]
-    monitor_workspace --> managed_grafana[managed_grafana]
-    
-    log_analytics --> aks_core
-    
-    prometheus_dcr --> aks_core
-    
-    frontdoor_profile[frontdoor_profile] --> frontdoor_endpoint[frontdoor_endpoint]
-    frontdoor_profile --> frontdoor_private_link
-    
-    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
-    classDef base fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
-    classDef network fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
-    classDef compute fill:#fff8e1,stroke:#ff8f00,stroke-width:2px;
-    classDef storage fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
-    classDef security fill:#ffebee,stroke:#c62828,stroke-width:2px;
-    classDef monitoring fill:#e0f7fa,stroke:#006064,stroke-width:2px;
-    classDef cdn fill:#fff3e0,stroke:#e65100,stroke-width:2px;
-    
-    class naming,resource_group,client_config base;
-    class networking,private_dns network;
-    class aks_core,aks_node_pools,container_registry compute;
-    class storage_account,storage_container,storage_roles storage;
-    class key_vault,aks_identity security;
-    class log_analytics,monitor_workspace,prometheus_dcr,managed_grafana monitoring;
-    class frontdoor_profile,frontdoor_endpoint,frontdoor_private_link cdn;
-```
-
-This dependency graph ensures that resources are created in the correct order, with foundational resources like resource groups created first, followed by networking resources, and finally application-specific resources.
-
-## Shared Configuration: `_base.hcl`
-
-Each cloud provider directory contains a `_base.hcl` file (e.g., `infra/live/azure/_base.hcl`) that centralizes the boilerplate every module-level `terragrunt.hcl` would otherwise repeat. By including `_base.hcl`, a module config eliminates roughly 30 lines of repeated configuration loading.
-
-`_base.hcl` loads and merges the full config hierarchy:
-
-1. `common.hcl` -- cloud-wide defaults (prefix, project tags)
-2. `env.hcl` -- environment-level settings (subscription, env tags)
-3. `region.hcl` -- region info (location, abbreviation)
-4. `network.hcl` -- authoritative CIDR allocations for the region
-5. `_versions.hcl` -- centralized module sources and Helm chart pins
-
-It exposes commonly used scalars (`env`, `prefix`, `customer`, `region`, `region_abbv`), composed tags (merged across common/env/region layers), and the `module_source` and `helm_versions` maps from `_versions.hcl`.
-
-`_base.hcl` also includes safety validations:
-
-- **Environment path check**: Verifies the directory path environment segment matches the value declared in `env.hcl`.
-- **Subscription ID check**: Verifies the subscription ID in `env.hcl` matches the expected value from the `environment_subscription_map` in `common.hcl`.
-
-### Config Hierarchy
-
-The full configuration hierarchy from broadest to narrowest scope:
-
-| Level | File | Purpose |
-|-------|------|---------|
-| Root | `infra/root.hcl` | Remote state, providers, global tags |
-| Cloud | `infra/live/azure/common.hcl` | Cloud-wide defaults (prefix, project tags) |
-| Environment | `infra/live/azure/{env}/env.hcl` | Subscription, env tags, shutdown policies |
-| Region | `infra/live/azure/{env}/{region}/region.hcl` | Region info |
-| Region | `infra/live/azure/{env}/{region}/network.hcl` | Authoritative CIDR allocations |
-| Workload | `infra/live/azure/{env}/{region}/{workload}/workload.hcl` | Workload name, compliance tier, workload tags |
-| Defaults | `infra/live/azure/_envcommon/*.hcl` | Module defaults shared across environments |
-| Module | `infra/live/azure/{env}/{region}/{workload}/{module}/terragrunt.hcl` | Final overrides |
-
-At each level, later layers override earlier ones for tags and inputs.
-
-### Workload Configuration: `workload.hcl`
-
-Each workload directory contains a `workload.hcl` that declares the workload's identity and compliance posture:
-
-```hcl
-# infra/live/azure/prod/westus/hipaa/workload.hcl
-locals {
-  workload        = "hipaa"
-  compliance_tier = "hipaa"
-  workload_tags = {
-    Workload       = "hipaa"
-    ComplianceTier = "hipaa"
-  }
-}
-```
-
-`_base.hcl` loads `workload.hcl` via `find_in_parent_folders()` and merges `workload_tags` into the tag hierarchy. The `compliance_tier` value drives cluster topology decisions (shared vCluster vs. dedicated cluster) and security control selection.
-
-## Centralized Version Management: `_versions.hcl`
-
-Each cloud provider directory contains a `_versions.hcl` file (e.g., `infra/live/azure/_versions.hcl`) that centralizes all module source paths and Helm chart version pins. `_base.hcl` loads this file and exposes `module_source` and `helm_versions` maps.
-
-All module source paths use `get_repo_root()` as the base, providing a single place to update if the project migrates to a Terraform registry or git-tag-based versioning. Helm chart versions are pinned here so every environment deploys the same chart version unless explicitly overridden.
-
-Modules reference their source via:
-
-```hcl
-terraform {
-  source = include.base.locals.module_source.networking
-}
-```
-
-## Example: Terragrunt Configuration
-
-A typical module-level `terragrunt.hcl` uses the `include "base"` pattern to pull in shared configuration:
-
-```hcl
-include "root" {
-  path = find_in_parent_folders()
-}
-
-include "base" {
-  path   = find_in_parent_folders("azure/_base.hcl")
-  expose = true
-}
-
-include "env" {
-  path = find_in_parent_folders("env.hcl")
-}
-
-terraform {
-  source = include.base.locals.module_source.networking
-}
-
-dependency "resource_group" {
-  config_path = "../resource_group"
-  mock_outputs = {
-    resource_group_name = "mock-rg"
-  }
-}
-
-inputs = {
-  resource_group_name = dependency.resource_group.outputs.resource_group_name
-  address_space       = ["10.0.0.0/16"]
-  
-  subnets = {
-    "az1-node-subnet" = {
-      address_prefix = "10.0.0.0/24"
-      security_rules = ["allow_ssh", "allow_http"]
-    }
-    "az2-node-subnet" = {
-      address_prefix = "10.0.1.0/24"
-      security_rules = ["allow_ssh", "allow_http"]
-    }
-  }
-}
-```
-
-Values from `_base.hcl` are accessed as `include.base.locals.*` -- for example, `include.base.locals.env`, `include.base.locals.tags`, `include.base.locals.module_source.aks_core`.
-
-## Example: Module Structure
-
-A typical module implementation looks like:
-
-```hcl
-# main.tf
-
-locals {
-  vnet_name = var.name != null ? var.name : "vnet-${var.environment}-${var.region_abbv}"
-  tags = merge(var.tags, {
-    ManagedBy = "Terraform"
-    Module    = "networking"
-  })
-}
-
-resource "azurerm_virtual_network" "vnet" {
-  name                = local.vnet_name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  address_space       = var.address_space
-  
-  dynamic "ddos_protection_plan" {
-    for_each = var.ddos_protection_plan_id != null ? [1] : []
-    content {
-      id     = var.ddos_protection_plan_id
-      enable = true
-    }
-  }
-  
-  tags = local.tags
-}
-
-resource "azurerm_subnet" "subnet" {
-  for_each = var.subnets
-  
-  name                 = each.key
-  resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = [each.value.address_prefix]
-  service_endpoints    = try(each.value.service_endpoints, [])
-  
-  dynamic "delegation" {
-    for_each = try(each.value.delegation, null) != null ? [1] : []
-    content {
-      name = each.value.delegation.name
-      service_delegation {
-        name    = each.value.delegation.service_name
-        actions = each.value.delegation.actions
-      }
-    }
-  }
-}
-
-resource "azurerm_network_security_group" "nsg" {
-  for_each = var.subnets
-  
-  name                = "${each.key}-nsg"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  
-  dynamic "security_rule" {
-    for_each = try(flatten([
-      for rule_name in each.value.security_rules : [
-        var.security_rules[rule_name]
-      ]
-    ]), [])
-    
-    content {
-      name                       = security_rule.value.name
-      priority                   = security_rule.value.priority
-      direction                  = security_rule.value.direction
-      access                     = security_rule.value.access
-      protocol                   = security_rule.value.protocol
-      source_port_range          = try(security_rule.value.source_port_range, "*")
-      destination_port_range     = try(security_rule.value.destination_port_range, "*")
-      source_address_prefix      = try(security_rule.value.source_address_prefix, "*")
-      destination_address_prefix = try(security_rule.value.destination_address_prefix, "*")
-    }
-  }
-  
-  tags = local.tags
-}
-
-resource "azurerm_subnet_network_security_group_association" "nsg_association" {
-  for_each = var.subnets
-  
-  subnet_id                 = azurerm_subnet.subnet[each.key].id
-  network_security_group_id = azurerm_network_security_group.nsg[each.key].id
-}
-
-# variables.tf
-
-variable "name" {
-  description = "The name of the virtual network (generated if not provided)"
-  type        = string
-  default     = null
-}
-
-variable "resource_group_name" {
-  description = "The name of the resource group"
-  type        = string
-  
-  validation {
-    condition     = length(var.resource_group_name) >= 3 && length(var.resource_group_name) <= 63
-    error_message = "Resource group name must be between 3 and 63 characters."
-  }
-}
-
-variable "location" {
-  description = "The Azure region where resources will be created"
-  type        = string
-}
-
-variable "address_space" {
-  description = "The address spaces for the virtual network"
-  type        = list(string)
-}
-
-variable "subnets" {
-  description = "Map of subnet objects to create"
-  type = map(object({
-    address_prefix    = string
-    security_rules    = optional(list(string), [])
-    service_endpoints = optional(list(string), [])
-    delegation = optional(object({
-      name         = string
-      service_name = string
-      actions      = list(string)
-    }))
-  }))
-  default = {}
-}
-
-variable "security_rules" {
-  description = "Map of security rules that can be referenced by subnets"
-  type = map(object({
-    name                       = string
-    priority                   = number
-    direction                  = string
-    access                     = string
-    protocol                   = string
-    source_port_range          = optional(string)
-    destination_port_range     = optional(string)
-    source_address_prefix      = optional(string)
-    destination_address_prefix = optional(string)
-  }))
-  default = {}
-}
-
-variable "ddos_protection_plan_id" {
-  description = "The ID of the DDoS protection plan to associate with the virtual network"
-  type        = string
-  default     = null
-}
-
-variable "environment" {
-  description = "Environment name (dev, test, staging, prod)"
-  type        = string
-  default     = "dev"
-}
-
-variable "region_abbv" {
-  description = "Abbreviation for Azure region (used in resource naming)"
-  type        = string
-  default     = "eus"
-}
-
-variable "tags" {
-  description = "Tags to apply to all resources"
-  type        = map(string)
-  default     = {}
-}
-
-# outputs.tf
-
-output "id" {
-  description = "The ID of the virtual network"
-  value       = azurerm_virtual_network.vnet.id
-}
-
-output "name" {
-  description = "The name of the virtual network"
-  value       = azurerm_virtual_network.vnet.name
-}
-
-output "subnet_ids" {
-  description = "Map of subnet names to subnet IDs"
-  value = {
-    for k, v in azurerm_subnet.subnet : k => v.id
-  }
-}
-
-output "nsg_ids" {
-  description = "Map of subnet names to NSG IDs"
-  value = {
-    for k, v in azurerm_network_security_group.nsg : k => v.id
-  }
-}
-```
-
-## Testing Approach
-
-The VIP Platform uses Terraform's built-in testing framework to validate module functionality:
-
-```hcl
-# Example test file: networking/tests/basic.tftest.hcl
-
-run "prepare_workspace" {
-  module {
-    source = "../"
-  }
-}
-
-variables {
-  vnet_name           = "test-vnet"
-  resource_group_name = "test-rg"
-  location            = "eastus"
-  address_space       = ["10.0.0.0/16"]
-  
-  subnets = {
-    "subnet1" = {
-      address_prefix = "10.0.0.0/24"
-      security_rules = ["allow_ssh"]
-    }
-  }
-}
-
-run "verify_vnet_creation" {
-  command = apply
-  
-  assert {
-    condition     = azurerm_virtual_network.vnet.name == "test-vnet"
-    error_message = "VNet name did not match expected value"
-  }
-  
-  assert {
-    condition     = length(azurerm_subnet.subnet) == 1
-    error_message = "Expected 1 subnet to be created"
-  }
-}
-
-run "verify_subnet_security" {
-  command = apply
-  
-  assert {
-    condition     = length(azurerm_network_security_group.nsg) == 1
-    error_message = "Expected 1 NSG to be created"
-  }
-  
-  assert {
-    condition     = length(azurerm_subnet_network_security_group_association.nsg_association) == 1
-    error_message = "Expected 1 NSG association to be created"
-  }
-}
-```
-
-### Comprehensive Testing Strategy
-
-Our testing approach includes several levels of validation:
-
-1. **Unit Tests**: Validate individual modules in isolation
-   - Verify resource creation
-   - Test input validation rules
-   - Confirm outputs match expectations
-
-2. **Integration Tests**: Test combinations of modules working together
-   - Verify dependencies are correctly managed
-   - Test end-to-end flows like networking to compute
-
-3. **Compliance Tests**: Ensure security and best practices
-   - Validate network security rules
-   - Check for required tags
-   - Verify encryption settings
-
-4. **Regression Tests**: Prevent reintroduction of fixed issues
-   - Maintain tests for all previously identified bugs
-   - Include edge cases and boundary conditions
-
-Tests are run using the project's Makefile with the following commands:
+### Adding a Module
+
+1. Create the module in `infra/modules/` with `main.tf`, `variables.tf`,
+   `outputs.tf`, `versions.tf`.
+2. Add the module source to `_versions.hcl`.
+3. Create a live unit in `infra/live/{cloud}/{env}/{region}/{workload}/`.
+4. Write tests in `infra/tests/`.
+
+### Deploying
 
 ```bash
-# Run all tests
-make test
+# Single module
+cd infra/live/aws/platform/us-east-1/platform/eks
+terragrunt plan
+terragrunt apply
 
-# Run tests for a specific module
-make test-module MODULE=azure/networking
-
-# Run tests with verbose output
-make test-verbose
+# Full stack (DAG order)
+cd infra/live/aws/platform/us-east-1/platform
+terragrunt run --all apply
 ```
 
-The Makefile provides a standardized and consistent way to run tests across the codebase and is the preferred method for both local testing and CI/CD pipelines.
+### Testing
 
-## Best Practices
+```bash
+# AWS (Terratest)
+cd infra/tests/aws
+go test -v -timeout 30m ./networking/...
 
-1. **Module Design**:
-   - Focus on single responsibility
-   - Provide sensible defaults
-   - Validate inputs
-   - Include comprehensive documentation
+# Azure (native)
+cd infra/tests/modules/azure/aks_core
+terraform init && terraform test
+```
 
-2. **Terragrunt Usage**:
-   - Keep DRY with common includes
-   - Use dependencies for resource references
-   - Use mock outputs for testing
-   - Maintain consistent directory structure
+For the full testing strategy, see [Testing Strategy](15-testing-strategy.md).
 
-3. **State Management**:
-   - Use remote state with locking
-   - Isolate state by environment and component
-   - Back up state files regularly
-   - Monitor for state drift
+### CI
 
-4. **Secret Management**:
-   - Never store secrets in version control
-   - Use Azure Key Vault for secure storage
-   - Use environment variables for sensitive inputs
-   - Leverage managed identities where possible
-
-5. **Testing**:
-   - Write tests for all modules
-   - Use both unit and integration tests
-   - Include negative test cases
-   - Verify resource properties and security configurations
+Every PR runs format checks (`tofu fmt`, `terragrunt hcl fmt`),
+validation (`tofu validate` on all modules), linting (`tflint`), and
+markdown linting. Integration tests run weekly on a schedule. See
+[Testing Strategy: CI Integration](15-testing-strategy.md#ci-integration).
 
 ## Next Steps
 
-Continue to [Multi-Cloud Strategy](04-multi-cloud-strategy.md) to understand how the VIP Platform implements a consistent approach across different cloud providers. 
+Continue to [Multi-Cloud Strategy](04-multi-cloud-strategy.md) to
+understand how the platform implements consistent patterns across cloud
+providers.

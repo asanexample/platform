@@ -52,7 +52,7 @@ module "networking" {
   
   tags = {
     Environment = "dev"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
@@ -91,7 +91,7 @@ module "storage" {
   
   tags = {
     Environment = "dev"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
@@ -129,7 +129,7 @@ module "key_vault" {
   
   tags = {
     Environment = "dev"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
@@ -174,7 +174,7 @@ module "aks_core" {
   
   tags = {
     Environment = "dev"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
@@ -257,7 +257,7 @@ module "resource_group" {
   
   tags = {
     Environment = "dev"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
@@ -419,7 +419,7 @@ module "acr" {
   
   tags = {
     Environment = "Development"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
@@ -456,7 +456,7 @@ module "private_dns" {
   
   tags = {
     Environment = "Production"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
@@ -488,7 +488,7 @@ module "aks_identity" {
   
   tags = {
     Environment = "Development"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
@@ -530,7 +530,7 @@ module "identities" {
   
   tags = {
     Environment = "Development"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
@@ -564,7 +564,7 @@ module "log_analytics" {
   
   tags = {
     Environment = "Production"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
@@ -606,7 +606,7 @@ module "managed_grafana" {
   
   tags = {
     Environment = "Production"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
@@ -635,7 +635,7 @@ module "monitor_workspace" {
   
   tags = {
     Environment = "Production"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
     Component   = "Monitoring"
   }
 }
@@ -668,7 +668,7 @@ module "prometheus_dcr" {
   
   tags = {
     Environment = "Production"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
     Component   = "Monitoring"
   }
 }
@@ -698,7 +698,7 @@ module "frontdoor_profile" {
   
   tags = {
     Environment = "Production"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
     Component   = "CDN"
   }
 }
@@ -730,7 +730,7 @@ module "frontdoor_endpoint" {
   
   tags = {
     Environment = "Production"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
     Component   = "CDN"
   }
 }
@@ -764,7 +764,7 @@ module "frontdoor_private_link" {
   
   tags = {
     Environment = "Production"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
     Component   = "CDN"
   }
 }
@@ -815,7 +815,7 @@ module "stack_base" {
 
   tags = {
     Environment = "dev"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
@@ -863,7 +863,7 @@ module "vcluster" {
 
   tags = {
     Environment = "dev"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
@@ -898,7 +898,7 @@ module "policy" {
 
   tags = {
     Environment = "prod"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
@@ -978,7 +978,7 @@ module "networking" {
 
   tags = {
     Environment = "dev"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terragrunt"
   }
 }
 ```
@@ -1105,18 +1105,21 @@ To learn more about the module design principles, see [Module Design](13-module-
 For a complete understanding of how these modules fit into the overall architecture, refer to these additional documentation resources:
 
 ### Implementation Guidance
+
 - [Infrastructure as Code Approach](03-infrastructure-as-code.md) - Understanding the IaC methodology used in this project
 - [Deployment Workflows](14-deployment-workflows.md) - Processes for deploying modules using Terragrunt
 - [Testing Strategy](15-testing-strategy.md) - Approaches for validating module functionality
 - [Module Design Principles](13-module-design.md) - Design patterns and principles for module development
 
 ### Architecture Context
+
 - [Architecture Overview](02-architecture-overview.md) - High-level architecture design
 - [Network Topology](07-network-topology.md) - Network design principles relevant to module implementation
 - [Kubernetes Network Design](08-kubernetes-network-design.md) - Specific network considerations for AKS modules
 - [Security Architecture](09-security-architecture.md) - Security principles implemented in modules
 
 ### Operational Considerations
+
 - [Environment Management](05-environment-management.md) - Managing multiple deployment environments
 - [Naming Conventions](11-naming-conventions.md) - Standardized resource naming patterns
 - [Tagging Strategy](12-tagging-strategy.md) - Resource tagging guidelines
@@ -1124,7 +1127,8 @@ For a complete understanding of how these modules fit into the overall architect
 - [Cost Management Strategy](19-cost-management.md) - Optimizing resource costs
 
 ### Templates and Standards
+
 - [README Standards](README-STANDARDS.md) - Standards for module documentation
 - [README Templates](README-TEMPLATES/) - Templates for consistent documentation
 
-When implementing these modules in different environments, also refer to the environment-specific documentation in the `infra/live` directory structure for configuration details tailored to each environment. 
+When implementing these modules in different environments, also refer to the environment-specific documentation in the `infra/live` directory structure for configuration details tailored to each environment.

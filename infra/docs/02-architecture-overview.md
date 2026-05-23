@@ -2,216 +2,346 @@
 
 ## Design Principles
 
-The VIP Platform architecture adheres to the following key design principles:
+1. **Infrastructure as Code** -- all infrastructure is defined in
+   OpenTofu modules managed by Terragrunt. No manual configuration.
+2. **Modularity** -- infrastructure is decomposed into single-purpose
+   modules (networking, EKS, IAM roles, etc.) composed via Terragrunt
+   dependency graphs.
+3. **Multi-cloud portability** -- shared modules (Cilium, ArgoCD,
+   cert-manager, etc.) are cloud-agnostic. Cloud-specific modules live
+   under `infra/modules/{aws,azure,gcp}/`. Live units handle
+   cloud-specific provider configuration.
+4. **Hierarchical configuration** -- settings are defined at the broadest
+   applicable layer (cloud, environment, region, workload) and merged at
+   apply time. Later layers override earlier ones.
+5. **Least privilege** -- IAM roles are purpose-built (PlatformAdmin,
+   PlatformDeployer, DeveloperAccess). SCPs enforce guardrails at the
+   organization level.
+6. **BYOCNI** -- Cilium replaces the default CNI on all clouds (ENI mode
+   on AWS, overlay on Azure) for consistent network policy, observability,
+   and eBPF-based networking.
 
-1. **Modularity**: Breaking down infrastructure into smaller, reusable components that can be combined to create complex environments.
+## Implementation Status
 
-2. **Separation of Concerns**: Clear boundaries between different aspects of the infrastructure (networking, security, compute, etc.).
+| Cloud | Status | What's Deployed |
+|-------|--------|-----------------|
+| AWS | **Production** | Full EKS platform in us-east-1: networking, IAM, EKS, Cilium, ArgoCD, cert-manager, external-dns, external-secrets, Tailscale VPN, gateway ingress. Preprod and prod accounts have networking only. |
+| Azure | **Development** | AKS clusters in dev (eastus) and ops (westus) with full observability stack (Grafana, Prometheus, Log Analytics), Front Door, storage, container registry. |
+| GCP | **Scaffolded** | Naming and networking modules exist. Live config for ops/us-east1 is defined but no units are deployed. |
 
-3. **Infrastructure as Code**: All infrastructure defined and managed through code, with no manual configuration.
+## AWS Architecture
 
-4. **Immutability**: Infrastructure components are replaced rather than modified, ensuring consistent and predictable states.
+### Account Structure
 
-5. **Least Privilege**: Access controls follow the principle of least privilege to minimize security risks.
+The AWS Organization has five accounts across three organizational units:
 
-6. **Multi-Cloud Compatibility**: Core patterns designed to work consistently across different cloud providers (currently implemented for Azure, with AWS and GCP planned for future phases).
+```mermaid
+graph TD
+    Root["Root (Management)<br/>851725353202"]
+    Root --> Platform_OU["Platform OU"]
+    Root --> Workloads_OU["Workloads OU"]
 
-7. **Environment Parity**: Production, staging, and development environments follow the same patterns with appropriate scaling.
+    Platform_OU --> Platform["Platform<br/>829808296602"]
+    Platform_OU --> Test["Test<br/>157263244316"]
 
-## Logical Architecture
+    Workloads_OU --> Preprod_OU["Preprod OU"]
+    Workloads_OU --> Prod_OU["Prod OU"]
+    Workloads_OU --> Regulated_OU["Regulated OU"]
 
-The VIP Platform is organized into the following logical layers:
-
-![VIP Platform Logical Architecture](diagrams/logical-architecture.png)
-
-1. **Foundation Layer**
-   - Core networking components (VPCs/VNets, subnets, security groups)
-   - Identity and access management
-   - Centralized logging and monitoring
-
-2. **Service Layer**
-   - Managed services (databases, message queues, etc.)
-   - Storage services
-   - Kubernetes clusters
-
-3. **Application Layer**
-   - Application-specific infrastructure
-   - Customer-specific resources
-   - Workload identity configurations
-
-4. **Security Layer** (cross-cutting)
-   - Encryption configurations
-   - Network security controls
-   - Secret management
-   - Compliance mechanisms
-
-5. **Operations Layer** (cross-cutting)
-   - Monitoring and logging
-   - Backup and disaster recovery
-   - Cost management
-   - Automation and CI/CD integration
-
-## Workload Hierarchy
-
-Infrastructure is organized by **workload** -- a logical grouping of related resources that share a compliance tier and lifecycle. The Terragrunt directory structure reflects this:
-
-```
-infra/live/{cloud}/{env}/{region}/{workload}/{module}/terragrunt.hcl
+    Preprod_OU --> Preprod["Preprod<br/>620830101009"]
+    Prod_OU --> Prod["Prod<br/>554518885123"]
 ```
 
-Each workload directory contains a `workload.hcl` that declares:
+| Account | ID | Purpose |
+|---------|-----|---------|
+| Management | 851725353202 | Organizations, Identity Center, Terraform state, GitHub OIDC |
+| Platform | 829808296602 | EKS cluster, platform services, IAM roles |
+| Test | 157263244316 | Terratest CI execution (GitHub Actions) |
+| Preprod | 620830101009 | Workload pre-production (networking only) |
+| Prod | 554518885123 | Workload production (networking only) |
 
-- **workload name** -- e.g., `platform`, `connectivity`, `hipaa`, `pci`
-- **compliance_tier** -- `standard`, `hipaa`, or `pci` (drives cluster topology and security controls)
-- **workload_tags** -- additional tags merged into every resource in the workload
+**Service Control Policies** are attached per OU:
 
-Workloads map to subscriptions organized by purpose, not team:
+- **Root**: baseline-guardrails, protect-security-services, enforce-encryption, deny-regions
+- **Platform**: protect-data-and-network
+- **Workloads**: protect-data-and-network, require-tagging, restrict-iam-users
 
+### IAM Roles
+
+| Role | Account | Trust | Purpose |
+|------|---------|-------|---------|
+| PlatformAdmin | Platform | SSO from mgmt + platform | kubectl, SSM tunnel, cluster debugging (4hr sessions) |
+| PlatformDeployer | Platform | mgmt account | Terragrunt apply, Helm/K8s providers (2hr sessions) |
+| DeveloperAccess | Platform | SSO from mgmt + platform | Namespace-scoped kubectl (4hr sessions) |
+| TerraformStateAccess | Management | PlatformDeployer | S3 state bucket + DynamoDB lock table |
+
+Authentication flows through AWS IAM Identity Center (SSO) with three
+permission sets (AdministratorAccess, PowerUserAccess, ReadOnlyAccess)
+assigned to groups (Admins, Developers, ReadOnly).
+
+### Network Topology
+
+The platform account VPC uses a multi-AZ, multi-tier subnet layout:
+
+```mermaid
+graph TB
+    subgraph VPC ["VPC 10.100.0.0/16"]
+        subgraph AZ1 ["us-east-1a"]
+            k1["kubernetes /26"]
+            e1["endpoints /26"]
+            f1["firewall /26"]
+            s1["services /27"]
+            p1["public /28"]
+            t1["transit /28"]
+        end
+        subgraph AZ2 ["us-east-1b"]
+            k2["kubernetes /26"]
+            e2["endpoints /26"]
+            f2["firewall /26"]
+            s2["services /27"]
+            p2["public /28"]
+            t2["transit /28"]
+        end
+        subgraph AZ3 ["us-east-1c"]
+            k3["kubernetes /26"]
+            e3["endpoints /26"]
+            f3["firewall /26"]
+            s3["services /27"]
+            p3["public /28"]
+            t3["transit /28"]
+        end
+        IGW["Internet Gateway"]
+        NAT["NAT Gateway (single)"]
+        S3EP["S3 Gateway Endpoint"]
+    end
 ```
-platform/
-  platform-connectivity-{prod,nonprod}  -- hub networking, DNS, firewall
-  platform-shared-{prod,nonprod}        -- shared clusters, observability, ACR
-  platform-data-{prod,nonprod}          -- shared data services
-regulated/
-  regulated-hipaa-prod                  -- HIPAA-isolated compute + data
-  regulated-pci-prod                    -- PCI CDE isolated compute + data
+
+| Subnet Tier | Size | Scope | Purpose |
+|-------------|------|-------|---------|
+| kubernetes | /26 (62 IPs) | Private | EKS node groups and pods |
+| endpoints | /26 (62 IPs) | Private | VPC endpoints, private links |
+| firewall | /26 (62 IPs) | Private | Network firewall (future) |
+| services | /27 (30 IPs) | Private | Internal services, load balancers |
+| public | /28 (14 IPs) | Public | NAT gateway, bastion, public ALBs |
+| transit | /28 (14 IPs) | Private | Cross-account/cross-region peering (future) |
+
+VPC Flow Logs ship to CloudWatch with 30-day retention. An S3 gateway
+endpoint reduces NAT costs for S3 traffic.
+
+CIDR allocation follows a per-environment `/16` scheme:
+
+| Environment | VPC CIDR |
+|-------------|----------|
+| Platform | `10.100.0.0/16` |
+| Preprod | `10.101.0.0/16` |
+| Prod | `10.102.0.0/16` |
+
+### EKS Cluster and Platform Services
+
+The platform account runs a single EKS cluster (`platform-use1-eks`,
+Kubernetes 1.35) with a private-only API endpoint. Developer access is
+via Tailscale VPN; SSM tunnel is the fallback.
+
+```mermaid
+graph LR
+    Dev["Developer Laptop<br/>(Tailscale client)"] --> TS["Tailscale<br/>Subnet Router"]
+    TS --> API["EKS Private API<br/>Endpoint"]
+    API --> CP["Control Plane"]
+
+    subgraph Node Groups
+        SYS["System Nodes<br/>2x t3.large"]
+        WRK["Workload Nodes<br/>1-6x t3.large"]
+    end
+
+    CP --> SYS
+    CP --> WRK
 ```
 
-## Compliance Tiers
+**Node groups:**
 
-The compliance tier declared in `workload.hcl` determines cluster topology, network isolation, and security controls:
+| Group | Instance Type | Min | Max | Labels |
+|-------|--------------|-----|-----|--------|
+| system | t3.large | 2 | 4 | `node-role=system` |
+| workload | t3.large | 1 | 6 | `node-role=workload` |
 
-| Tier | Workloads | Shared Cluster? | Dedicated VNet? | Extra Controls |
-|------|-----------|-----------------|-----------------|----------------|
-| Standard (SOC2) | platform, connectivity, data | Yes (vCluster) | Spoke peered to hub | RBAC, private endpoints, audit logging |
-| HIPAA | hipaa | Dedicated cluster | Isolated VNet | CMK encryption, 365-day logs, host encryption, private cluster |
-| PCI | pci | Dedicated cluster | CDE-segmented VNet | All HIPAA controls + WAF, IDS, deny-all default network policy |
+**Platform services deployed via Helm:**
 
-## Cluster Topology and vCluster Multi-Tenancy
+| Service | Chart Version | Purpose |
+|---------|--------------|---------|
+| Cilium | 1.17.2 | CNI (ENI mode, native routing, Hubble observability) |
+| ArgoCD | 9.5.14 | GitOps continuous delivery, SSO via Identity Center SAML |
+| cert-manager | 1.17.1 | TLS certificate management (Let's Encrypt, DNS01 via Route53) |
+| external-dns | 1.16.1 | DNS record sync to Route53 |
+| external-secrets | 0.14.3 | Secrets from AWS Secrets Manager + SSM Parameter Store |
+| Kyverno | 3.3.7 | Policy engine (pod security, image provenance) |
+| Tailscale Operator | 1.96.5 | Mesh VPN subnet router for private cluster access |
 
-Standard-tier workloads share physical AKS clusters. Tenant isolation is achieved via **vCluster** -- CNCF-certified virtual clusters that provide dedicated API servers, control planes, and CRDs without the cost of dedicated infrastructure. Each team or service gets its own vCluster inside the shared host cluster.
+All Helm chart versions are pinned in `infra/live/aws/_versions.hcl`.
 
-HIPAA and PCI workloads receive **dedicated physical clusters** with hardened configurations matching their compliance tier.
+**Deployment dependency graph:**
 
-## Physical Architecture
+```mermaid
+graph TD
+    NET["networking"] --> EKS["eks"]
+    IAM["iam-roles"] --> EKS
+    EKS --> CIL["cilium"]
+    CIL --> NG["node-groups"]
+    NG --> SSM["ssm-bastion"]
 
-The physical implementation follows a multi-region, multi-cloud approach:
+    EKS --> EA["eks-addons"]
+    CIL --> EA
+    NG --> EA
 
-![VIP Platform Physical Architecture](diagrams/physical-architecture.png)
+    NG --> CM["cert-manager"]
+    NG --> ED["external-dns"]
+    NG --> ES["external-secrets"]
+    NG --> ARGO["argocd"]
+    NG --> TS["tailscale"]
+    R53["route53"] --> CM
+    R53 --> ED
 
-### Multi-Cloud Architecture
+    CIL --> GW["gateway-config"]
+    CM --> GW
+    ED --> GW
+    ARGO --> GW
+    R53 --> GW
 
-The platform is designed to run across three major cloud providers, with current implementation status as follows:
+    TSA["tailscale-admin<br/>(no cluster deps)"]
+```
 
-- **Azure**: Primary cloud provider with comprehensive deployment (currently implemented)
-- **AWS**: Secondary cloud provider with equivalent capabilities (planned for future phases)
-- **GCP**: Tertiary cloud provider with core services (planned for future phases)
+EKS uses BYOCNI (`bootstrap_self_managed_addons = false`), so Cilium
+must be deployed before node groups can join the cluster. EKS managed
+add-ons (coredns) are in a separate `eks-addons` unit that depends on
+Cilium and node-groups, since addon pods need the CNI to schedule.
 
-Each cloud provider implementation follows similar patterns but respects the unique characteristics and best practices of each platform.
+### DNS
 
-### Multi-Region Design
+Route53 hosts the `aws.refplat.org` subdomain. Cloudflare manages the
+parent `refplat.org` zone and delegates via NS records. external-dns
+syncs Kubernetes ingress/service records to Route53. cert-manager uses
+Route53 DNS01 challenges for Let's Encrypt certificates.
 
-Within each cloud provider, resources are deployed across multiple regions for:
+### Private Cluster Access
 
-- **Disaster Recovery**: Ability to recover from region-wide outages
-- **Latency Optimization**: Services closer to end users
-- **Regulatory Compliance**: Data sovereignty requirements
+The EKS API endpoint is private-only. Two access methods:
 
-### Multi-Environment Strategy
+1. **Tailscale VPN** (primary) -- the Tailscale Operator runs as a subnet
+   router advertising `10.100.0.0/16` to the tailnet. Split DNS routes
+   `*.eks.amazonaws.com` to the VPC DNS resolver. Developers install
+   Tailscale, join the tailnet, and `kubectl` works directly.
+2. **SSM tunnel** (fallback) -- `scripts/eks-tunnel.sh` opens a port
+   forward through the SSM bastion to the cluster endpoint.
 
-The platform supports multiple environments with appropriate isolation:
+## Azure Architecture
 
-- **Development**: For development and testing with lower costs
-- **Staging/QA**: For pre-production validation (planned)
-- **Production**: For live workloads with high availability (planned)
+Azure has 24 modules covering AKS, networking, identity, observability,
+storage, and Front Door. Two environments are deployed:
 
-## Core Components
+| Environment | Subscription | Region |
+|-------------|-------------|--------|
+| dev | `db4f1d99-0ec0-44eb-90de-41975f9bb68b` | eastus |
+| ops | `9dc5edc4-8c4e-41a1-a4f8-2183c4e91954` | westus |
 
-### Networking
+Each environment deploys a full stack:
 
-The network architecture forms the foundation of the platform with:
+```mermaid
+graph TD
+    RG["resource_group"] --> NET["networking"]
+    RG --> KV["key_vault"]
+    NET --> AKS["aks_core"]
+    AKS --> NP["aks_node_pools"]
+    AKS --> CIL["cilium"]
 
-- **Virtual Networks**: Isolated network spaces for different environments
-- **Subnets**: Specialized subnets for different workload types
-- **Network Security**: Layered approach with security groups and firewalls
-- **Connectivity**: VPN and ExpressRoute/Direct Connect options
+    RG --> ACR["container_registry"]
+    RG --> LA["log_analytics"]
+    LA --> DS["diagnostic_settings"]
+    RG --> MW["monitor_workspace"]
+    MW --> MG["managed_grafana"]
+    MW --> PDCR["prometheus_dcr"]
+    RG --> MA["monitor_alerts"]
 
-### Kubernetes Infrastructure
+    RG --> FDP["frontdoor_profile"]
+    FDP --> FDE["frontdoor_endpoint"]
+    FDE --> FDPL["frontdoor_private_link"]
 
-Optimized Kubernetes environments with:
+    RG --> STR["storage"]
+    STR --> SR["storage_roles"]
+```
 
-- **AKS/EKS/GKE Clusters**: Managed Kubernetes services (AKS implemented, EKS and GKE planned)
-- **Node Pools**: Separated by workload type and availability zone
-- **Network Design**: Specialized subnet configuration for pods and services
-- **Identity Integration**: Workload identity for secure service access
+Key differences from AWS:
 
-### Storage Solutions
+- **Identities**: User-assigned managed identities with federated
+  credentials (no IRSA equivalent needed -- Azure handles this natively)
+- **Observability**: Azure-managed Grafana + Prometheus DCR + Log
+  Analytics (vs self-managed on AWS)
+- **Ingress**: Azure Front Door with private link backends (vs
+  gateway-config with Cilium on AWS)
+- **Cilium**: BYOCNI overlay mode (vs ENI mode on AWS)
 
-Comprehensive storage options including:
+## GCP Architecture
 
-- **Object Storage**: For unstructured data with controlled access
-- **Block Storage**: For virtual machines and container volumes
-- **File Storage**: For shared file systems
+GCP has two modules (`naming`, `networking`) that mirror the cross-cloud
+interface contracts. Live configuration exists for an ops environment in
+us-east1 with CIDR `10.102.0.0/16` and 15 planned subnets, but no units
+are deployed yet.
 
-### Identity and Access Management
+## Configuration Hierarchy
 
-Secure access control with:
+All clouds share the same layered configuration pattern. Each layer is a
+file that Terragrunt loads and merges:
 
-- **RBAC**: Role-based access control across all cloud resources
-- **Managed Identities**: Eliminating credential storage where possible
-- **Federation**: Cross-cloud identity federation (planned)
-- **Service Principals**: For service-to-service authentication
+```mermaid
+graph TD
+    ROOT["root.hcl<br/>State backend, providers"] --> COMMON["common.hcl<br/>Cloud-level defaults, tags"]
+    COMMON --> ENV["env.hcl<br/>Account/subscription, environment tags"]
+    ENV --> REGION["region.hcl<br/>Region name, AZs"]
+    REGION --> NETWORK["network.hcl<br/>CIDR, subnet tiers"]
+    NETWORK --> WORKLOAD["workload.hcl<br/>Workload name, compliance tier"]
+    WORKLOAD --> BASE["_base.hcl<br/>merge() all layers"]
+    BASE --> MODULE["terragrunt.hcl<br/>Module inputs"]
+```
 
-## Architecture Diagrams
+Tags, module sources, and Helm versions are composed from these layers.
+`_base.hcl` merges tags and exposes all computed locals to live units via
+`include.base.locals.*`. Safety validations assert that directory paths
+match the declared environment and account ID.
 
-### Terraform Module Architecture
+See [Configuration Hierarchy](../../docs/architecture/config-hierarchy.md)
+for the full breakdown.
 
-The platform's modular design is reflected in the Terraform module architecture:
+## State Management
 
-![Terraform Module Architecture](diagrams/terraform-module-architecture.png)
+| Cloud | Backend | Location |
+|-------|---------|----------|
+| AWS | S3 + DynamoDB | `tfstate-mgmt-851725353202` bucket in us-east-1, `terraform-locks` table |
+| Azure | Azure Blob Storage | `tfstatemulticloud` storage account, `terraformstate` container |
 
-### Network Architecture
+State paths follow the directory structure:
+`{env}/{region}/{workload}/{module}/terraform.tfstate`. The S3 bucket and
+DynamoDB table are bootstrapped by the `state-bootstrap` unit in the
+management account. Encryption is enabled on both backends.
 
-The network design follows a hierarchical approach with availability zone awareness:
-
-![Network Architecture](diagrams/network-architecture.png)
-
-### Deployment Architecture
-
-The infrastructure deployment flow uses Terragrunt to manage environment configurations:
-
-![Deployment Architecture](diagrams/deployment-architecture.png)
+The `TerraformStateAccess` role in the management account grants the
+`PlatformDeployer` role cross-account access to the state bucket and
+lock table.
 
 ## Technology Stack
 
-The VIP Platform is built using the following core technologies:
-
-- **Terraform**: For infrastructure definition (v1.6.0+)
-- **Terragrunt**: For configuration management and DRY implementations (v0.53.0+)
-- **Azure**: Primary cloud provider (AzureRM provider 4.25.0)
-- **AWS**: Planned cloud provider (AWS provider 5.91.0)
-- **GCP**: Planned cloud provider (Google provider 6.26.0)
-- **Kubernetes**: Container orchestration
-- **BitBucket Pipelines**: CI/CD automation (planned)
-- **Azure DevOps/GitHub Actions**: Workflow automation (planned)
-
-## Current Implementation Status
-
-As of the latest update, the following components have been implemented:
-
-- Azure networking foundation (VNets, subnets, NSGs)
-- Azure storage infrastructure
-- AKS infrastructure (core cluster, identity, node pools)
-- Azure Key Vault configuration
-- Development environment in Azure
-
-Planned but not yet implemented components include:
-
-- Production and staging environments
-- AWS and GCP infrastructure modules
-- Cross-cloud connectivity and federation
-- Comprehensive CI/CD pipelines
+| Component | Version |
+|-----------|---------|
+| OpenTofu | >= 1.6.0 (CI uses 1.9.0) |
+| Terragrunt | Latest (installed in CI from GitHub releases) |
+| AWS Provider | 6.45.0 |
+| Azure Provider | 4.25.0 |
+| GCP Provider | 6.26.0 |
+| Helm Provider | >= 3.0 |
+| Kubernetes Provider | >= 2.35.0 |
+| Tailscale Provider | ~> 0.29 |
+| Kubernetes | 1.35 (EKS) |
+| Go (tests) | 1.22+ |
 
 ## Next Steps
 
-Continue to [Infrastructure as Code Approach](03-infrastructure-as-code.md) to understand how the architecture is implemented using Terraform and Terragrunt. 
+Continue to [Infrastructure as Code Approach](03-infrastructure-as-code.md)
+to understand how the architecture is implemented using OpenTofu and
+Terragrunt.

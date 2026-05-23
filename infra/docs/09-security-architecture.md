@@ -26,6 +26,7 @@ The platform uses Azure's identity services as the foundation for security, impl
 We implement RBAC through several modules:
 
 - The `storage_roles` module provides granular RBAC for Azure Storage resources:
+
   ```hcl
   module "storage_roles" {
     source = "../../modules/azure/storage_roles"
@@ -75,6 +76,7 @@ The platform implements network segmentation through:
 - Application security groups for fine-grained control
 
 Example from the `networking` module:
+
 ```hcl
 resource "azurerm_subnet" "subnet" {
   for_each = var.subnets
@@ -127,6 +129,7 @@ Azure PaaS services are accessed via private endpoints whenever possible:
   - Azure Monitor resources
 
 Example for private DNS zones:
+
 ```hcl
 module "private_dns" {
   source = "../../modules/azure/private_dns"
@@ -228,6 +231,7 @@ Comprehensive logging is implemented using:
 - `prometheus_dcr` module for AKS metrics collection
 
 Example:
+
 ```hcl
 module "log_analytics" {
   source = "../../modules/azure/log_analytics"
@@ -289,27 +293,31 @@ The platform implements different security controls based on environment:
 - Full monitoring and alerting
 - Regular security scanning and reviews
 
-## Implementation in Terraform Modules
+## Implementation in Modules
 
-Security is integrated into each Terraform module:
+Security is integrated into each module:
 
 ### Networking Security
+
 - NSGs with restrictive default rules
 - Service endpoints for Azure services
 - Network isolation between workloads
 
 ### Storage Security
+
 - Public network access disabled by default
 - Private endpoints for secure access
 - Role-based access control via the `storage_roles` module
 
 ### AKS Security
+
 - Azure AD integration
 - Network policies enabled
 - Pod managed identities
 - Control plane security with private API server
 
 ### Key Vault Security
+
 - Network ACLs restricting access
 - RBAC-based access policies
 - Soft-delete and purge protection enabled
@@ -375,4 +383,4 @@ While the current implementation provides a solid security foundation, future en
 
 ## Next Steps
 
-Continue to [Compliance Framework](10-compliance-framework.md) to understand how the security architecture addresses compliance requirements. 
+Continue to [Compliance Framework](10-compliance-framework.md) to understand how the security architecture addresses compliance requirements.
