@@ -56,16 +56,19 @@ locals {
     external_dns     = "${local.source_base}/external-dns"
     external_secrets = "${local.source_base}/external-secrets"
     gateway_config   = "${local.source_base}/gateway-config"
+    tailscale        = "${local.source_base}/tailscale"
+    tailscale_admin  = "${local.source_base}/tailscale-admin"
     policy           = "${local.source_base}/policy"
   }
 
   # Helm chart version pins — single source of truth across environments
   helm_versions = {
-    cilium           = "1.17.2"
-    argocd           = "9.5.14"
-    cert_manager     = "1.17.1"
-    external_dns     = "1.16.1"
-    external_secrets = "0.14.3"
-    kyverno          = "3.3.7"
+    cilium             = "1.17.2"
+    argocd             = "9.5.14"
+    cert_manager       = "1.17.1"
+    external_dns       = "1.16.1"
+    external_secrets   = "0.14.3"
+    kyverno            = "3.3.7"
+    tailscale_operator = "1.96.5"
   }
 }

@@ -16,7 +16,7 @@ locals {
     aws = yamlencode({
       eni                        = { enabled = true }
       ipam                       = { mode = "eni" }
-      egressMasqueradeInterfaces = "eth0"
+      egressMasqueradeInterfaces = "ens+"
       routingMode                = "native"
       hubble = {
         tls = {

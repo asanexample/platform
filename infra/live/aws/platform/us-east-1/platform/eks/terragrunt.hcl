@@ -49,8 +49,7 @@ inputs = {
   ])
 
   endpoint_private_access = true
-  endpoint_public_access  = true
-  public_access_cidrs     = ["0.0.0.0/0"] # TODO: restrict to VPN/office/CI IPs before production workloads
+  endpoint_public_access  = false
 
   eks_addons = {}
 

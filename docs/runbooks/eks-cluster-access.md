@@ -10,11 +10,43 @@
 
 ## Table of Contents
 
-1. [Platform Engineer: kubectl Setup](#platform-engineer-kubectl-setup)
-2. [Developer: Namespace-Scoped kubectl](#developer-namespace-scoped-kubectl)
-3. [Private Cluster Access via SSM Tunnel](#private-cluster-access-via-ssm-tunnel)
-4. [Break-Glass Access](#break-glass-access)
-5. [Troubleshooting](#troubleshooting)
+1. [Tailscale VPN Access (Recommended)](#tailscale-vpn-access-recommended)
+2. [Platform Engineer: kubectl Setup](#platform-engineer-kubectl-setup)
+3. [Developer: Namespace-Scoped kubectl](#developer-namespace-scoped-kubectl)
+4. [Private Cluster Access via SSM Tunnel](#private-cluster-access-via-ssm-tunnel)
+5. [Break-Glass Access](#break-glass-access)
+6. [Troubleshooting](#troubleshooting)
+
+---
+
+## Tailscale VPN Access (Recommended)
+
+Tailscale provides always-on mesh VPN access to the private EKS cluster.
+No tunnel management required -- once connected, kubectl works directly.
+
+> **Full details:** [Tailscale VPN Runbook](tailscale-vpn.md) (setup from
+> scratch, rebuild procedures, troubleshooting, architecture)
+
+### One-Time Setup
+
+1. Install Tailscale: <https://tailscale.com/download>
+1. Get a tailnet invite from the platform team
+1. Configure kubeconfig:
+
+```bash
+aws sso login --profile platform
+
+AWS_PROFILE=platform aws eks update-kubeconfig \
+  --name platform-use1-eks \
+  --region us-east-1 \
+  --role-arn arn:aws:iam::829808296602:role/PlatformAdmin
+```
+
+1. Verify: `kubectl get nodes`
+
+### Fallback
+
+If Tailscale is unavailable, use the [SSM tunnel](#private-cluster-access-via-ssm-tunnel).
 
 ---
 
