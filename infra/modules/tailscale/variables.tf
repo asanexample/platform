@@ -50,6 +50,16 @@ variable "connector_hostname" {
 }
 
 # ---------------------------------------------------------------------------
+# Split DNS
+# ---------------------------------------------------------------------------
+
+variable "split_dns" {
+  description = "Map of domain to nameserver IPs for split DNS (created after subnet router is online)"
+  type        = map(list(string))
+  default     = {}
+}
+
+# ---------------------------------------------------------------------------
 # Helm
 # ---------------------------------------------------------------------------
 

@@ -72,6 +72,21 @@ generate "kubernetes_provider" {
   EOF
 }
 
+generate "tailscale_provider" {
+  path      = "tailscale-provider.tf"
+  if_exists = "overwrite_terragrunt"
+  contents  = <<-EOF
+    data "aws_secretsmanager_secret_version" "tailscale_api_key" {
+      secret_id = "platform/tailscale/api-key"
+    }
+
+    provider "tailscale" {
+      api_key = data.aws_secretsmanager_secret_version.tailscale_api_key.secret_string
+      tailnet = "taild3190d.ts.net"
+    }
+  EOF
+}
+
 generate "oauth" {
   path      = "oauth.tf"
   if_exists = "overwrite"
@@ -92,6 +107,10 @@ inputs = {
   cluster_name = dependency.eks.outputs.cluster_id
 
   advertise_routes = ["10.100.0.0/16"]
+
+  split_dns = {
+    "us-east-1.eks.amazonaws.com" = ["10.100.0.2"]
+  }
 
   helm_chart_version = include.base.locals.helm_versions.tailscale_operator
 

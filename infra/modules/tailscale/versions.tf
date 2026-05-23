@@ -10,5 +10,9 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = ">= 2.35.0"
     }
+    tailscale = {
+      source  = "tailscale/tailscale"
+      version = "~> 0.29"
+    }
   }
 }

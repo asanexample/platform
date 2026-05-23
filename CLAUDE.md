@@ -4,7 +4,7 @@
 
 Multi-cloud IaC platform using OpenTofu + Terragrunt. Targets AWS and Azure (GCP stubbed).
 
-- **Shared modules** (`infra/modules/`): cilium, argocd, argocd-bootstrap, policy, vcluster
+- **Shared modules** (`infra/modules/`): cilium, argocd, argocd-bootstrap, cert-manager, external-dns, external-secrets, gateway-config, tailscale, tailscale-admin, policy, vcluster
 - **Cloud-specific modules**: `infra/modules/aws/*` (eks, networking, ssm-bastion, etc.), `infra/modules/azure/*` (aks_core, networking, key_vault, etc.)
 - **Live configs**: `infra/live/{aws,azure}/` -- environment-specific Terragrunt units
 
@@ -26,7 +26,7 @@ networking ─┘                        |
               tailscale ─────────────┤ (eks, nodes, ext-secrets)
               gateway-config ────────┘ (eks, cilium, cert-manager, ext-dns, argocd, r53)
 
-tailscale-admin ─────────────────────── (no cluster deps, manages tailnet ACLs/DNS/OAuth)
+tailscale-admin ─────────────────────── (no cluster deps, manages tailnet ACLs/OAuth)
 ```
 
 EKS uses BYOCNI (`bootstrap_self_managed_addons = false`), so Cilium must be deployed before node groups can join the cluster. EKS managed add-ons (coredns) are in a separate `eks-addons` unit that depends on cilium + node-groups, since addon pods need the CNI to schedule.
@@ -39,6 +39,14 @@ terragrunt run --all apply    # handles DAG automatically
 ```
 
 ### Destroy order
+
+**Pre-flight:** If the EKS API is private-only (Tailscale VPN access), enable the public endpoint before destroying K8s units so Terragrunt can reach the API:
+
+```bash
+aws eks update-cluster-config --name platform-use1-eks --region us-east-1 \
+  --resources-vpc-config endpointPublicAccess=true --profile platform
+# Wait ~5 min for endpoint update + DNS propagation
+```
 
 ```bash
 # Option 1: automatic (handles DAG in reverse)
@@ -132,4 +140,4 @@ Cross-account access uses purpose-built IAM roles (see IAM Roles below). `Organi
 - **Node groups separated** from the EKS module to enforce deployment ordering (Cilium must be ready first).
 - **EKS add-ons separated** into `eks-addons` unit — with BYOCNI, addon pods (coredns) can't schedule until CNI + nodes are ready, so they must be deployed after cilium and node-groups.
 - **ArgoCD SSO via Dex + SAML** for AWS. Dex is built into ArgoCD's Helm chart and acts as a SAML-to-OIDC bridge. The SAML app in Identity Center is created manually (Terraform AWS provider doesn't support custom SAML apps). Group claims in the SAML assertion map to ArgoCD RBAC roles. The ArgoCD module remains cloud-agnostic — all SSO config is injected via `argocd_cm_extra` in the live unit.
-- **Tailscale Operator** for developer VPN access to private EKS. Runs as a subnet router advertising the VPC CIDR (`10.100.0.0/16`) to the tailnet. OAuth credentials sourced from AWS Secrets Manager via Terragrunt `run_cmd()`. Module is cloud-agnostic; only the live unit's credential fetch is AWS-specific.
+- **Tailscale Operator** for developer VPN access to private EKS. Runs as a subnet router advertising the VPC CIDR (`10.100.0.0/16`) to the tailnet. Split DNS is managed by the `tailscale` K8s unit (not `tailscale-admin`) with a `depends_on` on the Connector, so it's only created after the subnet router is online. OAuth credentials sourced from AWS Secrets Manager via generated data source. Module is cloud-agnostic; only the live unit's provider config is AWS-specific.

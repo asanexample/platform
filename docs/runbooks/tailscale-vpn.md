@@ -42,11 +42,11 @@ Developer laptop (Tailscale client)
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | Tailscale account | SaaS (login.tailscale.com) | Control plane, device management |
-| ACL policy | Tailscale admin console | Tags, autoApprovers, grants |
-| OAuth client | Tailscale admin > Settings | Operator authentication |
+| ACL policy | `tailscale-admin` unit | Tags, autoApprovers, grants |
+| OAuth client | `tailscale-admin` unit | Operator authentication |
 | OAuth secret | AWS Secrets Manager | Credential storage |
-| Split DNS | Tailscale admin > DNS | Route EKS DNS to VPC resolver |
-| Tailscale module | `infra/modules/tailscale/` | Helm release + Connector CRD |
+| Split DNS | `tailscale` unit (K8s) | Route EKS DNS to VPC resolver |
+| Tailscale module | `infra/modules/tailscale/` | Helm release + Connector + split DNS |
 | Live unit | `infra/live/aws/.../tailscale/` | Environment-specific config |
 | ProxyClass | Created by module | Forces userspace networking |
 | Connector | Created by module | Advertises VPC CIDR as subnet route |
@@ -71,18 +71,37 @@ have no internet egress.
 ## Full Setup from Scratch
 
 Follow these steps to set up Tailscale from zero. Steps 1-2 are manual
-(one-time bootstrap). Steps 3-4 are handled by the `tailscale-admin`
-Terragrunt unit. Steps 5-6 deploy the K8s operator.
+(one-time bootstrap). Steps 3-5 document what `tailscale-admin` automates
+(shown for reference). Steps 6-8 deploy the infrastructure.
 
 > **If rebuilding**: skip to [Rebuilding After Teardown](#rebuilding-after-teardown).
-> Steps 2-5 below are already automated by `tailscale-admin`.
+> Steps 3-5 below are automated by `tailscale-admin` -- skip them and go
+> straight to step 6. Step 2 (API key) is also one-time only.
 
 ### Step 1: Create Tailscale Account
 
 1. Go to <https://login.tailscale.com> and create an account
 1. Free tier covers 3 users, 100 devices
 
-### Step 2: Configure ACL Policy
+### Step 2: Create API Key for Terraform Provider
+
+In Tailscale admin > **Settings** > **Keys**:
+
+1. Generate a new API key
+1. Store it in AWS Secrets Manager:
+
+```bash
+aws secretsmanager create-secret \
+  --name platform/tailscale/api-key \
+  --secret-string '<API_KEY>' \
+  --region us-east-1 \
+  --profile platform
+```
+
+This key authenticates the Tailscale Terraform provider used by both
+`tailscale-admin` and `tailscale` units.
+
+### Step 3: Configure ACL Policy
 
 In Tailscale admin console > **Access Controls**, replace the entire policy:
 
@@ -120,7 +139,7 @@ Key points:
 - Without `autoApprovers`, subnet routes require manual approval each time
   the Connector is recreated
 
-### Step 3: Create OAuth Client
+### Step 4: Create OAuth Client
 
 In Tailscale admin > **Settings** > **OAuth clients**:
 
@@ -132,7 +151,7 @@ In Tailscale admin > **Settings** > **OAuth clients**:
 1. Set tag: `tag:k8s-operator`
 1. Save the **client ID** and **client secret**
 
-### Step 4: Store Credentials in Secrets Manager
+### Step 5: Store Credentials in Secrets Manager
 
 ```bash
 aws secretsmanager create-secret \
@@ -152,22 +171,18 @@ aws secretsmanager put-secret-value \
   --profile platform
 ```
 
-### Step 5: Configure Split DNS
+### Step 6: Deploy `tailscale-admin`
 
-In Tailscale admin > **DNS**:
+```bash
+cd infra/live/aws/platform/us-east-1/platform/tailscale-admin
+terragrunt apply
+```
 
-1. Click **Add nameserver** > **Custom**
-1. Nameserver: `10.100.0.2` (VPC DNS resolver)
-1. **Restrict to domain**: `us-east-1.eks.amazonaws.com`
+This creates the ACL policy, OAuth client, and Secrets Manager secret.
+Split DNS is **not** managed here — it's created by the `tailscale` unit
+after the subnet router is online (see next step).
 
-This routes EKS API endpoint DNS queries through the VPC DNS resolver via
-the subnet router, so clients resolve the private endpoint IP.
-
-**Important:** Only add split DNS after the subnet router is online and
-forwarding traffic. If added before, Tailscale clients can't resolve the
-EKS endpoint and kubectl breaks.
-
-### Step 6: Deploy via Terragrunt
+### Step 7: Deploy `tailscale` (K8s operator)
 
 ```bash
 cd infra/live/aws/platform/us-east-1/platform/tailscale
@@ -175,13 +190,18 @@ cd infra/live/aws/platform/us-east-1/platform/tailscale
 # First deploy: install operator (creates CRDs) before Connector
 terragrunt apply -target=helm_release.tailscale_operator[0]
 
-# Full apply to create ProxyClass + Connector
+# Full apply to create ProxyClass, Connector, and split DNS
 terragrunt apply
 ```
 
 Subsequent applies work without `-target` since the CRDs already exist.
 
-### Step 7: Verify
+Split DNS (`us-east-1.eks.amazonaws.com` -> `10.100.0.2`) is created
+automatically after the Connector (subnet router) is online, avoiding the
+chicken-and-egg problem where DNS queries route to an unreachable VPC DNS
+resolver.
+
+### Step 8: Verify
 
 ```bash
 # Operator pod running
@@ -205,17 +225,12 @@ kubectl get nodes
 ## Rebuilding After Teardown
 
 If the cluster was destroyed and rebuilt, follow these steps. The
-`tailscale-admin` unit (ACL policy, split DNS, OAuth client, Secrets Manager
-secret) persists across cluster teardowns -- you only need to redeploy the
-K8s operator.
+`tailscale-admin` unit (ACL policy, OAuth client, Secrets Manager secret)
+persists across cluster teardowns -- you only need to redeploy the K8s
+operator. Split DNS is managed by the `tailscale` unit and is automatically
+recreated after the subnet router comes online.
 
 ### Pre-flight Checks
-
-1. **Tailscale split DNS**: Temporarily destroy the `tailscale-admin` unit
-   (or remove the split DNS entry manually) before rebuilding. Split DNS
-   routes queries to `10.100.0.2` (VPC DNS) which is unreachable until the
-   subnet router is back online, breaking EKS DNS resolution for Tailscale
-   clients. Re-apply `tailscale-admin` after the subnet router is online.
 
 1. **EKS public endpoint**: Temporarily enable public access during rebuild
    so Terragrunt can reach the API:
@@ -246,11 +261,13 @@ terragrunt apply -target=helm_release.tailscale_operator[0]
 terragrunt apply
 ```
 
+Split DNS is created automatically by the `tailscale` unit after the
+Connector (subnet router) is online -- no manual step needed.
+
 ### Post-deploy
 
 1. Verify subnet router is online: `kubectl get pods -n tailscale-system`
 1. Verify route is approved in Tailscale admin (should auto-approve via ACL)
-1. Re-add split DNS: `10.100.0.2` restricted to `us-east-1.eks.amazonaws.com`
 1. Disable public endpoint:
 
    ```bash
@@ -292,16 +309,21 @@ The `tailscale-admin` Terragrunt unit manages tailnet-level configuration
 via the Tailscale Terraform provider (`tailscale/tailscale` v0.29.1+).
 This automates what were previously manual admin console steps:
 
-| What | Provider Resource | Module Path |
-|------|-------------------|-------------|
-| ACL policy | `tailscale_acl` | `infra/modules/tailscale-admin/main.tf` |
-| Split DNS | `tailscale_dns_split_nameservers` | `infra/modules/tailscale-admin/main.tf` |
-| OAuth client | `tailscale_oauth_client` | `infra/modules/tailscale-admin/main.tf` |
-| OAuth secret | `aws_secretsmanager_secret` | `infra/modules/tailscale-admin/main.tf` |
+| What | Provider Resource | Unit |
+|------|-------------------|------|
+| ACL policy | `tailscale_acl` | `tailscale-admin` |
+| OAuth client | `tailscale_oauth_client` | `tailscale-admin` |
+| OAuth secret | `aws_secretsmanager_secret` | `tailscale-admin` |
+| Split DNS | `tailscale_dns_split_nameservers` | `tailscale` (K8s unit) |
 
-The unit has **no cluster dependencies** -- it manages the tailnet, not the
-K8s operator. The OAuth credentials it creates are written to Secrets Manager
-at `platform/tailscale/oauth`, which the `tailscale` K8s unit reads.
+`tailscale-admin` has **no cluster dependencies** -- it manages the tailnet,
+not the K8s operator. The OAuth credentials it creates are written to Secrets
+Manager at `platform/tailscale/oauth`, which the `tailscale` K8s unit reads.
+
+Split DNS is managed by the `tailscale` K8s unit (not `tailscale-admin`) so
+it's created only after the Connector (subnet router) is online. This avoids
+a chicken-and-egg problem where split DNS routes queries to VPC DNS before
+the subnet router can forward them.
 
 ### Authentication
 
@@ -311,8 +333,9 @@ step (one-time, in Tailscale admin > Settings > Keys).
 
 ### Remaining Manual Steps
 
-- Creating the Tailscale account (one-time)
-- Creating the API key for the Terraform provider (one-time)
+- Creating the Tailscale account (one-time, step 1)
+- Creating the API key for the Terraform provider (one-time, step 2)
+- Enabling/disabling EKS public endpoint during rebuild
 - Removing stale devices after cluster teardown (admin console or
   `tailscale api delete device`)
 
@@ -376,8 +399,15 @@ AWS_PROFILE=platform aws eks update-kubeconfig \
 **Cause:** Split DNS routes `*.eks.amazonaws.com` to VPC DNS (`10.100.0.2`)
 but the subnet router is down, so DNS queries time out.
 
-**Fix:** Remove the split DNS entry in Tailscale admin > DNS until the
-subnet router is back online.
+**Fix:** This should not happen in normal operation -- split DNS is managed
+by the `tailscale` unit and depends on the Connector, so it's only created
+after the subnet router is online. If it happens anyway, destroy the
+`tailscale` unit's split DNS resource:
+
+```bash
+cd infra/live/aws/platform/us-east-1/platform/tailscale
+terragrunt apply -target='tailscale_dns_split_nameservers.this["us-east-1.eks.amazonaws.com"]' -destroy
+```
 
 ### Stale Device in Tailscale Admin
 
@@ -394,7 +424,7 @@ deployment creates devices with a `-1` suffix.
 | Item | Value |
 |------|-------|
 | Tailnet | `taild3190d.ts.net` |
-| OAuth client ID | `kvsxHnyLRb11CNTRL` |
+| OAuth client ID | Managed by `tailscale-admin` (sensitive) |
 | Secrets Manager key | `platform/tailscale/oauth` (us-east-1) |
 | Subnet route | `10.100.0.0/16` |
 | VPC DNS resolver | `10.100.0.2` |

@@ -92,3 +92,18 @@ resource "kubernetes_manifest" "connector" {
 
   depends_on = [kubernetes_manifest.proxy_class]
 }
+
+# ---------------------------------------------------------------------------
+# Split DNS — routes domain queries through VPC DNS via the subnet router.
+# Placed here (not in tailscale-admin) so it's created after the subnet
+# router is online, avoiding the chicken-and-egg DNS resolution failure.
+# ---------------------------------------------------------------------------
+
+resource "tailscale_dns_split_nameservers" "this" {
+  for_each = local.create && length(var.advertise_routes) > 0 ? var.split_dns : {}
+
+  domain      = each.key
+  nameservers = each.value
+
+  depends_on = [kubernetes_manifest.connector]
+}

@@ -14,16 +14,6 @@ variable "acl_policy" {
 }
 
 # ---------------------------------------------------------------------------
-# Split DNS
-# ---------------------------------------------------------------------------
-
-variable "split_dns" {
-  description = "Map of domain to nameserver IPs for split DNS"
-  type        = map(list(string))
-  default     = {}
-}
-
-# ---------------------------------------------------------------------------
 # OAuth Client
 # ---------------------------------------------------------------------------
 
@@ -69,6 +59,12 @@ variable "secrets_manager_name" {
   description = "Secrets Manager secret name for OAuth credentials"
   type        = string
   default     = "platform/tailscale/oauth"
+}
+
+variable "secrets_manager_recovery_window" {
+  description = "Number of days to retain a deleted secret (0 = immediate deletion)"
+  type        = number
+  default     = 0
 }
 
 variable "tags" {

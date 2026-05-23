@@ -12,3 +12,8 @@ output "connector_name" {
   description = "Name of the Tailscale Connector resource"
   value       = local.create && length(var.advertise_routes) > 0 ? kubernetes_manifest.connector[0].manifest.metadata.name : null
 }
+
+output "split_dns_domains" {
+  description = "List of configured split DNS domains"
+  value       = keys(tailscale_dns_split_nameservers.this)
+}

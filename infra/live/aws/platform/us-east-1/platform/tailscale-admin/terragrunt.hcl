@@ -76,10 +76,6 @@ inputs = {
     }
   HUJSON
 
-  split_dns = {
-    "us-east-1.eks.amazonaws.com" = ["10.100.0.2"]
-  }
-
   create_oauth_client      = true
   oauth_client_tags        = ["tag:k8s-operator"]
   oauth_client_description = "K8s Operator managed by Terraform"

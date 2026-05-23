@@ -14,17 +14,6 @@ resource "tailscale_acl" "this" {
 }
 
 # ---------------------------------------------------------------------------
-# Split DNS
-# ---------------------------------------------------------------------------
-
-resource "tailscale_dns_split_nameservers" "this" {
-  for_each = local.create ? var.split_dns : {}
-
-  domain      = each.key
-  nameservers = each.value
-}
-
-# ---------------------------------------------------------------------------
 # OAuth Client — for K8s operator authentication
 # ---------------------------------------------------------------------------
 
@@ -43,8 +32,9 @@ resource "tailscale_oauth_client" "k8s_operator" {
 resource "aws_secretsmanager_secret" "oauth" {
   count = local.create && var.create_oauth_client && var.write_to_secrets_manager ? 1 : 0
 
-  name = var.secrets_manager_name
-  tags = var.tags
+  name                    = var.secrets_manager_name
+  recovery_window_in_days = var.secrets_manager_recovery_window
+  tags                    = var.tags
 }
 
 resource "aws_secretsmanager_secret_version" "oauth" {
