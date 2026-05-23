@@ -2,138 +2,217 @@
 
 ## Overview
 
-The VIP Platform implements a comprehensive testing strategy to ensure reliability, security, and compliance of all infrastructure components. This document outlines the testing principles, methodologies, and tools used in the platform.
-
-*This document is under development. The full content will be available soon.*
+The platform uses a dual testing approach: **Terratest (Go)** for AWS
+modules with full apply/destroy cycles and SDK-based assertions, and
+**Terraform native tests** (`.tftest.hcl`) for Azure modules with
+plan-only validation. CI runs static checks (format, validate, lint) on
+every PR; integration tests run on a weekly schedule.
 
 ## Testing Principles
 
-The testing strategy is guided by the following principles:
+1. **Plan-only where possible** -- modules that are expensive to create or
+   require elevated permissions use plan-only tests. Apply/destroy tests
+   are reserved for modules where post-apply validation is essential.
+2. **OpenTofu binary** -- all Terratest options must set
+   `TerraformBinary: "tofu"` to match the production toolchain.
+3. **Tests live outside modules** -- test files are never colocated with
+   module code. AWS tests go in `infra/tests/aws/<module>/`, Azure tests
+   in `infra/tests/modules/azure/<module>/`.
+4. **Parallel execution** -- Go tests use `t.Parallel()` to run
+   concurrently where resource isolation allows.
 
-1. **Test-Driven Development**: Tests written before or alongside infrastructure code.
-2. **Comprehensive Coverage**: Testing all aspects of infrastructure.
-3. **Automated Testing**: Maximizing automation for consistency and efficiency.
-4. **Shift-Left Security**: Security testing integrated early in the development process.
-5. **Environment Parity**: Tests that reflect real-world deployment scenarios.
-6. **Clear Failure Reporting**: Easy identification of test failures and remediation steps.
-7. **Separation of Concerns**: Tests are separate from implementation code.
+## Directory Structure
 
-## Testing Types
-
-*Detailed documentation on testing types will be provided in a future update.*
-
-### Unit Testing
-
-- Testing individual modules in isolation
-- Validating input handling
-- Verifying expected outputs
-
-### Integration Testing
-
-- Testing combinations of modules
-- Verifying interactions between components
-- Validating end-to-end workflows
-
-### Compliance Testing
-
-- Validating security configurations
-- Checking for policy compliance
-- Ensuring adherence to standards
-
-### Performance Testing
-
-- Validating resource efficiency
-- Testing scalability
-- Measuring deployment times
-
-## Testing Tools
-
-*Documentation on testing tools will be provided in a future update.*
-
-## Test Implementation
-
-All module tests must be placed in the `infra/tests/modules` directory corresponding to the module being tested. Tests should never be colocated with the module implementation itself.
-
-For example, tests for the `infra/modules/azure/networking` module should be located at `infra/tests/modules/azure/networking`.
-
-### Test Directory Structure
-
-```
-infra/
-├── modules/             # Module implementation
-│   └── azure/
-│       ├── networking/
-│       ├── storage_account/
-│       └── ...
-└── tests/               # All test files
-    └── modules/
-        └── azure/
-            ├── networking/       # Tests for networking module
-            ├── storage_account/  # Tests for storage_account module
-            └── ...
+```text
+infra/tests/
+├── aws/                              # Terratest (Go)
+│   ├── go.mod                        # Module deps: terratest, aws-sdk, testify
+│   ├── go.sum
+│   ├── networking/
+│   │   ├── networking_test.go        # Test functions
+│   │   ├── helpers_test.go           # AWS clients, fixture helpers, assertions
+│   │   └── fixtures/                 # main.tf, provider.tf, versions.tf
+│   ├── eks/
+│   │   ├── eks_test.go
+│   │   ├── helpers_test.go
+│   │   └── fixtures/
+│   └── ssm-bastion/
+│       ├── ssm_bastion_test.go
+│       ├── helpers_test.go
+│       └── fixtures/
+└── modules/azure/                    # Terraform native tests
+    ├── aks_core/
+    │   ├── basic.tftest.hcl
+    │   ├── advanced.tftest.hcl
+    │   └── validation.tftest.hcl
+    ├── networking/
+    ├── storage_account/
+    └── ...                           # One directory per Azure module
 ```
 
-### Example Test
+## AWS Tests (Terratest)
+
+AWS tests use [Terratest](https://terratest.gruntwork.io/) to run
+OpenTofu against real AWS infrastructure, then validate results with the
+AWS SDK.
+
+### Dependencies
+
+```text
+github.com/gruntwork-io/terratest   v0.47.2
+github.com/aws/aws-sdk-go          v1.55.8
+github.com/stretchr/testify        v1.10.0
+```
+
+### Test Patterns
+
+**Full apply/destroy** -- creates real resources, validates with AWS API,
+cleans up:
+
+```go
+func TestNetworking_PrivateTopology(t *testing.T) {
+    t.Parallel()
+
+    moduleDir := copyModuleToTemp(t)
+    client := newEC2Client(t)
+
+    vars := map[string]interface{}{
+        "create":   true,
+        "vpc_name": "test-" + random.UniqueId() + "-vpc",
+        // ...
+    }
+
+    opts := newTerraformOptions(t, moduleDir, vars)
+    defer terraform.Destroy(t, opts)
+    terraform.InitAndApply(t, opts)
+
+    vpcID := terraform.Output(t, opts, "vpc_id")
+    assert.NotEmpty(t, vpcID)
+    assertSubnetPublicIP(t, client, subnetMap["az1-public"], true)
+}
+```
+
+**Plan-only** -- validates Terraform plan structure without provisioning:
+
+```go
+func TestNetworking_Disabled(t *testing.T) {
+    t.Parallel()
+
+    opts := newTerraformOptions(t, moduleDir, vars)
+    opts.PlanFilePath = filepath.Join(moduleDir, "plan.out")
+    planStruct := terraform.InitAndPlanAndShowWithStruct(t, opts)
+
+    assert.Empty(t, planStruct.ResourcePlannedValuesMap,
+        "should produce zero resources")
+}
+```
+
+### When to Use Each Pattern
+
+| Pattern | When to Use | Example |
+|---------|-------------|---------|
+| Apply/destroy | Must validate actual cloud state (routes, security groups, API responses) | Networking, EKS |
+| Plan-only | Validates resource structure, counts, or disabled-module behavior | `create = false` checks, addon plans |
+
+Rule of thumb: if the test calls AWS SDK APIs to assert state, it must be
+apply/destroy. If it only inspects the plan structure, use plan-only.
+
+### Helper Conventions
+
+Each test module has a `helpers_test.go` with shared utilities:
+
+| Helper | Purpose |
+|--------|---------|
+| `newTerraformOptions()` | Build `*terraform.Options` with `TerraformBinary: "tofu"` |
+| `copyModuleToTemp()` | Copy module source + fixtures to a temp directory |
+| `newEC2Client()` / `newEKSClient()` | Create AWS SDK clients (with optional STS assume-role) |
+| `testRegion()` / `testRoleARN()` | Read `TEST_AWS_REGION` / `TEST_ROLE_ARN` env vars with defaults |
+| `assert*()` functions | Custom assertions using AWS API (e.g., `assertRouteExists`, `assertSubnetPublicIP`) |
+
+### Fixtures
+
+Test fixtures live in `infra/tests/aws/<module>/fixtures/` and contain
+the Terraform entry point (`main.tf`, `provider.tf`, `versions.tf`) that
+references the module under test. The `.terraform/` directory is cached in
+fixtures to speed up repeated `tofu init` during local development.
+
+## Azure Tests (Terraform Native)
+
+Azure tests use Terraform's built-in `terraform test` command with
+`.tftest.hcl` files. All Azure tests are **plan-only** -- they validate
+resource configuration without creating infrastructure.
 
 ```hcl
-# Example test using Terraform's built-in testing framework
-variables {
-  resource_group_name = "test-rg"
-  location            = "eastus"
-}
+run "basic_prometheus_dcr" {
+  command = plan
 
-run "verify_resource_creation" {
-  command = apply
+  variables {
+    resource_group_name  = "test-rg"
+    location             = "eastus"
+    monitor_workspace_id = "/subscriptions/.../accounts/test-monitor"
+  }
+
+  module {
+    source = "../../../../modules/azure/prometheus_dcr"
+  }
 
   assert {
-    condition     = length(azurerm_virtual_network.vnet) > 0
-    error_message = "VNet was not created"
+    condition     = length(azurerm_monitor_data_collection_rule.this) > 0
+    error_message = "DCR should be planned for creation"
   }
 }
 ```
 
-## Test Automation
+Azure modules with mock dependencies use a `mocks/` subdirectory to
+provide fake outputs from upstream modules.
 
-The repository includes Makefile targets to automate test execution:
+## CI Integration
+
+### Every PR (`.github/workflows/ci.yml`)
+
+Static checks only -- no infrastructure is provisioned:
+
+| Job | What It Checks |
+|-----|---------------|
+| OpenTofu Format | `tofu fmt -check -recursive infra/modules/` |
+| OpenTofu Validate | `tofu init -backend=false` + `tofu validate` on every module |
+| TFLint | Linting with `--minimum-failure-severity=error` |
+| Terragrunt HCL Format | `terragrunt hcl fmt --check` |
+| Markdown Lint | `markdownlint-cli2` on changed `.md` files |
+
+### Weekly (`.github/workflows/test-aws.yml`)
+
+Integration tests run on a schedule (Monday 6:00 UTC) with manual
+dispatch available:
+
+| Job | Timeout | Command |
+|-----|---------|---------|
+| `test-networking` | 30 min | `go test -v -timeout 25m ./networking/...` |
+| `test-eks` | 45 min | `go test -v -timeout 40m ./eks/...` |
+
+These jobs authenticate via OIDC to the `github-actions-terratest` IAM
+role and run in `us-west-2`.
+
+## Running Tests Locally
 
 ```bash
-# Run all tests (auto-discovers all test directories)
-make test
+# AWS -- requires active AWS credentials
+cd infra/tests/aws
+go test -v -timeout 30m ./networking/...    # Single module
+go test -v -timeout 45m ./...               # All AWS tests
 
-# Test a specific module
-make test-module MODULE=networking
+# Azure -- requires Azure CLI authentication
+cd infra/tests/modules/azure/<module>
+terraform init && terraform test
 
-# Test modules in a specific category
-make test-category CATEGORY=storage
-
-# Test modules matching a pattern
-make test-pattern PATTERN=aks
+# Via Makefile
+make test-aws-networking                    # AWS networking (30m timeout)
+make test-aws-eks                           # AWS EKS (45m timeout)
+make test MODULE=aks_core                   # Azure specific module
 ```
-
-All tests are run from the `infra/tests/modules` directory rather than from within module directories.
-
-### Running Tests
-
-When running tests, the Makefile handles initialization, execution, and result summarization:
-
-1. For each test directory, Terraform is initialized and then tests are executed
-2. A summary of test results is displayed showing passing and failing tests
-3. The command exits with a non-zero status if any tests fail
-
-### Test Categories
-
-Tests can be organized and run by categories which helps when working on related modules:
-
-- **Storage**: Run all storage-related module tests with `make test-category CATEGORY=storage`
-- **Networking**: Run all networking-related module tests with `make test-category CATEGORY=network`
-- **Security**: Run all security-related module tests with `make test-category CATEGORY=security`
-
-### Test Patterns
-
-For more flexible filtering of tests, you can use the pattern matching approach:
-- `make test-pattern PATTERN=aks` to run all AKS-related tests
-- `make test-pattern PATTERN=container` to run all container-related tests
 
 ## Next Steps
 
-Continue to [Disaster Recovery](16-disaster-recovery.md) to understand how the VIP Platform handles business continuity and disaster recovery scenarios. 
+Continue to [Disaster Recovery](16-disaster-recovery.md) to understand how
+the VIP Platform handles business continuity and disaster recovery
+scenarios.

@@ -2,146 +2,180 @@
 
 ## Overview
 
-The VIP Platform supports multiple environments (development, testing, production) across cloud providers and regions. This document outlines the environment management strategy, including environment isolation, configuration patterns, and promotion workflows.
+Each environment maps to a dedicated cloud account (AWS) or subscription
+(Azure). Isolation is enforced at account boundaries, network address
+space, and identity scope. Terragrunt safety validations prevent
+cross-environment deployment mistakes at parse time.
 
-## Environment Types
+## Current Environments
 
-The platform supports the following environment types:
+### AWS
 
-1. **ops**: Shared operational infrastructure (CI/CD, ArgoCD, observability tooling)
-2. **dev**: Active development and early testing
-3. **test/qa**: Pre-production validation and quality assurance
-4. **prod**: Live workloads requiring maximum reliability
+| Environment | Account ID | Purpose | Deployed |
+|-------------|-----------|---------|----------|
+| mgmt | 851725353202 | Organizations, Identity Center, Terraform state, GitHub OIDC | Yes |
+| platform | 829808296602 | EKS cluster, platform services, IAM roles | Yes (full stack) |
+| test | 157263244316 | Terratest CI execution | Yes (OIDC role only) |
+| preprod | 620830101009 | Pre-production workloads | Networking only |
+| prod | 554518885123 | Production workloads | Networking only |
 
-Each environment maps to exactly one cloud subscription or account, enforced by safety validations in `_base.hcl` (see below).
+### Azure
 
-## Environment Isolation
+| Environment | Subscription ID | Purpose | Deployed |
+|-------------|----------------|---------|----------|
+| dev | `db4f1d99-0ec0-44eb-90de-41975f9bb68b` | Development and testing | Yes (full AKS stack) |
+| ops | `9dc5edc4-8c4e-41a1-a4f8-2183c4e91954` | Shared operational infrastructure | Yes (full AKS stack) |
 
-Environments are isolated at multiple layers: subscription/account boundaries, network address space, identity, and Terragrunt configuration hierarchy.
+### GCP
 
-### Subscription / Account Isolation
+| Environment | Project | Purpose | Deployed |
+|-------------|---------|---------|----------|
+| ops | `innovation-ops-gcp` | Operational infrastructure | Scaffolded only |
 
-Every environment is bound to a dedicated cloud subscription (Azure) or account (AWS/GCP). The mapping is declared once in the cloud-level `common.hcl`:
+## Isolation Boundaries
+
+### Account / Subscription Isolation
+
+Every environment is bound to a single cloud account or subscription.
+The mapping is declared in `common.hcl` at the cloud level:
 
 ```hcl
-# infra/live/azure/common.hcl
-environment_subscription_map = {
-  "dev" = "db4f1d99-..."
-  "ops" = "9dc5edc4-..."
+# AWS
+environment_account_map = {
+  "platform" = "829808296602"
+  "mgmt"     = "851725353202"
+  "preprod"  = "620830101009"
+  "prod"     = "554518885123"
 }
 ```
 
-`_base.hcl` validates at Terragrunt parse time that the `subscription_id` declared in `env.hcl` matches the expected value from this map. If someone copies an `env.hcl` into the wrong directory or edits the subscription ID, Terragrunt refuses to plan or apply. See **Safety Validations** below for the exact mechanism.
+`_base.hcl` validates that the account/subscription ID in `env.hcl`
+matches this map. If someone copies an env.hcl into the wrong directory,
+Terragrunt refuses to plan. See
+[Configuration Hierarchy: Safety Assertions](../../docs/architecture/config-hierarchy.md#how-_basehcl-composes-tags-and-validates-safety)
+for the exact mechanism.
 
 ### Network Isolation
 
-Each environment has its own dedicated network resources:
+Each environment gets its own VPC or VNet with a dedicated CIDR block.
+Address spaces do not overlap across environments:
 
-- Separate VNets/VPCs per environment and region
-- Non-overlapping CIDR ranges allocated via `network.hcl`
-- Controlled cross-environment access (default deny)
+| Cloud | Environment | CIDR |
+|-------|-------------|------|
+| AWS | platform | `10.100.0.0/16` |
+| AWS | preprod | `10.101.0.0/16` |
+| AWS | prod | `10.102.0.0/16` |
+
+Cross-environment connectivity is not enabled by default. VPC peering or
+transit gateway would be added explicitly if needed.
+
+See [CIDR Allocation Strategy](06-cidr-allocation.md) for the full
+allocation scheme.
 
 ### Identity Isolation
 
-Each environment uses its own Azure subscription (or AWS account / GCP project), so managed identities, service principals, and IAM roles are scoped to a single environment by default. Workload identity federation binds Kubernetes service accounts to cloud identities within the same subscription boundary, preventing cross-environment privilege escalation.
+Cloud identities are scoped to a single account or subscription:
 
-## Configuration Management
+- **AWS**: IAM roles are account-scoped. Cross-account access uses
+  explicit trust policies (e.g., PlatformDeployer trusts the management
+  account). IRSA binds Kubernetes service accounts to IAM roles within
+  the same account.
+- **Azure**: Managed identities and federated credentials are
+  subscription-scoped. Workload identity federation binds Kubernetes
+  service accounts to managed identities within the same subscription.
 
-The platform uses Terragrunt's configuration hierarchy to manage environment-specific settings. The config files are loaded broadest-to-narrowest, with later layers overriding earlier ones:
+### SCP / Policy Guardrails
 
-| Layer | File(s) | Scope |
-|-------|---------|-------|
-| Root | `infra/root.hcl` | Remote state, providers, global tags |
-| Cloud | `infra/live/azure/common.hcl` | Cloud-wide defaults (prefix, project tags, subscription map) |
-| Versions | `infra/live/azure/_versions.hcl` | Module source paths and Helm chart version pins |
-| Environment | `infra/live/azure/{env}/env.hcl` | Subscription, env tags, shutdown policies |
-| Region | `infra/live/azure/{env}/{region}/region.hcl`, `network.hcl` | Region name, CIDR blocks |
-| Defaults | `infra/live/azure/_envcommon/*.hcl` | Module defaults shared across environments |
-| Module | `infra/live/azure/{env}/{region}/{module}/terragrunt.hcl` | Final overrides |
+On AWS, Service Control Policies enforce guardrails at the organization
+level:
 
-### The `env.hcl` Symlink Pattern
+| OU | SCPs |
+|----|------|
+| Root | baseline-guardrails, protect-security-services, enforce-encryption, deny-regions |
+| Platform | protect-data-and-network |
+| Workloads | protect-data-and-network, require-tagging, restrict-iam-users |
 
-Within each environment directory (e.g., `infra/live/azure/dev/`), the canonical configuration lives in `common.hcl`. A symlink `env.hcl -> common.hcl` exists so that `_base.hcl` can locate it with `find_in_parent_folders("env.hcl")`. This avoids name collisions with the cloud-level `common.hcl` while keeping a single source of truth per environment.
+The `require-tagging` SCP denies creation of EC2, S3, and RDS resources
+without `Environment`, `ManagedBy`, and `Owner` tags.
 
-```
-infra/live/azure/dev/
-  common.hcl          # canonical environment config (subscription_id, env tags, etc.)
-  env.hcl -> common.hcl   # symlink for _base.hcl discovery
-```
+## Workloads
 
-### The `_base.hcl` Include Pattern
+Within each environment and region, infrastructure is grouped by
+**workload** -- a logical boundary that determines compliance tier,
+cluster topology, and resource tags.
 
-Every module-level `terragrunt.hcl` includes `_base.hcl` to load the full config hierarchy automatically:
-
-```hcl
-include "base" {
-  path   = find_in_parent_folders("azure/_base.hcl")
-  expose = true
-}
-```
-
-Module configs then reference values as `include.base.locals.<name>` (e.g., `include.base.locals.env`, `include.base.locals.module_source.networking`).
-
-## Safety Validations
-
-`_base.hcl` contains two assertions that fire at Terragrunt parse time, before any Terraform plan or apply runs. Both use the `tobool("error message")` pattern to produce an immediate, readable failure.
-
-### 1. Path-Environment Consistency
-
-The directory path is split to extract the environment segment (e.g., `dev/eastus/networking` yields `dev`). If this does not match the `environment` value in `env.hcl`, Terragrunt halts:
-
-```
-SAFETY: directory 'dev' does not match env.hcl environment 'ops'
-```
-
-This prevents a misconfigured or misplaced `env.hcl` from deploying resources under the wrong environment identity.
-
-### 2. Subscription Mapping
-
-The `subscription_id` declared in `env.hcl` is compared against the expected value in `common.hcl`'s `environment_subscription_map`. A mismatch produces:
-
-```
-SAFETY: env 'dev' expects subscription 'db4f1d99-...' but env.hcl has '9dc5edc4-...'
-```
-
-Together these validations guarantee that every module deploys into the correct environment and subscription, even if configuration files are copy-pasted between directories.
-
-## Workload Isolation
-
-Within each environment and region, resources are further isolated by **workload**. Each workload directory contains a `workload.hcl` that declares the workload name, compliance tier, and workload-specific tags. The full directory path becomes:
-
-```
+```text
 infra/live/{cloud}/{env}/{region}/{workload}/{module}/terragrunt.hcl
 ```
 
-### Subscription Topology
+Each workload directory has a `workload.hcl` declaring its identity:
 
-Subscriptions are organized by workload purpose, not by team:
-
-| Management Group | Subscription | Purpose |
-|------------------|-------------|---------|
-| platform | platform-connectivity-{prod,nonprod} | Hub networking, DNS, firewall |
-| platform | platform-shared-{prod,nonprod} | Shared clusters, observability, ACR |
-| platform | platform-data-{prod,nonprod} | Shared data services |
-| regulated | regulated-hipaa-prod | HIPAA-isolated compute and data |
-| regulated | regulated-pci-prod | PCI CDE isolated compute and data |
-
-Standard-tier workloads (platform, connectivity, data) share clusters via vCluster. HIPAA and PCI workloads get dedicated clusters and isolated VNets within their own subscriptions.
-
-### State Management per Workload
-
-Terraform state is isolated per workload and environment using path-based keys:
-
-```
-{cloud}/{env}/{region}/{workload}/{module}/terraform.tfstate
+```hcl
+locals {
+  workload        = "platform"
+  compliance_tier = "standard"
+  workload_tags   = {
+    Workload       = "platform"
+    ComplianceTier = "standard"
+  }
+}
 ```
 
-Each workload gets its own state namespace, preventing cross-workload state collisions and limiting the blast radius of any state corruption. The root `terragrunt.hcl` generates this key automatically from the directory path.
+### Compliance Tiers
+
+The `compliance_tier` value drives cluster topology and security
+controls:
+
+| Tier | Cluster Model | Network | Extra Controls |
+|------|--------------|---------|----------------|
+| standard (SOC2) | Shared cluster with vCluster | Spoke VNet / VPC | RBAC, private endpoints, audit logging |
+| hipaa | Dedicated cluster | Isolated network | CMK encryption, 365-day logs, host encryption |
+| pci | Dedicated cluster | CDE-segmented network | All HIPAA controls + WAF, IDS, deny-all network policy |
+
+Currently all deployed workloads use the `standard` tier. HIPAA and PCI
+tiers are designed but not yet deployed.
+
+## Environment-Specific Configuration
+
+Each environment defines its settings in `env.hcl` (or `common.hcl` at
+the environment level):
+
+| Setting | Purpose | Example |
+|---------|---------|---------|
+| `environment` | Environment name | `platform`, `dev`, `prod` |
+| `account_id` / `subscription_id` | Cloud identity | `829808296602` |
+| `DataClassification` | Data sensitivity tag | `Internal`, `Confidential` |
+| `AutoShutdown` | Non-prod cost optimization | `True`, `False` |
+
+These values merge into the tag hierarchy via `_base.hcl`. For the full
+configuration mechanics, see
+[Terragrunt Configuration Hierarchy](../../docs/architecture/config-hierarchy.md).
+
+## State Isolation
+
+Terraform state is isolated per environment, region, workload, and
+module. The state key mirrors the directory path:
+
+```text
+live/aws/platform/us-east-1/platform/eks/terraform.tfstate
+live/azure/dev/eastus/platform/aks_core/terraform.tfstate
+```
+
+This prevents cross-environment state collisions and limits the blast
+radius of state corruption to a single module.
 
 ## Promotion Workflow
 
-Infrastructure changes flow through environments in order: **dev** (or **ops** for shared tooling) then **test/qa** then **prod**. Each promotion is a separate Terragrunt apply against the target environment's directory tree. Because module sources are currently pinned to the monorepo HEAD (see `_versions.hcl`), all environments share the same module code. When the platform moves to registry-based modules, version pins in `_versions.hcl` will allow independent promotion per environment.
+Infrastructure changes flow through environments in order. Because
+module sources are pinned to the monorepo HEAD (via `_versions.hcl`),
+all environments share the same module code. Each promotion is a
+separate Terragrunt apply against the target environment directory.
+
+When the platform migrates to registry-based modules, `_versions.hcl`
+version pins will allow independent promotion per environment.
 
 ## Next Steps
 
-Continue to [CIDR Allocation Strategy](06-cidr-allocation.md) to understand how IP address spaces are managed across environments. 
+Continue to [CIDR Allocation Strategy](06-cidr-allocation.md) to
+understand how IP address spaces are managed across environments and
+clouds.

@@ -20,7 +20,7 @@ The networking module supports three distinct topologies, configurable per envir
 
 Standard for production workloads. Nodes in private subnets, NAT gateways provide internet egress.
 
-```
+```text
 Internet ─── IGW ─── Public Subnets (ALBs, NAT GWs)
                           │
                      NAT Gateway
@@ -34,7 +34,7 @@ Internet ─── IGW ─── Public Subnets (ALBs, NAT GWs)
 
 For dev/sandbox environments where cost matters more than isolation. Nodes get public IPs directly.
 
-```
+```text
 Internet ─── IGW ─── Public Subnets (EKS nodes, ALBs)
                           │
                     S3 Gateway Endpoint
@@ -44,7 +44,7 @@ Internet ─── IGW ─── Public Subnets (EKS nodes, ALBs)
 
 For regulated/isolated workloads. No internet access. Requires VPC endpoints for all AWS API access.
 
-```
+```text
               Private Subnets (all resources)
                           │
                 VPC Endpoints (STS, ECR, S3, EC2, ELB, CloudWatch, ...)
@@ -80,20 +80,20 @@ Subnets are computed from `vpc_cidr` + `azs` using `cidrsubnet()` in each enviro
 
 Transit Gateway will connect VPCs when cross-account communication is needed:
 
-```
+```text
             Transit Gateway
            /       |        \
     Platform    Preprod      Prod
    10.100/16   10.101/16   10.102/16
 ```
 
-Each VPC attaches via its transit subnets (/29 per AZ). TGW route tables control which environments can reach each other.
+Each VPC attaches via its transit subnets (/28 per AZ). TGW route tables control which environments can reach each other.
 
 ## Cross-Cloud Connectivity (Planned)
 
 Site-to-Site VPN between clouds, terminating in transit subnets:
 
-```
+```text
 AWS (10.100-102/16) ──── VPN ──── Azure (10.104-106/16)
                                        │
                                   VPN ──── GCP (10.108-110/16)

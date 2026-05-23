@@ -2,117 +2,180 @@
 
 ## Overview
 
-The VIP Platform is designed from the ground up to support multiple cloud providers (AWS, Azure, and GCP) with consistent patterns and abstractions. This document outlines the multi-cloud strategy, including design principles, implementation patterns, and operational considerations.
-
-**Current Implementation Status**: Azure is the primary implementation, with AWS and GCP networking modules now implemented and live config hierarchies in place for all three clouds.
+The platform supports AWS, Azure, and GCP with a shared configuration
+framework and consistent module interfaces. Cloud-specific modules use
+native services (EKS, AKS, VPCs, VNets); shared modules (Cilium,
+ArgoCD, cert-manager) deploy identically on any cluster.
 
 ## Design Principles
 
-The multi-cloud strategy is guided by the following principles:
+1. **Cloud-native where it matters** -- use managed services (EKS, AKS,
+   Route53, Front Door) rather than abstracting to a lowest common
+   denominator.
+2. **Shared where possible** -- Kubernetes add-ons (CNI, GitOps, TLS,
+   DNS, secrets, policy) are cloud-agnostic modules deployed via Helm.
+3. **Consistent interfaces** -- networking and naming modules across all
+   clouds expose a shared output contract so live configs can consume
+   them uniformly.
+4. **Parallel configuration** -- each cloud has its own `_base.hcl`,
+   `_versions.hcl`, and `common.hcl` following the same 7-layer
+   hierarchy. Adding a new cloud means creating these three files and
+   populating environment directories.
 
-1. **Consistent Abstractions**: Common patterns and interfaces across cloud providers.
-2. **Cloud-Native When Appropriate**: Leveraging cloud-native services where they provide significant advantages.
-3. **Avoid Lowest Common Denominator**: Not limiting functionality to only what's available in all clouds.
-4. **Modularity**: Cloud-specific implementations behind common interfaces.
-5. **Escape Hatches**: Ability to access cloud-specific features when needed.
+## Implementation Status
 
-## Implementation Approach
+| Feature | AWS | Azure | GCP |
+|---------|-----|-------|-----|
+| Config hierarchy (`_base.hcl`, `_versions.hcl`, `common.hcl`) | Done | Done | Done |
+| Naming module | Done | Done | Done |
+| Networking module | Done | Done | Done |
+| Kubernetes (EKS / AKS) | Done | Done | -- |
+| Cilium CNI | Done (ENI mode) | Done (overlay) | -- |
+| Node groups / pools | Done | Done | -- |
+| IAM / Identity | Done (IAM roles, IRSA) | Done (managed identities, federated creds) | -- |
+| Organizations / Accounts | Done (Organizations, SCPs, Identity Center) | -- | -- |
+| ArgoCD | Done | -- | -- |
+| cert-manager | Done | -- | -- |
+| external-dns | Done | -- | -- |
+| external-secrets | Done | -- | -- |
+| Tailscale VPN | Done | -- | -- |
+| Gateway ingress | Done | -- | -- |
+| Storage | -- | Done | -- |
+| Container registry | -- | Done | -- |
+| Observability (Grafana, Prometheus) | -- | Done | -- |
+| Front Door / CDN | -- | Done | -- |
+| Key Vault / KMS | Secrets encryption via EKS KMS | Done | -- |
+| Policy (Kyverno) | Available | Available | Available |
+| vCluster | Available | Available | Available |
+| Live deployments | 5 accounts (mgmt, platform, test, preprod, prod) | 2 subscriptions (dev, ops) | Scaffolded (ops) |
 
-The multi-cloud implementation follows a phased approach:
+AWS and Azure are both production-capable with different strengths: AWS
+has the full Kubernetes platform stack (EKS + add-ons + VPN + GitOps);
+Azure has the full application infrastructure stack (AKS + observability +
+CDN + storage).
 
-1. **Phase 1**: Azure implementation (complete -- full module suite)
-2. **Phase 2**: AWS networking implementation (complete)
-3. **Phase 3**: GCP networking implementation (complete)
-4. **Phase 4**: Cross-cloud integration (in progress -- shared output interface established)
+## Module Organization
 
-### Module Structure
+```text
+infra/modules/
+├── aws/                    # 12 AWS-specific modules
+│   ├── eks/
+│   ├── networking/
+│   ├── organizations/
+│   └── ...
+├── azure/                  # 24 Azure-specific modules
+│   ├── aks_core/
+│   ├── networking/
+│   ├── frontdoor_profile/
+│   └── ...
+├── gcp/                    # 2 GCP-specific modules
+│   ├── naming/
+│   └── networking/
+├── cloudflare/             # DNS delegation
+└── (shared modules)        # Cloud-agnostic Helm deployments
+    ├── cilium/
+    ├── argocd/
+    ├── cert-manager/
+    ├── external-dns/
+    ├── external-secrets/
+    ├── tailscale/
+    ├── tailscale-admin/
+    ├── gateway-config/
+    ├── policy/
+    └── vcluster/
+```
 
-The Terraform modules are organized to support the multi-cloud strategy:
+### Cloud-Specific vs Shared
 
-- **Common Modules**: Cloud-agnostic abstractions (planned)
-- **AWS Modules**: AWS-specific implementations (networking implemented)
-- **Azure Modules**: Azure-specific implementations (complete)
-- **GCP Modules**: GCP-specific implementations (networking implemented)
+**Cloud-specific modules** create cloud-native resources: VPCs, AKS
+clusters, IAM roles, storage accounts. They use the corresponding cloud
+provider (AWS, AzureRM, Google).
 
-Currently implemented modules by cloud:
-- **Azure**: Networking, storage, AKS clusters and node pools, Key Vault, resource groups, naming, monitoring, CDN, identities, composite stacks (`stack_base`)
-- **AWS**: Networking (VPC, subnets, NAT gateways, route tables, EKS security groups), naming
-- **GCP**: Networking (VPC, subnets, Cloud Router, Cloud NAT), naming
-- **Cloud-agnostic**: vCluster (virtual Kubernetes clusters), policy (Kyverno placeholder)
+**Shared modules** deploy Helm charts or Kubernetes manifests. They
+accept credentials and identity primitives as variables -- the live unit
+handles sourcing them from cloud-specific stores. For example, the
+`cilium` module accepts a `cloud_provider` variable that switches
+between ENI mode (AWS) and overlay mode (Azure).
 
-### Cross-Cloud Interface Pattern
+## Cross-Cloud Interface Contracts
 
-All networking modules across clouds expose a shared set of output names, enabling Terragrunt live configs to consume any cloud's networking module uniformly:
+### Networking Outputs
 
-| Output | Azure | AWS | GCP |
-|--------|-------|-----|-----|
-| `network_id` | VNet ID | VPC ID | VPC Network ID |
-| `network_name` | VNet name | VPC name | VPC Network name |
-| `subnet_ids` | Map of subnet names to IDs | Map of subnet names to IDs | Map of subnet names to IDs |
-| `kubernetes_subnet_id` | AKS subnet ID | First EKS subnet ID | GKE subnet ID |
-| `create` | Whether resources were created | Whether resources were created | Whether resources were created |
+All networking modules expose a shared output set:
 
-Each cloud module also exposes cloud-specific outputs (e.g., AWS: `vpc_cidr_block`, `nat_gateway_ids`; GCP: `vpc_self_link`, `cloud_nat_id`) alongside the shared interface.
+| Output | AWS | Azure | GCP |
+|--------|-----|-------|-----|
+| `network_id` | VPC ID | VNet ID | VPC Network ID |
+| `network_name` | VPC name | VNet name | VPC Network name |
+| `subnet_ids` | Map of names to IDs | Map of names to IDs | Map of names to IDs |
+| `kubernetes_subnet_id` | First EKS subnet | AKS subnet | GKE subnet |
+| `create` | Whether resources created | Whether resources created | Whether resources created |
 
-### Unified Naming Module Contract
+Each cloud also exposes cloud-specific outputs (e.g., AWS:
+`vpc_cidr_block`, `nat_gateway_ids`; GCP: `vpc_self_link`,
+`cloud_nat_id`).
 
-In addition to the networking interface, all three cloud naming modules (`azure/naming`, `aws/naming`, `gcp/naming`) share a unified input contract:
+### Naming Contract
+
+All naming modules (`aws/naming`, `azure/naming`, `gcp/naming`) accept
+the same inputs:
 
 | Input | Type | Description |
 |-------|------|-------------|
-| `workload` | `string` | Workload identifier (e.g., `platform`, `data`, `hipaa`) |
-| `environment` | `string` | Environment name (e.g., `dev`, `prod`, `ops`) |
-| `region_abbv` | `string` | Cloud-specific abbreviated region (e.g., `eus`, `use1`, `usc1`) |
+| `workload` | string | Workload identifier (e.g., `platform`) |
+| `environment` | string | Environment name (e.g., `dev`, `prod`) |
+| `region_abbv` | string | Abbreviated region (e.g., `use1`, `eus`, `usc1`) |
 
-Each module generates cloud-appropriate names following the CAF-aligned pattern `{type}-{workload}-{env}-{region}`, with cloud-specific accommodations for character limits, casing rules, and globally-unique resources. This shared contract means Terragrunt live configs can pass the same `workload`, `environment`, and `region_abbv` locals to any cloud's naming module without modification.
+Names follow the CAF-aligned pattern `{type}-{workload}-{env}-{region}`
+with cloud-specific accommodations for character limits and casing rules.
 
-### Terragrunt Configuration
+### Cilium Cloud Modes
 
-The Terragrunt configuration follows a consistent pattern across cloud providers:
+The shared `cilium` module uses `cloud_provider` to select the
+appropriate networking mode:
 
-- Root `terragrunt.hcl` with provider configurations
-- Cloud-level `_base.hcl` for shared configuration and safety validations
-- Cloud-level `_versions.hcl` for centralized module source paths and version pins
-- Cloud-level `common.hcl` for cloud-wide defaults
-- Environment-specific settings in `env.hcl` files
-- Region-specific settings in `region.hcl` and `network.hcl` files
-- Common configuration patterns in `_envcommon` directory
+| Cloud | Mode | Routing | Masquerade Interface |
+|-------|------|---------|---------------------|
+| AWS | ENI | Native routing via AWS ENI | `ens+` (AL2023 predictable names) |
+| Azure | Overlay | VXLAN tunnel | Default |
 
-Live config hierarchies exist for all three clouds:
-- `infra/live/azure/` -- full environment structure (dev, ops, etc.)
-- `infra/live/aws/` -- ops environment with `_base.hcl` and `common.hcl`
-- `infra/live/gcp/` -- ops environment with `_base.hcl` and `common.hcl`
+## Configuration Parity
 
-## Cloud Feature Parity Matrix
+Each cloud has a parallel directory structure:
 
-The following matrix tracks implementation status across cloud providers:
+```text
+infra/live/
+  aws/                    azure/                  gcp/
+    _base.hcl               _base.hcl               _base.hcl
+    _versions.hcl           _versions.hcl           (not yet)
+    common.hcl              common.hcl              common.hcl
+    {env}/                  {env}/                  {env}/
+      env.hcl                 common.hcl              env.hcl
+      {region}/               {region}/               {region}/
+        region.hcl              region.hcl              region.hcl
+        network.hcl             network.hcl             network.hcl
+```
 
-| Feature | Azure | AWS | GCP |
-|---------|-------|-----|-----|
-| Networking | Implemented | Implemented | Implemented |
-| Naming | Implemented | Implemented | Implemented |
-| Live config hierarchy | Implemented | Implemented | Implemented |
-| `_base.hcl` shared config | Implemented | Implemented | Implemented |
-| Storage | Implemented | Planned | Planned |
-| Kubernetes | Implemented | Planned | Planned |
-| Identity | Implemented | Planned | Planned |
-| Key Management | Implemented | Planned | Planned |
-| Monitoring | Implemented | Planned | Planned |
-| CDN | Implemented | Planned | Planned |
-| Composite stacks | Implemented (`stack_base`) | Planned | Planned |
-| vCluster | Cloud-agnostic | Cloud-agnostic | Cloud-agnostic |
-| Policy (Kyverno) | Cloud-agnostic | Cloud-agnostic | Cloud-agnostic |
+The `_base.hcl` in each cloud loads the same layers, merges tags the
+same way, and runs the same safety validations -- adapted for the
+cloud's identity model (account ID, subscription ID, or project ID).
 
-## Migration Considerations
+See
+[Configuration Hierarchy](../../docs/architecture/config-hierarchy.md#azure-vs-aws-parallel-structure-comparison)
+for a detailed side-by-side comparison.
 
-When implementing workloads across multiple cloud providers, consider the following:
+## Adding a New Cloud
 
-1. **Data Sovereignty**: Where data is stored and processed
-2. **Service Compatibility**: Differences in service capabilities and limitations
-3. **Cost Models**: Different pricing structures across cloud providers
-4. **Identity Management**: Cross-cloud identity federation
-5. **Monitoring and Operations**: Unified monitoring and management
+1. Create `infra/live/{cloud}/_base.hcl` following the existing pattern
+   (load common, env, region, network, workload; merge tags; safety
+   assertions using the cloud's identity type).
+2. Create `infra/live/{cloud}/_versions.hcl` with module source paths.
+3. Create `infra/live/{cloud}/common.hcl` with project tags and the
+   environment-to-identity safety map.
+4. Create cloud-specific modules under `infra/modules/{cloud}/`.
+5. Populate environment, region, and workload directories.
 
 ## Next Steps
 
-Continue to [Environment Management](05-environment-management.md) to understand how different environments are managed across cloud providers. 
+Continue to [Environment Management](05-environment-management.md) to
+understand how environments are isolated and managed across clouds.

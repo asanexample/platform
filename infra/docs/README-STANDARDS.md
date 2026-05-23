@@ -1,8 +1,8 @@
 # README Documentation Standards
 
-Standards for README files in Terraform modules and Terragrunt configurations.
+Standards for README files in infrastructure modules and Terragrunt configurations.
 
-## Terraform Module READMEs
+## Module READMEs
 
 Each module README has two parts: **hand-written narrative** and **auto-generated reference**.
 
