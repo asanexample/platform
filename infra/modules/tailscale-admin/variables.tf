@@ -64,7 +64,7 @@ variable "secrets_manager_name" {
 variable "secrets_manager_recovery_window" {
   description = "Number of days to retain a deleted secret (0 = immediate deletion)"
   type        = number
-  default     = 0
+  default     = 7
 }
 
 variable "tags" {

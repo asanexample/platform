@@ -39,7 +39,19 @@ variable "oidc_provider_url" {
 variable "kms_key_arns" {
   description = "KMS key ARNs that external-secrets is allowed to decrypt"
   type        = list(string)
-  default     = ["*"]
+  default     = []
+}
+
+variable "secret_path_prefix" {
+  description = "Secrets Manager path prefix for scoping IRSA access (e.g., 'platform')"
+  type        = string
+  default     = "*"
+}
+
+variable "ssm_path_prefix" {
+  description = "SSM Parameter Store path prefix for scoping IRSA access (e.g., '/platform')"
+  type        = string
+  default     = "/*"
 }
 
 # ---------------------------------------------------------------------------
