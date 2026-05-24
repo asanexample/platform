@@ -170,6 +170,30 @@ eks_endpoint_is_private_only() {
   [[ "$val" == "False" ]]
 }
 
+# wait_for_eks_deletion <cluster-name> <region> [timeout-seconds]
+#   Polls until the EKS cluster no longer exists. Default timeout: 15 minutes.
+wait_for_eks_deletion() {
+  local cluster="$1" region="$2" timeout="${3:-900}"
+  local elapsed=0 interval=30
+
+  if ! eks_cluster_exists "$cluster" "$region"; then
+    log_success "  Cluster $cluster already gone."
+    return 0
+  fi
+
+  log_info "  Waiting for EKS cluster $cluster to be deleted (timeout: ${timeout}s)..."
+  while eks_cluster_exists "$cluster" "$region"; do
+    if [[ $elapsed -ge $timeout ]]; then
+      log_error "Timed out waiting for cluster $cluster deletion after ${timeout}s."
+      exit 1
+    fi
+    sleep "$interval"
+    elapsed=$((elapsed + interval))
+    log_info "  Still waiting... (${elapsed}s elapsed)"
+  done
+  log_success "  Cluster $cluster deleted."
+}
+
 # k8s_crd_exists <crd-name>
 #   Returns 0 if the CRD is registered in the cluster.
 k8s_crd_exists() {

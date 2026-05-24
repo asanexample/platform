@@ -115,6 +115,9 @@ if eks_cluster_exists "$CLUSTER_NAME" "$REGION"; then
 
   log_info "Destroying EKS cluster..."
   run_tg "$UNIT_DIR/eks" destroy
+
+  log_info "Waiting for EKS cluster to finish deleting..."
+  wait_for_eks_deletion "$CLUSTER_NAME" "$REGION"
 else
   log_warn "EKS cluster not found — skipping K8s resource teardown."
   run_tg "$UNIT_DIR/tailscale-admin" destroy
