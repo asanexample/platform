@@ -21,6 +21,7 @@ networking ─┘                        |
               cert-manager ──────────┤ (eks, nodes, r53)
               external-dns ──────────┤ (eks, nodes, r53)
               external-secrets ──────┤ (eks, nodes)
+              secret-stores ─────────┤ (eks, nodes, ext-secrets)
                                      |
               argocd ────────────────┤ (eks, nodes)
               tailscale ─────────────┤ (eks, nodes, ext-secrets)
@@ -58,6 +59,7 @@ terragrunt run --all destroy --filter-allow-destroy -- -auto-approve
 cd gateway-config && terragrunt destroy -auto-approve && cd ..
 cd tailscale && terragrunt destroy -auto-approve && cd ..
 cd argocd && terragrunt destroy -auto-approve && cd ..
+cd secret-stores && terragrunt destroy -auto-approve && cd ..
 cd ssm-bastion && terragrunt destroy -auto-approve && cd ..
 cd cert-manager && terragrunt destroy -auto-approve && cd ..
 cd external-dns && terragrunt destroy -auto-approve && cd ..

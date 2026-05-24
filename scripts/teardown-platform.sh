@@ -101,6 +101,9 @@ if eks_cluster_exists "$CLUSTER_NAME" "$REGION"; then
   log_info "Destroying argocd..."
   run_tg "$UNIT_DIR/argocd" destroy
 
+  log_info "Destroying secret stores..."
+  run_tg "$UNIT_DIR/secret-stores" destroy
+
   log_info "Destroying platform services..."
   run_tg_destroy_parallel "$UNIT_DIR/cert-manager" "$UNIT_DIR/external-dns" "$UNIT_DIR/external-secrets"
 

@@ -55,6 +55,7 @@ locals {
     cert_manager     = "${local.source_base}/cert-manager"
     external_dns     = "${local.source_base}/external-dns"
     external_secrets = "${local.source_base}/external-secrets"
+    secret_stores    = "${local.source_base}/secret-stores"
     gateway_config   = "${local.source_base}/gateway-config"
     tailscale        = "${local.source_base}/tailscale"
     tailscale_admin  = "${local.source_base}/tailscale-admin"

@@ -44,14 +44,14 @@ check_prerequisites
 # Phase 1 — Foundation (parallel, no dependencies)
 # ─────────────────────────────────────────────────────────────────────────────
 
-log_info "Phase 1/14: Deploying IAM roles, networking, and Route53..."
+log_info "Phase 1/15: Deploying IAM roles, networking, and Route53..."
 run_tg_parallel "$UNIT_DIR/iam-roles" "$UNIT_DIR/networking" "$UNIT_DIR/route53"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 2 — Cloudflare NS delegation (needs route53 NS records)
 # ─────────────────────────────────────────────────────────────────────────────
 
-log_info "Phase 2/14: Delegating DNS to Route53 via Cloudflare..."
+log_info "Phase 2/15: Delegating DNS to Route53 via Cloudflare..."
 run_tg "$UNIT_DIR/cloudflare-dns"
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -59,31 +59,31 @@ run_tg "$UNIT_DIR/cloudflare-dns"
 #
 # The cluster is normally private-only (endpoint_public_access=false in
 # terragrunt.hcl). During bootstrap, Tailscale VPN isn't deployed yet, so we
-# temporarily enable the public endpoint. Phase 14 locks it back down.
+# temporarily enable the public endpoint. Phase 15 locks it back down.
 # ─────────────────────────────────────────────────────────────────────────────
 
-log_info "Phase 3/14: Deploying EKS cluster (public endpoint enabled for bootstrap)..."
+log_info "Phase 3/15: Deploying EKS cluster (public endpoint enabled for bootstrap)..."
 run_tg "$UNIT_DIR/eks" apply -var 'endpoint_public_access=true'
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 4 — Cilium CNI (BYOCNI — must be installed before nodes join)
 # ─────────────────────────────────────────────────────────────────────────────
 
-log_info "Phase 4/14: Deploying Cilium CNI..."
+log_info "Phase 4/15: Deploying Cilium CNI..."
 run_tg "$UNIT_DIR/cilium"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 5 — Managed node groups (need Cilium ready first)
 # ─────────────────────────────────────────────────────────────────────────────
 
-log_info "Phase 5/14: Deploying managed node groups..."
+log_info "Phase 5/15: Deploying managed node groups..."
 run_tg "$UNIT_DIR/node-groups"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 6 — Post-node services (parallel)
 # ─────────────────────────────────────────────────────────────────────────────
 
-log_info "Phase 6/14: Deploying EKS addons and SSM bastion..."
+log_info "Phase 6/15: Deploying EKS addons and SSM bastion..."
 run_tg_parallel "$UNIT_DIR/eks-addons" "$UNIT_DIR/ssm-bastion"
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ run_tg_parallel "$UNIT_DIR/eks-addons" "$UNIT_DIR/ssm-bastion"
 # ─────────────────────────────────────────────────────────────────────────────
 
 if secret_exists "platform/tailscale/api-key"; then
-  log_success "Phase 7/14: Tailscale API key already in Secrets Manager — skipping."
+  log_success "Phase 7/15: Tailscale API key already in Secrets Manager — skipping."
 elif [[ "$INTERACTIVE" == true ]]; then
   prompt_manual_step "Tailscale Account Setup" <<'INSTRUCTIONS'
 1. Create a Tailscale account at https://login.tailscale.com
@@ -110,7 +110,7 @@ elif [[ "$INTERACTIVE" == true ]]; then
 INSTRUCTIONS
   validate_secret "platform/tailscale/api-key"
 else
-  log_error "Phase 7/14: Secret platform/tailscale/api-key not found and --yes was passed."
+  log_error "Phase 7/15: Secret platform/tailscale/api-key not found and --yes was passed."
   log_error "Create the secret first, then re-run."
   exit 1
 fi
@@ -123,18 +123,29 @@ fi
 # platform/tailscale/oauth — the tailscale unit reads them later.
 # ─────────────────────────────────────────────────────────────────────────────
 
-log_info "Phase 8/14: Deploying Tailscale admin configuration..."
+log_info "Phase 8/15: Deploying Tailscale admin configuration..."
 run_tg "$UNIT_DIR/tailscale-admin"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 9 — Platform services (parallel)
 # ─────────────────────────────────────────────────────────────────────────────
 
-log_info "Phase 9/14: Deploying cert-manager, external-dns, external-secrets..."
+log_info "Phase 9/15: Deploying cert-manager, external-dns, external-secrets..."
 run_tg_parallel "$UNIT_DIR/cert-manager" "$UNIT_DIR/external-dns" "$UNIT_DIR/external-secrets"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Phase 10 — Tailscale operator (two-stage for CRD bootstrap)
+# Phase 10 — Secret stores (ClusterSecretStore CRDs)
+#
+# Deploys ClusterSecretStore resources backed by AWS Secrets Manager and
+# SSM Parameter Store. Runs after external-secrets (Phase 9) which installs
+# the ESO CRDs.
+# ─────────────────────────────────────────────────────────────────────────────
+
+log_info "Phase 10/15: Deploying ClusterSecretStore configuration..."
+run_tg "$UNIT_DIR/secret-stores"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 11 — Tailscale operator (two-stage for CRD bootstrap)
 #
 # The module uses kubernetes_manifest for ProxyClass and Connector CRDs.
 # These CRDs are installed by the Helm chart, so on a fresh cluster they
@@ -143,22 +154,22 @@ run_tg_parallel "$UNIT_DIR/cert-manager" "$UNIT_DIR/external-dns" "$UNIT_DIR/ext
 # ─────────────────────────────────────────────────────────────────────────────
 
 if k8s_crd_exists "connectors.tailscale.com"; then
-  log_info "Phase 10/14: Tailscale CRDs already registered — running full apply..."
+  log_info "Phase 11/15: Tailscale CRDs already registered — running full apply..."
   run_tg "$UNIT_DIR/tailscale"
 else
-  log_info "Phase 10/14: Deploying Tailscale operator (stage 1: Helm chart)..."
+  log_info "Phase 11/15: Deploying Tailscale operator (stage 1: Helm chart)..."
   run_tg "$UNIT_DIR/tailscale" apply -target='helm_release.tailscale_operator[0]'
 
-  log_info "Phase 10/14: Deploying Tailscale operator (stage 2: Connector + split DNS)..."
+  log_info "Phase 11/15: Deploying Tailscale operator (stage 2: Connector + split DNS)..."
   run_tg "$UNIT_DIR/tailscale"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Phase 11 — Manual: ArgoCD SAML app in Identity Center
+# Phase 12 — Manual: ArgoCD SAML app in Identity Center
 # ─────────────────────────────────────────────────────────────────────────────
 
 if grep -q 'argocd_sso_url.*portal\.sso' "$REPO_ROOT/infra/live/aws/common.hcl" 2>/dev/null; then
-  log_success "Phase 11/14: ArgoCD SSO URL found in common.hcl — skipping."
+  log_success "Phase 12/15: ArgoCD SSO URL found in common.hcl — skipping."
 elif [[ "$INTERACTIVE" == true ]]; then
   prompt_manual_step "ArgoCD SSO Setup" <<'INSTRUCTIONS'
 Create a SAML application in AWS Identity Center:
@@ -179,27 +190,27 @@ After creating the app, update infra/live/aws/common.hcl with:
   argocd_sso_ca_data = "<base64-encoded CA certificate>"
 INSTRUCTIONS
 else
-  log_error "Phase 11/14: ArgoCD SSO URL not found in common.hcl and --yes was passed."
+  log_error "Phase 12/15: ArgoCD SSO URL not found in common.hcl and --yes was passed."
   log_error "Create the SAML app and update common.hcl first, then re-run."
   exit 1
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Phase 12 — ArgoCD
+# Phase 13 — ArgoCD
 # ─────────────────────────────────────────────────────────────────────────────
 
-log_info "Phase 12/14: Deploying ArgoCD..."
+log_info "Phase 13/15: Deploying ArgoCD..."
 run_tg "$UNIT_DIR/argocd"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Phase 13 — Gateway config (final leaf node)
+# Phase 14 — Gateway config (final leaf node)
 # ─────────────────────────────────────────────────────────────────────────────
 
-log_info "Phase 13/14: Deploying Gateway configuration..."
+log_info "Phase 14/15: Deploying Gateway configuration..."
 run_tg "$UNIT_DIR/gateway-config"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Phase 14 — Lock down EKS to private-only endpoint
+# Phase 15 — Lock down EKS to private-only endpoint
 #
 # Re-applies the EKS unit without the -var override. The terragrunt.hcl
 # specifies endpoint_public_access=false, so this disables public access.
@@ -207,9 +218,9 @@ run_tg "$UNIT_DIR/gateway-config"
 # ─────────────────────────────────────────────────────────────────────────────
 
 if eks_endpoint_is_private_only "$CLUSTER_NAME" "$REGION"; then
-  log_success "Phase 14/14: EKS endpoint is already private-only — skipping."
+  log_success "Phase 15/15: EKS endpoint is already private-only — skipping."
 else
-  log_info "Phase 14/14: Locking down EKS to private-only endpoint..."
+  log_info "Phase 15/15: Locking down EKS to private-only endpoint..."
   run_tg "$UNIT_DIR/eks"
 fi
 
