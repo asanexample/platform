@@ -35,6 +35,13 @@ inputs = {
   enable_eks_networking = true
   eks_cluster_name      = "${include.base.locals.env}-${include.base.locals.region_abbv}-eks"
 
+  interface_vpc_endpoints = [
+    "secretsmanager",
+    "ssm",
+    "sts",
+    "kms",
+  ]
+
   enable_flow_logs        = true
   flow_log_retention_days = 30
 }
