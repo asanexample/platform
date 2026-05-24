@@ -4,7 +4,7 @@
 #
 # Prerequisites:
 #   - AWS credentials configured (aws sso login)
-#   - CLOUDFLARE_API_TOKEN exported
+#   - Cloudflare API token stored in Secrets Manager (platform/cloudflare/api-token)
 #   - Management account state backend already provisioned
 #
 # Usage:

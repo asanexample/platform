@@ -29,8 +29,9 @@ check_prerequisites() {
     || { log_error "AWS credentials not configured. Run: aws sso login"; exit 1; }
   log_info "AWS account: $account_id"
 
-  if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
-    log_error "CLOUDFLARE_API_TOKEN is not set. Export it before running."
+  if ! secret_exists "platform/cloudflare/api-token"; then
+    log_error "Cloudflare API token not found in Secrets Manager (platform/cloudflare/api-token)."
+    log_error "Create it with: aws secretsmanager create-secret --name platform/cloudflare/api-token --secret-string '<TOKEN>' --region us-east-1 --profile platform"
     exit 1
   fi
 }

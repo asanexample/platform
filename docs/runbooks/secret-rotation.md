@@ -25,9 +25,9 @@
 ## 1. Cloudflare API Token Rotation
 
 The Cloudflare API token authenticates the Cloudflare Terraform provider
-used by the `cloudflare-dns` unit. Currently this is passed as an
-environment variable. A future iteration will store the token in AWS
-Secrets Manager.
+used by the `cloudflare-dns` unit. The token is stored in AWS Secrets
+Manager at `platform/cloudflare/api-token` and read via a data source
+at plan/apply time.
 
 ### Procedure
 
@@ -39,25 +39,9 @@ Secrets Manager.
 2. **Revoke the old token** in the dashboard after the new token is
    verified (step 4).
 
-3. **Set the new token:**
-
-   **Current method (environment variable):**
+3. **Update the secret in Secrets Manager:**
 
    ```bash
-   export CLOUDFLARE_API_TOKEN='<new-token>'
-   ```
-
-   **Future method (Secrets Manager):**
-
-   ```bash
-   # First time -- create the secret:
-   aws secretsmanager create-secret \
-     --name platform/cloudflare/api-token \
-     --secret-string '<new-token>' \
-     --region us-east-1 \
-     --profile platform
-
-   # Subsequent rotations -- update the secret:
    aws secretsmanager put-secret-value \
      --secret-id platform/cloudflare/api-token \
      --secret-string '<new-token>' \
