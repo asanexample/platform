@@ -14,7 +14,7 @@ terraform {
 # Override versions.tf to add the tailscale provider
 generate "versions_override" {
   path      = "versions.tf"
-  if_exists = "overwrite_terragrunt"
+  if_exists = "overwrite"
   contents  = <<-EOF
     terraform {
       required_version = ">= 1.6.0"

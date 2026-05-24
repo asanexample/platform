@@ -80,6 +80,13 @@ All dependency blocks have `mock_outputs` so destroy works even if upstream depe
 terragrunt plan
 terragrunt apply
 
+# Bootstrap the full platform stack from zero
+./scripts/bootstrap-platform.sh
+
+# Tear down the full platform stack
+./scripts/teardown-platform.sh                # preserves Route53
+./scripts/teardown-platform.sh --include-route53  # destroys everything
+
 # Format checks
 tofu fmt -check -recursive infra/modules/
 terragrunt hclfmt --check
