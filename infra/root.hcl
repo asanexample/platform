@@ -22,6 +22,7 @@ remote_state {
     region         = "us-east-1"
     encrypt        = true
     dynamodb_table = "terraform-locks"
+    role_arn       = "arn:aws:iam::851725353202:role/TerraformStateAccess"
     } : {
     subscription_id      = "9dc5edc4-8c4e-41a1-a4f8-2183c4e91954"
     tenant_id            = "c945e155-be68-4477-b8d7-01939adbfe55"
