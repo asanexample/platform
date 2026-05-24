@@ -35,8 +35,13 @@ check_prerequisites() {
   fi
 }
 
+# SCP-protected resource types that cannot be deleted by member accounts.
+readonly SCP_PROTECTED_TYPES="aws_kms_key|aws_kms_alias|aws_flow_log"
+
 # run_tg <dir> [apply|destroy] [extra-args...]
 #   Runs terragrunt in the given directory. Defaults to 'apply' with -auto-approve.
+#   On destroy, if an SCP blocks deletion, removes the protected resources from
+#   state and retries automatically.
 run_tg() {
   local dir="$1"; shift
   local action="apply"
@@ -47,10 +52,44 @@ run_tg() {
   unit_name=$(basename "$dir")
 
   log_info "  → $unit_name ($action)"
-  if ! (cd "$dir" && terragrunt "$action" -auto-approve "$@"); then
-    log_error "Failed: $unit_name ($action)"
-    exit 1
+  local logfile
+  logfile=$(mktemp "/tmp/tg-${unit_name}-${action}-XXXXXX.log")
+
+  if (cd "$dir" && terragrunt "$action" -auto-approve "$@" > "$logfile" 2>&1); then
+    rm -f "$logfile"
+    return 0
   fi
+
+  if [[ "$action" == "destroy" ]] && grep -q "service.control.policy\|service_control_policy" "$logfile"; then
+    log_warn "  SCP blocked deletion in $unit_name — removing protected resources from state..."
+    _remove_scp_protected_resources "$dir"
+
+    if (cd "$dir" && terragrunt destroy -auto-approve > "$logfile" 2>&1); then
+      rm -f "$logfile"
+      return 0
+    fi
+  fi
+
+  cat "$logfile"
+  log_error "Failed: $unit_name ($action) (see $logfile)"
+  exit 1
+}
+
+# _remove_scp_protected_resources <dir>
+#   Lists state and removes any resources matching SCP-protected types.
+_remove_scp_protected_resources() {
+  local dir="$1"
+  local resources
+  resources=$(cd "$dir" && terragrunt state list 2>/dev/null | grep -E "$SCP_PROTECTED_TYPES" || true)
+
+  if [[ -z "$resources" ]]; then
+    return 0
+  fi
+
+  while IFS= read -r resource; do
+    log_warn "    Removing $resource from state (SCP-protected)"
+    (cd "$dir" && terragrunt state rm "$resource" >/dev/null 2>&1) || true
+  done <<< "$resources"
 }
 
 # run_tg_parallel <dir1> <dir2> ...
@@ -82,9 +121,11 @@ run_tg_parallel() {
 
 # run_tg_destroy_parallel <dir1> <dir2> ...
 #   Runs terragrunt destroy -auto-approve in each directory concurrently.
+#   On SCP failures, removes protected resources from state and retries.
 run_tg_destroy_parallel() {
+  local dirs=("$@")
   local pids=() names=() logs=()
-  for dir in "$@"; do
+  for dir in "${dirs[@]}"; do
     local name
     name=$(basename "$dir")
     local logfile
@@ -95,16 +136,32 @@ run_tg_destroy_parallel() {
     pids+=($!)
   done
 
-  local failed=0
+  local failed=() failed_dirs=()
   for i in "${!pids[@]}"; do
     if wait "${pids[$i]}"; then
       log_success "  ✓ ${names[$i]} (destroyed)"
+    elif grep -q "service.control.policy\|service_control_policy" "${logs[$i]}"; then
+      log_warn "  ⚠ ${names[$i]} hit SCP — will retry"
+      failed+=("$i")
+      failed_dirs+=("${dirs[$i]}")
     else
       log_error "  ✗ ${names[$i]} (see ${logs[$i]})"
-      failed=1
+      exit 1
     fi
   done
-  [[ $failed -eq 0 ]] || exit 1
+
+  for i in "${!failed_dirs[@]}"; do
+    local dir="${failed_dirs[$i]}"
+    local name
+    name=$(basename "$dir")
+    _remove_scp_protected_resources "$dir"
+    log_info "  → $name (retry destroy)"
+    if ! (cd "$dir" && terragrunt destroy -auto-approve > /dev/null 2>&1); then
+      log_error "  ✗ $name (retry failed)"
+      exit 1
+    fi
+    log_success "  ✓ $name (destroyed)"
+  done
 }
 
 # prompt_manual_step <title>
