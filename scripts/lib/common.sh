@@ -29,7 +29,7 @@ check_prerequisites() {
     || { log_error "AWS credentials not configured. Run: aws sso login"; exit 1; }
   log_info "AWS account: $account_id"
 
-  if ! secret_exists "platform/cloudflare/api-token"; then
+  if ! secret_exists "platform/cloudflare/api-token" platform; then
     log_error "Cloudflare API token not found in Secrets Manager (platform/cloudflare/api-token)."
     log_error "Create it with: aws secretsmanager create-secret --name platform/cloudflare/api-token --secret-string '<TOKEN>' --region us-east-1 --profile platform"
     exit 1
@@ -184,23 +184,27 @@ prompt_manual_step() {
   read -r -p "Press Enter when done..."
 }
 
-# validate_secret <secret-id>
+# validate_secret <secret-id> [profile]
 #   Checks that an AWS Secrets Manager secret exists.
 validate_secret() {
   local secret_id="$1"
+  local profile_args=()
+  [[ -n "${2:-}" ]] && profile_args=(--profile "$2")
   if ! aws secretsmanager describe-secret --secret-id "$secret_id" \
-       --region us-east-1 --query 'Name' --output text &>/dev/null; then
+       --region us-east-1 "${profile_args[@]}" --query 'Name' --output text &>/dev/null; then
     log_error "Secret '$secret_id' not found in Secrets Manager."
     exit 1
   fi
   log_success "  Secret '$secret_id' exists."
 }
 
-# secret_exists <secret-id>
+# secret_exists <secret-id> [profile]
 #   Returns 0 if the secret exists, 1 otherwise.
 secret_exists() {
+  local profile_args=()
+  [[ -n "${2:-}" ]] && profile_args=(--profile "$2")
   aws secretsmanager describe-secret --secret-id "$1" \
-    --region us-east-1 --query 'Name' --output text &>/dev/null
+    --region us-east-1 "${profile_args[@]}" --query 'Name' --output text &>/dev/null
 }
 
 # eks_cluster_exists <cluster-name> <region>

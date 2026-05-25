@@ -7,7 +7,7 @@
 # to destroy it as well.
 #
 # Usage:
-#   ./scripts/teardown-platform.sh [-y|--yes] [--include-route53]
+#   AWS_PROFILE=management ./scripts/teardown-platform.sh [-y|--yes] [--include-route53]
 #
 # Options:
 #   -y, --yes          Skip the DESTROY confirmation prompt

@@ -214,6 +214,20 @@ resource "aws_security_group" "vpc_endpoints" {
   tags = merge(var.tags, { Name = "${var.vpc_name}-vpce-sg" })
 }
 
+locals {
+  # Pick one private subnet per AZ for interface endpoints.
+  # Prefer subnets with "endpoints" in the name, fall back to any private subnet.
+  _endpoint_subnets_by_az = {
+    for k, v in local.private_subnets : lookup(v, "availability_zone", "unknown") => k...
+  }
+  endpoint_subnet_keys = [
+    for az, keys in local._endpoint_subnets_by_az : try(
+      [for k in keys : k if can(regex("endpoints", k))][0],
+      keys[0]
+    )
+  ]
+}
+
 resource "aws_vpc_endpoint" "interface" {
   for_each = local.create ? toset(var.interface_vpc_endpoints) : toset([])
 
@@ -222,7 +236,7 @@ resource "aws_vpc_endpoint" "interface" {
   vpc_endpoint_type   = "Interface"
   private_dns_enabled = true
 
-  subnet_ids         = [for k, v in local.private_subnets : aws_subnet.this[k].id]
+  subnet_ids         = [for k in local.endpoint_subnet_keys : aws_subnet.this[k].id]
   security_group_ids = [aws_security_group.vpc_endpoints[0].id]
 
   tags = merge(var.tags, { Name = "${var.vpc_name}-${each.value}-endpoint" })

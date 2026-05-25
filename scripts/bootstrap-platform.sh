@@ -6,9 +6,13 @@
 #   - AWS credentials configured (aws sso login)
 #   - Cloudflare API token stored in Secrets Manager (platform/cloudflare/api-token)
 #   - Management account state backend already provisioned
+#   - IAM roles must exist before first run. On a fresh account, bootstrap
+#     iam-roles manually first:
+#       AWS_PROFILE=platform terragrunt apply -auto-approve \
+#         -chdir=infra/live/aws/platform/us-east-1/platform/iam-roles
 #
 # Usage:
-#   ./scripts/bootstrap-platform.sh [-y|--yes]
+#   AWS_PROFILE=management ./scripts/bootstrap-platform.sh [-y|--yes]
 #
 # Options:
 #   -y, --yes    Non-interactive mode. Skips manual step prompts (assumes
@@ -90,7 +94,7 @@ run_tg_parallel "$UNIT_DIR/eks-addons" "$UNIT_DIR/ssm-bastion"
 # Phase 7 — Manual: Tailscale account + API key
 # ─────────────────────────────────────────────────────────────────────────────
 
-if secret_exists "platform/tailscale/api-key"; then
+if secret_exists "platform/tailscale/api-key" platform; then
   log_success "Phase 7/15: Tailscale API key already in Secrets Manager — skipping."
 elif [[ "$INTERACTIVE" == true ]]; then
   prompt_manual_step "Tailscale Account Setup" <<'INSTRUCTIONS'
@@ -108,7 +112,7 @@ elif [[ "$INTERACTIVE" == true ]]; then
 
    If the secret already exists, use put-secret-value instead.
 INSTRUCTIONS
-  validate_secret "platform/tailscale/api-key"
+  validate_secret "platform/tailscale/api-key" platform
 else
   log_error "Phase 7/15: Secret platform/tailscale/api-key not found and --yes was passed."
   log_error "Create the secret first, then re-run."
