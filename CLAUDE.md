@@ -83,11 +83,11 @@ terragrunt plan
 terragrunt apply
 
 # Bootstrap the full platform stack from zero
-./scripts/bootstrap-platform.sh
+AWS_PROFILE=management ./scripts/bootstrap-platform.sh
 
 # Tear down the full platform stack
-./scripts/teardown-platform.sh                # preserves Route53
-./scripts/teardown-platform.sh --include-route53  # destroys everything
+AWS_PROFILE=management ./scripts/teardown-platform.sh                # preserves Route53
+AWS_PROFILE=management ./scripts/teardown-platform.sh --include-route53  # destroys everything
 
 # Format checks
 tofu fmt -check -recursive infra/modules/

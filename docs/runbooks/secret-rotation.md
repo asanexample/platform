@@ -333,7 +333,7 @@ Within 48 hours of the incident:
 |--------|----------|--------|------------------|
 | Tailscale API key | `platform/tailscale/api-key` (Secrets Manager) | 90 days | Calendar reminder |
 | Tailscale OAuth client | `platform/tailscale/oauth` (Secrets Manager) | No expiry | Compromise only |
-| Cloudflare API token | Environment variable (future: Secrets Manager) | No expiry | Compromise or policy |
+| Cloudflare API token | `platform/cloudflare/api-token` (Secrets Manager) | No expiry | Compromise or policy |
 | ArgoCD SSO CA cert | `argocd_sso_ca_data` in `common.hcl` | Varies (IdC rotation) | Identity Center notification |
 
 ### Checking Current Key Age
