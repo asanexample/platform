@@ -29,6 +29,14 @@ networking ─┘                        |
 
 tailscale-admin ─────────────────────── (no cluster deps, manages tailnet ACLs/OAuth)
 cloudtrail ──────────────────────────── (no deps, secrets audit logging)
+
+### Preprod dependency graph (minimal stack)
+
+iam-roles ──┐
+             ├─> eks -> cilium -> node-groups -> eks-addons
+networking ─┘                        |
+              external-secrets ──────┤ (eks, nodes)
+              secret-stores ─────────┘ (eks, nodes, ext-secrets)
 ```
 
 EKS uses BYOCNI (`bootstrap_self_managed_addons = false`), so Cilium must be deployed before node groups can join the cluster. EKS managed add-ons (coredns) are in a separate `eks-addons` unit that depends on cilium + node-groups, since addon pods need the CNI to schedule.
@@ -76,6 +84,37 @@ cd cloudtrail && terragrunt destroy -auto-approve && cd ..
 ```
 
 All dependency blocks have `mock_outputs` so destroy works even if upstream dependencies are already gone.
+
+### Preprod deploy order
+
+```bash
+# From infra/live/aws/preprod/us-east-1/platform/
+# Step 1: bootstrap iam-roles (direct SSO, no role assumption)
+AWS_PROFILE=preprod terragrunt apply -chdir=iam-roles
+
+# Step 2+: remaining units (management SSO → PlatformDeployer in preprod)
+AWS_PROFILE=management terragrunt apply -chdir=networking
+AWS_PROFILE=management terragrunt apply -chdir=eks
+AWS_PROFILE=management terragrunt apply -chdir=cilium
+AWS_PROFILE=management terragrunt apply -chdir=node-groups
+AWS_PROFILE=management terragrunt apply -chdir=eks-addons
+AWS_PROFILE=management terragrunt apply -chdir=external-secrets
+AWS_PROFILE=management terragrunt apply -chdir=secret-stores
+```
+
+### Preprod destroy order
+
+```bash
+# From infra/live/aws/preprod/us-east-1/platform/
+cd secret-stores && terragrunt destroy -auto-approve && cd ..
+cd external-secrets && terragrunt destroy -auto-approve && cd ..
+cd eks-addons && terragrunt destroy -auto-approve && cd ..
+cd node-groups && terragrunt destroy -auto-approve && cd ..
+cd cilium && terragrunt destroy -auto-approve && cd ..
+cd eks && terragrunt destroy -auto-approve && cd ..
+cd networking && terragrunt destroy -auto-approve && cd ..
+cd iam-roles && terragrunt destroy -auto-approve && cd ..
+```
 
 ## Key Commands
 
@@ -132,9 +171,9 @@ Cross-account access uses purpose-built IAM roles (see IAM Roles below). `Organi
 
 | Role | Account | Purpose |
 |------|---------|---------|
-| **PlatformAdmin** | Platform (829808296602) | kubectl, SSM tunnel, cluster debugging |
-| **PlatformDeployer** | Platform (829808296602) | Terragrunt apply, Helm/K8s providers |
-| **DeveloperAccess** | Platform (829808296602) | Namespace-scoped kubectl for developers |
+| **PlatformAdmin** | Platform, PreProd | kubectl, SSM tunnel, cluster debugging |
+| **PlatformDeployer** | Platform, PreProd | Terragrunt apply, Helm/K8s providers |
+| **DeveloperAccess** | Platform, PreProd | Namespace-scoped kubectl for developers |
 | **TerraformStateAccess** | Management (851725353202) | S3 state bucket + DynamoDB lock table |
 | **OrganizationAccountAccessRole** | All accounts | Break-glass only |
 
