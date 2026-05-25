@@ -48,8 +48,8 @@ check_prerequisites
 # Phase 1 — Foundation (parallel, no dependencies)
 # ─────────────────────────────────────────────────────────────────────────────
 
-log_info "Phase 1/15: Deploying IAM roles, networking, and Route53..."
-run_tg_parallel "$UNIT_DIR/iam-roles" "$UNIT_DIR/networking" "$UNIT_DIR/route53"
+log_info "Phase 1/15: Deploying IAM roles, networking, Route53, and CloudTrail..."
+run_tg_parallel "$UNIT_DIR/iam-roles" "$UNIT_DIR/networking" "$UNIT_DIR/route53" "$UNIT_DIR/cloudtrail"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 2 — Cloudflare NS delegation (needs route53 NS records)

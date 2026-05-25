@@ -134,8 +134,8 @@ if [[ "$INCLUDE_ROUTE53" == true ]]; then
   run_tg "$UNIT_DIR/route53" destroy
 fi
 
-log_info "Destroying networking and IAM roles..."
-run_tg_destroy_parallel "$UNIT_DIR/networking" "$UNIT_DIR/iam-roles"
+log_info "Destroying CloudTrail, networking, and IAM roles..."
+run_tg_destroy_parallel "$UNIT_DIR/cloudtrail" "$UNIT_DIR/networking" "$UNIT_DIR/iam-roles"
 
 echo ""
 log_success "=== Teardown complete! ==="

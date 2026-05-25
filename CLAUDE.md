@@ -28,6 +28,7 @@ networking ─┘                        |
               gateway-config ────────┘ (eks, cilium, cert-manager, ext-dns, argocd, r53)
 
 tailscale-admin ─────────────────────── (no cluster deps, manages tailnet ACLs/OAuth)
+cloudtrail ──────────────────────────── (no deps, secrets audit logging)
 ```
 
 EKS uses BYOCNI (`bootstrap_self_managed_addons = false`), so Cilium must be deployed before node groups can join the cluster. EKS managed add-ons (coredns) are in a separate `eks-addons` unit that depends on cilium + node-groups, since addon pods need the CNI to schedule.
@@ -69,6 +70,7 @@ cd node-groups && terragrunt destroy -auto-approve && cd ..
 cd cilium && terragrunt destroy -auto-approve && cd ..
 cd eks && terragrunt destroy -auto-approve && cd ..
 cd networking && terragrunt destroy -auto-approve && cd ..
+cd cloudtrail && terragrunt destroy -auto-approve && cd ..
 # tailscale-admin — destroy separately if tearing down the tailnet
 # route53 — destroy separately if needed
 ```
