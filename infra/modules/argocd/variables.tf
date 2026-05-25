@@ -37,6 +37,12 @@ variable "extra_iam_policy_arns" {
   default     = []
 }
 
+variable "remote_cluster_role_arns" {
+  description = "Cross-account IAM role ARNs that ArgoCD needs to assume for remote cluster management"
+  type        = list(string)
+  default     = []
+}
+
 # ---------------------------------------------------------------------------
 # Helm
 # ---------------------------------------------------------------------------

@@ -31,6 +31,17 @@ dependency "node_groups" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+dependency "preprod_iam_roles" {
+  config_path = "../../../../preprod/us-east-1/platform/iam-roles"
+
+  mock_outputs = {
+    role_arns = {
+      ArgoCD = "arn:aws:iam::000000000000:role/ArgoCD"
+    }
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
 generate "helm_provider" {
   path      = "helm-provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -100,6 +111,10 @@ inputs = {
       }]
     })
   }
+
+  remote_cluster_role_arns = [
+    dependency.preprod_iam_roles.outputs.role_arns["ArgoCD"],
+  ]
 
   tags = include.base.locals.tags
 }

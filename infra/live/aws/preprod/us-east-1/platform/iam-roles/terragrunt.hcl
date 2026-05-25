@@ -116,6 +116,24 @@ inputs = {
       managed_policies = ["arn:aws:iam::aws:policy/AdministratorAccess"]
     }
 
+    ArgoCD = {
+      description = "Cross-account ArgoCD cluster management from platform hub"
+
+      trust_principals = {
+        aws = ["arn:aws:iam::829808296602:root"]
+      }
+
+      trust_conditions = [
+        {
+          test     = "ArnLike"
+          variable = "aws:PrincipalArn"
+          values   = ["arn:aws:iam::829808296602:role/platform-use1-eks-argocd-*"]
+        },
+      ]
+
+      managed_policies = []
+    }
+
     DeveloperAccess = {
       description          = "Namespace-scoped developer cluster access"
       max_session_duration = 14400

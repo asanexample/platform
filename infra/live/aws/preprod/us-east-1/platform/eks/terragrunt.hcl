@@ -62,6 +62,10 @@ inputs = {
       principal_arn = dependency.iam_roles.outputs.role_arns["PlatformDeployer"]
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
     }
+    argocd = {
+      principal_arn = dependency.iam_roles.outputs.role_arns["ArgoCD"]
+      policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+    }
     break_glass = {
       principal_arn = "arn:aws:iam::${include.base.locals.account_id}:role/OrganizationAccountAccessRole"
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"

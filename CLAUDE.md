@@ -4,7 +4,7 @@
 
 Multi-cloud IaC platform using OpenTofu + Terragrunt. Targets AWS and Azure (GCP stubbed).
 
-- **Shared modules** (`infra/modules/`): cilium, argocd, argocd-bootstrap, cert-manager, external-dns, external-secrets, gateway-config, tailscale, tailscale-admin, policy, vcluster
+- **Shared modules** (`infra/modules/`): cilium, argocd, argocd-bootstrap, argocd-clusters, cert-manager, external-dns, external-secrets, gateway-config, tailscale, tailscale-admin, policy, vcluster
 - **Cloud-specific modules**: `infra/modules/aws/*` (eks, networking, ssm-bastion, etc.), `infra/modules/azure/*` (aks_core, networking, key_vault, etc.)
 - **Live configs**: `infra/live/{aws,azure}/` -- environment-specific Terragrunt units
 
@@ -24,6 +24,7 @@ networking ─┘                        |
               secret-stores ─────────┤ (eks, nodes, ext-secrets)
                                      |
               argocd ────────────────┤ (eks, nodes)
+              argocd-clusters ──────┤ (argocd, eks, nodes, preprod eks+iam-roles)
               tailscale ─────────────┤ (eks, nodes, ext-secrets)
               gateway-config ────────┘ (eks, cilium, cert-manager, ext-dns, argocd, r53)
 
