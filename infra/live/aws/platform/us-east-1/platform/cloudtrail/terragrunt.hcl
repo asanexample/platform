@@ -15,13 +15,7 @@ inputs = {
   create     = true
   trail_name = "${include.base.locals.env}-${include.base.locals.region_abbv}-secrets-audit"
 
-  data_event_selectors = [
-    {
-      name          = "secrets-manager-data-events"
-      resource_type = "AWS::SecretsManager::Secret"
-      resource_arns = ["arn:aws:secretsmanager:${include.base.locals.region}:${include.base.locals.account_id}:secret:platform/"]
-    },
-  ]
+  data_event_selectors = []
 
   enable_cloudwatch     = true
   enable_secrets_alarms = true
