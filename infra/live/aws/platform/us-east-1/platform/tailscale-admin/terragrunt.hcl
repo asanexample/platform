@@ -25,7 +25,7 @@ generate "versions_override" {
         }
         aws = {
           source  = "hashicorp/aws"
-          version = "6.45.0"
+          version = "6.46.0"
         }
       }
     }
@@ -48,6 +48,53 @@ generate "provider_tailscale" {
   EOF
 }
 
+# Replicate Tailscale secrets to preprod account for the preprod tailscale unit
+generate "preprod_secrets" {
+  path      = "preprod-secrets.tf"
+  if_exists = "overwrite_terragrunt"
+  contents  = <<-EOF
+    provider "aws" {
+      alias  = "preprod"
+      region = "us-east-1"
+
+      assume_role {
+        role_arn = "arn:aws:iam::620830101009:role/PlatformDeployer"
+      }
+    }
+
+    resource "aws_secretsmanager_secret" "preprod_oauth" {
+      provider = aws.preprod
+
+      name                    = "preprod/tailscale/oauth"
+      recovery_window_in_days = 7
+    }
+
+    resource "aws_secretsmanager_secret_version" "preprod_oauth" {
+      provider = aws.preprod
+
+      secret_id = aws_secretsmanager_secret.preprod_oauth.id
+      secret_string = jsonencode({
+        clientId     = tailscale_oauth_client.k8s_operator[0].id
+        clientSecret = tailscale_oauth_client.k8s_operator[0].key
+      })
+    }
+
+    resource "aws_secretsmanager_secret" "preprod_api_key" {
+      provider = aws.preprod
+
+      name                    = "preprod/tailscale/api-key"
+      recovery_window_in_days = 7
+    }
+
+    resource "aws_secretsmanager_secret_version" "preprod_api_key" {
+      provider = aws.preprod
+
+      secret_id     = aws_secretsmanager_secret.preprod_api_key.id
+      secret_string = data.aws_secretsmanager_secret_version.tailscale_api_key.secret_string
+    }
+  EOF
+}
+
 inputs = {
   create = true
 
@@ -62,7 +109,8 @@ inputs = {
       ],
       "autoApprovers": {
         "routes": {
-          "10.100.0.0/16": ["tag:k8s-operator", "tag:k8s"]
+          "10.100.0.0/16": ["tag:k8s-operator", "tag:k8s"],
+          "10.101.0.0/16": ["tag:k8s-operator", "tag:k8s"]
         }
       },
       "ssh": [

@@ -38,7 +38,8 @@ iam-roles ──┐
 networking ─┘                        |
               eks-addons ────────────┤ (eks, cilium, nodes)
               external-secrets ──────┤ (eks, nodes)
-              secret-stores ─────────┘ (eks, nodes, ext-secrets)
+              secret-stores ─────────┤ (eks, nodes, ext-secrets)
+              tailscale ─────────────┘ (eks, nodes, ext-secrets)
 
 cloudtrail ──────────────────────────── (no deps, secrets audit logging)
 ```
@@ -105,6 +106,7 @@ AWS_PROFILE=management terragrunt apply -chdir=ssm-bastion
 AWS_PROFILE=management terragrunt apply -chdir=eks-addons
 AWS_PROFILE=management terragrunt apply -chdir=external-secrets
 AWS_PROFILE=management terragrunt apply -chdir=secret-stores
+AWS_PROFILE=management terragrunt apply -chdir=tailscale
 AWS_PROFILE=management terragrunt apply -chdir=cloudtrail
 ```
 
@@ -112,6 +114,7 @@ AWS_PROFILE=management terragrunt apply -chdir=cloudtrail
 
 ```bash
 # From infra/live/aws/preprod/us-east-1/platform/
+cd tailscale && terragrunt destroy -auto-approve && cd ..
 cd secret-stores && terragrunt destroy -auto-approve && cd ..
 cd external-secrets && terragrunt destroy -auto-approve && cd ..
 cd ssm-bastion && terragrunt destroy -auto-approve && cd ..
