@@ -23,6 +23,7 @@ inputs = {
         aws = [
           "arn:aws:iam::829808296602:root",
           "arn:aws:iam::851725353202:root",
+          "arn:aws:iam::620830101009:root",
         ]
       }
 
