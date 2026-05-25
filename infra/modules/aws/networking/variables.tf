@@ -76,6 +76,12 @@ variable "eks_cluster_name" {
   default     = null
 }
 
+variable "interface_vpc_endpoints" {
+  description = "List of AWS service short names for Interface VPC endpoints (e.g., secretsmanager, ssm, sts, kms)"
+  type        = list(string)
+  default     = []
+}
+
 variable "enable_flow_logs" {
   description = "Enable VPC Flow Logs"
   type        = bool

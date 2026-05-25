@@ -75,6 +75,11 @@ output "s3_endpoint_id" {
   value       = var.create ? aws_vpc_endpoint.s3[0].id : null
 }
 
+output "interface_endpoint_ids" {
+  description = "Map of service name to Interface VPC endpoint ID"
+  value       = { for k, v in aws_vpc_endpoint.interface : k => v.id }
+}
+
 output "flow_log_id" {
   description = "The ID of the VPC flow log"
   value       = var.create && var.enable_flow_logs ? aws_flow_log.this[0].id : null

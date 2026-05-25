@@ -193,6 +193,56 @@ resource "aws_vpc_endpoint" "s3" {
 }
 
 # ---------------------------------------------------------------------------
+# Interface VPC Endpoints (Secrets Manager, SSM, STS, KMS, etc.)
+# ---------------------------------------------------------------------------
+
+resource "aws_security_group" "vpc_endpoints" {
+  count = local.create && length(var.interface_vpc_endpoints) > 0 ? 1 : 0
+
+  name_prefix = "${var.vpc_name}-vpce-"
+  description = "Allow HTTPS from VPC to interface endpoints"
+  vpc_id      = aws_vpc.this[0].id
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = var.address_space
+    description = "HTTPS from VPC"
+  }
+
+  tags = merge(var.tags, { Name = "${var.vpc_name}-vpce-sg" })
+}
+
+locals {
+  # Pick one private subnet per AZ for interface endpoints.
+  # Prefer subnets with "endpoints" in the name, fall back to any private subnet.
+  _endpoint_subnets_by_az = {
+    for k, v in local.private_subnets : lookup(v, "availability_zone", "unknown") => k...
+  }
+  endpoint_subnet_keys = [
+    for az, keys in local._endpoint_subnets_by_az : try(
+      [for k in keys : k if can(regex("endpoints", k))][0],
+      keys[0]
+    )
+  ]
+}
+
+resource "aws_vpc_endpoint" "interface" {
+  for_each = local.create ? toset(var.interface_vpc_endpoints) : toset([])
+
+  vpc_id              = aws_vpc.this[0].id
+  service_name        = "com.amazonaws.${data.aws_region.current.id}.${each.value}"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+
+  subnet_ids         = [for k in local.endpoint_subnet_keys : aws_subnet.this[k].id]
+  security_group_ids = [aws_security_group.vpc_endpoints[0].id]
+
+  tags = merge(var.tags, { Name = "${var.vpc_name}-${each.value}-endpoint" })
+}
+
+# ---------------------------------------------------------------------------
 # EKS Security Group
 # ---------------------------------------------------------------------------
 

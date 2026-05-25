@@ -70,7 +70,7 @@ data "aws_iam_policy_document" "external_secrets" {
       "secretsmanager:DescribeSecret",
       "secretsmanager:ListSecretVersionIds",
     ]
-    resources = ["arn:aws:secretsmanager:*:${var.aws_account_id}:secret:*"]
+    resources = ["arn:aws:secretsmanager:*:${var.aws_account_id}:secret:${var.secret_path_prefix}/*"]
   }
 
   statement {
@@ -80,15 +80,18 @@ data "aws_iam_policy_document" "external_secrets" {
       "ssm:GetParameters",
       "ssm:GetParametersByPath",
     ]
-    resources = ["arn:aws:ssm:*:${var.aws_account_id}:parameter/*"]
+    resources = ["arn:aws:ssm:*:${var.aws_account_id}:parameter${var.ssm_path_prefix}/*"]
   }
 
-  statement {
-    effect = "Allow"
-    actions = [
-      "kms:Decrypt",
-    ]
-    resources = var.kms_key_arns
+  dynamic "statement" {
+    for_each = length(var.kms_key_arns) > 0 ? [1] : []
+    content {
+      effect = "Allow"
+      actions = [
+        "kms:Decrypt",
+      ]
+      resources = var.kms_key_arns
+    }
   }
 }
 

@@ -7,7 +7,7 @@
 # to destroy it as well.
 #
 # Usage:
-#   ./scripts/teardown-platform.sh [-y|--yes] [--include-route53]
+#   AWS_PROFILE=management ./scripts/teardown-platform.sh [-y|--yes] [--include-route53]
 #
 # Options:
 #   -y, --yes          Skip the DESTROY confirmation prompt
@@ -101,6 +101,9 @@ if eks_cluster_exists "$CLUSTER_NAME" "$REGION"; then
   log_info "Destroying argocd..."
   run_tg "$UNIT_DIR/argocd" destroy
 
+  log_info "Destroying secret stores..."
+  run_tg "$UNIT_DIR/secret-stores" destroy
+
   log_info "Destroying platform services..."
   run_tg_destroy_parallel "$UNIT_DIR/cert-manager" "$UNIT_DIR/external-dns" "$UNIT_DIR/external-secrets"
 
@@ -131,8 +134,8 @@ if [[ "$INCLUDE_ROUTE53" == true ]]; then
   run_tg "$UNIT_DIR/route53" destroy
 fi
 
-log_info "Destroying networking and IAM roles..."
-run_tg_destroy_parallel "$UNIT_DIR/networking" "$UNIT_DIR/iam-roles"
+log_info "Destroying CloudTrail, networking, and IAM roles..."
+run_tg_destroy_parallel "$UNIT_DIR/cloudtrail" "$UNIT_DIR/networking" "$UNIT_DIR/iam-roles"
 
 echo ""
 log_success "=== Teardown complete! ==="

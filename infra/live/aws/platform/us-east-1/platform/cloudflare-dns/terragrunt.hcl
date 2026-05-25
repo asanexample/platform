@@ -31,6 +31,10 @@ terraform {
       source  = "cloudflare/cloudflare"
       version = "~> 5.0"
     }
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 5.0"
+    }
   }
 }
 EOF
@@ -40,7 +44,13 @@ generate "provider_cloudflare" {
   path      = "provider_cloudflare.tf"
   if_exists = "overwrite_terragrunt"
   contents  = <<EOF
-provider "cloudflare" {}
+data "aws_secretsmanager_secret_version" "cloudflare_token" {
+  secret_id = "platform/cloudflare/api-token"
+}
+
+provider "cloudflare" {
+  api_token = data.aws_secretsmanager_secret_version.cloudflare_token.secret_string
+}
 EOF
 }
 

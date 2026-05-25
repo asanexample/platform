@@ -60,7 +60,9 @@ inputs = {
   oidc_provider_arn = dependency.eks.outputs.oidc_provider_arn
   oidc_provider_url = dependency.eks.outputs.oidc_provider_url
 
-  kms_key_arns = [dependency.eks.outputs.kms_key_arn]
+  kms_key_arns       = [dependency.eks.outputs.kms_key_arn]
+  secret_path_prefix = "platform"
+  ssm_path_prefix    = "/platform"
 
   helm_chart_version = include.base.locals.helm_versions.external_secrets
   helm_wait          = true

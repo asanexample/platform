@@ -82,6 +82,21 @@ inputs = {
               Action   = ["sts:GetCallerIdentity"]
               Resource = "*"
             },
+            {
+              Sid    = "SecretsReadForDebugging"
+              Effect = "Allow"
+              Action = [
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:DescribeSecret",
+              ]
+              Resource = "arn:aws:secretsmanager:*:829808296602:secret:platform/*"
+            },
+            {
+              Sid      = "SecretsListForDebugging"
+              Effect   = "Allow"
+              Action   = ["secretsmanager:ListSecrets"]
+              Resource = "*"
+            },
           ]
         })
       }
