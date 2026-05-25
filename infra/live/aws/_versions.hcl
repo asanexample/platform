@@ -52,6 +52,7 @@ locals {
     cilium           = "${local.source_base}/cilium"
     argocd           = "${local.source_base}/argocd"
     argocd_bootstrap = "${local.source_base}/argocd-bootstrap"
+    argocd_clusters  = "${local.source_base}/argocd-clusters"
     cert_manager     = "${local.source_base}/cert-manager"
     external_dns     = "${local.source_base}/external-dns"
     external_secrets = "${local.source_base}/external-secrets"

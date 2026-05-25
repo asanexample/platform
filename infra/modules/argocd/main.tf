@@ -138,6 +138,22 @@ resource "aws_iam_role_policy_attachment" "extra" {
   policy_arn = each.value
 }
 
+resource "aws_iam_role_policy" "remote_clusters" {
+  count = local.create_irsa && length(var.remote_cluster_role_arns) > 0 ? 1 : 0
+
+  name = "remote-cluster-access"
+  role = aws_iam_role.argocd[0].name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "sts:AssumeRole"
+      Resource = var.remote_cluster_role_arns
+    }]
+  })
+}
+
 # ---------------------------------------------------------------------------
 # Helm Release
 # ---------------------------------------------------------------------------
