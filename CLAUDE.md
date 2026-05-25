@@ -34,8 +34,9 @@ cloudtrail ───────────────────────
 ### Preprod dependency graph (minimal stack)
 
 iam-roles ──┐
-             ├─> eks -> cilium -> node-groups -> eks-addons
+             ├─> eks -> cilium -> node-groups -> ssm-bastion
 networking ─┘                        |
+              eks-addons ────────────┤ (eks, cilium, nodes)
               external-secrets ──────┤ (eks, nodes)
               secret-stores ─────────┘ (eks, nodes, ext-secrets)
 
@@ -100,6 +101,7 @@ AWS_PROFILE=management terragrunt apply -chdir=networking
 AWS_PROFILE=management terragrunt apply -chdir=eks
 AWS_PROFILE=management terragrunt apply -chdir=cilium
 AWS_PROFILE=management terragrunt apply -chdir=node-groups
+AWS_PROFILE=management terragrunt apply -chdir=ssm-bastion
 AWS_PROFILE=management terragrunt apply -chdir=eks-addons
 AWS_PROFILE=management terragrunt apply -chdir=external-secrets
 AWS_PROFILE=management terragrunt apply -chdir=secret-stores
@@ -112,6 +114,7 @@ AWS_PROFILE=management terragrunt apply -chdir=cloudtrail
 # From infra/live/aws/preprod/us-east-1/platform/
 cd secret-stores && terragrunt destroy -auto-approve && cd ..
 cd external-secrets && terragrunt destroy -auto-approve && cd ..
+cd ssm-bastion && terragrunt destroy -auto-approve && cd ..
 cd eks-addons && terragrunt destroy -auto-approve && cd ..
 cd node-groups && terragrunt destroy -auto-approve && cd ..
 cd cilium && terragrunt destroy -auto-approve && cd ..
