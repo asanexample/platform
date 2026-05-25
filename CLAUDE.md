@@ -38,6 +38,8 @@ iam-roles ──┐
 networking ─┘                        |
               external-secrets ──────┤ (eks, nodes)
               secret-stores ─────────┘ (eks, nodes, ext-secrets)
+
+cloudtrail ──────────────────────────── (no deps, secrets audit logging)
 ```
 
 EKS uses BYOCNI (`bootstrap_self_managed_addons = false`), so Cilium must be deployed before node groups can join the cluster. EKS managed add-ons (coredns) are in a separate `eks-addons` unit that depends on cilium + node-groups, since addon pods need the CNI to schedule.
@@ -101,6 +103,7 @@ AWS_PROFILE=management terragrunt apply -chdir=node-groups
 AWS_PROFILE=management terragrunt apply -chdir=eks-addons
 AWS_PROFILE=management terragrunt apply -chdir=external-secrets
 AWS_PROFILE=management terragrunt apply -chdir=secret-stores
+AWS_PROFILE=management terragrunt apply -chdir=cloudtrail
 ```
 
 ### Preprod destroy order
@@ -114,6 +117,7 @@ cd node-groups && terragrunt destroy -auto-approve && cd ..
 cd cilium && terragrunt destroy -auto-approve && cd ..
 cd eks && terragrunt destroy -auto-approve && cd ..
 cd networking && terragrunt destroy -auto-approve && cd ..
+cd cloudtrail && terragrunt destroy -auto-approve && cd ..
 cd iam-roles && terragrunt destroy -auto-approve && cd ..
 ```
 
