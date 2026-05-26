@@ -26,6 +26,7 @@ networking ─┘                        |
               argocd ────────────────┤ (eks, nodes)
               argocd-clusters ──────┤ (argocd, eks, nodes, preprod eks+iam-roles)
               tailscale ─────────────┤ (eks, nodes, ext-secrets)
+              transit-gateway (hub) ─┤ (networking, preprod eks+networking)
               gateway-config ────────┘ (eks, cilium, cert-manager, ext-dns, argocd, r53)
 
 tailscale-admin ─────────────────────── (no cluster deps, manages tailnet ACLs/OAuth)
@@ -39,7 +40,8 @@ networking ─┘                        |
               eks-addons ────────────┤ (eks, cilium, nodes)
               external-secrets ──────┤ (eks, nodes)
               secret-stores ─────────┤ (eks, nodes, ext-secrets)
-              tailscale ─────────────┘ (eks, nodes, ext-secrets)
+              tailscale ─────────────┤ (eks, nodes, ext-secrets)
+              transit-gateway (spoke)┘ (networking, eks, platform tgw)
 
 cloudtrail ──────────────────────────── (no deps, secrets audit logging)
 ```
@@ -71,6 +73,7 @@ terragrunt run --all destroy --filter-allow-destroy -- -auto-approve
 # Option 2: manual (if run-all fails or you need to skip units)
 # Destroy leaf nodes first, work backwards:
 cd gateway-config && terragrunt destroy -auto-approve && cd ..
+cd transit-gateway && terragrunt destroy -auto-approve && cd ..
 cd tailscale && terragrunt destroy -auto-approve && cd ..
 cd argocd && terragrunt destroy -auto-approve && cd ..
 cd secret-stores && terragrunt destroy -auto-approve && cd ..
@@ -107,6 +110,7 @@ AWS_PROFILE=management terragrunt apply -chdir=eks-addons
 AWS_PROFILE=management terragrunt apply -chdir=external-secrets
 AWS_PROFILE=management terragrunt apply -chdir=secret-stores
 AWS_PROFILE=management terragrunt apply -chdir=tailscale
+AWS_PROFILE=management terragrunt apply -chdir=transit-gateway
 AWS_PROFILE=management terragrunt apply -chdir=cloudtrail
 ```
 
@@ -114,6 +118,7 @@ AWS_PROFILE=management terragrunt apply -chdir=cloudtrail
 
 ```bash
 # From infra/live/aws/preprod/us-east-1/platform/
+cd transit-gateway && terragrunt destroy -auto-approve && cd ..
 cd tailscale && terragrunt destroy -auto-approve && cd ..
 cd secret-stores && terragrunt destroy -auto-approve && cd ..
 cd external-secrets && terragrunt destroy -auto-approve && cd ..
@@ -201,4 +206,5 @@ Cross-account access uses purpose-built IAM roles (see IAM Roles below). `Organi
 - **Node groups separated** from the EKS module to enforce deployment ordering (Cilium must be ready first).
 - **EKS add-ons separated** into `eks-addons` unit — with BYOCNI, addon pods (coredns) can't schedule until CNI + nodes are ready, so they must be deployed after cilium and node-groups.
 - **ArgoCD SSO via Dex + SAML** for AWS. Dex is built into ArgoCD's Helm chart and acts as a SAML-to-OIDC bridge. The SAML app in Identity Center is created manually (Terraform AWS provider doesn't support custom SAML apps). Group claims in the SAML assertion map to ArgoCD RBAC roles. The ArgoCD module remains cloud-agnostic — all SSO config is injected via `argocd_cm_extra` in the live unit.
+- **Transit Gateway** for cross-account VPC connectivity. TGW lives in the platform account (hub), shared to spoke accounts via RAM. Each VPC has dedicated /28 transit subnets per AZ for TGW ENIs. DNS resolution for private EKS endpoints uses cross-account Route53 PHZ association.
 - **Tailscale Operator** for developer VPN access to private EKS. Runs as a subnet router advertising the VPC CIDR (`10.100.0.0/16`) to the tailnet. Split DNS is managed by the `tailscale` K8s unit (not `tailscale-admin`) with a `depends_on` on the Connector, so it's only created after the subnet router is online. OAuth credentials sourced from AWS Secrets Manager via generated data source. Module is cloud-agnostic; only the live unit's provider config is AWS-specific.
