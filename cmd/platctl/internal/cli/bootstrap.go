@@ -119,14 +119,18 @@ func runDryRun(envFilter string) error {
 		}
 	}
 
-	// Show manual steps
+	// Show manual steps (only for units in the current graph)
 	for _, step := range cfg.ManualSteps {
-		fmt.Printf("Manual step before %s: %s\n", step.Before, step.Name)
+		if g.Unit(step.Before) != nil {
+			fmt.Printf("Manual step before %s: %s\n", step.Before, step.Name)
+		}
 	}
 
-	// Show lockdown steps
+	// Show lockdown steps (only for units in the current graph)
 	for _, lock := range cfg.Lockdown {
-		fmt.Printf("Lockdown: %s (%s)\n", lock.Unit, lock.Description)
+		if g.Unit(lock.Unit) != nil {
+			fmt.Printf("Lockdown: %s (%s)\n", lock.Unit, lock.Description)
+		}
 	}
 
 	return nil
