@@ -98,6 +98,9 @@ if eks_cluster_exists "$CLUSTER_NAME" "$REGION"; then
   # Phase 3 — Destroy remaining K8s services via public endpoint
   # ───────────────────────────────────────────────────────────────────────────
 
+  log_info "Destroying cross-vpc-dns..."
+  run_tg "$UNIT_DIR/cross-vpc-dns" destroy
+
   log_info "Destroying transit-gateway..."
   run_tg "$UNIT_DIR/transit-gateway" destroy
 
