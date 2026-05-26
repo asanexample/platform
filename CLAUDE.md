@@ -141,10 +141,18 @@ cd iam-roles && terragrunt destroy -auto-approve && cd ..
 terragrunt plan
 terragrunt apply
 
-# Bootstrap the full platform stack from zero
+# Bootstrap the full platform stack from zero (preferred)
+platctl bootstrap
+platctl bootstrap --dry-run     # preview execution plan
+platctl bootstrap --env platform  # single environment
+
+# Tear down the full platform stack (preferred)
+platctl teardown
+
+# Legacy scripts (deprecated, kept for reference)
 AWS_PROFILE=management ./scripts/bootstrap-platform.sh
 
-# Tear down the full platform stack
+# Legacy tear down
 AWS_PROFILE=management ./scripts/teardown-platform.sh                # preserves Route53
 AWS_PROFILE=management ./scripts/teardown-platform.sh --include-route53  # destroys everything
 

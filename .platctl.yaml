@@ -1,0 +1,85 @@
+environments:
+  platform:
+    path: infra/live/aws/platform/us-east-1/platform
+    provider: aws
+    auth:
+      profile: management
+  preprod:
+    path: infra/live/aws/preprod/us-east-1/platform
+    provider: aws
+    auth:
+      profile: management
+  # prod:
+  #   path: infra/live/aws/prod/us-east-1/platform
+  #   provider: aws
+  #   auth:
+  #     profile: management
+
+overrides:
+  preprod/iam-roles:
+    auth:
+      profile: preprod
+
+  platform/tailscale-admin:
+    implicit_deps: ["preprod/iam-roles"]
+
+  platform/eks:
+    bootstrap_args: ["-var", "endpoint_public_access=true"]
+
+  platform/tailscale:
+    hook: crd_two_stage
+    hook_target: "helm_release.tailscale_operator[0]"
+
+  preprod/tailscale:
+    hook: crd_two_stage
+    hook_target: "helm_release.tailscale_operator[0]"
+    implicit_deps: ["platform/tailscale-admin"]
+
+  platform/cross-vpc-dns:
+    hook: eni_ip_validation
+    hook_config:
+      cluster_name: preprod-use1-eks
+      profile: management
+
+manual_steps:
+  - name: cloudflare-api-token
+    before: platform/cloudflare-dns
+    instructions: |
+      Store Cloudflare API token in Secrets Manager:
+        aws secretsmanager create-secret \
+          --name platform/cloudflare/api-token \
+          --secret-string '<TOKEN>' \
+          --region us-east-1 --profile platform
+    check:
+      type: secret_exists
+      secret_id: platform/cloudflare/api-token
+      profile: platform
+
+  - name: tailscale-api-key
+    before: platform/tailscale-admin
+    instructions: |
+      1. Generate API key: Tailscale Admin -> Settings -> Keys
+      2. Store in Secrets Manager:
+        aws secretsmanager create-secret \
+          --name platform/tailscale/api-key \
+          --secret-string '<KEY>' \
+          --region us-east-1 --profile platform
+    check:
+      type: secret_exists
+      secret_id: platform/tailscale/api-key
+      profile: platform
+
+  - name: argocd-saml
+    before: platform/argocd
+    instructions: |
+      Create SAML app in AWS Identity Center for ArgoCD SSO.
+      See scripts/bootstrap-platform.sh Phase 12 for details.
+      Then update infra/live/aws/common.hcl with argocd_sso_url.
+    check:
+      type: file_contains
+      file: infra/live/aws/common.hcl
+      pattern: "argocd_sso_url"
+
+lockdown:
+  - unit: platform/eks
+    description: Disable public EKS endpoint
