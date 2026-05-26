@@ -43,6 +43,44 @@ func (h *CRDTwoStageHook) Execute(ctx context.Context, runner engine.Runner, uni
 	return nil
 }
 
+// SecretEntry is a secret name and the auth credentials needed to access it.
+type SecretEntry struct {
+	ID   string
+	Auth map[string]string
+}
+
+// SecretCleanupHook force-deletes Secrets Manager secrets that may be left over
+// from a previous deployment (pending deletion or orphaned). Runs before apply
+// so the module can recreate them cleanly.
+type SecretCleanupHook struct {
+	Secrets []SecretEntry
+	Client  cloud.AWSClient
+}
+
+// Execute checks for and force-deletes any existing secrets, then runs the apply.
+func (h *SecretCleanupHook) Execute(ctx context.Context, runner engine.Runner, unit *engine.Unit, action engine.Action) error {
+	if action == engine.Destroy {
+		return runner.Run(ctx, unit, action)
+	}
+
+	if h.Client == nil {
+		return runner.Run(ctx, unit, action)
+	}
+
+	for _, secret := range h.Secrets {
+		exists, _ := h.Client.SecretExists(ctx, secret.ID, secret.Auth)
+		if !exists {
+			continue
+		}
+		fmt.Printf("Cleaning up existing secret %s...\n", secret.ID)
+		if err := h.Client.ForceDeleteSecret(ctx, secret.ID, secret.Auth); err != nil {
+			return fmt.Errorf("cleaning up secret %s: %w", secret.ID, err)
+		}
+	}
+
+	return runner.Run(ctx, unit, action)
+}
+
 // ENIIPValidationHook queries EKS ENI IPs and compares them to the values
 // in the cross-vpc-dns live unit. Alerts the user if they're stale.
 type ENIIPValidationHook struct {
@@ -138,6 +176,34 @@ func ResolveHook(override UnitOverride, awsClient cloud.AWSClient, interactive b
 			Auth:        auth,
 			Client:      awsClient,
 			Interactive: interactive,
+		}
+
+	case "secret_cleanup":
+		defaultProfile := override.HookConfig["profile"]
+		var secrets []SecretEntry
+		if raw, ok := override.HookConfig["secrets"]; ok {
+			for _, s := range strings.Split(raw, ",") {
+				s = strings.TrimSpace(s)
+				if s == "" {
+					continue
+				}
+				// Format: "secret_id" or "secret_id@profile"
+				entry := SecretEntry{Auth: map[string]string{}}
+				if idx := strings.LastIndex(s, "@"); idx > 0 {
+					entry.ID = s[:idx]
+					entry.Auth["profile"] = s[idx+1:]
+				} else {
+					entry.ID = s
+					if defaultProfile != "" {
+						entry.Auth["profile"] = defaultProfile
+					}
+				}
+				secrets = append(secrets, entry)
+			}
+		}
+		return &SecretCleanupHook{
+			Secrets: secrets,
+			Client:  awsClient,
 		}
 
 	default:

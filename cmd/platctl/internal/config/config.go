@@ -91,7 +91,7 @@ func (c *Config) validate() error {
 	}
 	for name, override := range c.Overrides {
 		if override.Hook != "" {
-			valid := map[string]bool{"crd_two_stage": true, "eni_ip_validation": true}
+			valid := map[string]bool{"crd_two_stage": true, "eni_ip_validation": true, "secret_cleanup": true}
 			if !valid[override.Hook] {
 				return fmt.Errorf("override %q: unknown hook %q", name, override.Hook)
 			}

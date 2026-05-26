@@ -67,8 +67,9 @@ func TestCRDTwoStageHook_Destroy(t *testing.T) {
 }
 
 type mockAWSClient struct {
-	secretExists bool
-	eniIPs       []string
+	secretExists   bool
+	eniIPs         []string
+	deletedSecrets []string
 }
 
 func (m *mockAWSClient) SecretExists(_ context.Context, _ string, _ map[string]string) (bool, error) {
@@ -77,6 +78,11 @@ func (m *mockAWSClient) SecretExists(_ context.Context, _ string, _ map[string]s
 
 func (m *mockAWSClient) DescribeEKSENIs(_ context.Context, _ string, _ map[string]string) ([]string, error) {
 	return m.eniIPs, nil
+}
+
+func (m *mockAWSClient) ForceDeleteSecret(_ context.Context, secretID string, _ map[string]string) error {
+	m.deletedSecrets = append(m.deletedSecrets, secretID)
+	return nil
 }
 
 func TestManualStepChecker_SecretExists(t *testing.T) {
@@ -205,6 +211,115 @@ func TestResolveHook_ENIValidation(t *testing.T) {
 	}
 	if eni.ClusterName != "test-cluster" {
 		t.Fatalf("expected cluster name test-cluster, got %s", eni.ClusterName)
+	}
+}
+
+func TestSecretCleanupHook_DeletesExisting(t *testing.T) {
+	client := &mockAWSClient{secretExists: true}
+	hook := &SecretCleanupHook{
+		Secrets: []SecretEntry{
+			{ID: "my/secret-1", Auth: map[string]string{"profile": "test"}},
+			{ID: "my/secret-2", Auth: map[string]string{"profile": "test"}},
+		},
+		Client: client,
+	}
+	runner := &mockRunner{}
+	unit := &engine.Unit{Name: "platform/tailscale-admin", Path: "/tmp/test"}
+
+	if err := hook.Execute(context.Background(), runner, unit, engine.Apply); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(client.deletedSecrets) != 2 {
+		t.Fatalf("expected 2 deletions, got %d: %v", len(client.deletedSecrets), client.deletedSecrets)
+	}
+	if len(runner.calls) != 1 || runner.calls[0].Action != engine.Apply {
+		t.Fatalf("expected 1 apply call, got %d", len(runner.calls))
+	}
+}
+
+func TestSecretCleanupHook_SkipsNonExistent(t *testing.T) {
+	client := &mockAWSClient{secretExists: false}
+	hook := &SecretCleanupHook{
+		Secrets: []SecretEntry{
+			{ID: "my/secret-1", Auth: map[string]string{"profile": "test"}},
+		},
+		Client: client,
+	}
+	runner := &mockRunner{}
+	unit := &engine.Unit{Name: "platform/tailscale-admin", Path: "/tmp/test"}
+
+	if err := hook.Execute(context.Background(), runner, unit, engine.Apply); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(client.deletedSecrets) != 0 {
+		t.Fatalf("expected no deletions, got %v", client.deletedSecrets)
+	}
+	if len(runner.calls) != 1 {
+		t.Fatalf("expected 1 apply call, got %d", len(runner.calls))
+	}
+}
+
+func TestSecretCleanupHook_Destroy(t *testing.T) {
+	client := &mockAWSClient{secretExists: true}
+	hook := &SecretCleanupHook{
+		Secrets: []SecretEntry{
+			{ID: "my/secret-1", Auth: map[string]string{}},
+		},
+		Client: client,
+	}
+	runner := &mockRunner{}
+	unit := &engine.Unit{Name: "platform/tailscale-admin", Path: "/tmp/test"}
+
+	if err := hook.Execute(context.Background(), runner, unit, engine.Destroy); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(client.deletedSecrets) != 0 {
+		t.Fatalf("expected no cleanup on destroy, got %v", client.deletedSecrets)
+	}
+}
+
+func TestResolveHook_SecretCleanup(t *testing.T) {
+	override := UnitOverride{
+		Hook: "secret_cleanup",
+		HookConfig: map[string]string{
+			"profile": "platform",
+			"secrets": "my/secret@platform,other/secret@preprod",
+		},
+	}
+	hook := ResolveHook(override, &mockAWSClient{}, false)
+	if hook == nil {
+		t.Fatal("expected non-nil hook")
+	}
+	sc, ok := hook.(*SecretCleanupHook)
+	if !ok {
+		t.Fatalf("expected SecretCleanupHook, got %T", hook)
+	}
+	if len(sc.Secrets) != 2 {
+		t.Fatalf("expected 2 secrets, got %d", len(sc.Secrets))
+	}
+	if sc.Secrets[0].ID != "my/secret" || sc.Secrets[0].Auth["profile"] != "platform" {
+		t.Fatalf("expected my/secret@platform, got %s@%s", sc.Secrets[0].ID, sc.Secrets[0].Auth["profile"])
+	}
+	if sc.Secrets[1].ID != "other/secret" || sc.Secrets[1].Auth["profile"] != "preprod" {
+		t.Fatalf("expected other/secret@preprod, got %s@%s", sc.Secrets[1].ID, sc.Secrets[1].Auth["profile"])
+	}
+}
+
+func TestResolveHook_SecretCleanupDefaultProfile(t *testing.T) {
+	override := UnitOverride{
+		Hook: "secret_cleanup",
+		HookConfig: map[string]string{
+			"profile": "default-profile",
+			"secrets": "my/secret",
+		},
+	}
+	hook := ResolveHook(override, &mockAWSClient{}, false)
+	sc := hook.(*SecretCleanupHook)
+	if sc.Secrets[0].Auth["profile"] != "default-profile" {
+		t.Fatalf("expected default profile, got %s", sc.Secrets[0].Auth["profile"])
 	}
 }
 

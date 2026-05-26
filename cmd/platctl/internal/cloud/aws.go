@@ -30,6 +30,27 @@ func (a *AWS) SecretExists(ctx context.Context, secretID string, auth map[string
 	return true, nil
 }
 
+// ForceDeleteSecret immediately deletes a Secrets Manager secret with no recovery window.
+// Used to clean up leftover secrets (pending deletion or orphaned) before a fresh deploy.
+func (a *AWS) ForceDeleteSecret(ctx context.Context, secretID string, auth map[string]string) error {
+	args := []string{
+		"secretsmanager", "delete-secret",
+		"--secret-id", secretID,
+		"--force-delete-without-recovery",
+		"--region", "us-east-1",
+	}
+	if profile, ok := auth["profile"]; ok {
+		args = append(args, "--profile", profile)
+	}
+
+	cmd := exec.CommandContext(ctx, "aws", args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("force-deleting secret %s: %s", secretID, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
 // DescribeEKSENIs queries the ENI IPs attached to an EKS cluster's API server.
 // Returns the private IPs of the cross-account ENIs.
 func (a *AWS) DescribeEKSENIs(ctx context.Context, clusterName string, auth map[string]string) ([]string, error) {

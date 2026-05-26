@@ -17,6 +17,7 @@ type Client interface {
 type AWSClient interface {
 	Client
 	DescribeEKSENIs(ctx context.Context, clusterName string, auth map[string]string) ([]string, error)
+	ForceDeleteSecret(ctx context.Context, secretID string, auth map[string]string) error
 }
 
 // Checker validates that a deployed unit is healthy.

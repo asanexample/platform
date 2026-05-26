@@ -16,12 +16,20 @@ environments:
   #     profile: management
 
 overrides:
+  platform/iam-roles:
+    auth:
+      profile: platform
+
   preprod/iam-roles:
     auth:
       profile: preprod
 
   platform/tailscale-admin:
     implicit_deps: ["preprod/iam-roles"]
+    hook: secret_cleanup
+    hook_config:
+      profile: platform
+      secrets: "platform/tailscale/oauth@platform,preprod/tailscale/oauth@preprod,preprod/tailscale/api-key@preprod"
 
   platform/eks:
     bootstrap_args: ["-var", "endpoint_public_access=true"]

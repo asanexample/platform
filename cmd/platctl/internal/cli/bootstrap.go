@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/gangster/platform/cmd/platctl/internal/cloud"
 	"github.com/gangster/platform/cmd/platctl/internal/config"
 	"github.com/gangster/platform/cmd/platctl/internal/engine"
 )
@@ -163,8 +164,47 @@ func runBootstrap(cmd *cobra.Command, envFilter string, resume, yes bool) error 
 	statePath := filepath.Join(repoRoot, ".platctl-state.json")
 	store := engine.NewFileStore()
 
-	runner := &engine.TerragruntRunner{}
+	// Set up logging
+	logDir := filepath.Join(repoRoot, ".platctl-logs")
+	var envFilterPtr *string
+	if envFilter != "" {
+		envFilterPtr = &envFilter
+	}
+	unitNames := make([]string, 0, g.Len())
+	for _, u := range g.Units() {
+		unitNames = append(unitNames, u.Name)
+	}
+	logger, err := engine.NewLogger(logDir, "bootstrap", envFilterPtr, resume, unitNames)
+	if err != nil {
+		return fmt.Errorf("setting up logging: %w", err)
+	}
+	fmt.Printf("Logs: %s\n", logger.Dir())
+
+	runner := &engine.TerragruntRunner{
+		LogWriter: func(unit string, data []byte) {
+			_ = logger.Append(unit, data)
+		},
+	}
+
+	// Resolve hooks from config overrides
+	awsClient := &cloud.AWS{}
+	hooks := make(map[string]engine.Hook)
+	for name, override := range cfg.Overrides {
+		if override.Hook == "" {
+			continue
+		}
+		if g.Unit(name) == nil {
+			continue
+		}
+		h := config.ResolveHook(override, awsClient, !yes)
+		if h != nil {
+			hooks[name] = h
+		}
+	}
+
 	eng := engine.NewEngine(runner, store, g, statePath)
+	eng.Hooks = hooks
+	eng.Logger = logger
 
 	if resume {
 		existing, err := store.Load(statePath)

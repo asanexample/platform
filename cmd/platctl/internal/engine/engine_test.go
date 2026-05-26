@@ -152,6 +152,47 @@ func TestEngine_FailureSkipsDependents(t *testing.T) {
 	}
 }
 
+func TestEngine_FailureContinuesIndependentWork(t *testing.T) {
+	// a fails, but d is independent and should still run; b/c depend on a and should be skipped
+	units := []*Unit{
+		{Name: "a", Env: "test", Path: "/tmp/a"},
+		{Name: "b", Env: "test", Path: "/tmp/b", DependsOn: []string{"a"}},
+		{Name: "c", Env: "test", Path: "/tmp/c", DependsOn: []string{"b"}},
+		{Name: "d", Env: "test", Path: "/tmp/d"},
+		{Name: "e", Env: "test", Path: "/tmp/e", DependsOn: []string{"d"}},
+	}
+	g, err := NewGraph(units)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	runner := newMockRunner()
+	runner.failOn["a"] = &RunError{Unit: "a", Action: Apply, ExitCode: 1}
+	store := &mockStore{}
+	eng := NewEngine(runner, store, g, "state.json")
+
+	err = eng.Run(context.Background(), Apply, nil)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	if eng.State.Units["a"].Status != StatusFailed {
+		t.Fatalf("expected a=failed, got %s", eng.State.Units["a"].Status)
+	}
+	if eng.State.Units["b"].Status != StatusSkipped {
+		t.Fatalf("expected b=skipped, got %s", eng.State.Units["b"].Status)
+	}
+	if eng.State.Units["c"].Status != StatusSkipped {
+		t.Fatalf("expected c=skipped, got %s", eng.State.Units["c"].Status)
+	}
+	if eng.State.Units["d"].Status != StatusCompleted {
+		t.Fatalf("expected d=completed, got %s", eng.State.Units["d"].Status)
+	}
+	if eng.State.Units["e"].Status != StatusCompleted {
+		t.Fatalf("expected e=completed, got %s", eng.State.Units["e"].Status)
+	}
+}
+
 func TestEngine_Resume(t *testing.T) {
 	units := []*Unit{
 		{Name: "a", Env: "test", Path: "/tmp/a"},

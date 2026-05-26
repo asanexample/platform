@@ -8,6 +8,12 @@ import (
 	"sync"
 )
 
+// Hook defines a pre-apply or multi-stage operation for a unit.
+// Hooks are responsible for calling the runner — the engine delegates entirely to them.
+type Hook interface {
+	Execute(ctx context.Context, runner Runner, unit *Unit, action Action) error
+}
+
 // Engine orchestrates the execution of Terragrunt units in dependency order.
 type Engine struct {
 	Runner      Runner
@@ -16,6 +22,8 @@ type Engine struct {
 	State       *State
 	StatePath   string
 	Concurrency int
+	Hooks       map[string]Hook // unit name → hook (optional)
+	Logger      *Logger         // disk logger (optional)
 }
 
 // EngineOption configures the engine.
@@ -110,14 +118,13 @@ func (e *Engine) Run(ctx context.Context, action Action, unitArgs map[string][]s
 		return nil
 	}
 
-	// Execution loop: dispatch ready units, wait for completions, enqueue newly ready
+	// Execution loop: dispatch ready units, wait for completions, enqueue newly ready.
+	// A failure in one unit only skips its transitive dependents — independent work continues.
 	sem := make(chan struct{}, e.Concurrency)
 	results := make(chan unitResult, len(g.Units()))
 	var wg sync.WaitGroup
 	running := 0
-	failed := false
 
-	// startUnit launches a unit in a goroutine, respecting the concurrency semaphore.
 	startUnit := func(name string) {
 		unit := g.Unit(name)
 		if unit == nil {
@@ -126,6 +133,15 @@ func (e *Engine) Run(ctx context.Context, action Action, unitArgs map[string][]s
 		var args []string
 		if unitArgs != nil {
 			args = unitArgs[name]
+		}
+
+		if e.Logger != nil {
+			e.Logger.IncrementWave(name)
+			profile := ""
+			if p, ok := unit.Auth["profile"]; ok {
+				profile = p
+			}
+			_ = e.Logger.WriteHeader(name, "terragrunt "+action.String(), profile, unit.Path)
 		}
 
 		e.State.MarkRunning(name)
@@ -138,20 +154,23 @@ func (e *Engine) Run(ctx context.Context, action Action, unitArgs map[string][]s
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			err := e.Runner.Run(ctx, unit, action, args...)
+			var err error
+			if hook, ok := e.Hooks[name]; ok {
+				err = hook.Execute(ctx, e.Runner, unit, action)
+			} else {
+				err = e.Runner.Run(ctx, unit, action, args...)
+			}
 			results <- unitResult{Name: name, Err: err}
 		}()
 	}
 
-	// Seed initial ready units
+	if e.Logger != nil && len(ready) > 0 {
+		e.Logger.AssignWave(ready)
+	}
 	for _, name := range ready {
-		if failed {
-			break
-		}
 		startUnit(name)
 	}
 
-	// Process results until nothing is running and nothing is ready
 	for running > 0 {
 		res := <-results
 		running--
@@ -159,24 +178,17 @@ func (e *Engine) Run(ctx context.Context, action Action, unitArgs map[string][]s
 		if res.Err != nil {
 			e.State.MarkFailed(res.Name, res.Err.Error())
 			e.saveState()
-			failed = true
 
-			// Mark all transitive dependents as skipped
 			for _, s := range e.Graph.Dependents(res.Name) {
 				e.State.MarkSkipped(s)
 			}
 			e.saveState()
-			continue
+		} else {
+			e.State.MarkCompleted(res.Name)
+			e.saveState()
 		}
 
-		e.State.MarkCompleted(res.Name)
-		e.saveState()
-
-		if failed {
-			continue
-		}
-
-		// Enqueue newly ready dependents
+		// Enqueue newly ready dependents (skipped units are filtered out by status check)
 		var newReady []string
 		for _, dep := range dependents[res.Name] {
 			inDegree[dep]--
@@ -188,15 +200,17 @@ func (e *Engine) Run(ctx context.Context, action Action, unitArgs map[string][]s
 			}
 		}
 		sort.Strings(newReady)
+		if e.Logger != nil && len(newReady) > 1 {
+			e.Logger.AssignWave(newReady)
+		}
 		for _, name := range newReady {
 			startUnit(name)
 		}
 	}
 
-	// Wait for any stragglers (shouldn't be any, but be safe)
 	wg.Wait()
 
-	if failed {
+	if e.State.HasFailures() {
 		return e.buildFailureError()
 	}
 	return nil
