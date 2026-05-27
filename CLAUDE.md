@@ -25,10 +25,10 @@ networking ─┘                        |
                                      |
               argocd ────────────────┤ (eks, nodes)
               argocd-clusters ──────┤ (argocd, eks, nodes, preprod eks+iam-roles)
-              tailscale ─────────────┤ (eks, nodes, ext-secrets)
+              tailscale ─────────────┤ (eks, nodes, ext-secrets, argocd)
               transit-gateway (hub) ─┤ (networking)
               cross-vpc-dns ─────────┤ (networking, preprod eks)
-              gateway-config ────────┘ (eks, cilium, cert-manager, ext-dns, argocd, r53)
+              gateway-config ────────┘ (eks, cilium, cert-manager, ext-dns, r53)
 
 tailscale-admin ─────────────────────── (no cluster deps, manages tailnet ACLs/OAuth)
 cloudtrail ──────────────────────────── (no deps, secrets audit logging)
@@ -229,3 +229,4 @@ Cross-account access uses purpose-built IAM roles (see IAM Roles below). `Organi
 - **Transit Gateway** for cross-account VPC connectivity. TGW lives in the platform account (hub), shared to spoke accounts via RAM. Each VPC has dedicated /28 transit subnets per AZ for TGW ENIs.
 - **Cross-VPC DNS** for resolving private EKS endpoints across TGW-connected VPCs. Supports two modes via `dns_method` toggle: custom PHZ with A records (cheap, manual IP updates on cluster recreation) or Route53 Resolver endpoints (robust, automatic, ~$365/mo for 4 ENIs). EKS-managed Route53 PHZs are inaccessible via standard APIs, so cross-VPC PHZ association is not possible — we maintain our own zones instead.
 - **Tailscale Operator** for developer VPN access to private EKS. Runs as a subnet router advertising the VPC CIDR (`10.100.0.0/16`) to the tailnet. Split DNS is managed by the `tailscale` K8s unit (not `tailscale-admin`) with a `depends_on` on the Connector, so it's only created after the subnet router is online. OAuth credentials sourced from AWS Secrets Manager via generated data source. Module is cloud-agnostic; only the live unit's provider config is AWS-specific.
+- **ArgoCD via Tailscale Ingress** for tailnet-only access. The Tailscale operator's Ingress resource exposes ArgoCD at `argocd.taild3190d.ts.net` with automatic HTTPS. No public internet exposure — requires Tailscale VPN connection. The SAML callback URLs in Identity Center must match the tailnet hostname.

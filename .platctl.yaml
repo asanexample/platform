@@ -151,7 +151,7 @@ validate:
     cert_name: platform-gateway-tls
   endpoints:
     - name: argocd
-      url: https://argocd.aws.refplat.org/
+      url: https://argocd.taild3190d.ts.net/
       env: platform
   iam:
     state_bucket: tfstate-mgmt-851725353202

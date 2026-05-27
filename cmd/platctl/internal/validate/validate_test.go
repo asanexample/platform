@@ -661,7 +661,7 @@ func TestHostFromURL(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"https://argocd.aws.refplat.org/", "argocd.aws.refplat.org"},
+		{"https://argocd.taild3190d.ts.net/", "argocd.taild3190d.ts.net"},
 		{"http://example.com:8080/path", "example.com"},
 		{"example.com/path", "example.com"},
 	}

@@ -198,7 +198,7 @@ updated or SSO login will fail with a certificate verification error.
    pod restart.
 
 5. **Verify** SSO login:
-   - Access the ArgoCD UI at `https://argocd.aws.refplat.org`
+   - Access the ArgoCD UI at `https://argocd.taild3190d.ts.net`
    - Click "Log in via SSO"
    - Complete authentication through Identity Center
    - Confirm group-based RBAC permissions are working (admin users can

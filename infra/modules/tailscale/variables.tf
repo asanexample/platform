@@ -103,3 +103,18 @@ variable "helm_wait" {
   type        = bool
   default     = true
 }
+
+# ---------------------------------------------------------------------------
+# Tailscale Ingress
+# ---------------------------------------------------------------------------
+
+variable "ingresses" {
+  description = "Map of Tailscale Ingress resources to create (key = ingress name)"
+  type = map(object({
+    hostname  = string
+    namespace = string
+    service   = string
+    port      = number
+  }))
+  default = {}
+}

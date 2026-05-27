@@ -83,7 +83,7 @@ On failure: show the specific error (expired token, access denied, role not foun
 
 Verifies key service endpoints are reachable:
 
-- **ArgoCD**: `https://argocd.aws.refplat.org/` → HTTP 200 or 302 (SSO redirect)
+- **ArgoCD**: `https://argocd.taild3190d.ts.net/` → HTTP 200 or 302 (SSO redirect)
 - Extensible for future endpoints
 
 On failure: show HTTP status or connection error, check Gateway status and DNS resolution, suggest diagnostics.
@@ -123,7 +123,7 @@ IAM & access:
   ok state-backend                      S3 bucket accessible
 
 Endpoints:
-  ok argocd                             https://argocd.aws.refplat.org/ → 302
+  ok argocd                             https://argocd.taild3190d.ts.net/ → 302
 
 Passed: 35  Failed: 1  Skipped: 2
 ```
@@ -208,7 +208,7 @@ Endpoint URLs and IAM role ARNs come from `.platctl.yaml`. Add a new top-level s
 validate:
   endpoints:
     - name: argocd
-      url: https://argocd.aws.refplat.org/
+      url: https://argocd.taild3190d.ts.net/
       env: platform
   iam:
     state_bucket: tfstate-mgmt-851725353202

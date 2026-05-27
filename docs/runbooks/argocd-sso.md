@@ -1,7 +1,7 @@
 # Runbook: ArgoCD SSO
 
 > **Identity Provider:** AWS Identity Center (SAML 2.0 via Dex)
-> **URL:** `https://argocd.aws.refplat.org`
+> **URL:** `https://argocd.taild3190d.ts.net`
 >
 > **Last reviewed:** 2026-05-21
 
@@ -46,8 +46,8 @@ The SAML application must be created manually in the Identity Center console.
 3. Select **I have an application I want to set up** -> **SAML 2.0**
 4. Configure:
    - **Display name:** `ArgoCD`
-   - **Application ACS URL:** `https://argocd.aws.refplat.org/api/dex/callback`
-   - **Application SAML audience:** `https://argocd.aws.refplat.org/api/dex/callback`
+   - **Application ACS URL:** `https://argocd.taild3190d.ts.net/api/dex/callback`
+   - **Application SAML audience:** `https://argocd.taild3190d.ts.net/api/dex/callback`
 
 ### Step 2: Configure attribute mappings
 
@@ -169,7 +169,7 @@ kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-dex-server
 **Cause:** The `redirectURI` in the Dex SAML config does not match the
 ACS URL configured in the Identity Center SAML app.
 
-**Fix:** Both must be exactly `https://argocd.aws.refplat.org/api/dex/callback`.
+**Fix:** Both must be exactly `https://argocd.taild3190d.ts.net/api/dex/callback`.
 
 ### Login succeeds but user has no permissions
 
