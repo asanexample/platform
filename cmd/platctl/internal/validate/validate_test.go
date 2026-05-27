@@ -417,6 +417,10 @@ func TestEndpointCheck_HTTP500(t *testing.T) {
 // --- TailscaleCheck tests ---
 
 func TestTailscaleCheck_CliNotInstalled(t *testing.T) {
+	origPath := TailscaleMacOSPath
+	TailscaleMacOSPath = "/nonexistent/tailscale"
+	t.Cleanup(func() { TailscaleMacOSPath = origPath })
+
 	run := newMockRunner(
 		mockCall{prefix: "which tailscale", err: fmt.Errorf("not found")},
 	)

@@ -4,9 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 )
+
+// TailscaleMacOSPath is the default location for the Tailscale binary on macOS.
+// Exported for testing.
+var TailscaleMacOSPath = "/Applications/Tailscale.app/Contents/MacOS/Tailscale"
 
 // TailscaleCheck verifies Tailscale subnet router connectivity, route
 // advertisement, split DNS configuration, and private EKS API reachability.
@@ -39,19 +44,24 @@ func (t *TailscaleCheck) Check(ctx context.Context) CheckResult {
 	start := time.Now()
 	var details []string
 
-	// 1. Check if tailscale CLI is installed
+	// 1. Find the tailscale binary (PATH or macOS app bundle)
+	tsBinary := "tailscale"
 	_, err := t.Run(ctx, "which", "tailscale")
 	if err != nil {
-		return CheckResult{
-			Name:    t.Name,
-			Status:  "skipped",
-			Message: "tailscale CLI not installed",
-			Elapsed: time.Since(start),
+		if _, statErr := os.Stat(TailscaleMacOSPath); statErr == nil {
+			tsBinary = TailscaleMacOSPath
+		} else {
+			return CheckResult{
+				Name:    t.Name,
+				Status:  "skipped",
+				Message: "tailscale CLI not installed",
+				Elapsed: time.Since(start),
+			}
 		}
 	}
 
 	// 2. Get tailscale status and find the subnet router peer
-	out, err := t.Run(ctx, "tailscale", "status", "--json")
+	out, err := t.Run(ctx, tsBinary, "status", "--json")
 	if err != nil {
 		details = append(details,
 			fmt.Sprintf("Failed to get tailscale status: %s", strings.TrimSpace(string(out))),
@@ -84,16 +94,17 @@ func (t *TailscaleCheck) Check(ctx context.Context) CheckResult {
 		}
 	}
 
-	// Find the subnet router peer matching the environment
+	// Find the subnet router peer matching the environment.
+	// Prefer online peers when multiple match (e.g., after pod recreation).
 	var routerPeer *tailscalePeer
 	var routerPeerName string
 	for key, peer := range status.Peer {
-		// Match by hostname containing the env name (e.g., "platform-subnet-router")
 		if strings.Contains(strings.ToLower(peer.HostName), strings.ToLower(t.Env)) {
 			p := peer
-			routerPeer = &p
-			routerPeerName = key
-			break
+			if routerPeer == nil || (!routerPeer.Online && p.Online) {
+				routerPeer = &p
+				routerPeerName = key
+			}
 		}
 	}
 
@@ -169,7 +180,7 @@ func (t *TailscaleCheck) Check(ctx context.Context) CheckResult {
 	}
 
 	// 4. Check split DNS for EKS
-	dnsOut, err := t.Run(ctx, "tailscale", "dns", "status")
+	dnsOut, err := t.Run(ctx, tsBinary, "dns", "status")
 	if err != nil {
 		details = append(details,
 			fmt.Sprintf("Failed to get tailscale DNS status: %s", strings.TrimSpace(string(dnsOut))),
