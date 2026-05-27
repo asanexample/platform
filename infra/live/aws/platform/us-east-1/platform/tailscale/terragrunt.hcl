@@ -106,7 +106,7 @@ inputs = {
   create       = true
   cluster_name = dependency.eks.outputs.cluster_id
 
-  advertise_routes = ["10.100.0.0/16", "10.101.0.0/16"]
+  advertise_routes = ["10.100.0.0/16"]
 
   split_dns = {
     "us-east-1.eks.amazonaws.com" = ["10.100.0.2"]
