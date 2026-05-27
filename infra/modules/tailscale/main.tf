@@ -72,6 +72,21 @@ resource "kubernetes_manifest" "proxy_class" {
   depends_on = [helm_release.tailscale_operator]
 }
 
+resource "null_resource" "proxy_class_finalizer_cleanup" {
+  count = local.create && length(var.advertise_routes) > 0 ? 1 : 0
+
+  triggers = {
+    proxy_class_name = "${var.cluster_name}-subnet-router"
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = "kubectl patch proxyclass ${self.triggers.proxy_class_name} --type=merge -p '{\"metadata\":{\"finalizers\":null}}' 2>/dev/null || true"
+  }
+
+  depends_on = [kubernetes_manifest.proxy_class]
+}
+
 resource "kubernetes_manifest" "connector" {
   count = local.create && length(var.advertise_routes) > 0 ? 1 : 0
 
@@ -91,6 +106,23 @@ resource "kubernetes_manifest" "connector" {
   }
 
   depends_on = [kubernetes_manifest.proxy_class]
+}
+
+# Remove finalizers before destroy so the Connector deletion doesn't block
+# waiting for the operator to process the finalizer (which may time out).
+resource "null_resource" "connector_finalizer_cleanup" {
+  count = local.create && length(var.advertise_routes) > 0 ? 1 : 0
+
+  triggers = {
+    connector_name = "${var.cluster_name}-${var.connector_hostname}"
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = "kubectl patch connector ${self.triggers.connector_name} --type=merge -p '{\"metadata\":{\"finalizers\":null}}' 2>/dev/null || true"
+  }
+
+  depends_on = [kubernetes_manifest.connector]
 }
 
 # ---------------------------------------------------------------------------

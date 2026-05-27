@@ -1,8 +1,12 @@
 package cli
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -79,6 +83,32 @@ to target a single environment.`,
 				},
 			}
 
+			// Unlock phase: reverse lockdown before destroying.
+			// Re-apply lockdown units with bootstrap_args to restore access.
+			// Only runs if the unit has resources in state (avoids recreating destroyed infra).
+			if !resume {
+				for i := len(cfg.Lockdown) - 1; i >= 0; i-- {
+					lock := cfg.Lockdown[i]
+					unit := g.Unit(lock.Unit)
+					if unit == nil {
+						continue
+					}
+					override, ok := cfg.Overrides[lock.Unit]
+					if !ok || len(override.BootstrapArgs) == 0 {
+						continue
+					}
+					if !unitHasState(unit) {
+						fmt.Printf("Unlock: %s — skipped (no resources in state)\n", lock.Unit)
+						continue
+					}
+					fmt.Printf("Unlock: %s (%s)\n", lock.Unit, lock.Description)
+					if err := runner.Run(cmd.Context(), unit, engine.Apply, override.BootstrapArgs...); err != nil {
+						fmt.Printf("  Warning: unlock failed: %v\n", err)
+					}
+				}
+				fmt.Println()
+			}
+
 			awsClient := &cloud.AWS{}
 			hooks := make(map[string]engine.Hook)
 			for name, override := range cfg.Overrides {
@@ -112,6 +142,63 @@ to target a single environment.`,
 
 			_ = yes // will be used for interactive prompts in Phase 3
 
+			// Pre-destroy: apply teardown_args to update resource attributes in state.
+			// Passing -var force_destroy=true during destroy doesn't work because
+			// providers read the attribute from state, not the plan config.
+			if !resume {
+				teardownArgs := make(map[string][]string)
+				for name, override := range cfg.Overrides {
+					if len(override.TeardownArgs) > 0 && g.Unit(name) != nil {
+						teardownArgs[name] = override.TeardownArgs
+					}
+				}
+				for name, args := range teardownArgs {
+					unit := g.Unit(name)
+					if unit == nil {
+						continue
+					}
+					if !unitHasState(unit) {
+						continue
+					}
+					fmt.Printf("Pre-destroy apply: %s (%v)\n", name, args)
+					if err := runner.Run(cmd.Context(), unit, engine.Apply, args...); err != nil {
+						fmt.Printf("  Warning: pre-destroy apply failed: %v\n", err)
+					}
+				}
+			}
+
+			// Skip units with empty state — nothing to destroy.
+			// Checks run in parallel to avoid sequential ~30s per unit.
+			if !resume {
+				units := g.Units()
+				state := engine.NewState("destroy", units)
+				type stateResult struct {
+					name     string
+					hasState bool
+				}
+				results := make(chan stateResult, len(units))
+				sem := make(chan struct{}, 8)
+				for _, u := range units {
+					go func(u *engine.Unit) {
+						sem <- struct{}{}
+						defer func() { <-sem }()
+						results <- stateResult{name: u.Name, hasState: unitHasState(u)}
+					}(u)
+				}
+				skipped := 0
+				for range units {
+					r := <-results
+					if !r.hasState {
+						state.MarkCompleted(r.name)
+						skipped++
+					}
+				}
+				if skipped > 0 {
+					fmt.Printf("Skipping %d units with empty state\n", skipped)
+				}
+				eng.State = state
+			}
+
 			if err := eng.Run(cmd.Context(), engine.Destroy, nil); err != nil {
 				fmt.Println("\nTo resume after fixing: platctl teardown --resume")
 				return err
@@ -128,6 +215,34 @@ to target a single environment.`,
 	cmd.Flags().BoolVar(&yes, "yes", false, "Skip confirmation prompts")
 
 	return cmd
+}
+
+// unitHasState checks if a unit has any resources in Terraform state.
+// Returns false if the state is empty (unit already destroyed or never deployed).
+func unitHasState(unit *engine.Unit) bool {
+	cmd := exec.CommandContext(context.Background(), "terragrunt", "state", "list")
+	cmd.Dir = unit.Path
+	env := os.Environ()
+	if profile, ok := unit.Auth["profile"]; ok {
+		found := false
+		prefix := "AWS_PROFILE="
+		for i, e := range env {
+			if len(e) > len(prefix) && e[:len(prefix)] == prefix {
+				env[i] = prefix + profile
+				found = true
+				break
+			}
+		}
+		if !found {
+			env = append(env, prefix+profile)
+		}
+	}
+	cmd.Env = env
+	out, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	return len(strings.TrimSpace(string(out))) > 0
 }
 
 func printTeardownPlan(g *engine.Graph) error {

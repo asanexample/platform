@@ -14,6 +14,16 @@ type Config struct {
 	Overrides    map[string]UnitOverride `yaml:"overrides"`
 	ManualSteps  []ManualStep            `yaml:"manual_steps"`
 	Lockdown     []LockdownStep          `yaml:"lockdown"`
+	Kubeconfig   []KubeconfigEntry       `yaml:"kubeconfig"`
+}
+
+// KubeconfigEntry defines how to configure kubectl access for a cluster.
+type KubeconfigEntry struct {
+	Alias          string `yaml:"alias"`
+	Cluster        string `yaml:"cluster"`
+	Region         string `yaml:"region"`
+	Profile        string `yaml:"profile"`
+	KubectlRoleARN string `yaml:"kubectl_role_arn"`
 }
 
 // EnvConfig defines a deployment environment.
@@ -27,6 +37,7 @@ type EnvConfig struct {
 type UnitOverride struct {
 	Auth          map[string]string `yaml:"auth,omitempty"`
 	BootstrapArgs []string          `yaml:"bootstrap_args,omitempty"`
+	TeardownArgs  []string          `yaml:"teardown_args,omitempty"`
 	Hook          string            `yaml:"hook,omitempty"`
 	HookTarget    string            `yaml:"hook_target,omitempty"`
 	HookConfig    map[string]string `yaml:"hook_config,omitempty"`

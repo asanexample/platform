@@ -27,6 +27,7 @@ execution of independent units.`,
 	root.AddCommand(cli.NewTeardownCmd())
 	root.AddCommand(cli.NewStatusCmd())
 	root.AddCommand(cli.NewValidateCmd())
+	root.AddCommand(cli.NewKubeconfigCmd())
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

@@ -10,8 +10,9 @@ import (
 
 // Hook defines a pre-apply or multi-stage operation for a unit.
 // Hooks are responsible for calling the runner — the engine delegates entirely to them.
+// The args parameter carries bootstrap_args from the config so hooks can forward them.
 type Hook interface {
-	Execute(ctx context.Context, runner Runner, unit *Unit, action Action) error
+	Execute(ctx context.Context, runner Runner, unit *Unit, action Action, args ...string) error
 }
 
 // Engine orchestrates the execution of Terragrunt units in dependency order.
@@ -68,19 +69,22 @@ func (e *Engine) Run(ctx context.Context, action Action, unitArgs map[string][]s
 		e.State = NewState(action.String(), units)
 	}
 
-	g := e.Graph
+	// walkGraph is the graph used for traversal: original for apply, reversed for destroy.
+	// dependGraph is used to compute which units to skip on failure: it must match the walk
+	// direction so that transitive dependents (in the walk's sense) are correctly identified.
+	walkGraph := e.Graph
 	if action == Destroy {
 		var err error
-		g, err = g.Reverse()
+		walkGraph, err = walkGraph.Reverse()
 		if err != nil {
 			return fmt.Errorf("reversing graph for teardown: %w", err)
 		}
 	}
 
-	// Build dependency tracking
+	// Build dependency tracking from the walk graph
 	inDegree := make(map[string]int)
 	dependents := make(map[string][]string)
-	for _, u := range g.Units() {
+	for _, u := range walkGraph.Units() {
 		inDegree[u.Name] = len(u.DependsOn)
 		for _, dep := range u.DependsOn {
 			dependents[dep] = append(dependents[dep], u.Name)
@@ -121,12 +125,12 @@ func (e *Engine) Run(ctx context.Context, action Action, unitArgs map[string][]s
 	// Execution loop: dispatch ready units, wait for completions, enqueue newly ready.
 	// A failure in one unit only skips its transitive dependents — independent work continues.
 	sem := make(chan struct{}, e.Concurrency)
-	results := make(chan unitResult, len(g.Units()))
+	results := make(chan unitResult, len(walkGraph.Units()))
 	var wg sync.WaitGroup
 	running := 0
 
 	startUnit := func(name string) {
-		unit := g.Unit(name)
+		unit := walkGraph.Unit(name)
 		if unit == nil {
 			return
 		}
@@ -156,7 +160,7 @@ func (e *Engine) Run(ctx context.Context, action Action, unitArgs map[string][]s
 
 			var err error
 			if hook, ok := e.Hooks[name]; ok {
-				err = hook.Execute(ctx, e.Runner, unit, action)
+				err = hook.Execute(ctx, e.Runner, unit, action, args...)
 			} else {
 				err = e.Runner.Run(ctx, unit, action, args...)
 			}
@@ -179,8 +183,11 @@ func (e *Engine) Run(ctx context.Context, action Action, unitArgs map[string][]s
 			e.State.MarkFailed(res.Name, res.Err.Error())
 			e.saveState()
 
-			for _, s := range e.Graph.Dependents(res.Name) {
-				e.State.MarkSkipped(s)
+			for _, s := range walkGraph.Dependents(res.Name) {
+				us := e.State.Units[s]
+				if us != nil && us.Status == StatusPending {
+					e.State.MarkSkipped(s)
+				}
 			}
 			e.saveState()
 		} else {

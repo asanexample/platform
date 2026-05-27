@@ -36,26 +36,8 @@ resource "kubernetes_manifest" "cluster_issuer" {
 }
 
 # ---------------------------------------------------------------------------
-# GatewayClass — registers Cilium as the Gateway API controller
-# ---------------------------------------------------------------------------
-
-resource "kubernetes_manifest" "gateway_class" {
-  count = local.create ? 1 : 0
-
-  manifest = {
-    apiVersion = "gateway.networking.k8s.io/v1"
-    kind       = "GatewayClass"
-    metadata = {
-      name = "cilium"
-    }
-    spec = {
-      controllerName = "io.cilium/gateway-controller"
-    }
-  }
-}
-
-# ---------------------------------------------------------------------------
 # Gateway — Cilium Gateway API with TLS termination
+# GatewayClass "cilium" is created by the Cilium Helm chart, not managed here.
 # ---------------------------------------------------------------------------
 
 resource "kubernetes_manifest" "gateway" {
@@ -112,7 +94,7 @@ resource "kubernetes_manifest" "gateway" {
     }
   }
 
-  depends_on = [kubernetes_manifest.cluster_issuer, kubernetes_manifest.gateway_class]
+  depends_on = [kubernetes_manifest.cluster_issuer]
 }
 
 # ---------------------------------------------------------------------------

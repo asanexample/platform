@@ -34,14 +34,35 @@ overrides:
   platform/eks:
     bootstrap_args: ["-var", "endpoint_public_access=true"]
 
+  preprod/eks:
+    bootstrap_args: ["-var", "endpoint_public_access=true"]
+
   platform/tailscale:
     hook: crd_two_stage
     hook_target: "helm_release.tailscale_operator[0]"
+    bootstrap_args: ["-var", "split_dns={}"]
 
   preprod/tailscale:
     hook: crd_two_stage
     hook_target: "helm_release.tailscale_operator[0]"
     implicit_deps: ["platform/tailscale-admin"]
+
+  platform/networking:
+    implicit_deps: ["platform/iam-roles"]
+
+  preprod/networking:
+    implicit_deps: ["preprod/iam-roles"]
+
+  platform/route53:
+    implicit_deps: ["platform/iam-roles"]
+
+  platform/cloudtrail:
+    teardown_args: ["-var", "force_destroy=true"]
+    implicit_deps: ["platform/iam-roles"]
+
+  preprod/cloudtrail:
+    teardown_args: ["-var", "force_destroy=true"]
+    implicit_deps: ["preprod/iam-roles"]
 
   platform/cross-vpc-dns:
     hook: eni_ip_validation
@@ -88,6 +109,22 @@ manual_steps:
       file: infra/live/aws/common.hcl
       pattern: "argocd_sso_url"
 
+kubeconfig:
+  - alias: platform
+    cluster: platform-use1-eks
+    region: us-east-1
+    profile: platform
+    kubectl_role_arn: arn:aws:iam::829808296602:role/PlatformAdmin
+  - alias: preprod
+    cluster: preprod-use1-eks
+    region: us-east-1
+    profile: preprod
+    kubectl_role_arn: arn:aws:iam::620830101009:role/PlatformAdmin
+
 lockdown:
   - unit: platform/eks
     description: Disable public EKS endpoint
+  - unit: preprod/eks
+    description: Disable public EKS endpoint
+  - unit: platform/tailscale
+    description: Enable split DNS for private EKS resolution

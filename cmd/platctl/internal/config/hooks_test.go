@@ -48,6 +48,42 @@ func TestCRDTwoStageHook_Apply(t *testing.T) {
 	}
 }
 
+func TestCRDTwoStageHook_ApplyWithBootstrapArgs(t *testing.T) {
+	hook := &CRDTwoStageHook{Target: "helm_release.tailscale_operator[0]"}
+	runner := &mockRunner{}
+	unit := &engine.Unit{Name: "platform/tailscale", Path: "/tmp/test"}
+
+	if err := hook.Execute(context.Background(), runner, unit, engine.Apply, "-var", "split_dns={}"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.calls) != 2 {
+		t.Fatalf("expected 2 calls, got %d", len(runner.calls))
+	}
+
+	// Stage 1: target arg + bootstrap args
+	expect1 := []string{"-target=helm_release.tailscale_operator[0]", "-var", "split_dns={}"}
+	if len(runner.calls[0].Args) != len(expect1) {
+		t.Fatalf("stage 1 expected %v, got %v", expect1, runner.calls[0].Args)
+	}
+	for i, arg := range expect1 {
+		if runner.calls[0].Args[i] != arg {
+			t.Fatalf("stage 1 arg %d: expected %q, got %q", i, arg, runner.calls[0].Args[i])
+		}
+	}
+
+	// Stage 2: only bootstrap args (no target)
+	expect2 := []string{"-var", "split_dns={}"}
+	if len(runner.calls[1].Args) != len(expect2) {
+		t.Fatalf("stage 2 expected %v, got %v", expect2, runner.calls[1].Args)
+	}
+	for i, arg := range expect2 {
+		if runner.calls[1].Args[i] != arg {
+			t.Fatalf("stage 2 arg %d: expected %q, got %q", i, arg, runner.calls[1].Args[i])
+		}
+	}
+}
+
 func TestCRDTwoStageHook_Destroy(t *testing.T) {
 	hook := &CRDTwoStageHook{Target: "helm_release.tailscale_operator[0]"}
 	runner := &mockRunner{}

@@ -25,7 +25,9 @@ dependency "preprod_eks" {
   config_path = "../../../../preprod/us-east-1/platform/eks"
 
   mock_outputs = {
-    cluster_endpoint = "https://mock.gr7.us-east-1.eks.amazonaws.com"
+    cluster_endpoint          = "https://mock.gr7.us-east-1.eks.amazonaws.com"
+    cluster_id                = "mock-cluster"
+    cluster_security_group_id = "sg-mock"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
@@ -45,8 +47,9 @@ inputs = {
 
   phz_records = {
     preprod-eks = {
-      domain = replace(dependency.preprod_eks.outputs.cluster_endpoint, "https://", "")
-      ips    = ["10.101.0.54", "10.101.2.52"]
+      domain              = replace(dependency.preprod_eks.outputs.cluster_endpoint, "https://", "")
+      eks_cluster_name    = dependency.preprod_eks.outputs.cluster_id
+      eks_lookup_role_arn = "arn:aws:iam::620830101009:role/PlatformDeployer"
     }
   }
 

@@ -28,11 +28,13 @@ variable "vpc_id" {
 # --- PHZ variables ---
 
 variable "phz_records" {
-  description = "Map of name to PHZ config. Each creates a private hosted zone + A record."
+  description = "Map of name to PHZ config. Provide either static ips or eks_cluster_name for dynamic ENI lookup (requires eks_lookup_role_arn for cross-account)."
   type = map(object({
-    domain = string
-    ips    = list(string)
-    ttl    = optional(number, 60)
+    domain              = string
+    ips                 = optional(list(string), [])
+    eks_cluster_name    = optional(string, "")
+    eks_lookup_role_arn = optional(string, "")
+    ttl                 = optional(number, 60)
   }))
   default = {}
 }

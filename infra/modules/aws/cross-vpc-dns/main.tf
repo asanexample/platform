@@ -3,9 +3,40 @@ locals {
   use_phz      = local.create && var.dns_method == "phz"
   use_outbound = local.create && var.dns_method == "resolver_outbound"
   use_inbound  = local.create && var.dns_method == "resolver_inbound"
+
+  # PHZ records that use dynamic ENI lookup vs static IPs
+  phz_dynamic = { for k, v in var.phz_records : k => v if v.eks_cluster_name != "" && length(v.ips) == 0 }
+  phz_static  = { for k, v in var.phz_records : k => v if length(v.ips) > 0 || v.eks_cluster_name == "" }
+
+  phz_resolved_ips = merge(
+    { for k, v in local.phz_static : k => v.ips },
+    { for k, _ in local.phz_dynamic : k => split(",", data.external.eks_eni_ips[k].result.ips) }
+  )
 }
 
-# ── PHZ ──────────────────────────────────────────────────────────────────
+# ── Dynamic ENI IP lookup via AWS CLI ────────────────────────────────────
+
+data "external" "eks_eni_ips" {
+  for_each = local.use_phz ? local.phz_dynamic : {}
+
+  program = ["bash", "-c", <<-SCRIPT
+    if [ -n "${each.value.eks_lookup_role_arn}" ]; then
+      CREDS=$(aws sts assume-role --role-arn "${each.value.eks_lookup_role_arn}" --role-session-name eni-lookup --output json)
+      export AWS_ACCESS_KEY_ID=$(echo "$CREDS" | grep -o '"AccessKeyId": "[^"]*"' | cut -d'"' -f4)
+      export AWS_SECRET_ACCESS_KEY=$(echo "$CREDS" | grep -o '"SecretAccessKey": "[^"]*"' | cut -d'"' -f4)
+      export AWS_SESSION_TOKEN=$(echo "$CREDS" | grep -o '"SessionToken": "[^"]*"' | cut -d'"' -f4)
+    fi
+    IPS=$(aws ec2 describe-network-interfaces \
+      --filters "Name=description,Values=Amazon EKS ${each.value.eks_cluster_name}" \
+                "Name=status,Values=in-use" \
+      --query 'NetworkInterfaces[].PrivateIpAddress' \
+      --output text | tr '\t' ',')
+    echo "{\"ips\": \"$IPS\"}"
+  SCRIPT
+  ]
+}
+
+# ── Private Hosted Zones ────────────────────────────────────────────────
 
 resource "aws_route53_zone" "this" {
   for_each = local.use_phz ? var.phz_records : {}
@@ -30,7 +61,7 @@ resource "aws_route53_record" "this" {
   name    = each.value.domain
   type    = "A"
   ttl     = each.value.ttl
-  records = each.value.ips
+  records = local.phz_resolved_ips[each.key]
 }
 
 # ── Resolver Outbound (source VPC) ──────────────────────────────────────

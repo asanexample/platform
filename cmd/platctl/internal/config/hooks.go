@@ -12,8 +12,9 @@ import (
 )
 
 // Hook defines a pre-apply or multi-stage operation for a unit.
+// The args parameter carries bootstrap_args from the config so hooks can forward them.
 type Hook interface {
-	Execute(ctx context.Context, runner engine.Runner, unit *engine.Unit, action engine.Action) error
+	Execute(ctx context.Context, runner engine.Runner, unit *engine.Unit, action engine.Action, args ...string) error
 }
 
 // CRDTwoStageHook deploys a Helm release in two stages: first the operator
@@ -23,20 +24,20 @@ type CRDTwoStageHook struct {
 	Target string // e.g., "helm_release.tailscale_operator[0]"
 }
 
-// Execute runs the two-stage CRD bootstrap.
-func (h *CRDTwoStageHook) Execute(ctx context.Context, runner engine.Runner, unit *engine.Unit, action engine.Action) error {
+// Execute runs the two-stage CRD bootstrap on apply, or a straight destroy with args.
+func (h *CRDTwoStageHook) Execute(ctx context.Context, runner engine.Runner, unit *engine.Unit, action engine.Action, args ...string) error {
 	if action == engine.Destroy {
-		return runner.Run(ctx, unit, action)
+		return runner.Run(ctx, unit, action, args...)
 	}
 
 	// Stage 1: deploy only the operator to register CRDs
-	targetArg := fmt.Sprintf("-target=%s", h.Target)
-	if err := runner.Run(ctx, unit, action, targetArg); err != nil {
+	stage1Args := append([]string{fmt.Sprintf("-target=%s", h.Target)}, args...)
+	if err := runner.Run(ctx, unit, action, stage1Args...); err != nil {
 		return fmt.Errorf("CRD stage 1 (operator): %w", err)
 	}
 
-	// Stage 2: full apply (CRDs now exist, custom resources can be created)
-	if err := runner.Run(ctx, unit, action); err != nil {
+	// Stage 2: full apply with bootstrap args (CRDs now exist)
+	if err := runner.Run(ctx, unit, action, args...); err != nil {
 		return fmt.Errorf("CRD stage 2 (full): %w", err)
 	}
 
@@ -58,13 +59,13 @@ type SecretCleanupHook struct {
 }
 
 // Execute checks for and force-deletes any existing secrets, then runs the apply.
-func (h *SecretCleanupHook) Execute(ctx context.Context, runner engine.Runner, unit *engine.Unit, action engine.Action) error {
+func (h *SecretCleanupHook) Execute(ctx context.Context, runner engine.Runner, unit *engine.Unit, action engine.Action, args ...string) error {
 	if action == engine.Destroy {
-		return runner.Run(ctx, unit, action)
+		return runner.Run(ctx, unit, action, args...)
 	}
 
 	if h.Client == nil {
-		return runner.Run(ctx, unit, action)
+		return runner.Run(ctx, unit, action, args...)
 	}
 
 	for _, secret := range h.Secrets {
@@ -78,7 +79,7 @@ func (h *SecretCleanupHook) Execute(ctx context.Context, runner engine.Runner, u
 		}
 	}
 
-	return runner.Run(ctx, unit, action)
+	return runner.Run(ctx, unit, action, args...)
 }
 
 // ENIIPValidationHook queries EKS ENI IPs and compares them to the values
@@ -91,14 +92,13 @@ type ENIIPValidationHook struct {
 }
 
 // Execute validates ENI IPs before applying cross-vpc-dns.
-func (h *ENIIPValidationHook) Execute(ctx context.Context, runner engine.Runner, unit *engine.Unit, action engine.Action) error {
+func (h *ENIIPValidationHook) Execute(ctx context.Context, runner engine.Runner, unit *engine.Unit, action engine.Action, args ...string) error {
 	if action == engine.Destroy {
-		return runner.Run(ctx, unit, action)
+		return runner.Run(ctx, unit, action, args...)
 	}
 
 	if h.Client == nil {
-		// No AWS client available — skip validation, proceed with apply
-		return runner.Run(ctx, unit, action)
+		return runner.Run(ctx, unit, action, args...)
 	}
 
 	ips, err := h.Client.DescribeEKSENIs(ctx, h.ClusterName, h.Auth)
@@ -123,7 +123,7 @@ func (h *ENIIPValidationHook) Execute(ctx context.Context, runner engine.Runner,
 		}
 	}
 
-	return runner.Run(ctx, unit, action)
+	return runner.Run(ctx, unit, action, args...)
 }
 
 // ManualStepChecker verifies that manual prerequisites have been completed.

@@ -241,7 +241,35 @@ func runBootstrap(cmd *cobra.Command, envFilter string, resume, yes bool) error 
 		}
 	}
 
-	_ = yes // will be used for manual step prompts in Phase 3
+	// Pre-flight: check manual step prerequisites
+	if len(cfg.ManualSteps) > 0 && !resume {
+		checker := &config.ManualStepChecker{Client: awsClient, RepoRoot: repoRoot}
+		for _, step := range cfg.ManualSteps {
+			if g.Unit(step.Before) == nil {
+				continue
+			}
+			ok, err := checker.Check(cmd.Context(), step)
+			if err != nil {
+				fmt.Printf("Warning: could not verify %q: %v\n", step.Name, err)
+			}
+			if ok {
+				fmt.Printf("Prerequisite %q: satisfied\n", step.Name)
+				continue
+			}
+			fmt.Printf("\nPrerequisite %q not met (required before %s):\n", step.Name, step.Before)
+			fmt.Println(step.Instructions)
+			if yes {
+				return fmt.Errorf("prerequisite %q not met; complete it and retry", step.Name)
+			}
+			fmt.Print("Continue anyway? [y/N]: ")
+			var answer string
+			fmt.Scanln(&answer)
+			if answer != "y" && answer != "Y" {
+				return fmt.Errorf("aborted; complete prerequisite %q and retry", step.Name)
+			}
+		}
+		fmt.Println()
+	}
 
 	fmt.Printf("Bootstrapping %d units...\n\n", g.Len())
 	if err := eng.Run(cmd.Context(), engine.Apply, unitArgs); err != nil {
@@ -258,6 +286,15 @@ func runBootstrap(cmd *cobra.Command, envFilter string, resume, yes bool) error 
 		fmt.Printf("\nLockdown: %s (%s)\n", lock.Unit, lock.Description)
 		if err := runner.Run(cmd.Context(), unit, engine.Apply); err != nil {
 			return fmt.Errorf("lockdown %s: %w", lock.Unit, err)
+		}
+	}
+
+	// Configure kubectl contexts
+	if len(cfg.Kubeconfig) > 0 {
+		fmt.Println("\nConfiguring kubectl contexts...")
+		if err := configureKubeconfig(cfg.Kubeconfig, envFilter); err != nil {
+			fmt.Printf("Warning: kubeconfig setup failed: %v\n", err)
+			fmt.Println("Run 'platctl kubeconfig' to retry.")
 		}
 	}
 
