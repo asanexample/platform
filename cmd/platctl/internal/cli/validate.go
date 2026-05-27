@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -16,6 +17,7 @@ import (
 func NewValidateCmd() *cobra.Command {
 	var (
 		envFilter   string
+		checkFilter string
 		concurrency int
 	)
 
@@ -30,17 +32,18 @@ Checks are organized in two phases:
 
 If Phase 1 fails, Phase 2 is skipped to avoid cascading failures from expired credentials.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runValidate(cmd, envFilter, concurrency)
+			return runValidate(cmd, envFilter, checkFilter, concurrency)
 		},
 	}
 
 	cmd.Flags().StringVar(&envFilter, "env", "", "Target a single environment (e.g., platform, preprod)")
+	cmd.Flags().StringVar(&checkFilter, "check", "", "Run only checks matching these prefixes (comma-separated, e.g., tailscale,gateway)")
 	cmd.Flags().IntVar(&concurrency, "concurrency", 8, "Maximum parallel checks")
 
 	return cmd
 }
 
-func runValidate(cmd *cobra.Command, envFilter string, concurrency int) error {
+func runValidate(cmd *cobra.Command, envFilter, checkFilter string, concurrency int) error {
 	repoRoot, err := findRepoRoot()
 	if err != nil {
 		return err
@@ -68,6 +71,9 @@ func runValidate(cmd *cobra.Command, envFilter string, concurrency int) error {
 	fmt.Printf("Validating %d units", len(units))
 	if envFilter != "" {
 		fmt.Printf(" (env: %s)", envFilter)
+	}
+	if checkFilter != "" {
+		fmt.Printf(" (check: %s)", checkFilter)
 	}
 	fmt.Println("...")
 	fmt.Println()
@@ -194,6 +200,22 @@ func runValidate(cmd *cobra.Command, envFilter string, concurrency int) error {
 		})
 	}
 
+	// Apply --check filter
+	var checkPrefixes []string
+	if checkFilter != "" {
+		for _, p := range strings.Split(checkFilter, ",") {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				checkPrefixes = append(checkPrefixes, p)
+			}
+		}
+	}
+
+	if len(checkPrefixes) > 0 {
+		iamChecks = validate.FilterCheckers(iamChecks, checkPrefixes)
+		otherChecks = validate.FilterCheckers(otherChecks, checkPrefixes)
+	}
+
 	// Build the expired-profiles callback
 	expiredFn := func(_ context.Context) []string {
 		return iamCheck.ExpiredProfiles
@@ -201,7 +223,16 @@ func runValidate(cmd *cobra.Command, envFilter string, concurrency int) error {
 
 	// Run two-phase validation
 	start := time.Now()
-	results := validate.RunValidation(ctx, iamChecks, otherChecks, concurrency, expiredFn)
+	var results []validate.CheckResult
+	if len(iamChecks) == 0 && len(otherChecks) == 0 {
+		fmt.Println("No checks match the filter.")
+		return nil
+	}
+	if len(iamChecks) > 0 {
+		results = validate.RunValidation(ctx, iamChecks, otherChecks, concurrency, expiredFn)
+	} else {
+		results = validate.RunChecks(ctx, otherChecks, concurrency)
+	}
 
 	// Print results
 	fmt.Println()

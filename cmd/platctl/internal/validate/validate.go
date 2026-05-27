@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 )
@@ -108,6 +109,28 @@ func RunValidation(ctx context.Context, iamChecks []Checker, otherChecks []Check
 	// Phase 2: everything else
 	otherResults := RunChecks(ctx, otherChecks, concurrency)
 	return append(iamResults, otherResults...)
+}
+
+// FilterCheckers returns only the checkers whose name starts with any of the
+// given prefixes. If prefixes is empty, all checkers are returned.
+func FilterCheckers(checks []Checker, prefixes []string) []Checker {
+	if len(prefixes) == 0 {
+		return checks
+	}
+	var filtered []Checker
+	for _, c := range checks {
+		name := ""
+		if nc, ok := c.(interface{ CheckName() string }); ok {
+			name = nc.CheckName()
+		}
+		for _, p := range prefixes {
+			if strings.HasPrefix(name, p) {
+				filtered = append(filtered, c)
+				break
+			}
+		}
+	}
+	return filtered
 }
 
 // PrintResults formats check results to stdout and returns counts.
