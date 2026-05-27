@@ -15,6 +15,65 @@ type Config struct {
 	ManualSteps  []ManualStep            `yaml:"manual_steps"`
 	Lockdown     []LockdownStep          `yaml:"lockdown"`
 	Kubeconfig   []KubeconfigEntry       `yaml:"kubeconfig"`
+	Validate     ValidateConfig          `yaml:"validate"`
+}
+
+// ValidateConfig holds configuration for the validate command's health checks.
+type ValidateConfig struct {
+	DNS            DNSValidation         `yaml:"dns"`
+	TransitGateway TGWValidation         `yaml:"transit_gateway"`
+	CrossVPCDNS    CrossVPCDNSValidation `yaml:"cross_vpc_dns"`
+	Tailscale      TailscaleValidation   `yaml:"tailscale"`
+	Gateway        GatewayValidation     `yaml:"gateway"`
+	Endpoints      []EndpointValidation  `yaml:"endpoints"`
+	IAM            IAMValidation         `yaml:"iam"`
+}
+
+// DNSValidation configures the DNS delegation check.
+type DNSValidation struct {
+	Zone       string   `yaml:"zone"`
+	ExpectedNS []string `yaml:"expected_ns"`
+}
+
+// TGWValidation configures the Transit Gateway attachment check.
+type TGWValidation struct {
+	ID string `yaml:"id"`
+}
+
+// CrossVPCDNSValidation configures the cross-VPC DNS resolution check.
+type CrossVPCDNSValidation struct {
+	Endpoint string `yaml:"endpoint"`
+}
+
+// TailscaleValidation configures the Tailscale connectivity check.
+type TailscaleValidation struct {
+	VPCCIDRs map[string]string `yaml:"vpc_cidrs"`
+}
+
+// GatewayValidation configures the Gateway health check.
+type GatewayValidation struct {
+	Name      string `yaml:"name"`
+	Namespace string `yaml:"namespace"`
+	CertName  string `yaml:"cert_name"`
+}
+
+// EndpointValidation configures an HTTP endpoint reachability check.
+type EndpointValidation struct {
+	Name string `yaml:"name"`
+	URL  string `yaml:"url"`
+	Env  string `yaml:"env"`
+}
+
+// IAMValidation configures the IAM and access checks.
+type IAMValidation struct {
+	StateBucket string                      `yaml:"state_bucket"`
+	Accounts    map[string]IAMAccountConfig `yaml:"accounts"`
+}
+
+// IAMAccountConfig holds IAM configuration for a single AWS account.
+type IAMAccountConfig struct {
+	ID              string `yaml:"id"`
+	DeployerRoleARN string `yaml:"deployer_role_arn"`
 }
 
 // KubeconfigEntry defines how to configure kubectl access for a cluster.
