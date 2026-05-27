@@ -9,7 +9,8 @@ internal/
 ├── engine/     Orchestration: DAG walker, parallel execution, state, logging
 ├── config/     Configuration: .platctl.yaml parsing, unit auto-discovery, hooks
 ├── cloud/      Provider abstraction: CloudClient interface, AWS implementation
-└── cli/        Cobra commands: bootstrap, teardown, status, validate
+├── validate/   Health checks: two-phase execution, per-unit + cross-cutting checks
+└── cli/        Cobra commands: bootstrap, teardown, status, validate, kubeconfig
 ```
 
 **Dependency flow**: `cli` → `config` + `engine` + `cloud`. No circular imports. The `engine` package has no dependency on `config` or `cloud` — all configuration is injected via the `Unit` struct and interfaces.
@@ -135,3 +136,44 @@ All tests are in `_test.go` files alongside the code they test.
 **config package**: `discover_test.go` (fixture-based discovery, cross-env resolution, implicit deps, auth overrides), `hooks_test.go` (CRD two-stage call sequence, manual step checks with mock clients)
 
 **All side effects behind interfaces**: the engine calls `Runner.Run()`, `Store.Save()`, and `cloud.Client` methods. Tests inject mocks that record calls and return canned responses. No real terragrunt, filesystem I/O (beyond temp dirs), or AWS API calls in unit tests.
+
+## Validate Package
+
+The `validate` package provides infrastructure health checks via `platctl validate`.
+
+### Core Types
+
+- **`CheckResult`**: name, status (`ok`/`failed`/`skipped`), message, details (diagnostics), elapsed time
+- **`Checker`**: interface with `Check(ctx) CheckResult` and `CheckName() string`
+- **`CommandRunner`**: `func(ctx, name string, args ...string) ([]byte, error)` — all external commands go through this for testability
+
+### Two-Phase Execution
+
+`RunValidation` runs IAM checks first (Phase 1). If any SSO session is expired, all Phase 2 checks are skipped with "fix IAM/credentials first". This avoids cascading failures from stale tokens.
+
+### Check Types
+
+| Type | File | What it validates |
+|------|------|-------------------|
+| `IAMCheck` | `access.go` | SSO sessions, role assumptions, state bucket access |
+| `EKSClusterCheck` | `checks.go` | Cluster status ACTIVE, node readiness |
+| `K8sWorkloadCheck` | `checks.go` | Pod readiness in a namespace (optional label selector) |
+| `SecretStoreCheck` | `checks.go` | SecretStore/ClusterSecretStore Ready condition |
+| `ArgoCDAppCheck` | `checks.go` | Application CRs Synced + Healthy |
+| `TGWAttachmentCheck` | `checks.go` | Transit Gateway attachments available |
+| `GatewayHealthCheck` | `gateway.go` | GatewayClass, Gateway, cert, NLB health |
+| `TailscaleCheck` | `tailscale.go` | Subnet router online, routes advertised, split DNS, API reachable |
+| `DNSDelegationCheck` | `dns.go` | NS records match expected Route53 nameservers |
+| `EndpointCheck` | `endpoints.go` | HTTP reachability (200/302) |
+
+### Convention-Based Resolution
+
+`ResolveCheckers` maps unit short names to check types automatically. For example, `eks` → `EKSClusterCheck`, `cilium` → `K8sWorkloadCheck` (ns=`kube-system`, label=`app.kubernetes.io/name=cilium-agent`). Units without a specific mapping get a `StateCheck` (terragrunt state list).
+
+### Check Filtering
+
+`FilterCheckers` supports the `--check` flag by matching checker names against comma-separated prefixes. `--check tailscale` matches both `tailscale/platform` and `tailscale/preprod`.
+
+### Testing
+
+All checkers accept a `CommandRunner`. Tests inject mock runners that match on command name + args and return canned JSON/text output. 25 tests cover all check types, two-phase execution, filtering, and helper functions.

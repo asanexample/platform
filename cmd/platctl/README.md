@@ -86,7 +86,53 @@ Started:   2026-05-26 14:30:00
 
 ### `platctl validate`
 
-Extension point for infrastructure health checks. Currently prints a placeholder message. Cloud-specific checks (EKS status, node readiness, Helm releases) will be added in a future release.
+Runs health checks against deployed infrastructure. Checks are organized in two phases:
+
+- **Phase 1 (IAM)**: SSO sessions, role assumptions, state backend access. If any fail, Phase 2 is skipped to avoid cascading failures from expired credentials.
+- **Phase 2 (Infrastructure)**: Per-unit checks (EKS cluster, K8s workloads, secret stores, ArgoCD apps), cross-cutting checks (gateway, DNS delegation, Tailscale connectivity, endpoints).
+
+| Flag | Description |
+|------|-------------|
+| `--env <name>` | Target a single environment (e.g., `platform`, `preprod`) |
+| `--check <prefixes>` | Run only checks matching these prefixes (comma-separated, e.g., `tailscale,gateway`) |
+| `--concurrency <n>` | Maximum parallel checks (default: 8) |
+
+Check types are resolved automatically from unit names — `eks` gets an EKS cluster health check, `cilium` gets a K8s workload check in `kube-system`, etc. Cross-cutting checks (gateway, DNS, Tailscale, endpoints) are configured in the `validate:` section of `.platctl.yaml`.
+
+Every failure includes diagnostics: what failed, raw evidence, likely cause, and fix commands.
+
+```text
+$ platctl validate --env platform
+Validating 17 units (env: platform)...
+
+  ok iam                                SSO valid, 2/2 deployer roles assumable, state bucket ok
+  ok platform/eks                       cluster ACTIVE, 3/3 nodes Ready
+  ok platform/cilium                    3/3 pods ready in kube-system
+  ok platform/cert-manager              3/3 pods ready in cert-manager
+  !! platform/gateway                   TLS NOT ready
+     → Certificate platform-gateway-tls: Ready=False, Reason: rate limited
+     → Run: kubectl describe certificate platform-gateway-tls -n default
+  ok tailscale/platform                 subnet router online, CIDR 10.100.0.0/16 advertised, API reachable
+  ok dns/aws.refplat.org                4/4 NS records match
+
+Passed: 26  Failed: 1  Skipped: 0  (2.483s)
+```
+
+Use `--check` for fast targeted checks:
+
+```bash
+platctl validate --check tailscale          # ~3ms
+platctl validate --check gateway,dns        # just gateway + DNS
+```
+
+### `platctl kubeconfig`
+
+Configures kubectl contexts for all clusters defined in `.platctl.yaml`.
+
+```bash
+platctl kubeconfig                    # configure all clusters
+platctl kubeconfig --env platform     # single environment
+```
 
 ## Environment Filtering
 

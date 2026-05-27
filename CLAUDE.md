@@ -149,6 +149,16 @@ platctl bootstrap --env platform  # single environment
 # Tear down the full platform stack (preferred)
 platctl teardown
 
+# Validate deployed infrastructure
+platctl validate
+platctl validate --env platform       # single environment
+platctl validate --check tailscale    # targeted check
+platctl validate --check gateway,dns  # multiple check prefixes
+
+# Configure kubectl contexts
+platctl kubeconfig
+platctl kubeconfig --env platform
+
 # Legacy scripts (deprecated, kept for reference)
 AWS_PROFILE=management ./scripts/bootstrap-platform.sh
 
