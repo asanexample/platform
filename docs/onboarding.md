@@ -72,7 +72,7 @@ See [EKS Cluster Access](runbooks/eks-cluster-access.md) for kubectl setup.
 ### ArgoCD Access
 
 ArgoCD is the platform's continuous delivery tool, available at
-`https://argocd.taild3190d.ts.net`. You must be connected to the Tailscale
+`https://argocd.aws.refplat.org`. You must be connected to the Tailscale
 VPN to access ArgoCD.
 
 **Login:** Click "Log in via SSO" on the login page. You will be redirected to

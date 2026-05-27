@@ -17,8 +17,3 @@ output "split_dns_domains" {
   description = "List of configured split DNS domains"
   value       = keys(tailscale_dns_split_nameservers.this)
 }
-
-output "ingress_hostnames" {
-  description = "Map of Tailscale Ingress names to their tailnet hostnames"
-  value       = { for k, v in var.ingresses : k => v.hostname }
-}

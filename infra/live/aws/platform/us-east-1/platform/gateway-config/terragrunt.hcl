@@ -43,6 +43,15 @@ dependency "external_dns" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+dependency "argocd" {
+  config_path = "../argocd"
+
+  mock_outputs = {
+    namespace = "argocd"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
 dependency "route53" {
   config_path = "../route53"
 
@@ -70,12 +79,19 @@ generate "kubernetes_provider" {
 }
 
 inputs = {
-  create = true
-  domain = "aws.refplat.org"
+  create   = true
+  domain   = "aws.refplat.org"
+  internal = true
 
   letsencrypt_email      = "josh@deeden.org"
   route53_hosted_zone_id = dependency.route53.outputs.zone_id
   route53_region         = include.base.locals.region
 
-  routes = {}
+  routes = {
+    argocd = {
+      namespace = dependency.argocd.outputs.namespace
+      service   = "argocd-server"
+      port      = 80
+    }
+  }
 }

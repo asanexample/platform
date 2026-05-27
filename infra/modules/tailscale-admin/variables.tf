@@ -5,6 +5,16 @@ variable "create" {
 }
 
 # ---------------------------------------------------------------------------
+# Tailnet Settings
+# ---------------------------------------------------------------------------
+
+variable "https_enabled" {
+  description = "Enable HTTPS certificates for tailnet devices (required for Tailscale Ingress TLS)"
+  type        = bool
+  default     = true
+}
+
+# ---------------------------------------------------------------------------
 # ACL Policy
 # ---------------------------------------------------------------------------
 
