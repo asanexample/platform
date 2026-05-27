@@ -12,8 +12,9 @@ locals {
 
   module_source = {
     # Core infrastructure
-    networking = "${local.source_base}/aws//networking"
-    naming     = "${local.source_base}/aws//naming"
+    networking      = "${local.source_base}/aws//networking"
+    naming          = "${local.source_base}/aws//naming"
+    transit_gateway = "${local.source_base}/aws//transit-gateway"
 
     # Compute
     eks            = "${local.source_base}/aws//eks"
