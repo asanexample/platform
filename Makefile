@@ -170,6 +170,25 @@ az-create-state-resources: check-azure-auth ## Create Azure resources for Terraf
 	az storage container create --name terraformstate --account-name tfstatemulticloud
 
 #----------------------------------------------
+# platctl (platform orchestration CLI)
+#----------------------------------------------
+
+.PHONY: build-platctl
+build-platctl: ## Build the platctl CLI binary
+	@echo "$(GREEN)Building platctl...$(NC)"
+	@cd cmd/platctl && go build -o ../../bin/platctl
+
+.PHONY: install-platctl
+install-platctl: ## Install platctl globally via go install
+	@echo "$(GREEN)Installing platctl...$(NC)"
+	@cd cmd/platctl && go install
+
+.PHONY: test-platctl
+test-platctl: ## Run platctl unit tests
+	@echo "$(GREEN)Running platctl tests...$(NC)"
+	@cd cmd/platctl && go test ./... -timeout 30s
+
+#----------------------------------------------
 # AWS Testing (Terratest)
 #----------------------------------------------
 

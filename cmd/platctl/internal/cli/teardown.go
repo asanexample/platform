@@ -1,0 +1,278 @@
+package cli
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+
+	"github.com/spf13/cobra"
+
+	"github.com/gangster/platform/cmd/platctl/internal/cloud"
+	"github.com/gangster/platform/cmd/platctl/internal/config"
+	"github.com/gangster/platform/cmd/platctl/internal/engine"
+)
+
+// NewTeardownCmd creates the teardown subcommand.
+func NewTeardownCmd() *cobra.Command {
+	var (
+		envFilter   string
+		dryRun      bool
+		resume      bool
+		yes         bool
+		concurrency int
+	)
+
+	cmd := &cobra.Command{
+		Use:   "teardown",
+		Short: "Destroy infrastructure in reverse dependency order",
+		Long: `Teardown destroys all Terragrunt units in reverse topological order,
+ensuring dependents are destroyed before their dependencies. Use --env
+to target a single environment.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			repoRoot, err := findRepoRoot()
+			if err != nil {
+				return err
+			}
+
+			cfgPath := resolveConfig(cmd, repoRoot)
+			cfg, err := config.Load(cfgPath)
+			if err != nil {
+				return fmt.Errorf("loading config: %w", err)
+			}
+
+			g, err := config.Discover(cfg, repoRoot)
+			if err != nil {
+				return fmt.Errorf("discovering units: %w", err)
+			}
+
+			if envFilter != "" {
+				g, err = g.FilterByEnv(envFilter)
+				if err != nil {
+					return fmt.Errorf("filtering by env %q: %w", envFilter, err)
+				}
+			}
+
+			if dryRun {
+				return printTeardownPlan(g)
+			}
+
+			statePath := filepath.Join(repoRoot, ".platctl-state.json")
+			store := engine.NewFileStore()
+
+			// Set up logging
+			logDir := filepath.Join(repoRoot, ".platctl-logs")
+			var envFilterPtr *string
+			if envFilter != "" {
+				envFilterPtr = &envFilter
+			}
+			unitNames := make([]string, 0, g.Len())
+			for _, u := range g.Units() {
+				unitNames = append(unitNames, u.Name)
+			}
+			logger, err := engine.NewLogger(logDir, "teardown", envFilterPtr, resume, unitNames)
+			if err != nil {
+				return fmt.Errorf("setting up logging: %w", err)
+			}
+			fmt.Printf("Logs: %s\n", logger.Dir())
+
+			runner := &engine.TerragruntRunner{
+				LogWriter: func(unit string, data []byte) {
+					_ = logger.Append(unit, data)
+				},
+			}
+
+			// Unlock phase: reverse lockdown before destroying.
+			// Re-apply lockdown units with bootstrap_args to restore access.
+			// Only runs if the unit has resources in state (avoids recreating destroyed infra).
+			if !resume {
+				for i := len(cfg.Lockdown) - 1; i >= 0; i-- {
+					lock := cfg.Lockdown[i]
+					unit := g.Unit(lock.Unit)
+					if unit == nil {
+						continue
+					}
+					override, ok := cfg.Overrides[lock.Unit]
+					if !ok || len(override.BootstrapArgs) == 0 {
+						continue
+					}
+					if !unitHasState(unit, runner.Binary) {
+						fmt.Printf("Unlock: %s — skipped (no resources in state)\n", lock.Unit)
+						continue
+					}
+					fmt.Printf("Unlock: %s (%s)\n", lock.Unit, lock.Description)
+					if err := runner.Run(cmd.Context(), unit, engine.Apply, override.BootstrapArgs...); err != nil {
+						fmt.Printf("  Warning: unlock failed: %v\n", err)
+					}
+				}
+				fmt.Println()
+			}
+
+			awsClient := &cloud.AWS{}
+			hooks := make(map[string]engine.Hook)
+			for name, override := range cfg.Overrides {
+				if override.Hook == "" {
+					continue
+				}
+				if g.Unit(name) == nil {
+					continue
+				}
+				h := config.ResolveHook(override, awsClient, !yes)
+				if h != nil {
+					hooks[name] = h
+				}
+			}
+
+			eng := engine.NewEngine(runner, store, g, statePath, engine.WithConcurrency(concurrency))
+			eng.Hooks = hooks
+			eng.Logger = logger
+
+			if resume {
+				existing, err := store.Load(statePath)
+				if err != nil {
+					return fmt.Errorf("loading state for resume: %w", err)
+				}
+				if existing == nil {
+					return fmt.Errorf("no state file found; nothing to resume")
+				}
+				existing.PrepareForResume()
+				eng.State = existing
+			}
+
+			_ = yes // will be used for interactive prompts in Phase 3
+
+			// Pre-destroy: apply teardown_args to update resource attributes in state.
+			// Passing -var force_destroy=true during destroy doesn't work because
+			// providers read the attribute from state, not the plan config.
+			if !resume {
+				teardownArgs := make(map[string][]string)
+				for name, override := range cfg.Overrides {
+					if len(override.TeardownArgs) > 0 && g.Unit(name) != nil {
+						teardownArgs[name] = override.TeardownArgs
+					}
+				}
+				for name, args := range teardownArgs {
+					unit := g.Unit(name)
+					if unit == nil {
+						continue
+					}
+					if !unitHasState(unit, runner.Binary) {
+						continue
+					}
+					fmt.Printf("Pre-destroy apply: %s (%v)\n", name, args)
+					if err := runner.Run(cmd.Context(), unit, engine.Apply, args...); err != nil {
+						fmt.Printf("  Warning: pre-destroy apply failed: %v\n", err)
+					}
+				}
+			}
+
+			// Skip units with empty state — nothing to destroy.
+			// Checks run in parallel to avoid sequential ~30s per unit.
+			if !resume {
+				units := g.Units()
+				state := engine.NewState("destroy", units)
+				type stateResult struct {
+					name     string
+					hasState bool
+				}
+				results := make(chan stateResult, len(units))
+				sem := make(chan struct{}, concurrency)
+				for _, u := range units {
+					go func(u *engine.Unit) {
+						sem <- struct{}{}
+						defer func() { <-sem }()
+						results <- stateResult{name: u.Name, hasState: unitHasState(u, runner.Binary)}
+					}(u)
+				}
+				skipped := 0
+				for range units {
+					r := <-results
+					if !r.hasState {
+						state.MarkCompleted(r.name)
+						skipped++
+					}
+				}
+				if skipped > 0 {
+					fmt.Printf("Skipping %d units with empty state\n", skipped)
+				}
+				eng.State = state
+			}
+
+			if err := eng.Run(cmd.Context(), engine.Destroy, nil); err != nil {
+				fmt.Println("\nTo resume after fixing: platctl teardown --resume")
+				return err
+			}
+
+			fmt.Println("\nTeardown complete.")
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&envFilter, "env", "", "Target a single environment")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview the teardown plan")
+	cmd.Flags().BoolVar(&resume, "resume", false, "Resume from a previous incomplete run")
+	cmd.Flags().BoolVar(&yes, "yes", false, "Skip confirmation prompts")
+	cmd.Flags().IntVar(&concurrency, "concurrency", 4, "Maximum number of parallel unit executions")
+
+	return cmd
+}
+
+// unitHasState checks if a unit has any resources in Terraform state.
+// Returns false if the state is empty (unit already destroyed or never deployed).
+func unitHasState(unit *engine.Unit, binary string) bool {
+	if binary == "" {
+		binary = "terragrunt"
+	}
+	cmd := exec.CommandContext(context.Background(), binary, "state", "list")
+	cmd.Dir = unit.Path
+	env := os.Environ()
+	if profile, ok := unit.Auth["profile"]; ok {
+		found := false
+		prefix := "AWS_PROFILE="
+		for i, e := range env {
+			if len(e) > len(prefix) && e[:len(prefix)] == prefix {
+				env[i] = prefix + profile
+				found = true
+				break
+			}
+		}
+		if !found {
+			env = append(env, prefix+profile)
+		}
+	}
+	cmd.Env = env
+	out, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	return len(strings.TrimSpace(string(out))) > 0
+}
+
+func printTeardownPlan(g *engine.Graph) error {
+	rev, err := g.Reverse()
+	if err != nil {
+		return fmt.Errorf("reversing graph: %w", err)
+	}
+
+	waves, err := rev.Waves()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Teardown plan: %d units in %d waves (reverse order)\n\n", g.Len(), len(waves))
+
+	for i, wave := range waves {
+		fmt.Printf("Wave %d", i+1)
+		if len(wave) > 1 {
+			fmt.Printf(" (%d units in parallel)", len(wave))
+		}
+		fmt.Println()
+		for _, u := range wave {
+			fmt.Printf("  %-35s destroy\n", u.Name)
+		}
+		fmt.Println()
+	}
+	return nil
+}

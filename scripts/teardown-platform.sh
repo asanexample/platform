@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 #
+# DEPRECATED: Use `platctl teardown` instead. This script is kept for reference
+# but is no longer maintained. See cmd/platctl/README.md for documentation.
+#
 # Tear down the full AWS platform stack in reverse dependency order.
 #
 # By default, the Route53 hosted zone is preserved (destroying it would
@@ -97,6 +100,9 @@ if eks_cluster_exists "$CLUSTER_NAME" "$REGION"; then
   # ───────────────────────────────────────────────────────────────────────────
   # Phase 3 — Destroy remaining K8s services via public endpoint
   # ───────────────────────────────────────────────────────────────────────────
+
+  log_info "Destroying cross-vpc-dns..."
+  run_tg "$UNIT_DIR/cross-vpc-dns" destroy
 
   log_info "Destroying transit-gateway..."
   run_tg "$UNIT_DIR/transit-gateway" destroy

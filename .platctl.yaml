@@ -1,0 +1,164 @@
+environments:
+  platform:
+    path: infra/live/aws/platform/us-east-1/platform
+    provider: aws
+    auth:
+      profile: management
+  preprod:
+    path: infra/live/aws/preprod/us-east-1/platform
+    provider: aws
+    auth:
+      profile: management
+  # prod:
+  #   path: infra/live/aws/prod/us-east-1/platform
+  #   provider: aws
+  #   auth:
+  #     profile: management
+
+overrides:
+  platform/iam-roles:
+    auth:
+      profile: platform
+
+  preprod/iam-roles:
+    auth:
+      profile: preprod
+
+  platform/tailscale-admin:
+    implicit_deps: ["preprod/iam-roles"]
+    hook: secret_cleanup
+    hook_config:
+      profile: platform
+      secrets: "platform/tailscale/oauth@platform,preprod/tailscale/oauth@preprod,preprod/tailscale/api-key@preprod"
+
+  platform/eks:
+    bootstrap_args: ["-var", "endpoint_public_access=true"]
+
+  preprod/eks:
+    bootstrap_args: ["-var", "endpoint_public_access=true"]
+
+  platform/tailscale:
+    hook: crd_two_stage
+    hook_target: "helm_release.tailscale_operator[0]"
+    bootstrap_args: ["-var", "split_dns={}"]
+
+  preprod/tailscale:
+    hook: crd_two_stage
+    hook_target: "helm_release.tailscale_operator[0]"
+    implicit_deps: ["platform/tailscale-admin"]
+
+  platform/networking:
+    implicit_deps: ["platform/iam-roles"]
+
+  preprod/networking:
+    implicit_deps: ["preprod/iam-roles"]
+
+  platform/route53:
+    implicit_deps: ["platform/iam-roles"]
+
+  platform/cloudtrail:
+    teardown_args: ["-var", "force_destroy=true"]
+    implicit_deps: ["platform/iam-roles"]
+
+  preprod/cloudtrail:
+    teardown_args: ["-var", "force_destroy=true"]
+    implicit_deps: ["preprod/iam-roles"]
+
+  platform/cross-vpc-dns:
+    hook: eni_ip_validation
+    hook_config:
+      cluster_name: preprod-use1-eks
+      profile: management
+
+manual_steps:
+  - name: cloudflare-api-token
+    before: platform/cloudflare-dns
+    instructions: |
+      Store Cloudflare API token in Secrets Manager:
+        aws secretsmanager create-secret \
+          --name platform/cloudflare/api-token \
+          --secret-string '<TOKEN>' \
+          --region us-east-1 --profile platform
+    check:
+      type: secret_exists
+      secret_id: platform/cloudflare/api-token
+      profile: platform
+
+  - name: tailscale-api-key
+    before: platform/tailscale-admin
+    instructions: |
+      1. Generate API key: Tailscale Admin -> Settings -> Keys
+      2. Store in Secrets Manager:
+        aws secretsmanager create-secret \
+          --name platform/tailscale/api-key \
+          --secret-string '<KEY>' \
+          --region us-east-1 --profile platform
+    check:
+      type: secret_exists
+      secret_id: platform/tailscale/api-key
+      profile: platform
+
+  - name: argocd-saml
+    before: platform/argocd
+    instructions: |
+      Create SAML app in AWS Identity Center for ArgoCD SSO.
+      See scripts/bootstrap-platform.sh Phase 12 for details.
+      Then update infra/live/aws/common.hcl with argocd_sso_url.
+    check:
+      type: file_contains
+      file: infra/live/aws/common.hcl
+      pattern: "argocd_sso_url"
+
+kubeconfig:
+  - alias: platform
+    cluster: platform-use1-eks
+    region: us-east-1
+    profile: platform
+    kubectl_role_arn: arn:aws:iam::829808296602:role/PlatformAdmin
+  - alias: preprod
+    cluster: preprod-use1-eks
+    region: us-east-1
+    profile: preprod
+    kubectl_role_arn: arn:aws:iam::620830101009:role/PlatformAdmin
+
+lockdown:
+  - unit: platform/eks
+    description: Disable public EKS endpoint
+  - unit: preprod/eks
+    description: Disable public EKS endpoint
+  - unit: platform/tailscale
+    description: Enable split DNS for private EKS resolution
+
+validate:
+  dns:
+    zone: aws.refplat.org
+    expected_ns:
+      - ns-392.awsdns-49.com.
+      - ns-995.awsdns-60.net.
+      - ns-1129.awsdns-13.org.
+      - ns-1963.awsdns-53.co.uk.
+  transit_gateway:
+    id: tgw-080dccffd7843a544
+  cross_vpc_dns:
+    endpoint: 0BC1D9D127D845F50BA0DF2FA46E8C04.gr7.us-east-1.eks.amazonaws.com
+  tailscale:
+    vpc_cidrs:
+      platform: "10.100.0.0/16"
+      preprod: "10.101.0.0/16"
+  gateway:
+    name: platform-gateway
+    namespace: default
+    cert_name: platform-gateway-tls
+  endpoints:
+    - name: argocd
+      url: https://argocd.aws.refplat.org/
+      env: platform
+  iam:
+    state_bucket: tfstate-mgmt-851725353202
+    accounts:
+      platform:
+        id: "829808296602"
+        deployer_role_arn: arn:aws:iam::829808296602:role/PlatformDeployer
+      preprod:
+        id: "620830101009"
+        deployer_role_arn: arn:aws:iam::620830101009:role/PlatformDeployer

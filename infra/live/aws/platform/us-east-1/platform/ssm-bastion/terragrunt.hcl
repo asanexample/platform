@@ -16,7 +16,7 @@ dependency "networking" {
 
   mock_outputs = {
     vpc_id     = "vpc-mock"
-    subnet_ids = {}
+    subnet_ids = { "kubernetes" = "subnet-mock" }
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }

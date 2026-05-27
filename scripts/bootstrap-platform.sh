@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 #
+# DEPRECATED: Use `platctl bootstrap` instead. This script is kept for reference
+# but is no longer maintained. See cmd/platctl/README.md for documentation.
+#
 # Bootstrap the full AWS platform stack from zero.
 #
 # Prerequisites:

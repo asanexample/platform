@@ -37,6 +37,7 @@ locals {
 
     # DNS
     route53        = "${local.source_base}/aws//route53"
+    cross_vpc_dns  = "${local.source_base}/aws//cross-vpc-dns"
     dns_delegation = "${local.source_base}/cloudflare//dns_delegation"
 
     # CI/CD
