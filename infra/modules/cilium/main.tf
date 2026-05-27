@@ -47,6 +47,9 @@ locals {
     gatewayAPI = {
       enabled = var.gateway_api_enabled
     }
+    gatewayClass = {
+      create = var.gateway_api_enabled
+    }
 
     # Kube-proxy replacement
     kubeProxyReplacement = var.kube_proxy_replacement
@@ -185,6 +188,8 @@ resource "helm_release" "cilium" {
   atomic           = var.helm_wait
   cleanup_on_fail  = true
   replace          = true
+
+  depends_on = [null_resource.gateway_api_crds]
 
   values = [
     yamlencode(local.cilium_values),
