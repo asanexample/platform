@@ -45,8 +45,6 @@ Deploys all Terragrunt units in dependency order.
 | `--dry-run` | Preview the execution plan without running terragrunt |
 | `--resume` | Continue from a previous incomplete run |
 | `--yes` | Skip manual step prompts (assume prerequisites are met) |
-| `-v` | Verbose output (includes resource change summaries) |
-| `--stream` | Stream full terragrunt output, prefixed per unit |
 
 **What it does:**
 
@@ -60,7 +58,7 @@ Deploys all Terragrunt units in dependency order.
 
 Destroys all Terragrunt units in reverse dependency order (dependents first).
 
-Same flags as `bootstrap` except `--yes` applies to the destroy confirmation.
+Same flags as `bootstrap` (`--env`, `--dry-run`, `--resume`, `--yes`).
 
 ### `platctl status`
 
@@ -137,7 +135,8 @@ Hooks are pre-apply operations for units that need special handling:
 | Hook | Units | What it does |
 |------|-------|-------------|
 | CRD two-stage | `platform/tailscale`, `preprod/tailscale` | Deploys the Helm operator first (to register CRDs), then the full apply |
-| ENI IP validation | `platform/cross-vpc-dns` | Queries preprod EKS ENI IPs and warns if they don't match the live unit |
+| ENI IP validation | `platform/cross-vpc-dns` | Queries live preprod EKS ENI IPs and warns if they don't match the values in the terragrunt config |
+| Secret cleanup | `platform/tailscale-admin` | Force-deletes Secrets Manager secrets during teardown so they can be cleanly recreated on next bootstrap |
 
 ## Configuration
 

@@ -108,9 +108,15 @@ If CRDs already exist, stage 1 is a no-op. Idempotent.
 
 ### ENI IP Validation (`eni_ip_validation`)
 
-Problem: cross-vpc-dns PHZ records use hardcoded EKS API ENI IPs. On cluster recreation, IPs change.
+Problem: cross-vpc-dns PHZ records reference EKS API ENI IPs in the terragrunt config. On cluster recreation, these IPs change.
 
-Solution: query ENIs via `aws ec2 describe-network-interfaces`, compare to live unit values, warn if stale.
+Solution: query live ENI IPs via `aws ec2 describe-network-interfaces`, compare to the values in the terragrunt config, warn if stale.
+
+### Secret Cleanup (`secret_cleanup`)
+
+Problem: Secrets Manager secrets have a recovery window (default 30 days) after deletion. Teardown leaves secrets in "pending deletion" state, blocking recreation on the next bootstrap.
+
+Solution: during teardown, force-delete specified secrets (no recovery window) so they can be cleanly recreated. Configured with a list of `profile:secret_id` pairs in `hook_config`.
 
 ## Cloud Abstraction
 
