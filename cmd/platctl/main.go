@@ -23,6 +23,8 @@ execution of independent units.`,
 		SilenceUsage: true,
 	}
 
+	root.PersistentFlags().String("config", "", "Path to config file (default: <repo-root>/.platctl.yaml)")
+
 	root.AddCommand(cli.NewBootstrapCmd())
 	root.AddCommand(cli.NewTeardownCmd())
 	root.AddCommand(cli.NewStatusCmd())

@@ -17,10 +17,11 @@ import (
 // NewBootstrapCmd creates the bootstrap subcommand.
 func NewBootstrapCmd() *cobra.Command {
 	var (
-		envFilter string
-		dryRun    bool
-		resume    bool
-		yes       bool
+		envFilter   string
+		dryRun      bool
+		resume      bool
+		yes         bool
+		concurrency int
 	)
 
 	cmd := &cobra.Command{
@@ -32,9 +33,9 @@ environment, --dry-run to preview the execution plan, or --resume
 to continue after a failure.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRun {
-				return runDryRun(envFilter)
+				return runDryRun(cmd, envFilter)
 			}
-			return runBootstrap(cmd, envFilter, resume, yes)
+			return runBootstrap(cmd, envFilter, resume, yes, concurrency)
 		},
 	}
 
@@ -42,17 +43,18 @@ to continue after a failure.`,
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview the execution plan without running terragrunt")
 	cmd.Flags().BoolVar(&resume, "resume", false, "Resume from a previous incomplete run")
 	cmd.Flags().BoolVar(&yes, "yes", false, "Skip manual step prompts (assume prerequisites are met)")
+	cmd.Flags().IntVar(&concurrency, "concurrency", 4, "Maximum number of parallel unit executions")
 
 	return cmd
 }
 
-func runDryRun(envFilter string) error {
+func runDryRun(cmd *cobra.Command, envFilter string) error {
 	repoRoot, err := findRepoRoot()
 	if err != nil {
 		return err
 	}
 
-	cfgPath := findConfig(repoRoot)
+	cfgPath := resolveConfig(cmd, repoRoot)
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
@@ -137,13 +139,13 @@ func runDryRun(envFilter string) error {
 	return nil
 }
 
-func runBootstrap(cmd *cobra.Command, envFilter string, resume, yes bool) error {
+func runBootstrap(cmd *cobra.Command, envFilter string, resume, yes bool, concurrency int) error {
 	repoRoot, err := findRepoRoot()
 	if err != nil {
 		return err
 	}
 
-	cfgPath := findConfig(repoRoot)
+	cfgPath := resolveConfig(cmd, repoRoot)
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
@@ -202,7 +204,7 @@ func runBootstrap(cmd *cobra.Command, envFilter string, resume, yes bool) error 
 		}
 	}
 
-	eng := engine.NewEngine(runner, store, g, statePath)
+	eng := engine.NewEngine(runner, store, g, statePath, engine.WithConcurrency(concurrency))
 	eng.Hooks = hooks
 	eng.Logger = logger
 
@@ -321,7 +323,11 @@ func findRepoRoot() (string, error) {
 	}
 }
 
-// findConfig looks for .platctl.yaml in the repo root.
-func findConfig(repoRoot string) string {
-	return repoRoot + "/.platctl.yaml"
+// resolveConfig returns the config file path. If --config was passed, uses that;
+// otherwise defaults to .platctl.yaml in the repo root.
+func resolveConfig(cmd *cobra.Command, repoRoot string) string {
+	if cfg, _ := cmd.Flags().GetString("config"); cfg != "" {
+		return cfg
+	}
+	return filepath.Join(repoRoot, ".platctl.yaml")
 }

@@ -54,10 +54,31 @@ var (
 	lockPattern = regexp.MustCompile(`Lock Info:\s*ID:\s*([a-f0-9-]+)`)
 )
 
+// DefaultSCPProtectedTypes are AWS resource types commonly blocked by Service Control Policies.
+var DefaultSCPProtectedTypes = []string{"aws_kms_key", "aws_kms_alias", "aws_flow_log"}
+
 // TerragruntRunner executes terragrunt commands as subprocesses.
 type TerragruntRunner struct {
 	// LogWriter receives unit output for logging. If nil, output is discarded.
 	LogWriter func(unit string, data []byte)
+	// Binary is the terragrunt executable name or path. Defaults to "terragrunt".
+	Binary string
+	// SCPProtectedTypes are resource types to detect in SCP errors. Defaults to DefaultSCPProtectedTypes.
+	SCPProtectedTypes []string
+}
+
+func (r *TerragruntRunner) binary() string {
+	if r.Binary != "" {
+		return r.Binary
+	}
+	return "terragrunt"
+}
+
+func (r *TerragruntRunner) scpProtectedTypes() []string {
+	if len(r.SCPProtectedTypes) > 0 {
+		return r.SCPProtectedTypes
+	}
+	return DefaultSCPProtectedTypes
 }
 
 // Run executes a terragrunt action (apply/destroy) for the given unit.
@@ -65,7 +86,7 @@ func (r *TerragruntRunner) Run(ctx context.Context, unit *Unit, action Action, a
 	cmdArgs := []string{action.String(), "-auto-approve", "-input=false"}
 	cmdArgs = append(cmdArgs, args...)
 
-	cmd := exec.CommandContext(ctx, "terragrunt", cmdArgs...)
+	cmd := exec.CommandContext(ctx, r.binary(), cmdArgs...)
 	cmd.Dir = unit.Path
 	cmd.Env = r.buildEnv(unit)
 
@@ -96,13 +117,13 @@ func (r *TerragruntRunner) Run(ctx context.Context, unit *Unit, action Action, a
 		Output:   output,
 	}
 
-	return classifyError(runErr, output)
+	return classifyError(runErr, output, r.scpProtectedTypes())
 }
 
 // classifyError inspects terragrunt output to return a specific error type.
-func classifyError(runErr RunError, output string) error {
+func classifyError(runErr RunError, output string, scpTypes []string) error {
 	if scpPattern.MatchString(output) {
-		resources := detectProtectedResources(output)
+		resources := detectProtectedResources(output, scpTypes)
 		return &SCPError{RunError: runErr, ProtectedResources: resources}
 	}
 
@@ -113,8 +134,7 @@ func classifyError(runErr RunError, output string) error {
 	return &runErr
 }
 
-func detectProtectedResources(output string) []string {
-	protectedTypes := []string{"aws_kms_key", "aws_kms_alias", "aws_flow_log"}
+func detectProtectedResources(output string, protectedTypes []string) []string {
 	var found []string
 	for _, t := range protectedTypes {
 		if strings.Contains(output, t) {
@@ -155,11 +175,17 @@ func setEnv(env []string, key, value string) []string {
 }
 
 // DryRunner implements Runner but only prints what would be executed.
-type DryRunner struct{}
+type DryRunner struct {
+	Binary string
+}
 
 // Run prints the command that would be executed without running it.
 func (r *DryRunner) Run(_ context.Context, unit *Unit, action Action, args ...string) error {
+	binary := r.Binary
+	if binary == "" {
+		binary = "terragrunt"
+	}
 	cmdArgs := append([]string{action.String(), "-auto-approve"}, args...)
-	fmt.Printf("[dry-run] %s: terragrunt %s\n", unit.Name, strings.Join(cmdArgs, " "))
+	fmt.Printf("[dry-run] %s: %s %s\n", unit.Name, binary, strings.Join(cmdArgs, " "))
 	return nil
 }

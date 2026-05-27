@@ -73,8 +73,10 @@ Pure functions, no side effects:
 
 Wraps `os/exec.Cmd` for terragrunt subprocess execution:
 
+- `Binary` field controls the executable (defaults to `"terragrunt"`)
 - Sets provider-specific env vars (`AWS_PROFILE`, `ARM_SUBSCRIPTION_ID`) based on `unit.Provider` and `unit.Auth`
 - Captures stdout/stderr for logging
+- `SCPProtectedTypes` field controls which resource types trigger SCP error detection (defaults to `aws_kms_key`, `aws_kms_alias`, `aws_flow_log`)
 - Classifies errors by inspecting output:
   - SCP pattern → `SCPError` (engine can retry after `state rm`)
   - Lock pattern → `LockError` (prints force-unlock command)

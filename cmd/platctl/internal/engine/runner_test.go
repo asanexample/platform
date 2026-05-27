@@ -8,7 +8,7 @@ func TestClassifyError_SCP(t *testing.T) {
 	runErr := RunError{Unit: "platform/networking", Action: Destroy, ExitCode: 1}
 	output := `Error: deleting aws_flow_log (fl-abc123): operation error EC2: DeleteFlowLogs, https response error StatusCode: 403, api error AccessDeniedException: Service.control.policy blocked this action`
 
-	err := classifyError(runErr, output)
+	err := classifyError(runErr, output, DefaultSCPProtectedTypes)
 	scpErr, ok := err.(*SCPError)
 	if !ok {
 		t.Fatalf("expected SCPError, got %T", err)
@@ -27,6 +27,20 @@ func TestClassifyError_SCP(t *testing.T) {
 	}
 }
 
+func TestClassifyError_SCPCustomTypes(t *testing.T) {
+	runErr := RunError{Unit: "platform/networking", Action: Destroy, ExitCode: 1}
+	output := `Error: deleting aws_s3_bucket (my-bucket): Service.control.policy blocked this action`
+
+	err := classifyError(runErr, output, []string{"aws_s3_bucket", "aws_rds_cluster"})
+	scpErr, ok := err.(*SCPError)
+	if !ok {
+		t.Fatalf("expected SCPError, got %T", err)
+	}
+	if len(scpErr.ProtectedResources) != 1 || scpErr.ProtectedResources[0] != "aws_s3_bucket" {
+		t.Fatalf("expected [aws_s3_bucket], got %v", scpErr.ProtectedResources)
+	}
+}
+
 func TestClassifyError_Lock(t *testing.T) {
 	runErr := RunError{Unit: "platform/eks", Action: Apply, ExitCode: 1}
 	output := `Error acquiring the state lock
@@ -36,7 +50,7 @@ Lock Info:
   Path:      terraform.tfstate
   Operation: OperationTypeApply`
 
-	err := classifyError(runErr, output)
+	err := classifyError(runErr, output, DefaultSCPProtectedTypes)
 	lockErr, ok := err.(*LockError)
 	if !ok {
 		t.Fatalf("expected LockError, got %T", err)
@@ -50,10 +64,40 @@ func TestClassifyError_Generic(t *testing.T) {
 	runErr := RunError{Unit: "platform/eks", Action: Apply, ExitCode: 1}
 	output := `Error: creating EKS Cluster: operation error EKS: CreateCluster, some random error`
 
-	err := classifyError(runErr, output)
+	err := classifyError(runErr, output, DefaultSCPProtectedTypes)
 	_, ok := err.(*RunError)
 	if !ok {
 		t.Fatalf("expected RunError, got %T", err)
+	}
+}
+
+func TestRunnerBinaryDefault(t *testing.T) {
+	r := &TerragruntRunner{}
+	if r.binary() != "terragrunt" {
+		t.Fatalf("expected default binary 'terragrunt', got %q", r.binary())
+	}
+}
+
+func TestRunnerBinaryCustom(t *testing.T) {
+	r := &TerragruntRunner{Binary: "/usr/local/bin/terragrunt-v0.70"}
+	if r.binary() != "/usr/local/bin/terragrunt-v0.70" {
+		t.Fatalf("expected custom binary, got %q", r.binary())
+	}
+}
+
+func TestRunnerSCPProtectedTypesDefault(t *testing.T) {
+	r := &TerragruntRunner{}
+	types := r.scpProtectedTypes()
+	if len(types) != len(DefaultSCPProtectedTypes) {
+		t.Fatalf("expected default SCP types, got %v", types)
+	}
+}
+
+func TestRunnerSCPProtectedTypesCustom(t *testing.T) {
+	r := &TerragruntRunner{SCPProtectedTypes: []string{"aws_s3_bucket"}}
+	types := r.scpProtectedTypes()
+	if len(types) != 1 || types[0] != "aws_s3_bucket" {
+		t.Fatalf("expected custom SCP types, got %v", types)
 	}
 }
 

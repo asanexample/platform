@@ -45,6 +45,13 @@ Deploys all Terragrunt units in dependency order.
 | `--dry-run` | Preview the execution plan without running terragrunt |
 | `--resume` | Continue from a previous incomplete run |
 | `--yes` | Skip manual step prompts (assume prerequisites are met) |
+| `--concurrency <n>` | Maximum parallel unit executions (default: 4) |
+
+**Global flags** (available on all subcommands):
+
+| Flag | Description |
+|------|-------------|
+| `--config <path>` | Path to config file (default: `<repo-root>/.platctl.yaml`) |
 
 **What it does:**
 
@@ -58,7 +65,7 @@ Deploys all Terragrunt units in dependency order.
 
 Destroys all Terragrunt units in reverse dependency order (dependents first).
 
-Same flags as `bootstrap` (`--env`, `--dry-run`, `--resume`, `--yes`).
+Same flags as `bootstrap` (`--env`, `--dry-run`, `--resume`, `--yes`, `--concurrency`).
 
 ### `platctl status`
 
@@ -142,12 +149,24 @@ Hooks are pre-apply operations for units that need special handling:
 
 platctl is configured via `.platctl.yaml` in the repo root. The graph is auto-discovered; the config file only defines what can't be inferred:
 
-- **environments**: paths, providers, and auth credentials
+- **environments**: paths, providers, and auth credentials (including `region` for AWS API calls)
 - **overrides**: per-unit auth, bootstrap args, hooks, implicit deps
 - **manual_steps**: prerequisites that require user action
 - **lockdown**: post-bootstrap hardening steps
 
 See `.platctl.yaml` for the full configuration.
+
+### AWS region
+
+AWS API calls (Secrets Manager, EC2) use the `region` key from the environment's `auth` map. Defaults to `us-east-1` if not specified:
+
+```yaml
+environments:
+  platform:
+    auth:
+      profile: management
+      region: us-east-1  # optional, this is the default
+```
 
 ### Adding a new unit
 

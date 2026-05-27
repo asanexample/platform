@@ -11,12 +11,20 @@ import (
 // Avoids an AWS SDK dependency for operations that are infrequent (pre-apply checks).
 type AWS struct{}
 
+// RegionFromAuth extracts the AWS region from an auth map, defaulting to us-east-1.
+func RegionFromAuth(auth map[string]string) string {
+	if region, ok := auth["region"]; ok && region != "" {
+		return region
+	}
+	return "us-east-1"
+}
+
 // SecretExists checks whether a Secrets Manager secret exists.
 func (a *AWS) SecretExists(ctx context.Context, secretID string, auth map[string]string) (bool, error) {
 	args := []string{
 		"secretsmanager", "describe-secret",
 		"--secret-id", secretID,
-		"--region", "us-east-1",
+		"--region", RegionFromAuth(auth),
 	}
 	if profile, ok := auth["profile"]; ok {
 		args = append(args, "--profile", profile)
@@ -37,7 +45,7 @@ func (a *AWS) ForceDeleteSecret(ctx context.Context, secretID string, auth map[s
 		"secretsmanager", "delete-secret",
 		"--secret-id", secretID,
 		"--force-delete-without-recovery",
-		"--region", "us-east-1",
+		"--region", RegionFromAuth(auth),
 	}
 	if profile, ok := auth["profile"]; ok {
 		args = append(args, "--profile", profile)
@@ -61,7 +69,7 @@ func (a *AWS) DescribeEKSENIs(ctx context.Context, clusterName string, auth map[
 		"Name=interface-type,Values=vpc_endpoint",
 		"--query", "NetworkInterfaces[].PrivateIpAddress",
 		"--output", "text",
-		"--region", "us-east-1",
+		"--region", RegionFromAuth(auth),
 	}
 	if profile, ok := auth["profile"]; ok {
 		args = append(args, "--profile", profile)

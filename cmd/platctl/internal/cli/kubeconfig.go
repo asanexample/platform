@@ -24,7 +24,7 @@ Uses 'aws eks update-kubeconfig' with the configured admin role for each cluster
 				return err
 			}
 
-			cfgPath := findConfig(repoRoot)
+			cfgPath := resolveConfig(cmd, repoRoot)
 			cfg, err := config.Load(cfgPath)
 			if err != nil {
 				return fmt.Errorf("loading config: %w", err)

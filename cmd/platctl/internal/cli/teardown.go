@@ -18,10 +18,11 @@ import (
 // NewTeardownCmd creates the teardown subcommand.
 func NewTeardownCmd() *cobra.Command {
 	var (
-		envFilter string
-		dryRun    bool
-		resume    bool
-		yes       bool
+		envFilter   string
+		dryRun      bool
+		resume      bool
+		yes         bool
+		concurrency int
 	)
 
 	cmd := &cobra.Command{
@@ -36,7 +37,7 @@ to target a single environment.`,
 				return err
 			}
 
-			cfgPath := findConfig(repoRoot)
+			cfgPath := resolveConfig(cmd, repoRoot)
 			cfg, err := config.Load(cfgPath)
 			if err != nil {
 				return fmt.Errorf("loading config: %w", err)
@@ -97,7 +98,7 @@ to target a single environment.`,
 					if !ok || len(override.BootstrapArgs) == 0 {
 						continue
 					}
-					if !unitHasState(unit) {
+					if !unitHasState(unit, runner.Binary) {
 						fmt.Printf("Unlock: %s — skipped (no resources in state)\n", lock.Unit)
 						continue
 					}
@@ -124,7 +125,7 @@ to target a single environment.`,
 				}
 			}
 
-			eng := engine.NewEngine(runner, store, g, statePath)
+			eng := engine.NewEngine(runner, store, g, statePath, engine.WithConcurrency(concurrency))
 			eng.Hooks = hooks
 			eng.Logger = logger
 
@@ -157,7 +158,7 @@ to target a single environment.`,
 					if unit == nil {
 						continue
 					}
-					if !unitHasState(unit) {
+					if !unitHasState(unit, runner.Binary) {
 						continue
 					}
 					fmt.Printf("Pre-destroy apply: %s (%v)\n", name, args)
@@ -177,12 +178,12 @@ to target a single environment.`,
 					hasState bool
 				}
 				results := make(chan stateResult, len(units))
-				sem := make(chan struct{}, 8)
+				sem := make(chan struct{}, concurrency)
 				for _, u := range units {
 					go func(u *engine.Unit) {
 						sem <- struct{}{}
 						defer func() { <-sem }()
-						results <- stateResult{name: u.Name, hasState: unitHasState(u)}
+						results <- stateResult{name: u.Name, hasState: unitHasState(u, runner.Binary)}
 					}(u)
 				}
 				skipped := 0
@@ -213,14 +214,18 @@ to target a single environment.`,
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview the teardown plan")
 	cmd.Flags().BoolVar(&resume, "resume", false, "Resume from a previous incomplete run")
 	cmd.Flags().BoolVar(&yes, "yes", false, "Skip confirmation prompts")
+	cmd.Flags().IntVar(&concurrency, "concurrency", 4, "Maximum number of parallel unit executions")
 
 	return cmd
 }
 
 // unitHasState checks if a unit has any resources in Terraform state.
 // Returns false if the state is empty (unit already destroyed or never deployed).
-func unitHasState(unit *engine.Unit) bool {
-	cmd := exec.CommandContext(context.Background(), "terragrunt", "state", "list")
+func unitHasState(unit *engine.Unit, binary string) bool {
+	if binary == "" {
+		binary = "terragrunt"
+	}
+	cmd := exec.CommandContext(context.Background(), binary, "state", "list")
 	cmd.Dir = unit.Path
 	env := os.Environ()
 	if profile, ok := unit.Auth["profile"]; ok {
