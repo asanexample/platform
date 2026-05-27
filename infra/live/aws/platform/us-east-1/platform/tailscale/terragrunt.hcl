@@ -36,15 +36,6 @@ dependency "external_secrets" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-dependency "argocd" {
-  config_path = "../argocd"
-
-  mock_outputs = {
-    namespace = "argocd"
-  }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
-}
-
 generate "helm_provider" {
   path      = "helm-provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -119,15 +110,6 @@ inputs = {
 
   split_dns = {
     "us-east-1.eks.amazonaws.com" = ["10.100.0.2"]
-  }
-
-  ingresses = {
-    argocd = {
-      hostname  = "argocd"
-      namespace = dependency.argocd.outputs.namespace
-      service   = "argocd-server"
-      port      = 80
-    }
   }
 
   helm_chart_version = include.base.locals.helm_versions.tailscale_operator

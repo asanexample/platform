@@ -92,7 +92,7 @@ inputs = {
   CSV
 
   argocd_cm_extra = {
-    "url" = "https://argocd.taild3190d.ts.net"
+    "url" = "https://argocd.aws.refplat.org"
     "dex.config" = yamlencode({
       connectors = [{
         type = "saml"
@@ -101,8 +101,8 @@ inputs = {
         config = {
           ssoURL             = include.base.locals.all_vars.argocd_sso_url
           caData             = include.base.locals.all_vars.argocd_sso_ca_data
-          redirectURI        = "https://argocd.taild3190d.ts.net/api/dex/callback"
-          entityIssuer       = "https://argocd.taild3190d.ts.net/api/dex/callback"
+          redirectURI        = "https://argocd.aws.refplat.org/api/dex/callback"
+          entityIssuer       = "https://argocd.aws.refplat.org/api/dex/callback"
           nameIDPolicyFormat = "emailAddress"
           usernameAttr       = "email"
           emailAttr          = "email"
