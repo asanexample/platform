@@ -198,7 +198,7 @@ updated or SSO login will fail with a certificate verification error.
    pod restart.
 
 5. **Verify** SSO login:
-   - Access the ArgoCD UI at `https://argocd.aws.refplat.org`
+   - Connect to Tailscale VPN, then access the ArgoCD UI at `https://argocd.aws.refplat.org`
    - Click "Log in via SSO"
    - Complete authentication through Identity Center
    - Confirm group-based RBAC permissions are working (admin users can

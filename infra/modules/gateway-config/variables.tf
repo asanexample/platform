@@ -51,6 +51,12 @@ variable "gateway_namespace" {
   default     = "default"
 }
 
+variable "internal" {
+  description = "Use an internal NLB instead of internet-facing (requires VPN for access)"
+  type        = bool
+  default     = false
+}
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------

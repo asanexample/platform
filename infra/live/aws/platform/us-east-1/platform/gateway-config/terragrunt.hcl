@@ -79,8 +79,9 @@ generate "kubernetes_provider" {
 }
 
 inputs = {
-  create = true
-  domain = "aws.refplat.org"
+  create   = true
+  domain   = "aws.refplat.org"
+  internal = true
 
   letsencrypt_email      = "josh@deeden.org"
   route53_hosted_zone_id = dependency.route53.outputs.zone_id

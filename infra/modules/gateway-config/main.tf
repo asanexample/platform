@@ -56,10 +56,15 @@ resource "kubernetes_manifest" "gateway" {
     spec = {
       gatewayClassName = "cilium"
       infrastructure = {
-        annotations = {
-          "service.beta.kubernetes.io/aws-load-balancer-type"   = "nlb"
-          "service.beta.kubernetes.io/aws-load-balancer-scheme" = "internet-facing"
-        }
+        annotations = merge(
+          {
+            "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
+          },
+          var.internal ? {
+            "service.beta.kubernetes.io/aws-load-balancer-scheme"   = "internal"
+            "service.beta.kubernetes.io/aws-load-balancer-internal" = "true"
+          } : {}
+        )
       }
       listeners = [
         {

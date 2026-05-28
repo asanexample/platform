@@ -1,7 +1,7 @@
 # Runbook: ArgoCD SSO
 
 > **Identity Provider:** AWS Identity Center (SAML 2.0 via Dex)
-> **URL:** `https://argocd.aws.refplat.org`
+> **URL:** `https://argocd.aws.refplat.org` (requires Tailscale VPN)
 >
 > **Last reviewed:** 2026-05-21
 

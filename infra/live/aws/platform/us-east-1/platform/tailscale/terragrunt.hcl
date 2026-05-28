@@ -110,6 +110,7 @@ inputs = {
 
   split_dns = {
     "us-east-1.eks.amazonaws.com" = ["10.100.0.2"]
+    "aws.refplat.org"             = ["10.100.0.2"]
   }
 
   helm_chart_version = include.base.locals.helm_versions.tailscale_operator

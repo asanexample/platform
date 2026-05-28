@@ -6,6 +6,12 @@ locals {
 # ACL Policy
 # ---------------------------------------------------------------------------
 
+resource "tailscale_tailnet_settings" "this" {
+  count = local.create ? 1 : 0
+
+  https_enabled = var.https_enabled
+}
+
 resource "tailscale_acl" "this" {
   count = local.create ? 1 : 0
 
