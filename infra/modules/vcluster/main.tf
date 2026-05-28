@@ -46,130 +46,59 @@ resource "helm_release" "vcluster" {
   cleanup_on_fail  = true
   replace          = true
 
-  values = var.values != "" ? [var.values] : []
-
-  # vCluster app version
-  set {
-    name  = "vcluster.image.tag"
-    value = var.vcluster_version
-  }
-
-  # Resource limits for the syncer
-  dynamic "set" {
-    for_each = var.resource_limits != null ? [var.resource_limits] : []
-    content {
-      name  = "syncer.resources.limits.cpu"
-      value = set.value.cpu
-    }
-  }
-
-  dynamic "set" {
-    for_each = var.resource_limits != null ? [var.resource_limits] : []
-    content {
-      name  = "syncer.resources.limits.memory"
-      value = set.value.memory
-    }
-  }
-
-  # Sync configuration
-  dynamic "set" {
-    for_each = var.sync != null ? [var.sync] : []
-    content {
-      name  = "sync.nodes.enabled"
-      value = tostring(set.value.nodes)
-    }
-  }
-
-  dynamic "set" {
-    for_each = var.sync != null ? [var.sync] : []
-    content {
-      name  = "sync.ingresses.enabled"
-      value = tostring(set.value.ingresses)
-    }
-  }
-
-  dynamic "set" {
-    for_each = var.sync != null ? [var.sync] : []
-    content {
-      name  = "sync.storageClasses.enabled"
-      value = tostring(set.value.storage_classes)
-    }
-  }
-
-  # Isolation settings
-  dynamic "set" {
-    for_each = var.isolation != null ? [var.isolation] : []
-    content {
-      name  = "isolation.enabled"
-      value = "true"
-    }
-  }
-
-  dynamic "set" {
-    for_each = var.isolation != null ? [var.isolation] : []
-    content {
-      name  = "isolation.networkPolicy.enabled"
-      value = tostring(set.value.network_policy)
-    }
-  }
-
-  dynamic "set" {
-    for_each = var.isolation != null && var.isolation.limit_range != null ? [var.isolation.limit_range] : []
-    content {
-      name  = "isolation.limitRange.enabled"
-      value = tostring(set.value.enabled)
-    }
-  }
-
-  dynamic "set" {
-    for_each = var.isolation != null && var.isolation.resource_quota != null ? [var.isolation.resource_quota] : []
-    content {
-      name  = "isolation.resourceQuota.enabled"
-      value = tostring(set.value.enabled)
-    }
-  }
-
-  # Ingress configuration
-  dynamic "set" {
-    for_each = var.ingress != null && var.ingress.enabled ? [var.ingress] : []
-    content {
-      name  = "ingress.enabled"
-      value = "true"
-    }
-  }
-
-  dynamic "set" {
-    for_each = var.ingress != null && var.ingress.enabled && var.ingress.host != "" ? [var.ingress] : []
-    content {
-      name  = "ingress.host"
-      value = set.value.host
-    }
-  }
-
-  dynamic "set" {
-    for_each = var.ingress != null && var.ingress.enabled && var.ingress.ingress_class != "" ? [var.ingress] : []
-    content {
-      name  = "ingress.ingressClassName"
-      value = set.value.ingress_class
-    }
-  }
-
-  dynamic "set" {
-    for_each = var.ingress != null && var.ingress.enabled && var.ingress.tls_secret != "" ? [var.ingress] : []
-    content {
-      name  = "ingress.tls[0].secretName"
-      value = set.value.tls_secret
-    }
-  }
-
-  # Storage class
-  dynamic "set" {
-    for_each = var.storage_class != null ? [var.storage_class] : []
-    content {
-      name  = "storage.className"
-      value = set.value
-    }
-  }
+  values = [yamlencode(merge(
+    {
+      vcluster = {
+        image = {
+          tag = var.vcluster_version
+        }
+      }
+    },
+    var.resource_limits != null ? {
+      syncer = {
+        resources = {
+          limits = {
+            cpu    = var.resource_limits.cpu
+            memory = var.resource_limits.memory
+          }
+        }
+      }
+    } : {},
+    var.sync != null ? {
+      sync = {
+        nodes          = { enabled = var.sync.nodes }
+        ingresses      = { enabled = var.sync.ingresses }
+        storageClasses = { enabled = var.sync.storage_classes }
+      }
+    } : {},
+    var.isolation != null ? {
+      isolation = merge(
+        { enabled = true, networkPolicy = { enabled = var.isolation.network_policy } },
+        var.isolation.limit_range != null ? { limitRange = { enabled = var.isolation.limit_range.enabled } } : {},
+        var.isolation.resource_quota != null ? { resourceQuota = { enabled = var.isolation.resource_quota.enabled } } : {},
+      )
+    } : {},
+    var.ingress != null && var.ingress.enabled ? merge(
+      { ingress = merge(
+        { enabled = true },
+        var.ingress.host != "" ? { host = var.ingress.host } : {},
+        var.ingress.ingress_class != "" ? { ingressClassName = var.ingress.ingress_class } : {},
+        var.ingress.tls_secret != "" ? { tls = [{ secretName = var.ingress.tls_secret }] } : {},
+      ) },
+    ) : {},
+    var.storage_class != null ? {
+      storage = { className = var.storage_class }
+    } : {},
+    length(var.custom_resource_sync) > 0 ? {
+      experimental = {
+        syncSettings = {
+          syncToHost = {
+            customResources = { for cr in var.custom_resource_sync : cr.kind => { enabled = true } }
+          }
+        }
+      }
+    } : {},
+  )), var.values != "" ? var.values : "{}"]
 
   depends_on = [kubernetes_namespace.vcluster]
 }

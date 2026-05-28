@@ -160,12 +160,39 @@ func runValidate(cmd *cobra.Command, envFilter, checkFilter string, concurrency 
 		}
 	}
 
+	// Cross-cutting: Preprod gateway health
+	if cfg.Validate.PreprodGateway.Name != "" {
+		preprodCtx := kubeContextByEnv["preprod"]
+		if preprodCtx != "" && (envFilter == "" || envFilter == "preprod") {
+			gwAuth := cfg.AuthForUnit("preprod", "gateway-config")
+			otherChecks = append(otherChecks, &validate.GatewayHealthCheck{
+				Name:             "preprod/gateway",
+				KubeContext:      preprodCtx,
+				GatewayName:      cfg.Validate.PreprodGateway.Name,
+				GatewayNamespace: cfg.Validate.PreprodGateway.Namespace,
+				CertName:         cfg.Validate.PreprodGateway.CertName,
+				Auth:             gwAuth,
+				Run:              run,
+			})
+		}
+	}
+
 	// Cross-cutting: DNS delegation
 	if cfg.Validate.DNS.Zone != "" && len(cfg.Validate.DNS.ExpectedNS) > 0 {
 		otherChecks = append(otherChecks, &validate.DNSDelegationCheck{
 			Name:       "dns/" + cfg.Validate.DNS.Zone,
 			Zone:       cfg.Validate.DNS.Zone,
 			ExpectedNS: cfg.Validate.DNS.ExpectedNS,
+			Run:        run,
+		})
+	}
+
+	// Cross-cutting: Preprod DNS delegation
+	if cfg.Validate.PreprodDNS.Zone != "" && len(cfg.Validate.PreprodDNS.ExpectedNS) > 0 {
+		otherChecks = append(otherChecks, &validate.DNSDelegationCheck{
+			Name:       "dns/" + cfg.Validate.PreprodDNS.Zone,
+			Zone:       cfg.Validate.PreprodDNS.Zone,
+			ExpectedNS: cfg.Validate.PreprodDNS.ExpectedNS,
 			Run:        run,
 		})
 	}

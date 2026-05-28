@@ -36,9 +36,10 @@ locals {
     cloudwatch_alarms = "${local.source_base}/aws//cloudwatch_alarms"
 
     # DNS
-    route53        = "${local.source_base}/aws//route53"
-    cross_vpc_dns  = "${local.source_base}/aws//cross-vpc-dns"
-    dns_delegation = "${local.source_base}/cloudflare//dns_delegation"
+    route53            = "${local.source_base}/aws//route53"
+    route53_delegation = "${local.source_base}/aws//route53_delegation"
+    cross_vpc_dns      = "${local.source_base}/aws//cross-vpc-dns"
+    dns_delegation     = "${local.source_base}/cloudflare//dns_delegation"
 
     # CI/CD
     github_oidc = "${local.source_base}/aws//github_oidc"
@@ -55,11 +56,13 @@ locals {
     argocd           = "${local.source_base}/argocd"
     argocd_bootstrap = "${local.source_base}/argocd-bootstrap"
     argocd_clusters  = "${local.source_base}/argocd-clusters"
+    argocd_apps      = "${local.source_base}/argocd-apps"
     cert_manager     = "${local.source_base}/cert-manager"
     external_dns     = "${local.source_base}/external-dns"
     external_secrets = "${local.source_base}/external-secrets"
     secret_stores    = "${local.source_base}/secret-stores"
     gateway_config   = "${local.source_base}/gateway-config"
+    tenant           = "${local.source_base}/tenant"
     tailscale        = "${local.source_base}/tailscale"
     tailscale_admin  = "${local.source_base}/tailscale-admin"
     policy           = "${local.source_base}/policy"

@@ -21,10 +21,12 @@ type Config struct {
 // ValidateConfig holds configuration for the validate command's health checks.
 type ValidateConfig struct {
 	DNS            DNSValidation         `yaml:"dns"`
+	PreprodDNS     DNSValidation         `yaml:"preprod_dns"`
 	TransitGateway TGWValidation         `yaml:"transit_gateway"`
 	CrossVPCDNS    CrossVPCDNSValidation `yaml:"cross_vpc_dns"`
 	Tailscale      TailscaleValidation   `yaml:"tailscale"`
 	Gateway        GatewayValidation     `yaml:"gateway"`
+	PreprodGateway GatewayValidation     `yaml:"preprod_gateway"`
 	Endpoints      []EndpointValidation  `yaml:"endpoints"`
 	IAM            IAMValidation         `yaml:"iam"`
 }

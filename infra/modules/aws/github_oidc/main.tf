@@ -6,12 +6,16 @@ locals {
   oidc_provider_url = "token.actions.githubusercontent.com"
   audience          = "sts.amazonaws.com"
 
-  subject_claims = [
-    for branch in var.github_branches :
-    "repo:${var.github_org}/${var.github_repo}:ref:${
-      startswith(branch, "refs/") ? branch : "refs/heads/${branch}"
-    }"
-  ]
+  repos = length(var.github_repos) > 0 ? var.github_repos : [var.github_repo]
+
+  subject_claims = flatten([
+    for repo in local.repos : [
+      for branch in var.github_branches :
+      "repo:${var.github_org}/${repo}:ref:${
+        startswith(branch, "refs/") ? branch : "refs/heads/${branch}"
+      }"
+    ]
+  ])
 }
 
 resource "aws_iam_openid_connect_provider" "github" {

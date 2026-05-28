@@ -110,6 +110,17 @@ variable "storage_class" {
   default     = null
 }
 
+# Generic resource sync (vCluster v0.24+)
+variable "custom_resource_sync" {
+  description = "Custom resources to sync from virtual to host cluster"
+  type = list(object({
+    group   = string
+    version = string
+    kind    = string
+  }))
+  default = []
+}
+
 # Tags
 variable "tags" {
   description = "Tags to apply to all resources"

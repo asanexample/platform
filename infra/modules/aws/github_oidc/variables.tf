@@ -10,8 +10,15 @@ variable "github_org" {
 }
 
 variable "github_repo" {
-  description = "GitHub repository name"
+  description = "GitHub repository name (use github_repos for multiple)"
   type        = string
+  default     = ""
+}
+
+variable "github_repos" {
+  description = "List of GitHub repository names allowed to assume the role"
+  type        = list(string)
+  default     = []
 }
 
 variable "github_branches" {

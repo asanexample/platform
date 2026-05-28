@@ -4,8 +4,8 @@
 
 Multi-cloud IaC platform using OpenTofu + Terragrunt. Targets AWS and Azure (GCP stubbed).
 
-- **Shared modules** (`infra/modules/`): cilium, argocd, argocd-bootstrap, argocd-clusters, cert-manager, external-dns, external-secrets, gateway-config, tailscale, tailscale-admin, policy, vcluster
-- **Cloud-specific modules**: `infra/modules/aws/*` (eks, networking, ssm-bastion, etc.), `infra/modules/azure/*` (aks_core, networking, key_vault, etc.)
+- **Shared modules** (`infra/modules/`): cilium, argocd, argocd-bootstrap, argocd-clusters, argocd-apps, cert-manager, external-dns, external-secrets, gateway-config, tailscale, tailscale-admin, tenant, policy, vcluster
+- **Cloud-specific modules**: `infra/modules/aws/*` (eks, networking, ssm-bastion, ecr, route53_delegation, etc.), `infra/modules/azure/*` (aks_core, networking, key_vault, etc.)
 - **Live configs**: `infra/live/{aws,azure}/` -- environment-specific Terragrunt units
 
 ## Deployment Ordering (AWS)
@@ -33,16 +33,28 @@ networking ─┘                        |
 tailscale-admin ─────────────────────── (no cluster deps, manages tailnet ACLs/OAuth)
 cloudtrail ──────────────────────────── (no deps, secrets audit logging)
 
-### Preprod dependency graph (minimal stack)
+### Preprod dependency graph
 
 iam-roles ──┐
              ├─> eks -> cilium -> node-groups -> ssm-bastion
 networking ─┘                        |
+              route53 ───────────────┤
               eks-addons ────────────┤ (eks, cilium, nodes)
+              cert-manager ──────────┤ (eks, nodes, r53)
+              external-dns ──────────┤ (eks, nodes, r53)
               external-secrets ──────┤ (eks, nodes)
               secret-stores ─────────┤ (eks, nodes, ext-secrets)
               tailscale ─────────────┤ (eks, nodes, ext-secrets)
+              gateway-config ────────┤ (eks, cilium, cert-manager, ext-dns, r53)
+              tenants ───────────────┤ (eks, nodes, gateway-config)
               transit-gateway (spoke)┘ (networking, eks, platform tgw)
+
+### Cross-environment units (platform cluster)
+
+route53-delegation ──────────────────── (platform r53, preprod r53)
+ecr ─────────────────────────────────── (no deps)
+github-oidc ─────────────────────────── (ecr)
+argocd-apps ─────────────────────────── (argocd, argocd-clusters, preprod tenants)
 
 cloudtrail ──────────────────────────── (no deps, secrets audit logging)
 ```
@@ -114,12 +126,35 @@ AWS_PROFILE=management terragrunt apply -chdir=secret-stores
 AWS_PROFILE=management terragrunt apply -chdir=tailscale
 AWS_PROFILE=management terragrunt apply -chdir=transit-gateway
 AWS_PROFILE=management terragrunt apply -chdir=cloudtrail
+
+# Step 3: ingress + tenant stack
+AWS_PROFILE=management terragrunt apply -chdir=route53
+AWS_PROFILE=management terragrunt apply -chdir=cert-manager
+AWS_PROFILE=management terragrunt apply -chdir=external-dns
+AWS_PROFILE=management terragrunt apply -chdir=gateway-config
+AWS_PROFILE=management terragrunt apply -chdir=tenants
+
+# Step 4: cross-env units (from platform directory)
+# From infra/live/aws/platform/us-east-1/platform/
+AWS_PROFILE=management terragrunt apply -chdir=route53-delegation
+AWS_PROFILE=management terragrunt apply -chdir=ecr
+AWS_PROFILE=management terragrunt apply -chdir=github-oidc
+AWS_PROFILE=management terragrunt apply -chdir=argocd-apps
 ```
 
 ### Preprod destroy order
 
 ```bash
+# From infra/live/aws/platform/us-east-1/platform/ (cross-env first)
+cd argocd-apps && terragrunt destroy -auto-approve && cd ..
+cd route53-delegation && terragrunt destroy -auto-approve && cd ..
+
 # From infra/live/aws/preprod/us-east-1/platform/
+cd tenants && terragrunt destroy -auto-approve && cd ..
+cd gateway-config && terragrunt destroy -auto-approve && cd ..
+cd external-dns && terragrunt destroy -auto-approve && cd ..
+cd cert-manager && terragrunt destroy -auto-approve && cd ..
+cd route53 && terragrunt destroy -auto-approve && cd ..
 cd transit-gateway && terragrunt destroy -auto-approve && cd ..
 cd tailscale && terragrunt destroy -auto-approve && cd ..
 cd secret-stores && terragrunt destroy -auto-approve && cd ..
