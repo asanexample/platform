@@ -180,6 +180,7 @@ push. Repositories use `AES256` (S3-managed) encryption at rest. If prod images 
 - Repository creation requires platform team intervention — teams cannot self-service create
   new ECR repositories. This is intentional (the platform team controls the namespace and
   lifecycle policies) but adds a process step for onboarding new applications.
+
 ### Risks
 
 - If the GitHub OIDC trust policy is misconfigured, unauthorized repositories or branches could

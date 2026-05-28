@@ -19,7 +19,7 @@ creation, EKS access entries, vCluster deployments, and ArgoCD app targeting.
 
 ### Namespace mode (team-alpha)
 
-```
+```text
 Internet
   |
   v
@@ -58,7 +58,7 @@ Internet
 
 ### vCluster mode (team-bravo)
 
-```
+```text
 Internet
   |
   v
@@ -168,7 +168,7 @@ The tenant module creates three NetworkPolicies per namespace:
 **default-deny-ingress** -- Matches all pods, blocks all ingress. This is the
 baseline; everything is denied unless another policy explicitly allows it.
 
-```
+```yaml
 spec:
   podSelector: {}          # all pods
   policyTypes: [Ingress]
@@ -178,7 +178,7 @@ spec:
 **allow-gateway-ingress** -- Permits ingress from the gateway namespace so
 Cilium's Envoy proxy can forward requests to tenant pods.
 
-```
+```yaml
 spec:
   podSelector: {}
   policyTypes: [Ingress]
@@ -192,7 +192,7 @@ spec:
 **allow-dns-egress** -- Permits DNS resolution (port 53 UDP/TCP) and general
 internet egress. This is a single policy with two egress rules.
 
-```
+```yaml
 spec:
   podSelector: {}
   policyTypes: [Egress]
@@ -248,7 +248,7 @@ by default in the module.
 its isolation mode. Multiple Terragrunt units read this file to derive their
 inputs:
 
-```
+```text
 +---------------------------+
 |  teams.hcl                |
 |  alpha: mode=namespace    |
@@ -272,6 +272,7 @@ inputs:
 
 **EKS access entries** (`eks/terragrunt.hcl`): The `DeveloperAccess` role gets
 an `AmazonEKSEditPolicy` access entry scoped to each team's namespace:
+
 - Namespace teams: `team-<name>` (e.g., `team-alpha`)
 - vCluster teams: `vc-<name>` (e.g., `vc-bravo`)
 
@@ -287,6 +288,7 @@ namespace is derived from the team name and mode.
 ### Adding a new team
 
 1. Add an entry to `teams.hcl`:
+
    ```hcl
    charlie = {
      mode      = "namespace"
@@ -294,6 +296,7 @@ namespace is derived from the team name and mode.
      repo_path = "k8s/preprod"
    }
    ```
+
 2. Run `terragrunt apply` in `eks/` (updates access entries) and `tenants/`
    (creates namespace + policies).
 3. The ArgoCD Application is created automatically on the next sync.

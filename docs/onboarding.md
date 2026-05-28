@@ -421,7 +421,8 @@ network policies enforced.
 ### Quick Start
 
 1. **Push images** to ECR via GitHub Actions (OIDC auth, no credentials needed):
-   ```
+
+   ```text
    829808296602.dkr.ecr.us-east-1.amazonaws.com/team-<name>/app:<tag>
    ```
 
@@ -433,6 +434,7 @@ network policies enforced.
 4. **Access your app** at `https://<app>.preprod.aws.refplat.org`.
 
 5. **Debug** with namespace-scoped kubectl:
+
    ```bash
    platctl kubeconfig --env preprod
    kubectl --context preprod get pods -n team-<name>

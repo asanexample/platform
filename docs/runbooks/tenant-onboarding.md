@@ -2,6 +2,7 @@
 
 > **On-call scope:** Platform Engineering
 > **Live configurations:**
+>
 > - `infra/live/aws/preprod/us-east-1/platform/teams.hcl`
 > - `infra/live/aws/preprod/us-east-1/platform/tenants/terragrunt.hcl`
 > - `infra/live/aws/preprod/us-east-1/platform/eks/terragrunt.hcl`
@@ -34,12 +35,14 @@ Before starting, confirm the following:
   (829808296602) and preprod (620830101009) accounts.
 - [ ] You have `terragrunt`, `kubectl`, and `argocd` CLI tools installed.
 - [ ] You have kubeconfig configured for the preprod cluster:
+
   ```bash
   AWS_PROFILE=management aws eks update-kubeconfig \
     --name preprod-use1-eks \
     --region us-east-1 \
     --role-arn arn:aws:iam::620830101009:role/PlatformAdmin
   ```
+
 - [ ] You have the following information from the requesting team:
   - Team name (lowercase, alphanumeric + hyphens)
   - GitHub organization and repository name (under `centric/`)
@@ -287,31 +290,41 @@ confirm all workloads are drained before proceeding.
   backed up any data.
 - [ ] Remove the team entry from `teams.hcl`.
 - [ ] Apply `tenants` to destroy the namespace and its resources:
+
   ```bash
   cd infra/live/aws/preprod/us-east-1/platform/tenants
   AWS_PROFILE=management terragrunt apply
   ```
+
 - [ ] Apply `eks` to remove the namespace from the DeveloperAccess scope:
+
   ```bash
   cd infra/live/aws/preprod/us-east-1/platform/eks
   AWS_PROFILE=management terragrunt apply
   ```
+
 - [ ] Apply `argocd-apps` to remove the ArgoCD Application:
+
   ```bash
   cd infra/live/aws/platform/us-east-1/platform/argocd-apps
   AWS_PROFILE=management terragrunt apply
   ```
+
 - [ ] Remove the ECR repository from `ecr/terragrunt.hcl` and apply. Note: this
   deletes all images in the repository. Confirm the team no longer needs them.
+
   ```bash
   cd infra/live/aws/platform/us-east-1/platform/ecr
   AWS_PROFILE=management terragrunt apply
   ```
+
 - [ ] Remove the repo from `github-oidc/terragrunt.hcl` and apply:
+
   ```bash
   cd infra/live/aws/platform/us-east-1/platform/github-oidc
   AWS_PROFILE=management terragrunt apply
   ```
+
 - [ ] Remove the Identity Center group assignment for the team from the preprod
   account in the AWS SSO console.
 - [ ] Commit all changes on a feature branch and open a PR.
@@ -344,6 +357,7 @@ cluster via `argocd-clusters`. Verify:
 1. Confirm the Identity Center group assignment was completed (Step 5).
 2. Verify the user is a member of the correct Identity Center group.
 3. Check the EKS access entry includes the team's namespace:
+
    ```bash
    aws eks describe-access-entry \
      --cluster-name preprod-use1-eks \
@@ -355,10 +369,12 @@ cluster via `argocd-clusters`. Verify:
 
 1. Verify the repo name is in the `github_repos` list in `github-oidc/terragrunt.hcl`.
 2. Confirm the OIDC trust policy includes the repo:
+
    ```bash
    aws iam get-role --role-name github-actions-ecr-push --profile platform \
      --query 'Role.AssumeRolePolicyDocument'
    ```
+
 3. Check the GitHub Actions workflow uses the correct role ARN and region.
 4. Ensure the ECR repository name in the push step matches the name in
    `ecr/terragrunt.hcl` (format: `team-<name>/app`).
