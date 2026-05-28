@@ -75,7 +75,7 @@ Kustomize inline overrides
   - namePrefix: pr-<N>-
   - commonLabels: app.kubernetes.io/instance = pr-<N>
   - images: ECR image with head SHA tag
-  - patches: HTTPRoute hostname + backendRef rewrite
+  - patches: HTTPRoute hostname rewrite
         |
         v
 Kubernetes resources in team namespace
@@ -103,22 +103,36 @@ Services to cross-select pods from different deployments.
 
 ### HTTPRoute Patching
 
-Kustomize does not automatically update Gateway API `backendRefs` when `namePrefix` is applied.
-The ApplicationSet template uses an explicit kustomize JSON patch:
+Kustomize does not natively update Gateway API `backendRefs` when `namePrefix` is applied.
+Two mechanisms work together to handle this:
 
-```yaml
-patches:
-  - target: { kind: HTTPRoute }
-    patch: |
-      - op: replace
-        path: /spec/hostnames/0
-        value: <app>-pr-<N>.preprod.aws.refplat.org
-      - op: replace
-        path: /spec/rules/0/backendRefs/0/name
-        value: pr-<N>-<app>
-```
+1. **Hostname rewrite** — The ApplicationSet template uses an explicit kustomize JSON patch
+   to rewrite the HTTPRoute hostname for the preview URL:
 
-This rewrites both the hostname (for routing) and the backend reference (for the renamed Service).
+   ```yaml
+   patches:
+     - target: { kind: HTTPRoute }
+       patch: |
+         - op: replace
+           path: /spec/hostnames/0
+           value: <app>-pr-<N>.preprod.aws.refplat.org
+   ```
+
+2. **backendRef update via nameReference** — App repos include a `name-reference.yaml`
+   kustomize configuration that teaches kustomize to update HTTPRoute `backendRefs` when
+   `namePrefix` is applied. This avoids a brittle hardcoded patch in the ApplicationSet
+   template and works automatically as apps add or rename Services.
+
+   ```yaml
+   # k8s/preprod/name-reference.yaml
+   nameReference:
+     - kind: Service
+       fieldSpecs:
+         - path: spec/rules/backendRefs/name
+           kind: HTTPRoute
+   ```
+
+   The app's `kustomization.yaml` must reference this configuration (see below).
 
 ### OIDC Trust Policy Update
 
@@ -203,17 +217,33 @@ Private app repos require two credential configurations:
 
 ### Kustomization Requirement
 
-App repos must include a `kustomization.yaml` in their manifest directory listing all resources:
+App repos must include two files in their manifest directory:
+
+**`kustomization.yaml`** — lists all resources and references the nameReference configuration:
 
 ```yaml
 resources:
   - deployment.yaml
   - service.yaml
   - httproute.yaml
+configurations:
+  - name-reference.yaml
 ```
 
-ArgoCD detects kustomize automatically when this file exists. Without it, kustomize overrides
-(commonLabels, namePrefix, patches) have no effect.
+**`name-reference.yaml`** — teaches kustomize to update HTTPRoute `backendRefs` when
+`namePrefix` is applied:
+
+```yaml
+nameReference:
+  - kind: Service
+    fieldSpecs:
+      - path: spec/rules/backendRefs/name
+        kind: HTTPRoute
+```
+
+ArgoCD detects kustomize automatically when `kustomization.yaml` exists. Without it, kustomize
+overrides (commonLabels, namePrefix, patches) have no effect. Without `name-reference.yaml`,
+preview HTTPRoutes will point at the wrong (non-prefixed) Service name.
 
 ## Consequences
 

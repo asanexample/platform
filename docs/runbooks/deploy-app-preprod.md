@@ -132,19 +132,37 @@ not recursive.
 ### kustomization.yaml (Required)
 
 A `kustomization.yaml` file is required for PR preview environments
-(ADR-032). It lists all resources in the directory:
+(ADR-032). It lists all resources and references a `name-reference.yaml`
+configuration:
 
 ```yaml
 resources:
   - deployment.yaml
   - service.yaml
   - httproute.yaml
+configurations:
+  - name-reference.yaml
 ```
 
-ArgoCD detects kustomize automatically when this file is present. Without
-it, kustomize overrides (namePrefix, commonLabels, patches) used by PR
-previews have no effect. Even if you don't use PR previews, including
-this file is good practice.
+The `name-reference.yaml` file teaches kustomize to update HTTPRoute
+`backendRefs` when `namePrefix` is applied (preview environments use
+`namePrefix: pr-<N>-` to rename all resources):
+
+```yaml
+# name-reference.yaml
+nameReference:
+  - kind: Service
+    fieldSpecs:
+      - path: spec/rules/backendRefs/name
+        kind: HTTPRoute
+```
+
+ArgoCD detects kustomize automatically when `kustomization.yaml` is
+present. Without it, kustomize overrides (namePrefix, commonLabels,
+patches) used by PR previews have no effect. Without
+`name-reference.yaml`, preview HTTPRoutes will point at the wrong
+Service name. Even if you don't use PR previews, including both files
+is good practice.
 
 **Allowed resource kinds** (enforced by ArgoCD AppProject):
 
@@ -402,8 +420,9 @@ deployments for every open pull request. See
    with the PR's head commit SHA as the tag
 3. ArgoCD's ApplicationSet controller detects the open PR (polls every
    60s) and creates an ephemeral Application
-4. Kustomize overrides rename resources, isolate label selectors, and
-   rewrite the HTTPRoute hostname
+4. Kustomize overrides rename resources (`namePrefix`), isolate label
+   selectors (`commonLabels`), rewrite the HTTPRoute hostname (patch),
+   and update backendRefs automatically (`nameReference`)
 5. Preview is live at `<app>-pr-<N>.preprod.aws.refplat.org`
 6. When the PR is closed or merged, ArgoCD auto-deletes the preview
 

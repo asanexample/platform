@@ -355,7 +355,8 @@ Developer opens PR
      - namePrefix: pr-<N>-
      - commonLabels: app.kubernetes.io/instance = pr-<N>
      - images: ECR image with head SHA tag
-     - patches: HTTPRoute hostname + backendRef rewrite
+     - patches: HTTPRoute hostname rewrite
+     - nameReference: backendRef auto-update via app repo config
   -> Preview at <app>-pr-<N>.preprod.aws.refplat.org
   -> PR closes -> ArgoCD auto-deletes preview resources
 ```

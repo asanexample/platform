@@ -177,11 +177,6 @@ resource "kubernetes_manifest" "preview_appset" {
                       path  = "/spec/hostnames/0"
                       value = "${each.value.app_key}-pr-{{.number}}.${var.preview_domain}"
                     },
-                    {
-                      op    = "replace"
-                      path  = "/spec/rules/0/backendRefs/0/name"
-                      value = "pr-{{.number}}-${each.value.app_key}"
-                    },
                   ])
                 }
               ] : []
