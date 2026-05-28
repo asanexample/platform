@@ -114,12 +114,12 @@ locals {
   teams = {
     alpha = {
       mode      = "namespace"
-      repo_url  = "https://github.com/centric/app-alpha"
+      repo_url  = "https://github.com/gangster/app-alpha"
       repo_path = "k8s/preprod"
     }
     bravo = {
       mode      = "vcluster"
-      repo_url  = "https://github.com/centric/app-bravo"
+      repo_url  = "https://github.com/gangster/app-bravo"
       repo_path = "k8s/preprod"
     }
   }

@@ -45,7 +45,7 @@ Before starting, confirm the following:
 
 - [ ] You have the following information from the requesting team:
   - Team name (lowercase, alphanumeric + hyphens)
-  - GitHub organization and repository name (under `centric/`)
+  - GitHub organization and repository name (under `gangster/`)
   - Desired isolation mode (namespace or vCluster)
   - Resource quota requirements (if non-default)
 - [ ] You are working on a feature branch (not `main`).
@@ -93,19 +93,19 @@ locals {
     # Existing teams
     alpha = {
       mode      = "namespace"
-      repo_url  = "https://github.com/centric/app-alpha"
+      repo_url  = "https://github.com/gangster/app-alpha"
       repo_path = "k8s/preprod"
     }
     bravo = {
       mode      = "vcluster"
-      repo_url  = "https://github.com/centric/app-bravo"
+      repo_url  = "https://github.com/gangster/app-bravo"
       repo_path = "k8s/preprod"
     }
 
     # NEW: Add your team here
     charlie = {
       mode      = "namespace"
-      repo_url  = "https://github.com/centric/app-charlie"
+      repo_url  = "https://github.com/gangster/app-charlie"
       repo_path = "k8s/preprod"
     }
   }

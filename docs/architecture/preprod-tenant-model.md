@@ -292,7 +292,7 @@ namespace is derived from the team name and mode.
    ```hcl
    charlie = {
      mode      = "namespace"
-     repo_url  = "https://github.com/centric/app-charlie"
+     repo_url  = "https://github.com/gangster/app-charlie"
      repo_path = "k8s/preprod"
    }
    ```

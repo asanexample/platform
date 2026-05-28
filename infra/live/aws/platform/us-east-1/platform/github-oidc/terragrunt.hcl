@@ -26,7 +26,7 @@ dependency "ecr" {
 inputs = {
   create = true
 
-  github_org   = "centric"
+  github_org   = "gangster"
   github_repos = ["app-alpha", "app-bravo"]
 
   role_name = "github-actions-ecr-push"
