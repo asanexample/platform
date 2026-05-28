@@ -80,12 +80,16 @@ The tenant module creates:
   512Mi memory) to prevent unbounded resource consumption by pods without explicit limits
 - **NetworkPolicy (default-deny ingress)** — blocks all inbound traffic to the namespace by
   default
-- **NetworkPolicy (allow gateway ingress)** — permits traffic from the Gateway namespace so that
-  HTTPRoutes can reach backend services
+- **NetworkPolicy (allow gateway ingress)** — permits traffic from the Gateway namespace and
+  `kube-system` so that HTTPRoutes can reach backend services
+- **CiliumNetworkPolicy (allow gateway envoy)** — permits traffic from the Cilium `ingress`,
+  `remote-node`, and `host` entities. Required because Cilium's Gateway API Envoy proxy uses the
+  reserved `ingress` identity (not `host`) for upstream connections to backend pods (ADR-008).
+  Standard Kubernetes NetworkPolicy cannot match this identity.
 - **NetworkPolicy (allow DNS + internet egress)** — permits DNS resolution (UDP/TCP port 53) and
   outbound internet access for external API calls
 
-Cilium enforces these NetworkPolicies at the eBPF level (ADR-008), providing kernel-level network
+Cilium enforces these policies at the eBPF level (ADR-008), providing kernel-level network
 segmentation without iptables overhead.
 
 ### Mode: vCluster
@@ -113,18 +117,32 @@ Teams are declared in `teams.hcl` at the environment level:
 locals {
   teams = {
     alpha = {
-      mode      = "namespace"
-      repo_url  = "https://github.com/gangster/app-alpha"
-      repo_path = "k8s/preprod"
+      mode = "namespace"
+      apps = {
+        demo = {
+          repo_url  = "https://github.com/gangster/app-alpha"
+          repo_path = "k8s/preprod"
+          preview   = true
+        }
+      }
     }
     bravo = {
-      mode      = "vcluster"
-      repo_url  = "https://github.com/gangster/app-bravo"
-      repo_path = "k8s/preprod"
+      mode = "vcluster"
+      apps = {
+        demo = {
+          repo_url  = "https://github.com/gangster/app-bravo"
+          repo_path = "k8s/preprod"
+          preview   = true
+        }
+      }
     }
   }
 }
 ```
+
+> **Note:** The data model was updated from one-app-per-team to multi-app in
+> ADR-031. Each team now has a nested `apps` map. The `preview` flag enables
+> PR preview environments (ADR-032).
 
 The `tenants` Terragrunt unit reads this file and passes the team map to the tenant module. Mode
 selection filters happen inside the module — `namespace_tenants` and `vcluster_tenants` are

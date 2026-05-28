@@ -52,6 +52,27 @@ dependency "preprod_eks" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+generate "github_token_secret" {
+  path      = "github-token-secret.tf"
+  if_exists = "overwrite_terragrunt"
+  contents  = <<-EOF
+    data "aws_secretsmanager_secret_version" "github_pat" {
+      secret_id = "platform/github/argocd-pat"
+    }
+
+    resource "kubernetes_secret_v1" "github_appset_token" {
+      metadata {
+        name      = "github-appset-token"
+        namespace = "argocd"
+      }
+
+      data = {
+        token = data.aws_secretsmanager_secret_version.github_pat.secret_string
+      }
+    }
+  EOF
+}
+
 generate "kubernetes_provider" {
   path      = "kubernetes-provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -73,10 +94,14 @@ inputs = {
   create = true
 
   tenants = { for k, v in local.teams : k => {
-    mode      = v.mode
-    repo_url  = v.repo_url
-    repo_path = v.repo_path
+    mode = v.mode
+    apps = v.apps
   } }
+
+  github_org               = "gangster"
+  github_token_secret_name = "github-appset-token"
+  ecr_registry             = "829808296602.dkr.ecr.us-east-1.amazonaws.com"
+  preview_domain           = "preprod.aws.refplat.org"
 
   cluster_name     = "preprod"
   cluster_server   = dependency.preprod_eks.outputs.cluster_endpoint

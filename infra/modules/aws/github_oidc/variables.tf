@@ -27,6 +27,12 @@ variable "github_branches" {
   default     = ["main"]
 }
 
+variable "github_events" {
+  description = "GitHub event types to allow (e.g. [\"pull_request\"])"
+  type        = list(string)
+  default     = []
+}
+
 variable "role_name" {
   description = "Name of the IAM role to create"
   type        = string

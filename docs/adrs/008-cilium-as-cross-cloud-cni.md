@@ -56,7 +56,7 @@ the appropriate networking mode for each cloud.
 | IPAM mode | ENI | Cluster pool | Kubernetes |
 | Routing | Native (AWS ENI) | VXLAN tunnel | Native |
 | Masquerade interface | `ens+` (AL2023 predictable names) | Default | Default |
-| kube-proxy replacement | Configurable | Configurable | Configurable |
+| kube-proxy replacement | Required (`true`) | Configurable | Configurable |
 | Hubble | Enabled (TLS via `helm` method) | Enabled | Enabled |
 | Gateway API | Enabled | Enabled | Enabled |
 
@@ -68,6 +68,34 @@ ENI secondary IPs. Pod-to-pod traffic stays within the VPC fabric without encaps
 The `egressMasqueradeInterfaces` must be set to `ens+` (regex) because Amazon Linux 2023 uses
 predictable network interface names (`ens5`, not `eth0`). Without this setting, pods lose internet
 egress through NAT gateways.
+
+### Kube-Proxy Replacement on EKS
+
+On EKS with BYOCNI (`bootstrap_self_managed_addons = false`), no `kube-proxy` DaemonSet is
+deployed. Cilium must take over all kube-proxy duties by setting `kubeProxyReplacement = true` in
+the AWS cloud values. Without this, NodePort and LoadBalancer services have no implementation and
+connections to service ports are refused.
+
+### Gateway API and the `ingress` Identity
+
+Cilium's Gateway API implementation uses an external Envoy DaemonSet running with `hostNetwork`.
+When Envoy makes upstream connections to backend pods, it does **not** use the node's primary IP
+or the `host` Cilium identity. Instead, Cilium allocates a separate ENI secondary IP and assigns
+it the reserved `ingress` identity (identity 8). This IP is configured via the
+`cilium.bpf_metadata` listener filter's `ipv4_source_address` field.
+
+Any CiliumNetworkPolicy protecting tenant namespaces that receive Gateway API traffic must include
+`ingress` in their `fromEntities` list. Standard Kubernetes NetworkPolicy `ipBlock` CIDR rules do
+not work as a substitute — Cilium's identity-based matching takes precedence when the source IP
+has a known identity in the BPF ipcache.
+
+### TLS Secret Sync for Gateway API
+
+Gateway API TLS secrets referenced by Gateway listeners must exist in the `cilium-secrets`
+namespace with the naming convention `<source-namespace>-<secret-name>`. For example, a Gateway
+in the `default` namespace referencing secret `preprod-gateway-tls` requires a copy at
+`cilium-secrets/default-preprod-gateway-tls`. This sync is not automatic — it must be handled
+by the platform (e.g., via the gateway-config module or a secret copy mechanism).
 
 ### Hubble TLS
 
@@ -90,8 +118,8 @@ on the component separation.
 
 ### Helm Chart Version
 
-Cilium chart version is centrally pinned in `infra/live/aws/_versions.hcl` (currently 1.17.2).
-The module accepts a `helm_chart_version` variable that defaults to 1.17.2 as a fallback.
+Cilium chart version is centrally pinned in `infra/live/aws/_versions.hcl` (currently 1.19.4).
+The module accepts a `helm_chart_version` variable that defaults to 1.19.4 as a fallback.
 
 ## Consequences
 

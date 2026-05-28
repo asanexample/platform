@@ -113,13 +113,20 @@ func (t *TenantCheck) checkNamespaceResources(ctx context.Context, namespace str
 	hasQuota := strings.Contains(output, "resourcequota/")
 	hasNetpol := strings.Contains(output, "networkpolicy/")
 
-	if !hasQuota || !hasNetpol {
+	cnpOut, cnpErr := t.Run(ctx, "kubectl", "--context", t.KubeContext,
+		"get", "ciliumnetworkpolicy", "-n", namespace, "-o", "name")
+	hasCNP := cnpErr == nil && strings.Contains(strings.TrimSpace(string(cnpOut)), "ciliumnetworkpolicy/")
+
+	if !hasQuota || !hasNetpol || !hasCNP {
 		var missing []string
 		if !hasQuota {
 			missing = append(missing, "ResourceQuota")
 		}
 		if !hasNetpol {
 			missing = append(missing, "NetworkPolicy")
+		}
+		if !hasCNP {
+			missing = append(missing, "CiliumNetworkPolicy (allow-gateway-envoy)")
 		}
 		return fmt.Errorf("missing %s", strings.Join(missing, ", "))
 	}

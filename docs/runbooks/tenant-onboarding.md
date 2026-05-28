@@ -48,6 +48,9 @@ Before starting, confirm the following:
   - GitHub organization and repository name (under `gangster/`)
   - Desired isolation mode (namespace or vCluster)
   - Resource quota requirements (if non-default)
+  - Whether apps need PR preview environments (`preview = true`)
+  - Whether repos are private (requires ArgoCD credential template + GitHub
+    token for PR previews — see ADR-032)
 - [ ] You are working on a feature branch (not `main`).
 
 ---
@@ -92,21 +95,36 @@ locals {
   teams = {
     # Existing teams
     alpha = {
-      mode      = "namespace"
-      repo_url  = "https://github.com/gangster/app-alpha"
-      repo_path = "k8s/preprod"
+      mode = "namespace"
+      apps = {
+        demo = {
+          repo_url  = "https://github.com/gangster/app-alpha"
+          repo_path = "k8s/preprod"
+          preview   = true
+        }
+      }
     }
     bravo = {
-      mode      = "vcluster"
-      repo_url  = "https://github.com/gangster/app-bravo"
-      repo_path = "k8s/preprod"
+      mode = "vcluster"
+      apps = {
+        demo = {
+          repo_url  = "https://github.com/gangster/app-bravo"
+          repo_path = "k8s/preprod"
+          preview   = true
+        }
+      }
     }
 
     # NEW: Add your team here
     charlie = {
-      mode      = "namespace"
-      repo_url  = "https://github.com/gangster/app-charlie"
-      repo_path = "k8s/preprod"
+      mode = "namespace"
+      apps = {
+        api = {
+          repo_url  = "https://github.com/gangster/app-charlie"
+          repo_path = "k8s/preprod"
+          preview   = true
+        }
+      }
     }
   }
 
@@ -115,8 +133,29 @@ locals {
 }
 ```
 
-The `repo_url` and `repo_path` tell ArgoCD where to find the team's Kubernetes
-manifests. Confirm these values with the team before proceeding.
+Each team can have multiple apps. Each app entry has `repo_url` and `repo_path`
+telling ArgoCD where to find the Kubernetes manifests. Set `preview = true` to
+enable PR preview environments (see ADR-032). Confirm these values with the team
+before proceeding.
+
+Teams with multiple services add multiple app entries:
+
+```hcl
+charlie = {
+  mode = "namespace"
+  apps = {
+    api = {
+      repo_url  = "https://github.com/gangster/charlie-api"
+      repo_path = "k8s/preprod"
+      preview   = true
+    }
+    worker = {
+      repo_url  = "https://github.com/gangster/charlie-worker"
+      repo_path = "k8s/preprod"
+    }
+  }
+}
+```
 
 ### Step 2: Add ECR Repository
 
@@ -125,11 +164,15 @@ repository entry for the new team:
 
 ```hcl
 repositories = {
-  "team-alpha/app"   = {}
-  "team-bravo/app"   = {}
-  "team-charlie/app" = {}   # NEW
+  "team-alpha/demo"    = {}
+  "team-bravo/demo"    = {}
+  "team-charlie/api"   = {}   # NEW
 }
 ```
+
+ECR repos follow `team-<team>/<app>` naming (e.g., `team-charlie/api` for the
+`api` app owned by team `charlie`). Create one ECR repo per app entry in
+`teams.hcl`.
 
 The ECR module lives in the **platform** account (829808296602). Cross-account
 pull access for preprod (620830101009) and prod (554518885123) is already
@@ -141,7 +184,8 @@ Edit `infra/live/aws/platform/us-east-1/platform/github-oidc/terragrunt.hcl` and
 add the team's repository to the `github_repos` list:
 
 ```hcl
-github_repos = ["app-alpha", "app-bravo", "app-charlie"]   # NEW: app-charlie
+github_repos  = ["app-alpha", "app-bravo", "app-charlie"]   # NEW: app-charlie
+github_events = ["pull_request"]   # enables PR preview OIDC auth
 ```
 
 This grants the `github-actions-ecr-push` OIDC role permission to push images
@@ -180,9 +224,9 @@ terragrunt apply
 
 | Unit | Account | Resources Created |
 |---|---|---|
-| `tenants` | preprod | Namespace (`team-charlie` or `vc-charlie`), ResourceQuota, LimitRange, NetworkPolicy |
+| `tenants` | preprod | Namespace (`team-charlie` or `vc-charlie`), ResourceQuota, LimitRange, NetworkPolicy, CiliumNetworkPolicy |
 | `eks` | preprod | Updates DeveloperAccess entry with new namespace scope |
-| `ecr` | platform | ECR repository `team-charlie/app` |
+| `ecr` | platform | ECR repository `team-charlie/api` |
 | `github-oidc` | platform | Updates OIDC trust policy to include new repo |
 | `argocd-apps` | platform | ArgoCD Application targeting the team's Git repo |
 
@@ -236,6 +280,9 @@ kubectl get resourcequota tenant-quota -n team-charlie -o yaml
 ```bash
 kubectl get networkpolicy -n team-charlie
 # Expected: default-deny-ingress, allow-gateway-ingress, allow-dns-egress
+
+kubectl get ciliumnetworkpolicy -n team-charlie
+# Expected: allow-gateway-envoy
 ```
 
 ### EKS Access Entry Updated
@@ -263,7 +310,7 @@ kubectl get application -n argocd -l "platform.refplat.org/tenant=charlie"
 
 ```bash
 aws ecr describe-repositories \
-  --repository-names team-charlie/app \
+  --repository-names team-charlie/api \
   --region us-east-1 \
   --profile platform
 ```

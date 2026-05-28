@@ -8,14 +8,22 @@ locals {
 
   repos = length(var.github_repos) > 0 ? var.github_repos : [var.github_repo]
 
-  subject_claims = flatten([
-    for repo in local.repos : [
-      for branch in var.github_branches :
-      "repo:${var.github_org}/${repo}:ref:${
-        startswith(branch, "refs/") ? branch : "refs/heads/${branch}"
-      }"
-    ]
-  ])
+  subject_claims = concat(
+    flatten([
+      for repo in local.repos : [
+        for branch in var.github_branches :
+        "repo:${var.github_org}/${repo}:ref:${
+          startswith(branch, "refs/") ? branch : "refs/heads/${branch}"
+        }"
+      ]
+    ]),
+    flatten([
+      for repo in local.repos : [
+        for event in var.github_events :
+        "repo:${var.github_org}/${repo}:${event}"
+      ]
+    ]),
+  )
 }
 
 resource "aws_iam_openid_connect_provider" "github" {

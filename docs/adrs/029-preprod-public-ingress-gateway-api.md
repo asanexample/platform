@@ -117,6 +117,19 @@ against the preprod Route53 zone (`preprod.aws.refplat.org`, ADR-030). cert-mana
 is scoped to the preprod account's Route53 zone ARN only — it cannot modify DNS records in the
 platform account's zone (ADR-018, ADR-026).
 
+Cilium's Gateway API implementation requires the TLS secret to also exist in the `cilium-secrets`
+namespace with the naming convention `<source-namespace>-<secret-name>` (e.g.,
+`cilium-secrets/default-preprod-gateway-tls` for a Gateway in the `default` namespace). This is
+how Cilium's Envoy SDS discovers certificates. The gateway-config module must handle this copy.
+
+### Network Policy Requirements
+
+Cilium's external Envoy proxy uses the reserved `ingress` identity (identity 8) for upstream
+connections to backend pods — not the `host` identity, despite running with `hostNetwork` (see
+ADR-008). Tenant namespaces must have a CiliumNetworkPolicy allowing `fromEntities: ["ingress"]`
+in addition to the standard Kubernetes NetworkPolicy allowing traffic from the gateway namespace.
+The tenant module (ADR-027) creates both policies automatically.
+
 ### No ArgoCD Dependency
 
 Unlike the platform unit, the preprod gateway-config does not depend on an ArgoCD unit and starts

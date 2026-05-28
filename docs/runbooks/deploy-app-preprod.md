@@ -110,13 +110,14 @@ argocd login argocd.aws.refplat.org --sso
 
 ## Repository Structure
 
-ArgoCD watches each team's repo at the path configured in `teams.hcl`.
+ArgoCD watches each app's repo at the path configured in `teams.hcl`.
 The default convention is `k8s/preprod/`:
 
 ```text
 your-app-repo/
   k8s/
     preprod/
+      kustomization.yaml    # required for PR previews
       deployment.yaml
       service.yaml
       httproute.yaml
@@ -127,6 +128,23 @@ your-app-repo/
 ArgoCD syncs all YAML files in this directory. Do not use
 subdirectories -- the ArgoCD Application is configured with a flat path,
 not recursive.
+
+### kustomization.yaml (Required)
+
+A `kustomization.yaml` file is required for PR preview environments
+(ADR-032). It lists all resources in the directory:
+
+```yaml
+resources:
+  - deployment.yaml
+  - service.yaml
+  - httproute.yaml
+```
+
+ArgoCD detects kustomize automatically when this file is present. Without
+it, kustomize overrides (namePrefix, commonLabels, patches) used by PR
+previews have no effect. Even if you don't use PR previews, including
+this file is good practice.
 
 **Allowed resource kinds** (enforced by ArgoCD AppProject):
 
@@ -167,7 +185,7 @@ spec:
     spec:
       containers:
         - name: myapp
-          image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/myapp:v1.0.0
+          image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:v1.0.0
           ports:
             - containerPort: 8080
           resources:
@@ -278,7 +296,7 @@ permissions:
 
 env:
   ECR_REGISTRY: 829808296602.dkr.ecr.us-east-1.amazonaws.com
-  ECR_REPO: team-alpha/myapp
+  ECR_REPO: team-alpha/demo
 
 jobs:
   build:
@@ -314,8 +332,8 @@ AWS_PROFILE=platform aws ecr get-login-password --region us-east-1 \
   | docker login --username AWS --password-stdin 829808296602.dkr.ecr.us-east-1.amazonaws.com
 
 # Tag and push
-docker build -t 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/myapp:v1.0.0 .
-docker push 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/myapp:v1.0.0
+docker build -t 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:v1.0.0 .
+docker push 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:v1.0.0
 ```
 
 ---
@@ -340,20 +358,20 @@ manifest changes to `main`, expect the sync to begin within 3 minutes.
 1. Connect to Tailscale VPN
 2. Open `https://argocd.aws.refplat.org`
 3. Log in via SSO (Identity Center)
-4. Find your application (e.g. `alpha-app`)
+4. Find your application (e.g. `alpha-demo`)
 5. Click **Sync** > **Synchronize**
 
 ### Manual Sync via CLI
 
 ```bash
 # Sync your application
-argocd app sync alpha-app
+argocd app sync alpha-demo
 
 # Check sync status
-argocd app get alpha-app
+argocd app get alpha-demo
 
 # View sync history
-argocd app history alpha-app
+argocd app history alpha-demo
 ```
 
 ### Checking Application Status
@@ -363,11 +381,111 @@ argocd app history alpha-app
 argocd app list
 
 # Detailed status (shows out-of-sync resources)
-argocd app get alpha-app
+argocd app get alpha-demo
 
 # View the live manifest diff
-argocd app diff alpha-app
+argocd app diff alpha-demo
 ```
+
+---
+
+## PR Preview Environments
+
+Apps with `preview = true` in `teams.hcl` get automatic preview
+deployments for every open pull request. See
+[ADR-032](../adrs/032-pr-preview-environments.md) for the full design.
+
+### How It Works
+
+1. Developer opens a PR against the app repo
+2. GitHub Actions (`preview.yml`) builds and pushes the image to ECR
+   with the PR's head commit SHA as the tag
+3. ArgoCD's ApplicationSet controller detects the open PR (polls every
+   60s) and creates an ephemeral Application
+4. Kustomize overrides rename resources, isolate label selectors, and
+   rewrite the HTTPRoute hostname
+5. Preview is live at `<app>-pr-<N>.preprod.aws.refplat.org`
+6. When the PR is closed or merged, ArgoCD auto-deletes the preview
+
+### PR Preview Workflow
+
+Add this workflow to your app repo (`.github/workflows/preview.yml`):
+
+```yaml
+name: PR Preview
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ECR_REGISTRY: 829808296602.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REPO: team-alpha/demo
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::829808296602:role/github-actions-ecr-push
+          aws-region: us-east-1
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push
+        run: |
+          IMAGE_TAG="${{ github.event.pull_request.head.sha }}"
+          docker build -t $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
+```
+
+The preview workflow only builds and pushes the image. The
+ApplicationSet handles deployment — no manifest updates needed.
+
+### Checking Preview Status
+
+```bash
+# List preview applications
+argocd app list | grep preview
+
+# Check a specific preview
+argocd app get alpha-demo-pr-42
+
+# View preview pods
+kubectl get pods -n team-alpha -l app.kubernetes.io/instance=pr-42
+```
+
+### Private Repos
+
+Private app repos need additional configuration for ArgoCD access:
+
+1. **ArgoCD credential template** — the platform team configures this in the
+   ArgoCD module so ArgoCD can clone the repo. Teams do not need to do this
+   themselves.
+
+2. **GitHub token for PR generator** — required for the ApplicationSet to
+   discover open PRs on private repos. The platform team manages this as a
+   secret in the `argocd` namespace. Without it, PR previews silently fail
+   to detect open PRs.
+
+If your PR previews are not detecting open PRs, confirm with the platform
+team that the GitHub token is configured for your repo's organization.
+
+### Limitations
+
+- Fork PRs cannot push to ECR (GitHub blocks `id-token: write` on forks)
+- Each preview uses ~200m CPU and 256Mi memory; limited by namespace quota
+- Preview URLs require wildcard DNS (configured via external-dns)
+- Private repos require a GitHub token for PR detection (see above)
 
 ---
 
@@ -425,13 +543,13 @@ kubectl get events -n team-alpha --field-selector type=Warning
 
 ```bash
 # Check sync status and health
-argocd app get alpha-app
+argocd app get alpha-demo
 
 # View application events/conditions
-argocd app get alpha-app -o yaml | grep -A 20 conditions
+argocd app get alpha-demo -o yaml | grep -A 20 conditions
 
 # Force a refresh (re-read from Git without syncing)
-argocd app get alpha-app --refresh
+argocd app get alpha-demo --refresh
 ```
 
 ### Network Debugging
@@ -481,7 +599,7 @@ cross-account pull from `620830101009`.
 ```bash
 # Verify the ECR repo policy allows cross-account access
 AWS_PROFILE=platform aws ecr get-repository-policy \
-  --repository-name team-alpha/myapp \
+  --repository-name team-alpha/demo \
   --region us-east-1
 
 # The policy must include a statement allowing ecr:GetDownloadUrlForLayer,
@@ -496,33 +614,64 @@ Also verify the image tag exists:
 
 ```bash
 AWS_PROFILE=platform aws ecr describe-images \
-  --repository-name team-alpha/myapp \
+  --repository-name team-alpha/demo \
   --region us-east-1 \
   --query 'imageDetails[*].imageTags' --output table
 ```
 
 ### NetworkPolicy Blocking Traffic
 
-**Symptoms:** HTTPRoute is attached but requests time out or return 503.
+**Symptoms:** HTTPRoute is attached but requests return
+`upstream connect error or disconnect/reset before headers` or time out.
 
 **Cause:** Each tenant namespace has a default-deny ingress
-NetworkPolicy. Traffic from the Cilium gateway (in the `default`
-namespace) is allowed by the `allow-gateway-ingress` policy, but if that
-policy is missing or misconfigured, traffic is blocked.
+NetworkPolicy. Two policies must be present for gateway traffic to work:
+
+1. `allow-gateway-ingress` (Kubernetes NetworkPolicy) — allows traffic
+   from the gateway namespace (`default`) and `kube-system`
+2. `allow-gateway-envoy` (CiliumNetworkPolicy) — allows traffic from
+   the Cilium `ingress` identity, which is what the Gateway API Envoy
+   proxy uses for upstream connections
+
+The most common cause of "upstream connect error" with the gateway is
+a missing `allow-gateway-envoy` CiliumNetworkPolicy. Cilium's Envoy
+uses the reserved `ingress` identity (identity 8) — not `host` — so
+standard Kubernetes NetworkPolicy cannot authorize its traffic.
 
 **Fix:**
 
 ```bash
-# List network policies in your namespace
+# List both Kubernetes NetworkPolicies and CiliumNetworkPolicies
 kubectl get networkpolicy -n team-alpha
+kubectl get ciliumnetworkpolicy -n team-alpha
 
-# Expected policies:
+# Expected K8s NetworkPolicies:
 #   default-deny-ingress      (blocks all ingress by default)
-#   allow-gateway-ingress     (allows traffic from default namespace)
+#   allow-gateway-ingress     (allows traffic from default + kube-system)
 #   allow-dns-egress          (allows DNS + outbound)
+#
+# Expected CiliumNetworkPolicy:
+#   allow-gateway-envoy       (allows ingress, remote-node, host entities)
 
-# If allow-gateway-ingress is missing, contact the platform team.
-# This policy is managed by Terraform (tenant module), not application manifests.
+# If any are missing, contact the platform team.
+# These policies are managed by Terraform (tenant module), not application manifests.
+```
+
+**Debugging with Cilium (platform team):**
+
+```bash
+# Step 1: Check for BPF drops (ALWAYS start here)
+CILIUM_POD=$(kubectl get pods -n kube-system -l k8s-app=cilium \
+  --field-selector spec.nodeName=<node> -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n kube-system $CILIUM_POD -- \
+  timeout 10 cilium-dbg monitor --type drop --type policy-verdict
+
+# Step 2: Look for "identity ingress -> <N> action deny"
+# This means the CiliumNetworkPolicy for the ingress entity is missing
+
+# Step 3: Check the envoy cluster stats
+kubectl exec -n kube-system $CILIUM_POD -- \
+  cilium-dbg envoy admin clusters | grep cx_connect_fail
 ```
 
 If you need pod-to-pod communication within the namespace, add an
@@ -540,6 +689,41 @@ spec:
   ingress:
     - from:
         - podSelector: {}
+```
+
+### Gateway Returning Upstream Errors
+
+**Symptoms:** `curl` returns `upstream connect error or disconnect/reset
+before headers. reset reason: connection timeout`. The HTTPRoute is
+attached and DNS resolves correctly.
+
+**Cause:** Cilium's Gateway Envoy proxy cannot reach the backend pods.
+Common reasons:
+
+1. **Missing CiliumNetworkPolicy** — the `allow-gateway-envoy` policy
+   is not present in the tenant namespace (see NetworkPolicy section above)
+2. **TLS secret not synced** — the Gateway TLS secret must exist in the
+   `cilium-secrets` namespace as `<namespace>-<secret-name>` (e.g.,
+   `cilium-secrets/default-preprod-gateway-tls`)
+3. **Backend pods not ready** — endpoints are empty
+
+**Fix (platform team):**
+
+```bash
+# Check envoy upstream cluster health
+CILIUM_POD=$(kubectl get pods -n kube-system -l k8s-app=cilium \
+  -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n kube-system $CILIUM_POD -- \
+  cilium-dbg envoy admin clusters | grep -A 5 team-alpha
+
+# Check for cx_connect_fail > 0 — means TCP connections to backends are failing
+
+# Verify TLS secret is synced
+kubectl get secret -n cilium-secrets | grep gateway
+
+# Check envoy has loaded the TLS certificate
+kubectl exec -n kube-system $CILIUM_POD -- \
+  cilium-dbg envoy admin certs
 ```
 
 ### HTTPRoute Not Attaching to Gateway
@@ -640,10 +824,10 @@ ArgoCD UI.
 
 ```bash
 # Check sync status and error message
-argocd app get alpha-app
+argocd app get alpha-demo
 
 # View the sync result details
-argocd app get alpha-app -o yaml | grep -A 10 operationState
+argocd app get alpha-demo -o yaml | grep -A 10 operationState
 
 # Common causes:
 # - Invalid YAML syntax in manifests

@@ -255,7 +255,8 @@ Cross-account access uses purpose-built IAM roles (see IAM Roles below). `Organi
 
 ## Architecture Decisions
 
-- **Cilium as CNI** across all clouds. The shared `cilium` module uses a `cloud_provider` variable.
+- **Cilium as CNI** (1.19.4) across all clouds. The shared `cilium` module uses a `cloud_provider` variable. On EKS with BYOCNI, `kubeProxyReplacement = true` is required (no kube-proxy DaemonSet is deployed).
+- **Cilium Gateway API identity** — the external Envoy proxy uses the reserved `ingress` identity (identity 8) for upstream connections, not `host`. Tenant CiliumNetworkPolicies must include `fromEntities: ["ingress"]`. TLS secrets must be copied to `cilium-secrets` namespace as `<namespace>-<secret-name>`.
 - **SSM Session Manager** for private cluster access (no VPN needed).
 - **Hubble TLS** uses `helm` method on AWS to avoid post-install hook chicken-and-egg issues with BYOCNI.
 - **Node groups separated** from the EKS module to enforce deployment ordering (Cilium must be ready first).
@@ -265,3 +266,5 @@ Cross-account access uses purpose-built IAM roles (see IAM Roles below). `Organi
 - **Cross-VPC DNS** for resolving private EKS endpoints across TGW-connected VPCs. Supports two modes via `dns_method` toggle: custom PHZ with A records (cheap, manual IP updates on cluster recreation) or Route53 Resolver endpoints (robust, automatic, ~$365/mo for 4 ENIs). EKS-managed Route53 PHZs are inaccessible via standard APIs, so cross-VPC PHZ association is not possible — we maintain our own zones instead.
 - **Tailscale Operator** for developer VPN access to private EKS. Runs as a subnet router advertising the VPC CIDR (`10.100.0.0/16`) to the tailnet. Split DNS is managed by the `tailscale` K8s unit (not `tailscale-admin`) with a `depends_on` on the Connector, so it's only created after the subnet router is online. OAuth credentials sourced from AWS Secrets Manager via generated data source. Module is cloud-agnostic; only the live unit's provider config is AWS-specific.
 - **Internal Gateway NLB** for VPN-only access to platform services. The Gateway API NLB uses `internal` scheme so ArgoCD (`argocd.aws.refplat.org`) is only reachable through Tailscale. DNS still resolves publicly but connects to private VPC IPs. TLS via Let's Encrypt DNS-01 challenge (works without public HTTP access).
+- **Multi-app tenant model** (`teams.hcl`). Each team has a nested `apps` map — decouples team identity (isolation boundary) from app identity (deployment unit). Supports monorepo and multi-repo teams. ECR naming: `team-<team>/<app>`. ArgoCD creates one Application per app and one ApplicationSet per preview-enabled app.
+- **PR preview environments** via ArgoCD ApplicationSet PR generator. Apps with `preview = true` get ephemeral deployments per open PR. Kustomize `commonLabels` prevents label selector collision between stable and preview pods. Kustomize patches rewrite HTTPRoute hostnames and backendRefs.

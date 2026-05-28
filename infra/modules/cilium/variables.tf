@@ -96,7 +96,7 @@ variable "helm_chart" {
 variable "helm_chart_version" {
   description = "Version of the Cilium Helm chart"
   type        = string
-  default     = "1.17.2"
+  default     = "1.19.4"
 }
 
 variable "namespace" {
@@ -128,7 +128,7 @@ variable "gateway_api_enabled" {
 variable "gateway_api_crd_version" {
   description = "Gateway API CRD version to install (experimental channel). Set to empty string to skip CRD installation."
   type        = string
-  default     = "v1.2.1"
+  default     = "v1.3.0"
 }
 
 variable "kube_proxy_replacement" {

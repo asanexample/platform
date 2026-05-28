@@ -53,6 +53,7 @@ Internet
 | NetworkPolicy: default-deny-ingress     |
 |                + allow-gateway-ingress   |
 |                + allow-dns-egress        |
+| CiliumNetworkPolicy: allow-gateway-envoy|
 +------------------------------------------+
 ```
 
@@ -108,7 +109,8 @@ team with `mode = "namespace"`:
 | `ResourceQuota` | `tenant-quota` | CPU, memory, and pod caps |
 | `LimitRange` | `tenant-limits` | Default container requests/limits |
 | `NetworkPolicy` | `default-deny-ingress` | Block all inbound traffic by default |
-| `NetworkPolicy` | `allow-gateway-ingress` | Permit traffic from the Gateway namespace |
+| `NetworkPolicy` | `allow-gateway-ingress` | Permit traffic from the Gateway and kube-system namespaces |
+| `CiliumNetworkPolicy` | `allow-gateway-envoy` | Permit traffic from Cilium `ingress`, `remote-node`, and `host` entities |
 | `NetworkPolicy` | `allow-dns-egress` | Allow DNS (UDP/TCP 53) and internet egress |
 
 Pods are isolated by namespace. Cilium enforces NetworkPolicies at the eBPF
@@ -117,9 +119,18 @@ unless an explicit policy allows it.
 
 Gateway routing works because the `preprod-gateway` listener sets
 `allowedRoutes.namespaces.from: All`. Any namespace can create an HTTPRoute
-referencing the gateway. The `allow-gateway-ingress` NetworkPolicy permits
-ingress from pods in the gateway namespace (`default`), where Cilium's
-Envoy proxy runs.
+referencing the gateway.
+
+Two policies work together to allow gateway traffic:
+
+- The **`allow-gateway-ingress`** Kubernetes NetworkPolicy permits ingress
+  from pods in the gateway namespace (`default`) and `kube-system`.
+- The **`allow-gateway-envoy`** CiliumNetworkPolicy permits ingress from
+  the `ingress`, `remote-node`, and `host` Cilium entities. This is
+  required because Cilium's Gateway API Envoy proxy uses the reserved
+  `ingress` identity (identity 8) for upstream connections — not the `host`
+  identity, despite running with `hostNetwork`. Standard Kubernetes
+  NetworkPolicy `ipBlock` CIDR rules cannot match Cilium identities.
 
 ## vCluster Mode Detail
 
@@ -163,7 +174,8 @@ vcluster connect bravo -n vc-bravo
 
 ### Namespace mode policies
 
-The tenant module creates three NetworkPolicies per namespace:
+The tenant module creates three Kubernetes NetworkPolicies and one
+CiliumNetworkPolicy per namespace:
 
 **default-deny-ingress** -- Matches all pods, blocks all ingress. This is the
 baseline; everything is denied unless another policy explicitly allows it.
@@ -175,8 +187,8 @@ spec:
   # no ingress rules = deny all
 ```
 
-**allow-gateway-ingress** -- Permits ingress from the gateway namespace so
-Cilium's Envoy proxy can forward requests to tenant pods.
+**allow-gateway-ingress** -- Permits ingress from the gateway namespace
+and kube-system so infrastructure components can reach tenant pods.
 
 ```yaml
 spec:
@@ -186,7 +198,30 @@ spec:
   - from:
     - namespaceSelector:
         matchLabels:
-          kubernetes.io/metadata.name: default    # gateway namespace
+          kubernetes.io/metadata.name: default       # gateway namespace
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+```
+
+**allow-gateway-envoy** (CiliumNetworkPolicy) -- Permits ingress from
+Cilium's `ingress`, `remote-node`, and `host` entities. This is required
+because the Gateway API Envoy proxy uses the reserved `ingress` identity
+(identity 8) for upstream connections, which standard Kubernetes
+NetworkPolicy cannot match.
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-gateway-envoy
+spec:
+  endpointSelector: {}
+  ingress:
+  - fromEntities:
+    - ingress
+    - remote-node
+    - host
 ```
 
 **allow-dns-egress** -- Permits DNS resolution (port 53 UDP/TCP) and general
@@ -222,21 +257,19 @@ vCluster manages isolation end-to-end within the host namespace.
 
 ### Per-team overrides
 
-The `tenants` variable accepts per-team `resource_quota` overrides:
+The `tenants` variable in the tenant module accepts per-team `resource_quota`
+overrides. These are set in the `tenants/terragrunt.hcl` live config:
 
 ```hcl
-# in the tenants live unit inputs
-tenants = {
-  alpha = {
-    mode = "namespace"
-    resource_quota = {
-      cpu    = "8"
-      memory = "16Gi"
-      pods   = 40
-    }
-  }
+resource_quota = {
+  cpu    = "8"
+  memory = "16Gi"
+  pods   = 40
 }
 ```
+
+Resource quotas apply at the team level (namespace-scoped), not per-app. All
+apps within a team share the same quota.
 
 For vCluster tenants, resource limits are managed by vCluster's built-in
 `isolation.resourceQuota` and `isolation.limitRange` settings, both enabled
@@ -260,13 +293,13 @@ inputs:
    +--------+--------+------------------+
    |                  |                  |
    v                  v                  v
- eks/               tenants/         (future: argocd-apps/)
+ eks/               tenants/         argocd-apps/
  terragrunt.hcl     terragrunt.hcl   terragrunt.hcl
    |                  |                  |
    v                  v                  v
  EKS access        Namespaces,        ArgoCD Application
- entries            ResourceQuotas,    per team targeting
-                    NetworkPolicies,   preprod cluster
+ entries            ResourceQuotas,    per app + preview
+                    NetworkPolicies,   ApplicationSets
                     vClusters
 ```
 
@@ -281,9 +314,11 @@ mode, and passes to the tenant module. The module creates namespace-mode
 resources directly and delegates vCluster-mode teams to the vCluster sub-module.
 
 **ArgoCD apps** (platform cluster): ArgoCD on the platform cluster creates
-Application resources targeting the preprod cluster. Each team's `repo_url`
+Application resources targeting the preprod cluster. Each app's `repo_url`
 and `repo_path` from `teams.hcl` define the GitOps source; the destination
-namespace is derived from the team name and mode.
+namespace is derived from the team name and mode. Apps with `preview = true`
+get an additional ApplicationSet that creates ephemeral Applications for open
+pull requests (ADR-032).
 
 ### Adding a new team
 
@@ -291,15 +326,44 @@ namespace is derived from the team name and mode.
 
    ```hcl
    charlie = {
-     mode      = "namespace"
-     repo_url  = "https://github.com/gangster/app-charlie"
-     repo_path = "k8s/preprod"
+     mode = "namespace"
+     apps = {
+       api = {
+         repo_url  = "https://github.com/gangster/app-charlie"
+         repo_path = "k8s/preprod"
+         preview   = true
+       }
+     }
    }
    ```
 
 2. Run `terragrunt apply` in `eks/` (updates access entries) and `tenants/`
    (creates namespace + policies).
 3. The ArgoCD Application is created automatically on the next sync.
+
+## PR Preview Environments
+
+Apps with `preview = true` in `teams.hcl` get ephemeral preview deployments
+for open pull requests. See [ADR-032](../adrs/032-pr-preview-environments.md)
+for full design details.
+
+```text
+Developer opens PR
+  -> GitHub Actions builds image (team-<team>/<app>:<head-sha>)
+  -> ArgoCD ApplicationSet (PR generator) detects open PR
+  -> Creates ephemeral Application with kustomize overrides:
+     - namePrefix: pr-<N>-
+     - commonLabels: app.kubernetes.io/instance = pr-<N>
+     - images: ECR image with head SHA tag
+     - patches: HTTPRoute hostname + backendRef rewrite
+  -> Preview at <app>-pr-<N>.preprod.aws.refplat.org
+  -> PR closes -> ArgoCD auto-deletes preview resources
+```
+
+Label selector isolation via `commonLabels` prevents traffic routing
+collisions between stable and preview deployments. The stable Application
+uses `app.kubernetes.io/instance: stable`; each preview uses
+`app.kubernetes.io/instance: pr-<N>`.
 
 ## Security Boundaries
 

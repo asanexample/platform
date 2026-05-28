@@ -98,6 +98,32 @@ resource "kubernetes_network_policy" "tenant_allow_gateway" {
           }
         }
       }
+      from {
+        namespace_selector {
+          match_labels = {
+            "kubernetes.io/metadata.name" = "kube-system"
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "kubernetes_manifest" "tenant_allow_gateway_envoy" {
+  for_each = local.namespace_tenants
+
+  manifest = {
+    apiVersion = "cilium.io/v2"
+    kind       = "CiliumNetworkPolicy"
+    metadata = {
+      name      = "allow-gateway-envoy"
+      namespace = kubernetes_namespace.tenant[each.key].metadata[0].name
+    }
+    spec = {
+      endpointSelector = {}
+      ingress = [{
+        fromEntities = ["ingress", "remote-node", "host"]
+      }]
     }
   }
 }

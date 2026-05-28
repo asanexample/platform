@@ -16,8 +16,8 @@ dependency "ecr" {
 
   mock_outputs = {
     repository_arns = {
-      "team-alpha/app" = "arn:aws:ecr:us-east-1:000000000000:repository/team-alpha/app"
-      "team-bravo/app" = "arn:aws:ecr:us-east-1:000000000000:repository/team-bravo/app"
+      "team-alpha/demo" = "arn:aws:ecr:us-east-1:000000000000:repository/team-alpha/demo"
+      "team-bravo/demo" = "arn:aws:ecr:us-east-1:000000000000:repository/team-bravo/demo"
     }
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
@@ -26,8 +26,9 @@ dependency "ecr" {
 inputs = {
   create = true
 
-  github_org   = "gangster"
-  github_repos = ["app-alpha", "app-bravo"]
+  github_org    = "gangster"
+  github_repos  = ["app-alpha", "app-bravo"]
+  github_events = ["pull_request"]
 
   role_name = "github-actions-ecr-push"
 

@@ -42,6 +42,46 @@ dependency "preprod_iam_roles" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+generate "github_repo_creds" {
+  path      = "github-repo-creds.tf"
+  if_exists = "overwrite_terragrunt"
+  contents  = <<-EOF
+    provider "kubernetes" {
+      host                   = "${dependency.eks.outputs.cluster_endpoint}"
+      cluster_ca_certificate = base64decode("${dependency.eks.outputs.cluster_certificate_authority}")
+
+      exec {
+        api_version = "client.authentication.k8s.io/v1beta1"
+        command     = "aws"
+        args        = ["eks", "get-token", "--cluster-name", "${dependency.eks.outputs.cluster_id}", "--region", "${include.base.locals.region}", "--role-arn", "${include.base.locals.deployer_role_arn}"]
+      }
+    }
+
+    data "aws_secretsmanager_secret_version" "github_pat" {
+      secret_id = "platform/github/argocd-pat"
+    }
+
+    resource "kubernetes_secret_v1" "argocd_repo_creds_github" {
+      metadata {
+        name      = "github-gangster-creds"
+        namespace = "argocd"
+        labels = {
+          "argocd.argoproj.io/secret-type" = "repo-creds"
+        }
+      }
+
+      data = {
+        type     = "git"
+        url      = "https://github.com/gangster"
+        username = "x-access-token"
+        password = data.aws_secretsmanager_secret_version.github_pat.secret_string
+      }
+
+      depends_on = [helm_release.argocd]
+    }
+  EOF
+}
+
 generate "helm_provider" {
   path      = "helm-provider.tf"
   if_exists = "overwrite_terragrunt"

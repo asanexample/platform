@@ -15,8 +15,8 @@ inputs = {
   create = true
 
   repositories = {
-    "team-alpha/app" = {}
-    "team-bravo/app" = {}
+    "team-alpha/demo" = {}
+    "team-bravo/demo" = {}
   }
 
   pull_account_ids = ["620830101009", "554518885123"]

@@ -23,6 +23,7 @@ variable "gateway_namespace" {
   default     = "default"
 }
 
+
 variable "environment" {
   description = "Environment name"
   type        = string
