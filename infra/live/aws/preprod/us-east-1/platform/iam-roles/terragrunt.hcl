@@ -115,6 +115,20 @@ inputs = {
         ]
       }
 
+      # AdministratorAccess is high-value, so restrict assumption to SSO
+      # AdministratorAccess role holders (Terragrunt runs from the management SSO
+      # admin profile) — same posture as PlatformAdmin. See issue #57 / ADR-040.
+      trust_conditions = [
+        {
+          test     = "ArnLike"
+          variable = "aws:PrincipalArn"
+          values = [
+            "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
+            "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
+          ]
+        },
+      ]
+
       managed_policies = ["arn:aws:iam::aws:policy/AdministratorAccess"]
     }
 
