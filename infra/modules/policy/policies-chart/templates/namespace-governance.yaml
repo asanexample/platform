@@ -14,7 +14,9 @@ metadata:
       controllers are skipped via the principal allow-list (the shared Gateway lives in default and
       is platform-managed).
 spec:
-  background: true
+  # background: false — references request.userInfo.username (platform-principal skip), disallowed in
+  # background scanning. Admission-only is correct for default-namespace creation.
+  background: false
   failurePolicy: {{ .Values.failurePolicy }}
   rules:
     - name: no-workloads-in-default

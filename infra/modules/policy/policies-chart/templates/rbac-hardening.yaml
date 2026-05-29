@@ -14,7 +14,9 @@ metadata:
       controllers are skipped via the principal allow-list so addon reconciliation is unaffected.
       Validate in Audit on platform before flipping to Enforce.
 spec:
-  background: true
+  # background: false is required — these rules reference request.userInfo.username (platform-principal
+  # skip), which Kyverno disallows in background scanning. Admission-only is correct for RBAC checks.
+  background: false
   failurePolicy: {{ .Values.failurePolicy }}
   rules:
     - name: deny-clusteradmin-binding
@@ -51,7 +53,9 @@ metadata:
       (which holds 'edit', and so can create Roles in its namespace) from crafting an over-powered
       Role. Cluster-scoped; platform controllers skipped via the principal allow-list.
 spec:
-  background: true
+  # background: false is required — these rules reference request.userInfo.username (platform-principal
+  # skip), which Kyverno disallows in background scanning. Admission-only is correct for RBAC checks.
+  background: false
   failurePolicy: {{ .Values.failurePolicy }}
   rules:
     - name: deny-wildcard-rules
