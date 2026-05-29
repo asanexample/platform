@@ -157,3 +157,55 @@ func TestEKS_Disabled(t *testing.T) {
 	assert.Empty(t, planStruct.ResourcePlannedValuesMap,
 		"create=false should produce zero resources")
 }
+
+// TestEKS_GroupMappedAccessEntry verifies the Bridge B path: an access entry that
+// maps a principal to Kubernetes groups (no AWS-managed policy_arn) creates the
+// access entry with kubernetes_groups but NOT a policy association.
+func TestEKS_GroupMappedAccessEntry(t *testing.T) {
+	t.Parallel()
+
+	uniqueID := random.UniqueId()
+	tmpDir := copyFixtureToTemp(t)
+
+	vpcCIDR := testVPCCIDR(0)
+
+	subnets := map[string]interface{}{
+		"az1-kubernetes": map[string]interface{}{
+			"address_prefixes":  []string{subnetCIDR(0, "0/26")},
+			"availability_zone": testRegion() + "a",
+			"public":            false,
+		},
+	}
+
+	vars := map[string]interface{}{
+		"create":        true,
+		"vpc_name":      "test-" + uniqueID + "-vpc",
+		"cluster_name":  "test-" + uniqueID + "-eks",
+		"address_space": []string{vpcCIDR},
+		"subnets":       subnets,
+		"access_entries": map[string]interface{}{
+			// Group-mapped (Bridge B): no policy_arn, has kubernetes_groups.
+			"devs": map[string]interface{}{
+				"principal_arn":     "arn:aws:iam::000000000000:role/DeveloperAccess-team-x",
+				"type":              "STANDARD",
+				"kubernetes_groups": []string{"team-x:developers"},
+			},
+		},
+		"tags": map[string]string{"TestRun": uniqueID},
+	}
+
+	opts := newTerraformOptions(t, tmpDir, vars)
+	opts.PlanFilePath = tmpDir + "/plan.out"
+	planStruct := terraform.InitAndPlanAndShowWithStruct(t, opts)
+
+	entryKey := "module.eks.aws_eks_access_entry.this[\"devs\"]"
+	assert.Contains(t, planStruct.ResourcePlannedValuesMap, entryKey,
+		"plan should include an access entry for the group-mapped principal")
+	entry := planStruct.ResourcePlannedValuesMap[entryKey]
+	assert.Contains(t, entry.AttributeValues["kubernetes_groups"], "team-x:developers",
+		"access entry should map to the kubernetes group")
+
+	assocKey := "module.eks.aws_eks_access_policy_association.this[\"devs\"]"
+	assert.NotContains(t, planStruct.ResourcePlannedValuesMap, assocKey,
+		"no policy association should be created when policy_arn is null")
+}

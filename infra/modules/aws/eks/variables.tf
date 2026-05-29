@@ -60,10 +60,13 @@ variable "access_entries" {
   description = "IAM principal to Kubernetes access policy mappings"
   type = map(object({
     principal_arn = string
-    policy_arn    = string
-    type          = optional(string, "STANDARD")
-    scope_type    = optional(string, "cluster")
-    namespaces    = optional(list(string))
+    # Optional: when set, an AWS-managed access policy is associated (e.g. AmazonEKSEditPolicy).
+    # When null, the entry maps the principal to kubernetes_groups for cluster-managed RBAC instead.
+    policy_arn        = optional(string)
+    type              = optional(string, "STANDARD")
+    scope_type        = optional(string, "cluster")
+    namespaces        = optional(list(string))
+    kubernetes_groups = optional(list(string), [])
   }))
   default = {}
 }
