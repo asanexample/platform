@@ -173,7 +173,7 @@ graph LR
 | cert-manager | 1.17.1 | TLS certificate management (Let's Encrypt, DNS01 via Route53) |
 | external-dns | 1.16.1 | DNS record sync to Route53 |
 | external-secrets | 0.14.3 | Secrets from AWS Secrets Manager + SSM Parameter Store |
-| Kyverno | 3.3.7 | Policy engine (pod security, image provenance) |
+| Kyverno | 3.8.1 | Policy engine — admission `validate` policies (registry/per-team image scoping, RBAC hardening, resource/label requirements) layered above the PSA baseline floor |
 | Tailscale Operator | 1.96.5 | Mesh VPN subnet router for private cluster access |
 
 All Helm chart versions are pinned in `infra/live/aws/_versions.hcl`.

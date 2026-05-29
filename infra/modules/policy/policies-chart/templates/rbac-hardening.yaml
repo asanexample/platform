@@ -1,0 +1,81 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-binding-clusteradmin
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Restrict Binding to cluster-admin
+    policies.kyverno.io/category: Security, RBAC
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: RoleBinding, ClusterRoleBinding
+    policies.kyverno.io/description: >-
+      Deny new (Cluster)RoleBindings to the cluster-admin ClusterRole. Cluster-scoped; platform
+      controllers are skipped via the principal allow-list so addon reconciliation is unaffected.
+      Validate in Audit on platform before flipping to Enforce.
+spec:
+  background: true
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    - name: deny-clusteradmin-binding
+      match:
+        any:
+          - resources:
+              kinds:
+                - RoleBinding
+                - ClusterRoleBinding
+      {{- include "kpp.skipPlatformPrincipals" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.validationFailureAction }}
+        message: "Binding to the cluster-admin ClusterRole is not allowed."
+        deny:
+          conditions:
+            all:
+              - key: "{{`{{ request.object.roleRef.name }}`}}"
+                operator: Equals
+                value: cluster-admin
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-wildcard-rbac
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Restrict Wildcards in RBAC Rules
+    policies.kyverno.io/category: Security, RBAC, Multi-Tenancy
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Role, ClusterRole
+    policies.kyverno.io/description: >-
+      Deny Roles/ClusterRoles that grant wildcard verbs, resources, or apiGroups — prevents a tenant
+      (which holds 'edit', and so can create Roles in its namespace) from crafting an over-powered
+      Role. Cluster-scoped; platform controllers skipped via the principal allow-list.
+spec:
+  background: true
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    - name: deny-wildcard-rules
+      match:
+        any:
+          - resources:
+              kinds:
+                - Role
+                - ClusterRole
+      {{- include "kpp.skipPlatformPrincipals" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.validationFailureAction }}
+        message: "Wildcard (*) verbs, resources, or apiGroups are not allowed in RBAC rules."
+        foreach:
+          - list: request.object.rules
+            deny:
+              conditions:
+                any:
+                  - key: "{{`{{ element.verbs }}`}}"
+                    operator: AnyIn
+                    value: ["*"]
+                  - key: "{{`{{ element.resources }}`}}"
+                    operator: AnyIn
+                    value: ["*"]
+                  - key: "{{`{{ element.apiGroups }}`}}"
+                    operator: AnyIn
+                    value: ["*"]

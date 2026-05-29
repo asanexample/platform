@@ -872,14 +872,25 @@ module "vcluster" {
 
 **Location**: `/infra/modules/policy`
 
-The Policy module installs Kyverno (a Kubernetes-native policy engine) via Helm and provides a framework for applying compliance guardrails as ClusterPolicy resources. This is currently a placeholder with the Helm installation wired up; compliance-tier-specific policies (standard, HIPAA, PCI) will be added in a future iteration.
+The Policy module installs the Kyverno policy engine (HA admission controller) via Helm and a bundled
+local chart of the platform's admission-control ClusterPolicies. It layers above the Pod Security
+Admission `baseline` floor (ADR-027/040) to express controls PSA cannot. The module holds **no
+team-specific data** — per-tenant values are supplied by the Terragrunt unit from `teams.hcl`.
 
-- Installs Kyverno via Helm with atomic deploys
-- Compliance tier selection (`standard`, `hipaa`, `pci`) for future policy sets
-- Supports injecting additional custom ClusterPolicy resources as YAML
-- `create` toggle support
+- Two Helm releases: the Kyverno engine + a local `policies-chart` (no `kubernetes_manifest`, so no
+  plan-time CRD dependency)
+- **Audit-first rollout**: `validation_failure_action` toggles `Audit` (record PolicyReports, webhook
+  fail-open) ↔ `Enforce` (reject at admission, webhook fail-closed) in one input change
+- Phase 1 policies: per-team image-registry scoping, cross-team IRSA-annotation guard, RBAC hardening
+  (`restrict-binding-clusteradmin`, `restrict-wildcard-rbac`), `require-requests-limits`,
+  `require-workload-labels`, `disallow-latest-tag`, `block-public-loadbalancer`,
+  `require-pod-probes`, `disallow-default-namespace`; tier-gated restricted PSS + read-only rootfs
+- Compliance tier selection (`standard`, `hipaa`, `pci`)
+- `additional_policies` escape hatch for raw ClusterPolicy YAML; `create` toggle
+- Cluster-free unit tests via the Kyverno CLI (`.kyverno-tests/run.sh`)
 
-**Key Variables**: `compliance_tier`, `chart_version`, `namespace`, `additional_policies`, `tags`
+**Key Variables**: `validation_failure_action`, `compliance_tier`, `allowed_registries`,
+`tenant_registry_map`, `replica_count`, `helm_chart_version`, `additional_policies`, `tags`
 
 **Example Usage**:
 
@@ -887,19 +898,15 @@ The Policy module installs Kyverno (a Kubernetes-native policy engine) via Helm 
 module "policy" {
   source = "../../modules/policy"
 
-  create          = true
-  environment     = "prod"
-  compliance_tier = "hipaa"
-  chart_version   = "3.3.7"
+  validation_failure_action = "Audit"
+  compliance_tier           = "standard"
+  replica_count             = 3
 
-  additional_policies = {
-    "require-labels" = file("${path.module}/policies/require-labels.yaml")
-  }
+  allowed_registries  = ["829808296602.dkr.ecr.us-east-1.amazonaws.com"]
+  tenant_registry_map = { alpha = "829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha" }
 
-  tags = {
-    Environment = "prod"
-    ManagedBy   = "Terragrunt"
-  }
+  helm_chart_version = "3.8.1"
+  tags               = { Environment = "preprod", ManagedBy = "Terragrunt" }
 }
 ```
 
@@ -1084,7 +1091,7 @@ Rather than separate abstraction modules, the platform achieves cross-cloud comp
 | `create` toggle             | Implemented        | Implemented        | Implemented        |
 | Composite stacks            | Implemented (`stack_base`) | Planned     | Planned            |
 | vCluster                    | Cloud-agnostic (implemented)  | --          | --                 |
-| Policy (Kyverno)            | Cloud-agnostic (placeholder) | --          | --                 |
+| Policy (Kyverno)            | Cloud-agnostic (implemented) | --          | --                 |
 
 ## Module Usage Guidelines
 

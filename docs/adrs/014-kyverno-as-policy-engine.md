@@ -2,8 +2,10 @@
 
 **Date:** 2026-05-23
 
-**Status:** Accepted — **not yet deployed**. Pod Security Admission (`enforce=baseline` on tenant
-namespaces, see ADR-027/ADR-039) is the current admission-control floor until Kyverno is deployed.
+**Status:** Accepted — **Deployed (Phase 1, 2026-05-29)**. Kyverno is installed via the `policy`
+module (`infra/modules/policy/`) and the live `policy` units on preprod and platform. Pod Security
+Admission (`enforce=baseline` on tenant namespaces, ADR-027/ADR-039) remains the admission floor;
+Kyverno layers above it. See **Deployment** and **Rollout & Roadmap** below.
 
 ## Context
 
@@ -42,8 +44,38 @@ Deploy Kyverno as the policy engine on all Kubernetes clusters via the shared `p
 
 ### Deployment
 
-Kyverno is deployed via Helm chart (currently version 3.3.7, pinned in `_versions.hcl`). The
-policy module accepts a `compliance_tier` variable that determines which policies are enforced.
+Kyverno is deployed via Helm chart (version 3.8.1 / app v1.18.1, pinned in `_versions.hcl`). The
+`policy` module installs **two Helm releases**: the engine (HA admission controller — `replica_count`
+3 on platform, 1 on preprod) and a bundled local chart (`policies-chart/`) of the platform's
+ClusterPolicies. A local chart needs no plan-time access to the Kyverno CRDs (which the engine
+installs in the same apply), avoiding the `kubernetes_manifest` chicken-and-egg. The module is
+cloud-agnostic and **holds no team-specific data** — per-tenant values (`tenant_registry_map`,
+`allowed_registries`) are supplied by the Terragrunt unit from `teams.hcl`. The `compliance_tier`
+variable gates restricted-grade pod policies (rendered only for `hipaa`/`pci`).
+
+Tenant-targeted policies match the `platform.refplat.org/tenant` namespace label; infra namespaces
+are excluded. Cluster-scoped policies (RBAC bindings, default-namespace) skip platform controllers
+via an `exclude_principals` allow-list so addon reconciliation is never blocked.
+
+### Rollout & Roadmap
+
+**Audit-first.** Each phase deploys with `validation_failure_action = "Audit"` (records PolicyReports,
+webhook fail-open `Ignore`) on preprod first; once PolicyReports are confirmed clean against real
+workloads it flips to `"Enforce"` (rejects at admission, webhook fail-closed `Fail`), then promotes to
+platform. The flip is a one-line input change. This realizes the risk mitigation noted below
+(test before enforce; break-glass via webhook `failurePolicy` — see `docs/runbooks/kyverno-break-glass.md`).
+
+**Phases** (each its own PR; tracked as GitHub issues):
+
+1. **Engine + core admission `validate`** *(this ADR — done)*: registry/per-team image scoping,
+   cross-team IRSA-annotation guard, RBAC hardening, resource/label/probe requirements, no public
+   LB/NodePort, no `default` namespace, tenant namespace naming, tier-gated restricted PSS + RO-rootfs.
+2. **`mutate` + `generate`**: hardened-securityContext/label defaults; auto default-deny NetworkPolicy
+   and ResourceQuota generation for all namespaces (incl. PR-preview).
+3. **Supply chain**: `cosign` keyless signing (GitHub OIDC) in app CI + `verifyImages` enforcement.
+4. **Shift-left CLI**: `kyverno apply`/`test` gate in app-repo + platform CI.
+5. **Reporting + cleanup**: PolicyReport → observability; `CleanupPolicy` TTLs; Gateway-API HTTPRoute
+   hostname guard.
 
 ### Policy Categories
 

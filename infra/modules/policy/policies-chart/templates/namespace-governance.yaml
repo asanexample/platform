@@ -1,0 +1,72 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-default-namespace
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Disallow Default Namespace
+    policies.kyverno.io/category: Best Practices, Multi-Tenancy
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod, Workloads
+    policies.kyverno.io/description: >-
+      Workloads must run in a team-* namespace, never the default namespace. Cluster-scoped; platform
+      controllers are skipped via the principal allow-list (the shared Gateway lives in default and
+      is platform-managed).
+spec:
+  background: true
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    - name: no-workloads-in-default
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+                - ReplicaSet
+                - Job
+                - CronJob
+              namespaces:
+                - default
+      {{- include "kpp.skipPlatformPrincipals" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.validationFailureAction }}
+        message: "Running workloads in the default namespace is not allowed; use a team-* namespace."
+        deny: {}
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-tenant-namespace-naming
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Require Tenant Namespace Naming
+    policies.kyverno.io/category: Operational Excellence, Multi-Tenancy
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/subject: Namespace
+    policies.kyverno.io/description: >-
+      Namespaces marked as tenants must follow the team-<name> naming convention.
+spec:
+  background: true
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    - name: tenant-namespace-name
+      match:
+        any:
+          - resources:
+              kinds:
+                - Namespace
+              selector:
+                matchExpressions:
+                  - key: {{ .Values.tenantNamespaceLabel }}
+                    operator: Exists
+      validate:
+        failureAction: {{ .Values.validationFailureAction }}
+        message: "Tenant namespaces must be named team-<name>."
+        pattern:
+          metadata:
+            name: "team-*"

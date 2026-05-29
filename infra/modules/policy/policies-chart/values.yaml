@@ -1,0 +1,48 @@
+# Defaults are overridden by the Terraform module (terraform.tfvars-equivalent via helm_release
+# values). They exist here so `helm template` works standalone (e.g. for kyverno CLI tests).
+
+# Audit (record PolicyReport, admit) or Enforce (reject at admission).
+validationFailureAction: Audit
+# Generated-webhook failure policy: Ignore (fail-open, used during Audit) or Fail (fail-closed).
+failurePolicy: Ignore
+# Compliance tier: standard | hipaa | pci. Restricted-grade pod policies render only for hipaa/pci.
+complianceTier: standard
+
+# Cluster-wide (tenant-namespace) image registry allow-list, e.g. the platform ECR host.
+allowedRegistries: []
+# tenant key -> allowed image prefix for that tenant's team-<key> namespace.
+tenantRegistryMap: {}
+
+# Infra namespaces excluded from tenant-targeted and cluster-scoped policies.
+excludeNamespaces:
+  - kube-system
+  - kube-node-lease
+  - kube-public
+  - kyverno
+  - cert-manager
+  - external-secrets
+  - external-dns
+  - argocd
+  - tailscale
+
+# Requesting-principal (userInfo.username) wildcards skipped by cluster-scoped policies so platform
+# controllers can reconcile addons.
+excludePrincipals:
+  - "system:serviceaccount:argocd:*"
+  - "system:serviceaccount:kube-system:*"
+  - "system:nodes:*"
+  - "system:kube-controller-manager"
+
+# Namespace label marking tenant namespaces. Tenant-targeted policies match on its presence.
+tenantNamespaceLabel: platform.refplat.org/tenant
+
+# Labels every tenant workload must carry (team identity + cost allocation).
+requiredWorkloadLabels:
+  - app.kubernetes.io/name
+  - team
+
+# Raw ClusterPolicy YAML injected verbatim (ADR-014 escape hatch). name -> manifest string.
+additionalPolicies: {}
+
+# Common labels stamped on every ClusterPolicy.
+commonLabels: {}

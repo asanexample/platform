@@ -1,0 +1,120 @@
+# Compliant tenant workload — passes every tenant Pod policy.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: good-app
+  namespace: team-alpha
+  labels:
+    app.kubernetes.io/name: demo
+    team: alpha
+spec:
+  automountServiceAccountToken: false
+  containers:
+    - name: app
+      image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:1.0.0
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 8080
+        periodSeconds: 10
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 8080
+        periodSeconds: 10
+---
+# Foreign registry — fails the registry floor and the per-team image policy.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: foreign-app
+  namespace: team-alpha
+  labels:
+    app.kubernetes.io/name: demo
+    team: alpha
+spec:
+  automountServiceAccountToken: false
+  containers:
+    - name: app
+      image: docker.io/library/nginx:1.25
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 80
+        periodSeconds: 10
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 80
+        periodSeconds: 10
+---
+# :latest tag — fails disallow-latest-tag.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: latest-app
+  namespace: team-alpha
+  labels:
+    app.kubernetes.io/name: demo
+    team: alpha
+spec:
+  automountServiceAccountToken: false
+  containers:
+    - name: app
+      image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:latest
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 8080
+        periodSeconds: 10
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 8080
+        periodSeconds: 10
+---
+# No resource requests/limits — fails require-requests-limits.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: greedy-app
+  namespace: team-alpha
+  labels:
+    app.kubernetes.io/name: demo
+    team: alpha
+spec:
+  automountServiceAccountToken: false
+  containers:
+    - name: app
+      image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:1.0.0
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 8080
+        periodSeconds: 10
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 8080
+        periodSeconds: 10

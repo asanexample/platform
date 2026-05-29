@@ -4,7 +4,7 @@
 
 Multi-cloud IaC platform using OpenTofu (v1.11) + Terragrunt (v1.x). Currently targets AWS only (Azure/GCP removed).
 
-- **Shared modules** (`infra/modules/`): argocd, argocd-apps, argocd-clusters, cert-manager, cilium, cloudflare/dns_delegation, cluster-rbac, external-dns, external-secrets, gateway-config, secret-stores, tailscale, tailscale-admin, tenant, vcluster
+- **Shared modules** (`infra/modules/`): argocd, argocd-apps, argocd-clusters, cert-manager, cilium, cloudflare/dns_delegation, cluster-rbac, external-dns, external-secrets, gateway-config, policy, secret-stores, tailscale, tailscale-admin, tenant, vcluster
 - **AWS modules** (`infra/modules/aws/`): cloudtrail, cross-vpc-dns, ecr, eks, eks-addons, eks-node-group, github_oidc, iam_roles, identity_center, networking, organizations, route53, route53_delegation, ssm-bastion, state_bootstrap, transit-gateway
 - **Live configs**: `infra/live/aws/` -- environment-specific Terragrunt units
 
@@ -58,13 +58,14 @@ networking ─┘                        |
               cross-vpc-dns ─────────┤ (networking, preprod eks)
               gateway-config ────────┘ (eks, cilium, cert-mgr, ext-dns, argocd, r53)
               cluster-rbac ──────────┤ (eks) — platform-operator ClusterRole (ADR-040)
+              policy ────────────────┤ (eks, nodes) — Kyverno engine + ClusterPolicies (ADR-014), before tenants
 
 tailscale-admin ─── (no cluster deps, manages tailnet ACLs/OAuth)
 cloudtrail ──────── (no deps, secrets audit logging)
 cloudflare-dns ──── (no deps)
 ```
 
-Preprod is similar but adds `tenants` (after gateway-config) and `transit-gateway` as spoke.
+Preprod is similar but adds `tenants` (after `policy` + gateway-config) and `transit-gateway` as spoke.
 
 Cross-environment units (on platform cluster): route53-delegation, ecr, github-oidc, argocd-apps.
 
@@ -180,3 +181,4 @@ Cross-account access uses purpose-built IAM roles (see IAM Roles below). `Organi
 - **Internal Gateway NLB** — `internal` scheme, services only reachable through Tailscale. TLS via Let's Encrypt DNS-01.
 - **Multi-app tenant model** (`teams.hcl`) — team identity (isolation) decoupled from app identity (deployment). ECR: `team-<team>/<app>`. Namespace isolation only; vCluster deferred (ADR-033).
 - **PR preview environments** — ArgoCD ApplicationSet PR generator. Apps with `preview = true` get ephemeral deployments. Kustomize patches rewrite HTTPRoute hostnames.
+- **Kyverno policy engine** (3.8.1 / app v1.18.1, ADR-014) — `policy` module deploys the HA engine + a bundled local `policies-chart` of ClusterPolicies, layered above the PSA `baseline` floor. Per-tenant image-registry scoping + cross-team IRSA guard + RBAC hardening. **Audit-first** (`validation_failure_action`) then flip to Enforce. No team data in the module (per-tenant map from `teams.hcl` at the unit). Phased rollout (Phases 2–5: mutate/generate, cosign verifyImages, CLI shift-left, reporting/cleanup).

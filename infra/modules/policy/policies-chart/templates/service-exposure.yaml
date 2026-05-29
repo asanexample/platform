@@ -1,0 +1,36 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: block-public-loadbalancer
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Block LoadBalancer and NodePort Services
+    policies.kyverno.io/category: Multi-Tenancy, Networking
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Service
+    policies.kyverno.io/description: >-
+      Tenant Services must be ClusterIP. Ingress is only via the shared Gateway (ADR-029); direct
+      LoadBalancer or NodePort exposure is denied (reinforces the loadbalancers=0 quota, #65).
+spec:
+  background: true
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    - name: deny-lb-nodeport
+      match:
+        any:
+          - resources:
+              kinds:
+                - Service
+              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+      validate:
+        failureAction: {{ .Values.validationFailureAction }}
+        message: "Services must be ClusterIP; use the shared Gateway for ingress (LoadBalancer/NodePort are blocked)."
+        deny:
+          conditions:
+            any:
+              - key: "{{`{{ request.object.spec.type }}`}}"
+                operator: AnyIn
+                value:
+                  - LoadBalancer
+                  - NodePort

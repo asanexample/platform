@@ -134,6 +134,24 @@ jobs:
             echo "No changed markdown files to lint."
           fi
 
+  kyverno-policy-test:
+    name: Kyverno Policy Test
+    runs-on: ubuntu-latest
+    env:
+      # Pin to the chart's appVersion (helm_versions.kyverno = 3.8.1) so test semantics match.
+      KYVERNO_VERSION: "1.18.1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: Install Kyverno CLI
+        run: |
+          curl -fsSL "https://github.com/kyverno/kyverno/releases/download/v${KYVERNO_VERSION}/kyverno-cli_v${KYVERNO_VERSION}_linux_x86_64.tar.gz" -o kyverno.tgz
+          tar xzf kyverno.tgz kyverno
+          sudo install -m 0755 kyverno /usr/local/bin/kyverno
+          kyverno version
+      - name: Render policies and run tests
+        run: infra/modules/policy/.kyverno-tests/run.sh
+
   tflint:
     name: TFLint
     runs-on: ubuntu-latest
