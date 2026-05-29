@@ -93,6 +93,19 @@ The node group unit depends on the Cilium unit via Terragrunt `dependency`. Node
 cluster after Cilium is installed and ready (ADR-009). Without this ordering, nodes would join
 with no CNI and pods would be stuck in `ContainerCreating`.
 
+### Node Hardening (Launch Template)
+
+Each managed node group is backed by a minimal custom **launch template** (no `image_id`, so EKS
+still injects the optimized AMI + bootstrap) that:
+
+- **Enforces IMDSv2** (`http_tokens = required`) and sets `http_put_response_hop_limit = 1`, so pods
+  cannot reach the instance metadata endpoint and assume the node IAM role's credentials (pods use
+  IRSA, ADR-018). This also satisfies the `EnforceIMDSv2` SCP.
+- **Encrypts the root EBS volume** (`/dev/xvda`, gp3, `encrypted = true`). EKS's auto-generated
+  template encrypts the root volume; a custom template must do the same or the
+  `DenyUnencryptedEbsOnLaunch` SCP (ADR-003) blocks node launch ("not authorized to launch instances
+  with this launch template"). Adding/altering the launch template forces a rolling node replacement.
+
 ## Consequences
 
 **Positive:**

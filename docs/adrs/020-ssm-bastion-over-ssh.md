@@ -96,7 +96,9 @@ relay for SSM sessions — no workloads run on it. The SSM agent has minimal res
 
 - Zero inbound attack surface — no open ports, no public IP, no SSH keys to manage or rotate
 - IAM-based access control — who can start SSM sessions is governed by IAM policies, integrated
-  with Identity Center and the role model (ADR-007)
+  with Identity Center and the role model (ADR-007). `PlatformAdmin`'s `ssm:StartSession` is
+  least-privilege-scoped to the bastion instance via a `ssm:resourceTag/Name` condition (ADR-040),
+  not granted on all instances.
 - Native audit trail — every session start/stop is logged in CloudTrail. Session recording
   (optional) captures full terminal I/O.
 - Private subnet placement — no public subnet or Elastic IP needed, reducing cost and exposure

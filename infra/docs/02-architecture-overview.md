@@ -15,7 +15,7 @@
    applicable layer (cloud, environment, region, workload) and merged at
    apply time. Later layers override earlier ones.
 5. **Least privilege** -- IAM roles are purpose-built (PlatformAdmin,
-   PlatformDeployer, DeveloperAccess). SCPs enforce guardrails at the
+   PlatformDeployer, per-team DeveloperAccess-\<team\>). SCPs enforce guardrails at the
    organization level.
 6. **BYOCNI** -- Cilium replaces the default CNI on all clouds (ENI mode
    on AWS, overlay on Azure) for consistent network policy, observability,
@@ -70,9 +70,9 @@ graph TD
 
 | Role | Account | Trust | Purpose |
 |------|---------|-------|---------|
-| PlatformAdmin | Platform | SSO from mgmt + platform | kubectl, SSM tunnel, cluster debugging (4hr sessions) |
+| PlatformAdmin | Platform, PreProd | SSO AdministratorAccess | kubectl operate/debug + SSM tunnel — least-privilege, not author (ADR-040) |
 | PlatformDeployer | Platform | mgmt account | Terragrunt apply, Helm/K8s providers (2hr sessions) |
-| DeveloperAccess | Platform | SSO from mgmt + platform | Namespace-scoped kubectl (4hr sessions) |
+| DeveloperAccess-\<team\> | PreProd | team's `Dev-<team>` SSO set | Per-team namespace-scoped kubectl (one per team; ADR-039) |
 | TerraformStateAccess | Management | PlatformDeployer | S3 state bucket + DynamoDB lock table |
 
 Authentication flows through AWS IAM Identity Center (SSO) with three
