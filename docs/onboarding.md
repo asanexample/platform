@@ -412,6 +412,41 @@ READMEs contain formatted variable reference tables:
 
 ---
 
+## Deploying Applications
+
+Development teams deploy applications to the preprod EKS cluster via ArgoCD.
+Each team gets an isolated namespace with resource quotas and network policies
+enforced.
+
+### Quick Start
+
+1. **Push images** to ECR via GitHub Actions (OIDC auth, no credentials needed):
+
+   ```text
+   829808296602.dkr.ecr.us-east-1.amazonaws.com/team-<name>/app:<tag>
+   ```
+
+2. **Commit manifests** to your team's repo at `k8s/preprod/` (Deployment,
+   Service, HTTPRoute).
+
+3. **ArgoCD auto-syncs** your manifests to preprod.
+
+4. **Access your app** at `https://<app>.preprod.aws.refplat.org`.
+
+5. **Debug** with namespace-scoped kubectl:
+
+   ```bash
+   platctl kubeconfig --env preprod
+   kubectl --context preprod get pods -n team-<name>
+   ```
+
+For the full guide, see [Deploy App to Preprod](runbooks/deploy-app-preprod.md).
+
+For platform engineers onboarding new teams, see
+[Tenant Onboarding](runbooks/tenant-onboarding.md).
+
+---
+
 ## Next Steps
 
 Once you have completed your first deploy:

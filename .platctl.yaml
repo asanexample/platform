@@ -56,6 +56,23 @@ overrides:
   platform/route53:
     implicit_deps: ["platform/iam-roles"]
 
+  preprod/route53:
+    implicit_deps: ["preprod/iam-roles"]
+
+  platform/route53-delegation:
+    implicit_deps: ["platform/route53", "preprod/route53"]
+
+  preprod/cert-manager:
+    hook: crd_two_stage
+    hook_target: "helm_release.cert_manager[0]"
+
+  preprod/tenants:
+    hook: crd_two_stage
+    hook_target: "module.vcluster"
+
+  platform/argocd-apps:
+    implicit_deps: ["platform/argocd", "platform/argocd-clusters", "preprod/tenants"]
+
   platform/cloudtrail:
     teardown_args: ["-var", "force_destroy=true"]
     implicit_deps: ["platform/iam-roles"]
@@ -128,6 +145,8 @@ lockdown:
     description: Disable public EKS endpoint
   - unit: platform/tailscale
     description: Enable split DNS for private EKS resolution
+  - unit: preprod/tailscale
+    description: Enable split DNS for preprod.aws.refplat.org resolution
 
 validate:
   dns:
@@ -149,6 +168,10 @@ validate:
     name: platform-gateway
     namespace: default
     cert_name: platform-gateway-tls
+  preprod_gateway:
+    name: preprod-gateway
+    namespace: default
+    cert_name: preprod-gateway-tls
   endpoints:
     - name: argocd
       url: https://argocd.aws.refplat.org/

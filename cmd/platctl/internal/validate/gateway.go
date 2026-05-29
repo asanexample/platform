@@ -336,7 +336,27 @@ func (g *GatewayHealthCheck) Check(ctx context.Context) CheckResult {
 	}
 	details = append(details, fmt.Sprintf("Certificate '%s/%s': Ready=True", g.GatewayNamespace, g.CertName))
 
-	// 5. NLB health (only if gateway has an address)
+	// 5. Cilium TLS secret sync
+	ciliumSecretName := fmt.Sprintf("%s-%s", g.GatewayNamespace, g.CertName)
+	out, err = g.Run(ctx, "kubectl", "--context", g.KubeContext,
+		"get", "secret", ciliumSecretName, "-n", "cilium-secrets", "-o", "name")
+	if err != nil {
+		details = append(details,
+			fmt.Sprintf("TLS secret '%s' not found in cilium-secrets namespace", ciliumSecretName),
+			"Cilium Gateway API requires TLS secrets in cilium-secrets with naming: <namespace>-<secret-name>",
+			fmt.Sprintf("Run: kubectl get secret -n cilium-secrets | grep %s", g.CertName),
+		)
+		return CheckResult{
+			Name:    g.Name,
+			Status:  "failed",
+			Message: fmt.Sprintf("TLS secret not synced to cilium-secrets/%s", ciliumSecretName),
+			Details: details,
+			Elapsed: time.Since(start),
+		}
+	}
+	details = append(details, fmt.Sprintf("TLS secret 'cilium-secrets/%s': present", ciliumSecretName))
+
+	// 6. NLB health (only if gateway has an address)
 	if gatewayAddress != "" {
 		nlbResult := g.checkNLBHealth(ctx, gatewayAddress, profile, region, details)
 		if nlbResult != nil {

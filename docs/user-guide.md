@@ -744,3 +744,47 @@ tagpolicies.tag.amazonaws.com
 | `account_ids` | `map(string)` | Map of account names to their IDs. |
 | `account_arns` | `map(string)` | Map of account names to their ARNs. |
 | `scp_ids` | `map(string)` | Map of SCP names to their IDs. |
+
+---
+
+## Application Deployment (Preprod)
+
+Development teams deploy applications to the preprod EKS cluster via ArgoCD
+GitOps. Each team gets an isolated namespace with resource quotas and network
+policies enforced.
+
+### ECR Container Registry
+
+Images are stored in ECR in the platform account (829808296602) and pulled
+cross-account by preprod (620830101009) and prod (554518885123).
+
+```bash
+# Authenticate to ECR
+aws ecr get-login-password --region us-east-1 --profile platform \
+  | docker login --username AWS --password-stdin 829808296602.dkr.ecr.us-east-1.amazonaws.com
+
+# Push an image
+docker tag myapp:latest 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/app:v1.0.0
+docker push 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/app:v1.0.0
+```
+
+ECR repos are defined in `infra/live/aws/platform/us-east-1/platform/ecr/terragrunt.hcl`.
+GitHub Actions pushes via OIDC federation — no static credentials needed.
+
+### Tenant Management
+
+Teams are defined in `infra/live/aws/preprod/us-east-1/platform/teams.hcl`.
+All teams use namespace isolation (`team-<name>`).
+
+> **Note:** A vCluster mode for stronger isolation exists in the tenant module
+> but is currently deferred (ADR-033) due to HTTPRoute sync limitations in
+> the open-source vCluster chart.
+
+See [Tenant Onboarding](runbooks/tenant-onboarding.md) for the full
+onboarding procedure.
+
+### Developer Workflow
+
+See [Deploy App to Preprod](runbooks/deploy-app-preprod.md) for the complete
+developer guide including repo structure, sample manifests, ECR push, and
+debugging.

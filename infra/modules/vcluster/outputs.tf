@@ -21,3 +21,8 @@ output "helm_release_status" {
   description = "Status of the vCluster Helm release"
   value       = var.create ? helm_release.vcluster[0].status : "disabled"
 }
+
+output "kubeconfig_secret_name" {
+  description = "Name of the K8s secret containing the vCluster kubeconfig"
+  value       = var.create ? "vc-${var.cluster_name}" : null
+}

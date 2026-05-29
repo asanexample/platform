@@ -1031,6 +1031,48 @@ func ResolveCheckers(
 				Binary: "terragrunt",
 			})
 
+		case "route53-delegation":
+			checks = append(checks, &StateCheck{
+				Name:   u.Name + "/state",
+				Unit:   u,
+				Binary: "terragrunt",
+			})
+
+		case "ecr":
+			checks = append(checks, &StateCheck{
+				Name:   u.Name + "/state",
+				Unit:   u,
+				Binary: "terragrunt",
+			})
+
+		case "github-oidc":
+			checks = append(checks, &StateCheck{
+				Name:   u.Name + "/state",
+				Unit:   u,
+				Binary: "terragrunt",
+			})
+
+		case "tenants":
+			checks = append(checks, &StateCheck{
+				Name:   u.Name + "/state",
+				Unit:   u,
+				Binary: "terragrunt",
+			})
+			if kubeCtx != "" {
+				checks = append(checks, &TenantCheck{
+					Name:        u.Name + "/namespaces",
+					KubeContext: kubeCtx,
+					Run:         run,
+				})
+			}
+
+		case "argocd-apps":
+			checks = append(checks, &StateCheck{
+				Name:   u.Name + "/state",
+				Unit:   u,
+				Binary: "terragrunt",
+			})
+
 		case "cloudtrail":
 			checks = append(checks, &StateCheck{
 				Name:   u.Name + "/state",

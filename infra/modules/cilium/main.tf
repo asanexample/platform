@@ -18,6 +18,10 @@ locals {
       ipam                       = { mode = "eni" }
       egressMasqueradeInterfaces = "ens+"
       routingMode                = "native"
+      tunnelProtocol             = ""
+      enableIPv4Masquerade       = true
+      kubeProxyReplacement       = true
+      l2NeighDiscovery           = { enabled = true }
       hubble = {
         tls = {
           auto = {

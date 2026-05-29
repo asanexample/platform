@@ -35,6 +35,12 @@ dependency "iam_roles" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+locals {
+  teams_config    = read_terragrunt_config("${get_terragrunt_dir()}/../teams.hcl")
+  namespace_teams = local.teams_config.locals.namespace_teams
+  vcluster_teams  = local.teams_config.locals.vcluster_teams
+}
+
 inputs = {
   create       = true
   cluster_name = "${include.base.locals.env}-${include.base.locals.region_abbv}-eks"
@@ -69,6 +75,15 @@ inputs = {
     break_glass = {
       principal_arn = "arn:aws:iam::${include.base.locals.account_id}:role/OrganizationAccountAccessRole"
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+    }
+    developer_access = {
+      principal_arn = dependency.iam_roles.outputs.role_arns["DeveloperAccess"]
+      policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSEditPolicy"
+      scope_type    = "namespace"
+      namespaces = concat(
+        [for k, v in local.namespace_teams : "team-${k}"],
+        [for k, v in local.vcluster_teams : "vc-${k}"],
+      )
     }
   }
 

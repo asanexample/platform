@@ -10,14 +10,27 @@ variable "github_org" {
 }
 
 variable "github_repo" {
-  description = "GitHub repository name"
+  description = "GitHub repository name (use github_repos for multiple)"
   type        = string
+  default     = ""
+}
+
+variable "github_repos" {
+  description = "List of GitHub repository names allowed to assume the role"
+  type        = list(string)
+  default     = []
 }
 
 variable "github_branches" {
   description = "List of branch patterns allowed to assume the role (e.g. [\"main\", \"refs/heads/feat/*\"])"
   type        = list(string)
   default     = ["main"]
+}
+
+variable "github_events" {
+  description = "GitHub event types to allow (e.g. [\"pull_request\"])"
+  type        = list(string)
+  default     = []
 }
 
 variable "role_name" {
