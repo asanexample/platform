@@ -64,9 +64,12 @@ inputs = {
   eks_addons = {} # Managed addons deployed separately in eks-addons unit (BYOCNI ordering)
 
   access_entries = merge({
+    # Read across the cluster (View) + the platform-operator group for debug/operate
+    # verbs (cluster-rbac unit). Not cluster-admin: authoring is GitOps-only (ADR-040).
     platform_admin = {
-      principal_arn = dependency.iam_roles.outputs.role_arns["PlatformAdmin"]
-      policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+      principal_arn     = dependency.iam_roles.outputs.role_arns["PlatformAdmin"]
+      policy_arn        = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
+      kubernetes_groups = ["platform-operators"]
     }
     platform_deployer = {
       principal_arn = dependency.iam_roles.outputs.role_arns["PlatformDeployer"]
