@@ -76,7 +76,7 @@ resource "aws_eks_addon" "this" {
   addon_version        = each.value.addon_version
   configuration_values = each.value.configuration_values
   # Prefer caller-supplied role ARN; fall back to auto-created IRSA role
-  service_account_role_arn = coalesce(each.value.service_account_role_arn, try(aws_iam_role.addon[each.key].arn, null))
+  service_account_role_arn = try(coalesce(each.value.service_account_role_arn, try(aws_iam_role.addon[each.key].arn, null)), null)
   # OVERWRITE ensures addon updates succeed even if K8s resources were manually modified
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"
