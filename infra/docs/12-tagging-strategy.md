@@ -30,6 +30,7 @@ Every resource receives these tags via the merge chain:
 | `DataClassification` | common.hcl / env.hcl | Data sensitivity | `Internal`, `Confidential` |
 | `CostCenter` | common.hcl | Cost allocation group | `Engineering` |
 | `Owner` | common.hcl | Responsible team | `Platform Team` |
+| `Team` | common.hcl (default) / resource-level | Owning tenant team; `platform` for cross-cutting resources, `<team>` on team-owned ones (ECR repos, per-team IAM roles). Basis for per-team ABAC (ADR-039, #62). | `platform`, `alpha` |
 | `Environment` | env.hcl | Deployment environment | `platform`, `prod`, `dev` |
 | `AutoShutdown` | env.hcl | Non-prod shutdown automation | `True`, `False` |
 | `AccountAlias` | env.hcl (AWS) | AWS account alias | `platform-use1` |

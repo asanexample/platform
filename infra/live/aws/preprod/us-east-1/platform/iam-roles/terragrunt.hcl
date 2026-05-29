@@ -162,6 +162,7 @@ inputs = {
         description          = "Namespace-scoped developer cluster access for team ${team}"
         max_session_duration = 14400
         managed_policies     = []
+        tags                 = { Team = team } # per-team attribution / ABAC (#61)
 
         trust_principals = {
           aws = [

@@ -115,7 +115,7 @@ No modules.
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_create"></a> [create](#input\_create) | Whether to create resources in this module | `bool` | `true` | no |
-| <a name="input_roles"></a> [roles](#input\_roles) | Map of IAM roles to create | <pre>map(object({<br/>    description          = optional(string, "")<br/>    path                 = optional(string, "/")<br/>    max_session_duration = optional(number, 3600)<br/>    trust_principals     = map(list(string))<br/>    trust_conditions = optional(list(object({<br/>      test     = string<br/>      variable = string<br/>      values   = list(string)<br/>    })), [])<br/>    managed_policies = optional(list(string), [])<br/>    inline_policies  = optional(map(string), {})<br/>  }))</pre> | `{}` | no |
+| <a name="input_roles"></a> [roles](#input\_roles) | Map of IAM roles to create | <pre>map(object({<br/>    description          = optional(string, "")<br/>    path                 = optional(string, "/")<br/>    max_session_duration = optional(number, 3600)<br/>    trust_principals     = map(list(string))<br/>    trust_conditions = optional(list(object({<br/>      test     = string<br/>      variable = string<br/>      values   = list(string)<br/>    })), [])<br/>    managed_policies = optional(list(string), [])<br/>    inline_policies  = optional(map(string), {})<br/>    tags             = optional(map(string), {})<br/>  }))</pre> | `{}` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to all resources | `map(string)` | `{}` | no |
 
 ## Outputs

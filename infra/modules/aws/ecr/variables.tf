@@ -6,8 +6,11 @@ variable "create" {
 
 variable "repositories" {
   description = "Map of repository names to configuration. Keys are repo names (e.g. 'team-alpha/app')."
-  type        = map(map(string))
-  default     = {}
+  type = map(object({
+    tag_mutability = optional(string, "IMMUTABLE")
+    tags           = optional(map(string), {}) # merged onto var.tags (e.g. { Team = "alpha" })
+  }))
+  default = {}
 }
 
 variable "pull_account_ids" {

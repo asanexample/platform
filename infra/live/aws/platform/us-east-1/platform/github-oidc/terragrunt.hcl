@@ -44,6 +44,7 @@ inputs = {
       repos    = [cfg.github_repo]
       branches = ["main"]         # push on merge to main
       events   = ["pull_request"] # and PR preview builds
+      tags     = { Team = team }  # per-team attribution / ABAC (#61)
 
       inline_policy = jsonencode({
         Version = "2012-10-17"

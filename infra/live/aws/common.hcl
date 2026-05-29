@@ -31,5 +31,8 @@ locals {
     DataClassification = "Internal"
     CostCenter         = "Engineering"
     Owner              = "Platform Team"
+    # Default owner for cross-cutting/platform resources; team-owned resources
+    # (ECR repos, per-team IAM roles) override this with their team (#61).
+    Team = "platform"
   }
 }
