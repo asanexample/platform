@@ -135,3 +135,7 @@ No modules.
 - Key Vault names must be globally unique, 3-24 characters, alphanumeric and hyphens only. The auto-generated name uses the `name_components` object.
 - Purge protection is enabled by default with a 90-day soft delete retention. These settings cannot be reduced once set on an existing vault.
 - Default tags include `DataClassification = "Confidential"` and `ManagedBy = "Terraform"`.
+
+## Related ADRs
+
+- ADR-024: Secrets Management Architecture

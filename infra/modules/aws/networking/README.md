@@ -249,3 +249,7 @@ No modules.
 - Interface VPC endpoints are placed in one private subnet per AZ, preferring subnets with "endpoints" in their name.
 - Flow logs default to CloudWatch Logs but can be sent to S3 by setting `flow_log_destination = "s3"` with `flow_log_s3_bucket_arn`.
 - Secondary CIDR blocks can be added via `address_space` (list). The first element is the primary VPC CIDR; additional entries create `aws_vpc_ipv4_cidr_block_association` resources.
+
+## Related ADRs
+
+- ADR-015: CIDR Allocation Strategy

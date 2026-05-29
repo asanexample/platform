@@ -125,3 +125,7 @@ No modules.
 - Split DNS is created in this module (not `tailscale-admin`) with an explicit `depends_on` on the Connector, ensuring the subnet router is online before DNS rules reference it.
 - Finalizer cleanup `null_resource` blocks are included for both the Connector and ProxyClass to prevent destroy operations from blocking on operator finalizer processing.
 - The `helm_chart_version` has no default and must be explicitly set.
+
+## Related ADRs
+
+- ADR-011: Tailscale Operator for Private Cluster Access

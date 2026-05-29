@@ -126,3 +126,8 @@ No modules.
 - Preview ApplicationSets use Kustomize `namePrefix` (`pr-<number>-`) and `commonLabels` (`app.kubernetes.io/instance: pr-<number>`) to isolate preview pods from stable deployments.
 - Preview hostname rewriting patches `HTTPRoute` hostnames to `<app>-pr-<number>.<preview_domain>`.
 - The `github_org` variable must be set for PR preview generators to be created; if empty, preview ApplicationSets are skipped.
+
+## Related ADRs
+
+- ADR-031: Multi-App Tenant Model
+- ADR-032: PR Preview Environments

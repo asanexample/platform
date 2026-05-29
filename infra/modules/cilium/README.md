@@ -168,3 +168,8 @@ No modules.
 - Gateway API CRDs are installed via `kubectl apply` using a `null_resource` provisioner. Set `gateway_api_crd_version` to `""` to skip CRD installation.
 - The `configHash` Helm value forces a rollout on any values change, even if the structural diff is empty.
 - Cilium is installed into `kube-system` by default (not a custom namespace).
+
+## Related ADRs
+
+- ADR-008: Cilium as Cross-Cloud CNI
+- ADR-017: Gateway API over Traditional Ingress

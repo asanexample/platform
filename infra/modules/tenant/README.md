@@ -127,3 +127,8 @@ module "tenants" {
 - The CiliumNetworkPolicy allows traffic from `ingress`, `remote-node`, and `host` entities so that the Cilium Gateway API Envoy proxy (which uses the reserved `ingress` identity) can reach tenant pods.
 - Default container limits are 500m CPU / 512Mi memory with requests of 100m / 128Mi, applied via LimitRange.
 - vCluster mode is currently deferred (ADR-033) because OSS vCluster cannot sync HTTPRoute CRDs to the host cluster's Gateway. All teams should use `namespace` mode.
+
+## Related ADRs
+
+- ADR-027: Hybrid Tenant Isolation Model
+- ADR-033: Defer vCluster Tenant Support

@@ -95,3 +95,7 @@ No modules.
 - The module hardcodes three Application resources (cert-manager, external-dns, external-secrets) regardless of the `bootstrap_applications` input. The variable controls whether they are created at all but does not dynamically generate applications from its contents.
 - Sync-wave annotations control ordering: cert-manager at wave 0, external-dns and external-secrets at wave 1.
 - All bootstrap applications use `CreateNamespace=true` so their target namespaces are created automatically.
+
+## Related ADRs
+
+- ADR-021: ArgoCD for GitOps Delivery

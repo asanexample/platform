@@ -97,3 +97,7 @@ No modules.
 - IRSA roles are only created when `oidc_provider_arn` is provided and the add-on has an `irsa` block.
 - Conflict resolution is set to `OVERWRITE` for both create and update operations.
 - You can provide a pre-existing IAM role via `service_account_role_arn` instead of using the built-in IRSA configuration.
+
+## Related ADRs
+
+- ADR-009: EKS Component Separation

@@ -117,3 +117,7 @@ No modules.
 - OAuth client credentials are written to AWS Secrets Manager when both `create_oauth_client` and `write_to_secrets_manager` are true. The `tailscale` K8s module reads from this secret.
 - The `secrets_manager_recovery_window` defaults to 7 days. Set to 0 for immediate deletion during development/testing (avoids name conflicts on recreate).
 - This module requires the `tailscale` Terraform provider to be configured with an API key or OAuth credentials that have admin access to the tailnet.
+
+## Related ADRs
+
+- ADR-011: Tailscale Operator for Private Cluster Access

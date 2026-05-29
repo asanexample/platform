@@ -132,3 +132,7 @@ No modules.
 - Managed policies and inline policies are both optional and default to empty.
 - Role names are used as the map keys and become the actual IAM role names in AWS.
 - Default max session duration is 3600 seconds (1 hour); increase for long-running Terragrunt applies.
+
+## Related ADRs
+
+- ADR-007: Platform IAM Role Model

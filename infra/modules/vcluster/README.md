@@ -140,3 +140,8 @@ No modules.
 - The kubeconfig for the virtual cluster is stored in a Kubernetes secret named `vc-<cluster_name>` in the vCluster namespace.
 - Persistence is enabled by default. Set `persistence_enabled = false` for ephemeral clusters, but note that data is lost on pod restart.
 - This module is typically invoked indirectly via the `tenant` module when a tenant's `mode` is set to `"vcluster"`.
+
+## Related ADRs
+
+- ADR-027: Hybrid Tenant Isolation Model
+- ADR-033: Defer vCluster Tenant Support

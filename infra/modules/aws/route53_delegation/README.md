@@ -92,3 +92,7 @@ No modules.
 - The default TTL for NS delegation records is 172800 seconds (48 hours), which is standard for NS records.
 - This module runs in the account that owns the parent zone, referencing name servers from child zones that may be in different accounts.
 - The `delegations` map keys are the subdomain FQDNs and values are lists of name server hostnames from the child zone's `name_servers` output.
+
+## Related ADRs
+
+- ADR-030: Route53 Subdomain Delegation for Environment DNS

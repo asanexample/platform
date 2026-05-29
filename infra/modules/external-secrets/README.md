@@ -114,3 +114,8 @@ No modules.
 - The IAM policy scopes Secrets Manager access to `arn:aws:secretsmanager:*:<account>:secret:<prefix>/*` and SSM to `arn:aws:ssm:*:<account>:parameter<prefix>/*`. Use `secret_path_prefix = "*"` and `ssm_path_prefix = "/*"` for unrestricted access (the defaults).
 - KMS decrypt permissions are only included when `kms_key_arns` is non-empty. This is needed when secrets are encrypted with a customer-managed KMS key.
 - This module only installs the ESO operator. ClusterSecretStore resources that configure which backend to use are managed by the `secret-stores` module.
+
+## Related ADRs
+
+- ADR-019: External Secrets Operator for Secrets Management
+- ADR-018: IRSA for Pod-Level AWS Identity

@@ -148,3 +148,7 @@ No modules.
 - A deny-all inbound rule is added at priority 4096 on the AKS subnet NSG. All allowed traffic must have explicit rules with lower priority numbers.
 - If `aks_private_cluster_enabled = true` and no `aks_private_dns_zone_id` is provided, a private DNS zone (`privatelink.{region}.azmk8s.io`) is created and linked to the VNet.
 - The `AzureFirewallSubnet` name is treated specially -- it is excluded from NSG associations, as Azure does not allow NSGs on firewall subnets.
+
+## Related ADRs
+
+- ADR-015: CIDR Allocation Strategy

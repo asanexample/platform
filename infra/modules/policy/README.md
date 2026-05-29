@@ -119,3 +119,8 @@ No modules.
 - Compliance tiers (`standard`, `hipaa`, `pci`) are validated but not yet implemented -- the variable exists for future use.
 - Custom policies in `additional_policies` must be valid YAML that deserializes to a Kubernetes manifest. Each value is passed through `yamldecode()`.
 - Kyverno is installed with `atomic = true`, so a failed install is automatically rolled back.
+
+## Related ADRs
+
+- ADR-014: Kyverno as Policy Engine
+- ADR-013: Compliance Tier Model

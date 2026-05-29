@@ -149,3 +149,9 @@ No modules.
 - Built-in SCPs exempt roles listed in `exempt_roles` from deny statements using `ArnNotLike` conditions. The default exemption is `OrganizationAccountAccessRole`.
 - The `service_control_policies` variable replaces all built-in SCPs when set. Use it only if you need complete control over SCP content.
 - Child OUs use slash-separated keys (e.g., `Workloads/PreProd`) where the `parent` field references the top-level OU key.
+
+## Related ADRs
+
+- ADR-003: Service Control Policy Design Philosophy
+- ADR-004: AWS Account Management Strategy
+- ADR-005: Organizational Unit Hierarchy Design

@@ -137,3 +137,7 @@ No modules.
 - Subnet IDs should point to dedicated `/28` transit subnets (one per AZ) reserved for TGW ENIs, not workload subnets.
 - The `security_group_ingress_cidrs` variable adds port 443 ingress rules, which is useful for allowing cross-VPC EKS API access through the TGW.
 - In spoke mode, the RAM share must be accepted before the VPC attachment can be created; the module handles this ordering via `depends_on`.
+
+## Related ADRs
+
+- ADR-034: Transit Gateway for Cross-Account VPC Connectivity
