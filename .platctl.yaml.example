@@ -120,10 +120,10 @@ manual_steps:
     instructions: |
       Create SAML app in AWS Identity Center for ArgoCD SSO.
       See scripts/bootstrap-platform.sh Phase 12 for details.
-      Then update infra/live/aws/common.hcl with argocd_sso_url.
+      Then update infra/live/aws/secrets.hcl with argocd_sso_url.
     check:
       type: file_contains
-      file: infra/live/aws/common.hcl
+      file: infra/live/aws/secrets.hcl
       pattern: "argocd_sso_url"
 
 kubeconfig:
@@ -131,12 +131,12 @@ kubeconfig:
     cluster: platform-use1-eks
     region: us-east-1
     profile: platform
-    kubectl_role_arn: arn:aws:iam::829808296602:role/PlatformAdmin
+    kubectl_role_arn: arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/PlatformAdmin
   - alias: preprod
     cluster: preprod-use1-eks
     region: us-east-1
     profile: preprod
-    kubectl_role_arn: arn:aws:iam::620830101009:role/PlatformAdmin
+    kubectl_role_arn: arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/PlatformAdmin
 
 lockdown:
   - unit: platform/eks
@@ -152,14 +152,14 @@ validate:
   dns:
     zone: aws.refplat.org
     expected_ns:
-      - ns-392.awsdns-49.com.
-      - ns-995.awsdns-60.net.
-      - ns-1129.awsdns-13.org.
-      - ns-1963.awsdns-53.co.uk.
+      - ns-example1.awsdns-00.com.
+      - ns-example2.awsdns-00.net.
+      - ns-example3.awsdns-00.org.
+      - ns-example4.awsdns-00.co.uk.
   transit_gateway:
-    id: tgw-080dccffd7843a544
+    id: tgw-XXXXXXXXXXXXXXXXX
   cross_vpc_dns:
-    endpoint: 0BC1D9D127D845F50BA0DF2FA46E8C04.gr7.us-east-1.eks.amazonaws.com
+    endpoint: XXXXXXXXXX.gr7.us-east-1.eks.amazonaws.com
   tailscale:
     vpc_cidrs:
       platform: "10.100.0.0/16"
@@ -177,11 +177,11 @@ validate:
       url: https://argocd.aws.refplat.org/
       env: platform
   iam:
-    state_bucket: tfstate-mgmt-851725353202
+    state_bucket: tfstate-mgmt-<MGMT_ACCOUNT_ID>
     accounts:
       platform:
-        id: "829808296602"
-        deployer_role_arn: arn:aws:iam::829808296602:role/PlatformDeployer
+        id: "<PLATFORM_ACCOUNT_ID>"
+        deployer_role_arn: arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/PlatformDeployer
       preprod:
-        id: "620830101009"
-        deployer_role_arn: arn:aws:iam::620830101009:role/PlatformDeployer
+        id: "<PREPROD_ACCOUNT_ID>"
+        deployer_role_arn: arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/PlatformDeployer
