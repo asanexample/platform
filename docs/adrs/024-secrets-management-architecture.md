@@ -220,6 +220,9 @@ configuration changes. This is the same portability model as Cilium (ADR-008) an
 
 - Blast radius is contained per account — a compromised IRSA role in PreProd cannot read Prod
   secrets, even if the attacker has full control of the ESO controller
+- Human roles do not read secret values: `PlatformAdmin` is denied `secretsmanager:GetSecretValue`
+  (ADR-040); retrieving a raw value requires break-glass (note: a `pods/exec` shell can still read a
+  secret a running pod mounts)
 - Audit trail is clear — CloudTrail logs in each account show exactly which IRSA role accessed
   which secrets, with no cross-account noise
 - Aligns with SCP enforcement — workload accounts block static credentials via

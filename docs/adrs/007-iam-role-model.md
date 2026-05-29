@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-20
 
-**Status:** Accepted (DeveloperAccess refined into per-team roles in ADR-039)
+**Status:** Accepted (DeveloperAccess refined into per-team roles in ADR-039; PlatformAdmin rescoped to operate-not-author in ADR-040)
 
 ## Context
 
@@ -46,7 +46,7 @@ Create four purpose-built IAM roles, each scoped to a specific access pattern:
 
 | Role | Account | Purpose | EKS Access |
 |------|---------|---------|------------|
-| **PlatformAdmin** | Platform | kubectl, SSM tunnel, debugging | AmazonEKSClusterAdminPolicy (cluster) |
+| **PlatformAdmin** | Platform, PreProd | kubectl, SSM tunnel, operate/debug (not author) | AmazonEKSViewPolicy + `platform-operator` group (ADR-040) |
 | **PlatformDeployer** | Platform | Terragrunt apply, Helm providers | AmazonEKSClusterAdminPolicy (cluster) |
 | **DeveloperAccess-\<team\>** | Preprod | Namespace-scoped kubectl, one role per team | Group-mapped RBAC (see ADR-039) |
 | **TerraformStateAccess** | Management | S3 state + DynamoDB locks | None |
@@ -56,8 +56,10 @@ EKS access entries and SCP exemptions.
 
 ### Trust Boundaries
 
-- **PlatformAdmin:** Trusts management and platform accounts. Condition restricts to
-  AdministratorAccess SSO roles.
+- **PlatformAdmin:** Trusts management and platform/preprod accounts. Condition restricts to
+  AdministratorAccess SSO roles. **Rescoped to operate/observe, not author** (ADR-040): AWS
+  ReadOnlyAccess minus secret/data exfil + bastion-scoped SSM; K8s read + debug + operate (no
+  cluster-admin). Authoring flows through pipelines (`PlatformDeployer`/ArgoCD); break-glass for emergencies.
 - **PlatformDeployer:** Trusts management account only (Terragrunt always runs from the
   management profile). Condition restricts to AdministratorAccess SSO role. Starts with
   `AdministratorAccess` managed policy to avoid regression; scope down in a follow-up.

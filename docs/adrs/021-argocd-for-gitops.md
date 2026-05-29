@@ -86,7 +86,9 @@ by changing only the live unit's inputs.
 **Positive:**
 
 - GitOps reconciliation — cluster state continuously matches Git. Manual drift is detected and
-  corrected automatically.
+  corrected automatically. This self-heal is also the enforcement mechanism behind the
+  "platform engineers operate but don't author" access model (ADR-040): even the operate-tier `patch`
+  verbs can't durably change ArgoCD-managed resources.
 - Web UI provides visibility into sync status, resource health, and deployment history without
   CLI access
 - Private API endpoint is not a barrier — ArgoCD runs inside the cluster and has native API access

@@ -52,7 +52,11 @@ If Tailscale is unavailable, use the [SSM tunnel](#private-cluster-access-via-ss
 
 ## Platform Engineer: kubectl Setup
 
-Platform engineers use the **PlatformAdmin** role for cluster access.
+Platform engineers use the **PlatformAdmin** role for cluster access. It is **read + operate, not
+author** (ADR-040): you can inspect everything, view logs, `exec`/`port-forward`, delete a stuck pod,
+cordon/drain nodes, and `kubectl rollout restart` — but you **cannot** create or edit resources. To
+author resources, commit to Git (ArgoCD syncs); for AWS infra use Terragrunt (PlatformDeployer); for
+genuine emergencies that must bypass the pipelines, use break-glass (`OrganizationAccountAccessRole`).
 
 ### Prerequisites
 

@@ -4,7 +4,7 @@
 
 Multi-cloud IaC platform using OpenTofu (v1.11) + Terragrunt (v1.x). Currently targets AWS only (Azure/GCP removed).
 
-- **Shared modules** (`infra/modules/`): argocd, argocd-apps, argocd-clusters, cert-manager, cilium, cloudflare/dns_delegation, external-dns, external-secrets, gateway-config, secret-stores, tailscale, tailscale-admin, tenant, vcluster
+- **Shared modules** (`infra/modules/`): argocd, argocd-apps, argocd-clusters, cert-manager, cilium, cloudflare/dns_delegation, cluster-rbac, external-dns, external-secrets, gateway-config, secret-stores, tailscale, tailscale-admin, tenant, vcluster
 - **AWS modules** (`infra/modules/aws/`): cloudtrail, cross-vpc-dns, ecr, eks, eks-addons, eks-node-group, github_oidc, iam_roles, identity_center, networking, organizations, route53, route53_delegation, ssm-bastion, state_bootstrap, transit-gateway
 - **Live configs**: `infra/live/aws/` -- environment-specific Terragrunt units
 
@@ -57,6 +57,7 @@ networking ─┘                        |
               transit-gateway (hub) ─┤ (networking)
               cross-vpc-dns ─────────┤ (networking, preprod eks)
               gateway-config ────────┘ (eks, cilium, cert-mgr, ext-dns, argocd, r53)
+              cluster-rbac ──────────┤ (eks) — platform-operator ClusterRole (ADR-040)
 
 tailscale-admin ─── (no cluster deps, manages tailnet ACLs/OAuth)
 cloudtrail ──────── (no deps, secrets audit logging)
@@ -153,7 +154,7 @@ Cross-account access uses purpose-built IAM roles (see IAM Roles below). `Organi
 
 | Role | Account | Purpose |
 |------|---------|---------|
-| **PlatformAdmin** | Platform, PreProd | kubectl, SSM tunnel, cluster debugging |
+| **PlatformAdmin** | Platform, PreProd | kubectl operate/debug + SSM tunnel — least-privilege (read+operate, NOT author; cluster authoring via ArgoCD, AWS via PlatformDeployer, emergencies via break-glass — ADR-040) |
 | **PlatformDeployer** | Platform, PreProd | Terragrunt apply, Helm/K8s providers |
 | **DeveloperAccess-\<team\>** | PreProd | Per-team, namespace-scoped kubectl (one role per team, generated from `teams.hcl`; group-mapped RBAC — see ADR-039) |
 | **TerraformStateAccess** | Management | S3 state bucket + DynamoDB lock table |
