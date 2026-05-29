@@ -48,9 +48,11 @@ inputs = {
             {
               Sid    = "EKSAccess"
               Effect = "Allow"
+              # Read-only EKS API access for cluster debugging — node groups,
+              # add-ons, updates, access entries, etc. (not just the cluster).
               Action = [
-                "eks:DescribeCluster",
-                "eks:ListClusters",
+                "eks:Describe*",
+                "eks:List*",
               ]
               Resource = "*"
             },
