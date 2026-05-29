@@ -26,10 +26,7 @@ func testRegion() string {
 }
 
 func testRoleARN() string {
-	if r, ok := os.LookupEnv("TEST_ROLE_ARN"); ok {
-		return r
-	}
-	return "arn:aws:iam::157263244316:role/OrganizationAccountAccessRole"
+	return os.Getenv("TEST_ROLE_ARN")
 }
 
 func copyFixtureToTemp(t *testing.T) string {

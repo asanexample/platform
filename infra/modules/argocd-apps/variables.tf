@@ -49,7 +49,7 @@ variable "github_org" {
 }
 
 variable "ecr_registry" {
-  description = "ECR registry URL (e.g. 829808296602.dkr.ecr.us-east-1.amazonaws.com)"
+  description = "ECR registry URL (e.g. 123456789012.dkr.ecr.us-east-1.amazonaws.com)"
   type        = string
   default     = ""
 }

@@ -26,7 +26,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::157263244316:role/github-actions-terratest
+          role-to-assume: ${{ vars.TEST_ROLE_ARN }}
           aws-region: ${{ env.TEST_AWS_REGION }}
 
       - name: Install OpenTofu
@@ -57,7 +57,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::157263244316:role/github-actions-terratest
+          role-to-assume: ${{ vars.TEST_ROLE_ARN }}
           aws-region: ${{ env.TEST_AWS_REGION }}
 
       - name: Install OpenTofu
