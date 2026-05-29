@@ -45,11 +45,13 @@ resource "kubernetes_cluster_role" "platform_operator" {
     verbs      = ["create"]
   }
 
-  # Operate: cordon / drain / uncordon nodes (patches spec.unschedulable).
+  # Operate: cordon / drain / uncordon nodes (patches spec.unschedulable). Read
+  # verbs are required too — AmazonEKSViewPolicy does not grant cluster-scoped
+  # node read, and `kubectl drain`/`cordon` must get the node first.
   rule {
     api_groups = [""]
     resources  = ["nodes"]
-    verbs      = ["patch"]
+    verbs      = ["get", "list", "watch", "patch"]
   }
 
   # Operate: `kubectl rollout restart` (patches a restartedAt annotation).

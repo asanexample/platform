@@ -9,7 +9,8 @@ read comes from the AWS-managed `AmazonEKSViewPolicy` associated with the same a
 ClusterRole only adds the **delta** View lacks:
 
 - **Debug:** `pods/log` (get), `pods/exec` (create), `pods/portforward` (create)
-- **Operate:** `pods` (delete), `pods/eviction` (create — drain), `nodes` (patch — cordon/drain),
+- **Operate:** `pods` (delete), `pods/eviction` (create — drain), `nodes` (get/list/watch + patch —
+  cordon/drain; View doesn't grant cluster-scoped node read),
   `deployments`/`statefulsets`/`daemonsets` (patch — `kubectl rollout restart`)
 
 It deliberately grants **no `create`** and no other resource types. Resource authoring flows through
