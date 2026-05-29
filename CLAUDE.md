@@ -2,15 +2,44 @@
 
 ## Project Overview
 
-Multi-cloud IaC platform using OpenTofu + Terragrunt. Targets AWS and Azure (GCP stubbed).
+Multi-cloud IaC platform using OpenTofu (v1.11) + Terragrunt (v1.x). Currently targets AWS only (Azure/GCP removed).
 
-- **Shared modules** (`infra/modules/`): cilium, argocd, argocd-bootstrap, argocd-clusters, argocd-apps, cert-manager, external-dns, external-secrets, gateway-config, tailscale, tailscale-admin, tenant, policy, vcluster
-- **Cloud-specific modules**: `infra/modules/aws/*` (eks, networking, ssm-bastion, ecr, route53_delegation, etc.), `infra/modules/azure/*` (aks_core, networking, key_vault, etc.)
-- **Live configs**: `infra/live/{aws,azure}/` -- environment-specific Terragrunt units
+- **Shared modules** (`infra/modules/`): argocd, argocd-apps, argocd-bootstrap, argocd-clusters, cert-manager, cilium, cloudflare/dns_delegation, external-dns, external-secrets, gateway-config, policy, secret-stores, tailscale, tailscale-admin, tenant, vcluster
+- **AWS modules** (`infra/modules/aws/`): cloudtrail, cross-vpc-dns, ecr, eks, eks-addons, eks-node-group, github_oidc, iam_roles, identity_center, naming, networking, organizations, route53, route53_delegation, ssm-bastion, state_bootstrap, transit-gateway
+- **Live configs**: `infra/live/aws/` -- environment-specific Terragrunt units
+
+## Terragrunt Config Hierarchy
+
+```text
+root.hcl              Remote state (S3), providers, terraform_binary
+  └─ common.hcl       Cloud-wide defaults, loads secrets.hcl, tags
+      └─ env.hcl      Account ID (from secrets), env tags
+          └─ region.hcl / network.hcl    Region, CIDRs
+              └─ workload.hcl            Workload name, compliance tier
+                  └─ terragrunt.hcl      Unit-level inputs and dependencies
+```
+
+`_base.hcl` loads all layers and exposes them to units via `include.base.locals.*`. Units include it as:
+
+```hcl
+include "base" {
+  path   = find_in_parent_folders("aws/_base.hcl")
+  expose = true
+}
+```
+
+### Secrets
+
+Sensitive values (account IDs, emails, SSO URLs) live in `infra/live/aws/secrets.hcl` (gitignored). See `secrets.hcl.example` for the structure. Loaded via `read_terragrunt_config("${get_repo_root()}/infra/live/aws/secrets.hcl")` in common.hcl, then exposed through `_base.hcl`:
+
+```hcl
+include.base.locals.account_ids["platform"]   # AWS account ID
+include.base.locals.account_id                 # current env's account ID
+include.base.locals.admin_email                # contact email
+include.base.locals.account_emails["preprod"]  # per-account email
+```
 
 ## Deployment Ordering (AWS)
-
-Full dependency graph:
 
 ```text
 iam-roles ──┐
@@ -22,152 +51,39 @@ networking ─┘                        |
               external-dns ──────────┤ (eks, nodes, r53)
               external-secrets ──────┤ (eks, nodes)
               secret-stores ─────────┤ (eks, nodes, ext-secrets)
-                                     |
               argocd ────────────────┤ (eks, nodes)
-              argocd-clusters ──────┤ (argocd, eks, nodes, preprod eks+iam-roles)
+              argocd-clusters ──────┤ (argocd, preprod eks+iam-roles)
               tailscale ─────────────┤ (eks, nodes, ext-secrets)
               transit-gateway (hub) ─┤ (networking)
               cross-vpc-dns ─────────┤ (networking, preprod eks)
-              gateway-config ────────┘ (eks, cilium, cert-manager, ext-dns, argocd, r53)
+              gateway-config ────────┘ (eks, cilium, cert-mgr, ext-dns, argocd, r53)
 
-tailscale-admin ─────────────────────── (no cluster deps, manages tailnet ACLs/OAuth)
-cloudtrail ──────────────────────────── (no deps, secrets audit logging)
-
-### Preprod dependency graph
-
-iam-roles ──┐
-             ├─> eks -> cilium -> node-groups -> ssm-bastion
-networking ─┘                        |
-              route53 ───────────────┤
-              eks-addons ────────────┤ (eks, cilium, nodes)
-              cert-manager ──────────┤ (eks, nodes, r53)
-              external-dns ──────────┤ (eks, nodes, r53)
-              external-secrets ──────┤ (eks, nodes)
-              secret-stores ─────────┤ (eks, nodes, ext-secrets)
-              tailscale ─────────────┤ (eks, nodes, ext-secrets)
-              gateway-config ────────┤ (eks, cilium, cert-manager, ext-dns, r53)
-              tenants ───────────────┤ (eks, nodes, gateway-config)
-              transit-gateway (spoke)┘ (networking, eks, platform tgw)
-
-### Cross-environment units (platform cluster)
-
-route53-delegation ──────────────────── (platform r53, preprod r53)
-ecr ─────────────────────────────────── (no deps)
-github-oidc ─────────────────────────── (ecr)
-argocd-apps ─────────────────────────── (argocd, argocd-clusters, preprod tenants)
-
-cloudtrail ──────────────────────────── (no deps, secrets audit logging)
+tailscale-admin ─── (no cluster deps, manages tailnet ACLs/OAuth)
+cloudtrail ──────── (no deps, secrets audit logging)
+cloudflare-dns ──── (no deps)
 ```
 
-EKS uses BYOCNI (`bootstrap_self_managed_addons = false`), so Cilium must be deployed before node groups can join the cluster. EKS managed add-ons (coredns) are in a separate `eks-addons` unit that depends on cilium + node-groups, since addon pods need the CNI to schedule.
+Preprod is similar but adds `tenants` (after gateway-config) and `transit-gateway` as spoke.
 
-### Apply order
+Cross-environment units (on platform cluster): route53-delegation, ecr, github-oidc, argocd-apps.
 
-```bash
-# From infra/live/aws/platform/us-east-1/platform/
-terragrunt run --all apply    # handles DAG automatically
-```
+EKS uses BYOCNI (`bootstrap_self_managed_addons = false`), so Cilium must be deployed before node groups join. EKS managed add-ons (coredns) are in a separate `eks-addons` unit since addon pods need the CNI to schedule.
 
-### Destroy order
-
-**Pre-flight:** If the EKS API is private-only (Tailscale VPN access), enable the public endpoint before destroying K8s units so Terragrunt can reach the API:
+### Apply / Destroy
 
 ```bash
-aws eks update-cluster-config --name platform-use1-eks --region us-east-1 \
-  --resources-vpc-config endpointPublicAccess=true --profile platform
-# Wait ~5 min for endpoint update + DNS propagation
-```
+# Apply (from any env's unit directory, e.g. infra/live/aws/platform/us-east-1/platform/)
+terragrunt run --all apply
 
-```bash
-# Option 1: automatic (handles DAG in reverse)
-# To skip route53: add --filter '!./route53'
+# Destroy (reverse DAG)
 terragrunt run --all destroy --filter-allow-destroy -- -auto-approve
 
-# Option 2: manual (if run-all fails or you need to skip units)
-# Destroy leaf nodes first, work backwards:
-cd gateway-config && terragrunt destroy -auto-approve && cd ..
-cd cross-vpc-dns && terragrunt destroy -auto-approve && cd ..
-cd transit-gateway && terragrunt destroy -auto-approve && cd ..
-cd tailscale && terragrunt destroy -auto-approve && cd ..
-cd argocd && terragrunt destroy -auto-approve && cd ..
-cd secret-stores && terragrunt destroy -auto-approve && cd ..
-cd ssm-bastion && terragrunt destroy -auto-approve && cd ..
-cd cert-manager && terragrunt destroy -auto-approve && cd ..
-cd external-dns && terragrunt destroy -auto-approve && cd ..
-cd external-secrets && terragrunt destroy -auto-approve && cd ..
-cd eks-addons && terragrunt destroy -auto-approve && cd ..
-cd node-groups && terragrunt destroy -auto-approve && cd ..
-cd cilium && terragrunt destroy -auto-approve && cd ..
-cd eks && terragrunt destroy -auto-approve && cd ..
-cd networking && terragrunt destroy -auto-approve && cd ..
-cd cloudtrail && terragrunt destroy -auto-approve && cd ..
-# tailscale-admin — destroy separately if tearing down the tailnet
-# route53 — destroy separately if needed
+# If EKS API is private-only, enable public endpoint first:
+aws eks update-cluster-config --name platform-use1-eks --region us-east-1 \
+  --resources-vpc-config endpointPublicAccess=true --profile platform
 ```
 
 All dependency blocks have `mock_outputs` so destroy works even if upstream dependencies are already gone.
-
-### Preprod deploy order
-
-```bash
-# From infra/live/aws/preprod/us-east-1/platform/
-# Step 1: bootstrap iam-roles (direct SSO, no role assumption)
-AWS_PROFILE=preprod terragrunt apply -chdir=iam-roles
-
-# Step 2+: remaining units (management SSO → PlatformDeployer in preprod)
-AWS_PROFILE=management terragrunt apply -chdir=networking
-AWS_PROFILE=management terragrunt apply -chdir=eks
-AWS_PROFILE=management terragrunt apply -chdir=cilium
-AWS_PROFILE=management terragrunt apply -chdir=node-groups
-AWS_PROFILE=management terragrunt apply -chdir=ssm-bastion
-AWS_PROFILE=management terragrunt apply -chdir=eks-addons
-AWS_PROFILE=management terragrunt apply -chdir=external-secrets
-AWS_PROFILE=management terragrunt apply -chdir=secret-stores
-AWS_PROFILE=management terragrunt apply -chdir=tailscale
-AWS_PROFILE=management terragrunt apply -chdir=transit-gateway
-AWS_PROFILE=management terragrunt apply -chdir=cloudtrail
-
-# Step 3: ingress + tenant stack
-AWS_PROFILE=management terragrunt apply -chdir=route53
-AWS_PROFILE=management terragrunt apply -chdir=cert-manager
-AWS_PROFILE=management terragrunt apply -chdir=external-dns
-AWS_PROFILE=management terragrunt apply -chdir=gateway-config
-AWS_PROFILE=management terragrunt apply -chdir=tenants
-
-# Step 4: cross-env units (from platform directory)
-# From infra/live/aws/platform/us-east-1/platform/
-AWS_PROFILE=management terragrunt apply -chdir=route53-delegation
-AWS_PROFILE=management terragrunt apply -chdir=ecr
-AWS_PROFILE=management terragrunt apply -chdir=github-oidc
-AWS_PROFILE=management terragrunt apply -chdir=argocd-apps
-```
-
-### Preprod destroy order
-
-```bash
-# From infra/live/aws/platform/us-east-1/platform/ (cross-env first)
-cd argocd-apps && terragrunt destroy -auto-approve && cd ..
-cd route53-delegation && terragrunt destroy -auto-approve && cd ..
-
-# From infra/live/aws/preprod/us-east-1/platform/
-cd tenants && terragrunt destroy -auto-approve && cd ..
-cd gateway-config && terragrunt destroy -auto-approve && cd ..
-cd external-dns && terragrunt destroy -auto-approve && cd ..
-cd cert-manager && terragrunt destroy -auto-approve && cd ..
-cd route53 && terragrunt destroy -auto-approve && cd ..
-cd transit-gateway && terragrunt destroy -auto-approve && cd ..
-cd tailscale && terragrunt destroy -auto-approve && cd ..
-cd secret-stores && terragrunt destroy -auto-approve && cd ..
-cd external-secrets && terragrunt destroy -auto-approve && cd ..
-cd ssm-bastion && terragrunt destroy -auto-approve && cd ..
-cd eks-addons && terragrunt destroy -auto-approve && cd ..
-cd node-groups && terragrunt destroy -auto-approve && cd ..
-cd cilium && terragrunt destroy -auto-approve && cd ..
-cd eks && terragrunt destroy -auto-approve && cd ..
-cd networking && terragrunt destroy -auto-approve && cd ..
-cd cloudtrail && terragrunt destroy -auto-approve && cd ..
-cd iam-roles && terragrunt destroy -auto-approve && cd ..
-```
 
 ## Key Commands
 
@@ -176,30 +92,18 @@ cd iam-roles && terragrunt destroy -auto-approve && cd ..
 terragrunt plan
 terragrunt apply
 
-# Bootstrap the full platform stack from zero (preferred)
+# Bootstrap/teardown (preferred)
 platctl bootstrap
-platctl bootstrap --dry-run     # preview execution plan
-platctl bootstrap --env platform  # single environment
-
-# Tear down the full platform stack (preferred)
+platctl bootstrap --dry-run
 platctl teardown
 
 # Validate deployed infrastructure
 platctl validate
-platctl validate --env platform       # single environment
-platctl validate --check tailscale    # targeted check
-platctl validate --check gateway,dns  # multiple check prefixes
+platctl validate --env platform
+platctl validate --check tailscale
 
 # Configure kubectl contexts
 platctl kubeconfig
-platctl kubeconfig --env platform
-
-# Legacy scripts (deprecated, kept for reference)
-AWS_PROFILE=management ./scripts/bootstrap-platform.sh
-
-# Legacy tear down
-AWS_PROFILE=management ./scripts/teardown-platform.sh                # preserves Route53
-AWS_PROFILE=management ./scripts/teardown-platform.sh --include-route53  # destroys everything
 
 # Format checks
 tofu fmt -check -recursive infra/modules/
@@ -220,6 +124,18 @@ cd infra/tests/aws/<module> && go test -v -timeout 30m
 git config core.hooksPath .githooks
 ```
 
+## Module Code Style
+
+Use section headers to organize `main.tf` in Terraform/OpenTofu modules:
+
+```hcl
+# ---------------------------------------------------------------------------
+# Section Name
+# ---------------------------------------------------------------------------
+```
+
+Group related resources under a header (e.g. "IAM", "KMS", "EKS Cluster"). No headers needed in small modules with only a few resources.
+
 ## Testing Conventions
 
 - Terratest (Go) for all modules. Tests live in `infra/tests/aws/<module>/`.
@@ -229,8 +145,7 @@ git config core.hooksPath .githooks
 
 ## AWS Accounts
 
-Real account IDs are in `infra/live/aws/secrets.hcl` (gitignored).
-See `infra/live/aws/secrets.hcl.example` for the structure.
+Real account IDs are in `infra/live/aws/secrets.hcl` (gitignored). See `infra/live/aws/secrets.hcl.example` for the structure.
 
 Cross-account access uses purpose-built IAM roles (see IAM Roles below). `OrganizationAccountAccessRole` retained as break-glass only.
 
@@ -241,7 +156,7 @@ Cross-account access uses purpose-built IAM roles (see IAM Roles below). `Organi
 | **PlatformAdmin** | Platform, PreProd | kubectl, SSM tunnel, cluster debugging |
 | **PlatformDeployer** | Platform, PreProd | Terragrunt apply, Helm/K8s providers |
 | **DeveloperAccess** | Platform, PreProd | Namespace-scoped kubectl for developers |
-| **TerraformStateAccess** | Management (<MGMT_ACCOUNT_ID>) | S3 state bucket + DynamoDB lock table |
+| **TerraformStateAccess** | Management | S3 state bucket + DynamoDB lock table |
 | **OrganizationAccountAccessRole** | All accounts | Break-glass only |
 
 - Terragrunt providers assume **PlatformDeployer** (via root.hcl)
@@ -251,16 +166,16 @@ Cross-account access uses purpose-built IAM roles (see IAM Roles below). `Organi
 
 ## Architecture Decisions
 
-- **Cilium as CNI** (1.19.4) across all clouds. The shared `cilium` module uses a `cloud_provider` variable. On EKS with BYOCNI, `kubeProxyReplacement = true` is required (no kube-proxy DaemonSet is deployed).
-- **Cilium Gateway API identity** — the external Envoy proxy uses the reserved `ingress` identity (identity 8) for upstream connections, not `host`. Tenant CiliumNetworkPolicies must include `fromEntities: ["ingress"]`. TLS secrets must be copied to `cilium-secrets` namespace as `<namespace>-<secret-name>`.
+- **Cilium as CNI** (1.19.4) — BYOCNI on EKS, `kubeProxyReplacement = true`. Shared module uses `cloud_provider` variable.
+- **Cilium Gateway API** — external Envoy uses reserved `ingress` identity (8), not `host`. Tenant CiliumNetworkPolicies must allow `fromEntities: ["ingress"]`. TLS secrets copied to `cilium-secrets` namespace.
 - **SSM Session Manager** for private cluster access (no VPN needed).
-- **Hubble TLS** uses `helm` method on AWS to avoid post-install hook chicken-and-egg issues with BYOCNI.
-- **Node groups separated** from the EKS module to enforce deployment ordering (Cilium must be ready first).
-- **EKS add-ons separated** into `eks-addons` unit — with BYOCNI, addon pods (coredns) can't schedule until CNI + nodes are ready, so they must be deployed after cilium and node-groups.
-- **ArgoCD SSO via Dex + SAML** for AWS. Dex is built into ArgoCD's Helm chart and acts as a SAML-to-OIDC bridge. The SAML app in Identity Center is created manually (Terraform AWS provider doesn't support custom SAML apps). Group claims in the SAML assertion map to ArgoCD RBAC roles. The ArgoCD module remains cloud-agnostic — all SSO config is injected via `argocd_cm_extra` in the live unit.
-- **Transit Gateway** for cross-account VPC connectivity. TGW lives in the platform account (hub), shared to spoke accounts via RAM. Each VPC has dedicated /28 transit subnets per AZ for TGW ENIs.
-- **Cross-VPC DNS** for resolving private EKS endpoints across TGW-connected VPCs. Supports two modes via `dns_method` toggle: custom PHZ with A records (cheap, manual IP updates on cluster recreation) or Route53 Resolver endpoints (robust, automatic, ~$365/mo for 4 ENIs). EKS-managed Route53 PHZs are inaccessible via standard APIs, so cross-VPC PHZ association is not possible — we maintain our own zones instead.
-- **Tailscale Operator** for developer VPN access to private EKS. Runs as a subnet router advertising the VPC CIDR (`10.100.0.0/16`) to the tailnet. Split DNS is managed by the `tailscale` K8s unit (not `tailscale-admin`) with a `depends_on` on the Connector, so it's only created after the subnet router is online. OAuth credentials sourced from AWS Secrets Manager via generated data source. Module is cloud-agnostic; only the live unit's provider config is AWS-specific.
-- **Internal Gateway NLB** for VPN-only access to platform services. The Gateway API NLB uses `internal` scheme so ArgoCD (`argocd.aws.refplat.org`) is only reachable through Tailscale. DNS still resolves publicly but connects to private VPC IPs. TLS via Let's Encrypt DNS-01 challenge (works without public HTTP access).
-- **Multi-app tenant model** (`teams.hcl`). Each team has a nested `apps` map — decouples team identity (isolation boundary) from app identity (deployment unit). Supports monorepo and multi-repo teams. ECR naming: `team-<team>/<app>`. ArgoCD creates one Application per app and one ApplicationSet per preview-enabled app. All teams use namespace isolation; vCluster mode is deferred (ADR-033) because OSS vCluster cannot sync HTTPRoute to the host cluster's Gateway.
-- **PR preview environments** via ArgoCD ApplicationSet PR generator. Apps with `preview = true` get ephemeral deployments per open PR. Kustomize `commonLabels` prevents label selector collision between stable and preview pods. Kustomize patches rewrite HTTPRoute hostnames and backendRefs.
+- **Hubble TLS** uses `helm` method on AWS to avoid BYOCNI chicken-and-egg with post-install hooks.
+- **Node groups separated** from EKS module to enforce Cilium-first ordering.
+- **EKS add-ons separated** — coredns can't schedule until CNI + nodes are ready.
+- **ArgoCD SSO** — Dex + SAML bridge to AWS Identity Center. SAML app created manually. Module is cloud-agnostic; SSO config injected via `argocd_cm_extra`.
+- **Transit Gateway** — hub in platform account, shared to spokes via RAM. Dedicated /28 transit subnets per AZ.
+- **Cross-VPC DNS** — two modes via `dns_method`: custom PHZ (cheap, manual IP updates) or Route53 Resolver endpoints (robust, ~$365/mo). EKS-managed PHZs are inaccessible, so we maintain our own.
+- **Tailscale Operator** — subnet router advertising VPC CIDR to tailnet. Split DNS managed by `tailscale` K8s unit. OAuth from Secrets Manager.
+- **Internal Gateway NLB** — `internal` scheme, services only reachable through Tailscale. TLS via Let's Encrypt DNS-01.
+- **Multi-app tenant model** (`teams.hcl`) — team identity (isolation) decoupled from app identity (deployment). ECR: `team-<team>/<app>`. Namespace isolation only; vCluster deferred (ADR-033).
+- **PR preview environments** — ArgoCD ApplicationSet PR generator. Apps with `preview = true` get ephemeral deployments. Kustomize patches rewrite HTTPRoute hostnames.
