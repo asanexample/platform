@@ -184,12 +184,6 @@ variable "credential_templates" {
 # Projects and resource exclusions
 # ---------------------------------------------------------------------------
 
-variable "projects" {
-  description = "ArgoCD project definitions"
-  type        = any
-  default     = {}
-}
-
 variable "resource_exclusions" {
   description = "Resources ArgoCD should ignore (list of {apiGroups, kinds, clusters})"
   type        = any

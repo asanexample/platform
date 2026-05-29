@@ -50,11 +50,11 @@ platform/
 │   │   ├── azure/              # Azure environments (dev, ops) — not actively deployed
 │   │   └── gcp/                # GCP stub (networking + naming only)
 │   ├── modules/                # Reusable OpenTofu modules
-│   │   ├── aws/                # 17 AWS modules
+│   │   ├── aws/                # 16 AWS modules
 │   │   ├── azure/              # 24 Azure modules
 │   │   ├── cloudflare/         # 1 Cloudflare module
 │   │   ├── gcp/                # 2 GCP modules
-│   │   └── (shared)            # 15 cloud-agnostic modules (cilium, argocd, tenant, etc.)
+│   │   └── (shared)            # 14 cloud-agnostic modules (cilium, argocd, tenant, etc.)
 │   ├── tests/                  # Terratest integration tests (Go)
 │   └── root.hcl                # Root Terragrunt config (cloud-aware state routing)
 └── scripts/                    # Helper scripts (eks-tunnel, bootstrap, teardown)
@@ -102,7 +102,7 @@ deployment method is `platctl bootstrap`, which resolves the DAG automatically.
 
 ## Modules
 
-### Shared (14 modules)
+### Shared (13 modules)
 
 | Module | Description |
 |--------|-------------|
@@ -114,14 +114,13 @@ deployment method is `platctl bootstrap`, which resolves the DAG automatically.
 | [external-dns](infra/modules/external-dns/) | ExternalDNS Helm with IRSA |
 | [external-secrets](infra/modules/external-secrets/) | External Secrets Operator Helm with IRSA |
 | [gateway-config](infra/modules/gateway-config/) | ClusterIssuer, Gateway, HTTPRoutes |
-| [policy](infra/modules/policy/) | Kyverno policy engine |
 | [secret-stores](infra/modules/secret-stores/) | ClusterSecretStore for AWS Secrets Manager and SSM |
 | [tailscale](infra/modules/tailscale/) | Tailscale Operator, subnet router, split DNS |
 | [tailscale-admin](infra/modules/tailscale-admin/) | Tailnet ACL and OAuth client management |
 | [tenant](infra/modules/tenant/) | Namespace isolation with quotas, limits, network policies |
 | [vcluster](infra/modules/vcluster/) | vCluster Helm (deferred — ADR-033) |
 
-### AWS (17 modules)
+### AWS (16 modules)
 
 | Module | Description |
 |--------|-------------|
@@ -134,7 +133,6 @@ deployment method is `platctl bootstrap`, which resolves the DAG automatically.
 | [github_oidc](infra/modules/aws/github_oidc/) | GitHub Actions OIDC federation |
 | [iam_roles](infra/modules/aws/iam_roles/) | Purpose-built IAM roles |
 | [identity_center](infra/modules/aws/identity_center/) | IAM Identity Center permission sets |
-| [naming](infra/modules/aws/naming/) | Resource naming conventions |
 | [networking](infra/modules/aws/networking/) | VPC, subnets, NAT, flow logs (3 topology modes) |
 | [organizations](infra/modules/aws/organizations/) | AWS Organizations with OUs and SCPs |
 | [route53](infra/modules/aws/route53/) | Route53 hosted zones |

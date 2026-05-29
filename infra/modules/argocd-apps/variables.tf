@@ -19,11 +19,6 @@ variable "tenants" {
   default = {}
 }
 
-variable "cluster_name" {
-  description = "Name of the target cluster in ArgoCD (e.g. 'preprod')"
-  type        = string
-}
-
 variable "cluster_server" {
   description = "API server URL of the target cluster"
   type        = string

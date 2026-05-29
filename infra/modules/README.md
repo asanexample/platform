@@ -25,7 +25,6 @@ modules/
 | [external-dns](external-dns/) | ExternalDNS Helm with IRSA, Gateway API source support |
 | [external-secrets](external-secrets/) | External Secrets Operator Helm with IRSA |
 | [gateway-config](gateway-config/) | ClusterIssuer, Cilium Gateway, HTTPRoutes, HTTP-to-HTTPS redirect |
-| [policy](policy/) | Kyverno Helm with compliance-tier policies |
 | [secret-stores](secret-stores/) | ClusterSecretStore for Secrets Manager and SSM Parameter Store |
 | [tailscale](tailscale/) | Tailscale Operator, subnet router, split DNS |
 | [tailscale-admin](tailscale-admin/) | Tailnet ACL management, OAuth client provisioning |
@@ -45,7 +44,6 @@ modules/
 | [github_oidc](aws/github_oidc/) | GitHub Actions OIDC federation for keyless CI/CD |
 | [iam_roles](aws/iam_roles/) | Purpose-built IAM roles (PlatformAdmin, PlatformDeployer, DeveloperAccess) |
 | [identity_center](aws/identity_center/) | AWS IAM Identity Center permission sets and assignments |
-| [naming](aws/naming/) | Resource naming conventions for AWS |
 | [networking](aws/networking/) | VPC, subnets, NAT, flow logs, three topology modes |
 | [organizations](aws/organizations/) | AWS Organizations with OUs and SCPs |
 | [route53](aws/route53/) | Route53 hosted zones |

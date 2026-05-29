@@ -25,21 +25,6 @@ variable "subnets" {
   default = {}
 }
 
-variable "environment" {
-  description = "Environment name (e.g. ops, dev, staging, prod)"
-  type        = string
-}
-
-variable "workload" {
-  description = "Workload identifier for resource names"
-  type        = string
-}
-
-variable "region_abbv" {
-  description = "Abbreviated region name for resource naming"
-  type        = string
-}
-
 variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)

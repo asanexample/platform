@@ -8,22 +8,6 @@ variable "create" {
   default     = true
 }
 
-variable "workload" {
-  description = "Workload identifier for resource naming"
-  type        = string
-  default     = "platform"
-}
-
-variable "environment" {
-  description = "Environment name (e.g., dev, preprod, prod)"
-  type        = string
-}
-
-variable "region_abbv" {
-  description = "Abbreviated name of the region (e.g., wus for westus, eus for eastus)"
-  type        = string
-}
-
 variable "cluster_name" {
   description = "Name for the vCluster instance"
   type        = string
@@ -79,17 +63,6 @@ variable "policies" {
     resource_quota = optional(bool, true)
   })
   default = {}
-}
-
-variable "ingress" {
-  description = "Ingress configuration for vCluster API server exposure"
-  type = object({
-    enabled       = optional(bool, false)
-    host          = optional(string, "")
-    ingress_class = optional(string, "")
-    tls_secret    = optional(string, "")
-  })
-  default = null
 }
 
 variable "persistence_enabled" {
