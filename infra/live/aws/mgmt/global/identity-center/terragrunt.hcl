@@ -85,6 +85,23 @@ inputs = {
       email       = include.base.locals.admin_email
       groups      = ["Admins"]
     }
+
+    # Sample developers for validating per-team isolation (ADR-039). One per team
+    # so we can confirm a dev can edit only their own namespace. Emails are
+    # plus-addressed on the org domain (from admin_email) — replace with the real
+    # addresses before these users need to sign in via SSO.
+    "alpha-dev" = {
+      given_name  = "Alpha"
+      family_name = "Developer"
+      email       = "alpha-dev+test@${split("@", include.base.locals.admin_email)[1]}"
+      groups      = ["Developers-alpha"]
+    }
+    "bravo-dev" = {
+      given_name  = "Bravo"
+      family_name = "Developer"
+      email       = "bravo-dev+test@${split("@", include.base.locals.admin_email)[1]}"
+      groups      = ["Developers-bravo"]
+    }
   }
 
   account_assignments = [
