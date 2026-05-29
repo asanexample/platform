@@ -46,6 +46,11 @@ hierarchy that promotes consistency across environments.
 | [ADR-031: Multi-App Tenant Model](adrs/031-multi-app-tenant-model.md) | Nested apps per team in teams.hcl, ECR naming convention |
 | [ADR-032: PR Preview Environments](adrs/032-pr-preview-environments.md) | ArgoCD ApplicationSet PR generator for ephemeral previews |
 | [ADR-033: Defer vCluster Support](adrs/033-defer-vcluster-tenant-support.md) | vCluster deferred — OSS lacks HTTPRoute sync |
+| [ADR-034: Transit Gateway](adrs/034-transit-gateway-cross-account-connectivity.md) | Hub/spoke TGW for cross-account VPC connectivity |
+| [ADR-035: Cross-VPC DNS](adrs/035-cross-vpc-dns-resolution.md) | Dynamic PHZ for private EKS endpoint resolution |
+| [ADR-036: GitHub OIDC](adrs/036-github-actions-oidc-federation.md) | OIDC federation for keyless CI/CD with ECR and Terratest |
+| [ADR-037: CloudTrail](adrs/037-cloudtrail-audit-logging.md) | Per-account audit logging with S3, KMS, and secrets alarms |
+| [ADR-038: platctl CLI](adrs/038-platctl-cli-for-platform-operations.md) | DAG-aware Go CLI for bootstrap, teardown, validate |
 | [Compliance Framework](compliance/) | Regulatory mappings, SCP rationale, and audit evidence |
 
 ## Reference
