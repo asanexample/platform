@@ -47,12 +47,27 @@ inputs = {
       managed_policies = ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
       inline_policy = jsonencode({
         Version = "2012-10-17"
-        Statement = [{
-          Sid      = "AssumeTeamDeveloperRole"
-          Effect   = "Allow"
-          Action   = "sts:AssumeRole"
-          Resource = "arn:aws:iam::${dependency.organizations.outputs.account_ids["Preprod"]}:role/DeveloperAccess-alpha"
-        }]
+        Statement = [
+          {
+            Sid      = "AssumeTeamDeveloperRole"
+            Effect   = "Allow"
+            Action   = "sts:AssumeRole"
+            Resource = "arn:aws:iam::${dependency.organizations.outputs.account_ids["Preprod"]}:role/DeveloperAccess-alpha"
+          },
+          {
+            # Per-team ABAC (#62): deny acting on resources owned by another team.
+            # Only bites when a Team tag is present and is neither alpha nor platform
+            # (untagged / unsupported actions unaffected → broad read preserved).
+            Sid      = "DenyOtherTeamsResources"
+            Effect   = "Deny"
+            Action   = "*"
+            Resource = "*"
+            Condition = {
+              StringNotEquals = { "aws:ResourceTag/Team" = ["alpha", "platform"] }
+              Null            = { "aws:ResourceTag/Team" = "false" }
+            }
+          },
+        ]
       })
     }
     "Dev-bravo" = {
@@ -61,12 +76,27 @@ inputs = {
       managed_policies = ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
       inline_policy = jsonencode({
         Version = "2012-10-17"
-        Statement = [{
-          Sid      = "AssumeTeamDeveloperRole"
-          Effect   = "Allow"
-          Action   = "sts:AssumeRole"
-          Resource = "arn:aws:iam::${dependency.organizations.outputs.account_ids["Preprod"]}:role/DeveloperAccess-bravo"
-        }]
+        Statement = [
+          {
+            Sid      = "AssumeTeamDeveloperRole"
+            Effect   = "Allow"
+            Action   = "sts:AssumeRole"
+            Resource = "arn:aws:iam::${dependency.organizations.outputs.account_ids["Preprod"]}:role/DeveloperAccess-bravo"
+          },
+          {
+            # Per-team ABAC (#62): deny acting on resources owned by another team.
+            # Only bites when a Team tag is present and is neither bravo nor platform
+            # (untagged / unsupported actions unaffected → broad read preserved).
+            Sid      = "DenyOtherTeamsResources"
+            Effect   = "Deny"
+            Action   = "*"
+            Resource = "*"
+            Condition = {
+              StringNotEquals = { "aws:ResourceTag/Team" = ["bravo", "platform"] }
+              Null            = { "aws:ResourceTag/Team" = "false" }
+            }
+          },
+        ]
       })
     }
   }

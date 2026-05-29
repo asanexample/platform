@@ -73,11 +73,15 @@ who can exec/run pods can read any Secret a pod mounts.)
 
 ### AWS access posture
 
-- **Preprod:** the `Dev-<team>` permission set grants account-wide **`ReadOnlyAccess`** (seeing other
-  teams' resources read-only is acceptable in preprod; `ReadOnlyAccess` excludes value retrieval like
-  `secretsmanager:GetSecretValue`) plus `sts:AssumeRole` into the team's role. No data-plane write.
-- **Prod (not yet deployed):** no account-wide read; access scoped via resource tags / ABAC to meet
-  least-privilege expectations of major compliance frameworks. Depends on the team-tagging workstream.
+- **Preprod:** the `Dev-<team>` permission set grants account-wide **`ReadOnlyAccess`** (broad
+  metadata read; `ReadOnlyAccess` excludes value retrieval like `secretsmanager:GetSecretValue`) plus
+  `sts:AssumeRole` into the team's role, **plus a per-team ABAC `Deny`** (#62) that blocks acting on
+  any resource tagged with another team (`aws:ResourceTag/Team` ∉ {own team, `platform`}) — so a dev
+  can't pull another team's ECR images, etc. Backed by the `Team` tag (#61) and a tag-integrity SCP
+  that prevents forging the tag. AWS ABAC only covers actions that support `aws:ResourceTag`, so broad
+  `Describe`/`List` metadata read remains account-wide. No data-plane write.
+- **Prod (not yet deployed):** same deny-other-teams model; whether to drop account-wide read entirely
+  is bounded by the same ABAC limits — tracked as a prod-posture follow-up.
 
 ## Consequences
 

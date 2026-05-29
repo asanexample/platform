@@ -400,6 +400,37 @@ data "aws_iam_policy_document" "protect_data_and_network" {
       values   = local.exempt_role_arns
     }
   }
+
+  # Tag integrity for per-team ABAC (#62): the `Team` tag must not be forgeable, or
+  # the deny-other-teams developer policies could be bypassed by relabeling a
+  # resource. Deny mutation of the Team tag except for platform/deployer roles AND
+  # AWS service-linked roles (EKS/Auto Scaling tag/propagate tags onto the resources
+  # they create — excluding them would break node provisioning/scaling).
+  statement {
+    sid    = "DenyTeamTagTampering"
+    effect = "Deny"
+    actions = [
+      "ec2:CreateTags",
+      "ec2:DeleteTags",
+      "ecr:TagResource",
+      "ecr:UntagResource",
+      "iam:TagRole",
+      "iam:UntagRole",
+      "secretsmanager:TagResource",
+      "secretsmanager:UntagResource",
+    ]
+    resources = ["*"]
+    condition {
+      test     = "ForAnyValue:StringEquals"
+      variable = "aws:TagKeys"
+      values   = ["Team"]
+    }
+    condition {
+      test     = "ArnNotLike"
+      variable = "aws:PrincipalArn"
+      values   = concat(local.exempt_role_arns, ["arn:aws:iam::*:role/aws-service-role/*"])
+    }
+  }
 }
 
 # ---------------------------------------------------------------------------
