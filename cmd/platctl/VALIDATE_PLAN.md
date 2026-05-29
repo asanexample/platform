@@ -117,7 +117,7 @@ Tailscale connectivity:
   ok preprod                            subnet router online, API reachable
 
 IAM & access:
-  ok management                         SSO session valid (851725353202)
+  ok management                         SSO session valid (<MGMT_ACCOUNT_ID>)
   ok platform                           PlatformDeployer assumable, PlatformAdmin assumable
   ok preprod                            PlatformDeployer assumable, PlatformAdmin assumable
   ok state-backend                      S3 bucket accessible
@@ -211,13 +211,13 @@ validate:
       url: https://argocd.aws.refplat.org/
       env: platform
   iam:
-    state_bucket: tfstate-mgmt-851725353202
-    state_role_arn: arn:aws:iam::851725353202:role/TerraformStateAccess
+    state_bucket: tfstate-mgmt-<MGMT_ACCOUNT_ID>
+    state_role_arn: arn:aws:iam::<MGMT_ACCOUNT_ID>:role/TerraformStateAccess
     accounts:
       platform:
-        id: "829808296602"
+        id: "<PLATFORM_ACCOUNT_ID>"
         deployer_role: PlatformDeployer
       preprod:
-        id: "620830101009"
+        id: "<PREPROD_ACCOUNT_ID>"
         deployer_role: PlatformDeployer
 ```

@@ -21,12 +21,12 @@ module "eks" {
 
   access_entries = {
     platform-admin = {
-      principal_arn = "arn:aws:iam::829808296602:role/PlatformAdmin"
+      principal_arn = "arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/PlatformAdmin"
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
       scope_type    = "cluster"
     }
     platform-deployer = {
-      principal_arn = "arn:aws:iam::829808296602:role/PlatformDeployer"
+      principal_arn = "arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/PlatformDeployer"
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
       scope_type    = "cluster"
     }

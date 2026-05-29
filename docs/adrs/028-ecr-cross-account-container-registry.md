@@ -6,8 +6,8 @@
 
 ## Context
 
-The platform operates across four AWS accounts (ADR-004): management (851725353202), platform
-(829808296602), preprod (620830101009), and prod (554518885123). Application teams build container
+The platform operates across four AWS accounts (ADR-004): management (<MGMT_ACCOUNT_ID>), platform
+(<PLATFORM_ACCOUNT_ID>), preprod (<PREPROD_ACCOUNT_ID>), and prod (<PROD_ACCOUNT_ID>). Application teams build container
 images in CI pipelines (GitHub Actions) and deploy them to EKS clusters running in preprod and
 prod. The platform needs a container registry strategy that satisfies three constraints:
 
@@ -39,7 +39,7 @@ consistency, meaning a deploy can race the replication). Image digest identity a
 is not guaranteed unless the same manifest is pushed byte-for-byte.
 
 **2. Centralized ECR in platform account with cross-account pull (chosen).** All repositories
-live in the platform account (829808296602). CI pushes once. Preprod and prod pull the same
+live in the platform account (<PLATFORM_ACCOUNT_ID>). CI pushes once. Preprod and prod pull the same
 image by digest. Cross-account access is granted via ECR repository policies that allow
 `ecr:BatchGetImage`, `ecr:GetDownloadUrlForLayer`, and `ecr:BatchCheckLayerAvailability` to
 the preprod and prod account root principals. No credentials are stored in workload accounts —
@@ -64,7 +64,7 @@ scale (2-3 teams, <50 repositories), this overhead is not justified.
 
 ## Decision
 
-Use centralized ECR repositories in the platform account (829808296602) with cross-account pull
+Use centralized ECR repositories in the platform account (<PLATFORM_ACCOUNT_ID>) with cross-account pull
 access for preprod and prod. The `infra/modules/aws/ecr/` module manages repository creation,
 cross-account policies, and lifecycle rules. The ECR live unit is deployed at
 `infra/live/aws/platform/us-east-1/platform/ecr/`.
@@ -88,7 +88,7 @@ The ECR module creates a repository policy on each repository that grants pull p
 specified account root principals:
 
 ```hcl
-pull_account_ids = ["620830101009", "554518885123"]  # preprod, prod
+pull_account_ids = ["<PREPROD_ACCOUNT_ID>", "<PROD_ACCOUNT_ID>"]  # preprod, prod
 ```
 
 The repository policy grants `ecr:BatchGetImage`, `ecr:GetDownloadUrlForLayer`, and

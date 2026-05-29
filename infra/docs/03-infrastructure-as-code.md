@@ -193,7 +193,7 @@ State is routed automatically by `root.hcl` based on the cloud directory:
 
 | Cloud | Backend | Location |
 |-------|---------|----------|
-| AWS | S3 + DynamoDB | `tfstate-mgmt-851725353202`, `terraform-locks` |
+| AWS | S3 + DynamoDB | `tfstate-mgmt-<MGMT_ACCOUNT_ID>`, `terraform-locks` |
 | Azure/GCP | Azure Blob | `tfstatemulticloud`, `terraformstate` container |
 
 State keys mirror the directory structure:

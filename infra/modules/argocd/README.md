@@ -9,7 +9,7 @@ module "argocd" {
   source = "../../modules/argocd"
 
   cluster_name      = "platform-use1-eks"
-  oidc_provider_arn = "arn:aws:iam::829808296602:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE"
+  oidc_provider_arn = "arn:aws:iam::<PLATFORM_ACCOUNT_ID>:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE"
   oidc_provider_url = "oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE"
 
   high_availability = true
@@ -17,7 +17,7 @@ module "argocd" {
   rbac_scopes       = "[groups]"
 
   remote_cluster_role_arns = [
-    "arn:aws:iam::620830101009:role/PlatformDeployer",
+    "arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/PlatformDeployer",
   ]
 
   argocd_cm_extra = {

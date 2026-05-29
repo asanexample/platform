@@ -294,7 +294,7 @@ Connector (subnet router) is online -- no manual step needed.
    AWS_PROFILE=platform aws eks update-kubeconfig \
      --name platform-use1-eks \
      --region us-east-1 \
-     --role-arn arn:aws:iam::829808296602:role/PlatformAdmin
+     --role-arn arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/PlatformAdmin
    ```
 
 1. Verify: `kubectl get nodes`
@@ -391,7 +391,7 @@ The Connector must reference the ProxyClass by name.
 AWS_PROFILE=platform aws eks update-kubeconfig \
   --name platform-use1-eks \
   --region us-east-1 \
-  --role-arn arn:aws:iam::829808296602:role/PlatformAdmin
+  --role-arn arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/PlatformAdmin
 ```
 
 ### Split DNS Breaking kubectl

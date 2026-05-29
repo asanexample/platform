@@ -7,9 +7,9 @@
 ## Context
 
 Each environment needs its own DNS zone for ingress, certificate validation, and service
-discovery. The platform account (829808296602) owns the `aws.refplat.org` Route53 hosted zone,
+discovery. The platform account (<PLATFORM_ACCOUNT_ID>) owns the `aws.refplat.org` Route53 hosted zone,
 which serves as the authoritative DNS for the platform cluster's Gateway API services (ADR-022).
-As the preprod environment (620830101009) adds its own EKS cluster with public ingress (ADR-029),
+As the preprod environment (<PREPROD_ACCOUNT_ID>) adds its own EKS cluster with public ingress (ADR-029),
 it needs DNS records under `preprod.aws.refplat.org` — and the question is where that zone lives
 and how the DNS tooling authenticates to it.
 
@@ -25,8 +25,8 @@ specific Route53 zone ARN. This is the standard per-workload least-privilege pat
 
 The problem arises when preprod's cert-manager and external-dns need to manage records in a DNS
 zone. If the zone lives in the platform account, preprod's IRSA roles would need cross-account
-Route53 access — the IAM role in preprod (620830101009) would need `route53:ChangeResourceRecordSets`
-permission on a zone in the platform account (829808296602). This requires:
+Route53 access — the IAM role in preprod (<PREPROD_ACCOUNT_ID>) would need `route53:ChangeResourceRecordSets`
+permission on a zone in the platform account (<PLATFORM_ACCOUNT_ID>). This requires:
 
 - A resource-based policy on the platform account's Route53 zone granting cross-account access
 - The preprod IRSA role to include `sts:AssumeRole` for a cross-account role, or direct
@@ -80,20 +80,20 @@ to the child account's zone nameservers.
 Cloudflare (parent zone: refplat.org)
   └── NS records for aws.refplat.org → Route53 (platform account)
 
-Route53 (platform account: 829808296602)
+Route53 (platform account: <PLATFORM_ACCOUNT_ID>)
   Zone: aws.refplat.org
   ├── A records (argocd.aws.refplat.org → internal NLB, via external-dns)
   ├── TXT records (ACME challenges, via cert-manager)
   ├── CAA record (restrict issuance to Let's Encrypt)
   └── NS records for preprod.aws.refplat.org → Route53 (preprod account)
 
-Route53 (preprod account: 620830101009)
+Route53 (preprod account: <PREPROD_ACCOUNT_ID>)
   Zone: preprod.aws.refplat.org
   ├── A records (*.preprod.aws.refplat.org → public NLB, via external-dns)
   ├── TXT records (ACME challenges, via cert-manager)
   └── CAA record (restrict issuance to Let's Encrypt)
 
-Route53 (prod account: 554518885123)         [future]
+Route53 (prod account: <PROD_ACCOUNT_ID>)         [future]
   Zone: prod.aws.refplat.org
   ├── A records
   ├── TXT records

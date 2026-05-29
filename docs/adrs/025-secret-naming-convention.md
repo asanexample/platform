@@ -37,7 +37,7 @@ platform secrets, the prod account only contains prod secrets. Adding an environ
 redundant with the account boundary and creates a risk of mismatched labels (a secret named
 `prod/...` in the preprod account). Rejected.
 
-**3. Account-ID-prefixed (e.g., `829808296602/tailscale/api-key`).** Technically unique across
+**3. Account-ID-prefixed (e.g., `<PLATFORM_ACCOUNT_ID>/tailscale/api-key`).** Technically unique across
 accounts, but account IDs are opaque 12-digit numbers that convey no meaning. Anyone reading
 the path needs to look up which account the ID maps to. The account boundary already provides
 uniqueness. Rejected.

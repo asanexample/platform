@@ -14,7 +14,7 @@ None
 
 | Input | Value | Notes |
 |-------|-------|-------|
-| `bucket_name` | `tfstate-mgmt-851725353202` | S3 bucket for state files |
+| `bucket_name` | `tfstate-mgmt-<MGMT_ACCOUNT_ID>` | S3 bucket for state files |
 | `dynamodb_table_name` | `terraform-locks` | DynamoDB table for state locking |
 
 **Note:** This unit uses a `local` backend override (state stored in `terraform.tfstate` on disk). This is intentional -- it creates the S3 bucket that all other units store state in, so it cannot use that bucket itself.

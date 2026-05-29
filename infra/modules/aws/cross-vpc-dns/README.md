@@ -16,7 +16,7 @@ module "cross_vpc_dns" {
     eks = {
       domain              = "ABCDEF1234.gr7.us-east-1.eks.amazonaws.com"
       eks_cluster_name    = "preprod-use1-eks"
-      eks_lookup_role_arn = "arn:aws:iam::620830101009:role/PlatformDeployer"
+      eks_lookup_role_arn = "arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/PlatformDeployer"
       ttl                 = 60
     }
   }

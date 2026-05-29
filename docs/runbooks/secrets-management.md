@@ -256,7 +256,7 @@ AWS_PROFILE=platform aws iam get-role-policy \
 ```
 
 Confirm the policy grants `secretsmanager:GetSecretValue` on an ARN pattern
-that matches the secret path (e.g., `arn:aws:secretsmanager:*:829808296602:secret:platform/*`).
+that matches the secret path (e.g., `arn:aws:secretsmanager:*:<PLATFORM_ACCOUNT_ID>:secret:platform/*`).
 
 ### Verify the secret exists in Secrets Manager
 

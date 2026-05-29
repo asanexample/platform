@@ -18,7 +18,7 @@ None.
 | `create_oauth_client` | `true` | Creates OAuth client for the K8s operator with `tag:k8s-operator` |
 | `secrets_manager_name` | `platform/tailscale/oauth` | Stores OAuth credentials in platform account Secrets Manager |
 
-Also generates Terraform resources to replicate OAuth and API key secrets to the preprod account (`620830101009`) via `aws.preprod` provider alias.
+Also generates Terraform resources to replicate OAuth and API key secrets to the preprod account (`<PREPROD_ACCOUNT_ID>`) via `aws.preprod` provider alias.
 
 ## Commands
 

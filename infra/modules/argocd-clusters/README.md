@@ -16,7 +16,7 @@ module "argocd_clusters" {
       ca_data = base64encode(file("preprod-ca.pem"))
       aws_auth = {
         cluster_name = "preprod-use1-eks"
-        role_arn     = "arn:aws:iam::620830101009:role/PlatformDeployer"
+        role_arn     = "arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/PlatformDeployer"
       }
     }
   }

@@ -14,7 +14,7 @@ module "ecr" {
     "team-bravo/frontend" = { tag_mutability = "MUTABLE" }
   }
 
-  pull_account_ids = ["620830101009", "554518885123"]
+  pull_account_ids = ["<PREPROD_ACCOUNT_ID>", "<PROD_ACCOUNT_ID>"]
   max_image_count  = 50
 
   tags = {

@@ -36,12 +36,12 @@ module "identity_center" {
 
   account_assignments = [
     {
-      account_id     = "829808296602"
+      account_id     = "<PLATFORM_ACCOUNT_ID>"
       permission_set = "AdministratorAccess"
       group          = "PlatformEngineers"
     },
     {
-      account_id     = "620830101009"
+      account_id     = "<PREPROD_ACCOUNT_ID>"
       permission_set = "ReadOnlyAccess"
       group          = "Developers"
     },

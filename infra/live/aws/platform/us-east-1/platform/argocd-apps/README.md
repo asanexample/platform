@@ -19,7 +19,7 @@ Creates ArgoCD Applications and ApplicationSets for tenant workloads deployed to
 |-------|-------|-------|
 | `tenants` | Loaded from preprod `teams.hcl` | Team/app definitions with mode and apps map |
 | `github_org` | `gangster` | |
-| `ecr_registry` | `829808296602.dkr.ecr.us-east-1.amazonaws.com` | Platform account ECR |
+| `ecr_registry` | `<PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com` | Platform account ECR |
 | `preview_domain` | `preprod.aws.refplat.org` | PR preview environment domain |
 | `cluster_name` | `preprod` | Target cluster for app deployments |
 | `cluster_server` | Preprod EKS endpoint | From preprod EKS dependency |

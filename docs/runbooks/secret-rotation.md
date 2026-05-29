@@ -164,7 +164,7 @@ updated or SSO login will fail with a certificate verification error.
    application:
 
    - Open the [IAM Identity Center console](https://console.aws.amazon.com/singlesignon)
-     in the management account (851725353202)
+     in the management account (<MGMT_ACCOUNT_ID>)
    - Navigate to **Applications** > **ArgoCD** > application details
    - Download the **SAML metadata XML**
 
@@ -391,7 +391,7 @@ aws sns create-topic \
 
 # Subscribe the platform team
 aws sns subscribe \
-  --topic-arn arn:aws:sns:us-east-1:829808296602:secret-rotation-alerts \
+  --topic-arn arn:aws:sns:us-east-1:<PLATFORM_ACCOUNT_ID>:secret-rotation-alerts \
   --protocol email \
   --notification-endpoint platform-team@company.com \
   --region us-east-1 \

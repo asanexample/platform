@@ -36,7 +36,7 @@ teams don't need to understand the module internals.
 
 **What we built:**
 
-- **S3 + DynamoDB** in the management account (851725353202) with a dedicated
+- **S3 + DynamoDB** in the management account (<MGMT_ACCOUNT_ID>) with a dedicated
   `TerraformStateAccess` IAM role. Every environment's state is stored in the
   same bucket but isolated by key path
   (`{env}/{region}/{workload}/{unit}/terraform.tfstate`).

@@ -63,12 +63,14 @@ variable "create_organization" {
 ```
 
 **When `create_organization = true`** (greenfield):
+
 - An `aws_organizations_organization` resource is created with the specified service access
   principals, enabled policy types, and `feature_set = "ALL"`.
 - The resource has `lifecycle { prevent_destroy = true }` to prevent accidental deletion of the
   entire organization.
 
 **When `create_organization = false`** (brownfield, the default):
+
 - A `data.aws_organizations_organization.current` data source reads the existing organization.
 - The root ID is extracted from the data source for OU and SCP attachment operations.
 
@@ -147,12 +149,12 @@ module surfaces this constraint through the account variable structure:
 
 ```hcl
 accounts = {
-  "platform" = { email = "josh+platform@deeden.org", ou = "Platform" }
-  "preprod"  = { email = "josh+preprod@deeden.org",  ou = "Workloads/Preprod" }
+  "platform" = { email = "admin+platform@example.com", ou = "Platform" }
+  "preprod"  = { email = "admin+preprod@example.com",  ou = "Workloads/Preprod" }
 }
 ```
 
-The use of `+` subaddressing (e.g., `josh+platform@deeden.org`) is a common pattern that allows a
+The use of `+` subaddressing (e.g., `admin+platform@example.com`) is a common pattern that allows a
 single email mailbox to serve as the root email for multiple AWS accounts. This works because:
 
 - AWS treats each `+` variant as a unique email address.

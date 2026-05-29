@@ -31,18 +31,18 @@ Add the following to `~/.aws/config`:
 
 ```ini
 [sso-session centric]
-sso_start_url = https://d-9067aa6520.awsapps.com/start
+sso_start_url = https://d-XXXXXXXXXX.awsapps.com/start
 sso_region = us-east-1
 sso_registration_scopes = sso:account:access
 
 [profile management]
 sso_session = centric
-sso_account_id = 851725353202
+sso_account_id = <MGMT_ACCOUNT_ID>
 sso_role_name = AdministratorAccess
 
 [profile platform]
 sso_session = centric
-sso_account_id = 829808296602
+sso_account_id = <PLATFORM_ACCOUNT_ID>
 sso_role_name = AdministratorAccess
 ```
 
@@ -51,7 +51,7 @@ Developers should also add:
 ```ini
 [profile platform-dev]
 sso_session = centric
-sso_account_id = 829808296602
+sso_account_id = <PLATFORM_ACCOUNT_ID>
 sso_role_name = PowerUserAccess
 ```
 
@@ -140,12 +140,12 @@ aws --version     # Should print aws-cli/2.x
 │   │   │   ├── _base.hcl             # Shared AWS base config (config hierarchy)
 │   │   │   ├── _versions.hcl         # Module source paths and version pins
 │   │   │   ├── common.hcl            # Cloud-wide defaults and account mapping
-│   │   │   ├── mgmt/                  # Management account (851725353202)
+│   │   │   ├── mgmt/                  # Management account (<MGMT_ACCOUNT_ID>)
 │   │   │   │   ├── common.hcl        # Environment-level config
 │   │   │   │   └── global/
 │   │   │   │       ├── state-bootstrap/   # Remote state backend (deploy first)
 │   │   │   │       └── organizations/     # AWS Org, OUs, accounts, SCPs
-│   │   │   └── platform/              # Platform account (829808296602)
+│   │   │   └── platform/              # Platform account (<PLATFORM_ACCOUNT_ID>)
 │   │   ├── azure/                     # Azure environments (dev, ops)
 │   │   └── gcp/                       # GCP environments (ops)
 │   │
@@ -216,7 +216,7 @@ terragrunt plan
 terragrunt apply
 
 # Verify the bucket exists
-aws s3 ls s3://tfstate-mgmt-851725353202
+aws s3 ls s3://tfstate-mgmt-<MGMT_ACCOUNT_ID>
 ```
 
 After this step, the state file lives locally at
@@ -423,7 +423,7 @@ enforced.
 1. **Push images** to ECR via GitHub Actions (OIDC auth, no credentials needed):
 
    ```text
-   829808296602.dkr.ecr.us-east-1.amazonaws.com/team-<name>/app:<tag>
+   <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/team-<name>/app:<tag>
    ```
 
 2. **Commit manifests** to your team's repo at `k8s/preprod/` (Deployment,

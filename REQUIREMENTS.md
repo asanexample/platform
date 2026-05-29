@@ -7,7 +7,7 @@
 2. Cloud-aware state management: S3 with DynamoDB locking for AWS, Azure Blob
    Storage for Azure — root `root.hcl` routes automatically based on directory
    path (ADR-002)
-3. State stored in management account (851725353202) with a dedicated
+3. State stored in management account (<MGMT_ACCOUNT_ID>) with a dedicated
    `TerraformStateAccess` IAM role — isolation by key path
    (`{env}/{region}/{workload}/{unit}/terraform.tfstate`), not by bucket
    (ADR-006)

@@ -74,7 +74,7 @@ The module's PHZ mode works as follows:
 
 The live unit (`infra/live/aws/platform/us-east-1/platform/cross-vpc-dns/terragrunt.hcl`)
 configures a single PHZ record for the preprod EKS cluster, using the `PlatformDeployer` role
-in the preprod account (620830101009) for cross-account ENI lookup. It depends on the platform
+in the preprod account (<PREPROD_ACCOUNT_ID>) for cross-account ENI lookup. It depends on the platform
 `networking` module (for VPC ID) and the preprod `eks` module (for cluster endpoint and name).
 
 ### Resolver Mode

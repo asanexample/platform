@@ -97,7 +97,7 @@ responsibility is creating the S3 state bucket and DynamoDB lock table. This mod
 
 2. **Creates two resources** -- an S3 bucket and a DynamoDB table -- with hardened configurations:
 
-   **S3 Bucket (`tfstate-mgmt-851725353202`):**
+   **S3 Bucket (`tfstate-mgmt-<MGMT_ACCOUNT_ID>`):**
    - Versioning: Enabled (allows state recovery from accidental corruption or deletion)
    - Encryption: AWS KMS with bucket key enabled (cost-effective server-side encryption)
    - Public access block: All four settings enabled (block_public_acls, block_public_policy,
@@ -110,7 +110,7 @@ responsibility is creating the S3 state bucket and DynamoDB lock table. This mod
 3. **Is completely separate from the Organizations module.** The state_bootstrap module has no
    knowledge of Organizations, OUs, accounts, or SCPs. The Organizations module has no knowledge
    of state storage. They share only the convention that the bucket name is
-   `tfstate-mgmt-851725353202` and the DynamoDB table is `terraform-locks`.
+   `tfstate-mgmt-<MGMT_ACCOUNT_ID>` and the DynamoDB table is `terraform-locks`.
 
 ### State File Committed to Repository
 
@@ -132,7 +132,7 @@ intentional exception to the general rule of "never commit state files" because:
 - No access credentials for the bucket or table.
 
 The S3 bucket and DynamoDB table are "infrastructure about infrastructure." Their metadata is not
-sensitive. The bucket name (`tfstate-mgmt-851725353202`) and table name (`terraform-locks`) are
+sensitive. The bucket name (`tfstate-mgmt-<MGMT_ACCOUNT_ID>`) and table name (`terraform-locks`) are
 already visible in the root `root.hcl` and in the `_base.hcl` configuration. Committing the
 state file adds no information that is not already public within the repository.
 
@@ -148,7 +148,7 @@ Committing the state file provides:
 
 The bootstrap creates a strict ordering requirement for initial AWS setup:
 
-```
+```text
 Phase 1: state_bootstrap
   - Uses local backend
   - Creates S3 bucket + DynamoDB table
@@ -224,7 +224,7 @@ This means:
 - **Minimal blast radius.** The bootstrap module manages exactly 2 resources (bucket + table). Its
   local state file is small and rarely changes.
 - **Recoverable.** If the local state file is lost, the resources can be re-imported by name
-  (`terragrunt import 'aws_s3_bucket.state[0]' tfstate-mgmt-851725353202`). The bucket and table
+  (`terragrunt import 'aws_s3_bucket.state[0]' tfstate-mgmt-<MGMT_ACCOUNT_ID>`). The bucket and table
   names are deterministic.
 - **No cross-tool dependency.** Unlike a CloudFormation bootstrap, this approach uses the same
   toolchain (OpenTofu + Terragrunt) as everything else in the repository.

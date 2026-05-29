@@ -1,6 +1,6 @@
 # IAM Roles
 
-Creates purpose-built IAM roles for platform operations in the platform account (829808296602).
+Creates purpose-built IAM roles for platform operations in the platform account (<PLATFORM_ACCOUNT_ID>).
 
 ## Module
 

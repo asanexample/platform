@@ -41,7 +41,7 @@ The SAML application must be created manually in the Identity Center console.
 ### Step 1: Create the SAML application
 
 1. Open the [IAM Identity Center console](https://console.aws.amazon.com/singlesignon)
-   in the management account (851725353202)
+   in the management account (<MGMT_ACCOUNT_ID>)
 2. Navigate to **Applications** -> **Add application**
 3. Select **I have an application I want to set up** -> **SAML 2.0**
 4. Configure:

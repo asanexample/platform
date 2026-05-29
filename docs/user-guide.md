@@ -56,7 +56,7 @@ terraform {
 }
 
 inputs = {
-  bucket_name         = "tfstate-mgmt-851725353202"
+  bucket_name         = "tfstate-mgmt-<MGMT_ACCOUNT_ID>"
   dynamodb_table_name = "terraform-locks"
   tags                = include.base.locals.tags
 }
@@ -267,7 +267,7 @@ terragrunt apply
 
 Expected resources created:
 
-- S3 bucket `tfstate-mgmt-851725353202` with versioning, KMS encryption, and public access block
+- S3 bucket `tfstate-mgmt-<MGMT_ACCOUNT_ID>` with versioning, KMS encryption, and public access block
 - DynamoDB table `terraform-locks` with PAY_PER_REQUEST billing and `LockID` hash key
 
 ### Step 2: Deploy AWS Organizations
@@ -365,8 +365,8 @@ Gather the following identifiers from your existing organization:
 |----------|-----------|---------------|
 | Organization | Organization ID | `o-a4kjvito7o` |
 | Organization root | Root ID | Find via `aws organizations list-roots` |
-| Platform account | Account ID | `829808296602` |
-| Preprod account | Account ID | `620830101009` |
+| Platform account | Account ID | `<PLATFORM_ACCOUNT_ID>` |
+| Preprod account | Account ID | `<PREPROD_ACCOUNT_ID>` |
 | Existing OUs | OU IDs | Find via `aws organizations list-organizational-units-for-parent` |
 
 ### Step 1: Deploy State Bootstrap
@@ -414,8 +414,8 @@ terragrunt import 'aws_organizations_organizational_unit.this["Workloads/Preprod
 # ... repeat for each OU
 
 # Import accounts
-terragrunt import 'aws_organizations_account.this["platform"]' 829808296602
-terragrunt import 'aws_organizations_account.this["preprod"]' 620830101009
+terragrunt import 'aws_organizations_account.this["platform"]' <PLATFORM_ACCOUNT_ID>
+terragrunt import 'aws_organizations_account.this["preprod"]' <PREPROD_ACCOUNT_ID>
 ```
 
 ### Step 4: Plan and Verify
@@ -665,7 +665,7 @@ can initialize:
 remote_state {
   backend = "s3"
   config = {
-    bucket         = "tfstate-mgmt-851725353202"
+    bucket         = "tfstate-mgmt-<MGMT_ACCOUNT_ID>"
     key            = "${path_relative_to_include()}/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
@@ -755,17 +755,17 @@ policies enforced.
 
 ### ECR Container Registry
 
-Images are stored in ECR in the platform account (829808296602) and pulled
-cross-account by preprod (620830101009) and prod (554518885123).
+Images are stored in ECR in the platform account (<PLATFORM_ACCOUNT_ID>) and pulled
+cross-account by preprod (<PREPROD_ACCOUNT_ID>) and prod (<PROD_ACCOUNT_ID>).
 
 ```bash
 # Authenticate to ECR
 aws ecr get-login-password --region us-east-1 --profile platform \
-  | docker login --username AWS --password-stdin 829808296602.dkr.ecr.us-east-1.amazonaws.com
+  | docker login --username AWS --password-stdin <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
 
 # Push an image
-docker tag myapp:latest 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/app:v1.0.0
-docker push 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/app:v1.0.0
+docker tag myapp:latest <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/app:v1.0.0
+docker push <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/app:v1.0.0
 ```
 
 ECR repos are defined in `infra/live/aws/platform/us-east-1/platform/ecr/terragrunt.hcl`.
