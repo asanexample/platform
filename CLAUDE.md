@@ -155,7 +155,7 @@ Cross-account access uses purpose-built IAM roles (see IAM Roles below). `Organi
 |------|---------|---------|
 | **PlatformAdmin** | Platform, PreProd | kubectl, SSM tunnel, cluster debugging |
 | **PlatformDeployer** | Platform, PreProd | Terragrunt apply, Helm/K8s providers |
-| **DeveloperAccess** | Platform, PreProd | Namespace-scoped kubectl for developers |
+| **DeveloperAccess-\<team\>** | PreProd | Per-team, namespace-scoped kubectl (one role per team, generated from `teams.hcl`; group-mapped RBAC — see ADR-039) |
 | **TerraformStateAccess** | Management | S3 state bucket + DynamoDB lock table |
 | **OrganizationAccountAccessRole** | All accounts | Break-glass only |
 
