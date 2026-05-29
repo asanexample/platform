@@ -76,7 +76,7 @@ team with `mode = "namespace"`:
 | Resource | Name | Purpose |
 |----------|------|---------|
 | `Namespace` | `team-<name>` | Workload boundary |
-| `ResourceQuota` | `tenant-quota` | CPU, memory, and pod caps |
+| `ResourceQuota` | `tenant-quota` | CPU, memory, pod, service/LB, PVC, and storage caps |
 | `LimitRange` | `tenant-limits` | Default container requests/limits |
 | `NetworkPolicy` | `default-deny-ingress` | Block all inbound traffic by default |
 | `NetworkPolicy` | `allow-gateway-ingress` | Permit traffic from the Gateway and kube-system namespaces |
@@ -204,6 +204,10 @@ on top. See ADR-033 for why vCluster mode is currently deferred.
 | `requests.cpu` / `limits.cpu` | 4 cores |
 | `requests.memory` / `limits.memory` | 8Gi |
 | `pods` | 20 |
+| `services` | 20 |
+| `services.loadbalancers` | 0 (ingress via the shared Gateway, ADR-017 — no per-tenant NLBs) |
+| `persistentvolumeclaims` | 10 |
+| `requests.storage` | 50Gi |
 | Container default limit | 500m CPU, 512Mi memory |
 | Container default request | 100m CPU, 128Mi memory |
 

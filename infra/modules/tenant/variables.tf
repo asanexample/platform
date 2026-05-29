@@ -12,6 +12,11 @@ variable "tenants" {
       cpu    = optional(string, "4")
       memory = optional(string, "8Gi")
       pods   = optional(number, 20)
+      # Object/storage caps to prevent exhaustion of shared cluster capacity.
+      services      = optional(number, 20)
+      loadbalancers = optional(number, 0) # ingress is via the shared Gateway (ADR-017), not per-tenant NLBs
+      pvcs          = optional(number, 10)
+      storage       = optional(string, "50Gi") # total requested PVC storage
     }), {})
   }))
   default = {}
