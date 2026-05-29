@@ -71,7 +71,7 @@ platform. The flip is a one-line input change. This realizes the risk mitigation
    cross-team IRSA-annotation guard, RBAC hardening, resource/label/probe requirements, no public
    LB/NodePort, no `default` namespace, tenant namespace naming, tier-gated restricted PSS + RO-rootfs.
 2. **`mutate` + `generate`**: hardened-securityContext/label defaults; auto default-deny NetworkPolicy
-   + ResourceQuota generation for all namespaces (incl. PR-preview).
+   and ResourceQuota generation for all namespaces (incl. PR-preview).
 3. **Supply chain**: `cosign` keyless signing (GitHub OIDC) in app CI + `verifyImages` enforcement.
 4. **Shift-left CLI**: `kyverno apply`/`test` gate in app-repo + platform CI.
 5. **Reporting + cleanup**: PolicyReport → observability; `CleanupPolicy` TTLs; Gateway-API HTTPRoute

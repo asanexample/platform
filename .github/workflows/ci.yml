@@ -145,7 +145,7 @@ jobs:
       - uses: azure/setup-helm@v4
       - name: Install Kyverno CLI
         run: |
-          curl -fsSL "https://github.com/kyverno/kyverno/releases/download/v${KYVERNO_VERSION}/kyverno-cli_v${KYVERNO_VERSION}_linux_amd64.tar.gz" -o kyverno.tgz
+          curl -fsSL "https://github.com/kyverno/kyverno/releases/download/v${KYVERNO_VERSION}/kyverno-cli_v${KYVERNO_VERSION}_linux_x86_64.tar.gz" -o kyverno.tgz
           tar xzf kyverno.tgz kyverno
           sudo install -m 0755 kyverno /usr/local/bin/kyverno
           kyverno version
