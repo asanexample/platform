@@ -26,11 +26,16 @@ dependency "iam_roles" {
   config_path = "../iam-roles"
 
   mock_outputs = {
-    role_arns = {
-      PlatformAdmin    = "arn:aws:iam::000000000000:role/PlatformAdmin"
-      PlatformDeployer = "arn:aws:iam::000000000000:role/PlatformDeployer"
-      DeveloperAccess  = "arn:aws:iam::000000000000:role/DeveloperAccess"
-    }
+    role_arns = merge(
+      {
+        PlatformAdmin    = "arn:aws:iam::000000000000:role/PlatformAdmin"
+        PlatformDeployer = "arn:aws:iam::000000000000:role/PlatformDeployer"
+        ArgoCD           = "arn:aws:iam::000000000000:role/ArgoCD"
+      },
+      { for team, _ in local.namespace_teams :
+        "DeveloperAccess-${team}" => "arn:aws:iam::000000000000:role/DeveloperAccess-${team}"
+      },
+    )
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
@@ -38,7 +43,6 @@ dependency "iam_roles" {
 locals {
   teams_config    = read_terragrunt_config("${get_terragrunt_dir()}/../teams.hcl")
   namespace_teams = local.teams_config.locals.namespace_teams
-  vcluster_teams  = local.teams_config.locals.vcluster_teams
 }
 
 inputs = {
@@ -59,7 +63,7 @@ inputs = {
 
   eks_addons = {} # Managed addons deployed separately in eks-addons unit (BYOCNI ordering)
 
-  access_entries = {
+  access_entries = merge({
     platform_admin = {
       principal_arn = dependency.iam_roles.outputs.role_arns["PlatformAdmin"]
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
@@ -77,17 +81,18 @@ inputs = {
       principal_arn = "arn:aws:iam::${include.base.locals.account_id}:role/OrganizationAccountAccessRole"
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
     }
-    # Scoped to tenant namespaces only — dynamically derived from teams.hcl
-    developer_access = {
-      principal_arn = dependency.iam_roles.outputs.role_arns["DeveloperAccess"]
-      policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSEditPolicy"
-      scope_type    = "namespace"
-      namespaces = concat(
-        [for k, v in local.namespace_teams : "team-${k}"],
-        [for k, v in local.vcluster_teams : "vc-${k}"],
-      )
-    }
-  }
+    },
+    # One group-mapped access entry per namespace team (Bridge B): maps the team's
+    # DeveloperAccess-<team> role to the Kubernetes group team-<team>:developers.
+    # Authorization is governed by the namespace-scoped RoleBinding the tenant
+    # module creates for that group — not by an AWS-managed access policy.
+    { for team, _ in local.namespace_teams :
+      "developer_${team}" => {
+        principal_arn     = dependency.iam_roles.outputs.role_arns["DeveloperAccess-${team}"]
+        type              = "STANDARD"
+        kubernetes_groups = ["team-${team}:developers"]
+      }
+  })
 
   tags = include.base.locals.tags
 }

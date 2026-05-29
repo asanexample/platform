@@ -1,6 +1,6 @@
 # Tenant
 
-Provisions multi-tenant isolation boundaries on a shared Kubernetes cluster. Supports two modes: `namespace` (default) creates a dedicated namespace with resource quotas, limit ranges, and network policies; `vcluster` delegates to the `vcluster` module to create a virtual cluster. Namespace-mode tenants get a default-deny ingress NetworkPolicy, an allow rule for the Gateway namespace and kube-system, a CiliumNetworkPolicy allowing the Cilium `ingress` identity (used by the Gateway API Envoy proxy), and a permissive egress policy with DNS access.
+Provisions multi-tenant isolation boundaries on a shared Kubernetes cluster. Supports two modes: `namespace` (default) creates a dedicated namespace with resource quotas, limit ranges, and network policies; `vcluster` delegates to the `vcluster` module to create a virtual cluster. Namespace-mode tenants get a default-deny ingress NetworkPolicy, an allow rule for the Gateway namespace and kube-system, a CiliumNetworkPolicy allowing the Cilium `ingress` identity (used by the Gateway API Envoy proxy), a permissive egress policy with DNS access (excluding the IMDS endpoint), Pod Security Admission labels, and per-team developer RBAC (a namespace-scoped RoleBinding to a `tenant-developer` ClusterRole).
 
 ## Usage
 
@@ -92,8 +92,10 @@ module "tenants" {
 | ---- | ---- |
 | [kubernetes_limit_range.tenant](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/limit_range) | resource |
 | [kubernetes_manifest.tenant_allow_gateway_envoy](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
+| [kubernetes_cluster_role.tenant_developer](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/cluster_role) | resource |
 | [kubernetes_namespace.tenant](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/namespace) | resource |
 | [kubernetes_network_policy.tenant_allow_dns](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/network_policy) | resource |
+| [kubernetes_role_binding.tenant_developers](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/role_binding) | resource |
 | [kubernetes_network_policy.tenant_allow_gateway](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/network_policy) | resource |
 | [kubernetes_network_policy.tenant_default_deny](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/network_policy) | resource |
 | [kubernetes_resource_quota.tenant](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/resource_quota) | resource |
@@ -125,6 +127,8 @@ module "tenants" {
 
 - Namespace-mode tenants are named `team-<key>` (e.g., tenant key `acme` gets namespace `team-acme`).
 - The CiliumNetworkPolicy allows traffic from `ingress`, `remote-node`, and `host` entities so that the Cilium Gateway API Envoy proxy (which uses the reserved `ingress` identity) can reach tenant pods.
+- Namespaces carry Pod Security Admission labels (`enforce=baseline`, `warn`/`audit=restricted`) to block privileged/hostPath/hostNetwork pods (node-escape vectors), and the egress policy denies the IMDS endpoint (`169.254.169.254/32`) so pods cannot steal node-role credentials.
+- **Developer RBAC:** a `tenant-developer` ClusterRole (aggregates the built-in `edit` role under a name the platform owns) is bound per-namespace via the `tenant-developers` RoleBinding to the group `team-<key>:developers`. That group name **must match** the `kubernetes_groups` set on the team's EKS access entry in the eks unit. See ADR-039.
 - Default container limits are 500m CPU / 512Mi memory with requests of 100m / 128Mi, applied via LimitRange.
 - vCluster mode is currently deferred (ADR-033) because OSS vCluster cannot sync HTTPRoute CRDs to the host cluster's Gateway. All teams should use `namespace` mode.
 
