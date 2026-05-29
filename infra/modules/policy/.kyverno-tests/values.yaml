@@ -1,0 +1,13 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Values
+metadata:
+  name: namespace-labels
+# Tells the CLI which labels each namespace carries so policies that match on the tenant-namespace
+# label (namespaceSelector) resolve correctly without a live cluster.
+namespaceSelector:
+  - name: team-alpha
+    labels:
+      platform.refplat.org/tenant: alpha
+  - name: team-bravo
+    labels:
+      platform.refplat.org/tenant: bravo

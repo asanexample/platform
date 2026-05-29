@@ -39,7 +39,7 @@ Current versions:
 | cert-manager | 1.17.1 | `_versions.hcl` → `helm_versions.cert_manager` |
 | external-dns | 1.16.1 | `_versions.hcl` → `helm_versions.external_dns` |
 | external-secrets | 0.14.3 | `_versions.hcl` → `helm_versions.external_secrets` |
-| Kyverno | 3.3.7 | `_versions.hcl` → `helm_versions.kyverno` |
+| Kyverno | 3.8.1 | `_versions.hcl` → `helm_versions.kyverno` |
 | Tailscale Operator | 1.96.5 | `_versions.hcl` → `helm_versions.tailscale_operator` |
 
 Modules are sourced from the monorepo at HEAD (`get_repo_root()`). All

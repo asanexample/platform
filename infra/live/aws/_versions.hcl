@@ -54,6 +54,7 @@ locals {
     gateway_config   = "${local.source_base}/gateway-config"
     cluster_rbac     = "${local.source_base}//cluster-rbac"
     tenant           = "${local.source_base}//tenant"
+    policy           = "${local.source_base}//policy"
     tailscale        = "${local.source_base}/tailscale"
     tailscale_admin  = "${local.source_base}/tailscale-admin"
   }
@@ -65,7 +66,7 @@ locals {
     cert_manager       = "1.17.1"
     external_dns       = "1.16.1"
     external_secrets   = "0.14.3"
-    kyverno            = "3.3.7"
+    kyverno            = "3.8.1"
     tailscale_operator = "1.96.5"
   }
 }

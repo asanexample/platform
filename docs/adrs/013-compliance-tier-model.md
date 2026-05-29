@@ -82,6 +82,13 @@ locals {
 The `compliance_tier` is validated by the policy module (Kyverno) with
 `contains(["standard", "hipaa", "pci"], var.compliance_tier)`.
 
+**Tier → policy mapping (Kyverno, ADR-014).** All tiers get the Phase 1 baseline pack (per-team image
+registry scoping, cross-team IRSA guard, RBAC hardening, `require-requests-limits`,
+`require-workload-labels`, `require-pod-probes`, `disallow-latest-tag`, `block-public-loadbalancer`,
+`disallow-default-namespace`). The `hipaa`/`pci` tiers additionally render
+`require-pod-security-restricted` (full Restricted PSS) and `require-ro-rootfs` (read-only root
+filesystem). HIPAA/PCI-specific packs beyond these are tracked for when those tiers are deployed.
+
 ### vCluster for Standard Tier
 
 > **Note:** vCluster tenant support is currently deferred (ADR-033) because the

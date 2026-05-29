@@ -1,0 +1,6 @@
+{{- /* Raw ClusterPolicy manifests injected verbatim via the module's additional_policies input
+       (ADR-014 escape hatch). Each value is a complete YAML manifest. */}}
+{{- range $name, $manifest := .Values.additionalPolicies }}
+---
+{{ $manifest }}
+{{- end }}

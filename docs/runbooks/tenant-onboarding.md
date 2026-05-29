@@ -175,6 +175,11 @@ ECR repos follow `team-<team>/<app>` naming (e.g., `team-charlie/api` for the
 `api` app owned by team `charlie`). Create one ECR repo per app entry in
 `teams.hcl`.
 
+> **Kyverno (ADR-014):** the per-team image-registry policy (`restrict-images-team-<team>`,
+> admitting only `…/team-<team>/*`) is generated automatically — the `policy` unit derives
+> `tenant_registry_map` from `teams.hcl`, so no extra step is needed for the new team. It applies in
+> `Audit` until the cluster is flipped to `Enforce` (see [kyverno-break-glass](kyverno-break-glass.md)).
+
 The ECR module lives in the **platform** account (<PLATFORM_ACCOUNT_ID>). Cross-account
 pull access for preprod (<PREPROD_ACCOUNT_ID>) and prod (<PROD_ACCOUNT_ID>) is already
 configured via the `pull_account_ids` input.

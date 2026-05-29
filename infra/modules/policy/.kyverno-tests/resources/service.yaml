@@ -1,0 +1,13 @@
+# LoadBalancer Service in a tenant namespace — fails block-public-loadbalancer.
+apiVersion: v1
+kind: Service
+metadata:
+  name: public-svc
+  namespace: team-alpha
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: demo
+  ports:
+    - port: 80
+      targetPort: 8080

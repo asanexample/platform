@@ -228,8 +228,8 @@ CNI, nodes, and Gateway are all ready before tenant resources are created.
 - Namespace-mode tenants share the host cluster's CRD space and node pool. Pod Security Admission
   (`enforce=baseline`) blocks the privileged/hostPath/hostNetwork pods that would let a tenant escape
   to a node, and developer RBAC is namespace-scoped (cannot create cluster-scoped resources or CRDs).
-  Richer policy (e.g. restricting which CRDs may be installed, image provenance) is intended via
-  Kyverno (ADR-014) but **Kyverno is not yet deployed** — PSA `baseline` is the current floor.
+  Richer policy (image provenance/per-team registry scoping, RBAC hardening, cross-team IRSA guard)
+  is provided by **Kyverno (ADR-014), now deployed (Phase 1)** layered above the PSA `baseline` floor.
 - ResourceQuota defaults (4 CPU, 8Gi, 20 pods) may be too restrictive for some teams or too
   generous for others. These are configurable per-team via the `resource_quota` field in the
   tenant map, but require platform team intervention to adjust.

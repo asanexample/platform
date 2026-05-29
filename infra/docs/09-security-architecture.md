@@ -364,7 +364,8 @@ HIPAA and PCI workloads bypass vCluster entirely and run on dedicated physical c
 
 [Kyverno](https://kyverno.io/) is deployed as a policy engine on all clusters to enforce security guardrails at admission time:
 
-- **Image provenance**: Only images from approved registries (ACR) are admitted
+- **Image provenance**: Only images from approved registries (the platform ECR) are admitted, scoped
+  per-team so a tenant namespace may only run its own `team-<name>/*` images
 - **Pod security**: Enforce restricted pod security standards (no privileged containers, no host networking)
 - **Label requirements**: Workload and compliance-tier labels required on all namespaces
 - **Network policy enforcement**: Every namespace must have a default-deny network policy (mandatory for PCI, recommended for all tiers)

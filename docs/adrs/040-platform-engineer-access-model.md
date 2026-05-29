@@ -71,7 +71,10 @@ Trust is unchanged — only SSO `AdministratorAccess` holders may assume `Platfo
 - **`pods/exec` is the main residual privilege:** a shell into any pod can read that pod's mounted
   secrets and its IRSA service-account token (→ assume the workload's IAM role). So "no
   `GetSecretValue`" is not absolute while exec is granted. Deliberate trade for debuggability; the
-  tighter option is logs + port-forward without exec.
+  tighter option is logs + port-forward without exec. **Partly mitigated** by Kyverno (ADR-014): the
+  `disallow-irsa-annotation-cross-team` policy blocks tenant ServiceAccounts from carrying an IRSA
+  role-arn, so there is no workload IAM role for an exec'd shell to assume today (pre-empts the #64
+  escalation path until per-team IRSA lands).
 - `ReadOnlyAccess` + Deny is **best-effort, not airtight** — it still allows content reads the Deny
   list doesn't enumerate (`lambda:GetFunction`, ECR image pull, log contents). The airtight-but-narrower
   alternative is `ViewOnlyAccess`.

@@ -1,0 +1,36 @@
+{{- if .Values.requiredWorkloadLabels }}
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-workload-labels
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Require Workload Labels (identity + cost allocation)
+    policies.kyverno.io/category: Operational Excellence, Cost
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/subject: Pod, Deployment
+    policies.kyverno.io/description: >-
+      Tenant workloads must carry identity and cost-allocation labels ({{ join ", " .Values.requiredWorkloadLabels }}).
+      The 'team' label is the in-cluster analog of the AWS Team cost-allocation tag (#61).
+spec:
+  background: true
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    - name: require-labels
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+      validate:
+        failureAction: {{ .Values.validationFailureAction }}
+        message: "Required labels are missing: {{ join ", " .Values.requiredWorkloadLabels }}."
+        pattern:
+          metadata:
+            labels:
+              {{- range .Values.requiredWorkloadLabels }}
+              {{ . }}: "?*"
+              {{- end }}
+{{- end }}

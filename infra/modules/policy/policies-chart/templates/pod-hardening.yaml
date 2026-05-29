@@ -1,0 +1,134 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-automount-sa-token
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Restrict Auto-Mount of ServiceAccount Tokens
+    policies.kyverno.io/category: Security, Multi-Tenancy
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Tenant pods must set automountServiceAccountToken: false unless they genuinely need the API
+      server — least privilege; reduces the in-pod credential blast radius (ties to #64 IRSA).
+spec:
+  background: true
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    - name: validate-automount
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+      validate:
+        failureAction: {{ .Values.validationFailureAction }}
+        message: "automountServiceAccountToken must be set to false on the pod spec."
+        pattern:
+          spec:
+            automountServiceAccountToken: "false"
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-pod-probes
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Require Pod Probes
+    policies.kyverno.io/category: Best Practices, Developer Guardrails
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Tenant containers must define liveness and readiness probes so the platform can detect and
+      route around unhealthy workloads.
+spec:
+  background: true
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    - name: validate-probes
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+      validate:
+        failureAction: {{ .Values.validationFailureAction }}
+        message: "Liveness and readiness probes are required on every container."
+        foreach:
+          - list: request.object.spec.containers
+            pattern:
+              livenessProbe:
+                periodSeconds: ">0"
+              readinessProbe:
+                periodSeconds: ">0"
+{{- if ne .Values.complianceTier "standard" }}
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-pod-security-restricted
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Require Restricted Pod Security ({{ .Values.complianceTier }})
+    policies.kyverno.io/category: Pod Security, Compliance
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Regulated tiers (hipaa/pci) enforce the full Restricted Pod Security Standard at admission,
+      layering above the PSA baseline floor (ADR-013, ADR-027, ADR-040).
+spec:
+  background: true
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    - name: restricted
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+      validate:
+        failureAction: {{ .Values.validationFailureAction }}
+        podSecurity:
+          level: restricted
+          version: latest
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-ro-rootfs
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Require Read-Only Root Filesystem ({{ .Values.complianceTier }})
+    policies.kyverno.io/category: Security, Compliance
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Regulated tiers require an immutable container root filesystem
+      (securityContext.readOnlyRootFilesystem: true).
+spec:
+  background: true
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    - name: validate-ro-rootfs
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+      validate:
+        failureAction: {{ .Values.validationFailureAction }}
+        message: "Containers must run with a read-only root filesystem."
+        foreach:
+          - list: request.object.spec.containers
+            pattern:
+              securityContext:
+                readOnlyRootFilesystem: true
+{{- end }}

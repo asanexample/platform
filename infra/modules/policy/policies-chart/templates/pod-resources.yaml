@@ -1,0 +1,39 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-requests-limits
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Require Resource Requests and Limits
+    policies.kyverno.io/category: Cost, Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Every tenant container must declare CPU/memory requests and limits. The tenant LimitRange only
+      supplies defaults; this requires explicit declaration for cost attribution and noisy-neighbor
+      protection (complements ResourceQuota, #65).
+spec:
+  background: true
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    - name: validate-resources
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+      validate:
+        failureAction: {{ .Values.validationFailureAction }}
+        message: "CPU and memory requests and limits are required on every container."
+        foreach:
+          - list: request.object.spec.containers
+            pattern:
+              resources:
+                requests:
+                  memory: "?*"
+                  cpu: "?*"
+                limits:
+                  memory: "?*"
+                  cpu: "?*"

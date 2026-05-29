@@ -1,0 +1,6 @@
+apiVersion: v2
+name: kyverno-platform-policies
+description: Platform Kyverno ClusterPolicies (Phase 1 — admission validate set)
+type: application
+version: 0.1.0
+appVersion: "1.18.1"

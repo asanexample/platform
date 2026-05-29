@@ -1,0 +1,80 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: platform-policies
+# Policies are Helm-templated; run.sh renders them to rendered/policies.yaml first.
+policies:
+  - rendered/policies.yaml
+resources:
+  - resources/workloads.yaml
+  - resources/serviceaccount.yaml
+  - resources/service.yaml
+variables: values.yaml
+results:
+  # --- compliant workload passes every tenant Pod policy ---
+  - policy: restrict-image-registries
+    rule: validate-registry
+    kind: Pod
+    resources: [good-app]
+    result: pass
+  - policy: restrict-images-team-alpha
+    rule: only-own-team-images
+    kind: Pod
+    resources: [good-app]
+    result: pass
+  - policy: disallow-latest-tag
+    rule: disallow-latest-tag
+    kind: Pod
+    resources: [good-app]
+    result: pass
+  - policy: require-requests-limits
+    rule: validate-resources
+    kind: Pod
+    resources: [good-app]
+    result: pass
+  - policy: require-pod-probes
+    rule: validate-probes
+    kind: Pod
+    resources: [good-app]
+    result: pass
+  - policy: restrict-automount-sa-token
+    rule: validate-automount
+    kind: Pod
+    resources: [good-app]
+    result: pass
+  - policy: require-workload-labels
+    rule: require-labels
+    kind: Pod
+    resources: [good-app]
+    result: pass
+  # --- violations are caught ---
+  - policy: restrict-image-registries
+    rule: validate-registry
+    kind: Pod
+    resources: [foreign-app]
+    result: fail
+  - policy: restrict-images-team-alpha
+    rule: only-own-team-images
+    kind: Pod
+    resources: [foreign-app]
+    result: fail
+  - policy: disallow-latest-tag
+    rule: disallow-latest-tag
+    kind: Pod
+    resources: [latest-app]
+    result: fail
+  - policy: require-requests-limits
+    rule: validate-resources
+    kind: Pod
+    resources: [greedy-app]
+    result: fail
+  - policy: disallow-irsa-annotation-cross-team
+    rule: deny-irsa-annotation
+    kind: ServiceAccount
+    resources: [sneaky-sa]
+    result: fail
+  - policy: block-public-loadbalancer
+    rule: deny-lb-nodeport
+    kind: Service
+    resources: [public-svc]
+    result: fail
