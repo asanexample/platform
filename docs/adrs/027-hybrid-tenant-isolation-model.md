@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-27
 
-**Status:** Accepted
+**Status:** Accepted (vCluster mode deferred — see ADR-033)
 
 ## Context
 
@@ -92,22 +92,29 @@ The tenant module creates:
 Cilium enforces these policies at the eBPF level (ADR-008), providing kernel-level network
 segmentation without iptables overhead.
 
-### Mode: vCluster
+### Mode: vCluster (Deferred)
+
+> **Note:** vCluster mode is deferred as of ADR-033. The open-source vCluster chart does not
+> support syncing custom resources (like HTTPRoute) from the virtual cluster to the host cluster
+> — this feature requires the vCluster Platform operator (Free tier) with a connection to Loft's
+> license server. Without HTTPRoute sync, vCluster tenants cannot route traffic through the
+> shared Gateway API Gateway, making apps unreachable from the internet. All teams currently use
+> namespace mode. The vCluster module is retained for future use.
 
 For teams that need CRD independence, cluster-admin-like permissions, or stronger blast-radius
 containment.
 
-The tenant module deploys a vCluster instance via the existing `infra/modules/vcluster/` module:
+The tenant module can deploy a vCluster instance via the `infra/modules/vcluster/` module:
 
 - **Namespace** `vc-<name>` on the host cluster for the vCluster control plane
 - **Virtual API server** running as a StatefulSet in the host namespace
-- **Isolation enabled** — vCluster's built-in isolation mode activates resource quotas, limit
+- **Policies** — vCluster's built-in policy enforcement activates resource quotas, limit
   ranges, and network policies within the virtual cluster
-- **HTTPRoute sync** — `custom_resource_sync` configured to sync HTTPRoute resources from the
-  virtual cluster to the host cluster's Gateway API Gateway, enabling ingress without exposing the
-  host cluster's Gateway configuration to tenants
 - **CRD independence** — each vCluster has its own CRD registry, so team-installed operators and
   custom resources do not affect the host cluster or other tenants
+- **Limitation** — HTTPRoute sync from virtual to host cluster requires vCluster Pro/Free tier
+  (not available in OSS). Without it, apps are only reachable via `vcluster connect` or
+  port-forward.
 
 ### Team Declaration
 
@@ -127,12 +134,12 @@ locals {
       }
     }
     bravo = {
-      mode = "vcluster"
+      mode = "namespace"
       apps = {
         demo = {
           repo_url  = "https://github.com/gangster/app-bravo"
           repo_path = "k8s/preprod"
-          preview   = true
+          preview   = false
         }
       }
     }
@@ -166,9 +173,9 @@ Internet → NLB → Cilium Gateway → HTTPRoute → Backend Service
 ```
 
 For namespace-mode tenants, HTTPRoutes are created directly in the tenant namespace (or in the
-Gateway namespace with backend references). For vCluster-mode tenants, HTTPRoutes created inside
-the virtual cluster are synced to the host cluster by the vCluster syncer, appearing as host-
-cluster HTTPRoutes that the Cilium Gateway processes normally.
+Gateway namespace with backend references). For vCluster-mode tenants, HTTPRoute sync would
+require the vCluster Platform operator (Free tier), which is not currently deployed — see
+ADR-033 for details on this limitation.
 
 ### Deployment Dependencies
 
@@ -189,7 +196,8 @@ CNI, nodes, and Gateway are all ready before tenant resources are created.
   load balancing configuration is managed once by the platform team.
 - Incremental adoption — teams can start in namespace mode and graduate to vCluster mode if their
   requirements grow, without changing their application manifests (only the `mode` field in
-  `teams.hcl`).
+  `teams.hcl`). Note: vCluster mode is currently deferred (ADR-033) due to HTTPRoute sync
+  requiring vCluster Pro/Free tier.
 
 ### Negative
 

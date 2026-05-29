@@ -37,7 +37,19 @@ variable "region_abbv" {
 variable "vcluster_chart_version" {
   description = "vCluster Helm chart version"
   type        = string
-  default     = "0.24.1"
+  default     = "0.34.1"
+}
+
+variable "vcluster_storage_class" {
+  description = "StorageClass for vCluster persistent volume"
+  type        = string
+  default     = null
+}
+
+variable "vcluster_persistence_enabled" {
+  description = "Enable persistent volume for vCluster data (requires a working StorageClass + CSI driver)"
+  type        = bool
+  default     = true
 }
 
 variable "tags" {

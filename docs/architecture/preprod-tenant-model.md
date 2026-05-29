@@ -1,19 +1,22 @@
 # Preprod Tenant Isolation Model
 
-> Related: [ADR-027 — Hybrid Tenant Isolation](../adrs/027-hybrid-tenant-isolation.md)
+> Related: [ADR-027 — Hybrid Tenant Isolation](../adrs/027-hybrid-tenant-isolation.md),
+> [ADR-033 — Defer vCluster Support](../adrs/033-defer-vcluster-tenant-support.md)
 
 ## Overview
 
-The preprod EKS cluster (`preprod-use1-eks`, account `620830101009`) supports two
-tenant isolation modes on a single shared cluster:
+The preprod EKS cluster (`preprod-use1-eks`, account `620830101009`) uses
+**namespace-based tenant isolation** on a shared cluster. Each team gets a
+dedicated namespace with ResourceQuotas, LimitRanges, and Cilium NetworkPolicies.
 
-- **Namespace mode** — lightweight isolation via Kubernetes namespaces,
-  ResourceQuotas, LimitRanges, and Cilium NetworkPolicies.
-- **vCluster mode** — full virtual control plane per tenant, with its own API
-  server, etcd, and resource syncing to a host namespace.
+Teams are declared in `teams.hcl`. That single file drives namespace creation,
+EKS access entries, and ArgoCD app targeting.
 
-Teams declare their mode in `teams.hcl`. That single file drives namespace
-creation, EKS access entries, vCluster deployments, and ArgoCD app targeting.
+> **Note:** The tenant module also supports a vCluster mode for stronger isolation
+> (CRD independence, virtual control plane), but this is **deferred** (ADR-033).
+> The open-source vCluster chart cannot sync HTTPRoute resources to the host
+> cluster's Gateway, making vCluster tenants unreachable from the internet.
+> All teams currently use namespace mode.
 
 ## Architecture Diagram
 
@@ -57,46 +60,13 @@ Internet
 +------------------------------------------+
 ```
 
-### vCluster mode (team-bravo)
+### Namespace mode (team-bravo)
 
-```text
-Internet
-  |
-  v
-+------------------+
-|   AWS NLB        |
-+------------------+
-  |
-  v
-+------------------------------------------+
-| Gateway: preprod-gateway  (ns: default)  |
-+------------------------------------------+
-  |
-  v
-+------------------------------------------+
-| HTTPRoute        (ns: vc-bravo)          |
-| synced from vCluster via generic sync    |
-| hostname: bravo.preprod.aws.refplat.org  |
-+------------------------------------------+
-  |
-  v
-+------------------------------------------+
-| Service          (ns: vc-bravo)          |  <-- synced from virtual cluster
-+------------------------------------------+
-  |
-  v
-+------------------------------------------+
-| Pod              (ns: vc-bravo)          |  <-- scheduled on host nodes
-| isolation.enabled policies (vCluster)    |
-+------------------------------------------+
+Same architecture as team-alpha. Both teams use namespace isolation.
 
-  vCluster control plane (in vc-bravo):
-  +--------------------------------------+
-  | vcluster syncer  (StatefulSet)       |
-  | virtual API server + etcd            |
-  | generic sync: HTTPRoute v -> host    |
-  +--------------------------------------+
-```
+> **vCluster mode** is supported by the tenant module but currently deferred
+> (ADR-033) because HTTPRoute sync from virtual to host cluster requires the
+> vCluster Platform operator (not available in the open-source chart).
 
 ## Namespace Mode Detail
 
@@ -132,43 +102,23 @@ Two policies work together to allow gateway traffic:
   identity, despite running with `hostNetwork`. Standard Kubernetes
   NetworkPolicy `ipBlock` CIDR rules cannot match Cilium identities.
 
-## vCluster Mode Detail
+## vCluster Mode (Deferred)
 
-For teams with `mode = "vcluster"`, the tenant module delegates to the
-`vcluster` module (`infra/modules/vcluster/`), which:
+> **Status:** Deferred per ADR-033. The information below describes the design
+> intent; vCluster mode is not currently deployed.
 
-1. Creates host namespace `vc-<name>`.
-2. Deploys the vCluster Helm chart (chart `vcluster`, repo `charts.loft.sh`,
-   version `0.24.1`) into that namespace.
-3. Enables `isolation.enabled`, which creates vCluster-managed NetworkPolicies,
-   LimitRanges, and ResourceQuotas on the host namespace.
-4. Configures generic resource sync for `HTTPRoute` (`gateway.networking.k8s.io/v1`)
-   from virtual to host cluster.
+The tenant module supports a `mode = "vcluster"` option that delegates to
+`infra/modules/vcluster/` (chart version 0.34.1). When active, it creates:
 
-### How HTTPRoute sync works
+1. Host namespace `vc-<name>`.
+2. A vCluster Helm release with virtual API server, etcd, and syncer.
+3. Policy enforcement (resource quotas, limit ranges, network policies).
 
-The vCluster syncer watches HTTPRoute resources inside the virtual cluster and
-creates corresponding HTTPRoute resources in the host namespace (`vc-<name>`).
-Because the gateway listener accepts routes from all namespaces, these synced
-HTTPRoutes attach to `preprod-gateway` and receive traffic through the shared
-NLB. Backend Services and Pods are also synced to the host namespace by
-vCluster's standard sync, so the Gateway data plane can reach them directly.
-
-### kubeconfig access
-
-Each vCluster generates a kubeconfig stored in secret `vc-<name>` in the host
-namespace. Developers with `DeveloperAccess` (scoped to `vc-<name>`) can
-retrieve it:
-
-```bash
-kubectl -n vc-bravo get secret vc-bravo -o jsonpath='{.data.config}' | base64 -d
-```
-
-Or use the vCluster CLI:
-
-```bash
-vcluster connect bravo -n vc-bravo
-```
+**Why it's deferred:** The open-source vCluster chart does not support
+`sync.toHost.customResources` — this is a Pro/Free tier feature requiring the
+vCluster Platform operator and a connection to `admin.loft.sh`. Without
+HTTPRoute sync, apps inside a vCluster cannot register with the host cluster's
+Gateway API Gateway and are unreachable from the internet.
 
 ## Network Topology
 
@@ -236,12 +186,12 @@ spec:
   - to: [{ipBlock: {cidr: 0.0.0.0/0}}]
 ```
 
-### vCluster mode policies
+### vCluster mode policies (deferred)
 
-vCluster's built-in `isolation.enabled` creates its own set of NetworkPolicies
-in the host namespace (`vc-<name>`). These policies restrict the syncer and
-workload pods. The platform does not layer additional custom policies on top --
-vCluster manages isolation end-to-end within the host namespace.
+When vCluster mode is active, vCluster's built-in policy enforcement creates
+its own set of NetworkPolicies, LimitRanges, and ResourceQuotas in the host
+namespace (`vc-<name>`). The platform does not layer additional custom policies
+on top. See ADR-033 for why vCluster mode is currently deferred.
 
 ## Resource Governance
 
@@ -271,9 +221,8 @@ resource_quota = {
 Resource quotas apply at the team level (namespace-scoped), not per-app. All
 apps within a team share the same quota.
 
-For vCluster tenants, resource limits are managed by vCluster's built-in
-`isolation.resourceQuota` and `isolation.limitRange` settings, both enabled
-by default in the module.
+For vCluster tenants (when enabled), resource limits are managed by vCluster's
+built-in policy enforcement settings. See ADR-033 for current status.
 
 ## teams.hcl as Single Source of Truth
 
@@ -285,7 +234,7 @@ inputs:
 +---------------------------+
 |  teams.hcl                |
 |  alpha: mode=namespace    |
-|  bravo: mode=vcluster     |
+|  bravo: mode=namespace    |
 +-----------+---------------+
             |
             |  read_terragrunt_config()
@@ -299,15 +248,13 @@ inputs:
    v                  v                  v
  EKS access        Namespaces,        ArgoCD Application
  entries            ResourceQuotas,    per app + preview
-                    NetworkPolicies,   ApplicationSets
-                    vClusters
+                    NetworkPolicies    ApplicationSets
 ```
 
 **EKS access entries** (`eks/terragrunt.hcl`): The `DeveloperAccess` role gets
 an `AmazonEKSEditPolicy` access entry scoped to each team's namespace:
 
-- Namespace teams: `team-<name>` (e.g., `team-alpha`)
-- vCluster teams: `vc-<name>` (e.g., `vc-bravo`)
+- All teams: `team-<name>` (e.g., `team-alpha`, `team-bravo`)
 
 **Tenant resources** (`tenants/terragrunt.hcl`): Reads `teams.hcl`, splits by
 mode, and passes to the tenant module. The module creates namespace-mode
@@ -387,31 +334,13 @@ uses `app.kubernetes.io/instance: stable`; each preview uses
 - **CRD visibility** -- Cluster-scoped resources (CRDs, ClusterRoles, Nodes)
   are visible to anyone with list permissions at the cluster scope.
 
-### What vCluster mode adds
+### What vCluster mode would add (deferred — ADR-033)
 
 - **Full API server isolation** -- Each tenant gets a virtual API server. CRDs,
   RBAC, namespaces, and admission webhooks are scoped to the virtual cluster.
-  Tenants can install their own operators without affecting others.
 - **Stronger blast radius** -- A misconfigured admission webhook or runaway
   controller only impacts the virtual cluster, not the host.
 - **Independent RBAC** -- Tenants can create ClusterRoles and
   ClusterRoleBindings inside their virtual cluster without host-level impact.
-
-### What vCluster mode does NOT protect against
-
-- **Kernel-level exploits** -- Same as namespace mode; pods still run on shared
-  host nodes.
-- **Resource exhaustion beyond quotas** -- vCluster's built-in quotas apply, but
-  I/O and network bandwidth are still shared.
-- **Host namespace breakout** -- If a tenant can exec into the syncer pod or
-  access the host namespace service account, they could escalate.
-
-### When to use which
-
-| Criteria | Namespace | vCluster |
-|----------|-----------|----------|
-| Team needs custom CRDs / operators | No | Yes |
-| Team needs cluster-admin inside their env | No | Yes |
-| Minimal overhead, fast provisioning | Yes | No |
-| Cost sensitivity (no extra API server) | Yes | No |
-| Regulatory requirement for control-plane separation | No | Yes |
+- **Limitation** -- HTTPRoute sync requires vCluster Pro/Free tier. Without it,
+  apps inside a vCluster are not publicly accessible via the shared Gateway.

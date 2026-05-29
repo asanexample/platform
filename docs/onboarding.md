@@ -415,8 +415,8 @@ READMEs contain formatted variable reference tables:
 ## Deploying Applications
 
 Development teams deploy applications to the preprod EKS cluster via ArgoCD.
-Each team gets an isolated namespace (or vCluster) with resource quotas and
-network policies enforced.
+Each team gets an isolated namespace with resource quotas and network policies
+enforced.
 
 ### Quick Start
 

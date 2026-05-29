@@ -89,5 +89,8 @@ inputs = {
   environment = include.base.locals.env
   region_abbv = include.base.locals.region_abbv
 
+  vcluster_storage_class       = "gp2"
+  vcluster_persistence_enabled = false
+
   tags = include.base.locals.tags
 }

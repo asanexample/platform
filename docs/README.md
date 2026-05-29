@@ -17,7 +17,7 @@ hierarchy that promotes consistency across environments.
 | Document | Description |
 |----------|-------------|
 | [Architecture](architecture/) | System design, network topology, and multi-cloud strategy |
-| [Preprod Tenant Model](architecture/preprod-tenant-model.md) | Hybrid namespace/vCluster isolation architecture |
+| [Preprod Tenant Model](architecture/preprod-tenant-model.md) | Namespace-based tenant isolation architecture |
 | [Config Hierarchy](../infra/live/aws/_base.hcl) | Seven-layer Terragrunt configuration precedence (root through module) |
 | [Module Design](../infra/docs/13-module-design.md) | Conventions for writing and consuming infrastructure modules |
 
@@ -39,12 +39,13 @@ hierarchy that promotes consistency across environments.
 |----------|-------------|
 | [ADRs](adrs/) | Architecture Decision Records explaining key design choices |
 | [ADR-007: IAM Role Model](adrs/007-iam-role-model.md) | Purpose-built IAM roles replacing OrganizationAccountAccessRole |
-| [ADR-027: Hybrid Tenant Isolation](adrs/027-hybrid-tenant-isolation-model.md) | Namespace + vCluster isolation model for preprod |
+| [ADR-027: Hybrid Tenant Isolation](adrs/027-hybrid-tenant-isolation-model.md) | Namespace isolation model for preprod (vCluster deferred) |
 | [ADR-028: ECR Cross-Account Registry](adrs/028-ecr-cross-account-container-registry.md) | Centralized ECR with cross-account pull |
 | [ADR-029: Preprod Public Ingress](adrs/029-preprod-public-ingress-gateway-api.md) | Public Gateway API ingress for preprod |
 | [ADR-030: Route53 Subdomain Delegation](adrs/030-route53-subdomain-delegation.md) | Per-environment DNS zones with NS delegation |
 | [ADR-031: Multi-App Tenant Model](adrs/031-multi-app-tenant-model.md) | Nested apps per team in teams.hcl, ECR naming convention |
 | [ADR-032: PR Preview Environments](adrs/032-pr-preview-environments.md) | ArgoCD ApplicationSet PR generator for ephemeral previews |
+| [ADR-033: Defer vCluster Support](adrs/033-defer-vcluster-tenant-support.md) | vCluster deferred — OSS lacks HTTPRoute sync |
 | [Compliance Framework](compliance/) | Regulatory mappings, SCP rationale, and audit evidence |
 
 ## Reference

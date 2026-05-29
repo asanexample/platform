@@ -10,16 +10,16 @@ locals {
         }
       }
     }
-    # bravo = {
-    #   mode = "vcluster"
-    #   apps = {
-    #     demo = {
-    #       repo_url  = "https://github.com/gangster/app-bravo"
-    #       repo_path = "k8s/preprod"
-    #       preview   = true
-    #     }
-    #   }
-    # }
+    bravo = {
+      mode = "namespace"
+      apps = {
+        demo = {
+          repo_url  = "https://github.com/gangster/app-bravo"
+          repo_path = "k8s/preprod"
+          preview   = false
+        }
+      }
+    }
   }
 
   namespace_teams = { for k, v in local.teams : k => v if v.mode == "namespace" }

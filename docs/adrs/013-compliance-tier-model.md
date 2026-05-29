@@ -84,6 +84,10 @@ The `compliance_tier` is validated by the policy module (Kyverno) with
 
 ### vCluster for Standard Tier
 
+> **Note:** vCluster tenant support is currently deferred (ADR-033) because the
+> open-source chart cannot sync custom resources (e.g., HTTPRoute) to the host
+> cluster. Standard-tier tenants use namespace isolation until this is resolved.
+
 Standard-tier workloads share physical clusters. Tenant isolation is provided by vCluster, which
 gives each tenant a virtual Kubernetes cluster with its own API server, control plane, and resource
 namespace. vClusters are CNCF-certified and provide:

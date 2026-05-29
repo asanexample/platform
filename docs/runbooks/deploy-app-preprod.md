@@ -37,10 +37,8 @@ Developer pushes code
   -> cert-manager provisions TLS, external-dns creates DNS records
 ```
 
-Teams are assigned either a **namespace** (`team-<name>`) or a
-**vCluster** (`vc-<name>`) in `infra/live/aws/preprod/us-east-1/platform/teams.hcl`.
-This runbook covers namespace-mode tenants. vCluster tenants follow the
-same manifest patterns but deploy into their virtual cluster.
+Teams are assigned a namespace (`team-<name>`) in
+`infra/live/aws/preprod/us-east-1/platform/teams.hcl`.
 
 ---
 
@@ -856,6 +854,4 @@ argocd app get alpha-demo -o yaml | grep -A 10 operationState
 ```
 
 Verify your manifest namespace matches the team namespace convention:
-
-- Namespace mode: `team-<name>` (e.g. `team-alpha`)
-- vCluster mode: `vc-<name>` (e.g. `vc-bravo`)
+`team-<name>` (e.g., `team-alpha`)

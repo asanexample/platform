@@ -1,19 +1,67 @@
 /**
- * # vCluster Helm Module
+ * ## vCluster Helm Module
  *
- * This module deploys vCluster (virtual Kubernetes clusters) on a host cluster using Helm.
+ * Deploys vCluster (virtual Kubernetes clusters) on a host cluster using Helm.
  */
 
 locals {
-  # Prepare Kubernetes labels from tags, replacing any characters not allowed in labels
   k8s_labels = {
     for k, v in var.tags :
     replace(lower(k), "/[^a-z0-9_.-]/", "_") => replace(lower(v), "/[^a-z0-9_.-]/", "_")
     if length(replace(lower(k), "/[^a-z0-9_.-]/", "_")) <= 63 && length(replace(lower(v), "/[^a-z0-9_.-]/", "_")) <= 63
   }
+
+  vcluster_values = {
+    controlPlane = {
+      statefulSet = merge(
+        {
+          image = { tag = var.vcluster_version }
+        },
+        var.resource_limits != null ? {
+          resources = {
+            limits = {
+              cpu    = var.resource_limits.cpu
+              memory = var.resource_limits.memory
+            }
+          }
+        } : {},
+        {
+          persistence = {
+            volumeClaim = merge(
+              { enabled = var.persistence_enabled },
+              var.storage_class != null ? { storageClass = var.storage_class } : {},
+            )
+          }
+        },
+      )
+    }
+
+    sync = {
+      toHost = merge(
+        var.sync != null ? {
+          ingresses      = { enabled = var.sync.ingresses }
+          storageClasses = { enabled = var.sync.storage_classes }
+        } : {},
+        length(var.custom_resource_sync) > 0 ? {
+          customResources = {
+            for cr in var.custom_resource_sync :
+            "${cr.plural}.${cr.group}" => { enabled = true }
+          }
+        } : {},
+      )
+      fromHost = var.sync != null ? {
+        nodes = { enabled = var.sync.nodes }
+      } : {}
+    }
+
+    policies = {
+      resourceQuota = { enabled = var.policies.resource_quota }
+      limitRange    = { enabled = var.policies.limit_range }
+      networkPolicy = { enabled = var.policies.network_policy }
+    }
+  }
 }
 
-# Create the namespace for the vCluster
 resource "kubernetes_namespace" "vcluster" {
   count = var.create ? 1 : 0
 
@@ -31,7 +79,6 @@ resource "kubernetes_namespace" "vcluster" {
   }
 }
 
-# Deploy vCluster using Helm
 resource "helm_release" "vcluster" {
   count            = var.create ? 1 : 0
   name             = var.cluster_name
@@ -46,59 +93,10 @@ resource "helm_release" "vcluster" {
   cleanup_on_fail  = true
   replace          = true
 
-  values = [yamlencode(merge(
-    {
-      vcluster = {
-        image = {
-          tag = var.vcluster_version
-        }
-      }
-    },
-    var.resource_limits != null ? {
-      syncer = {
-        resources = {
-          limits = {
-            cpu    = var.resource_limits.cpu
-            memory = var.resource_limits.memory
-          }
-        }
-      }
-    } : {},
-    var.sync != null ? {
-      sync = {
-        nodes          = { enabled = var.sync.nodes }
-        ingresses      = { enabled = var.sync.ingresses }
-        storageClasses = { enabled = var.sync.storage_classes }
-      }
-    } : {},
-    var.isolation != null ? {
-      isolation = merge(
-        { enabled = true, networkPolicy = { enabled = var.isolation.network_policy } },
-        var.isolation.limit_range != null ? { limitRange = { enabled = var.isolation.limit_range.enabled } } : {},
-        var.isolation.resource_quota != null ? { resourceQuota = { enabled = var.isolation.resource_quota.enabled } } : {},
-      )
-    } : {},
-    var.ingress != null && var.ingress.enabled ? merge(
-      { ingress = merge(
-        { enabled = true },
-        var.ingress.host != "" ? { host = var.ingress.host } : {},
-        var.ingress.ingress_class != "" ? { ingressClassName = var.ingress.ingress_class } : {},
-        var.ingress.tls_secret != "" ? { tls = [{ secretName = var.ingress.tls_secret }] } : {},
-      ) },
-    ) : {},
-    var.storage_class != null ? {
-      storage = { className = var.storage_class }
-    } : {},
-    length(var.custom_resource_sync) > 0 ? {
-      experimental = {
-        syncSettings = {
-          syncToHost = {
-            customResources = { for cr in var.custom_resource_sync : cr.kind => { enabled = true } }
-          }
-        }
-      }
-    } : {},
-  )), var.values != "" ? var.values : "{}"]
+  values = [
+    yamlencode(local.vcluster_values),
+    var.values != "" ? var.values : "{}",
+  ]
 
   depends_on = [kubernetes_namespace.vcluster]
 }

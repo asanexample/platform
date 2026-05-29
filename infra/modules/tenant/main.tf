@@ -175,21 +175,15 @@ module "vcluster" {
   environment  = var.environment
   region_abbv  = var.region_abbv
 
-  chart_version = var.vcluster_chart_version
+  chart_version       = var.vcluster_chart_version
+  storage_class       = var.vcluster_storage_class
+  persistence_enabled = var.vcluster_persistence_enabled
 
-  isolation = {
+  policies = {
     network_policy = true
-    limit_range    = { enabled = true }
-    resource_quota = { enabled = true }
+    limit_range    = true
+    resource_quota = true
   }
-
-  custom_resource_sync = [
-    {
-      group   = "gateway.networking.k8s.io"
-      version = "v1"
-      kind    = "HTTPRoute"
-    },
-  ]
 
   tags = var.tags
 }

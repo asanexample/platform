@@ -750,8 +750,8 @@ tagpolicies.tag.amazonaws.com
 ## Application Deployment (Preprod)
 
 Development teams deploy applications to the preprod EKS cluster via ArgoCD
-GitOps. Each team gets an isolated namespace or vCluster with resource quotas
-and network policies enforced.
+GitOps. Each team gets an isolated namespace with resource quotas and network
+policies enforced.
 
 ### ECR Container Registry
 
@@ -774,12 +774,11 @@ GitHub Actions pushes via OIDC federation — no static credentials needed.
 ### Tenant Management
 
 Teams are defined in `infra/live/aws/preprod/us-east-1/platform/teams.hcl`.
-Two isolation modes are available:
+All teams use namespace isolation (`team-<name>`).
 
-| Mode | Namespace | Isolation | Best For |
-|------|-----------|-----------|----------|
-| `namespace` | `team-<name>` | Cilium NetworkPolicy | Trusted teams, simple apps |
-| `vcluster` | `vc-<name>` | Full virtual control plane | CRD independence, strong isolation |
+> **Note:** A vCluster mode for stronger isolation exists in the tenant module
+> but is currently deferred (ADR-033) due to HTTPRoute sync limitations in
+> the open-source vCluster chart.
 
 See [Tenant Onboarding](runbooks/tenant-onboarding.md) for the full
 onboarding procedure.

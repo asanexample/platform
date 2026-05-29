@@ -2,14 +2,12 @@
  * # vCluster Module Variables
  */
 
-# Installation control
 variable "create" {
   description = "Controls whether vCluster resources should be created"
   type        = bool
   default     = true
 }
 
-# Environment variables
 variable "workload" {
   description = "Workload identifier for resource naming"
   type        = string
@@ -17,7 +15,7 @@ variable "workload" {
 }
 
 variable "environment" {
-  description = "Environment name (e.g., dev, ops, prod)"
+  description = "Environment name (e.g., dev, preprod, prod)"
   type        = string
 }
 
@@ -26,7 +24,6 @@ variable "region_abbv" {
   type        = string
 }
 
-# vCluster configuration
 variable "cluster_name" {
   description = "Name for the vCluster instance"
   type        = string
@@ -40,13 +37,13 @@ variable "namespace" {
 variable "chart_version" {
   description = "Version of the vCluster Helm chart"
   type        = string
-  default     = "0.24.1"
+  default     = "0.34.1"
 }
 
 variable "vcluster_version" {
   description = "vCluster application version"
   type        = string
-  default     = "0.24.1"
+  default     = "0.34.1"
 }
 
 variable "values" {
@@ -55,9 +52,8 @@ variable "values" {
   default     = ""
 }
 
-# Resource limits
 variable "resource_limits" {
-  description = "Resource limits for the vCluster syncer container"
+  description = "Resource limits for the vCluster control plane container"
   type = object({
     cpu    = string
     memory = string
@@ -65,33 +61,26 @@ variable "resource_limits" {
   default = null
 }
 
-# Sync configuration
 variable "sync" {
   description = "Sync configuration for vCluster (controls which resources are synced between host and virtual cluster)"
   type = object({
     nodes           = optional(bool, false)
-    ingresses       = optional(bool, true)
+    ingresses       = optional(bool, false)
     storage_classes = optional(bool, false)
   })
   default = null
 }
 
-# Isolation settings
-variable "isolation" {
-  description = "Isolation settings for the vCluster"
+variable "policies" {
+  description = "Policy enforcement for the vCluster deployment"
   type = object({
     network_policy = optional(bool, true)
-    limit_range = optional(object({
-      enabled = optional(bool, true)
-    }), null)
-    resource_quota = optional(object({
-      enabled = optional(bool, true)
-    }), null)
+    limit_range    = optional(bool, true)
+    resource_quota = optional(bool, true)
   })
-  default = null
+  default = {}
 }
 
-# Ingress configuration
 variable "ingress" {
   description = "Ingress configuration for vCluster API server exposure"
   type = object({
@@ -103,25 +92,28 @@ variable "ingress" {
   default = null
 }
 
-# Storage
+variable "persistence_enabled" {
+  description = "Enable persistent volume for vCluster data (requires a working StorageClass + CSI driver)"
+  type        = bool
+  default     = true
+}
+
 variable "storage_class" {
-  description = "Storage class for vCluster persistence"
+  description = "StorageClass for vCluster persistent volume"
   type        = string
   default     = null
 }
 
-# Generic resource sync (vCluster v0.24+)
 variable "custom_resource_sync" {
-  description = "Custom resources to sync from virtual to host cluster"
+  description = "Custom resources to sync from virtual to host cluster (plural.apiGroup format)"
   type = list(object({
     group   = string
     version = string
-    kind    = string
+    plural  = string
   }))
   default = []
 }
 
-# Tags
 variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)

@@ -46,7 +46,6 @@ Before starting, confirm the following:
 - [ ] You have the following information from the requesting team:
   - Team name (lowercase, alphanumeric + hyphens)
   - GitHub organization and repository name (under `gangster/`)
-  - Desired isolation mode (namespace or vCluster)
   - Resource quota requirements (if non-default)
   - Whether apps need PR preview environments (`preview = true`)
   - Whether repos are private (requires ArgoCD credential template + GitHub
@@ -55,24 +54,24 @@ Before starting, confirm the following:
 
 ---
 
-## Choosing Isolation Mode
+## Isolation Mode
 
-Teams are onboarded in one of two isolation modes. The choice is recorded in
-`teams.hcl` and determines what the `tenants` module provisions.
+All teams use **namespace isolation** (`mode = "namespace"`). Each team gets a
+`team-<name>` namespace with ResourceQuota, LimitRange, and Cilium NetworkPolicies.
 
-| | **Namespace** (`mode = "namespace"`) | **vCluster** (`mode = "vcluster"`) |
-|---|---|---|
-| **What's created** | `team-<name>` namespace, ResourceQuota, LimitRange, NetworkPolicy | `vc-<name>` namespace with a full vCluster (virtual control plane) |
-| **Isolation level** | Namespace-scoped RBAC + NetworkPolicy | Virtual cluster with its own API server, etcd, scheduler |
-| **CRD access** | Shared cluster CRDs only | Team can install their own CRDs inside the vCluster |
-| **Resource overhead** | Minimal | ~0.5 CPU / 1 Gi per vCluster control plane |
-| **Best for** | Standard microservice teams, simple workloads | Teams needing cluster-admin, custom operators, or CRD-heavy stacks |
-| **Default quotas** | 4 CPU, 8 Gi memory, 20 pods | Managed by vCluster isolation settings |
-| **EKS access entry** | DeveloperAccess scoped to `team-<name>` | DeveloperAccess scoped to `vc-<name>` |
+| | **Namespace** (`mode = "namespace"`) |
+|---|---|
+| **What's created** | `team-<name>` namespace, ResourceQuota, LimitRange, NetworkPolicy |
+| **Isolation level** | Namespace-scoped RBAC + NetworkPolicy |
+| **CRD access** | Shared cluster CRDs only |
+| **Resource overhead** | Minimal |
+| **Default quotas** | 4 CPU, 8 Gi memory, 20 pods |
+| **EKS access entry** | DeveloperAccess scoped to `team-<name>` |
 
-**Recommendation:** Start with `namespace` unless the team has an explicit need for
-cluster-level resources. Migrating from namespace to vCluster later requires
-redeploying workloads but no data loss.
+> **Note:** The tenant module also supports a `vcluster` mode for stronger
+> isolation (CRD independence, virtual control plane), but this is currently
+> **deferred** (ADR-033) because the open-source vCluster chart cannot sync
+> HTTPRoute resources to the host cluster's Gateway.
 
 ---
 
@@ -105,12 +104,12 @@ locals {
       }
     }
     bravo = {
-      mode = "vcluster"
+      mode = "namespace"
       apps = {
         demo = {
           repo_url  = "https://github.com/gangster/app-bravo"
           repo_path = "k8s/preprod"
-          preview   = true
+          preview   = false
         }
       }
     }
@@ -224,7 +223,7 @@ terragrunt apply
 
 | Unit | Account | Resources Created |
 |---|---|---|
-| `tenants` | preprod | Namespace (`team-charlie` or `vc-charlie`), ResourceQuota, LimitRange, NetworkPolicy, CiliumNetworkPolicy |
+| `tenants` | preprod | Namespace (`team-charlie`), ResourceQuota, LimitRange, NetworkPolicy, CiliumNetworkPolicy |
 | `eks` | preprod | Updates DeveloperAccess entry with new namespace scope |
 | `ecr` | platform | ECR repository `team-charlie/api` |
 | `github-oidc` | platform | Updates OIDC trust policy to include new repo |
@@ -257,15 +256,10 @@ See the full [Verification Commands](#verification-commands) section below.
 Run these checks after completing the onboarding steps. Replace `charlie` with
 the actual team name.
 
-### Namespace / vCluster Exists
+### Namespace Exists
 
 ```bash
-# Namespace-mode team
 kubectl get namespace team-charlie
-
-# vCluster-mode team
-kubectl get namespace vc-charlie
-kubectl get pods -n vc-charlie   # vCluster control plane pods should be Running
 ```
 
 ### Resource Quota Applied
@@ -426,8 +420,9 @@ cluster via `argocd-clusters`. Verify:
 4. Ensure the ECR repository name in the push step matches the name in
    `ecr/terragrunt.hcl` (format: `team-<name>/app`).
 
-### vCluster pods stuck in Pending
+### Pods stuck in Pending
 
 1. Check node capacity: `kubectl describe nodes | grep -A5 "Allocated resources"`
-2. Verify the `vc-<name>` namespace resource quota has not been exhausted.
-3. Ensure Cilium is healthy: `cilium status` (vCluster pods need CNI to schedule).
+2. Verify the `team-<name>` namespace resource quota has not been exhausted:
+   `kubectl describe resourcequota tenant-quota -n team-<name>`
+3. Ensure Cilium is healthy: `cilium status`
