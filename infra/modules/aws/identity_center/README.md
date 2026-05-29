@@ -1,50 +1,70 @@
 # Identity Center
 
-Manages AWS IAM Identity Center (SSO) resources including permission sets, groups, users, group memberships, and account assignments. Permission sets support both managed policy attachments and inline policies. Users are assigned to groups, and groups are assigned to accounts with specific permission sets, creating a complete SSO configuration for multi-account access.
+Manages AWS IAM Identity Center (SSO) resources: permission sets (with managed-policy attachments and/or an inline policy), groups, users, group memberships, and account assignments. Users are added to groups, and groups are assigned to accounts with a permission set — a complete SSO configuration for multi-account access.
+
+The four inputs reference each other by name: a `users` entry's `groups` and an `account_assignments` entry's `group` must exist in `groups`, and an assignment's `permission_set` must exist in `permission_sets`.
 
 ## Usage
+
+A complete example that exercises every feature, modeled on the platform's per-team developer access (ADR-039): a full-admin set, a per-team developer set that pairs a managed read-only policy with an inline assume-role policy, groups, users added to those groups, and account assignments.
 
 ```hcl
 module "identity_center" {
   source = "../../modules/aws/identity_center"
 
+  # Permission sets — attach managed policies and/or one inline policy per set.
   permission_sets = {
     AdministratorAccess = {
-      description      = "Full admin access"
+      description      = "Full administrator access"
       session_duration = "PT4H"
       managed_policies = ["arn:aws:iam::aws:policy/AdministratorAccess"]
     }
-    ReadOnlyAccess = {
-      description      = "Read-only access"
+
+    # Per-team developer set: account-wide read PLUS the ability to assume only
+    # that team's DeveloperAccess role (the launchpad into namespace-scoped kubectl).
+    "Dev-alpha" = {
+      description      = "Developer access for team alpha"
+      session_duration = "PT4H"
       managed_policies = ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
+      inline_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+          Sid      = "AssumeTeamDeveloperRole"
+          Effect   = "Allow"
+          Action   = "sts:AssumeRole"
+          Resource = "arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/DeveloperAccess-alpha"
+        }]
+      })
     }
   }
 
+  # Groups — account assignments target groups, never individual users.
   groups = {
-    PlatformEngineers = { description = "Platform team" }
-    Developers        = { description = "Application developers" }
+    "Admins"           = { description = "Platform administrators" }
+    "Developers-alpha" = { description = "Developers for team alpha" }
   }
 
+  # Users — created in the Identity Store and added to groups by name.
   users = {
-    jdeeden = {
+    "josh" = {
       given_name  = "Josh"
       family_name = "Deeden"
       email       = "josh@example.com"
-      groups      = ["PlatformEngineers"]
+      groups      = ["Admins"]
+    }
+    "alpha-dev" = {
+      given_name  = "Alpha"
+      family_name = "Developer"
+      email       = "alpha-dev@example.com"
+      groups      = ["Developers-alpha"]
     }
   }
 
+  # Account assignments — (group, account, permission set). Creating an
+  # assignment also provisions the permission set into the target account.
   account_assignments = [
-    {
-      account_id     = "<PLATFORM_ACCOUNT_ID>"
-      permission_set = "AdministratorAccess"
-      group          = "PlatformEngineers"
-    },
-    {
-      account_id     = "<PREPROD_ACCOUNT_ID>"
-      permission_set = "ReadOnlyAccess"
-      group          = "Developers"
-    },
+    { account_id = "<MGMT_ACCOUNT_ID>", permission_set = "AdministratorAccess", group = "Admins" },
+    { account_id = "<PREPROD_ACCOUNT_ID>", permission_set = "Dev-alpha", group = "Developers-alpha" },
   ]
 
   tags = {
@@ -52,6 +72,8 @@ module "identity_center" {
   }
 }
 ```
+
+> Note: object keys containing hyphens (e.g. `"Dev-alpha"`, `"Developers-alpha"`) must be quoted.
 
 ## Examples
 
@@ -61,37 +83,6 @@ module "identity_center" {
 module "identity_center" {
   source = "../../modules/aws/identity_center"
   create = false
-}
-```
-
-### Permission Set with Inline Policy
-
-```hcl
-module "identity_center" {
-  source = "../../modules/aws/identity_center"
-
-  permission_sets = {
-    EKSAdmin = {
-      description      = "EKS cluster admin with assume-role"
-      session_duration = "PT8H"
-      inline_policy = jsonencode({
-        Version = "2012-10-17"
-        Statement = [{
-          Effect   = "Allow"
-          Action   = ["sts:AssumeRole"]
-          Resource = ["arn:aws:iam::*:role/PlatformAdmin"]
-        }]
-      })
-    }
-  }
-
-  groups              = {}
-  users               = {}
-  account_assignments = []
-
-  tags = {
-    ManagedBy = "opentofu"
-  }
 }
 ```
 
@@ -150,8 +141,11 @@ No modules.
 - The module automatically discovers the IAM Identity Center instance ARN and Identity Store ID using data sources; no manual configuration is needed.
 - Must be run in the management account where IAM Identity Center is enabled.
 - Permission set session duration uses ISO 8601 duration format (e.g., `PT4H` for 4 hours).
-- Account assignments link groups (not individual users) to accounts with permission sets.
+- Account assignments link groups (not individual users) to accounts with permission sets. Assigning a permission set to a group on an account also provisions that permission set into the account — there is no separate provisioning step.
+- Each permission set supports at most one inline policy (`inline_policy`); combine it with `managed_policies` for additional grants.
+- **Identity source:** this module manages users and groups as Terraform resources (`aws_identitystore_user` / `aws_identitystore_group`), which requires IAM Identity Center to be the **identity source**. If you sync from an external IdP via SCIM (Okta, Entra ID, etc.), manage users and groups in that IdP instead and use only `permission_sets` + `account_assignments` here (assignments reference the SCIM-provisioned group by name).
 
 ## Related ADRs
 
 - ADR-007: Platform IAM Role Model
+- ADR-039: Per-Team Developer RBAC (uses per-team `Dev-<team>` permission sets and `Developers-<team>` groups)
