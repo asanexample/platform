@@ -67,6 +67,9 @@ bin/
 .platctl-logs/
 .platctl-state.json
 
+# Secrets (real values, gitignored — see secrets.hcl.example for structure)
+**/secrets.hcl
+
 # OS files
 .DS_Store
 **/.DS_Store

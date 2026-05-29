@@ -58,7 +58,7 @@ generate "preprod_secrets" {
       region = "us-east-1"
 
       assume_role {
-        role_arn = "arn:aws:iam::620830101009:role/PlatformDeployer" # Preprod account
+        role_arn = "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:role/PlatformDeployer" # Preprod account
       }
     }
 

@@ -28,9 +28,9 @@ inputs = {
   }
 
   accounts = {
-    "Platform" = { email = "josh+platform@deeden.org", ou = "Platform" }
-    "Test"     = { email = "josh+test@deeden.org", ou = "Platform" }
-    "Preprod"  = { email = "josh+preprod@deeden.org", ou = "Workloads/Preprod" }
-    "Prod"     = { email = "josh+prod@deeden.org", ou = "Workloads/Prod" }
+    "Platform" = { email = include.base.locals.account_emails["platform"], ou = "Platform" }
+    "Test"     = { email = include.base.locals.account_emails["test"], ou = "Platform" }
+    "Preprod"  = { email = include.base.locals.account_emails["preprod"], ou = "Workloads/Preprod" }
+    "Prod"     = { email = include.base.locals.account_emails["prod"], ou = "Workloads/Prod" }
   }
 }

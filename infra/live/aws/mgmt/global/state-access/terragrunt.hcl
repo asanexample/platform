@@ -21,9 +21,9 @@ inputs = {
 
       trust_principals = {
         aws = [
-          "arn:aws:iam::829808296602:root", # Platform account
-          "arn:aws:iam::851725353202:root", # Management account (self)
-          "arn:aws:iam::620830101009:root", # Preprod account
+          "arn:aws:iam::${include.base.locals.account_ids["platform"]}:root", # Platform account
+          "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:root",     # Management account (self)
+          "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:root",  # Preprod account
         ]
       }
 
@@ -44,8 +44,8 @@ inputs = {
                 "s3:ListBucket",
               ]
               Resource = [
-                "arn:aws:s3:::tfstate-mgmt-851725353202",
-                "arn:aws:s3:::tfstate-mgmt-851725353202/*",
+                "arn:aws:s3:::tfstate-mgmt-${include.base.locals.account_ids["mgmt"]}",
+                "arn:aws:s3:::tfstate-mgmt-${include.base.locals.account_ids["mgmt"]}/*",
               ]
             },
             {
@@ -56,7 +56,7 @@ inputs = {
                 "dynamodb:PutItem",
                 "dynamodb:DeleteItem",
               ]
-              Resource = "arn:aws:dynamodb:us-east-1:851725353202:table/terraform-locks"
+              Resource = "arn:aws:dynamodb:us-east-1:${include.base.locals.account_ids["mgmt"]}:table/terraform-locks"
             },
           ]
         })

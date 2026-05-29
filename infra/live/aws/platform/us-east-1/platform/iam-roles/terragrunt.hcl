@@ -22,8 +22,8 @@ inputs = {
       # Trusted by SSO administrators in management and platform accounts
       trust_principals = {
         aws = [
-          "arn:aws:iam::851725353202:root", # Management account
-          "arn:aws:iam::829808296602:root", # Platform account (self)
+          "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:root",     # Management account
+          "arn:aws:iam::${include.base.locals.account_ids["platform"]}:root", # Platform account (self)
         ]
       }
 
@@ -33,8 +33,8 @@ inputs = {
           test     = "ArnLike"
           variable = "aws:PrincipalArn"
           values = [
-            "arn:aws:iam::851725353202:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
-            "arn:aws:iam::829808296602:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
+            "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
+            "arn:aws:iam::${include.base.locals.account_ids["platform"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
           ]
         },
       ]
@@ -92,7 +92,7 @@ inputs = {
                 "secretsmanager:GetSecretValue",
                 "secretsmanager:DescribeSecret",
               ]
-              Resource = "arn:aws:secretsmanager:*:829808296602:secret:platform/*"
+              Resource = "arn:aws:secretsmanager:*:${include.base.locals.account_ids["platform"]}:secret:platform/*"
             },
             {
               Sid      = "SecretsListForDebugging"
@@ -111,8 +111,8 @@ inputs = {
 
       trust_principals = {
         aws = [
-          "arn:aws:iam::851725353202:root", # Management account
-          "arn:aws:iam::829808296602:root", # Platform account (self)
+          "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:root",     # Management account
+          "arn:aws:iam::${include.base.locals.account_ids["platform"]}:root", # Platform account (self)
         ]
       }
 
@@ -125,8 +125,8 @@ inputs = {
 
       trust_principals = {
         aws = [
-          "arn:aws:iam::851725353202:root", # Management account
-          "arn:aws:iam::829808296602:root", # Platform account (self)
+          "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:root",     # Management account
+          "arn:aws:iam::${include.base.locals.account_ids["platform"]}:root", # Platform account (self)
         ]
       }
 
@@ -136,10 +136,10 @@ inputs = {
           test     = "ArnLike"
           variable = "aws:PrincipalArn"
           values = [
-            "arn:aws:iam::851725353202:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_PowerUserAccess_*",
-            "arn:aws:iam::851725353202:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
-            "arn:aws:iam::829808296602:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_PowerUserAccess_*",
-            "arn:aws:iam::829808296602:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
+            "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_PowerUserAccess_*",
+            "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
+            "arn:aws:iam::${include.base.locals.account_ids["platform"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_PowerUserAccess_*",
+            "arn:aws:iam::${include.base.locals.account_ids["platform"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
           ]
         },
       ]

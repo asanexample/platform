@@ -99,8 +99,8 @@ inputs = {
   } }
 
   github_org               = "gangster"
-  github_token_secret_name = "github-appset-token"                          # K8s secret created by generate block above
-  ecr_registry             = "829808296602.dkr.ecr.us-east-1.amazonaws.com" # Platform account ECR
+  github_token_secret_name = "github-appset-token"                                                                                # K8s secret created by generate block above
+  ecr_registry             = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com" # Platform account ECR
   preview_domain           = "preprod.aws.refplat.org"
 
   # Target cluster name in ArgoCD — the preprod cluster that ArgoCD manages,

@@ -47,7 +47,7 @@ inputs = {
     "josh" = {
       given_name  = "Josh"
       family_name = "Deeden"
-      email       = "josh@deeden.org"
+      email       = include.base.locals.admin_email
       groups      = ["Admins"]
     }
   }

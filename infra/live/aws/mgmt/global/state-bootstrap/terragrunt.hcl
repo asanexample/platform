@@ -27,7 +27,7 @@ terraform {
 
 inputs = {
   create              = true
-  bucket_name         = "tfstate-mgmt-851725353202"
+  bucket_name         = "tfstate-mgmt-${include.base.locals.account_ids["mgmt"]}"
   dynamodb_table_name = "terraform-locks"
   tags                = include.base.locals.tags
 }

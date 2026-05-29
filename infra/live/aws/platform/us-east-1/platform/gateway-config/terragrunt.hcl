@@ -83,7 +83,7 @@ inputs = {
   domain   = "aws.refplat.org"
   internal = true # Internal NLB — platform services only reachable via Tailscale VPN
 
-  letsencrypt_email      = "josh@deeden.org" # Let's Encrypt certificate renewal notifications
+  letsencrypt_email      = include.base.locals.admin_email # Let's Encrypt certificate renewal notifications
   route53_hosted_zone_id = dependency.route53.outputs.zone_id
   route53_region         = include.base.locals.region
 
