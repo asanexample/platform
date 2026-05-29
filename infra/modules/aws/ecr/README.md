@@ -66,7 +66,7 @@ No modules.
 | <a name="input_force_delete"></a> [force\_delete](#input\_force\_delete) | Whether to allow deletion of non-empty repositories | `bool` | `false` | no |
 | <a name="input_max_image_count"></a> [max\_image\_count](#input\_max\_image\_count) | Maximum number of tagged images to retain per repository | `number` | `50` | no |
 | <a name="input_pull_account_ids"></a> [pull\_account\_ids](#input\_pull\_account\_ids) | AWS account IDs allowed to pull images cross-account | `list(string)` | `[]` | no |
-| <a name="input_repositories"></a> [repositories](#input\_repositories) | Map of repository names to configuration. Keys are repo names (e.g. 'team-alpha/app'). | `map(map(string))` | `{}` | no |
+| <a name="input_repositories"></a> [repositories](#input\_repositories) | Map of repository names to configuration. Keys are repo names (e.g. 'team-alpha/app'). | <pre>map(object({<br/>    tag_mutability = optional(string, "IMMUTABLE")<br/>    tags           = optional(map(string), {})<br/>  }))</pre> | `{}` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to all resources | `map(string)` | `{}` | no |
 
 ## Outputs

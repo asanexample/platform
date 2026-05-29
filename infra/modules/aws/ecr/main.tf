@@ -10,7 +10,7 @@ resource "aws_ecr_repository" "this" {
   for_each = local.create ? var.repositories : {}
 
   name                 = each.key
-  image_tag_mutability = lookup(each.value, "tag_mutability", "IMMUTABLE")
+  image_tag_mutability = each.value.tag_mutability
   force_delete         = var.force_delete
 
   image_scanning_configuration {
@@ -21,7 +21,7 @@ resource "aws_ecr_repository" "this" {
     encryption_type = "AES256"
   }
 
-  tags = var.tags
+  tags = merge(var.tags, each.value.tags)
 }
 
 # ---------------------------------------------------------------------------

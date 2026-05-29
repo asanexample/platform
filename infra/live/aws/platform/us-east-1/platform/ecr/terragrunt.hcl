@@ -14,10 +14,11 @@ terraform {
 inputs = {
   create = true
 
-  # ECR naming convention: team-<team>/<app> (matches teams.hcl app keys)
+  # ECR naming convention: team-<team>/<app> (matches teams.hcl app keys).
+  # The Team tag scopes per-team access (ABAC, #62) and cost attribution (#61).
   repositories = {
-    "team-alpha/demo" = {}
-    "team-bravo/demo" = {}
+    "team-alpha/demo" = { tags = { Team = "alpha" } }
+    "team-bravo/demo" = { tags = { Team = "bravo" } }
   }
 
   # Accounts granted cross-account image pull access

@@ -93,7 +93,7 @@ No modules.
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_github_org"></a> [github\_org](#input\_github\_org) | GitHub organization name | `string` | n/a | yes |
 | <a name="input_create"></a> [create](#input\_create) | Whether to create the OIDC provider and roles | `bool` | `true` | no |
-| <a name="input_roles"></a> [roles](#input\_roles) | Map of IAM role name to its GitHub Actions OIDC configuration (repos, branches, events, policies). | <pre>map(object({<br/>    repos                = list(string)<br/>    branches             = optional(list(string), ["main"])<br/>    events               = optional(list(string), [])<br/>    role_policy_arns     = optional(list(string), [])<br/>    inline_policy        = optional(string)<br/>    max_session_duration = optional(number, 3600)<br/>  }))</pre> | `{}` | no |
+| <a name="input_roles"></a> [roles](#input\_roles) | Map of IAM role name to its GitHub Actions OIDC configuration (repos, branches, events, policies). | <pre>map(object({<br/>    repos                = list(string)<br/>    branches             = optional(list(string), ["main"])<br/>    events               = optional(list(string), [])<br/>    role_policy_arns     = optional(list(string), [])<br/>    inline_policy        = optional(string)<br/>    max_session_duration = optional(number, 3600)<br/>    tags                 = optional(map(string), {})<br/>  }))</pre> | `{}` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to all resources | `map(string)` | `{}` | no |
 
 ## Outputs

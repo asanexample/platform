@@ -55,7 +55,7 @@ resource "aws_iam_role" "this" {
   max_session_duration = each.value.max_session_duration
   assume_role_policy   = data.aws_iam_policy_document.trust[each.key].json
 
-  tags = var.tags
+  tags = merge(var.tags, each.value.tags)
 }
 
 resource "aws_iam_role_policy_attachment" "this" {

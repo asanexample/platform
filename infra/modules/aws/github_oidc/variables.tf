@@ -22,6 +22,7 @@ variable "roles" {
     role_policy_arns     = optional(list(string), [])
     inline_policy        = optional(string)
     max_session_duration = optional(number, 3600)
+    tags                 = optional(map(string), {}) # merged onto var.tags (e.g. { Team = "alpha" })
   }))
   default = {}
 }

@@ -18,6 +18,7 @@ variable "roles" {
     })), [])
     managed_policies = optional(list(string), [])
     inline_policies  = optional(map(string), {})
+    tags             = optional(map(string), {}) # merged onto var.tags (e.g. { Team = "alpha" })
   }))
   default = {}
 }
