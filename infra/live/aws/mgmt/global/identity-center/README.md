@@ -14,10 +14,10 @@ Configures AWS IAM Identity Center (SSO) with permission sets, groups, users, an
 
 | Input | Value | Notes |
 |-------|-------|-------|
-| `permission_sets` | `AdministratorAccess`, `ReadOnlyAccess`, `PowerUserAccess` | Session durations: 4h, 8h, 4h respectively |
-| `groups` | `Admins`, `Developers`, `ReadOnly` | Maps to permission sets via account assignments |
+| `permission_sets` | `AdministratorAccess`, `ReadOnlyAccess`, `PowerUserAccess`, and one `Dev-<team>` per team | Session durations: 4h, 8h, 4h, 4h. Each `Dev-<team>` grants account-wide read + assume-role into that team's `DeveloperAccess-<team>` (ADR-039) |
+| `groups` | `Admins`, `ReadOnly`, and one `Developers-<team>` per team | Maps to permission sets via account assignments |
 | `users` | `josh` | Member of `Admins` group |
-| `account_assignments` | 9 assignments | Admins get AdministratorAccess on all accounts; ReadOnly on all accounts; Developers get PowerUserAccess on Preprod only |
+| `account_assignments` | Admins/ReadOnly on all accounts; each `Developers-<team>` gets its `Dev-<team>` set on Preprod | The former broad `Developers → PowerUserAccess` assignment was removed (it bypassed namespace RBAC) |
 
 ## Commands
 

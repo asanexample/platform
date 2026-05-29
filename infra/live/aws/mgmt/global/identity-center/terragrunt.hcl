@@ -35,12 +35,47 @@ inputs = {
       session_duration = "PT4H"
       managed_policies = ["arn:aws:iam::aws:policy/PowerUserAccess"]
     }
+
+    # Per-team developer permission sets (preprod). Each grants account-wide
+    # read-only visibility plus the ability to assume only its own team's
+    # DeveloperAccess role (the launchpad into namespace-scoped kubectl).
+    # Hand-maintained: adding a team means adding an entry here, in the matching
+    # group/assignment below, and in preprod teams.hcl.
+    "Dev-alpha" = {
+      description      = "Developer access for team alpha (preprod)"
+      session_duration = "PT4H"
+      managed_policies = ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
+      inline_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+          Sid      = "AssumeTeamDeveloperRole"
+          Effect   = "Allow"
+          Action   = "sts:AssumeRole"
+          Resource = "arn:aws:iam::${dependency.organizations.outputs.account_ids["Preprod"]}:role/DeveloperAccess-alpha"
+        }]
+      })
+    }
+    "Dev-bravo" = {
+      description      = "Developer access for team bravo (preprod)"
+      session_duration = "PT4H"
+      managed_policies = ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
+      inline_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+          Sid      = "AssumeTeamDeveloperRole"
+          Effect   = "Allow"
+          Action   = "sts:AssumeRole"
+          Resource = "arn:aws:iam::${dependency.organizations.outputs.account_ids["Preprod"]}:role/DeveloperAccess-bravo"
+        }]
+      })
+    }
   }
 
   groups = {
-    "Admins"     = { description = "Full administrator access to all accounts" }
-    "Developers" = { description = "Developer access to workload accounts" }
-    "ReadOnly"   = { description = "Read-only access for auditing" }
+    "Admins"           = { description = "Full administrator access to all accounts" }
+    "ReadOnly"         = { description = "Read-only access for auditing" }
+    "Developers-alpha" = { description = "Developers for team alpha" }
+    "Developers-bravo" = { description = "Developers for team bravo" }
   }
 
   users = {
@@ -63,7 +98,11 @@ inputs = {
     { account_id = dependency.organizations.outputs.account_ids["Platform"], permission_set = "ReadOnlyAccess", group = "ReadOnly" },
     { account_id = dependency.organizations.outputs.account_ids["Preprod"], permission_set = "ReadOnlyAccess", group = "ReadOnly" },
     { account_id = dependency.organizations.outputs.account_ids["Prod"], permission_set = "ReadOnlyAccess", group = "ReadOnly" },
-    # Developers get PowerUserAccess on Preprod
-    { account_id = dependency.organizations.outputs.account_ids["Preprod"], permission_set = "PowerUserAccess", group = "Developers" },
+    # Each team's developers get their own per-team permission set on Preprod
+    # (account-wide read + assume their DeveloperAccess-<team> role). Replaces the
+    # former broad Developers -> PowerUserAccess assignment, which would have let
+    # any developer read/write every team's AWS resources and bypass namespace RBAC.
+    { account_id = dependency.organizations.outputs.account_ids["Preprod"], permission_set = "Dev-alpha", group = "Developers-alpha" },
+    { account_id = dependency.organizations.outputs.account_ids["Preprod"], permission_set = "Dev-bravo", group = "Developers-bravo" },
   ]
 }

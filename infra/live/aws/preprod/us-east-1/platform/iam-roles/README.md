@@ -1,6 +1,6 @@
 # iam-roles
 
-Bootstraps IAM roles (PlatformAdmin, PlatformDeployer, ArgoCD, DeveloperAccess) in the preprod account. Must be applied first — all other units depend on these roles for cross-account access.
+Bootstraps IAM roles (PlatformAdmin, PlatformDeployer, ArgoCD, and one DeveloperAccess-\<team\> per team) in the preprod account. Must be applied first — all other units depend on these roles for cross-account access.
 
 ## Module
 
@@ -17,7 +17,7 @@ None
 | `roles.PlatformAdmin`    | Trust: management + preprod SSO                     | EKS, SSM, Secrets Manager read access; used for kubectl and debugging           |
 | `roles.PlatformDeployer` | Trust: management + preprod                         | AdministratorAccess managed policy; used by Terragrunt for all provisioning     |
 | `roles.ArgoCD`           | Trust: platform account (<PLATFORM_ACCOUNT_ID>)              | Scoped to platform's ArgoCD IRSA role; enables cross-account cluster management |
-| `roles.DeveloperAccess`  | Trust: management + preprod SSO (PowerUser + Admin) | Namespace-scoped EKS access for developers                                      |
+| `roles.DeveloperAccess-<team>` | Trust: that team's `Dev-<team>` SSO permission set | One per team (from `teams.hcl`); namespace-scoped EKS access via group-mapped RBAC (ADR-039) |
 
 ## Commands
 
