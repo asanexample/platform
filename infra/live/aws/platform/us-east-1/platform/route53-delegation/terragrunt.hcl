@@ -20,6 +20,7 @@ dependency "route53" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+# Cross-environment: reads preprod Route53 zone nameservers for NS record delegation
 dependency "preprod_route53" {
   config_path = "../../../../preprod/us-east-1/platform/route53"
 

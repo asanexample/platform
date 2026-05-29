@@ -21,7 +21,7 @@ resource "helm_release" "kyverno" {
   version          = var.chart_version
   namespace        = var.namespace
   create_namespace = true
-  timeout          = 600
+  timeout          = 600 # 10 min — Kyverno CRDs and webhooks can be slow to initialize
   wait             = true
   atomic           = true
   cleanup_on_fail  = true
@@ -31,5 +31,6 @@ resource "helm_release" "kyverno" {
 resource "kubernetes_manifest" "additional_policies" {
   for_each = var.create ? var.additional_policies : {}
 
+  # Values are YAML-encoded policy manifests; decoded to HCL map for kubernetes_manifest
   manifest = yamldecode(each.value)
 }

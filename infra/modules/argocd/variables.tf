@@ -193,6 +193,8 @@ variable "projects" {
 variable "resource_exclusions" {
   description = "Resources ArgoCD should ignore (list of {apiGroups, kinds, clusters})"
   type        = any
+  # CiliumIdentity resources are high-churn and auto-managed by the Cilium agent;
+  # tracking them causes excessive ArgoCD reconciliation noise
   default = [
     {
       apiGroups = ["cilium.io"]

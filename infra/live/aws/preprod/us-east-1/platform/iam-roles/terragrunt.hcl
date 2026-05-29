@@ -19,13 +19,15 @@ inputs = {
       description          = "Platform team cluster access"
       max_session_duration = 14400
 
+      # Trusted by SSO administrators in management and preprod accounts
       trust_principals = {
         aws = [
-          "arn:aws:iam::851725353202:root",
-          "arn:aws:iam::620830101009:root",
+          "arn:aws:iam::851725353202:root", # Management account
+          "arn:aws:iam::620830101009:root", # Preprod account (self)
         ]
       }
 
+      # Only SSO AdministratorAccess role holders can assume this role
       trust_conditions = [
         {
           test     = "ArnLike"
@@ -83,6 +85,7 @@ inputs = {
               Resource = "*"
             },
             {
+              # Scoped to preprod/* prefix — for debugging secrets-backed services
               Sid    = "SecretsReadForDebugging"
               Effect = "Allow"
               Action = [
@@ -104,25 +107,27 @@ inputs = {
 
     PlatformDeployer = {
       description          = "Terragrunt infrastructure provisioning"
-      max_session_duration = 7200
+      max_session_duration = 7200 # 2 hours — long enough for full-stack applies
 
       trust_principals = {
         aws = [
-          "arn:aws:iam::851725353202:root",
-          "arn:aws:iam::620830101009:root",
+          "arn:aws:iam::851725353202:root", # Management account
+          "arn:aws:iam::620830101009:root", # Preprod account (self)
         ]
       }
 
       managed_policies = ["arn:aws:iam::aws:policy/AdministratorAccess"]
     }
 
+    # Assumed by ArgoCD IRSA service accounts in the platform cluster
     ArgoCD = {
       description = "Cross-account ArgoCD cluster management from platform hub"
 
       trust_principals = {
-        aws = ["arn:aws:iam::829808296602:root"]
+        aws = ["arn:aws:iam::829808296602:root"] # Platform account
       }
 
+      # Only ArgoCD service account roles from the platform EKS cluster
       trust_conditions = [
         {
           test     = "ArnLike"
@@ -140,11 +145,12 @@ inputs = {
 
       trust_principals = {
         aws = [
-          "arn:aws:iam::851725353202:root",
-          "arn:aws:iam::620830101009:root",
+          "arn:aws:iam::851725353202:root", # Management account
+          "arn:aws:iam::620830101009:root", # Preprod account (self)
         ]
       }
 
+      # SSO PowerUser or Admin role holders can assume DeveloperAccess
       trust_conditions = [
         {
           test     = "ArnLike"

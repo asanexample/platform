@@ -12,16 +12,18 @@ terraform {
 }
 
 inputs = {
-  create          = true
-  github_org      = "gangster"
-  github_repo     = "platform"
+  create      = true
+  github_org  = "gangster"
+  github_repo = "platform"
+  # Allow CI from main and feature branches (Terratest runs on PRs)
   github_branches = ["main", "refs/heads/feat/*"]
   role_name       = "github-actions-terratest"
   tags            = include.base.locals.tags
 
+  # AdministratorAccess required because Terratest creates and destroys real AWS resources
   role_policy_arns = [
     "arn:aws:iam::aws:policy/AdministratorAccess",
   ]
 
-  max_session_duration = 3600
+  max_session_duration = 3600 # 1 hour — sufficient for Terratest runs
 }

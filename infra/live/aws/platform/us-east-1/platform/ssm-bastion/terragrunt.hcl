@@ -35,6 +35,8 @@ inputs = {
   name   = "${include.base.locals.env}-${include.base.locals.region_abbv}-ssm-bastion"
   vpc_id = dependency.networking.outputs.vpc_id
 
+  # Pick the first kubernetes-tier subnet — bastion needs to be in the same
+  # subnet tier as EKS nodes to reach the cluster API via the cluster SG
   subnet_id = [
     for name, id in dependency.networking.outputs.subnet_ids :
     id if can(regex("kubernetes$", name))

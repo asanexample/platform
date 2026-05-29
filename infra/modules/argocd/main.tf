@@ -2,6 +2,7 @@ locals {
   create      = var.create
   create_irsa = local.create && var.oidc_provider_arn != ""
 
+  # Sanitize tags for K8s label compliance (RFC 1123): lowercase, valid chars, max 63 chars
   k8s_labels = {
     for k, v in var.tags :
     replace(lower(k), "/[^a-z0-9_.-]/", "_") => replace(lower(v), "/[^a-z0-9_.-]/", "_")
@@ -127,7 +128,8 @@ resource "aws_iam_role" "argocd" {
 resource "aws_iam_role_policy_attachment" "ecr_read" {
   count = local.create_irsa ? 1 : 0
 
-  role       = aws_iam_role.argocd[0].name
+  role = aws_iam_role.argocd[0].name
+  # Allows ArgoCD to pull Helm charts and container images from ECR
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
@@ -138,6 +140,7 @@ resource "aws_iam_role_policy_attachment" "extra" {
   policy_arn = each.value
 }
 
+# Allows ArgoCD to assume cross-account roles for managing remote EKS clusters
 resource "aws_iam_role_policy" "remote_clusters" {
   count = local.create_irsa && length(var.remote_cluster_role_arns) > 0 ? 1 : 0
 
@@ -168,14 +171,15 @@ resource "helm_release" "argocd" {
   create_namespace = true
   timeout          = var.helm_timeout
   wait             = var.helm_wait
-  atomic           = var.helm_wait
+  atomic           = var.helm_wait # atomic requires wait=true; tied to same var so they stay consistent
   cleanup_on_fail  = true
-  replace          = true
+  replace          = true # Delete and recreate the release on failed upgrade (avoids stuck FAILED state)
 
   values = [
     yamlencode(local.argocd_values),
   ]
 
+  # Force Helm release upgrade when computed values change (Helm may miss yamlencode diffs)
   set = [
     {
       name  = "configHash"

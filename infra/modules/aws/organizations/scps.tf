@@ -1,4 +1,7 @@
+# ---------------------------------------------------------------------------
 # SCP 1: baseline-guardrails — Account & identity protection
+# ---------------------------------------------------------------------------
+
 data "aws_iam_policy_document" "baseline_guardrails" {
   count = local.create && var.service_control_policies == null ? 1 : 0
 
@@ -10,8 +13,9 @@ data "aws_iam_policy_document" "baseline_guardrails" {
   }
 
   statement {
-    sid         = "DenyRootUserActions"
-    effect      = "Deny"
+    sid    = "DenyRootUserActions"
+    effect = "Deny"
+    # Allow only GetSessionToken for root — required for MFA bootstrapping
     not_actions = ["sts:GetSessionToken"]
     resources   = ["*"]
     condition {
@@ -65,7 +69,10 @@ data "aws_iam_policy_document" "baseline_guardrails" {
   }
 }
 
+# ---------------------------------------------------------------------------
 # SCP 2: protect-security-services — Audit trail integrity
+# ---------------------------------------------------------------------------
+
 data "aws_iam_policy_document" "protect_security_services" {
   count = local.create && var.service_control_policies == null ? 1 : 0
 
@@ -162,7 +169,10 @@ data "aws_iam_policy_document" "protect_security_services" {
   }
 }
 
+# ---------------------------------------------------------------------------
 # SCP 3: enforce-encryption — Encryption at rest & instance security
+# ---------------------------------------------------------------------------
+
 data "aws_iam_policy_document" "enforce_encryption" {
   count = local.create && var.service_control_policies == null ? 1 : 0
 
@@ -208,6 +218,7 @@ data "aws_iam_policy_document" "enforce_encryption" {
     actions   = ["s3:PutObject"]
     resources = ["*"]
     condition {
+      # Null test with "true" = deny when SSE header is ABSENT (forces explicit encryption)
       test     = "Null"
       variable = "s3:x-amz-server-side-encryption"
       values   = ["true"]
@@ -263,7 +274,10 @@ data "aws_iam_policy_document" "enforce_encryption" {
   }
 }
 
+# ---------------------------------------------------------------------------
 # SCP 4: deny-regions — Region restriction with global service exemptions
+# ---------------------------------------------------------------------------
+
 data "aws_iam_policy_document" "deny_regions" {
   count = local.create && var.service_control_policies == null ? 1 : 0
 
@@ -315,7 +329,10 @@ data "aws_iam_policy_document" "deny_regions" {
   }
 }
 
+# ---------------------------------------------------------------------------
 # SCP 5: protect-data-and-network — Public exposure prevention
+# ---------------------------------------------------------------------------
+
 data "aws_iam_policy_document" "protect_data_and_network" {
   count = local.create && var.service_control_policies == null ? 1 : 0
 
@@ -385,7 +402,10 @@ data "aws_iam_policy_document" "protect_data_and_network" {
   }
 }
 
+# ---------------------------------------------------------------------------
 # SCP 6: require-tagging — Dynamic per var.required_tags
+# ---------------------------------------------------------------------------
+
 data "aws_iam_policy_document" "require_tagging" {
   count = local.create && var.service_control_policies == null ? 1 : 0
 
@@ -414,7 +434,10 @@ data "aws_iam_policy_document" "require_tagging" {
   }
 }
 
+# ---------------------------------------------------------------------------
 # SCP 7: restrict-iam-users — Force federation
+# ---------------------------------------------------------------------------
+
 data "aws_iam_policy_document" "restrict_iam_users" {
   count = local.create && var.service_control_policies == null ? 1 : 0
 
@@ -450,7 +473,10 @@ data "aws_iam_policy_document" "restrict_iam_users" {
   }
 }
 
+# ---------------------------------------------------------------------------
 # SCP 8: hipaa-eligible-services — HIPAA service allowlist (optional)
+# ---------------------------------------------------------------------------
+
 data "aws_iam_policy_document" "hipaa_eligible_services" {
   count = local.create && var.service_control_policies == null && var.enable_hipaa_scp ? 1 : 0
 

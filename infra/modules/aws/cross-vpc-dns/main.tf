@@ -14,8 +14,11 @@ locals {
   )
 }
 
-# ── Dynamic ENI IP lookup via AWS CLI ────────────────────────────────────
+# ---------------------------------------------------------------------------
+# Dynamic ENI IP lookup via AWS CLI
+# ---------------------------------------------------------------------------
 
+# Dynamically look up EKS API ENI IPs via cross-account STS assume-role
 data "external" "eks_eni_ips" {
   for_each = local.use_phz ? local.phz_dynamic : {}
 
@@ -36,7 +39,9 @@ data "external" "eks_eni_ips" {
   ]
 }
 
-# ── Private Hosted Zones ────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# Private Hosted Zones
+# ---------------------------------------------------------------------------
 
 resource "aws_route53_zone" "this" {
   for_each = local.use_phz ? var.phz_records : {}
@@ -49,6 +54,7 @@ resource "aws_route53_zone" "this" {
 
   tags = merge(var.tags, { Name = "${var.name}-${each.key}" })
 
+  # Additional VPCs may be associated outside Terraform; ignore_changes prevents removing them
   lifecycle {
     ignore_changes = [vpc]
   }
@@ -64,7 +70,9 @@ resource "aws_route53_record" "this" {
   records = local.phz_resolved_ips[each.key]
 }
 
-# ── Resolver Outbound (source VPC) ──────────────────────────────────────
+# ---------------------------------------------------------------------------
+# Resolver Outbound (source VPC)
+# ---------------------------------------------------------------------------
 
 resource "aws_security_group" "resolver_outbound" {
   count = local.use_outbound ? 1 : 0
@@ -147,7 +155,9 @@ resource "aws_route53_resolver_rule_association" "this" {
   vpc_id           = var.vpc_id
 }
 
-# ── Resolver Inbound (target VPC) ───────────────────────────────────────
+# ---------------------------------------------------------------------------
+# Resolver Inbound (target VPC)
+# ---------------------------------------------------------------------------
 
 resource "aws_security_group" "resolver_inbound" {
   count = local.use_inbound ? 1 : 0

@@ -1,46 +1,30 @@
-# SSM Bastion - US East 1 (Platform)
+# SSM Bastion
 
-## Overview
+Deploys a lightweight EC2 bastion host accessible only via AWS Systems Manager Session Manager for private EKS API access.
 
-Deploys an SSM-managed bastion host for secure, private access to the EKS cluster without SSH keys or public IPs.
+## Module
 
-## Configuration Details
+`infra/modules/aws/ssm-bastion`
 
-### Purpose
+## Dependencies
 
-- Provisions a lightweight EC2 instance accessible only through AWS Systems Manager Session Manager
-- Adds an ingress rule to the EKS cluster security group so the bastion can reach the API server
-- Provides a jump point for kubectl access to the private EKS endpoint
+- `networking` -- `../networking`
+- `eks` -- `../eks`
 
-### Dependencies
+## Key Inputs
 
-- **networking**: provides VPC ID and kubernetes subnet ID for bastion placement
-- **eks**: provides cluster_security_group_id for ingress rule injection
+| Input | Value | Notes |
+|-------|-------|-------|
+| `name` | `platform-use1-ssm-bastion` | |
+| `subnet_id` | First kubernetes subnet | Placed in same subnet tier as EKS nodes |
+| `cluster_security_group_id` | From EKS dependency | Adds ingress rule so bastion can reach the EKS API server |
 
-### Key Configuration Settings
-
-- **Instance**:
-  - Type: `t3.nano`
-  - Name pattern: `{env}-{region_abbv}-ssm-bastion`
-  - Subnet: first kubernetes subnet
-
-- **Security**:
-  - No inbound ports opened; access is via SSM Session Manager only
-  - Egress-only security group
-  - Adds ingress rule to EKS cluster security group for API server communication
-
-## Usage
+## Commands
 
 ```bash
-cd infra/live/aws/platform/us-east-1/platform/ssm-bastion
-terragrunt plan
-terragrunt apply
+# Plan
+AWS_PROFILE=management terragrunt plan
+
+# Apply
+AWS_PROFILE=management terragrunt apply
 ```
-
-## Dependencies on this Configuration
-
-None. This is a leaf node in the deployment graph.
-
-## Implementation Notes
-
-Use `./scripts/eks-tunnel.sh` to establish an SSM tunnel and configure kubectl access to the EKS cluster. No direct SSH is available; all session access goes through SSM.

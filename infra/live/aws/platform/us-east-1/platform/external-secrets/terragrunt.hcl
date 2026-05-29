@@ -60,7 +60,8 @@ inputs = {
   oidc_provider_arn = dependency.eks.outputs.oidc_provider_arn
   oidc_provider_url = dependency.eks.outputs.oidc_provider_url
 
-  kms_key_arns       = [dependency.eks.outputs.kms_key_arn]
+  kms_key_arns = [dependency.eks.outputs.kms_key_arn]
+  # IRSA permissions scoped to secrets/params under the platform prefix
   secret_path_prefix = "platform"
   ssm_path_prefix    = "/platform"
 

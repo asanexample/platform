@@ -134,7 +134,9 @@ variable "gateway_api_crd_version" {
 variable "kube_proxy_replacement" {
   description = "KubeProxy replacement mode (false, 'strict', 'partial', 'probe')"
   type        = string
-  default     = "false"
+  # On AWS, this is overridden to true by cloud_values_yaml (required for BYOCNI).
+  # This default only applies to Azure/GCP.
+  default = "false"
 }
 
 variable "node_port_enabled" {
@@ -275,13 +277,13 @@ variable "hubble_tls_auto_method" {
 variable "hubble_tls_cert_validity_duration" {
   description = "Validity duration of the Hubble TLS certificates in days"
   type        = number
-  default     = 1095
+  default     = 1095 # 3 years
 }
 
 variable "hubble_tls_schedule" {
   description = "Cron schedule for Hubble TLS certificate generation"
   type        = string
-  default     = "0 0 1 */4 *"
+  default     = "0 0 1 */4 *" # Midnight on 1st of every 4th month
 }
 
 # Resource limits

@@ -49,7 +49,7 @@ inputs = {
     preprod-eks = {
       domain              = replace(dependency.preprod_eks.outputs.cluster_endpoint, "https://", "")
       eks_cluster_name    = dependency.preprod_eks.outputs.cluster_id
-      eks_lookup_role_arn = "arn:aws:iam::620830101009:role/PlatformDeployer"
+      eks_lookup_role_arn = "arn:aws:iam::620830101009:role/PlatformDeployer" # Preprod account — role to look up EKS ENI IPs
     }
   }
 

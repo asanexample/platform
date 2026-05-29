@@ -35,6 +35,7 @@ inputs = {
   name   = "${include.base.locals.env}-${include.base.locals.region_abbv}-ssm-bastion"
   vpc_id = dependency.networking.outputs.vpc_id
 
+  # Pick the first kubernetes-tier private subnet (same AZ placement as EKS nodes)
   subnet_id = [
     for name, id in dependency.networking.outputs.subnet_ids :
     id if can(regex("kubernetes$", name))

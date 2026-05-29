@@ -1,12 +1,12 @@
-# ArgoCD Bootstrap Module
+# ArgoCD Bootstrap
 
-Deploys bootstrap ArgoCD Applications for foundational cluster services (cert-manager, external-dns, external-secrets).
+Creates ArgoCD Application resources for bootstrapping core platform components (cert-manager, external-dns, external-secrets) via the App-of-Apps pattern. Each application is deployed with sync-wave ordering, automated sync with self-heal and prune, and namespace auto-creation. Applications are only created when the `bootstrap_applications` list is non-empty.
 
 ## Usage
 
 ```hcl
 module "argocd_bootstrap" {
-  source = "../argocd-bootstrap"
+  source = "../../modules/argocd-bootstrap"
 
   argocd_namespace = "argocd"
   project          = "default"
@@ -20,7 +20,7 @@ module "argocd_bootstrap" {
       chart           = "cert-manager"
       target_revision = "v1.12.0"
       sync_wave       = 0
-      helm_values     = { "installCRDs" = "true" }
+      helm_values     = { installCRDs = "true" }
     },
     {
       name            = "external-dns"
@@ -30,31 +30,38 @@ module "argocd_bootstrap" {
       target_revision = "1.13.1"
       sync_wave       = 1
     },
-    {
-      name            = "external-secrets"
-      namespace       = "external-secrets"
-      repo_url        = "https://charts.external-secrets.io"
-      chart           = "external-secrets"
-      target_revision = "0.9.5"
-      sync_wave       = 1
-    },
   ]
 }
 ```
 
 ## Examples
 
-### Disabled (no bootstrap apps)
+### Disabled (No Bootstrap Apps)
 
 ```hcl
 module "argocd_bootstrap" {
-  source           = "../argocd-bootstrap"
-  argocd_namespace = "argocd"
+  source = "../../modules/argocd-bootstrap"
+
+  argocd_namespace       = "argocd"
   bootstrap_applications = []
 }
 ```
 
 <!-- BEGIN_TF_DOCS -->
+## Requirements
+
+No requirements.
+
+## Providers
+
+| Name | Version |
+| ---- | ------- |
+| <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | n/a |
+
+## Modules
+
+No modules.
+
 ## Resources
 
 | Name | Type |
@@ -67,29 +74,28 @@ module "argocd_bootstrap" {
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| argocd_namespace | The namespace where ArgoCD is deployed | `string` | n/a | yes |
-| bootstrap_applications | List of applications to bootstrap with ArgoCD | <pre>list(object({<br/>    name            = string<br/>    namespace       = string<br/>    repo_url        = string<br/>    path            = optional(string, "")<br/>    chart           = optional(string, "")<br/>    target_revision = string<br/>    helm_values     = optional(map(string), {})<br/>    sync_wave       = optional(number, 0)<br/>    self_heal       = optional(bool, true)<br/>    prune           = optional(bool, true)<br/>  }))</pre> | `[]` | no |
-| project | The ArgoCD project to use for applications | `string` | `"default"` | no |
-| server | The Kubernetes server URL for ArgoCD to connect to | `string` | `"https://kubernetes.default.svc"` | no |
+| <a name="input_argocd_namespace"></a> [argocd\_namespace](#input\_argocd\_namespace) | The namespace where ArgoCD is deployed | `string` | n/a | yes |
+| <a name="input_bootstrap_applications"></a> [bootstrap\_applications](#input\_bootstrap\_applications) | List of applications to bootstrap with ArgoCD | <pre>list(object({<br/>    name            = string<br/>    namespace       = string<br/>    repo_url        = string<br/>    path            = optional(string, "")<br/>    chart           = optional(string, "")<br/>    target_revision = string<br/>    helm_values     = optional(map(string), {})<br/>    sync_wave       = optional(number, 0)<br/>    self_heal       = optional(bool, true)<br/>    prune           = optional(bool, true)<br/>  }))</pre> | `[]` | no |
+| <a name="input_project"></a> [project](#input\_project) | The ArgoCD project to use for applications | `string` | `"default"` | no |
+| <a name="input_server"></a> [server](#input\_server) | The Kubernetes server URL for ArgoCD to connect to | `string` | `"https://kubernetes.default.svc"` | no |
 
 ## Outputs
 
 | Name | Description |
 | ---- | ----------- |
-| bootstrap_applications | The list of bootstrap applications |
-| bootstrap_applications_count | The number of bootstrap applications configured |
-| cert_manager_name | The name of the cert-manager application |
-| external_dns_name | The name of the external-dns application |
-| external_secrets_name | The name of the external-secrets application |
+| <a name="output_bootstrap_applications"></a> [bootstrap\_applications](#output\_bootstrap\_applications) | The list of bootstrap applications |
+| <a name="output_bootstrap_applications_count"></a> [bootstrap\_applications\_count](#output\_bootstrap\_applications\_count) | The number of bootstrap applications configured |
+| <a name="output_cert_manager_name"></a> [cert\_manager\_name](#output\_cert\_manager\_name) | The name of the cert-manager application |
+| <a name="output_external_dns_name"></a> [external\_dns\_name](#output\_external\_dns\_name) | The name of the external-dns application |
+| <a name="output_external_secrets_name"></a> [external\_secrets\_name](#output\_external\_secrets\_name) | The name of the external-secrets application |
 <!-- END_TF_DOCS -->
-
-## Dependencies
-
-- `argocd` — ArgoCD must be deployed and its CRDs available before this module runs.
 
 ## Notes
 
-- Cloud-agnostic module; works on any cluster where ArgoCD is installed.
-- Uses the App-of-Apps pattern: each entry in `bootstrap_applications` becomes a `kubernetes_manifest` of kind `Application` with automated sync (`selfHeal = true`, `prune = true`).
-- `sync_wave` controls deployment ordering: lower values deploy first (e.g., cert-manager at wave 0 before external-dns at wave 1).
-- All applications are configured with `CreateNamespace=true` so target namespaces are created automatically.
+- The module hardcodes three Application resources (cert-manager, external-dns, external-secrets) regardless of the `bootstrap_applications` input. The variable controls whether they are created at all but does not dynamically generate applications from its contents.
+- Sync-wave annotations control ordering: cert-manager at wave 0, external-dns and external-secrets at wave 1.
+- All bootstrap applications use `CreateNamespace=true` so their target namespaces are created automatically.
+
+## Related ADRs
+
+- ADR-021: ArgoCD for GitOps Delivery

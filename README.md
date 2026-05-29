@@ -1,261 +1,190 @@
 # Multi-Cloud Platform Infrastructure
 
-This repository contains infrastructure-as-code for a multi-cloud platform using OpenTofu and Terragrunt, spanning AWS, Azure, and GCP. It emphasizes security, reusability, and consistent implementation patterns across all three clouds.
+Infrastructure-as-code for a multi-cloud platform using OpenTofu and Terragrunt.
+AWS is the primary deployed platform (4 accounts, 2 EKS clusters); Azure and GCP
+modules exist but are not actively deployed. The platform provides tenant isolation,
+GitOps delivery, private cluster access, and compliance guardrails through a layered
+module architecture.
 
-## Project Structure
+## Quick Start
 
+```bash
+# Prerequisites: OpenTofu >= 1.6.0, Terragrunt >= 0.69.0, AWS CLI v2
+
+# Authenticate
+aws sso login --profile management
+
+# Bootstrap the full platform stack
+platctl bootstrap
+
+# Or deploy a single unit
+cd infra/live/aws/platform/us-east-1/platform/eks
+AWS_PROFILE=management terragrunt apply
+
+# Validate deployed infrastructure
+platctl validate
+
+# Configure kubectl contexts
+platctl kubeconfig
 ```
+
+## Repository Layout
+
+```text
 platform/
-├── infra/                       # Infrastructure code
-│   ├── docs/                    # Operational documentation (20+ docs)
-│   │   ├── 00-documentation-guide.md
-│   │   ├── 01-introduction.md
-│   │   ├── 02-architecture-overview.md
-│   │   ├── ...
-│   │   ├── 20-region-scaffolding.md
-│   │   └── README.md
-│   ├── live/                    # Live infrastructure (Terragrunt)
+├── cmd/platctl/                 # Go CLI for platform operations (bootstrap, teardown, validate)
+├── docs/                        # User-facing documentation
+│   ├── adrs/                    # 38 architecture decision records
+│   ├── architecture/            # System design, tenant model, config hierarchy
+│   ├── compliance/              # SOC2/HIPAA/PCI-DSS control mappings
+│   ├── runbooks/                # Operational procedures
+│   └── troubleshooting/         # Known issues and solutions
+├── infra/
+│   ├── live/                    # Terragrunt live configurations
 │   │   ├── aws/
-│   │   │   ├── _base.hcl        # AWS base config
-│   │   │   ├── _versions.hcl    # Module sources and version pins
-│   │   │   ├── mgmt/global/     # Management account
-│   │   │   │   ├── organizations/   # AWS Organizations + SCPs
-│   │   │   │   └── state-bootstrap/ # S3 + DynamoDB remote state
-│   │   │   └── ops/us-east-1/   # Operations (networking + naming)
-│   │   ├── azure/
-│   │   │   ├── _base.hcl        # Azure base config
-│   │   │   ├── _versions.hcl    # Module sources and Helm version pins
-│   │   │   ├── _envcommon/      # Shared configs across environments
-│   │   │   ├── dev/eastus/      # Development (full stack)
-│   │   │   └── ops/westus/      # Operations (full stack)
-│   │   └── gcp/
-│   │       ├── _base.hcl        # GCP base config
-│   │       └── ops/us-east1/    # Operations (networking + naming)
-│   ├── modules/                 # Reusable modules
-│   │   ├── aws/                 # 4 modules: naming, networking, organizations, state_bootstrap
-│   │   ├── azure/               # 24 modules (see below)
-│   │   ├── gcp/                 # 2 modules: naming, networking
-│   │   ├── argocd/              # GitOps deployment via Helm
-│   │   ├── argocd-bootstrap/    # Bootstrap applications
-│   │   ├── cilium/              # CNI deployment via Helm
-│   │   ├── policy/              # OPA/Gatekeeper policy engine
-│   │   └── vcluster/            # Virtual Kubernetes clusters
-│   ├── terragrunt.hcl           # Root Terragrunt configuration
-│   └── tests/                   # Test configurations
-│       ├── helpers/
-│       ├── modules/azure/
-│       └── setup/
-├── docs/                        # AWS Organizations & compliance docs
-│   ├── adrs/                    # 6 architecture decision records
-│   ├── architecture/            # Config hierarchy, AWS Org design
-│   ├── compliance/              # SOC2/HIPAA/PCI-DSS/NIST/CIS mapping
-│   ├── runbooks/                # Operational runbooks
-│   ├── troubleshooting/         # Troubleshooting guides
-│   ├── onboarding.md
-│   └── user-guide.md
-├── Makefile                     # Infrastructure operations automation
-├── scripts/                     # Utility scripts
-├── charts/                      # Helm charts
-└── terragrunt.hcl               # Root Terragrunt config (cloud-aware state routing)
+│   │   │   ├── mgmt/           # Management account (Organizations, state, IAM Identity Center)
+│   │   │   ├── platform/       # Platform account (EKS, ArgoCD, Tailscale, TGW hub)
+│   │   │   ├── preprod/        # Preprod account (EKS, tenants, ingress, TGW spoke)
+│   │   │   ├── prod/           # Prod account (networking defined, not yet deployed)
+│   │   │   └── test/           # Test account (GitHub OIDC for Terratest CI)
+│   │   ├── azure/              # Azure environments (dev, ops) — not actively deployed
+│   │   └── gcp/                # GCP stub (networking + naming only)
+│   ├── modules/                # Reusable OpenTofu modules
+│   │   ├── aws/                # 17 AWS modules
+│   │   ├── azure/              # 24 Azure modules
+│   │   ├── cloudflare/         # 1 Cloudflare module
+│   │   ├── gcp/                # 2 GCP modules
+│   │   └── (shared)            # 15 cloud-agnostic modules (cilium, argocd, tenant, etc.)
+│   ├── tests/                  # Terratest integration tests (Go)
+│   └── root.hcl                # Root Terragrunt config (cloud-aware state routing)
+└── scripts/                    # Helper scripts (eks-tunnel, bootstrap, teardown)
 ```
 
-## Features
+## AWS Accounts
 
-- **Multi-Cloud Architecture**: AWS, Azure, and GCP with cross-cloud interface contract (`network_id`, `subnet_ids`, `kubernetes_subnet_id`) for cloud-agnostic downstream modules
-- **AWS Organizations**: Full org management with OUs (Platform, Workloads/Preprod, Workloads/Prod, Workloads/Regulated), multiple accounts, and 8 enterprise SCPs
-- **Enterprise Security Controls**: SCPs enforcing encryption, region restrictions, IMDSv2, root user protection, security service protection (CloudTrail, GuardDuty, Security Hub, Config, Access Analyzer), tagging requirements, and HIPAA-eligible service restrictions
-- **Cloud-Aware State Management**: S3 backend for AWS (mgmt account 851725353202), Azure Blob Storage for Azure — root `terragrunt.hcl` detects cloud from directory path and routes automatically
-- **7-Layer Config Hierarchy**: Root `terragrunt.hcl` > cloud `_base.hcl` > `_versions.hcl` > env `common.hcl` > region > workload > module
-- **Environment Safety Validations**: Automatic path-env consistency checks and subscription/account mapping verification prevent cross-environment deployment accidents
-- **Hierarchical CIDR Allocation**: Well-structured address space across all clouds (see [CIDR Allocation Strategy](infra/docs/06-cidr-allocation.md))
-- **Universal Create Toggles**: Every resource-creating module supports `create = true/false` for selective deployment without config removal
-- **Composite Module Pattern**: Stack modules (e.g., `stack_base`) compose multiple modules into single deployable units
-- **AKS Cluster Support**: Kubernetes clusters with Cilium CNI, node pools, workload identity, and ArgoCD GitOps
-- **Monitoring & Observability**: Log Analytics, Prometheus, Managed Grafana, diagnostic settings, and monitor alerts
-- **Front Door Integration**: Global content delivery and security with Azure Front Door, private link backends
-- **Standardized Naming**: Consistent resource naming across all clouds via dedicated naming modules
-- **Compliance Documentation**: Mapping to SOC2, HIPAA, PCI-DSS, NIST, and CIS frameworks
+| Account | ID | Purpose |
+|---------|------|---------|
+| Management | 851725353202 | AWS Organizations, SCPs, IAM Identity Center, Terraform state |
+| Platform | 829808296602 | Shared services: EKS, ArgoCD, Tailscale, TGW hub, ECR |
+| PreProd | 620830101009 | Workloads: EKS, tenant namespaces, ingress, TGW spoke |
+| Prod | 554518885123 | Production workloads (networking defined, not yet deployed) |
+
+Cross-account access uses purpose-built IAM roles (PlatformAdmin, PlatformDeployer,
+DeveloperAccess, TerraformStateAccess). `OrganizationAccountAccessRole` retained as
+break-glass only.
+
+## Platform Stack
+
+### Deployed Infrastructure (AWS)
+
+**Platform account** — shared services cluster:
+
+- EKS cluster (private API, BYOCNI) with Cilium 1.19.4
+- ArgoCD for GitOps delivery with Dex SAML SSO
+- Tailscale Operator for VPN access to private clusters
+- Transit Gateway hub for cross-VPC connectivity
+- Cross-VPC DNS for private EKS endpoint resolution
+- Gateway API (internal NLB) for platform service ingress
+- cert-manager, ExternalDNS, External Secrets Operator
+
+**Preprod account** — workload cluster:
+
+- EKS cluster with Cilium, Gateway API (public NLB)
+- Tenant isolation via namespaces with default-deny NetworkPolicies
+- ArgoCD Applications and PR preview ApplicationSets per team
+- ECR cross-account image pull, GitHub OIDC for CI/CD
+- Transit Gateway spoke connected to platform hub
+
+### Deployment Order
+
+The full dependency DAG is documented in [CLAUDE.md](CLAUDE.md). The preferred
+deployment method is `platctl bootstrap`, which resolves the DAG automatically.
 
 ## Modules
 
-### AWS (4 modules)
+### Shared (15 modules)
 
 | Module | Description |
 |--------|-------------|
-| `naming` | Resource naming conventions |
-| `networking` | VPC, subnets, Internet Gateway, NAT Gateway, route tables |
-| `organizations` | AWS Organizations, OUs, accounts, 8 enterprise SCPs (baseline-guardrails, protect-security-services, enforce-encryption, deny-regions, protect-data-and-network, require-tagging, restrict-iam-users, hipaa-eligible-services) |
-| `state_bootstrap` | S3 bucket + DynamoDB table for OpenTofu remote state |
+| [argocd](infra/modules/argocd/) | ArgoCD Helm deployment with HA, RBAC, Dex SSO |
+| [argocd-apps](infra/modules/argocd-apps/) | Multi-tenant AppProjects, Applications, PR preview ApplicationSets |
+| [argocd-bootstrap](infra/modules/argocd-bootstrap/) | Bootstrap App-of-Apps for foundational services |
+| [argocd-clusters](infra/modules/argocd-clusters/) | Remote cluster registration |
+| [cert-manager](infra/modules/cert-manager/) | cert-manager Helm with IRSA for DNS-01 challenges |
+| [cilium](infra/modules/cilium/) | Cilium CNI with cloud-specific config, Gateway API, Hubble |
+| [external-dns](infra/modules/external-dns/) | ExternalDNS Helm with IRSA |
+| [external-secrets](infra/modules/external-secrets/) | External Secrets Operator Helm with IRSA |
+| [gateway-config](infra/modules/gateway-config/) | ClusterIssuer, Gateway, HTTPRoutes |
+| [policy](infra/modules/policy/) | Kyverno policy engine |
+| [secret-stores](infra/modules/secret-stores/) | ClusterSecretStore for AWS Secrets Manager and SSM |
+| [tailscale](infra/modules/tailscale/) | Tailscale Operator, subnet router, split DNS |
+| [tailscale-admin](infra/modules/tailscale-admin/) | Tailnet ACL and OAuth client management |
+| [tenant](infra/modules/tenant/) | Namespace isolation with quotas, limits, network policies |
+| [vcluster](infra/modules/vcluster/) | vCluster Helm (deferred — ADR-033) |
 
-### Azure (24 modules)
-
-| Module | Description |
-|--------|-------------|
-| `aks_core` | AKS cluster core configuration |
-| `aks_identity` | AKS managed identities |
-| `aks_node_pools` | AKS node pool management |
-| `client_config` | Azure client configuration data |
-| `container_registry` | Azure Container Registry with private networking |
-| `diagnostic_settings` | Azure Monitor diagnostic settings |
-| `frontdoor_endpoint` | Front Door endpoint configuration |
-| `frontdoor_private_link` | Front Door private link connectivity |
-| `frontdoor_profile` | Front Door CDN profile |
-| `identities` | Azure managed identities |
-| `key_vault` | Azure Key Vault with RBAC authorization |
-| `log_analytics` | Log Analytics workspace |
-| `managed_grafana` | Azure Managed Grafana |
-| `monitor_alerts` | Azure Monitor alert rules |
-| `monitor_workspace` | Azure Monitor workspace for Prometheus |
-| `naming` | Resource naming conventions |
-| `networking` | Virtual network, subnets, NSGs |
-| `private_dns` | Private DNS zones |
-| `prometheus_dcr` | Prometheus data collection rules |
-| `resource_group` | Resource group management |
-| `stack_base` | Composite: resource_group + networking + key_vault |
-| `storage_account` | Storage account with network rules |
-| `storage_container` | Blob container management |
-| `storage_roles` | Storage RBAC permissions |
-
-### GCP (2 modules)
+### AWS (17 modules)
 
 | Module | Description |
 |--------|-------------|
-| `naming` | Resource naming conventions |
-| `networking` | VPC, subnets, Cloud Router, Cloud NAT |
+| [cloudtrail](infra/modules/aws/cloudtrail/) | Audit logging with S3, KMS, secrets alarms |
+| [cross-vpc-dns](infra/modules/aws/cross-vpc-dns/) | Cross-VPC DNS for private EKS endpoints |
+| [ecr](infra/modules/aws/ecr/) | ECR with lifecycle policies and cross-account access |
+| [eks](infra/modules/aws/eks/) | EKS cluster with BYOCNI, KMS, OIDC, access entries |
+| [eks-addons](infra/modules/aws/eks-addons/) | EKS managed add-ons with IRSA |
+| [eks-node-group](infra/modules/aws/eks-node-group/) | EKS managed node groups |
+| [github_oidc](infra/modules/aws/github_oidc/) | GitHub Actions OIDC federation |
+| [iam_roles](infra/modules/aws/iam_roles/) | Purpose-built IAM roles |
+| [identity_center](infra/modules/aws/identity_center/) | IAM Identity Center permission sets |
+| [naming](infra/modules/aws/naming/) | Resource naming conventions |
+| [networking](infra/modules/aws/networking/) | VPC, subnets, NAT, flow logs (3 topology modes) |
+| [organizations](infra/modules/aws/organizations/) | AWS Organizations with OUs and SCPs |
+| [route53](infra/modules/aws/route53/) | Route53 hosted zones |
+| [route53_delegation](infra/modules/aws/route53_delegation/) | NS record delegation between zones |
+| [ssm-bastion](infra/modules/aws/ssm-bastion/) | SSM bastion for private cluster access |
+| [state_bootstrap](infra/modules/aws/state_bootstrap/) | S3 + DynamoDB for Terraform state |
+| [transit-gateway](infra/modules/aws/transit-gateway/) | TGW hub/spoke for cross-VPC connectivity |
 
-### Cross-Cloud (5 modules)
+### Azure (24 modules), GCP (2 modules), Cloudflare (1 module)
 
-| Module | Description |
-|--------|-------------|
-| `cilium` | CNI deployment via Helm (works with AKS, EKS, GKE) |
-| `argocd` | GitOps deployment via Helm |
-| `argocd-bootstrap` | Bootstrap applications (cert-manager, external-dns, external-secrets) |
-| `policy` | OPA/Gatekeeper policy engine |
-| `vcluster` | Virtual Kubernetes clusters |
+See [infra/modules/README.md](infra/modules/README.md) for the full catalog.
 
-## Live Environments
+## Key Design Decisions
 
-| Path | Cloud | Purpose |
-|------|-------|---------|
-| `aws/mgmt/global/` | AWS | Management account: state-bootstrap + organizations |
-| `aws/ops/us-east-1/` | AWS | Operations: networking + naming |
-| `azure/dev/eastus/` | Azure | Development: full stack (AKS, monitoring, Front Door, DNS, storage, etc.) |
-| `azure/ops/westus/` | Azure | Operations: full stack + ArgoCD |
-| `azure/_envcommon/` | Azure | Shared configurations across environments |
-| `gcp/ops/us-east1/` | GCP | Operations: networking + naming |
+| Decision | ADR |
+|----------|-----|
+| Multi-cloud Terragrunt monorepo | [ADR-001](docs/adrs/001-multi-cloud-terragrunt-structure.md) |
+| Cilium as cross-cloud CNI | [ADR-008](docs/adrs/008-cilium-as-cross-cloud-cni.md) |
+| EKS component separation (BYOCNI ordering) | [ADR-009](docs/adrs/009-eks-component-separation.md) |
+| Private EKS API endpoint | [ADR-010](docs/adrs/010-private-eks-api-endpoint.md) |
+| Tailscale for VPN access | [ADR-011](docs/adrs/011-tailscale-for-private-cluster-access.md) |
+| Gateway API over Ingress | [ADR-017](docs/adrs/017-gateway-api-over-ingress.md) |
+| ArgoCD for GitOps | [ADR-021](docs/adrs/021-argocd-for-gitops.md) |
+| Namespace tenant isolation | [ADR-027](docs/adrs/027-hybrid-tenant-isolation-model.md) |
+| Multi-app tenant model | [ADR-031](docs/adrs/031-multi-app-tenant-model.md) |
+| PR preview environments | [ADR-032](docs/adrs/032-pr-preview-environments.md) |
+| Transit Gateway hub/spoke | [ADR-034](docs/adrs/034-transit-gateway-cross-account-connectivity.md) |
+| platctl CLI | [ADR-038](docs/adrs/038-platctl-cli-for-platform-operations.md) |
 
-## AWS Organizations
-
-- **Organization**: `o-a4kjvito7o`, management account `851725353202`
-- **Accounts**: platform (`829808296602`), preprod (`620830101009`)
-- **OU structure**: Platform, Workloads/{Preprod, Prod, Regulated}
-- **SCPs**: 7 default + 1 optional HIPAA SCP, covering root user lockdown, region restrictions, encryption enforcement, security service protection, tagging requirements, and IAM user restrictions
-
-## Getting Started
-
-### Prerequisites
-
-- OpenTofu >= 1.6.0
-- Terragrunt >= 0.55.0
-- AWS CLI (for AWS environments)
-- Azure CLI (for Azure environments)
-- Google Cloud SDK (for GCP environments)
-
-### Authentication
-
-```bash
-# AWS
-aws configure
-# or use SSO
-aws sso login --profile your-profile
-
-# Azure
-az login
-az account set --subscription "your-subscription-id"
-
-# GCP
-gcloud auth application-default login
-gcloud config set project your-project-id
-```
-
-### Deployment
-
-The project includes a Makefile to simplify operations:
-
-```bash
-# Show available commands
-make help
-
-# Plan all modules in an environment
-make plan CLOUD=azure ENV=dev REGION=eastus
-
-# Apply all modules in an environment
-make apply CLOUD=azure ENV=ops REGION=westus
-
-# Work with a specific module
-make plan-module MODULE=networking CLOUD=azure ENV=dev REGION=eastus
-make apply-module MODULE=aks_core CLOUD=azure ENV=ops REGION=westus
-
-# Work with AWS
-make plan CLOUD=aws ENV=mgmt REGION=global
-make plan CLOUD=aws ENV=ops REGION=us-east-1
-
-# Validate OpenTofu code
-make validate
-
-# Check tool versions
-make version
-
-# Clean Terragrunt cache
-make clean
-```
+All 38 ADRs: [docs/adrs/](docs/adrs/)
 
 ## Testing
 
-Module tests are organized in `infra/tests/modules/`, separate from module code:
+Tests use Terratest (Go) and live in `infra/tests/aws/<module>/`.
 
 ```bash
-# Run all tests
-make test
-
-# Run tests for a specific module
-make test-module MODULE=networking
+cd infra/tests/aws/networking && go test -v -timeout 30m
 ```
+
+CI runs via GitHub Actions with OIDC federation — no stored credentials.
 
 ## Documentation
 
-### Operational Docs (`infra/docs/`)
-
-20+ documents covering architecture, security, networking, and operations:
-
-- [Documentation Guide](infra/docs/00-documentation-guide.md)
-- [Project Introduction](infra/docs/01-introduction.md)
-- [Architecture Overview](infra/docs/02-architecture-overview.md)
-- [Infrastructure as Code Approach](infra/docs/03-infrastructure-as-code.md)
-- [Multi-Cloud Strategy](infra/docs/04-multi-cloud-strategy.md)
-- [Environment Management](infra/docs/05-environment-management.md)
-- [CIDR Allocation Strategy](infra/docs/06-cidr-allocation.md)
-- [Network Topology](infra/docs/07-network-topology.md)
-- [Kubernetes Network Design](infra/docs/08-kubernetes-network-design.md)
-- [Security Architecture](infra/docs/09-security-architecture.md)
-- [Compliance Framework](infra/docs/10-compliance-framework.md)
-- [Naming Conventions](infra/docs/11-naming-conventions.md)
-- [Tagging Strategy](infra/docs/12-tagging-strategy.md)
-- [Module Design](infra/docs/13-module-design.md)
-- [Deployment Workflows](infra/docs/14-deployment-workflows.md)
-- [Testing Strategy](infra/docs/15-testing-strategy.md)
-- [Disaster Recovery](infra/docs/16-disaster-recovery.md)
-- [Available Modules](infra/docs/17-available-modules.md)
-- [Troubleshooting](infra/docs/18-troubleshooting.md)
-- [Cost Management](infra/docs/19-cost-management.md)
-- [Region Scaffolding](infra/docs/20-region-scaffolding.md)
-
-Full index: [Documentation Table of Contents](infra/docs/README.md)
-
-### AWS Organizations & Compliance Docs (`docs/`)
-
-- **ADRs**: [Multi-cloud structure](docs/adrs/001-multi-cloud-terragrunt-structure.md), [AWS state storage](docs/adrs/002-aws-state-storage.md), [SCP design](docs/adrs/003-scp-design-philosophy.md), [Account management](docs/adrs/004-account-management-strategy.md), [OU hierarchy](docs/adrs/005-ou-hierarchy-design.md), [State bootstrap pattern](docs/adrs/006-state-bootstrap-pattern.md)
-- **Architecture**: [AWS Organizations](docs/architecture/aws-organizations.md), [Config hierarchy](docs/architecture/config-hierarchy.md)
-- **Compliance**: [SCP control mapping](docs/compliance/scp-control-mapping.md) (SOC2, HIPAA, PCI-DSS, NIST, CIS)
-- **Runbooks**: [Add AWS account](docs/runbooks/add-aws-account.md), [Modify SCPs](docs/runbooks/modify-scps.md), [SCP incident response](docs/runbooks/incident-scp-blocking.md)
-- **Guides**: [Onboarding](docs/onboarding.md), [User guide](docs/user-guide.md), [Troubleshooting](docs/troubleshooting/aws-organizations.md)
+| Document | Description |
+|----------|-------------|
+| [Onboarding Guide](docs/onboarding.md) | New team member quickstart |
+| [User Guide](docs/user-guide.md) | Complete reference for deployments and day-2 ops |
+| [Deploy App to Preprod](docs/runbooks/deploy-app-preprod.md) | Developer guide: manifests, ECR, ArgoCD |
+| [Tenant Onboarding](docs/runbooks/tenant-onboarding.md) | Add/remove teams via `teams.hcl` |
+| [EKS Cluster Access](docs/runbooks/eks-cluster-access.md) | kubectl setup for engineers |
+| [Architecture Decisions](docs/adrs/) | 38 ADRs documenting every significant choice |
+| [Compliance Mappings](docs/compliance/) | SOC2, HIPAA, PCI-DSS control coverage |

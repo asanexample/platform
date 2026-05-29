@@ -16,7 +16,7 @@ resource "tailscale_acl" "this" {
   count = local.create ? 1 : 0
 
   acl                        = var.acl_policy
-  overwrite_existing_content = true
+  overwrite_existing_content = true # Overwrites any manual ACL edits made in the Tailscale admin console
 }
 
 # ---------------------------------------------------------------------------

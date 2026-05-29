@@ -18,5 +18,5 @@ variable "delegations" {
 variable "ttl" {
   description = "TTL for NS delegation records"
   type        = number
-  default     = 172800
+  default     = 172800 # 48 hours — standard NS delegation TTL
 }

@@ -4,7 +4,7 @@
 > **Related ADR:** [007-iam-role-model](../adrs/007-iam-role-model.md)
 > **See also:** [ArgoCD SSO](argocd-sso.md) for web UI access
 >
-> **Last reviewed:** 2026-05-21
+> **Last reviewed:** 2026-05-28
 
 ---
 
@@ -99,8 +99,9 @@ subsequent `kubectl` commands automatically assume it.
 
 ## Developer: Namespace-Scoped kubectl
 
-Developers use the **DeveloperAccess** role, which grants access only to
-assigned namespaces.
+Developers use the **DeveloperAccess** role on the **preprod** cluster, which
+grants access only to assigned team namespaces. The platform cluster does not
+have developer access -- it is admin-only.
 
 ### Prerequisites
 
@@ -113,26 +114,31 @@ assigned namespaces.
 Add to `~/.aws/config`:
 
 ```ini
-[profile platform-dev]
+[profile preprod-dev]
 sso_session = centric
-sso_account_id = 829808296602
+sso_account_id = 620830101009
 sso_role_name = PowerUserAccess
+
+[sso-session centric]
+sso_start_url = https://d-9067aa6520.awsapps.com/start
+sso_region = us-east-1
+sso_registration_scopes = sso:account:access
 ```
 
 ### Steps
 
 ```bash
 # 1. Log in via SSO
-aws sso login --profile platform-dev
+aws sso login --profile preprod-dev
 
 # 2. Configure kubeconfig
-AWS_PROFILE=platform-dev aws eks update-kubeconfig \
-  --name platform-use1-eks \
+AWS_PROFILE=preprod-dev aws eks update-kubeconfig \
+  --name preprod-use1-eks \
   --region us-east-1 \
-  --role-arn arn:aws:iam::829808296602:role/DeveloperAccess
+  --role-arn arn:aws:iam::620830101009:role/DeveloperAccess
 
 # 3. Access your namespace
-kubectl get pods -n <your-namespace>
+kubectl get pods -n team-<your-team>
 
 # This will be denied (namespace not assigned):
 kubectl get pods -n kube-system
@@ -140,12 +146,18 @@ kubectl get pods -n kube-system
 
 ### Requesting Namespace Access
 
-To get access to a namespace, ask the platform team to add it to the
-`developer` access entry's namespace list in:
+Namespace access is automatic -- when a team is added to `teams.hcl`, the
+`developer_access` EKS access entry is updated to include the team's namespace.
+The configuration is in:
 
 ```text
-infra/live/aws/platform/us-east-1/platform/eks/terragrunt.hcl
+infra/live/aws/preprod/us-east-1/platform/eks/terragrunt.hcl
 ```
+
+If you cannot access your namespace, verify with the platform team that your
+team is listed in `teams.hcl` and that you are assigned to the
+**DeveloperAccess** permission set in IAM Identity Center for the preprod
+account (620830101009).
 
 ---
 

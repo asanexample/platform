@@ -69,6 +69,7 @@ resource "aws_eks_cluster" "this" {
   role_arn = aws_iam_role.cluster[0].arn
   version  = var.kubernetes_version
 
+  # BYOCNI mode: disables default VPC CNI and kube-proxy. Cilium provides both.
   bootstrap_self_managed_addons = false
   enabled_cluster_log_types     = var.enabled_cluster_log_types
 
@@ -91,6 +92,7 @@ resource "aws_eks_cluster" "this" {
   }
 
   access_config {
+    # Dual-mode auth: EKS access entries (preferred) + aws-auth configmap (backward compat)
     authentication_mode = "API_AND_CONFIG_MAP"
   }
 
@@ -116,7 +118,7 @@ resource "aws_iam_openid_connect_provider" "cluster" {
   count = local.create ? 1 : 0
 
   url             = aws_eks_cluster.this[0].identity[0].oidc[0].issuer
-  client_id_list  = ["sts.amazonaws.com"]
+  client_id_list  = ["sts.amazonaws.com"] # Required audience for IRSA token validation
   thumbprint_list = [data.tls_certificate.cluster[0].certificates[0].sha1_fingerprint]
 
   tags = merge(var.tags, { Name = "${var.cluster_name}-oidc" })
@@ -153,6 +155,7 @@ resource "aws_eks_access_policy_association" "this" {
 # EKS Managed Add-ons
 # ---------------------------------------------------------------------------
 
+# Addons at cluster creation time (before CNI/nodes). For post-CNI addons, use eks-addons module.
 resource "aws_eks_addon" "this" {
   for_each = local.create ? var.eks_addons : {}
 

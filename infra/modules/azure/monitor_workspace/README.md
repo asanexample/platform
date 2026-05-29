@@ -1,60 +1,50 @@
-# Azure Monitor Workspace Module
+# Monitor Workspace
 
-Creates an Azure Monitor workspace for storing Prometheus metrics from AKS clusters and other sources.
+Creates an Azure Monitor workspace, which serves as the storage and query backend for Azure Managed Prometheus metrics. This is a lightweight wrapper around `azurerm_monitor_workspace` that provides the workspace ID and query endpoint consumed by the `prometheus_dcr` and `managed_grafana` modules.
 
 ## Usage
 
 ```hcl
 module "monitor_workspace" {
-  source = "../monitor_workspace"
+  source = "../../modules/azure/monitor_workspace"
 
-  create = true
-
-  resource_group_name = "rg-platform-prod-eus"
+  name                = "amw-platform-dev-eus-prometheus"
+  resource_group_name = "rg-platform-dev-eus"
   location            = "eastus"
-  name                = "mw-platform-prod-eus"
 
   tags = {
-    Environment = "prod"
-    ManagedBy   = "Terragrunt"
+    Environment = "dev"
+    ManagedBy   = "Terraform"
   }
 }
 ```
 
 ## Examples
 
-### Disabled
+### Disabled Module
 
 ```hcl
 module "monitor_workspace" {
-  source = "../monitor_workspace"
+  source = "../../modules/azure/monitor_workspace"
   create = false
 }
 ```
 
-### Auto-generated name via naming module
-
-```hcl
-module "monitor_workspace" {
-  source = "../monitor_workspace"
-
-  create = true
-
-  resource_group_name = "rg-platform-dev-eus"
-  location            = "eastus"
-
-  workload    = "platform"
-  environment = "dev"
-  region_abbv = "eus"
-
-  tags = {
-    Environment = "dev"
-    ManagedBy   = "Terragrunt"
-  }
-}
-```
-
 <!-- BEGIN_TF_DOCS -->
+## Requirements
+
+No requirements.
+
+## Providers
+
+| Name | Version |
+| ---- | ------- |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | n/a |
+
+## Modules
+
+No modules.
+
 ## Resources
 
 | Name | Type |
@@ -65,32 +55,27 @@ module "monitor_workspace" {
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| location | The Azure region where the Azure Monitor Workspace will be deployed. | `string` | n/a | yes |
-| resource_group_name | The name of the resource group to deploy the Azure Monitor Workspace in. | `string` | n/a | yes |
-| create | Whether to create resources in this module | `bool` | `true` | no |
-| environment | Environment name for resource naming (dev, test, staging, prod, ops) | `string` | `"dev"` | no |
-| name | The name of the Azure Monitor Workspace. If null, a name should be provided by Terragrunt using the naming module. | `string` | `null` | no |
-| workload | Workload name for resource names | `string` | `"platform"` | no |
-| region_abbv | Abbreviation for Azure region (used in resource naming) | `string` | `"eus"` | no |
-| tags | A map of tags to apply to the Azure Monitor Workspace. | `map(string)` | `{}` | no |
+| <a name="input_location"></a> [location](#input\_location) | The Azure region where the Azure Monitor Workspace will be deployed. | `string` | n/a | yes |
+| <a name="input_resource_group_name"></a> [resource\_group\_name](#input\_resource\_group\_name) | The name of the resource group to deploy the Azure Monitor Workspace in. | `string` | n/a | yes |
+| <a name="input_create"></a> [create](#input\_create) | Whether to create resources in this module | `bool` | `true` | no |
+| <a name="input_environment"></a> [environment](#input\_environment) | Environment name for resource naming (dev, test, staging, prod, ops) | `string` | `"dev"` | no |
+| <a name="input_name"></a> [name](#input\_name) | The name of the Azure Monitor Workspace. If null, a name should be provided by Terragrunt using the naming module. | `string` | `null` | no |
+| <a name="input_region_abbv"></a> [region\_abbv](#input\_region\_abbv) | Abbreviation for Azure region (used in resource naming) | `string` | `"eus"` | no |
+| <a name="input_tags"></a> [tags](#input\_tags) | A map of tags to apply to the Azure Monitor Workspace. | `map(string)` | `{}` | no |
+| <a name="input_workload"></a> [workload](#input\_workload) | Workload identifier for resource names | `string` | `"platform"` | no |
 
 ## Outputs
 
 | Name | Description |
 | ---- | ----------- |
-| create | Whether resources were created |
-| id | The ID of the Azure Monitor Workspace. |
-| name | The name of the Azure Monitor Workspace. |
-| query_endpoint | The query endpoint for the Azure Monitor Workspace. |
+| <a name="output_create"></a> [create](#output\_create) | Whether resources were created |
+| <a name="output_id"></a> [id](#output\_id) | The ID of the Azure Monitor Workspace. |
+| <a name="output_name"></a> [name](#output\_name) | The name of the Azure Monitor Workspace. |
+| <a name="output_query_endpoint"></a> [query\_endpoint](#output\_query\_endpoint) | The query endpoint for the Azure Monitor Workspace. |
 <!-- END_TF_DOCS -->
-
-## Dependencies
-
-- [naming](../naming) — Provides standardized resource names
-- [resource_group](../resource_group) — Provides the resource group to deploy into
 
 ## Notes
 
-- Monitor Workspaces have a fixed 30-day retention period; plan archival separately.
-- Deploy in the same region as monitored resources to minimize metric collection latency.
-- Pricing is separate from Log Analytics Workspaces.
+- The workspace ID output is required by the `prometheus_dcr` module (for the data collection rule destination) and the `managed_grafana` module (for Prometheus integration).
+- The `query_endpoint` output provides the PromQL query URL used by Grafana and other consumers.
+- Azure Monitor workspace names must be 3-90 characters, alphanumeric with hyphens and underscores.

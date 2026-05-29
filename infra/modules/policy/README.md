@@ -1,40 +1,89 @@
-# Policy Module
+# Policy
 
-Deploys [Kyverno](https://kyverno.io/) -- a Kubernetes-native policy engine -- via Helm chart, providing policy-as-code enforcement for cluster compliance guardrails.
-
-> **Note:** This module is a placeholder. Compliance-tier-specific policies will be added in a future iteration.
+Deploys Kyverno, a Kubernetes-native policy engine, via Helm and supports applying custom ClusterPolicy resources. Includes a `compliance_tier` variable for future compliance-tier-specific policy sets (standard, HIPAA, PCI) -- currently a placeholder with no tier-specific logic implemented. Custom policies can be provided as YAML strings via the `additional_policies` map.
 
 ## Usage
 
 ```hcl
 module "policy" {
-  source = "../policy"
+  source = "../../modules/policy"
 
-  create          = true
-  environment     = "prod"
-  compliance_tier = "hipaa"
-  chart_version   = "3.3.7"
+  environment     = "preprod"
+  compliance_tier = "standard"
 
   additional_policies = {
-    require-labels = file("${path.module}/policies/require-labels.yaml")
+    require-labels = <<-YAML
+      apiVersion: kyverno.io/v1
+      kind: ClusterPolicy
+      metadata:
+        name: require-labels
+      spec:
+        validationFailureAction: Enforce
+        rules:
+          - name: check-team-label
+            match:
+              any:
+                - resources:
+                    kinds:
+                      - Pod
+            validate:
+              message: "The label 'team' is required."
+              pattern:
+                metadata:
+                  labels:
+                    team: "?*"
+    YAML
   }
 
   tags = {
-    Environment = "prod"
-    ManagedBy   = "Terragrunt"
+    Environment = "preprod"
+    ManagedBy   = "terraform"
   }
 }
 ```
 
-## Compliance Tiers
+## Examples
 
-| Tier | Description |
-| ---- | ----------- |
-| `standard` | Baseline best practices: require resource labels, disallow privileged containers, enforce resource limits. |
-| `hipaa` | Extends standard with audit logging enforcement, encryption-at-rest validation, and access control policies. |
-| `pci` | Extends standard with network isolation rules, container image allowlisting, and secret rotation policies. |
+### Disabled Module
 
-Tier-specific policies are not yet implemented -- the `compliance_tier` variable is accepted now so that consuming modules can declare intent and be ready when enforcement is added.
+```hcl
+module "policy" {
+  source = "../../modules/policy"
+
+  create      = false
+  environment = "preprod"
+}
+```
+
+### Minimal
+
+```hcl
+module "policy" {
+  source = "../../modules/policy"
+
+  environment = "platform"
+}
+```
+
+<!-- BEGIN_TF_DOCS -->
+## Requirements
+
+| Name | Version |
+| ---- | ------- |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.6.0 |
+| <a name="requirement_helm"></a> [helm](#requirement\_helm) | >= 2.5.0 |
+| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | >= 2.10.0 |
+
+## Providers
+
+| Name | Version |
+| ---- | ------- |
+| <a name="provider_helm"></a> [helm](#provider\_helm) | >= 2.5.0 |
+| <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | >= 2.10.0 |
+
+## Modules
+
+No modules.
 
 ## Resources
 
@@ -47,19 +96,31 @@ Tier-specific policies are not yet implemented -- the `compliance_tier` variable
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| environment | Environment name (e.g., dev, test, prod) | `string` | n/a | yes |
-| additional_policies | Map of policy name to YAML content for custom ClusterPolicy resources | `map(string)` | `{}` | no |
-| chart_version | Version of the Kyverno Helm chart | `string` | `"3.3.7"` | no |
-| compliance_tier | Compliance tier to enforce (standard, hipaa, pci) | `string` | `"standard"` | no |
-| create | Controls whether policy resources should be created | `bool` | `true` | no |
-| namespace | Kubernetes namespace to install Kyverno into | `string` | `"kyverno"` | no |
-| tags | Tags to apply to all resources | `map(string)` | `{}` | no |
-| workload | Workload identifier for resource naming | `string` | `"platform"` | no |
+| <a name="input_environment"></a> [environment](#input\_environment) | Environment name (e.g., dev, test, prod) | `string` | n/a | yes |
+| <a name="input_additional_policies"></a> [additional\_policies](#input\_additional\_policies) | Map of policy name to YAML content for custom ClusterPolicy resources | `map(string)` | `{}` | no |
+| <a name="input_chart_version"></a> [chart\_version](#input\_chart\_version) | Version of the Kyverno Helm chart | `string` | `"3.3.7"` | no |
+| <a name="input_compliance_tier"></a> [compliance\_tier](#input\_compliance\_tier) | Compliance tier to enforce (standard, hipaa, pci) | `string` | `"standard"` | no |
+| <a name="input_create"></a> [create](#input\_create) | Controls whether policy resources should be created | `bool` | `true` | no |
+| <a name="input_namespace"></a> [namespace](#input\_namespace) | Kubernetes namespace to install Kyverno into | `string` | `"kyverno"` | no |
+| <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to all resources | `map(string)` | `{}` | no |
+| <a name="input_workload"></a> [workload](#input\_workload) | Workload identifier for resource naming | `string` | `"platform"` | no |
 
 ## Outputs
 
 | Name | Description |
 | ---- | ----------- |
-| compliance_tier | Compliance tier this deployment enforces |
-| helm_release_status | Status of the Kyverno Helm release |
-| namespace | Kubernetes namespace where Kyverno is installed |
+| <a name="output_compliance_tier"></a> [compliance\_tier](#output\_compliance\_tier) | Compliance tier this deployment enforces |
+| <a name="output_helm_release_status"></a> [helm\_release\_status](#output\_helm\_release\_status) | Status of the Kyverno Helm release |
+| <a name="output_namespace"></a> [namespace](#output\_namespace) | Kubernetes namespace where Kyverno is installed |
+<!-- END_TF_DOCS -->
+
+## Notes
+
+- Compliance tiers (`standard`, `hipaa`, `pci`) are validated but not yet implemented -- the variable exists for future use.
+- Custom policies in `additional_policies` must be valid YAML that deserializes to a Kubernetes manifest. Each value is passed through `yamldecode()`.
+- Kyverno is installed with `atomic = true`, so a failed install is automatically rolled back.
+
+## Related ADRs
+
+- ADR-014: Kyverno as Policy Engine
+- ADR-013: Compliance Tier Model

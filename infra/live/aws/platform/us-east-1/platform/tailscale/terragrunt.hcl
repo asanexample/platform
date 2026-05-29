@@ -106,11 +106,13 @@ inputs = {
   create       = true
   cluster_name = dependency.eks.outputs.cluster_id
 
+  # Platform VPC CIDR — advertised to tailnet so VPN clients can reach private resources
   advertise_routes = ["10.100.0.0/16"]
 
+  # Route DNS queries for these domains through VPC DNS resolver (AmazonProvidedDNS at VPC CIDR + 2)
   split_dns = {
-    "us-east-1.eks.amazonaws.com" = ["10.100.0.2"]
-    "aws.refplat.org"             = ["10.100.0.2"]
+    "us-east-1.eks.amazonaws.com" = ["10.100.0.2"] # Resolves private EKS API endpoints
+    "aws.refplat.org"             = ["10.100.0.2"] # Resolves platform service hostnames
   }
 
   helm_chart_version = include.base.locals.helm_versions.tailscale_operator

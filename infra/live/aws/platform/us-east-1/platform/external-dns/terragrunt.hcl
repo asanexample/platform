@@ -68,6 +68,7 @@ inputs = {
 
   route53_hosted_zone_arn = dependency.route53.outputs.zone_arn
 
+  # Restrict ExternalDNS to only manage records under the platform's parent domain
   domain_filters = ["aws.refplat.org"]
 
   helm_chart_version = include.base.locals.helm_versions.external_dns

@@ -27,11 +27,12 @@ inputs = {
   create = true
 
   github_org    = "gangster"
-  github_repos  = ["app-alpha", "app-bravo"]
-  github_events = ["pull_request"]
+  github_repos  = ["app-alpha", "app-bravo"] # Team app repos that push images to ECR
+  github_events = ["pull_request"]           # Allow OIDC from PR workflows (preview image builds)
 
   role_name = "github-actions-ecr-push"
 
+  # Scoped to ECR auth + push only — no other AWS access
   inline_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [

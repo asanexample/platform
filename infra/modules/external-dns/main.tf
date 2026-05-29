@@ -2,6 +2,7 @@ locals {
   create      = var.create
   create_irsa = local.create && var.oidc_provider_arn != ""
 
+  # Sanitize tags for K8s label compliance (RFC 1123): lowercase, valid chars, max 63 chars
   k8s_labels = {
     for k, v in var.tags :
     replace(lower(k), "/[^a-z0-9_.-]/", "_") => replace(lower(v), "/[^a-z0-9_.-]/", "_")
@@ -17,7 +18,7 @@ locals {
 
     domainFilters = var.domain_filters
 
-    txtOwnerId = var.cluster_name
+    txtOwnerId = var.cluster_name # TXT owner ID prevents record conflicts when multiple clusters share a hosted zone
 
     policy = var.policy
 
@@ -88,7 +89,7 @@ data "aws_iam_policy_document" "external_dns_route53" {
       "route53:ListResourceRecordSets",
       "route53:ListTagsForResource",
     ]
-    resources = ["*"]
+    resources = ["*"] # List actions don't support resource-level scoping in Route53 IAM
   }
 }
 
@@ -116,7 +117,7 @@ resource "helm_release" "external_dns" {
   wait             = var.helm_wait
   atomic           = var.helm_wait
   cleanup_on_fail  = true
-  replace          = true
+  replace          = true # Delete + reinstall if the release is stuck in a failed state
 
   values = [
     yamlencode(local.external_dns_values),

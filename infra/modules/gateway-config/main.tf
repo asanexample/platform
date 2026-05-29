@@ -56,6 +56,7 @@ resource "kubernetes_manifest" "gateway" {
     spec = {
       gatewayClassName = "cilium"
       infrastructure = {
+        # Both scheme and internal annotations set for compat with LB Controller v1 and v2
         annotations = merge(
           {
             "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
@@ -84,6 +85,7 @@ resource "kubernetes_manifest" "gateway" {
             }
           }
         },
+        # HTTP listener exists only to support HTTP->HTTPS 301 redirects below
         {
           name     = "http"
           protocol = "HTTP"
@@ -122,7 +124,7 @@ resource "kubernetes_manifest" "http_routes" {
         namespace   = var.gateway_namespace
         sectionName = "https"
       }]
-      hostnames = ["${each.key}.${var.domain}"]
+      hostnames = ["${each.key}.${var.domain}"] # Map key is the hostname prefix (e.g., "argocd" -> "argocd.aws.refplat.org")
       rules = [{
         backendRefs = [{
           name = each.value.service

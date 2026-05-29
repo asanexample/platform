@@ -1,27 +1,25 @@
-# Azure Storage Roles Module
+# Storage Roles
 
-Assigns RBAC roles on a storage account to enable Entra ID authentication for users, groups, and service principals.
+Creates Azure RBAC role assignments on a storage account for Entra ID (Azure AD) authentication. This module is designed for transitioning from shared access key authentication to identity-based access. Each role assignment specifies a principal, a role (by name or ID), and an optional scope override. When scope is not specified, assignments default to the storage account level.
 
 ## Usage
 
 ```hcl
 module "storage_roles" {
-  source = "../storage_roles"
+  source = "../../modules/azure/storage_roles"
 
-  create = true
-
-  storage_account_id = module.storage_account.id
+  storage_account_id = "/subscriptions/.../storageAccounts/stplatdeveus001"
 
   role_assignments = [
     {
-      principal_id         = data.azuread_group.developers.id
+      principal_id         = "00000000-0000-0000-0000-000000000000"
       role_definition_name = "Storage Blob Data Contributor"
-      description          = "Developer team blob read/write access"
+      description          = "App identity for blob read/write"
     },
     {
-      principal_id         = data.azuread_service_principal.ci_pipeline.id
+      principal_id         = "11111111-1111-1111-1111-111111111111"
       role_definition_name = "Storage Blob Data Reader"
-      description          = "CI pipeline read access"
+      description          = "Monitoring identity for log access"
     }
   ]
 }
@@ -29,37 +27,30 @@ module "storage_roles" {
 
 ## Examples
 
-### Disabled
+### Disabled Module
 
 ```hcl
 module "storage_roles" {
-  source = "../storage_roles"
+  source = "../../modules/azure/storage_roles"
   create = false
 }
 ```
 
-### Container-scoped role
-
-```hcl
-module "storage_roles" {
-  source = "../storage_roles"
-
-  create = true
-
-  storage_account_id = module.storage_account.id
-
-  role_assignments = [
-    {
-      principal_id         = data.azuread_service_principal.app.id
-      role_definition_name = "Storage Blob Data Owner"
-      description          = "App full access to exports container"
-      scope                = "${module.storage_account.id}/blobServices/default/containers/data-exports"
-    }
-  ]
-}
-```
-
 <!-- BEGIN_TF_DOCS -->
+## Requirements
+
+No requirements.
+
+## Providers
+
+| Name | Version |
+| ---- | ------- |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | n/a |
+
+## Modules
+
+No modules.
+
 ## Resources
 
 | Name | Type |
@@ -70,24 +61,20 @@ module "storage_roles" {
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| storage_account_id | ID of the storage account to assign roles for | `string` | n/a | yes |
-| create | Whether to create resources in this module | `bool` | `true` | no |
-| role_assignments | List of role assignments to create for Entra ID authentication. Should contain principal_id, role_definition_name or role_definition_id, and scope (optional). | <pre>list(object({<br/>    principal_id         = string<br/>    role_definition_name = optional(string, null)<br/>    role_definition_id   = optional(string, null)<br/>    description          = optional(string, null)<br/>    scope                = optional(string, null) # Defaults to storage account resource ID<br/>  }))</pre> | `[]` | no |
+| <a name="input_storage_account_id"></a> [storage\_account\_id](#input\_storage\_account\_id) | ID of the storage account to assign roles for | `string` | n/a | yes |
+| <a name="input_create"></a> [create](#input\_create) | Whether to create resources in this module | `bool` | `true` | no |
+| <a name="input_role_assignments"></a> [role\_assignments](#input\_role\_assignments) | List of role assignments to create for Entra ID authentication. Should contain principal\_id, role\_definition\_name or role\_definition\_id, and scope (optional). | <pre>list(object({<br/>    principal_id         = string<br/>    role_definition_name = optional(string, null)<br/>    role_definition_id   = optional(string, null)<br/>    description          = optional(string, null)<br/>    scope                = optional(string, null) # Defaults to storage account resource ID<br/>  }))</pre> | `[]` | no |
 
 ## Outputs
 
 | Name | Description |
 | ---- | ----------- |
-| create | Whether resources were created |
-| role_assignment_ids | List of role assignment IDs created for Entra ID authentication |
+| <a name="output_create"></a> [create](#output\_create) | Whether resources were created |
+| <a name="output_role_assignment_ids"></a> [role\_assignment\_ids](#output\_role\_assignment\_ids) | List of role assignment IDs created for Entra ID authentication |
 <!-- END_TF_DOCS -->
-
-## Dependencies
-
-- [storage_account](../storage_account) — Provides the storage account ID
-- [identities](../identities) — Provides principal IDs for role assignment targets
 
 ## Notes
 
-- Either `role_definition_name` or `role_definition_id` must be provided per assignment.
-- Role assignments may take a few minutes to propagate in Azure.
+- Either `role_definition_name` or `role_definition_id` must be provided for each assignment, but not both.
+- When `scope` is null (default), the role assignment is scoped to the `storage_account_id`. Override `scope` for container-level or resource-group-level assignments.
+- This module uses `count` rather than `for_each`, so reordering the `role_assignments` list will cause recreation of assignments. For stable identity, use the `storage_container` module's built-in role assignment support instead.

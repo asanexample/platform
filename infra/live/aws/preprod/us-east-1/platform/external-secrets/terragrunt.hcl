@@ -60,7 +60,8 @@ inputs = {
   oidc_provider_arn = dependency.eks.outputs.oidc_provider_arn
   oidc_provider_url = dependency.eks.outputs.oidc_provider_url
 
-  kms_key_arns       = [dependency.eks.outputs.kms_key_arn]
+  kms_key_arns = [dependency.eks.outputs.kms_key_arn]
+  # IRSA path prefixes scope ESO permissions to preprod-prefixed secrets only
   secret_path_prefix = "preprod"
   ssm_path_prefix    = "/preprod"
 

@@ -16,16 +16,16 @@ locals {
     aws = yamlencode({
       eni                        = { enabled = true }
       ipam                       = { mode = "eni" }
-      egressMasqueradeInterfaces = "ens+"
-      routingMode                = "native"
-      tunnelProtocol             = ""
+      egressMasqueradeInterfaces = "ens+"   # Match ENI interfaces on EC2 Nitro instances
+      routingMode                = "native" # VPC-native routing (no VXLAN/Geneve) — ENI IPAM gives routable pod IPs
+      tunnelProtocol             = ""       # Disable encapsulation (native routing mode)
       enableIPv4Masquerade       = true
-      kubeProxyReplacement       = true
-      l2NeighDiscovery           = { enabled = true }
+      kubeProxyReplacement       = true               # Required: EKS BYOCNI deploys no kube-proxy DaemonSet
+      l2NeighDiscovery           = { enabled = true } # ARP resolution in VPC ENI mode
       hubble = {
         tls = {
           auto = {
-            method = "helm"
+            method = "helm" # Avoids post-install hook chicken-and-egg with BYOCNI (no nodes at install time)
           }
         }
       }
@@ -174,6 +174,7 @@ resource "null_resource" "gateway_api_crds" {
   }
 
   provisioner "local-exec" {
+    # Experimental channel includes GRPCRoute, TCPRoute, and TLSRoute CRDs
     command = "${var.kubeconfig_path != "" ? "kubectl --kubeconfig=${var.kubeconfig_path}" : "kubectl"} apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/${var.gateway_api_crd_version}/experimental-install.yaml"
   }
 }
@@ -186,7 +187,7 @@ resource "helm_release" "cilium" {
   chart            = var.helm_chart
   version          = var.helm_chart_version
   namespace        = var.namespace
-  create_namespace = false
+  create_namespace = false # kube-system always exists
   timeout          = var.helm_timeout
   wait             = var.helm_wait
   atomic           = var.helm_wait
