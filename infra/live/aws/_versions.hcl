@@ -52,6 +52,7 @@ locals {
     external_secrets = "${local.source_base}/external-secrets"
     secret_stores    = "${local.source_base}/secret-stores"
     gateway_config   = "${local.source_base}/gateway-config"
+    cluster_rbac     = "${local.source_base}//cluster-rbac"
     tenant           = "${local.source_base}//tenant"
     tailscale        = "${local.source_base}/tailscale"
     tailscale_admin  = "${local.source_base}/tailscale-admin"
