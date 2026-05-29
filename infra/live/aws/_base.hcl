@@ -59,6 +59,13 @@ locals {
   helm_versions = local.version_vars.locals.helm_versions
 
   # ---------------------------------------------------------------------------
+  # Secrets (via common.hcl -> secrets.hcl chain)
+  # ---------------------------------------------------------------------------
+  account_ids    = local.common_vars.locals.account_ids
+  admin_email    = local.common_vars.locals.admin_email
+  account_emails = local.common_vars.locals.account_emails
+
+  # ---------------------------------------------------------------------------
   # IAM role ARNs
   # ---------------------------------------------------------------------------
   deployer_role_arn = "arn:aws:iam::${local.account_id}:role/PlatformDeployer"

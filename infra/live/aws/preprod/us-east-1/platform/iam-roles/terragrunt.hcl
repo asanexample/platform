@@ -22,8 +22,8 @@ inputs = {
       # Trusted by SSO administrators in management and preprod accounts
       trust_principals = {
         aws = [
-          "arn:aws:iam::851725353202:root", # Management account
-          "arn:aws:iam::620830101009:root", # Preprod account (self)
+          "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:root",    # Management account
+          "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:root", # Preprod account (self)
         ]
       }
 
@@ -33,8 +33,8 @@ inputs = {
           test     = "ArnLike"
           variable = "aws:PrincipalArn"
           values = [
-            "arn:aws:iam::851725353202:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
-            "arn:aws:iam::620830101009:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
+            "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
+            "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
           ]
         },
       ]
@@ -92,7 +92,7 @@ inputs = {
                 "secretsmanager:GetSecretValue",
                 "secretsmanager:DescribeSecret",
               ]
-              Resource = "arn:aws:secretsmanager:*:620830101009:secret:preprod/*"
+              Resource = "arn:aws:secretsmanager:*:${include.base.locals.account_ids["preprod"]}:secret:preprod/*"
             },
             {
               Sid      = "SecretsListForDebugging"
@@ -111,8 +111,8 @@ inputs = {
 
       trust_principals = {
         aws = [
-          "arn:aws:iam::851725353202:root", # Management account
-          "arn:aws:iam::620830101009:root", # Preprod account (self)
+          "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:root",    # Management account
+          "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:root", # Preprod account (self)
         ]
       }
 
@@ -124,7 +124,7 @@ inputs = {
       description = "Cross-account ArgoCD cluster management from platform hub"
 
       trust_principals = {
-        aws = ["arn:aws:iam::829808296602:root"] # Platform account
+        aws = ["arn:aws:iam::${include.base.locals.account_ids["platform"]}:root"] # Platform account
       }
 
       # Only ArgoCD service account roles from the platform EKS cluster
@@ -132,7 +132,7 @@ inputs = {
         {
           test     = "ArnLike"
           variable = "aws:PrincipalArn"
-          values   = ["arn:aws:iam::829808296602:role/platform-use1-eks-argocd-*"]
+          values   = ["arn:aws:iam::${include.base.locals.account_ids["platform"]}:role/platform-use1-eks-argocd-*"]
         },
       ]
 
@@ -145,8 +145,8 @@ inputs = {
 
       trust_principals = {
         aws = [
-          "arn:aws:iam::851725353202:root", # Management account
-          "arn:aws:iam::620830101009:root", # Preprod account (self)
+          "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:root",    # Management account
+          "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:root", # Preprod account (self)
         ]
       }
 
@@ -156,10 +156,10 @@ inputs = {
           test     = "ArnLike"
           variable = "aws:PrincipalArn"
           values = [
-            "arn:aws:iam::851725353202:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_PowerUserAccess_*",
-            "arn:aws:iam::851725353202:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
-            "arn:aws:iam::620830101009:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_PowerUserAccess_*",
-            "arn:aws:iam::620830101009:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
+            "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_PowerUserAccess_*",
+            "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
+            "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_PowerUserAccess_*",
+            "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
           ]
         },
       ]

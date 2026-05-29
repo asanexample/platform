@@ -37,7 +37,7 @@ dependency "platform_tgw" {
 
   mock_outputs = {
     transit_gateway_id = "tgw-mock"
-    ram_share_arn      = "arn:aws:ram:us-east-1:829808296602:resource-share/mock"
+    ram_share_arn      = "arn:aws:ram:us-east-1:000000000000:resource-share/mock"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }

@@ -22,8 +22,8 @@ inputs = {
 
   # Accounts granted cross-account image pull access
   pull_account_ids = [
-    "620830101009", # Preprod
-    "554518885123", # Prod
+    include.base.locals.account_ids["preprod"], # Preprod
+    include.base.locals.account_ids["prod"],    # Prod
   ]
 
   tags = include.base.locals.tags

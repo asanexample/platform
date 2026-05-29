@@ -21,7 +21,7 @@ inputs = {
   caa_records = [
     "0 issue \"letsencrypt.org\"",
     "0 issuewild \"letsencrypt.org\"",
-    "0 iodef \"mailto:josh@deeden.org\"", # Certificate violation notifications
+    "0 iodef \"mailto:${include.base.locals.admin_email}\"", # Certificate violation notifications
   ]
 
   tags = include.base.locals.tags

@@ -1,9 +1,11 @@
 locals {
+  _secrets = read_terragrunt_config("${get_repo_root()}/infra/live/aws/secrets.hcl")
+
   env           = "platform"
   environment   = "platform"
   workload      = "platform"
   account_alias = "platform-aws"
-  account_id    = "829808296602"
+  account_id    = local._secrets.locals.account_ids["platform"]
 
   tags = {
     Environment        = local.environment

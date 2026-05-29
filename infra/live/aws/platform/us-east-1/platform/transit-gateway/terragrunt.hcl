@@ -28,7 +28,7 @@ inputs = {
   create_tgw = true # Hub mode — creates the TGW and shares it via RAM
 
   # Spoke accounts to share TGW with via RAM
-  ram_share_principals = ["620830101009"] # Preprod account
+  ram_share_principals = [include.base.locals.account_ids["preprod"]] # Preprod account
 
   vpc_id = dependency.networking.outputs.vpc_id
 
