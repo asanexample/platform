@@ -86,7 +86,8 @@ inputs = {
   k8s_service_port = "443"
 
   helm_chart_version = include.base.locals.helm_versions.cilium
-  helm_wait          = false
+  # Must not wait — Cilium deploys before node groups exist (BYOCNI ordering)
+  helm_wait = false
 
   tags = include.base.locals.tags
 }

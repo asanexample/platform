@@ -17,18 +17,19 @@ inputs = {
   roles = {
     TerraformStateAccess = {
       description          = "Cross-account access to S3 state bucket and DynamoDB lock table"
-      max_session_duration = 3600
+      max_session_duration = 3600 # 1 hour — sufficient for automated Terraform runs
 
       trust_principals = {
         aws = [
-          "arn:aws:iam::829808296602:root",
-          "arn:aws:iam::851725353202:root",
-          "arn:aws:iam::620830101009:root",
+          "arn:aws:iam::829808296602:root", # Platform account
+          "arn:aws:iam::851725353202:root", # Management account (self)
+          "arn:aws:iam::620830101009:root", # Preprod account
         ]
       }
 
       managed_policies = []
 
+      # Bucket and table names must match state-bootstrap configuration
       inline_policies = {
         state-access = jsonencode({
           Version = "2012-10-17"

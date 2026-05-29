@@ -41,18 +41,20 @@ inputs = {
   cluster_name = dependency.eks.outputs.cluster_id
 
   node_groups = {
+    # System nodes run platform components (Cilium, ArgoCD agents, cert-manager, etc.)
     system = {
       subnet_ids     = [for name, id in dependency.networking.outputs.subnet_ids : id if can(regex("kubernetes$", name))]
-      instance_types = ["t3.large"]
+      instance_types = ["t3.large"] # 2 vCPU / 8 GiB — sufficient for platform workloads
       desired_size   = 2
       max_size       = 4
       min_size       = 2
       labels         = { "node-role" = "system" }
     }
+    # Workload nodes run tenant application pods
     workload = {
       subnet_ids     = [for name, id in dependency.networking.outputs.subnet_ids : id if can(regex("kubernetes$", name))]
       instance_types = ["t3.large"]
-      desired_size   = 1
+      desired_size   = 1 # Scaled down for preprod cost savings (platform uses 2)
       max_size       = 6
       min_size       = 1
       labels         = { "node-role" = "workload" }

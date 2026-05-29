@@ -55,9 +55,9 @@ inputs = {
   ])
 
   endpoint_private_access = true
-  endpoint_public_access  = true
+  endpoint_public_access  = true # Public endpoint required — cross-VPC DNS not yet resolving private endpoint
 
-  eks_addons = {}
+  eks_addons = {} # Managed addons deployed separately in eks-addons unit (BYOCNI ordering)
 
   access_entries = {
     platform_admin = {
@@ -68,6 +68,7 @@ inputs = {
       principal_arn = dependency.iam_roles.outputs.role_arns["PlatformDeployer"]
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
     }
+    # ArgoCD on the platform cluster assumes this role to manage preprod workloads
     argocd = {
       principal_arn = dependency.iam_roles.outputs.role_arns["ArgoCD"]
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
@@ -76,6 +77,7 @@ inputs = {
       principal_arn = "arn:aws:iam::${include.base.locals.account_id}:role/OrganizationAccountAccessRole"
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
     }
+    # Scoped to tenant namespaces only — dynamically derived from teams.hcl
     developer_access = {
       principal_arn = dependency.iam_roles.outputs.role_arns["DeveloperAccess"]
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSEditPolicy"

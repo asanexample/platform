@@ -109,13 +109,14 @@ inputs = {
   oidc_provider_url = dependency.eks.outputs.oidc_provider_url
 
   helm_chart_version = include.base.locals.helm_versions.argocd
-  helm_wait          = false
+  helm_wait          = false # ArgoCD CRDs need time to register; sync-wave handles ordering
 
-  high_availability = false
+  high_availability = false # Single instance — sufficient for non-production platform cluster
 
   dex_enabled = true
   rbac_scopes = "[groups]"
 
+  # Group UUIDs are IAM Identity Center group IDs (Admins, Developers, ReadOnly)
   rbac_policy_csv = <<-CSV
     p, role:org-admin, applications, *, */*, allow
     p, role:org-admin, clusters, get, *, allow
@@ -152,8 +153,9 @@ inputs = {
     })
   }
 
+  # ArgoCD assumes these roles to deploy to remote clusters (cross-account)
   remote_cluster_role_arns = [
-    dependency.preprod_iam_roles.outputs.role_arns["ArgoCD"],
+    dependency.preprod_iam_roles.outputs.role_arns["ArgoCD"], # Preprod account
   ]
 
   tags = include.base.locals.tags

@@ -72,11 +72,11 @@ generate "kubernetes_provider" {
 inputs = {
   create   = true
   domain   = "preprod.aws.refplat.org"
-  internal = false
+  internal = false # Public NLB — preprod services accessible from the internet
 
   gateway_name = "preprod-gateway"
 
-  letsencrypt_email      = "josh@deeden.org"
+  letsencrypt_email      = "josh@deeden.org" # Let's Encrypt certificate renewal notifications
   route53_hosted_zone_id = dependency.route53.outputs.zone_id
   route53_region         = include.base.locals.region
 

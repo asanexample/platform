@@ -14,12 +14,17 @@ terraform {
 inputs = {
   create = true
 
+  # ECR naming convention: team-<team>/<app> (matches teams.hcl app keys)
   repositories = {
     "team-alpha/demo" = {}
     "team-bravo/demo" = {}
   }
 
-  pull_account_ids = ["620830101009", "554518885123"]
+  # Accounts granted cross-account image pull access
+  pull_account_ids = [
+    "620830101009", # Preprod
+    "554518885123", # Prod
+  ]
 
   tags = include.base.locals.tags
 }

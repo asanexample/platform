@@ -25,12 +25,14 @@ dependency "networking" {
 inputs = {
   create     = true
   name       = "${include.base.locals.env}-${include.base.locals.region_abbv}-tgw"
-  create_tgw = true
+  create_tgw = true # Hub mode — creates the TGW and shares it via RAM
 
-  ram_share_principals = ["620830101009"]
+  # Spoke accounts to share TGW with via RAM
+  ram_share_principals = ["620830101009"] # Preprod account
 
   vpc_id = dependency.networking.outputs.vpc_id
 
+  # Filter to transit-tier subnets (/28 per AZ, dedicated to TGW ENIs)
   subnet_ids = [
     for name, id in dependency.networking.outputs.subnet_ids :
     id if can(regex("transit$", name))
@@ -38,7 +40,8 @@ inputs = {
 
   route_table_ids = dependency.networking.outputs.private_route_table_ids
 
-  destination_cidrs = ["10.101.0.0/16"]
+  # Routes to add to platform VPC route tables pointing at TGW
+  destination_cidrs = ["10.101.0.0/16"] # Preprod VPC CIDR
 
   tags = include.base.locals.tags
 }

@@ -58,7 +58,7 @@ generate "preprod_secrets" {
       region = "us-east-1"
 
       assume_role {
-        role_arn = "arn:aws:iam::620830101009:role/PlatformDeployer"
+        role_arn = "arn:aws:iam::620830101009:role/PlatformDeployer" # Preprod account
       }
     }
 
@@ -107,10 +107,11 @@ inputs = {
       "grants": [
         {"src": ["*"], "dst": ["*"], "ip": ["*"]}
       ],
+      // Auto-approve VPC subnet routes so they don't need manual admin approval
       "autoApprovers": {
         "routes": {
-          "10.100.0.0/16": ["tag:k8s-operator", "tag:k8s"],
-          "10.101.0.0/16": ["tag:k8s-operator", "tag:k8s"]
+          "10.100.0.0/16": ["tag:k8s-operator", "tag:k8s"], // Platform VPC
+          "10.101.0.0/16": ["tag:k8s-operator", "tag:k8s"]  // Preprod VPC
         }
       },
       "ssh": [

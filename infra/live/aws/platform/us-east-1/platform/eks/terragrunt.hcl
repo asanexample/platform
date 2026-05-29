@@ -49,9 +49,9 @@ inputs = {
   ])
 
   endpoint_private_access = true
-  endpoint_public_access  = false
+  endpoint_public_access  = false # API only reachable via Tailscale VPN or SSM bastion
 
-  eks_addons = {}
+  eks_addons = {} # Managed addons deployed separately in eks-addons unit (BYOCNI ordering)
 
   access_entries = {
     platform_admin = {
