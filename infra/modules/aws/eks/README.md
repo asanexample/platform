@@ -30,6 +30,13 @@ module "eks" {
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
       scope_type    = "cluster"
     }
+    # Group-mapped entry (no policy_arn): maps the principal to Kubernetes groups
+    # so authorization is governed by cluster-managed RBAC (Role/RoleBinding) instead
+    # of an AWS-managed access policy. Team-specific values come from the caller.
+    developer = {
+      principal_arn     = "arn:aws:iam::<ACCOUNT_ID>:role/<DEVELOPER_ROLE>"
+      kubernetes_groups = ["<GROUP_NAME>"]
+    }
   }
 
   tags = {
@@ -113,7 +120,7 @@ No modules.
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | Name of the EKS cluster | `string` | n/a | yes |
 | <a name="input_subnet_ids"></a> [subnet\_ids](#input\_subnet\_ids) | Subnet IDs for the EKS cluster ENIs | `list(string)` | n/a | yes |
-| <a name="input_access_entries"></a> [access\_entries](#input\_access\_entries) | IAM principal to Kubernetes access policy mappings | <pre>map(object({<br/>    principal_arn = string<br/>    policy_arn    = string<br/>    type          = optional(string, "STANDARD")<br/>    scope_type    = optional(string, "cluster")<br/>    namespaces    = optional(list(string))<br/>  }))</pre> | `{}` | no |
+| <a name="input_access_entries"></a> [access\_entries](#input\_access\_entries) | IAM principal to Kubernetes access policy mappings | <pre>map(object({<br/>    principal_arn     = string<br/>    policy_arn        = optional(string)<br/>    type              = optional(string, "STANDARD")<br/>    scope_type        = optional(string, "cluster")<br/>    namespaces        = optional(list(string))<br/>    kubernetes_groups = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
 | <a name="input_additional_security_group_ids"></a> [additional\_security\_group\_ids](#input\_additional\_security\_group\_ids) | Additional security group IDs to attach to the cluster (e.g. networking module's EKS SG) | `list(string)` | `[]` | no |
 | <a name="input_create"></a> [create](#input\_create) | Whether to create resources in this module | `bool` | `true` | no |
 | <a name="input_eks_addons"></a> [eks\_addons](#input\_eks\_addons) | EKS managed add-ons to install (e.g. coredns, kube-proxy) | <pre>map(object({<br/>    most_recent = optional(bool, true)<br/>  }))</pre> | `{}` | no |
