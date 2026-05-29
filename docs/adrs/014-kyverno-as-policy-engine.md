@@ -2,7 +2,8 @@
 
 **Date:** 2026-05-23
 
-**Status:** Accepted
+**Status:** Accepted — **not yet deployed**. Pod Security Admission (`enforce=baseline` on tenant
+namespaces, see ADR-027/ADR-039) is the current admission-control floor until Kyverno is deployed.
 
 ## Context
 

@@ -81,7 +81,9 @@ team with `mode = "namespace"`:
 | `NetworkPolicy` | `default-deny-ingress` | Block all inbound traffic by default |
 | `NetworkPolicy` | `allow-gateway-ingress` | Permit traffic from the Gateway and kube-system namespaces |
 | `CiliumNetworkPolicy` | `allow-gateway-envoy` | Permit traffic from Cilium `ingress`, `remote-node`, and `host` entities |
-| `NetworkPolicy` | `allow-dns-egress` | Allow DNS (UDP/TCP 53) and internet egress |
+| `NetworkPolicy` | `allow-dns-egress` | Allow DNS (UDP/TCP 53) and internet egress, except the IMDS endpoint (169.254.169.254/32) |
+| Namespace PSA labels | `enforce=baseline`, `warn`/`audit=restricted` | Block privileged/hostPath/hostNetwork pods (node-escape vectors) |
+| `RoleBinding` | `tenant-developers` | Bind group `team-<name>:developers` to the `tenant-developer` ClusterRole (ADR-039) |
 
 Pods are isolated by namespace. Cilium enforces NetworkPolicies at the eBPF
 level -- there is no iptables fallback. Cross-namespace traffic is blocked
@@ -251,10 +253,12 @@ inputs:
                     NetworkPolicies    ApplicationSets
 ```
 
-**EKS access entries** (`eks/terragrunt.hcl`): The `DeveloperAccess` role gets
-an `AmazonEKSEditPolicy` access entry scoped to each team's namespace:
+**EKS access entries** (`eks/terragrunt.hcl`): each team's `DeveloperAccess-<team>`
+role gets a group-mapped access entry tying it to the Kubernetes group
+`team-<team>:developers`. Authorization is the namespace-scoped `tenant-developers`
+RoleBinding the tenant module creates (not an AWS-managed policy). See ADR-039.
 
-- All teams: `team-<name>` (e.g., `team-alpha`, `team-bravo`)
+- All teams: principal `DeveloperAccess-<name>` → group `team-<name>:developers`
 
 **Tenant resources** (`tenants/terragrunt.hcl`): Reads `teams.hcl`, splits by
 mode, and passes to the tenant module. The module creates namespace-mode
@@ -321,14 +325,19 @@ uses `app.kubernetes.io/instance: stable`; each preview uses
   enforcement. Pods in `team-alpha` cannot receive traffic from `team-bravo`.
 - **Resource exhaustion** -- ResourceQuota caps CPU, memory, and pod count.
   LimitRange sets defaults so pods without explicit requests still get bounded.
-- **Unauthorized API access** -- `DeveloperAccess` EKS access entry is scoped
-  to the team's namespace via `AmazonEKSEditPolicy`. Developers cannot list or
-  modify resources in other namespaces.
+- **Unauthorized API access** -- each team's `DeveloperAccess-<team>` role is
+  group-mapped and bound (namespace-scoped) to the `tenant-developer` role in its
+  own namespace only. A developer can edit only their own namespace and can assume
+  only their own team's role (ADR-039).
+- **Node escape via pods** -- Pod Security Admission (`enforce=baseline`) blocks
+  privileged, hostPath, and host-network/PID pods; the egress policy blocks the IMDS
+  endpoint so pods cannot steal node-role credentials.
 
 ### What namespace mode does NOT protect against
 
-- **Kernel-level exploits** -- Namespaces share the host kernel. A container
-  escape grants access to the node and all co-located tenants.
+- **Kernel-level exploits** -- Namespaces share the host kernel. A container escape
+  via a kernel/runtime vulnerability (i.e. not the pod-spec vectors PSA blocks)
+  grants access to the node and all co-located tenants.
 - **Noisy-neighbor I/O** -- ResourceQuota does not cap disk or network I/O.
   A pod performing heavy disk writes can degrade node performance.
 - **CRD visibility** -- Cluster-scoped resources (CRDs, ClusterRoles, Nodes)

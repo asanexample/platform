@@ -5,12 +5,14 @@
 >
 > - `infra/live/aws/preprod/us-east-1/platform/teams.hcl`
 > - `infra/live/aws/preprod/us-east-1/platform/tenants/terragrunt.hcl`
+> - `infra/live/aws/preprod/us-east-1/platform/iam-roles/terragrunt.hcl`
 > - `infra/live/aws/preprod/us-east-1/platform/eks/terragrunt.hcl`
+> - `infra/live/aws/mgmt/global/identity-center/terragrunt.hcl`
 > - `infra/live/aws/platform/us-east-1/platform/ecr/terragrunt.hcl`
 > - `infra/live/aws/platform/us-east-1/platform/argocd-apps/terragrunt.hcl`
 > - `infra/live/aws/platform/us-east-1/platform/github-oidc/terragrunt.hcl`
 >
-> **Last reviewed:** 2026-05-27
+> **Last reviewed:** 2026-05-29
 
 ---
 
@@ -66,7 +68,7 @@ All teams use **namespace isolation** (`mode = "namespace"`). Each team gets a
 | **CRD access** | Shared cluster CRDs only |
 | **Resource overhead** | Minimal |
 | **Default quotas** | 4 CPU, 8 Gi memory, 20 pods |
-| **EKS access entry** | DeveloperAccess scoped to `team-<name>` |
+| **EKS access entry** | Per-team `DeveloperAccess-<name>` role, group-mapped to `team-<name>:developers` and bound (namespace-scoped) to `tenant-developer` (ADR-039) |
 
 > **Note:** The tenant module also supports a `vcluster` mode for stronger
 > isolation (CRD independence, virtual control plane), but this is currently
@@ -196,13 +198,18 @@ Apply changes across both accounts. The order matters -- `ecr` and `github-oidc`
 are independent, but `tenants` must come before `argocd-apps` since ArgoCD targets
 the tenant namespace.
 
-**Preprod account** (tenants + EKS access entries):
+**Preprod account** (IAM role + EKS access entry + tenant resources). Apply
+`iam-roles` first so the per-team `DeveloperAccess-<name>` role exists before the
+`eks` access entry references it, and before `tenants` creates the RoleBinding:
 
 ```bash
-cd infra/live/aws/preprod/us-east-1/platform/tenants
+cd infra/live/aws/preprod/us-east-1/platform/iam-roles
 terragrunt apply
 
 cd ../eks
+terragrunt apply
+
+cd ../tenants
 terragrunt apply
 ```
 
@@ -223,27 +230,56 @@ terragrunt apply
 
 | Unit | Account | Resources Created |
 |---|---|---|
-| `tenants` | preprod | Namespace (`team-charlie`), ResourceQuota, LimitRange, NetworkPolicy, CiliumNetworkPolicy |
-| `eks` | preprod | Updates DeveloperAccess entry with new namespace scope |
+| `iam-roles` | preprod | `DeveloperAccess-charlie` IAM role (trusted by the `Dev-charlie` SSO set) |
+| `eks` | preprod | Group-mapped access entry for `DeveloperAccess-charlie` → group `team-charlie:developers` |
+| `tenants` | preprod | Namespace (`team-charlie`) with PSA labels, ResourceQuota, LimitRange, NetworkPolicy, CiliumNetworkPolicy, and the `tenant-developers` RoleBinding |
 | `ecr` | platform | ECR repository `team-charlie/api` |
 | `github-oidc` | platform | Updates OIDC trust policy to include new repo |
 | `argocd-apps` | platform | ArgoCD Application targeting the team's Git repo |
 
-### Step 5: Grant Identity Center Access
+### Step 5: Add the Team's SSO Permission Set + Group (IaC)
 
-Add the team's Identity Center group to the **DeveloperAccess** permission set
-assignment for the preprod account (<PREPROD_ACCOUNT_ID>). This is done in the AWS SSO
-console:
+Identity Center is managed as code. Edit
+`infra/live/aws/mgmt/global/identity-center/terragrunt.hcl` and add a per-team
+permission set, group, and account assignment (mirroring the `Dev-alpha` /
+`Developers-alpha` entries):
 
-1. Open **IAM Identity Center** in the management account.
-2. Navigate to **AWS accounts** > select **preprod** (<PREPROD_ACCOUNT_ID>).
-3. Click **Assign users or groups**.
-4. Select the team's group (e.g., `Team-Charlie-Developers`).
-5. Choose the **DeveloperAccess** permission set.
-6. Confirm the assignment.
+```hcl
+# permission_sets
+"Dev-charlie" = {
+  description      = "Developer access for team charlie (preprod)"
+  session_duration = "PT4H"
+  managed_policies = ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
+  inline_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid      = "AssumeTeamDeveloperRole"
+      Effect   = "Allow"
+      Action   = "sts:AssumeRole"
+      Resource = "arn:aws:iam::${dependency.organizations.outputs.account_ids["Preprod"]}:role/DeveloperAccess-charlie"
+    }]
+  })
+}
 
-After assignment, team members can run `aws sso login --profile preprod` and
-assume the DeveloperAccess role, which grants namespace-scoped kubectl access.
+# groups
+"Developers-charlie" = { description = "Developers for team charlie" }
+
+# account_assignments
+{ account_id = dependency.organizations.outputs.account_ids["Preprod"], permission_set = "Dev-charlie", group = "Developers-charlie" },
+```
+
+Apply from the management account:
+
+```bash
+cd infra/live/aws/mgmt/global/identity-center
+terragrunt apply
+```
+
+Then add the team's developers to the `Developers-charlie` group (via SCIM or the
+SSO console). After that, a developer runs `aws sso login` with the `Dev-charlie`
+permission set, assumes `DeveloperAccess-charlie`, and gets kubectl access scoped
+to `team-charlie` only. The `Dev-charlie` set also grants account-wide read-only
+AWS access (preprod posture).
 
 ### Step 6: Verify
 
@@ -274,20 +310,33 @@ kubectl get resourcequota tenant-quota -n team-charlie -o yaml
 ```bash
 kubectl get networkpolicy -n team-charlie
 # Expected: default-deny-ingress, allow-gateway-ingress, allow-dns-egress
+# (allow-dns-egress denies egress to 169.254.169.254/32 — the IMDS endpoint)
 
 kubectl get ciliumnetworkpolicy -n team-charlie
 # Expected: allow-gateway-envoy
 ```
 
-### EKS Access Entry Updated
+### Pod Security Admission Labels
 
 ```bash
-aws eks list-associated-access-policies \
+kubectl get namespace team-charlie -o jsonpath='{.metadata.labels}' | tr ',' '\n' | grep pod-security
+# Expected: enforce=baseline, warn=restricted, audit=restricted
+```
+
+### EKS Access Entry + RBAC
+
+```bash
+# The per-team access entry maps DeveloperAccess-charlie to the team's K8s group
+aws eks describe-access-entry \
   --cluster-name preprod-use1-eks \
-  --principal-arn arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/DeveloperAccess \
+  --principal-arn arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/DeveloperAccess-charlie \
   --region us-east-1 \
-  --query 'associatedAccessPolicies[].accessScope'
-# Verify: team-charlie (or vc-charlie) appears in the namespaces list
+  --query 'accessEntry.kubernetesGroups'
+# Verify: ["team-charlie:developers"]
+
+# The RoleBinding granting that group edit rights exists in the team namespace
+kubectl get rolebinding tenant-developers -n team-charlie -o yaml
+# Verify: roleRef -> ClusterRole/tenant-developer, subject Group team-charlie:developers
 ```
 
 ### ArgoCD Application Created
@@ -337,10 +386,17 @@ confirm all workloads are drained before proceeding.
   AWS_PROFILE=management terragrunt apply
   ```
 
-- [ ] Apply `eks` to remove the namespace from the DeveloperAccess scope:
+- [ ] Apply `eks` to remove the team's group-mapped access entry:
 
   ```bash
   cd infra/live/aws/preprod/us-east-1/platform/eks
+  AWS_PROFILE=management terragrunt apply
+  ```
+
+- [ ] Apply `iam-roles` to destroy the team's `DeveloperAccess-<name>` role:
+
+  ```bash
+  cd infra/live/aws/preprod/us-east-1/platform/iam-roles
   AWS_PROFILE=management terragrunt apply
   ```
 
@@ -366,8 +422,14 @@ confirm all workloads are drained before proceeding.
   AWS_PROFILE=management terragrunt apply
   ```
 
-- [ ] Remove the Identity Center group assignment for the team from the preprod
-  account in the AWS SSO console.
+- [ ] Remove the team's `Dev-<name>` permission set, `Developers-<name>` group, and
+  account assignment from `identity-center/terragrunt.hcl` and apply:
+
+  ```bash
+  cd infra/live/aws/mgmt/global/identity-center
+  AWS_PROFILE=management terragrunt apply
+  ```
+
 - [ ] Commit all changes on a feature branch and open a PR.
 
 ---
@@ -393,18 +455,24 @@ cluster via `argocd-clusters`. Verify:
 2. The `repo_url` in `teams.hcl` is correct and the repo is accessible to ArgoCD.
 3. The `repo_path` directory exists in the team's repository.
 
-### Developer cannot assume DeveloperAccess role
+### Developer cannot assume their DeveloperAccess-<team> role
 
-1. Confirm the Identity Center group assignment was completed (Step 5).
-2. Verify the user is a member of the correct Identity Center group.
-3. Check the EKS access entry includes the team's namespace:
+1. Confirm the `Dev-<team>` permission set, `Developers-<team>` group, and assignment
+   were applied (Step 5), and the user is a member of that group.
+2. Verify the role's trust policy allows the team's SSO permission set — the
+   `aws:PrincipalArn` condition must match `AWSReservedSSO_Dev-<team>_*`.
+3. Check the team's group-mapped access entry exists:
 
    ```bash
    aws eks describe-access-entry \
      --cluster-name preprod-use1-eks \
-     --principal-arn arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/DeveloperAccess \
+     --principal-arn arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/DeveloperAccess-<team> \
      --region us-east-1
    ```
+
+4. If the developer authenticates but is forbidden, confirm the `tenant-developers`
+   RoleBinding exists in `team-<team>` (the `tenants` unit creates it) and its subject
+   group matches the access entry's `kubernetesGroups`.
 
 ### ECR push from GitHub Actions fails with "Not Authorized"
 

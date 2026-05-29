@@ -87,7 +87,13 @@ The tenant module creates:
   reserved `ingress` identity (not `host`) for upstream connections to backend pods (ADR-008).
   Standard Kubernetes NetworkPolicy cannot match this identity.
 - **NetworkPolicy (allow DNS + internet egress)** — permits DNS resolution (UDP/TCP port 53) and
-  outbound internet access for external API calls
+  outbound internet access for external API calls, **except** the instance metadata endpoint
+  (`169.254.169.254/32`), so a tenant pod cannot steal the node IAM role's credentials
+- **Pod Security Admission labels** — `enforce=baseline` (blocks privileged, hostPath,
+  hostNetwork/PID, and host ports — the node-escape vectors) with `warn=restricted`/`audit=restricted`
+  to surface stricter violations without breaking current workloads
+- **Developer RBAC** — a per-namespace `RoleBinding` binding the team's developer group
+  (`team-<name>:developers`) to the cluster-wide `tenant-developer` role (see ADR-039)
 
 Cilium enforces these policies at the eBPF level (ADR-008), providing kernel-level network
 segmentation without iptables overhead.
@@ -158,11 +164,13 @@ change in `teams.hcl`.
 
 ### EKS Access
 
-The DeveloperAccess role (ADR-007) provides namespace-scoped kubectl access via EKS access
-entries. For namespace-mode tenants, the access entry is scoped to `team-<name>`. For vCluster-
-mode tenants, developers interact with the virtual cluster's API server directly — they do not
-need host cluster access. The vCluster kubeconfig is generated from the vCluster's service
-account token.
+Each team has its own `DeveloperAccess-<team>` IAM role (ADR-039). For namespace-mode tenants, the
+team's EKS access entry maps that role to the Kubernetes group `team-<name>:developers`, which the
+tenant module binds — via a namespace-scoped `RoleBinding` — to the `tenant-developer` role in the
+team's namespace only. A developer can therefore edit only their own namespace, and can assume only
+their own team's role. For vCluster-mode tenants, developers interact with the virtual cluster's API
+server directly — they do not need host cluster access. The vCluster kubeconfig is generated from the
+vCluster's service account token.
 
 ### Ingress Path
 
@@ -217,9 +225,11 @@ CNI, nodes, and Gateway are all ready before tenant resources are created.
 - A vCluster syncer bug could leak resources to the host cluster or fail to sync HTTPRoutes,
   breaking ingress for that tenant. Mitigated by pinning the vCluster chart version and testing
   upgrades in a non-production vCluster first.
-- Namespace-mode tenants share the host cluster's CRD space. A team that installs a CRD without
-  coordination could conflict with platform CRDs or other tenants. Mitigated by Kyverno policies
-  (ADR-014) that restrict CRD creation to platform-owned namespaces.
+- Namespace-mode tenants share the host cluster's CRD space and node pool. Pod Security Admission
+  (`enforce=baseline`) blocks the privileged/hostPath/hostNetwork pods that would let a tenant escape
+  to a node, and developer RBAC is namespace-scoped (cannot create cluster-scoped resources or CRDs).
+  Richer policy (e.g. restricting which CRDs may be installed, image provenance) is intended via
+  Kyverno (ADR-014) but **Kyverno is not yet deployed** — PSA `baseline` is the current floor.
 - ResourceQuota defaults (4 CPU, 8Gi, 20 pods) may be too restrictive for some teams or too
   generous for others. These are configurable per-team via the `resource_quota` field in the
   tenant map, but require platform team intervention to adjust.

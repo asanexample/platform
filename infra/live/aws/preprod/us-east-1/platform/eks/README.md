@@ -19,7 +19,7 @@ Deploys the EKS control plane for the preprod account. Uses BYOCNI (Cilium) — 
 | `endpoint_private_access` | `true`                                                                |                                                                                                                                           |
 | `endpoint_public_access`  | `true`                                                                | Public access still enabled in preprod                                                                                                    |
 | `eks_addons`              | `{}`                                                                  | Addons deployed separately via `eks-addons` unit                                                                                          |
-| `access_entries`          | PlatformAdmin, PlatformDeployer, ArgoCD, DeveloperAccess, break-glass | ArgoCD entry allows cross-account management from platform hub; DeveloperAccess is namespace-scoped to team namespaces (from `teams.hcl`) |
+| `access_entries`          | PlatformAdmin, PlatformDeployer, ArgoCD, break-glass, one `developer_<team>` per team | ArgoCD entry allows cross-account management from platform hub; each `developer_<team>` group-maps `DeveloperAccess-<team>` to `team-<team>:developers` (RBAC lives in the tenant module's RoleBinding — ADR-039). Generated from `teams.hcl` |
 
 ## Commands
 

@@ -1,7 +1,7 @@
 # Runbook: EKS Cluster Access
 
-> **Roles:** PlatformAdmin, PlatformDeployer, DeveloperAccess
-> **Related ADR:** [007-iam-role-model](../adrs/007-iam-role-model.md)
+> **Roles:** PlatformAdmin, PlatformDeployer, DeveloperAccess-\<team\>
+> **Related ADR:** [007-iam-role-model](../adrs/007-iam-role-model.md), [039-per-team-developer-rbac](../adrs/039-per-team-developer-rbac.md)
 > **See also:** [ArgoCD SSO](argocd-sso.md) for web UI access
 >
 > **Last reviewed:** 2026-05-28
@@ -99,25 +99,28 @@ subsequent `kubectl` commands automatically assume it.
 
 ## Developer: Namespace-Scoped kubectl
 
-Developers use the **DeveloperAccess** role on the **preprod** cluster, which
-grants access only to assigned team namespaces. The platform cluster does not
-have developer access -- it is admin-only.
+Each developer uses their team's own **DeveloperAccess-\<team\>** role on the
+**preprod** cluster, which grants edit access to that team's namespace only. A
+developer can assume only their own team's role (the role's trust is restricted to
+the team's `Dev-<team>` SSO permission set). The platform cluster does not have
+developer access -- it is admin-only. See ADR-039 for the full model.
 
 ### Prerequisites
 
 - AWS CLI v2 with SSO configured
 - kubectl installed
-- Namespace assignment in the EKS access entry (managed by platform team)
+- Membership in your team's `Developers-<team>` Identity Center group (managed by
+  the platform team)
 
 ### AWS Config
 
-Add to `~/.aws/config`:
+Add to `~/.aws/config` (use your team's `Dev-<team>` permission set):
 
 ```ini
 [profile preprod-dev]
 sso_session = centric
 sso_account_id = <PREPROD_ACCOUNT_ID>
-sso_role_name = PowerUserAccess
+sso_role_name = Dev-<your-team>     # e.g. Dev-alpha
 
 [sso-session centric]
 sso_start_url = https://d-XXXXXXXXXX.awsapps.com/start
@@ -131,33 +134,30 @@ sso_registration_scopes = sso:account:access
 # 1. Log in via SSO
 aws sso login --profile preprod-dev
 
-# 2. Configure kubeconfig
+# 2. Configure kubeconfig (assume your team's DeveloperAccess-<team> role)
 AWS_PROFILE=preprod-dev aws eks update-kubeconfig \
   --name preprod-use1-eks \
   --region us-east-1 \
-  --role-arn arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/DeveloperAccess
+  --role-arn arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/DeveloperAccess-<your-team>
 
 # 3. Access your namespace
 kubectl get pods -n team-<your-team>
 
-# This will be denied (namespace not assigned):
+# These will be denied (other namespace / cluster-scoped):
+kubectl get pods -n team-<other-team>
 kubectl get pods -n kube-system
 ```
 
 ### Requesting Namespace Access
 
-Namespace access is automatic -- when a team is added to `teams.hcl`, the
-`developer_access` EKS access entry is updated to include the team's namespace.
-The configuration is in:
+Access is provisioned when a team is onboarded — the per-team `DeveloperAccess-<team>`
+role, its group-mapped EKS access entry, and the namespace `RoleBinding` are all
+generated from `teams.hcl` (the SSO permission set/group are added in the
+identity-center unit). See the [Tenant Onboarding](tenant-onboarding.md) runbook.
 
-```text
-infra/live/aws/preprod/us-east-1/platform/eks/terragrunt.hcl
-```
-
-If you cannot access your namespace, verify with the platform team that your
-team is listed in `teams.hcl` and that you are assigned to the
-**DeveloperAccess** permission set in IAM Identity Center for the preprod
-account (<PREPROD_ACCOUNT_ID>).
+If you cannot access your namespace, verify with the platform team that your team is
+listed in `teams.hcl` and that you are a member of the `Developers-<team>` Identity
+Center group for the preprod account (<PREPROD_ACCOUNT_ID>).
 
 ---
 
@@ -241,8 +241,8 @@ trust policy condition does not match your SSO role ARN pattern.
 aws sts get-caller-identity
 
 # Verify the role ARN pattern matches the trust condition
-# PlatformAdmin trusts: AWSReservedSSO_AdministratorAccess_*
-# DeveloperAccess trusts: AWSReservedSSO_PowerUserAccess_* and AWSReservedSSO_AdministratorAccess_*
+# PlatformAdmin trusts:          AWSReservedSSO_AdministratorAccess_*
+# DeveloperAccess-<team> trusts: AWSReservedSSO_Dev-<team>_* (that team's set only)
 ```
 
 ### Kubeconfig points to wrong server/role

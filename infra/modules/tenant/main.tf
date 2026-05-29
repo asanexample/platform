@@ -18,6 +18,13 @@ resource "kubernetes_namespace" "tenant" {
       "app.kubernetes.io/managed-by" = "terraform"
       "platform.refplat.org/tenant"  = each.key
       "platform.refplat.org/mode"    = "namespace"
+
+      # Pod Security Admission. enforce=baseline blocks the node-escape vectors
+      # (privileged, hostPath, hostNetwork/PID, host ports); warn/audit=restricted
+      # surface stricter violations without breaking current workloads.
+      "pod-security.kubernetes.io/enforce" = "baseline"
+      "pod-security.kubernetes.io/warn"    = "restricted"
+      "pod-security.kubernetes.io/audit"   = "restricted"
     }
   }
 }
@@ -138,7 +145,9 @@ resource "kubernetes_manifest" "tenant_allow_gateway_envoy" {
 
 # Allows DNS resolution (port 53) and all other egress. Named "allow-dns" because
 # DNS is the primary concern — without it, pods cannot resolve service names.
-# General egress is also permitted as the default tenant posture.
+# General egress is also permitted as the default tenant posture, EXCEPT the
+# instance metadata endpoint (169.254.169.254) — blocking it stops a tenant pod
+# from stealing the node IAM role's credentials.
 resource "kubernetes_network_policy" "tenant_allow_dns" {
   for_each = local.namespace_tenants
 
@@ -165,10 +174,57 @@ resource "kubernetes_network_policy" "tenant_allow_dns" {
     egress {
       to {
         ip_block {
-          cidr = "0.0.0.0/0"
+          cidr   = "0.0.0.0/0"
+          except = ["169.254.169.254/32"]
         }
       }
     }
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Developer RBAC (group-mapped from per-team EKS access entries)
+# ---------------------------------------------------------------------------
+
+# Cluster-wide role equivalent to the built-in "edit" role, under a name we own
+# so its permissions can be tightened per compliance tier (e.g. exclude secrets)
+# without touching the per-namespace bindings. Created once for the cluster.
+resource "kubernetes_cluster_role" "tenant_developer" {
+  count = local.create && length(local.namespace_tenants) > 0 ? 1 : 0
+
+  metadata {
+    name   = "tenant-developer"
+    labels = { "app.kubernetes.io/managed-by" = "terraform" }
+  }
+
+  aggregation_rule {
+    cluster_role_selectors {
+      match_labels = { "rbac.authorization.k8s.io/aggregate-to-edit" = "true" }
+    }
+  }
+}
+
+# Binds each team's developer group to tenant-developer within that team's
+# namespace only. The group name (team-<name>:developers) must match the
+# kubernetes_groups set on the team's EKS access entry in the eks unit.
+resource "kubernetes_role_binding" "tenant_developers" {
+  for_each = local.namespace_tenants
+
+  metadata {
+    name      = "tenant-developers"
+    namespace = kubernetes_namespace.tenant[each.key].metadata[0].name
+  }
+
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "ClusterRole"
+    name      = kubernetes_cluster_role.tenant_developer[0].metadata[0].name
+  }
+
+  subject {
+    kind      = "Group"
+    name      = "team-${each.key}:developers"
+    api_group = "rbac.authorization.k8s.io"
   }
 }
 
