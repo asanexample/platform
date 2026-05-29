@@ -39,30 +39,6 @@ jobs:
           }
           TFEOF
 
-          read -r -d '' AZURE_VERSIONS << 'TFEOF' || true
-          terraform {
-            required_version = ">= 1.6.0"
-            required_providers {
-              azurerm = {
-                source  = "hashicorp/azurerm"
-                version = "~> 4.0"
-              }
-            }
-          }
-          TFEOF
-
-          read -r -d '' GCP_VERSIONS << 'TFEOF' || true
-          terraform {
-            required_version = ">= 1.6.0"
-            required_providers {
-              google = {
-                source  = "hashicorp/google"
-                version = "~> 6.0"
-              }
-            }
-          }
-          TFEOF
-
           read -r -d '' HELM_VERSIONS << 'TFEOF' || true
           terraform {
             required_version = ">= 1.6.0"
@@ -98,8 +74,6 @@ jobs:
               GENERATED=true
               case "$dir" in
                 infra/modules/aws/*)   echo "$AWS_VERSIONS"   > "$dir/versions.tf" ;;
-                infra/modules/azure/*) echo "$AZURE_VERSIONS" > "$dir/versions.tf" ;;
-                infra/modules/gcp/*)   echo "$GCP_VERSIONS"   > "$dir/versions.tf" ;;
                 *)                     echo "$HELM_VERSIONS"   > "$dir/versions.tf" ;;
               esac
             fi
