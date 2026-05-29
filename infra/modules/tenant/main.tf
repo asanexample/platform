@@ -44,6 +44,12 @@ resource "kubernetes_resource_quota" "tenant" {
       "limits.cpu"      = each.value.resource_quota.cpu
       "limits.memory"   = each.value.resource_quota.memory
       pods              = each.value.resource_quota.pods
+
+      # Caps on shared-capacity object types (noisy-neighbor protection).
+      services                 = each.value.resource_quota.services
+      "services.loadbalancers" = each.value.resource_quota.loadbalancers
+      persistentvolumeclaims   = each.value.resource_quota.pvcs
+      "requests.storage"       = each.value.resource_quota.storage
     }
   }
 }
