@@ -58,14 +58,16 @@ Trust is unchanged — only SSO `AdministratorAccess` holders may assume `Platfo
 
 ## Consequences
 
-**Positive**
+**Positive:**
+
 - Platform engineers can observe and operate the whole platform but cannot author resources by hand;
   GitOps/IaC stay the enforced source of truth.
 - No standing access to secret values or bulk data; no AWS write; no K8s cluster-admin.
 - Clear separation: author = pipelines (`PlatformDeployer`/ArgoCD), operate = `PlatformAdmin`,
   emergency = break-glass.
 
-**Negative / residual risks**
+**Negative / residual risks:**
+
 - **`pods/exec` is the main residual privilege:** a shell into any pod can read that pod's mounted
   secrets and its IRSA service-account token (→ assume the workload's IAM role). So "no
   `GetSecretValue`" is not absolute while exec is granted. Deliberate trade for debuggability; the
