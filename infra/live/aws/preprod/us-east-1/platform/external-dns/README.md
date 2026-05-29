@@ -14,12 +14,12 @@ Deploys ExternalDNS to automatically manage Route53 DNS records for Kubernetes s
 
 ## Key Inputs
 
-| Input | Value | Notes |
-|-------|-------|-------|
-| `route53_hosted_zone_arn` | From route53 dependency | Scopes IRSA permissions |
-| `domain_filters` | `["preprod.aws.refplat.org"]` | Only manages records in this domain |
-| `helm_chart_version` | Pinned in `_versions.hcl` | Currently 1.16.1 |
-| `helm_wait` | `true` | Blocks until pods are ready |
+| Input                     | Value                         | Notes                               |
+|---------------------------|-------------------------------|-------------------------------------|
+| `route53_hosted_zone_arn` | From route53 dependency       | Scopes IRSA permissions             |
+| `domain_filters`          | `["preprod.aws.refplat.org"]` | Only manages records in this domain |
+| `helm_chart_version`      | Pinned in `_versions.hcl`     | Currently 1.16.1                    |
+| `helm_wait`               | `true`                        | Blocks until pods are ready         |
 
 ## Commands
 

@@ -13,7 +13,7 @@ locals {
       clientSecret = local.oauth_client_secret
     }
     operatorConfig = {
-      defaultTags = ["tag:k8s-operator"]
+      defaultTags = ["tag:k8s-operator"] # Must match oauth_client_tags in tailscale-admin module and ACL policy tag owners
     }
     podLabels = local.k8s_labels
   }
@@ -57,6 +57,7 @@ resource "kubernetes_manifest" "proxy_class" {
       statefulSet = {
         pod = {
           tailscaleContainer = {
+            # Kernel-mode subnet routing conflicts with Cilium's eBPF datapath; userspace mode avoids the conflict
             env = [
               {
                 name  = "TS_USERSPACE"
@@ -72,6 +73,7 @@ resource "kubernetes_manifest" "proxy_class" {
   depends_on = [helm_release.tailscale_operator]
 }
 
+# Remove ProxyClass finalizers before destroy — operator adds finalizers that block deletion if the operator pod is already gone
 resource "null_resource" "proxy_class_finalizer_cleanup" {
   count = local.create && length(var.advertise_routes) > 0 ? 1 : 0
 

@@ -5,5 +5,5 @@ resource "cloudflare_dns_record" "ns" {
   name    = var.subdomain
   type    = "NS"
   content = each.value
-  ttl     = 3600
+  ttl     = 3600 # 1 hour — low for faster propagation during initial setup
 }

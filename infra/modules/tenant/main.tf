@@ -52,6 +52,7 @@ resource "kubernetes_limit_range" "tenant" {
   spec {
     limit {
       type = "Container"
+      # Opinionated platform defaults — applied to containers without explicit resource specs
       default = {
         cpu    = "500m"
         memory = "512Mi"
@@ -78,6 +79,10 @@ resource "kubernetes_network_policy" "tenant_default_deny" {
   }
 }
 
+# K8s NetworkPolicy allows traffic from gateway and kube-system namespaces.
+# The companion CiliumNetworkPolicy below is also required because Cilium's
+# Envoy proxy uses the L3 "ingress" identity, which is not expressible as a
+# K8s NetworkPolicy namespaceSelector.
 resource "kubernetes_network_policy" "tenant_allow_gateway" {
   for_each = local.namespace_tenants
 
@@ -122,12 +127,18 @@ resource "kubernetes_manifest" "tenant_allow_gateway_envoy" {
     spec = {
       endpointSelector = {}
       ingress = [{
+        # "ingress" = Cilium Gateway Envoy proxy (identity 8)
+        # "remote-node" = cross-node traffic (pods scheduled on different nodes)
+        # "host" = kubelet health checks
         fromEntities = ["ingress", "remote-node", "host"]
       }]
     }
   }
 }
 
+# Allows DNS resolution (port 53) and all other egress. Named "allow-dns" because
+# DNS is the primary concern — without it, pods cannot resolve service names.
+# General egress is also permitted as the default tenant posture.
 resource "kubernetes_network_policy" "tenant_allow_dns" {
   for_each = local.namespace_tenants
 

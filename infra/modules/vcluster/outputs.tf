@@ -24,5 +24,6 @@ output "helm_release_status" {
 
 output "kubeconfig_secret_name" {
   description = "Name of the K8s secret containing the vCluster kubeconfig"
-  value       = var.create ? "vc-${var.cluster_name}" : null
+  # vc- prefix is a vCluster convention — the controller auto-creates this secret
+  value = var.create ? "vc-${var.cluster_name}" : null
 }

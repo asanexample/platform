@@ -46,6 +46,7 @@ resource "aws_iam_role" "addon" {
   tags               = var.tags
 }
 
+# Flatten the per-addon policy_arns lists so each (addon, policy_arn) pair gets its own attachment
 resource "aws_iam_role_policy_attachment" "addon" {
   for_each = {
     for item in flatten([
@@ -70,11 +71,13 @@ resource "aws_iam_role_policy_attachment" "addon" {
 resource "aws_eks_addon" "this" {
   for_each = local.create ? var.addons : {}
 
-  cluster_name                = var.cluster_name
-  addon_name                  = each.key
-  addon_version               = each.value.addon_version
-  configuration_values        = each.value.configuration_values
-  service_account_role_arn    = coalesce(each.value.service_account_role_arn, try(aws_iam_role.addon[each.key].arn, null))
+  cluster_name         = var.cluster_name
+  addon_name           = each.key
+  addon_version        = each.value.addon_version
+  configuration_values = each.value.configuration_values
+  # Prefer caller-supplied role ARN; fall back to auto-created IRSA role
+  service_account_role_arn = coalesce(each.value.service_account_role_arn, try(aws_iam_role.addon[each.key].arn, null))
+  # OVERWRITE ensures addon updates succeed even if K8s resources were manually modified
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"
 

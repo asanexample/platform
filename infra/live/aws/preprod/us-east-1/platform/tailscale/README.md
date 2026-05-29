@@ -14,11 +14,11 @@ Deploys the Tailscale Kubernetes Operator as a subnet router for VPN access to t
 
 ## Key Inputs
 
-| Input | Value | Notes |
-|-------|-------|-------|
-| `advertise_routes` | `["10.101.0.0/16"]` | Advertises the preprod VPC CIDR to the tailnet |
-| `split_dns` | `us-east-1.eks.amazonaws.com` and `preprod.aws.refplat.org` pointing to `10.101.0.2` | Resolves EKS API and preprod services via VPC DNS |
-| `helm_chart_version` | Pinned in `_versions.hcl` | Currently 1.96.5 |
+| Input                | Value                                                                                | Notes                                             |
+|----------------------|--------------------------------------------------------------------------------------|---------------------------------------------------|
+| `advertise_routes`   | `["10.101.0.0/16"]`                                                                  | Advertises the preprod VPC CIDR to the tailnet    |
+| `split_dns`          | `us-east-1.eks.amazonaws.com` and `preprod.aws.refplat.org` pointing to `10.101.0.2` | Resolves EKS API and preprod services via VPC DNS |
+| `helm_chart_version` | Pinned in `_versions.hcl`                                                            | Currently 1.96.5                                  |
 
 ## Notes
 

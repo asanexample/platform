@@ -2,6 +2,7 @@ locals {
   create      = var.create
   create_irsa = local.create && var.oidc_provider_arn != ""
 
+  # Sanitize tags for K8s label compliance (RFC 1123): lowercase, valid chars, max 63 chars
   k8s_labels = {
     for k, v in var.tags :
     replace(lower(k), "/[^a-z0-9_.-]/", "_") => replace(lower(v), "/[^a-z0-9_.-]/", "_")
@@ -9,7 +10,7 @@ locals {
   }
 
   external_secrets_values = {
-    installCRDs = true
+    installCRDs = true # CRDs installed via Helm; Helm won't remove CRDs on uninstall
 
     podLabels = local.k8s_labels
 
@@ -70,6 +71,7 @@ data "aws_iam_policy_document" "external_secrets" {
       "secretsmanager:DescribeSecret",
       "secretsmanager:ListSecretVersionIds",
     ]
+    # Wildcard region allows access to secrets replicated across regions
     resources = ["arn:aws:secretsmanager:*:${var.aws_account_id}:secret:${var.secret_path_prefix}/*"]
   }
 
@@ -80,6 +82,7 @@ data "aws_iam_policy_document" "external_secrets" {
       "ssm:GetParameters",
       "ssm:GetParametersByPath",
     ]
+    # ssm_path_prefix must start with "/" (SSM ARN format: parameter/<path>)
     resources = ["arn:aws:ssm:*:${var.aws_account_id}:parameter${var.ssm_path_prefix}/*"]
   }
 

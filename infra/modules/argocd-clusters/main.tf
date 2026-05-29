@@ -10,13 +10,15 @@ resource "kubernetes_secret_v1" "cluster" {
     name      = each.key
     namespace = var.namespace
     labels = {
-      "argocd.argoproj.io/secret-type" = "cluster"
+      "argocd.argoproj.io/secret-type" = "cluster" # Required label for ArgoCD cluster auto-discovery
     }
   }
 
   data = {
     name   = each.key
     server = each.value.server
+    # ArgoCD cluster secret format (not kubeconfig). awsAuthConfig tells the
+    # application-controller to use STS AssumeRole + EKS token for auth.
     config = jsonencode(merge(
       {
         tlsClientConfig = {

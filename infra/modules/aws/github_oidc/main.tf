@@ -12,6 +12,7 @@ locals {
     flatten([
       for repo in local.repos : [
         for branch in var.github_branches :
+        # Auto-prefix bare branch names with refs/heads/; pass through full ref paths unchanged
         "repo:${var.github_org}/${repo}:ref:${
           startswith(branch, "refs/") ? branch : "refs/heads/${branch}"
         }"
@@ -26,11 +27,16 @@ locals {
   )
 }
 
+# ---------------------------------------------------------------------------
+# OIDC Provider
+# ---------------------------------------------------------------------------
+
 resource "aws_iam_openid_connect_provider" "github" {
   count = var.create ? 1 : 0
 
-  url             = "https://${local.oidc_provider_url}"
-  client_id_list  = [local.audience]
+  url            = "https://${local.oidc_provider_url}"
+  client_id_list = [local.audience]
+  # AWS no longer validates GitHub OIDC thumbprints (since July 2023); dummy value required by API
   thumbprint_list = ["ffffffffffffffffffffffffffffffffffffffff"]
 
   tags = var.tags
@@ -61,6 +67,10 @@ data "aws_iam_policy_document" "trust" {
     }
   }
 }
+
+# ---------------------------------------------------------------------------
+# IAM Role
+# ---------------------------------------------------------------------------
 
 resource "aws_iam_role" "this" {
   count = var.create ? 1 : 0

@@ -14,9 +14,9 @@ Deploys ClusterSecretStore resources that connect External Secrets Operator to t
 
 ## Key Inputs
 
-| Input | Value | Notes |
-|-------|-------|-------|
-| `region` | From base locals | AWS region for the secret store backend |
+| Input                       | Value                        | Notes                                     |
+|-----------------------------|------------------------------|-------------------------------------------|
+| `region`                    | From base locals             | AWS region for the secret store backend   |
 | `service_account_namespace` | From external-secrets output | Namespace where ESO service account lives |
 
 ## Commands

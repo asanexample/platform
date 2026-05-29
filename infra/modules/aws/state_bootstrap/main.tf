@@ -32,7 +32,7 @@ resource "aws_dynamodb_table" "locks" {
   count        = var.create ? 1 : 0
   name         = var.dynamodb_table_name
   billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "LockID"
+  hash_key     = "LockID" # Partition key expected by the Terraform/OpenTofu S3 backend for state locking
 
   attribute {
     name = "LockID"

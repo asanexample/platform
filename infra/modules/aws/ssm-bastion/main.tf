@@ -71,7 +71,8 @@ resource "aws_vpc_security_group_egress_rule" "https" {
   ip_protocol       = "tcp"
   from_port         = 443
   to_port           = 443
-  cidr_ipv4         = "0.0.0.0/0"
+  # Broad egress required: SSM endpoints may resolve to IPs outside the VPC
+  cidr_ipv4 = "0.0.0.0/0"
 
   tags = var.tags
 }
@@ -96,13 +97,14 @@ resource "aws_instance" "bastion" {
   }
 
   root_block_device {
-    volume_size = 8
+    volume_size = 8 # Minimum viable — bastion runs no local workloads, only SSM agent
     encrypted   = true
   }
 
   tags = merge(var.tags, { Name = var.name })
 }
 
+# Side effect: adds ingress to the EKS cluster SG (not the bastion's SG) so the bastion can reach the private API endpoint
 resource "aws_vpc_security_group_ingress_rule" "eks_api" {
   count = local.create && var.cluster_security_group_id != "" ? 1 : 0
 

@@ -13,13 +13,13 @@ Deploys the EKS control plane for the preprod account. Uses BYOCNI (Cilium) — 
 
 ## Key Inputs
 
-| Input | Value | Notes |
-|-------|-------|-------|
-| `cluster_name` | `preprod-use1-eks` | |
-| `endpoint_private_access` | `true` | |
-| `endpoint_public_access` | `true` | Public access still enabled in preprod |
-| `eks_addons` | `{}` | Addons deployed separately via `eks-addons` unit |
-| `access_entries` | PlatformAdmin, PlatformDeployer, ArgoCD, DeveloperAccess, break-glass | ArgoCD entry allows cross-account management from platform hub; DeveloperAccess is namespace-scoped to team namespaces (from `teams.hcl`) |
+| Input                     | Value                                                                 | Notes                                                                                                                                     |
+|---------------------------|-----------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| `cluster_name`            | `preprod-use1-eks`                                                    |                                                                                                                                           |
+| `endpoint_private_access` | `true`                                                                |                                                                                                                                           |
+| `endpoint_public_access`  | `true`                                                                | Public access still enabled in preprod                                                                                                    |
+| `eks_addons`              | `{}`                                                                  | Addons deployed separately via `eks-addons` unit                                                                                          |
+| `access_entries`          | PlatformAdmin, PlatformDeployer, ArgoCD, DeveloperAccess, break-glass | ArgoCD entry allows cross-account management from platform hub; DeveloperAccess is namespace-scoped to team namespaces (from `teams.hcl`) |
 
 ## Commands
 

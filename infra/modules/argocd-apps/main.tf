@@ -3,12 +3,13 @@ locals {
 
   tenants = local.create ? var.tenants : {}
 
+  # Convention: "team-<name>" for namespace isolation, "vc-<name>" for vCluster; explicit namespace overrides both
   tenant_namespaces = { for k, v in local.tenants : k => coalesce(
     v.namespace,
     v.mode == "vcluster" ? "vc-${k}" : "team-${k}",
   ) }
 
-  # Flatten apps across all tenants for iteration
+  # Flatten nested team->app map into a flat "team-app" keyed map using merge(list...)
   applications = merge([
     for team_key, team in local.tenants : {
       for app_key, app in team.apps : "${team_key}-${app_key}" => {
@@ -26,7 +27,9 @@ locals {
   preview_apps = { for k, v in local.applications : k => v if v.preview && var.github_org != "" }
 }
 
-# --- AppProject: one per team ---
+# ---------------------------------------------------------------------------
+# AppProject: one per team
+# ---------------------------------------------------------------------------
 
 resource "kubernetes_manifest" "app_project" {
   for_each = local.tenants
@@ -45,6 +48,7 @@ resource "kubernetes_manifest" "app_project" {
         server    = var.cluster_server
         namespace = local.tenant_namespaces[each.key]
       }]
+      # Tenant-deployable resource types; excludes cluster-scoped and privileged types
       namespaceResourceWhitelist = [
         { group = "", kind = "ConfigMap" },
         { group = "", kind = "Secret" },
@@ -61,7 +65,9 @@ resource "kubernetes_manifest" "app_project" {
   }
 }
 
-# --- Application: one per app (main/stable) ---
+# ---------------------------------------------------------------------------
+# Application: one per app (main/stable)
+# ---------------------------------------------------------------------------
 
 resource "kubernetes_manifest" "application" {
   for_each = local.applications
@@ -84,6 +90,7 @@ resource "kubernetes_manifest" "application" {
         targetRevision = each.value.repo_branch
         path           = each.value.repo_path
         kustomize = {
+          # Prevents label selector collision with preview (PR) deployments of the same app
           commonLabels = {
             "app.kubernetes.io/instance" = "stable"
           }
@@ -98,7 +105,7 @@ resource "kubernetes_manifest" "application" {
           selfHeal = true
           prune    = true
         }
-        syncOptions = ["CreateNamespace=false"]
+        syncOptions = ["CreateNamespace=false"] # Namespace lifecycle managed by the tenant module
         } : {
         automated   = null
         syncOptions = null
@@ -109,7 +116,9 @@ resource "kubernetes_manifest" "application" {
   depends_on = [kubernetes_manifest.app_project]
 }
 
-# --- ApplicationSet: one per preview-enabled app (PR generator) ---
+# ---------------------------------------------------------------------------
+# ApplicationSet: one per preview-enabled app (PR generator)
+# ---------------------------------------------------------------------------
 
 resource "kubernetes_manifest" "preview_appset" {
   for_each = local.preview_apps
@@ -133,7 +142,7 @@ resource "kubernetes_manifest" "preview_appset" {
           github = merge(
             {
               owner = var.github_org
-              repo  = regex("[^/]+$", each.value.repo_url)
+              repo  = regex("[^/]+$", each.value.repo_url) # Extract repo name from URL
             },
             var.github_token_secret_name != "" ? {
               tokenRef = {
@@ -142,7 +151,7 @@ resource "kubernetes_manifest" "preview_appset" {
               }
             } : {}
           )
-          requeueAfterSeconds = 60
+          requeueAfterSeconds = 60 # Poll GitHub for new/updated PRs every 60s
         }
       }]
       template = {
@@ -161,13 +170,16 @@ resource "kubernetes_manifest" "preview_appset" {
             targetRevision = "{{.branch}}"
             path           = each.value.repo_path
             kustomize = {
+              # namePrefix + commonLabels isolate preview resources from the stable deployment
               namePrefix = "pr-{{.number}}-"
               commonLabels = {
                 "app.kubernetes.io/instance" = "pr-{{.number}}"
               }
+              # Override image to the PR's head SHA; ECR repo follows "team-<team>/<app>" convention
               images = var.ecr_registry != "" ? [
                 "${var.ecr_registry}/team-${each.value.team_key}/${each.value.app_key}:{{.head_sha}}"
               ] : []
+              # Rewrite the first HTTPRoute hostname to a PR-specific subdomain
               patches = var.preview_domain != "" ? [
                 {
                   target = { kind = "HTTPRoute" }

@@ -9,13 +9,14 @@ locals {
     for k, v in var.subnets : k => v if !lookup(v, "public", false)
   } : {}
 
+  # single_nat_gateway: use only the first public subnet (alphabetically) for the shared NAT
   nat_subnets = local.create && var.create_nat_gateways ? (
     var.single_nat_gateway
     ? { for k, v in local.public_subnets : k => v if k == keys(local.public_subnets)[0] }
     : local.public_subnets
   ) : {}
 
-  # Map each private subnet to its NAT gateway (same-AZ preferred, first NAT as fallback)
+  # Map each private subnet to its NAT: same-AZ preferred, first NAT as fallback
   private_subnet_nat_map = {
     for k, v in local.private_subnets : k => (
       var.single_nat_gateway
@@ -42,7 +43,8 @@ data "aws_region" "current" {}
 resource "aws_vpc" "this" {
   count = local.create ? 1 : 0
 
-  cidr_block           = var.address_space[0]
+  cidr_block = var.address_space[0]
+  # Required for VPC interface endpoints and EKS private DNS resolution
   enable_dns_support   = true
   enable_dns_hostnames = true
 
@@ -86,6 +88,7 @@ resource "aws_subnet" "this" {
   tags = merge(
     var.tags,
     { Name = each.key },
+    # EKS subnet discovery: private "kubernetes" subnets get internal-elb tag, public get elb tag
     var.enable_eks_networking && can(regex("kubernetes$", each.key)) ? {
       "kubernetes.io/role/internal-elb"                                    = "1"
       "kubernetes.io/cluster/${coalesce(var.eks_cluster_name, "unknown")}" = "shared"

@@ -20,6 +20,7 @@ resource "kubernetes_manifest" "cluster_secret_store" {
         aws = {
           service = "SecretsManager"
           region  = var.region
+          # JWT auth: ESO exchanges its K8s service account token for AWS credentials via IRSA
           auth = {
             jwt = {
               serviceAccountRef = {
@@ -52,6 +53,7 @@ resource "kubernetes_manifest" "cluster_secret_store_ssm" {
         aws = {
           service = "ParameterStore"
           region  = var.region
+          # JWT auth: ESO exchanges its K8s service account token for AWS credentials via IRSA
           auth = {
             jwt = {
               serviceAccountRef = {

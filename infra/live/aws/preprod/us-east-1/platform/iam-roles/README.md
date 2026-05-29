@@ -12,12 +12,12 @@ None
 
 ## Key Inputs
 
-| Input | Value | Notes |
-|-------|-------|-------|
-| `roles.PlatformAdmin` | Trust: management + preprod SSO | EKS, SSM, Secrets Manager read access; used for kubectl and debugging |
-| `roles.PlatformDeployer` | Trust: management + preprod | AdministratorAccess managed policy; used by Terragrunt for all provisioning |
-| `roles.ArgoCD` | Trust: platform account (829808296602) | Scoped to platform's ArgoCD IRSA role; enables cross-account cluster management |
-| `roles.DeveloperAccess` | Trust: management + preprod SSO (PowerUser + Admin) | Namespace-scoped EKS access for developers |
+| Input                    | Value                                               | Notes                                                                           |
+|--------------------------|-----------------------------------------------------|---------------------------------------------------------------------------------|
+| `roles.PlatformAdmin`    | Trust: management + preprod SSO                     | EKS, SSM, Secrets Manager read access; used for kubectl and debugging           |
+| `roles.PlatformDeployer` | Trust: management + preprod                         | AdministratorAccess managed policy; used by Terragrunt for all provisioning     |
+| `roles.ArgoCD`           | Trust: platform account (829808296602)              | Scoped to platform's ArgoCD IRSA role; enables cross-account cluster management |
+| `roles.DeveloperAccess`  | Trust: management + preprod SSO (PowerUser + Admin) | Namespace-scoped EKS access for developers                                      |
 
 ## Commands
 

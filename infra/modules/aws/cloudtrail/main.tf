@@ -235,9 +235,9 @@ resource "aws_cloudwatch_metric_alarm" "secrets_write" {
   evaluation_periods  = 1
   metric_name         = "SecretsManagerAccessCount"
   namespace           = "CloudTrail/SecretsManager"
-  period              = 300
+  period              = 300 # 5-minute evaluation window to batch low-volume events
   statistic           = "Sum"
-  threshold           = 0
+  threshold           = 0 # Alert on any Secrets Manager activity
   treat_missing_data  = "notBreaching"
 
   tags = var.tags

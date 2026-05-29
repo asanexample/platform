@@ -14,14 +14,14 @@ Attaches the preprod VPC to the platform account's Transit Gateway as a spoke. E
 
 ## Key Inputs
 
-| Input | Value | Notes |
-|-------|-------|-------|
-| `create_tgw` | `false` | Spoke mode — does not create a new TGW |
-| `transit_gateway_id` | From platform TGW output | Attaches to the existing hub TGW |
-| `ram_share_arn` | From platform TGW output | Accepts the RAM share to use the shared TGW |
-| `subnet_ids` | Transit subnets only | Uses `/28` transit subnets for TGW ENIs |
-| `destination_cidrs` | `["10.100.0.0/16"]` | Routes to platform VPC CIDR via TGW |
-| `security_group_ingress_cidrs` | `["10.100.0.0/16"]` | Allows inbound traffic from platform VPC |
+| Input                          | Value                    | Notes                                       |
+|--------------------------------|--------------------------|---------------------------------------------|
+| `create_tgw`                   | `false`                  | Spoke mode — does not create a new TGW      |
+| `transit_gateway_id`           | From platform TGW output | Attaches to the existing hub TGW            |
+| `ram_share_arn`                | From platform TGW output | Accepts the RAM share to use the shared TGW |
+| `subnet_ids`                   | Transit subnets only     | Uses `/28` transit subnets for TGW ENIs     |
+| `destination_cidrs`            | `["10.100.0.0/16"]`      | Routes to platform VPC CIDR via TGW         |
+| `security_group_ingress_cidrs` | `["10.100.0.0/16"]`      | Allows inbound traffic from platform VPC    |
 
 ## Commands
 

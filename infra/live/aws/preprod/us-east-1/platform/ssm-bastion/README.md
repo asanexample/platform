@@ -13,11 +13,11 @@ Deploys an SSM-managed bastion EC2 instance for private EKS API access via Sessi
 
 ## Key Inputs
 
-| Input | Value | Notes |
-|-------|-------|-------|
-| `name` | `preprod-use1-ssm-bastion` | |
-| `subnet_id` | First kubernetes subnet | Placed in a private subnet |
-| `cluster_security_group_id` | From EKS output | Allows bastion to reach EKS API |
+| Input                       | Value                      | Notes                           |
+|-----------------------------|----------------------------|---------------------------------|
+| `name`                      | `preprod-use1-ssm-bastion` |                                 |
+| `subnet_id`                 | First kubernetes subnet    | Placed in a private subnet      |
+| `cluster_security_group_id` | From EKS output            | Allows bastion to reach EKS API |
 
 ## Commands
 

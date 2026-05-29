@@ -12,13 +12,13 @@ None
 
 ## Key Inputs
 
-| Input | Value | Notes |
-|-------|-------|-------|
-| `trail_name` | `preprod-use1-secrets-audit` | Derived from env and region |
-| `enable_cloudwatch` | `true` | Streams trail events to CloudWatch Logs |
-| `enable_secrets_alarms` | `true` | Alerts on secrets access |
-| `log_retention_days` | `90` | |
-| `data_event_selectors` | `[]` | No data events configured yet |
+| Input                   | Value                        | Notes                                   |
+|-------------------------|------------------------------|-----------------------------------------|
+| `trail_name`            | `preprod-use1-secrets-audit` | Derived from env and region             |
+| `enable_cloudwatch`     | `true`                       | Streams trail events to CloudWatch Logs |
+| `enable_secrets_alarms` | `true`                       | Alerts on secrets access                |
+| `log_retention_days`    | `90`                         |                                         |
+| `data_event_selectors`  | `[]`                         | No data events configured yet           |
 
 ## Commands
 

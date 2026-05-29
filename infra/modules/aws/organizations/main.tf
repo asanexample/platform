@@ -47,6 +47,10 @@ locals {
   ])
 }
 
+# ---------------------------------------------------------------------------
+# Organization
+# ---------------------------------------------------------------------------
+
 data "aws_organizations_organization" "current" {
   count = local.create && !var.create_organization ? 1 : 0
 }
@@ -59,6 +63,10 @@ resource "aws_organizations_organization" "this" {
   lifecycle { prevent_destroy = true }
 }
 
+# ---------------------------------------------------------------------------
+# Organizational Units
+# ---------------------------------------------------------------------------
+
 resource "aws_organizations_organizational_unit" "top_level" {
   for_each  = local.create ? local.top_level_ous : {}
   name      = each.key
@@ -68,22 +76,32 @@ resource "aws_organizations_organizational_unit" "top_level" {
 }
 
 resource "aws_organizations_organizational_unit" "child" {
-  for_each  = local.create ? local.child_ous : {}
+  for_each = local.create ? local.child_ous : {}
+  # Child OU keys use "Parent/Child" format; extract the last segment as the OU display name
   name      = element(split("/", each.key), length(split("/", each.key)) - 1)
   parent_id = aws_organizations_organizational_unit.top_level[each.value.parent].id
   tags      = var.tags
   lifecycle { prevent_destroy = true }
 }
 
+# ---------------------------------------------------------------------------
+# Accounts
+# ---------------------------------------------------------------------------
+
 resource "aws_organizations_account" "this" {
   for_each          = local.create ? var.accounts : {}
   name              = each.key
   email             = each.value.email
   parent_id         = each.value.ou != null ? local.all_ou_ids[each.value.ou] : local.root_id
-  close_on_deletion = false
+  close_on_deletion = false # Never close an AWS account when removed from Terraform state
   tags              = var.tags
+  # AWS auto-populates role_name at account creation; ignoring prevents spurious diffs
   lifecycle { ignore_changes = [role_name] }
 }
+
+# ---------------------------------------------------------------------------
+# Service Control Policies
+# ---------------------------------------------------------------------------
 
 resource "aws_organizations_policy" "this" {
   for_each    = local.effective_scps

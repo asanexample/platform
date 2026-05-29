@@ -44,6 +44,7 @@ resource "aws_iam_role_policy_attachment" "node_ssm" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
+# Attached even with Cilium BYOCNI: required for EKS node registration
 resource "aws_iam_role_policy_attachment" "node_cni" {
   count = local.create ? 1 : 0
 

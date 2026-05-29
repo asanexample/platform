@@ -5,6 +5,8 @@
  */
 
 locals {
+  # Sanitize cloud tags to valid K8s labels (RFC 1123: lowercase, max 63 chars).
+  # Tags exceeding 63 chars after sanitization are silently excluded.
   k8s_labels = {
     for k, v in var.tags :
     replace(lower(k), "/[^a-z0-9_.-]/", "_") => replace(lower(v), "/[^a-z0-9_.-]/", "_")
@@ -62,6 +64,10 @@ locals {
   }
 }
 
+# ---------------------------------------------------------------------------
+# Namespace
+# ---------------------------------------------------------------------------
+
 resource "kubernetes_namespace" "vcluster" {
   count = var.create ? 1 : 0
 
@@ -79,6 +85,10 @@ resource "kubernetes_namespace" "vcluster" {
   }
 }
 
+# ---------------------------------------------------------------------------
+# Helm Release
+# ---------------------------------------------------------------------------
+
 resource "helm_release" "vcluster" {
   count            = var.create ? 1 : 0
   name             = var.cluster_name
@@ -87,11 +97,11 @@ resource "helm_release" "vcluster" {
   version          = var.chart_version
   namespace        = var.namespace
   create_namespace = false
-  timeout          = 600
+  timeout          = 600 # 10 min — vCluster control plane startup can be slow (image pull + PV provisioning)
   wait             = true
   atomic           = true
   cleanup_on_fail  = true
-  replace          = true
+  replace          = true # Delete and reinstall if release is in a failed state, rather than erroring
 
   values = [
     yamlencode(local.vcluster_values),

@@ -26,7 +26,7 @@ locals {
     }
 
     securityContext = {
-      fsGroup = 1001
+      fsGroup = 1001 # cert-manager runs as non-root uid 1001; fsGroup ensures volume mounts are writable
     }
   }
 }
@@ -75,6 +75,7 @@ data "aws_iam_policy_document" "cert_manager_route53" {
 
   statement {
     effect = "Allow"
+    # GetChange polls for DNS propagation status after creating DNS-01 challenge TXT records
     actions = [
       "route53:GetChange",
     ]
@@ -92,6 +93,7 @@ data "aws_iam_policy_document" "cert_manager_route53" {
 
   statement {
     effect = "Allow"
+    # List actions don't support resource-level restrictions in Route53 IAM
     actions = [
       "route53:ListHostedZones",
       "route53:ListHostedZonesByName",

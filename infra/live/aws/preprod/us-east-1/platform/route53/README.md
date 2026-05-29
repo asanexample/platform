@@ -12,11 +12,11 @@ None
 
 ## Key Inputs
 
-| Input | Value | Notes |
-|-------|-------|-------|
-| `domain_name` | `"preprod.aws.refplat.org"` | Delegated from platform's `aws.refplat.org` zone |
-| `force_destroy` | `true` | Allows zone deletion even with records |
-| `caa_records` | Let's Encrypt issue/issuewild + iodef | Restricts TLS cert issuance to Let's Encrypt only |
+| Input           | Value                                 | Notes                                             |
+|-----------------|---------------------------------------|---------------------------------------------------|
+| `domain_name`   | `"preprod.aws.refplat.org"`           | Delegated from platform's `aws.refplat.org` zone  |
+| `force_destroy` | `true`                                | Allows zone deletion even with records            |
+| `caa_records`   | Let's Encrypt issue/issuewild + iodef | Restricts TLS cert issuance to Let's Encrypt only |
 
 ## Commands
 

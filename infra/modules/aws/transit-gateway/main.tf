@@ -3,6 +3,7 @@ locals {
   create_tgw = local.create && var.create_tgw
   tgw_id     = local.create_tgw ? aws_ec2_transit_gateway.this[0].id : var.transit_gateway_id
 
+  # Create a route for every (route_table x destination_cidr) combination
   route_pairs = {
     for pair in setproduct(keys(var.route_table_ids), var.destination_cidrs) :
     "${pair[0]}:${pair[1]}" => {
@@ -12,12 +13,15 @@ locals {
   }
 }
 
-# --- Transit Gateway (hub) ---
+# ---------------------------------------------------------------------------
+# Transit Gateway (hub)
+# ---------------------------------------------------------------------------
 
 resource "aws_ec2_transit_gateway" "this" {
   count = local.create_tgw ? 1 : 0
 
-  amazon_side_asn                 = var.amazon_side_asn
+  amazon_side_asn = var.amazon_side_asn
+  # Spoke VPCs attach without manual approval (trusted accounts only)
   auto_accept_shared_attachments  = "enable"
   default_route_table_association = "enable"
   default_route_table_propagation = "enable"
@@ -27,12 +31,15 @@ resource "aws_ec2_transit_gateway" "this" {
   tags = merge(var.tags, { Name = var.name })
 }
 
-# --- RAM Share (hub) ---
+# ---------------------------------------------------------------------------
+# RAM Share (hub)
+# ---------------------------------------------------------------------------
 
 resource "aws_ram_resource_share" "this" {
   count = local.create_tgw && length(var.ram_share_principals) > 0 ? 1 : 0
 
-  name                      = "${var.name}-share"
+  name = "${var.name}-share"
+  # Required for cross-account sharing; could be false if RAM org sharing is enabled
   allow_external_principals = true
 
   tags = merge(var.tags, { Name = "${var.name}-share" })
@@ -52,7 +59,9 @@ resource "aws_ram_principal_association" "this" {
   principal          = each.value
 }
 
-# --- RAM Share Acceptance (spoke) ---
+# ---------------------------------------------------------------------------
+# RAM Share Acceptance (spoke)
+# ---------------------------------------------------------------------------
 
 resource "aws_ram_resource_share_accepter" "this" {
   count = local.create && !var.create_tgw && var.ram_share_arn != null ? 1 : 0
@@ -60,7 +69,9 @@ resource "aws_ram_resource_share_accepter" "this" {
   share_arn = var.ram_share_arn
 }
 
-# --- VPC Attachment ---
+# ---------------------------------------------------------------------------
+# VPC Attachment
+# ---------------------------------------------------------------------------
 
 resource "aws_ec2_transit_gateway_vpc_attachment" "this" {
   count = local.create ? 1 : 0
@@ -78,7 +89,9 @@ resource "aws_ec2_transit_gateway_vpc_attachment" "this" {
   ]
 }
 
-# --- Routes ---
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
 
 resource "aws_route" "tgw" {
   for_each = local.create ? local.route_pairs : {}
@@ -90,7 +103,9 @@ resource "aws_route" "tgw" {
   depends_on = [aws_ec2_transit_gateway_vpc_attachment.this]
 }
 
-# --- Security Group Rules (spoke, optional) ---
+# ---------------------------------------------------------------------------
+# Security Group Rules (spoke, optional)
+# ---------------------------------------------------------------------------
 
 resource "aws_security_group_rule" "tgw_ingress" {
   for_each = local.create && var.security_group_id != null ? toset(var.security_group_ingress_cidrs) : toset([])

@@ -14,9 +14,9 @@ Deploys EKS managed node groups for the preprod cluster. Depends on Cilium being
 
 ## Key Inputs
 
-| Input | Value | Notes |
-|-------|-------|-------|
-| `node_groups.system` | t3.large, 2-4 nodes | Labeled `node-role=system` |
+| Input                  | Value               | Notes                        |
+|------------------------|---------------------|------------------------------|
+| `node_groups.system`   | t3.large, 2-4 nodes | Labeled `node-role=system`   |
 | `node_groups.workload` | t3.large, 1-6 nodes | Labeled `node-role=workload` |
 
 ## Commands

@@ -2,6 +2,10 @@ locals {
   create = var.create
 }
 
+# ---------------------------------------------------------------------------
+# Repositories
+# ---------------------------------------------------------------------------
+
 resource "aws_ecr_repository" "this" {
   for_each = local.create ? var.repositories : {}
 
@@ -20,6 +24,10 @@ resource "aws_ecr_repository" "this" {
   tags = var.tags
 }
 
+# ---------------------------------------------------------------------------
+# Cross-Account Pull Policy
+# ---------------------------------------------------------------------------
+
 resource "aws_ecr_repository_policy" "cross_account_pull" {
   for_each = local.create && length(var.pull_account_ids) > 0 ? var.repositories : {}
 
@@ -32,6 +40,7 @@ resource "aws_ecr_repository_policy" "cross_account_pull" {
         Sid    = "CrossAccountPull"
         Effect = "Allow"
         Principal = {
+          # Region is intentionally empty in IAM ARNs (IAM is a global service)
           AWS = [for id in var.pull_account_ids : "arn:aws:iam::${id}:root"]
         }
         Action = [
@@ -43,6 +52,10 @@ resource "aws_ecr_repository_policy" "cross_account_pull" {
     ]
   })
 }
+
+# ---------------------------------------------------------------------------
+# Lifecycle Policy
+# ---------------------------------------------------------------------------
 
 resource "aws_ecr_lifecycle_policy" "this" {
   for_each = local.create ? var.repositories : {}

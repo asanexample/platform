@@ -6,6 +6,7 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = ">= 2.10.0"
     }
+    # Required by the vcluster sub-module
     helm = {
       source  = "hashicorp/helm"
       version = ">= 3.0"

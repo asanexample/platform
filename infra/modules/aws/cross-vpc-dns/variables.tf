@@ -25,7 +25,9 @@ variable "vpc_id" {
   type        = string
 }
 
-# --- PHZ variables ---
+# ---------------------------------------------------------------------------
+# PHZ variables
+# ---------------------------------------------------------------------------
 
 variable "phz_records" {
   description = "Map of name to PHZ config. Provide either static ips or eks_cluster_name for dynamic ENI lookup (requires eks_lookup_role_arn for cross-account)."
@@ -39,7 +41,9 @@ variable "phz_records" {
   default = {}
 }
 
-# --- Resolver variables ---
+# ---------------------------------------------------------------------------
+# Resolver variables
+# ---------------------------------------------------------------------------
 
 variable "resolver_subnet_ids" {
   description = "Subnet IDs for resolver ENIs (min 2, different AZs). Used by both outbound and inbound."
