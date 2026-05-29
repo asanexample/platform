@@ -179,18 +179,25 @@ The ECR module lives in the **platform** account (<PLATFORM_ACCOUNT_ID>). Cross-
 pull access for preprod (<PREPROD_ACCOUNT_ID>) and prod (<PROD_ACCOUNT_ID>) is already
 configured via the `pull_account_ids` input.
 
-### Step 3: Add GitHub Repository to OIDC Role
+### Step 3: Add the team to the GitHub OIDC unit
 
 Edit `infra/live/aws/platform/us-east-1/platform/github-oidc/terragrunt.hcl` and
-add the team's repository to the `github_repos` list:
+add the team to the `teams` map:
 
 ```hcl
-github_repos  = ["app-alpha", "app-bravo", "app-charlie"]   # NEW: app-charlie
-github_events = ["pull_request"]   # enables PR preview OIDC auth
+locals {
+  teams = {
+    alpha   = { github_repo = "app-alpha" }
+    bravo   = { github_repo = "app-bravo" }
+    charlie = { github_repo = "app-charlie" }   # NEW
+  }
+}
 ```
 
-This grants the `github-actions-ecr-push` OIDC role permission to push images
-from the new repository's GitHub Actions workflows.
+This generates a dedicated `github-actions-ecr-push-charlie` IAM role that trusts
+**only** `gangster/app-charlie` (OIDC `sub`) and can push **only** to that team's
+`team-charlie/*` ECR repos (per-team isolation — ADR-039 / issue #60). The team's
+GitHub Actions workflow must then assume `arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/github-actions-ecr-push-charlie`.
 
 ### Step 4: Apply Changes
 
@@ -361,10 +368,14 @@ aws ecr describe-repositories \
 ### GitHub OIDC Trust Policy
 
 ```bash
+# Per-team role: trusts only the team's repo and pushes only to team-charlie/*
 aws iam get-role \
-  --role-name github-actions-ecr-push \
+  --role-name github-actions-ecr-push-charlie \
   --profile platform \
   --query 'Role.AssumeRolePolicyDocument' | grep app-charlie
+aws iam get-role-policy \
+  --role-name github-actions-ecr-push-charlie --policy-name github-actions-ecr-push-charlie-inline \
+  --profile platform --query 'PolicyDocument.Statement[?Sid==`ECRPush`].Resource'  # only team-charlie/*
 ```
 
 ---
@@ -476,17 +487,20 @@ cluster via `argocd-clusters`. Verify:
 
 ### ECR push from GitHub Actions fails with "Not Authorized"
 
-1. Verify the repo name is in the `github_repos` list in `github-oidc/terragrunt.hcl`.
-2. Confirm the OIDC trust policy includes the repo:
+1. Verify the team is in the `teams` map in `github-oidc/terragrunt.hcl` (which
+   generates `github-actions-ecr-push-<team>`).
+2. Confirm the workflow assumes the **per-team** role ARN
+   (`github-actions-ecr-push-<team>`), not the old shared `github-actions-ecr-push`
+   (removed in #60), and that its trust includes the repo:
 
    ```bash
-   aws iam get-role --role-name github-actions-ecr-push --profile platform \
+   aws iam get-role --role-name github-actions-ecr-push-<team> --profile platform \
      --query 'Role.AssumeRolePolicyDocument'
    ```
 
-3. Check the GitHub Actions workflow uses the correct role ARN and region.
-4. Ensure the ECR repository name in the push step matches the name in
-   `ecr/terragrunt.hcl` (format: `team-<name>/app`).
+3. Check the GitHub Actions workflow uses the correct (per-team) role ARN and region.
+4. Ensure the ECR repository name in the push step matches `ecr/terragrunt.hcl`
+   (format: `team-<name>/app`) and is under the calling team's `team-<team>/*` prefix.
 
 ### Pods stuck in Pending
 
