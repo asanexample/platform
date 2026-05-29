@@ -21,7 +21,7 @@ deploying the vCluster Platform operator and connecting it to Loft's license ser
 The open-source vCluster chart (what we deploy via Helm) does not support
 `sync.toHost.customResources`. When configured, the vCluster pod crashes immediately:
 
-```
+```text
 you are trying to use a vCluster pro feature 'Generic Sync' (vcp-distro-generic-sync)
 that is not available in the open source vcluster
 ```

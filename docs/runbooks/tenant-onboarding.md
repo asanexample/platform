@@ -17,7 +17,7 @@
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
-2. [Choosing Isolation Mode](#choosing-isolation-mode)
+2. [Isolation Mode](#isolation-mode)
 3. [Onboarding Steps](#onboarding-steps)
 4. [Verification Commands](#verification-commands)
 5. [Offboarding](#offboarding)
