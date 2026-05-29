@@ -30,6 +30,8 @@ hierarchy that promotes consistency across environments.
 | [Tenant Onboarding](runbooks/tenant-onboarding.md) | Platform team: onboard/offboard teams, choose isolation mode |
 | [EKS Cluster Access](runbooks/eks-cluster-access.md) | kubectl setup for platform engineers and developers |
 | [ArgoCD SSO](runbooks/argocd-sso.md) | SSO setup, troubleshooting, and group-based RBAC |
+| [Transit Gateway Operations](runbooks/transit-gateway-operations.md) | Hub/spoke TGW: add spokes, verify connectivity, troubleshoot |
+| [Upgrade Procedures](runbooks/upgrade-procedures.md) | EKS, Cilium, Helm chart, and toolchain version upgrades |
 | [User Guide](user-guide.md) | Greenfield and brownfield deployments, day-2 operations |
 | [Troubleshooting](troubleshooting/) | Solutions to known issues and error patterns |
 

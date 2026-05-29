@@ -3,7 +3,7 @@
 > **Module path:** `infra/modules/aws/organizations`
 > **Live configuration:** `infra/live/aws/mgmt/global/organizations/terragrunt.hcl`
 >
-> **Last reviewed:** 2026-05-15
+> **Last reviewed:** 2026-05-28
 
 ---
 
@@ -62,6 +62,10 @@ SCPs that apply depend on the OU. Root-level SCPs (`baseline-guardrails`,
 `protect-security-services`, `enforce-encryption`, `deny-regions`) apply to all accounts
 regardless of OU placement. OU-specific SCPs are documented in
 `docs/compliance/scp-control-mapping.md`.
+
+Three roles are exempt from SCP deny statements: `OrganizationAccountAccessRole`
+(break-glass), `PlatformDeployer` (Terragrunt apply), and `github-actions-terratest`
+(CI test runner). See `docs/runbooks/modify-scps.md` for details on exempt roles.
 
 ---
 
