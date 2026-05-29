@@ -65,6 +65,18 @@ resource "aws_launch_template" "this" {
 
   name_prefix = "${var.cluster_name}-${each.key}-"
 
+  # EKS's auto-generated launch template encrypts the root volume. Our custom
+  # template must do the same, or the DenyUnencryptedEbsOnLaunch SCP blocks node
+  # launch ("not authorized to launch instances with this launch template").
+  block_device_mappings {
+    device_name = "/dev/xvda" # root device for the AL2023 EKS-optimized AMI
+    ebs {
+      encrypted   = true
+      volume_size = 20
+      volume_type = "gp3"
+    }
+  }
+
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
