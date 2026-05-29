@@ -40,7 +40,7 @@ Before starting, confirm the following:
 
 Review the current OU structure defined in `terragrunt.hcl`:
 
-```
+```text
 Root
   |-- Platform                     (infra/shared services)
   |-- Workloads                    (application accounts)
@@ -114,7 +114,7 @@ terragrunt plan
 
 You should see exactly one new resource:
 
-```
+```text
   # aws_organizations_account.this["myapp-prod"] will be created
   + resource "aws_organizations_account" "this" {
       + arn               = (known after apply)
@@ -151,7 +151,7 @@ Confirm the apply prompt. AWS account creation typically takes 30-60 seconds.
 
 **Expected output:**
 
-```
+```text
 aws_organizations_account.this["myapp-prod"]: Creating...
 aws_organizations_account.this["myapp-prod"]: Creation complete after 45s [id=123456789012]
 
