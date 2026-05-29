@@ -46,67 +46,57 @@ inputs = {
         },
       ]
 
-      managed_policies = []
+      # Broad read across the platform comes from the AWS-managed ReadOnlyAccess
+      # policy. PlatformAdmin authors nothing directly — AWS changes flow through
+      # Terragrunt/PlatformDeployer, K8s through ArgoCD; emergencies use break-glass.
+      managed_policies = ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
 
       inline_policies = {
-        eks-access = jsonencode({
+        # Deny sensitive data/secret exfil (Deny overrides ReadOnlyAccess), and grant
+        # only the non-read SSM session actions needed to reach the cluster via the
+        # bastion. See ADR-040.
+        platform-admin-guardrails = jsonencode({
           Version = "2012-10-17"
           Statement = [
             {
-              Sid    = "EKSAccess"
-              Effect = "Allow"
-              # Read-only EKS API access for cluster debugging — node groups,
-              # add-ons, updates, access entries, etc. (not just the cluster).
+              Sid    = "DenySensitiveDataReads"
+              Effect = "Deny"
               Action = [
-                "eks:Describe*",
-                "eks:List*",
+                "secretsmanager:GetSecretValue",
+                "kms:Decrypt",
+                "s3:GetObject*",
+                "dynamodb:GetItem",
+                "dynamodb:BatchGetItem",
+                "dynamodb:Query",
+                "dynamodb:Scan",
+                "ssm:GetParameter",
+                "ssm:GetParameters",
+                "ssm:GetParametersByPath",
               ]
               Resource = "*"
             },
             {
-              Sid    = "SSMAccess"
-              Effect = "Allow"
-              Action = [
-                "ssm:StartSession",
-                "ssm:TerminateSession",
-                "ssm:ResumeSession",
-                "ssm:DescribeSessions",
-                "ssm:GetConnectionStatus",
-              ]
-              Resource = "*"
+              # SSM Session Manager to the bastion only (reach the private cluster).
+              Sid      = "SSMStartSessionBastion"
+              Effect   = "Allow"
+              Action   = ["ssm:StartSession"]
+              Resource = "arn:aws:ec2:*:*:instance/*"
+              Condition = {
+                StringEquals = {
+                  "ssm:resourceTag/Name" = "${include.base.locals.env}-${include.base.locals.region_abbv}-ssm-bastion"
+                }
+              }
             },
             {
-              Sid      = "SSMDocumentAccess"
+              Sid      = "SSMStartSessionPortForwardDoc"
               Effect   = "Allow"
               Action   = ["ssm:StartSession"]
               Resource = "arn:aws:ssm:*::document/AWS-StartPortForwardingSessionToRemoteHost"
             },
             {
-              Sid      = "EC2Describe"
+              Sid      = "SSMManageOwnSessions"
               Effect   = "Allow"
-              Action   = ["ec2:DescribeInstances"]
-              Resource = "*"
-            },
-            {
-              Sid      = "Identity"
-              Effect   = "Allow"
-              Action   = ["sts:GetCallerIdentity"]
-              Resource = "*"
-            },
-            {
-              # Scoped to preprod/* prefix — for debugging secrets-backed services
-              Sid    = "SecretsReadForDebugging"
-              Effect = "Allow"
-              Action = [
-                "secretsmanager:GetSecretValue",
-                "secretsmanager:DescribeSecret",
-              ]
-              Resource = "arn:aws:secretsmanager:*:${include.base.locals.account_ids["preprod"]}:secret:preprod/*"
-            },
-            {
-              Sid      = "SecretsListForDebugging"
-              Effect   = "Allow"
-              Action   = ["secretsmanager:ListSecrets"]
+              Action   = ["ssm:TerminateSession", "ssm:ResumeSession"]
               Resource = "*"
             },
           ]
