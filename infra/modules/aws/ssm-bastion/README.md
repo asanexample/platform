@@ -107,3 +107,7 @@ No modules.
 - The security group only allows HTTPS egress (port 443), which is sufficient for SSM agent communication and EKS API access.
 - Default instance type is `t3.nano`, the smallest general-purpose instance, since the bastion only serves as an SSM relay.
 - The EKS cluster security group ingress rule is only created when `cluster_security_group_id` is set.
+
+## Related ADRs
+
+- ADR-020: SSM Session Manager Bastion over SSH Bastion

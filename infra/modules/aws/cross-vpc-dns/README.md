@@ -161,3 +161,8 @@ No modules.
 - Dynamic ENI lookup uses a `data "external"` source that shells out to the AWS CLI; the runner must have `aws` CLI available and valid credentials.
 - EKS-managed Route53 Private Hosted Zones are inaccessible via standard APIs, which is why this module maintains its own zones rather than associating the EKS-managed ones.
 - Resolver endpoints require at least 2 subnet IDs in different availability zones.
+
+## Related ADRs
+
+- ADR-035: Cross-VPC DNS Resolution for Private EKS Endpoints
+- ADR-022: DNS Architecture

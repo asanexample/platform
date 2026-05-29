@@ -106,3 +106,7 @@ No modules.
 - Gateway API integration is enabled by default (`enableGatewayAPI = true`), so cert-manager watches Gateway and HTTPRoute resources for TLS certificate requests.
 - The `fsGroup: 1001` security context is set to avoid permission issues with cert-manager's key storage.
 - The Helm release uses `replace = true`, so failed installs are replaced rather than upgraded.
+
+## Related ADRs
+
+- ADR-018: IRSA for Pod-Level AWS Identity

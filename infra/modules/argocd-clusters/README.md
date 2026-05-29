@@ -95,3 +95,7 @@ No modules.
 - The `aws_auth` field is optional. When set, ArgoCD uses `awsAuthConfig` to assume the specified IAM role for cluster authentication. When `null`, only TLS CA data is used.
 - Cluster secrets are created in the ArgoCD namespace (default `argocd`). ArgoCD must be installed before this module is applied.
 - The secret `config` field is JSON-encoded and contains `tlsClientConfig.caData` plus optional `awsAuthConfig`.
+
+## Related ADRs
+
+- ADR-021: ArgoCD for GitOps Delivery

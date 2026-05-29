@@ -96,3 +96,7 @@ No modules.
 - Each nameserver in the list creates a separate `cloudflare_dns_record` resource of type NS, so adds/removes are handled individually without affecting other records.
 - TTL is hardcoded to 3600 seconds (1 hour). Change `main.tf` directly if a different TTL is needed.
 - Requires the Cloudflare provider to be configured with an API token that has DNS edit permissions on the target zone.
+
+## Related ADRs
+
+- ADR-022: DNS Architecture

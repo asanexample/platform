@@ -182,3 +182,7 @@ No modules.
 - The default node pool is always created inline with the cluster. Use `default_nodepool_only_critical_addons_enabled` to taint it with `CriticalAddonsOnly` and schedule workloads on separate user node pools.
 - Prometheus integration is enabled by default via `enable_prometheus_integration`. Supply `prometheus_dcr_id` and `monitor_workspace_id` for the DCR association to take effect.
 - The module outputs `oidc_issuer_url` and `node_resource_group_id`, which are required inputs for the `identities` and `aks_identity` modules to create federated credentials and role assignments.
+
+## Related ADRs
+
+- ADR-008: Cilium as Cross-Cloud CNI

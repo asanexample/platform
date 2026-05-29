@@ -147,3 +147,8 @@ No modules.
 - All five control plane log types are enabled by default: `api`, `audit`, `authenticator`, `controllerManager`, `scheduler`.
 - The OIDC provider is always created when the cluster is created, enabling IRSA for workloads.
 - KMS key rotation is enabled by default for secrets encryption.
+
+## Related ADRs
+
+- ADR-009: EKS Component Separation
+- ADR-010: Private-Only EKS API Endpoint

@@ -113,3 +113,8 @@ No modules.
 - Default sources are `gateway-httproute`, `gateway-grpcroute`, and `gateway-tlsroute`. Change `sources` to `["ingress", "service"]` if using traditional Ingress resources instead of Gateway API.
 - The `policy` variable controls record lifecycle: `sync` (default) creates and deletes records, `upsert-only` creates but never deletes, `create-only` creates once and never updates.
 - IRSA is enabled automatically when `oidc_provider_arn` is non-empty. The IAM policy grants `route53:ChangeResourceRecordSets` on the specified zone and `route53:ListHostedZones` globally.
+
+## Related ADRs
+
+- ADR-022: DNS Architecture
+- ADR-018: IRSA for Pod-Level AWS Identity

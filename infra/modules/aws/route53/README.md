@@ -98,3 +98,8 @@ No modules.
 - The `name_servers` output provides the NS records that must be added to the parent domain's registrar or parent hosted zone for delegation.
 - Set `force_destroy = true` to allow zone deletion when records still exist (useful during teardowns).
 - CAA records use a TTL of 3600 seconds (1 hour).
+
+## Related ADRs
+
+- ADR-022: DNS Architecture
+- ADR-030: Route53 Subdomain Delegation for Environment DNS

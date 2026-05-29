@@ -127,3 +127,8 @@ No modules.
 - The default AMI type is `AL2023_x86_64_STANDARD` (Amazon Linux 2023).
 - This module must be deployed after Cilium is installed, since nodes will fail to join the cluster without a CNI.
 - No resources are created if `node_groups` is empty, even when `create = true`.
+
+## Related ADRs
+
+- ADR-009: EKS Component Separation
+- ADR-023: EKS Managed Node Groups over Self-Managed or Karpenter

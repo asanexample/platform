@@ -124,3 +124,7 @@ No modules.
 - Use `github_repos` (list) for multi-repo access or `github_repo` (string) for a single repo. If both are set, `github_repos` takes precedence.
 - Branch patterns that do not start with `refs/` are automatically prefixed with `refs/heads/`.
 - Event-based claims (e.g., `pull_request`) are combined with branch-based claims in the trust policy using `StringLike`.
+
+## Related ADRs
+
+- ADR-036: GitHub Actions OIDC Federation for CI/CD

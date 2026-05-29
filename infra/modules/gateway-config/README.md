@@ -127,3 +127,8 @@ No modules.
 - Each route creates both an HTTPS HTTPRoute and an HTTP-to-HTTPS 301 redirect route.
 - The Gateway listener uses a wildcard hostname (`*.<domain>`), so all routes must be subdomains of the configured `domain`.
 - When `internal = true`, the NLB uses the `internal` scheme and is only reachable through VPN (Tailscale) or VPC peering.
+
+## Related ADRs
+
+- ADR-017: Gateway API over Traditional Ingress
+- ADR-029: Preprod Public Ingress via Gateway API

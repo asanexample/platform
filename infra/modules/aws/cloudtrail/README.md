@@ -124,3 +124,7 @@ No modules.
 - Log file validation is always enabled on the trail.
 - The Secrets Manager alarm triggers on any `GetSecretValue`, `PutSecretValue`, `CreateSecret`, or `DeleteSecret` event within a 5-minute window.
 - Set `force_destroy = true` if you need to tear down the bucket with logs still in it (e.g., in non-production environments).
+
+## Related ADRs
+
+- ADR-037: CloudTrail for Secrets Audit Logging

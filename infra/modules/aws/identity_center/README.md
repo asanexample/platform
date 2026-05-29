@@ -151,3 +151,7 @@ No modules.
 - Must be run in the management account where IAM Identity Center is enabled.
 - Permission set session duration uses ISO 8601 duration format (e.g., `PT4H` for 4 hours).
 - Account assignments link groups (not individual users) to accounts with permission sets.
+
+## Related ADRs
+
+- ADR-007: Platform IAM Role Model

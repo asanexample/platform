@@ -89,3 +89,8 @@ No modules.
 - This module only creates ClusterSecretStore resources. The ESO operator itself must be deployed first (via the `external-secrets` module) and its service account must have IRSA permissions for Secrets Manager and SSM.
 - When `create_ssm_store = true` (default), a second ClusterSecretStore named `<store_name>-ssm` is created for SSM Parameter Store access.
 - The `service_account_name` and `service_account_namespace` must match the ESO Helm release's service account configuration.
+
+## Related ADRs
+
+- ADR-024: Secrets Management Architecture
+- ADR-019: External Secrets Operator for Secrets Management

@@ -147,3 +147,8 @@ No modules.
 - The module uses `replace = true` on the Helm release, so failed installs are replaced rather than upgraded in-place.
 - SSO configuration (Dex/SAML) is injected via `argocd_cm_extra` to keep the module cloud-agnostic -- the SAML app in Identity Center must be created manually.
 - A `configHash` value forces Helm to detect config drift even when values don't change structurally.
+
+## Related ADRs
+
+- ADR-021: ArgoCD for GitOps Delivery
+- ADR-012: ArgoCD SSO via Dex and SAML

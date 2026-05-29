@@ -80,3 +80,8 @@ No modules.
 - The DynamoDB table name defaults to `terraform-locks` if not specified.
 - State bucket versioning ensures that prior state versions are recoverable.
 - Access to the state bucket is controlled via the `TerraformStateAccess` IAM role defined in the management account, not by this module.
+
+## Related ADRs
+
+- ADR-002: AWS State Storage in S3 with Cloud-Aware Routing
+- ADR-006: State Bootstrap Pattern
