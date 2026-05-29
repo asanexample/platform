@@ -174,7 +174,7 @@ because:
 
 The bootstrap creates a hard dependency ordering for initial AWS setup:
 
-```
+```text
 1. state_bootstrap  (local state)  -> Creates S3 bucket + DynamoDB table
 2. organizations    (S3 state)     -> Creates org, OUs, accounts, SCPs
 3. everything else  (S3 state)     -> Networking, compute, etc.

@@ -63,12 +63,14 @@ variable "create_organization" {
 ```
 
 **When `create_organization = true`** (greenfield):
+
 - An `aws_organizations_organization` resource is created with the specified service access
   principals, enabled policy types, and `feature_set = "ALL"`.
 - The resource has `lifecycle { prevent_destroy = true }` to prevent accidental deletion of the
   entire organization.
 
 **When `create_organization = false`** (brownfield, the default):
+
 - A `data.aws_organizations_organization.current` data source reads the existing organization.
 - The root ID is extracted from the data source for OU and SCP attachment operations.
 

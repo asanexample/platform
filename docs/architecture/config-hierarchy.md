@@ -28,7 +28,7 @@ hierarchy. Each layer can define variables that are consumed by layers above it
 (narrower scope) or composed together by `_base.hcl`. Later (narrower) layers
 override earlier (broader) layers when tags or inputs are merged.
 
-```
+```text
 Layer 1 (broadest)    infra/root.hcl
     |                     Remote state, providers, global tags, cloud detection
     |
@@ -53,7 +53,7 @@ Layer 7 (narrowest)   infra/live/{cloud}/{env}/{region}/{workload}/{module}/terr
 
 ### Concrete Example: AWS Organizations Module
 
-```
+```text
 infra/
   terragrunt.hcl                          <-- Layer 1: root
   live/
@@ -73,7 +73,7 @@ infra/
 
 ### Concrete Example: Azure AKS Core Module
 
-```
+```text
 infra/
   terragrunt.hcl                          <-- Layer 1: root
   live/
@@ -109,10 +109,12 @@ The root configuration file applies to every module in every cloud. It provides:
   (AWS 5.91.0, AzureRM 4.25.0, Google 6.26.0).
 - **Global inputs.** Passes `common_tags` to all modules.
 - **Cloud detection.** Parses the relative path to extract the cloud provider:
+
   ```hcl
   _path_parts_cloud = split("/", path_relative_to_include())
   _cloud            = try(local._path_parts_cloud[1], "azure")
   ```
+
   For a module at `live/aws/mgmt/global/organizations`, the split produces
   `["live", "aws", "mgmt", "global", "organizations"]`, so `_cloud = "aws"`.
 
@@ -128,6 +130,7 @@ Each cloud has its own `common.hcl` at the cloud root. This file defines:
   mistakes.
 
 Example from AWS:
+
 ```hcl
 environment_account_map = {
   "ops"  = "<PLATFORM_ACCOUNT_ID>"
@@ -136,6 +139,7 @@ environment_account_map = {
 ```
 
 Example from Azure:
+
 ```hcl
 environment_subscription_map = {
   "dev" = "db4f1d99-0ec0-44eb-90de-41975f9bb68b"
@@ -210,7 +214,7 @@ as `include.base.locals.*`.
 Tags are merged in order of increasing specificity. Later layers overwrite
 earlier layers for the same key:
 
-```
+```text
 Step 1:  common_vars.locals.tags         (cloud-wide: ManagedBy, Project, CostCenter, Owner, DataClassification)
 Step 2:  + env_vars.locals.env_tags      (environment: Environment, DataClassification override, AutoShutdown)
 Step 3:  + region_vars.locals.region_tags (region: Region)
@@ -219,7 +223,7 @@ Step 4:  + workload_vars.locals.workload_tags (workload: Workload, ComplianceTie
 
 Result for the Azure dev/eastus/platform context:
 
-```
+```text
 {
   ManagedBy          = "Terragrunt"        # from common (step 1)
   Project            = "Multi-Cloud Platform" # from common (step 1)
@@ -339,7 +343,7 @@ Using `get_repo_root()` instead of relative paths provides two benefits:
    registry or Git tag-based versioning, only `_versions.hcl` needs to change.
    The comment block in the Azure version file documents this strategy:
 
-   ```
+   ```hcl
    # Monorepo (current): modules are sourced from get_repo_root() at HEAD.
    # Registry (future): change source_base to a registry URL and
    #   pin each module to a semver tag.
@@ -394,7 +398,7 @@ picks up.
 
 Starting from: `infra/live/aws/mgmt/global/organizations/terragrunt.hcl`
 
-```
+```text
 find_in_parent_folders("aws/_base.hcl"):
   organizations/  --> global/  --> mgmt/  --> aws/
   Found: infra/live/aws/_base.hcl
@@ -432,7 +436,7 @@ find_in_parent_folders("common.hcl"):
 
 Starting from: `infra/live/azure/dev/eastus/platform/aks_core/terragrunt.hcl`
 
-```
+```text
 find_in_parent_folders("azure/_base.hcl"):
   aks_core/  --> platform/  --> eastus/  --> dev/  --> azure/
   Found: infra/live/azure/_base.hcl
@@ -512,7 +516,7 @@ under a recognized cloud directory defaults to Azure storage.
 Both backends use `path_relative_to_include()` as the state key, which ensures
 each module gets a unique state file path that mirrors the directory structure:
 
-```
+```text
 State key for organizations module:
   live/aws/mgmt/global/organizations/terraform.tfstate
 
@@ -529,7 +533,7 @@ how the same architectural concepts map between AWS and Azure:
 
 ### Directory Structure
 
-```
+```text
 infra/live/
   aws/                              azure/
     _base.hcl                         _base.hcl
@@ -649,6 +653,7 @@ and `common.hcl`, then populating environment directories following the same
 
 1. Create the directory: `infra/live/{cloud}/{env}/{region}/{workload}/{module}/`.
 2. Create `terragrunt.hcl` with the standard includes, source, and inputs:
+
    ```hcl
    include "base" {
      path   = find_in_parent_folders("{cloud}/_base.hcl")
@@ -668,4 +673,5 @@ and `common.hcl`, then populating environment directories following the same
      # ... module-specific inputs
    }
    ```
+
 3. Add the module source to `_versions.hcl` if it does not already exist.

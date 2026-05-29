@@ -32,6 +32,7 @@ go test -v -run TestNetworking_PrivateTopology -timeout 30m ./networking/...
 ## Cost
 
 Each full test run creates and destroys real AWS resources. Estimated cost per run:
+
 - Networking: ~$0.10-0.20 (NAT gateway hourly charges)
 - EKS: ~$0.50-1.00 (EKS cluster $0.10/hr + NAT + EC2 node)
 

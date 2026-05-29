@@ -15,7 +15,7 @@ drawn, and how the organization can scale.
 
 The module deploys the following OU hierarchy:
 
-```
+```text
 Root (Organization Root)
   |
   +-- Platform
@@ -101,12 +101,14 @@ This separation ensures that:
 The Workloads OU has three child OUs representing environment tiers:
 
 **Preprod** -- Development, staging, and testing accounts. These accounts may have:
+
 - Relaxed cost controls
 - Shorter data retention
 - More permissive IAM policies for experimentation
 - Access to non-production data only
 
 **Prod** -- Production accounts running customer-facing workloads. These accounts should have:
+
 - Stricter change management controls
 - Longer data retention
 - Full audit logging
@@ -114,6 +116,7 @@ The Workloads OU has three child OUs representing environment tiers:
 
 **Regulated** -- Accounts subject to specific compliance frameworks (HIPAA, PCI-DSS, FedRAMP).
 These accounts will have:
+
 - The `hipaa-eligible-services` SCP when HIPAA workloads are present
 - Additional data residency controls
 - Enhanced logging and monitoring
@@ -123,7 +126,7 @@ These accounts will have:
 
 SCPs flow down the hierarchy through inheritance:
 
-```
+```text
 Root
   SCPs: baseline-guardrails, protect-security-services, enforce-encryption, deny-regions
   |

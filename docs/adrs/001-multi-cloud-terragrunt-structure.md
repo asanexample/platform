@@ -56,7 +56,7 @@ configuration hierarchy** and **local monorepo module sourcing**.
 
 ### Repository Layout
 
-```
+```text
 infra/
   terragrunt.hcl                          # Layer 1: Root
   live/

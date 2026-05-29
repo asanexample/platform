@@ -32,7 +32,7 @@ Organizational Units (OUs) and member accounts are created declaratively via the
 
 ### OU Tree with SCP Attachment Points
 
-```
+```text
 Root (r-xxxx)
 |
 |-- [SCPs attached at root]:
@@ -90,7 +90,7 @@ Allow at a lower level.
 
 ### How Policies Compose: Root to OU to Account
 
-```
+```text
                     +------------------+
                     |   Organization   |
                     |      Root        |
@@ -172,7 +172,7 @@ to become AWS API calls.
 
 ### Step 1: Terragrunt Input Resolution
 
-```
+```text
 infra/live/aws/mgmt/global/organizations/terragrunt.hcl
     |
     |-- include "base" --> aws/_base.hcl
@@ -209,7 +209,7 @@ infra/live/aws/mgmt/global/organizations/terragrunt.hcl
 
 Inside `infra/modules/aws/organizations/main.tf`, the inputs drive resource creation:
 
-```
+```text
 inputs.create = true
 inputs.create_organization = true
     |
@@ -539,6 +539,7 @@ split. The largest policies in this module are:
   statement per tag).
 
 When approaching the 5,120-byte limit, consider:
+
 1. Splitting the SCP into two policies (uses an additional attachment slot).
 2. Reducing whitespace (Terraform's `jsonencode` is already compact).
 3. Using wildcards in action lists where safe (e.g., `s3:Put*` instead of

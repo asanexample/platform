@@ -148,7 +148,7 @@ Committing the state file provides:
 
 The bootstrap creates a strict ordering requirement for initial AWS setup:
 
-```
+```text
 Phase 1: state_bootstrap
   - Uses local backend
   - Creates S3 bucket + DynamoDB table
