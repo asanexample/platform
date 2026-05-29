@@ -1,39 +1,55 @@
 # SSM Bastion
 
-Creates an SSM Session Manager bastion for private EKS cluster access -- no SSH keys or inbound ports.
+Deploys a lightweight EC2 instance in a private subnet for use as an SSM Session Manager bastion host. The instance has no inbound security group rules (access is exclusively through SSM), uses Amazon Linux 2023 with IMDSv2 required, and has an encrypted root volume. When an EKS cluster security group ID is provided, the module adds an ingress rule allowing HTTPS (port 443) from the bastion to the cluster API server, enabling `kubectl` access through SSM port forwarding.
 
 ## Usage
 
 ```hcl
-module "bastion" {
+module "ssm_bastion" {
   source = "../../modules/aws/ssm-bastion"
 
-  create = true
-
-  # Required
-  name      = "bastion-platform-use1"
+  name      = "platform-use1-bastion"
   vpc_id    = module.networking.vpc_id
-  subnet_id = module.networking.subnet_ids["az1-kubernetes"]
+  subnet_id = module.networking.subnet_ids["snet-platform-ops-private-use1-a-kubernetes"]
 
-  # Optional
-  instance_type             = "t3.nano"
   cluster_security_group_id = module.eks.cluster_security_group_id
 
   tags = {
     Environment = "platform"
-    ManagedBy   = "Terragrunt"
+    ManagedBy   = "opentofu"
   }
 }
 ```
 
 ## Examples
 
-### Disabled module
+### Disabled Module
 
 ```hcl
-module "bastion" {
+module "ssm_bastion" {
   source = "../../modules/aws/ssm-bastion"
   create = false
+
+  name      = "unused"
+  vpc_id    = "vpc-xxx"
+  subnet_id = "subnet-xxx"
+}
+```
+
+### Bastion Without EKS Access
+
+```hcl
+module "ssm_bastion" {
+  source = "../../modules/aws/ssm-bastion"
+
+  name          = "debug-bastion"
+  vpc_id        = module.networking.vpc_id
+  subnet_id     = module.networking.subnet_ids["private-a"]
+  instance_type = "t3.micro"
+
+  tags = {
+    Environment = "preprod"
+  }
 }
 ```
 
@@ -46,7 +62,7 @@ No requirements.
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_aws"></a> [aws](#provider\_aws) | 6.45.0 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | n/a |
 
 ## Modules
 
@@ -69,13 +85,13 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_name"></a> [name](#input\_name) | Name prefix for all resources | `string` | n/a | yes |
+| <a name="input_subnet_id"></a> [subnet\_id](#input\_subnet\_id) | Private subnet ID for the bastion instance | `string` | n/a | yes |
+| <a name="input_vpc_id"></a> [vpc\_id](#input\_vpc\_id) | VPC ID to place the bastion in | `string` | n/a | yes |
 | <a name="input_cluster_security_group_id"></a> [cluster\_security\_group\_id](#input\_cluster\_security\_group\_id) | EKS cluster security group ID — when set, adds an ingress rule allowing HTTPS from the bastion | `string` | `""` | no |
 | <a name="input_create"></a> [create](#input\_create) | Whether to create resources in this module | `bool` | `true` | no |
 | <a name="input_instance_type"></a> [instance\_type](#input\_instance\_type) | EC2 instance type | `string` | `"t3.nano"` | no |
-| <a name="input_name"></a> [name](#input\_name) | Name prefix for all resources | `string` | n/a | yes |
-| <a name="input_subnet_id"></a> [subnet\_id](#input\_subnet\_id) | Private subnet ID for the bastion instance | `string` | n/a | yes |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to all resources | `map(string)` | `{}` | no |
-| <a name="input_vpc_id"></a> [vpc\_id](#input\_vpc\_id) | VPC ID to place the bastion in | `string` | n/a | yes |
 
 ## Outputs
 
@@ -85,13 +101,9 @@ No modules.
 | <a name="output_security_group_id"></a> [security\_group\_id](#output\_security\_group\_id) | Security group ID of the bastion |
 <!-- END_TF_DOCS -->
 
-## Dependencies
-
-- Networking -- needs `vpc_id` and `subnet_id`
-- [eks](../eks) -- optionally needs `cluster_security_group_id` to allow HTTPS from the bastion
-
 ## Notes
 
-- Access is exclusively via SSM. There are no SSH keys, no inbound security group rules.
-- Use with `scripts/eks-tunnel.sh` to tunnel kubectl through the bastion: `./scripts/eks-tunnel.sh <instance-id> <cluster-endpoint>`
-- When `cluster_security_group_id` is set, the module adds an ingress rule to the EKS cluster security group allowing HTTPS (443) from the bastion.
+- The bastion AMI is automatically resolved to the latest Amazon Linux 2023 x86_64 AMI via SSM Parameter Store.
+- The security group only allows HTTPS egress (port 443), which is sufficient for SSM agent communication and EKS API access.
+- Default instance type is `t3.nano`, the smallest general-purpose instance, since the bastion only serves as an SSM relay.
+- The EKS cluster security group ingress rule is only created when `cluster_security_group_id` is set.

@@ -1,6 +1,6 @@
 # EKS
 
-Creates an EKS cluster (control plane only) with IAM role, KMS encryption, OIDC provider for IRSA, and configurable API endpoint access.
+Creates an Amazon EKS cluster with an IAM service role, OIDC provider for IRSA (IAM Roles for Service Accounts), optional KMS envelope encryption for Kubernetes secrets, and EKS access entries for IAM-to-Kubernetes RBAC mapping. The cluster is configured with `bootstrap_self_managed_addons = false` (BYOCNI mode), meaning the AWS VPC CNI is not installed and Cilium must be deployed before nodes can join. Authentication mode is set to `API_AND_CONFIG_MAP`.
 
 ## Usage
 
@@ -8,23 +8,25 @@ Creates an EKS cluster (control plane only) with IAM role, KMS encryption, OIDC 
 module "eks" {
   source = "../../modules/aws/eks"
 
-  create = true
+  cluster_name       = "platform-use1-eks"
+  kubernetes_version = "1.35"
+  subnet_ids         = [for k, v in module.networking.subnet_ids : v if can(regex("kubernetes$", k))]
 
-  # Required
-  cluster_name = "platform-use1-eks"
-  subnet_ids   = ["subnet-abc123", "subnet-def456"]
+  additional_security_group_ids = [module.networking.eks_security_group_id]
 
-  # Optional
-  kubernetes_version          = "1.35"
-  endpoint_private_access     = true
-  endpoint_public_access      = true
-  public_access_cidrs         = ["0.0.0.0/0"]
-  enable_secrets_encryption   = true
-  additional_security_group_ids = []
+  endpoint_private_access = true
+  endpoint_public_access  = false
+
+  enable_secrets_encryption = true
 
   access_entries = {
-    admin = {
-      principal_arn = "arn:aws:iam::123456789012:role/Admin"
+    platform-admin = {
+      principal_arn = "arn:aws:iam::829808296602:role/PlatformAdmin"
+      policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+      scope_type    = "cluster"
+    }
+    platform-deployer = {
+      principal_arn = "arn:aws:iam::829808296602:role/PlatformDeployer"
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
       scope_type    = "cluster"
     }
@@ -32,19 +34,44 @@ module "eks" {
 
   tags = {
     Environment = "platform"
-    ManagedBy   = "Terragrunt"
+    ManagedBy   = "opentofu"
   }
 }
 ```
 
 ## Examples
 
-### Disabled module
+### Disabled Module
 
 ```hcl
 module "eks" {
   source = "../../modules/aws/eks"
   create = false
+
+  cluster_name = "unused"
+  subnet_ids   = []
+}
+```
+
+### Public Cluster with Add-ons
+
+```hcl
+module "eks" {
+  source = "../../modules/aws/eks"
+
+  cluster_name            = "preprod-use1-eks"
+  subnet_ids              = ["subnet-aaa", "subnet-bbb"]
+  endpoint_public_access  = true
+  endpoint_private_access = true
+  public_access_cidrs     = ["203.0.113.0/24"]
+
+  eks_addons = {
+    vpc-cni = {}
+  }
+
+  tags = {
+    Environment = "preprod"
+  }
 }
 ```
 
@@ -57,8 +84,8 @@ No requirements.
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_aws"></a> [aws](#provider\_aws) | 6.45.0 |
-| <a name="provider_tls"></a> [tls](#provider\_tls) | 4.3.0 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | n/a |
+| <a name="provider_tls"></a> [tls](#provider\_tls) | n/a |
 
 ## Modules
 
@@ -84,9 +111,10 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | Name of the EKS cluster | `string` | n/a | yes |
+| <a name="input_subnet_ids"></a> [subnet\_ids](#input\_subnet\_ids) | Subnet IDs for the EKS cluster ENIs | `list(string)` | n/a | yes |
 | <a name="input_access_entries"></a> [access\_entries](#input\_access\_entries) | IAM principal to Kubernetes access policy mappings | <pre>map(object({<br/>    principal_arn = string<br/>    policy_arn    = string<br/>    type          = optional(string, "STANDARD")<br/>    scope_type    = optional(string, "cluster")<br/>    namespaces    = optional(list(string))<br/>  }))</pre> | `{}` | no |
 | <a name="input_additional_security_group_ids"></a> [additional\_security\_group\_ids](#input\_additional\_security\_group\_ids) | Additional security group IDs to attach to the cluster (e.g. networking module's EKS SG) | `list(string)` | `[]` | no |
-| <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | Name of the EKS cluster | `string` | n/a | yes |
 | <a name="input_create"></a> [create](#input\_create) | Whether to create resources in this module | `bool` | `true` | no |
 | <a name="input_eks_addons"></a> [eks\_addons](#input\_eks\_addons) | EKS managed add-ons to install (e.g. coredns, kube-proxy) | <pre>map(object({<br/>    most_recent = optional(bool, true)<br/>  }))</pre> | `{}` | no |
 | <a name="input_enable_secrets_encryption"></a> [enable\_secrets\_encryption](#input\_enable\_secrets\_encryption) | Enable KMS envelope encryption for Kubernetes secrets | `bool` | `true` | no |
@@ -95,7 +123,6 @@ No modules.
 | <a name="input_endpoint_public_access"></a> [endpoint\_public\_access](#input\_endpoint\_public\_access) | Enable public API server endpoint | `bool` | `true` | no |
 | <a name="input_kubernetes_version"></a> [kubernetes\_version](#input\_kubernetes\_version) | Kubernetes version for the EKS cluster | `string` | `"1.35"` | no |
 | <a name="input_public_access_cidrs"></a> [public\_access\_cidrs](#input\_public\_access\_cidrs) | CIDR blocks allowed to access the public API endpoint | `list(string)` | <pre>[<br/>  "0.0.0.0/0"<br/>]</pre> | no |
-| <a name="input_subnet_ids"></a> [subnet\_ids](#input\_subnet\_ids) | Subnet IDs for the EKS cluster ENIs | `list(string)` | n/a | yes |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to all resources | `map(string)` | `{}` | no |
 
 ## Outputs
@@ -113,11 +140,10 @@ No modules.
 | <a name="output_oidc_provider_url"></a> [oidc\_provider\_url](#output\_oidc\_provider\_url) | The OIDC issuer URL (without https:// prefix) for IRSA trust policies |
 <!-- END_TF_DOCS -->
 
-## Dependencies
-
-None -- standalone cluster module.
-
 ## Notes
 
-- Sets `bootstrap_self_managed_addons = false` for BYOCNI (e.g., Cilium). The AWS VPC CNI is not installed.
-- Node groups are managed separately via the `eks-node-group` module so they can depend on CNI deployment.
+- BYOCNI mode (`bootstrap_self_managed_addons = false`) means no CNI, kube-proxy, or CoreDNS is installed by default. Cilium must be deployed before node groups are created, and CoreDNS should be installed via the separate `eks-addons` module after nodes are ready.
+- The `eks_addons` variable on this module is for add-ons that can be installed at cluster creation time. For add-ons that depend on CNI and nodes (e.g., CoreDNS), use the `eks-addons` module instead.
+- All five control plane log types are enabled by default: `api`, `audit`, `authenticator`, `controllerManager`, `scheduler`.
+- The OIDC provider is always created when the cluster is created, enabling IRSA for workloads.
+- KMS key rotation is enabled by default for secrets encryption.

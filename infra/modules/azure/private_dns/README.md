@@ -1,87 +1,65 @@
-# Azure Private DNS Module
+# Private DNS
 
-Creates private DNS zones and links them to a virtual network for private endpoint name resolution.
+Creates Azure private DNS zones and links them to virtual networks. Each DNS zone is defined as a map entry with its domain name, target VNet, and registration settings. VNet links enable DNS resolution for private endpoints and other resources within the linked virtual network. This module handles the common pattern of creating multiple private DNS zones (e.g., for Key Vault, Storage, AKS) and linking them all to the same VNet.
 
 ## Usage
 
 ```hcl
 module "private_dns" {
-  source = "../private_dns"
+  source = "../../modules/azure/private_dns"
 
-  create = true
-
-  resource_group_name = "rg-platform-prod-eus"
+  resource_group_name = "rg-platform-dev-eus"
 
   private_dns_zones = {
-    "blob" = {
-      name                      = "privatelink.blob.core.windows.net"
-      vnet_id                   = module.networking.id
-      vnet_resource_group_name  = "rg-platform-prod-eus"
-      registration_enabled      = false
-      virtual_network_link_name = "link-to-prod-vnet-blob"
-    }
     "keyvault" = {
       name                      = "privatelink.vaultcore.azure.net"
-      vnet_id                   = module.networking.id
-      vnet_resource_group_name  = "rg-platform-prod-eus"
+      vnet_id                   = "/subscriptions/.../virtualNetworks/vnet-platform-dev-eus"
+      vnet_resource_group_name  = "rg-platform-dev-eus"
       registration_enabled      = false
-      virtual_network_link_name = "link-to-prod-vnet-keyvault"
+      virtual_network_link_name = "keyvault-vnet-link"
     }
-    "aks" = {
-      name                      = "privatelink.eastus.azmk8s.io"
-      vnet_id                   = module.networking.id
-      vnet_resource_group_name  = "rg-platform-prod-eus"
+    "blob" = {
+      name                      = "privatelink.blob.core.windows.net"
+      vnet_id                   = "/subscriptions/.../virtualNetworks/vnet-platform-dev-eus"
+      vnet_resource_group_name  = "rg-platform-dev-eus"
       registration_enabled      = false
-      virtual_network_link_name = "link-to-prod-vnet-aks"
+      virtual_network_link_name = "blob-vnet-link"
     }
   }
 
   tags = {
-    Environment = "prod"
-    ManagedBy   = "Terragrunt"
+    Environment = "dev"
+    ManagedBy   = "Terraform"
   }
 }
 ```
 
 ## Examples
 
-### Disabled
+### Disabled Module
 
 ```hcl
 module "private_dns" {
-  source = "../private_dns"
+  source = "../../modules/azure/private_dns"
   create = false
 }
 ```
 
-### Single zone
-
-```hcl
-module "private_dns" {
-  source = "../private_dns"
-
-  create = true
-
-  resource_group_name = "rg-platform-dev-eus"
-
-  private_dns_zones = {
-    "blob" = {
-      name                      = "privatelink.blob.core.windows.net"
-      vnet_id                   = module.networking.id
-      vnet_resource_group_name  = "rg-platform-dev-eus"
-      registration_enabled      = false
-      virtual_network_link_name = "link-to-dev-vnet-blob"
-    }
-  }
-
-  tags = {
-    Environment = "dev"
-    ManagedBy   = "Terragrunt"
-  }
-}
-```
-
 <!-- BEGIN_TF_DOCS -->
+## Requirements
+
+No requirements.
+
+## Providers
+
+| Name | Version |
+| ---- | ------- |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | n/a |
+
+## Modules
+
+No modules.
+
 ## Resources
 
 | Name | Type |
@@ -93,26 +71,21 @@ module "private_dns" {
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| private_dns_zones | Map of private DNS zones to create | <pre>map(object({<br/>    name                      = string<br/>    vnet_id                   = string<br/>    vnet_resource_group_name  = string<br/>    registration_enabled      = bool<br/>    virtual_network_link_name = string<br/>  }))</pre> | n/a | yes |
-| resource_group_name | The name of the resource group in which to create the private DNS zones | `string` | n/a | yes |
-| create | Whether to create resources in this module | `bool` | `true` | no |
-| tags | A mapping of tags to assign to the resources | `map(string)` | `{}` | no |
+| <a name="input_private_dns_zones"></a> [private\_dns\_zones](#input\_private\_dns\_zones) | Map of private DNS zones to create | <pre>map(object({<br/>    name                      = string<br/>    vnet_id                   = string<br/>    vnet_resource_group_name  = string<br/>    registration_enabled      = bool<br/>    virtual_network_link_name = string<br/>  }))</pre> | n/a | yes |
+| <a name="input_resource_group_name"></a> [resource\_group\_name](#input\_resource\_group\_name) | The name of the resource group in which to create the private DNS zones | `string` | n/a | yes |
+| <a name="input_create"></a> [create](#input\_create) | Whether to create resources in this module | `bool` | `true` | no |
+| <a name="input_tags"></a> [tags](#input\_tags) | A mapping of tags to assign to the resources | `map(string)` | `{}` | no |
 
 ## Outputs
 
 | Name | Description |
 | ---- | ----------- |
-| create | Whether resources were created |
-| private_dns_zone_ids | Map of private DNS zone names to their IDs |
+| <a name="output_create"></a> [create](#output\_create) | Whether resources were created |
+| <a name="output_private_dns_zone_ids"></a> [private\_dns\_zone\_ids](#output\_private\_dns\_zone\_ids) | Map of private DNS zone names to their IDs |
 <!-- END_TF_DOCS -->
-
-## Dependencies
-
-- [networking](../networking) — Provides the VNet ID to link zones to
-- [resource_group](../resource_group) — Provides the resource group to deploy into
 
 ## Notes
 
-- Set `registration_enabled = false` for private link zones (the typical case). Auto-registration is only for VM DNS records.
-- DNS zone names must exactly match the expected pattern for each Azure service (e.g., `privatelink.blob.core.windows.net`).
-- AKS private DNS zones are region-specific: `privatelink.{region}.azmk8s.io`.
+- Set `registration_enabled = true` to enable auto-registration of VM DNS records in the zone. This is typically only needed for custom private DNS zones, not Azure service privatelink zones.
+- DNS zone names must be valid domain names using lowercase letters, numbers, hyphens, and periods.
+- The output `private_dns_zone_ids` is a map keyed by the input map keys, which can be passed to private endpoint configurations in other modules (e.g., `key_vault`, `storage_account`).

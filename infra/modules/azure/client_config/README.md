@@ -1,62 +1,51 @@
-# Azure Client Config Module
+# Client Config
 
-Data source that exposes the current Azure client configuration (tenant ID, subscription ID, object ID, client ID).
+Exposes the current Azure client configuration (tenant ID, subscription ID, client ID, and object ID) as outputs. This is a data-only module that creates no resources -- it wraps `azurerm_client_config` so other modules can reference the authenticated principal's details without duplicating data source declarations.
 
 ## Usage
 
 ```hcl
 module "client_config" {
-  source = "../client_config"
-}
-
-# Use in role assignments or access policies
-resource "azurerm_role_assignment" "deployer" {
-  scope                = module.resource_group.id
-  role_definition_name = "Contributor"
-  principal_id         = module.client_config.object_id
-}
-```
-
-## Examples
-
-### Key Vault access policy for the current identity
-
-```hcl
-module "client_config" {
-  source = "../client_config"
-}
-
-resource "azurerm_key_vault_access_policy" "deployer" {
-  key_vault_id = module.key_vault.id
-  tenant_id    = module.client_config.tenant_id
-  object_id    = module.client_config.object_id
-
-  secret_permissions = ["Get", "List", "Set", "Delete"]
+  source = "../../modules/azure/client_config"
 }
 ```
 
 <!-- BEGIN_TF_DOCS -->
+## Requirements
+
+No requirements.
+
+## Providers
+
+| Name | Version |
+| ---- | ------- |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | n/a |
+
+## Modules
+
+No modules.
+
 ## Resources
 
 | Name | Type |
 | ---- | ---- |
+| [azurerm_client_config.current](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/client_config) | data source |
+
+## Inputs
+
+No inputs.
 
 ## Outputs
 
 | Name | Description |
 | ---- | ----------- |
-| client_id | The client ID (application ID) of the current Azure client |
-| object_id | The object ID of the current Azure client (user or service principal) |
-| subscription_id | The subscription ID of the current Azure client |
-| tenant_id | The tenant ID of the current Azure client |
+| <a name="output_client_id"></a> [client\_id](#output\_client\_id) | The client ID (application ID) of the current Azure client |
+| <a name="output_object_id"></a> [object\_id](#output\_object\_id) | The object ID of the current Azure client (user or service principal) |
+| <a name="output_subscription_id"></a> [subscription\_id](#output\_subscription\_id) | The subscription ID of the current Azure client |
+| <a name="output_tenant_id"></a> [tenant\_id](#output\_tenant\_id) | The tenant ID of the current Azure client |
 <!-- END_TF_DOCS -->
-
-## Dependencies
-
-None -- this is a data-only module.
 
 ## Notes
 
-- This module has no `create` variable and no inputs; it is a pure data source wrapper.
-- The returned identity depends on how Terraform authenticates (user vs. service principal).
-- Creates zero Azure resources.
+- This module has no input variables and creates no Azure resources. It only reads the current authentication context.
+- Useful for dynamically setting `tenant_id` or `object_id` on Key Vault access policies, role assignments, or other identity-dependent resources.

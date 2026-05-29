@@ -1,41 +1,28 @@
 # Cilium
 
-Deploys Cilium CNI on a Kubernetes cluster via Helm with cloud-specific configuration for AWS (EKS), Azure (AKS), and GCP (GKE).
+Deploys Cilium CNI via Helm with cloud-specific configurations for AWS (EKS), Azure (AKS), and GCP (GKE). On AWS, configures ENI-based IPAM, native routing, kube-proxy replacement, and L2 neighbor discovery. On Azure, enables AKS BYOCNI mode with node init. On GCP, uses Kubernetes IPAM with native routing. The module also installs Gateway API CRDs (experimental channel) and enables Cilium's Gateway API controller by default. Includes Hubble observability with relay, UI, and configurable metrics. A `cloud_provider` variable selects the appropriate cloud-specific Helm values overlay.
 
 ## Usage
 
+### AWS (EKS with BYOCNI)
+
 ```hcl
 module "cilium" {
-  source = "../cilium"
+  source = "../../modules/cilium"
 
-  create         = true
-  cloud_provider = "aws"
-  cluster_name   = "eks-platform-dev-use1"
+  cloud_provider       = "aws"
+  cluster_name         = "platform-use1-eks"
+  k8s_service_host     = "EXAMPLE.gr7.us-east-1.eks.amazonaws.com"
+  k8s_service_port     = "443"
+  kube_proxy_replacement = "true"
+  gateway_api_enabled  = true
 
-  k8s_service_host = "ABCDEF1234.gr7.us-east-1.eks.amazonaws.com"
-  k8s_service_port = "443"
-
-  helm_chart_version  = "1.17.2"
-  gateway_api_enabled = true
-  hubble_enabled      = true
-  hubble_ui_enabled   = true
+  hubble_tls_auto_method = "helm"
 
   tags = {
-    Environment = "dev"
-    ManagedBy   = "Terragrunt"
+    Environment = "platform"
+    ManagedBy   = "terraform"
   }
-}
-```
-
-## Examples
-
-### Disabled module
-
-```hcl
-module "cilium" {
-  source       = "../cilium"
-  create       = false
-  cluster_name = ""
 }
 ```
 
@@ -43,55 +30,44 @@ module "cilium" {
 
 ```hcl
 module "cilium" {
-  source = "../cilium"
+  source = "../../modules/cilium"
 
-  create              = true
   cloud_provider      = "azure"
-  cluster_name        = "aks-platform-ops-wus"
-  resource_group_name = "rg-platform-ops-wus"
-
-  helm_chart_version  = "1.17.2"
+  cluster_name        = "platform-wus-aks"
   gateway_api_enabled = true
-  hubble_enabled      = true
-  hubble_ui_enabled   = true
 
   tags = {
-    Environment = "ops"
-    ManagedBy   = "Terragrunt"
+    Environment = "platform"
+    ManagedBy   = "terraform"
   }
 }
 ```
 
-### GCP (GKE)
+## Examples
+
+### Disabled Module
 
 ```hcl
 module "cilium" {
-  source = "../cilium"
+  source = "../../modules/cilium"
 
-  create         = true
+  create       = false
+  cluster_name = "platform-use1-eks"
+}
+```
+
+### Minimal (GCP)
+
+```hcl
+module "cilium" {
+  source = "../../modules/cilium"
+
   cloud_provider = "gcp"
-  cluster_name   = "gke-platform-dev-usc1"
-
-  k8s_service_host = "10.0.0.1"
-  k8s_service_port = "443"
-
-  helm_chart_version  = "1.17.2"
-  gateway_api_enabled = true
-  hubble_enabled      = true
-  hubble_ui_enabled   = true
-
-  tags = {
-    Environment = "dev"
-    ManagedBy   = "Terragrunt"
-  }
+  cluster_name   = "platform-usc1-gke"
 }
 ```
 
 <!-- BEGIN_TF_DOCS -->
-## Cilium Helm Module
-
-Deploys Cilium CNI via Helm. Supports Azure (AKS), AWS (EKS), and GCP (GKE).
-
 ## Requirements
 
 | Name | Version |
@@ -105,8 +81,8 @@ Deploys Cilium CNI via Helm. Supports Azure (AKS), AWS (EKS), and GCP (GKE).
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_helm"></a> [helm](#provider\_helm) | 3.1.1 |
-| <a name="provider_null"></a> [null](#provider\_null) | 3.3.0 |
+| <a name="provider_helm"></a> [helm](#provider\_helm) | >= 3.0 |
+| <a name="provider_null"></a> [null](#provider\_null) | >= 3.0 |
 
 ## Modules
 
@@ -123,18 +99,18 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| <a name="input_cloud_provider"></a> [cloud\_provider](#input\_cloud\_provider) | Cloud provider for platform-specific CNI config | `string` | `"azure"` | no |
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | Name of the Kubernetes cluster | `string` | n/a | yes |
+| <a name="input_cloud_provider"></a> [cloud\_provider](#input\_cloud\_provider) | Cloud provider for platform-specific CNI config | `string` | `"azure"` | no |
 | <a name="input_cni"></a> [cni](#input\_cni) | CNI configuration for Cilium | `any` | <pre>{<br/>  "chainingMode": null,<br/>  "exclusive": false<br/>}</pre> | no |
 | <a name="input_cni_exclusive"></a> [cni\_exclusive](#input\_cni\_exclusive) | Make Cilium take ownership over the container runtime CNI configuration | `bool` | `false` | no |
 | <a name="input_create"></a> [create](#input\_create) | Controls whether Cilium resources should be created | `bool` | `true` | no |
 | <a name="input_debug"></a> [debug](#input\_debug) | Debug configuration for Cilium | `any` | <pre>{<br/>  "enabled": false<br/>}</pre> | no |
 | <a name="input_environment"></a> [environment](#input\_environment) | Environment name (e.g., dev, test, prod) | `string` | `"dev"` | no |
 | <a name="input_external_ips_enabled"></a> [external\_ips\_enabled](#input\_external\_ips\_enabled) | Enable ExternalIPs service support | `bool` | `true` | no |
-| <a name="input_gateway_api_crd_version"></a> [gateway\_api\_crd\_version](#input\_gateway\_api\_crd\_version) | Gateway API CRD version to install (experimental channel). Set to empty string to skip CRD installation. | `string` | `"v1.2.1"` | no |
+| <a name="input_gateway_api_crd_version"></a> [gateway\_api\_crd\_version](#input\_gateway\_api\_crd\_version) | Gateway API CRD version to install (experimental channel). Set to empty string to skip CRD installation. | `string` | `"v1.3.0"` | no |
 | <a name="input_gateway_api_enabled"></a> [gateway\_api\_enabled](#input\_gateway\_api\_enabled) | Enable Gateway API support | `bool` | `true` | no |
 | <a name="input_helm_chart"></a> [helm\_chart](#input\_helm\_chart) | Name of the Cilium Helm chart | `string` | `"cilium"` | no |
-| <a name="input_helm_chart_version"></a> [helm\_chart\_version](#input\_helm\_chart\_version) | Version of the Cilium Helm chart | `string` | `"1.17.2"` | no |
+| <a name="input_helm_chart_version"></a> [helm\_chart\_version](#input\_helm\_chart\_version) | Version of the Cilium Helm chart | `string` | `"1.19.4"` | no |
 | <a name="input_helm_release_name"></a> [helm\_release\_name](#input\_helm\_release\_name) | Name of the Helm release for Cilium | `string` | `"cilium"` | no |
 | <a name="input_helm_repository"></a> [helm\_repository](#input\_helm\_repository) | Repository URL for the Cilium Helm chart | `string` | `"https://helm.cilium.io/"` | no |
 | <a name="input_helm_timeout"></a> [helm\_timeout](#input\_helm\_timeout) | Timeout for Helm operations in seconds | `number` | `1200` | no |
@@ -185,15 +161,10 @@ No modules.
 | <a name="output_namespace"></a> [namespace](#output\_namespace) | Kubernetes namespace where Cilium is installed |
 <!-- END_TF_DOCS -->
 
-## Dependencies
-
-- Helm provider must be configured by the caller with valid cluster credentials.
-- A Kubernetes cluster (EKS, AKS, or GKE) must exist and be reachable.
-
 ## Notes
 
-- Cloud-specific Helm values are applied automatically based on `cloud_provider` (aws=ENI mode, azure=AKS BYOCNI, gcp=GKE native routing).
-- On AWS, `hubble.tls.auto.method` is set to `"helm"` instead of the default `"cronJob"` to avoid post-install hook issues with BYOCNI bootstrapping.
-- On EKS, `k8s_service_host` must be set to the cluster API endpoint because the in-cluster Kubernetes service IP is unreachable before the CNI exists.
-- On Azure, the AKS cluster must be provisioned with `network_plugin = "none"`.
-- The Helm release uses `atomic = true` -- a failed deploy automatically rolls back.
+- On EKS with BYOCNI, `k8s_service_host` must be set to the EKS API endpoint because the in-cluster Kubernetes service IP is unreachable before the CNI is installed.
+- On AWS, `hubble_tls_auto_method` should be set to `"helm"` to avoid post-install hook chicken-and-egg issues with BYOCNI.
+- Gateway API CRDs are installed via `kubectl apply` using a `null_resource` provisioner. Set `gateway_api_crd_version` to `""` to skip CRD installation.
+- The `configHash` Helm value forces a rollout on any values change, even if the structural diff is empty.
+- Cilium is installed into `kube-system` by default (not a custom namespace).
