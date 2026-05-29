@@ -13,7 +13,6 @@ locals {
   module_source = {
     # Core infrastructure
     networking      = "${local.source_base}/aws//networking"
-    naming          = "${local.source_base}/aws//naming"
     transit_gateway = "${local.source_base}/aws//transit-gateway"
 
     # Compute
@@ -26,14 +25,7 @@ locals {
     iam_roles = "${local.source_base}/aws//iam_roles"
 
     # Storage & secrets
-    kms = "${local.source_base}/aws//kms"
     ecr = "${local.source_base}/aws//ecr"
-
-    # Observability
-    cloudwatch        = "${local.source_base}/aws//cloudwatch"
-    prometheus        = "${local.source_base}/aws//prometheus"
-    grafana           = "${local.source_base}/aws//grafana"
-    cloudwatch_alarms = "${local.source_base}/aws//cloudwatch_alarms"
 
     # DNS
     route53            = "${local.source_base}/aws//route53"
@@ -48,13 +40,11 @@ locals {
     organizations   = "${local.source_base}/aws//organizations"
     identity_center = "${local.source_base}/aws//identity_center"
     cloudtrail      = "${local.source_base}/aws//cloudtrail"
-    budgets         = "${local.source_base}/aws//budgets"
     state_bootstrap = "${local.source_base}/aws//state_bootstrap"
 
     # Cloud-agnostic (Kubernetes add-ons)
     cilium           = "${local.source_base}/cilium"
     argocd           = "${local.source_base}/argocd"
-    argocd_bootstrap = "${local.source_base}/argocd-bootstrap"
     argocd_clusters  = "${local.source_base}/argocd-clusters"
     argocd_apps      = "${local.source_base}/argocd-apps"
     cert_manager     = "${local.source_base}/cert-manager"
@@ -65,7 +55,6 @@ locals {
     tenant           = "${local.source_base}//tenant"
     tailscale        = "${local.source_base}/tailscale"
     tailscale_admin  = "${local.source_base}/tailscale-admin"
-    policy           = "${local.source_base}/policy"
   }
 
   # Helm chart version pins — single source of truth across environments

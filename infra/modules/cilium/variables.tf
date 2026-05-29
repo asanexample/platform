@@ -12,7 +12,7 @@ variable "create" {
 variable "cloud_provider" {
   description = "Cloud provider for platform-specific CNI config"
   type        = string
-  default     = "azure"
+  default     = "aws"
   validation {
     condition     = contains(["azure", "aws", "gcp"], var.cloud_provider)
     error_message = "cloud_provider must be 'azure', 'aws', or 'gcp'"

@@ -183,8 +183,6 @@ module "vcluster" {
   create       = true
   cluster_name = each.key
   namespace    = "vc-${each.key}"
-  environment  = var.environment
-  region_abbv  = var.region_abbv
 
   chart_version       = var.vcluster_chart_version
   storage_class       = var.vcluster_storage_class
