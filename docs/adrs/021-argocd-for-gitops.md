@@ -46,18 +46,13 @@ tool in the Kubernetes ecosystem.
 ## Decision
 
 Deploy ArgoCD on all Kubernetes clusters for GitOps-based workload delivery. The module
-(`infra/modules/argocd/`) installs ArgoCD via Helm, and the `argocd-bootstrap` module provides
-the App-of-Apps pattern for declarative application management.
+(`infra/modules/argocd/`) installs ArgoCD via Helm. Application management is handled by the
+`argocd-apps` module, which creates per-tenant AppProjects and Applications.
 
 ### Deployment Architecture
 
 ArgoCD is deployed as a Terragrunt unit (`argocd`) that depends on EKS and node-groups. It
 installs the ArgoCD Helm chart with IRSA (ADR-018) for ECR image access.
-
-The `argocd-bootstrap` module creates ArgoCD `Application` resources that define the initial set
-of applications to manage. This enables a bootstrap pattern where the first `terragrunt apply`
-sets up ArgoCD and its initial applications, and subsequent changes to those applications are
-managed via Git.
 
 ### SSO Integration
 

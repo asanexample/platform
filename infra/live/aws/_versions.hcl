@@ -54,7 +54,6 @@ locals {
     # Cloud-agnostic (Kubernetes add-ons)
     cilium           = "${local.source_base}/cilium"
     argocd           = "${local.source_base}/argocd"
-    argocd_bootstrap = "${local.source_base}/argocd-bootstrap"
     argocd_clusters  = "${local.source_base}/argocd-clusters"
     argocd_apps      = "${local.source_base}/argocd-apps"
     cert_manager     = "${local.source_base}/cert-manager"

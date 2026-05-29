@@ -602,7 +602,7 @@ directory).
 | Module count    | 4 modules              | 27+ modules                            |
 | Helm versions   | Empty map (future use) | 6 charts pinned                        |
 | Source pattern   | `{repo_root}/infra/modules/aws//{name}` | `{repo_root}/infra/modules/azure//{name}` |
-| Cloud-agnostic  | (none yet)             | cilium, argocd, argocd-bootstrap, policy |
+| Cloud-agnostic  | (none yet)             | cilium, argocd, policy |
 
 ---
 
