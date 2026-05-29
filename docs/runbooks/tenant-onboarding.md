@@ -32,7 +32,7 @@ Before starting, confirm the following:
 - [ ] You have an active AWS SSO session for the **management** profile
   (`aws sso login --profile management`).
 - [ ] Your SSO identity can assume **PlatformDeployer** in both the platform
-  (829808296602) and preprod (620830101009) accounts.
+  (<PLATFORM_ACCOUNT_ID>) and preprod (<PREPROD_ACCOUNT_ID>) accounts.
 - [ ] You have `terragrunt`, `kubectl`, and `argocd` CLI tools installed.
 - [ ] You have kubeconfig configured for the preprod cluster:
 
@@ -40,7 +40,7 @@ Before starting, confirm the following:
   AWS_PROFILE=management aws eks update-kubeconfig \
     --name preprod-use1-eks \
     --region us-east-1 \
-    --role-arn arn:aws:iam::620830101009:role/PlatformAdmin
+    --role-arn arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/PlatformAdmin
   ```
 
 - [ ] You have the following information from the requesting team:
@@ -173,8 +173,8 @@ ECR repos follow `team-<team>/<app>` naming (e.g., `team-charlie/api` for the
 `api` app owned by team `charlie`). Create one ECR repo per app entry in
 `teams.hcl`.
 
-The ECR module lives in the **platform** account (829808296602). Cross-account
-pull access for preprod (620830101009) and prod (554518885123) is already
+The ECR module lives in the **platform** account (<PLATFORM_ACCOUNT_ID>). Cross-account
+pull access for preprod (<PREPROD_ACCOUNT_ID>) and prod (<PROD_ACCOUNT_ID>) is already
 configured via the `pull_account_ids` input.
 
 ### Step 3: Add GitHub Repository to OIDC Role
@@ -232,11 +232,11 @@ terragrunt apply
 ### Step 5: Grant Identity Center Access
 
 Add the team's Identity Center group to the **DeveloperAccess** permission set
-assignment for the preprod account (620830101009). This is done in the AWS SSO
+assignment for the preprod account (<PREPROD_ACCOUNT_ID>). This is done in the AWS SSO
 console:
 
 1. Open **IAM Identity Center** in the management account.
-2. Navigate to **AWS accounts** > select **preprod** (620830101009).
+2. Navigate to **AWS accounts** > select **preprod** (<PREPROD_ACCOUNT_ID>).
 3. Click **Assign users or groups**.
 4. Select the team's group (e.g., `Team-Charlie-Developers`).
 5. Choose the **DeveloperAccess** permission set.
@@ -284,7 +284,7 @@ kubectl get ciliumnetworkpolicy -n team-charlie
 ```bash
 aws eks list-associated-access-policies \
   --cluster-name preprod-use1-eks \
-  --principal-arn arn:aws:iam::620830101009:role/DeveloperAccess \
+  --principal-arn arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/DeveloperAccess \
   --region us-east-1 \
   --query 'associatedAccessPolicies[].accessScope'
 # Verify: team-charlie (or vc-charlie) appears in the namespaces list
@@ -402,7 +402,7 @@ cluster via `argocd-clusters`. Verify:
    ```bash
    aws eks describe-access-entry \
      --cluster-name preprod-use1-eks \
-     --principal-arn arn:aws:iam::620830101009:role/DeveloperAccess \
+     --principal-arn arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/DeveloperAccess \
      --region us-east-1
    ```
 

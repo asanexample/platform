@@ -25,7 +25,7 @@
 ## Overview
 
 Applications deploy to the preprod EKS cluster (`preprod-use1-eks` in
-account `620830101009`) via ArgoCD running on the platform cluster. The
+account `<PREPROD_ACCOUNT_ID>`) via ArgoCD running on the platform cluster. The
 delivery flow:
 
 ```text
@@ -52,11 +52,11 @@ You need an SSO profile for the preprod account with the
 ```ini
 [profile preprod-dev]
 sso_session = centric
-sso_account_id = 620830101009
+sso_account_id = <PREPROD_ACCOUNT_ID>
 sso_role_name = PowerUserAccess
 
 [sso-session centric]
-sso_start_url = https://d-9067aa6520.awsapps.com/start
+sso_start_url = https://d-XXXXXXXXXX.awsapps.com/start
 sso_region = us-east-1
 sso_registration_scopes = sso:account:access
 ```
@@ -81,7 +81,7 @@ Or manually:
 AWS_PROFILE=preprod-dev aws eks update-kubeconfig \
   --name preprod-use1-eks \
   --region us-east-1 \
-  --role-arn arn:aws:iam::620830101009:role/DeveloperAccess
+  --role-arn arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/DeveloperAccess
 ```
 
 Verify access to your team namespace:
@@ -201,7 +201,7 @@ spec:
     spec:
       containers:
         - name: myapp
-          image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:v1.0.0
+          image: <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:v1.0.0
           ports:
             - containerPort: 8080
           resources:
@@ -289,7 +289,7 @@ HTTPRoute. No manual Route53 configuration is needed.
 ## Pushing Images to ECR
 
 Container images are stored in ECR in the **platform** account
-(`829808296602`). The preprod account pulls cross-account via an ECR
+(`<PLATFORM_ACCOUNT_ID>`). The preprod account pulls cross-account via an ECR
 repository policy.
 
 ### GitHub Actions (CI)
@@ -311,7 +311,7 @@ permissions:
   contents: read
 
 env:
-  ECR_REGISTRY: 829808296602.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REGISTRY: <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
   ECR_REPO: team-alpha/demo
 
 jobs:
@@ -323,7 +323,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::829808296602:role/github-actions-ecr-push
+          role-to-assume: arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/github-actions-ecr-push
           aws-region: us-east-1
 
       - name: Login to ECR
@@ -345,11 +345,11 @@ jobs:
 # Authenticate to ECR in the platform account
 aws sso login --profile platform
 AWS_PROFILE=platform aws ecr get-login-password --region us-east-1 \
-  | docker login --username AWS --password-stdin 829808296602.dkr.ecr.us-east-1.amazonaws.com
+  | docker login --username AWS --password-stdin <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
 
 # Tag and push
-docker build -t 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:v1.0.0 .
-docker push 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:v1.0.0
+docker build -t <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:v1.0.0 .
+docker push <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:v1.0.0
 ```
 
 ---
@@ -440,7 +440,7 @@ permissions:
   contents: read
 
 env:
-  ECR_REGISTRY: 829808296602.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REGISTRY: <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
   ECR_REPO: team-alpha/demo
 
 jobs:
@@ -452,7 +452,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::829808296602:role/github-actions-ecr-push
+          role-to-assume: arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/github-actions-ecr-push
           aws-region: us-east-1
 
       - name: Login to ECR
@@ -609,7 +609,7 @@ kubectl describe clusterissuer letsencrypt-prod
 
 **Cause:** The preprod cluster cannot pull images from the platform
 account ECR. The ECR repository policy must explicitly allow
-cross-account pull from `620830101009`.
+cross-account pull from `<PREPROD_ACCOUNT_ID>`.
 
 **Fix:**
 
@@ -621,7 +621,7 @@ AWS_PROFILE=platform aws ecr get-repository-policy \
 
 # The policy must include a statement allowing ecr:GetDownloadUrlForLayer,
 # ecr:BatchGetImage, and ecr:BatchCheckLayerAvailability for the
-# preprod account root (arn:aws:iam::620830101009:root)
+# preprod account root (arn:aws:iam::<PREPROD_ACCOUNT_ID>:root)
 ```
 
 If the policy is missing, ask the platform team to add a cross-account

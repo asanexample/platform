@@ -11,7 +11,7 @@ module "naming" {
   workload    = "platform"
   environment = "ops"
   region_abbv = "use1"
-  unique_seed = "829808296602"
+  unique_seed = "<PLATFORM_ACCOUNT_ID>"
 }
 
 # Reference outputs:
@@ -32,7 +32,7 @@ module "naming" {
   workload    = "platform"
   environment = "preprod"
   region_abbv = "use1"
-  unique_seed = "620830101009"
+  unique_seed = "<PREPROD_ACCOUNT_ID>"
 }
 ```
 

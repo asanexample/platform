@@ -27,7 +27,7 @@ go test -v -run TestNetworking_PrivateTopology -timeout 30m ./networking/...
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
 | `TEST_AWS_REGION` | `us-west-2` | Region to deploy test resources |
-| `TEST_ROLE_ARN` | `arn:aws:iam::157263244316:role/OrganizationAccountAccessRole` | IAM role to assume (Test account) |
+| `TEST_ROLE_ARN` | `arn:aws:iam::<TEST_ACCOUNT_ID>:role/OrganizationAccountAccessRole` | IAM role to assume (Test account) |
 
 ## Cost
 

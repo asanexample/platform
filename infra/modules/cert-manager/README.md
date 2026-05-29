@@ -9,7 +9,7 @@ module "cert_manager" {
   source = "../../modules/cert-manager"
 
   cluster_name           = "platform-use1-eks"
-  oidc_provider_arn      = "arn:aws:iam::829808296602:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE"
+  oidc_provider_arn      = "arn:aws:iam::<PLATFORM_ACCOUNT_ID>:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE"
   oidc_provider_url      = "oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE"
   route53_hosted_zone_arn = "arn:aws:route53:::hostedzone/Z1234567890"
 

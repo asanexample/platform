@@ -67,20 +67,20 @@ unless explicitly exempted and documented.
 ### Architecture
 
 ```text
-Platform (829808296602)
+Platform (<PLATFORM_ACCOUNT_ID>)
 ├── Secrets Manager ─── platform/{service}/{name}
 ├── ESO ─── ClusterSecretStore (IRSA → this account only)
-└── IRSA role: arn:aws:secretsmanager:*:829808296602:secret:*
+└── IRSA role: arn:aws:secretsmanager:*:<PLATFORM_ACCOUNT_ID>:secret:*
 
-Preprod (620830101009)
+Preprod (<PREPROD_ACCOUNT_ID>)
 ├── Secrets Manager ─── {team}/{service}/{name}
 ├── ESO ─── ClusterSecretStore (IRSA → this account only)
-└── IRSA role: arn:aws:secretsmanager:*:620830101009:secret:*
+└── IRSA role: arn:aws:secretsmanager:*:<PREPROD_ACCOUNT_ID>:secret:*
 
-Prod (554518885123)
+Prod (<PROD_ACCOUNT_ID>)
 ├── Secrets Manager ─── {team}/{service}/{name}
 ├── ESO ─── ClusterSecretStore (IRSA → this account only)
-└── IRSA role: arn:aws:secretsmanager:*:554518885123:secret:*
+└── IRSA role: arn:aws:secretsmanager:*:<PROD_ACCOUNT_ID>:secret:*
 ```
 
 Each ESO deployment's IRSA role is scoped to `arn:aws:secretsmanager:*:${THIS_ACCOUNT_ID}:secret:*`.

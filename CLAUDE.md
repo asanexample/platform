@@ -229,12 +229,8 @@ git config core.hooksPath .githooks
 
 ## AWS Accounts
 
-| Account    | ID           |
-|------------|--------------|
-| Management | 851725353202 |
-| Platform   | 829808296602 |
-| PreProd    | 620830101009 |
-| Prod       | 554518885123 |
+Real account IDs are in `infra/live/aws/secrets.hcl` (gitignored).
+See `infra/live/aws/secrets.hcl.example` for the structure.
 
 Cross-account access uses purpose-built IAM roles (see IAM Roles below). `OrganizationAccountAccessRole` retained as break-glass only.
 
@@ -245,7 +241,7 @@ Cross-account access uses purpose-built IAM roles (see IAM Roles below). `Organi
 | **PlatformAdmin** | Platform, PreProd | kubectl, SSM tunnel, cluster debugging |
 | **PlatformDeployer** | Platform, PreProd | Terragrunt apply, Helm/K8s providers |
 | **DeveloperAccess** | Platform, PreProd | Namespace-scoped kubectl for developers |
-| **TerraformStateAccess** | Management (851725353202) | S3 state bucket + DynamoDB lock table |
+| **TerraformStateAccess** | Management (<MGMT_ACCOUNT_ID>) | S3 state bucket + DynamoDB lock table |
 | **OrganizationAccountAccessRole** | All accounts | Break-glass only |
 
 - Terragrunt providers assume **PlatformDeployer** (via root.hcl)

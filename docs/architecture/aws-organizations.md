@@ -26,7 +26,7 @@ Terragrunt. No manual console changes are expected or supported.
 
 ## Organization Structure
 
-The organization is rooted in the management account (`851725353202`). All
+The organization is rooted in the management account (`<MGMT_ACCOUNT_ID>`). All
 Organizational Units (OUs) and member accounts are created declaratively via the
 `organizational_units` and `accounts` input maps.
 
@@ -45,7 +45,7 @@ Root (r-xxxx)
 |     |-- [SCPs attached at Platform]:
 |     |     * protect-data-and-network
 |     |
-|     |-- Account: platform (josh+platform@deeden.org)
+|     |-- Account: platform (admin+platform@example.com)
 |
 |-- OU: Workloads
       |-- [SCPs attached at Workloads]:
@@ -54,7 +54,7 @@ Root (r-xxxx)
       |     * restrict-iam-users
       |
       |-- OU: Workloads/Preprod
-      |     |-- Account: preprod (josh+preprod@deeden.org)
+      |     |-- Account: preprod (admin+preprod@example.com)
       |
       |-- OU: Workloads/Prod
       |     |-- (no accounts yet)
@@ -187,7 +187,7 @@ infra/live/aws/mgmt/global/organizations/terragrunt.hcl
     |
     |-- include "root" --> infra/root.hcl
     |       |-- detects cloud = "aws" from path
-    |       |-- configures S3 backend (bucket: tfstate-mgmt-851725353202)
+    |       |-- configures S3 backend (bucket: tfstate-mgmt-<MGMT_ACCOUNT_ID>)
     |       |-- generates provider_aws.tf (region: us-east-1)
     |       |-- generates versions.tf (AWS provider 5.91.0)
     |
@@ -235,10 +235,10 @@ inputs.create_organization = true
     |
     +--> For each entry in inputs.accounts:
     |      aws_organizations_account.this["platform"]
-    |        email     = josh+platform@deeden.org
+    |        email     = admin+platform@example.com
     |        parent_id = OU["Platform"].id
     |      aws_organizations_account.this["preprod"]
-    |        email     = josh+preprod@deeden.org
+    |        email     = admin+preprod@example.com
     |        parent_id = OU["Workloads/Preprod"].id
     |
     +--> Builds default SCP JSON from data sources (scps.tf)

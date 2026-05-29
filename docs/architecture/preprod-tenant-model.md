@@ -5,7 +5,7 @@
 
 ## Overview
 
-The preprod EKS cluster (`preprod-use1-eks`, account `620830101009`) uses
+The preprod EKS cluster (`preprod-use1-eks`, account `<PREPROD_ACCOUNT_ID>`) uses
 **namespace-based tenant isolation** on a shared cluster. Each team gets a
 dedicated namespace with ResourceQuotas, LimitRanges, and Cilium NetworkPolicies.
 

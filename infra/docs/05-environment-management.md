@@ -13,11 +13,11 @@ cross-environment deployment mistakes at parse time.
 
 | Environment | Account ID | Purpose | Deployed |
 |-------------|-----------|---------|----------|
-| mgmt | 851725353202 | Organizations, Identity Center, Terraform state, GitHub OIDC | Yes |
-| platform | 829808296602 | EKS cluster, platform services, IAM roles | Yes (full stack) |
-| test | 157263244316 | Terratest CI execution | Yes (OIDC role only) |
-| preprod | 620830101009 | Pre-production workloads | Networking only |
-| prod | 554518885123 | Production workloads | Networking only |
+| mgmt | <MGMT_ACCOUNT_ID> | Organizations, Identity Center, Terraform state, GitHub OIDC | Yes |
+| platform | <PLATFORM_ACCOUNT_ID> | EKS cluster, platform services, IAM roles | Yes (full stack) |
+| test | <TEST_ACCOUNT_ID> | Terratest CI execution | Yes (OIDC role only) |
+| preprod | <PREPROD_ACCOUNT_ID> | Pre-production workloads | Networking only |
+| prod | <PROD_ACCOUNT_ID> | Production workloads | Networking only |
 
 ### Azure
 
@@ -42,10 +42,10 @@ The mapping is declared in `common.hcl` at the cloud level:
 ```hcl
 # AWS
 environment_account_map = {
-  "platform" = "829808296602"
-  "mgmt"     = "851725353202"
-  "preprod"  = "620830101009"
-  "prod"     = "554518885123"
+  "platform" = "<PLATFORM_ACCOUNT_ID>"
+  "mgmt"     = "<MGMT_ACCOUNT_ID>"
+  "preprod"  = "<PREPROD_ACCOUNT_ID>"
+  "prod"     = "<PROD_ACCOUNT_ID>"
 }
 ```
 
@@ -143,7 +143,7 @@ the environment level):
 | Setting | Purpose | Example |
 |---------|---------|---------|
 | `environment` | Environment name | `platform`, `dev`, `prod` |
-| `account_id` / `subscription_id` | Cloud identity | `829808296602` |
+| `account_id` / `subscription_id` | Cloud identity | `<PLATFORM_ACCOUNT_ID>` |
 | `DataClassification` | Data sensitivity tag | `Internal`, `Confidential` |
 | `AutoShutdown` | Non-prod cost optimization | `True`, `False` |
 

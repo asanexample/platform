@@ -9,13 +9,13 @@ module "external_secrets" {
   source = "../../modules/external-secrets"
 
   cluster_name      = "platform-use1-eks"
-  aws_account_id    = "829808296602"
-  oidc_provider_arn = "arn:aws:iam::829808296602:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE"
+  aws_account_id    = "<PLATFORM_ACCOUNT_ID>"
+  oidc_provider_arn = "arn:aws:iam::<PLATFORM_ACCOUNT_ID>:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE"
   oidc_provider_url = "oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE"
 
   secret_path_prefix = "platform"
   ssm_path_prefix    = "/platform"
-  kms_key_arns       = ["arn:aws:kms:us-east-1:829808296602:key/example-key-id"]
+  kms_key_arns       = ["arn:aws:kms:us-east-1:<PLATFORM_ACCOUNT_ID>:key/example-key-id"]
 
   tags = {
     Environment = "platform"
@@ -34,7 +34,7 @@ module "external_secrets" {
 
   create         = false
   cluster_name   = "platform-use1-eks"
-  aws_account_id = "829808296602"
+  aws_account_id = "<PLATFORM_ACCOUNT_ID>"
 }
 ```
 
@@ -45,7 +45,7 @@ module "external_secrets" {
   source = "../../modules/external-secrets"
 
   cluster_name   = "platform-use1-eks"
-  aws_account_id = "829808296602"
+  aws_account_id = "<PLATFORM_ACCOUNT_ID>"
 }
 ```
 

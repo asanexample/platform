@@ -28,7 +28,7 @@ Before starting, confirm the following:
   permissions to assume the Terraform execution role.
 - [ ] You have a **unique email address** for the new account. AWS requires a globally
   unique email per account. Use the plus-alias pattern if needed (e.g.,
-  `josh+newaccount@deeden.org`).
+  `admin+newaccount@example.com`).
 - [ ] You have decided which **Organizational Unit (OU)** the account belongs to.
 - [ ] You have confirmed the account name with the relevant team lead or project owner.
 - [ ] You have Terragrunt installed and the repository cloned locally.
@@ -80,11 +80,11 @@ inputs = {
 
   accounts = {
     # Existing accounts
-    "platform" = { email = "josh+platform@deeden.org", ou = "Platform" }
-    "preprod"  = { email = "josh+preprod@deeden.org",  ou = "Workloads/Preprod" }
+    "platform" = { email = "admin+platform@example.com", ou = "Platform" }
+    "preprod"  = { email = "admin+preprod@example.com",  ou = "Workloads/Preprod" }
 
     # NEW: Add your account here
-    "myapp-prod" = { email = "josh+myapp-prod@deeden.org", ou = "Workloads/Prod" }
+    "myapp-prod" = { email = "admin+myapp-prod@example.com", ou = "Workloads/Prod" }
   }
 }
 ```
@@ -118,7 +118,7 @@ You should see exactly one new resource:
   # aws_organizations_account.this["myapp-prod"] will be created
   + resource "aws_organizations_account" "this" {
       + arn               = (known after apply)
-      + email             = "josh+myapp-prod@deeden.org"
+      + email             = "admin+myapp-prod@example.com"
       + id                = (known after apply)
       + name              = "myapp-prod"
       + parent_id         = "ou-xxxx-xxxxxxxx"

@@ -15,7 +15,7 @@ None.
 | Input | Value | Notes |
 |-------|-------|-------|
 | `repositories` | `team-alpha/demo`, `team-bravo/demo` | One repo per team/app combination |
-| `pull_account_ids` | `620830101009`, `554518885123` | Grants cross-account pull access to preprod and prod |
+| `pull_account_ids` | `<PREPROD_ACCOUNT_ID>`, `<PROD_ACCOUNT_ID>` | Grants cross-account pull access to preprod and prod |
 
 ## Commands
 

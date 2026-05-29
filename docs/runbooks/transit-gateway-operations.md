@@ -43,10 +43,10 @@ Platform VPC (10.100.0.0/16)          Preprod VPC (10.101.0.0/16)
 
 | Component | Account | Purpose |
 |-----------|---------|---------|
-| Transit Gateway | Platform (829808296602) | Hub -- owns the TGW |
+| Transit Gateway | Platform (<PLATFORM_ACCOUNT_ID>) | Hub -- owns the TGW |
 | RAM Share | Platform | Shares TGW to spoke accounts |
 | VPC Attachment (platform) | Platform | Connects platform VPC |
-| VPC Attachment (preprod) | Preprod (620830101009) | Connects preprod VPC |
+| VPC Attachment (preprod) | Preprod (<PREPROD_ACCOUNT_ID>) | Connects preprod VPC |
 | Routes (platform) | Platform | 10.101.0.0/16 -> TGW |
 | Routes (preprod) | Preprod | 10.100.0.0/16 -> TGW |
 | SG Rule (preprod) | Preprod | Allows 443 from 10.100.0.0/16 on EKS cluster SG |
@@ -78,8 +78,8 @@ and add the new account ID to `ram_share_principals`:
 
 ```hcl
 ram_share_principals = [
-  "620830101009",   # preprod
-  "554518885123",   # prod (NEW)
+  "<PREPROD_ACCOUNT_ID>",   # preprod
+  "<PROD_ACCOUNT_ID>",   # prod (NEW)
 ]
 ```
 

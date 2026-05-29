@@ -136,7 +136,7 @@ single pull request.
 The root `terragrunt.hcl` detects the cloud provider from the directory path
 (`split("/", path_relative_to_include())`) and routes state to the appropriate backend:
 
-- **AWS modules** -> S3 + DynamoDB in the management account (851725353202)
+- **AWS modules** -> S3 + DynamoDB in the management account (<MGMT_ACCOUNT_ID>)
 - **Azure/GCP modules** -> Azure Blob Storage with Azure AD authentication
 
 This is a single conditional expression, not separate root configs per cloud.

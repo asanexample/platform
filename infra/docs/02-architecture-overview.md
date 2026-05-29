@@ -37,28 +37,28 @@ The AWS Organization has five accounts across three organizational units:
 
 ```mermaid
 graph TD
-    Root["Root (Management)<br/>851725353202"]
+    Root["Root (Management)<br/><MGMT_ACCOUNT_ID>"]
     Root --> Platform_OU["Platform OU"]
     Root --> Workloads_OU["Workloads OU"]
 
-    Platform_OU --> Platform["Platform<br/>829808296602"]
-    Platform_OU --> Test["Test<br/>157263244316"]
+    Platform_OU --> Platform["Platform<br/><PLATFORM_ACCOUNT_ID>"]
+    Platform_OU --> Test["Test<br/><TEST_ACCOUNT_ID>"]
 
     Workloads_OU --> Preprod_OU["Preprod OU"]
     Workloads_OU --> Prod_OU["Prod OU"]
     Workloads_OU --> Regulated_OU["Regulated OU"]
 
-    Preprod_OU --> Preprod["Preprod<br/>620830101009"]
-    Prod_OU --> Prod["Prod<br/>554518885123"]
+    Preprod_OU --> Preprod["Preprod<br/><PREPROD_ACCOUNT_ID>"]
+    Prod_OU --> Prod["Prod<br/><PROD_ACCOUNT_ID>"]
 ```
 
 | Account | ID | Purpose |
 |---------|-----|---------|
-| Management | 851725353202 | Organizations, Identity Center, Terraform state, GitHub OIDC |
-| Platform | 829808296602 | EKS cluster, platform services, IAM roles |
-| Test | 157263244316 | Terratest CI execution (GitHub Actions) |
-| Preprod | 620830101009 | Workload pre-production (networking only) |
-| Prod | 554518885123 | Workload production (networking only) |
+| Management | <MGMT_ACCOUNT_ID> | Organizations, Identity Center, Terraform state, GitHub OIDC |
+| Platform | <PLATFORM_ACCOUNT_ID> | EKS cluster, platform services, IAM roles |
+| Test | <TEST_ACCOUNT_ID> | Terratest CI execution (GitHub Actions) |
+| Preprod | <PREPROD_ACCOUNT_ID> | Workload pre-production (networking only) |
+| Prod | <PROD_ACCOUNT_ID> | Workload production (networking only) |
 
 **Service Control Policies** are attached per OU:
 
@@ -313,7 +313,7 @@ for the full breakdown.
 
 | Cloud | Backend | Location |
 |-------|---------|----------|
-| AWS | S3 + DynamoDB | `tfstate-mgmt-851725353202` bucket in us-east-1, `terraform-locks` table |
+| AWS | S3 + DynamoDB | `tfstate-mgmt-<MGMT_ACCOUNT_ID>` bucket in us-east-1, `terraform-locks` table |
 | Azure | Azure Blob Storage | `tfstatemulticloud` storage account, `terraformstate` container |
 
 State paths follow the directory structure:

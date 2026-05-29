@@ -12,7 +12,7 @@ module "iam_roles" {
     PlatformAdmin = {
       description = "Full cluster admin access for kubectl and debugging"
       trust_principals = {
-        aws = ["arn:aws:iam::851725353202:root"]
+        aws = ["arn:aws:iam::<MGMT_ACCOUNT_ID>:root"]
       }
       managed_policies = [
         "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
@@ -22,7 +22,7 @@ module "iam_roles" {
       description          = "Terragrunt apply, Helm, and K8s providers"
       max_session_duration = 7200
       trust_principals = {
-        aws = ["arn:aws:iam::851725353202:root"]
+        aws = ["arn:aws:iam::<MGMT_ACCOUNT_ID>:root"]
       }
       managed_policies = [
         "arn:aws:iam::aws:policy/PowerUserAccess",
@@ -68,7 +68,7 @@ module "iam_roles" {
     DeveloperAccess = {
       description = "Namespace-scoped kubectl for developers"
       trust_principals = {
-        aws = ["arn:aws:iam::851725353202:root"]
+        aws = ["arn:aws:iam::<MGMT_ACCOUNT_ID>:root"]
       }
       trust_conditions = [
         {

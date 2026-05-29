@@ -71,10 +71,10 @@ Subnets are computed from `vpc_cidr` + `azs` using `cidrsubnet()` in each enviro
 
 | Account | Environment | VPC CIDR | Purpose |
 |---------|-------------|----------|---------|
-| Management (851725353202) | mgmt | None | Organizations, Identity Center, state backend |
-| Platform (829808296602) | platform | `10.100.0.0/16` | Platform dev, CI/CD, shared services |
-| Preprod (620830101009) | preprod | `10.101.0.0/16` | Pre-production workloads |
-| Prod (554518885123) | prod | `10.102.0.0/16` | Production workloads |
+| Management (<MGMT_ACCOUNT_ID>) | mgmt | None | Organizations, Identity Center, state backend |
+| Platform (<PLATFORM_ACCOUNT_ID>) | platform | `10.100.0.0/16` | Platform dev, CI/CD, shared services |
+| Preprod (<PREPROD_ACCOUNT_ID>) | preprod | `10.101.0.0/16` | Pre-production workloads |
+| Prod (<PROD_ACCOUNT_ID>) | prod | `10.102.0.0/16` | Production workloads |
 
 ### Cross-Account Connectivity (Planned)
 

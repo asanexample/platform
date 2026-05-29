@@ -39,7 +39,7 @@ aws sso login --profile platform
 AWS_PROFILE=platform aws eks update-kubeconfig \
   --name platform-use1-eks \
   --region us-east-1 \
-  --role-arn arn:aws:iam::829808296602:role/PlatformAdmin
+  --role-arn arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/PlatformAdmin
 ```
 
 1. Verify: `kubectl get nodes`
@@ -67,11 +67,11 @@ Add to `~/.aws/config`:
 ```ini
 [profile platform]
 sso_session = centric
-sso_account_id = 829808296602
+sso_account_id = <PLATFORM_ACCOUNT_ID>
 sso_role_name = AdministratorAccess
 
 [sso-session centric]
-sso_start_url = https://d-9067aa6520.awsapps.com/start
+sso_start_url = https://d-XXXXXXXXXX.awsapps.com/start
 sso_region = us-east-1
 sso_registration_scopes = sso:account:access
 ```
@@ -86,7 +86,7 @@ aws sso login --profile platform
 AWS_PROFILE=platform aws eks update-kubeconfig \
   --name platform-use1-eks \
   --region us-east-1 \
-  --role-arn arn:aws:iam::829808296602:role/PlatformAdmin
+  --role-arn arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/PlatformAdmin
 
 # 3. Verify access
 kubectl get pods -A
@@ -116,11 +116,11 @@ Add to `~/.aws/config`:
 ```ini
 [profile preprod-dev]
 sso_session = centric
-sso_account_id = 620830101009
+sso_account_id = <PREPROD_ACCOUNT_ID>
 sso_role_name = PowerUserAccess
 
 [sso-session centric]
-sso_start_url = https://d-9067aa6520.awsapps.com/start
+sso_start_url = https://d-XXXXXXXXXX.awsapps.com/start
 sso_region = us-east-1
 sso_registration_scopes = sso:account:access
 ```
@@ -135,7 +135,7 @@ aws sso login --profile preprod-dev
 AWS_PROFILE=preprod-dev aws eks update-kubeconfig \
   --name preprod-use1-eks \
   --region us-east-1 \
-  --role-arn arn:aws:iam::620830101009:role/DeveloperAccess
+  --role-arn arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/DeveloperAccess
 
 # 3. Access your namespace
 kubectl get pods -n team-<your-team>
@@ -157,7 +157,7 @@ infra/live/aws/preprod/us-east-1/platform/eks/terragrunt.hcl
 If you cannot access your namespace, verify with the platform team that your
 team is listed in `teams.hcl` and that you are assigned to the
 **DeveloperAccess** permission set in IAM Identity Center for the preprod
-account (620830101009).
+account (<PREPROD_ACCOUNT_ID>).
 
 ---
 
@@ -196,7 +196,7 @@ aws sso login --profile management
 aws eks update-kubeconfig \
   --name platform-use1-eks \
   --region us-east-1 \
-  --role-arn arn:aws:iam::829808296602:role/OrganizationAccountAccessRole
+  --role-arn arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/OrganizationAccountAccessRole
 
 kubectl get pods -A
 ```
@@ -226,7 +226,7 @@ aws sso login --profile platform
 AWS_PROFILE=platform aws eks update-kubeconfig \
   --name platform-use1-eks \
   --region us-east-1 \
-  --role-arn arn:aws:iam::829808296602:role/PlatformAdmin
+  --role-arn arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/PlatformAdmin
 ```
 
 ### "An error occurred (AccessDenied) when calling the AssumeRole operation"
@@ -257,7 +257,7 @@ the kubeconfig entry.
 AWS_PROFILE=platform aws eks update-kubeconfig \
   --name platform-use1-eks \
   --region us-east-1 \
-  --role-arn arn:aws:iam::829808296602:role/PlatformAdmin
+  --role-arn arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/PlatformAdmin
 ```
 
 ### "connection refused" to localhost:8443

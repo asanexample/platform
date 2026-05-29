@@ -6,8 +6,8 @@
 
 ## Context
 
-The platform spans multiple AWS accounts (platform 829808296602, preprod 620830101009, prod
-554518885123), each with its own VPC in private /16 CIDR ranges (platform `10.100.0.0/16`,
+The platform spans multiple AWS accounts (platform <PLATFORM_ACCOUNT_ID>, preprod <PREPROD_ACCOUNT_ID>, prod
+<PROD_ACCOUNT_ID>), each with its own VPC in private /16 CIDR ranges (platform `10.100.0.0/16`,
 preprod `10.101.0.0/16`). EKS clusters run with private-only API endpoints (ADR-010), and
 several cross-account connectivity requirements exist:
 
@@ -66,7 +66,7 @@ When `create_tgw = true`, the module creates:
    and propagation enabled, and DNS support enabled.
 
 2. **RAM resource share** that shares the TGW with specified spoke account IDs via
-   `ram_share_principals`. The platform hub shares with preprod (`620830101009`).
+   `ram_share_principals`. The platform hub shares with preprod (`<PREPROD_ACCOUNT_ID>`).
 
 3. **VPC attachment** connecting the platform VPC to the TGW through dedicated transit subnets.
 

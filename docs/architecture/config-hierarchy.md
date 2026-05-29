@@ -130,8 +130,8 @@ Each cloud has its own `common.hcl` at the cloud root. This file defines:
 Example from AWS:
 ```hcl
 environment_account_map = {
-  "ops"  = "829808296602"
-  "mgmt" = "851725353202"
+  "ops"  = "<PLATFORM_ACCOUNT_ID>"
+  "mgmt" = "<MGMT_ACCOUNT_ID>"
 }
 ```
 
@@ -163,7 +163,7 @@ Example values:
 | Field               | AWS mgmt               | Azure dev                              |
 |---------------------|-------------------------|----------------------------------------|
 | environment         | `mgmt`                  | `dev`                                  |
-| account/subscription| `851725353202`          | `db4f1d99-0ec0-44eb-90de-41975f9bb68b` |
+| account/subscription| `<MGMT_ACCOUNT_ID>`          | `db4f1d99-0ec0-44eb-90de-41975f9bb68b` |
 | DataClassification  | `Confidential`          | `Internal`                             |
 | AutoShutdown        | (not set)               | `True`                                 |
 
@@ -506,7 +506,7 @@ under a recognized cloud directory defaults to Azure storage.
 
 | Cloud   | Backend    | Configuration                                                   |
 |---------|------------|-----------------------------------------------------------------|
-| AWS     | S3         | Bucket: `tfstate-mgmt-851725353202`, Region: `us-east-1`, DynamoDB lock table: `terraform-locks`, Encryption: enabled |
+| AWS     | S3         | Bucket: `tfstate-mgmt-<MGMT_ACCOUNT_ID>`, Region: `us-east-1`, DynamoDB lock table: `terraform-locks`, Encryption: enabled |
 | Default | Azure Blob | Subscription: `9dc5edc4-...`, Storage account: `tfstatemulticloud`, Container: `terraformstate`, Azure AD auth: enabled |
 
 Both backends use `path_relative_to_include()` as the state key, which ensures

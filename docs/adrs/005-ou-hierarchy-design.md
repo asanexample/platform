@@ -196,7 +196,7 @@ SCPs are attached to OUs, never to individual accounts:
 
 ### Management Account Placement
 
-The management account (851725353202) is not placed in any OU. It sits at the organization root
+The management account (<MGMT_ACCOUNT_ID>) is not placed in any OU. It sits at the organization root
 by default. This is an AWS best practice because:
 
 - SCPs do not apply to the management account (AWS restriction).

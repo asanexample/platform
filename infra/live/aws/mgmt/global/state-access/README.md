@@ -15,8 +15,8 @@ None
 | Input | Value | Notes |
 |-------|-------|-------|
 | `roles` | `TerraformStateAccess` | Single role with 1h max session duration |
-| Trust principals | Platform (`829808296602`), Management (`851725353202`), PreProd (`620830101009`) | Cross-account assume-role |
-| S3 access | `tfstate-mgmt-851725353202` | GetObject, PutObject, DeleteObject, ListBucket |
+| Trust principals | Platform (`<PLATFORM_ACCOUNT_ID>`), Management (`<MGMT_ACCOUNT_ID>`), PreProd (`<PREPROD_ACCOUNT_ID>`) | Cross-account assume-role |
+| S3 access | `tfstate-mgmt-<MGMT_ACCOUNT_ID>` | GetObject, PutObject, DeleteObject, ListBucket |
 | DynamoDB access | `terraform-locks` (us-east-1) | GetItem, PutItem, DeleteItem |
 
 ## Commands

@@ -12,7 +12,7 @@ module "argocd_apps" {
   cluster_server = "https://EXAMPLE.gr7.us-east-1.eks.amazonaws.com"
 
   github_org               = "centric"
-  ecr_registry             = "829808296602.dkr.ecr.us-east-1.amazonaws.com"
+  ecr_registry             = "<PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com"
   preview_domain           = "preprod.aws.refplat.org"
   github_token_secret_name = "github-pat"
 
@@ -105,7 +105,7 @@ No modules.
 | <a name="input_auto_sync"></a> [auto\_sync](#input\_auto\_sync) | Enable automated sync with self-heal and prune | `bool` | `true` | no |
 | <a name="input_cluster_server"></a> [cluster\_server](#input\_cluster\_server) | API server URL of the target cluster | `string` | `""` | no |
 | <a name="input_create"></a> [create](#input\_create) | Whether to create ArgoCD app resources | `bool` | `true` | no |
-| <a name="input_ecr_registry"></a> [ecr\_registry](#input\_ecr\_registry) | ECR registry URL (e.g. 829808296602.dkr.ecr.us-east-1.amazonaws.com) | `string` | `""` | no |
+| <a name="input_ecr_registry"></a> [ecr\_registry](#input\_ecr\_registry) | ECR registry URL (e.g. <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com) | `string` | `""` | no |
 | <a name="input_github_org"></a> [github\_org](#input\_github\_org) | GitHub org for PR preview generators | `string` | `""` | no |
 | <a name="input_github_token_secret_name"></a> [github\_token\_secret\_name](#input\_github\_token\_secret\_name) | Name of the Kubernetes Secret in the ArgoCD namespace containing the GitHub PAT (key: token) | `string` | `""` | no |
 | <a name="input_preview_domain"></a> [preview\_domain](#input\_preview\_domain) | Base domain for PR preview hostnames (e.g. preprod.aws.refplat.org) | `string` | `""` | no |

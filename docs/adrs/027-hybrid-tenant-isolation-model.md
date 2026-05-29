@@ -6,7 +6,7 @@
 
 ## Context
 
-The preprod EKS cluster (account 620830101009) needs multi-tenant isolation for development teams.
+The preprod EKS cluster (account <PREPROD_ACCOUNT_ID>) needs multi-tenant isolation for development teams.
 The initial scope is 2-3 teams, each with their own Git repository and application deployments.
 Teams will need public-facing ingress via the shared Gateway API Gateway (ADR-017).
 

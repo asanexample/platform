@@ -16,7 +16,7 @@ None.
 |-------|-------|-------|
 | `domain_name` | `aws.refplat.org` | |
 | `force_destroy` | `true` | Allows zone deletion even with records present |
-| `caa_records` | Let's Encrypt only | Restricts certificate issuance to `letsencrypt.org`; iodef reports to `josh@deeden.org` |
+| `caa_records` | Let's Encrypt only | Restricts certificate issuance to `letsencrypt.org`; iodef reports to `admin@example.com` |
 
 ## Commands
 

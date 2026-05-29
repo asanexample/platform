@@ -147,12 +147,12 @@ module surfaces this constraint through the account variable structure:
 
 ```hcl
 accounts = {
-  "platform" = { email = "josh+platform@deeden.org", ou = "Platform" }
-  "preprod"  = { email = "josh+preprod@deeden.org",  ou = "Workloads/Preprod" }
+  "platform" = { email = "admin+platform@example.com", ou = "Platform" }
+  "preprod"  = { email = "admin+preprod@example.com",  ou = "Workloads/Preprod" }
 }
 ```
 
-The use of `+` subaddressing (e.g., `josh+platform@deeden.org`) is a common pattern that allows a
+The use of `+` subaddressing (e.g., `admin+platform@example.com`) is a common pattern that allows a
 single email mailbox to serve as the root email for multiple AWS accounts. This works because:
 
 - AWS treats each `+` variant as a unique email address.

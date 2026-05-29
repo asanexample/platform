@@ -17,7 +17,7 @@ module "transit_gateway" {
   ]
 
   amazon_side_asn      = 64512
-  ram_share_principals = ["620830101009", "554518885123"]
+  ram_share_principals = ["<PREPROD_ACCOUNT_ID>", "<PROD_ACCOUNT_ID>"]
 
   route_table_ids = module.networking.private_route_table_ids
   destination_cidrs = ["10.200.0.0/16"]
@@ -53,7 +53,7 @@ module "transit_gateway" {
   name               = "preprod-use1-tgw"
   create_tgw         = false
   transit_gateway_id = "tgw-0abc123def456"
-  ram_share_arn      = "arn:aws:ram:us-east-1:829808296602:resource-share/abc-123"
+  ram_share_arn      = "arn:aws:ram:us-east-1:<PLATFORM_ACCOUNT_ID>:resource-share/abc-123"
 
   vpc_id     = module.networking.vpc_id
   subnet_ids = [

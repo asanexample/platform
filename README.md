@@ -64,10 +64,10 @@ platform/
 
 | Account | ID | Purpose |
 |---------|------|---------|
-| Management | 851725353202 | AWS Organizations, SCPs, IAM Identity Center, Terraform state |
-| Platform | 829808296602 | Shared services: EKS, ArgoCD, Tailscale, TGW hub, ECR |
-| PreProd | 620830101009 | Workloads: EKS, tenant namespaces, ingress, TGW spoke |
-| Prod | 554518885123 | Production workloads (networking defined, not yet deployed) |
+| Management | <MGMT_ACCOUNT_ID> | AWS Organizations, SCPs, IAM Identity Center, Terraform state |
+| Platform | <PLATFORM_ACCOUNT_ID> | Shared services: EKS, ArgoCD, Tailscale, TGW hub, ECR |
+| PreProd | <PREPROD_ACCOUNT_ID> | Workloads: EKS, tenant namespaces, ingress, TGW spoke |
+| Prod | <PROD_ACCOUNT_ID> | Production workloads (networking defined, not yet deployed) |
 
 Cross-account access uses purpose-built IAM roles (PlatformAdmin, PlatformDeployer,
 DeveloperAccess, TerraformStateAccess). `OrganizationAccountAccessRole` retained as

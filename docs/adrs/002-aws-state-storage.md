@@ -20,7 +20,7 @@ cloud-native backend?
 
 ### Constraints
 
-- **AWS Organizations** is being created from the management account (851725353202). The management
+- **AWS Organizations** is being created from the management account (<MGMT_ACCOUNT_ID>). The management
   account is the natural home for centralized state storage.
 - **Cross-cloud authentication complexity.** Storing AWS state in Azure Blob Storage means every AWS
   CI/CD pipeline and developer workstation must authenticate to both AWS (for resource provisioning)
@@ -71,7 +71,7 @@ locals {
 remote_state {
   backend = local._cloud == "aws" ? "s3" : "azurerm"
   config = local._cloud == "aws" ? {
-    bucket         = "tfstate-mgmt-851725353202"
+    bucket         = "tfstate-mgmt-<MGMT_ACCOUNT_ID>"
     key            = "${path_relative_to_include()}/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
@@ -90,7 +90,7 @@ defaults to Azure Blob Storage.
 
 | Setting | Value | Rationale |
 |---------|-------|-----------|
-| Bucket | `tfstate-mgmt-851725353202` | Account ID suffix prevents global name collisions and makes ownership obvious |
+| Bucket | `tfstate-mgmt-<MGMT_ACCOUNT_ID>` | Account ID suffix prevents global name collisions and makes ownership obvious |
 | Region | `us-east-1` | Primary AWS region; colocated with Organizations (global service, but API endpoint is us-east-1) |
 | Encryption | `true` (AES-256/KMS) | Required for compliance; state files may contain sensitive resource attributes |
 | DynamoDB table | `terraform-locks` | Prevents concurrent state modifications; PAY_PER_REQUEST billing |
@@ -163,7 +163,7 @@ because:
 
 ### Risks
 
-- If the management account (851725353202) is compromised, all AWS state files are exposed.
+- If the management account (<MGMT_ACCOUNT_ID>) is compromised, all AWS state files are exposed.
   Mitigation: the management account should have the strictest access controls in the organization.
 - S3 bucket deletion (accidental or malicious) would lose all AWS state. Mitigation: bucket
   versioning is enabled; MFA delete should be configured as a follow-up.
