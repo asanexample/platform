@@ -59,9 +59,9 @@ generate "helm_provider" {
 inputs = {
   create = true
 
-  # Audit-first rollout (ADR-014): record PolicyReports without blocking admission. Flip to
-  # "Enforce" only after PolicyReports are confirmed clean against real workloads.
-  validation_failure_action = "Audit"
+  # Enforce: reject violations at admission (webhook fails closed). Flipped after the Audit phase
+  # confirmed PolicyReports clean against the live alpha workload (ADR-014 rollout).
+  validation_failure_action = "Enforce"
 
   compliance_tier = include.base.locals.compliance_tier
   replica_count   = 1 # non-prod; platform runs 3 for HA
