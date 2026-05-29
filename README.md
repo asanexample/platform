@@ -102,13 +102,12 @@ deployment method is `platctl bootstrap`, which resolves the DAG automatically.
 
 ## Modules
 
-### Shared (15 modules)
+### Shared (14 modules)
 
 | Module | Description |
 |--------|-------------|
 | [argocd](infra/modules/argocd/) | ArgoCD Helm deployment with HA, RBAC, Dex SSO |
 | [argocd-apps](infra/modules/argocd-apps/) | Multi-tenant AppProjects, Applications, PR preview ApplicationSets |
-| [argocd-bootstrap](infra/modules/argocd-bootstrap/) | Bootstrap App-of-Apps for foundational services |
 | [argocd-clusters](infra/modules/argocd-clusters/) | Remote cluster registration |
 | [cert-manager](infra/modules/cert-manager/) | cert-manager Helm with IRSA for DNS-01 challenges |
 | [cilium](infra/modules/cilium/) | Cilium CNI with cloud-specific config, Gateway API, Hubble |

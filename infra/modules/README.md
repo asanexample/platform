@@ -19,7 +19,6 @@ modules/
 |--------|-------------|
 | [argocd](argocd/) | ArgoCD Helm deployment with HA, RBAC, Dex SSO |
 | [argocd-apps](argocd-apps/) | Multi-tenant AppProjects, Applications, PR preview ApplicationSets |
-| [argocd-bootstrap](argocd-bootstrap/) | Bootstrap App-of-Apps for foundational cluster services |
 | [argocd-clusters](argocd-clusters/) | Remote cluster registration via labeled K8s Secrets |
 | [cert-manager](cert-manager/) | cert-manager Helm with IRSA for DNS-01 challenges |
 | [cilium](cilium/) | Cilium CNI with cloud-specific config (AWS/Azure/GCP), Gateway API, Hubble |
