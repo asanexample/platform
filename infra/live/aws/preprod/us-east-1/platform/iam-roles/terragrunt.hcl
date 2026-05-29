@@ -11,10 +11,17 @@ terraform {
   source = include.base.locals.module_source.iam_roles
 }
 
+locals {
+  # Team definitions are the single source of truth (shared with the eks and
+  # tenants units). One DeveloperAccess role is generated per namespace team.
+  teams_config    = read_terragrunt_config("${get_terragrunt_dir()}/../teams.hcl")
+  namespace_teams = local.teams_config.locals.namespace_teams
+}
+
 inputs = {
   create = true
 
-  roles = {
+  roles = merge({
     PlatformAdmin = {
       description          = "Platform team cluster access"
       max_session_duration = 14400
@@ -139,57 +146,60 @@ inputs = {
       managed_policies = []
     }
 
-    DeveloperAccess = {
-      description          = "Namespace-scoped developer cluster access"
-      max_session_duration = 14400
+    },
 
-      trust_principals = {
-        aws = [
-          "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:root",    # Management account
-          "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:root", # Preprod account (self)
+    # Per-team developer roles, generated from teams.hcl. Each role is scoped to
+    # its team's namespace via an EKS access entry (in the eks unit) and is
+    # assumable only by that team's SSO permission set (Dev-<team>).
+    { for team, _ in local.namespace_teams :
+      "DeveloperAccess-${team}" => {
+        description          = "Namespace-scoped developer cluster access for team ${team}"
+        max_session_duration = 14400
+        managed_policies     = []
+
+        trust_principals = {
+          aws = [
+            "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:root",    # Management account
+            "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:root", # Preprod account (self)
+          ]
+        }
+
+        # Only this team's SSO permission set (Dev-<team>) can assume the role.
+        trust_conditions = [
+          {
+            test     = "ArnLike"
+            variable = "aws:PrincipalArn"
+            values = [
+              "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_Dev-${team}_*",
+              "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_Dev-${team}_*",
+            ]
+          },
         ]
+
+        inline_policies = {
+          eks-access = jsonencode({
+            Version = "2012-10-17"
+            Statement = [
+              {
+                Sid    = "EKSAccess"
+                Effect = "Allow"
+                Action = [
+                  "eks:DescribeCluster",
+                  "eks:ListClusters",
+                ]
+                Resource = "*"
+              },
+              {
+                Sid      = "Identity"
+                Effect   = "Allow"
+                Action   = ["sts:GetCallerIdentity"]
+                Resource = "*"
+              },
+            ]
+          })
+        }
       }
-
-      # SSO PowerUser or Admin role holders can assume DeveloperAccess
-      trust_conditions = [
-        {
-          test     = "ArnLike"
-          variable = "aws:PrincipalArn"
-          values = [
-            "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_PowerUserAccess_*",
-            "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
-            "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_PowerUserAccess_*",
-            "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
-          ]
-        },
-      ]
-
-      managed_policies = []
-
-      inline_policies = {
-        eks-access = jsonencode({
-          Version = "2012-10-17"
-          Statement = [
-            {
-              Sid    = "EKSAccess"
-              Effect = "Allow"
-              Action = [
-                "eks:DescribeCluster",
-                "eks:ListClusters",
-              ]
-              Resource = "*"
-            },
-            {
-              Sid      = "Identity"
-              Effect   = "Allow"
-              Action   = ["sts:GetCallerIdentity"]
-              Resource = "*"
-            },
-          ]
-        })
-      }
-    }
-  }
+  })
 
   tags = include.base.locals.tags
 }

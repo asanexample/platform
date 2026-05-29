@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-20
 
-**Status:** Accepted
+**Status:** Accepted (DeveloperAccess refined into per-team roles in ADR-039)
 
 ## Context
 
@@ -48,7 +48,7 @@ Create four purpose-built IAM roles, each scoped to a specific access pattern:
 |------|---------|---------|------------|
 | **PlatformAdmin** | Platform | kubectl, SSM tunnel, debugging | AmazonEKSClusterAdminPolicy (cluster) |
 | **PlatformDeployer** | Platform | Terragrunt apply, Helm providers | AmazonEKSClusterAdminPolicy (cluster) |
-| **DeveloperAccess** | Platform | Namespace-scoped kubectl | AmazonEKSEditPolicy (namespace) |
+| **DeveloperAccess-\<team\>** | Preprod | Namespace-scoped kubectl, one role per team | Group-mapped RBAC (see ADR-039) |
 | **TerraformStateAccess** | Management | S3 state + DynamoDB locks | None |
 
 `OrganizationAccountAccessRole` is retained as a break-glass credential, permanently mapped in
@@ -61,8 +61,11 @@ EKS access entries and SCP exemptions.
 - **PlatformDeployer:** Trusts management account only (Terragrunt always runs from the
   management profile). Condition restricts to AdministratorAccess SSO role. Starts with
   `AdministratorAccess` managed policy to avoid regression; scope down in a follow-up.
-- **DeveloperAccess:** Trusts management and platform accounts. Condition restricts to
-  PowerUserAccess and AdministratorAccess SSO roles.
+- **DeveloperAccess-\<team\>:** One role per team (generated from `teams.hcl`). Trusts management
+  and preprod accounts, with the condition restricting to that team's own SSO permission set
+  (`Dev-<team>`) — so a developer can assume only their own team's role. The original single
+  `DeveloperAccess` role (assumable by any PowerUser/Admin and scoped to the union of all team
+  namespaces) was replaced; see ADR-039.
 - **TerraformStateAccess:** Trusts PlatformDeployer roles across all accounts. Scoped to
   S3 and DynamoDB state resources only.
 
@@ -84,7 +87,7 @@ aws sso login --profile management -> PlatformDeployer -> Helm/K8s providers
 **Developer (kubectl):**
 
 ```text
-aws sso login --profile platform-dev -> DeveloperAccess -> eks get-token -> EKS (namespace-scoped)
+aws sso login (Dev-<team> permission set) -> DeveloperAccess-<team> -> eks get-token -> EKS (own namespace only)
 ```
 
 ## Consequences
@@ -110,5 +113,6 @@ aws sso login --profile platform-dev -> DeveloperAccess -> eks get-token -> EKS 
 
 - If TerraformStateAccess trust policy is misconfigured, all Terragrunt operations fail across
   all environments. Mitigated by deploying state-access last and testing incrementally.
-- Namespace list for DeveloperAccess must be maintained manually in the EKS unit until tenant
-  onboarding automation is built.
+- Per-team DeveloperAccess roles, their EKS access entries, and RBAC bindings are now generated
+  from `teams.hcl` (the single source of truth); the matching SSO permission sets/groups remain a
+  manual step in the mgmt identity-center unit. See ADR-039 and the tenant-onboarding runbook.
