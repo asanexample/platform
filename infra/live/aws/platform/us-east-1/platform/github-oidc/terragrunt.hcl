@@ -23,41 +23,60 @@ dependency "ecr" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+locals {
+  # Team -> GitHub app repo. Hand-maintained alongside the ecr `repositories` list
+  # in this account (see tenant-onboarding runbook). Each team gets its own ECR
+  # push role that can push ONLY to its own team-<team>/* repos.
+  teams = {
+    alpha = { github_repo = "app-alpha" }
+    bravo = { github_repo = "app-bravo" }
+  }
+}
+
 inputs = {
-  create = true
+  create     = true
+  github_org = "gangster"
 
-  github_org    = "gangster"
-  github_repos  = ["app-alpha", "app-bravo"] # Team app repos that push images to ECR
-  github_events = ["pull_request"]           # Allow OIDC from PR workflows (preview image builds)
+  # One push role per team: trusts only that team's repo (OIDC sub) and can push
+  # only to that team's ECR repos. Generated for teams that have ≥1 ECR repo.
+  roles = { for team, cfg in local.teams :
+    "github-actions-ecr-push-${team}" => {
+      repos    = [cfg.github_repo]
+      branches = ["main"]         # push on merge to main
+      events   = ["pull_request"] # and PR preview builds
 
-  role_name = "github-actions-ecr-push"
-
-  # Scoped to ECR auth + push only — no other AWS access
-  inline_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid      = "ECRAuth"
-        Effect   = "Allow"
-        Action   = ["ecr:GetAuthorizationToken"]
-        Resource = "*"
-      },
-      {
-        Sid    = "ECRPush"
-        Effect = "Allow"
-        Action = [
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage",
-          "ecr:PutImage",
-          "ecr:InitiateLayerUpload",
-          "ecr:UploadLayerPart",
-          "ecr:CompleteLayerUpload",
+      inline_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [
+          {
+            Sid      = "ECRAuth"
+            Effect   = "Allow"
+            Action   = ["ecr:GetAuthorizationToken"]
+            Resource = "*"
+          },
+          {
+            Sid    = "ECRPush"
+            Effect = "Allow"
+            Action = [
+              "ecr:BatchCheckLayerAvailability",
+              "ecr:GetDownloadUrlForLayer",
+              "ecr:BatchGetImage",
+              "ecr:PutImage",
+              "ecr:InitiateLayerUpload",
+              "ecr:UploadLayerPart",
+              "ecr:CompleteLayerUpload",
+            ]
+            # Only this team's repositories (team-<team>/*).
+            Resource = [
+              for k, arn in dependency.ecr.outputs.repository_arns : arn
+              if startswith(k, "team-${team}/")
+            ]
+          },
         ]
-        Resource = values(dependency.ecr.outputs.repository_arns)
-      },
-    ]
-  })
+      })
+    }
+    if length([for k, _ in dependency.ecr.outputs.repository_arns : k if startswith(k, "team-${team}/")]) > 0
+  }
 
   tags = include.base.locals.tags
 }
