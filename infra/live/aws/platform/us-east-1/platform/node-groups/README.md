@@ -1,50 +1,32 @@
-# EKS Node Groups - US East 1 (Platform)
+# Node Groups
 
-## Overview
+Deploys EKS managed node groups providing compute capacity for system and application workloads.
 
-Deploys EKS managed node groups for the platform environment, providing compute capacity for system and application workloads.
+## Module
 
-## Configuration Details
+`infra/modules/aws/eks-node-group`
 
-### Purpose
+## Dependencies
 
-- Provisions two managed node groups: system (platform components) and workload (application workloads)
-- Places all nodes in kubernetes subnets for direct pod networking
-- Applies node labels for workload scheduling via nodeSelector or affinity rules
+- `networking` -- `../networking`
+- `eks` -- `../eks`
+- `cilium` -- `../cilium`
 
-### Dependencies
+## Key Inputs
 
-- **networking**: provides kubernetes subnet IDs for node placement
-- **eks**: provides the cluster ID to attach node groups to
-- **cilium**: CNI must be deployed first; nodes will not pass readiness checks without a CNI
+| Input | Value | Notes |
+|-------|-------|-------|
+| `node_groups.system` | `t3.large`, 2-4 nodes, label `node-role=system` | Platform components (ArgoCD, cert-manager, etc.) |
+| `node_groups.workload` | `t3.large`, 1-6 nodes, label `node-role=workload` | Application workloads |
 
-### Key Configuration Settings
+Both groups are placed in kubernetes subnets. Cilium dependency is structural -- nodes will not reach Ready without the CNI.
 
-- **system node group**:
-  - Instance type: `t3.large`
-  - Scaling: 2 min, 2 desired, 4 max
-  - Labels: `node-role=system`
-
-- **workload node group**:
-  - Instance type: `t3.large`
-  - Scaling: 1 min, 2 desired, 6 max
-  - Labels: `node-role=workload`
-
-- **Placement**:
-  - Both groups: kubernetes subnets
-
-## Usage
+## Commands
 
 ```bash
-cd infra/live/aws/platform/us-east-1/platform/node-groups
-terragrunt plan
-terragrunt apply
+# Plan
+AWS_PROFILE=management terragrunt plan
+
+# Apply
+AWS_PROFILE=management terragrunt apply
 ```
-
-## Dependencies on this Configuration
-
-- **argocd**: requires running nodes to schedule workloads
-
-## Implementation Notes
-
-The Cilium dependency is structural, not just for ordering. In a BYOCNI cluster, nodes that join before the CNI is installed will remain in a NotReady state because no network plugin is available to configure pod networking.
