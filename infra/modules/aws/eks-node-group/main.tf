@@ -53,6 +53,33 @@ resource "aws_iam_role_policy_attachment" "node_cni" {
 }
 
 # ---------------------------------------------------------------------------
+# Launch Template — IMDS hardening
+# ---------------------------------------------------------------------------
+
+# A minimal launch template (no image_id, so EKS still injects the optimized AMI
+# and bootstrap) that enforces IMDSv2 and a hop limit of 1. The hop limit stops
+# pods from reaching the instance metadata endpoint and stealing the node IAM
+# role's credentials; pods get their own credentials via IRSA.
+resource "aws_launch_template" "this" {
+  for_each = var.create ? var.node_groups : {}
+
+  name_prefix = "${var.cluster_name}-${each.key}-"
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
+    instance_metadata_tags      = "disabled"
+  }
+
+  tags = var.tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# ---------------------------------------------------------------------------
 # Managed Node Groups
 # ---------------------------------------------------------------------------
 
@@ -66,6 +93,11 @@ resource "aws_eks_node_group" "this" {
   instance_types  = each.value.instance_types
   capacity_type   = each.value.capacity_type
   ami_type        = each.value.ami_type
+
+  launch_template {
+    id      = aws_launch_template.this[each.key].id
+    version = aws_launch_template.this[each.key].latest_version
+  }
 
   scaling_config {
     desired_size = each.value.desired_size

@@ -2,6 +2,8 @@
 
 Creates EKS managed node groups with a shared IAM node role. The node role includes the standard EKS worker, ECR read-only, SSM managed instance, and CNI policies. Each node group is independently configurable for instance types, scaling parameters, capacity type (on-demand vs spot), AMI type, and Kubernetes labels. Node groups are separated from the EKS module to enforce deployment ordering -- Cilium must be deployed before nodes can join the cluster.
 
+Each node group is backed by a minimal launch template that enforces IMDSv2 (`http_tokens = required`) and a metadata hop limit of 1, so pods cannot reach the instance metadata endpoint and assume the node IAM role's credentials (pods use IRSA instead). The launch template sets no `image_id`, so EKS still injects the EKS-optimized AMI and bootstrap. **Changing these node groups triggers a rolling instance replacement.**
+
 ## Usage
 
 ```hcl
@@ -103,6 +105,7 @@ No modules.
 | [aws_iam_role_policy_attachment.node_ecr](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
 | [aws_iam_role_policy_attachment.node_ssm](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
 | [aws_iam_role_policy_attachment.node_worker](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
+| [aws_launch_template.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/launch_template) | resource |
 
 ## Inputs
 
