@@ -23,6 +23,11 @@ teams.hcl (aws block, platform-controlled)
 Default-deny, by construction: a team's role and its bucket's reader are **both** derived from the team
 key, so a team can only ever access `<org>-team-<itself>-*`. See ADR-041 "Isolation model".
 
+> **Bucket placement.** This setup keeps tenant buckets in the **platform** account to demonstrate the
+> cross-account pattern (hence the bucket policy in `s3-shared`). In most cases you'd put a team's bucket
+> in the **same account as the cluster** (preprod) — then the role's identity policy alone is enough and
+> no bucket policy is needed. The Pod Identity wiring is identical either way (ADR-041).
+
 ## Granting a team AWS access (platform engineer)
 
 1. **Declare it in `teams.hcl`** (`infra/live/aws/preprod/us-east-1/platform/teams.hcl`), under the
