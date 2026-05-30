@@ -49,9 +49,10 @@ The module is **cloud-agnostic and holds no team-specific data** — per-tenant 
 ### Phase 2 mutate policies (`enable_mutate_defaults`, default true)
 
 Auto-inject safe defaults on tenant workloads (add-if-absent; webhooks fail open):
-`mutate-securitycontext` (allowPrivilegeEscalation=false, drop ALL caps, seccompProfile=RuntimeDefault),
-`mutate-automount` (automountServiceAccountToken=false), `mutate-workload-labels` (`team` +
-`app.kubernetes.io/name`). Pair with ArgoCD `ignoreDifferences` for the mutated fields. See the
+`mutate-pod-defaults` (allowPrivilegeEscalation=false, drop ALL caps, seccompProfile=RuntimeDefault,
+automountServiceAccountToken=false — one patch so it resolves under autogen) and
+`mutate-workload-labels` (`team`, derived from the namespace). Pair with ArgoCD `ignoreDifferences`
+for the mutated fields. See the
 [policy catalog](../../../docs/architecture/kyverno-policy-catalog.md#mutate-policies-phase-2).
 
 ## Usage

@@ -81,9 +81,9 @@ variable "tenant_namespace_label" {
 }
 
 variable "required_workload_labels" {
-  description = "Labels every tenant workload must carry (team identity + cost allocation). Keys only; presence is validated."
+  description = "Labels every tenant workload must carry (presence validated). Default is the team cost-allocation label, which the mutate-workload-labels policy auto-injects from the namespace — so apps need no label boilerplate. app.kubernetes.io/name can't be auto-derived under autogen, so it is recommended but not required."
   type        = list(string)
-  default     = ["app.kubernetes.io/name", "team"]
+  default     = ["team"]
 }
 
 # ---------------------------------------------------------------------------
