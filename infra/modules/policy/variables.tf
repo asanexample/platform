@@ -55,6 +55,7 @@ variable "exclude_namespaces" {
     "external-dns",
     "argocd",
     "tailscale",
+    "falco",
   ]
 }
 
