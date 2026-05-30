@@ -235,12 +235,15 @@ jobs:
       - name: Install Trivy CLI (download release binary + verify SHA-256)
         run: |
           base="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
-          curl -sfL "${base}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" -o trivy.tgz
+          asset="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          # keep the original asset name so `sha256sum -c` (which reads the name
+          # from the checksums line) can find the downloaded file.
+          curl -sfL "${base}/${asset}" -o "${asset}"
           curl -sfL "${base}/trivy_${TRIVY_VERSION}_checksums.txt" -o trivy_checksums.txt
-          grep "  trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz\$" trivy_checksums.txt | sha256sum -c -
-          tar xzf trivy.tgz trivy
+          grep " ${asset}\$" trivy_checksums.txt | sha256sum -c -
+          tar xzf "${asset}" trivy
           sudo install -m 0755 trivy /usr/local/bin/trivy
-          rm -f trivy trivy.tgz trivy_checksums.txt
+          rm -f trivy "${asset}" trivy_checksums.txt
           trivy --version
       - name: IaC misconfig (infra/modules) + Go dependency SCA (infra/tests)
         run: |
