@@ -1,0 +1,97 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-privilege-escalation
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Disallow Privilege Escalation
+    policies.kyverno.io/category: Security, Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Deny containers that explicitly set securityContext.allowPrivilegeEscalation=true. Backstops the
+      mutate-securitycontext default so the secure value is enforced at admission (not merely a default
+      that ArgoCD ignores). Compliant workloads are unaffected — mutate supplies false when unset.
+spec:
+  background: true
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    - name: deny-privilege-escalation
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+      validate:
+        failureAction: {{ .Values.validationFailureAction }}
+        message: "allowPrivilegeEscalation must not be true."
+        foreach:
+          - list: request.object.spec.containers
+            deny:
+              conditions:
+                any:
+                  - key: "{{`{{ element.securityContext.allowPrivilegeEscalation }}`}}"
+                    operator: Equals
+                    value: true
+          - list: request.object.spec.initContainers
+            deny:
+              conditions:
+                any:
+                  - key: "{{`{{ element.securityContext.allowPrivilegeEscalation }}`}}"
+                    operator: Equals
+                    value: true
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-seccomp
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Disallow Unconfined seccomp
+    policies.kyverno.io/category: Security, Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Deny pods/containers that explicitly set seccompProfile.type=Unconfined. Backstops the
+      mutate-securitycontext default (RuntimeDefault) so it is enforced, not merely defaulted.
+spec:
+  background: true
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    - name: deny-unconfined-seccomp-pod
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+      validate:
+        failureAction: {{ .Values.validationFailureAction }}
+        message: "seccompProfile.type Unconfined is not allowed (pod securityContext)."
+        deny:
+          conditions:
+            any:
+              - key: "{{`{{ request.object.spec.securityContext.seccompProfile.type || '' }}`}}"
+                operator: Equals
+                value: Unconfined
+    - name: deny-unconfined-seccomp-containers
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+      validate:
+        failureAction: {{ .Values.validationFailureAction }}
+        message: "seccompProfile.type Unconfined is not allowed (container securityContext)."
+        foreach:
+          - list: request.object.spec.containers
+            deny:
+              conditions:
+                any:
+                  - key: "{{`{{ element.securityContext.seccompProfile.type || '' }}`}}"
+                    operator: Equals
+                    value: Unconfined

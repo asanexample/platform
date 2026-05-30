@@ -51,12 +51,32 @@ emergency disable / the Audit↔Enforce flip.
 | `restrict-binding-clusteradmin` | RoleBinding, ClusterRoleBinding | Deny binding to `cluster-admin` | cluster | all | preprod, platform |
 | `restrict-wildcard-rbac` | Role, ClusterRole | Deny wildcard verbs / resources / apiGroups | cluster | all | preprod, platform |
 | `disallow-default-namespace` | Pod, Deployment, StatefulSet, DaemonSet, ReplicaSet, Job, CronJob | No workloads in `default` | cluster | all | preprod, platform |
+| `disallow-privilege-escalation` | Pod | Deny `securityContext.allowPrivilegeEscalation: true` (backstops the mutate default) | tenant | all | preprod, platform |
+| `require-seccomp` | Pod | Deny `seccompProfile.type: Unconfined` (backstops the mutate default) | tenant | all | preprod, platform |
 | `require-pod-security-restricted` | Pod | Full Restricted Pod Security Standard | tenant | **hipaa/pci only** | _(none yet — standard tier)_ |
 | `require-ro-rootfs` | Pod | `readOnlyRootFilesystem: true` | tenant | **hipaa/pci only** | _(none yet — standard tier)_ |
 
 The two tier-gated policies render only when a cluster's `compliance_tier` is `hipaa` or `pci`. Both
 current clusters are `standard`, so they are not deployed there yet; they will appear automatically on
 any cluster set to a regulated tier (e.g. a future prod). See [ADR-013](../adrs/013-compliance-tier-model.md).
+
+## Mutate policies (Phase 2)
+
+`mutate` policies auto-inject safe defaults on tenant workloads at admission (add-if-absent — never
+overrides an explicit app value), so apps need no security boilerplate and still satisfy the validate
+policies (Kyverno mutates before validating). Gated by `enable_mutate_defaults` (default true); the
+mutate webhooks **fail open** (a missed default must never block a pod). Their security values are
+_enforced_ by the `disallow-privilege-escalation` / `require-seccomp` validate backstops above, so the
+matching ArgoCD `ignoreDifferences` is safe.
+
+| Policy | Injects (when absent) | Scope |
+| ------ | --------------------- | ----- |
+| `mutate-securitycontext` | `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`, `seccompProfile.type: RuntimeDefault` on every container/initContainer (not `runAsNonRoot`) | tenant |
+| `mutate-automount` | pod `automountServiceAccountToken: false` | tenant |
+| `mutate-workload-labels` | `team` (tenant key from the `team-<k>[-env]` namespace name) + `app.kubernetes.io/name` (workload name) | tenant |
+
+ArgoCD is told to ignore the mutated sub-fields (`argocd_cm_extra` →
+`resource.customizations.ignoreDifferences.all`) so selfHeal doesn't fight Kyverno.
 
 ## Exemptions (so the platform never blocks itself)
 

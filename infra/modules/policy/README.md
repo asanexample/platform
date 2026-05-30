@@ -43,6 +43,16 @@ The module is **cloud-agnostic and holds no team-specific data** — per-tenant 
 | `require-tenant-namespace-naming` | Namespace | Tenant namespaces named `team-*` |
 | `require-pod-security-restricted` | Pod | **hipaa/pci only** — full Restricted PSS |
 | `require-ro-rootfs` | Pod | **hipaa/pci only** — read-only root filesystem |
+| `disallow-privilege-escalation` | Pod | Deny `allowPrivilegeEscalation: true` (Phase 2 backstop) |
+| `require-seccomp` | Pod | Deny `seccompProfile.type: Unconfined` (Phase 2 backstop) |
+
+### Phase 2 mutate policies (`enable_mutate_defaults`, default true)
+
+Auto-inject safe defaults on tenant workloads (add-if-absent; webhooks fail open):
+`mutate-securitycontext` (allowPrivilegeEscalation=false, drop ALL caps, seccompProfile=RuntimeDefault),
+`mutate-automount` (automountServiceAccountToken=false), `mutate-workload-labels` (`team` +
+`app.kubernetes.io/name`). Pair with ArgoCD `ignoreDifferences` for the mutated fields. See the
+[policy catalog](../../../docs/architecture/kyverno-policy-catalog.md#mutate-policies-phase-2).
 
 ## Usage
 

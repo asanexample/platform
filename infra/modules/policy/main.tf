@@ -38,6 +38,7 @@ locals {
     excludePrincipals       = var.exclude_principals
     tenantNamespaceLabel    = var.tenant_namespace_label
     requiredWorkloadLabels  = var.required_workload_labels
+    enableMutateDefaults    = var.enable_mutate_defaults
     additionalPolicies      = var.additional_policies
     commonLabels            = local.k8s_labels
   }

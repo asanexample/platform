@@ -17,3 +17,19 @@ helm template kpp "$CHART" \
 
 cd "$DIR"
 kyverno test .
+
+# Mutation smoke-check: the three mutate policies must inject their defaults on a bare pod with no
+# errors. (kyverno test's declarative patchedResources comparison is brittle across CLI versions, so
+# we assert success + a clean error count here instead.)
+echo "Running mutation smoke-check ..."
+# kyverno apply exits non-zero when a resource fails a validate policy (the bare pod intentionally
+# does), so tolerate that and inspect the captured output instead.
+MUT="$(kyverno apply rendered/policies.yaml --resource resources/mutate-input.yaml --values-file values.yaml 2>&1 || true)"
+APPLIED="$(printf '%s' "$MUT" | grep -c 'Mutation has been applied successfully' || true)"
+if ! printf '%s' "$MUT" | grep -q 'error: 0'; then
+  echo "FAIL: mutate produced errors"; printf '%s\n' "$MUT"; exit 1
+fi
+if [ "$APPLIED" -lt 3 ]; then
+  echo "FAIL: expected >=3 mutations on the bare pod, got $APPLIED"; printf '%s\n' "$MUT"; exit 1
+fi
+echo "Mutation smoke-check passed ($APPLIED mutations applied, 0 errors)."

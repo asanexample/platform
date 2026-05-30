@@ -70,8 +70,11 @@ platform. The flip is a one-line input change. This realizes the risk mitigation
 1. **Engine + core admission `validate`** *(this ADR — done)*: registry/per-team image scoping,
    cross-team IRSA-annotation guard, RBAC hardening, resource/label/probe requirements, no public
    LB/NodePort, no `default` namespace, tenant namespace naming, tier-gated restricted PSS + RO-rootfs.
-2. **`mutate` + `generate`**: hardened-securityContext/label defaults; auto default-deny NetworkPolicy
-   and ResourceQuota generation for all namespaces (incl. PR-preview).
+2. **`mutate`** *(done)*: auto-inject safe defaults on tenant workloads — hardened securityContext
+   (safe subset), `automountServiceAccountToken: false`, `team`/`app.kubernetes.io/name` labels —
+   backed by `disallow-privilege-escalation`/`require-seccomp` validate guards and ArgoCD
+   `ignoreDifferences`. `generate`-based namespace governance is split out to the multi-namespace /
+   self-service tenant-model design (issue #88).
 3. **Supply chain**: `cosign` keyless signing (GitHub OIDC) in app CI + `verifyImages` enforcement.
 4. **Shift-left CLI**: `kyverno apply`/`test` gate in app-repo + platform CI.
 5. **Reporting + cleanup**: PolicyReport → observability; `CleanupPolicy` TTLs; Gateway-API HTTPRoute

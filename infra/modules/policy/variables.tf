@@ -126,6 +126,12 @@ variable "helm_wait" {
   default     = true
 }
 
+variable "enable_mutate_defaults" {
+  description = "Deploy the mutate policies that auto-inject safe defaults (hardened securityContext, automountServiceAccountToken=false, team/app labels) on tenant workloads. Mutate webhooks fail open. The validate backstops (disallow-privilege-escalation, require-seccomp) deploy regardless."
+  type        = bool
+  default     = true
+}
+
 variable "additional_policies" {
   description = "Raw ClusterPolicy YAML manifests for custom policy injection beyond the built-in set (ADR-014 contract). Keyed by name."
   type        = map(string)
