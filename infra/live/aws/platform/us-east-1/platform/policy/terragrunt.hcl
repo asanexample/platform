@@ -57,10 +57,11 @@ generate "helm_provider" {
 inputs = {
   create = true
 
-  # Audit-first rollout (ADR-014). Promote to "Enforce" only after preprod is proven and platform
-  # PolicyReports are clean — platform hosts shared services, so the cluster-scoped policies must be
-  # validated against platform controllers here before flipping.
-  validation_failure_action = "Audit"
+  # Enforce: webhook fails closed. Flipped after preprod was proven in Enforce and the cluster-scoped
+  # RBAC policies were hardened to exempt the IaC deployer (validated on preprod: PlatformDeployer
+  # cluster-admin binding denied -> admitted). ArgoCD + the deployer (the RBAC-creating actors here)
+  # are in exclude_principals. See ADR-014 / kyverno-break-glass runbook.
+  validation_failure_action = "Enforce"
 
   compliance_tier = include.base.locals.compliance_tier
   replica_count   = 3 # HA on the shared platform cluster
