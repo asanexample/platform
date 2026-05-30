@@ -60,6 +60,26 @@ resource "kubernetes_cluster_role" "platform_operator" {
     resources  = ["deployments", "statefulsets", "daemonsets"]
     verbs      = ["patch"]
   }
+
+  # Debug: read Kyverno PolicyReports + policies — the primary surface for
+  # understanding WHY a resource was admitted/rejected (e.g. verifyImages
+  # signature/attestation results). Read-only; AmazonEKSViewPolicy's view role
+  # doesn't cover these CRD groups, and authoring stays in GitOps (ADR-040).
+  rule {
+    api_groups = ["wgpolicyk8s.io"]
+    resources  = ["policyreports", "clusterpolicyreports"]
+    verbs      = ["get", "list", "watch"]
+  }
+  rule {
+    api_groups = ["kyverno.io"]
+    resources  = ["policies", "clusterpolicies", "policyexceptions"]
+    verbs      = ["get", "list", "watch"]
+  }
+  rule {
+    api_groups = ["reports.kyverno.io"]
+    resources  = ["ephemeralreports", "clusterephemeralreports"]
+    verbs      = ["get", "list", "watch"]
+  }
 }
 
 resource "kubernetes_cluster_role_binding" "platform_operator" {
