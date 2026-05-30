@@ -1,4 +1,18 @@
 {{- if .Values.enableCleanup }}
+# The cleanup controller only gets delete RBAC for resource types granted via an aggregated
+# ClusterRole. Without this it rejects the policy ("no permission to delete kind Job").
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kyverno:cleanup-jobs
+  labels:
+    rbac.kyverno.io/aggregate-to-cleanup-controller: "true"
+    {{- include "kpp.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "delete"]
+---
 apiVersion: kyverno.io/v2
 kind: ClusterCleanupPolicy
 metadata:
