@@ -279,11 +279,12 @@ jobs:
           python-version: "3.12"
       - name: Install Semgrep (pinned)
         run: pip install --quiet semgrep==1.164.0 # latest stable; verify before bumping
-      - name: Static analysis (terraform / bash / actions / secrets / go / dockerfile)
+      - name: Static analysis (terraform / actions / secrets / go / dockerfile)
         run: |
           # SARIF artifact (exit 0, always written) then the BLOCKING text gate
-          # (--error exits non-zero on any finding).
-          rulesets="--config p/terraform --config p/bash --config p/github-actions --config p/secrets --config p/golang --config p/dockerfile"
+          # (--error exits non-zero on any finding OR invalid config). Registry
+          # packs only (no p/bash — it 404s; shell rules aren't a registry pack).
+          rulesets="--config p/terraform --config p/github-actions --config p/secrets --config p/golang --config p/dockerfile"
           semgrep scan $rulesets --metrics off --sarif --output semgrep.sarif || true
           echo "::group::Semgrep findings"
           semgrep scan $rulesets --metrics off --error
