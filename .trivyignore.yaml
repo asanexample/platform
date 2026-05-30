@@ -1,0 +1,46 @@
+# Trivy ignore file — accepted findings from the #112 (108a) baseline triage.
+# Each entry is PATH-SCOPED so the underlying check still fires on any OTHER
+# resource (this is a security gate, not a blanket mute). Paths are relative to
+# the scan root (the `trivy config infra/modules` target).
+misconfigurations:
+  - id: AWS-0104
+    paths:
+      - "aws/ssm-bastion/main.tf"
+    statement: >-
+      SSM bastion uses an egress-only security group (no ingress). Broad egress
+      to 0.0.0.0/0 is required because AWS SSM endpoints resolve to IPs outside
+      the VPC; documented in the module.
+
+  - id: AWS-0040
+    paths:
+      - "aws/eks/main.tf"
+    statement: >-
+      The EKS module intentionally SUPPORTS a public endpoint: it is needed
+      during bootstrap (Cilium installs before Tailscale/SSM exist) and for the
+      documented preprod cross-VPC-DNS case. Deployed posture is set explicitly
+      per unit (platform = private). See the #108 triage.
+
+  - id: AWS-0041
+    paths:
+      - "aws/eks/main.tf"
+    statement: >-
+      public_access_cidrs only takes effect when a consumer explicitly enables
+      public access; the 0.0.0.0/0 default exists for the documented
+      bootstrap/preprod case. Production units must scope CIDRs. See #108 triage.
+
+  - id: AWS-0015
+    paths:
+      - "aws/cloudtrail/main.tf"
+    statement: >-
+      CloudTrail logs are encrypted with SSE-KMS (AWS-managed key). A dedicated
+      customer-managed CMK is tracked hardening in #118 (regulated-tier),
+      deferred to avoid key-policy/cross-account complexity now.
+
+  - id: AWS-0132
+    paths:
+      - "aws/cloudtrail/main.tf"
+      - "aws/state_bootstrap/main.tf"
+    statement: >-
+      Buckets use SSE-KMS (AWS-managed key). Customer-managed CMK for the audit
+      and state buckets is tracked in #118; deferred to avoid cross-account KMS
+      key-policy complexity (consistent with the s3 module's encryption choice).

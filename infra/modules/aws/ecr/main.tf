@@ -6,6 +6,10 @@ locals {
 # Repositories
 # ---------------------------------------------------------------------------
 
+# Tag mutability is per-repo configurable (var.repositories[*].tag_mutability). Supply-chain
+# integrity is enforced by digest-pinning + cosign signing + Kyverno immutable-tag admission on
+# workloads, not by repo-level immutability. Immutable ECR tags tracked as hardening (#119).
+# nosemgrep: terraform.aws.security.aws-ecr-mutable-image-tags.aws-ecr-mutable-image-tags
 resource "aws_ecr_repository" "this" {
   for_each = local.create ? var.repositories : {}
 

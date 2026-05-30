@@ -1,0 +1,29 @@
+# Dependabot — dependency + GitHub Actions update PRs.
+# Free on private repos (unlike Code Scanning / GHAS). Part of #112 (108a, supply-chain hardening).
+version: 2
+updates:
+  # Go modules used by the Terratest suites.
+  - package-ecosystem: "gomod"
+    directory: "/infra/tests/aws"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "go"]
+
+  # GitHub Actions in workflows + composite actions. Surfaces unpinned/outdated actions
+  # (and lets us move pins forward) — directly relevant after the trivy-action tag-hijack.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "ci"]
+
+  # OpenTofu/Terraform provider + module version constraints across the shared modules.
+  - package-ecosystem: "terraform"
+    directories:
+      - "/infra/modules/**"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "terraform"]

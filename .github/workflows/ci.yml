@@ -121,10 +121,14 @@ jobs:
         with:
           fetch-depth: 0
       - name: Lint changed markdown files
+        # ${{ }} via env, not interpolated into the script (semgrep run-shell-injection / #112).
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
           npm install -g markdownlint-cli2
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            FILES=$(git diff --name-only --diff-filter=ACM origin/${{ github.base_ref }}...HEAD -- '*.md' | grep -v '.terraform/' | grep -v '.terragrunt-cache/' || true)
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            FILES=$(git diff --name-only --diff-filter=ACM "origin/${BASE_REF}...HEAD" -- '*.md' | grep -v '.terraform/' | grep -v '.terragrunt-cache/' || true)
           else
             FILES=$(git diff --name-only --diff-filter=ACM HEAD~1 -- '*.md' | grep -v '.terraform/' | grep -v '.terragrunt-cache/' || true)
           fi
@@ -209,3 +213,88 @@ jobs:
             echo "::endgroup::"
           done
           exit $FAILED
+
+  # ---------------------------------------------------------------------------
+  # Security scanning (#112 / 108a) — OSS scanners. These repos are private
+  # without GitHub Advanced Security, so Code Scanning / the Security-tab SARIF
+  # integration is unavailable; findings surface in job logs + SARIF artifacts.
+  # Scanner CLIs are installed at PINNED versions (downloaded + SHA-256 verified)
+  # rather than via their GitHub Actions: aquasecurity/trivy-action + setup-trivy
+  # were compromised in 03/2026 (tags force-pushed to malware; a malicious Trivy
+  # v0.69.4 was published). We avoid those Actions, pin the clean post-incident
+  # v0.70.0, and verify the binary's checksum — minimal third-party trust on the
+  # very job meant to harden the supply chain. (We do not `curl | sh` either.)
+  # ENFORCING: blocks on HIGH/CRITICAL (the baseline was triaged clean first —
+  # Audit->Enforce, per ADR-014). Accepted findings live in `.trivyignore.yaml`
+  # (path-scoped + justified); Go-dep CVEs are fixed by bumping (Dependabot keeps
+  # them current). New HIGH/CRITICAL findings fail the PR.
+  # ---------------------------------------------------------------------------
+
+  trivy:
+    name: Trivy (IaC + deps)
+    runs-on: ubuntu-latest
+    env:
+      TRIVY_VERSION: "0.70.0" # pinned clean release; v0.69.4 was the malicious one
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Trivy CLI (download release binary + verify SHA-256)
+        run: |
+          base="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
+          asset="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          # keep the original asset name so `sha256sum -c` (which reads the name
+          # from the checksums line) can find the downloaded file.
+          curl -sfL "${base}/${asset}" -o "${asset}"
+          curl -sfL "${base}/trivy_${TRIVY_VERSION}_checksums.txt" -o trivy_checksums.txt
+          grep " ${asset}\$" trivy_checksums.txt | sha256sum -c -
+          tar xzf "${asset}" trivy
+          sudo install -m 0755 trivy /usr/local/bin/trivy
+          rm -f trivy "${asset}" trivy_checksums.txt
+          trivy --version
+      - name: IaC misconfig (infra/modules) + Go dependency SCA (infra/tests)
+        run: |
+          # IaC — skip provider caches + the Kyverno test fixtures (deliberately
+          # non-compliant sample manifests, not deployed infra). Accepted findings
+          # are in .trivyignore.yaml (path-scoped). For each scan: SARIF artifact
+          # (exit 0, always written) then the BLOCKING table gate (exit 1) so the
+          # findings are visible in the log when the gate fails.
+          iac() { trivy config infra/modules --severity HIGH,CRITICAL \
+            --skip-dirs '**/.terraform' --skip-dirs '**/.kyverno-tests' \
+            --ignorefile "$PWD/.trivyignore.yaml" "$@"; }
+          iac --format sarif --output trivy-iac.sarif --exit-code 0
+          echo "::group::Trivy IaC findings"; iac --format table --exit-code 1; echo "::endgroup::"
+
+          # Go dependency vulnerabilities (Terratest suite).
+          dep() { trivy fs infra/tests/aws --scanners vuln --severity HIGH,CRITICAL "$@"; }
+          dep --format sarif --output trivy-deps.sarif --exit-code 0
+          echo "::group::Trivy dependency findings"; dep --format table --exit-code 1; echo "::endgroup::"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-sarif
+          path: trivy-*.sarif
+
+  semgrep:
+    name: Semgrep (SAST)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Semgrep (pinned)
+        run: pip install --quiet semgrep==1.164.0 # latest stable; verify before bumping
+      - name: Static analysis (terraform / actions / secrets / go / dockerfile)
+        run: |
+          # SARIF artifact (exit 0, always written) then the BLOCKING text gate
+          # (--error exits non-zero on any finding OR invalid config). Registry
+          # packs only (no p/bash — it 404s; shell rules aren't a registry pack).
+          rulesets="--config p/terraform --config p/github-actions --config p/secrets --config p/golang --config p/dockerfile"
+          semgrep scan $rulesets --metrics off --sarif --output semgrep.sarif || true
+          echo "::group::Semgrep findings"
+          semgrep scan $rulesets --metrics off --error
+          echo "::endgroup::"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: semgrep-sarif
+          path: semgrep.sarif
