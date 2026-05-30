@@ -220,9 +220,10 @@ jobs:
   # v0.69.4 was published). We avoid those Actions, pin the clean post-incident
   # v0.70.0, and verify the binary's checksum — minimal third-party trust on the
   # very job meant to harden the supply chain. (We do not `curl | sh` either.)
-  # ROLLOUT: report-only baseline (exit-code 0 / `|| true`). Flip to blocking on
-  # HIGH/CRITICAL once a clean baseline is confirmed (Audit->Enforce, per ADR-014).
-  # Accepted findings live in `.trivyignore.yaml` (path-scoped + justified).
+  # ENFORCING: blocks on HIGH/CRITICAL (the baseline was triaged clean first —
+  # Audit->Enforce, per ADR-014). Accepted findings live in `.trivyignore.yaml`
+  # (path-scoped + justified); Go-dep CVEs are fixed by bumping (Dependabot keeps
+  # them current). New HIGH/CRITICAL findings fail the PR.
   # ---------------------------------------------------------------------------
 
   trivy:
@@ -249,20 +250,19 @@ jobs:
         run: |
           # IaC — skip provider caches + the Kyverno test fixtures (deliberately
           # non-compliant sample manifests, not deployed infra). Accepted findings
-          # are in .trivyignore.yaml (path-scoped).
-          for fmt in 'sarif --output trivy-iac.sarif' 'table'; do
-            trivy config infra/modules \
-              --severity HIGH,CRITICAL \
-              --skip-dirs '**/.terraform' --skip-dirs '**/.kyverno-tests' \
-              --ignorefile "$PWD/.trivyignore.yaml" \
-              --format $fmt --exit-code 0   # report-only baseline (#112)
-          done
+          # are in .trivyignore.yaml (path-scoped). For each scan: SARIF artifact
+          # (exit 0, always written) then the BLOCKING table gate (exit 1) so the
+          # findings are visible in the log when the gate fails.
+          iac() { trivy config infra/modules --severity HIGH,CRITICAL \
+            --skip-dirs '**/.terraform' --skip-dirs '**/.kyverno-tests' \
+            --ignorefile "$PWD/.trivyignore.yaml" "$@"; }
+          iac --format sarif --output trivy-iac.sarif --exit-code 0
+          echo "::group::Trivy IaC findings"; iac --format table --exit-code 1; echo "::endgroup::"
+
           # Go dependency vulnerabilities (Terratest suite).
-          for fmt in 'sarif --output trivy-deps.sarif' 'table'; do
-            trivy fs infra/tests/aws --scanners vuln \
-              --severity HIGH,CRITICAL \
-              --format $fmt --exit-code 0   # report-only baseline (#112)
-          done
+          dep() { trivy fs infra/tests/aws --scanners vuln --severity HIGH,CRITICAL "$@"; }
+          dep --format sarif --output trivy-deps.sarif --exit-code 0
+          echo "::group::Trivy dependency findings"; dep --format table --exit-code 1; echo "::endgroup::"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -281,17 +281,12 @@ jobs:
         run: pip install --quiet semgrep==1.164.0 # latest stable; verify before bumping
       - name: Static analysis (terraform / bash / actions / secrets / go / dockerfile)
         run: |
-          semgrep scan \
-            --config p/terraform --config p/bash --config p/github-actions \
-            --config p/secrets --config p/golang --config p/dockerfile \
-            --metrics off \
-            --sarif --output semgrep.sarif \
-            --error || true   # report-only baseline (#112); drop `|| true` to block
+          # SARIF artifact (exit 0, always written) then the BLOCKING text gate
+          # (--error exits non-zero on any finding).
+          rulesets="--config p/terraform --config p/bash --config p/github-actions --config p/secrets --config p/golang --config p/dockerfile"
+          semgrep scan $rulesets --metrics off --sarif --output semgrep.sarif || true
           echo "::group::Semgrep findings"
-          semgrep scan \
-            --config p/terraform --config p/bash --config p/github-actions \
-            --config p/secrets --config p/golang --config p/dockerfile \
-            --metrics off || true
+          semgrep scan $rulesets --metrics off --error
           echo "::endgroup::"
       - uses: actions/upload-artifact@v4
         if: always()
