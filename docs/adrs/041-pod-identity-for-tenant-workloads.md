@@ -70,6 +70,17 @@ module). That also makes IMDS (`169.254.169.254:80`, also host) network-reachabl
 **IMDSv2 with `HttpPutResponseHopLimit=1`**, so a pod (one hop from the node) cannot reach IMDS and steal
 the node role — that hop-limit is the hard control; the egress restriction is defense-in-depth.
 
+### Bucket placement is a deployment choice (not fixed by this ADR)
+
+The mechanism — a `Pod-team-<team>` role bound by a Pod Identity association — is identical no matter
+where the resource lives. **The common, recommended case is the bucket in the *same account as the
+cluster* (preprod):** simplest, and the role's identity policy alone suffices — **no bucket policy
+needed**. The reference demo deliberately puts the bucket in the **platform** (shared-services) account
+to exercise the **cross-account** pattern (which is why it needs the two-sided grant — identity policy
+*and* bucket policy). A **dedicated data account** is the strongest blast-radius isolation. Only the
+bucket's location, and whether a cross-account resource policy is required, change — the Pod Identity
+wiring does not.
+
 ### Components
 
 - **Module** `iam_roles` extended to support `service` trust principals + `trust_actions`
