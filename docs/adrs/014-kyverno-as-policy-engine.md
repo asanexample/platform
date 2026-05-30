@@ -79,6 +79,9 @@ platform. The flip is a one-line input change. This realizes the risk mitigation
 
 ### Policy Categories
 
+> The live, per-cluster list of enforced policies (preprod / platform / prod) is maintained in the
+> **[Kyverno Policy Catalog](../architecture/kyverno-policy-catalog.md)**.
+
 The following policy guardrails are enforced at admission time:
 
 | Policy | Description | Tiers |

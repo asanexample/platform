@@ -111,8 +111,10 @@ If a policy blocks legitimate admission, patch the generated webhook configurati
 | `policies_status` | Helm status of the ClusterPolicies release |
 | `validation_failure_action` | Effective policy action (Audit/Enforce) |
 
-## Related ADRs
+## Related
 
+- **[Kyverno Policy Catalog](../../../docs/architecture/kyverno-policy-catalog.md)** — the per-cluster
+  list of enforced policies (preprod / platform / prod) and their scope
 - ADR-014: Kyverno as Policy Engine
 - ADR-013: Compliance Tier Model
 - ADR-027 / ADR-039 / ADR-040: Tenant isolation, per-team RBAC, platform-engineer access
