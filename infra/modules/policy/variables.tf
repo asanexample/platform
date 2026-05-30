@@ -71,6 +71,9 @@ variable "exclude_principals" {
     "system:serviceaccount:kube-system:*",
     "system:nodes:*",
     "system:kube-controller-manager",
+    # EKS installs managed add-ons (EBS CSI, etc.) as eks:addon-manager; their upstream RBAC uses
+    # wildcards. It is a platform/system installer, not a tenant, so exclude it like kube-system/argocd.
+    "eks:addon-manager",
   ]
 }
 
