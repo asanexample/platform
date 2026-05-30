@@ -53,6 +53,7 @@ emergency disable / the Audit↔Enforce flip.
 | `disallow-default-namespace` | Pod, Deployment, StatefulSet, DaemonSet, ReplicaSet, Job, CronJob | No workloads in `default` | cluster | all | preprod, platform |
 | `disallow-privilege-escalation` | Pod | Deny `securityContext.allowPrivilegeEscalation: true` (backstops the mutate default) | tenant | all | preprod, platform |
 | `require-seccomp` | Pod | Deny `seccompProfile.type: Unconfined` (backstops the mutate default) | tenant | all | preprod, platform |
+| `restrict-route-hostnames-team-<t>` | HTTPRoute, GRPCRoute, TLSRoute | Per-team route hostnames must be in the team's allow-list (from `teams.hcl`); deny cross-team/platform hostnames + empty hostname lists (anti-squatting, ADR-029) | tenant (per-team) | all | preprod |
 | `require-pod-security-restricted` | Pod | Full Restricted Pod Security Standard | tenant | **hipaa/pci only** | _(none yet — standard tier)_ |
 | `require-ro-rootfs` | Pod | `readOnlyRootFilesystem: true` | tenant | **hipaa/pci only** | _(none yet — standard tier)_ |
 
@@ -96,6 +97,13 @@ Per-team identity isolation: a signature from another team's workflow does **not
 policy — the supply-chain analog of per-team registry scoping. Deployed on **preprod** (where tenants
 run); the platform cluster has no tenant workloads. Verification depends on cluster egress to
 sigstore (Fulcio/Rekor) — see the break-glass runbook.
+
+## Cleanup (Phase 5)
+
+`ClusterCleanupPolicy` `cleanup-finished-cronjob-jobs` (gated by `enable_cleanup`) reaps **finished
+CronJob-spawned Jobs** in tenant namespaces on an hourly schedule. Scoped to CronJob-owned Jobs so it
+never deletes a Git-declared/ArgoCD-managed Job (selfHeal would recreate it). CleanupPolicies have no
+Audit mode — they delete on schedule.
 
 ## Exemptions (so the platform never blocks itself)
 

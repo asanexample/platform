@@ -192,6 +192,28 @@ variable "rekor_url" {
   default     = "https://rekor.sigstore.dev"
 }
 
+# ---------------------------------------------------------------------------
+# Ingress hostname guard + cleanup (Phase 5)
+# ---------------------------------------------------------------------------
+
+variable "enable_httproute_guard" {
+  description = "Deploy the per-team Gateway-API route hostname guard (anti-squatting on the shared wildcard listener, ADR-029). Renders only for teams present in tenant_hostname_patterns."
+  type        = bool
+  default     = true
+}
+
+variable "tenant_hostname_patterns" {
+  description = "Per-tenant allowed route hostnames/patterns (wildcards ok). Key = tenant; supplied by the unit from teams.hcl. A team's routes may only claim hostnames matching its list. Empty list for a team = no guard rendered for it."
+  type        = map(list(string))
+  default     = {}
+}
+
+variable "enable_cleanup" {
+  description = "Deploy the ClusterCleanupPolicy that reaps finished CronJob-spawned Jobs in tenant namespaces."
+  type        = bool
+  default     = true
+}
+
 variable "additional_policies" {
   description = "Raw ClusterPolicy YAML manifests for custom policy injection beyond the built-in set (ADR-014 contract). Keyed by name."
   type        = map(string)

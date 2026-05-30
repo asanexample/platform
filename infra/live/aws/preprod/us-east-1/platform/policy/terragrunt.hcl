@@ -87,5 +87,12 @@ inputs = {
     preview_subject_regexp = "${values(v.apps)[0].repo_url}/.github/workflows/preview.yml@refs/.*"
   } }
 
+  # Phase 5 — Gateway-API route hostname guard (anti-squatting on the shared wildcard listener).
+  # Each team's routes may only claim the hostnames it declares in teams.hcl. (When PR previews get a
+  # dedicated preview_domain, add an app-scoped "<app>-pr-*.<domain>" pattern here.)
+  enable_httproute_guard   = true
+  tenant_hostname_patterns = { for k, v in local.teams : k => v.hostnames }
+  enable_cleanup           = true
+
   tags = include.base.locals.tags
 }

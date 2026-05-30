@@ -1,0 +1,50 @@
+{{- if .Values.enableCleanup }}
+# The cleanup controller only gets delete RBAC for resource types granted via an aggregated
+# ClusterRole. Without this it rejects the policy ("no permission to delete kind Job").
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kyverno:cleanup-jobs
+  labels:
+    rbac.kyverno.io/aggregate-to-cleanup-controller: "true"
+    {{- include "kpp.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "delete"]
+---
+apiVersion: kyverno.io/v2
+kind: ClusterCleanupPolicy
+metadata:
+  name: cleanup-finished-cronjob-jobs
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Cleanup Finished CronJob Jobs
+    policies.kyverno.io/category: Cost, Operational Excellence
+    policies.kyverno.io/description: >-
+      Reaps finished Jobs spawned by CronJobs in tenant namespaces. Scoped to CronJob-owned Jobs so it
+      never deletes a Git-declared/ArgoCD-managed Job (which selfHeal would recreate → re-run loop).
+      Tenant namespaces only — never system/infra Jobs.
+spec:
+  match:
+    any:
+      - resources:
+          kinds:
+            - Job
+          namespaceSelector:
+            matchExpressions:
+              - key: {{ .Values.tenantNamespaceLabel }}
+                operator: Exists
+  conditions:
+    all:
+      # Owned by a CronJob (not Git/ArgoCD-managed).
+      - key: "{{`{{ length(target.metadata.ownerReferences[?kind=='CronJob']) }}`}}"
+        operator: GreaterThanOrEquals
+        value: 1
+      # Finished (has a completion time).
+      - key: "{{`{{ target.status.completionTime || '' }}`}}"
+        operator: NotEquals
+        value: ""
+  schedule: "0 * * * *"
+{{- end }}

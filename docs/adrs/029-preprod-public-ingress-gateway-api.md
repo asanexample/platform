@@ -171,10 +171,12 @@ and Route53. This mirrors the platform dependency chain minus ArgoCD.
 - A vulnerable preprod application could be exploited from the internet. Mitigated by: Cilium
   NetworkPolicy restricting lateral movement, no production data in preprod (synthetic test data
   only), and the ability to quickly set `internal = true` if needed.
-- Wildcard listener (`*.preprod.aws.refplat.org`) means any HTTPRoute can attach and become
-  publicly accessible. A team could accidentally expose an internal-only service. Mitigated by
-  code review on HTTPRoute additions and Kyverno policies (ADR-014) that can enforce namespace-
-  level route constraints.
+- Wildcard listener (`*.preprod.aws.refplat.org`) means any HTTPRoute can attach and claim any
+  hostname — including another team's or a platform service's. **Mitigated (Phase 5, ADR-014):** the
+  Kyverno `restrict-route-hostnames-team-<t>` policies enforce a per-team hostname allow-list (from
+  `teams.hcl`) on HTTPRoute/GRPCRoute/TLSRoute in tenant namespaces, denying cross-team/platform
+  hostnames and empty hostname lists. Per-team allow-lists are the ingress analog of per-team image
+  isolation.
 - The `routes = {}` empty map means the Gateway initially serves no traffic. If teams deploy
   HTTPRoutes via ArgoCD manifests rather than through the Terragrunt unit's `routes` input, the
   Terraform state will not track those routes. This is expected — the `routes` input is for

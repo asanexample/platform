@@ -15,6 +15,8 @@ locals {
   teams = {
     alpha = {
       mode = "namespace"
+      # Hostnames this team's Gateway-API routes may claim (Kyverno hostname guard, ADR-029).
+      hostnames = ["demo.preprod.aws.refplat.org"]
       apps = {
         demo = {
           repo_url  = "https://github.com/gangster/app-alpha"
@@ -24,7 +26,8 @@ locals {
       }
     }
     bravo = {
-      mode = "namespace"
+      mode      = "namespace"
+      hostnames = ["demo-bravo.preprod.aws.refplat.org"]
       apps = {
         demo = {
           repo_url  = "https://github.com/gangster/app-bravo"
