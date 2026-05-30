@@ -182,3 +182,37 @@ Cross-account access uses purpose-built IAM roles (see IAM Roles below). `Organi
 - **Multi-app tenant model** (`teams.hcl`) — team identity (isolation) decoupled from app identity (deployment). ECR: `team-<team>/<app>`. Namespace isolation only; vCluster deferred (ADR-033).
 - **PR preview environments** — ArgoCD ApplicationSet PR generator. Apps with `preview = true` get ephemeral deployments. Kustomize patches rewrite HTTPRoute hostnames.
 - **Kyverno policy engine** (3.8.1 / app v1.18.1, ADR-014) — `policy` module deploys the HA engine + a bundled local `policies-chart` of ClusterPolicies, layered above the PSA `baseline` floor. Per-tenant image-registry scoping + cross-team IRSA guard + RBAC hardening. **Audit-first** (`validation_failure_action`) then flip to Enforce. No team data in the module (per-tenant map from `teams.hcl` at the unit). Phased rollout (Phases 2–5: mutate/generate, cosign verifyImages, CLI shift-left, reporting/cleanup).
+
+## Authoring Policy-Compliant Workloads (Kyverno)
+
+Kyverno is in **Enforce** mode on **preprod and platform** — non-compliant resources in tenant
+namespaces (those labeled `platform.refplat.org/tenant`, e.g. `team-*`) are **rejected at admission**.
+Full per-cluster list: `docs/architecture/kyverno-policy-catalog.md`. When writing tenant manifests
+(app repos' `k8s/`, or anything applied to a `team-*` namespace):
+
+**Auto-injected by `mutate` — do NOT bother setting (Kyverno adds them when absent):**
+
+- Container `securityContext`: `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`, `seccompProfile.type: RuntimeDefault`
+- Pod `automountServiceAccountToken: false`
+- The `team` label (derived from the namespace name)
+
+**Required — omitting these gets the resource REJECTED:**
+
+- **Image** from the platform ECR **scoped to the team**: `<platform-acct>.dkr.ecr.us-east-1.amazonaws.com/team-<team>/<app>:<tag>` (cross-team images are denied)
+- An **explicit, immutable image tag** — never `:latest`, never untagged
+- **Resource requests AND limits** (cpu + memory) on every container
+- **`livenessProbe` and `readinessProbe`** on every container
+- Services must be **`ClusterIP`** — `LoadBalancer`/`NodePort` are denied (ingress is via the shared Gateway / `HTTPRoute`)
+- Workloads only in `team-*` namespaces — **never `default`**
+- **Do not** set `securityContext.allowPrivilegeEscalation: true` or `seccompProfile.type: Unconfined` (backstop policies deny them)
+- ServiceAccounts must **not** carry an `eks.amazonaws.com/role-arn` annotation (tenant IRSA isn't available yet — #64)
+- **No** `cluster-admin` (Cluster)RoleBindings or wildcard (`*`) verbs/resources in Roles
+
+**Recommended (not enforced):** `app.kubernetes.io/name` (can't be auto-derived).
+
+**Regulated tiers only** (`compliance_tier` = hipaa/pci — not the current `standard` clusters):
+`runAsNonRoot: true` and `readOnlyRootFilesystem: true` become required.
+
+If a workload legitimately needs to violate a policy, that's a platform decision — see
+`docs/runbooks/kyverno-break-glass.md`; don't weaken a policy to fit one app. A minimal compliant
+Deployment lives at `app-alpha/k8s/preprod/deployment.yaml`.
