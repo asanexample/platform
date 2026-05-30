@@ -6,9 +6,11 @@ locals {
 # Repositories
 # ---------------------------------------------------------------------------
 
-# Tag mutability is per-repo configurable (var.repositories[*].tag_mutability). Supply-chain
-# integrity is enforced by digest-pinning + cosign signing + Kyverno immutable-tag admission on
-# workloads, not by repo-level immutability. Immutable ECR tags tracked as hardening (#119).
+# Tag mutability is per-repo configurable (var.repositories[*].tag_mutability); team repos default
+# to IMMUTABLE. Use IMMUTABLE_WITH_EXCLUSION to keep IMAGE tags immutable while letting cosign update
+# its `sha256-*.sig`/`.att` auxiliary tags — required so an image can carry multiple attestations
+# (SBOM + SLSA provenance) on an immutable repo (#114). The exclusion never touches image tags
+# (commit SHAs), only cosign's sha256-* tags.
 # nosemgrep: terraform.aws.security.aws-ecr-mutable-image-tags.aws-ecr-mutable-image-tags
 resource "aws_ecr_repository" "this" {
   for_each = local.create ? var.repositories : {}
@@ -16,6 +18,14 @@ resource "aws_ecr_repository" "this" {
   name                 = each.key
   image_tag_mutability = each.value.tag_mutability
   force_delete         = var.force_delete
+
+  dynamic "image_tag_mutability_exclusion_filter" {
+    for_each = each.value.tag_mutability == "IMMUTABLE_WITH_EXCLUSION" ? var.tag_mutability_exclusion_filters : []
+    content {
+      filter      = image_tag_mutability_exclusion_filter.value
+      filter_type = "WILDCARD"
+    }
+  }
 
   image_scanning_configuration {
     scan_on_push = true

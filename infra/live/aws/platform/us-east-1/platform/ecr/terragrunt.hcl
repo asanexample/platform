@@ -16,9 +16,11 @@ inputs = {
 
   # ECR naming convention: team-<team>/<app> (matches teams.hcl app keys).
   # The Team tag scopes per-team access (ABAC, #62) and cost attribution (#61).
+  # IMMUTABLE_WITH_EXCLUSION: image tags stay immutable; cosign's sha256-* signature/attestation
+  # tags are exempt so an image can carry multiple attestations (SBOM + SLSA provenance) — #114.
   repositories = {
-    "team-alpha/demo" = { tags = { Team = "alpha" } }
-    "team-bravo/demo" = { tags = { Team = "bravo" } }
+    "team-alpha/demo" = { tag_mutability = "IMMUTABLE_WITH_EXCLUSION", tags = { Team = "alpha" } }
+    "team-bravo/demo" = { tag_mutability = "IMMUTABLE_WITH_EXCLUSION", tags = { Team = "bravo" } }
   }
 
   # Accounts granted cross-account image pull access
