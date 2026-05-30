@@ -44,6 +44,15 @@ requiredWorkloadLabels:
 # Deploy the mutate policies (safe-default securityContext / automount / labels) on tenant workloads.
 enableMutateDefaults: true
 
+# Deploy per-team verifyImages policies (cosign keyless). Requires signed images + Kyverno ECR IRSA.
+enableImageVerification: false
+# verifyImages action/failurePolicy — independent so verification rolls Audit-first under Enforce.
+verifyFailureAction: Audit
+verifyFailurePolicy: Ignore
+# tenant -> { deploy_subject, preview_subject_regexp } cosign keyless identities (from teams.hcl).
+verifySubjects: {}
+rekorUrl: https://rekor.sigstore.dev
+
 # Raw ClusterPolicy YAML injected verbatim (ADR-014 escape hatch). name -> manifest string.
 additionalPolicies: {}
 

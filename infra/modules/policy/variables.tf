@@ -132,6 +132,66 @@ variable "enable_mutate_defaults" {
   default     = true
 }
 
+# ---------------------------------------------------------------------------
+# Image verification (Phase 3 — cosign keyless)
+# ---------------------------------------------------------------------------
+
+variable "enable_image_verification" {
+  description = "Deploy the per-team verifyImages policies (cosign keyless) and the Kyverno IRSA role granting ECR read (so Kyverno can fetch signatures). Requires app CI to sign images first (#74). Off by default."
+  type        = bool
+  default     = false
+}
+
+variable "verify_failure_action" {
+  description = "Audit/Enforce for the verifyImages policies — independent of validation_failure_action so signature verification can roll out Audit-first while the other policies stay Enforce."
+  type        = string
+  default     = "Audit"
+
+  validation {
+    condition     = contains(["Audit", "Enforce"], var.verify_failure_action)
+    error_message = "verify_failure_action must be either \"Audit\" or \"Enforce\"."
+  }
+}
+
+variable "oidc_provider_arn" {
+  description = "EKS OIDC provider ARN, for the Kyverno IRSA trust policy. Required when enable_image_verification = true."
+  type        = string
+  default     = ""
+}
+
+variable "oidc_provider_url" {
+  description = "EKS OIDC provider URL (no https:// prefix), for the Kyverno IRSA trust policy."
+  type        = string
+  default     = ""
+}
+
+variable "ecr_account_id" {
+  description = "AWS account ID hosting the ECR repos Kyverno reads signatures from (the platform account). Cross-account from preprod is permitted by the ECR repo policy."
+  type        = string
+  default     = ""
+}
+
+variable "ecr_region" {
+  description = "Region of the ECR repos (for the IRSA policy resource ARN)."
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "verify_subjects" {
+  description = "Per-tenant cosign keyless identities (built from teams.hcl at the unit). Key = tenant; deploy_subject is the exact main-branch workflow identity; preview_subject_regexp matches the PR-preview workflow (its OIDC ref varies per PR)."
+  type = map(object({
+    deploy_subject         = string
+    preview_subject_regexp = string
+  }))
+  default = {}
+}
+
+variable "rekor_url" {
+  description = "Rekor transparency log URL for keyless verification."
+  type        = string
+  default     = "https://rekor.sigstore.dev"
+}
+
 variable "additional_policies" {
   description = "Raw ClusterPolicy YAML manifests for custom policy injection beyond the built-in set (ADR-014 contract). Keyed by name."
   type        = map(string)

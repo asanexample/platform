@@ -26,6 +26,8 @@ dependency "eks" {
     cluster_id                    = "mock-cluster"
     cluster_endpoint              = "https://mock-endpoint"
     cluster_certificate_authority = "bW9jaw=="
+    oidc_provider_arn             = "arn:aws:iam::000000000000:oidc-provider/mock"
+    oidc_provider_url             = "oidc.eks.mock.amazonaws.com/id/mock"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
@@ -72,6 +74,18 @@ inputs = {
 
   helm_chart_version = include.base.locals.helm_versions.kyverno
   helm_wait          = true
+
+  # Phase 3 — cosign keyless image verification (Audit-first, independent of the Enforce above).
+  enable_image_verification = true
+  verify_failure_action     = "Enforce"
+  oidc_provider_arn         = dependency.eks.outputs.oidc_provider_arn
+  oidc_provider_url         = dependency.eks.outputs.oidc_provider_url
+  ecr_account_id            = include.base.locals.account_ids["platform"]
+  # Per-team cosign keyless identities derived from each team's app repo (team data stays at the unit).
+  verify_subjects = { for k, v in local.teams : k => {
+    deploy_subject         = "${values(v.apps)[0].repo_url}/.github/workflows/deploy.yml@refs/heads/main"
+    preview_subject_regexp = "${values(v.apps)[0].repo_url}/.github/workflows/preview.yml@refs/.*"
+  } }
 
   tags = include.base.locals.tags
 }
