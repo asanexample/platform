@@ -209,3 +209,99 @@ jobs:
             echo "::endgroup::"
           done
           exit $FAILED
+
+  # ---------------------------------------------------------------------------
+  # Security scanning (#112 / 108a) — OSS scanners. These repos are private
+  # without GitHub Advanced Security, so Code Scanning / the Security-tab SARIF
+  # integration is unavailable; findings surface in job logs + SARIF artifacts.
+  # Scanner CLIs are installed at PINNED versions rather than via their GitHub
+  # Actions: aquasecurity/trivy-action + setup-trivy were compromised in 03/2026
+  # (version tags force-pushed to malware), so we minimise third-party action
+  # trust on the very job meant to harden the supply chain.
+  # ROLLOUT: report-only baseline (exit-code 0 / `|| true`). Flip to blocking on
+  # HIGH/CRITICAL once a clean baseline is confirmed (Audit->Enforce, per ADR-014).
+  # ---------------------------------------------------------------------------
+
+  trivy-iac:
+    name: Trivy IaC (misconfig)
+    runs-on: ubuntu-latest
+    env:
+      TRIVY_VERSION: "0.70.0" # latest stable; verify before bumping
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Trivy CLI (tag-pinned install script; avoids the compromised action)
+        run: |
+          curl -sfL "https://raw.githubusercontent.com/aquasecurity/trivy/v${TRIVY_VERSION}/contrib/install.sh" \
+            | sh -s -- -b /usr/local/bin "v${TRIVY_VERSION}"
+          trivy --version
+      - name: Scan OpenTofu/Terraform under infra/modules for misconfigurations
+        run: |
+          trivy config infra/modules \
+            --severity HIGH,CRITICAL \
+            --skip-dirs '**/.terraform' \
+            --format sarif --output trivy-iac.sarif \
+            --exit-code 0   # report-only baseline (#112)
+          echo "::group::Trivy IaC findings"
+          trivy convert --format table trivy-iac.sarif
+          echo "::endgroup::"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-iac-sarif
+          path: trivy-iac.sarif
+
+  trivy-deps:
+    name: Trivy deps (Go SCA)
+    runs-on: ubuntu-latest
+    env:
+      TRIVY_VERSION: "0.70.0"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Trivy CLI
+        run: |
+          curl -sfL "https://raw.githubusercontent.com/aquasecurity/trivy/v${TRIVY_VERSION}/contrib/install.sh" \
+            | sh -s -- -b /usr/local/bin "v${TRIVY_VERSION}"
+      - name: Scan Go modules (infra/tests) for known vulnerabilities
+        run: |
+          trivy fs infra/tests/aws --scanners vuln \
+            --severity HIGH,CRITICAL \
+            --format sarif --output trivy-deps.sarif \
+            --exit-code 0   # report-only baseline (#112)
+          echo "::group::Trivy dependency findings"
+          trivy convert --format table trivy-deps.sarif
+          echo "::endgroup::"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-deps-sarif
+          path: trivy-deps.sarif
+
+  semgrep:
+    name: Semgrep (SAST)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Semgrep (pinned)
+        run: pip install --quiet semgrep==1.164.0 # latest stable; verify before bumping
+      - name: Static analysis (terraform / bash / actions / secrets / go / dockerfile)
+        run: |
+          semgrep scan \
+            --config p/terraform --config p/bash --config p/github-actions \
+            --config p/secrets --config p/golang --config p/dockerfile \
+            --metrics off \
+            --sarif --output semgrep.sarif \
+            --error || true   # report-only baseline (#112); drop `|| true` to block
+          echo "::group::Semgrep findings"
+          semgrep scan \
+            --config p/terraform --config p/bash --config p/github-actions \
+            --config p/secrets --config p/golang --config p/dockerfile \
+            --metrics off || true
+          echo "::endgroup::"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: semgrep-sarif
+          path: semgrep.sarif
