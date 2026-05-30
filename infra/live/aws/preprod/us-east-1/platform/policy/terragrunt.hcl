@@ -83,10 +83,10 @@ inputs = {
   # Phase 3 — cosign keyless image verification (Audit-first, independent of the Enforce above).
   enable_image_verification = true
   verify_failure_action     = "Enforce"
-  # SBOM + SLSA provenance attestation requirement (#108/108d). Audit-first: confirm app images
-  # pass via PolicyReports before flipping to Enforce (signatures stay Enforce above).
+  # SBOM + SLSA provenance attestation requirement (#108/108d). Flipped to Enforce after the Audit
+  # phase confirmed the live alpha deploy + PR-preview images verify ("image verified" PolicyReport).
   enable_attestation_verification = true
-  attest_failure_action           = "Audit"
+  attest_failure_action           = "Enforce"
   oidc_provider_arn               = dependency.eks.outputs.oidc_provider_arn
   oidc_provider_url               = dependency.eks.outputs.oidc_provider_url
   ecr_account_id                  = include.base.locals.account_ids["platform"]
