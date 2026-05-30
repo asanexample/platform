@@ -1,0 +1,26 @@
+variable "create" {
+  description = "Controls whether resources should be created"
+  type        = bool
+  default     = true
+}
+
+variable "buckets" {
+  description = <<-EOT
+    Map of bucket name -> config. Each bucket is private (all public access blocked) and SSE-S3
+    encrypted. reader_role_arns / writer_role_arns are granted via a bucket policy scoped to those exact
+    role ARNs (least-privilege cross-account: tighter than an account :root grant). Cross-account S3
+    access additionally requires the caller's own identity policy to allow it (granted on the team role).
+  EOT
+  type = map(object({
+    reader_role_arns = optional(list(string), [])
+    writer_role_arns = optional(list(string), [])
+    tags             = optional(map(string), {})
+  }))
+  default = {}
+}
+
+variable "tags" {
+  description = "Tags applied to all buckets"
+  type        = map(string)
+  default     = {}
+}

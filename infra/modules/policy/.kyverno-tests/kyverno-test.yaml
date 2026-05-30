@@ -75,6 +75,11 @@ results:
     kind: ServiceAccount
     resources: [sneaky-sa]
     result: fail
+  - policy: disallow-irsa-annotation-cross-team
+    rule: deny-irsa-annotation
+    kind: ServiceAccount
+    resources: [app-alpha] # Pod Identity shape (named SA, no annotation) is admitted
+    result: pass
   - policy: block-public-loadbalancer
     rule: deny-lb-nodeport
     kind: Service

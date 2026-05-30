@@ -46,7 +46,7 @@ emergency disable / the Audit↔Enforce flip.
 | `restrict-automount-sa-token` | Pod | `automountServiceAccountToken: false` | tenant | all | preprod, platform |
 | `require-workload-labels` | Pod | `app.kubernetes.io/name` + `team` labels | tenant | all | preprod, platform |
 | `block-public-loadbalancer` | Service | Deny `LoadBalancer` / `NodePort` (Gateway-only ingress) | tenant | all | preprod, platform |
-| `disallow-irsa-annotation-cross-team` | ServiceAccount | Deny `eks.amazonaws.com/role-arn` annotation (until per-team IRSA, #64) | tenant | all | preprod, platform |
+| `disallow-irsa-annotation-cross-team` | ServiceAccount | Deny `eks.amazonaws.com/role-arn` annotation (tenant AWS access is Pod Identity, not IRSA — ADR-041; backstop) | tenant | all | preprod, platform |
 | `require-tenant-namespace-naming` | Namespace | Tenant namespaces named `team-*` | tenant (labelled ns) | all | preprod, platform |
 | `restrict-binding-clusteradmin` | RoleBinding, ClusterRoleBinding | Deny binding to `cluster-admin` | cluster | all | preprod, platform |
 | `restrict-wildcard-rbac` | Role, ClusterRole | Deny wildcard verbs / resources / apiGroups | cluster | all | preprod, platform |

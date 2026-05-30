@@ -296,6 +296,25 @@ pull requests (ADR-032).
    (creates namespace + policies).
 3. The ArgoCD Application is created automatically on the next sync.
 
+## Tenant AWS Access (Pod Identity)
+
+Tenants reach AWS resources via **platform-managed EKS Pod Identity** (ADR-041), not IRSA. A team
+declares its needs in `teams.hcl` (`aws` block: a named ServiceAccount + S3 suffixes); the platform
+generates a `Pod-team-<team>` role, the bucket(s), and a `PodIdentityAssociation` binding
+`(cluster, team-<team>, <serviceAccount>) → role`. Pods running as that named SA receive credentials
+from the Pod Identity agent — no `eks.amazonaws.com/role-arn` annotation (which stays denied as a
+backstop).
+
+**Isolation is default-deny, by construction.** A team's role identity policy is scoped to the exact
+bucket ARNs it declares (no wildcard), and each bucket's resource policy grants only the owning team's
+role. Both the bucket name and its sole reader derive from the team key (`<org>-team-<team>-<suffix>` →
+`Pod-team-<team>`), so a team can only ever access `<org>-team-<itself>-*` — a cross-grant is
+structurally impossible (the same posture as per-team ECR `team-<team>/*`). Cross-account S3 (bucket in
+the platform account, role in preprod) requires **both** the identity policy and the bucket policy to
+allow it; neither is true for another team. Tenants cannot create associations (an AWS API call), and
+the egress NetworkPolicy blocks IMDS so they cannot steal the node role. See the runbook
+[`tenant-aws-access-pod-identity.md`](../runbooks/tenant-aws-access-pod-identity.md).
+
 ## PR Preview Environments
 
 Apps with `preview = true` in `teams.hcl` get ephemeral preview deployments

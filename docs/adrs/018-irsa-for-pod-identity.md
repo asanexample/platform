@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-23
 
-**Status:** Accepted
+**Status:** Accepted — **narrowed for tenant workloads by [ADR-041](041-pod-identity-for-tenant-workloads.md)** (platform add-ons keep IRSA; *tenant* workloads use EKS Pod Identity).
 
 ## Context
 

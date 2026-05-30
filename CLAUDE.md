@@ -183,7 +183,7 @@ The **Test** account (`157263244316`, Terratest sandbox) is a standard `Platform
 - **Internal Gateway NLB** — `internal` scheme, services only reachable through Tailscale. TLS via Let's Encrypt DNS-01.
 - **Multi-app tenant model** (`teams.hcl`) — team identity (isolation) decoupled from app identity (deployment). ECR: `team-<team>/<app>`. Namespace isolation only; vCluster deferred (ADR-033).
 - **PR preview environments** — ArgoCD ApplicationSet PR generator. Apps with `preview = true` get ephemeral deployments. Kustomize patches rewrite HTTPRoute hostnames.
-- **Kyverno policy engine** (3.8.1 / app v1.18.1, ADR-014) — `policy` module deploys the HA engine + a bundled local `policies-chart` of ClusterPolicies, layered above the PSA `baseline` floor. Per-tenant image-registry scoping + cross-team IRSA guard + RBAC hardening. **Audit-first** (`validation_failure_action`) then flip to Enforce. No team data in the module (per-tenant map from `teams.hcl` at the unit). Phased rollout (Phases 2–5: mutate/generate, cosign verifyImages, CLI shift-left, reporting/cleanup).
+- **Kyverno policy engine** (3.8.1 / app v1.18.1, ADR-014) — `policy` module deploys the HA engine + a bundled local `policies-chart` of ClusterPolicies, layered above the PSA `baseline` floor. Per-tenant image-registry scoping + cross-team IRSA-annotation backstop (tenant AWS access is Pod Identity, ADR-041) + RBAC hardening. **Audit-first** (`validation_failure_action`) then flip to Enforce. No team data in the module (per-tenant map from `teams.hcl` at the unit). Phased rollout (Phases 2–5: mutate/generate, cosign verifyImages, CLI shift-left, reporting/cleanup).
 
 ## Authoring Policy-Compliant Workloads (Kyverno)
 
@@ -208,7 +208,7 @@ Full per-cluster list: `docs/architecture/kyverno-policy-catalog.md`. When writi
 - **HTTPRoute/GRPCRoute/TLSRoute hostnames** must be in the team's allow-list in `teams.hcl` (`hostnames`) — claiming another team's or a platform hostname (or omitting hostnames) is denied (ADR-029)
 - Workloads only in `team-*` namespaces — **never `default`**
 - **Do not** set `securityContext.allowPrivilegeEscalation: true` or `seccompProfile.type: Unconfined` (backstop policies deny them)
-- ServiceAccounts must **not** carry an `eks.amazonaws.com/role-arn` annotation (tenant IRSA isn't available yet — #64)
+- Tenant AWS access is via **platform-managed EKS Pod Identity** (association → named ServiceAccount; ADR-041): use a **named** ServiceAccount (never `default`) and set `serviceAccountName`; declare the access in `teams.hcl` (`aws` block). ServiceAccounts must **not** carry an `eks.amazonaws.com/role-arn` annotation — IRSA is platform-only; a tenant annotation is denied (backstop `disallow-irsa-annotation-cross-team`)
 - **Images must be cosign-signed** by the app's own GitHub workflow (keyless; Phase 3, preprod). App CI signs after the ECR push (`cosign sign --yes …@<digest>`); Kyverno's `verify-images-team-<team>` admits only images signed by `app-<team>`'s `deploy.yml`/`preview.yml` identity. Unsigned or another team's image is rejected. Full explainer (how keyless signing/Fulcio/Rekor/IRSA fit together): `docs/architecture/cosign-image-signing.md`.
 - **No** `cluster-admin` (Cluster)RoleBindings or wildcard (`*`) verbs/resources in Roles
 
