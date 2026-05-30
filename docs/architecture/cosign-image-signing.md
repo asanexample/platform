@@ -357,6 +357,39 @@ else; no keys, no secrets. The platform side (trusting that identity) is wired f
 
 ---
 
+## 10b. Isolated build provenance (SLSA Build L3 — ADR-042)
+
+The image **signature** above proves *who built* an image. The **SLSA provenance** attestation proves
+*how* it was built. Today the provenance is hand-authored and signed by the app's own build job — so a
+compromised build could forge it (Build L1+). [ADR-042](../adrs/042-isolated-build-provenance-slsa-l3.md)
+moves provenance signing to an **isolated reusable workflow** the app team cannot edit:
+
+- The signer lives in `asanexample/trusted-ci` (private, org-only call access, CODEOWNERS=platform). App
+  CI calls it as a job (`uses: …/trusted-ci/.github/workflows/slsa-provenance.yml@<sha>`, pinned).
+- Because it is a **reusable** workflow, the Fulcio cert's **subject is the signer workflow, not the
+  caller** — so the app build can't forge provenance attributed to trusted-ci. That isolation is the
+  SLSA **Build L3** lever. The cert's `GitHub Workflow Repository` extension still records the caller
+  (`app-<team>`), which per-team verification keys on.
+- It mints its own ECR token by assuming the **caller team's `github-actions-ecr-push-<team>` role**
+  (AWS doesn't honor the `job_workflow_ref` claim in trust policies — only `sub`/`aud`), then
+  `cosign attest --type slsaprovenance` (legacy `.att`, same format this doc's verification uses).
+
+Verify the isolated provenance by hand:
+
+```bash
+cosign verify-attestation --type slsaprovenance \
+  --certificate-identity-regexp 'https://github.com/asanexample/trusted-ci/.github/workflows/slsa-provenance.yml@.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-github-workflow-repository asanexample/app-<team> \
+  <registry>/team-<team>/<app>@<digest>
+```
+
+Rollout is dual-provenance first (both the old hand-authored and the new isolated attestation exist), so
+admission never breaks; Kyverno swaps the SLSA attestor to the trusted-ci identity in a later phase. The
+image **signature** policy (sections 4–6) is unchanged and remains the primary per-team gate.
+
+---
+
 ## 11. Glossary
 
 | Term | Meaning |
