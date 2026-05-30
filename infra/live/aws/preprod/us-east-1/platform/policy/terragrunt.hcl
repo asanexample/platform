@@ -77,7 +77,7 @@ inputs = {
 
   # Phase 3 — cosign keyless image verification (Audit-first, independent of the Enforce above).
   enable_image_verification = true
-  verify_failure_action     = "Audit"
+  verify_failure_action     = "Enforce"
   oidc_provider_arn         = dependency.eks.outputs.oidc_provider_arn
   oidc_provider_url         = dependency.eks.outputs.oidc_provider_url
   ecr_account_id            = include.base.locals.account_ids["platform"]
