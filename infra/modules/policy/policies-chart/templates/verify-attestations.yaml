@@ -1,0 +1,80 @@
+{{- if and .Values.enableImageVerification .Values.enableAttestationVerification }}
+{{- range $team, $idents := .Values.verifySubjects }}
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-attestations-team-{{ $team }}
+  labels:
+    {{- include "kpp.labels" $ | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Verify Image Attestations — team-{{ $team }}
+    policies.kyverno.io/category: Supply Chain, Multi-Tenancy
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Requires team-{{ $team }} images to carry a cosign-signed SBOM (CycloneDX) AND a SLSA build
+      provenance attestation from app-{{ $team }}'s own GitHub Actions workflow — the full provenance
+      chain layered on top of the signature (verify-images-team-{{ $team }}). Same per-team keyless
+      identity. Predicate types match what the app deploy emits: `cosign attest --type cyclonedx`
+      (https://cyclonedx.org/bom) and `--type slsaprovenance` (https://slsa.dev/provenance/v0.2).
+spec:
+  # Own action/failurePolicy so the SBOM+provenance requirement can roll out Audit-first while
+  # verify-images (signatures) stays Enforce. Digest pinning is done by verify-images-team-{{ $team }};
+  # here we only fetch + verify the attestations (Rekor lookup covered by the webhook timeout).
+  validationFailureAction: {{ $.Values.attestFailureAction }}
+  webhookTimeoutSeconds: 30
+  failurePolicy: {{ $.Values.attestFailurePolicy }}
+  background: false
+  rules:
+    - name: require-sbom-and-provenance
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - team-{{ $team }}
+      verifyImages:
+        - imageReferences:
+            - "{{ index $.Values.tenantRegistryMap $team }}/*"
+          mutateDigest: false # verify-images-team-{{ $team }} pins the digest; don't double-mutate
+          verifyDigest: false
+          required: true
+          attestations:
+            # SBOM (CycloneDX) — must exist and be signed by the team's own workflow identity.
+            - type: https://cyclonedx.org/bom
+              attestors:
+                - count: 1
+                  entries:
+                    {{- range $idents }}
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subject: "{{ .deploy_subject }}"
+                        rekor:
+                          url: "{{ $.Values.rekorUrl }}"
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subjectRegExp: "{{ .preview_subject_regexp }}"
+                        rekor:
+                          url: "{{ $.Values.rekorUrl }}"
+                    {{- end }}
+            # SLSA build provenance — must exist and be signed by the same identity.
+            - type: https://slsa.dev/provenance/v0.2
+              attestors:
+                - count: 1
+                  entries:
+                    {{- range $idents }}
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subject: "{{ .deploy_subject }}"
+                        rekor:
+                          url: "{{ $.Values.rekorUrl }}"
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subjectRegExp: "{{ .preview_subject_regexp }}"
+                        rekor:
+                          url: "{{ $.Values.rekorUrl }}"
+                    {{- end }}
+---
+{{- end }}
+{{- end }}

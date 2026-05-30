@@ -5,6 +5,7 @@ locals {
   # admission; only once Enforce + HA are proven do we fail-closed (Fail).
   failure_policy        = var.validation_failure_action == "Enforce" ? "Fail" : "Ignore"
   verify_failure_policy = var.verify_failure_action == "Enforce" ? "Fail" : "Ignore"
+  attest_failure_policy = var.attest_failure_action == "Enforce" ? "Fail" : "Ignore"
 
   # Kyverno needs ECR read (IRSA) to fetch cosign signatures for verifyImages (Phase 3).
   create_irsa = local.create && var.enable_image_verification && var.oidc_provider_arn != ""
@@ -58,11 +59,15 @@ locals {
     verifyFailurePolicy     = local.verify_failure_policy
     verifySubjects          = var.verify_subjects
     rekorUrl                = var.rekor_url
-    enableHttprouteGuard    = var.enable_httproute_guard
-    tenantHostnamePatterns  = var.tenant_hostname_patterns
-    enableCleanup           = var.enable_cleanup
-    additionalPolicies      = var.additional_policies
-    commonLabels            = local.k8s_labels
+
+    enableAttestationVerification = var.enable_attestation_verification
+    attestFailureAction           = var.attest_failure_action
+    attestFailurePolicy           = local.attest_failure_policy
+    enableHttprouteGuard          = var.enable_httproute_guard
+    tenantHostnamePatterns        = var.tenant_hostname_patterns
+    enableCleanup                 = var.enable_cleanup
+    additionalPolicies            = var.additional_policies
+    commonLabels                  = local.k8s_labels
   }
 }
 

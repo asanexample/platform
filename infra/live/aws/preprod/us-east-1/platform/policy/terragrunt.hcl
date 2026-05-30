@@ -83,9 +83,13 @@ inputs = {
   # Phase 3 — cosign keyless image verification (Audit-first, independent of the Enforce above).
   enable_image_verification = true
   verify_failure_action     = "Enforce"
-  oidc_provider_arn         = dependency.eks.outputs.oidc_provider_arn
-  oidc_provider_url         = dependency.eks.outputs.oidc_provider_url
-  ecr_account_id            = include.base.locals.account_ids["platform"]
+  # SBOM + SLSA provenance attestation requirement (#108/108d). Audit-first: confirm app images
+  # pass via PolicyReports before flipping to Enforce (signatures stay Enforce above).
+  enable_attestation_verification = true
+  attest_failure_action           = "Audit"
+  oidc_provider_arn               = dependency.eks.outputs.oidc_provider_arn
+  oidc_provider_url               = dependency.eks.outputs.oidc_provider_url
+  ecr_account_id                  = include.base.locals.account_ids["platform"]
   # Per-team cosign keyless identities derived from each team's app repo (team data stays at the unit).
   # A LIST per team (count:1 attestor): the asanexample identity plus, during the org migration, the
   # legacy gangster identity (same repo path under the old org). distinct/compact collapse the legacy

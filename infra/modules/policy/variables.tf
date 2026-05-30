@@ -156,6 +156,23 @@ variable "verify_failure_action" {
   }
 }
 
+variable "enable_attestation_verification" {
+  description = "Deploy the per-team verify-attestations policies requiring a cosign-signed SBOM (CycloneDX) AND SLSA provenance attestation, in addition to the image signature (#108/108d). Reuses verify_subjects + the Kyverno ECR-read IRSA, so it also requires enable_image_verification = true. Off by default."
+  type        = bool
+  default     = false
+}
+
+variable "attest_failure_action" {
+  description = "Audit/Enforce for the verify-attestations policies — separate from verify_failure_action so the SBOM+provenance requirement can roll out Audit-first while signature verification stays Enforce."
+  type        = string
+  default     = "Audit"
+
+  validation {
+    condition     = contains(["Audit", "Enforce"], var.attest_failure_action)
+    error_message = "attest_failure_action must be either \"Audit\" or \"Enforce\"."
+  }
+}
+
 variable "oidc_provider_arn" {
   description = "EKS OIDC provider ARN, for the Kyverno IRSA trust policy. Required when enable_image_verification = true."
   type        = string
