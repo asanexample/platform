@@ -72,7 +72,7 @@ has the record.
 
 ## 3. The two halves of our system
 
-```
+```text
           ┌─────────────────────────  SIGN (app repo CI)  ─────────────────────────┐
           │                                                                          │
  git push │   build image ──▶ push to ECR ──▶ cosign sign (keyless, by digest)       │
@@ -159,7 +159,7 @@ cosign verify \
 
 The output's certificate extensions spell out exactly who signed it:
 
-```
+```text
 Issuer:  https://token.actions.githubusercontent.com
 Subject: https://github.com/asanexample/app-alpha/.github/workflows/deploy.yml@refs/heads/main
 githubWorkflowRepository: asanexample/app-alpha
