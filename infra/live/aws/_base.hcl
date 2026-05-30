@@ -65,6 +65,9 @@ locals {
   admin_email    = local.common_vars.locals.admin_email
   account_emails = local.common_vars.locals.account_emails
 
+  # Org/resource name prefix (e.g. tenant bucket names). See common.hcl.
+  org_name = local.common_vars.locals.org_name
+
   # ---------------------------------------------------------------------------
   # IAM role ARNs
   # ---------------------------------------------------------------------------

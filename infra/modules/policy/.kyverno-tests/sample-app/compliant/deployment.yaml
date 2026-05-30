@@ -19,6 +19,7 @@ spec:
       labels:
         app.kubernetes.io/name: demo
     spec:
+      serviceAccountName: demo
       containers:
         - name: app
           image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:v1.0.0

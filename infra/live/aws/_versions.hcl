@@ -22,10 +22,12 @@ locals {
     ssm_bastion    = "${local.source_base}/aws//ssm-bastion"
 
     # IAM
-    iam_roles = "${local.source_base}/aws//iam_roles"
+    iam_roles        = "${local.source_base}/aws//iam_roles"
+    eks_pod_identity = "${local.source_base}/aws//eks-pod-identity"
 
     # Storage & secrets
     ecr = "${local.source_base}/aws//ecr"
+    s3  = "${local.source_base}/aws//s3"
 
     # DNS
     route53            = "${local.source_base}/aws//route53"

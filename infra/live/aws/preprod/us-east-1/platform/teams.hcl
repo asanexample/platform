@@ -10,6 +10,9 @@
 #     repo_url  - Git repo containing the app's Kubernetes manifests
 #     repo_path - Path within the repo to the manifest directory
 #     preview   - Whether to create an ApplicationSet for PR preview deployments
+#   aws       - Optional: per-team AWS access via EKS Pod Identity (ADR-041)
+#     service_account - the named ServiceAccount the app's pods run as (association binds to it)
+#     s3              - map of bucket name -> { bucket_account, access (read|readwrite), prefix }
 
 locals {
   teams = {
@@ -24,6 +27,16 @@ locals {
           preview   = true
         }
       }
+      # Per-team AWS access via EKS Pod Identity (ADR-041). The platform binds the role to exactly this
+      # (namespace, service_account); the app manifest MUST set spec.serviceAccountName to it.
+      # s3 keys are SUFFIXES — the full bucket name is built as `asanexample-team-<team>-<suffix>`, so a
+      # team structurally cannot name (or be granted) another team's bucket (isolation by construction).
+      aws = {
+        service_account = "app-alpha"
+        s3 = {
+          "data" = { access = "read", prefix = "" } # -> asanexample-team-alpha-data
+        }
+      }
     }
     bravo = {
       mode      = "namespace"
@@ -35,9 +48,19 @@ locals {
           preview   = false
         }
       }
+      # bravo's role/bucket/association are provisioned (for the cross-team isolation test) even though
+      # app-bravo isn't deployed yet; the association is inert until a pod runs as this SA.
+      aws = {
+        service_account = "app-bravo"
+        s3 = {
+          "data" = { access = "read", prefix = "" } # -> asanexample-team-bravo-data
+        }
+      }
     }
   }
 
   namespace_teams = { for k, v in local.teams : k => v if v.mode == "namespace" }
   vcluster_teams  = { for k, v in local.teams : k => v if v.mode == "vcluster" }
+  # Teams that declare AWS access (Pod Identity role + association + bucket grants).
+  aws_teams = { for k, v in local.teams : k => v if try(v.aws, null) != null }
 }

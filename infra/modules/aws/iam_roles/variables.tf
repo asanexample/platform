@@ -10,7 +10,11 @@ variable "roles" {
     description          = optional(string, "")
     path                 = optional(string, "/")
     max_session_duration = optional(number, 3600)
-    trust_principals     = map(list(string))
+    # Map of principal type -> identifiers. Keys: "aws" (AWS account/role ARNs), "service" (AWS service
+    # principals, e.g. "pods.eks.amazonaws.com" for EKS Pod Identity), "federated".
+    trust_principals = map(list(string))
+    # Trust-policy actions. Defaults to sts:AssumeRole; Pod Identity needs ["sts:AssumeRole","sts:TagSession"].
+    trust_actions = optional(list(string), ["sts:AssumeRole"])
     trust_conditions = optional(list(object({
       test     = string
       variable = string

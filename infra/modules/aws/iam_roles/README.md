@@ -1,6 +1,6 @@
 # IAM Roles
 
-Creates IAM roles with configurable trust policies, managed policy attachments, and inline policies. Designed for creating purpose-built cross-account roles (PlatformAdmin, PlatformDeployer, DeveloperAccess, TerraformStateAccess) that are assumed from a central management account. Each role's trust policy is built from AWS principal ARNs with optional conditions.
+Creates IAM roles with configurable trust policies, managed policy attachments, and inline policies. Designed for creating purpose-built cross-account roles (PlatformAdmin, PlatformDeployer, DeveloperAccess, TerraformStateAccess) that are assumed from a central management account. Each role's trust policy is built from `trust_principals` (AWS principal ARNs and/or a `service` principal such as `pods.eks.amazonaws.com` for EKS Pod Identity) with optional conditions, and `trust_actions` (defaults to `sts:AssumeRole`; Pod Identity roles also need `sts:TagSession`).
 
 ## Usage
 
@@ -115,7 +115,7 @@ No modules.
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_create"></a> [create](#input\_create) | Whether to create resources in this module | `bool` | `true` | no |
-| <a name="input_roles"></a> [roles](#input\_roles) | Map of IAM roles to create | <pre>map(object({<br/>    description          = optional(string, "")<br/>    path                 = optional(string, "/")<br/>    max_session_duration = optional(number, 3600)<br/>    trust_principals     = map(list(string))<br/>    trust_conditions = optional(list(object({<br/>      test     = string<br/>      variable = string<br/>      values   = list(string)<br/>    })), [])<br/>    managed_policies = optional(list(string), [])<br/>    inline_policies  = optional(map(string), {})<br/>    tags             = optional(map(string), {})<br/>  }))</pre> | `{}` | no |
+| <a name="input_roles"></a> [roles](#input\_roles) | Map of IAM roles to create | <pre>map(object({<br/>    description          = optional(string, "")<br/>    path                 = optional(string, "/")<br/>    max_session_duration = optional(number, 3600)<br/>    # Map of principal type -> identifiers. Keys: "aws" (AWS account/role ARNs), "service" (AWS service<br/>    # principals, e.g. "pods.eks.amazonaws.com" for EKS Pod Identity), "federated".<br/>    trust_principals = map(list(string))<br/>    # Trust-policy actions. Defaults to sts:AssumeRole; Pod Identity needs ["sts:AssumeRole","sts:TagSession"].<br/>    trust_actions = optional(list(string), ["sts:AssumeRole"])<br/>    trust_conditions = optional(list(object({<br/>      test     = string<br/>      variable = string<br/>      values   = list(string)<br/>    })), [])<br/>    managed_policies = optional(list(string), [])<br/>    inline_policies  = optional(map(string), {})<br/>    tags             = optional(map(string), {}) # merged onto var.tags (e.g. { Team = "alpha" })<br/>  }))</pre> | `{}` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to all resources | `map(string)` | `{}` | no |
 
 ## Outputs
@@ -128,7 +128,7 @@ No modules.
 
 ## Notes
 
-- The `trust_principals` map currently expects an `aws` key with a list of IAM principal ARNs.
+- The `trust_principals` map keys by principal type: `aws` (IAM/account ARNs), `service` (AWS service principals, e.g. `pods.eks.amazonaws.com` for EKS Pod Identity), and `federated`. `trust_actions` defaults to `["sts:AssumeRole"]`; Pod Identity roles set `["sts:AssumeRole","sts:TagSession"]`.
 - Managed policies and inline policies are both optional and default to empty.
 - Role names are used as the map keys and become the actual IAM role names in AWS.
 - Default max session duration is 3600 seconds (1 hour); increase for long-running Terragrunt applies.

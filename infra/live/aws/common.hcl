@@ -24,6 +24,10 @@ locals {
   # Project variables
   workload = "platform"
 
+  # Org/resource name prefix for globally- or account-unique resource names (e.g. tenant S3 buckets
+  # `${org_name}-team-<team>-<suffix>`). Matches the GitHub org. Change here to rebrand the platform.
+  org_name = "asanexample"
+
   # Common tags
   tags = {
     ManagedBy          = "Terragrunt"

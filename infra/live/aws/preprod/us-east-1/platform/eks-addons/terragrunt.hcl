@@ -52,6 +52,9 @@ inputs = {
         policy_arns               = ["arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"]
       }
     }
+    # Serves per-team workload AWS credentials via Pod Identity associations (ADR-041). No IRSA — runs
+    # as a DaemonSet AWS manages. Required by the pod-identity unit.
+    eks-pod-identity-agent = {}
   }
 
   tags = include.base.locals.tags

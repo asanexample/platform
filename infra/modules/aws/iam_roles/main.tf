@@ -28,11 +28,17 @@ data "aws_iam_policy_document" "trust" {
 
   statement {
     effect  = "Allow"
-    actions = ["sts:AssumeRole"]
+    actions = each.value.trust_actions
 
-    principals {
-      type        = "AWS"
-      identifiers = each.value.trust_principals["aws"]
+    # Iterate the trust_principals map so roles can trust AWS principals (the common case) and/or a
+    # service principal (e.g. pods.eks.amazonaws.com for EKS Pod Identity). For the {aws=[...]} shape
+    # this renders one type="AWS" block — byte-identical to the previous static block.
+    dynamic "principals" {
+      for_each = each.value.trust_principals
+      content {
+        type        = lookup({ aws = "AWS", service = "Service", federated = "Federated" }, principals.key, "AWS")
+        identifiers = principals.value
+      }
     }
 
     dynamic "condition" {

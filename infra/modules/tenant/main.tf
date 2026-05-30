@@ -149,6 +149,36 @@ resource "kubernetes_manifest" "tenant_allow_gateway_envoy" {
   }
 }
 
+# Allows egress to the EKS Pod Identity agent so tenant pods can fetch their workload AWS credentials
+# (ADR-041). The agent serves credentials at the link-local 169.254.170.23:80, which is node-served, so
+# Cilium classifies it as the `host` entity. A CIDR rule (broad 0.0.0.0/0 OR a narrow /32) does NOT match
+# the host entity in Cilium, so we must allow it via `toEntities: [host]`, scoped to port 80. This also
+# makes IMDS (169.254.169.254:80, also host) network-reachable — but the node enforces IMDSv2 with
+# HttpPutResponseHopLimit=1, so a pod (1 hop from the node) cannot reach IMDS regardless. That hop-limit
+# is the hard control against node-role theft; the egress restriction is defense-in-depth. (Verify the
+# hop-limit stays 1 on the node groups.) Rendered for every namespace tenant; harmless without an association.
+resource "kubernetes_manifest" "tenant_allow_pod_identity_egress" {
+  for_each = local.namespace_tenants
+
+  manifest = {
+    apiVersion = "cilium.io/v2"
+    kind       = "CiliumNetworkPolicy"
+    metadata = {
+      name      = "allow-pod-identity-egress"
+      namespace = kubernetes_namespace.tenant[each.key].metadata[0].name
+    }
+    spec = {
+      endpointSelector = {}
+      egress = [{
+        toEntities = ["host"]
+        toPorts = [{
+          ports = [{ port = "80", protocol = "TCP" }]
+        }]
+      }]
+    }
+  }
+}
+
 # Allows DNS resolution (port 53) and all other egress. Named "allow-dns" because
 # DNS is the primary concern — without it, pods cannot resolve service names.
 # General egress is also permitted as the default tenant posture, EXCEPT the
