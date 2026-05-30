@@ -35,7 +35,8 @@ spec:
       verifyImages:
         - imageReferences:
             - "{{ index $.Values.tenantRegistryMap $team }}/*"
-          mutateDigest: true
+          # Kyverno forbids mutation in Audit mode — only pin to digest once we Enforce.
+          mutateDigest: {{ eq $.Values.verifyFailureAction "Enforce" }}
           verifyDigest: true
           required: true
           attestors:
