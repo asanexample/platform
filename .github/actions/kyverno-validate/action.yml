@@ -38,37 +38,47 @@ runs:
   steps:
     - uses: azure/setup-helm@v4
     - uses: azure/setup-kubectl@v4
+    # ${{ }} expressions are passed via env (not interpolated into the script) to
+    # avoid the shell-injection class (semgrep run-shell-injection / #112).
     - name: Install Kyverno CLI
       shell: bash
+      env:
+        KYVERNO_VERSION: ${{ inputs.kyverno-version }}
       run: |
         set -euo pipefail
-        url="https://github.com/kyverno/kyverno/releases/download/v${{ inputs.kyverno-version }}/kyverno-cli_v${{ inputs.kyverno-version }}_linux_x86_64.tar.gz"
+        url="https://github.com/kyverno/kyverno/releases/download/v${KYVERNO_VERSION}/kyverno-cli_v${KYVERNO_VERSION}_linux_x86_64.tar.gz"
         curl -fsSL "$url" -o /tmp/kyverno.tgz
         tar -C /tmp -xzf /tmp/kyverno.tgz kyverno
         sudo install -m 0755 /tmp/kyverno /usr/local/bin/kyverno
         kyverno version
     - name: Install hcl2json
       shell: bash
+      env:
+        HCL2JSON_VERSION: ${{ inputs.hcl2json-version }}
       run: |
         set -euo pipefail
-        url="https://github.com/tmccombs/hcl2json/releases/download/v${{ inputs.hcl2json-version }}/hcl2json_linux_amd64"
+        url="https://github.com/tmccombs/hcl2json/releases/download/v${HCL2JSON_VERSION}/hcl2json_linux_amd64"
         curl -fsSL "$url" -o /tmp/hcl2json
         sudo install -m 0755 /tmp/hcl2json /usr/local/bin/hcl2json
     - name: Extract team hostnames from teams.hcl
       id: hostnames
       shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        ENV_NAME: ${{ inputs.env }}
+        TEAM: ${{ inputs.team }}
       run: |
         set -euo pipefail
-        teams_hcl="${{ github.action_path }}/../../../infra/live/aws/${{ inputs.env }}/us-east-1/platform/teams.hcl"
+        teams_hcl="${ACTION_PATH}/../../../infra/live/aws/${ENV_NAME}/us-east-1/platform/teams.hcl"
         if [ -f "$teams_hcl" ]; then
           # `locals` is a block (array); `teams` and the per-team maps are attributes (objects).
-          json="$(hcl2json < "$teams_hcl" | jq -c --arg t "${{ inputs.team }}" '.locals[0].teams[$t].hostnames // []')"
+          json="$(hcl2json < "$teams_hcl" | jq -c --arg t "${TEAM}" '.locals[0].teams[$t].hostnames // []')"
         else
           echo "::warning::teams.hcl not found at $teams_hcl — hostname guard will be skipped."
           json="[]"
         fi
         echo "json=$json" >> "$GITHUB_OUTPUT"
-        echo "team-${{ inputs.team }} hostnames: $json"
+        echo "team-${TEAM} hostnames: $json"
     - name: Validate manifests against platform policies
       shell: bash
       env:

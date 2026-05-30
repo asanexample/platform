@@ -121,10 +121,14 @@ jobs:
         with:
           fetch-depth: 0
       - name: Lint changed markdown files
+        # ${{ }} via env, not interpolated into the script (semgrep run-shell-injection / #112).
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
           npm install -g markdownlint-cli2
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            FILES=$(git diff --name-only --diff-filter=ACM origin/${{ github.base_ref }}...HEAD -- '*.md' | grep -v '.terraform/' | grep -v '.terragrunt-cache/' || true)
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            FILES=$(git diff --name-only --diff-filter=ACM "origin/${BASE_REF}...HEAD" -- '*.md' | grep -v '.terraform/' | grep -v '.terragrunt-cache/' || true)
           else
             FILES=$(git diff --name-only --diff-filter=ACM HEAD~1 -- '*.md' | grep -v '.terraform/' | grep -v '.terragrunt-cache/' || true)
           fi

@@ -28,6 +28,9 @@ resource "aws_s3_bucket_public_access_block" "state" {
   restrict_public_buckets = true
 }
 
+# nosemgrep: terraform.aws.security.aws-dynamodb-table-unencrypted.aws-dynamodb-table-unencrypted
+# DynamoDB encrypts at rest by default (AWS-owned key); this lock table holds only state-lock
+# metadata (LockID), no sensitive data. A customer-managed CMK would be tracked with #118 if needed.
 resource "aws_dynamodb_table" "locks" {
   count        = var.create ? 1 : 0
   name         = var.dynamodb_table_name
