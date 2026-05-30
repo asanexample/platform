@@ -63,11 +63,15 @@ locals {
     enableAttestationVerification = var.enable_attestation_verification
     attestFailureAction           = var.attest_failure_action
     attestFailurePolicy           = local.attest_failure_policy
-    enableHttprouteGuard          = var.enable_httproute_guard
-    tenantHostnamePatterns        = var.tenant_hostname_patterns
-    enableCleanup                 = var.enable_cleanup
-    additionalPolicies            = var.additional_policies
-    commonLabels                  = local.k8s_labels
+
+    enableL3ProvenanceAudit = var.enable_l3_provenance_audit
+    trustedCiSubjectRegExp  = var.trusted_ci_subject_regexp
+    attestCallerRepos       = var.attest_caller_repos
+    enableHttprouteGuard    = var.enable_httproute_guard
+    tenantHostnamePatterns  = var.tenant_hostname_patterns
+    enableCleanup           = var.enable_cleanup
+    additionalPolicies      = var.additional_policies
+    commonLabels            = local.k8s_labels
   }
 }
 

@@ -22,6 +22,11 @@ locals {
   # running image (sha256:d60ea84) verified, so the legacy gangster identity is dropped. Left empty (not
   # removed) to keep the dual-subject scaffold documented and reusable for the next org/identity change.
   legacy_org = ""
+
+  # Teams whose app CI calls asanexample/trusted-ci's slsa-provenance.yml (SLSA L3, #131). Drives the
+  # Audit-only verify-attestations-l3 policy. Add a team here ONLY once its CI wires the provenance job —
+  # otherwise its pods get spurious Audit failures. P1 wired alpha. (Later: a teams.hcl per-app flag.)
+  isolated_provenance_teams = ["alpha"]
 }
 
 dependency "eks" {
@@ -103,6 +108,15 @@ inputs = {
       preview_subject_regexp = "${url}/.github/workflows/preview.yml@refs/.*"
     }
   ] }
+
+  # SLSA Build L3 P2 (#131, ADR-042): Audit-only check that the ISOLATED trusted-ci signer's provenance
+  # verifies, gated per-team by the cert's githubWorkflowRepository extension (the caller = the team's
+  # own app repo). Runs alongside the Enforce app-provenance policy; PolicyReports confirm the trusted-ci
+  # path before P3 enforces it. Only for adopted teams (local.isolated_provenance_teams).
+  enable_l3_provenance_audit = true
+  attest_caller_repos = { for k in local.isolated_provenance_teams :
+    k => replace(values(local.teams[k].apps)[0].repo_url, "https://github.com/", "")
+  }
 
   # Phase 5 — Gateway-API route hostname guard (anti-squatting on the shared wildcard listener).
   # Each team's routes may only claim the hostnames it declares in teams.hcl. (When PR previews get a

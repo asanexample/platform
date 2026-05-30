@@ -1,0 +1,70 @@
+{{- /*
+SLSA Build L3 — isolated-provenance verification (platform #131 P2, ADR-042). Audit-only validation
+that runs ALONGSIDE the Enforce verify-attestations-team-* policy (which still requires the app's own
+provenance). This requires the SLSA provenance signed by the isolated asanexample/trusted-ci reusable
+workflow, gated per-team by the certificate's githubWorkflowRepository extension (= the team's own app
+repo). PolicyReports from this policy confirm the trusted-ci path verifies before P3 makes it the sole,
+enforced requirement. Renders only for teams that have adopted the trusted-ci provenance job
+(.Values.attestCallerRepos), so unadopted teams don't get spurious failures.
+*/}}
+{{- if and .Values.enableImageVerification .Values.enableAttestationVerification .Values.enableL3ProvenanceAudit }}
+{{- range $team, $callerRepo := .Values.attestCallerRepos }}
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-attestations-l3-team-{{ $team }}
+  labels:
+    {{- include "kpp.labels" $ | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Verify Isolated Build Provenance (SLSA L3) — team-{{ $team }}
+    policies.kyverno.io/category: Supply Chain, Multi-Tenancy
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Audit-only (SLSA Build L3 P2, ADR-042). Requires team-{{ $team }} images to carry a SLSA provenance
+      attestation signed by the ISOLATED asanexample/trusted-ci reusable workflow — an identity the app's
+      own build cannot forge — gated per-team by the certificate's githubWorkflowRepository extension
+      (= {{ $callerRepo }}). Runs alongside the Enforce verify-attestations-team-{{ $team }} (app-signed
+      provenance); its PolicyReports confirm the trusted-ci path verifies before P3 enforces it.
+spec:
+  # Always Audit + fail-open in P2: this is the validation gate, never an admission blocker. The Enforce
+  # provenance requirement stays on verify-attestations-team-{{ $team }} (app identity) until P3.
+  validationFailureAction: Audit
+  webhookTimeoutSeconds: 30
+  failurePolicy: Ignore
+  background: false
+  rules:
+    - name: require-isolated-provenance
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - team-{{ $team }}
+      verifyImages:
+        - imageReferences:
+            - "{{ index $.Values.tenantRegistryMap $team }}/*"
+          mutateDigest: false # verify-images-team-{{ $team }} pins the digest; don't double-mutate
+          verifyDigest: false
+          required: true
+          attestations:
+            # SLSA build provenance from the isolated signer. The cert SUBJECT is the shared trusted-ci
+            # workflow; the per-team gate is the githubWorkflowRepository extension (the CALLER), which
+            # Fulcio sets from the calling repo's own OIDC — a different team cannot forge it.
+            - type: https://slsa.dev/provenance/v0.2
+              attestors:
+                - count: 1
+                  entries:
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        # single-quoted: the anchored regex contains backslash escapes (\.) that
+                        # double-quoted YAML would reject as unknown escapes.
+                        subjectRegExp: {{ $.Values.trustedCiSubjectRegExp | squote }}
+                        additionalExtensions:
+                          githubWorkflowRepository: {{ $callerRepo | quote }}
+                        rekor:
+                          url: "{{ $.Values.rekorUrl }}"
+---
+{{- end }}
+{{- end }}

@@ -174,6 +174,28 @@ variable "attest_failure_action" {
   }
 }
 
+# ---------------------------------------------------------------------------
+# Isolated build provenance (SLSA Build L3, #131 P2 — ADR-042)
+# ---------------------------------------------------------------------------
+
+variable "enable_l3_provenance_audit" {
+  description = "Deploy the Audit-only verify-attestations-l3 policies that require SLSA provenance from the ISOLATED trusted-ci reusable workflow (gated per-team by the cert's githubWorkflowRepository extension), alongside the app-signed provenance Enforce policy. Validates the trusted-ci path via PolicyReports before P3 enforces it. Requires enable_attestation_verification = true. Off by default."
+  type        = bool
+  default     = false
+}
+
+variable "trusted_ci_subject_regexp" {
+  description = "Anchored regex for the isolated provenance signer's keyless cert subject (the trusted-ci reusable workflow, any pinned ref). Dots escaped; ^...$ anchored so a look-alike repo path can't match."
+  type        = string
+  default     = "^https://github\\.com/asanexample/trusted-ci/\\.github/workflows/slsa-provenance\\.yml@.+$"
+}
+
+variable "attest_caller_repos" {
+  description = "Per-team caller repo (org/repo, e.g. asanexample/app-alpha) for the verify-attestations-l3 githubWorkflowRepository extension gate. Key = tenant; supplied by the unit ONLY for teams that have adopted the trusted-ci provenance job (else their pods get spurious Audit failures). Empty = no L3 audit policy rendered."
+  type        = map(string)
+  default     = {}
+}
+
 variable "oidc_provider_arn" {
   description = "EKS OIDC provider ARN, for the Kyverno IRSA trust policy. Required when enable_image_verification = true."
   type        = string
