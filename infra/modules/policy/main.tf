@@ -58,6 +58,9 @@ locals {
     verifyFailurePolicy     = local.verify_failure_policy
     verifySubjects          = var.verify_subjects
     rekorUrl                = var.rekor_url
+    enableHttprouteGuard    = var.enable_httproute_guard
+    tenantHostnamePatterns  = var.tenant_hostname_patterns
+    enableCleanup           = var.enable_cleanup
     additionalPolicies      = var.additional_policies
     commonLabels            = local.k8s_labels
   }

@@ -10,6 +10,7 @@ resources:
   - resources/serviceaccount.yaml
   - resources/service.yaml
   - resources/securitycontext.yaml
+  - resources/httproutes.yaml
 variables: values.yaml
 results:
   # --- compliant workload passes every tenant Pod policy ---
@@ -100,3 +101,19 @@ results:
     kind: Pod
     resources: [good-app]
     result: pass
+  # --- Phase 5 HTTPRoute hostname guard ---
+  - policy: restrict-route-hostnames-team-alpha
+    rule: allowed-hostnames
+    kind: HTTPRoute
+    resources: [good-route]
+    result: pass
+  - policy: restrict-route-hostnames-team-alpha
+    rule: allowed-hostnames
+    kind: HTTPRoute
+    resources: [squat-route]
+    result: fail
+  - policy: restrict-route-hostnames-team-alpha
+    rule: require-hostnames
+    kind: HTTPRoute
+    resources: [empty-route]
+    result: fail

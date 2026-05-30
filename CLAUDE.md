@@ -203,6 +203,7 @@ Full per-cluster list: `docs/architecture/kyverno-policy-catalog.md`. When writi
 - **Resource requests AND limits** (cpu + memory) on every container
 - **`livenessProbe` and `readinessProbe`** on every container
 - Services must be **`ClusterIP`** — `LoadBalancer`/`NodePort` are denied (ingress is via the shared Gateway / `HTTPRoute`)
+- **HTTPRoute/GRPCRoute/TLSRoute hostnames** must be in the team's allow-list in `teams.hcl` (`hostnames`) — claiming another team's or a platform hostname (or omitting hostnames) is denied (ADR-029)
 - Workloads only in `team-*` namespaces — **never `default`**
 - **Do not** set `securityContext.allowPrivilegeEscalation: true` or `seccompProfile.type: Unconfined` (backstop policies deny them)
 - ServiceAccounts must **not** carry an `eks.amazonaws.com/role-arn` annotation (tenant IRSA isn't available yet — #64)

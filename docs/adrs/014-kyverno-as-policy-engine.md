@@ -80,8 +80,9 @@ platform. The flip is a one-line input change. This realizes the risk mitigation
    workflow identity. Kyverno gains **IRSA** (ECR read) to fetch signatures; verification rolls
    Audit→Enforce via its own `verify_failure_action`, independent of the other policies.
 4. **Shift-left CLI**: `kyverno apply`/`test` gate in app-repo + platform CI.
-5. **Reporting + cleanup**: PolicyReport → observability; `CleanupPolicy` TTLs; Gateway-API HTTPRoute
-   hostname guard.
+5. **Ingress guard + cleanup** *(done)*: per-team Gateway-API route **hostname guard** (anti-squatting
+   on the shared wildcard listener — closes the ADR-029 gap) + a `CleanupPolicy` reaping finished
+   CronJob Jobs. PolicyReport → Grafana **deferred** to the monitoring-stack effort (#93).
 
 ### Policy Categories
 
