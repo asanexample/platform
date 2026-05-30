@@ -47,7 +47,7 @@ Before starting, confirm the following:
 
 - [ ] You have the following information from the requesting team:
   - Team name (lowercase, alphanumeric + hyphens)
-  - GitHub organization and repository name (under `gangster/`)
+  - GitHub organization and repository name (under `asanexample/`)
   - Resource quota requirements (if non-default)
   - Whether apps need PR preview environments (`preview = true`)
   - Whether repos are private (requires ArgoCD credential template + GitHub
@@ -99,7 +99,7 @@ locals {
       mode = "namespace"
       apps = {
         demo = {
-          repo_url  = "https://github.com/gangster/app-alpha"
+          repo_url  = "https://github.com/asanexample/app-alpha"
           repo_path = "k8s/preprod"
           preview   = true
         }
@@ -109,7 +109,7 @@ locals {
       mode = "namespace"
       apps = {
         demo = {
-          repo_url  = "https://github.com/gangster/app-bravo"
+          repo_url  = "https://github.com/asanexample/app-bravo"
           repo_path = "k8s/preprod"
           preview   = false
         }
@@ -121,7 +121,7 @@ locals {
       mode = "namespace"
       apps = {
         api = {
-          repo_url  = "https://github.com/gangster/app-charlie"
+          repo_url  = "https://github.com/asanexample/app-charlie"
           repo_path = "k8s/preprod"
           preview   = true
         }
@@ -146,12 +146,12 @@ charlie = {
   mode = "namespace"
   apps = {
     api = {
-      repo_url  = "https://github.com/gangster/charlie-api"
+      repo_url  = "https://github.com/asanexample/charlie-api"
       repo_path = "k8s/preprod"
       preview   = true
     }
     worker = {
-      repo_url  = "https://github.com/gangster/charlie-worker"
+      repo_url  = "https://github.com/asanexample/charlie-worker"
       repo_path = "k8s/preprod"
     }
   }
@@ -200,7 +200,7 @@ locals {
 ```
 
 This generates a dedicated `github-actions-ecr-push-charlie` IAM role that trusts
-**only** `gangster/app-charlie` (OIDC `sub`) and can push **only** to that team's
+**only** `asanexample/app-charlie` (OIDC `sub`) and can push **only** to that team's
 `team-charlie/*` ECR repos (per-team isolation — ADR-039 / issue #60). The team's
 GitHub Actions workflow must then assume `arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/github-actions-ecr-push-charlie`.
 

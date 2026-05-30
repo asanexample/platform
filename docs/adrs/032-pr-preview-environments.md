@@ -174,15 +174,15 @@ Private app repos require two credential configurations:
 
    ```hcl
    credential_templates = {
-     "github-gangster" = {
-       url      = "https://github.com/gangster"
+     "github-asanexample" = {
+       url      = "https://github.com/asanexample"
        password = "<github-pat-or-app-token>"
        username = "x-access-token"
      }
    }
    ```
 
-   The template pattern-matches all repos under the `gangster` org. Use a GitHub App installation
+   The template pattern-matches all repos under the `asanexample` org. Use a GitHub App installation
    token or a fine-grained PAT with `contents: read` scope. Store the token in AWS Secrets
    Manager and inject via External Secrets Operator.
 

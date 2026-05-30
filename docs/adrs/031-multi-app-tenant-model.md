@@ -12,7 +12,7 @@ ADR-027 established a hybrid tenant isolation model where each team declares its
 ```hcl
 alpha = {
   mode      = "namespace"
-  repo_url  = "https://github.com/gangster/app-alpha"
+  repo_url  = "https://github.com/asanexample/app-alpha"
   repo_path = "k8s/preprod"
 }
 ```
@@ -57,7 +57,7 @@ locals {
       mode = "namespace"
       apps = {
         demo = {
-          repo_url  = "https://github.com/gangster/app-alpha"
+          repo_url  = "https://github.com/asanexample/app-alpha"
           repo_path = "k8s/preprod"
           preview   = true
         }

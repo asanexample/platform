@@ -19,7 +19,7 @@ locals {
       hostnames = ["demo.preprod.aws.refplat.org"]
       apps = {
         demo = {
-          repo_url  = "https://github.com/gangster/app-alpha"
+          repo_url  = "https://github.com/asanexample/app-alpha"
           repo_path = "k8s/preprod"
           preview   = true
         }
@@ -30,7 +30,7 @@ locals {
       hostnames = ["demo-bravo.preprod.aws.refplat.org"]
       apps = {
         demo = {
-          repo_url  = "https://github.com/gangster/app-bravo"
+          repo_url  = "https://github.com/asanexample/app-bravo"
           repo_path = "k8s/preprod"
           preview   = false
         }

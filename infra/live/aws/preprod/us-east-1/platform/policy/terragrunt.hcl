@@ -17,6 +17,12 @@ locals {
 
   # Tenant images live in the platform account's ECR (apps push there — see #60).
   ecr_registry = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com"
+
+  # Zero-downtime cosign identity transition for the gangster->asanexample org migration: verifyImages
+  # accepts BOTH the new (asanexample, from repo_url) and the legacy (gangster) signing identity until
+  # app CI re-signs the running image under asanexample. Set legacy_org = "" (and apply) to drop the
+  # legacy identity once images are re-signed (transition step 6).
+  legacy_org = "gangster"
 }
 
 dependency "eks" {
@@ -82,10 +88,18 @@ inputs = {
   oidc_provider_url         = dependency.eks.outputs.oidc_provider_url
   ecr_account_id            = include.base.locals.account_ids["platform"]
   # Per-team cosign keyless identities derived from each team's app repo (team data stays at the unit).
-  verify_subjects = { for k, v in local.teams : k => {
-    deploy_subject         = "${values(v.apps)[0].repo_url}/.github/workflows/deploy.yml@refs/heads/main"
-    preview_subject_regexp = "${values(v.apps)[0].repo_url}/.github/workflows/preview.yml@refs/.*"
-  } }
+  # A LIST per team (count:1 attestor): the asanexample identity plus, during the org migration, the
+  # legacy gangster identity (same repo path under the old org). distinct/compact collapse the legacy
+  # entry away once local.legacy_org = "".
+  verify_subjects = { for k, v in local.teams : k => [
+    for url in distinct(compact([
+      values(v.apps)[0].repo_url,
+      local.legacy_org == "" ? "" : replace(values(v.apps)[0].repo_url, "asanexample", local.legacy_org),
+      ])) : {
+      deploy_subject         = "${url}/.github/workflows/deploy.yml@refs/heads/main"
+      preview_subject_regexp = "${url}/.github/workflows/preview.yml@refs/.*"
+    }
+  ] }
 
   # Phase 5 — Gateway-API route hostname guard (anti-squatting on the shared wildcard listener).
   # Each team's routes may only claim the hostnames it declares in teams.hcl. (When PR previews get a

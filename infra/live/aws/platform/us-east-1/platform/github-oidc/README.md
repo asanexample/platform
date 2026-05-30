@@ -14,7 +14,7 @@ Creates an IAM OIDC identity provider and role for GitHub Actions to push contai
 
 | Input | Value | Notes |
 |-------|-------|-------|
-| `github_org` | `gangster` | |
+| `github_org` | `asanexample` | |
 | `github_repos` | `app-alpha`, `app-bravo` | Repos allowed to assume the role |
 | `github_events` | `pull_request` | Scoped to PR events only |
 | `role_name` | `github-actions-ecr-push` | |

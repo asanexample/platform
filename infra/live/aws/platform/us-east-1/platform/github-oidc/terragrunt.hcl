@@ -35,7 +35,7 @@ locals {
 
 inputs = {
   create     = true
-  github_org = "gangster"
+  github_org = "asanexample"
 
   # One push role per team: trusts only that team's repo (OIDC sub) and can push
   # only to that team's ECR repos. Generated for teams that have ≥1 ECR repo.

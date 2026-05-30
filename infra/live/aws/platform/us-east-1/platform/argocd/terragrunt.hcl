@@ -63,7 +63,7 @@ generate "github_repo_creds" {
 
     resource "kubernetes_secret_v1" "argocd_repo_creds_github" {
       metadata {
-        name      = "github-gangster-creds"
+        name      = "github-asanexample-creds"
         namespace = "argocd"
         labels = {
           "argocd.argoproj.io/secret-type" = "repo-creds"
@@ -72,7 +72,7 @@ generate "github_repo_creds" {
 
       data = {
         type     = "git"
-        url      = "https://github.com/gangster"
+        url      = "https://github.com/asanexample"
         username = "x-access-token"
         password = data.aws_secretsmanager_secret_version.github_pat.secret_string
       }

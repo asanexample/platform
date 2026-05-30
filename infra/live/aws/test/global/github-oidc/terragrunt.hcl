@@ -13,7 +13,7 @@ terraform {
 
 inputs = {
   create     = true
-  github_org = "gangster"
+  github_org = "asanexample"
 
   roles = {
     "github-actions-terratest" = {

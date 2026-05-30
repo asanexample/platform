@@ -284,7 +284,7 @@ pull requests (ADR-032).
      mode = "namespace"
      apps = {
        api = {
-         repo_url  = "https://github.com/gangster/app-charlie"
+         repo_url  = "https://github.com/asanexample/app-charlie"
          repo_path = "k8s/preprod"
          preview   = true
        }

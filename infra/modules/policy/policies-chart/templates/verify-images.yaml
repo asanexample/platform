@@ -1,5 +1,5 @@
 {{- if .Values.enableImageVerification }}
-{{- range $team, $subj := .Values.verifySubjects }}
+{{- range $team, $idents := .Values.verifySubjects }}
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
@@ -40,20 +40,24 @@ spec:
           verifyDigest: true
           required: true
           attestors:
+            # count:1 — admitting any ONE matching identity. Multiple identities (deploy+preview per
+            # org, and old+new org during a signing-identity transition) are all listed as alternatives.
             - count: 1
               entries:
+                {{- range $idents }}
                 # Stable deploys — pinned to the main-branch deploy workflow identity.
                 - keyless:
                     issuer: https://token.actions.githubusercontent.com
-                    subject: "{{ $subj.deploy_subject }}"
+                    subject: "{{ .deploy_subject }}"
                     rekor:
                       url: "{{ $.Values.rekorUrl }}"
                 # PR previews — the OIDC ref varies per PR, so match the preview workflow by regexp.
                 - keyless:
                     issuer: https://token.actions.githubusercontent.com
-                    subjectRegExp: "{{ $subj.preview_subject_regexp }}"
+                    subjectRegExp: "{{ .preview_subject_regexp }}"
                     rekor:
                       url: "{{ $.Values.rekorUrl }}"
+                {{- end }}
 ---
 {{- end }}
 {{- end }}

@@ -58,7 +58,7 @@ Deployed at `infra/live/aws/platform/us-east-1/platform/github-oidc/`. Creates a
 specific teams.
 
 ```hcl
-github_org    = "gangster"
+github_org    = "asanexample"
 github_repos  = ["app-alpha", "app-bravo"]
 github_events = ["pull_request"]
 role_name     = "github-actions-ecr-push"
@@ -71,7 +71,7 @@ This ensures CI can only push to repositories that actually exist in the ECR mod
 new team's repository requires updating both the `ecr` and `github-oidc` live units.
 
 The trust policy uses `github_events = ["pull_request"]` to generate subject claims of the form
-`repo:gangster/<repo>:pull_request`, allowing workflows triggered by PR events to assume the
+`repo:asanexample/<repo>:pull_request`, allowing workflows triggered by PR events to assume the
 role. Since `github_branches` defaults to `["main"]`, the trust policy also allows runs on the
 `main` branch (for post-merge image builds).
 
@@ -81,7 +81,7 @@ Deployed at `infra/live/aws/test/global/github-oidc/`. Creates a role named
 `github-actions-terratest` with `AdministratorAccess` for running Terratest integration tests.
 
 ```hcl
-github_org      = "gangster"
+github_org      = "asanexample"
 github_repo     = "platform"
 github_branches = ["main", "refs/heads/feat/*"]
 role_name       = "github-actions-terratest"
@@ -106,7 +106,7 @@ condition:
    it is used as-is (supporting patterns like `refs/heads/feat/*` or `refs/tags/v*`).
 
 2. **Event claims:** For each repo and event combination, generates
-   `repo:{org}/{repo}:{event}` (e.g., `repo:gangster/app-alpha:pull_request`).
+   `repo:{org}/{repo}:{event}` (e.g., `repo:asanexample/app-alpha:pull_request`).
 
 This design allows fine-grained control: a role can be restricted to only PR-triggered workflows,
 only main branch pushes, or both.
