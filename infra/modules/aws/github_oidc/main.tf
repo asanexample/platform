@@ -23,6 +23,15 @@ locals {
     )
   }
 
+  # Per-role job_workflow_ref claims (org-prefixed). Used to scope a role to a specific
+  # REUSABLE workflow regardless of which repo calls it (the `sub` claim reflects the
+  # caller, so it can't be used for this). Format: <org>/<repo>/.github/workflows/<f>@<ref>.
+  job_workflow_ref_claims_by_role = {
+    for role_key, role in var.roles : role_key => [
+      for ref in role.job_workflow_refs : "${var.github_org}/${ref}"
+    ]
+  }
+
   # Flatten role -> managed policy attachments into a single keyed map.
   role_policy_attachments = merge([
     for role_key, role in var.roles : {
@@ -69,10 +78,27 @@ data "aws_iam_policy_document" "trust" {
       values   = [local.audience]
     }
 
-    condition {
-      test     = "StringLike"
-      variable = "${local.oidc_provider_url}:sub"
-      values   = local.subject_claims_by_role[each.key]
+    # Scope by the `sub` claim (repo × branch/event). Rendered only when the role defines
+    # repos; a job_workflow_ref-only role omits it (the caller's `sub` is not the scope).
+    dynamic "condition" {
+      for_each = length(local.subject_claims_by_role[each.key]) > 0 ? [1] : []
+      content {
+        test     = "StringLike"
+        variable = "${local.oidc_provider_url}:sub"
+        values   = local.subject_claims_by_role[each.key]
+      }
+    }
+
+    # Scope by the `job_workflow_ref` claim — the reusable workflow that is executing,
+    # independent of the calling repo. This is what makes a shared signer role assumable
+    # ONLY while a trusted reusable workflow runs.
+    dynamic "condition" {
+      for_each = length(local.job_workflow_ref_claims_by_role[each.key]) > 0 ? [1] : []
+      content {
+        test     = "StringLike"
+        variable = "${local.oidc_provider_url}:job_workflow_ref"
+        values   = local.job_workflow_ref_claims_by_role[each.key]
+      }
     }
   }
 }
