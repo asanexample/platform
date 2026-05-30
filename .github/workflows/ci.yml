@@ -288,10 +288,12 @@ jobs:
           # SARIF artifact (exit 0, always written) then the BLOCKING text gate
           # (--error exits non-zero on any finding OR invalid config). Registry
           # packs only (no p/bash — it 404s; shell rules aren't a registry pack).
+          # --exclude '*.sarif' so the gate run doesn't scan the artifact the first
+          # run just wrote (semgrep would otherwise flag token-like strings in it).
           rulesets="--config p/terraform --config p/github-actions --config p/secrets --config p/golang --config p/dockerfile"
-          semgrep scan $rulesets --metrics off --sarif --output semgrep.sarif || true
+          semgrep scan $rulesets --exclude '*.sarif' --metrics off --sarif --output semgrep.sarif || true
           echo "::group::Semgrep findings"
-          semgrep scan $rulesets --metrics off --error
+          semgrep scan $rulesets --exclude '*.sarif' --metrics off --error
           echo "::endgroup::"
       - uses: actions/upload-artifact@v4
         if: always()
