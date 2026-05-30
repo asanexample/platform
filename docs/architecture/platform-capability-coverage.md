@@ -50,7 +50,6 @@ detection, SAST/SCA).
 - This page should be updated as gaps close; treat the linked issues as the backlog.
 
 [#88]: https://github.com/asanexample/platform/issues/88
-[#93]: https://github.com/asanexample/platform/issues/93
 [#102]: https://github.com/asanexample/platform/issues/102
 [#103]: https://github.com/asanexample/platform/issues/103
 [#104]: https://github.com/asanexample/platform/issues/104
