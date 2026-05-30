@@ -1,0 +1,13 @@
+# Violation: LoadBalancer is denied (ingress must go through the shared Gateway; ClusterIP only).
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo
+  namespace: team-alpha
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: demo
+  ports:
+    - port: 80
+      targetPort: 80
