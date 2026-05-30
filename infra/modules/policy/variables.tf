@@ -178,11 +178,11 @@ variable "ecr_region" {
 }
 
 variable "verify_subjects" {
-  description = "Per-tenant cosign keyless identities (built from teams.hcl at the unit). Key = tenant; deploy_subject is the exact main-branch workflow identity; preview_subject_regexp matches the PR-preview workflow (its OIDC ref varies per PR)."
-  type = map(object({
+  description = "Per-tenant cosign keyless identities (built from teams.hcl at the unit). Key = tenant; value is a LIST of accepted identities (count:1 attestor — any one verifies). A single-element list is the steady state; a 2+ element list supports a zero-downtime signing-identity transition (e.g. a GitHub org migration: accept both old and new org identities until images are re-signed, then drop the old). Per identity: deploy_subject is the exact main-branch workflow identity; preview_subject_regexp matches the PR-preview workflow (its OIDC ref varies per PR)."
+  type = map(list(object({
     deploy_subject         = string
     preview_subject_regexp = string
-  }))
+  })))
   default = {}
 }
 

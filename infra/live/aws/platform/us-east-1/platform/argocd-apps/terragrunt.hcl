@@ -98,7 +98,7 @@ inputs = {
     apps = v.apps
   } }
 
-  github_org               = "gangster"
+  github_org               = "asanexample"
   github_token_secret_name = "github-appset-token"                                                                                # K8s secret created by generate block above
   ecr_registry             = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com" # Platform account ECR
   preview_domain           = "preprod.aws.refplat.org"

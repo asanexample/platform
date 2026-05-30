@@ -79,6 +79,7 @@ platform. The flip is a one-line input change. This realizes the risk mitigation
    CI (`app-alpha`) + per-team `verifyImages` policies that admit only images signed by that team's own
    workflow identity. Kyverno gains **IRSA** (ECR read) to fetch signatures; verification rolls
    Audit→Enforce via its own `verify_failure_action`, independent of the other policies.
+   Full from-scratch explainer: [`cosign-image-signing.md`](../architecture/cosign-image-signing.md).
 4. **Shift-left CLI**: `kyverno apply`/`test` gate in app-repo + platform CI.
 5. **Ingress guard + cleanup** *(done)*: per-team Gateway-API route **hostname guard** (anti-squatting
    on the shared wildcard listener — closes the ADR-029 gap) + a `CleanupPolicy` reaping finished

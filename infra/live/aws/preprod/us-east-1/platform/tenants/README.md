@@ -16,8 +16,8 @@ Provisions tenant namespaces, network policies, and isolation resources for appl
 
 | Team    | Mode      | Apps                                                  | Preview |
 |---------|-----------|-------------------------------------------------------|---------|
-| `alpha` | namespace | `demo` (github.com/gangster/app-alpha, `k8s/preprod`) | yes     |
-| `bravo` | namespace | `demo` (github.com/gangster/app-bravo, `k8s/preprod`) | no      |
+| `alpha` | namespace | `demo` (github.com/asanexample/app-alpha, `k8s/preprod`) | yes     |
+| `bravo` | namespace | `demo` (github.com/asanexample/app-bravo, `k8s/preprod`) | no      |
 
 ## Key Inputs
 

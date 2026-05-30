@@ -14,7 +14,7 @@ None
 
 | Input | Value | Notes |
 |-------|-------|-------|
-| `github_org` | `gangster` | GitHub organization |
+| `github_org` | `asanexample` | GitHub organization |
 | `github_repo` | `platform` | Repository allowed to assume the role |
 | `github_branches` | `["main", "refs/heads/feat/*"]` | Branch restrictions for OIDC trust |
 | `role_name` | `github-actions-terratest` | IAM role name assumed by CI |

@@ -207,7 +207,7 @@ Full per-cluster list: `docs/architecture/kyverno-policy-catalog.md`. When writi
 - Workloads only in `team-*` namespaces — **never `default`**
 - **Do not** set `securityContext.allowPrivilegeEscalation: true` or `seccompProfile.type: Unconfined` (backstop policies deny them)
 - ServiceAccounts must **not** carry an `eks.amazonaws.com/role-arn` annotation (tenant IRSA isn't available yet — #64)
-- **Images must be cosign-signed** by the app's own GitHub workflow (keyless; Phase 3, preprod). App CI signs after the ECR push (`cosign sign --yes …@<digest>`); Kyverno's `verify-images-team-<team>` admits only images signed by `app-<team>`'s `deploy.yml`/`preview.yml` identity. Unsigned or another team's image is rejected.
+- **Images must be cosign-signed** by the app's own GitHub workflow (keyless; Phase 3, preprod). App CI signs after the ECR push (`cosign sign --yes …@<digest>`); Kyverno's `verify-images-team-<team>` admits only images signed by `app-<team>`'s `deploy.yml`/`preview.yml` identity. Unsigned or another team's image is rejected. Full explainer (how keyless signing/Fulcio/Rekor/IRSA fit together): `docs/architecture/cosign-image-signing.md`.
 - **No** `cluster-admin` (Cluster)RoleBindings or wildcard (`*`) verbs/resources in Roles
 
 **Recommended (not enforced):** `app.kubernetes.io/name` (can't be auto-derived).
