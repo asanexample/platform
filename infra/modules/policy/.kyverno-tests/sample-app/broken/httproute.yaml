@@ -1,0 +1,17 @@
+# Violation: hostname is not in team-alpha's allow-list (teams.hcl) — squats a hostname the team
+# doesn't own. The route hostname guard denies it.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: demo
+  namespace: team-alpha
+spec:
+  parentRefs:
+    - name: preprod-gateway
+      namespace: default
+  hostnames:
+    - evil.example.com
+  rules:
+    - backendRefs:
+        - name: demo
+          port: 80

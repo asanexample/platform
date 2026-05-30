@@ -1,0 +1,80 @@
+name: Kyverno Validate (shift-left)
+description: >-
+  Render the platform tenant Kyverno policies for a team and apply them to an app's manifests, failing
+  the build on any violation — the same checks admission enforces, run pre-merge. Cluster-free; needs no
+  AWS credentials or secrets, so it is safe on pull_request (including forks). Image signature
+  verification is intentionally skipped (the image isn't built/signed at PR time); admission remains the
+  enforcement point.
+inputs:
+  team:
+    description: Tenant team key (namespace is team-<team>), e.g. "alpha".
+    required: true
+  manifests-path:
+    description: Path in the calling repo to the app's kustomize dir (contains kustomization.yaml).
+    required: false
+    default: k8s/preprod
+  env:
+    description: Platform environment whose teams.hcl supplies the team's allowed route hostnames.
+    required: false
+    default: preprod
+  ecr-registry:
+    description: Platform ECR host that tenant images must come from.
+    required: false
+    default: "829808296602.dkr.ecr.us-east-1.amazonaws.com"
+  kyverno-version:
+    description: Kyverno CLI version — pin to the cluster chart's appVersion so semantics match.
+    required: false
+    default: "1.18.1"
+  hcl2json-version:
+    description: hcl2json release version used to read teams.hcl.
+    required: false
+    default: "0.6.4"
+outputs:
+  hostnames:
+    description: The team's allowed route hostnames extracted from teams.hcl (JSON array).
+    value: ${{ steps.hostnames.outputs.json }}
+runs:
+  using: composite
+  steps:
+    - uses: azure/setup-helm@v4
+    - uses: azure/setup-kubectl@v4
+    - name: Install Kyverno CLI
+      shell: bash
+      run: |
+        set -euo pipefail
+        url="https://github.com/kyverno/kyverno/releases/download/v${{ inputs.kyverno-version }}/kyverno-cli_v${{ inputs.kyverno-version }}_linux_x86_64.tar.gz"
+        curl -fsSL "$url" -o /tmp/kyverno.tgz
+        tar -C /tmp -xzf /tmp/kyverno.tgz kyverno
+        sudo install -m 0755 /tmp/kyverno /usr/local/bin/kyverno
+        kyverno version
+    - name: Install hcl2json
+      shell: bash
+      run: |
+        set -euo pipefail
+        url="https://github.com/tmccombs/hcl2json/releases/download/v${{ inputs.hcl2json-version }}/hcl2json_linux_amd64"
+        curl -fsSL "$url" -o /tmp/hcl2json
+        sudo install -m 0755 /tmp/hcl2json /usr/local/bin/hcl2json
+    - name: Extract team hostnames from teams.hcl
+      id: hostnames
+      shell: bash
+      run: |
+        set -euo pipefail
+        teams_hcl="${{ github.action_path }}/../../../infra/live/aws/${{ inputs.env }}/us-east-1/platform/teams.hcl"
+        if [ -f "$teams_hcl" ]; then
+          # `locals` is a block (array); `teams` and the per-team maps are attributes (objects).
+          json="$(hcl2json < "$teams_hcl" | jq -c --arg t "${{ inputs.team }}" '.locals[0].teams[$t].hostnames // []')"
+        else
+          echo "::warning::teams.hcl not found at $teams_hcl — hostname guard will be skipped."
+          json="[]"
+        fi
+        echo "json=$json" >> "$GITHUB_OUTPUT"
+        echo "team-${{ inputs.team }} hostnames: $json"
+    - name: Validate manifests against platform policies
+      shell: bash
+      env:
+        TEAM: ${{ inputs.team }}
+        MANIFESTS_PATH: ${{ inputs.manifests-path }}
+        POLICIES_CHART: ${{ github.action_path }}/../../../infra/modules/policy/policies-chart
+        ECR_REGISTRY: ${{ inputs.ecr-registry }}
+        HOSTNAMES_JSON: ${{ steps.hostnames.outputs.json }}
+      run: ${{ github.action_path }}/validate.sh

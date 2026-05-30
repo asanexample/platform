@@ -152,6 +152,43 @@ jobs:
       - name: Render policies and run tests
         run: infra/modules/policy/.kyverno-tests/run.sh
 
+  # Dogfoods the shift-left composite action (.github/actions/kyverno-validate) against committed
+  # sample apps, proving it works without the app repos: the compliant app must pass, the broken app
+  # must fail, and the teams.hcl hostname extraction must resolve. This is what app-repo PR CI runs.
+  kyverno-shift-left:
+    name: Kyverno Shift-Left (dogfood)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate compliant sample (must pass)
+        id: compliant
+        uses: ./.github/actions/kyverno-validate
+        with:
+          team: alpha
+          manifests-path: infra/modules/policy/.kyverno-tests/sample-app/compliant
+          env: preprod
+      - name: Assert hostname extraction (hcl2json → teams.hcl) resolved
+        shell: bash
+        run: |
+          echo "extracted hostnames: ${{ steps.compliant.outputs.hostnames }}"
+          echo '${{ steps.compliant.outputs.hostnames }}' | grep -q 'demo.preprod.aws.refplat.org' \
+            || { echo "::error::hostname extraction from teams.hcl failed (got '${{ steps.compliant.outputs.hostnames }}')"; exit 1; }
+      - name: Validate broken sample (must fail)
+        id: broken
+        continue-on-error: true
+        uses: ./.github/actions/kyverno-validate
+        with:
+          team: alpha
+          manifests-path: infra/modules/policy/.kyverno-tests/sample-app/broken
+          env: preprod
+      - name: Assert broken sample was rejected
+        shell: bash
+        run: |
+          if [ "${{ steps.broken.outcome }}" != "failure" ]; then
+            echo "::error::Broken sample app should have FAILED policy validation but did not."; exit 1
+          fi
+          echo "✅ Broken sample correctly rejected by the shift-left gate."
+
   tflint:
     name: TFLint
     runs-on: ubuntu-latest
