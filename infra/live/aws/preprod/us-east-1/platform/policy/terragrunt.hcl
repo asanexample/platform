@@ -18,11 +18,10 @@ locals {
   # Tenant images live in the platform account's ECR (apps push there — see #60).
   ecr_registry = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com"
 
-  # Zero-downtime cosign identity transition for the gangster->asanexample org migration: verifyImages
-  # accepts BOTH the new (asanexample, from repo_url) and the legacy (gangster) signing identity until
-  # app CI re-signs the running image under asanexample. Set legacy_org = "" (and apply) to drop the
-  # legacy identity once images are re-signed (transition step 6).
-  legacy_org = "gangster"
+  # Cosign identity transition complete (2026-05-29): app-alpha re-signed under asanexample and the
+  # running image (sha256:d60ea84) verified, so the legacy gangster identity is dropped. Left empty (not
+  # removed) to keep the dual-subject scaffold documented and reusable for the next org/identity change.
+  legacy_org = ""
 }
 
 dependency "eks" {
