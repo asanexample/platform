@@ -29,7 +29,7 @@ APPLIED="$(printf '%s' "$MUT" | grep -c 'Mutation has been applied successfully'
 if ! printf '%s' "$MUT" | grep -q 'error: 0'; then
   echo "FAIL: mutate produced errors"; printf '%s\n' "$MUT"; exit 1
 fi
-if [ "$APPLIED" -lt 3 ]; then
-  echo "FAIL: expected >=3 mutations on the bare pod, got $APPLIED"; printf '%s\n' "$MUT"; exit 1
+if [ "$APPLIED" -lt 2 ]; then
+  echo "FAIL: expected >=2 mutations on the bare Deployment, got $APPLIED"; printf '%s\n' "$MUT"; exit 1
 fi
-echo "Mutation smoke-check passed ($APPLIED mutations applied, 0 errors)."
+echo "Mutation smoke-check passed ($APPLIED mutations applied via autogen, 0 errors)."

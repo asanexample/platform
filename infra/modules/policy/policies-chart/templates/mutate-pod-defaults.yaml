@@ -2,26 +2,27 @@
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
-  name: mutate-securitycontext
+  name: mutate-pod-defaults
   labels:
     {{- include "kpp.labels" . | nindent 4 }}
   annotations:
-    policies.kyverno.io/title: Default Hardened securityContext
+    policies.kyverno.io/title: Default Hardened Pod securityContext + automount
     policies.kyverno.io/category: Security, Pod Security
     policies.kyverno.io/severity: medium
     policies.kyverno.io/subject: Pod
     policies.kyverno.io/description: >-
-      Adds a safe default securityContext to tenant containers when one is not already set
-      (allowPrivilegeEscalation=false, drop ALL capabilities, seccompProfile=RuntimeDefault). Uses
-      add-if-absent so it never overrides an explicit choice. runAsNonRoot is intentionally left to
-      the workload (forcing it crashes root images) — enforced for regulated tiers via
-      require-pod-security-restricted. Paired with the disallow-privilege-escalation / require-seccomp
-      validate backstops.
+      Adds safe defaults to tenant pods when not already set: a hardened container securityContext
+      (allowPrivilegeEscalation=false, drop ALL capabilities, seccompProfile=RuntimeDefault) and
+      automountServiceAccountToken=false. add-if-absent so it never overrides an explicit choice.
+      runAsNonRoot is intentionally left to the workload (forcing it crashes root images) — enforced
+      for regulated tiers via require-pod-security-restricted. Paired with the
+      disallow-privilege-escalation / require-seccomp validate backstops. (securityContext and
+      automount share one patch so the strategic-merge type resolves correctly under autogen.)
 spec:
   # Mutations fail open: a best-effort default must never block admission (validation is separate).
   failurePolicy: Ignore
   rules:
-    - name: add-default-securitycontext
+    - name: add-pod-defaults
       match:
         any:
           - resources:
@@ -31,6 +32,7 @@ spec:
       mutate:
         patchStrategicMerge:
           spec:
+            +(automountServiceAccountToken): false
             containers:
               - (name): "?*"
                 securityContext:
