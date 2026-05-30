@@ -92,8 +92,11 @@ AWS_PROFILE=platform aws s3api get-bucket-policy --bucket asanexample-team-bravo
 - **AccessDenied on the team's OWN bucket** — both the identity policy (iam-roles) and the bucket policy
   (s3-shared) must be applied; if you applied `s3-shared` before `iam-roles`, re-apply `s3-shared` so the
   bucket policy resolves the role principal.
-- **Pod admitted but can't reach S3** — the tenant egress NetworkPolicy allows `0.0.0.0/0 except
-  169.254.169.254/32`; do **not** broaden the `except` to all link-local or you'll block the Pod Identity
-  agent (`169.254.170.23`).
+- **Pod gets no AWS creds / SDK hangs then DNS-fails** — the SDK can't reach the Pod Identity agent.
+  Cilium classifies the agent (`169.254.170.23:80`) as the **`host`** entity, which CIDR egress rules
+  don't match; the `tenant` module's `allow-pod-identity-egress` CiliumNetworkPolicy
+  (`toEntities: ["host"]`, port 80) grants it. Confirm with `cilium monitor --type drop` on the node —
+  a `…->host: …169.254.170.23:80 … Policy denied` means that CNP is missing/not applied. (IMDS stays
+  blocked by the node's IMDSv2 hop-limit=1, not by this rule.)
 - **Tenant tried to set an `eks.amazonaws.com/role-arn` annotation** — denied by
   `disallow-irsa-annotation-cross-team` (by design — tenants use Pod Identity, not IRSA).

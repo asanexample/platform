@@ -62,8 +62,13 @@ Both the bucket **name** and its **sole reader** are derived from the owning tea
 `Pod-team-X` — a cross-grant is structurally impossible, not merely caught in review. This mirrors the
 per-team ECR scoping (`team-<team>/*`). Genuinely shared buckets would be a deliberate future opt-in.
 
-Defense in depth: the tenant egress NetworkPolicy blocks IMDS (`169.254.169.254`), so a tenant cannot
-steal the broader **node** role; it still reaches the Pod Identity agent (`169.254.170.23`) and S3.
+**Network path (Cilium nuance).** The Pod Identity agent serves credentials at the link-local
+`169.254.170.23:80`, which Cilium classifies as the **`host`** entity. A CIDR egress rule — broad
+`0.0.0.0/0` *or* a narrow `/32` `toCIDR` — does **not** match the host entity, so tenant pods need an
+explicit `CiliumNetworkPolicy` egress `toEntities: ["host"]` (port 80) to fetch creds (in the `tenant`
+module). That also makes IMDS (`169.254.169.254:80`, also host) network-reachable, but the node enforces
+**IMDSv2 with `HttpPutResponseHopLimit=1`**, so a pod (one hop from the node) cannot reach IMDS and steal
+the node role — that hop-limit is the hard control; the egress restriction is defense-in-depth.
 
 ### Components
 
