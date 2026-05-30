@@ -28,13 +28,14 @@ locals {
       podLabels = local.k8s_labels
       # IRSA: lets the admission controller pull cosign signatures from ECR (the EKS pod-identity
       # webhook injects AWS_REGION/creds from this annotation). Empty when verification is off.
-      serviceAccount = { annotations = local.irsa_sa_annotations }
+      # The chart nests the SA under rbac.serviceAccount.
+      rbac = { serviceAccount = { annotations = local.irsa_sa_annotations } }
     }
     # Leader-elected controllers: a single active replica regardless of count.
     backgroundController = { replicas = 1 }
     reportsController = {
-      replicas       = 1
-      serviceAccount = { annotations = local.irsa_sa_annotations }
+      replicas = 1
+      rbac     = { serviceAccount = { annotations = local.irsa_sa_annotations } }
     }
     cleanupController = { replicas = 1 }
   }
