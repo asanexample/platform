@@ -59,6 +59,7 @@ locals {
     policy           = "${local.source_base}//policy"
     tailscale        = "${local.source_base}/tailscale"
     tailscale_admin  = "${local.source_base}/tailscale-admin"
+    falco            = "${local.source_base}/falco"
   }
 
   # Helm chart version pins — single source of truth across environments
@@ -70,5 +71,6 @@ locals {
     external_secrets   = "0.14.3"
     kyverno            = "3.8.1"
     tailscale_operator = "1.96.5"
+    falco              = "9.0.0"
   }
 }
