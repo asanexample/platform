@@ -1,0 +1,58 @@
+{{- if .Values.enableImageVerification }}
+{{- range $team, $subj := .Values.verifySubjects }}
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-images-team-{{ $team }}
+  labels:
+    {{- include "kpp.labels" $ | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Verify Image Signatures — team-{{ $team }}
+    policies.kyverno.io/category: Supply Chain, Multi-Tenancy
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Admits only images in team-{{ $team }} that are cosign-signed (keyless) by app-{{ $team }}'s
+      own GitHub Actions workflows. Per-team identity — a signature from another team's workflow does
+      not satisfy this policy (supply-chain analog of per-team registry isolation). mutateDigest pins
+      admitted images to their digest.
+spec:
+  # verifyImages honors the spec-level action; webhookTimeout covers signature fetch + Rekor lookup.
+  # Uses its OWN action/failurePolicy so verification can be Audit while other policies are Enforce.
+  validationFailureAction: {{ $.Values.verifyFailureAction }}
+  webhookTimeoutSeconds: 30
+  failurePolicy: {{ $.Values.verifyFailurePolicy }}
+  background: false
+  rules:
+    - name: verify-signed
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - team-{{ $team }}
+      verifyImages:
+        - imageReferences:
+            - "{{ index $.Values.tenantRegistryMap $team }}/*"
+          mutateDigest: true
+          verifyDigest: true
+          required: true
+          attestors:
+            - count: 1
+              entries:
+                # Stable deploys — pinned to the main-branch deploy workflow identity.
+                - keyless:
+                    issuer: https://token.actions.githubusercontent.com
+                    subject: "{{ $subj.deploy_subject }}"
+                    rekor:
+                      url: "{{ $.Values.rekorUrl }}"
+                # PR previews — the OIDC ref varies per PR, so match the preview workflow by regexp.
+                - keyless:
+                    issuer: https://token.actions.githubusercontent.com
+                    subjectRegExp: "{{ $subj.preview_subject_regexp }}"
+                    rekor:
+                      url: "{{ $.Values.rekorUrl }}"
+---
+{{- end }}
+{{- end }}

@@ -81,3 +81,8 @@ kubectl get clusterpolicy -o wide                 # READY column should be true
   platform addon install is blocked, that allow-list (module `exclude_principals`) is the place to fix
   it — verify in `Audit` before re-flipping to `Enforce`.
 - Kyverno self-manages its webhook CA (1-year, auto-rotated); no cert-manager dependency.
+- **Image verification (Phase 3)** depends on cluster egress to **sigstore** (Fulcio/Rekor) and on the
+  Kyverno **IRSA** role (ECR read). A sigstore outage under Enforce blocks admission of *new* images —
+  break-glass by setting `verify_failure_action = "Audit"` on the `policy` unit and applying (or
+  fail-open the verify webhook as above). The verify policies roll Audit→Enforce independently of the
+  other policies via `verify_failure_action`.

@@ -75,7 +75,10 @@ platform. The flip is a one-line input change. This realizes the risk mitigation
    backed by `disallow-privilege-escalation`/`require-seccomp` validate guards and ArgoCD
    `ignoreDifferences`. `generate`-based namespace governance is split out to the multi-namespace /
    self-service tenant-model design (issue #88).
-3. **Supply chain**: `cosign` keyless signing (GitHub OIDC) in app CI + `verifyImages` enforcement.
+3. **Supply chain** *(in progress)*: `cosign` **keyless** signing (GitHub OIDC → Fulcio/Rekor) in app
+   CI (`app-alpha`) + per-team `verifyImages` policies that admit only images signed by that team's own
+   workflow identity. Kyverno gains **IRSA** (ECR read) to fetch signatures; verification rolls
+   Audit→Enforce via its own `verify_failure_action`, independent of the other policies.
 4. **Shift-left CLI**: `kyverno apply`/`test` gate in app-repo + platform CI.
 5. **Reporting + cleanup**: PolicyReport → observability; `CleanupPolicy` TTLs; Gateway-API HTTPRoute
    hostname guard.

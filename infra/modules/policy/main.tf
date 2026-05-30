@@ -3,7 +3,14 @@ locals {
 
   # Audit rollout keeps the webhook fail-open (Ignore) so a policy/engine problem can never block
   # admission; only once Enforce + HA are proven do we fail-closed (Fail).
-  failure_policy = var.validation_failure_action == "Enforce" ? "Fail" : "Ignore"
+  failure_policy        = var.validation_failure_action == "Enforce" ? "Fail" : "Ignore"
+  verify_failure_policy = var.verify_failure_action == "Enforce" ? "Fail" : "Ignore"
+
+  # Kyverno needs ECR read (IRSA) to fetch cosign signatures for verifyImages (Phase 3).
+  create_irsa = local.create && var.enable_image_verification && var.oidc_provider_arn != ""
+  irsa_sa_annotations = local.create_irsa ? {
+    "eks.amazonaws.com/role-arn" = aws_iam_role.kyverno_ecr[0].arn
+  } : {}
 
   # Sanitize tags for K8s label compliance (RFC 1123): lowercase, valid chars, max 63 chars
   k8s_labels = {
@@ -19,11 +26,17 @@ locals {
     admissionController = {
       replicas  = var.replica_count
       podLabels = local.k8s_labels
+      # IRSA: lets the admission controller pull cosign signatures from ECR (the EKS pod-identity
+      # webhook injects AWS_REGION/creds from this annotation). Empty when verification is off.
+      serviceAccount = { annotations = local.irsa_sa_annotations }
     }
     # Leader-elected controllers: a single active replica regardless of count.
     backgroundController = { replicas = 1 }
-    reportsController    = { replicas = 1 }
-    cleanupController    = { replicas = 1 }
+    reportsController = {
+      replicas       = 1
+      serviceAccount = { annotations = local.irsa_sa_annotations }
+    }
+    cleanupController = { replicas = 1 }
   }
 
   # Policies (local chart) values — all dynamic, environment-specific knobs live here so the module
@@ -39,9 +52,89 @@ locals {
     tenantNamespaceLabel    = var.tenant_namespace_label
     requiredWorkloadLabels  = var.required_workload_labels
     enableMutateDefaults    = var.enable_mutate_defaults
+    enableImageVerification = var.enable_image_verification
+    verifyFailureAction     = var.verify_failure_action
+    verifyFailurePolicy     = local.verify_failure_policy
+    verifySubjects          = var.verify_subjects
+    rekorUrl                = var.rekor_url
     additionalPolicies      = var.additional_policies
     commonLabels            = local.k8s_labels
   }
+}
+
+# ---------------------------------------------------------------------------
+# IRSA — Kyverno ECR read (for verifyImages signature fetch)
+# ---------------------------------------------------------------------------
+
+data "aws_iam_policy_document" "kyverno_trust" {
+  count = local.create_irsa ? 1 : 0
+
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    principals {
+      type        = "Federated"
+      identifiers = [var.oidc_provider_arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${var.oidc_provider_url}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+
+    # Admission controller verifies at admission; reports controller for background image scans.
+    condition {
+      test     = "StringEquals"
+      variable = "${var.oidc_provider_url}:sub"
+      values = [
+        "system:serviceaccount:${var.namespace}:kyverno-admission-controller",
+        "system:serviceaccount:${var.namespace}:kyverno-reports-controller",
+      ]
+    }
+  }
+}
+
+resource "aws_iam_role" "kyverno_ecr" {
+  count = local.create_irsa ? 1 : 0
+
+  name_prefix        = "kyverno-ecr-"
+  assume_role_policy = data.aws_iam_policy_document.kyverno_trust[0].json
+
+  tags = var.tags
+}
+
+data "aws_iam_policy_document" "kyverno_ecr" {
+  count = local.create_irsa ? 1 : 0
+
+  statement {
+    sid       = "EcrAuth"
+    effect    = "Allow"
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "EcrReadTeamRepos"
+    effect = "Allow"
+    actions = [
+      "ecr:BatchGetImage",
+      "ecr:GetDownloadUrlForLayer",
+      "ecr:BatchCheckLayerAvailability",
+    ]
+    # Read-only, scoped to the team-* repos. Cross-account read from preprod is additionally allowed
+    # by the ECR repo policy (pull_account_ids), as the node role does today.
+    resources = ["arn:aws:ecr:${var.ecr_region}:${var.ecr_account_id}:repository/team-*"]
+  }
+}
+
+resource "aws_iam_role_policy" "kyverno_ecr" {
+  count = local.create_irsa ? 1 : 0
+
+  name   = "ecr-read"
+  role   = aws_iam_role.kyverno_ecr[0].id
+  policy = data.aws_iam_policy_document.kyverno_ecr[0].json
 }
 
 # ---------------------------------------------------------------------------

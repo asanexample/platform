@@ -17,3 +17,8 @@ output "validation_failure_action" {
   description = "Effective policy action (Audit or Enforce) for the deployed ClusterPolicies"
   value       = var.validation_failure_action
 }
+
+output "kyverno_ecr_role_arn" {
+  description = "ARN of the Kyverno IRSA role for ECR signature reads (null when image verification is disabled)"
+  value       = local.create_irsa ? aws_iam_role.kyverno_ecr[0].arn : null
+}

@@ -71,12 +71,31 @@ matching ArgoCD `ignoreDifferences` is safe.
 
 | Policy | Injects (when absent) | Scope |
 | ------ | --------------------- | ----- |
-| `mutate-securitycontext` | `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`, `seccompProfile.type: RuntimeDefault` on every container/initContainer (not `runAsNonRoot`) | tenant |
-| `mutate-automount` | pod `automountServiceAccountToken: false` | tenant |
-| `mutate-workload-labels` | `team` (tenant key from the `team-<k>[-env]` namespace name) + `app.kubernetes.io/name` (workload name) | tenant |
+| `mutate-pod-defaults` | container `securityContext` (`allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`, `seccompProfile.type: RuntimeDefault`; not `runAsNonRoot`) **and** pod `automountServiceAccountToken: false` — one patch so strategic-merge resolves under autogen | tenant |
+| `mutate-workload-labels` | `team` (tenant key from the `team-<k>[-env]` namespace name) | tenant |
+
+> `app.kubernetes.io/name` can't be auto-derived under autogen (pod templates have no name), so it is
+> **recommended but not required** — `require-workload-labels` requires only `team`, which is
+> auto-injected. Apps therefore need no label boilerplate.
 
 ArgoCD is told to ignore the mutated sub-fields (`argocd_cm_extra` →
 `resource.customizations.ignoreDifferences.all`) so selfHeal doesn't fight Kyverno.
+
+## Image verification (Phase 3 — cosign keyless)
+
+Gated by `enable_image_verification`; rolls Audit→Enforce via its **own** `verify_failure_action`
+(independent of the validate/Enforce action above). App CI signs images keyless (GitHub Actions OIDC →
+Fulcio/Rekor); Kyverno fetches the signature from ECR (via an IRSA role granting ECR read) and admits
+only images signed by that team's workflow identity.
+
+| Policy | Verifies | Scope |
+| ------ | -------- | ----- |
+| `verify-images-team-<team>` | Images under `…/team-<team>/*` are cosign-signed by `app-<team>`'s `deploy.yml@main` (pinned) **or** `preview.yml` (subjectRegExp — the PR OIDC ref varies); `mutateDigest` pins to digest | tenant (per-team) |
+
+Per-team identity isolation: a signature from another team's workflow does **not** satisfy a team's
+policy — the supply-chain analog of per-team registry scoping. Deployed on **preprod** (where tenants
+run); the platform cluster has no tenant workloads. Verification depends on cluster egress to
+sigstore (Fulcio/Rekor) — see the break-glass runbook.
 
 ## Exemptions (so the platform never blocks itself)
 
