@@ -236,13 +236,19 @@ jobs:
           trivy --version
       - name: Scan OpenTofu/Terraform under infra/modules for misconfigurations
         run: |
+          # SARIF artifact (durable record / future GHAS upload)
           trivy config infra/modules \
             --severity HIGH,CRITICAL \
             --skip-dirs '**/.terraform' \
             --format sarif --output trivy-iac.sarif \
             --exit-code 0   # report-only baseline (#112)
+          # Human-readable summary to the log (config reports can't be `trivy convert`-ed)
           echo "::group::Trivy IaC findings"
-          trivy convert --format table trivy-iac.sarif
+          trivy config infra/modules \
+            --severity HIGH,CRITICAL \
+            --skip-dirs '**/.terraform' \
+            --format table \
+            --exit-code 0
           echo "::endgroup::"
       - uses: actions/upload-artifact@v4
         if: always()
@@ -268,7 +274,10 @@ jobs:
             --format sarif --output trivy-deps.sarif \
             --exit-code 0   # report-only baseline (#112)
           echo "::group::Trivy dependency findings"
-          trivy convert --format table trivy-deps.sarif
+          trivy fs infra/tests/aws --scanners vuln \
+            --severity HIGH,CRITICAL \
+            --format table \
+            --exit-code 0
           echo "::endgroup::"
       - uses: actions/upload-artifact@v4
         if: always()
