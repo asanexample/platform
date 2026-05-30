@@ -62,6 +62,11 @@ variable "exclude_principals" {
   description = "Principal (username) wildcards excluded from cluster-scoped policies (RBAC/registry floor) so platform controllers can reconcile addons. Defaults cover the Terraform deployer, ArgoCD, and Kubernetes service controllers."
   type        = list(string)
   default = [
+    # PlatformDeployer is the IaC pipeline (Terragrunt/Helm) — it provisions cluster RBAC, so it must
+    # not be blocked by the RBAC-hardening policies. EKS presents its username as the assumed-role
+    # ARN; the wildcard covers every account + session name. PlatformAdmin is intentionally NOT here
+    # (it is read+operate, not author — ADR-040).
+    "arn:aws:sts::*:assumed-role/PlatformDeployer/*",
     "system:serviceaccount:argocd:*",
     "system:serviceaccount:kube-system:*",
     "system:nodes:*",
