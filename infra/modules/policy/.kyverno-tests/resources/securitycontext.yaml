@@ -1,0 +1,44 @@
+# Explicit allowPrivilegeEscalation: true -> fails disallow-privilege-escalation backstop.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: privesc-app
+  namespace: team-alpha
+  labels:
+    app.kubernetes.io/name: demo
+    team: alpha
+spec:
+  automountServiceAccountToken: false
+  containers:
+    - name: app
+      image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:1.0.0
+      securityContext:
+        allowPrivilegeEscalation: true
+      resources:
+        requests: { cpu: 100m, memory: 128Mi }
+        limits: { cpu: 500m, memory: 512Mi }
+      livenessProbe: { httpGet: { path: /, port: 8080 }, periodSeconds: 10 }
+      readinessProbe: { httpGet: { path: /, port: 8080 }, periodSeconds: 10 }
+---
+# Explicit seccompProfile.type: Unconfined -> fails require-seccomp backstop.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: unconfined-app
+  namespace: team-alpha
+  labels:
+    app.kubernetes.io/name: demo
+    team: alpha
+spec:
+  automountServiceAccountToken: false
+  containers:
+    - name: app
+      image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:1.0.0
+      securityContext:
+        seccompProfile:
+          type: Unconfined
+      resources:
+        requests: { cpu: 100m, memory: 128Mi }
+        limits: { cpu: 500m, memory: 512Mi }
+      livenessProbe: { httpGet: { path: /, port: 8080 }, periodSeconds: 10 }
+      readinessProbe: { httpGet: { path: /, port: 8080 }, periodSeconds: 10 }

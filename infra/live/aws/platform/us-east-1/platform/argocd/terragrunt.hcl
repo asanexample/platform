@@ -134,6 +134,26 @@ inputs = {
 
   argocd_cm_extra = {
     "url" = "https://argocd.aws.refplat.org"
+
+    # Kyverno Phase 2 (#73): the policy engine mutates these fields at admission (safe-default
+    # securityContext / automountServiceAccountToken / identity labels). Tell ArgoCD to ignore the
+    # mutated sub-fields so selfHeal doesn't fight Kyverno (which would thrash). Scoped to only the
+    # mutated paths — app-controlled fields (runAsNonRoot, etc.) still sync. The admission webhook
+    # (disallow-privilege-escalation / require-seccomp) is what actually enforces these, so ignoring
+    # the ArgoCD diff is safe. See docs/architecture/kyverno-policy-catalog.md.
+    "resource.customizations.ignoreDifferences.all" = yamlencode({
+      jqPathExpressions = [
+        ".spec.template.spec.automountServiceAccountToken",
+        ".spec.template.spec.containers[]?.securityContext.allowPrivilegeEscalation",
+        ".spec.template.spec.containers[]?.securityContext.capabilities",
+        ".spec.template.spec.containers[]?.securityContext.seccompProfile",
+        ".spec.template.spec.initContainers[]?.securityContext.allowPrivilegeEscalation",
+        ".spec.template.spec.initContainers[]?.securityContext.capabilities",
+        ".spec.template.spec.initContainers[]?.securityContext.seccompProfile",
+        ".spec.template.metadata.labels.team",
+        ".spec.template.metadata.labels.\"app.kubernetes.io/name\"",
+      ]
+    })
     "dex.config" = yamlencode({
       connectors = [{
         type = "saml"

@@ -41,6 +41,9 @@ requiredWorkloadLabels:
   - app.kubernetes.io/name
   - team
 
+# Deploy the mutate policies (safe-default securityContext / automount / labels) on tenant workloads.
+enableMutateDefaults: true
+
 # Raw ClusterPolicy YAML injected verbatim (ADR-014 escape hatch). name -> manifest string.
 additionalPolicies: {}
 

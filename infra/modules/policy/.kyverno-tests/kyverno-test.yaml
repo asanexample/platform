@@ -9,6 +9,7 @@ resources:
   - resources/workloads.yaml
   - resources/serviceaccount.yaml
   - resources/service.yaml
+  - resources/securitycontext.yaml
 variables: values.yaml
 results:
   # --- compliant workload passes every tenant Pod policy ---
@@ -78,3 +79,24 @@ results:
     kind: Service
     resources: [public-svc]
     result: fail
+  # --- Phase 2 validate backstops ---
+  - policy: disallow-privilege-escalation
+    rule: deny-privilege-escalation
+    kind: Pod
+    resources: [privesc-app]
+    result: fail
+  - policy: require-seccomp
+    rule: deny-unconfined-seccomp-containers
+    kind: Pod
+    resources: [unconfined-app]
+    result: fail
+  - policy: disallow-privilege-escalation
+    rule: deny-privilege-escalation
+    kind: Pod
+    resources: [good-app]
+    result: pass
+  - policy: require-seccomp
+    rule: deny-unconfined-seccomp-containers
+    kind: Pod
+    resources: [good-app]
+    result: pass

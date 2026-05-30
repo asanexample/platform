@@ -1,0 +1,34 @@
+{{- if .Values.enableMutateDefaults }}
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: mutate-workload-labels
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Default Workload Labels
+    policies.kyverno.io/category: Operational Excellence, Cost
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Adds the identity/cost-allocation labels when absent: `team` (the tenant key, derived from the
+      `team-<key>[-<env>]` namespace name — robust to multi-namespace tenants) and
+      `app.kubernetes.io/name` (defaulted to the workload name). Makes require-workload-labels
+      self-satisfying so apps need no label boilerplate. add-if-absent: never overrides an app's labels.
+spec:
+  failurePolicy: Ignore
+  rules:
+    - name: add-default-labels
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+      mutate:
+        patchStrategicMerge:
+          metadata:
+            labels:
+              +(team): "{{`{{ split(request.namespace, '-')[1] }}`}}"
+              +(app.kubernetes.io/name): "{{`{{ request.object.metadata.name }}`}}"
+{{- end }}

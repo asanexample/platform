@@ -1,0 +1,11 @@
+# A deliberately bare tenant pod (no securityContext, automount, or labels) — used by run.sh to
+# smoke-test that all three mutate policies inject their safe defaults without error.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bare-app
+  namespace: team-alpha
+spec:
+  containers:
+    - name: app
+      image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:1.0.0
