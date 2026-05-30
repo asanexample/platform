@@ -62,9 +62,6 @@ module "networking" {
   vpc_name      = var.vpc_name
   address_space = var.address_space
   subnets       = var.subnets
-  environment   = "test"
-  workload      = "terratest"
-  region_abbv   = "usw2"
 
   create_internet_gateway = true
   create_nat_gateways     = true
