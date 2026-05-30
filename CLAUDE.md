@@ -151,6 +151,8 @@ Real account IDs are in `infra/live/aws/secrets.hcl` (gitignored). See `infra/li
 
 Cross-account access uses purpose-built IAM roles (see IAM Roles below). `OrganizationAccountAccessRole` retained as break-glass only.
 
+The **Test** account (Terratest sandbox) is deliberately minimal — no `PlatformDeployer`, applied in-account with SSO admin. Setup, the rationale, and the apply procedure: `docs/runbooks/test-sandbox-account.md`.
+
 ## IAM Roles
 
 | Role | Account | Purpose |
