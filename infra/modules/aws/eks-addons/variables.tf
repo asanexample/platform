@@ -36,6 +36,12 @@ variable "addons" {
   default = {}
 }
 
+variable "create_default_storageclass" {
+  description = "Create a gp3 StorageClass (via the EBS CSI driver) and mark it the cluster default. Needs the aws-ebs-csi-driver addon. Off by default; enable on clusters that need dynamic PVCs (e.g. the observability hub / Mimir, #102 P2)."
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Tags to apply to resources"
   type        = map(string)

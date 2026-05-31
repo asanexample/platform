@@ -83,3 +83,35 @@ resource "aws_eks_addon" "this" {
 
   tags = var.tags
 }
+
+# ---------------------------------------------------------------------------
+# Default StorageClass (gp3 via the EBS CSI driver)
+# ---------------------------------------------------------------------------
+# EKS ships only the deprecated in-tree gp2 SC (non-default). Provide a gp3
+# StorageClass as the cluster default so workloads get dynamic, encrypted,
+# expandable EBS volumes. WaitForFirstConsumer defers binding until a pod is
+# scheduled (respects zone/topology). depends_on the EBS CSI addon so its
+# provisioner exists before anything binds a claim.
+
+resource "kubernetes_storage_class" "gp3" {
+  count = local.create && var.create_default_storageclass ? 1 : 0
+
+  metadata {
+    name = "gp3"
+    annotations = {
+      "storageclass.kubernetes.io/is-default-class" = "true"
+    }
+  }
+
+  storage_provisioner    = "ebs.csi.aws.com"
+  reclaim_policy         = "Delete"
+  volume_binding_mode    = "WaitForFirstConsumer"
+  allow_volume_expansion = true
+
+  parameters = {
+    type      = "gp3"
+    encrypted = "true"
+  }
+
+  depends_on = [aws_eks_addon.this]
+}
