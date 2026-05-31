@@ -348,12 +348,27 @@ resource "aws_iam_role_policy" "alertmanager_sns" {
   role = aws_iam_role.alertmanager[0].id
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Sid      = "PublishAlerts"
-      Effect   = "Allow"
-      Action   = ["sns:Publish"]
-      Resource = [var.alerts_topic_arn]
-    }]
+    Statement = [
+      {
+        Sid      = "PublishAlerts"
+        Effect   = "Allow"
+        Action   = ["sns:Publish"]
+        Resource = [var.alerts_topic_arn]
+      },
+      {
+        # The alerts topic is SSE-KMS encrypted (AWS-managed alias/aws/sns key),
+        # so publishing requires data-key access. The managed key's ARN isn't
+        # known here; scope to SNS via kms:ViaService so the grant is only usable
+        # for SNS publishes in this region.
+        Sid      = "EncryptAlerts"
+        Effect   = "Allow"
+        Action   = ["kms:GenerateDataKey*", "kms:Decrypt"]
+        Resource = ["*"]
+        Condition = {
+          StringEquals = { "kms:ViaService" = "sns.${var.aws_region}.amazonaws.com" }
+        }
+      },
+    ]
   })
 }
 

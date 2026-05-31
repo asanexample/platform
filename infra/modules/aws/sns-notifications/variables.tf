@@ -16,6 +16,12 @@ variable "alert_emails" {
   default     = []
 }
 
+variable "kms_master_key_id" {
+  description = "KMS key ID/alias for SNS server-side encryption. Defaults to the AWS-managed SNS key (alias/aws/sns); a customer-managed CMK upgrade is tracked in #118. Publishers need kms:GenerateDataKey*/Decrypt on this key."
+  type        = string
+  default     = "alias/aws/sns"
+}
+
 variable "tags" {
   description = "Tags to apply to all resources."
   type        = map(string)
