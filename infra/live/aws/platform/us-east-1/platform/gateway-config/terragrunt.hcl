@@ -93,5 +93,11 @@ inputs = {
       service   = "argocd-server"
       port      = 80
     }
+    # Observability hub (#102 P1) — Grafana, Tailscale-only at grafana.aws.refplat.org.
+    grafana = {
+      namespace = "observability"
+      service   = "kube-prometheus-stack-grafana"
+      port      = 80
+    }
   }
 }

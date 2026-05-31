@@ -29,6 +29,9 @@ locals {
     ecr = "${local.source_base}/aws//ecr"
     s3  = "${local.source_base}/aws//s3"
 
+    # Notifications
+    sns_notifications = "${local.source_base}/aws//sns-notifications"
+
     # DNS
     route53            = "${local.source_base}/aws//route53"
     route53_delegation = "${local.source_base}/aws//route53_delegation"
@@ -60,17 +63,19 @@ locals {
     tailscale        = "${local.source_base}/tailscale"
     tailscale_admin  = "${local.source_base}/tailscale-admin"
     falco            = "${local.source_base}/falco"
+    observability    = "${local.source_base}/observability"
   }
 
   # Helm chart version pins — single source of truth across environments
   helm_versions = {
-    cilium             = "1.19.4"
-    argocd             = "9.5.14"
-    cert_manager       = "1.17.1"
-    external_dns       = "1.16.1"
-    external_secrets   = "0.14.3"
-    kyverno            = "3.8.1"
-    tailscale_operator = "1.96.5"
-    falco              = "9.0.0"
+    cilium                = "1.19.4"
+    argocd                = "9.5.14"
+    cert_manager          = "1.17.1"
+    external_dns          = "1.16.1"
+    external_secrets      = "0.14.3"
+    kyverno               = "3.8.1"
+    tailscale_operator    = "1.96.5"
+    falco                 = "9.0.0"
+    kube_prometheus_stack = "86.1.0"
   }
 }
