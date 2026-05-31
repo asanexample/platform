@@ -47,7 +47,7 @@ slsaprovenance` keyless.
 **Why this is L3 (the load-bearing fact, verified):** for a **reusable** workflow, the Fulcio
 certificate's signer identity (SAN) is the *reusable workflow* — verified in P1:
 
-```
+```text
 Certificate subject: https://github.com/asanexample/trusted-ci/.github/workflows/slsa-provenance.yml@<sha>
 GitHub Workflow Repository: asanexample/app-alpha
 ```
