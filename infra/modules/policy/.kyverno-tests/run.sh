@@ -35,18 +35,24 @@ if [ "$APPLIED" -lt 2 ]; then
 fi
 echo "Mutation smoke-check passed ($APPLIED mutations applied via autogen, 0 errors)."
 
-# Render-check the SLSA Build L3 isolated-provenance Audit policy (#131 P2). verifyImages policies can't
-# be unit-tested offline — cosign/Rekor verification needs a live cluster, so the Audit PolicyReport is
-# the real gate. Here we only assert the template renders valid YAML with the per-team caller extension.
-echo "Rendering SLSA-L3 isolated-provenance policy (template validity) ..."
-L3="$(helm template kpp "$CHART" \
+# Render-check the SLSA Build L3 isolated-provenance path (#131, ADR-042). It's now FOLDED INTO the main
+# verify-attestations policy: for a team in attestCallerRepos the SLSA provenance attestor is the isolated
+# trusted-ci workflow (gated by the per-team githubWorkflowRepository extension) instead of the app's own,
+# while the SBOM stays app-signed. verifyImages policies can't be unit-tested offline (cosign/Rekor needs
+# a live cluster — the Audit PolicyReport is the real gate); here we assert the template renders the right
+# attestor identity per team. alpha = adopted (trusted-ci provenance); bravo = not adopted (app provenance).
+echo "Rendering verify-attestations policy (isolated-provenance fold-in, template validity) ..."
+VA="$(helm template kpp "$CHART" \
   --set enableImageVerification=true \
   --set enableAttestationVerification=true \
-  --set enableL3ProvenanceAudit=true \
-  --set-json 'tenantRegistryMap={"alpha":"829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha"}' \
+  --set-json 'tenantRegistryMap={"alpha":"829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha","bravo":"829808296602.dkr.ecr.us-east-1.amazonaws.com/team-bravo"}' \
   --set-json 'attestCallerRepos={"alpha":"asanexample/app-alpha"}' \
-  --show-only templates/verify-attestations-l3.yaml)"
-printf '%s' "$L3" | grep -q 'name: verify-attestations-l3-team-alpha' || { echo "FAIL: L3 policy did not render"; exit 1; }
-printf '%s' "$L3" | grep -q 'githubWorkflowRepository: "asanexample/app-alpha"' || { echo "FAIL: per-team caller extension missing"; exit 1; }
-printf '%s' "$L3" | grep -q 'validationFailureAction: Audit' || { echo "FAIL: L3 policy must be Audit"; exit 1; }
-echo "SLSA-L3 policy render-check passed."
+  --set-json 'verifySubjects={"alpha":[{"deploy_subject":"https://github.com/asanexample/app-alpha/.github/workflows/deploy.yml@refs/heads/main","preview_subject_regexp":"https://github.com/asanexample/app-alpha/.github/workflows/preview.yml@refs/.*"}],"bravo":[{"deploy_subject":"https://github.com/asanexample/app-bravo/.github/workflows/deploy.yml@refs/heads/main","preview_subject_regexp":"https://github.com/asanexample/app-bravo/.github/workflows/preview.yml@refs/.*"}]}')"
+# alpha (adopted): provenance attestor is trusted-ci, gated by the caller-repo extension.
+printf '%s' "$VA" | grep -q 'name: verify-attestations-team-alpha' || { echo "FAIL: alpha verify-attestations did not render"; exit 1; }
+printf '%s' "$VA" | grep -q 'asanexample/trusted-ci' || { echo "FAIL: alpha provenance must use the trusted-ci subject"; exit 1; }
+printf '%s' "$VA" | grep -q 'githubWorkflowRepository: "asanexample/app-alpha"' || { echo "FAIL: alpha per-team caller extension missing"; exit 1; }
+# bravo (not adopted): keeps app-signed provenance, no trusted-ci, no caller-repo gate.
+printf '%s' "$VA" | grep -q 'name: verify-attestations-team-bravo' || { echo "FAIL: bravo verify-attestations did not render"; exit 1; }
+printf '%s' "$VA" | grep -q 'githubWorkflowRepository: "asanexample/app-bravo"' && { echo "FAIL: bravo must NOT carry a trusted-ci caller gate"; exit 1; }
+echo "verify-attestations isolated-provenance render-check passed (alpha=trusted-ci, bravo=app)."

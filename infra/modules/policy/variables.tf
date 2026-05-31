@@ -118,6 +118,12 @@ variable "replica_count" {
   default     = 3
 }
 
+variable "engine_log_verbosity" {
+  description = "Kyverno engine log verbosity (--v). 2 is normal; 4-6 surfaces cosign/image-verification detail for debugging. Maps to the chart's features.logging.verbosity."
+  type        = number
+  default     = 2
+}
+
 variable "helm_timeout" {
   description = "Timeout for Helm operations in seconds"
   type        = number
@@ -178,12 +184,6 @@ variable "attest_failure_action" {
 # Isolated build provenance (SLSA Build L3, #131 P2 — ADR-042)
 # ---------------------------------------------------------------------------
 
-variable "enable_l3_provenance_audit" {
-  description = "Deploy the Audit-only verify-attestations-l3 policies that require SLSA provenance from the ISOLATED trusted-ci reusable workflow (gated per-team by the cert's githubWorkflowRepository extension), alongside the app-signed provenance Enforce policy. Validates the trusted-ci path via PolicyReports before P3 enforces it. Requires enable_attestation_verification = true. Off by default."
-  type        = bool
-  default     = false
-}
-
 variable "trusted_ci_subject_regexp" {
   description = "Anchored regex for the isolated provenance signer's keyless cert subject (the trusted-ci reusable workflow, any pinned ref). Dots escaped; ^...$ anchored so a look-alike repo path can't match."
   type        = string
@@ -191,7 +191,7 @@ variable "trusted_ci_subject_regexp" {
 }
 
 variable "attest_caller_repos" {
-  description = "Per-team caller repo (org/repo, e.g. asanexample/app-alpha) for the verify-attestations-l3 githubWorkflowRepository extension gate. Key = tenant; supplied by the unit ONLY for teams that have adopted the trusted-ci provenance job (else their pods get spurious Audit failures). Empty = no L3 audit policy rendered."
+  description = "Per-team caller repo (org/repo, e.g. asanexample/app-alpha) for the verify-attestations githubWorkflowRepository extension gate. Key = tenant; supplied by the unit ONLY for teams that have adopted the isolated trusted-ci provenance job — for those teams the SLSA provenance attestation must be signed by trusted-ci (gated by this caller repo) instead of the app's own workflow. Teams absent here keep app-signed provenance. Empty = no team uses isolated provenance."
   type        = map(string)
   default     = {}
 }

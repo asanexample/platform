@@ -1,5 +1,14 @@
 {{- if and .Values.enableImageVerification .Values.enableAttestationVerification }}
 {{- range $team, $idents := .Values.verifySubjects }}
+{{- /*
+For teams that have adopted the isolated trusted-ci provenance job (those present in
+.Values.attestCallerRepos — SLSA Build L3, #131/ADR-042), the SLSA provenance attestation must be
+signed by the ISOLATED asanexample/trusted-ci reusable workflow, NOT the app's own build. The app no
+longer self-attests provenance, so the image carries a SINGLE slsaprovenance attestation (trusted-ci)
+— a clean one-identity match. Teams that have not adopted it keep app-signed provenance. The SBOM
+(CycloneDX) attestation stays app-signed for every team either way.
+*/}}
+{{- $callerRepo := index $.Values.attestCallerRepos $team }}
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
@@ -12,11 +21,15 @@ metadata:
     policies.kyverno.io/severity: high
     policies.kyverno.io/subject: Pod
     policies.kyverno.io/description: >-
-      Requires team-{{ $team }} images to carry a cosign-signed SBOM (CycloneDX) AND a SLSA build
-      provenance attestation from app-{{ $team }}'s own GitHub Actions workflow — the full provenance
-      chain layered on top of the signature (verify-images-team-{{ $team }}). Same per-team keyless
-      identity. Predicate types match what the app deploy emits: `cosign attest --type cyclonedx`
-      (https://cyclonedx.org/bom) and `--type slsaprovenance` (https://slsa.dev/provenance/v0.2).
+      Requires team-{{ $team }} images to carry a cosign-signed SBOM (CycloneDX) from app-{{ $team }}'s
+      own GitHub Actions workflow AND a SLSA build provenance attestation
+      {{- if $callerRepo }} from the ISOLATED asanexample/trusted-ci reusable workflow (an identity the
+      app's own build cannot forge; SLSA Build L3, ADR-042), gated per-team by the certificate's
+      githubWorkflowRepository extension (= {{ $callerRepo }}){{- else }} from app-{{ $team }}'s own
+      GitHub Actions workflow{{- end }} — the full provenance chain layered on top of the signature
+      (verify-images-team-{{ $team }}). Predicate types match what the app deploy emits:
+      `cosign attest --type cyclonedx` (https://cyclonedx.org/bom) and `--type slsaprovenance`
+      (https://slsa.dev/provenance/v0.2).
 spec:
   # Own action/failurePolicy so the SBOM+provenance requirement can roll out Audit-first while
   # verify-images (signatures) stays Enforce. Digest pinning is done by verify-images-team-{{ $team }};
@@ -58,11 +71,28 @@ spec:
                         rekor:
                           url: "{{ $.Values.rekorUrl }}"
                     {{- end }}
-            # SLSA build provenance — must exist and be signed by the same identity.
+            # SLSA build provenance.
             - type: https://slsa.dev/provenance/v0.2
               attestors:
                 - count: 1
                   entries:
+                    {{- if $callerRepo }}
+                    # Isolated trusted-ci signer (SLSA Build L3). The cert SUBJECT is the shared
+                    # trusted-ci workflow; the per-team gate is the githubWorkflowRepository extension
+                    # (the CALLER), which Fulcio sets from the calling repo's own OIDC — a different
+                    # team cannot forge it. The app no longer self-attests, so this is the only
+                    # slsaprovenance attestation on the image.
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        # single-quoted: the anchored regex contains backslash escapes (\.) that
+                        # double-quoted YAML would reject as unknown escapes.
+                        subjectRegExp: {{ $.Values.trustedCiSubjectRegExp | squote }}
+                        additionalExtensions:
+                          githubWorkflowRepository: {{ $callerRepo | quote }}
+                        rekor:
+                          url: "{{ $.Values.rekorUrl }}"
+                    {{- else }}
+                    # App-signed provenance (team has not adopted the isolated trusted-ci signer).
                     {{- range $idents }}
                     - keyless:
                         issuer: https://token.actions.githubusercontent.com
@@ -74,6 +104,7 @@ spec:
                         subjectRegExp: "{{ .preview_subject_regexp }}"
                         rekor:
                           url: "{{ $.Values.rekorUrl }}"
+                    {{- end }}
                     {{- end }}
 ---
 {{- end }}

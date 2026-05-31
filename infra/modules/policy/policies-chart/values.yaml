@@ -55,10 +55,11 @@ verifyFailurePolicy: Ignore
 verifySubjects: {}
 rekorUrl: https://rekor.sigstore.dev
 
-# Isolated build provenance (SLSA Build L3, #131 P2). Audit-only policies requiring SLSA provenance from
-# the trusted-ci reusable workflow, gated per-team by the cert's githubWorkflowRepository extension.
-# attestCallerRepos: tenant -> "<org>/app-<team>" (only adopted teams; empty = no L3 audit policy).
-enableL3ProvenanceAudit: false
+# Isolated build provenance (SLSA Build L3, #131/ADR-042). For teams in attestCallerRepos the SLSA
+# provenance attestation in verify-attestations must be signed by the trusted-ci reusable workflow
+# (gated per-team by the cert's githubWorkflowRepository extension) instead of the app's own workflow;
+# teams absent keep app-signed provenance. attestCallerRepos: tenant -> "<org>/app-<team>" (only teams
+# using isolated provenance; empty = every team keeps app-signed provenance).
 trustedCiSubjectRegExp: '^https://github\.com/asanexample/trusted-ci/\.github/workflows/slsa-provenance\.yml@.+$'
 attestCallerRepos: {}
 

@@ -23,9 +23,10 @@ locals {
   # removed) to keep the dual-subject scaffold documented and reusable for the next org/identity change.
   legacy_org = ""
 
-  # Teams whose app CI calls asanexample/trusted-ci's slsa-provenance.yml (SLSA L3, #131). Drives the
-  # Audit-only verify-attestations-l3 policy. Add a team here ONLY once its CI wires the provenance job —
-  # otherwise its pods get spurious Audit failures. P1 wired alpha. (Later: a teams.hcl per-app flag.)
+  # Teams whose app CI calls asanexample/trusted-ci's slsa-provenance.yml as the SOLE provenance signer
+  # (SLSA L3, #131). For these teams verify-attestations requires trusted-ci-signed provenance instead of
+  # app-signed. Add a team here ONLY once its CI has dropped the hand-authored provenance step and wired
+  # the trusted-ci job — otherwise its images fail the provenance check. (Later: a teams.hcl per-app flag.)
   isolated_provenance_teams = ["alpha"]
 }
 
@@ -88,10 +89,15 @@ inputs = {
   # Phase 3 — cosign keyless image verification (Audit-first, independent of the Enforce above).
   enable_image_verification = true
   verify_failure_action     = "Enforce"
-  # SBOM + SLSA provenance attestation requirement (#108/108d). Flipped to Enforce after the Audit
-  # phase confirmed the live alpha deploy + PR-preview images verify ("image verified" PolicyReport).
+  # SBOM + SLSA provenance attestation requirement (#108/108d).
+  # TEMPORARILY Audit during the SLSA L3 single-provenance cutover (#131): adopted teams' provenance now
+  # must be trusted-ci-signed (see attest_caller_repos below). Kept Audit so the policy switch can land
+  # BEFORE the first single-provenance image exists without rejecting the running app-provenance image
+  # (Kyverno couples verify-images to the attestation result, so a mismatch would block on pod restart).
+  # Flip back to Enforce once the new trusted-ci-provenance image is built and verified (verifiedCount:1).
+  # Signature verification (verify_failure_action) stays Enforce, so images must still be team-signed.
   enable_attestation_verification = true
-  attest_failure_action           = "Enforce"
+  attest_failure_action           = "Audit"
   oidc_provider_arn               = dependency.eks.outputs.oidc_provider_arn
   oidc_provider_url               = dependency.eks.outputs.oidc_provider_url
   ecr_account_id                  = include.base.locals.account_ids["platform"]
@@ -109,11 +115,13 @@ inputs = {
     }
   ] }
 
-  # SLSA Build L3 P2 (#131, ADR-042): Audit-only check that the ISOLATED trusted-ci signer's provenance
-  # verifies, gated per-team by the cert's githubWorkflowRepository extension (the caller = the team's
-  # own app repo). Runs alongside the Enforce app-provenance policy; PolicyReports confirm the trusted-ci
-  # path before P3 enforces it. Only for adopted teams (local.isolated_provenance_teams).
-  enable_l3_provenance_audit = true
+  # SLSA Build L3 (#131, ADR-042): for adopted teams (local.isolated_provenance_teams), verify-attestations
+  # requires the SLSA provenance to be signed by the ISOLATED trusted-ci reusable workflow instead of the
+  # app's own — gated per-team by the cert's githubWorkflowRepository extension (= the team's app repo).
+  # The app dropped its hand-authored provenance step, so each image carries a SINGLE slsaprovenance
+  # attestation (trusted-ci) → a clean one-identity match. (Replaced the dead separate-Audit-policy
+  # approach: two slsaprovenance attestations of different identities ERROR Kyverno's matching →
+  # verifiedCount:0.) SBOM stays app-signed.
   attest_caller_repos = { for k in local.isolated_provenance_teams :
     k => replace(values(local.teams[k].apps)[0].repo_url, "https://github.com/", "")
   }
