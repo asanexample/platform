@@ -81,10 +81,13 @@ locals {
     gateway = { enabled = true, replicas = var.high_availability ? 2 : 1 }
 
     # --- Write/read path ---
-    distributor     = { replicas = var.high_availability ? 3 : 1 }
-    querier         = { replicas = var.high_availability ? 2 : 1 }
-    query_frontend  = { replicas = var.high_availability ? 2 : 1 }
-    query_scheduler = { enabled = var.high_availability }
+    distributor    = { replicas = var.high_availability ? 3 : 1 }
+    querier        = { replicas = var.high_availability ? 2 : 1 }
+    query_frontend = { replicas = var.high_availability ? 2 : 1 }
+    # The query-scheduler is required: the chart's base config wires the querier's frontend_worker +
+    # query-frontend to scheduler-headless and does NOT reconfigure for scheduler-less mode, so disabling
+    # it breaks the read path (DNS failures). Keep it on (single replica when not HA).
+    query_scheduler = { enabled = true, replicas = var.high_availability ? 2 : 1 }
 
     ingester = {
       replicas             = var.high_availability ? 3 : 1
