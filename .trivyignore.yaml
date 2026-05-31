@@ -44,3 +44,12 @@ misconfigurations:
       Buckets use SSE-KMS (AWS-managed key). Customer-managed CMK for the audit
       and state buckets is tracked in #118; deferred to avoid cross-account KMS
       key-policy complexity (consistent with the s3 module's encryption choice).
+
+  - id: AWS-0136
+    paths:
+      - "aws/sns-notifications/main.tf"
+    statement: >-
+      The platform-alerts topic uses SSE-KMS (AWS-managed alias/aws/sns key).
+      Customer-managed CMK is tracked in #118, consistent with the cloudtrail
+      (AWS-0015) and state-bucket (AWS-0132) encryption choice; deferred to avoid
+      the publisher key-policy complexity for now.

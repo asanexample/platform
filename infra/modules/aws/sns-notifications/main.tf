@@ -11,6 +11,13 @@ resource "aws_sns_topic" "this" {
   count = var.create ? 1 : 0
 
   name = var.topic_name
+  # SSE-KMS at rest. Defaults to the AWS-managed SNS key (alias/aws/sns); a
+  # customer-managed CMK upgrade is tracked in #118 (consistent with the
+  # cloudtrail/state-bucket encryption choice). Publishers must hold
+  # kms:GenerateDataKey*/Decrypt on this key (scoped via kms:ViaService) — the
+  # Alertmanager IRSA role does (see the observability module).
+  kms_master_key_id = var.kms_master_key_id
+
   tags = var.tags
 }
 
