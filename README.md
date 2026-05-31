@@ -37,7 +37,7 @@ platctl kubeconfig
 platform/
 ├── cmd/platctl/                 # Go CLI for platform operations (bootstrap, teardown, validate, kubeconfig)
 ├── docs/                        # User-facing documentation
-│   ├── adrs/                    # 42 architecture decision records
+│   ├── adrs/                    # 45 architecture decision records
 │   ├── architecture/            # System design, supply chain, observability, tenant model, config hierarchy
 │   ├── compliance/              # SCP → control mapping
 │   ├── runbooks/                # Operational procedures
@@ -193,8 +193,11 @@ Plus [cloudflare/dns_delegation](infra/modules/cloudflare/dns_delegation/) (DNS 
 | Platform-engineer access model | [ADR-040](docs/adrs/040-platform-engineer-access-model.md) |
 | Pod Identity for tenant workloads | [ADR-041](docs/adrs/041-pod-identity-for-tenant-workloads.md) |
 | Isolated build provenance (SLSA L3) | [ADR-042](docs/adrs/042-isolated-build-provenance-slsa-l3.md) |
+| Self-hosted observability stack | [ADR-043](docs/adrs/043-self-hosted-observability-stack.md) |
+| Mimir for durable multi-tenant metrics | [ADR-044](docs/adrs/044-mimir-durable-multi-tenant-metrics.md) |
+| Falco for runtime threat detection | [ADR-045](docs/adrs/045-falco-runtime-threat-detection.md) |
 
-All 42 ADRs: [docs/adrs/](docs/adrs/)
+All 45 ADRs: [docs/adrs/](docs/adrs/)
 
 ## Testing
 
@@ -221,4 +224,4 @@ scanning (Trivy IaC, Semgrep) — via OIDC federation, no stored credentials.
 | [App Supply-Chain Onboarding](docs/runbooks/app-supply-chain-onboarding.md) | Wire signing/SBOM/provenance into app CI |
 | [Tenant Onboarding](docs/runbooks/tenant-onboarding.md) | Add/remove teams via `teams.hcl` |
 | [EKS Cluster Access](docs/runbooks/eks-cluster-access.md) | kubectl setup for engineers |
-| [Architecture Decisions](docs/adrs/) | 42 ADRs documenting every significant choice |
+| [Architecture Decisions](docs/adrs/) | 45 ADRs documenting every significant choice |
