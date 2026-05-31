@@ -95,8 +95,9 @@ inputs = {
   high_availability = false
   storage_class     = "gp3"
 
-  # Keep Prometheus the Grafana default until the observability change (Step 3) flips it.
-  datasource_is_default = false
+  # Mimir is Grafana's default datasource (durable, full-range); the observability change sets the bundled
+  # Prometheus datasource non-default so there's exactly one default.
+  datasource_is_default = true
 
   tags = include.base.locals.tags
 }
