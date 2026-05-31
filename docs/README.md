@@ -17,6 +17,8 @@ hierarchy that promotes consistency across environments.
 | Document | Description |
 |----------|-------------|
 | [Architecture](architecture/) | System design, network topology, and multi-cloud strategy |
+| [Supply-Chain Overview](architecture/supply-chain-overview.md) | Why + end-to-end flow: SBOM, cosign, SLSA provenance, Rekor, Kyverno, and the SLSA Build L3 matrix |
+| [Observability Current State](architecture/observability-current-state.md) | As-built P1 hub + P2 Mimir: topology, multi-tenancy/security model, storage |
 | [Preprod Tenant Model](architecture/preprod-tenant-model.md) | Namespace-based tenant isolation architecture |
 | [Config Hierarchy](../infra/live/aws/_base.hcl) | Seven-layer Terragrunt configuration precedence (root through module) |
 | [Module Design](../infra/docs/13-module-design.md) | Conventions for writing and consuming infrastructure modules |
@@ -28,6 +30,10 @@ hierarchy that promotes consistency across environments.
 | [Runbooks](runbooks/) | Step-by-step operational procedures for common tasks |
 | [Deploy App to Preprod](runbooks/deploy-app-preprod.md) | Developer guide: repo structure, manifests, ECR push, ArgoCD sync |
 | [Tenant Onboarding](runbooks/tenant-onboarding.md) | Platform team: onboard/offboard teams, choose isolation mode |
+| [App Supply-Chain Onboarding](runbooks/app-supply-chain-onboarding.md) | App team: wire cosign signing + SBOM + SLSA provenance into CI |
+| [Supply-Chain Incidents](runbooks/supply-chain-incidents.md) | Verification failures, Sigstore outage, identity rotation, break-glass |
+| [Observability Access](runbooks/observability-access.md) | Access Grafana (Tailscale + creds), dashboards, query Mimir, alerting |
+| [Observability Troubleshooting](runbooks/observability-troubleshooting.md) | Grafana/Prometheus/Mimir/storage diagnostics + apply gotchas |
 | [EKS Cluster Access](runbooks/eks-cluster-access.md) | kubectl setup for platform engineers and developers |
 | [ArgoCD SSO](runbooks/argocd-sso.md) | SSO setup, troubleshooting, and group-based RBAC |
 | [Transit Gateway Operations](runbooks/transit-gateway-operations.md) | Hub/spoke TGW: add spokes, verify connectivity, troubleshoot |
