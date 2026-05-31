@@ -45,6 +45,16 @@ misconfigurations:
       and state buckets is tracked in #118; deferred to avoid cross-account KMS
       key-policy complexity (consistent with the s3 module's encryption choice).
 
+  - id: AWS-0132
+    paths:
+      - "observability-mimir/main.tf"
+    statement: >-
+      The Mimir blocks bucket uses SSE-S3 (AES256), not a CMK. AES256 is the right
+      fit for a high-churn metrics block store: it avoids per-object KMS
+      GenerateDataKey cost/throttle and keeps the Mimir IRSA free of kms perms (an
+      SSE-KMS bucket would require kms:GenerateDataKey*/Decrypt or writes fail). It
+      is Grafana's documented default. CMK is the regulated-tier upgrade (#118).
+
   - id: AWS-0136
     paths:
       - "aws/sns-notifications/main.tf"
