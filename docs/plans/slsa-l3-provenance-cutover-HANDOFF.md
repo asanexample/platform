@@ -4,12 +4,14 @@
 SINGLE trusted-ci provenance identity. Most of the rollout is DONE; we're at the verify-and-flip stage.
 
 ## TL;DR of the fix (decided + executed)
+
 The app's hand-authored `cosign attest --type slsaprovenance` step was worthless for SLSA L3 and, worse,
 produced DUAL provenance (app + trusted-ci) that Kyverno's cosign attestation matching can never pass
 (verifiedCount:0). Fix = drop the hand-authored step so **trusted-ci is the sole provenance signer**;
 switch the verify-attestations policy's provenance block to the trusted-ci identity (SBOM stays app-signed).
 
 ## DONE this session
+
 1. **app-alpha repo** (`asanexample/app-alpha`, local at `/Users/josh/centric/app-alpha`):
    - Remote standardized to `git@github.com:asanexample/app-alpha.git` (was `gangster/...`).
    - Removed hand-authored provenance from `deploy.yml` + `preview.yml`. `deploy.yml` restructured into
@@ -40,6 +42,7 @@ switch the verify-attestations policy's provenance block to the trusted-ci ident
      `githubWorkflowRepository: asanexample/app-alpha`. SBOM block still app (deploy/preview subjects).
 
 ## NEXT STEPS (resume here)
+
 1. **(optional sanity, in progress at handoff)** finish confirming the live policy's attestations block
    has provenance=trusted-ci ONLY (no app provenance entry) and SBOM=app. Extract:
    `kubectl --context preprod get clusterpolicy verify-attestations-team-alpha -o jsonpath='{.spec.rules[0].verifyImages[0].attestations}' | python3 -m json.tool`
@@ -55,6 +58,7 @@ switch the verify-attestations policy's provenance block to the trusted-ci ident
    `b6d9371`) and open a platform PR. Update memory `project_slsa_l3_provenance_cutover` when fully done.
 
 ## Environment / gotchas
+
 - ArgoCD = **platform** cluster (`kubectl --context platform`); tenants + cosign verify = **preprod**
   (`kubectl --context preprod`). alpha-demo destination = preprod ns team-alpha.
 - AWS: `AWS_PROFILE=management` for terragrunt (PlatformDeployer); `AWS_PROFILE=platform` for ECR/cosign
@@ -67,4 +71,4 @@ switch the verify-attestations policy's provenance block to the trusted-ci ident
 - cosign local = v3 (verifies the v2 legacy `.att` fine). `cp` is aliased to prompt — use `/bin/cp -f`.
 - Images: OLD/blocked dual = `sha256:c57b2a26…`; NEW good single-provenance = `sha256:d1e942d031ee4898…`.
 
-## Issue #1 (ArgoCD SSO cert rotation) — DONE earlier, do not redo. Follow-up GH issue #137 filed.
+## Issue #1 (ArgoCD SSO cert rotation) — DONE earlier, do not redo. Follow-up GH issue #137 filed

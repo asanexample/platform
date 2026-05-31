@@ -85,6 +85,7 @@ IRM. Treat as optional; the safe default is Alertmanager → SNS, with PagerDuty
 escalation seam.
 
 ### Portable layer (constant in both modes) vs. what swaps
+
 - **Constant — authored once, never re-done to go commercial:** app instrumentation (OTel SDK / Beyla),
   collection (Alloy / OTel Collector), **dashboards-as-code** (JSON), **alert rules** (`PrometheusRule`),
   SLO *definitions* (abstract objective/window).
@@ -92,6 +93,7 @@ escalation seam.
   which engine *renders* the abstract SLO/synthetic definitions.
 
 ### Module contract
+
 Each capability module expresses the capability in **backend-agnostic** terms and selects the
 implementation internally — e.g. the `slo` module takes `{ objective = 99.9, window = "30d" }` and renders
 **Sloth CRs** (`slo_engine = "sloth"`) or **Grafana SLO** resources (`"grafana_slo"`). Commercial-only paths
@@ -99,6 +101,7 @@ are simply **not wired** when OSS is selected (graceful degradation, no dangling
 license/SaaS credentials come via **External Secrets**, only when a commercial edition is chosen.
 
 ### Honest limits (stated, not papered over)
+
 - A few commercial features have **no OSS parity** (Enterprise reporting/audit, advanced RBAC, Grafana Cloud
   adaptive metrics). For those the platform offers the **seam** (flag + integration point) and documents
   "OSS default = not available / lesser" — we accommodate by making it opt-in, never by blocking or faking.
@@ -139,7 +142,7 @@ license/SaaS credentials come via **External Secrets**, only when a commercial e
   (SingleBinary→**SimpleScalable** RF3) · `tempo` (monolithic→**distributed** RF3) · `alloy` (DaemonSet;
   Promtail/Grafana-Agent EOL) · `opentelemetry-collector` (gateway, 1→×2) · `grafana`/`dex` (1→×2) ·
   `opencost`/`policy-reporter` (1→×2) · `pyroscope` (monolithic→microservices) · `opentelemetry-operator`
-  + `beyla` (DaemonSet) · `blackbox-exporter` · `k6-operator` · `sloth`/`pyrra` · `yace`/`cloudwatch-exporter`.
+  - `beyla` (DaemonSet) · `blackbox-exporter` · `k6-operator` · `sloth`/`pyrra` · `yace`/`cloudwatch-exporter`.
   The module maps `high_availability` to the chart's mode + replica counts + PDB/anti-affinity.
 - **Versioning policy (latest-stable):** at the START of each phase, resolve the **absolute latest stable
   (GA)** chart version via `helm search repo <repo>/<chart> --versions` (or ArtifactHub/OCI) and pin THAT
@@ -230,6 +233,7 @@ depth; F–G are multi-cluster reach, economics, and tenant self-service. Each p
 independently-verifiable sub-issue + unit(s); do not batch.
 
 ### Track A — Core stores & UI
+
 - **P1 — Hub: Grafana + SSO + metrics (dogfood platform).** kube-prometheus-stack + Dex SSO;
   `observability` ns (+ default-deny) + Kyverno exclude on platform; **dashboards-as-code** (concrete set:
   see **"P1 dashboard inventory"** below) + Grafana hardening (#4); expose Grafana Tailscale-only.
@@ -248,6 +252,7 @@ independently-verifiable sub-issue + unit(s); do not batch.
   logs/traces in Grafana. (Splittable P3a/P3b.)
 
 ### Track B — Make it actionable
+
 - **P4 — Alerting, notifications & incident response (full set).** Promote P1's minimal route to the full
   design (see **"P4 alert inventory"**): Mimir **ruler** (multi-tenant alert rules) + curated
   platform-specific `PrometheusRule`s + severity routing + inhibition + runbook links; Alertmanager → SNS →
@@ -257,6 +262,7 @@ independently-verifiable sub-issue + unit(s); do not batch.
   severity; inhibition + Watchdog confirmed; a deploy shows as a dashboard annotation.
 
 ### Track C — Cloud-resource observability (AWS)
+
 - **P5 — Cloud-resource observability.** The "cloud resource" half of the goal — visibility *beyond* the
   cluster. **(a)** Grafana **CloudWatch datasource** (zero-storage, query-time) for broad coverage of RDS /
   ALB·NLB / SQS·SNS / Transit Gateway / Route53 / ACM / NAT / EKS control plane; **(b)** **YACE /
@@ -267,6 +273,7 @@ independently-verifiable sub-issue + unit(s); do not batch.
   *cost* lands in P11.)
 
 ### Track D — Developer experience / APM
+
 - **P6 — APM correlation (RED + service graph + exemplars).** Turn Tempo from a trace bucket into APM:
   enable the Tempo **metrics-generator** → auto **RED metrics** + **service graph** into Mimir; wire
   **exemplars** (Prometheus/Mimir) so a latency spike links to the exact trace; complete the
@@ -276,13 +283,14 @@ independently-verifiable sub-issue + unit(s); do not batch.
   Java/Python/Node/.NET/Go) + **Grafana Beyla** (eBPF — RED metrics + traces with no app changes). Makes
   per-app onboarding free instead of per-team hand-instrumentation; dogfood on a hub workload + a canary,
   then it's the default tenants get at P10. **Verify:** an un-instrumented sample workload emits RED metrics
-  + traces with zero code change.
+  - traces with zero code change.
 - **P8 — Continuous profiling (Pyroscope).** **Pyroscope** store (S3 + IRSA, `auth_enabled` + per-tenant
   limits, `high_availability` toggle) + Alloy/SDK profiling; Grafana **traces ↔ profiles** link (flame graph
   from a slow span). **Verify:** CPU/heap flame graphs for the hub's own components; jump from a trace to its
   profile.
 
 ### Track E — Reliability
+
 - **P9 — SLOs & synthetics.** External truth + reliability targets: **blackbox-exporter** (HTTP/TLS/latency
   probes of HTTPRoutes from *outside*) + **k6** scripted checks → Mimir; **Sloth/Pyrra** render SLO
   recording + multi-window burn-rate **error-budget** alerts from abstract `{ objective, window }`
@@ -290,6 +298,7 @@ independently-verifiable sub-issue + unit(s); do not batch.
   metrics miss; an SLO burn-rate alert fires against a forced error budget.
 
 ### Track F — Multi-cluster reach & economics
+
 - **P10 — Onboard preprod spoke (all signals).** Preprod foundations (Kyverno exclude + tenant
   `allow-metrics-scrape` + `observability` ns) + **authenticated** cross-cluster ingest (Tailscale/TGW,
   per security #1) + agent buffering. Preprod collectors stamp `X-Scope-OrgID=<team>` + `cluster=preprod`;
@@ -306,6 +315,7 @@ independently-verifiable sub-issue + unit(s); do not batch.
   **Verify:** dashboards populated. **Close #93.**
 
 ### Track G — Tenancy & self-service
+
 - **P13 — Full per-team tenant isolation.** Per-team Grafana access (per-team OSS instances or Enterprise
   `org_mapping`); datasources pinned to the team's `X-Scope-OrgID`; IC group-GUID gating; `teams.hcl`
   `observability` block + maps. Applies across **all** signals — metrics, logs, traces, profiles.
@@ -325,7 +335,9 @@ by effort: **bundled** (ship with the chart), **vendored** (commit upstream JSON
 `infra/modules/<obs>/dashboards/`), **custom** (authored in-repo).
 
 ### Tier 1 — Bundled (kube-prometheus-stack, auto-provisioned — zero effort)
+
 Genuinely useful day one:
+
 - **Compute Resources** — Cluster / Namespace (Pods) / Namespace (Workloads) / Node (Pods) / Pod / Workload
 - **Node Exporter** — Nodes + USE Method (Node & Cluster): CPU / mem / disk / network saturation
 - **Kubernetes / API server** — request rate, latency, error ratio, SLO burn
@@ -342,10 +354,12 @@ Genuinely useful day one:
 > logs are a later, separate add-on).
 
 ### Tier 2 — Vendored upstream (commit pinned JSON; provision via sidecar)
+
 The platform-specific dashboards P1 calls out — **none are chart-bundled**; each needs its component's
 metrics enabled (ServiceMonitor / `prometheus.enabled`). Resolve the exact grafana.com **ID + revision**
 at authoring time and commit that JSON (don't live-import by ID — upgrades go through PR review; re-point
 hard-coded `datasource` fields to the provisioned Prometheus/Mimir uid):
+
 - **ArgoCD** — official dashboard (argoproj `argo-cd` repo; grafana.com ~**14584**): app health, sync
   status, reconciliation rate, controller queue depth. Needs the ArgoCD metrics ServiceMonitors.
 - **Kyverno** — official dashboards (kyverno repo): admission request rate + **allow/deny by policy**,
@@ -361,8 +375,10 @@ hard-coded `datasource` fields to the provisioned Prometheus/Mimir uid):
 - *(optional)* **external-dns** and **Tailscale operator** once we confirm they expose useful series.
 
 ### Tier 3 — Custom: "Platform Health" overview (the only authored dashboard in P1)
+
 A single-pane **landing dashboard** — the first thing you open — aggregating the highest-signal panels
 across the stack, each linking down into the tier-1/2 dashboards:
+
 - **Cluster vitals:** nodes Ready/total, node CPU·mem·disk pressure, pods Pending / CrashLoopBackOff,
   recent OOMKills.
 - **Control plane:** API server availability + p99 latency + error ratio (the one control-plane signal EKS
@@ -385,6 +401,7 @@ rules until then). Routing/silences live in Alertmanager config (secrets via Ext
 a `runbook_url`. **Minimal critical-only route ships in P1; the full set lands in P4.**
 
 ### Tier 1 — Bundled (kube-prometheus-stack mixins — free, on in P1)
+
 kubernetes-mixin + node-exporter mixin: `KubePodCrashLooping`, `KubePodNotReady`,
 `KubeDeploymentReplicasMismatch`, `KubeStatefulSetReplicasMismatch`, `KubeJobFailed`, `KubeHpaMaxedOut`,
 `KubeNodeNotReady`/`KubeNodeUnreachable`, `KubeletTooManyPods`, `KubeQuotaAlmostFull`,
@@ -399,7 +416,9 @@ kubernetes-mixin + node-exporter mixin: `KubePodCrashLooping`, `KubePodNotReady`
 > empty-dashboard note above.
 
 ### Tier 2 — Curated platform-specific (`PrometheusRule`, authored in P4)
+
 The high-signal alerts the mixins don't cover — one rule file per component:
+
 - **ArgoCD** — `ArgoCDAppDegraded` / `ArgoCDAppOutOfSync` (>15m), `ArgoCDAppSyncFailed`,
   `ArgoCDComponentDown` (repo-server / app-controller). *Deploy regressions.*
 - **Kyverno** — `KyvernoWebhookDown` (admission unavailable = blocks/fails all admission),
@@ -417,6 +436,7 @@ The high-signal alerts the mixins don't cover — one rule file per component:
   rejections (also the noisy-neighbor security signal, security §3).
 
 ### Tier 3 — Meta & routing design
+
 - **Watchdog / DeadMansSwitch** — an always-firing alert routed to an **external** heartbeat
   (healthchecks.io / PagerDuty heartbeat). If it stops arriving, the *monitoring pipeline itself* is down.
   Ships in P1.

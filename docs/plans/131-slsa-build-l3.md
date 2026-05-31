@@ -53,6 +53,7 @@ a compromised build step could forge it — that fails L3's "non-falsifiable" ba
 
 **Key finding (reshapes the effort):** the **slsa-framework/slsa-github-generator** SLSA-3 *container*
 reusable workflow:
+
 - is **free** — signs via the **public Sigstore** keyless, **NOT** GitHub Artifact Attestations (so **no
   GitHub Enterprise Cloud**, unlike `actions/attest-build-provenance`);
 - stores provenance as a **legacy cosign attestation** (`.att` DSSE), the **same format Kyverno already
@@ -112,7 +113,7 @@ unchanged.
   mints the ECR token, `cosign attest --type slsaprovenance` keyless. Added the provenance job to
   `app-alpha` `deploy.yml` + `preview.yml` (pinned SHA) alongside the hand-authored step (dual
   provenance). Verified: preview run green, `cosign verify-attestation` shows the **trusted-ci** signer
-  + `app-alpha` caller extension.
+  - `app-alpha` caller extension.
 - **P2 — Kyverno dual-accept, Audit.** Attestor accepts **either** app identity (old) **or** generator
   (new); confirm PolicyReports show the generator path verifies on deploy **and** preview pods; add the
   per-team source condition.
