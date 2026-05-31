@@ -1,0 +1,356 @@
+locals {
+  create      = var.create
+  create_irsa = local.create && var.alerts_topic_arn != "" && var.oidc_provider_arn != ""
+
+  # Sanitize tags for K8s label compliance (RFC-1123), mirroring the policy module.
+  k8s_labels = {
+    for k, v in var.tags :
+    replace(lower(k), "/[^a-z0-9_.-]/", "_") => replace(lower(v), "/[^a-z0-9_.-]/", "_")
+    if length(replace(lower(k), "/[^a-z0-9_.-]/", "_")) <= 63 && length(replace(lower(v), "/[^a-z0-9_.-]/", "_")) <= 63
+  }
+
+  # Deterministic names (release pinned so these are stable).
+  grafana_service       = "${var.helm_release_name}-grafana"
+  alertmanager_sa       = "${var.helm_release_name}-alertmanager"
+  grafana_admin_secret  = "grafana-admin"
+  grafana_admin_sm_name = "${var.secret_path_prefix}/observability/grafana-admin"
+  prometheus_storage_spec = var.use_persistent_storage ? {
+    volumeClaimTemplate = {
+      spec = {
+        storageClassName = var.storage_class
+        accessModes      = ["ReadWriteOnce"]
+        resources        = { requests = { storage = "20Gi" } }
+      }
+    }
+  } : null
+
+  # Alertmanager routing: critical → SNS, Watchdog → null (external heartbeat is a P4 follow-up),
+  # everything else → null. Only wired when an SNS topic + IRSA are present.
+  alertmanager_config = {
+    global = { resolve_timeout = "5m" }
+    route = {
+      group_by        = ["namespace", "alertname"]
+      group_wait      = "30s"
+      group_interval  = "5m"
+      repeat_interval = "4h"
+      receiver        = "null"
+      routes = concat(
+        [{ receiver = "null", matchers = ["alertname = \"Watchdog\""] }],
+        local.create_irsa ? [{ receiver = "critical-sns", matchers = ["severity = \"critical\""], continue = false }] : [],
+      )
+    }
+    receivers = concat(
+      [{ name = "null" }],
+      local.create_irsa ? [{
+        name = "critical-sns"
+        sns_configs = [{
+          topic_arn     = var.alerts_topic_arn
+          sigv4         = { region = var.aws_region }
+          subject       = "[{{ .CommonLabels.severity }}] {{ .CommonLabels.alertname }}"
+          message       = "{{ range .Alerts }}{{ .Annotations.description }}{{ \"\\n\" }}{{ end }}"
+          send_resolved = true
+        }]
+      }] : [],
+    )
+  }
+
+  helm_values = {
+    # --- EKS accuracy: managed control plane is unscrapeable; Cilium replaces kube-proxy. ---
+    # Disable the scrape jobs AND their alert rule groups so we don't ship empty dashboards
+    # or perpetually-firing "target down" alerts.
+    kubeScheduler         = { enabled = false }
+    kubeControllerManager = { enabled = false }
+    kubeEtcd              = { enabled = false }
+    kubeProxy             = { enabled = false }
+
+    defaultRules = {
+      create = true
+      rules = {
+        etcd                  = false
+        kubeScheduler         = false
+        kubeControllerManager = false
+        kubeProxy             = false
+      }
+    }
+
+    # --- Prometheus ---
+    prometheus = {
+      prometheusSpec = {
+        replicas  = var.high_availability ? 2 : 1
+        retention = var.prometheus_retention
+        # Pick up ServiceMonitors / PodMonitors / Rules cluster-wide, not just chart-labelled ones
+        # (so the per-component ServiceMonitors below — and future ones — are scraped).
+        serviceMonitorSelectorNilUsesHelmValues = false
+        podMonitorSelectorNilUsesHelmValues     = false
+        ruleSelectorNilUsesHelmValues           = false
+        probeSelectorNilUsesHelmValues          = false
+        resources = {
+          requests = { cpu = "200m", memory = "1Gi" }
+          limits   = { memory = "2Gi" }
+        }
+        storageSpec     = local.prometheus_storage_spec
+        podAntiAffinity = var.high_availability ? "hard" : "soft"
+      }
+      # Per-component ServiceMonitors for the tier-2 dashboards (sources that already expose metrics).
+      additionalServiceMonitors = [
+        {
+          name              = "kyverno"
+          namespaceSelector = { matchNames = ["kyverno"] }
+          selector          = { matchLabels = { "app.kubernetes.io/part-of" = "kyverno" } }
+          endpoints         = [{ port = "metrics-port", interval = "30s" }]
+        },
+      ]
+    }
+
+    # --- Alertmanager ---
+    alertmanager = {
+      alertmanagerSpec = {
+        replicas        = var.high_availability ? 3 : 1
+        podAntiAffinity = var.high_availability ? "hard" : "soft"
+        resources = {
+          requests = { cpu = "50m", memory = "128Mi" }
+          limits   = { memory = "256Mi" }
+        }
+      }
+      serviceAccount = {
+        annotations = local.create_irsa ? {
+          "eks.amazonaws.com/role-arn" = aws_iam_role.alertmanager[0].arn
+        } : {}
+      }
+      config = local.alertmanager_config
+    }
+
+    # --- Grafana (hardened; admin via the TF-managed secret; SSO is a fast-follow) ---
+    grafana = {
+      replicas = var.high_availability ? 2 : 1
+      admin = {
+        existingSecret = local.grafana_admin_secret
+        userKey        = "admin-user"
+        passwordKey    = "admin-password"
+      }
+      defaultDashboardsEnabled  = true # tier-1 bundled dashboards
+      defaultDashboardsTimezone = "utc"
+      sidecar = {
+        dashboards  = { enabled = true, label = "grafana_dashboard", searchNamespace = var.namespace, folderAnnotation = "grafana_folder", provider = { foldersFromFilesStructure = true } }
+        datasources = { enabled = true }
+      }
+      service = { port = 80 }
+      "grafana.ini" = {
+        server           = { root_url = "https://${var.grafana_hostname}", enforce_domain = false }
+        "auth.anonymous" = { enabled = false }
+        users            = { viewers_can_edit = false, allow_sign_up = false, allow_org_create = false, default_theme = "dark" }
+        security         = { cookie_secure = true, cookie_samesite = "strict", content_security_policy = true, disable_gravatar = true }
+        plugins          = { allow_loading_unsigned_plugins = "" }
+        analytics        = { reporting_enabled = false, check_for_updates = false }
+      }
+      resources = {
+        requests = { cpu = "100m", memory = "256Mi" }
+        limits   = { memory = "512Mi" }
+      }
+    }
+
+    # node-exporter needs host access — the ns is created (below) with PSA `privileged` for it.
+    "kube-state-metrics" = {}
+    nodeExporter         = { enabled = true }
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Namespace (PSA `privileged` for node-exporter; created here, NOT by the chart,
+# so the label is set — and intentionally NO tenant label).
+# ---------------------------------------------------------------------------
+resource "kubernetes_namespace" "this" {
+  count = local.create ? 1 : 0
+
+  metadata {
+    name = var.namespace
+    labels = merge(local.k8s_labels, {
+      "pod-security.kubernetes.io/enforce" = "privileged"
+      "app.kubernetes.io/managed-by"       = "terraform"
+    })
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Network policies — default-deny ingress; allow intra-namespace; Grafana reachable
+# (gateway path). Egress left open (Prometheus scrapes cluster-wide). Full store-endpoint
+# isolation lands with the multi-tenant stores in P2.
+# ---------------------------------------------------------------------------
+resource "kubernetes_network_policy" "default_deny_ingress" {
+  count = local.create ? 1 : 0
+
+  metadata {
+    name      = "default-deny-ingress"
+    namespace = kubernetes_namespace.this[0].metadata[0].name
+  }
+  spec {
+    pod_selector {}
+    policy_types = ["Ingress"]
+  }
+}
+
+resource "kubernetes_network_policy" "allow_intra_namespace" {
+  count = local.create ? 1 : 0
+
+  metadata {
+    name      = "allow-intra-namespace"
+    namespace = kubernetes_namespace.this[0].metadata[0].name
+  }
+  spec {
+    pod_selector {}
+    policy_types = ["Ingress"]
+    ingress {
+      from {
+        pod_selector {}
+      }
+    }
+  }
+}
+
+resource "kubernetes_network_policy" "allow_grafana_ingress" {
+  count = local.create ? 1 : 0
+
+  metadata {
+    name      = "allow-grafana-ingress"
+    namespace = kubernetes_namespace.this[0].metadata[0].name
+  }
+  spec {
+    pod_selector {
+      match_labels = { "app.kubernetes.io/name" = "grafana" }
+    }
+    policy_types = ["Ingress"]
+    ingress {
+      # Reachable from any namespace (the Gateway/Envoy data path). Tighten to the gateway ns later.
+      from {
+        namespace_selector {}
+      }
+      ports {
+        port     = "3000"
+        protocol = "TCP"
+      }
+    }
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Grafana admin credential — TF-generated (so TF owns it), mirrored to Secrets
+# Manager for human retrieval, and delivered to the cluster as a k8s Secret.
+# (Direct, since the secret originates in TF — ESO is for externally-sourced secrets.)
+# ---------------------------------------------------------------------------
+resource "random_password" "grafana_admin" {
+  count   = local.create ? 1 : 0
+  length  = 24
+  special = false # avoid shell/URL-escaping headaches in the admin password
+}
+
+resource "aws_secretsmanager_secret" "grafana_admin" {
+  count = local.create ? 1 : 0
+
+  name        = local.grafana_admin_sm_name
+  description = "Grafana admin credential (observability hub). Interim until SSO lands."
+  tags        = var.tags
+}
+
+resource "aws_secretsmanager_secret_version" "grafana_admin" {
+  count = local.create ? 1 : 0
+
+  secret_id = aws_secretsmanager_secret.grafana_admin[0].id
+  secret_string = jsonencode({
+    "admin-user"     = "admin"
+    "admin-password" = random_password.grafana_admin[0].result
+  })
+}
+
+resource "kubernetes_secret" "grafana_admin" {
+  count = local.create ? 1 : 0
+
+  metadata {
+    name      = local.grafana_admin_secret
+    namespace = kubernetes_namespace.this[0].metadata[0].name
+    labels    = local.k8s_labels
+  }
+  data = {
+    "admin-user"     = "admin"
+    "admin-password" = random_password.grafana_admin[0].result
+  }
+  type = "Opaque"
+}
+
+# ---------------------------------------------------------------------------
+# IRSA — Alertmanager → SNS publish (the only AWS access in P1)
+# ---------------------------------------------------------------------------
+data "aws_iam_policy_document" "alertmanager_trust" {
+  count = local.create_irsa ? 1 : 0
+
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    principals {
+      type        = "Federated"
+      identifiers = [var.oidc_provider_arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "${var.oidc_provider_url}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "${var.oidc_provider_url}:sub"
+      values   = ["system:serviceaccount:${var.namespace}:${local.alertmanager_sa}"]
+    }
+  }
+}
+
+resource "aws_iam_role" "alertmanager" {
+  count = local.create_irsa ? 1 : 0
+
+  name_prefix        = "${var.cluster_name}-am-sns-"
+  assume_role_policy = data.aws_iam_policy_document.alertmanager_trust[0].json
+  tags               = var.tags
+}
+
+resource "aws_iam_role_policy" "alertmanager_sns" {
+  count = local.create_irsa ? 1 : 0
+
+  name = "sns-publish"
+  role = aws_iam_role.alertmanager[0].id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid      = "PublishAlerts"
+      Effect   = "Allow"
+      Action   = ["sns:Publish"]
+      Resource = [var.alerts_topic_arn]
+    }]
+  })
+}
+
+# ---------------------------------------------------------------------------
+# kube-prometheus-stack
+# ---------------------------------------------------------------------------
+resource "helm_release" "kube_prometheus_stack" {
+  count = local.create ? 1 : 0
+
+  name             = var.helm_release_name
+  repository       = var.helm_repository
+  chart            = var.helm_chart
+  version          = var.helm_chart_version
+  namespace        = kubernetes_namespace.this[0].metadata[0].name
+  create_namespace = false # created above with the PSA label
+  timeout          = var.helm_timeout
+  wait             = var.helm_wait
+  atomic           = var.helm_wait
+  cleanup_on_fail  = true
+
+  values = [
+    yamlencode(local.helm_values),
+  ]
+
+  depends_on = [
+    kubernetes_secret.grafana_admin,
+    kubernetes_network_policy.default_deny_ingress,
+    aws_iam_role_policy.alertmanager_sns,
+  ]
+}

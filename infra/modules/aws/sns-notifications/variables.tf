@@ -1,0 +1,23 @@
+variable "create" {
+  description = "Controls whether resources are created."
+  type        = bool
+  default     = true
+}
+
+variable "topic_name" {
+  description = "SNS topic name for platform alert notifications (e.g. Alertmanager critical alerts, Falco security events)."
+  type        = string
+  default     = "platform-alerts"
+}
+
+variable "alert_emails" {
+  description = "Email addresses subscribed to the topic. Each subscription must be confirmed via the email AWS sends before notifications flow."
+  type        = list(string)
+  default     = []
+}
+
+variable "tags" {
+  description = "Tags to apply to all resources."
+  type        = map(string)
+  default     = {}
+}

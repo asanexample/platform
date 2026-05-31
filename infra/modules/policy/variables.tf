@@ -56,6 +56,7 @@ variable "exclude_namespaces" {
     "argocd",
     "tailscale",
     "falco",
+    "observability",
   ]
 }
 
