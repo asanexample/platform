@@ -92,12 +92,20 @@ locals {
         podAntiAffinity = var.high_availability ? "hard" : "soft"
       }
       # Per-component ServiceMonitors for the tier-2 dashboards (sources that already expose metrics).
+      # ArgoCD / Cilium-agent / External-Secrets need a metrics flag in their own unit first — added as
+      # those units enable metrics (follow-up).
       additionalServiceMonitors = [
         {
           name              = "kyverno"
           namespaceSelector = { matchNames = ["kyverno"] }
           selector          = { matchLabels = { "app.kubernetes.io/part-of" = "kyverno" } }
           endpoints         = [{ port = "metrics-port", interval = "30s" }]
+        },
+        {
+          name              = "cert-manager"
+          namespaceSelector = { matchNames = ["cert-manager"] }
+          selector          = { matchLabels = { "app.kubernetes.io/name" = "cert-manager" } }
+          endpoints         = [{ port = "tcp-prometheus-servicemonitor", interval = "30s" }]
         },
       ]
     }
@@ -277,6 +285,25 @@ resource "kubernetes_secret" "grafana_admin" {
     "admin-password" = random_password.grafana_admin[0].result
   }
   type = "Opaque"
+}
+
+# ---------------------------------------------------------------------------
+# Curated dashboards-as-code — one ConfigMap per JSON in dashboards/, picked up by the
+# Grafana sidecar (label grafana_dashboard=1). Tier-1 bundled dashboards ship with the chart;
+# these are the tier-3 custom (Platform Health) + tier-2 vendored ones.
+# ---------------------------------------------------------------------------
+resource "kubernetes_config_map" "dashboards" {
+  for_each = local.create ? fileset("${path.module}/dashboards", "*.json") : toset([])
+
+  metadata {
+    name        = "obs-dashboard-${trimsuffix(each.value, ".json")}"
+    namespace   = kubernetes_namespace.this[0].metadata[0].name
+    labels      = merge(local.k8s_labels, { grafana_dashboard = "1" })
+    annotations = { grafana_folder = "Platform" }
+  }
+  data = {
+    (each.value) = file("${path.module}/dashboards/${each.value}")
+  }
 }
 
 # ---------------------------------------------------------------------------
