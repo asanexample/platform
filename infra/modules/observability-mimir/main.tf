@@ -54,8 +54,16 @@ locals {
           s3      = { bucket_name = try(aws_s3_bucket.blocks[0].bucket, "") }
         }
 
-        # Single ingester => replication_factor must be 1 or writes are rejected.
-        ingester = { ring = { replication_factor = var.high_availability ? 3 : 1 } }
+        # Classic write path (distributor -> ingester gRPC push). The chart's base config defaults to
+        # the Kafka-based ingest-storage architecture (ingest_storage.enabled: true +
+        # push_grpc_method_enabled: false); override both to OFF so no Kafka is needed. Kafka itself is
+        # disabled in the helm values below. (Ingest-storage is an HA/scale option for later.)
+        ingest_storage = { enabled = false }
+        ingester = {
+          push_grpc_method_enabled = true
+          # Single ingester => replication_factor must be 1 or writes are rejected.
+          ring = { replication_factor = var.high_availability ? 3 : 1 }
+        }
 
         limits = {
           max_global_series_per_user        = var.max_global_series_per_user
@@ -65,6 +73,9 @@ locals {
         }
       }
     }
+
+    # Classic architecture — no Kafka (ingest_storage disabled in structuredConfig above).
+    kafka = { enabled = false }
 
     # Single entry point (nginx) for push + query.
     gateway = { enabled = true, replicas = var.high_availability ? 2 : 1 }
