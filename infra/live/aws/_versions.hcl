@@ -48,22 +48,23 @@ locals {
     state_bootstrap = "${local.source_base}/aws//state_bootstrap"
 
     # Cloud-agnostic (Kubernetes add-ons)
-    cilium           = "${local.source_base}/cilium"
-    argocd           = "${local.source_base}/argocd"
-    argocd_clusters  = "${local.source_base}/argocd-clusters"
-    argocd_apps      = "${local.source_base}/argocd-apps"
-    cert_manager     = "${local.source_base}/cert-manager"
-    external_dns     = "${local.source_base}/external-dns"
-    external_secrets = "${local.source_base}/external-secrets"
-    secret_stores    = "${local.source_base}/secret-stores"
-    gateway_config   = "${local.source_base}/gateway-config"
-    cluster_rbac     = "${local.source_base}//cluster-rbac"
-    tenant           = "${local.source_base}//tenant"
-    policy           = "${local.source_base}//policy"
-    tailscale        = "${local.source_base}/tailscale"
-    tailscale_admin  = "${local.source_base}/tailscale-admin"
-    falco            = "${local.source_base}/falco"
-    observability    = "${local.source_base}/observability"
+    cilium              = "${local.source_base}/cilium"
+    argocd              = "${local.source_base}/argocd"
+    argocd_clusters     = "${local.source_base}/argocd-clusters"
+    argocd_apps         = "${local.source_base}/argocd-apps"
+    cert_manager        = "${local.source_base}/cert-manager"
+    external_dns        = "${local.source_base}/external-dns"
+    external_secrets    = "${local.source_base}/external-secrets"
+    secret_stores       = "${local.source_base}/secret-stores"
+    gateway_config      = "${local.source_base}/gateway-config"
+    cluster_rbac        = "${local.source_base}//cluster-rbac"
+    tenant              = "${local.source_base}//tenant"
+    policy              = "${local.source_base}//policy"
+    tailscale           = "${local.source_base}/tailscale"
+    tailscale_admin     = "${local.source_base}/tailscale-admin"
+    falco               = "${local.source_base}/falco"
+    observability       = "${local.source_base}/observability"
+    observability_mimir = "${local.source_base}/observability-mimir"
   }
 
   # Helm chart version pins — single source of truth across environments
@@ -77,5 +78,6 @@ locals {
     tailscale_operator    = "1.96.5"
     falco                 = "9.0.0"
     kube_prometheus_stack = "86.1.0"
+    mimir                 = "6.0.6"
   }
 }
