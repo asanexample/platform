@@ -22,6 +22,12 @@ locals {
   # running image (sha256:d60ea84) verified, so the legacy gangster identity is dropped. Left empty (not
   # removed) to keep the dual-subject scaffold documented and reusable for the next org/identity change.
   legacy_org = ""
+
+  # Teams whose app CI calls asanexample/trusted-ci's slsa-provenance.yml as the SOLE provenance signer
+  # (SLSA L3, #131). For these teams verify-attestations requires trusted-ci-signed provenance instead of
+  # app-signed. Add a team here ONLY once its CI has dropped the hand-authored provenance step and wired
+  # the trusted-ci job — otherwise its images fail the provenance check. (Later: a teams.hcl per-app flag.)
+  isolated_provenance_teams = ["alpha"]
 }
 
 dependency "eks" {
@@ -83,8 +89,11 @@ inputs = {
   # Phase 3 — cosign keyless image verification (Audit-first, independent of the Enforce above).
   enable_image_verification = true
   verify_failure_action     = "Enforce"
-  # SBOM + SLSA provenance attestation requirement (#108/108d). Flipped to Enforce after the Audit
-  # phase confirmed the live alpha deploy + PR-preview images verify ("image verified" PolicyReport).
+  # SBOM + SLSA provenance attestation requirement (#108/108d). Enforce: non-compliant tenant images are
+  # rejected at admission. For adopted teams the SLSA provenance must be trusted-ci-signed (see
+  # attest_caller_repos below). Re-flipped to Enforce 2026-05-30 after the SLSA L3 single-provenance
+  # cutover (#131): the new trusted-ci-provenance alpha image (sha256:d1e942d0) verified clean under Audit
+  # (PolicyReport verifiedCount:1, pods rolled out) so Enforce no longer risks blocking the live workload.
   enable_attestation_verification = true
   attest_failure_action           = "Enforce"
   oidc_provider_arn               = dependency.eks.outputs.oidc_provider_arn
@@ -103,6 +112,17 @@ inputs = {
       preview_subject_regexp = "${url}/.github/workflows/preview.yml@refs/.*"
     }
   ] }
+
+  # SLSA Build L3 (#131, ADR-042): for adopted teams (local.isolated_provenance_teams), verify-attestations
+  # requires the SLSA provenance to be signed by the ISOLATED trusted-ci reusable workflow instead of the
+  # app's own — gated per-team by the cert's githubWorkflowRepository extension (= the team's app repo).
+  # The app dropped its hand-authored provenance step, so each image carries a SINGLE slsaprovenance
+  # attestation (trusted-ci) → a clean one-identity match. (Replaced the dead separate-Audit-policy
+  # approach: two slsaprovenance attestations of different identities ERROR Kyverno's matching →
+  # verifiedCount:0.) SBOM stays app-signed.
+  attest_caller_repos = { for k in local.isolated_provenance_teams :
+    k => replace(values(local.teams[k].apps)[0].repo_url, "https://github.com/", "")
+  }
 
   # Phase 5 — Gateway-API route hostname guard (anti-squatting on the shared wildcard listener).
   # Each team's routes may only claim the hostnames it declares in teams.hcl. (When PR previews get a

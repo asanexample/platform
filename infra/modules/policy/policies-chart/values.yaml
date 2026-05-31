@@ -55,6 +55,14 @@ verifyFailurePolicy: Ignore
 verifySubjects: {}
 rekorUrl: https://rekor.sigstore.dev
 
+# Isolated build provenance (SLSA Build L3, #131/ADR-042). For teams in attestCallerRepos the SLSA
+# provenance attestation in verify-attestations must be signed by the trusted-ci reusable workflow
+# (gated per-team by the cert's githubWorkflowRepository extension) instead of the app's own workflow;
+# teams absent keep app-signed provenance. attestCallerRepos: tenant -> "<org>/app-<team>" (only teams
+# using isolated provenance; empty = every team keeps app-signed provenance).
+trustedCiSubjectRegExp: '^https://github\.com/asanexample/trusted-ci/\.github/workflows/slsa-provenance\.yml@.+$'
+attestCallerRepos: {}
+
 # Per-team Gateway-API route hostname guard (anti-squatting). tenant -> [allowed hostname patterns].
 enableHttprouteGuard: true
 tenantHostnamePatterns: {}

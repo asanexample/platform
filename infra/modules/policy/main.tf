@@ -24,6 +24,9 @@ locals {
   # resourceFilters (which already skip kube-system + the kyverno namespace) left intact for the
   # background scanner; per-policy excludes handle the remaining infra namespaces.
   engine_values = {
+    features = {
+      logging = { verbosity = var.engine_log_verbosity }
+    }
     admissionController = {
       replicas  = var.replica_count
       podLabels = local.k8s_labels
@@ -63,11 +66,14 @@ locals {
     enableAttestationVerification = var.enable_attestation_verification
     attestFailureAction           = var.attest_failure_action
     attestFailurePolicy           = local.attest_failure_policy
-    enableHttprouteGuard          = var.enable_httproute_guard
-    tenantHostnamePatterns        = var.tenant_hostname_patterns
-    enableCleanup                 = var.enable_cleanup
-    additionalPolicies            = var.additional_policies
-    commonLabels                  = local.k8s_labels
+
+    trustedCiSubjectRegExp = var.trusted_ci_subject_regexp
+    attestCallerRepos      = var.attest_caller_repos
+    enableHttprouteGuard   = var.enable_httproute_guard
+    tenantHostnamePatterns = var.tenant_hostname_patterns
+    enableCleanup          = var.enable_cleanup
+    additionalPolicies     = var.additional_policies
+    commonLabels           = local.k8s_labels
   }
 }
 
