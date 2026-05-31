@@ -207,29 +207,32 @@ resource "kubernetes_network_policy" "allow_intra_namespace" {
   }
 }
 
-resource "kubernetes_network_policy" "allow_grafana_ingress" {
+# Grafana ingress from the Cilium Gateway. The gateway's Envoy connects with the reserved Cilium
+# `ingress` identity (8), which a STANDARD k8s NetworkPolicy `from:` cannot match (it's not a
+# namespace/pod) — so this must be a CiliumNetworkPolicy with `fromEntities: ["ingress"]`
+# (the repo's documented Gateway gotcha — see CLAUDE.md "Cilium Gateway API"). Cilium unions this
+# allow with the k8s default-deny above, so Grafana is reachable only via the gateway (+ intra-ns
+# scraping via allow-intra-namespace).
+resource "kubernetes_manifest" "allow_grafana_from_gateway" {
   count = local.create ? 1 : 0
 
-  metadata {
-    name      = "allow-grafana-ingress"
-    namespace = kubernetes_namespace.this[0].metadata[0].name
-  }
-  spec {
-    pod_selector {
-      match_labels = { "app.kubernetes.io/name" = "grafana" }
+  manifest = {
+    apiVersion = "cilium.io/v2"
+    kind       = "CiliumNetworkPolicy"
+    metadata = {
+      name      = "allow-grafana-from-gateway"
+      namespace = kubernetes_namespace.this[0].metadata[0].name
     }
-    policy_types = ["Ingress"]
-    ingress {
-      # Reachable from any namespace (the Gateway/Envoy data path). Tighten to the gateway ns later.
-      from {
-        namespace_selector {}
-      }
-      ports {
-        port     = "3000"
-        protocol = "TCP"
-      }
+    spec = {
+      endpointSelector = { matchLabels = { "app.kubernetes.io/name" = "grafana" } }
+      ingress = [{
+        fromEntities = ["ingress"]
+        toPorts      = [{ ports = [{ port = "3000", protocol = "TCP" }] }]
+      }]
     }
   }
+
+  depends_on = [kubernetes_namespace.this]
 }
 
 # ---------------------------------------------------------------------------
