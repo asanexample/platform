@@ -19,6 +19,11 @@ locals {
         "eks.amazonaws.com/role-arn" = aws_iam_role.external_secrets[0].arn
       } : {}
     }
+
+    # Prometheus metrics: expose the controller metrics Service + a ServiceMonitor (needs the
+    # Prometheus-operator CRDs from the observability hub, #102). Off by default.
+    metrics        = { service = { enabled = var.metrics_enabled } }
+    serviceMonitor = { enabled = var.metrics_enabled }
   }
 }
 

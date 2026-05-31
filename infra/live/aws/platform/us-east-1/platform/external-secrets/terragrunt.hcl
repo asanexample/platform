@@ -68,5 +68,8 @@ inputs = {
   helm_chart_version = include.base.locals.helm_versions.external_secrets
   helm_wait          = true
 
+  # Prometheus metrics + ServiceMonitor for the observability hub dashboards (#102 P1).
+  metrics_enabled = true
+
   tags = include.base.locals.tags
 }
