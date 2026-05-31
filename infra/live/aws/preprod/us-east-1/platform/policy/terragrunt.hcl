@@ -89,15 +89,13 @@ inputs = {
   # Phase 3 — cosign keyless image verification (Audit-first, independent of the Enforce above).
   enable_image_verification = true
   verify_failure_action     = "Enforce"
-  # SBOM + SLSA provenance attestation requirement (#108/108d).
-  # TEMPORARILY Audit during the SLSA L3 single-provenance cutover (#131): adopted teams' provenance now
-  # must be trusted-ci-signed (see attest_caller_repos below). Kept Audit so the policy switch can land
-  # BEFORE the first single-provenance image exists without rejecting the running app-provenance image
-  # (Kyverno couples verify-images to the attestation result, so a mismatch would block on pod restart).
-  # Flip back to Enforce once the new trusted-ci-provenance image is built and verified (verifiedCount:1).
-  # Signature verification (verify_failure_action) stays Enforce, so images must still be team-signed.
+  # SBOM + SLSA provenance attestation requirement (#108/108d). Enforce: non-compliant tenant images are
+  # rejected at admission. For adopted teams the SLSA provenance must be trusted-ci-signed (see
+  # attest_caller_repos below). Re-flipped to Enforce 2026-05-30 after the SLSA L3 single-provenance
+  # cutover (#131): the new trusted-ci-provenance alpha image (sha256:d1e942d0) verified clean under Audit
+  # (PolicyReport verifiedCount:1, pods rolled out) so Enforce no longer risks blocking the live workload.
   enable_attestation_verification = true
-  attest_failure_action           = "Audit"
+  attest_failure_action           = "Enforce"
   oidc_provider_arn               = dependency.eks.outputs.oidc_provider_arn
   oidc_provider_url               = dependency.eks.outputs.oidc_provider_url
   ecr_account_id                  = include.base.locals.account_ids["platform"]
