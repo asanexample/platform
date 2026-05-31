@@ -4,6 +4,12 @@ variable "create" {
   default     = true
 }
 
+variable "metrics_enabled" {
+  description = "Expose the ESO controller metrics Service + a ServiceMonitor for Prometheus. Requires the Prometheus-operator CRDs (the observability hub, #102). Off by default."
+  type        = bool
+  default     = false
+}
+
 variable "cluster_name" {
   description = "Name of the EKS cluster (used for IAM role naming)"
   type        = string

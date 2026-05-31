@@ -99,6 +99,12 @@ variable "high_availability" {
   default     = false
 }
 
+variable "metrics_enabled" {
+  description = "Enable per-component Prometheus metrics Services + ServiceMonitors (controller/server/repoServer/applicationSet). Requires the Prometheus-operator CRDs (the observability hub, #102). Off by default."
+  type        = bool
+  default     = false
+}
+
 variable "server_insecure" {
   description = "Run ArgoCD server without TLS (for use behind a TLS-terminating proxy or port-forward)"
   type        = bool

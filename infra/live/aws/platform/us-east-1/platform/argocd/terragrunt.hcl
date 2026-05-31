@@ -113,6 +113,9 @@ inputs = {
 
   high_availability = false # Single instance — sufficient for non-production platform cluster
 
+  # Prometheus metrics + ServiceMonitors for the observability hub dashboards (#102 P1).
+  metrics_enabled = true
+
   dex_enabled = true
   rbac_scopes = "[groups]"
 

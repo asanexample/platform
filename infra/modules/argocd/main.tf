@@ -13,6 +13,13 @@ locals {
     "eks.amazonaws.com/role-arn" = aws_iam_role.argocd[0].arn
   } : {}
 
+  # Per-component metrics: enabling creates the metrics Service AND a ServiceMonitor (the
+  # Prometheus-operator CRD is present once the observability hub is installed, #102 P1).
+  metrics = {
+    enabled        = var.metrics_enabled
+    serviceMonitor = { enabled = var.metrics_enabled }
+  }
+
   argocd_values = {
     global = {
       podLabels = local.k8s_labels
@@ -48,6 +55,7 @@ locals {
       serviceAccount = {
         annotations = local.irsa_annotations
       }
+      metrics = local.metrics
     }
 
     server = {
@@ -58,6 +66,7 @@ locals {
       serviceAccount = {
         annotations = local.irsa_annotations
       }
+      metrics = local.metrics
     }
 
     repoServer = {
@@ -65,11 +74,13 @@ locals {
       serviceAccount = {
         annotations = local.irsa_annotations
       }
+      metrics = local.metrics
     }
 
     applicationSet = {
       enabled  = var.applicationset_enabled
       replicas = var.high_availability ? 2 : 1
+      metrics  = local.metrics
     }
 
     notifications = {
