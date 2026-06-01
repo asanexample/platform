@@ -289,25 +289,28 @@ Expected resources created:
 
 - AWS Organization with `ALL` features
 - 5 organizational units (Platform, Workloads, Workloads/Preprod, Workloads/Prod, Workloads/Regulated)
-- 2 member accounts (platform, preprod)
-- 7 Service Control Policies (baseline-guardrails, protect-security-services, enforce-encryption, deny-regions, protect-data-and-network, require-tagging, restrict-iam-users)
+- 4 member accounts (platform, test, preprod, prod)
+- 7 Service Control Policies (baseline-guardrails, protect-security-services, enforce-encryption, deny-regions, protect-data-and-network, require-tagging, restrict-iam-users) + the optional hipaa-eligible-services
 - SCP attachments to root and OUs
 
 ### Step 3: Deploy the Platform Stack
 
 With the management account configured, deploy the full platform stack using
-the bootstrap script. This deploys all 16 Terragrunt units (networking, EKS,
-Cilium, node groups, Tailscale, ArgoCD, and all supporting services) in
-dependency order.
+**`platctl`** (the Go orchestration CLI, ADR-038). It auto-discovers all Terragrunt
+units (~30: networking, EKS, Cilium, node groups, eks-addons, Tailscale, ArgoCD,
+cert-manager, external-dns/secrets, policy/Kyverno, observability, Mimir, etc.) and
+applies them in dependency order with resumable state.
 
 ```bash
 # Prerequisites:
 #   - AWS SSO login completed
 #   - CLOUDFLARE_API_TOKEN exported
-./scripts/bootstrap-platform.sh
+platctl bootstrap
+platctl bootstrap --dry-run   # preview the execution waves
+platctl bootstrap --resume    # continue after a partial failure
 ```
 
-The script prompts for two manual steps during execution:
+The flow includes two manual steps:
 
 1. **Tailscale account setup** (after node groups are deployed) -- create an
    account, generate an API key, store it in Secrets Manager
@@ -315,8 +318,8 @@ The script prompts for two manual steps during execution:
    Identity Center. SSO URL and CA cert are pre-configured in
    `infra/live/aws/common.hcl`
 
-The script is idempotent. Re-running after a failure picks up where it left
-off -- already-applied units complete in seconds with no changes.
+`platctl` is resumable — `--resume` skips already-applied units, and a re-run
+re-applies cleanly (no-op for converged units).
 
 ### Step 4: Verify
 
@@ -335,18 +338,16 @@ kubectl get pods -A
 
 ### Teardown
 
-To destroy the full platform stack:
+To destroy the full platform stack, use `platctl teardown` (the reverse-DAG
+orchestrator; a legacy `scripts/teardown-platform.sh` also exists):
 
 ```bash
-./scripts/teardown-platform.sh                  # preserves Route53 zone
-./scripts/teardown-platform.sh --include-route53  # destroys everything
+platctl teardown
 ```
 
-The teardown script requires typing `DESTROY` to confirm. It enables the
-public EKS endpoint before destroying K8s resources (since Tailscale is
-destroyed first), then waits 5 minutes for DNS propagation. Route53 is
-preserved by default because destroying the zone requires re-creating the
-Cloudflare NS delegation.
+Teardown re-enables the public EKS endpoint before destroying K8s resources
+(since Tailscale is destroyed first). All dependency blocks have `mock_outputs`
+so `run --all destroy` works even when upstreams are already gone.
 
 ---
 
@@ -608,7 +609,7 @@ Use Terragrunt `dependency` blocks to reference organizations outputs from
 downstream modules:
 
 ```hcl
-# Example: infra/live/aws/ops/us-east-1/platform/networking/terragrunt.hcl
+# Example: infra/live/aws/platform/us-east-1/platform/networking/terragrunt.hcl
 dependency "org" {
   config_path = "../../../../mgmt/global/organizations"
 }
@@ -643,9 +644,9 @@ for the design rationale.
 
 | Role | Account | Purpose |
 |------|---------|---------|
-| **PlatformAdmin** | Platform | kubectl, SSM tunnel, cluster debugging |
-| **PlatformDeployer** | Platform | Terragrunt apply, Helm/K8s providers |
-| **DeveloperAccess** | Platform | Namespace-scoped kubectl for developers |
+| **PlatformAdmin** | Platform, PreProd | kubectl operate/debug + SSM tunnel — read+operate, not author (ADR-040) |
+| **PlatformDeployer** | Platform, PreProd, Test | Terragrunt apply, Helm/K8s providers |
+| **DeveloperAccess-\<team\>** | PreProd | Per-team, namespace-scoped kubectl (one role per team, ADR-039) |
 | **TerraformStateAccess** | Management | S3 state + DynamoDB lock table |
 | **OrganizationAccountAccessRole** | All accounts | Break-glass only |
 
