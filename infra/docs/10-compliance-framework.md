@@ -2,9 +2,7 @@
 
 ## Overview
 
-The Reference Platform implements a comprehensive compliance framework that addresses various regulatory requirements and industry standards. This document outlines the compliance controls, implementation patterns, and validation mechanisms used in the platform.
-
-*This document is under development. The full content will be available soon.*
+The Reference Platform implements a compliance framework that addresses various regulatory requirements and industry standards. This document outlines the compliance controls, implementation patterns, and validation mechanisms used in the platform. The control-level mapping of Service Control Policies to SOC2/HIPAA/PCI/ISO/NIST/CIS lives in [SCP control mapping](../../docs/compliance/scp-control-mapping.md).
 
 ## Compliance Standards
 
@@ -22,17 +20,17 @@ The platform implements a tiered compliance model driven by the `compliance_tier
 
 ### Tier 1: Standard (SOC2)
 
-Applies to: `platform`, `connectivity`, `data` workloads.
+Applies to the current `platform` and tenant workloads (all `standard` today).
 
 | Control Area | Implementation |
 |-------------|----------------|
-| Compute isolation | Shared AKS clusters with vCluster virtual clusters |
-| Network | Spoke VNet peered to hub; NSGs on all subnets |
-| Identity | Azure RBAC; workload identity; managed identities |
-| Encryption | Azure-managed keys (SSE); TLS 1.2+ in transit |
-| Endpoints | Private endpoints for all PaaS services |
-| Logging | 90-day log retention; Container Insights; audit logs forwarded to Log Analytics |
-| Policy | Kyverno baseline policies (image provenance, pod security, resource limits) |
+| Compute isolation | Shared EKS cluster with **namespace isolation** (vCluster deferred, ADR-033) — namespace, ResourceQuota, LimitRange per team |
+| Network | Private VPC subnets; default-deny Cilium NetworkPolicies; security groups; private EKS API |
+| Identity | IAM Identity Center (SSO); purpose-built IAM roles; IRSA / EKS Pod Identity (no static keys) |
+| Encryption | KMS (EKS secrets, CloudTrail) + SSE-S3 (AES256); TLS 1.2+ in transit; EBS encrypted by SCP |
+| Endpoints | Private-only EKS API; SSM bastion; Tailscale VPN |
+| Logging | CloudTrail (per-account, 90-day) + VPC Flow Logs + observability (Prometheus/Mimir) |
+| Policy | Kyverno Enforce (image provenance + cosign verify, pod security, resource limits, RBAC hardening) above PSA baseline |
 
 ### Tier 2: HIPAA
 
@@ -40,8 +38,8 @@ Applies to: `hipaa` workload. Inherits all Standard controls, plus:
 
 | Control Area | Implementation |
 |-------------|----------------|
-| Compute isolation | Dedicated AKS cluster (no shared tenancy) |
-| Network | Isolated VNet (no default hub peering); private cluster API server |
+| Compute isolation | Dedicated EKS cluster (no shared tenancy) |
+| Network | Isolated VPC (no default hub peering); private EKS API endpoint |
 | Encryption | Customer-managed keys (CMK) for all data at rest; host encryption on all nodes |
 | Logging | 365-day log retention; immutable audit trail |
 | Access | JIT access for operations; break-glass procedures documented |
@@ -53,7 +51,7 @@ Applies to: `pci` workload. Inherits all HIPAA controls, plus:
 
 | Control Area | Implementation |
 |-------------|----------------|
-| Network | CDE-segmented VNet; deny-all default network policy; WAF on all ingress |
+| Network | CDE-segmented VPC; deny-all default network policy; WAF on all ingress |
 | Monitoring | IDS/IPS enabled; real-time alerting on policy violations |
 | Access | MFA for all CDE access; quarterly access reviews |
 | Segmentation | Annual penetration test of segmentation controls |
@@ -63,11 +61,11 @@ Applies to: `pci` workload. Inherits all HIPAA controls, plus:
 
 ### Technical Controls
 
-- **Access control**: RBAC at Azure, Kubernetes, and namespace levels; workload identity federation
+- **Access control**: IAM (Identity Center + purpose-built roles), Kubernetes RBAC, and namespace-scoped RoleBindings; IRSA / Pod Identity
 - **Encryption**: SSE with platform-managed or customer-managed keys depending on tier; TLS everywhere
-- **Logging and monitoring**: Centralized Log Analytics; Prometheus/Grafana stack; retention scaled by tier
-- **Network security**: NSGs, private endpoints, network policies; segmentation validated per tier
-- **Secure configuration**: Kyverno admission policies; Azure Policy assignments; CIS benchmark scanning
+- **Logging and monitoring**: Centralized CloudTrail + CloudWatch; Prometheus/Mimir/Grafana stack; retention scaled by tier
+- **Network security**: security groups, private endpoints, Cilium NetworkPolicies; segmentation validated per tier
+- **Secure configuration**: Kyverno admission policies; AWS SCP guardrails; CIS benchmark scanning
 
 ### Administrative Controls
 
@@ -81,7 +79,7 @@ Applies to: `pci` workload. Inherits all HIPAA controls, plus:
 
 Compliance is validated through:
 
-1. **Kyverno audit reports** -- policy violations are surfaced as Kubernetes events and forwarded to Log Analytics
+1. **Kyverno audit reports** -- policy violations are surfaced as Kubernetes events and PolicyReports
 2. **Terraform plan review** -- compliance-relevant changes (encryption, network rules, RBAC) are flagged in PR checks
 3. **Periodic scanning** -- CIS benchmarks and cloud security posture management tools run on a schedule
 4. **State drift detection** -- Terragrunt detects configuration drift and alerts on non-compliant resources
@@ -97,4 +95,4 @@ Compliance controls are encoded in Terraform modules and enforced via the worklo
 
 ## Next Steps
 
-Continue to [Tagging Strategy](12-tagging-strategy.md) to understand how resource tagging is used in the Reference Platform. 
+Continue to [Tagging Strategy](12-tagging-strategy.md) to understand how resource tagging is used in the Reference Platform.
