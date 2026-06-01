@@ -4,7 +4,7 @@
 > **On-call scope:** Infrastructure / Platform Engineering
 > **Module path:** `infra/modules/aws/organizations/scps.tf`
 >
-> **Last reviewed:** 2026-05-15
+> **Last reviewed:** 2026-06-01
 
 ---
 
@@ -162,8 +162,11 @@ list without modifying the SCP logic.
    ```hcl
    inputs = {
      exempt_roles = [
+       # Keep the three live roles — do NOT drop these:
        "OrganizationAccountAccessRole",
-       "TemporaryExempt-INCIDENT-1234"   # Add with incident ticket reference
+       "PlatformDeployer",
+       "github-actions-terratest",
+       "TemporaryExempt-INCIDENT-1234",  # <-- add with incident ticket reference
      ]
    }
    ```
@@ -354,6 +357,8 @@ Use this table to quickly identify which SCP is likely responsible for a specifi
 | Security Hub disable denied | protect-security-services | ProtectSecurityHub | Do not disable Security Hub. |
 | `DeleteFlowLogs` denied | protect-security-services | ProtectFlowLogs | Do not delete VPC Flow Logs. |
 | `CreateVolume` denied (EBS) | enforce-encryption | DenyUnencryptedVolumes | Add `encrypted = true` to the volume configuration. |
+| `RunInstances` denied (unencrypted block device) | enforce-encryption | DenyUnencryptedEbsOnLaunch | Encrypt all block devices in the launch template / instance config. |
+| `PutObject` denied (S3) | enforce-encryption | DenyUnencryptedS3Uploads | Send the `x-amz-server-side-encryption` header (`aws:kms` or `AES256`). |
 | `CreateDBInstance` denied (RDS) | enforce-encryption | DenyUnencryptedRds | Add `storage_encrypted = true` to the RDS configuration. |
 | `RunInstances` denied (EC2) | enforce-encryption | EnforceIMDSv2 | Set `http_tokens = "required"` in the instance metadata options. |
 | Action denied in non-allowed region | deny-regions | DenyNonAllowedRegions | Use `us-east-1` or `us-west-2`. If a new region is needed, update `allowed_regions`. |
@@ -361,6 +366,7 @@ Use this table to quickly identify which SCP is likely responsible for a specifi
 | `CreateDefaultVpc` denied | protect-data-and-network | DenyDefaultVpc | Use custom VPCs, not default VPCs. |
 | `CreateResourceShare` denied (RAM) | protect-data-and-network | DenyExternalSharing | Set `allow_external_principals = false` on the RAM share. |
 | Backup/Glacier deletion denied | protect-data-and-network | ProtectBackups | Do not delete backups. Use an exempt role if decommissioning. |
+| `TagResource`/`UntagResource` denied on `Team` tag | protect-data-and-network | DenyTeamTagTampering | The `Team` tag is set by IaC/platform roles only; don't relabel resources by hand (ABAC integrity). |
 | Resource creation denied (missing tags) | require-tagging | RequireTag* | Add the required tags: `Environment`, `ManagedBy`, `Owner`. |
 | `CreateUser` / `CreateAccessKey` denied | restrict-iam-users | DenyIamUserCreation | Use IAM roles and SSO, not IAM users. |
 | `AttachUserPolicy` denied | restrict-iam-users | DenyUserPolicyAttachment | Attach policies to roles, not users. |
