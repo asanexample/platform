@@ -103,36 +103,29 @@ Services to cross-select pods from different deployments.
 
 ### HTTPRoute Patching
 
-Kustomize does not natively update Gateway API `backendRefs` when `namePrefix` is applied.
-Two mechanisms work together to handle this:
+All preview kustomize transforms are injected **by the platform's ApplicationSet template** (in the
+`argocd-apps` module), not by files in the app repo. The template sets `namePrefix = "pr-{{.number}}-"`,
+`commonLabels`, an `images` override to the PR head SHA, and a hostname patch:
 
-1. **Hostname rewrite** — The ApplicationSet template uses an explicit kustomize JSON patch
-   to rewrite the HTTPRoute hostname for the preview URL:
+```yaml
+# rendered into the ApplicationSet template by infra/modules/argocd-apps/
+patches:
+  - target: { kind: HTTPRoute }
+    patch: |
+      - op: replace
+        path: /spec/hostnames/0
+        value: <app>-pr-<N>.preprod.aws.refplat.org
+```
 
-   ```yaml
-   patches:
-     - target: { kind: HTTPRoute }
-       patch: |
-         - op: replace
-           path: /spec/hostnames/0
-           value: <app>-pr-<N>.preprod.aws.refplat.org
-   ```
-
-2. **backendRef update via nameReference** — App repos include a `name-reference.yaml`
-   kustomize configuration that teaches kustomize to update HTTPRoute `backendRefs` when
-   `namePrefix` is applied. This avoids a brittle hardcoded patch in the ApplicationSet
-   template and works automatically as apps add or rename Services.
-
-   ```yaml
-   # k8s/preprod/name-reference.yaml
-   nameReference:
-     - kind: Service
-       fieldSpecs:
-         - path: spec/rules/backendRefs/name
-           kind: HTTPRoute
-   ```
-
-   The app's `kustomization.yaml` must reference this configuration (see below).
+> **Known limitation — HTTPRoute `backendRef` is not auto-rewritten.** Kustomize's built-in
+> nameReference transformer does **not** know about Gateway API `HTTPRoute`, so `namePrefix` renames
+> the `Service` (to `pr-<N>-<svc>`) and the `HTTPRoute` object but leaves the route's
+> `spec.rules[].backendRefs[].name` pointing at the **un-prefixed** (stable) Service. An earlier
+> design solved this with a per-app `name-reference.yaml` kustomize `configurations` file; that file
+> is **not** present in the current app repos or module. Until backendRef rewriting is restored (via
+> a module-side nameReference config, a JSON patch on `backendRefs`, or a templated app manifest),
+> preview routing of the rewritten hostname to the **preview** Service should be verified per app —
+> see the Risks section. Tracked in issue #155.
 
 ### OIDC Trust Policy Update
 
@@ -217,33 +210,22 @@ Private app repos require two credential configurations:
 
 ### Kustomization Requirement
 
-App repos must include two files in their manifest directory:
-
-**`kustomization.yaml`** — lists all resources and references the nameReference configuration:
+App repos must include a `kustomization.yaml` in their manifest directory listing all resources —
+ArgoCD detects kustomize automatically when this file exists, and the ApplicationSet template's
+overrides (`commonLabels`, `namePrefix`, image, hostname patch) only apply to a kustomize source:
 
 ```yaml
+# k8s/preprod/kustomization.yaml (as in app-alpha)
 resources:
+  - serviceaccount.yaml
   - deployment.yaml
   - service.yaml
   - httproute.yaml
-configurations:
-  - name-reference.yaml
 ```
 
-**`name-reference.yaml`** — teaches kustomize to update HTTPRoute `backendRefs` when
-`namePrefix` is applied:
-
-```yaml
-nameReference:
-  - kind: Service
-    fieldSpecs:
-      - path: spec/rules/backendRefs/name
-        kind: HTTPRoute
-```
-
-ArgoCD detects kustomize automatically when `kustomization.yaml` exists. Without it, kustomize
-overrides (commonLabels, namePrefix, patches) have no effect. Without `name-reference.yaml`,
-preview HTTPRoutes will point at the wrong (non-prefixed) Service name.
+No `configurations:` / `name-reference.yaml` is present in the current app repos (see the HTTPRoute
+Patching limitation above). The platform team owns the preview transform logic in the `argocd-apps`
+module, so app repos stay minimal — they declare their resources and nothing preview-specific.
 
 ## Consequences
 
@@ -269,6 +251,12 @@ preview HTTPRoutes will point at the wrong (non-prefixed) Service name.
 
 ### Risks
 
+- **Preview HTTPRoute may route to the stable Service.** As noted under HTTPRoute Patching,
+  kustomize `namePrefix` does not rewrite an `HTTPRoute` `backendRef` (Gateway API CRD), and the
+  `name-reference.yaml` mechanism that previously handled this is absent. A preview's rewritten
+  hostname can therefore resolve to the stable Service/pods rather than the PR's preview pods,
+  silently showing stable code under a preview URL. Until backendRef rewriting is restored, validate
+  end-to-end preview routing before relying on it. Tracked in issue #155.
 - **Fork PRs cannot push images.** GitHub blocks `id-token: write` on fork PRs by default, so
   forks cannot authenticate to ECR. The ApplicationSet will create an Application, but it will
   fail to sync because the image tag doesn't exist. This is safe (no resource creation) but may
