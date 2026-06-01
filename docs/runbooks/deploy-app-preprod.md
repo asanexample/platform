@@ -162,6 +162,22 @@ patches) used by PR previews have no effect. Without
 Service name. Even if you don't use PR previews, including both files
 is good practice.
 
+Guard this in CI with the shared **`preview-routing-check`** action, which
+renders the overlay the way ArgoCD does and fails the PR if any HTTPRoute
+backendRef isn't rewritten under `namePrefix` (the missing-`name-reference.yaml`
+regression, platform #155). Add it to the app's `validate.yml`:
+
+```yaml
+  preview-routing:
+    name: Preview routing (backendRef rewrite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: asanexample/platform/.github/actions/preview-routing-check@main
+        with:
+          manifests-path: k8s/preprod
+```
+
 **Allowed resource kinds** (enforced by ArgoCD AppProject):
 
 - ConfigMap, Secret, Service, ServiceAccount
