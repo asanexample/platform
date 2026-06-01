@@ -20,8 +20,8 @@ issue tracking each gap.
 | 13 | Artifact storage | 🟡 | ECR (per-team images) + GitHub (source). *Missing: generic package/binary + Helm chart registry* | — |
 | 3 | Golden-path templates | 🟡 | Strong docs (ADRs, runbooks, CLAUDE.md authoring rules) + app-alpha reference app. *Missing: scaffolding ("create new app/tenant")* | [#104](https://github.com/asanexample/platform/issues/104) |
 | 2 | Self-service APIs/CLIs | 🟡 | `platctl` (ops), `teams.hcl` (declarative). *But provisioning is platform-engineer-gated via PRs, not developer self-service* | [#88](https://github.com/asanexample/platform/issues/88), [#103](https://github.com/asanexample/platform/issues/103) |
+| 7 | Observability | 🟡 | Metrics + curated dashboards + alerting **live** on the platform hub (kube-prometheus-stack + durable Mimir/S3, ADR-043/044), Alertmanager→SNS, Hubble (network), **Falco** runtime threat detection on preprod (ADR-045), ArgoCD (deploy state). *Missing: logs/traces (Loki/Tempo, P3), cost, and spoke→hub remote-write rollout (P10)* | [#102](https://github.com/asanexample/platform/issues/102) (+[#93](https://github.com/asanexample/platform/issues/93)) |
 | 1 | Web portal / service catalog | ❌ | ArgoCD UI shows deploy state only; no developer portal / catalog | [#103](https://github.com/asanexample/platform/issues/103) |
-| 7 | Observability | ❌ | Only Hubble (network) + ArgoCD (deploy state). **No metrics/traces/logs/cost** — no *runtime* visibility | [#102](https://github.com/asanexample/platform/issues/102) (+[#93](https://github.com/asanexample/platform/issues/93)) |
 | 9 | Data services | ❌ | Per-team **S3** shipped (#64); no DB/cache as a paved road | [#106](https://github.com/asanexample/platform/issues/106) |
 | 10 | Messaging & event services | ❌ | None offered to tenants | [#107](https://github.com/asanexample/platform/issues/107) |
 | 6 | Development environments | ❌ | PR *preview* envs exist; no developer *dev* environments / hosted IDEs | [#105](https://github.com/asanexample/platform/issues/105) |
@@ -34,12 +34,16 @@ delivery are genuinely solid and several are reference-grade. The gaps cluster i
 1. **The developer-experience / self-service layer** (the "Vercel-like" IDP goal): a **portal** (#1,
    [#103]), true **self-service** (#2, [#88]), **golden-path scaffolding** (#3, [#104]), and **dev
    environments** (#6, [#105]). Today everything routes through platform-engineer PRs to `teams.hcl`.
-2. **Observability** (#7, [#102]) — the standout single gap. Everything today is admission-time /
-   GitOps-time; there is no runtime metrics/traces/logs/cost visibility.
+   This is now the dominant gap.
+2. **Observability** (#7, [#102]) — the foundation is now **live**: metrics, durable multi-tenant
+   storage (Mimir/S3), curated dashboards, and SNS alerting on the platform hub, plus Falco runtime
+   detection. The remaining work is **logs/traces** (Loki/Tempo, P3), **cost** visibility, and fanning
+   the spokes (preprod/prod) into the hub via authenticated remote-write (P10).
 
 Secondary: **paved-road data & messaging services** (#9/#10, [#106]/[#107]) — extend the per-team
-isolation pattern proven for S3 in #64 — and **security depth** (#12, [#108]: SBOM, SLSA, runtime
-detection, SAST/SCA).
+isolation pattern proven for S3 in #64. The earlier **security-depth** items (#12, [#108]) have largely
+shipped — SBOM (cosign CycloneDX attest), **SLSA Build L3** (isolated provenance, ADR-042), runtime
+detection (Falco, ADR-045), and SAST (Semgrep in CI) — leaving SCA/cost-of-ownership depth as the tail.
 
 ## Notes
 
