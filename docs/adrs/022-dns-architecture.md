@@ -123,5 +123,9 @@ DNS record in Route53.
 - If the Cloudflare NS delegation is accidentally deleted, the entire platform subdomain stops
   resolving. Mitigated by the delegation being managed in Terraform state (the `cloudflare-dns`
   unit) and Cloudflare's API audit logging.
-- Route53 zone deletion would break all platform DNS. Mitigated by AWS deletion protection on the
-  hosted zone and the zone being in Terraform state with `prevent_destroy` lifecycle rules.
+- Route53 zone deletion would break all platform DNS. The zone is managed in Terraform state (the
+  `route53` unit), so deletion requires a deliberate apply/destroy and is visible in plan review.
+  Note the zone intentionally uses `force_destroy = var.force_destroy` and **no `prevent_destroy`**
+  — the reference platform is designed to be torn down and rebuilt cleanly (see the planned-rebuild
+  posture), so the mitigation is IaC review and state, not a hard deletion lock. A long-lived
+  production deployment would set `prevent_destroy` and enable registrar/zone safeguards.
