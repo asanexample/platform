@@ -120,60 +120,55 @@ aws --version     # Should print aws-cli/2.x
 │   └── troubleshooting/              # Known issues and solutions
 │
 ├── infra/
-│   ├── terragrunt.hcl                 # Root config: providers, remote state, global tags
+│   ├── root.hcl                       # Root config: providers, remote state (S3), global tags
 │   │
-│   ├── modules/                       # Reusable OpenTofu modules
-│   │   ├── aws/
-│   │   │   ├── organizations/         # AWS Organizations, OUs, SCPs
-│   │   │   ├── state_bootstrap/       # S3 + DynamoDB for remote state
-│   │   │   ├── naming/                # AWS resource naming conventions
-│   │   │   └── networking/            # VPCs, subnets, routing
-│   │   ├── azure/                     # Azure modules (AKS, networking, etc.)
-│   │   ├── gcp/                       # GCP modules (networking, naming)
-│   │   ├── argocd/                    # ArgoCD deployment
-│   │   ├── cilium/                    # Cilium CNI
-│   │   ├── policy/                    # Cross-cloud policy engine
-│   │   └── vcluster/                  # Virtual Kubernetes clusters
+│   ├── modules/                       # Reusable OpenTofu modules (AWS only today; azure/, gcp/ planned)
+│   │   ├── aws/                       # AWS-specific: organizations, state_bootstrap, networking,
+│   │   │                              #   eks, eks-addons, ecr, cloudtrail, transit-gateway, s3, ...
+│   │   ├── argocd/ argocd-apps/       # Shared (cloud-agnostic) modules:
+│   │   ├── cilium/ cert-manager/      #   CNI, GitOps, TLS, DNS, secrets, gateway, policy (Kyverno),
+│   │   ├── external-dns/ external-secrets/  #   observability, observability-mimir, tenant, tailscale,
+│   │   ├── policy/ observability/     #   secret-stores, cluster-rbac, eks-pod-identity, vcluster (deferred)
+│   │   └── ...
 │   │
 │   ├── live/                          # Terragrunt live configurations
-│   │   ├── aws/
-│   │   │   ├── _base.hcl             # Shared AWS base config (config hierarchy)
-│   │   │   ├── _versions.hcl         # Module source paths and version pins
-│   │   │   ├── common.hcl            # Cloud-wide defaults and account mapping
-│   │   │   ├── mgmt/                  # Management account (<MGMT_ACCOUNT_ID>)
-│   │   │   │   ├── common.hcl        # Environment-level config
-│   │   │   │   └── global/
-│   │   │   │       ├── state-bootstrap/   # Remote state backend (deploy first)
-│   │   │   │       └── organizations/     # AWS Org, OUs, accounts, SCPs
-│   │   │   └── platform/              # Platform account (<PLATFORM_ACCOUNT_ID>)
-│   │   ├── azure/                     # Azure environments (dev, ops)
-│   │   └── gcp/                       # GCP environments (ops)
+│   │   └── aws/                       # (only cloud deployed; live/azure, live/gcp are planned)
+│   │       ├── _base.hcl              # Composer: loads layers, composes tags, safety assertions
+│   │       ├── _versions.hcl          # Module source paths and Helm version pins
+│   │       ├── common.hcl             # Cloud-wide defaults; loads secrets.hcl (gitignored)
+│   │       ├── mgmt/                  # Management account (<MGMT_ACCOUNT_ID>)
+│   │       │   ├── env.hcl            # Environment-level config
+│   │       │   └── global/{state-bootstrap,organizations,identity-center}/
+│   │       ├── platform/  us-east-1/  # Platform account — the hub cluster + shared services
+│   │       ├── preprod/   us-east-1/  # Preprod account — tenant workloads
+│   │       ├── prod/      us-east-1/  # Prod account
+│   │       └── test/      global/     # Terratest sandbox account
 │   │
-│   ├── tests/                         # Module integration tests
+│   ├── tests/                         # Terratest (Go) module integration tests
 │   ├── scripts/                       # Helper scripts and hooks
-│   └── docs/                          # Infrastructure design docs (numbered)
+│   └── docs/                          # Infrastructure design docs (numbered 00-20)
 │
-├── charts/                            # Helm charts
-└── planning/                          # Planning and strategy documents
+└── cmd/platctl/                       # The platctl orchestration CLI (Go, ADR-038)
 ```
 
 ---
 
 ## Configuration Hierarchy
 
-Terragrunt uses a seven-layer configuration hierarchy where each layer can
+Terragrunt uses a six-layer configuration hierarchy where each layer can
 override values from layers above it. This eliminates duplication while
-allowing per-environment customization.
+allowing per-environment customization. (`_versions.hcl` and `_base.hcl` are
+supporting files loaded by the composer, not hierarchy layers — see
+[config-hierarchy.md](architecture/config-hierarchy.md).)
 
 The layers, from broadest to narrowest scope:
 
-1. **Root** (`infra/root.hcl`) -- Remote state backends, provider versions, global tags
-2. **Cloud** (`infra/live/aws/common.hcl`) -- Cloud-wide defaults, account mapping, project tags
-3. **Environment** (`infra/live/aws/{env}/common.hcl`) -- Account IDs, environment tags, classification
-4. **Region** (`infra/live/aws/{env}/{region}/region.hcl`) -- Region name, abbreviation, region-specific tags
+1. **Root** (`infra/root.hcl`) -- Remote state (S3), AWS provider, global tags
+2. **Cloud** (`infra/live/aws/common.hcl`) -- Cloud-wide defaults, loads secrets.hcl, account mapping
+3. **Environment** (`infra/live/aws/{env}/env.hcl`) -- Account ID, environment tags, classification
+4. **Region** (`infra/live/aws/{env}/{region}/region.hcl` + `network.hcl`) -- Region, abbreviation, CIDRs
 5. **Workload** (`infra/live/aws/{env}/{region}/{workload}/workload.hcl`) -- Workload name, compliance tier
-6. **Defaults** (`infra/live/aws/_envcommon/*.hcl`) -- Shared module defaults across environments
-7. **Module** (`infra/live/aws/{env}/{region}/{workload}/{module}/terragrunt.hcl`) -- Final overrides
+6. **Unit** (`infra/live/aws/{env}/{region}/{workload}/{unit}/terragrunt.hcl`) -- Final inputs, dependencies
 
 Tags merge across all layers, with narrower scopes winning on conflict. For
 example, an environment-level `DataClassification = "Confidential"` overrides a
@@ -242,9 +237,11 @@ terragrunt plan
 #   + aws_organizations_organizational_unit.this["Workloads/Prod"]
 #   + aws_organizations_organizational_unit.this["Workloads/Regulated"]
 #   + aws_organizations_account.this["platform"]
+#   + aws_organizations_account.this["test"]
 #   + aws_organizations_account.this["preprod"]
+#   + aws_organizations_account.this["prod"]
 #   + aws_organizations_policy.this["baseline-guardrails"]
-#   ... (7 SCPs total)
+#   ... (7 SCPs total, + optional hipaa-eligible-services)
 
 # Apply
 terragrunt apply
@@ -255,35 +252,34 @@ State for this module is stored remotely in the S3 bucket created in Step 1.
 ### Step 3: Deploy the Platform Stack
 
 With the management account set up, deploy the full platform stack (EKS,
-networking, Cilium, ArgoCD, Tailscale, and all supporting services) using the
-bootstrap script:
+networking, Cilium, ArgoCD, Tailscale, observability, and all supporting
+services) using **`platctl`** (the Go orchestration CLI, ADR-038):
 
 ```bash
 # Prerequisites:
 #   - AWS SSO login completed (aws sso login --profile management)
 #   - CLOUDFLARE_API_TOKEN exported
 
-./scripts/bootstrap-platform.sh
+platctl bootstrap            # or: platctl bootstrap --dry-run / --resume
 ```
 
-The script deploys all 16 Terragrunt units in dependency order with parallel
-execution where possible. It handles the private endpoint bootstrap problem
-(temporarily enables public access, locks down after Tailscale is deployed)
-and prompts for two manual steps:
+`platctl` auto-discovers all (~30) Terragrunt units and applies them in
+dependency order with parallel execution. It handles the private-endpoint
+bootstrap problem (temporarily enables public access, locks down after
+Tailscale is deployed) and prompts for two manual steps:
 
 1. **Tailscale account setup** -- create an account, generate an API key, and
    store it in Secrets Manager
 2. **ArgoCD SAML app** -- create a SAML application in AWS Identity Center
    (SSO URL and CA cert are pre-configured in `infra/live/aws/common.hcl`)
 
-The script is idempotent -- if it fails partway through, re-run it and it
+`platctl` is resumable -- if it fails partway through, `platctl bootstrap --resume`
 picks up where it left off.
 
 To tear down the entire stack:
 
 ```bash
-./scripts/teardown-platform.sh                  # preserves Route53 zone
-./scripts/teardown-platform.sh --include-route53  # destroys everything
+platctl teardown
 ```
 
 ---
