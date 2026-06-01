@@ -65,6 +65,15 @@ Cilium's Gateway API implementation provisions Envoy proxy instances to handle G
 These proxies are managed by Cilium's control plane and share the same eBPF dataplane used for
 pod-to-pod networking.
 
+**Per-cluster exposure:** the **platform** gateway uses an **internal** NLB (reachable only via
+Tailscale); **preprod** uses a **public** NLB ([ADR-029](029-preprod-public-ingress-gateway-api.md)).
+
+**Cilium gotcha:** the Gateway's Envoy connects to backends with the reserved Cilium `ingress` identity
+(8), which a *standard* k8s NetworkPolicy `from:` **cannot** match. Tenant CiliumNetworkPolicies
+receiving Gateway traffic must allow `fromEntities: ["ingress"]` (see
+[ADR-008](008-cilium-as-cross-cloud-cni.md); the `gateway-config` and `observability` modules rely on
+this).
+
 ### Gateway Configuration Module
 
 The `gateway-config` module creates three types of resources:
@@ -115,7 +124,8 @@ deployment DAG.
 - Role-oriented design — platform team manages the Gateway (ports, TLS, listeners), app teams can
   manage their own HTTPRoutes
 - Integrated TLS via cert-manager — automated certificate provisioning and renewal
-- Cross-cloud consistency — same Gateway API resources work on Azure (AKS with Cilium) and GCP
+- Cross-cloud consistency — the same Gateway API resources will work on Azure (AKS) and GCP when those
+  clouds land
 
 **Negative:**
 
