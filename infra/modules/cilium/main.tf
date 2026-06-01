@@ -12,33 +12,50 @@ locals {
     if length(replace(lower(k), "/[^a-z0-9_.-]/", "_")) <= 63 && length(replace(lower(v), "/[^a-z0-9_.-]/", "_")) <= 63
   }
 
-  cloud_values_yaml = {
-    aws = yamlencode({
-      eni                        = { enabled = true }
-      ipam                       = { mode = "eni" }
-      egressMasqueradeInterfaces = "ens+"   # Match ENI interfaces on EC2 Nitro instances
-      routingMode                = "native" # VPC-native routing (no VXLAN/Geneve) — ENI IPAM gives routable pod IPs
-      tunnelProtocol             = ""       # Disable encapsulation (native routing mode)
-      enableIPv4Masquerade       = true
-      kubeProxyReplacement       = true               # Required: EKS BYOCNI deploys no kube-proxy DaemonSet
-      l2NeighDiscovery           = { enabled = true } # ARP resolution in VPC ENI mode
-      hubble = {
-        tls = {
-          auto = {
-            method = "helm" # Avoids post-install hook chicken-and-egg with BYOCNI (no nodes at install time)
+  # Datapath config, driven entirely by variables (cloud-agnostic). Each merge
+  # fragment contributes distinct top-level keys, so the shallow merge is safe.
+  datapath_values = merge(
+    {
+      routingMode          = var.routing_mode
+      enableIPv4Masquerade = var.enable_ipv4_masquerade
+      ipam = merge(
+        { mode = var.ipam_mode },
+        var.ipam_mode == "cluster-pool" ? {
+          operator = {
+            clusterPoolIPv4PodCIDRList = [var.pod_cidr]
+            clusterPoolIPv4MaskSize    = var.pod_cidr_mask_size
           }
-        }
-      }
-    })
-    azure = yamlencode({
+        } : {}
+      )
+    },
+    # Encapsulation only applies in tunnel mode; clear it in native mode.
+    { tunnelProtocol = var.routing_mode == "tunnel" ? var.tunnel_protocol : "" },
+    var.bpf_masquerade ? { bpf = { masquerade = true } } : {},
+    var.egress_masquerade_interfaces != "" ? { egressMasqueradeInterfaces = var.egress_masquerade_interfaces } : {},
+    var.routing_mode == "native" && var.native_routing_cidr != "" ? { ipv4NativeRoutingCIDR = var.native_routing_cidr } : {},
+    var.mtu > 0 ? { MTU = var.mtu } : {},
+  )
+
+  # Irreducible per-cloud plumbing — NOT the datapath (that's variable-driven above).
+  cloud_plumbing = {
+    aws = merge(
+      {
+        kubeProxyReplacement = true                                     # Required: EKS BYOCNI deploys no kube-proxy DaemonSet
+        hubble               = { tls = { auto = { method = "helm" } } } # Avoids BYOCNI post-install hook chicken-and-egg
+      },
+      # ENI native routing needs the ENI datapath + ARP resolution; omit in overlay.
+      var.ipam_mode == "eni" ? {
+        eni              = { enabled = true }
+        l2NeighDiscovery = { enabled = true }
+      } : {}
+    )
+    azure = {
       aksbyocni = { enabled = true }
       nodeinit  = { enabled = true }
-    })
-    gcp = yamlencode({
-      gke         = { enabled = true }
-      ipam        = { mode = "kubernetes" }
-      routingMode = "native"
-    })
+    }
+    gcp = {
+      gke = { enabled = true }
+    }
   }
 
   k8s_api_values_yaml = var.k8s_service_host != "" ? yamlencode({
@@ -196,9 +213,13 @@ resource "helm_release" "cilium" {
 
   depends_on = [null_resource.gateway_api_crds]
 
+  # Helm deep-merges these in order: generic <- datapath (variable-driven) <-
+  # per-cloud plumbing <- k8s API. Later docs win on shared leaf keys
+  # (e.g. cloud plumbing's hubble.tls.auto.method=helm overrides the generic default).
   values = [
     yamlencode(local.cilium_values),
-    local.cloud_values_yaml[var.cloud_provider],
+    yamlencode(local.datapath_values),
+    yamlencode(local.cloud_plumbing[var.cloud_provider]),
     local.k8s_api_values_yaml,
   ]
 
@@ -207,9 +228,29 @@ resource "helm_release" "cilium" {
       name = "configHash"
       value = sha256(join("", [
         yamlencode(local.cilium_values),
-        local.cloud_values_yaml[var.cloud_provider],
+        yamlencode(local.datapath_values),
+        yamlencode(local.cloud_plumbing[var.cloud_provider]),
         local.k8s_api_values_yaml,
       ]))
     },
   ]
+
+  lifecycle {
+    precondition {
+      condition     = !(var.ipam_mode == "cluster-pool" && var.pod_cidr == "")
+      error_message = "pod_cidr must be set when ipam_mode = \"cluster-pool\"."
+    }
+    precondition {
+      condition     = !(var.routing_mode == "native" && var.ipam_mode != "eni" && var.native_routing_cidr == "")
+      error_message = "native_routing_cidr must be set when routing_mode = \"native\" and ipam_mode is not \"eni\"."
+    }
+    precondition {
+      condition     = !(var.bpf_masquerade && var.egress_masquerade_interfaces != "")
+      error_message = "egress_masquerade_interfaces must be empty when bpf_masquerade = true (eBPF masquerade ignores the interface glob and would silently fall back to iptables)."
+    }
+    precondition {
+      condition     = var.ipam_mode != "cluster-pool" || var.pod_cidr == "" || var.pod_cidr_mask_size > tonumber(split("/", var.pod_cidr)[1])
+      error_message = "pod_cidr_mask_size must be more specific (numerically greater) than the pod_cidr prefix length."
+    }
+  }
 }

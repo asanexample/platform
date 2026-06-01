@@ -19,6 +19,105 @@ variable "cloud_provider" {
   }
 }
 
+# ---------------------------------------------------------------------------
+# Datapath / pod networking
+#
+# These control how pods get IPs and how pod traffic is carried. Defaults
+# select an OVERLAY datapath (cluster-pool IPAM + VXLAN tunnel): pod IPs come
+# from `pod_cidr` and are decoupled from the VPC, so a cluster can run many
+# more pods than the node subnets could hold. Set ipam_mode="eni" +
+# routing_mode="native" (+ egress_masquerade_interfaces="ens+") to use AWS
+# VPC-native routing instead (pods get routable VPC IPs).
+# ---------------------------------------------------------------------------
+
+variable "ipam_mode" {
+  description = "Cilium IPAM mode: cluster-pool (overlay), eni (AWS VPC-native), or kubernetes (host-scope)."
+  type        = string
+  default     = "cluster-pool"
+  validation {
+    condition     = contains(["cluster-pool", "eni", "kubernetes"], var.ipam_mode)
+    error_message = "ipam_mode must be 'cluster-pool', 'eni', or 'kubernetes'."
+  }
+}
+
+variable "routing_mode" {
+  description = "Cilium routing mode: tunnel (encapsulated overlay) or native (no encapsulation)."
+  type        = string
+  default     = "tunnel"
+  validation {
+    condition     = contains(["tunnel", "native"], var.routing_mode)
+    error_message = "routing_mode must be 'tunnel' or 'native'."
+  }
+}
+
+variable "tunnel_protocol" {
+  description = "Encapsulation protocol when routing_mode = tunnel. Ignored otherwise."
+  type        = string
+  default     = "vxlan"
+  validation {
+    condition     = contains(["vxlan", "geneve"], var.tunnel_protocol)
+    error_message = "tunnel_protocol must be 'vxlan' or 'geneve'."
+  }
+}
+
+variable "pod_cidr" {
+  description = "IPv4 pool for cluster-pool IPAM (required when ipam_mode = cluster-pool). Must be non-routable on the VPC and distinct from the VPC and service CIDRs. Empty for eni/kubernetes IPAM."
+  type        = string
+  default     = ""
+  validation {
+    condition     = var.pod_cidr == "" || can(cidrnetmask(var.pod_cidr))
+    error_message = "pod_cidr must be empty or a valid IPv4 CIDR (e.g. 10.240.0.0/16)."
+  }
+}
+
+variable "pod_cidr_mask_size" {
+  description = "Per-node block size carved from pod_cidr for cluster-pool IPAM (e.g. 24 = 256 IPs/node)."
+  type        = number
+  default     = 24
+  validation {
+    condition     = var.pod_cidr_mask_size > 0 && var.pod_cidr_mask_size <= 32
+    error_message = "pod_cidr_mask_size must be between 1 and 32."
+  }
+}
+
+variable "enable_ipv4_masquerade" {
+  description = "Masquerade pod egress to the node IP for traffic leaving the cluster."
+  type        = bool
+  default     = true
+}
+
+variable "egress_masquerade_interfaces" {
+  description = "Interface glob to masquerade on (e.g. 'ens+' for ENI native). Empty = all interfaces (overlay default). Must be empty when bpf_masquerade = true."
+  type        = string
+  default     = ""
+}
+
+variable "bpf_masquerade" {
+  description = "Use eBPF masquerade instead of iptables. Requires kubeProxyReplacement and an empty egress_masquerade_interfaces (BPF masquerade ignores the interface glob)."
+  type        = bool
+  default     = false
+}
+
+variable "native_routing_cidr" {
+  description = "CIDR that Cilium treats as natively routable (no masquerade within it). Required when routing_mode = native AND ipam_mode != eni; ENI mode auto-derives it."
+  type        = string
+  default     = ""
+  validation {
+    condition     = var.native_routing_cidr == "" || can(cidrnetmask(var.native_routing_cidr))
+    error_message = "native_routing_cidr must be empty or a valid IPv4 CIDR."
+  }
+}
+
+variable "mtu" {
+  description = "Override the device MTU. 0 = auto-detect (Cilium subtracts tunnel overhead). Pin to 1500 if jumbo frames cause PMTU black-holing on egress."
+  type        = number
+  default     = 0
+  validation {
+    condition     = var.mtu >= 0
+    error_message = "mtu must be >= 0 (0 = auto)."
+  }
+}
+
 variable "k8s_service_host" {
   description = "Kubernetes API server hostname (required for BYOCNI — in-cluster service IP unreachable before CNI exists)"
   type        = string

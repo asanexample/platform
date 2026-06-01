@@ -82,6 +82,11 @@ inputs = {
   cluster_name    = dependency.eks.outputs.cluster_id
   kubeconfig_path = "kubeconfig.yaml"
 
+  # Overlay datapath (cluster-pool IPAM + VXLAN). pod_cidr is authoritative in
+  # network.hcl; ipam_mode/routing_mode/tunnel_protocol/pod_cidr_mask_size use the
+  # module overlay defaults. Override here (e.g. ipam_mode = "eni") to use native.
+  pod_cidr = include.base.locals.all_vars.pod_cidr
+
   k8s_service_host = replace(dependency.eks.outputs.cluster_endpoint, "https://", "")
   k8s_service_port = "443"
 
