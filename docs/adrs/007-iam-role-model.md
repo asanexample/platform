@@ -47,7 +47,7 @@ Create four purpose-built IAM roles, each scoped to a specific access pattern:
 | Role | Account | Purpose | EKS Access |
 |------|---------|---------|------------|
 | **PlatformAdmin** | Platform, PreProd | kubectl, SSM tunnel, operate/debug (not author) | AmazonEKSViewPolicy + `platform-operator` group (ADR-040) |
-| **PlatformDeployer** | Platform | Terragrunt apply, Helm providers | AmazonEKSClusterAdminPolicy (cluster) |
+| **PlatformDeployer** | Platform, PreProd, Test | Terragrunt apply, Helm/K8s providers | AmazonEKSClusterAdminPolicy (cluster) |
 | **DeveloperAccess-\<team\>** | Preprod | Namespace-scoped kubectl, one role per team | Group-mapped RBAC (see ADR-039) |
 | **TerraformStateAccess** | Management | S3 state + DynamoDB locks | None |
 
@@ -60,9 +60,10 @@ EKS access entries and SCP exemptions.
   AdministratorAccess SSO roles. **Rescoped to operate/observe, not author** (ADR-040): AWS
   ReadOnlyAccess minus secret/data exfil + bastion-scoped SSM; K8s read + debug + operate (no
   cluster-admin). Authoring flows through pipelines (`PlatformDeployer`/ArgoCD); break-glass for emergencies.
-- **PlatformDeployer:** Trusts management account only (Terragrunt always runs from the
-  management profile). Condition restricts to AdministratorAccess SSO role. Starts with
-  `AdministratorAccess` managed policy to avoid regression; scope down in a follow-up.
+- **PlatformDeployer:** Exists in every account Terragrunt applies to (platform, preprod, test) and is
+  **assumed from the management SSO profile** — its trust allows only the management AdministratorAccess
+  SSO role (Terragrunt always runs from the management profile). Starts with the `AdministratorAccess`
+  managed policy to avoid regression; scope down in a follow-up.
 - **DeveloperAccess-\<team\>:** One role per team (generated from `teams.hcl`). Trusts management
   and preprod accounts, with the condition restricting to that team's own SSO permission set
   (`Dev-<team>`) — so a developer can assume only their own team's role. The original single

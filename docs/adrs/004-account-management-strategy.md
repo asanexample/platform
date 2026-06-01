@@ -15,9 +15,11 @@ AWS Organizations account management must handle two fundamentally different sce
    another tool). The module must import the existing organization, its accounts, and its OU
    structure into Terraform state without modifying or disrupting running workloads.
 
-The organization has an existing AWS Organization (`o-a4kjvito7o`) with existing accounts that were
-created before this Terraform module existed. The module must be able to adopt these existing
-resources while also creating new accounts and OUs going forward.
+The live AWS Organization (`o-a4kjvito7o`) is managed by this module in **greenfield** mode
+(`create_organization = true`). The module must *also* support **brownfield adoption** — importing a
+pre-existing organization, its accounts, and OU structure into state without disrupting running
+workloads — so the same code can serve an org created elsewhere, and continues to serve as new
+accounts and OUs are added.
 
 ### Constraints
 
@@ -200,10 +202,10 @@ For a brand-new organization:
 3. **Run `terragrunt apply`.** The module creates the organization, OUs, accounts, and SCPs in a
    single apply (respecting dependency ordering via `parent_id` references).
 
-The current deployment uses `create_organization = true`, indicating the organization is being
-created fresh despite the existence of `o-a4kjvito7o`. This suggests an initial greenfield
-deployment with plans to import existing resources as a follow-up, or a separate organization for
-IaC-managed workloads.
+The live deployment uses `create_organization = true` (greenfield): the organization `o-a4kjvito7o`,
+its OUs, and member accounts are created and owned by this module, protected by `prevent_destroy` and
+`close_on_deletion = false`. The brownfield mode (`create_organization = false`) remains a supported
+capability for adopting an organization created outside this module.
 
 ## Consequences
 
@@ -238,9 +240,10 @@ IaC-managed workloads.
 
 ### Risks
 
-- **Stale `environment_account_map`.** The safety validation in `_base.hcl` checks account IDs
-  against a hardcoded map. If new environments are added without updating this map, the validation
-  fails. Mitigation: CI should verify the map is complete.
+- **Stale `environment_account_map`.** The safety validation in `_base.hcl` checks each env's account
+  ID against the `environment_account_map` (defined in `common.hcl` / the gitignored `secrets.hcl`).
+  If a new environment is added without updating the map, validation fails. Mitigation: keep the map
+  complete; review/CI should catch omissions.
 - **Root account email compromise.** All AWS accounts use email addresses in the same domain. If
   the email domain is compromised, all AWS accounts are at risk of root-level takeover. Mitigation:
   enable MFA on all root accounts; use a dedicated email domain for AWS accounts.

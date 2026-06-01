@@ -54,7 +54,7 @@ eks → cilium → node-groups → eks-addons
 | `eks` | `aws/eks` | EKS cluster, OIDC provider, KMS key, security group, access entries | Cluster must exist before CNI installation |
 | `cilium` | `cilium` (shared) | Helm release for Cilium CNI, CRDs | CNI must be running before nodes join |
 | `node-groups` | `aws/eks-node-group` | Managed node groups, node IAM role | Nodes need CNI to configure networking |
-| `eks-addons` | `aws/eks-addons` | EKS managed add-ons (CoreDNS, etc.) | Add-on pods need CNI + nodes to schedule |
+| `eks-addons` | `aws/eks-addons` | EKS managed add-ons (CoreDNS, EBS CSI driver) + the gp3 default StorageClass | Add-on pods need CNI + nodes to schedule |
 
 ### EKS Cluster Configuration
 
@@ -105,7 +105,7 @@ Each unit has its own Terraform state file, which means:
 
 - Four Terragrunt units instead of one — more directories, more state files, more plan/apply
   cycles for initial cluster setup
-- First-time deployment requires running units in order (though `terragrunt run-all apply`
+- First-time deployment requires running units in order (though `terragrunt run --all apply`
   handles this automatically via the DAG)
 - Developers must understand the dependency chain to troubleshoot deployment failures
 - Changes that span multiple units (e.g., adding a new subnet that affects both networking and

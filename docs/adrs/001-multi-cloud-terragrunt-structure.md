@@ -6,9 +6,11 @@
 
 ## Context
 
-The organization operates infrastructure across three cloud providers: Azure (mature, production
-workloads), AWS (actively being built out with Organizations and account vending), and GCP
-(operational). Managing infrastructure-as-code across multiple clouds presents several fundamental
+The platform is **designed to run across multiple cloud providers** but is implemented **AWS-first**:
+AWS is the active build-out (Organizations and account vending, EKS, the full platform stack), while
+**Azure and GCP are on the roadmap** — deferred until AWS is stable, then added as an *additive* change
+(a new cloud directory + module tree) rather than a restructuring. Even with a single cloud deployed
+today, structuring infrastructure-as-code so it *stays* multi-cloud-ready presents several fundamental
 challenges:
 
 1. **Configuration consistency.** Each cloud has its own provider semantics, authentication model,
@@ -34,7 +36,8 @@ challenges:
 ### Constraints
 
 - OpenTofu is the execution engine (not HashiCorp Terraform), set via `terraform_binary = "tofu"`.
-- Azure is the most mature cloud; any structural decision must not disrupt existing Azure workflows.
+- The structure must let an additional cloud be onboarded later as a mechanical, additive change — a
+  new per-cloud directory and module tree — without restructuring what already exists.
 - The team is small enough that a single repository is manageable but large enough that implicit
   conventions are insufficient.
 - CI/CD pipelines must be able to target individual modules without running the entire estate.
@@ -51,19 +54,20 @@ challenges:
 
 ## Decision
 
-We adopt a **single monorepo** with Terragrunt orchestration, organized around a **7-layer
+We adopt a **single monorepo** with Terragrunt orchestration, organized around a **6-layer
 configuration hierarchy** and **local monorepo module sourcing**.
 
 ### Repository Layout
 
 ```text
 infra/
-  terragrunt.hcl                          # Layer 1: Root
+  root.hcl                                # Layer 1: Root (remote state, providers, tofu binary)
   live/
     aws/
-      common.hcl                          # Layer 2: Cloud-wide defaults
-      _base.hcl                           # Per-cloud base include (loads all layers)
-      _versions.hcl                       # Module source pins
+      common.hcl                          # Layer 2: Cloud-wide defaults (loads secrets.hcl)
+      secrets.hcl                         # Sensitive values — account IDs, emails (gitignored)
+      _base.hcl                           # Per-cloud base include (loads all layers, exposes them)
+      _versions.hcl                       # Module source + Helm chart version pins
       {env}/
         env.hcl                           # Layer 3: Environment (account ID, env tags)
         {region}/
@@ -72,36 +76,30 @@ infra/
           {workload}/
             workload.hcl                  # Layer 5: Workload name, compliance tier
             {module}/
-              terragrunt.hcl              # Layer 7: Final module overrides
-    azure/
-      ...                                 # Same hierarchy
-    gcp/
-      ...                                 # Same hierarchy
+              terragrunt.hcl              # Layer 6: Final module overrides + dependencies
+    # azure/ , gcp/  — planned (same hierarchy); deferred until AWS is stable
   modules/
-    aws/
-      organizations/
-      state_bootstrap/
-      networking/
-      naming/
-    azure/
-      ...
-    gcp/
-      ...
+    aws/                                  # AWS modules (organizations, eks, networking, …)
+    cloudflare/                           # Cloudflare (dns_delegation)
+    <shared>/                             # Cloud-agnostic K8s modules (cilium, argocd, policy, …)
+    # azure/ , gcp/  — planned
 ```
 
-### 7-Layer Configuration Hierarchy
+### 6-Layer Configuration Hierarchy
 
 Each layer has a well-defined scope and override semantics (later layers win for tags and inputs):
 
 | Layer | File | Scope | Examples |
 |-------|------|-------|---------|
 | 1. Root | `infra/root.hcl` | Global | Remote state routing, provider generation, common tags, OpenTofu binary |
-| 2. Cloud | `infra/live/{cloud}/common.hcl` | Cloud-wide | Project name, default workload, environment-to-account-ID safety map |
+| 2. Cloud | `infra/live/{cloud}/common.hcl` | Cloud-wide | Project name, default workload, environment-to-account-ID safety map; loads `secrets.hcl` |
 | 3. Environment | `infra/live/{cloud}/{env}/env.hcl` | Per-account | Account ID, environment name, data classification, env-specific tags |
 | 4. Region | `infra/live/{cloud}/{env}/{region}/region.hcl` + `network.hcl` | Per-region | Region name/abbreviation, VPC CIDRs, region tags |
 | 5. Workload | `infra/live/{cloud}/{env}/{region}/{workload}/workload.hcl` | Per-workload | Workload name, compliance tier, workload-specific tags |
-| 6. Defaults | `infra/live/{cloud}/_envcommon/*.hcl` | Shared module defaults | Default input values reused across environments |
-| 7. Module | `infra/live/{cloud}/{env}/{region}/{workload}/{module}/terragrunt.hcl` | Per-deployment | Final source reference, input overrides, dependencies |
+| 6. Module | `infra/live/{cloud}/{env}/{region}/{workload}/{module}/terragrunt.hcl` | Per-deployment | Final source reference, input overrides, dependencies |
+
+(Sensitive values live in the gitignored `secrets.hcl`, loaded by `common.hcl` and exposed through
+`_base.hcl` — see [ADR-024](024-secrets-management-architecture.md) / [ADR-026](026-cross-account-secret-isolation.md).)
 
 ### Per-Cloud Base Include (`_base.hcl`)
 
@@ -123,7 +121,7 @@ module_source = {
   organizations   = "${local.source_base}/aws//organizations"
   state_bootstrap = "${local.source_base}/aws//state_bootstrap"
   networking      = "${local.source_base}/aws//networking"
-  naming          = "${local.source_base}/aws//naming"
+  eks             = "${local.source_base}/aws//eks"
 }
 ```
 
@@ -133,13 +131,14 @@ single pull request.
 
 ### Cloud-Aware Remote State Routing
 
-The root `terragrunt.hcl` detects the cloud provider from the directory path
+The root `root.hcl` detects the cloud provider from the directory path
 (`split("/", path_relative_to_include())`) and routes state to the appropriate backend:
 
-- **AWS modules** -> S3 + DynamoDB in the management account (<MGMT_ACCOUNT_ID>)
-- **Azure/GCP modules** -> Azure Blob Storage with Azure AD authentication
+- **AWS modules** -> S3 + DynamoDB in the management account.
 
-This is a single conditional expression, not separate root configs per cloud.
+Only the AWS branch is wired today (`_cloud` defaults to `aws`); the path-based cloud detection is
+kept in `root.hcl` so Azure/GCP state routing can be added later without restructuring. This is a
+single conditional expression, not separate root configs per cloud.
 
 ## Consequences
 
@@ -149,27 +148,27 @@ This is a single conditional expression, not separate root configs per cloud.
   one repository. Code review, CI status, and audit trails are unified.
 - **Atomic changes.** A module refactor and the corresponding live configuration update ship in one
   PR. No cross-repo version coordination needed.
-- **DRY configuration.** The 7-layer hierarchy eliminates per-module boilerplate. A new module
+- **DRY configuration.** The layered hierarchy eliminates per-module boilerplate. A new module
   deployment in an existing environment inherits region, account, tagging, and compliance settings
   automatically.
 - **Safety rails.** The `_base.hcl` validation assertions catch environment/account mismatches
   before any resource is created, preventing accidental cross-account deployments.
 - **Cloud isolation with shared patterns.** Each cloud has its own `_base.hcl`, `common.hcl`, and
   `_versions.hcl`, so cloud-specific concerns stay contained while the overall structure is
-  consistent.
+  consistent — and a second cloud is an additive change, not a rewrite.
 - **Selective execution.** Terragrunt's directory-based targeting means CI can run `terragrunt plan`
-  on a single module without processing unrelated clouds or environments.
+  on a single module without processing unrelated environments.
 
 ### Negative
 
-- **Cognitive overhead.** New engineers must understand the 7-layer hierarchy, the `_base.hcl`
+- **Cognitive overhead.** New engineers must understand the layered hierarchy, the `_base.hcl`
   mechanics, and Terragrunt's `include`/`expose`/`read_terragrunt_config` semantics before they can
   contribute effectively.
-- **Monorepo scaling.** As the number of modules and environments grows, `terragrunt run-all` at
+- **Monorepo scaling.** As the number of modules and environments grows, `terragrunt run --all` at
   the repo root becomes slow. This is mitigated by scoping runs to specific directories.
 - **Tight coupling risk.** Local module sourcing means a breaking change to a module immediately
   affects all consumers. There is no version pinning buffer like a registry provides. This is
-  mitigated by CI plan-all checks on PRs that touch modules.
+  mitigated by CI plan checks on PRs that touch modules.
 - **No independent module versioning.** All consumers of a module always use the same (HEAD)
   version. Canary rollouts of module changes require feature flags or directory-level overrides
   rather than version pinning.
@@ -187,7 +186,8 @@ This is a single conditional expression, not separate root configs per cloud.
 
 - Adding a new AWS environment is a matter of creating an `env.hcl` with the account ID and
   replicating the region/workload/module directory structure.
-- Adding a new cloud provider requires a new `_base.hcl`, `common.hcl`, `_versions.hcl`, and a
-  remote state routing branch in the root `terragrunt.hcl`.
+- Adding a new cloud provider (Azure/GCP, when AWS is stable) requires a new per-cloud `_base.hcl`,
+  `common.hcl`, `_versions.hcl`, and a remote-state-routing branch in `root.hcl` — additive, not a
+  restructuring.
 - Compliance auditors can trace any deployed resource to a specific directory path, PR, and merge
   commit in a single repository.
