@@ -20,7 +20,7 @@ Reference Platform modules follow these core design principles:
 All modules follow a consistent structure:
 
 ```text
-modules/azure/example_module/
+modules/aws/example_module/
 ├── main.tf           # Primary resources
 ├── variables.tf      # Input variables
 ├── outputs.tf        # Output values
@@ -46,9 +46,9 @@ When configuring providers in modules, follow these guidelines to avoid conflict
    terraform {
      required_version = ">= 1.6.0"
      required_providers {
-       azurerm = {
-         source  = "hashicorp/azurerm"
-         version = "~> 4.25.0"
+       aws = {
+         source  = "hashicorp/aws"
+         version = "6.47.0"
        }
      }
    }
@@ -115,10 +115,8 @@ When modules will be used with Terragrunt, follow these additional guidelines:
    ```hcl
    # In terragrunt.hcl inputs block
    inputs = {
-     kubernetes_host = dependency.aks_core.outputs.host
-     kubernetes_client_certificate = dependency.aks_core.outputs.client_certificate
-     kubernetes_client_key = dependency.aks_core.outputs.client_key
-     kubernetes_cluster_ca_certificate = dependency.aks_core.outputs.cluster_ca_certificate
+     kubernetes_host                   = dependency.eks.outputs.cluster_endpoint
+     kubernetes_cluster_ca_certificate = dependency.eks.outputs.cluster_certificate_authority
    }
    ```
 
@@ -190,16 +188,15 @@ variable "create" {
 }
 
 # main.tf — every resource uses count
-resource "azurerm_resource_group" "this" {
-  count    = var.create ? 1 : 0
-  name     = var.name
-  location = var.location
+resource "aws_ecr_repository" "this" {
+  count = var.create ? 1 : 0
+  name  = var.name
 }
 
 # outputs.tf — conditional to avoid index errors when create = false
-output "id" {
-  description = "The ID of the resource group"
-  value       = var.create ? azurerm_resource_group.this[0].id : null
+output "arn" {
+  description = "The ARN of the repository"
+  value       = var.create ? aws_ecr_repository.this[0].arn : null
 }
 
 output "create" {
@@ -208,14 +205,14 @@ output "create" {
 }
 ```
 
-All 19 resource-creating Azure modules implement this pattern today. Modules that do not create resources (`client_config`, `naming`) do not need it because there is nothing to toggle.
+Every resource-creating module implements this pattern. Data-source-only modules do not need it.
 
 ## Variable Naming Conventions
 
 Consistent variable naming makes modules predictable for callers:
 
 - **`create`** -- Top-level toggle that gates all resource creation in the module. Always a `bool`, always defaults to `true`.
-- **`enable_*`** -- Sub-feature toggles within a module that control optional functionality (e.g., `enable_aks_networking`, `enable_cloud_nat`, `enable_key_vault`). These allow fine-grained control without splitting into separate modules.
+- **`enable_*`** -- Sub-feature toggles within a module that control optional functionality (e.g., `enable_eks_networking`, `enable_secrets_encryption`, `enable_falcosidekick`). These allow fine-grained control without splitting into separate modules.
 - **`null` for optional strings** -- Optional string variables should default to `null` rather than `""`. This lets downstream logic distinguish "not set" from "set to empty" and avoids unexpected empty-string behavior in OpenTofu conditionals.
 
 ```hcl
@@ -224,20 +221,20 @@ variable "create" {
   default = true
 }
 
-variable "enable_aks_networking" {
+variable "enable_eks_networking" {
   type    = bool
   default = false
 }
 
-variable "aks_cluster_name" {
+variable "eks_cluster_name" {
   type    = string
-  default = null  # only required when enable_aks_networking = true
+  default = null  # only required when enable_eks_networking = true
 }
 ```
 
 ## Cross-Cloud Interface Outputs
 
-Networking modules across all three clouds (Azure, AWS, GCP) expose a shared set of output names so that downstream Terragrunt configs and composite modules can consume network information without cloud-specific branching:
+Networking modules expose a shared set of output names so that downstream Terragrunt configs and composite modules can consume network information without cloud-specific branching:
 
 | Output               | Description                                    |
 |----------------------|------------------------------------------------|
@@ -247,7 +244,7 @@ Networking modules across all three clouds (Azure, AWS, GCP) expose a shared set
 | `kubernetes_subnet_id` | The ID of the subnet designated for Kubernetes |
 | `create`             | Whether resources were created                  |
 
-Cloud-specific outputs remain alongside these shared names. For example, the Azure module still exposes `vnet_id`, the AWS module exposes `vpc_id` and `vpc_cidr_block`, and the GCP module exposes `vpc_self_link` and `subnet_self_links`. The shared names are aliases that allow cloud-agnostic consumption when needed.
+Cloud-specific outputs remain alongside these shared names. For example, the AWS module exposes `vpc_id` and `vpc_cidr_block` alongside the shared names; an Azure module would expose `vnet_id`. The shared names allow cloud-agnostic consumption.
 
 ## Composite Module Pattern
 
@@ -255,47 +252,33 @@ Composite modules compose multiple single-purpose modules into a single deployab
 
 ### Example: `stack_base`
 
-The `azure/stack_base` module composes `resource_group`, `networking`, and `key_vault` into a base infrastructure stack:
+A composite module composes single-purpose modules into one deployable unit. For example, a base-stack module could wire `networking` + `eks` together (the platform currently wires these as separate Terragrunt units rather than a composite module, but the pattern is the same):
 
 ```hcl
-module "resource_group" {
-  source = "../resource_group"
-
-  create      = var.create
-  name        = var.name
-  location    = var.location
-  # ...
-}
-
 module "networking" {
-  source = "../networking"
-
-  create              = var.create
-  resource_group_name = module.resource_group.name
-  location            = module.resource_group.location
+  source = "../aws/networking"
+  create = var.create
   # ...
 }
 
-module "key_vault" {
-  source = "../key_vault"
-
-  create              = var.create && var.enable_key_vault
-  resource_group_name = module.resource_group.name
-  location            = module.resource_group.location
+module "eks" {
+  source     = "../aws/eks"
+  create     = var.create
+  subnet_ids = module.networking.subnet_ids
   # ...
 }
 ```
 
 Key principles for composite modules:
 
-1. **Source child modules via relative paths** -- use `source = "../resource_group"` to keep modules in the same repo.
+1. **Source child modules via relative paths** -- use `source = "../aws/networking"` to keep modules in the same repo.
 2. **Thread `create` through** -- pass the top-level `create` variable to every child. Sub-features use `var.create && var.enable_*` to combine the top-level gate with feature-specific toggles.
-3. **Use child module outputs for wiring** -- never hardcode values that a child module already exposes (e.g., `module.resource_group.name`).
+3. **Use child module outputs for wiring** -- never hardcode values that a child module already exposes (e.g., `module.networking.vpc_id`).
 4. **Re-export child outputs** -- the composite module's `outputs.tf` should surface the outputs callers need from its children.
 
 ## Centralized Versioning with `_versions.hcl`
 
-Module source paths and Helm chart version pins are centralized in `infra/live/azure/_versions.hcl`. Terragrunt live configs access these via `include.base.locals.module_source.<module_name>` and `include.base.locals.helm_versions.<chart_name>`.
+Module source paths and Helm chart version pins are centralized in `infra/live/aws/_versions.hcl`. Terragrunt live configs access these via `include.base.locals.module_source.<module_name>` and `include.base.locals.helm_versions.<chart_name>`.
 
 ```hcl
 # _versions.hcl (excerpt)
@@ -303,9 +286,9 @@ locals {
   source_base = "${get_repo_root()}/infra/modules"
 
   module_source = {
-    resource_group = "${local.source_base}/azure//resource_group"
-    networking     = "${local.source_base}/azure//networking"
-    stack_base     = "${local.source_base}/azure//stack_base"
+    networking   = "${local.source_base}/aws//networking"
+    eks          = "${local.source_base}/aws//eks"
+    cilium       = "${local.source_base}/cilium"
     # ...
   }
 }
@@ -326,12 +309,12 @@ Well-designed module variables follow these principles:
 Example:
 
 ```hcl
-variable "resource_group_name" {
-  description = "The name of the resource group in which to create the resources"
+variable "cluster_name" {
+  description = "The name of the EKS cluster"
   type        = string
   validation {
-    condition     = length(var.resource_group_name) > 0 && length(var.resource_group_name) <= 90
-    error_message = "Resource group name must be between 1 and 90 characters."
+    condition     = length(var.cluster_name) > 0 && length(var.cluster_name) <= 100
+    error_message = "Cluster name must be between 1 and 100 characters."
   }
 }
 
@@ -355,12 +338,12 @@ Example:
 ```hcl
 output "id" {
   description = "The ID of the created resource"
-  value       = azurerm_resource.example.id
+  value       = aws_eks_cluster.this.arn
 }
 
 output "principal_id" {
-  description = "The Principal ID of the managed identity associated with the resource"
-  value       = azurerm_resource.example.identity[0].principal_id
+  description = "The ARN of the IAM role"
+  value       = aws_eks_cluster.this.arnentity[0].principal_id
 }
 ```
 
