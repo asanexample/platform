@@ -75,11 +75,15 @@ platform. The flip is a one-line input change. This realizes the risk mitigation
    backed by `disallow-privilege-escalation`/`require-seccomp` validate guards and ArgoCD
    `ignoreDifferences`. `generate`-based namespace governance is split out to the multi-namespace /
    self-service tenant-model design (issue #88).
-3. **Supply chain** *(in progress)*: `cosign` **keyless** signing (GitHub OIDC → Fulcio/Rekor) in app
-   CI (`app-alpha`) + per-team `verifyImages` policies that admit only images signed by that team's own
-   workflow identity. Kyverno gains **IRSA** (ECR read) to fetch signatures; verification rolls
-   Audit→Enforce via its own `verify_failure_action`, independent of the other policies.
-   Full from-scratch explainer: [`cosign-image-signing.md`](../architecture/cosign-image-signing.md).
+3. **Supply chain** *(done — Enforce on preprod)*: `cosign` **keyless** signing (GitHub OIDC →
+   Fulcio/Rekor) in app CI (`app-alpha`) + per-team `verifyImages` policies that admit only images signed
+   by that team's own workflow identity, **plus** `verifyAttestations` requiring a CycloneDX SBOM and a
+   SLSA Build L3 provenance from the isolated `trusted-ci` signer
+   ([ADR-042](042-isolated-build-provenance-slsa-l3.md)). Kyverno gains **IRSA** (ECR read) to fetch
+   signatures; verification rolls Audit→Enforce via its own `verify_failure_action`, independent of the
+   other policies. Full picture:
+   [`supply-chain-overview.md`](../architecture/supply-chain-overview.md) /
+   [`cosign-image-signing.md`](../architecture/cosign-image-signing.md).
 4. **Shift-left CLI** *(done)*: a reusable composite action (`.github/actions/kyverno-validate`) renders
    the tenant policies (`mutate` on, `verifyImages`/`cleanup` off) and runs `kyverno apply` against an
    app's manifests in **PR CI**, failing before merge — same checks as admission, earlier. Dogfooded in
@@ -100,7 +104,7 @@ The following policy guardrails are enforced at admission time:
 
 | Policy | Description | Tiers |
 |--------|-------------|-------|
-| Image provenance | Only images from approved registries (ACR/ECR) | All |
+| Image provenance | Only images from approved registries (per-team ECR scoping) | All |
 | Pod security | Restricted pod security standards (no privileged, no host networking) | All |
 | Resource limits | All pods must declare resource requests and limits | All |
 | Label requirements | Workload and compliance-tier labels required on namespaces | All |
@@ -127,9 +131,11 @@ beyond the built-in set.
 
 ### Policy Mode
 
-Policies are deployed in `Enforce` mode by default — violations are rejected at admission. This
-is a deliberate choice over `Audit` mode, which logs violations but allows them through. Audit
-mode is useful for policy rollout but provides no actual protection.
+Each policy reaches **`Enforce`** (violations rejected at admission) as its steady state, but gets there
+via the **audit-first rollout** above — deployed `Audit` (PolicyReports, webhook fail-open) on preprod,
+confirmed clean against real workloads, then flipped to `Enforce` (webhook fail-closed) and promoted to
+platform. Audit is the safe on-ramp, not the destination. Kyverno is currently in **Enforce** on both
+preprod and platform.
 
 ## Consequences
 

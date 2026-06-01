@@ -6,8 +6,10 @@
 
 ## Context
 
-The platform operates across four AWS accounts (ADR-004): management (<MGMT_ACCOUNT_ID>), platform
-(<PLATFORM_ACCOUNT_ID>), preprod (<PREPROD_ACCOUNT_ID>), and prod (<PROD_ACCOUNT_ID>). Application teams build container
+The platform's container-image flow spans four AWS accounts (ADR-004): management
+(<MGMT_ACCOUNT_ID>), platform (<PLATFORM_ACCOUNT_ID>), preprod (<PREPROD_ACCOUNT_ID>), and prod
+(<PROD_ACCOUNT_ID>) — the Test sandbox account is a Terratest-only environment and is not part of
+this registry topology. Application teams build container
 images in CI pipelines (GitHub Actions) and deploy them to EKS clusters running in preprod and
 prod. The platform needs a container registry strategy that satisfies three constraints:
 
@@ -75,12 +77,13 @@ Repositories follow a `{team}/{app}` naming convention, matching the tenant stru
 
 ```hcl
 repositories = {
-  "team-alpha/app" = {}
-  "team-bravo/app" = {}
+  "team-alpha/demo" = { tag_mutability = "IMMUTABLE_WITH_EXCLUSION", tags = { Team = "alpha" } }
+  "team-bravo/demo" = { tag_mutability = "IMMUTABLE_WITH_EXCLUSION", tags = { Team = "bravo" } }
 }
 ```
 
-Teams can have multiple repositories (e.g., `team-alpha/api`, `team-alpha/worker`).
+Teams can have multiple repositories (e.g., `team-alpha/api`, `team-alpha/worker`). Repo keys
+match the team's `apps` keys in `teams.hcl` (ADR-027).
 
 ### Cross-Account Pull Access
 
@@ -110,8 +113,11 @@ role to specific repository and branch patterns.
 
 ### Image Tag Immutability
 
-All repositories are created with `image_tag_mutability = "IMMUTABLE"`. Once an image is pushed
-with a tag (e.g., `v1.2.3`), that tag cannot be reassigned to a different image digest. This
+All team repositories are created with `image_tag_mutability = "IMMUTABLE_WITH_EXCLUSION"`. Once an
+image is pushed with a tag (e.g., `v1.2.3`), that tag cannot be reassigned to a different image
+digest. The exclusion filter (`tag_mutability_exclusion_filters`, default `["sha256-*"]`) exempts
+cosign's `sha256-*` signature/attestation tags so they can be updated — a digest may accumulate
+multiple attestations (SBOM + provenance) — while the actual **image** tags stay immutable. This
 enforces:
 
 - **Reproducible deployments** — `v1.2.3` always refers to the same image, regardless of when
@@ -188,8 +194,11 @@ push. Repositories use `AES256` (S3-managed) encryption at rest. If prod images 
   patterns and reviewing trust policies during CI pipeline onboarding.
 - A compromised CI pipeline could push a malicious image with a new tag. Tag immutability
   prevents overwriting existing tags, but new tags are unrestricted. Mitigated by ECR scan-on-
-  push (detects known CVEs) and future image signing with cosign/Sigstore for supply chain
-  verification.
+  push (detects known CVEs) and by **keyless cosign/Sigstore signing, now implemented** — apps
+  sign images after the ECR push and Kyverno's `verify-images-team-<team>` admits only images
+  signed by that team's own GitHub workflow identity (ADR-014 Phase 3; see
+  `docs/architecture/cosign-image-signing.md`). The `IMMUTABLE_WITH_EXCLUSION` `sha256-*` exemption
+  above is what lets those signatures be written.
 - The 50-image retention limit may be too aggressive for teams with frequent releases or too
   generous for teams with infrequent releases. The `max_image_count` variable allows per-team
   tuning, but the default applies uniformly. Teams that exhaust their history window lose the

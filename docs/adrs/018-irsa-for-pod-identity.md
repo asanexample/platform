@@ -96,6 +96,9 @@ serviceAccount.annotations = {
 | `cert-manager` | cert-manager | Route53 record management (DNS01 validation) |
 | `external-dns` | external-dns | Route53 record management |
 | `external-secrets` | external-secrets | Secrets Manager + SSM Parameter Store read |
+| `eks-addons` | ebs-csi-controller-sa (kube-system) | EBS CSI driver (`AmazonEBSCSIDriverPolicy`) |
+| `observability` | kube-prometheus-stack-alertmanager | SNS publish (+ KMS data-key) for alerting |
+| `observability-mimir` | mimir | S3 (Mimir blocks bucket) |
 
 ### OIDC Provider
 
@@ -155,5 +158,6 @@ Workload Identity) would be configured separately.
   all IRSA trust policies break because the provider ARN changes. Mitigated by the OIDC provider
   being managed as part of the EKS module — it's only recreated when the cluster itself is
   recreated.
-- AWS has a limit of 100 OIDC provider thumbprints and audience values. With current usage (4
-  IRSA roles), this is not a concern, but it could become relevant at scale.
+- AWS has a limit of 100 OIDC provider thumbprints and audience values. With current usage (a handful
+  of IRSA roles — argocd, cert-manager, external-dns, external-secrets, eks-addons, plus the
+  observability hub and Mimir), this is not a concern, but it could become relevant at scale.

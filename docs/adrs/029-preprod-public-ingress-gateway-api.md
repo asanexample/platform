@@ -83,7 +83,7 @@ inputs = {
 
   gateway_name = "preprod-gateway"
 
-  letsencrypt_email      = "admin@example.com"
+  letsencrypt_email      = include.base.locals.admin_email
   route53_hosted_zone_id = dependency.route53.outputs.zone_id
   route53_region         = include.base.locals.region
 

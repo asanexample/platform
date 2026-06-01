@@ -45,14 +45,21 @@ tool in the Kubernetes ecosystem.
 
 ## Decision
 
-Deploy ArgoCD on all Kubernetes clusters for GitOps-based workload delivery. The module
-(`infra/modules/argocd/`) installs ArgoCD via Helm. Application management is handled by the
-`argocd-apps` module, which creates per-tenant AppProjects and Applications.
+Deploy a **single ArgoCD instance on the platform (hub) cluster** for GitOps-based workload
+delivery across all clusters. The module (`infra/modules/argocd/`) installs ArgoCD via Helm.
+Application management is handled by the `argocd-apps` module, which creates per-tenant AppProjects
+and Applications.
 
-### Deployment Architecture
+### Deployment Architecture (hub-and-spoke)
 
-ArgoCD is deployed as a Terragrunt unit (`argocd`) that depends on EKS and node-groups. It
-installs the ArgoCD Helm chart with IRSA (ADR-018) for ECR image access.
+ArgoCD runs only on the **platform** cluster (the live `argocd`, `argocd-apps`, and `argocd-clusters`
+units exist solely under `infra/live/aws/platform/`). It is a Terragrunt unit (`argocd`) that depends
+on EKS and node-groups and installs the ArgoCD Helm chart with IRSA (ADR-018) for ECR image access.
+
+Spoke clusters (currently **preprod**) are registered as remote ArgoCD clusters by the
+`argocd-clusters` unit, which writes cluster credentials so the hub's application-controller can
+reconcile workloads into the spoke over the network. There is no second ArgoCD install per spoke — a
+single hub manages every cluster.
 
 ### SSO Integration
 

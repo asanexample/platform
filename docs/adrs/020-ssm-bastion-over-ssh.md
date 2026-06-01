@@ -46,8 +46,9 @@ Sessions are logged to CloudTrail with optional session recording to S3 or Cloud
 
 ## Decision
 
-Deploy a minimal EC2 instance (`t3.nano`) in a private subnet with SSM Session Manager as the
-sole access mechanism. No SSH, no public IP, no inbound security group rules.
+Deploy a minimal EC2 instance (`t3.nano`) per cluster (platform and preprod) in a private subnet, with
+SSM Session Manager as the sole access mechanism — the fallback path when Tailscale (ADR-011) is
+unavailable. No SSH, no public IP, no inbound security group rules.
 
 ### Implementation
 

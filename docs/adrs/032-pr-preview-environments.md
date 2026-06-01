@@ -103,36 +103,44 @@ Services to cross-select pods from different deployments.
 
 ### HTTPRoute Patching
 
-Kustomize does not natively update Gateway API `backendRefs` when `namePrefix` is applied.
-Two mechanisms work together to handle this:
+All preview kustomize transforms are injected **by the platform's ApplicationSet template** (in the
+`argocd-apps` module), not by files in the app repo. The template sets `namePrefix = "pr-{{.number}}-"`,
+`commonLabels`, an `images` override to the PR head SHA, and a hostname patch:
 
-1. **Hostname rewrite** — The ApplicationSet template uses an explicit kustomize JSON patch
-   to rewrite the HTTPRoute hostname for the preview URL:
+```yaml
+# rendered into the ApplicationSet template by infra/modules/argocd-apps/
+patches:
+  - target: { kind: HTTPRoute }
+    patch: |
+      - op: replace
+        path: /spec/hostnames/0
+        value: <app>-pr-<N>.preprod.aws.refplat.org
+```
 
-   ```yaml
-   patches:
-     - target: { kind: HTTPRoute }
-       patch: |
-         - op: replace
-           path: /spec/hostnames/0
-           value: <app>-pr-<N>.preprod.aws.refplat.org
-   ```
+**HTTPRoute `backendRef` rewriting (issue #155, resolved).** Kustomize's built-in nameReference
+transformer does **not** know about Gateway API `HTTPRoute`, so `namePrefix` alone renames the
+`Service` (to `pr-<N>-<svc>`) and the `HTTPRoute` object but would leave the route's
+`spec.rules[].backendRefs[].name` pointing at the **un-prefixed** (stable) Service — silently routing a
+preview hostname to stable pods. The fix is a per-app kustomize **nameReference config** that teaches
+kustomize the `HTTPRoute` backendRef references a `Service`, so the same rename rewrites the backendRef
+too:
 
-2. **backendRef update via nameReference** — App repos include a `name-reference.yaml`
-   kustomize configuration that teaches kustomize to update HTTPRoute `backendRefs` when
-   `namePrefix` is applied. This avoids a brittle hardcoded patch in the ApplicationSet
-   template and works automatically as apps add or rename Services.
+```yaml
+# k8s/preprod/name-reference.yaml (referenced by kustomization.yaml's `configurations:`)
+nameReference:
+  - kind: Service
+    fieldSpecs:
+      - kind: HTTPRoute
+        path: spec/rules/backendRefs/name
+```
 
-   ```yaml
-   # k8s/preprod/name-reference.yaml
-   nameReference:
-     - kind: Service
-       fieldSpecs:
-         - path: spec/rules/backendRefs/name
-           kind: HTTPRoute
-   ```
-
-   The app's `kustomization.yaml` must reference this configuration (see below).
+This lives in the **app repo** (not the ApplicationSet template) because ArgoCD's `source.kustomize`
+exposes no field to inject transformer `configurations` — it applies `namePrefix` over whatever the
+app's `kustomization.yaml` builds, so the nameReference must be in that kustomization. It is generic
+(any service name, any number of rules/backendRefs) — preferable to a brittle index-0 JSON patch. App
+CI guards it with a cluster-free regression check (renders the overlay the way ArgoCD does and asserts
+every backendRef carries the prefix). Implemented for app-alpha in
+[app-alpha#24](https://github.com/asanexample/app-alpha/pull/24).
 
 ### OIDC Trust Policy Update
 
@@ -217,33 +225,25 @@ Private app repos require two credential configurations:
 
 ### Kustomization Requirement
 
-App repos must include two files in their manifest directory:
-
-**`kustomization.yaml`** — lists all resources and references the nameReference configuration:
+App repos must include a `kustomization.yaml` in their manifest directory listing all resources —
+ArgoCD detects kustomize automatically when this file exists, and the ApplicationSet template's
+overrides (`commonLabels`, `namePrefix`, image, hostname patch) only apply to a kustomize source.
+Preview-enabled apps must **also** carry the `name-reference.yaml` backendRef config (above):
 
 ```yaml
+# k8s/preprod/kustomization.yaml (as in app-alpha)
 resources:
+  - serviceaccount.yaml
   - deployment.yaml
   - service.yaml
   - httproute.yaml
 configurations:
-  - name-reference.yaml
+  - name-reference.yaml   # rewrite HTTPRoute backendRefs under namePrefix (preview isolation, #155)
 ```
 
-**`name-reference.yaml`** — teaches kustomize to update HTTPRoute `backendRefs` when
-`namePrefix` is applied:
-
-```yaml
-nameReference:
-  - kind: Service
-    fieldSpecs:
-      - path: spec/rules/backendRefs/name
-        kind: HTTPRoute
-```
-
-ArgoCD detects kustomize automatically when `kustomization.yaml` exists. Without it, kustomize
-overrides (commonLabels, namePrefix, patches) have no effect. Without `name-reference.yaml`,
-preview HTTPRoutes will point at the wrong (non-prefixed) Service name.
+The platform team owns the bulk of the preview transform logic in the `argocd-apps` module; the one
+piece that must live in the app repo is the nameReference config, because ArgoCD cannot inject
+transformer `configurations` from the Application spec. New apps should be scaffolded with both files.
 
 ## Consequences
 
@@ -269,6 +269,11 @@ preview HTTPRoutes will point at the wrong (non-prefixed) Service name.
 
 ### Risks
 
+- **Preview routing correctness depends on the per-app nameReference config.** Kustomize `namePrefix`
+  does not natively rewrite an `HTTPRoute` `backendRef` (Gateway API CRD); the `name-reference.yaml`
+  config (above) restores it, and a CI regression check fails the PR if it's missing (#155 resolved).
+  A new preview-enabled app that forgets the config — and skips the check — would route previews to the
+  stable Service, so the scaffolding + CI guard are what keep this correct.
 - **Fork PRs cannot push images.** GitHub blocks `id-token: write` on fork PRs by default, so
   forks cannot authenticate to ECR. The ApplicationSet will create an Application, but it will
   fail to sync because the image tag doesn't exist. This is safe (no resource creation) but may
@@ -279,5 +284,7 @@ preview HTTPRoutes will point at the wrong (non-prefixed) Service name.
 - **Resource exhaustion from concurrent PRs.** Each preview creates ~2 pods (200m CPU, 256Mi).
   The default quota (4 CPU, 20 pods) limits to ~10 concurrent previews per team. Teams with high
   PR volume may need quota increases.
-- **Broad ECR push scope.** The single `github-actions-ecr-push` OIDC role can push to all team
-  repos. Acceptable for the current scale; production should use per-team roles.
+- **Per-team ECR push scope.** Push access uses one OIDC role per team
+  (`github-actions-ecr-push-<team>`), each trusting only that team's repo and scoped to that team's
+  `team-<team>/*` repositories (ADR-036). A compromised CI workflow for one team cannot push to
+  another team's images.

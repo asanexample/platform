@@ -79,7 +79,9 @@ The `cloudtrail` module creates the following resources:
    - Single-region by default (`is_multi_region = false`) — can be extended to multi-region
      when needed
    - Advanced event selectors for data events — configurable via `data_event_selectors` to
-     capture data-plane operations (e.g., Secrets Manager `GetSecretValue`)
+     capture true data-plane operations on data-event-eligible services (e.g., S3 object-level
+     `GetObject`/`PutObject`, Lambda `Invoke`). Note: Secrets Manager is **not** a data-event
+     service — its API calls (including `GetSecretValue`) are management events (see below)
 
 3. **CloudWatch Logs integration** (enabled by default):
    - A CloudWatch log group (`/aws/cloudtrail/<trail-name>`) with configurable retention
@@ -107,10 +109,12 @@ data_event_selectors  = []
 ```
 
 Trail naming follows the pattern `<env>-<region>-secrets-audit` (e.g.,
-`platform-use1-secrets-audit`, `preprod-use1-secrets-audit`). Data event selectors are
-currently empty — the trail captures management events only. Data events for Secrets Manager
-reads (`GetSecretValue`) can be added later by populating `data_event_selectors` with
-`resource_type = "AWS::SecretsManager::Secret"`.
+`platform-use1-secrets-audit`, `preprod-use1-secrets-audit`). `data_event_selectors` is empty, so
+the trail captures **all management events** (the CloudTrail default when no selector is set —
+read + write). Crucially, **Secrets Manager logs `GetSecretValue` and all its other API calls as
+management events**, so secret reads and writes are already captured by this trail without any data
+event selectors. `data_event_selectors` exists for genuinely data-plane services (S3 objects,
+Lambda invokes) and is unused today.
 
 ### Deployment Independence
 
@@ -156,7 +160,9 @@ deployment orderings.
   via `terraform destroy` if the bucket contains objects. However, the live units do not
   explicitly set this, relying on the default. If `force_destroy` were set to `true` in a live
   unit, a `terraform destroy` would delete all audit logs without confirmation
-- Data event selectors are currently empty, meaning Secrets Manager data-plane operations
-  (`GetSecretValue`) are not captured — only management events (trail creation, configuration
-  changes) are logged. To get full audit coverage of secret reads, data event selectors must be
-  configured for `AWS::SecretsManager::Secret`
+- Common misconception: `GetSecretValue` is **not** a CloudTrail *data* event. Secrets Manager
+  records all its operations (reads and writes) as **management events**, which this trail captures
+  by default — so the `secrets-write-activity` metric filter (which matches `GetSecretValue`,
+  `PutSecretValue`, `CreateSecret`, `DeleteSecret`) works as intended with `data_event_selectors`
+  empty. No data event selectors are needed for secrets audit coverage; they would only matter for
+  S3/Lambda-style data-plane logging

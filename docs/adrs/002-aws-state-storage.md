@@ -12,26 +12,25 @@ for security, reliability, access control, and operational complexity.
 
 ### The Multi-Cloud State Problem
 
-This repository manages infrastructure across AWS, Azure, and GCP. The existing Azure environment
-uses Azure Blob Storage for Terraform state, authenticated via Azure AD. When the AWS buildout
-began, the team faced a fundamental question: should AWS infrastructure state live alongside Azure
-state in the existing Azure Blob Storage backend, or should each cloud's state live in its own
-cloud-native backend?
+The platform is built multi-cloud-ready but **AWS-first** (Azure/GCP deferred — see
+[ADR-001](001-multi-cloud-terragrunt-structure.md)). The design question that informs the state backend:
+should each cloud's state live in its own cloud-native backend, or share one? Storing one cloud's state
+in another's backend (e.g. AWS state in Azure Blob) doubles the authentication surface and couples the
+clouds' availability. We chose **per-cloud, cloud-native backends** — so AWS state lives in AWS-native
+S3, and a future Azure/GCP backend slots in independently.
 
 ### Constraints
 
 - **AWS Organizations** is being created from the management account (<MGMT_ACCOUNT_ID>). The management
   account is the natural home for centralized state storage.
-- **Cross-cloud authentication complexity.** Storing AWS state in Azure Blob Storage means every AWS
-  CI/CD pipeline and developer workstation must authenticate to both AWS (for resource provisioning)
-  and Azure (for state operations). This doubles the authentication surface.
-- **State backend performance.** S3 in `us-east-1` provides lower latency for AWS operations than
-  cross-cloud HTTPS calls to Azure Blob Storage in `eastus`.
-- **Blast radius isolation.** An Azure outage should not block AWS infrastructure operations and
-  vice versa.
-- **Existing Azure state** must not be disrupted. The Azure backend (subscription
-  `9dc5edc4-8c4e-41a1-a4f8-2183c4e91954`, storage account `tfstatemulticloud`) is already in
-  production.
+- **Cross-cloud authentication complexity.** Storing one cloud's state in another's backend forces
+  every pipeline and workstation to authenticate to both clouds — doubling the authentication surface.
+- **State backend performance.** S3 in `us-east-1` gives AWS operations native, low-latency state
+  access rather than cross-cloud HTTPS calls.
+- **Blast radius isolation.** One cloud's storage outage should not block another cloud's
+  infrastructure operations.
+- **Additive future clouds.** A second cloud's backend (Azure/GCP, when they land) must slot in
+  without disrupting the AWS backend.
 
 ### The Bootstrap Chicken-and-Egg Problem
 
@@ -58,43 +57,47 @@ AWS infrastructure state is stored in **S3 with DynamoDB locking** in the AWS ma
 Azure and GCP state continues to use Azure Blob Storage. Each cloud's state lives in its own
 cloud-native backend.
 
-### Cloud-Aware Routing in Root `root.hcl`
+### Cloud-Aware-Ready Routing in `root.hcl`
 
-The root `root.hcl` uses **path-based detection** to route state to the correct backend:
+`root.hcl` retains **path-based cloud detection** so per-cloud state routing can be re-activated when a
+second cloud lands. Today only AWS is deployed, so the `remote_state` block resolves unconditionally to
+S3; the `_cloud` local is computed and kept *"for future multi-cloud"* but does not yet branch the
+backend:
 
 ```hcl
 locals {
+  # Detect cloud provider from directory path (kept for future multi-cloud)
   _path_parts_cloud = split("/", path_relative_to_include())
-  _cloud            = try(local._path_parts_cloud[1], "azure")
+  _cloud            = try(local._path_parts_cloud[1], "aws")
+  _secrets          = read_terragrunt_config("${get_repo_root()}/infra/live/aws/secrets.hcl")
 }
 
 remote_state {
-  backend = local._cloud == "aws" ? "s3" : "azurerm"
-  config = local._cloud == "aws" ? {
-    bucket         = "tfstate-mgmt-<MGMT_ACCOUNT_ID>"
+  backend = "s3"
+  config = {
+    bucket         = local._secrets.locals.state_bucket    # tfstate-mgmt-<acct>, from secrets.hcl
     key            = "${path_relative_to_include()}/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
     dynamodb_table = "terraform-locks"
-  } : {
-    # Azure Blob Storage config...
+    role_arn       = local._secrets.locals.state_role_arn  # TerraformStateAccess (ADR-007)
   }
 }
 ```
 
-The detection logic splits the `path_relative_to_include()` on `/` and checks whether element `[1]`
-(the cloud directory) is `"aws"`. Any module under `infra/live/aws/...` gets S3; everything else
-defaults to Azure Blob Storage.
+When Azure/GCP return, the backend becomes a `local._cloud == "aws" ? "s3" : "azurerm"` conditional
+again. The bucket name and the state-access role ARN come from the gitignored `secrets.hcl`.
 
 ### S3 Backend Configuration
 
 | Setting | Value | Rationale |
 |---------|-------|-----------|
-| Bucket | `tfstate-mgmt-<MGMT_ACCOUNT_ID>` | Account ID suffix prevents global name collisions and makes ownership obvious |
-| Region | `us-east-1` | Primary AWS region; colocated with Organizations (global service, but API endpoint is us-east-1) |
-| Encryption | `true` (AES-256/KMS) | Required for compliance; state files may contain sensitive resource attributes |
+| Bucket | `tfstate-mgmt-<acct>` (from `secrets.hcl`) | Account-ID suffix prevents global name collisions and makes ownership obvious |
+| Region | `us-east-1` | Primary AWS region; Organizations API endpoint is us-east-1 |
+| Encryption | `true`, SSE-KMS (AWS-managed key) | State files may contain sensitive resource attributes |
 | DynamoDB table | `terraform-locks` | Prevents concurrent state modifications; PAY_PER_REQUEST billing |
 | State key | `{path_relative_to_include}/terraform.tfstate` | Directory structure maps 1:1 to state keys, making state files discoverable |
+| Access role | `TerraformStateAccess` (`role_arn` from `secrets.hcl`) | Dedicated cross-account role scoped to the state bucket + lock table ([ADR-007](007-iam-role-model.md)) |
 
 ### Bootstrap Module for Chicken-and-Egg Resolution
 
@@ -115,9 +118,10 @@ and DynamoDB lock table. This module:
    - Full public access block (all four settings)
    - DynamoDB PAY_PER_REQUEST billing to avoid capacity provisioning
 
-4. **Commits `terraform.tfstate` to the repository.** Since this module uses local state, the state
-   file is committed to the repo at the module's directory. This is safe because the state only
-   contains metadata about an S3 bucket and a DynamoDB table -- no secrets, no sensitive attributes.
+4. **Local state for the first apply, then migrated to S3.** The local `terraform.tfstate` (gitignored)
+   is transient — once the bucket exists, the bootstrap's backend is migrated to S3 so it stores state
+   in the bucket it created, just like every other module (details + recovery in
+   [ADR-006](006-state-bootstrap-pattern.md)).
 
 ### Why Not Terragrunt Auto-Create
 
@@ -145,19 +149,19 @@ because:
   for any module is trivial: look at its path relative to the repo root.
 - **Fully managed bootstrap.** The state bucket and lock table are tracked in IaC with proper
   encryption, versioning, and access controls. Drift is detectable.
-- **Single routing logic.** The path-based cloud detection in root `root.hcl` is a single
-  conditional expression. Adding a new cloud requires one additional branch.
+- **Single routing logic.** Cloud detection lives in one place in `root.hcl`; re-introducing a second
+  cloud's backend is one conditional branch, not a separate root config per cloud.
 
 ### Negative
 
-- **Two state backends to operate.** The team must monitor and maintain both the S3 backend and the
-  Azure Blob Storage backend. Backup, retention, and access policies must be managed separately.
+- **Per-cloud backends to operate (when multi-cloud).** Today there is one backend (S3); when
+  Azure/GCP return, each cloud's backend has its own backup, retention, and access policies to manage.
 - **Bootstrap ceremony.** New AWS accounts require running the `state_bootstrap` module first with
   local state before any other module can be deployed. This is an extra step that must be documented
   and enforced.
-- **Local state file in repo.** The bootstrap module's `terraform.tfstate` is committed to the
-  repository. While safe for this specific case (no secrets), it is an exception to the general rule
-  of "never commit state files" and could confuse new contributors.
+- **Bootstrap special-case (first apply only).** The bootstrap's *first* apply uses local state before
+  migrating to S3 — an exception to the normal workflow that must be documented (see ADR-006). After
+  migration it is an ordinary S3-backed module.
 - **Path coupling.** The cloud detection logic depends on the directory structure
   (`live/aws/...`). Reorganizing the directory hierarchy would break state routing.
 

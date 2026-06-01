@@ -6,10 +6,12 @@
 
 ## Context
 
-The platform runs Kubernetes clusters on both AWS (EKS) and Azure (AKS), with GCP (GKE) planned.
-Each cloud provider offers a default CNI — AWS VPC CNI, Azure CNI, and GKE's default — but these
-are tightly coupled to their respective cloud networking models and offer inconsistent feature sets
-for network policy, observability, and service mesh capabilities.
+The platform runs Kubernetes on **AWS (EKS) today**, with **Azure (AKS) and GCP (GKE) planned**
+(deferred until AWS is stable — see [ADR-001](001-multi-cloud-terragrunt-structure.md)). Each cloud
+offers a default CNI — AWS VPC CNI, Azure CNI, GKE's default — but these are tightly coupled to their
+cloud networking models and offer inconsistent feature sets for network policy, observability, and
+service mesh. Picking one CNI that works across all of them keeps the networking model uniform as
+clouds are added.
 
 Operating different CNIs per cloud creates several problems:
 
@@ -59,6 +61,9 @@ the appropriate networking mode for each cloud.
 | kube-proxy replacement | Required (`true`) | Configurable | Configurable |
 | Hubble | Enabled (TLS via `helm` method) | Enabled | Enabled |
 | Gateway API | Enabled | Enabled | Enabled |
+
+Only **AWS (EKS)** is deployed today; the Azure/GCP columns are the module's `cloud_provider` branches
+(present and validated in `infra/modules/cilium/`), ready for when those clouds land.
 
 ### AWS ENI Mode
 
@@ -137,9 +142,10 @@ The module accepts a `helm_chart_version` variable that defaults to 1.19.4 as a 
 
 - BYOCNI adds deployment complexity — clusters cannot schedule any pods until Cilium is installed,
   requiring strict ordering (see ADR-009)
-- Cloud-specific tuning required — ENI mode on AWS, VXLAN on Azure — means the "single module"
-  still has cloud-conditional logic
-- Cilium upgrades affect all clusters simultaneously (mitigated by testing in non-prod first)
+- Cloud-specific tuning required — ENI/native on AWS, VXLAN on Azure, etc. — means the "single module"
+  still carries cloud-conditional logic (the Azure/GCP branches exist but are dormant today)
+- A Cilium upgrade affects every cluster on that cloud at once (today: the AWS clusters) — mitigated by
+  testing in the platform environment before preprod/prod
 - Hubble TLS using `helm` method means certificates are not integrated with the platform's
   cert-manager infrastructure
 

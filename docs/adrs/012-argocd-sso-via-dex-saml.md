@@ -112,8 +112,10 @@ g, PlatformAdmins, role:admin
 g, Developers, role:readonly
 ```
 
-The `rbac_scopes = "[groups]"` setting tells ArgoCD to inspect the `groups` claim from the OIDC
-token when evaluating RBAC policies.
+(The live policy maps the **Identity Center group GUIDs** — not display names — to custom
+`role:org-admin` / `role:developer` / `role:readonly` roles defined in the unit's `rbac_policy_csv`;
+the names above are illustrative.) The `rbac_scopes = "[groups]"` setting tells ArgoCD to inspect the
+`groups` claim from the OIDC token when evaluating RBAC policies.
 
 ## Consequences
 

@@ -16,21 +16,21 @@ drawn, and how the organization can scale.
 The module deploys the following OU hierarchy:
 
 ```text
-Root (Organization Root)
+Root (Organization Root)   [management account sits here, in no OU]
   |
   +-- Platform
-  |     |
-  |     +-- [platform account]
+  |     +-- platform account
+  |     +-- test account        (Terratest sandbox — see "Test account placement" below)
   |
   +-- Workloads
         |
         +-- Preprod
-        |     |
-        |     +-- [preprod account]
+        |     +-- preprod account
         |
         +-- Prod
+        |     +-- prod account
         |
-        +-- Regulated
+        +-- Regulated           (no accounts yet — reserved for future HIPAA/PCI workloads)
 ```
 
 ### Design Principles at Play
@@ -66,8 +66,8 @@ Root (Organization Root)
 
 - Flat hierarchies are simpler but provide fewer policy attachment points.
 - Deep hierarchies provide more granularity but increase complexity and risk hitting nesting limits.
-- The hierarchy must accommodate both current needs (2 accounts) and future growth (potentially
-  dozens of accounts across multiple environments).
+- The hierarchy must accommodate both current needs (4 member accounts: platform, test, preprod,
+  prod) and future growth (potentially dozens of accounts across multiple environments).
 
 ## Decision
 
@@ -206,6 +206,15 @@ by default. This is an AWS best practice because:
 - The management account should have minimal workloads.
 - Placing it in an OU could create confusion about which policies apply.
 
+### Test Account Placement
+
+The **Test** account (the Terratest sandbox) sits in the **Platform** OU, not Workloads/Preprod. This
+is deliberate: there it inherits only the root SCPs + `protect-data-and-network`, and **not** the
+Workloads `require-tagging` / `restrict-iam-users` SCPs — which would otherwise block a
+create-and-destroy test sandbox from making IAM resources or untagged fixtures. Its IaC still runs via
+`PlatformDeployer` like every other account (see [ADR-040](040-platform-engineer-access-model.md) and
+the test-sandbox runbook).
+
 ## Consequences
 
 ### Positive
@@ -229,9 +238,10 @@ by default. This is an AWS best practice because:
 - **Platform OU is a catch-all.** Currently there is no sub-OU structure under Platform. As the
   number of platform accounts grows (networking, security, logging, CI/CD), a flat OU may become
   difficult to manage. Mitigation: sub-OUs can be added later without disrupting existing accounts.
-- **No Sandbox OU.** Developer experimentation accounts would need to go under Workloads/Preprod,
-  which may be too restrictive (tagging requirements, IAM user restrictions). A dedicated Sandbox
-  OU at the root level may be needed. This is a known gap, not a design flaw.
+- **No dedicated Sandbox OU.** The Test (Terratest sandbox) account lives in the Platform OU to dodge
+  the Workloads tagging/IAM restrictions (see "Test Account Placement"). That covers the CI-sandbox
+  case; a dedicated root-level Sandbox OU may still be worth adding if interactive experimentation
+  accounts proliferate.
 - **Regulated OU is unused.** The Regulated OU exists but has no accounts yet and the HIPAA SCP is
   not enabled. This is forward-looking design, but empty OUs add visual noise.
 - **OU renames are state-breaking.** The `for_each` key for OUs is the OU name (e.g.,

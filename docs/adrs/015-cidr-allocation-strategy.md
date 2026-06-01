@@ -6,10 +6,12 @@
 
 ## Context
 
-The platform operates across three cloud providers (AWS, Azure, GCP) with multiple environments
-(platform, preprod, prod) and multiple regions per environment. Each environment needs a VPC/VNet
-with non-overlapping address space. Cross-cloud VPN connectivity is planned, which requires the
-entire multi-cloud estate to have globally non-overlapping CIDRs.
+The platform is multi-cloud by design but **AWS-first** today (Azure/GCP deferred —
+[ADR-001](001-multi-cloud-terragrunt-structure.md)), with multiple environments (platform, preprod,
+prod) and multiple regions per environment. Each environment needs a VPC with non-overlapping address
+space, and cross-cloud VPN connectivity is on the roadmap — so the scheme reserves **globally
+non-overlapping** CIDRs across all (current and future) clouds from the start, even though only AWS is
+deployed.
 
 Without a systematic allocation strategy, CIDR assignment becomes ad-hoc — teams pick ranges that
 seem available, overlaps are discovered only when connectivity is attempted, and resizing a VPC
@@ -76,7 +78,7 @@ Each environment gets a /16 within its cloud's /14:
 | GCP | Platform | `10.108.0.0/16` |
 
 A /16 provides 65,536 addresses per environment — enough for multiple regions, each with its own
-/21 allocation.
+/21 allocation. The AWS rows are live; the Azure/GCP rows are **reserved** for when those clouds land.
 
 ### Subnet Tier Scheme
 
@@ -132,15 +134,16 @@ by the networking module.
   addresses. This trades address efficiency for simplicity and growth headroom.
 - The scheme assumes 3 AZs per region. Regions with 2 AZs would waste subnet allocations; regions
   with 4+ AZs would need scheme adjustments.
-- Pre-existing environments that don't follow the scheme (Azure ops/westus using `10.101.24.0/21`,
-  GCP ops using `10.102.0.0/16`) create exceptions that must be documented and accounted for in
-  routing rules.
+- The scheme reserves space for clouds not yet deployed (Azure/GCP). If their eventual real-world
+  ranges don't match the reservation they'll need reconciling — but with those clouds removed today,
+  there are no live off-scheme exceptions.
 
 **Risks:**
 
-- The GCP ops environment (`10.102.0.0/16`) overlaps with AWS prod (`10.102.0.0/16`). This
-  must be resolved before cross-cloud VPN is established between these environments. Options:
-  re-IP the GCP environment or use NAT at the VPN boundary.
+- The reserved per-cloud /14s are non-overlapping, so AWS, Azure, and GCP environments won't collide
+  when the latter two are added. (The earlier Azure/GCP scaffolding had an off-scheme overlap — GCP at
+  `10.102.0.0/16` colliding with AWS prod — but it has been removed.) Re-validate the allocation table
+  before establishing cross-cloud VPN.
 - If the platform grows beyond 4 environments per cloud, the /14 allocation is exhausted. Mitigated
   by the fact that 4 environments per cloud is sufficient for the foreseeable roadmap, and adjacent
   /14 blocks are available if needed.

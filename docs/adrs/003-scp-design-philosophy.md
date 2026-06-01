@@ -62,7 +62,7 @@ The Organizations module ships with **7 built-in SCPs** that are generated from
 | 2 | `protect-security-services` | Prevent disabling CloudTrail, Config, GuardDuty, Security Hub, Access Analyzer, VPC Flow Logs | SOC 2, NIST 800-53, PCI-DSS, CIS |
 | 3 | `enforce-encryption` | Require EBS/RDS encryption, protect KMS keys, enforce IMDSv2 | HIPAA, PCI-DSS, NIST 800-53, CIS |
 | 4 | `deny-regions` | Restrict resource creation to allowed regions (us-east-1, us-west-2) with global service exemptions | PCI-DSS, NIST 800-53, data residency |
-| 5 | `protect-data-and-network` | Block S3 public access changes, default VPC creation, external RAM sharing, backup deletion | SOC 2, PCI-DSS, NIST 800-53 |
+| 5 | `protect-data-and-network` | Block S3 public access changes, default VPC creation, external RAM sharing, backup deletion; protect `Team`-tag integrity for per-team ABAC (`DenyTeamTagTampering`, #62) | SOC 2, PCI-DSS, NIST 800-53 |
 | 6 | `require-tagging` | Dynamic deny for resource creation without required tags (Environment, ManagedBy, Owner) | SOC 2 (asset management), cost allocation |
 | 7 | `restrict-iam-users` | Deny IAM user/access key creation and direct user policy attachment (force federation) | SOC 2, NIST 800-53, CIS |
 | 8 | `hipaa-eligible-services` | Allowlist of HIPAA BAA-covered services (optional, off by default) | HIPAA |
@@ -108,10 +108,11 @@ condition {
 }
 ```
 
-The default exempt role is `OrganizationAccountAccessRole`, which is the cross-account
-administrative role that AWS Organizations creates in every member account. This role is used by the
-management account for initial setup and break-glass access. The `exempt_roles` variable allows
-additional roles to be exempted.
+The module's default exempt role is `OrganizationAccountAccessRole` (the cross-account administrative
+role AWS Organizations creates in every member account — used for initial setup and break-glass). The
+`exempt_roles` variable adds more; in the live org these are **`PlatformDeployer`** (the Terragrunt
+apply role — it *must* be exempt, or every apply would hit SCP denies) and the Terratest CI role (see
+[ADR-007](007-iam-role-model.md)).
 
 The exempt role pattern is deliberately narrow:
 

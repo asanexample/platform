@@ -6,8 +6,8 @@
 
 ## Context
 
-The platform spans 5 AWS accounts (management, platform, preprod, prod, and the organization
-root). Secrets currently follow an ad-hoc naming pattern — the Tailscale integration uses
+The platform spans 5 AWS accounts (management, platform, the Test sandbox, preprod, and prod).
+Secrets currently follow an ad-hoc naming pattern — the Tailscale integration uses
 `platform/tailscale/api-key` and `platform/tailscale/oauth`, but nothing formalizes this
 convention or requires other services to follow it.
 
@@ -87,19 +87,21 @@ Rules:
 
 ### SSM Parameter Store
 
-SSM parameters use a leading slash (AWS convention) and a fixed `config` segment to distinguish
-them from secrets:
+SSM parameters use a leading slash (AWS convention) and a leading `config` segment to distinguish
+them from secrets, then mirror the secrets `{owner}/{service}/{name}` hierarchy. There is **no
+environment prefix** — the AWS account boundary IS the environment, the same rule applied to
+secrets above (and consistent with ADR-024):
 
 ```text
-/{environment}/config/{param-name}
+/config/{owner}/{service}/{param-name}
 ```
 
 Examples:
 
 ```text
-/platform/config/cluster-domain
-/platform/config/vpc-cidr
-/preprod/config/feature-flags
+/config/platform/cluster/domain
+/config/platform/networking/vpc-cidr
+/config/payments/stripe/webhook-endpoint
 ```
 
 ### IAM Integration

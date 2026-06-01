@@ -51,29 +51,36 @@ Use GitHub Actions OIDC federation for all CI/CD AWS access. The `infra/modules/
 module creates an OIDC identity provider and a scoped IAM role in a single unit. Two deployments
 exist today:
 
-### Platform Account: ECR Push Role
+### Platform Account: Per-Team ECR Push Roles
 
-Deployed at `infra/live/aws/platform/us-east-1/platform/github-oidc/`. Creates a role named
-`github-actions-ecr-push` that grants ECR push permissions scoped to repositories owned by
-specific teams.
+Deployed at `infra/live/aws/platform/us-east-1/platform/github-oidc/`. Rather than one shared push
+role, the unit generates **one role per team** from the `roles` map — `github-actions-ecr-push-<team>`
+— so each role trusts only that team's repo (via the OIDC `sub`) and can push only to that team's
+`team-<team>/*` ECR repositories (per-team attribution / ABAC, #61):
 
 ```hcl
-github_org    = "asanexample"
-github_repos  = ["app-alpha", "app-bravo"]
-github_events = ["pull_request"]
-role_name     = "github-actions-ecr-push"
+github_org = "asanexample"
+
+# One push role per team: trusts only that team's repo, pushes only to that team's ECR repos.
+roles = { for team, cfg in local.teams :
+  "github-actions-ecr-push-${team}" => {
+    repos    = [cfg.github_repo] # e.g. ["app-alpha"]
+    branches = ["main"]          # push on merge to main
+    events   = ["pull_request"]  # and PR preview builds
+    tags     = { Team = team }
+    inline_policy = jsonencode({ /* ECRAuth (global GetAuthorizationToken) + ECRPush on team-<team>/* */ })
+  }
+}
 ```
 
-The role's inline policy grants `ecr:GetAuthorizationToken` (global) and ECR push actions
+Each role's inline policy grants `ecr:GetAuthorizationToken` (global) and ECR push actions
 (`BatchCheckLayerAvailability`, `PutImage`, `InitiateLayerUpload`, `UploadLayerPart`,
-`CompleteLayerUpload`) scoped to the specific repository ARNs output by the `ecr` dependency.
-This ensures CI can only push to repositories that actually exist in the ECR module — adding a
-new team's repository requires updating both the `ecr` and `github-oidc` live units.
+`CompleteLayerUpload`) scoped to that team's repository ARNs only. A compromised CI workflow for one
+team therefore cannot push to another team's images — cross-team push is denied at the IAM layer.
 
-The trust policy uses `github_events = ["pull_request"]` to generate subject claims of the form
-`repo:asanexample/<repo>:pull_request`, allowing workflows triggered by PR events to assume the
-role. Since `github_branches` defaults to `["main"]`, the trust policy also allows runs on the
-`main` branch (for post-merge image builds).
+Each role's trust policy uses `events = ["pull_request"]` to generate subject claims of the form
+`repo:asanexample/<repo>:pull_request` (PR preview builds) plus `branches = ["main"]` for post-merge
+image builds.
 
 ### Test Account: Terratest Role
 
@@ -149,10 +156,10 @@ HTTPS JWKS endpoints.
   feature (forks should not have access to the target repository's AWS resources) but means
   external contributors cannot trigger CI workflows that require AWS access. Mitigated by running
   AWS-dependent tests only on `push` events to branches in the origin repository.
-- Trust policy maintenance — each new repository that needs CI/CD access requires updating the
-  `github_repos` list in the live unit. This is a manual step, unlike a wildcard trust that would
-  automatically cover new repositories. The explicit enumeration is intentional (principle of
-  least privilege) but adds a process step during onboarding.
+- Trust policy maintenance — each new team/repository that needs CI/CD access requires a new entry
+  in the `teams`/`roles` map in the live unit. This is a manual step, unlike a wildcard trust that
+  would automatically cover new repositories. The explicit enumeration plus per-team role split is
+  intentional (least privilege, no cross-team push) but adds a process step during onboarding.
 - `AdministratorAccess` on the Terratest role is broad — a compromised `feat/*` branch workflow
   could perform arbitrary actions in the test account. Mitigated by the test account containing
   no production data and branch protection rules requiring PR review for merges to `main`.

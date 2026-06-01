@@ -48,9 +48,11 @@ keeping configuration in version control.
 
 ## Decision
 
-Deploy the Tailscale Kubernetes Operator on EKS as a subnet router. The Operator advertises the
-VPC CIDR (`10.100.0.0/16`) to the tailnet, giving all tailnet members transparent access to VPC
-resources.
+Deploy the Tailscale Kubernetes Operator on each EKS cluster as a subnet router. Each operator
+advertises its own VPC CIDR to the tailnet — **platform** `10.100.0.0/16`, **preprod** `10.101.0.0/16`
+— giving all tailnet members transparent access to both VPCs' resources, including each cluster's
+private API endpoint. (Examples below use the platform VPC; preprod is identical with its own CIDR and
+VPC resolver.)
 
 ### Architecture
 

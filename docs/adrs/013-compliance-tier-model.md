@@ -54,8 +54,8 @@ Implement a three-tier compliance model declared per workload via `compliance_ti
 
 | Control | Standard (SOC 2) | HIPAA | PCI |
 |---------|-------------------|-------|-----|
-| **Compute isolation** | Shared cluster (vCluster) | Dedicated cluster | Dedicated cluster |
-| **Network isolation** | Shared VNet, hub-peered spoke | Isolated VNet, no hub peering | CDE-segmented VNet |
+| **Compute isolation** | Shared cluster, namespace isolation (vCluster deferred — ADR-033) | Dedicated cluster | Dedicated cluster |
+| **Network isolation** | Shared VPC, TGW-connected | Isolated VPC, no TGW peering | CDE-segmented VPC |
 | **Encryption at rest** | Platform-managed keys | Customer-managed keys (CMK) | CMK + rotation policy |
 | **Host encryption** | Not required | Required | Required |
 | **API server access** | Private endpoint | Private endpoint | Private endpoint |
@@ -89,22 +89,19 @@ registry scoping, cross-team IRSA guard, RBAC hardening, `require-requests-limit
 `require-pod-security-restricted` (full Restricted PSS) and `require-ro-rootfs` (read-only root
 filesystem). HIPAA/PCI-specific packs beyond these are tracked for when those tiers are deployed.
 
-### vCluster for Standard Tier
+### Standard-Tier Isolation (Namespace; vCluster Deferred)
 
-> **Note:** vCluster tenant support is currently deferred (ADR-033) because the
-> open-source chart cannot sync custom resources (e.g., HTTPRoute) to the host
-> cluster. Standard-tier tenants use namespace isolation until this is resolved.
+Standard-tier workloads share physical clusters. Today, tenant isolation is **namespace-based** — a
+dedicated namespace per team with default-deny NetworkPolicies, resource quotas/limits, per-team RBAC,
+and per-team AWS access via Pod Identity (see [ADR-027](027-hybrid-tenant-isolation-model.md),
+[ADR-031](031-multi-app-tenant-model.md), [ADR-041](041-pod-identity-for-tenant-workloads.md)).
 
-Standard-tier workloads share physical clusters. Tenant isolation is provided by vCluster, which
-gives each tenant a virtual Kubernetes cluster with its own API server, control plane, and resource
-namespace. vClusters are CNCF-certified and provide:
+**vCluster** — a virtual cluster per tenant with its own API server and control plane — was the original
+design for stronger standard-tier isolation, but is **deferred**
+([ADR-033](033-defer-vcluster-tenant-support.md)): the OSS chart can't sync HTTPRoute and other CRDs to
+the host cluster. It remains the intended upgrade once that's resolved.
 
-- API server isolation (separate authentication and authorization)
-- Resource quotas and limit ranges per virtual cluster
-- Network policy isolation between virtual clusters
-- Independent CRD management
-
-HIPAA and PCI workloads bypass vCluster entirely and run on dedicated physical clusters.
+HIPAA and PCI workloads bypass shared isolation entirely and run on dedicated physical clusters.
 
 ### Tag Propagation
 
@@ -122,7 +119,8 @@ auditing by tag queries across the cloud estate.
 - Prescriptive controls — teams don't need to figure out what "HIPAA-compliant infrastructure"
   means; the tier definition prescribes it
 - Tag-based auditing — `ComplianceTier` tag on all resources enables automated compliance checks
-- vCluster provides strong isolation for standard-tier tenants without dedicated cluster overhead
+- Namespace isolation gives standard-tier tenants separation without dedicated-cluster overhead
+  (vCluster is the deferred stronger-isolation upgrade — ADR-033)
 
 **Negative:**
 
@@ -130,8 +128,8 @@ auditing by tag queries across the cloud estate.
   need to be defined and implemented.
 - The tier boundary is per-workload, not per-namespace or per-application. A single regulated
   application in a workload forces the entire workload to the higher tier.
-- vCluster adds operational complexity — virtual clusters must be managed, monitored, and upgraded
-  alongside the host cluster
+- Namespace isolation is weaker than per-tenant control-plane isolation; vCluster would close that gap
+  but adds its own operational complexity (a reason it's currently deferred — ADR-033)
 - Dedicated clusters for HIPAA/PCI multiply infrastructure cost and operational surface area
 
 **Risks:**
@@ -139,7 +137,7 @@ auditing by tag queries across the cloud estate.
 - If a workload is miscategorized (e.g., handling PHI but declared as `standard`), it runs on
   shared infrastructure without HIPAA controls. Mitigated by making `compliance_tier` a required
   field in `workload.hcl` and reviewing tier assignments during workload onboarding.
-- vCluster isolation, while strong, is not identical to physical cluster isolation. A vulnerability
-  in vCluster's syncer or the host cluster's control plane could theoretically cross tenant
-  boundaries. Mitigated by keeping vCluster updated and restricting standard-tier workloads to
-  non-regulated data.
+- Namespace isolation shares one control plane across tenants, so a control-plane or CNI vulnerability
+  could theoretically cross namespace boundaries — weaker than physical/vCluster isolation. Mitigated by
+  Kyverno admission hardening, default-deny NetworkPolicies, and keeping regulated data off shared
+  clusters.

@@ -18,18 +18,21 @@ mechanism today:
   `tailscale-admin` module and written to Secrets Manager, KMS keys created by the EKS module
   for envelope encryption. These are in Terraform state (encrypted via S3 KMS).
 - **Runtime.** Kubernetes workloads needing API keys, database credentials, and service tokens.
-  External Secrets Operator is deployed (ADR-019) with IRSA (ADR-018), but no SecretStore or
-  ClusterSecretStore CRDs exist yet. Legacy ExternalSecret templates in `charts/secrets/`
-  reference superseded patterns.
+  External Secrets Operator is deployed (ADR-019) with IRSA (ADR-018). *(At the time this ADR was
+  written no SecretStore/ClusterSecretStore CRDs existed and legacy ExternalSecret templates lived
+  in `charts/secrets/`; this ADR's decision has since been implemented — see Implementation Status
+  below — so the `secret-stores` module now deploys a ClusterSecretStore and the legacy chart is
+  removed.)*
 - **CI/CD.** GitHub Actions authenticates via OIDC federation to an IAM role — no static
   credentials. But CI needs to read secrets during deploy (e.g., Helm values referencing
   Secrets Manager paths).
 
-Several gaps exist in the current state. ESO's IRSA policy is over-permissioned — it can read
+At decision time several gaps existed. ESO's IRSA policy was over-permissioned — it could read
 all secrets in the platform account rather than being scoped to a path prefix. No naming
-convention exists for secrets, leading to inconsistent paths (`platform/tailscale/oauth` vs.
-ad hoc names). There is no defined pattern for workload accounts — when PreProd and Prod clusters
-come online, each will need its own ESO deployment, IRSA roles, and secret stores.
+convention existed for secrets, leading to inconsistent paths (`platform/tailscale/oauth` vs.
+ad hoc names). And there was no defined pattern for workload accounts — when PreProd and Prod
+clusters come online, each needs its own ESO deployment, IRSA roles, and secret stores. The
+decision below closes these gaps; what has shipped is tracked under Implementation Status.
 
 The workload accounts have a `restrict-iam-users` SCP that blocks `iam:CreateAccessKey` and
 `iam:CreateLoginProfile` — all identity must be federated. Prod has
@@ -158,8 +161,8 @@ denied, so static credentials cannot be created even accidentally.
 
 ### ESO IRSA Scoping
 
-The current ESO IRSA policy is over-permissioned. The updated policy scopes access to the
-account's secret path prefix:
+The ESO IRSA policy scopes access to the account's secret path prefix (implemented in
+`infra/modules/external-secrets/` as `secret:${var.secret_path_prefix}/*`):
 
 ```json
 {
@@ -213,6 +216,17 @@ The per-account isolation pattern maps directly to Azure:
 The ExternalSecret CRDs are identical across clouds — only the SecretStore backend
 configuration changes. This is the same portability model as Cilium (ADR-008) and ESO
 (ADR-019): cloud-agnostic workload interface, cloud-specific infrastructure backend.
+
+### Implementation Status
+
+| Element | Status |
+|---------|--------|
+| Path-scoped ESO IRSA (`secret:${prefix}/*`) | **Done** — `external-secrets` module, `var.secret_path_prefix` |
+| ClusterSecretStore (Secrets Manager + SSM backend) | **Done** — `secret-stores` module, deployed on platform **and** preprod |
+| Legacy `charts/secrets/` removed | **Done** |
+| Naming convention (`{owner}/{service}/{name}`) | **Adopted** for new secrets; not yet policy-enforced |
+| Per-namespace tenant `SecretStore` + scoped IRSA | **Pending** — lands with tenant secret onboarding |
+| Per-account ESO on Prod | **Pending** — Prod cluster not yet online |
 
 ## Consequences
 
