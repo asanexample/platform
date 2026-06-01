@@ -35,6 +35,19 @@ func TestEKS_BasicCluster(t *testing.T) {
 		},
 	}
 
+	// The CI workflow deliberately passes TEST_ROLE_ARN="" (OIDC auth uses vars.TEST_ROLE_ARN
+	// separately), so only add an access entry when a principal ARN is actually available — an
+	// empty principal_arn is rejected by the EKS API (InvalidParameterException). Mirrors the
+	// fixture provider's `test_role_arn != ""` guard. When a dev sets TEST_ROLE_ARN locally, the
+	// access entry + policy association are exercised too.
+	accessEntries := map[string]interface{}{}
+	if roleARN := testRoleARN(); roleARN != "" {
+		accessEntries["admin"] = map[string]interface{}{
+			"principal_arn": roleARN,
+			"policy_arn":    "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy",
+		}
+	}
+
 	baseVars := map[string]interface{}{
 		"create":                    true,
 		"vpc_name":                  "test-" + uniqueID + "-vpc",
@@ -44,13 +57,8 @@ func TestEKS_BasicCluster(t *testing.T) {
 		"kubernetes_version":        "1.35",
 		"enable_secrets_encryption": true,
 		"create_node_group":         false,
-		"access_entries": map[string]interface{}{
-			"admin": map[string]interface{}{
-				"principal_arn": testRoleARN(),
-				"policy_arn":    "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy",
-			},
-		},
-		"tags": map[string]string{"TestRun": uniqueID},
+		"access_entries":            accessEntries,
+		"tags":                      map[string]string{"TestRun": uniqueID},
 	}
 
 	// Phase 1: create cluster + install Cilium (no node groups)
@@ -104,6 +112,13 @@ func TestEKS_AddonsInPlan(t *testing.T) {
 	vpcCIDR := testVPCCIDR(0)
 
 	subnets := map[string]interface{}{
+		// A public subnet is required because the fixture enables NAT gateways (which must live in a
+		// public subnet); this also mirrors a realistic EKS VPC topology (public + private tiers).
+		"az1-public": map[string]interface{}{
+			"address_prefixes":  []string{subnetCIDR(0, "224/28")},
+			"availability_zone": testRegion() + "a",
+			"public":            true,
+		},
 		"az1-kubernetes": map[string]interface{}{
 			"address_prefixes":  []string{subnetCIDR(0, "0/26")},
 			"availability_zone": testRegion() + "a",
@@ -170,6 +185,13 @@ func TestEKS_GroupMappedAccessEntry(t *testing.T) {
 	vpcCIDR := testVPCCIDR(0)
 
 	subnets := map[string]interface{}{
+		// A public subnet is required because the fixture enables NAT gateways (which must live in a
+		// public subnet); this also mirrors a realistic EKS VPC topology (public + private tiers).
+		"az1-public": map[string]interface{}{
+			"address_prefixes":  []string{subnetCIDR(0, "224/28")},
+			"availability_zone": testRegion() + "a",
+			"public":            true,
+		},
 		"az1-kubernetes": map[string]interface{}{
 			"address_prefixes":  []string{subnetCIDR(0, "0/26")},
 			"availability_zone": testRegion() + "a",

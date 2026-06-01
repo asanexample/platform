@@ -9,10 +9,12 @@ locals {
     for k, v in var.subnets : k => v if !lookup(v, "public", false)
   } : {}
 
-  # single_nat_gateway: use only the first public subnet (alphabetically) for the shared NAT
+  # single_nat_gateway: use only the first public subnet (alphabetically) for the shared NAT.
+  # try() guards the index so an empty public_subnets set never produces a cryptic "Invalid index"
+  # at plan time — a missing public subnet is surfaced instead by the precondition on aws_vpc below.
   nat_subnets = local.create && var.create_nat_gateways ? (
     var.single_nat_gateway
-    ? { for k, v in local.public_subnets : k => v if k == keys(local.public_subnets)[0] }
+    ? { for k, v in local.public_subnets : k => v if k == try(keys(local.public_subnets)[0], "") }
     : local.public_subnets
   ) : {}
 
@@ -49,6 +51,17 @@ resource "aws_vpc" "this" {
   enable_dns_hostnames = true
 
   tags = merge(var.tags, { Name = var.vpc_name })
+
+  lifecycle {
+    # A NAT gateway must live in a public subnet. If NAT is requested but no public subnet
+    # (public = true) was provided, fail at plan with a clear message instead of a cryptic
+    # "Invalid index" (or silently creating no NAT). Attached here so it evaluates whenever the
+    # VPC is planned, without adding a separate state resource.
+    precondition {
+      condition     = !var.create_nat_gateways || length(local.public_subnets) > 0
+      error_message = "create_nat_gateways = true requires at least one public subnet (a var.subnets entry with public = true), but none were provided. NAT gateways must be placed in a public subnet."
+    }
+  }
 }
 
 resource "aws_vpc_ipv4_cidr_block_association" "secondary" {
