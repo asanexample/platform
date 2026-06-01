@@ -2,386 +2,129 @@
 
 ## Overview
 
-The Reference Platform implements a comprehensive security architecture that enforces defense-in-depth across all infrastructure components. This document outlines the security principles, design patterns, and controls implemented in the platform.
+The Reference Platform enforces **defense in depth** across the AWS infrastructure —
+from the AWS Organization down to individual pods. This document describes the security
+principles and the concrete AWS controls that implement them. (The platform is AWS-first;
+the same patterns would map to Azure/GCP equivalents when those clouds land — there is no
+Azure/GCP deployment today.)
 
 ## Security Principles
 
-The security architecture is guided by the following principles:
-
-1. **Defense in Depth**: Multiple layers of security controls throughout the infrastructure.
-2. **Least Privilege**: Access limited to only what's necessary for each component and user.
-3. **Secure by Default**: Conservative security settings as the starting point.
-4. **Identity-Based Security**: Strong identity controls as the foundation of security.
-5. **Encryption Everywhere**: Data encrypted both at rest and in transit.
-6. **Continuous Validation**: Regular testing and verification of security controls.
-
-## Security Components
-
-### Identity and Access Management
-
-The platform uses Azure's identity services as the foundation for security, implementing:
-
-#### Role-Based Access Control (RBAC)
-
-We implement RBAC through several modules:
-
-- The `storage_roles` module provides granular RBAC for Azure Storage resources:
-
-  ```hcl
-  module "storage_roles" {
-    source = "../../modules/azure/storage_roles"
-    storage_account_id = module.storage_account.id
-    role_assignments = [
-      {
-        principal_id         = data.azuread_group.developers.id
-        role_definition_name = "Storage Blob Data Contributor"
-        description          = "Grant write access to development team"
-      }
-    ]
-  }
-  ```
-
-- Key Vault access policies use RBAC to control access to secrets and certificates
-- AKS clusters implement Kubernetes RBAC integrated with Azure AD
-
-#### Managed Identities
-
-User-assigned managed identities are used extensively:
-
-- The `aks_identity` module creates and configures identities specifically for AKS clusters
-- The `identities` module creates general-purpose managed identities with appropriate role assignments
-- All modules that require identity use these managed identities rather than service principals with credentials
-
-#### Workload Identity
-
-For AKS clusters, we implement Azure Workload Identity for secure pod-based authentication:
-
-- Enables Kubernetes applications to access Azure resources using pod identity
-- Eliminates the need for secrets in pod configurations
-- Implemented through the `aks_core` module with federation configuration
-
-#### Multi-Factor Authentication
-
-- Admin access to all environments requires MFA through Azure Entra ID
-- CI/CD pipelines use service principals with strict scope limitations
-
-### Network Security
-
-#### Network Segmentation
-
-The platform implements network segmentation through:
-
-- Virtual networks with separate subnets for different workload types
-- Network security groups (NSGs) attached to each subnet
-- Application security groups for fine-grained control
-
-Example from the `networking` module:
-
-```hcl
-resource "azurerm_subnet" "subnet" {
-  for_each = var.subnets
-  
-  name                 = each.key
-  resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = [each.value.address_prefix]
-  service_endpoints    = try(each.value.service_endpoints, [])
-}
-
-resource "azurerm_network_security_group" "nsg" {
-  for_each = var.subnets
-  
-  name                = "${each.key}-nsg"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  
-  dynamic "security_rule" {
-    for_each = try(flatten([
-      for rule_name in each.value.security_rules : [
-        var.security_rules[rule_name]
-      ]
-    ]), [])
-    
-    content {
-      name                       = security_rule.value.name
-      priority                   = security_rule.value.priority
-      direction                  = security_rule.value.direction
-      access                     = security_rule.value.access
-      protocol                   = security_rule.value.protocol
-      source_port_range          = try(security_rule.value.source_port_range, "*")
-      destination_port_range     = try(security_rule.value.destination_port_range, "*")
-      source_address_prefix      = try(security_rule.value.source_address_prefix, "*")
-      destination_address_prefix = try(security_rule.value.destination_address_prefix, "*")
-    }
-  }
-}
-```
-
-#### Private Endpoints
-
-Azure PaaS services are accessed via private endpoints whenever possible:
-
-- The `private_dns` module creates private DNS zones for Azure services
-- Private endpoints are configured for:
-  - Azure Key Vault
-  - Azure Storage Accounts
-  - Azure Container Registry
-  - Azure Monitor resources
-
-Example for private DNS zones:
-
-```hcl
-module "private_dns" {
-  source = "../../modules/azure/private_dns"
-  resource_group_name = module.resource_group.name
-  zones = [
-    "privatelink.azurecr.io", 
-    "privatelink.vaultcore.azure.net",
-    "privatelink.blob.core.windows.net"
-  ]
-  vnet_links = {
-    "hub-vnet" = {
-      vnet_id = module.networking.vnet_id
-    }
-  }
-}
-```
-
-#### Network Policies
-
-For AKS clusters, network policies are implemented using:
-
-- Azure CNI networking
-- Calico network policies for pod-to-pod communication control
-- Ingress/egress rules defined at the pod level
-
-#### Edge Security
-
-Front Door is used as a security edge with:
-
-- WAF policies
-- DDoS protection
-- TLS termination
-- Private Link Service for backend connection
-
-### Data Protection
-
-#### Encryption at Rest
-
-All data storage services implement encryption at rest:
-
-- Azure Storage accounts use Azure-managed keys by default
-- Azure Key Vault can be configured with customer-managed keys
-- AKS etcd encryption is enabled through the `aks_core` module
-
-#### Encryption in Transit
-
-All communication uses TLS encryption:
-
-- Front Door enforces HTTPS with minimum TLS 1.2
-- Service-to-service communication uses TLS
-- AKS API Server communication is encrypted
-
-#### Key Management
-
-Azure Key Vault is used for centralized key management:
-
-```hcl
-module "key_vault" {
-  source = "../../modules/azure/key_vault"
-  
-  name                = "kv-platform-prod-eus"
-  resource_group_name = module.resource_group.name
-  location            = module.resource_group.location
-  
-  network_acls = {
-    default_action = "Deny"
-    bypass         = "AzureServices"
-    ip_rules       = []
-    subnet_ids     = [module.networking.subnet_ids["endpoints"]]
-  }
-  
-  access_policies = [
-    {
-      object_id     = module.client_config.object_id
-      certificate_permissions = ["Get", "List", "Create"]
-      key_permissions = ["Get", "List", "Create"]
-      secret_permissions = ["Get", "List", "Set"]
-    }
-  ]
-}
-```
-
-#### Secrets Management
-
-For secrets management, the platform uses:
-
-- Azure Key Vault for storing credentials and certificates
-- Managed identities to avoid storing credentials in code
-- Kubernetes CSI Driver integration for AKS pods
-
-### Monitoring and Detection
-
-#### Logging and Monitoring
-
-Comprehensive logging is implemented using:
-
-- `log_analytics` module for centralized log collection
-- `monitor_workspace` module for metrics storage
-- `prometheus_dcr` module for AKS metrics collection
-
-Example:
-
-```hcl
-module "log_analytics" {
-  source = "../../modules/azure/log_analytics"
-  name                = "log-platform-prod-eus"
-  resource_group_name = module.resource_group.name
-  location            = module.resource_group.location
-  retention_in_days   = 30
-  solutions           = ["ContainerInsights"]
-}
-```
-
-#### Threat Detection
-
-Security monitoring is implemented through:
-
-- Azure Security Center integration
-- Container insights for AKS
-- Network flow logs analysis
-- Azure Sentinel (optional, can be enabled as needed)
-
-#### Security Dashboards
-
-Visualization of security data is provided by:
-
-- `managed_grafana` module for custom security dashboards
-- Integration with Azure Monitor for alerting
-- Custom queries for threat detection
-
-```hcl
-module "managed_grafana" {
-  source = "../../modules/azure/managed_grafana"
-  name                = "grf-monitoring-prod-eus"
-  resource_group_name = module.resource_group.name
-  location            = module.resource_group.location
-  sku                 = "Standard"
-  
-  azure_monitor_workspace_integrations = [
-    {
-      workspace_id = module.monitor_workspace.id
-    }
-  ]
-}
-```
-
-## Security Controls by Environment
-
-The platform implements different security controls based on environment:
-
-### Development Environment
-
-- Network rules are more permissive to facilitate development
-- RBAC allows broader access for developers
-- Non-production data only
-
-### Production Environment
-
-- Strict network isolation with NSGs and private endpoints
-- Limited RBAC access on a need-to-know basis
-- Full monitoring and alerting
-- Regular security scanning and reviews
-
-## Implementation in Modules
-
-Security is integrated into each module:
-
-### Networking Security
-
-- NSGs with restrictive default rules
-- Service endpoints for Azure services
-- Network isolation between workloads
-
-### Storage Security
-
-- Public network access disabled by default
-- Private endpoints for secure access
-- Role-based access control via the `storage_roles` module
-
-### AKS Security
-
-- Azure AD integration
-- Network policies enabled
-- Pod managed identities
-- Control plane security with private API server
-
-### Key Vault Security
-
-- Network ACLs restricting access
-- RBAC-based access policies
-- Soft-delete and purge protection enabled
+1. **Defense in Depth** — multiple independent control layers (org SCPs → IAM → network →
+   admission → runtime).
+2. **Least Privilege** — purpose-built roles; humans operate but do not author (ADR-040).
+3. **Secure by Default** — private endpoints, default-deny NetworkPolicies, encryption on.
+4. **Identity-Based** — no long-lived credentials; federated identity everywhere.
+5. **Encryption Everywhere** — at rest (KMS/AES256) and in transit (TLS).
+6. **Continuous Validation** — admission policy (Kyverno), runtime detection (Falco), audit (CloudTrail).
+
+## Identity and Access Management
+
+- **AWS Organizations + SCPs** (ADR-003) — org-wide guardrails: no leaving the org, root
+  lockdown, mandatory encryption (EBS/S3/RDS), IMDSv2, region restriction, no IAM users,
+  protected audit services, `Team`-tag integrity. Exempt only for `OrganizationAccountAccessRole`,
+  `PlatformDeployer`, `github-actions-terratest`.
+- **IAM Identity Center (SSO)** — all human access is federated (no IAM users; the
+  `restrict-iam-users` SCP blocks `iam:CreateUser`/`CreateAccessKey`). Permission sets map to
+  groups (Admins, Developers, ReadOnly; per-team `Dev-<team>`).
+- **Purpose-built IAM roles** (ADR-007/039/040):
+  - `PlatformAdmin` (platform, preprod) — kubectl **operate/observe, not author**; AWS `ReadOnlyAccess`
+    plus a deny on secret/data exfil, and SSM-to-bastion only.
+  - `PlatformDeployer` (platform, preprod, test) — the Terragrunt/IaC apply role.
+  - `DeveloperAccess-<team>` (preprod) — per-team, namespace-scoped kubectl via group-mapped EKS
+    access entries + a `tenant-developer` RoleBinding.
+  - `OrganizationAccountAccessRole` — break-glass only.
+- **Pod-level AWS identity**: **IRSA** for platform add-ons (ADR-018), **EKS Pod Identity** for
+  tenant workloads (ADR-041) — short-lived STS credentials, no static keys, no cross-team annotation
+  (Kyverno backstops `disallow-irsa-annotation-cross-team`).
+- **GitHub Actions OIDC** (ADR-036) — keyless CI; per-team `github-actions-ecr-push-<team>` roles
+  scoped to that team's ECR repos.
+
+## Network Security
+
+- **Private EKS API endpoints** (ADR-010) — both clusters are private-only; access via **Tailscale**
+  subnet routers (ADR-011) or the **SSM bastion** (ADR-020). No SSH, no public API.
+- **Cilium NetworkPolicies** (ADR-008) — eBPF-enforced. Tenant namespaces are **default-deny ingress**
+  with explicit allows for the Gateway (`fromEntities: [ingress]`), DNS, and the Pod Identity agent;
+  egress to IMDS is blocked (node enforces IMDSv2 hop-limit=1).
+- **Gateway API ingress** (ADR-017/029) — Cilium Gateway with TLS (Let's Encrypt DNS-01). Platform uses
+  an **internal** NLB (Tailscale-only); preprod uses a **public** NLB. `LoadBalancer`/`NodePort` Services
+  are denied by Kyverno (Gateway-only ingress).
+- **VPC isolation** — non-overlapping per-env /16 CIDRs (ADR-015); cross-account connectivity only via
+  **Transit Gateway** (ADR-034) with security-group scoping; VPC Flow Logs to CloudWatch.
+
+## Data Protection
+
+- **Encryption at rest** — EKS secrets via **KMS** envelope encryption; CloudTrail S3 via KMS; tenant/
+  Mimir S3 via SSE-S3 (AES256); EBS encrypted by default (SCP-enforced).
+- **Encryption in transit** — TLS everywhere (Gateway termination, Hubble TLS, service-to-service).
+- **Secrets** (ADR-019/024/025/026) — AWS Secrets Manager as the source of truth; **External Secrets
+  Operator** (IRSA) syncs to Kubernetes; per-account isolation (no cross-account reads by default);
+  hierarchical naming; `PlatformAdmin` is **denied** `secretsmanager:GetSecretValue` (break-glass only).
+
+## Supply-Chain Security
+
+- **Image signing** (ADR-014 Phase 3) — app CI **cosign-signs** images keyless (GitHub OIDC →
+  Fulcio/Rekor); Kyverno `verify-images-team-<team>` admits only images signed by that team's workflow.
+- **SBOM + provenance** — CycloneDX SBOM + **SLSA Build L3** provenance (isolated `trusted-ci` signer,
+  ADR-042), required at admission by `verify-attestations-team-<team>` (Enforce on preprod).
+- **Per-team ECR scoping** (ADR-028) — `team-<team>/*` repos, immutable tags, scan-on-push.
+
+## Detection & Monitoring
+
+- **CloudTrail** (ADR-037) — per-account audit trail (log-file validation, KMS, CloudWatch); metric
+  filter/alarm on Secrets Manager activity.
+- **Falco** (ADR-045) — runtime threat detection (modern eBPF) on preprod.
+- **GuardDuty / Config / Security Hub / Access Analyzer** — protected from tampering by the
+  `protect-security-services` SCP.
+- **Observability** (ADR-043/044) — Prometheus + Grafana + durable Mimir + SNS alerting; **Hubble**
+  for network flow visibility.
+
+## Admission Policy (Kyverno)
+
+[Kyverno](https://kyverno.io/) (ADR-014) runs in **Enforce** on preprod and platform, layered above the
+Pod Security Admission `baseline` floor:
+
+- **Image provenance** — approved-registry + per-team `team-<name>/*` scoping; cosign signature +
+  attestation verification.
+- **Pod hardening** — `mutate` injects `securityContext`/`automountServiceAccountToken: false`;
+  backstops deny privilege-escalation and `seccompProfile: Unconfined`.
+- **Multi-tenancy** — route-hostname allow-lists (anti-squatting, ADR-029), `LoadBalancer`/`NodePort`
+  denial, no `default` namespace, cross-team IRSA-annotation guard, RBAC hardening (no `cluster-admin`,
+  no wildcard verbs), required requests/limits + probes + labels.
+
+Full per-cluster list: [Kyverno policy catalog](../../docs/architecture/kyverno-policy-catalog.md).
 
 ## Compliance Tier Enforcement
 
-Security controls are applied based on the `compliance_tier` declared in each workload's `workload.hcl`. The tier determines the isolation model and mandatory controls:
+Security controls scale with the `compliance_tier` in each workload's `workload.hcl` (ADR-013):
 
 ### Standard (SOC2)
 
-- Shared AKS clusters with **vCluster** isolation (CNCF-certified virtual clusters)
-- Spoke VNets peered to a central hub
-- RBAC, private endpoints, and audit logging enabled by default
+- Shared cluster with **namespace isolation** (vCluster deferred, ADR-033) — per-team namespace,
+  ResourceQuota, LimitRange, default-deny NetworkPolicies, namespace-scoped RBAC.
+- Private endpoints, audit logging, Kyverno Enforce.
 
 ### HIPAA
 
-- **Dedicated AKS cluster** (no shared tenancy)
-- Isolated VNet with no hub peering by default
-- Customer-managed key (CMK) encryption for all data at rest
-- Host encryption enabled on all node pools
-- Private cluster (no public API server endpoint)
-- 365-day log retention
+- **Dedicated cluster** (no shared tenancy), isolated VPC.
+- Customer-managed KMS keys, host encryption, private API, 365-day log retention.
+- Kyverno **restricted** PSS + read-only root filesystem + `runAsNonRoot` (tier-gated policies).
 
 ### PCI
 
-- **Dedicated AKS cluster** with all HIPAA controls, plus:
-- CDE-segmented VNet with strict boundary controls
-- WAF enforced on all ingress paths
-- IDS/IPS enabled
-- Deny-all default network policy (explicit allow required)
+- All HIPAA controls plus a CDE-segmented VPC, WAF on ingress, IDS/IPS, and a deny-all default
+  network policy.
 
-## vCluster Isolation Model
+> HIPAA/PCI tiers are designed but **not yet deployed** — both live clusters are `standard`.
 
-Standard-tier workloads share physical clusters. Tenant isolation is provided by **vCluster**, which gives each team a virtual Kubernetes cluster with its own API server, control plane, and resource namespace. vClusters are CNCF-certified and provide:
+## Future Enhancements
 
-- API server isolation (separate authentication and authorization)
-- Resource quotas and limit ranges per virtual cluster
-- Network policy isolation between virtual clusters
-- Independent CRD management
-
-HIPAA and PCI workloads bypass vCluster entirely and run on dedicated physical clusters.
-
-## Kyverno Policy Guardrails
-
-[Kyverno](https://kyverno.io/) is deployed as a policy engine on all clusters to enforce security guardrails at admission time:
-
-- **Image provenance**: Only images from approved registries (the platform ECR) are admitted, scoped
-  per-team so a tenant namespace may only run its own `team-<name>/*` images
-- **Pod security**: Enforce restricted pod security standards (no privileged containers, no host networking)
-- **Label requirements**: Workload and compliance-tier labels required on all namespaces
-- **Network policy enforcement**: Every namespace must have a default-deny network policy (mandatory for PCI, recommended for all tiers)
-- **Resource limits**: All pods must declare resource requests and limits
-
-Policies are deployed as Kyverno `ClusterPolicy` resources and are version-controlled alongside infrastructure code.
-
-## Future Security Enhancements
-
-While the current implementation provides a solid security foundation, future enhancements will include:
-
-1. Integration with security scanning tools (tfsec, checkov)
-2. Comprehensive compliance mapping for SOC2 and ISO 27001
-3. Enhanced security testing frameworks
-4. Automated security validation in CI/CD pipelines
+- Shift-left scanning depth (Trivy/Semgrep already in CI; expand SCA/cost-of-ownership).
+- Comprehensive SOC2/ISO 27001 control mapping (started — see
+  [SCP control mapping](../../docs/compliance/scp-control-mapping.md)).
+- Automated security validation gates in CI.
 
 ## Next Steps
 
-Continue to [Compliance Framework](10-compliance-framework.md) to understand how the security architecture addresses compliance requirements.
+Continue to [Compliance Framework](10-compliance-framework.md).
