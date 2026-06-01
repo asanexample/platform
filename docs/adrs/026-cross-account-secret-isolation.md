@@ -6,8 +6,9 @@
 
 ## Context
 
-The organization has 5 AWS accounts spanning two OUs: the Platform OU (management, platform) and
-the Workloads OU (preprod, prod), with a Regulated OU reserved for HIPAA-scoped workloads. Each
+The organization has 5 AWS accounts: the **management** account at the org root, the **Platform OU**
+(platform, test), and the **Workloads OU** (preprod, prod) with a **Workloads/Regulated** child OU
+reserved for HIPAA-scoped workloads. Each
 workload account will eventually host its own EKS cluster with its own External Secrets Operator
 deployment (ADR-019). The question is whether secrets should be centralized — one account holds
 all secrets, others read cross-account — or isolated, with each account owning its own secrets.
@@ -115,12 +116,16 @@ No other cross-account pattern is permitted without an ADR amendment.
 
 Existing SCPs reinforce per-account isolation without requiring new policies:
 
-- **restrict-iam-users** (Workloads OU): no long-lived credentials. IRSA is the only
-  authentication path for ESO, and IRSA trust policies are inherently single-account.
-- **enforce-encryption**: ensures Secrets Manager uses KMS encryption at rest. Each account's
-  KMS key is account-scoped — cross-account decryption would require an additional KMS key
-  policy grant, adding another layer that must be explicitly opened.
-- **ProtectKmsKeys**: prevents key deletion, ensuring secrets remain recoverable.
+- **restrict-iam-users** (Workloads OU): no long-lived credentials (`iam:CreateUser`,
+  `iam:CreateAccessKey`, `iam:CreateLoginProfile` denied). IRSA is the only authentication path
+  for ESO, and IRSA trust policies are inherently single-account.
+- **enforce-encryption** (root, org-wide): enforces KMS encryption at rest for EBS, S3, and RDS
+  and includes the `ProtectKmsKeys` statement. Secrets Manager is KMS-encrypted by default
+  regardless; the per-account isolation here rests on each account's KMS key being account-scoped,
+  so cross-account decryption would require an additional KMS key-policy grant — another layer that
+  must be explicitly opened.
+- **ProtectKmsKeys** (a statement within `enforce-encryption`): prevents key deletion/disable,
+  ensuring secrets remain recoverable.
 
 ### Prod-Specific Controls
 
@@ -169,8 +174,9 @@ Prod's `DataClassification=Confidential` tag triggers additional controls:
 
 - Teams attempting to work around isolation by hardcoding secrets in Git, passing values through
   Terraform outputs, or storing credentials in SSM Parameter Store (which may have different
-  IAM policies). Mitigated by SCPs preventing `ssm:PutParameter` for paths outside the naming
-  convention (ADR-025), code review policies, and onboarding documentation.
+  IAM policies). Mitigated by path-scoped IRSA policies (ADR-025 naming convention), code review,
+  and onboarding documentation. (There is no SCP restricting `ssm:PutParameter` by path today —
+  SSM-path enforcement would be a future Kyverno/CI control, not an org guardrail.)
 - The registry exception creates a precedent that teams may try to expand. Each exception request
   must go through the same ADR amendment process. The exception is scoped to read-only access
   for a specific secret path, not a blanket cross-account trust.
