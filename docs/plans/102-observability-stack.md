@@ -1,7 +1,12 @@
 # #102 — Observability stack (metrics, logs, traces, profiles, cost, cloud resources) — hub-and-spoke, phased
 
-> **Status:** Design approved, implementation not started. Parked to do a small task first; resume at
-> "Execution order". Tracking issue: [#102](https://github.com/asanexample/platform/issues/102).
+> **Status:** **P1 (kube-prometheus-stack hub: Grafana + metrics + dashboards + SNS alerting) and P2
+> (Grafana Mimir — durable, S3-backed, multi-tenant metrics) are DONE and live on the platform hub**
+> (ADR-043, ADR-044; merged through PR #147). As-built reference:
+> [observability-current-state.md](../architecture/observability-current-state.md). Remaining phases
+> (P3 logs/traces via Loki/Tempo, P4 curated alerts, P5 cloud-resource metrics, P10 spoke onboarding,
+> cost, and the Grafana SSO fast-follow) are below. Tracking issue:
+> [#102](https://github.com/asanexample/platform/issues/102).
 
 ## Context
 

@@ -1,9 +1,11 @@
 # SLSA Build L3 — isolated provenance via slsa-github-generator (#131)
 
-> **Status:** **P1 DONE + verified (2026-05-30).** P0 ruled out the off-the-shelf generator for ECR;
-> P1 built the custom isolated signer (`asanexample/trusted-ci`) and dual provenance in app CI. P2–P4
-> not started; best landed with (or after) the from-scratch rebuild, or strictly Audit-first.
-> Tracking issue: [#131](https://github.com/asanexample/platform/issues/131). Design: ADR-042.
+> **Status:** **P1–P3 DONE on preprod — Build L3 achieved (2026-05-30).** P0 ruled out the off-the-shelf
+> generator for ECR; P1 built the custom isolated signer (`asanexample/trusted-ci`); P2/P3 dropped the
+> app's hand-authored provenance so trusted-ci is the **sole** provenance signer and flipped Kyverno
+> `verify-attestations` to **Enforce** requiring it. **P4 (replicate to the platform cluster) is the
+> remaining step.** Tracking issue: [#131](https://github.com/asanexample/platform/issues/131).
+> Design: ADR-042.
 >
 > **P1 as-built note (differs from the original plan):** AWS does **not** honor the OIDC
 > `job_workflow_ref` claim as an IAM trust condition (only `sub`/`aud`), so the planned shared

@@ -1,5 +1,11 @@
 # SLSA L3 provenance cutover — working handoff (updated 2026-05-30 ~18:25 PT)
 
+> **✅ COMPLETE (2026-05-30).** The cutover is done: app-alpha emits trusted-ci as its **sole** provenance
+> signer and preprod Kyverno `verify-attestations` is in **Enforce** requiring it — **Build L3 achieved on
+> preprod**. The permanent record is [ADR-042](../adrs/042-isolated-build-provenance-slsa-l3.md) and the
+> [#131 plan](131-slsa-build-l3.md); the only remaining step is P4 (replicate to the platform cluster).
+> This handoff is retained for history and can be deleted once P4 lands. The original working notes follow.
+
 **Resume:** read this file first. The dual-provenance blocker is being resolved by cutting over to a
 SINGLE trusted-ci provenance identity. Most of the rollout is DONE; we're at the verify-and-flip stage.
 
