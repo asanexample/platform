@@ -267,5 +267,7 @@ module, so app repos stay minimal — they declare their resources and nothing p
 - **Resource exhaustion from concurrent PRs.** Each preview creates ~2 pods (200m CPU, 256Mi).
   The default quota (4 CPU, 20 pods) limits to ~10 concurrent previews per team. Teams with high
   PR volume may need quota increases.
-- **Broad ECR push scope.** The single `github-actions-ecr-push` OIDC role can push to all team
-  repos. Acceptable for the current scale; production should use per-team roles.
+- **Per-team ECR push scope.** Push access uses one OIDC role per team
+  (`github-actions-ecr-push-<team>`), each trusting only that team's repo and scoped to that team's
+  `team-<team>/*` repositories (ADR-036). A compromised CI workflow for one team cannot push to
+  another team's images.
