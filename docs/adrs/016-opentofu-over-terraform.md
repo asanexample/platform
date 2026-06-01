@@ -7,7 +7,7 @@
 ## Context
 
 The platform needs an infrastructure-as-code execution engine to provision and manage cloud
-resources across AWS, Azure, and GCP. HashiCorp Terraform has been the industry standard for
+resources on AWS (with Azure/GCP planned). HashiCorp Terraform has been the industry standard for
 multi-cloud IaC since 2014, but in August 2023 HashiCorp changed Terraform's license from the
 Mozilla Public License 2.0 (MPL-2.0) to the Business Source License 1.1 (BSL-1.1).
 
@@ -55,7 +55,7 @@ terraform_binary = "tofu"
 
 ### Compatibility
 
-OpenTofu 1.6+ is a drop-in replacement for Terraform 1.6.x:
+OpenTofu (currently **v1.11**, floor `>= 1.6.0`) is a drop-in replacement for Terraform 1.6.x:
 
 - All existing HCL modules work without modification
 - Provider lock files use `registry.opentofu.org` but resolve the same provider binaries
@@ -70,7 +70,7 @@ Tailscale). Lock files reference the OpenTofu registry:
 
 ```hcl
 provider "registry.opentofu.org/hashicorp/aws" {
-  version = "6.0.0"
+  version = "6.47.0"
 }
 ```
 
