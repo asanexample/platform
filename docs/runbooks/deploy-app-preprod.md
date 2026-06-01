@@ -339,20 +339,22 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/github-actions-ecr-push
+          # Per-team push role (ADR-036, #60) — trusts only this team's repo, pushes only to team-alpha/*
+          role-to-assume: arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/github-actions-ecr-push-alpha
           aws-region: us-east-1
 
       - name: Login to ECR
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push
+      - name: Build and push (immutable tag only — never :latest)
         run: |
-          IMAGE_TAG="${{ github.sha }}"
+          IMAGE_TAG="${{ github.sha }}"     # explicit, immutable tag — Kyverno denies :latest
           docker build -t $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG .
-          docker build -t $ECR_REGISTRY/$ECR_REPO:latest .
           docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPO:latest
+      # NOTE: this snippet omits signing. The image must be cosign-signed (+ SBOM + SLSA provenance)
+      # to pass admission (verify-images/verify-attestations are in Enforce on preprod). Wire that in
+      # per docs/runbooks/app-supply-chain-onboarding.md — see app-alpha/.github/workflows/deploy.yml.
 ```
 
 ### Manual Push (Local)
@@ -468,7 +470,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/github-actions-ecr-push
+          # Per-team push role (ADR-036). The team's role trusts pull_request events too (github_events).
+          role-to-assume: arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/github-actions-ecr-push-alpha
           aws-region: us-east-1
 
       - name: Login to ECR
@@ -481,8 +484,9 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
 ```
 
-The preview workflow only builds and pushes the image. The
-ApplicationSet handles deployment — no manifest updates needed.
+The preview workflow only builds and pushes the image (which must also be
+cosign-signed to pass admission — see the note in the main build workflow above).
+The ApplicationSet handles deployment — no manifest updates needed.
 
 ### Checking Preview Status
 
