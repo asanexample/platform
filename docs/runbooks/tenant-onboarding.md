@@ -118,7 +118,9 @@ locals {
 
     # NEW: Add your team here
     charlie = {
-      mode = "namespace"
+      mode      = "namespace"
+      hostnames = ["api.preprod.aws.refplat.org"] # REQUIRED for ingress — Kyverno denies HTTPRoutes
+                                                  # whose hostname isn't in this allow-list (ADR-029)
       apps = {
         api = {
           repo_url  = "https://github.com/asanexample/app-charlie"
@@ -126,6 +128,10 @@ locals {
           preview   = true
         }
       }
+      # OPTIONAL: per-team AWS access via EKS Pod Identity (ADR-041). Declaring an `aws` block
+      # provisions a Pod-team-charlie role + scoped buckets; apply the `pod-identity` (preprod) and
+      # `s3-shared` (platform) units after `tenants`. See tenant-aws-access-pod-identity.md.
+      # aws = { service_account = "app-charlie", s3 = { "data" = { access = "read", prefix = "" } } }
     }
   }
 
@@ -136,8 +142,11 @@ locals {
 
 Each team can have multiple apps. Each app entry has `repo_url` and `repo_path`
 telling ArgoCD where to find the Kubernetes manifests. Set `preview = true` to
-enable PR preview environments (see ADR-032). Confirm these values with the team
-before proceeding.
+enable PR preview environments (see ADR-032). The team-level **`hostnames`** list is
+the Gateway allow-list enforced by Kyverno (ADR-029) — **omitting it means every
+HTTPRoute the team creates is rejected at admission**, so capture the team's hostnames
+up front. The optional `aws` block grants per-team AWS access via Pod Identity (ADR-041).
+Confirm these values with the team before proceeding.
 
 Teams with multiple services add multiple app entries:
 
@@ -249,6 +258,14 @@ terragrunt apply
 | `github-oidc` | platform | Updates OIDC trust policy to include new repo |
 | `argocd-apps` | platform | ArgoCD Application targeting the team's Git repo |
 
+> **If the team declared an `aws` block** (Pod Identity), also apply the **`pod-identity`** unit
+> (preprod — creates the `Pod-team-<team>` role + association) and **`s3-shared`** unit (platform —
+> the cross-account buckets, if used). See [tenant-aws-access-pod-identity.md](tenant-aws-access-pod-identity.md).
+>
+> **App images must be cosign-signed** to pass admission (`verify-images`/`verify-attestations` on
+> preprod). Onboard the app's CI per [app-supply-chain-onboarding.md](app-supply-chain-onboarding.md)
+> (build → push → `cosign sign` keyless → SBOM + SLSA provenance attestations).
+
 ### Step 5: Add the Team's SSO Permission Set + Group (IaC)
 
 Identity Center is managed as code. Edit
@@ -325,7 +342,8 @@ kubectl get networkpolicy -n team-charlie
 # (allow-dns-egress denies egress to 169.254.169.254/32 — the IMDS endpoint)
 
 kubectl get ciliumnetworkpolicy -n team-charlie
-# Expected: allow-gateway-envoy
+# Expected: allow-gateway-envoy, allow-pod-identity-egress (the latter lets pods reach the
+# Pod Identity agent for AWS creds — ADR-041)
 ```
 
 ### Pod Security Admission Labels
