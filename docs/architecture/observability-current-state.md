@@ -131,8 +131,8 @@ gp3 is the cluster-**default** StorageClass (encrypted, expandable, WaitForFirst
 ## Status notes
 
 - **P2 Step 3** (Prometheus `remote_write` → Mimir + Prometheus/Alertmanager on gp3 PVCs + Mimir as the
-  default datasource) is **applied and live on the cluster**; its code is finalizing in **PR #147** (a helm
-  release-bookkeeping reconcile + a known prometheus-operator webhook-latency gotcha — see the
-  [troubleshooting runbook](../runbooks/observability-troubleshooting.md)).
+  default datasource) is **applied and live on the cluster**, and its code is **merged (PR #147)**. The
+  one known wrinkle was a prometheus-operator webhook-latency gotcha during the helm reconcile — see the
+  [troubleshooting runbook](../runbooks/observability-troubleshooting.md).
 - **Single-replica everywhere** (`high_availability = false`) — appropriate for a reference cluster. Each
   module has an `high_availability` toggle that scales to multi-replica/RF3 when a cluster has the capacity.
