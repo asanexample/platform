@@ -12,8 +12,8 @@ reusable modules, cloud-specific live configurations, and automated tests.
 |------|------|
 | [OpenTofu](https://opentofu.org/) >= 1.6.0 | Infrastructure definition and provisioning (open-source Terraform fork) |
 | [Terragrunt](https://terragrunt.gruntwork.io/) | DRY configuration, remote state, dependency orchestration, provider generation |
-| [Terratest](https://terratest.gruntwork.io/) | Go-based infrastructure testing (AWS) |
-| `terraform test` | Native `.tftest.hcl` testing (Azure) |
+| [Terratest](https://terratest.gruntwork.io/) | Go-based infrastructure testing (all modules) |
+| [platctl](../../docs/adrs/038-platctl-cli-for-platform-operations.md) | DAG-aware Go CLI for bootstrap/teardown/validate (ADR-038) |
 
 All modules use the `tofu` binary, not `terraform`. This is configured in
 `infra/root.hcl`.
@@ -22,51 +22,23 @@ All modules use the `tofu` binary, not `terraform`. This is configured in
 
 ```text
 infra/
-├── modules/                        # Reusable modules
-│   ├── aws/                        # AWS-specific (12 modules)
-│   │   ├── eks/
-│   │   ├── networking/
-│   │   ├── organizations/
-│   │   └── ...
-│   ├── azure/                      # Azure-specific (24 modules)
-│   │   ├── aks_core/
-│   │   ├── networking/
-│   │   └── ...
-│   ├── gcp/                        # GCP-specific (2 modules)
-│   │   ├── naming/
-│   │   └── networking/
+├── modules/                        # Reusable modules (AWS only today; azure/, gcp/ planned)
+│   ├── aws/                        # AWS-specific (eks, networking, organizations, ecr, ...)
 │   ├── cloudflare/                 # DNS delegation
-│   ├── cilium/                     # Shared: CNI
-│   ├── argocd/                     # Shared: GitOps
-│   ├── cert-manager/               # Shared: TLS
-│   ├── external-dns/               # Shared: DNS sync
-│   ├── external-secrets/           # Shared: secret injection
-│   ├── tailscale/                  # Shared: VPN operator
-│   ├── tailscale-admin/            # Shared: tailnet config
-│   ├── gateway-config/             # Shared: ingress
-│   ├── policy/                     # Shared: Kyverno
-│   └── vcluster/                   # Shared: virtual clusters
+│   ├── cilium/  argocd/  argocd-apps/   # Shared (cloud-agnostic) modules:
+│   ├── cert-manager/  external-dns/  external-secrets/  secret-stores/
+│   ├── tailscale/  tailscale-admin/  gateway-config/
+│   ├── policy/  observability/  observability-mimir/
+│   ├── tenant/  cluster-rbac/  eks-pod-identity/
+│   └── vcluster/                   # deferred (ADR-033)
 ├── live/                           # Environment-specific configs
-│   ├── aws/
-│   │   ├── _base.hcl              # Config composer
-│   │   ├── _versions.hcl          # Module sources + Helm pins
-│   │   ├── common.hcl             # Cloud-level defaults
-│   │   ├── mgmt/                  # Management account
-│   │   ├── platform/              # Platform account
-│   │   ├── preprod/               # Pre-production
-│   │   └── prod/                  # Production
-│   ├── azure/
-│   │   ├── _base.hcl
-│   │   ├── _versions.hcl
-│   │   ├── _envcommon/            # Shared module defaults
-│   │   ├── dev/
-│   │   └── ops/
-│   └── gcp/
-│       ├── _base.hcl
-│       └── ops/                   # Scaffolded, not deployed
+│   └── aws/                        # only cloud deployed (live/azure, live/gcp are planned)
+│       ├── _base.hcl              # Config composer
+│       ├── _versions.hcl          # Module sources + Helm pins
+│       ├── common.hcl             # Cloud-level defaults (loads secrets.hcl)
+│       ├── mgmt/  platform/  preprod/  prod/  test/   # 5 accounts
 ├── tests/
-│   ├── aws/                       # Terratest (Go)
-│   └── modules/azure/             # Native .tftest.hcl
+│   └── aws/                       # Terratest (Go)
 └── docs/                          # This documentation
 ```
 
@@ -75,7 +47,7 @@ infra/
 **Modules** (`infra/modules/`) are reusable, parameterized components.
 They accept variables, create resources, and produce outputs. Modules
 are cloud-agnostic where possible (Cilium, ArgoCD) or cloud-specific
-where necessary (EKS, AKS).
+where necessary (EKS, networking, IAM).
 
 **Live configs** (`infra/live/`) are environment-specific Terragrunt
 units that compose modules with concrete values. Each `terragrunt.hcl`
@@ -88,20 +60,20 @@ Kubernetes manifests that work on any cluster. They accept OAuth
 credentials, IRSA role ARNs, or other identity primitives as variables
 -- the live unit handles sourcing these from cloud-specific stores.
 
-Cloud-specific modules live under `infra/modules/{aws,azure,gcp}/` and
-use cloud-native resources (VPCs, AKS clusters, IAM roles, etc.).
+Cloud-specific modules live under `infra/modules/aws/` today (`azure/`, `gcp/`
+planned) and use cloud-native resources (VPCs, EKS clusters, IAM roles, etc.).
 
 ## Configuration Hierarchy
 
-Terragrunt uses a 7-layer configuration hierarchy that composes values
-from broad defaults down to module-specific overrides:
+Terragrunt uses a 6-layer configuration hierarchy that composes values from broad
+defaults down to unit-specific overrides (`_versions.hcl` and `_base.hcl` are
+supporting files, not layers):
 
 ```text
-root.hcl          → State backend, providers, OpenTofu binary
-common.hcl        → Cloud-wide tags, account/subscription maps
-_versions.hcl     → Module source paths, Helm chart version pins
+root.hcl          → State backend (S3), AWS provider, OpenTofu binary
+common.hcl        → Cloud-wide tags, account map (loads secrets.hcl)
 env.hcl           → Account ID, environment name, env tags
-region.hcl        → Region name, AZs
+region.hcl + network.hcl → Region name, AZs, CIDRs
 workload.hcl      → Workload name, compliance tier
 terragrunt.hcl    → Module source, dependencies, inputs
 ```
@@ -153,7 +125,7 @@ module_source = {
 }
 
 helm_versions = {
-  cilium             = "1.17.2"
+  cilium             = "1.19.4"
   argocd             = "9.5.14"
   cert_manager       = "1.17.1"
   # ...
@@ -184,23 +156,23 @@ dependency "eks" {
 `terragrunt run --all apply` resolves the full DAG and deploys in
 order. `terragrunt run --all destroy` reverses the graph.
 
-See the AWS and Azure dependency graphs in
+See the AWS deployment dependency graph in
 [Architecture Overview](02-architecture-overview.md).
 
 ## State Management
 
-State is routed automatically by `root.hcl` based on the cloud directory:
+`root.hcl` configures the backend (unconditionally S3 today; the `_cloud`
+detection seam is kept for future multi-cloud routing):
 
 | Cloud | Backend | Location |
 |-------|---------|----------|
-| AWS | S3 + DynamoDB | `tfstate-mgmt-<MGMT_ACCOUNT_ID>`, `terraform-locks` |
-| Azure/GCP | Azure Blob | `tfstatemulticloud`, `terraformstate` container |
+| AWS | S3 + DynamoDB | state bucket (from `secrets.hcl`) in us-east-1, `terraform-locks` |
 
 State keys mirror the directory structure:
 `live/aws/platform/us-east-1/platform/eks/terraform.tfstate`.
 
 For details, see
-[Configuration Hierarchy: Cloud-Aware Remote State Routing](../../docs/architecture/config-hierarchy.md#cloud-aware-remote-state-routing).
+[Configuration Hierarchy: Remote State Routing](../../docs/architecture/config-hierarchy.md#remote-state-routing).
 
 ## Development Workflow
 
@@ -228,13 +200,10 @@ terragrunt run --all apply
 ### Testing
 
 ```bash
-# AWS (Terratest)
+# Terratest (Go) — per module
 cd infra/tests/aws
 go test -v -timeout 30m ./networking/...
-
-# Azure (native)
-cd infra/tests/modules/azure/aks_core
-terraform init && terraform test
+go test -v -timeout 40m ./eks/...
 ```
 
 For the full testing strategy, see [Testing Strategy](15-testing-strategy.md).
