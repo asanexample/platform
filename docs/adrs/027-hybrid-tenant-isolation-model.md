@@ -130,7 +130,8 @@ Teams are declared in `teams.hcl` at the environment level:
 locals {
   teams = {
     alpha = {
-      mode = "namespace"
+      mode      = "namespace"
+      hostnames = ["demo.preprod.aws.refplat.org"] # Gateway allow-list (ADR-029)
       apps = {
         demo = {
           repo_url  = "https://github.com/asanexample/app-alpha"
@@ -138,9 +139,14 @@ locals {
           preview   = true
         }
       }
+      aws = { # per-team AWS access via EKS Pod Identity (ADR-041)
+        service_account = "app-alpha"
+        s3              = { "data" = { access = "read", prefix = "" } }
+      }
     }
     bravo = {
-      mode = "namespace"
+      mode      = "namespace"
+      hostnames = ["demo-bravo.preprod.aws.refplat.org"]
       apps = {
         demo = {
           repo_url  = "https://github.com/asanexample/app-bravo"
@@ -155,7 +161,9 @@ locals {
 
 > **Note:** The data model was updated from one-app-per-team to multi-app in
 > ADR-031. Each team now has a nested `apps` map. The `preview` flag enables
-> PR preview environments (ADR-032).
+> PR preview environments (ADR-032). `hostnames` is the team's Gateway hostname
+> allow-list enforced by Kyverno (ADR-029); the optional `aws` block grants
+> per-team AWS access via EKS Pod Identity (ADR-041).
 
 The `tenants` Terragrunt unit reads this file and passes the team map to the tenant module. Mode
 selection filters happen inside the module — `namespace_tenants` and `vcluster_tenants` are
@@ -229,7 +237,8 @@ CNI, nodes, and Gateway are all ready before tenant resources are created.
   (`enforce=baseline`) blocks the privileged/hostPath/hostNetwork pods that would let a tenant escape
   to a node, and developer RBAC is namespace-scoped (cannot create cluster-scoped resources or CRDs).
   Richer policy (image provenance/per-team registry scoping, RBAC hardening, cross-team IRSA guard)
-  is provided by **Kyverno (ADR-014), now deployed (Phase 1)** layered above the PSA `baseline` floor.
+  is provided by **Kyverno (ADR-014), deployed and in Enforce mode on preprod and platform**,
+  layered above the PSA `baseline` floor.
 - ResourceQuota defaults (4 CPU, 8Gi, 20 pods) may be too restrictive for some teams or too
   generous for others. These are configurable per-team via the `resource_quota` field in the
   tenant map, but require platform team intervention to adjust.
