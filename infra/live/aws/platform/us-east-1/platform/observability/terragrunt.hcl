@@ -86,9 +86,13 @@ inputs = {
 
   # Reference cluster — single-replica. Flip to true for prod / capacity-rich clusters (needs >=3 nodes / 2-3 AZs).
   high_availability = false
-  # No usable default StorageClass on platform (only the deprecated in-tree gp2) — interim local Prometheus
-  # is fine on emptyDir; Mimir becomes the durable store at P2.
-  use_persistent_storage = false
+  # Prometheus + Alertmanager on durable gp3 PVCs (the eks-addons gp3 default StorageClass, #102 P2).
+  use_persistent_storage = true
+  storage_class          = "gp3"
+
+  # Ship metrics to Mimir for durable, long-range storage (#102 P2). Tenant = platform (the hub's own
+  # metrics). Setting this also makes the Mimir datasource Grafana's default (Prometheus stays selectable).
+  mimir_remote_write_url = "http://mimir-gateway.observability.svc/api/v1/push"
 
   # Alertmanager → SNS (critical alerts → email)
   oidc_provider_arn = dependency.eks.outputs.oidc_provider_arn

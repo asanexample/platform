@@ -24,6 +24,23 @@ locals {
     }
   } : null
 
+  alertmanager_storage_spec = var.use_persistent_storage ? {
+    volumeClaimTemplate = {
+      spec = {
+        storageClassName = var.storage_class
+        accessModes      = ["ReadWriteOnce"]
+        resources        = { requests = { storage = "5Gi" } }
+      }
+    }
+  } : null
+
+  # Prometheus -> Mimir remote_write (durable multi-tenant store, #102 P2). Empty url = off (P1 behaviour);
+  # the X-Scope-OrgID header stamps the hub's own metrics into the tenant.
+  prometheus_remote_write = var.mimir_remote_write_url != "" ? [{
+    url     = var.mimir_remote_write_url
+    headers = { "X-Scope-OrgID" = var.mimir_tenant_id }
+  }] : []
+
   # Alertmanager routing: critical → SNS, Watchdog → null (external heartbeat is a P4 follow-up),
   # everything else → null. Only wired when an SNS topic + IRSA are present.
   alertmanager_config = {
@@ -78,6 +95,10 @@ locals {
       prometheusSpec = {
         replicas  = var.high_availability ? 2 : 1
         retention = var.prometheus_retention
+        # Tag every series with the source cluster (needed once spokes remote_write to the same Mimir).
+        externalLabels = { cluster = var.cluster_name }
+        # Ship to Mimir for durable, long-range storage (empty when no Mimir url is set).
+        remoteWrite = local.prometheus_remote_write
         # Pick up ServiceMonitors / PodMonitors / Rules cluster-wide, not just chart-labelled ones
         # (so the per-component ServiceMonitors below — and future ones — are scraped).
         serviceMonitorSelectorNilUsesHelmValues = false
@@ -119,6 +140,7 @@ locals {
           requests = { cpu = "50m", memory = "128Mi" }
           limits   = { memory = "256Mi" }
         }
+        storage = local.alertmanager_storage_spec
       }
       serviceAccount = {
         annotations = local.create_irsa ? {
@@ -139,8 +161,10 @@ locals {
       defaultDashboardsEnabled  = true # tier-1 bundled dashboards
       defaultDashboardsTimezone = "utc"
       sidecar = {
-        dashboards  = { enabled = true, label = "grafana_dashboard", searchNamespace = var.namespace, folderAnnotation = "grafana_folder", provider = { foldersFromFilesStructure = true } }
-        datasources = { enabled = true }
+        dashboards = { enabled = true, label = "grafana_dashboard", searchNamespace = var.namespace, folderAnnotation = "grafana_folder", provider = { foldersFromFilesStructure = true } }
+        # When Mimir is wired (remote_write set), stop marking the bundled Prometheus datasource default so
+        # the Mimir datasource (durable, full-range) becomes Grafana's primary. Prometheus stays selectable.
+        datasources = { enabled = true, defaultDatasourceEnabled = var.mimir_remote_write_url == "" }
       }
       service = { port = 80 }
       "grafana.ini" = {

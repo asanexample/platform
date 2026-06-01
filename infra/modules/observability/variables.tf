@@ -90,6 +90,22 @@ variable "storage_class" {
 }
 
 # ---------------------------------------------------------------------------
+# Mimir remote_write (#102 P2) — durable long-range metrics store
+# ---------------------------------------------------------------------------
+
+variable "mimir_remote_write_url" {
+  description = "Mimir push endpoint for Prometheus remote_write (e.g. http://mimir-gateway.observability.svc/api/v1/push). Empty = no remote_write (P1 behaviour). When set, the bundled Prometheus datasource is no longer Grafana's default (the Mimir datasource takes over)."
+  type        = string
+  default     = ""
+}
+
+variable "mimir_tenant_id" {
+  description = "X-Scope-OrgID the hub's own metrics are written under (and queried with)."
+  type        = string
+  default     = "platform"
+}
+
+# ---------------------------------------------------------------------------
 # IRSA (P1: Alertmanager → SNS publish only)
 # ---------------------------------------------------------------------------
 
