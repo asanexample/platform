@@ -8,10 +8,10 @@ Reference document mapping the platform's architecture to expected interview top
 
 **What we built:**
 
-- **Three-layer separation**: reusable modules (`infra/modules/`), cloud-specific
-  modules (`infra/modules/aws/`, `azure/`), and live environment configs
-  (`infra/live/aws/{platform,preprod,prod}/`). Modules are DRY; live configs are
-  thin wrappers that set inputs.
+- **Three-layer separation**: shared cloud-agnostic modules (`infra/modules/`),
+  cloud-specific modules (`infra/modules/aws/`; `azure/`/`gcp/` are planned, not yet
+  present), and live environment configs (`infra/live/aws/{platform,preprod,prod,test}/`).
+  Modules are DRY; live configs are thin wrappers that set inputs.
 
 - **Terragrunt config hierarchy** (`root.hcl` → `_base.hcl` → unit
   `terragrunt.hcl`): environment, region, account ID, tags, and provider config
@@ -22,9 +22,10 @@ Reference document mapping the platform's architecture to expected interview top
   argocd-apps`. Terragrunt resolves this automatically with `dependency` blocks.
   Each unit is independently plannable/applyable.
 
-- **Multi-cloud by design**: shared modules (cilium, argocd, tenant) use a
-  `cloud_provider` variable. Cloud-specific logic lives in cloud-specific
-  modules. The same tenant model works on EKS and AKS.
+- **Multi-cloud by design, AWS-first today**: shared modules (cilium, argocd, tenant)
+  use a `cloud_provider` variable so cloud-specific logic stays in cloud-specific
+  modules. The same tenant model is designed to work on AKS/GKE when those land — only
+  AWS/EKS is deployed today.
 
 **Key talking point:** The module/live split enforces a contract — module authors
 define the interface, platform consumers just set inputs. This scales because
