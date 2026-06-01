@@ -3,7 +3,10 @@
 **Date:** 2026-05-30
 
 **Status:** Accepted — extends [ADR-036](036-github-actions-oidc-federation.md) (GitHub Actions OIDC
-federation) and builds on the image-signing/attestation chain (platform #108). P1 implemented + verified.
+federation) and builds on the image-signing/attestation chain (platform #108). **P1–P3 done on preprod
+(2026-05-30): app-alpha emits trusted-ci as its SOLE provenance signer and preprod Kyverno
+verify-attestations is in Enforce requiring it — Build L3 achieved on preprod.** P4 (platform-cluster
+replication) pending.
 
 ## Context
 
@@ -89,12 +92,16 @@ the app build cannot produce regardless of which role pushes the bytes.
 
 ### Rollout (each gated, preprod first; full plan in `docs/plans/131-slsa-build-l3.md`)
 
-- **P1 (this ADR, done):** trusted-ci repo + reusable signer; provenance job in app CI **alongside** the
+- **P1 (done):** trusted-ci repo + reusable signer; provenance job in app CI **alongside** the
   hand-authored step (**dual provenance**); no Kyverno change → zero admission risk. Verified end-to-end.
-- **P2:** Kyverno dual-accept (app *or* trusted-ci identity) in Audit + the per-team caller-extension
-  condition.
-- **P3:** generator-only + Enforce; drop the hand-authored step → **L3 achieved**.
-- **P4:** replicate to the platform cluster + negative test.
+- **P2 (done):** Kyverno dual-accept (app *or* trusted-ci identity) + the per-team caller-extension
+  condition (`attest_caller_repos`).
+- **P3 (done, 2026-05-30):** generator-only + Enforce on preprod; dropped the hand-authored step
+  (app-alpha `deploy.yml` now signs the SOLE provenance via trusted-ci) → **Build L3 achieved on
+  preprod**. Preprod `verify-attestations` re-flipped to Enforce.
+- **P4 (pending):** replicate to the platform cluster + negative test. The platform `policy` unit does
+  not yet carry `attest_caller_repos`/trusted-ci verification; tenants run on preprod today, so this is
+  lower priority.
 
 ## Consequences
 
@@ -117,8 +124,9 @@ the app build cannot produce regardless of which role pushes the bytes.
 - **New supply-chain surface** — the signer in the release path with `id-token: write` + ECR push.
   Mitigated by pinning the app's `uses:` to a commit SHA, the in-workflow team guard, and Dependabot on
   the signer's actions. SHA-pinning the signer's own third-party actions is a follow-up.
-- **L3 holds only after P3** — during the P2 dual-accept window the old forgeable provenance is still
-  admitted.
+- **L3 holds on preprod as of P3** — during the earlier P2 dual-accept window the old forgeable
+  provenance was still admitted; that window is closed on preprod now that the hand-authored step is
+  dropped and Enforce requires the trusted-ci signer. The platform cluster (P4) is not yet at L3.
 - **Branch protection unavailable on the private `trusted-ci`** under the org's current plan; isolation
   rests on app teams not being write-collaborators (+ CODEOWNERS). Enable it on a paid plan.
 - **What L3 does NOT buy** — it does not stop a compromised `app-<team>` build from emitting a bad image
