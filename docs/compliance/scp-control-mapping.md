@@ -511,7 +511,7 @@ is a compliance violation.
 
 | Statement SID | Denied Actions | SOC 2 | HIPAA | PCI-DSS | ISO 27001 | NIST 800-53 | CIS AWS |
 |---|---|---|---|---|---|---|---|
-| DenyNonHipaaServices | All actions NOT in the HIPAA-eligible allowlist (120+ services) | CC6.1 | 164.308(a)(1)(ii)(B), 164.308(a)(4)(ii)(B), 164.312(a)(1) | -- | A.5.23 | SA-9, CM-7, AC-6 | -- |
+| DenyNonHipaaServices | All actions NOT in the HIPAA-eligible allowlist (~117 services) | CC6.1 | 164.308(a)(1)(ii)(B), 164.308(a)(4)(ii)(B), 164.312(a)(1) | -- | A.5.23 | SA-9, CM-7, AC-6 | -- |
 
 **HIPAA-eligible services included in the allowlist (partial list):**
 

@@ -556,7 +556,7 @@ split. The largest policies in this module are:
 - **deny-regions**: Contains a long `not_actions` list for global service exemptions.
   This can grow as AWS adds new global services.
 - **hipaa-eligible-services**: Contains the full HIPAA-eligible service allowlist
-  (~90 services). This is the largest single SCP and may approach the byte limit
+  (~117 services). This is the largest single SCP and may approach the byte limit
   as AWS adds new HIPAA-eligible services.
 - **require-tagging**: Grows linearly with the number of required tags (one
   statement per tag).
@@ -619,7 +619,7 @@ HIPAA Eligible Services list.
 
 ### Impact Assessment
 
-- The allowlist contains approximately 90 services.
+- The allowlist contains approximately 117 services.
 - Newer AWS services that are HIPAA-eligible but not yet in the list will be
   blocked until the list is updated.
 - The exempt role can bypass this restriction for administrative operations.
