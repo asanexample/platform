@@ -2,25 +2,26 @@
 
 ## Overview
 
-The platform is a multi-cloud infrastructure solution built with
-OpenTofu and Terragrunt. It provides standardized, repeatable
-infrastructure across AWS, Azure, and GCP with consistent patterns for
-networking, security, Kubernetes, and operations.
+The platform is an infrastructure solution built with OpenTofu and
+Terragrunt. It is **multi-cloud by design but AWS-first today** — only AWS is
+deployed; Azure and GCP are planned and the shared modules/structure are
+parameterized for them. It provides standardized, repeatable infrastructure with
+consistent patterns for networking, security, Kubernetes, and operations.
 
 ## Goals
 
-1. **Multi-cloud deployment** -- consistent patterns across AWS, Azure,
-   and GCP using shared modules (Cilium, ArgoCD, cert-manager) and
-   cloud-specific modules where necessary.
+1. **Multi-cloud by design, AWS-first** -- cloud-agnostic shared modules (Cilium,
+   ArgoCD, cert-manager) plus cloud-specific modules, so Azure/GCP can be added
+   without restructuring. Only AWS is deployed today.
 2. **Security by design** -- SCPs, private endpoints, RBAC,
    least-privilege IAM, encryption at rest and in transit.
-3. **Kubernetes-first** -- EKS and AKS clusters with Cilium CNI,
-   ArgoCD GitOps, and vCluster multi-tenancy for standard workloads.
-4. **Hierarchical configuration** -- 7-layer Terragrunt hierarchy that
+3. **Kubernetes-first** -- EKS clusters with Cilium CNI (BYOCNI) and ArgoCD
+   GitOps. Standard tenants use **namespace isolation** (vCluster deferred, ADR-033).
+4. **Hierarchical configuration** -- a 6-layer Terragrunt hierarchy that
    composes tags, CIDRs, and module inputs from broad defaults to
-   module-specific overrides.
-5. **Testable infrastructure** -- Terratest (Go) for AWS, native
-   `.tftest.hcl` for Azure, CI validation on every PR.
+   unit-specific overrides.
+5. **Testable infrastructure** -- Terratest (Go) for module integration tests,
+   with CI validation (fmt/validate/lint/policy) on every PR.
 
 ## Project Structure
 
@@ -30,32 +31,29 @@ platform/
 ├── docs/                        # ADRs, runbooks, onboarding
 ├── infra/
 │   ├── docs/                    # This reference documentation
-│   ├── modules/                 # Reusable modules
-│   │   ├── aws/                 # AWS-specific (EKS, networking, IAM, etc.)
-│   │   ├── azure/               # Azure-specific (AKS, storage, Front Door, etc.)
-│   │   ├── gcp/                 # GCP-specific (naming, networking)
+│   ├── modules/                 # Reusable modules (AWS only today; azure/, gcp/ planned)
+│   │   ├── aws/                 # AWS-specific (EKS, networking, IAM, ECR, organizations, ...)
 │   │   ├── cloudflare/          # DNS delegation
 │   │   ├── cilium/              # Shared: CNI
-│   │   ├── argocd/              # Shared: GitOps
+│   │   ├── argocd/ argocd-apps/ # Shared: GitOps
 │   │   ├── cert-manager/        # Shared: TLS certificates
 │   │   ├── external-dns/        # Shared: DNS record sync
-│   │   ├── external-secrets/    # Shared: secret injection
-│   │   ├── tailscale/           # Shared: VPN operator
-│   │   ├── tailscale-admin/     # Shared: tailnet config
-│   │   ├── gateway-config/      # Shared: ingress
+│   │   ├── external-secrets/    # Shared: secret injection (+ secret-stores)
+│   │   ├── tailscale/           # Shared: VPN operator (+ tailscale-admin)
+│   │   ├── gateway-config/      # Shared: Gateway API ingress
 │   │   ├── policy/              # Shared: Kyverno
-│   │   └── vcluster/            # Shared: virtual clusters
+│   │   ├── observability/       # Shared: kube-prometheus-stack (+ observability-mimir)
+│   │   ├── tenant/ cluster-rbac/ eks-pod-identity/   # Shared: multi-tenancy + RBAC + Pod Identity
+│   │   └── vcluster/            # Shared: virtual clusters (deferred, ADR-033)
 │   ├── live/                    # Environment-specific Terragrunt configs
-│   │   ├── aws/                 # 5 accounts (mgmt, platform, test, preprod, prod)
-│   │   ├── azure/               # 2 subscriptions (dev, ops)
-│   │   └── gcp/                 # Scaffolded (ops)
+│   │   └── aws/                 # 5 accounts (mgmt, platform, test, preprod, prod)
+│   │                           #   (live/azure, live/gcp are planned, not present)
 │   ├── tests/
-│   │   ├── aws/                 # Terratest (Go)
-│   │   └── modules/azure/       # Native .tftest.hcl
+│   │   └── aws/                 # Terratest (Go)
 │   └── scripts/
 │       └── eks-tunnel.sh        # SSM tunnel to private EKS
-├── scripts/
-│   └── scaffold-region.sh       # Region scaffolding tool
+├── cmd/platctl/                 # platctl orchestration CLI (Go, ADR-038)
+├── scripts/                     # Helper scripts (e.g. scaffold-region.sh)
 └── .github/workflows/           # CI (format, validate, lint, tests)
 ```
 
