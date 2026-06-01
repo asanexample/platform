@@ -24,6 +24,14 @@ locals {
     # Prometheus-operator CRDs from the observability hub, #102). Off by default.
     metrics        = { service = { enabled = var.metrics_enabled } }
     serviceMonitor = { enabled = var.metrics_enabled }
+
+    # EKS + Cilium overlay (cluster-pool): the EKS managed control plane can't route to overlay pod
+    # IPs, so the validating webhook server runs on hostNetwork (node VPC IP). port moves off 10250
+    # (kubelet) and off cert-manager's 10260 to avoid host-port clashes if they co-locate on a node.
+    webhook = {
+      hostNetwork = var.webhook_host_network
+      port        = var.webhook_host_network ? 10261 : 10250
+    }
   }
 }
 

@@ -79,6 +79,10 @@ inputs = {
   compliance_tier = include.base.locals.compliance_tier
   replica_count   = 1 # non-prod; platform runs 3 for HA
 
+  # Cilium overlay (cluster-pool) datapath: the EKS managed control plane can't route to overlay
+  # pod IPs, so the admission/cleanup webhook servers must run on hostNetwork (node VPC IP).
+  webhook_host_network = true
+
   # Cluster-wide tenant image floor + per-team scoping (team data stays at the unit level).
   allowed_registries  = [local.ecr_registry]
   tenant_registry_map = { for k, v in local.teams : k => "${local.ecr_registry}/team-${k}" }

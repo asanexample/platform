@@ -28,6 +28,14 @@ locals {
     securityContext = {
       fsGroup = 1001 # cert-manager runs as non-root uid 1001; fsGroup ensures volume mounts are writable
     }
+
+    # EKS + Cilium overlay (cluster-pool): the EKS managed control plane can't route to overlay pod
+    # IPs, so the webhook server runs on hostNetwork (node VPC IP the API server can dial). securePort
+    # moves off 10250 (kubelet) to avoid a host-port clash; ClusterFirstWithHostNet keeps DNS working.
+    webhook = {
+      hostNetwork = var.webhook_host_network
+      securePort  = var.webhook_host_network ? 10260 : 10250
+    }
   }
 }
 

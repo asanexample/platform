@@ -30,6 +30,12 @@ locals {
     admissionController = {
       replicas  = var.replica_count
       podLabels = local.k8s_labels
+      # EKS + Cilium overlay (cluster-pool): the EKS managed control plane reaches admission
+      # webhooks only at VPC-routable addresses, but overlay pod IPs (the pod CIDR) are not
+      # routable from it. Run the webhook server on hostNetwork so the kyverno-svc endpoint is the
+      # node's VPC IP the API server can dial; ClusterFirstWithHostNet keeps cluster DNS working.
+      hostNetwork = var.webhook_host_network
+      dnsPolicy   = var.webhook_host_network ? "ClusterFirstWithHostNet" : "ClusterFirst"
       # IRSA: lets the admission controller pull cosign signatures from ECR (the EKS pod-identity
       # webhook injects AWS_REGION/creds from this annotation). Empty when verification is off.
       # The chart nests the SA under rbac.serviceAccount.
@@ -41,7 +47,12 @@ locals {
       replicas = 1
       rbac     = { serviceAccount = { annotations = local.irsa_sa_annotations } }
     }
-    cleanupController = { replicas = 1 }
+    # The cleanup controller also serves an API-server-called webhook → same hostNetwork need.
+    cleanupController = {
+      replicas    = 1
+      hostNetwork = var.webhook_host_network
+      dnsPolicy   = var.webhook_host_network ? "ClusterFirstWithHostNet" : "ClusterFirst"
+    }
   }
 
   # Policies (local chart) values — all dynamic, environment-specific knobs live here so the module
