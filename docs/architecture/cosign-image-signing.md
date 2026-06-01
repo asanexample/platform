@@ -360,9 +360,10 @@ else; no keys, no secrets. The platform side (trusting that identity) is wired f
 ## 10b. Isolated build provenance (SLSA Build L3 — ADR-042)
 
 The image **signature** above proves *who built* an image. The **SLSA provenance** attestation proves
-*how* it was built. Today the provenance is hand-authored and signed by the app's own build job — so a
-compromised build could forge it (Build L1+). [ADR-042](../adrs/042-isolated-build-provenance-slsa-l3.md)
-moves provenance signing to an **isolated reusable workflow** the app team cannot edit:
+*how* it was built. The app's **sole** provenance is now signed by an **isolated reusable workflow** the
+app team cannot edit — the SLSA **Build L3** cutover ([ADR-042](../adrs/042-isolated-build-provenance-slsa-l3.md)),
+completed on **preprod** (2026-05-30). Previously the provenance was hand-authored and signed by the
+app's own build job, which a compromised build could forge (Build L1+):
 
 - The signer lives in `asanexample/trusted-ci` (private, org-only call access, CODEOWNERS=platform). App
   CI calls it as a job (`uses: …/trusted-ci/.github/workflows/slsa-provenance.yml@<sha>`, pinned).
@@ -384,9 +385,11 @@ cosign verify-attestation --type slsaprovenance \
   <registry>/team-<team>/<app>@<digest>
 ```
 
-Rollout is dual-provenance first (both the old hand-authored and the new isolated attestation exist), so
-admission never breaks; Kyverno swaps the SLSA attestor to the trusted-ci identity in a later phase. The
-image **signature** policy (sections 4–6) is unchanged and remains the primary per-team gate.
+The rollout was dual-provenance first (old hand-authored + new isolated attestation both present) so
+admission never broke; **preprod has since dropped the hand-authored step**, and Kyverno's
+`verify-attestations` is in **Enforce** requiring the trusted-ci identity — **Build L3 on preprod**.
+Replicating to the **platform** cluster is the remaining step (ADR-042 P4). The image **signature**
+policy (sections 4–6) is unchanged and remains the primary per-team gate.
 
 ---
 

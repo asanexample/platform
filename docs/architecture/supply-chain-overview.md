@@ -95,7 +95,7 @@ Each mechanism answers a different question; together they form a verifiable cha
 verifies that the Fulcio cert on each signature/attestation was issued to the **expected GitHub workflow
 identity** (`issuer: https://token.actions.githubusercontent.com`, `subject: <workflow ref>`) and that the
 entry is in **Rekor**. Per-team isolation falls out of this: `app-alpha`'s images are signed by
-`app-alpha`'s workflow ref, which `app-beta`'s policy does not list. See
+`app-alpha`'s workflow ref, which `app-bravo`'s policy does not list. See
 [`cosign-image-signing.md`](cosign-image-signing.md) for the full keyless mechanics.
 
 **Predicate types must match end-to-end.** The app emits `cosign attest --type cyclonedx`

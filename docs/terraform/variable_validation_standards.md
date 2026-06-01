@@ -1,6 +1,8 @@
 # Terraform Variable Validation Standards
 
-This document outlines the standard validation patterns for variables in Terraform modules. These patterns should be followed consistently across all modules to ensure robust and predictable behavior.
+This document outlines the standard validation patterns for variables in Terraform/OpenTofu modules. These patterns should be followed consistently across all modules to ensure robust and predictable behavior.
+
+> **Note:** The platform is **AWS-first today** (Azure/GCP planned). The *principles* here — the `create` toggle, `enable_` prefixes, `null` defaults, length/regex/`cidrnetmask` validation — are cloud-agnostic and apply to every module. A few examples below still use Azure resource shapes (Resource Group, Key Vault, VNet) from the original multi-cloud scaffolding; they illustrate the **validation pattern**, which transfers directly to the AWS equivalents (S3 bucket name, EKS cluster name, VPC, etc.). New AWS modules should follow the pattern with AWS resource naming rules.
 
 ## General Guidelines
 
@@ -66,7 +68,7 @@ variable "custom_domain" {
 When a variable defaults to `null`, condition guards should use `!= null` rather than `!= ""`:
 
 ```hcl
-resource "azurerm_example" "this" {
+resource "aws_acm_certificate" "this" {
   count       = var.custom_domain != null ? 1 : 0
   domain_name = var.custom_domain
 }
@@ -95,25 +97,19 @@ variable "resource_group_name" {
 }
 ```
 
-### Azure Region/Location
+### AWS Region
+
+Constrain to the platform's allowed regions (the same set the `deny-regions` SCP enforces, ADR-003):
 
 ```hcl
-variable "location" {
-  description = "Azure region where resources will be deployed"
+variable "aws_region" {
+  description = "AWS region where resources will be deployed"
   type        = string
+  default     = "us-east-1"
 
   validation {
-    condition = contains([
-      "eastus", "eastus2", "westus", "westus2", "centralus", "southcentralus",
-      "northcentralus", "westcentralus", "westeurope", "northeurope",
-      "southeastasia", "eastasia", "japaneast", "japanwest", "australiaeast",
-      "australiasoutheast", "australiacentral", "brazilsouth", "southindia",
-      "centralindia", "westindia", "canadacentral", "canadaeast", "uksouth",
-      "ukwest", "koreacentral", "koreasouth", "francecentral", "southafricanorth",
-      "uaenorth", "switzerlandnorth", "germanywestcentral", "norwayeast",
-      "swedencentral", "qatarcentral", "brazilsoutheast"
-    ], var.location)
-    error_message = "The location must be a valid Azure region name."
+    condition     = contains(["us-east-1", "us-west-2"], var.aws_region)
+    error_message = "Region must be one of the platform's allowed regions (us-east-1, us-west-2)."
   }
 }
 ```
@@ -252,7 +248,7 @@ variable "retention_in_days" {
   description = "The number of days to retain data"
   type        = number
   default     = 30
-  
+
   validation {
     condition     = var.retention_in_days >= 30 && var.retention_in_days <= 730
     error_message = "The retention period must be between 30 and 730 days."
@@ -327,4 +323,4 @@ When implementing a new module or reviewing an existing one, ensure:
 6. Variable descriptions are clear and explain the purpose and constraints
 7. The top-level resource creation toggle is named `create` (bool, default `true`)
 8. Sub-feature flags use the `enable_` prefix (e.g., `enable_diagnostics`)
-9. Optional string variables default to `null`, not `""` 
+9. Optional string variables default to `null`, not `""`

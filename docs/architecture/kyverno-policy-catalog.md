@@ -19,9 +19,12 @@ emergency disable / the Audit↔Enforce flip.
 | **platform** | 829808296602 | v1.18.1 | **Enforce** | 3 (HA) | standard | 12 |
 | **prod** | 554518885123 | _not deployed_ | — | — | _TBD_ | — |
 
-- The **count differs** because per-team image policies (`restrict-images-team-<team>`) are generated
-  one-per-tenant from `teams.hcl`. Preprod has tenants `alpha` + `bravo` (→ +2 policies); the platform
-  cluster hosts shared services only (no tenants), so it has the 12 common policies.
+- The **count differs** because several policy _families_ are generated one-per-tenant from
+  `teams.hcl` — `restrict-images-team-<team>`, `restrict-route-hostnames-team-<team>`,
+  `verify-images-team-<team>`, and `verify-attestations-team-<team>`. Preprod has tenants `alpha` +
+  `bravo`, so each family contributes two policies; the platform cluster hosts shared services only (no
+  tenants), so it carries just the common (non-per-team) policies. The counts above are an indicative
+  snapshot — read the exact live total with `kubectl get cpol` (it shifts as tenants/phases change).
 - **Mode** is controlled by the unit's `validation_failure_action` (`Audit` records PolicyReports and
   fails the webhook open; `Enforce` rejects at admission and fails the webhook closed). The flip is a
   one-line input change + apply.
@@ -97,6 +100,22 @@ Per-team identity isolation: a signature from another team's workflow does **not
 policy — the supply-chain analog of per-team registry scoping. Deployed on **preprod** (where tenants
 run); the platform cluster has no tenant workloads. Verification depends on cluster egress to
 sigstore (Fulcio/Rekor) — see the break-glass runbook.
+
+## Attestation verification (Phase 3 — SBOM + SLSA provenance)
+
+Gated by `enable_attestation_verification` (requires `enable_image_verification`), with its **own**
+`verify_attestations_failure_action` so the SBOM/provenance requirement can roll out Audit-first while
+signature verification stays Enforce. On top of the image _signature_, this requires the image to carry
+two cosign-signed **attestations**: a CycloneDX **SBOM** (`https://cyclonedx.org/bom`) and a **SLSA
+provenance** (`https://slsa.dev/provenance/v0.2`). **Enforce on preprod** as of 2026-05-30.
+
+| Policy | Verifies | Scope |
+| ------ | -------- | ----- |
+| `verify-attestations-team-<team>` | `…/team-<team>/*` images carry a cosign-signed CycloneDX SBOM **and** a SLSA provenance attestation. For SLSA-L3-adopted teams (`attest_caller_repos`), the provenance must be signed by the isolated **`trusted-ci`** reusable workflow with the caller-repo = the team's own `app-<team>` (ADR-042); for others, by the team's own `deploy.yml`/`preview.yml`. | tenant (per-team) |
+
+This is the admission-side counterpart to the image-signing/attestation chain in
+[`cosign-image-signing.md`](cosign-image-signing.md) §10b — the signature proves _who built_ the image;
+these attestations prove the SBOM and _how_ it was built.
 
 ## Cleanup (Phase 5)
 

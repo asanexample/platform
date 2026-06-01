@@ -3,15 +3,21 @@
 > **Owner:** Platform team
 > **Related:** [EKS Cluster Access](eks-cluster-access.md)
 >
-> **Last reviewed:** 2026-05-22
+> **Last reviewed:** 2026-06-01
 
 ---
 
 ## Overview
 
-Tailscale provides always-on mesh VPN access to the private EKS cluster,
+Tailscale provides always-on mesh VPN access to the private EKS clusters,
 replacing SSM tunnels as the primary access method. The Tailscale Kubernetes
 Operator runs as a subnet router, advertising the VPC CIDR to the tailnet.
+
+> **Per cluster:** there is a `tailscale` unit (subnet router) on **both** clusters — **platform**
+> advertises `10.100.0.0/16` (split DNS `us-east-1.eks.amazonaws.com` → `10.100.0.2`) and **preprod**
+> advertises `10.101.0.0/16` (→ `10.101.0.2`). This runbook uses the platform cluster throughout;
+> preprod mirrors it exactly with the preprod CIDR/resolver. Preprod's router is what gives operators
+> kubectl access to the now-private preprod API (ADR-010/011).
 
 ```text
 Developer laptop (Tailscale client)

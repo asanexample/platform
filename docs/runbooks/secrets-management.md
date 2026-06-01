@@ -4,7 +4,7 @@
 > **On-call scope:** Infrastructure / Platform Engineering
 > **Module path:** `infra/modules/external-secrets/`, `infra/live/aws/platform/us-east-1/platform/external-secrets/`
 >
-> **Last reviewed:** 2026-05-24
+> **Last reviewed:** 2026-06-01
 
 ---
 
@@ -133,8 +133,12 @@ kubectl apply -f external-secret.yaml
 
 ## Creating a New App Team Secret
 
-> **Note:** This section describes the target model for when multi-tenancy is
-> enabled. Currently all secrets are platform-scoped.
+> **Note:** This section describes the **target model** for per-namespace tenant *secrets* via ESO,
+> which is **not yet deployed** (ADR-024 Implementation Status). Today, ESO secrets are platform-scoped
+> (the `aws-secrets-manager` ClusterSecretStore runs on both platform and preprod). Tenant access to
+> AWS *resources* (S3, etc.) is already live but uses **EKS Pod Identity**, not ESO — see
+> [ADR-041](../adrs/041-pod-identity-for-tenant-workloads.md) and the
+> [tenant AWS access runbook](tenant-aws-access-pod-identity.md).
 
 App team secrets use the naming convention `{namespace}/{service}/{secret-name}`,
 where the namespace maps to the team's Kubernetes namespace.

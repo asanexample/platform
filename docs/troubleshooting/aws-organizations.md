@@ -3,7 +3,7 @@
 > **Module path:** `infra/modules/aws/organizations`
 > **Live configuration:** `infra/live/aws/mgmt/global/organizations/terragrunt.hcl`
 >
-> **Last reviewed:** 2026-05-15
+> **Last reviewed:** 2026-06-01
 
 ---
 
@@ -126,7 +126,7 @@ Quick fixes:
 
 Terraform apply fails with:
 
-```
+```text
 Error: error creating Organizations Policy: MalformedPolicyDocumentException:
   SCP content is too large. The maximum size is 5120 bytes.
 ```
@@ -232,7 +232,7 @@ CloudTrail identification (not recommended -- SIDs help greatly with troubleshoo
 
 ### The HIPAA SCP Special Case
 
-The `hipaa-eligible-services` SCP is the largest because it enumerates 120+ services in
+The `hipaa-eligible-services` SCP is the largest because it enumerates ~117 services in
 a `NotAction` block. If it approaches the limit:
 
 - Check if AWS has consolidated any service namespaces.
@@ -249,7 +249,7 @@ a `NotAction` block. If it approaches the limit:
 
 Terraform apply fails with:
 
-```
+```text
 Error: error attaching Organizations Policy: ConstraintViolationException:
   You have attached the maximum number of policies to the specified target.
 ```
@@ -317,7 +317,7 @@ scp_attachments = {
 
 Create an intermediate OU to gain an additional 5-SCP slot:
 
-```
+```text
 Root (4 SCPs)
   |-- Workloads (3 SCPs)
        |-- Workloads/Regulated (2 more SCPs, inherits parent SCPs)
@@ -335,9 +335,9 @@ Running `terragrunt import` for an existing organization, OU, account, or SCP fa
 
 ### Common Errors and Fixes
 
-**Error: "Resource already managed by Terraform"**
+#### Error: "Resource already managed by Terraform"
 
-```
+```text
 Error: Resource already exists in state
 ```
 
@@ -356,7 +356,7 @@ terragrunt state rm 'aws_organizations_account.this["account-name"]'
 
 Then re-import.
 
-**Error: "Cannot import non-existent resource"**
+#### Error: "Cannot import non-existent resource"
 
 The ID you provided does not match an existing AWS resource. Verify the ID:
 
@@ -371,7 +371,7 @@ aws organizations describe-organizational-unit --organizational-unit-id <ou-id>
 aws organizations describe-policy --policy-id <policy-id>
 ```
 
-**Error: "Error importing: expected format 'target_id:policy_id'"**
+#### Error: "Error importing: expected format 'target_id:policy_id'"
 
 SCP attachments require a composite import ID:
 
@@ -381,9 +381,9 @@ terragrunt import \
   "<root-id>:<policy-id>"
 ```
 
-**Error: "Organization features must be set to ALL"**
+#### Error: "Organization features must be set to ALL"
 
-```
+```text
 Error: error reading AWS Organization: organization features are not set to ALL
 ```
 
@@ -422,14 +422,14 @@ terragrunt import \
 
 Terraform plan or apply fails with:
 
-```
+```text
 Error: Cycle: aws_organizations_organizational_unit.this["Parent"],
   aws_organizations_organizational_unit.this["Child"]
 ```
 
 Or:
 
-```
+```text
 Error: Invalid index: The given key does not identify an element in this collection.
 ```
 
@@ -456,7 +456,7 @@ A cycle occurs if:
 
 **Verify the OU hierarchy is a valid tree:**
 
-```
+```text
 # Correct: tree structure with root-level OUs having parent = null
 "Platform"            = { parent = null }          # Root level
 "Workloads"           = { parent = null }          # Root level
@@ -569,7 +569,7 @@ add if needed:
 
 ### Error: "find_in_parent_folders: no file found"
 
-```
+```text
 Error: Error in function call: Call to function "find_in_parent_folders" failed:
   Could not find a aws/_base.hcl in any of the parent folders
 ```
@@ -598,7 +598,7 @@ directory tree from the current module.
 
 ### Error: "missing _versions.hcl"
 
-```
+```text
 Error: Error in function call: read_terragrunt_config: no file found matching _versions.hcl
 ```
 
@@ -617,7 +617,7 @@ git log --diff-filter=D -- '*_versions.hcl'
 
 ### Error: "locals block not found in common.hcl / env.hcl / region.hcl / workload.hcl"
 
-```
+```text
 Error: Could not find a common.hcl in any of the parent folders
 ```
 
@@ -645,7 +645,7 @@ locals {
 
 ### Error: "Unsupported Terraform Core version"
 
-```
+```text
 Error: This configuration does not support Terraform version X.Y.Z
 ```
 
@@ -659,7 +659,7 @@ terraform version
 
 ### Error: "Backend configuration changed"
 
-```
+```text
 Error: Backend configuration changed
 ```
 
@@ -682,7 +682,7 @@ terragrunt init -reconfigure
 
 ### Error: "Email already associated with an account"
 
-```
+```text
 Error: error creating Organizations Account: ConstraintViolationException:
   An account with the email address already exists in the organization.
 ```
@@ -692,7 +692,7 @@ pattern with a different suffix.
 
 ### Error: "Account limit exceeded"
 
-```
+```text
 Error: error creating Organizations Account: ConstraintViolationException:
   You have exceeded the limit on the number of accounts in your organization.
 ```
@@ -702,7 +702,7 @@ Go to Service Quotas > AWS Organizations > Maximum number of accounts.
 
 ### Error: "Account creation in progress"
 
-```
+```text
 Error: error creating Organizations Account: FinalizingCreationException
 ```
 

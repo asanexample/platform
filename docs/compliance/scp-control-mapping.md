@@ -7,7 +7,7 @@
 > **Module path:** `infra/modules/aws/organizations/scps.tf`
 > **Live configuration:** `infra/live/aws/mgmt/global/organizations/terragrunt.hcl`
 >
-> **Last reviewed:** 2026-05-15
+> **Last reviewed:** 2026-06-01
 
 ---
 
@@ -204,7 +204,8 @@ aws securityhub describe-hub | jq '.HubArn'
 
 ### What It Prevents
 
-Blocks disabling EBS default encryption, creating unencrypted EBS volumes, creating
+Blocks disabling EBS default encryption, creating unencrypted EBS volumes, launching
+instances with an unencrypted block device, uploading unencrypted S3 objects, creating
 unencrypted RDS instances or clusters, scheduling KMS key deletion or disabling keys,
 and launching EC2 instances without IMDSv2 (instance metadata service version 2).
 
@@ -220,6 +221,8 @@ sensitive data. IMDSv1 is vulnerable to SSRF-based credential theft.
 |---|---|---|---|---|---|---|---|
 | DenyDisableEbsDefault | `ec2:DisableEbsEncryptionByDefault` | CC6.1, CC6.7 | 164.312(a)(2)(iv) | 3.4.1 | A.8.24 | SC-28, SC-28(1) | 2.2.1 |
 | DenyUnencryptedVolumes | `ec2:CreateVolume` (when `ec2:Encrypted=false`) | CC6.1, CC6.7 | 164.312(a)(2)(iv) | 3.4.1 | A.8.24 | SC-28 | 2.2.1 |
+| DenyUnencryptedEbsOnLaunch | `ec2:RunInstances` (when a block device is unencrypted) | CC6.1, CC6.7 | 164.312(a)(2)(iv) | 3.4.1 | A.8.24 | SC-28 | 2.2.1 |
+| DenyUnencryptedS3Uploads | `s3:PutObject` (when `s3:x-amz-server-side-encryption` is absent) | CC6.1, CC6.7 | 164.312(a)(2)(iv) | 3.4.1 | A.8.24 | SC-28 | 2.1.1 |
 | DenyUnencryptedRds | `rds:CreateDBInstance` (when `rds:StorageEncrypted=false`) | CC6.1, CC6.7 | 164.312(a)(2)(iv) | 3.4.1 | A.8.24 | SC-28 | 2.3.1 |
 | DenyUnencryptedRdsCluster | `rds:CreateDBCluster` (when `rds:StorageEncrypted=false`) | CC6.1, CC6.7 | 164.312(a)(2)(iv) | 3.4.1 | A.8.24 | SC-28 | 2.3.1 |
 | ProtectKmsKeys | `kms:ScheduleKeyDeletion`, `kms:DisableKey` | CC6.1 | 164.312(a)(2)(iv) | 3.5.1, 3.6.1 | A.8.24 | SC-12, SC-12(1) | -- |
@@ -327,8 +330,9 @@ aws organizations describe-policy --policy-id "$POLICY_ID" \
 
 Prevents modification of S3 account-level and bucket-level public access blocks,
 blocks creation of default VPCs and default subnets, denies RAM resource shares
-with external principals, and protects backups (Glacier archives/vaults and AWS Backup
-vaults/plans/recovery points) from deletion.
+with external principals, protects backups (Glacier archives/vaults and AWS Backup
+vaults/plans/recovery points) from deletion, and protects the integrity of the `Team`
+tag (`DenyTeamTagTampering`) so it can be trusted as the basis for per-team ABAC.
 
 ### Why It Matters
 
@@ -345,6 +349,7 @@ recovery.
 | DenyDefaultVpc | `ec2:CreateDefaultVpc`, `ec2:CreateDefaultSubnet` | CC6.6 | 164.312(e)(1) | 1.2.1 | A.8.20, A.8.22 | SC-7, CM-7 | 5.1 |
 | DenyExternalSharing | `ram:CreateResourceShare` (when `ram:AllowsExternalPrincipals=true`) | CC6.1, CC6.6 | 164.308(a)(4)(ii)(B) | 7.2.5 | A.5.19 | AC-3, AC-4 | -- |
 | ProtectBackups | `glacier:DeleteArchive`, `DeleteVault`, `backup:DeleteBackupVault`, `DeleteBackupPlan`, `DeleteRecoveryPoint` | CC6.1, CC9.1 | 164.308(a)(7)(ii)(A) | 3.4.1 | A.8.13 | CP-9, CP-10 | -- |
+| DenyTeamTagTampering | Tag/untag of the `Team` tag on ECR, IAM roles, Secrets Manager, etc. (except platform/deployer + service-linked roles) | CC6.1, CC6.3 | 164.312(a)(1) | 7.2.1, 7.2.5 | A.5.15, A.8.2 | AC-3, AC-6 | -- |
 
 ### Evidence Collection
 
@@ -506,7 +511,7 @@ is a compliance violation.
 
 | Statement SID | Denied Actions | SOC 2 | HIPAA | PCI-DSS | ISO 27001 | NIST 800-53 | CIS AWS |
 |---|---|---|---|---|---|---|---|
-| DenyNonHipaaServices | All actions NOT in the HIPAA-eligible allowlist (120+ services) | CC6.1 | 164.308(a)(1)(ii)(B), 164.308(a)(4)(ii)(B), 164.312(a)(1) | -- | A.5.23 | SA-9, CM-7, AC-6 | -- |
+| DenyNonHipaaServices | All actions NOT in the HIPAA-eligible allowlist (~117 services) | CC6.1 | 164.308(a)(1)(ii)(B), 164.308(a)(4)(ii)(B), 164.312(a)(1) | -- | A.5.23 | SA-9, CM-7, AC-6 | -- |
 
 **HIPAA-eligible services included in the allowlist (partial list):**
 
@@ -731,12 +736,20 @@ ORDER BY eventTime DESC;
 
 ### Exempt Role Governance
 
-All SCP deny statements include an `ArnNotLike` condition for exempt roles. The default
-exempt role is `OrganizationAccountAccessRole`. This is the role AWS Organizations creates
-in each member account for management-account access.
+Most SCP deny statements include an `ArnNotLike` condition for exempt roles. The live
+configuration sets **three** exempt roles (`var.exempt_roles` in the mgmt org unit):
+
+- `OrganizationAccountAccessRole` — AWS-created in each member account for management-account
+  (break-glass) access.
+- `PlatformDeployer` — the Terragrunt/IaC apply role; must perform the administrative operations
+  the Deny statements otherwise block (manage encryption defaults, tag resources, etc.).
+- `github-actions-terratest` — the CI integration-test role in the Test sandbox account.
+
+Note a subset of statements (`DenyLeaveOrganization`, `DenyRootUserActions`, `DenyRootAccessKeys`,
+the unencrypted-resource denies, `EnforceIMDSv2`) have **no exemption** and bind even these roles.
 
 **Auditor note:** Verify that the exempt role list (`var.exempt_roles`) has not been
-expanded beyond operational necessity. Check the Terraform variable definition and the
+expanded beyond these three / operational necessity. Check the Terraform variable definition and the
 live Terragrunt inputs:
 
 ```bash

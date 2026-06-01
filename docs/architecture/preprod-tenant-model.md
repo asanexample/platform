@@ -1,7 +1,8 @@
 # Preprod Tenant Isolation Model
 
-> Related: [ADR-027 — Hybrid Tenant Isolation](../adrs/027-hybrid-tenant-isolation.md),
-> [ADR-033 — Defer vCluster Support](../adrs/033-defer-vcluster-tenant-support.md)
+> Related: [ADR-027 — Hybrid Tenant Isolation](../adrs/027-hybrid-tenant-isolation-model.md),
+> [ADR-033 — Defer vCluster Support](../adrs/033-defer-vcluster-tenant-support.md),
+> [ADR-041 — Pod Identity for Tenant Workloads](../adrs/041-pod-identity-for-tenant-workloads.md)
 
 ## Overview
 
@@ -82,6 +83,7 @@ team with `mode = "namespace"`:
 | `NetworkPolicy` | `allow-gateway-ingress` | Permit traffic from the Gateway and kube-system namespaces |
 | `CiliumNetworkPolicy` | `allow-gateway-envoy` | Permit traffic from Cilium `ingress`, `remote-node`, and `host` entities |
 | `NetworkPolicy` | `allow-dns-egress` | Allow DNS (UDP/TCP 53) and internet egress, except the IMDS endpoint (169.254.169.254/32) |
+| `CiliumNetworkPolicy` | `allow-pod-identity-egress` | Permit egress to the EKS Pod Identity agent (`host` entity, `169.254.170.23:80`) so pods can fetch their workload AWS credentials (ADR-041) |
 | Namespace PSA labels | `enforce=baseline`, `warn`/`audit=restricted` | Block privileged/hostPath/hostNetwork pods (node-escape vectors) |
 | `RoleBinding` | `tenant-developers` | Bind group `team-<name>:developers` to the `tenant-developer` ClusterRole (ADR-039) |
 
@@ -126,8 +128,8 @@ Gateway API Gateway and are unreachable from the internet.
 
 ### Namespace mode policies
 
-The tenant module creates three Kubernetes NetworkPolicies and one
-CiliumNetworkPolicy per namespace:
+The tenant module creates three Kubernetes NetworkPolicies and two
+CiliumNetworkPolicies per namespace:
 
 **default-deny-ingress** -- Matches all pods, blocks all ingress. This is the
 baseline; everything is denied unless another policy explicitly allows it.
@@ -186,6 +188,26 @@ spec:
   egress:
   - ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
   - to: [{ipBlock: {cidr: 0.0.0.0/0}}]
+```
+
+**allow-pod-identity-egress** (CiliumNetworkPolicy) -- Permits egress to the EKS
+Pod Identity agent so tenant pods can fetch their workload AWS credentials
+(ADR-041). The agent serves credentials at the link-local `169.254.170.23:80`,
+which Cilium classifies as the `host` entity — a CIDR `toCIDR` rule cannot match it,
+so this needs `toEntities: [host]`. (IMDS at `169.254.169.254` is also `host` and thus
+reachable, but the node enforces IMDSv2 with `HttpPutResponseHopLimit=1`, so a pod —
+one hop from the node — still cannot steal the node role.)
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-pod-identity-egress
+spec:
+  endpointSelector: {}
+  egress:
+  - toEntities: [host]
+    toPorts: [{ports: [{port: "80", protocol: TCP}]}]
 ```
 
 ### vCluster mode policies (deferred)

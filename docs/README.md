@@ -1,9 +1,11 @@
 # Documentation Index
 
-This repository manages multi-cloud infrastructure (AWS, Azure, GCP) using
-OpenTofu modules orchestrated by Terragrunt. All cloud resources are defined
-declaratively, version-controlled, and deployed through a layered configuration
-hierarchy that promotes consistency across environments.
+This repository manages infrastructure with OpenTofu modules orchestrated by
+Terragrunt. It is **multi-cloud by design but AWS-first today** — only `live/aws/`
+is deployed; Azure and GCP are planned and the layout is parameterized for them.
+All cloud resources are defined declaratively, version-controlled, and deployed
+through a layered configuration hierarchy that promotes consistency across
+environments.
 
 ## Start Here
 
@@ -20,7 +22,11 @@ hierarchy that promotes consistency across environments.
 | [Supply-Chain Overview](architecture/supply-chain-overview.md) | Why + end-to-end flow: SBOM, cosign, SLSA provenance, Rekor, Kyverno, and the SLSA Build L3 matrix |
 | [Observability Current State](architecture/observability-current-state.md) | As-built P1 hub + P2 Mimir: topology, multi-tenancy/security model, storage |
 | [Preprod Tenant Model](architecture/preprod-tenant-model.md) | Namespace-based tenant isolation architecture |
-| [Config Hierarchy](../infra/live/aws/_base.hcl) | Seven-layer Terragrunt configuration precedence (root through module) |
+| [Cosign Image Signing](architecture/cosign-image-signing.md) | From-scratch explainer: keyless signing, Fulcio/Rekor, per-team identity, Kyverno verify |
+| [Kyverno Policy Catalog](architecture/kyverno-policy-catalog.md) | Every admission policy enforced per cluster, scope, and mode |
+| [AWS Organizations](architecture/aws-organizations.md) | OU hierarchy, SCP catalog, exempt roles, blast-radius analysis |
+| [Platform Capability Coverage](architecture/platform-capability-coverage.md) | The platform mapped against the CNCF IDP capability domains |
+| [Config Hierarchy](architecture/config-hierarchy.md) | Six-layer Terragrunt configuration precedence (root through unit) |
 | [Module Design](../infra/docs/13-module-design.md) | Conventions for writing and consuming infrastructure modules |
 
 ## How-To Guides
@@ -76,9 +82,10 @@ hierarchy that promotes consistency across environments.
 
 ```text
 docs/               You are here -- user-facing documentation
-infra/modules/      Reusable OpenTofu modules (aws/, azure/, gcp/, shared)
-infra/live/         Terragrunt live configurations per cloud/env/region/workload
-infra/tests/        Module integration tests
+infra/modules/      Reusable OpenTofu modules (aws/ + shared; azure/, gcp/ planned)
+infra/live/aws/     Terragrunt live configurations per env/region/workload (AWS only today)
+infra/tests/        Terratest (Go) module integration tests
 infra/docs/         Infrastructure design documentation (numbered series)
 infra/scripts/      Helper scripts and Terragrunt hooks
+cmd/platctl/        platctl orchestration CLI (Go, ADR-038)
 ```
