@@ -3,7 +3,7 @@
 > **Module path:** `infra/modules/aws/organizations/scps.tf`
 > **Live configuration:** `infra/live/aws/mgmt/global/organizations/terragrunt.hcl`
 >
-> **Last reviewed:** 2026-05-15
+> **Last reviewed:** 2026-06-01
 
 ---
 
@@ -52,11 +52,12 @@ interpolation, automatic JSON formatting).
 1. **Open `scps.tf`** and locate the relevant `data "aws_iam_policy_document"` block.
    Each SCP is clearly labeled with a comment (e.g., `# SCP 3: enforce-encryption`).
 
-2. **Make your changes.** For example, to add a deny for unencrypted S3 uploads to the
-   `enforce-encryption` SCP:
+2. **Make your changes.** For example, the statement below denies unencrypted S3 uploads in the
+   `enforce-encryption` SCP (shown as a syntax example — this particular `DenyUnencryptedS3Uploads`
+   statement already ships in the module; use the same shape for a genuinely new statement):
 
    ```hcl
-   # Add this statement inside data "aws_iam_policy_document" "enforce_encryption"
+   # Statement inside data "aws_iam_policy_document" "enforce_encryption"
    statement {
      sid       = "DenyUnencryptedS3Uploads"
      effect    = "Deny"
@@ -94,11 +95,18 @@ interpolation, automatic JSON formatting).
 ### Modifying Exempt Roles
 
 To change which roles are exempt from SCP deny statements, modify `var.exempt_roles`
-in `terragrunt.hcl`:
+in `terragrunt.hcl`. **The current live value has three roles — keep them and append**;
+dropping `PlatformDeployer` or `github-actions-terratest` will break Terragrunt apply and
+the Terratest CI respectively:
 
 ```hcl
 inputs = {
-  exempt_roles = ["OrganizationAccountAccessRole", "EmergencyBreakGlassRole"]
+  exempt_roles = [
+    "OrganizationAccountAccessRole", # break-glass (AWS-created per account)
+    "PlatformDeployer",              # IaC apply role — DO NOT REMOVE
+    "github-actions-terratest",      # CI integration tests — DO NOT REMOVE
+    "EmergencyBreakGlassRole",       # <-- new role being added
+  ]
 }
 ```
 
@@ -414,11 +422,16 @@ dynamic "statement" {
 
 ### Add an Emergency Exempt Role
 
-In `terragrunt.hcl`:
+In `terragrunt.hcl` — **append to the existing three roles, do not replace them**:
 
 ```hcl
 inputs = {
-  exempt_roles = ["OrganizationAccountAccessRole", "BreakGlassRole"]
+  exempt_roles = [
+    "OrganizationAccountAccessRole",
+    "PlatformDeployer",         # keep — IaC apply
+    "github-actions-terratest", # keep — CI tests
+    "BreakGlassRole",           # <-- emergency role being added
+  ]
 }
 ```
 
