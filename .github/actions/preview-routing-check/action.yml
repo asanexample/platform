@@ -1,0 +1,30 @@
+name: Preview Routing Check (HTTPRoute backendRef rewrite)
+description: >-
+  Regression guard for PR preview environments (ADR-032, issue #155). Renders an app's kustomize dir
+  the way ArgoCD's PR-preview ApplicationSet does — applying a `namePrefix` — and fails if any Gateway
+  API HTTPRoute backendRef is NOT rewritten to the prefixed (preview) Service. HTTPRoute is a CRD, so
+  without the app's `name-reference.yaml` kustomize config a prefixed preview HTTPRoute keeps pointing
+  at the un-prefixed (stable) Service, silently serving stable pods under a preview URL. Cluster-free;
+  needs no AWS credentials or secrets, so it is safe on pull_request (including forks). The calling
+  workflow must check out the repo first (actions/checkout).
+inputs:
+  manifests-path:
+    description: Path in the calling repo to the app's kustomize dir (contains kustomization.yaml).
+    required: false
+    default: k8s/preprod
+  prefix:
+    description: Test namePrefix used to simulate a PR preview overlay (must end with '-').
+    required: false
+    default: pr-citest-
+runs:
+  using: composite
+  steps:
+    - uses: azure/setup-kubectl@v4
+    # ${{ }} expressions are passed via env (not interpolated into the script) to avoid the
+    # shell-injection class (semgrep run-shell-injection / #112), matching kyverno-validate.
+    - name: Assert HTTPRoute backendRefs follow namePrefix
+      shell: bash
+      env:
+        MANIFESTS_PATH: ${{ inputs.manifests-path }}
+        PREFIX: ${{ inputs.prefix }}
+      run: ${{ github.action_path }}/check.sh
