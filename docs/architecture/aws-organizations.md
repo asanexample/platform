@@ -46,6 +46,7 @@ Root (r-xxxx)
 |     |     * protect-data-and-network
 |     |
 |     |-- Account: platform (admin+platform@example.com)
+|     |-- Account: test     (admin+test@example.com)  -- Terratest sandbox
 |
 |-- OU: Workloads
       |-- [SCPs attached at Workloads]:
@@ -57,7 +58,7 @@ Root (r-xxxx)
       |     |-- Account: preprod (admin+preprod@example.com)
       |
       |-- OU: Workloads/Prod
-      |     |-- (no accounts yet)
+      |     |-- Account: prod (admin+prod@example.com)
       |
       |-- OU: Workloads/Regulated
             |-- (no accounts yet)
@@ -189,7 +190,7 @@ infra/live/aws/mgmt/global/organizations/terragrunt.hcl
     |       |-- detects cloud = "aws" from path
     |       |-- configures S3 backend (bucket: tfstate-mgmt-<MGMT_ACCOUNT_ID>)
     |       |-- generates provider_aws.tf (region: us-east-1)
-    |       |-- generates versions.tf (AWS provider 5.91.0)
+    |       |-- generates versions.tf (AWS provider 6.47.0)
     |
     |-- terraform.source = module_source.organizations
     |       resolved to: {repo_root}/infra/modules/aws//organizations
@@ -201,7 +202,7 @@ infra/live/aws/mgmt/global/organizations/terragrunt.hcl
     |     allowed_regions     = ["us-east-1", "us-west-2"]
     |     required_tags       = ["Environment", "ManagedBy", "Owner"]
     |     organizational_units = { ... 5 OUs ... }
-    |     accounts             = { ... 2 accounts ... }
+    |     accounts             = { ... 4 accounts ... }
     |   }
 ```
 
@@ -237,9 +238,15 @@ inputs.create_organization = true
     |      aws_organizations_account.this["platform"]
     |        email     = admin+platform@example.com
     |        parent_id = OU["Platform"].id
+    |      aws_organizations_account.this["test"]
+    |        email     = admin+test@example.com
+    |        parent_id = OU["Platform"].id
     |      aws_organizations_account.this["preprod"]
     |        email     = admin+preprod@example.com
     |        parent_id = OU["Workloads/Preprod"].id
+    |      aws_organizations_account.this["prod"]
+    |        email     = admin+prod@example.com
+    |        parent_id = OU["Workloads/Prod"].id
     |
     +--> Builds default SCP JSON from data sources (scps.tf)
     |      7 default SCPs + 1 optional HIPAA SCP
@@ -330,6 +337,8 @@ use the more secure IMDSv2 metadata service.
 |--------------------------|-----------------------------------------------------|---------|
 | DenyDisableEbsDefault    | Disabling default EBS encryption                    | Yes     |
 | DenyUnencryptedVolumes   | Creating unencrypted EBS volumes                    | No      |
+| DenyUnencryptedEbsOnLaunch | Launching instances with an unencrypted EBS volume | No    |
+| DenyUnencryptedS3Uploads | `s3:PutObject` without server-side encryption       | No      |
 | DenyUnencryptedRds       | Creating unencrypted RDS instances                  | No      |
 | DenyUnencryptedRdsCluster| Creating unencrypted RDS clusters                   | No      |
 | ProtectKmsKeys           | Scheduling key deletion or disabling keys           | Yes     |
@@ -376,10 +385,15 @@ restriction limits the blast radius and simplifies monitoring.
 | DenyDefaultVpc              | Creating default VPCs or subnets                 | Yes     |
 | DenyExternalSharing         | RAM shares that allow external principals        | Yes     |
 | ProtectBackups              | Deleting Glacier archives, Backup vaults/plans/recovery points | Yes |
+| DenyTeamTagTampering        | Mutating the `Team` tag (tag/untag on ECR, IAM roles, Secrets Manager, …) | Yes |
 
 **Why it matters:** Public S3 buckets are one of the most common sources of cloud
 data breaches. Default VPCs have overly permissive default security groups. RAM
 external sharing could leak resources to accounts outside the organization.
+`DenyTeamTagTampering` keeps the `Team` tag non-forgeable so it can be trusted as the
+basis for per-team ABAC (a developer can't relabel a resource onto another team — #62);
+it exempts the platform/deployer roles and AWS service-linked roles that legitimately
+set/propagate the tag.
 
 ### SCP 6: require-tagging
 
@@ -438,13 +452,20 @@ a condition that exempts specific IAM roles:
 condition {
   test     = "ArnNotLike"
   variable = "aws:PrincipalArn"
-  values   = ["arn:aws:iam::*:role/OrganizationAccountAccessRole"]
+  values   = local.exempt_role_arns # one ARN pattern per role in var.exempt_roles
 }
 ```
 
-The default exempt role is `OrganizationAccountAccessRole`, which is the role AWS
-automatically creates in member accounts during account creation. It is assumable
-from the management account.
+The exempt roles are driven by `var.exempt_roles`. The live management unit
+(`infra/live/aws/mgmt/global/organizations/terragrunt.hcl`) sets **three**:
+
+| Role | Why it's exempt |
+|------|-----------------|
+| `OrganizationAccountAccessRole` | AWS-created in every member account, assumable from the management account — the break-glass administrative path (ADR-007). |
+| `PlatformDeployer` | The Terragrunt/IaC apply role (ADR-007). IaC must perform the administrative operations the Deny statements otherwise block (manage encryption defaults, tag resources, etc.). |
+| `github-actions-terratest` | The CI integration-test role in the Test sandbox account; Terratest creates and destroys real resources, so it needs the same administrative latitude. |
+
+Each role name becomes an `arn:aws:iam::*:role/<name>` pattern in `local.exempt_role_arns`.
 
 ### What Exempt Roles CAN Bypass
 
@@ -463,8 +484,8 @@ for infrastructure management:
 
 ### What Exempt Roles CANNOT Bypass
 
-Three statements have **no exemption condition** and apply universally, even to
-the exempt role:
+Several statements have **no exemption condition** and apply universally, even to
+the exempt roles:
 
 | Statement                   | Why No Exemption                                       |
 |-----------------------------|--------------------------------------------------------|
@@ -472,7 +493,9 @@ the exempt role:
 | DenyRootUserActions         | Root user should never be used; this is a hard lockout |
 | DenyRootAccessKeys          | Root access keys should never exist                    |
 | DenyUnencryptedVolumes      | Encryption has no legitimate bypass case               |
-| DenyUnencryptedRds          | Same as above                                          |
+| DenyUnencryptedEbsOnLaunch  | Same as above (enforced at instance launch)            |
+| DenyUnencryptedS3Uploads    | Gated on the encryption header, not the principal — any role must encrypt |
+| DenyUnencryptedRds          | Encryption has no legitimate bypass case               |
 | DenyUnencryptedRdsCluster   | Same as above                                          |
 | EnforceIMDSv2               | IMDSv2 has no legitimate bypass case                   |
 
@@ -533,7 +556,7 @@ split. The largest policies in this module are:
 - **deny-regions**: Contains a long `not_actions` list for global service exemptions.
   This can grow as AWS adds new global services.
 - **hipaa-eligible-services**: Contains the full HIPAA-eligible service allowlist
-  (70+ services). This is the largest single SCP and may approach the byte limit
+  (~90 services). This is the largest single SCP and may approach the byte limit
   as AWS adds new HIPAA-eligible services.
 - **require-tagging**: Grows linearly with the number of required tags (one
   statement per tag).
