@@ -79,9 +79,11 @@ ESO supports two CRD types:
 - `SecretStore` — namespace-scoped, can only create secrets in its own namespace
 - `ClusterSecretStore` — cluster-wide, can create secrets in any namespace
 
-The platform currently uses module-level secret fetching (Terragrunt `run_cmd` or generated data
-sources) rather than ExternalSecret CRDs. The ESO deployment prepares the infrastructure for
-migrating to the declarative ExternalSecret model as more services are onboarded.
+The platform deploys a **`ClusterSecretStore`** (AWS Secrets Manager + SSM backend) via the separate
+**`secret-stores`** module (see [ADR-024](024-secrets-management-architecture.md)). Many secrets still
+flow into Terragrunt at parse time via generated `aws_secretsmanager_secret_version` data sources rather
+than `ExternalSecret` CRDs; the ESO + ClusterSecretStore deployment is the infrastructure for migrating
+to the declarative model as more services are onboarded.
 
 ### Helm Chart Version
 
