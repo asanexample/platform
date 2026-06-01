@@ -1,6 +1,6 @@
-# VIP Platform Naming Conventions
+# Reference Platform Naming Conventions
 
-This document outlines the standard naming conventions used across the VIP Platform infrastructure to ensure consistency across all resources and environments.
+This document outlines the standard naming conventions used across the Reference Platform infrastructure to ensure consistency across all resources and environments.
 
 ## General Structure
 
@@ -335,7 +335,7 @@ locals {
 
 ### Terragrunt Implementation with Naming Module
 
-The VIP Platform uses a centralized naming approach with Terragrunt to manage dependencies between the naming module and resource modules. All three cloud naming modules (`azure/naming`, `aws/naming`, `gcp/naming`) share the same input contract -- `workload`, `environment`, `region_abbv` -- so Terragrunt live configs can pass the same locals regardless of cloud provider.
+The Reference Platform uses a centralized naming approach with Terragrunt to manage dependencies between the naming module and resource modules. All three cloud naming modules (`azure/naming`, `aws/naming`, `gcp/naming`) share the same input contract -- `workload`, `environment`, `region_abbv` -- so Terragrunt live configs can pass the same locals regardless of cloud provider.
 
 1. **Dedicated Naming Module**: A specialized module that generates standardized resource names based on inputs.
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The VIP Platform includes a collection of reusable Terraform modules for deploying infrastructure components across different cloud providers. This document provides an overview of the available modules, their capabilities, and usage patterns.
+The Reference Platform includes a collection of reusable Terraform modules for deploying infrastructure components across different cloud providers. This document provides an overview of the available modules, their capabilities, and usage patterns.
 
 ## Azure Modules
 

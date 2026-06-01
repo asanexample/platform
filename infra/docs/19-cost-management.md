@@ -1,6 +1,6 @@
 # Cost Management Strategy
 
-> **TODO**: This document needs to be written to reflect the actual cost management practices for the VIP Platform. Topics to cover:
+> **TODO**: This document needs to be written to reflect the actual cost management practices for the Reference Platform. Topics to cover:
 >
 > - Tagging strategy for cost allocation (see [12-tagging-strategy.md](./12-tagging-strategy.md) for current tag definitions)
 > - Environment-specific cost optimizations (dev vs prod sizing, NAT gateway consolidation)

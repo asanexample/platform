@@ -140,4 +140,4 @@ No tag enforcement is implemented yet.
 ## Next Steps
 
 Continue to [Module Design Principles](13-module-design.md) to understand
-how the VIP Platform modules are designed and implemented.
+how the Reference Platform modules are designed and implemented.

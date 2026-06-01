@@ -1,6 +1,6 @@
-# VIP Platform Documentation
+# Reference Platform Documentation
 
-Welcome to the VIP Platform documentation. This comprehensive documentation covers all aspects of the multi-cloud infrastructure platform, including design principles, architectural patterns, implementation details, and operational guidance.
+Welcome to the Reference Platform documentation. This comprehensive documentation covers all aspects of the infrastructure platform — design principles, architectural patterns, implementation details, and operational guidance. The platform is **multi-cloud by design but AWS-first today** (Azure/GCP planned).
 
 ## Table of Contents
 
@@ -41,11 +41,11 @@ Welcome to the VIP Platform documentation. This comprehensive documentation cove
 
 ## Getting Started
 
-If you're new to the VIP Platform, we recommend starting with the [Project Introduction](01-introduction.md) and then proceeding to the [Architecture Overview](02-architecture-overview.md). These documents will give you a high-level understanding of the platform before diving into specific details.
+If you're new to the Reference Platform, we recommend starting with the [Project Introduction](01-introduction.md) and then proceeding to the [Architecture Overview](02-architecture-overview.md). These documents will give you a high-level understanding of the platform before diving into specific details.
 
 ## Contributing
 
-To contribute to this documentation, please follow the guidelines in the [Documentation Guide](00-documentation-guide.md). All diagrams should be created according to the standards outlined in the [Diagram Guidelines](diagrams/README.md).
+To contribute to this documentation, please follow the guidelines in the [Documentation Guide](00-documentation-guide.md).
 
 ## Support
 

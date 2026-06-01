@@ -2,11 +2,11 @@
 
 ## Overview
 
-This document outlines the principles and best practices for designing infrastructure modules within the VIP Platform. Properly structured modules are essential for maintainability, reusability, and consistency across infrastructure deployments.
+This document outlines the principles and best practices for designing infrastructure modules within the Reference Platform. Properly structured modules are essential for maintainability, reusability, and consistency across infrastructure deployments.
 
 ## Design Principles
 
-VIP Platform modules follow these core design principles:
+Reference Platform modules follow these core design principles:
 
 1. **Single Responsibility**: Each module should have a clear, focused purpose
 2. **High Cohesion**: Related resources should be grouped together
@@ -378,7 +378,7 @@ Each module should include a comprehensive README.md that contains:
 
 ## Testing Strategy
 
-VIP Platform modules implement a comprehensive testing approach:
+Reference Platform modules implement a comprehensive testing approach:
 
 1. **Unit Tests**: Validate individual resource configurations
 2. **Integration Tests**: Test interactions between resources

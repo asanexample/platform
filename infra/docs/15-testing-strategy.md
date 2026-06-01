@@ -214,5 +214,5 @@ make test MODULE=aks_core                   # Azure specific module
 ## Next Steps
 
 Continue to [Disaster Recovery](16-disaster-recovery.md) to understand how
-the VIP Platform handles business continuity and disaster recovery
+the Reference Platform handles business continuity and disaster recovery
 scenarios.

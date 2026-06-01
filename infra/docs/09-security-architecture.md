@@ -2,7 +2,7 @@
 
 ## Overview
 
-The VIP Platform implements a comprehensive security architecture that enforces defense-in-depth across all infrastructure components. This document outlines the security principles, design patterns, and controls implemented in the platform.
+The Reference Platform implements a comprehensive security architecture that enforces defense-in-depth across all infrastructure components. This document outlines the security principles, design patterns, and controls implemented in the platform.
 
 ## Security Principles
 

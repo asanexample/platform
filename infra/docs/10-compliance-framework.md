@@ -2,7 +2,7 @@
 
 ## Overview
 
-The VIP Platform implements a comprehensive compliance framework that addresses various regulatory requirements and industry standards. This document outlines the compliance controls, implementation patterns, and validation mechanisms used in the platform.
+The Reference Platform implements a comprehensive compliance framework that addresses various regulatory requirements and industry standards. This document outlines the compliance controls, implementation patterns, and validation mechanisms used in the platform.
 
 *This document is under development. The full content will be available soon.*
 
@@ -97,4 +97,4 @@ Compliance controls are encoded in Terraform modules and enforced via the worklo
 
 ## Next Steps
 
-Continue to [Tagging Strategy](12-tagging-strategy.md) to understand how resource tagging is used in the VIP Platform. 
+Continue to [Tagging Strategy](12-tagging-strategy.md) to understand how resource tagging is used in the Reference Platform. 

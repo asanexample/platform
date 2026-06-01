@@ -11,4 +11,4 @@
 ## Next Steps
 
 Continue to [Available Modules](17-available-modules.md) to understand the
-reusable infrastructure components available in the VIP Platform.
+reusable infrastructure components available in the Reference Platform.
