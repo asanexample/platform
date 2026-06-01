@@ -2,11 +2,14 @@
 
 ## Overview
 
-The platform uses a dual testing approach: **Terratest (Go)** for AWS
-modules with full apply/destroy cycles and SDK-based assertions, and
-**Terraform native tests** (`.tftest.hcl`) for Azure modules with
-plan-only validation. CI runs static checks (format, validate, lint) on
-every PR; integration tests run on a weekly schedule.
+The platform standardizes on **Terratest (Go)** for module testing — full
+apply/destroy cycles with AWS SDK-based assertions where post-apply state must
+be validated, and **plan-only** Terratest for modules that cannot be safely
+apply/destroyed in CI. Terraform native tests (`.tftest.hcl`) are **not** used
+(see [Testing Conventions](../../CLAUDE.md#testing-conventions)). Only AWS is
+deployed today; Azure/GCP module tests will follow the same Terratest approach
+when those clouds land. CI runs static checks (format, validate, lint, policy)
+on every PR; integration tests run on a weekly schedule.
 
 ## Testing Principles
 
@@ -16,8 +19,7 @@ every PR; integration tests run on a weekly schedule.
 2. **OpenTofu binary** -- all Terratest options must set
    `TerraformBinary: "tofu"` to match the production toolchain.
 3. **Tests live outside modules** -- test files are never colocated with
-   module code. AWS tests go in `infra/tests/aws/<module>/`, Azure tests
-   in `infra/tests/modules/azure/<module>/`.
+   module code. AWS tests go in `infra/tests/aws/<module>/`.
 4. **Parallel execution** -- Go tests use `t.Parallel()` to run
    concurrently where resource isolation allows.
 
@@ -28,6 +30,7 @@ infra/tests/
 ├── aws/                              # Terratest (Go)
 │   ├── go.mod                        # Module deps: terratest, aws-sdk, testify
 │   ├── go.sum
+│   ├── README.md
 │   ├── networking/
 │   │   ├── networking_test.go        # Test functions
 │   │   ├── helpers_test.go           # AWS clients, fixture helpers, assertions
@@ -40,15 +43,11 @@ infra/tests/
 │       ├── ssm_bastion_test.go
 │       ├── helpers_test.go
 │       └── fixtures/
-└── modules/azure/                    # Terraform native tests
-    ├── aks_core/
-    │   ├── basic.tftest.hcl
-    │   ├── advanced.tftest.hcl
-    │   └── validation.tftest.hcl
-    ├── networking/
-    ├── storage_account/
-    └── ...                           # One directory per Azure module
+└── helpers/                          # Shared Go helpers (e.g. get_public_ip)
+    └── get_public_ip/
 ```
+
+New module tests are added as a sibling directory under `infra/tests/aws/`.
 
 ## AWS Tests (Terratest)
 
@@ -61,7 +60,7 @@ AWS SDK.
 ```text
 github.com/gruntwork-io/terratest   v0.47.2
 github.com/aws/aws-sdk-go          v1.55.8
-github.com/stretchr/testify        v1.10.0
+github.com/stretchr/testify        v1.11.1
 ```
 
 ### Test Patterns
@@ -136,41 +135,11 @@ the Terraform entry point (`main.tf`, `provider.tf`, `versions.tf`) that
 references the module under test. The `.terraform/` directory is cached in
 fixtures to speed up repeated `tofu init` during local development.
 
-## Azure Tests (Terraform Native)
-
-Azure tests use Terraform's built-in `terraform test` command with
-`.tftest.hcl` files. All Azure tests are **plan-only** -- they validate
-resource configuration without creating infrastructure.
-
-```hcl
-run "basic_prometheus_dcr" {
-  command = plan
-
-  variables {
-    resource_group_name  = "test-rg"
-    location             = "eastus"
-    monitor_workspace_id = "/subscriptions/.../accounts/test-monitor"
-  }
-
-  module {
-    source = "../../../../modules/azure/prometheus_dcr"
-  }
-
-  assert {
-    condition     = length(azurerm_monitor_data_collection_rule.this) > 0
-    error_message = "DCR should be planned for creation"
-  }
-}
-```
-
-Azure modules with mock dependencies use a `mocks/` subdirectory to
-provide fake outputs from upstream modules.
-
 ## CI Integration
 
 ### Every PR (`.github/workflows/ci.yml`)
 
-Static checks only -- no infrastructure is provisioned:
+Static checks + policy + security scanning -- no infrastructure is provisioned:
 
 | Job | What It Checks |
 |-----|---------------|
@@ -179,6 +148,12 @@ Static checks only -- no infrastructure is provisioned:
 | TFLint | Linting with `--minimum-failure-severity=error` |
 | Terragrunt HCL Format | `terragrunt hcl fmt --check` |
 | Markdown Lint | `markdownlint-cli2` on changed `.md` files |
+| Kyverno Policy Test | renders the `policy` module's ClusterPolicies and runs `kyverno test` |
+| Kyverno Shift-Left (dogfood) | runs the `kyverno-validate` action against compliant/broken sample apps |
+| Trivy / Semgrep | IaC misconfig + Go SCA + SAST, blocking on HIGH/CRITICAL |
+
+See [Deployment Workflows](14-deployment-workflows.md#ci-on-every-pr-githubworkflowsciyml)
+for the full security-gate detail.
 
 ### Weekly (`.github/workflows/test-aws.yml`)
 
@@ -190,25 +165,24 @@ dispatch available:
 | `test-networking` | 30 min | `go test -v -timeout 25m ./networking/...` |
 | `test-eks` | 45 min | `go test -v -timeout 40m ./eks/...` |
 
-These jobs authenticate via OIDC to the `github-actions-terratest` IAM
-role and run in `us-west-2`.
+These jobs authenticate via GitHub OIDC to the test-sandbox Terratest role
+(`github-actions-terratest`, supplied through the `TEST_ROLE_ARN` repo variable)
+and run in `us-west-2` (the `157263244316` test account — see
+[test-sandbox runbook](../../docs/runbooks/test-sandbox-account.md)).
 
 ## Running Tests Locally
 
 ```bash
-# AWS -- requires active AWS credentials
+# Requires active AWS credentials (PlatformDeployer in the test sandbox account)
 cd infra/tests/aws
 go test -v -timeout 30m ./networking/...    # Single module
 go test -v -timeout 45m ./...               # All AWS tests
 
-# Azure -- requires Azure CLI authentication
-cd infra/tests/modules/azure/<module>
-terraform init && terraform test
-
 # Via Makefile
+make test-aws                               # All AWS Terratest (45m timeout)
 make test-aws-networking                    # AWS networking (30m timeout)
 make test-aws-eks                           # AWS EKS (45m timeout)
-make test MODULE=aks_core                   # Azure specific module
+make test-platctl                           # platctl Go unit tests
 ```
 
 ## Next Steps
