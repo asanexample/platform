@@ -59,7 +59,7 @@ inputs = {
   ])
 
   endpoint_private_access = true
-  endpoint_public_access  = true # Public endpoint required — cross-VPC DNS not yet resolving private endpoint
+  endpoint_public_access  = false # Private-only (matches platform, ADR-010). Reach via preprod Tailscale (operators) or TGW + cross-vpc-dns (ArgoCD on platform).
 
   eks_addons = {} # Managed addons deployed separately in eks-addons unit (BYOCNI ordering)
 
