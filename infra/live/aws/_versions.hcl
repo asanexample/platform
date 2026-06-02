@@ -65,6 +65,7 @@ locals {
     falco               = "${local.source_base}/falco"
     observability       = "${local.source_base}/observability"
     observability_mimir = "${local.source_base}/observability-mimir"
+    crossplane          = "${local.source_base}/crossplane"
   }
 
   # Helm chart version pins — single source of truth across environments
@@ -79,5 +80,6 @@ locals {
     falco                 = "9.0.0"
     kube_prometheus_stack = "86.1.0"
     mimir                 = "6.0.6"
+    crossplane            = "2.3.1" # Crossplane v2 (ADR-046)
   }
 }

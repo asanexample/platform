@@ -1,0 +1,52 @@
+{{- $base := int .Values.webhookBasePort -}}
+{{- range $i, $svc := .Values.providerServices }}
+{{- $wport := add $base (mul $i 10) -}}
+{{- $mport := add $wport 1 -}}
+{{- $hport := add $wport 2 }}
+# One DeploymentRuntimeConfig per provider. It pins the provider pods' ServiceAccount (so the shared EKS Pod
+# Identity association resolves) AND runs the provider on hostNetwork. hostNetwork is required because the EKS
+# managed control plane cannot reach overlay (cluster-pool) pod IPs to invoke the provider's conversion/
+# validation webhooks ("Address is not allowed") — on hostNetwork the webhook is served on the node VPC IP,
+# which is routable. Each provider gets a unique port triplet (webhook/metrics/health) so hostNetwork pods
+# never collide on a node — including with Kyverno's hostNetwork webhooks (9443/9444) and the node's 8080.
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: provider-aws-{{ $svc }}-runtime
+spec:
+  serviceAccountTemplate:
+    metadata:
+      name: {{ $.Values.serviceAccountName }}
+  deploymentTemplate:
+    spec:
+      selector: {}
+      template:
+        spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          containers:
+            - name: package-runtime
+              # Env is merged by name onto the package-generated container, so the Crossplane-injected
+              # TLS_*/POD_* env is preserved. The Service's targetPort=webhook follows the named port below.
+              env:
+                - name: WEBHOOK_PORT
+                  value: "{{ $wport }}"
+                - name: METRICS_BIND_ADDRESS
+                  value: ":{{ $mport }}"
+                - name: HEALTH_PROBE_BIND_ADDRESS
+                  value: ":{{ $hport }}"
+              ports:
+                - name: metrics
+                  containerPort: {{ $mport }}
+                - name: webhook
+                  containerPort: {{ $wport }}
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-aws-{{ $svc }}
+spec:
+  package: {{ $.Values.providerRegistry }}/provider-aws-{{ $svc }}:{{ $.Values.providerVersion }}
+  runtimeConfigRef:
+    name: provider-aws-{{ $svc }}-runtime
+{{- end }}

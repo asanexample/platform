@@ -72,6 +72,10 @@ inputs = {
         policy_arns               = ["arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"]
       }
     }
+    # Serves workload AWS credentials via EKS Pod Identity associations (ADR-041). Required by Crossplane
+    # (the tenant control plane, ADR-046), whose AWS provider authenticates via Pod Identity. Platform
+    # add-ons otherwise use IRSA; this brings the hub cluster in line with preprod. AWS-managed DaemonSet.
+    eks-pod-identity-agent = {}
   }
 
   # gp3 cluster-default StorageClass for dynamic PVCs (observability hub / Mimir, #102 P2).

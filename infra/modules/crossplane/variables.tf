@@ -1,0 +1,122 @@
+variable "create" {
+  description = "Whether to create resources in this module."
+  type        = bool
+  default     = true
+}
+
+# ---------------------------------------------------------------------------
+# Cluster / account context
+# ---------------------------------------------------------------------------
+
+variable "cluster_name" {
+  description = "EKS cluster name the Crossplane provider runs on (target of the Pod Identity association)."
+  type        = string
+}
+
+variable "region" {
+  description = "AWS region (used to scope the ECR repository ARNs the provisioning role may manage)."
+  type        = string
+}
+
+variable "account_id" {
+  description = "Platform AWS account ID that hosts the tenant ECR repositories the provisioning role manages."
+  type        = string
+}
+
+# ---------------------------------------------------------------------------
+# Crossplane core (Helm)
+# ---------------------------------------------------------------------------
+
+variable "namespace" {
+  description = "Namespace Crossplane and its providers run in."
+  type        = string
+  default     = "crossplane-system"
+}
+
+variable "helm_chart_version" {
+  description = "Crossplane Helm chart version (must be v2.x — this module targets the Crossplane v2 API model)."
+  type        = string
+
+  validation {
+    condition     = can(regex("^2\\.", var.helm_chart_version))
+    error_message = "This module requires Crossplane v2 (chart version must start with '2.')."
+  }
+}
+
+variable "helm_repository" {
+  description = "Crossplane Helm chart repository."
+  type        = string
+  default     = "https://charts.crossplane.io/stable"
+}
+
+variable "helm_wait" {
+  description = "Wait for Helm releases to report ready. Keep true so the provider wait-Job gates ProviderConfig."
+  type        = bool
+  default     = true
+}
+
+variable "helm_timeout" {
+  description = "Helm release timeout (seconds). Covers provider package download + becoming Healthy."
+  type        = number
+  default     = 600
+}
+
+# ---------------------------------------------------------------------------
+# AWS providers (Upbound provider-family-aws)
+# ---------------------------------------------------------------------------
+
+variable "provider_registry" {
+  description = "OCI registry + org path the provider packages are pulled from."
+  type        = string
+  default     = "xpkg.upbound.io/upbound"
+}
+
+variable "provider_version" {
+  description = "Version tag for the AWS provider packages (must be v2.x to run the Crossplane v2 API model and support the PodIdentity credential source)."
+  type        = string
+  default     = "v2.5.0"
+}
+
+variable "provider_services" {
+  description = <<-EOT
+    AWS provider-family members to install (e.g. "ecr", "iam", "eks"). P1 installs only "ecr" — the
+    smallest footprint that proves reconciliation + drift correction. Later phases extend this (and the
+    provisioning IAM policy) as the Tenant Composition needs IAM roles / Pod Identity associations.
+  EOT
+  type        = list(string)
+  default     = ["ecr"]
+}
+
+variable "provider_service_account" {
+  description = "ServiceAccount name the provider pods run as (pinned via DeploymentRuntimeConfig so the Pod Identity association can target it). Tenant workloads never use this SA."
+  type        = string
+  default     = "provider-aws"
+}
+
+variable "providerconfig_name" {
+  description = "Name of the ProviderConfig managed resources reference. 'default' is used when an MR omits providerConfigRef."
+  type        = string
+  default     = "default"
+}
+
+variable "wait_image" {
+  description = "kubectl image for the post-install Job that blocks until providers are Healthy (so the aws.upbound.io ProviderConfig CRD — installed by the provider package, not the core chart — exists before ProviderConfig is applied)."
+  type        = string
+  default     = "registry.k8s.io/kubectl:v1.35.0"
+}
+
+# ---------------------------------------------------------------------------
+# Scoped provisioning identity
+# ---------------------------------------------------------------------------
+
+variable "tenant_repo_prefix" {
+  description = "ECR repository name prefix the provisioning role may manage. Tenant repos are 'team-<team>/<app>', so 'team-' scopes the role to tenant repositories only."
+  type        = string
+  default     = "team-"
+}
+
+variable "tags" {
+  description = "Tags applied to AWS resources created by this module."
+  type        = map(string)
+  default     = {}
+}
