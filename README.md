@@ -1,13 +1,69 @@
-# Platform Infrastructure (AWS)
+# Reference Platform
 
-Infrastructure-as-code for a multi-account **AWS** Internal Developer Platform, built with
-**OpenTofu (v1.11)** and **Terragrunt (v1.x)**. The platform provides GitOps delivery, namespace-based
-tenant isolation, private cluster access, a full observability stack, admission-time policy guardrails, and
-a signed software supply chain — across 4 AWS accounts and 2 EKS clusters.
+A **reference architecture and pattern library for platform engineering** — a blueprint for the kind of
+**Internal Developer Platform (IDP)** an enterprise platform team builds so product teams get a Vercel-like
+"push to ship" experience on top of governed, secure, compliant cloud.
 
-> **Scope:** AWS-only. The repo previously carried Azure/GCP scaffolding; those modules and environments have
-> been removed. A `cloudflare/dns_delegation` module remains for DNS delegation. The shared (cloud-agnostic)
-> Kubernetes modules are written to be portable but are exercised only on AWS today.
+It treats the **platform as a product**, not a pile of Terraform. Product teams self-serve through a
+declarative contract ([`teams.hcl`](infra/live/aws/preprod/us-east-1/platform/teams.hcl)), ship along
+**paved roads** (GitOps delivery + a signed software supply chain + per-PR preview environments), and move
+fast inside **guardrails** — policy-as-code enforced at admission — instead of waiting on tickets. The
+platform absorbs the cognitive load of cloud, networking, security, and compliance so developers focus on
+their apps, while governance stays invariant by construction.
+
+The running infrastructure — multi-account AWS, private EKS, GitOps, a self-hosted observability stack, a
+signed supply chain — is real and production-shaped, but it is the **means, not the end**. The deliverable
+is the set of **patterns, contracts, and decisions**: 45 [architecture decision records](docs/adrs/) and a
+full [design-doc set](infra/docs/) you can study, adapt, or lift wholesale.
+
+> **Cloud scope — multi-cloud by design, AWS-first in practice.** A cloud-agnostic Kubernetes/platform layer
+> (`infra/modules/`) sits over per-cloud foundations (`infra/modules/aws/`). AWS is the only cloud
+> implemented today; Azure/GCP are **deferred until the AWS reference is mature**, and the shared modules are
+> written to be portable for that future.
+
+## What it demonstrates
+
+The platform-engineering capabilities an enterprise IDP needs — each implemented end-to-end and documented:
+
+| Capability | How it shows up here |
+|------------|----------------------|
+| **Self-service via contract** | Teams declare identity, apps, hostnames, and AWS access in `teams.hcl`; the platform provisions namespaces, ECR repos, IAM, and policy from it ([ADR-031](docs/adrs/031-multi-app-tenant-model.md)). *This is the interim contract — the north star is portal-driven self-service; see [Where this is heading](#where-this-is-heading--the-back-stack).* |
+| **Golden paths / paved roads** | GitOps delivery (ArgoCD), signed-digest promotion, and per-PR preview environments are the supported, opinionated route to production ([ADR-021](docs/adrs/021-argocd-for-gitops.md)/[032](docs/adrs/032-pr-preview-environments.md)) |
+| **Guardrails, not gates** | Policy-as-code at every layer — org SCPs and Kyverno admission — lets teams move fast without breaking governance ([ADR-014](docs/adrs/014-kyverno-as-policy-engine.md)) |
+| **Multi-tenancy** | Team identity decoupled from app identity; namespace isolation with default-deny networking, quotas, and per-team EKS Pod Identity for AWS access ([ADR-027](docs/adrs/027-hybrid-tenant-isolation-model.md)/[041](docs/adrs/041-pod-identity-for-tenant-workloads.md)) |
+| **Defense in depth** | Layered controls — Organizations/SCPs → IAM (operate-not-author) → private networking → admission policy → runtime detection (Falco) — with **no static credentials** anywhere (IRSA / Pod Identity / OIDC) |
+| **Supply-chain integrity** | cosign keyless signing + CycloneDX SBOM + SLSA Build L3 provenance, **verified at admission** per team ([ADR-042](docs/adrs/042-isolated-build-provenance-slsa-l3.md)) |
+| **Compliance as a capability** | Workloads declare a `compliance_tier` (standard/HIPAA/PCI) that selects controls; SCPs mapped to SOC2/HIPAA/PCI/ISO/NIST/CIS ([ADR-013](docs/adrs/013-compliance-tier-model.md)) |
+| **Self-hosted observability** | Prometheus + Grafana + durable, multi-tenant Mimir — metrics you own, ready for spoke tenants ([ADR-043](docs/adrs/043-self-hosted-observability-stack.md)/[044](docs/adrs/044-mimir-durable-multi-tenant-metrics.md)) |
+| **Day-2 operability** | A purpose-built CLI (`platctl`) for DAG-aware bootstrap/teardown/validate; private cluster access via Tailscale or SSM ([ADR-038](docs/adrs/038-platctl-cli-for-platform-operations.md)) |
+
+## Using this as a reference
+
+- **Platform / DevEx engineers** adopting patterns — start with the [design docs](infra/docs/) (architecture,
+  multi-tenancy, security, supply chain) and compose the [reusable modules](infra/modules/); `infra/live/`
+  shows one opinionated composition.
+- **Architects** evaluating an approach — the [45 ADRs](docs/adrs/) record *why* each choice was made, and
+  what was rejected.
+- **New team members** — the [Onboarding Guide](docs/onboarding.md) and the [Quick Start](#quick-start) below.
+
+## Where this is heading — the BACK stack
+
+Today's self-service is a **declarative contract** (`teams.hcl`) reconciled by the platform team via
+Terragrunt. That's deliberate — the **thinnest viable platform** that proves the tenancy, security, and
+supply-chain model first. With that foundation in place, the next phase is true developer self-service on the
+**BACK stack**:
+
+| | Role | Status |
+|---|------|--------|
+| **B — [Backstage](https://backstage.io/)** | Internal Developer Portal — service catalog + software templates; the self-service front door (replaces hand-edited `teams.hcl` onboarding) | Planned |
+| **A — ArgoCD** | GitOps reconciliation engine | **In place** |
+| **C — [Crossplane](https://www.crossplane.io/)** | Infrastructure control plane — tenant capabilities (namespaces, ECR, IAM, Pod Identity, policy) modeled as Compositions/XRDs and **claimed through the Kubernetes API**, continuously reconciled (replaces Terragrunt for tenant-facing provisioning) | Planned |
+| **K — Kubernetes** | The universal control plane everything rides on | **In place** |
+
+The end state: a developer picks a Backstage template, which scaffolds a repo and a Crossplane claim; ArgoCD
+applies it; Crossplane provisions the resources; Kubernetes runs them — portal-driven, GitOps-reconciled,
+self-served. The patterns in this repo (multi-tenancy, policy-as-code, signed supply chain, observability)
+are the substrate that stack composes onto. This work begins now that the foundation is established.
 
 ## Quick Start
 
@@ -133,7 +189,7 @@ The full dependency DAG is documented in [CLAUDE.md](CLAUDE.md). The preferred d
 | [cluster-rbac](infra/modules/cluster-rbac/) | platform-operator ClusterRole — least-privilege kubectl (ADR-040) |
 | [external-dns](infra/modules/external-dns/) | ExternalDNS Helm with IRSA |
 | [external-secrets](infra/modules/external-secrets/) | External Secrets Operator Helm with IRSA |
-| [falco](infra/modules/falco/) | Runtime threat detection (eBPF) — module available, not yet deployed |
+| [falco](infra/modules/falco/) | Runtime threat detection (eBPF) — deployed on preprod ([ADR-045](docs/adrs/045-falco-runtime-threat-detection.md)) |
 | [gateway-config](infra/modules/gateway-config/) | ClusterIssuer, Gateway, HTTPRoutes (TLS via cert-manager) |
 | [observability](infra/modules/observability/) | Observability hub — kube-prometheus-stack + SNS alerting |
 | [observability-mimir](infra/modules/observability-mimir/) | Durable, multi-tenant, S3-backed metrics store (Mimir) |
