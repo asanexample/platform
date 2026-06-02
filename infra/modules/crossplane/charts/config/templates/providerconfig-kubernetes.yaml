@@ -33,6 +33,13 @@ rules:
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["rolebindings"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Creating a RoleBinding to tenant-developer is an RBAC privilege grant; Kubernetes' escalation check
+  # requires the creator to hold the granted perms OR have "bind" on the referenced role. Grant "bind"
+  # scoped to exactly tenant-developer (resourceNames) — least privilege, no need to mirror edit's perms.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    resourceNames: ["tenant-developer"]
+    verbs: ["bind"]
   # Per-team Kyverno policies (P2b) — cluster-scoped ClusterPolicies.
   - apiGroups: ["kyverno.io"]
     resources: ["clusterpolicies"]
