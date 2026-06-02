@@ -68,8 +68,8 @@ locals {
     complianceTier          = var.compliance_tier
     allowedRegistries       = var.allowed_registries
     tenantRegistryMap       = var.tenant_registry_map
-    excludeNamespaces       = var.exclude_namespaces
-    excludePrincipals       = var.exclude_principals
+    excludeNamespaces       = concat(var.exclude_namespaces, var.extra_exclude_namespaces)
+    excludePrincipals       = concat(var.exclude_principals, var.extra_exclude_principals)
     tenantNamespaceLabel    = var.tenant_namespace_label
     requiredWorkloadLabels  = var.required_workload_labels
     enableMutateDefaults    = var.enable_mutate_defaults

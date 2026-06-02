@@ -1,0 +1,28 @@
+# P1 acceptance smoke test (issue #172) — NOT managed by Terraform; apply/inspect/delete by hand.
+#
+# Proves the AWS provider reconciles a managed resource and drift-corrects it:
+#   kubectl apply -f smoke-ecr-repository.yaml
+#   kubectl get repository.ecr.aws.upbound.io team-xptest-smoke -w   # READY=True SYNCED=True
+#   aws ecr describe-repositories --repository-names team-xptest/smoke --region us-east-1 --profile platform
+#   # delete the repo in the AWS console -> Crossplane recreates it (drift correction)
+#   kubectl delete -f smoke-ecr-repository.yaml                      # repo removed; tear down after
+#
+# Repository name comes from the external-name annotation (metadata.name can't contain "/"). It is under
+# "team-*" so it exercises the provisioning role's repository/team-* scope. NO "Team" tag — the
+# DenyTeamTagTampering SCP denies ecr:TagResource on the Team key for non-exempt roles (fine for P1; P2
+# adds the provisioning role to the org exempt_roles).
+apiVersion: ecr.aws.upbound.io/v1beta1
+kind: Repository
+metadata:
+  name: team-xptest-smoke
+  annotations:
+    crossplane.io/external-name: team-xptest/smoke
+spec:
+  forProvider:
+    region: us-east-1
+    imageTagMutability: IMMUTABLE
+    imageScanningConfiguration:
+      - scanOnPush: true
+    forceDelete: true
+  providerConfigRef:
+    name: default

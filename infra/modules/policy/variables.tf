@@ -79,6 +79,18 @@ variable "exclude_principals" {
   ]
 }
 
+variable "extra_exclude_namespaces" {
+  description = "Additional infrastructure namespaces to exclude, appended to exclude_namespaces. Use this to add per-environment platform add-ons (e.g. crossplane-system) without restating the full default list."
+  type        = list(string)
+  default     = []
+}
+
+variable "extra_exclude_principals" {
+  description = "Additional principal (username) wildcards to exclude, appended to exclude_principals. Use this for per-environment platform controllers that author wildcard RBAC (e.g. Crossplane's rbac-manager) without restating the full default list."
+  type        = list(string)
+  default     = []
+}
+
 variable "tenant_namespace_label" {
   description = "Namespace label that marks tenant namespaces. Tenant-targeted policies match on its presence."
   type        = string

@@ -1,0 +1,15 @@
+# Values are injected by the crossplane Terraform module (helm_release.crossplane_runtime).
+namespace: crossplane-system
+
+# ServiceAccount the provider pods run as. Pinned here so the EKS Pod Identity association (created in
+# Terraform) can target it. All providers share it, so one association credentials them all.
+serviceAccountName: provider-aws
+
+# Provider package source. Packages: <providerRegistry>/provider-aws-<svc>:<providerVersion>.
+providerRegistry: xpkg.upbound.io/upbound
+providerVersion: v2.5.0
+providerServices:
+  - ecr
+
+# kubectl image for the Healthy-gate Job (official, distroless; entrypoint is kubectl).
+waitImage: registry.k8s.io/kubectl:v1.35.0

@@ -1,0 +1,23 @@
+# DeploymentRuntimeConfig pins the provider pods' ServiceAccount name so the EKS Pod Identity association
+# (created in Terraform) resolves. All providers reference it, so they share one SA / one association.
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: {{ .Values.serviceAccountName }}-runtime
+spec:
+  serviceAccountTemplate:
+    metadata:
+      name: {{ .Values.serviceAccountName }}
+  deploymentTemplate: {}
+{{- range .Values.providerServices }}
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-aws-{{ . }}
+spec:
+  package: {{ $.Values.providerRegistry }}/provider-aws-{{ . }}:{{ $.Values.providerVersion }}
+  # All providers run as the pinned SA so a single Pod Identity association credentials them.
+  runtimeConfigRef:
+    name: {{ $.Values.serviceAccountName }}-runtime
+{{- end }}

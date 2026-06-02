@@ -72,8 +72,11 @@ responsibility:
   state are **not** moved to Crossplane: they bootstrap the very cluster Crossplane runs on, change rarely, and
   are operator-, not developer-, facing. OpenTofu + Terragrunt remains the foundation layer; Crossplane is the
   tenant/app layer on top.
-- **Crossplane and Backstage run on the platform (hub) cluster**, delivered via **ArgoCD** (GitOps, like every
-  other platform service), with **IAM Identity Center SSO** for Backstage (consistent with ArgoCD and Grafana).
+- **Crossplane and Backstage run on the platform (hub) cluster**, delivered as **Terragrunt Helm add-on units**
+  like every other platform service (Kyverno, cert-manager, Cilium, ArgoCD itself) — platform components stay
+  on Terragrunt; **ArgoCD delivers tenant/app workloads and the tenant claims/XRs**, not the platform add-ons.
+  **IAM Identity Center SSO** for Backstage (consistent with ArgoCD and Grafana). Whether Crossplane should
+  later self-manage via ArgoCD is a future call, not a P1 decision.
 - **The golden path is preserved**: a Backstage Software Template scaffolds an app repo + a Crossplane Claim +
   an ArgoCD Application; the existing supply-chain verification, admission policy, and observability apply
   unchanged. Backstage is a *thin portal over real, reconciled APIs* — which is why the control plane comes
@@ -85,10 +88,14 @@ The portal is only as good as the APIs it exposes, so Crossplane lands before Ba
 
 - **Phase 0 — foundation (done):** multi-account AWS, EKS, GitOps, policy-as-code, signed supply chain,
   observability; `teams.hcl` as the interim tenant contract.
-- **Phase 1 — Crossplane core:** install Crossplane on the platform cluster (via ArgoCD) with the AWS, Helm,
-  and Kubernetes providers; a least-privilege provisioning identity (its own privileged control-plane role).
+- **Phase 1 — Crossplane core:** install Crossplane v2 on the platform cluster (a Terragrunt Helm add-on unit)
+  with the Upbound AWS provider family; a least-privilege provisioning identity authenticated via EKS Pod
+  Identity (ADR-041), scoped to tenant resources (its own privileged control-plane role). Started ECR-only,
+  extended to IAM + Pod Identity associations as the Tenant Composition (P2) needs them.
 - **Phase 2 — the `Tenant` XRD/Composition:** model the tenant capabilities as a Composition; prove a `Tenant`
-  claim reconciles to the **same** resources the `tenant` module produces today (parity test).
+  claim reconciles to the **same** resources the `tenant` module produces today (parity test). Authored against
+  the **Crossplane v2** API model — composite resources are **namespaced** and the legacy cluster-scoped Claim
+  type is deprecated, so a "claim" here is a namespaced `Tenant` XR; Compositions are function-based pipelines.
 - **Phase 3 — migrate tenants (coexistence):** cut one team (alpha) to a `Tenant` claim, validate parity, then
   migrate the rest team-by-team. `teams.hcl` stays authoritative per team until that team is cut over; retire
   the `tenant` module's tenant provisioning once all teams are migrated.

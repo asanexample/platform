@@ -1,0 +1,93 @@
+# The aws.upbound.io ProviderConfig CRD is installed by the provider PACKAGE (asynchronously), not by the
+# Crossplane core chart. So before the config chart can apply a ProviderConfig, the providers must finish
+# installing. This Job (a post-install/upgrade hook that helm waits on) blocks until the declared providers
+# are Healthy and the ProviderConfig CRD is Established — gating helm_release.crossplane_config.
+#
+# Two single-purpose containers, each invoking the image's kubectl entrypoint directly (no shell needed):
+# an initContainer waits for providers Healthy; the main container waits for the CRD to be Established.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: crossplane-bootstrap-wait
+  namespace: {{ .Values.namespace }}
+---
+# Explicit verbs/resources only — no wildcards (passes restrict-wildcard-rbac regardless of exclusions).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: crossplane-bootstrap-wait
+rules:
+  - apiGroups: ["pkg.crossplane.io"]
+    resources: ["providers"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: crossplane-bootstrap-wait
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: crossplane-bootstrap-wait
+subjects:
+  - kind: ServiceAccount
+    name: crossplane-bootstrap-wait
+    namespace: {{ .Values.namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: crossplane-wait-providers
+  namespace: {{ .Values.namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 900
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      serviceAccountName: crossplane-bootstrap-wait
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: wait-providers-healthy
+          image: {{ .Values.waitImage }}
+          args:
+            - wait
+            - --for=condition=Healthy
+            - provider.pkg.crossplane.io
+            - --all
+            - --timeout=600s
+          resources:
+            requests: { cpu: 25m, memory: 64Mi }
+            limits: { cpu: 100m, memory: 128Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+      containers:
+        - name: wait-providerconfig-crd
+          image: {{ .Values.waitImage }}
+          args:
+            - wait
+            - --for=condition=established
+            - crd/providerconfigs.aws.upbound.io
+            - --timeout=180s
+          resources:
+            requests: { cpu: 25m, memory: 64Mi }
+            limits: { cpu: 100m, memory: 128Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
