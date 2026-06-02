@@ -116,16 +116,18 @@ Summary routes: AWS `10.100.0.0/14`, Azure `10.104.0.0/14`, GCP `10.108.0.0/14`.
 
 ## Kubernetes Network Integration
 
-Kubernetes clusters use Cilium CNI with overlay networking:
+Kubernetes clusters use Cilium CNI with an overlay (cluster-pool IPAM + VXLAN):
 
 | Setting | Value |
 |---------|-------|
-| Network plugin | Cilium (installed post-cluster) |
-| Pod CIDR | `10.240.0.0/16` (overlay, not routed on VPC) |
-| Service CIDR | `10.241.0.0/16` (cluster-internal) |
-| DNS Service IP | `10.241.0.10` |
+| Network plugin | Cilium 1.19.4 (BYOCNI, installed post-cluster) |
+| Pod CIDR | per-cluster `/16` from `10.240.0.0/14` (platform `10.240/16`, preprod `10.241/16`) — overlay, not routed on the VPC |
+| Service CIDR | `172.20.0.0/16` (EKS default; cluster-internal) |
+| DNS Service IP | `172.20.0.10` (CoreDNS) |
 
-Cross-cluster communication uses Cilium ClusterMesh, not L3 routing.
+Pod IPs are decoupled from the VPC; node-to-node pod traffic is VXLAN-encapsulated.
+Cross-cluster pod connectivity (Cilium ClusterMesh) is deferred. See
+[Kubernetes Network Design](08-kubernetes-network-design.md).
 
 ## Cost Considerations
 
