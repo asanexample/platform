@@ -72,11 +72,14 @@ responsibility:
   state are **not** moved to Crossplane: they bootstrap the very cluster Crossplane runs on, change rarely, and
   are operator-, not developer-, facing. OpenTofu + Terragrunt remains the foundation layer; Crossplane is the
   tenant/app layer on top.
-- **Crossplane and Backstage run on the platform (hub) cluster**, delivered as **Terragrunt Helm add-on units**
-  like every other platform service (Kyverno, cert-manager, Cilium, ArgoCD itself) — platform components stay
-  on Terragrunt; **ArgoCD delivers tenant/app workloads and the tenant claims/XRs**, not the platform add-ons.
-  **IAM Identity Center SSO** for Backstage (consistent with ArgoCD and Grafana). Whether Crossplane should
-  later self-manage via ArgoCD is a future call, not a P1 decision.
+- **Crossplane runs on each workload cluster (federated), Backstage on the platform cluster**, delivered as
+  **Terragrunt Helm add-on units** like every other platform service (Kyverno, cert-manager, Cilium, ArgoCD
+  itself) — platform components stay on Terragrunt; **ArgoCD delivers tenant/app workloads and the tenant
+  claims/XRs**, not the platform add-ons. **IAM Identity Center SSO** for Backstage (consistent with ArgoCD
+  and Grafana). *(Topology updated by [ADR-048](048-federated-per-cluster-crossplane.md): Crossplane is
+  per-cluster — each workload cluster provisions its own tenants locally — rather than a single hub on the
+  platform cluster reaching across clusters. The platform cluster keeps its Crossplane as a standard add-on.)*
+  Whether Crossplane should later self-manage via ArgoCD is a future call, not a P1 decision.
 - **The golden path is preserved**: a Backstage Software Template scaffolds an app repo + a Crossplane Claim +
   an ArgoCD Application; the existing supply-chain verification, admission policy, and observability apply
   unchanged. Backstage is a *thin portal over real, reconciled APIs* — which is why the control plane comes
