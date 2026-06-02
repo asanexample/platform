@@ -48,10 +48,15 @@ locals {
       rbac     = { serviceAccount = { annotations = local.irsa_sa_annotations } }
     }
     # The cleanup controller also serves an API-server-called webhook → same hostNetwork need.
+    # On hostNetwork its server (9443) + metrics (8000) become host ports that collide with the
+    # admission controllers'. Move them to 9444/8001 so a 3rd admission HA replica can co-locate on
+    # the cleanup controller's node (otherwise admission_replicas + 1 cleanup > nodes leaves one Pending).
     cleanupController = {
       replicas    = 1
       hostNetwork = var.webhook_host_network
       dnsPolicy   = var.webhook_host_network ? "ClusterFirstWithHostNet" : "ClusterFirst"
+      server      = { port = var.webhook_host_network ? 9444 : 9443 }
+      metering    = { port = var.webhook_host_network ? 8001 : 8000 }
     }
   }
 
