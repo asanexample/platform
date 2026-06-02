@@ -1,0 +1,6 @@
+{{/*
+The Composition carries an inline go-template whose {{ }} must NOT be processed by Helm. It is shipped as a
+raw file and emitted verbatim via .Files.Get (Helm does not re-template the result), so the gotemplating
+delimiters reach Crossplane intact.
+*/ -}}
+{{ .Files.Get "files/composition.yaml" }}

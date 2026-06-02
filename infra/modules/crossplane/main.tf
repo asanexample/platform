@@ -3,6 +3,33 @@ locals {
 
   # Tenant ECR repositories the provisioning role may manage: "repository/team-*" in the platform account.
   ecr_repo_arn = "arn:aws:ecr:${var.region}:${var.account_id}:repository/${var.tenant_repo_prefix}*"
+
+  enable_aws = local.create && length(var.provider_services) > 0
+
+  # AWS family providers share one SA (so a single Pod Identity association credentials them) and serve on
+  # hostNetwork (their CRDs are multi-version → the EKS control plane must reach the conversion webhook).
+  aws_providers = [for svc in var.provider_services : {
+    name           = "provider-aws-${svc}"
+    package        = "${var.provider_registry}/provider-aws-${svc}:${var.provider_version}"
+    serviceAccount = var.provider_service_account
+    hostNetwork    = true
+  }]
+
+  # provider-kubernetes runs in-cluster (InjectedIdentity); its own SA carries a scoped ClusterRole.
+  k8s_provider = var.enable_kubernetes_provider ? [{
+    name           = "provider-kubernetes"
+    package        = var.kubernetes_provider_package
+    serviceAccount = "provider-kubernetes"
+    hostNetwork    = var.kubernetes_provider_hostnetwork
+  }] : []
+
+  providers = concat(local.aws_providers, local.k8s_provider)
+
+  # ProviderConfig CRDs the wait-Job gates on (each installed asynchronously by its provider package).
+  wait_for_crds = concat(
+    local.enable_aws ? ["providerconfigs.aws.upbound.io"] : [],
+    var.enable_kubernetes_provider ? ["providerconfigs.kubernetes.crossplane.io"] : [],
+  )
 }
 
 # ---------------------------------------------------------------------------
@@ -51,12 +78,11 @@ resource "helm_release" "crossplane_runtime" {
   atomic    = var.helm_wait
 
   values = [yamlencode({
-    namespace          = var.namespace
-    serviceAccountName = var.provider_service_account
-    providerRegistry   = var.provider_registry
-    providerVersion    = var.provider_version
-    providerServices   = var.provider_services
-    waitImage          = var.wait_image
+    namespace   = var.namespace
+    waitImage   = var.wait_image
+    providers   = local.providers
+    functions   = var.functions
+    waitForCrds = local.wait_for_crds
   })]
 
   depends_on = [helm_release.crossplane]
@@ -77,10 +103,37 @@ resource "helm_release" "crossplane_config" {
   atomic    = var.helm_wait
 
   values = [yamlencode({
+    namespace          = var.namespace
     providerConfigName = var.providerconfig_name
+    enableAws          = local.enable_aws
+    enableKubernetes   = var.enable_kubernetes_provider
   })]
 
   depends_on = [helm_release.crossplane_runtime]
+}
+
+# ---------------------------------------------------------------------------
+# Tenant API (local chart): the Tenant XRD + Composition + the shared tenant-developer ClusterRole
+# ---------------------------------------------------------------------------
+# Workload clusters only (ADR-048). The Composition (function-go-templating) renders a tenant's Kubernetes
+# resources via provider-kubernetes. Applied after config so the kubernetes ProviderConfig + the function
+# exist. Crossplane core validates XRD/Composition at admission — see the README note on the overlay webhook.
+
+resource "helm_release" "crossplane_tenant" {
+  count = local.create && var.enable_tenant_api ? 1 : 0
+
+  name      = "crossplane-tenant"
+  chart     = "${path.module}/charts/tenant"
+  namespace = var.namespace
+  timeout   = var.helm_timeout
+  wait      = var.helm_wait
+  atomic    = var.helm_wait
+
+  values = [yamlencode({
+    providerConfigName = var.providerconfig_name
+  })]
+
+  depends_on = [helm_release.crossplane_config]
 }
 
 # ---------------------------------------------------------------------------
@@ -93,7 +146,7 @@ resource "helm_release" "crossplane_config" {
 # identity like the deployer role: broadly capable within its scope and a high-value target (ADR-046).
 
 data "aws_iam_policy_document" "assume" {
-  count = local.create ? 1 : 0
+  count = local.enable_aws ? 1 : 0
 
   statement {
     effect  = "Allow"
@@ -107,7 +160,7 @@ data "aws_iam_policy_document" "assume" {
 }
 
 resource "aws_iam_role" "provisioner" {
-  count = local.create ? 1 : 0
+  count = local.enable_aws ? 1 : 0
 
   name               = "crossplane-provisioner-${var.cluster_name}"
   description        = "Crossplane AWS provider - tenant resource provisioning (ECR). EKS Pod Identity (ADR-046)."
@@ -116,7 +169,7 @@ resource "aws_iam_role" "provisioner" {
 }
 
 data "aws_iam_policy_document" "provisioner" {
-  count = local.create ? 1 : 0
+  count = local.enable_aws ? 1 : 0
 
   statement {
     sid    = "TenantEcrRepositories"
@@ -142,7 +195,7 @@ data "aws_iam_policy_document" "provisioner" {
 }
 
 resource "aws_iam_role_policy" "provisioner" {
-  count = local.create ? 1 : 0
+  count = local.enable_aws ? 1 : 0
 
   name   = "tenant-provisioning"
   role   = aws_iam_role.provisioner[0].id
@@ -153,7 +206,7 @@ resource "aws_iam_role_policy" "provisioner" {
 # that credentials the provider pods (no SA annotation). The provider SA is platform-controlled and never
 # used by tenant workloads.
 resource "aws_eks_pod_identity_association" "provisioner" {
-  count = local.create ? 1 : 0
+  count = local.enable_aws ? 1 : 0
 
   cluster_name    = var.cluster_name
   namespace       = var.namespace

@@ -1,0 +1,53 @@
+{{- if .Values.enableKubernetes }}
+# provider-kubernetes authenticates in-cluster (InjectedIdentity = the provider pod's ServiceAccount).
+apiVersion: kubernetes.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: {{ .Values.providerConfigName }}
+spec:
+  credentials:
+    source: InjectedIdentity
+---
+# Scoped RBAC for the provider-kubernetes ServiceAccount — exactly the resource types the Tenant Composition
+# creates, NOT cluster-admin. Explicit verbs/resources only: no wildcards (passes restrict-wildcard-rbac),
+# and it never binds cluster-admin (passes restrict-binding-clusteradmin). Least-privilege per ADR-048.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: crossplane-tenant-provisioner
+rules:
+  # Tenant namespace + governance objects.
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["resourcequotas", "limitranges"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["cilium.io"]
+    resources: ["ciliumnetworkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Developer RoleBindings into the tenant namespace (bound to the shared tenant-developer ClusterRole).
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["rolebindings"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Per-team Kyverno policies (P2b) — cluster-scoped ClusterPolicies.
+  - apiGroups: ["kyverno.io"]
+    resources: ["clusterpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: crossplane-tenant-provisioner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: crossplane-tenant-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: provider-kubernetes
+    namespace: {{ .Values.namespace }}
+{{- end }}

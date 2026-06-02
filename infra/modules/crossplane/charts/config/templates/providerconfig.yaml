@@ -1,4 +1,5 @@
-# EKS Pod Identity credentials (ADR-041): no SA annotation, no OIDC. The provider pods assume the
+{{- if .Values.enableAws }}
+# EKS Pod Identity credentials (ADR-041/047): no SA annotation, no OIDC. The provider pods assume the
 # provisioning IAM role via the Pod Identity association created in Terraform. Cluster-scoped (v2 API).
 apiVersion: aws.upbound.io/v1beta1
 kind: ProviderConfig
@@ -7,3 +8,4 @@ metadata:
 spec:
   credentials:
     source: PodIdentity
+{{- end }}

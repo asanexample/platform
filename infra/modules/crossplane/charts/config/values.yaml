@@ -1,3 +1,9 @@
 # Injected by the crossplane Terraform module (helm_release.crossplane_config).
+namespace: crossplane-system
+
 # Name managed resources reference; "default" is used when an MR omits providerConfigRef.
 providerConfigName: default
+
+# Which ProviderConfigs to render.
+enableAws: false        # AWS family (Pod Identity) — workload + platform clusters that provision AWS
+enableKubernetes: false # provider-kubernetes (InjectedIdentity) — workload clusters with the Tenant API

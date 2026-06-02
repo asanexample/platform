@@ -87,6 +87,14 @@ inputs = {
   allowed_registries  = [local.ecr_registry]
   tenant_registry_map = { for k, v in local.teams : k => "${local.ecr_registry}/team-${k}" }
 
+  # Crossplane (the federated tenant control plane, ADR-046/048) runs here. Its rbac-manager authors wildcard
+  # provider ClusterRoles at runtime as its own ServiceAccount (not the deployer), which the cluster-scoped
+  # restrict-wildcard-rbac policy would otherwise deny in Enforce — blocking the install. Exclude the
+  # crossplane-system control-plane principals (justified like kube-system/argocd) and the namespace. MUST be
+  # applied before the crossplane unit.
+  extra_exclude_principals = ["system:serviceaccount:crossplane-system:*"]
+  extra_exclude_namespaces = ["crossplane-system"]
+
   helm_chart_version = include.base.locals.helm_versions.kyverno
   helm_wait          = true
 

@@ -84,7 +84,44 @@ variable "provider_services" {
     provisioning IAM policy) as the Tenant Composition needs IAM roles / Pod Identity associations.
   EOT
   type        = list(string)
-  default     = ["ecr"]
+  default     = []
+}
+
+# ---------------------------------------------------------------------------
+# provider-kubernetes + Composition functions (federated tenant Composition, ADR-048)
+# ---------------------------------------------------------------------------
+
+variable "enable_kubernetes_provider" {
+  description = "Install provider-kubernetes (in-cluster InjectedIdentity) so a Composition can create the tenant's Kubernetes resources locally. Enabled on workload clusters (preprod/prod), not the platform hub."
+  type        = bool
+  default     = false
+}
+
+variable "kubernetes_provider_package" {
+  description = "OCI package ref for provider-kubernetes."
+  type        = string
+  default     = "xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v1.2.1"
+}
+
+variable "kubernetes_provider_hostnetwork" {
+  description = "Run provider-kubernetes on hostNetwork (only if its CRDs expose an apiserver-facing webhook unreachable under the overlay). Default false; flip if a conversion/validation webhook is unreachable."
+  type        = bool
+  default     = false
+}
+
+variable "functions" {
+  description = "Crossplane Composition Functions to install, as {name, package}. e.g. function-go-templating."
+  type = list(object({
+    name    = string
+    package = string
+  }))
+  default = []
+}
+
+variable "enable_tenant_api" {
+  description = "Install the Tenant XRD + Composition (the federated tenant control plane). Workload clusters only."
+  type        = bool
+  default     = false
 }
 
 variable "provider_service_account" {
