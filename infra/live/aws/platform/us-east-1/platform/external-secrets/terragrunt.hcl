@@ -68,6 +68,10 @@ inputs = {
   helm_chart_version = include.base.locals.helm_versions.external_secrets
   helm_wait          = true
 
+  # Cilium overlay (cluster-pool): EKS control plane can't reach overlay pod IPs, so the webhook
+  # runs on hostNetwork (node VPC IP, port 10261). Applied after the overlay cutover.
+  webhook_host_network = true
+
   # Prometheus metrics + ServiceMonitor for the observability hub dashboards (#102 P1).
   metrics_enabled = true
 
