@@ -1,6 +1,8 @@
-# VIP Platform Naming Conventions
+# Reference Platform Naming Conventions
 
-This document outlines the standard naming conventions used across the VIP Platform infrastructure to ensure consistency across all resources and environments.
+This document outlines the standard naming conventions used across the Reference Platform infrastructure to ensure consistency across all resources and environments.
+
+> **AWS-first:** AWS is the only deployed cloud — the **AWS Resource Type Abbreviations** table below is the live one. The Azure/GCP region and resource tables are kept as **reference** for when those clouds land (multi-cloud by design); they are not in use today. There is **no naming module** — names are composed inline from `workload`/`env`/`region_abbv` locals surfaced by `_base.hcl`.
 
 ## General Structure
 
@@ -15,18 +17,23 @@ Where:
 - `type` is a short abbreviation for the resource (see table below)
 - `workload` is our standard workload identifier (default: "platform")
 - `env` is the environment (dev, test, prod)
-- `region_abbv` is the shortened region name (e.g., eus, wus)
+- `region_abbv` is the shortened region name (e.g., use1, usw2)
 - `purpose` is optional and describes the specific purpose (e.g., "main", "secondary")
 
 ## Environment Abbreviations
 
-| Environment | Abbreviation |
-|-------------|--------------|
-| Development | dev          |
-| Testing     | test         |
-| Staging     | staging      |
-| Production  | prod         |
-| Operations  | ops          |
+The deployed AWS environments (one account each). `dev`/`staging` remain reserved generic
+abbreviations for future use.
+
+| Environment | Abbreviation | Deployed |
+|-------------|--------------|----------|
+| Management  | mgmt         | Yes (Organizations, Identity Center, state) |
+| Platform    | platform     | Yes (hub cluster + shared services) |
+| Test        | test         | Yes (Terratest CI sandbox) |
+| Preprod     | preprod      | Yes (full tenant cluster) |
+| Production  | prod         | Yes (networking + org scaffolding) |
+| Development | dev          | Reserved |
+| Staging     | staging      | Reserved |
 
 ## Region Abbreviations
 
@@ -63,7 +70,9 @@ Where:
 | europe-west1     | euw1         |
 | asia-southeast1  | asse1        |
 
-## Azure Resource Type Abbreviations
+## Azure Resource Type Abbreviations (reference — planned cloud, not deployed)
+
+> Azure is not deployed today. This table is the reserved convention for when Azure lands; the **AWS** table below is the live one.
 
 | Resource Type                              | Abbreviation | Example                                     |
 |--------------------------------------------|--------------|---------------------------------------------|
@@ -123,7 +132,9 @@ AWS names follow the same `{type}-{workload}-{env}-{region}` pattern. For tight-
 | Secrets Manager            | sm           | sm-platform-dev-use1                   |
 | EFS                        | efs          | efs-platform-dev-use1                  |
 
-## GCP Resource Type Abbreviations
+## GCP Resource Type Abbreviations (reference — planned cloud, not deployed)
+
+> GCP is not deployed today. This table is the reserved convention for when GCP lands.
 
 GCP names follow the same `{type}-{workload}-{env}-{region}` pattern. All GCP resource names must be lowercase. For tight-constraint or globally-unique resources (GCS, service accounts), names are collapsed: `{type}{abbv_workload}{env}{region}`.
 
@@ -163,7 +174,12 @@ Examples:
 - `az2-lb-subnet` (Subnet for load balancers in AZ2)
 - `az3-endpoint-subnet` (Subnet for private endpoints in AZ3)
 
-### Storage Accounts
+> The subsections below (Storage Accounts, Container Names, Customer-Specific, Role Assignments,
+> Private Link, Deployment ID) describe **Azure** constructs and are **reference for the planned Azure
+> cloud** — not in use today. The AWS equivalents in production are S3 buckets (see the AWS table above),
+> Secrets Manager, VPC endpoints / PrivateLink, and per-team `team-<team>/<app>` namespaces.
+
+### Storage Accounts (Azure reference)
 
 Storage accounts have a 24 character limit and cannot use hyphens. They follow this pattern:
 
@@ -251,11 +267,11 @@ All resources should include the following standard tags:
 | Environment        | Deployment environment                            | "dev", "test", "prod"              |
 | ManagedBy          | Tool managing the resource                        | "Terragrunt"                       |
 | Component          | System component                                  | "Networking", "Compute", "Storage" |
-| Project            | Project name                                      | "Multi-Cloud Platform"             |
+| Project            | Project name                                      | "Reference Platform"               |
 | DataClassification | Data sensitivity                                  | "Internal", "Confidential"         |
-| Region             | Azure region                                      | "eastus", "westus"                 |
+| Region             | AWS region                                        | "us-east-1", "us-west-2"           |
 | AutoShutdown       | Auto-shutdown eligibility                         | "True", "False"                    |
-| CIDRHierarchy      | For network resources, position in CIDR hierarchy | "Azure-Dev-EastUS"                 |
+| CIDRHierarchy      | For network resources, position in CIDR hierarchy | "AWS-Platform-UsEast1"             |
 | NetworkDesign      | Network design pattern                            | "Kubernetes3AZ"                    |
 | CreatedDate        | Date when the resource was created                | "2023-06-01"                       |
 
@@ -265,7 +281,7 @@ All Terraform modules follow these standard variable naming conventions:
 
 ### Resource Toggle: `create`
 
-Every resource-creating module includes a `variable "create"` (type `bool`, default `true`) that controls whether the module provisions any resources. This is the standard toggle name across all 19 resource-creating modules.
+Every resource-creating module includes a `variable "create"` (type `bool`, default `true`) that controls whether the module provisions any resources. This is the standard toggle name across all resource-creating modules.
 
 - Resources use `count = var.create ? 1 : 0` or `for_each = var.create ? ... : {}`.
 - Outputs return `null` (for scalars) or `{}` (for maps) when `create = false`.
@@ -301,8 +317,8 @@ variable "enable_eks_networking" {
   default     = false
 }
 
-variable "enable_cloud_nat" {
-  description = "Whether to create a Cloud NAT gateway"
+variable "enable_flow_logs" {
+  description = "Whether to enable VPC Flow Logs"
   type        = bool
   default     = true
 }
@@ -316,80 +332,41 @@ Use locals to construct resource names consistently:
 
 ```hcl
 locals {
-  workload      = "platform"
-  environment   = "dev"
-  region        = "eastus"
-  region_abbv   = "eus"
-  component     = "net"
-  
-  # Resource Group
-  resource_group_name = "rg-${local.workload}-${local.environment}-${local.region_abbv}-${local.component}"
-  
-  # Virtual Network
-  vnet_name = "vnet-${local.workload}-${local.environment}-${local.region_abbv}-main"
-  
-  # Storage Account (no hyphens, 24 char limit)
-  storage_account_name = "${local.workload}${local.environment}${local.region_abbv}st001"
+  workload    = "platform"
+  region_abbv = "use1"
+
+  # VPC
+  vpc_name = "vpc-${local.workload}-${local.region_abbv}"
+
+  # EKS cluster
+  cluster_name = "eks-${local.workload}-${local.region_abbv}"
+
+  # S3 bucket (no hyphens needed, lowercase, globally unique — collapse + org prefix)
+  bucket_name = "${var.org_name}-${local.workload}-${local.region_abbv}-data"
 }
 ```
 
-### Terragrunt Implementation with Naming Module
+### How names are composed (no naming module)
 
-The VIP Platform uses a centralized naming approach with Terragrunt to manage dependencies between the naming module and resource modules. All three cloud naming modules (`azure/naming`, `aws/naming`, `gcp/naming`) share the same input contract -- `workload`, `environment`, `region_abbv` -- so Terragrunt live configs can pass the same locals regardless of cloud provider.
-
-1. **Dedicated Naming Module**: A specialized module that generates standardized resource names based on inputs.
-
-2. **Terragrunt Dependency Management**: Terragrunt manages dependencies between modules, passing naming outputs to resource modules.
+There is **no dedicated naming module** today. The composition dimensions (`workload`,
+`environment`, `region_abbv`) are surfaced by `_base.hcl` to every unit via
+`include.base.locals.*`, and unit/module locals compose the name inline:
 
 ```hcl
-# Example naming module configuration in Terragrunt
-# File: infra/live/azure/dev/eastus/naming/terragrunt.hcl
-terraform {
-  source = "${get_repo_root()}/infra/modules/azure//naming"
+# In a unit's terragrunt.hcl / a module's main.tf
+locals {
+  name = "${include.base.locals.workload}-${include.base.locals.env}-${include.base.locals.region_abbv}"
 }
 
 inputs = {
-  workload    = local.workload
-  environment = local.env
-  region_abbv = local.region_abbv
+  cluster_name = "eks-${include.base.locals.workload}-${include.base.locals.region_abbv}" # e.g. eks-platform-use1
+  vpc_name     = "vpc-${include.base.locals.workload}-${include.base.locals.region_abbv}"
 }
 ```
 
-Resource modules don't use the naming module internally, but rather receive naming values through Terragrunt's dependency mechanism:
-
-```hcl
-# Example resource group configuration in Terragrunt
-# File: infra/live/azure/dev/eastus/resource_group/terragrunt.hcl
-
-# Set dependencies for this module
-dependency "naming" {
-  config_path = "../naming"
-  
-  # Mock outputs for plan and validation
-  mock_outputs = {
-    resource_group_name = "mock-rg"
-  }
-}
-
-# Specify inputs specific to this module
-inputs = {
-  # Resource configuration
-  name     = dependency.naming.outputs.resource_group_name
-  location = local.region
-  
-  # Tags and other inputs
-  tags = local.tags
-}
-```
-
-This approach provides several advantages:
-
-1. **Centralized Naming Conventions**: All resource names are generated from a single source of truth.
-2. **Separation of Concerns**: Resources modules focus on resource configuration, not naming logic.
-3. **Consistent Implementation**: The same naming patterns are applied across all environments.
-4. **Flexible Updates**: Naming conventions can be updated centrally without modifying resource modules.
-
-All infrastructure follows this pattern through Terragrunt's dependency management features.
+This keeps the naming dimensions centralized (in `_base.hcl`) while avoiding an extra module +
+dependency in the DAG. If naming complexity grows, a shared naming module with the same
+`workload`/`environment`/`region_abbv` contract could be added without changing callers materially.
 
 ## Reference
 

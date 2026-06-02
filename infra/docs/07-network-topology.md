@@ -2,11 +2,11 @@
 
 ## Overview
 
-The platform implements a multi-cloud, multi-account network topology with per-environment VPCs/VNets. Each environment gets a dedicated /16 CIDR block, and each region within an environment is allocated a /21 block subdivided into 6 specialized subnet tiers across 3 availability zones.
+The platform implements a multi-account network topology with per-environment VPCs. Each environment gets a dedicated /16 CIDR block, and each region within an environment is allocated a /21 block subdivided into 6 specialized subnet tiers across 3 availability zones. AWS is the only deployed cloud today; the CIDR scheme reserves non-overlapping space for Azure/GCP when they land (see [CIDR Allocation](06-cidr-allocation.md)).
 
 ## Design Principles
 
-1. **Multi-Cloud Connectivity**: Non-overlapping CIDRs across AWS, Azure, and GCP enable cross-cloud VPN and interconnect.
+1. **Multi-Cloud Ready**: Non-overlapping CIDRs reserve space across AWS (deployed) and Azure/GCP (planned) to enable cross-cloud VPN and interconnect without renumbering.
 2. **Multi-Account Isolation**: Each AWS account has its own VPC — no shared networking between environments.
 3. **Topology Flexibility**: Three supported topologies — private (NAT), public (direct IGW), and airgapped (no internet).
 4. **Availability Zone Awareness**: Resources distributed across multiple AZs for high availability.
@@ -72,22 +72,27 @@ Subnets are computed from `vpc_cidr` + `azs` using `cidrsubnet()` in each enviro
 | Account | Environment | VPC CIDR | Purpose |
 |---------|-------------|----------|---------|
 | Management (<MGMT_ACCOUNT_ID>) | mgmt | None | Organizations, Identity Center, state backend |
-| Platform (<PLATFORM_ACCOUNT_ID>) | platform | `10.100.0.0/16` | Platform dev, CI/CD, shared services |
-| Preprod (<PREPROD_ACCOUNT_ID>) | preprod | `10.101.0.0/16` | Pre-production workloads |
-| Prod (<PROD_ACCOUNT_ID>) | prod | `10.102.0.0/16` | Production workloads |
+| Platform (<PLATFORM_ACCOUNT_ID>) | platform | `10.100.0.0/16` | Hub EKS cluster, shared services, observability, TGW hub |
+| Preprod (<PREPROD_ACCOUNT_ID>) | preprod | `10.101.0.0/16` | Full tenant cluster (EKS, tenants, Kyverno Enforce), TGW spoke |
+| Prod (<PROD_ACCOUNT_ID>) | prod | `10.102.0.0/16` | Networking + org scaffolding (no cluster yet) |
 
-### Cross-Account Connectivity (Planned)
+### Cross-Account Connectivity
 
-Transit Gateway will connect VPCs when cross-account communication is needed:
+Transit Gateway is **deployed**: the hub lives in the platform account and is shared to spokes via
+RAM (ADR-034). The platform↔preprod attachment is live; the prod attachment is planned (prod has
+networking but no cluster yet).
 
 ```text
-            Transit Gateway
-           /       |        \
-    Platform    Preprod      Prod
-   10.100/16   10.101/16   10.102/16
+            Transit Gateway (hub: platform account)
+           /          |            \
+    Platform       Preprod          Prod
+   10.100/16      10.101/16       10.102/16
+   (hub)          (spoke, live)   (attachment planned)
 ```
 
-Each VPC attaches via its transit subnets (/28 per AZ). TGW route tables control which environments can reach each other.
+Each VPC attaches via its transit subnets (/28 per AZ). TGW route tables control which environments
+can reach each other. EKS-managed private hosted zones are inaccessible cross-VPC, so the platform
+maintains its own **cross-VPC DNS** (deployed) for resolving preprod cluster endpoints over the TGW.
 
 ## Cross-Cloud Connectivity (Planned)
 
@@ -111,16 +116,18 @@ Summary routes: AWS `10.100.0.0/14`, Azure `10.104.0.0/14`, GCP `10.108.0.0/14`.
 
 ## Kubernetes Network Integration
 
-Kubernetes clusters use Cilium CNI with overlay networking:
+Kubernetes clusters use Cilium CNI with an overlay (cluster-pool IPAM + VXLAN):
 
 | Setting | Value |
 |---------|-------|
-| Network plugin | Cilium (installed post-cluster) |
-| Pod CIDR | `10.240.0.0/16` (overlay, not routed on VPC) |
-| Service CIDR | `10.241.0.0/16` (cluster-internal) |
-| DNS Service IP | `10.241.0.10` |
+| Network plugin | Cilium 1.19.4 (BYOCNI, installed post-cluster) |
+| Pod CIDR | per-cluster `/16` from `10.240.0.0/14` (platform `10.240/16`, preprod `10.241/16`) — overlay, not routed on the VPC |
+| Service CIDR | `172.20.0.0/16` (EKS default; cluster-internal) |
+| DNS Service IP | `172.20.0.10` (CoreDNS) |
 
-Cross-cluster communication uses Cilium ClusterMesh, not L3 routing.
+Pod IPs are decoupled from the VPC; node-to-node pod traffic is VXLAN-encapsulated.
+Cross-cluster pod connectivity (Cilium ClusterMesh) is deferred. See
+[Kubernetes Network Design](08-kubernetes-network-design.md).
 
 ## Cost Considerations
 

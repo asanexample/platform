@@ -2,35 +2,22 @@
 
 ## Overview
 
-Each environment maps to a dedicated cloud account (AWS) or subscription
-(Azure). Isolation is enforced at account boundaries, network address
-space, and identity scope. Terragrunt safety validations prevent
-cross-environment deployment mistakes at parse time.
+Each environment maps to a dedicated AWS account. Isolation is enforced at account
+boundaries, network address space, and identity scope. Terragrunt safety validations
+prevent cross-environment deployment mistakes at parse time. (Azure subscriptions / GCP
+projects would map the same way when those clouds land — they are not deployed today.)
 
 ## Current Environments
 
-### AWS
+Only **AWS** is deployed (5 accounts). Azure/GCP are planned (no `live/azure`, `live/gcp`).
 
 | Environment | Account ID | Purpose | Deployed |
 |-------------|-----------|---------|----------|
 | mgmt | <MGMT_ACCOUNT_ID> | Organizations, Identity Center, Terraform state, GitHub OIDC | Yes |
-| platform | <PLATFORM_ACCOUNT_ID> | EKS cluster, platform services, IAM roles | Yes (full stack) |
-| test | <TEST_ACCOUNT_ID> | Terratest CI execution | Yes (OIDC role only) |
-| preprod | <PREPROD_ACCOUNT_ID> | Pre-production workloads | Networking only |
-| prod | <PROD_ACCOUNT_ID> | Production workloads | Networking only |
-
-### Azure
-
-| Environment | Subscription ID | Purpose | Deployed |
-|-------------|----------------|---------|----------|
-| dev | `db4f1d99-0ec0-44eb-90de-41975f9bb68b` | Development and testing | Yes (full AKS stack) |
-| ops | `9dc5edc4-8c4e-41a1-a4f8-2183c4e91954` | Shared operational infrastructure | Yes (full AKS stack) |
-
-### GCP
-
-| Environment | Project | Purpose | Deployed |
-|-------------|---------|---------|----------|
-| ops | `innovation-ops-gcp` | Operational infrastructure | Scaffolded only |
+| platform | <PLATFORM_ACCOUNT_ID> | EKS hub cluster + platform services + observability + IAM roles | Yes (full stack) |
+| test | <TEST_ACCOUNT_ID> | Terratest CI sandbox | Yes (GitHub OIDC + PlatformDeployer) |
+| preprod | <PREPROD_ACCOUNT_ID> | Pre-production tenant workloads | **Yes (full tenant cluster: EKS, tenants, Kyverno Enforce, Falco, Pod Identity)** |
+| prod | <PROD_ACCOUNT_ID> | Production workloads | Networking + org scaffolding (no cluster yet) |
 
 ## Isolation Boundaries
 
@@ -128,8 +115,8 @@ controls:
 
 | Tier | Cluster Model | Network | Extra Controls |
 |------|--------------|---------|----------------|
-| standard (SOC2) | Shared cluster with vCluster | Spoke VNet / VPC | RBAC, private endpoints, audit logging |
-| hipaa | Dedicated cluster | Isolated network | CMK encryption, 365-day logs, host encryption |
+| standard (SOC2) | Shared cluster, **namespace isolation** (vCluster deferred, ADR-033) | Spoke VPC | RBAC, NetworkPolicies, private endpoints, audit logging |
+| hipaa | Dedicated cluster | Isolated network | CMK encryption, 365-day logs, host encryption, restricted PSS + read-only rootfs |
 | pci | Dedicated cluster | CDE-segmented network | All HIPAA controls + WAF, IDS, deny-all network policy |
 
 Currently all deployed workloads use the `standard` tier. HIPAA and PCI
@@ -158,7 +145,7 @@ module. The state key mirrors the directory path:
 
 ```text
 live/aws/platform/us-east-1/platform/eks/terraform.tfstate
-live/azure/dev/eastus/platform/aks_core/terraform.tfstate
+live/aws/preprod/us-east-1/platform/tenants/terraform.tfstate
 ```
 
 This prevents cross-environment state collisions and limits the blast

@@ -2,10 +2,13 @@
 
 ## Overview
 
-The platform supports AWS, Azure, and GCP with a shared configuration
-framework and consistent module interfaces. Cloud-specific modules use
-native services (EKS, AKS, VPCs, VNets); shared modules (Cilium,
-ArgoCD, cert-manager) deploy identically on any cluster.
+The platform is **multi-cloud by design but AWS-first today** — only AWS is
+deployed. The strategy (shared cloud-agnostic modules, a cloud-parameterized
+config hierarchy, consistent module interface contracts, and reserved
+non-overlapping CIDRs per cloud) is what makes adding Azure or GCP a matter of
+populating new directories rather than restructuring. This document describes that
+strategy and the contracts a second cloud would implement; it does **not** describe
+deployed Azure/GCP infrastructure (there is none yet).
 
 ## Design Principles
 
@@ -17,72 +20,47 @@ ArgoCD, cert-manager) deploy identically on any cluster.
 3. **Consistent interfaces** -- networking and naming modules across all
    clouds expose a shared output contract so live configs can consume
    them uniformly.
-4. **Parallel configuration** -- each cloud has its own `_base.hcl`,
-   `_versions.hcl`, and `common.hcl` following the same 7-layer
-   hierarchy. Adding a new cloud means creating these three files and
+4. **Parallel configuration** -- each cloud would have its own `_base.hcl`,
+   `_versions.hcl`, and `common.hcl` following the same 6-layer
+   hierarchy. Adding a new cloud means creating these files and
    populating environment directories.
 
 ## Implementation Status
 
-| Feature | AWS | Azure | GCP |
-|---------|-----|-------|-----|
-| Config hierarchy (`_base.hcl`, `_versions.hcl`, `common.hcl`) | Done | Done | Done |
-| Naming module | Done | Done | Done |
-| Networking module | Done | Done | Done |
-| Kubernetes (EKS / AKS) | Done | Done | -- |
-| Cilium CNI | Done (ENI mode) | Done (overlay) | -- |
-| Node groups / pools | Done | Done | -- |
-| IAM / Identity | Done (IAM roles, IRSA) | Done (managed identities, federated creds) | -- |
-| Organizations / Accounts | Done (Organizations, SCPs, Identity Center) | -- | -- |
-| ArgoCD | Done | -- | -- |
-| cert-manager | Done | -- | -- |
-| external-dns | Done | -- | -- |
-| external-secrets | Done | -- | -- |
-| Tailscale VPN | Done | -- | -- |
-| Gateway ingress | Done | -- | -- |
-| Storage | -- | Done | -- |
-| Container registry | -- | Done | -- |
-| Observability (Grafana, Prometheus) | -- | Done | -- |
-| Front Door / CDN | -- | Done | -- |
-| Key Vault / KMS | Secrets encryption via EKS KMS | Done | -- |
-| Policy (Kyverno) | Available | Available | Available |
-| vCluster | Available | Available | Available |
-| Live deployments | 5 accounts (mgmt, platform, test, preprod, prod) | 2 subscriptions (dev, ops) | Scaffolded (ops) |
+Only **AWS** is deployed. Azure and GCP are **planned** — no `modules/azure`,
+`modules/gcp`, `live/azure`, or `live/gcp` exists today.
 
-AWS and Azure are both production-capable with different strengths: AWS
-has the full Kubernetes platform stack (EKS + add-ons + VPN + GitOps);
-Azure has the full application infrastructure stack (AKS + observability +
-CDN + storage).
+| Capability | AWS | Azure / GCP |
+|------------|-----|-------------|
+| Config hierarchy, networking, naming patterns | Done | Planned (would reuse the shared shape) |
+| Kubernetes (EKS) + Cilium (ENI) + node groups | Done | Planned (AKS/GKE + Cilium overlay) |
+| IAM/Identity (IAM roles, IRSA, Pod Identity) | Done | Planned (managed identities / Workload Identity) |
+| Organizations / Accounts (SCPs, Identity Center) | Done | n/a (AWS-specific) |
+| ArgoCD, cert-manager, external-dns/secrets, Tailscale, gateway | Done | Planned (shared modules, reused) |
+| Kyverno policy, observability (Prometheus/Mimir/Grafana), Falco | Done | Planned (shared modules, reused) |
+| vCluster | Deferred (ADR-033) | — |
+| Live deployments | 5 accounts (mgmt, platform, test, preprod, prod) | none |
+
+AWS is the full reference platform — EKS hub + add-ons + GitOps + VPN +
+policy + observability. The shared modules and contracts below are what a
+second cloud would consume.
 
 ## Module Organization
 
 ```text
 infra/modules/
-├── aws/                    # 12 AWS-specific modules
-│   ├── eks/
-│   ├── networking/
-│   ├── organizations/
+├── aws/                    # AWS-specific modules (eks, networking, organizations,
+│   │                       #   ecr, cloudtrail, transit-gateway, iam_roles, s3, ...)
 │   └── ...
-├── azure/                  # 24 Azure-specific modules
-│   ├── aks_core/
-│   ├── networking/
-│   ├── frontdoor_profile/
-│   └── ...
-├── gcp/                    # 2 GCP-specific modules
-│   ├── naming/
-│   └── networking/
+├── (azure/, gcp/)          # planned — not present today
 ├── cloudflare/             # DNS delegation
-└── (shared modules)        # Cloud-agnostic Helm deployments
-    ├── cilium/
-    ├── argocd/
-    ├── cert-manager/
-    ├── external-dns/
-    ├── external-secrets/
-    ├── tailscale/
-    ├── tailscale-admin/
-    ├── gateway-config/
-    ├── policy/
-    └── vcluster/
+└── (shared modules)        # Cloud-agnostic Helm / K8s deployments
+    ├── cilium/  argocd/  argocd-apps/
+    ├── cert-manager/  external-dns/  external-secrets/  secret-stores/
+    ├── tailscale/  tailscale-admin/  gateway-config/
+    ├── policy/  observability/  observability-mimir/
+    ├── tenant/  cluster-rbac/  eks-pod-identity/
+    └── vcluster/           # deferred (ADR-033)
 ```
 
 ### Cloud-Specific vs Shared
@@ -117,17 +95,19 @@ Each cloud also exposes cloud-specific outputs (e.g., AWS:
 
 ### Naming Contract
 
-All naming modules (`aws/naming`, `azure/naming`, `gcp/naming`) accept
-the same inputs:
+Resource names are derived from the same dimensions everywhere (there is no
+standalone naming module today — names are composed inline from these locals,
+surfaced by `_base.hcl`):
 
 | Input | Type | Description |
 |-------|------|-------------|
 | `workload` | string | Workload identifier (e.g., `platform`) |
-| `environment` | string | Environment name (e.g., `dev`, `prod`) |
-| `region_abbv` | string | Abbreviated region (e.g., `use1`, `eus`, `usc1`) |
+| `environment` | string | Environment name (e.g., `preprod`, `prod`) |
+| `region_abbv` | string | Abbreviated region (e.g., `use1`) |
 
-Names follow the CAF-aligned pattern `{type}-{workload}-{env}-{region}`
-with cloud-specific accommodations for character limits and casing rules.
+Names follow a consistent pattern (see [Naming Conventions](11-naming-conventions.md))
+with cloud-specific accommodations for character limits and casing rules when a
+second cloud is added.
 
 ### Cilium Cloud Modes
 
@@ -141,28 +121,26 @@ appropriate networking mode:
 
 ## Configuration Parity
 
-Each cloud has a parallel directory structure:
+Today only `infra/live/aws/` exists. A second cloud would mirror the same
+directory shape under `infra/live/{cloud}/`:
 
 ```text
-infra/live/
-  aws/                    azure/                  gcp/
-    _base.hcl               _base.hcl               _base.hcl
-    _versions.hcl           _versions.hcl           (not yet)
-    common.hcl              common.hcl              common.hcl
-    {env}/                  {env}/                  {env}/
-      env.hcl                 common.hcl              env.hcl
-      {region}/               {region}/               {region}/
-        region.hcl              region.hcl              region.hcl
-        network.hcl             network.hcl             network.hcl
+infra/live/aws/            (live/{cloud}/ would mirror this)
+  _base.hcl                  # composer: loads layers, merges tags, safety assertions
+  _versions.hcl              # module sources + Helm pins
+  common.hcl                 # cloud-wide defaults; loads secrets.hcl
+  {env}/
+    env.hcl                  # account ID (or subscription/project ID), env tags
+    {region}/
+      region.hcl  network.hcl
 ```
 
-The `_base.hcl` in each cloud loads the same layers, merges tags the
-same way, and runs the same safety validations -- adapted for the
-cloud's identity model (account ID, subscription ID, or project ID).
+A per-cloud `_base.hcl` loads the same layers, merges tags the same way, and runs
+the same safety validations — adapted for the cloud's identity model (account ID,
+subscription ID, or project ID).
 
-See
-[Configuration Hierarchy](../../docs/architecture/config-hierarchy.md#azure-vs-aws-parallel-structure-comparison)
-for a detailed side-by-side comparison.
+See [Configuration Hierarchy](../../docs/architecture/config-hierarchy.md) for the
+full breakdown (and its Multi-Cloud Readiness section).
 
 ## Adding a New Cloud
 

@@ -7,9 +7,9 @@
 2. **Modularity** -- infrastructure is decomposed into single-purpose
    modules (networking, EKS, IAM roles, etc.) composed via Terragrunt
    dependency graphs.
-3. **Multi-cloud portability** -- shared modules (Cilium, ArgoCD,
-   cert-manager, etc.) are cloud-agnostic. Cloud-specific modules live
-   under `infra/modules/{aws,azure,gcp}/`. Live units handle
+3. **Multi-cloud portability (AWS-first)** -- shared modules (Cilium, ArgoCD,
+   cert-manager, etc.) are cloud-agnostic. Cloud-specific modules live under
+   `infra/modules/aws/` today (`azure/`, `gcp/` are planned). Live units handle
    cloud-specific provider configuration.
 4. **Hierarchical configuration** -- settings are defined at the broadest
    applicable layer (cloud, environment, region, workload) and merged at
@@ -17,17 +17,18 @@
 5. **Least privilege** -- IAM roles are purpose-built (PlatformAdmin,
    PlatformDeployer, per-team DeveloperAccess-\<team\>). SCPs enforce guardrails at the
    organization level.
-6. **BYOCNI** -- Cilium replaces the default CNI on all clouds (ENI mode
-   on AWS, overlay on Azure) for consistent network policy, observability,
-   and eBPF-based networking.
+6. **BYOCNI** -- Cilium replaces the default CNI (ENI mode on AWS;
+   `kubeProxyReplacement = true`) for consistent network policy, Hubble
+   observability, and eBPF-based networking. Designed to extend to other clouds
+   (e.g. overlay mode) when they land.
 
 ## Implementation Status
 
 | Cloud | Status | What's Deployed |
 |-------|--------|-----------------|
-| AWS | **Production** | Full EKS platform in us-east-1: networking, IAM, EKS, Cilium, ArgoCD, cert-manager, external-dns, external-secrets, Tailscale VPN, gateway ingress. Preprod and prod accounts have networking only. |
-| Azure | **Development** | AKS clusters in dev (eastus) and ops (westus) with full observability stack (Grafana, Prometheus, Log Analytics), Front Door, storage, container registry. |
-| GCP | **Scaffolded** | Naming and networking modules exist. Live config for ops/us-east1 is defined but no units are deployed. |
+| AWS | **Live** | **Platform** account: full EKS hub in us-east-1 (networking, IAM, EKS, Cilium, node groups, ArgoCD, cert-manager, external-dns/secrets, Kyverno, Tailscale, gateway ingress, **observability + Mimir**). **Preprod** account: a full tenant cluster (EKS, Cilium, tenants/Kyverno-Enforce, public gateway, **Falco**, Pod Identity). **Prod** account: networking + org scaffolding (no cluster yet). |
+| Azure | **Planned** | No `live/azure` or `modules/azure` exists yet. The shared modules and config hierarchy are parameterized so Azure can be added without restructuring (ADR-001/008). |
+| GCP | **Planned** | Same as Azure — reserved in the CIDR plan (ADR-015), not yet present. |
 
 ## AWS Architecture
 
@@ -168,13 +169,16 @@ graph LR
 
 | Service | Chart Version | Purpose |
 |---------|--------------|---------|
-| Cilium | 1.17.2 | CNI (ENI mode, native routing, Hubble observability) |
+| Cilium | 1.19.4 | CNI (ENI mode, `kubeProxyReplacement`, Hubble observability) |
 | ArgoCD | 9.5.14 | GitOps continuous delivery, SSO via Identity Center SAML |
 | cert-manager | 1.17.1 | TLS certificate management (Let's Encrypt, DNS01 via Route53) |
 | external-dns | 1.16.1 | DNS record sync to Route53 |
 | external-secrets | 0.14.3 | Secrets from AWS Secrets Manager + SSM Parameter Store |
-| Kyverno | 3.8.1 | Policy engine — admission `validate` policies (registry/per-team image scoping, RBAC hardening, resource/label requirements) layered above the PSA baseline floor |
+| Kyverno | 3.8.1 | Policy engine — `validate` + `mutate` + cosign image/attestation verification (Enforce) above the PSA baseline floor |
 | Tailscale Operator | 1.96.5 | Mesh VPN subnet router for private cluster access |
+| kube-prometheus-stack | 86.1.0 | Observability hub: Prometheus + Grafana + Alertmanager (platform) |
+| Grafana Mimir | 6.0.6 | Durable, S3-backed, multi-tenant metrics store (platform) |
+| Falco | 9.0.0 | Runtime threat detection (preprod) |
 
 All Helm chart versions are pinned in `infra/live/aws/_versions.hcl`.
 
@@ -232,63 +236,20 @@ The EKS API endpoint is private-only. Two access methods:
 2. **SSM tunnel** (fallback) -- `scripts/eks-tunnel.sh` opens a port
    forward through the SSM bastion to the cluster endpoint.
 
-## Azure Architecture
+## Azure / GCP (Planned)
 
-Azure has 24 modules covering AKS, networking, identity, observability,
-storage, and Front Door. Two environments are deployed:
-
-| Environment | Subscription | Region |
-|-------------|-------------|--------|
-| dev | `db4f1d99-0ec0-44eb-90de-41975f9bb68b` | eastus |
-| ops | `9dc5edc4-8c4e-41a1-a4f8-2183c4e91954` | westus |
-
-Each environment deploys a full stack:
-
-```mermaid
-graph TD
-    RG["resource_group"] --> NET["networking"]
-    RG --> KV["key_vault"]
-    NET --> AKS["aks_core"]
-    AKS --> NP["aks_node_pools"]
-    AKS --> CIL["cilium"]
-
-    RG --> ACR["container_registry"]
-    RG --> LA["log_analytics"]
-    LA --> DS["diagnostic_settings"]
-    RG --> MW["monitor_workspace"]
-    MW --> MG["managed_grafana"]
-    MW --> PDCR["prometheus_dcr"]
-    RG --> MA["monitor_alerts"]
-
-    RG --> FDP["frontdoor_profile"]
-    FDP --> FDE["frontdoor_endpoint"]
-    FDE --> FDPL["frontdoor_private_link"]
-
-    RG --> STR["storage"]
-    STR --> SR["storage_roles"]
-```
-
-Key differences from AWS:
-
-- **Identities**: User-assigned managed identities with federated
-  credentials (no IRSA equivalent needed -- Azure handles this natively)
-- **Observability**: Azure-managed Grafana + Prometheus DCR + Log
-  Analytics (vs self-managed on AWS)
-- **Ingress**: Azure Front Door with private link backends (vs
-  gateway-config with Cilium on AWS)
-- **Cilium**: BYOCNI overlay mode (vs ENI mode on AWS)
-
-## GCP Architecture
-
-GCP has two modules (`naming`, `networking`) that mirror the cross-cloud
-interface contracts. Live configuration exists for an ops environment in
-us-east1 with CIDR `10.102.0.0/16` and 15 planned subnets, but no units
-are deployed yet.
+Azure and GCP are **not deployed** and there are no `modules/azure`, `modules/gcp`,
+`live/azure`, or `live/gcp` trees today. The platform is multi-cloud *by design*:
+the shared modules (Cilium, ArgoCD, cert-manager, External Secrets, tenant, etc.)
+are cloud-agnostic, the live hierarchy is cloud-parameterized (`live/{cloud}/…`),
+and the CIDR plan reserves non-overlapping ranges per cloud (ADR-015), so a second
+cloud can be added without restructuring. When Azure lands it would reuse the shared
+modules with cloud-specific modules under `modules/azure/` and an
+`environment_subscription_map` mirroring the AWS account map (see ADR-008, ADR-001).
 
 ## Configuration Hierarchy
 
-All clouds share the same layered configuration pattern. Each layer is a
-file that Terragrunt loads and merges:
+The layered configuration pattern (AWS today; the same shape applies per cloud):
 
 ```mermaid
 graph TD
@@ -313,11 +274,13 @@ for the full breakdown.
 
 | Cloud | Backend | Location |
 |-------|---------|----------|
-| AWS | S3 + DynamoDB | `tfstate-mgmt-<MGMT_ACCOUNT_ID>` bucket in us-east-1, `terraform-locks` table |
-| Azure | Azure Blob Storage | `tfstatemulticloud` storage account, `terraformstate` container |
+| AWS | S3 + DynamoDB | state bucket (from `secrets.hcl`) in us-east-1, `terraform-locks` lock table |
+
+(An Azure Blob backend would be added when Azure lands; the `root.hcl` backend is
+unconditionally `s3` today.)
 
 State paths follow the directory structure:
-`{env}/{region}/{workload}/{module}/terraform.tfstate`. The S3 bucket and
+`{env}/{region}/{workload}/{unit}/terraform.tfstate`. The S3 bucket and
 DynamoDB table are bootstrapped by the `state-bootstrap` unit in the
 management account. Encryption is enabled on both backends.
 
@@ -329,11 +292,9 @@ lock table.
 
 | Component | Version |
 |-----------|---------|
-| OpenTofu | >= 1.6.0 (CI uses 1.9.0) |
+| OpenTofu | >= 1.6.0 (CI uses 1.9.0; 1.11 in use locally) |
 | Terragrunt | Latest (installed in CI from GitHub releases) |
-| AWS Provider | 6.45.0 |
-| Azure Provider | 4.25.0 |
-| GCP Provider | 6.26.0 |
+| AWS Provider | 6.47.0 |
 | Helm Provider | >= 3.0 |
 | Kubernetes Provider | >= 2.35.0 |
 | Tailscale Provider | ~> 0.29 |

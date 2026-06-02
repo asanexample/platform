@@ -2,7 +2,7 @@
 
 This directory contains the infrastructure reference documentation. It
 covers architecture, design patterns, conventions, and operational guides
-for the multi-cloud platform.
+for the platform — AWS-first today, multi-cloud by design (Azure/GCP planned).
 
 For ADRs, runbooks, and onboarding, see [`docs/`](../../docs/).
 
@@ -32,13 +32,13 @@ For ADRs, runbooks, and onboarding, see [`docs/`](../../docs/).
    - [Module Design Principles](13-module-design.md)
 
 6. **Operations**
-   - [Deployment Workflows](14-deployment-workflows.md) *(TODO)*
+   - [Deployment Workflows](14-deployment-workflows.md)
    - [Testing Strategy](15-testing-strategy.md)
-   - [Disaster Recovery](16-disaster-recovery.md) *(TODO)*
+   - [Disaster Recovery](16-disaster-recovery.md)
 
 7. **Reference**
    - [Available Modules](17-available-modules.md)
-   - [Troubleshooting Guide](18-troubleshooting.md) *(TODO)*
+   - [Troubleshooting Guide](18-troubleshooting.md)
    - [Cost Management Strategy](19-cost-management.md)
    - [Region Scaffolding](20-region-scaffolding.md)
 

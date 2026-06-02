@@ -15,9 +15,10 @@ explicitly to every module via the `tags` input variable.
 2. **Explicit over implicit** -- tags flow through Terragrunt `inputs`, not
    provider-level `default_tags`. Every module receives and applies tags
    explicitly, keeping modules cloud-agnostic and portable.
-3. **Consistency** -- the same tag keys are used across AWS, Azure, and GCP.
-4. **Enforcement** -- required tags are enforced by SCPs on AWS. Azure and
-   GCP enforcement is not yet implemented.
+3. **Consistency** -- the same tag keys are used cloud-agnostically, so the
+   scheme carries over unchanged to Azure/GCP when those clouds land.
+4. **Enforcement** -- required tags are enforced by SCPs on AWS (the deployed
+   cloud). Equivalent Azure Policy / GCP org-policy enforcement is planned.
 
 ## Standard Tags
 
@@ -26,7 +27,7 @@ Every resource receives these tags via the merge chain:
 | Tag Key | Source Layer | Description | Example |
 |---------|-------------|-------------|---------|
 | `ManagedBy` | common.hcl | Tool managing the resource | `Terragrunt` |
-| `Project` | common.hcl | Project name | `Multi-Cloud Platform` |
+| `Project` | common.hcl | Project name | `Reference Platform` |
 | `DataClassification` | common.hcl / env.hcl | Data sensitivity | `Internal`, `Confidential` |
 | `CostCenter` | common.hcl | Cost allocation group | `Engineering` |
 | `Owner` | common.hcl | Responsible team | `Platform Team` |
@@ -34,8 +35,7 @@ Every resource receives these tags via the merge chain:
 | `Environment` | env.hcl | Deployment environment | `platform`, `prod`, `dev` |
 | `AutoShutdown` | env.hcl | Non-prod shutdown automation | `True`, `False` |
 | `AccountAlias` | env.hcl (AWS) | AWS account alias | `platform-use1` |
-| `SubscriptionName` | env.hcl (Azure) | Azure subscription name | `vip-ops` |
-| `Region` | region.hcl | Deployment region | `us-east-1`, `westus` |
+| `Region` | region.hcl | Deployment region | `us-east-1`, `us-west-2` |
 | `Name` | resource-level | Resource identifier | `platform-use1-vpc` |
 
 ### Optional Tags
@@ -70,10 +70,12 @@ module             variable "tags" { type = map(string) }
 resource           tags = merge(var.tags, { Name = "..." })
 ```
 
-AWS and Azure both use this four-layer merge. GCP currently uses three
-layers (no workload tags).
+AWS uses this four-layer merge. The same composition applies to Azure/GCP
+when those `live/` trees are added (mirroring `live/aws/`).
 
 ### Source Files
+
+Only `live/aws/` exists today; an Azure/GCP tree would mirror this layout.
 
 | Cloud | Layer | File |
 |-------|-------|------|
@@ -82,11 +84,6 @@ layers (no workload tags).
 | AWS | Region | `infra/live/aws/{env}/{region}/region.hcl` |
 | AWS | Workload | `infra/live/aws/{env}/{region}/{workload}/workload.hcl` |
 | AWS | Merge | `infra/live/aws/_base.hcl` |
-| Azure | Common | `infra/live/azure/common.hcl` |
-| Azure | Environment | `infra/live/azure/{env}/common.hcl` |
-| Azure | Region | `infra/live/azure/{env}/{region}/region.hcl` |
-| Azure | Workload | `infra/live/azure/{env}/{region}/{workload}/workload.hcl` |
-| Azure | Merge | `infra/live/azure/_base.hcl` |
 
 ## Module Implementation
 
@@ -127,17 +124,13 @@ The SCP is defined in `infra/modules/aws/organizations/scps.tf` and
 attached to the Workloads organizational unit. It uses `aws:RequestTag`
 conditions to enforce tag presence at creation time.
 
-### Azure
+### Azure / GCP (planned)
 
-No centralized tag enforcement is implemented yet. Azure modules define
-`default_tags` locally as a fallback, but there is no Azure Policy
-assignment requiring tags.
-
-### GCP
-
-No tag enforcement is implemented yet.
+Azure and GCP are not deployed today. When they land, equivalent enforcement
+(Azure Policy `require`/`deny` effects; GCP organization policy + label
+constraints) will mirror the AWS `require-tagging` SCP using the same tag keys.
 
 ## Next Steps
 
 Continue to [Module Design Principles](13-module-design.md) to understand
-how the VIP Platform modules are designed and implemented.
+how the Reference Platform modules are designed and implemented.
