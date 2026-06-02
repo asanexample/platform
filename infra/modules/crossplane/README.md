@@ -1,28 +1,56 @@
 # Crossplane
 
-Installs [Crossplane](https://crossplane.io) **v2** as the tenant control plane on the platform (hub)
-cluster, with the Upbound AWS provider family authenticated via **EKS Pod Identity**. Phase 1 of the BACK
-stack ([ADR-046](../../../docs/adrs/046-back-stack-for-developer-self-service.md)).
+Installs [Crossplane](https://crossplane.io) **v2** as the tenant control plane, **federated per workload
+cluster** ([ADR-048](../../../docs/adrs/048-federated-per-cluster-crossplane.md)) — each cluster runs its own
+Crossplane and provisions its own tenants locally. Part of the BACK stack
+([ADR-046](../../../docs/adrs/046-back-stack-for-developer-self-service.md)).
 
-Crossplane provisions **tenant-facing** resources (P1: ECR repositories; later phases: IAM roles + Pod
-Identity associations + the `Tenant` Composition). Foundational/platform infra stays on Terragrunt.
+Two roles, selected by inputs:
+
+- **Platform (hub) cluster** — Upbound AWS provider family (Pod Identity) for shared AWS provisioning (P1:
+  ECR repositories).
+- **Workload clusters (preprod/prod)** — `provider-kubernetes` (in-cluster) + Composition Functions + the
+  **`Tenant` XRD/Composition**, which renders a tenant's Kubernetes resources (namespace, quota, limits,
+  NetworkPolicies, CiliumNetworkPolicies, developer RoleBinding) — parity with `infra/modules/tenant`. AWS
+  per-tenant resources (IAM role, Pod Identity association, cross-account ECR) arrive in P2b.
+
+Foundational/platform infra stays on Terragrunt.
 
 ## Usage
 
+**Platform (hub) — AWS provisioning:**
+
 ```hcl
 module "crossplane" {
-  source = "../../modules/crossplane"
-
-  create             = true
+  source             = "../../modules/crossplane"
   cluster_name       = "platform-use1-eks"
   region             = "us-east-1"
   account_id         = "<platform-account-id>"
   helm_chart_version = "2.3.1"
+  provider_services  = ["ecr"] # Upbound AWS family members
+  tags               = local.tags
+}
+```
 
-  # P1 default: ECR only. Later phases extend provider_services (and the provisioning IAM policy).
-  provider_services = ["ecr"]
+**Workload cluster (preprod) — the Tenant API:**
 
-  tags = local.tags
+```hcl
+module "crossplane" {
+  source             = "../../modules/crossplane"
+  cluster_name       = "preprod-use1-eks"
+  region             = "us-east-1"
+  account_id         = "<preprod-account-id>"
+  helm_chart_version = "2.3.1"
+
+  provider_services               = []   # AWS arrives in P2b
+  enable_kubernetes_provider      = true
+  kubernetes_provider_hostnetwork = true # Object CRD is multi-version → conversion webhook must be reachable
+  functions = [
+    { name = "function-go-templating", package = "xpkg.upbound.io/crossplane-contrib/function-go-templating:v0.12.1" },
+    { name = "function-auto-ready", package = "xpkg.upbound.io/crossplane-contrib/function-auto-ready:v0.6.5" },
+  ]
+  enable_tenant_api = true
+  tags              = local.tags
 }
 ```
 

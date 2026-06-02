@@ -1,0 +1,76 @@
+# The Tenant API. Crossplane v2 XRD, Cluster-scoped: a Tenant provisions a namespace + cluster-scoped
+# policies (it is not "in" a namespace), and Cluster scope composes resources across namespaces. Being
+# cluster-scoped also means creating an XTenant requires cluster RBAC — tenants cannot self-provision
+# (security gate S1); claims are delivered by a platform-controlled GitOps path.
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xtenants.platform.refplat.org
+spec:
+  scope: Cluster
+  group: platform.refplat.org
+  names:
+    kind: XTenant
+    plural: xtenants
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                team:
+                  type: string
+                  description: Team name. The tenant namespace is "team-<team>".
+                gatewayNamespace:
+                  type: string
+                  description: Namespace of the shared Gateway (ingress source).
+                  default: default
+                hostnames:
+                  type: array
+                  description: Gateway-API route hostnames the team may claim (enforced in P2b).
+                  items:
+                    type: string
+                  default: []
+                resourceQuota:
+                  type: object
+                  description: Per-namespace ResourceQuota. Defaults match the tenant module.
+                  properties:
+                    cpu:
+                      type: string
+                      default: "4"
+                    memory:
+                      type: string
+                      default: "8Gi"
+                    pods:
+                      type: integer
+                      default: 20
+                    services:
+                      type: integer
+                      default: 20
+                    loadbalancers:
+                      type: integer
+                      default: 0
+                    pvcs:
+                      type: integer
+                      default: 10
+                    storage:
+                      type: string
+                      default: "50Gi"
+                  default: {}
+                complianceTier:
+                  type: string
+                  enum: ["standard", "hipaa", "pci"]
+                  default: standard
+              required:
+                - team
+            status:
+              type: object
+              properties:
+                namespace:
+                  type: string
+                  description: The provisioned tenant namespace.

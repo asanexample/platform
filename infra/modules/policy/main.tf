@@ -7,6 +7,10 @@ locals {
   verify_failure_policy = var.verify_failure_action == "Enforce" ? "Fail" : "Ignore"
   attest_failure_policy = var.attest_failure_action == "Enforce" ? "Fail" : "Ignore"
 
+  # Cleanup controller webhook server port — moved off 9443 on hostNetwork to avoid colliding with the
+  # admission controllers (which also bind 9443 on the host). Its health probes must follow it.
+  cleanup_server_port = var.webhook_host_network ? 9444 : 9443
+
   # Kyverno needs ECR read (IRSA) to fetch cosign signatures for verifyImages (Phase 3).
   create_irsa = local.create && var.enable_image_verification && var.oidc_provider_arn != ""
   irsa_sa_annotations = local.create_irsa ? {
@@ -51,13 +55,42 @@ locals {
     # On hostNetwork its server (9443) + metrics (8000) become host ports that collide with the
     # admission controllers'. Move them to 9444/8001 so a 3rd admission HA replica can co-locate on
     # the cleanup controller's node (otherwise admission_replicas + 1 cleanup > nodes leaves one Pending).
-    cleanupController = {
+    # The chart does NOT derive the probe ports from server.port (they default to 9443), so when the
+    # server moves to 9444 the probes still hit 9443 — which only "works" if an admission pod (9443) is
+    # co-located on the same node; on a single-replica cluster the cleanup pod can land on a node with
+    # nothing on 9443 → probe fails → rollout stalls. Pin the probes to the cleanup server port too.
+    cleanupController = merge({
       replicas    = 1
       hostNetwork = var.webhook_host_network
       dnsPolicy   = var.webhook_host_network ? "ClusterFirstWithHostNet" : "ClusterFirst"
-      server      = { port = var.webhook_host_network ? 9444 : 9443 }
+      server      = { port = local.cleanup_server_port }
       metering    = { port = var.webhook_host_network ? 8001 : 8000 }
-    }
+      }, var.webhook_host_network ? {
+      startupProbe = {
+        httpGet             = { path = "/health/liveness", port = local.cleanup_server_port, scheme = "HTTPS" }
+        failureThreshold    = 20
+        initialDelaySeconds = 2
+        periodSeconds       = 6
+        successThreshold    = 1
+        timeoutSeconds      = 1
+      }
+      livenessProbe = {
+        httpGet             = { path = "/health/liveness", port = local.cleanup_server_port, scheme = "HTTPS" }
+        failureThreshold    = 2
+        initialDelaySeconds = 15
+        periodSeconds       = 30
+        successThreshold    = 1
+        timeoutSeconds      = 5
+      }
+      readinessProbe = {
+        httpGet             = { path = "/health/readiness", port = local.cleanup_server_port, scheme = "HTTPS" }
+        failureThreshold    = 6
+        initialDelaySeconds = 5
+        periodSeconds       = 10
+        successThreshold    = 1
+        timeoutSeconds      = 5
+      }
+    } : {})
   }
 
   # Policies (local chart) values — all dynamic, environment-specific knobs live here so the module

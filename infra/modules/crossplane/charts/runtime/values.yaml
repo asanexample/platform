@@ -1,19 +1,32 @@
 # Values are injected by the crossplane Terraform module (helm_release.crossplane_runtime).
 namespace: crossplane-system
 
-# ServiceAccount the provider pods run as. Pinned here so the EKS Pod Identity association (created in
-# Terraform) can target it. All providers share it, so one association credentials them all.
-serviceAccountName: provider-aws
-
-# Provider package source. Packages: <providerRegistry>/provider-aws-<svc>:<providerVersion>.
-providerRegistry: xpkg.upbound.io/upbound
-providerVersion: v2.5.0
-providerServices:
-  - ecr
-
-# Base port for the per-provider hostNetwork webhook. Each provider i uses webhook=base+i*10,
+# Base port for per-provider hostNetwork webhooks. Provider at list index i uses webhook=base+i*10,
 # metrics=+1, health=+2 — kept clear of Kyverno's hostNetwork webhooks (9443/9444) and the node's 8080.
 webhookBasePort: 9450
 
 # kubectl image for the Healthy-gate Job (official, distroless; entrypoint is kubectl).
 waitImage: registry.k8s.io/kubectl:v1.35.0
+
+# Providers to install. Each entry:
+#   name           Provider CR + DeploymentRuntimeConfig name
+#   package        OCI package ref
+#   serviceAccount ServiceAccount the provider pods run as (pinned via DRC). AWS providers share one SA so a
+#                  single Pod Identity association credentials them; provider-kubernetes gets its own SA so a
+#                  scoped ClusterRole can be bound to it (InjectedIdentity).
+#   hostNetwork    true for providers whose CRDs the EKS control plane must reach (conversion/validation
+#                  webhooks) — they serve on the node VPC IP since overlay pod IPs are unroutable.
+providers:
+  - name: provider-aws-ecr
+    package: xpkg.upbound.io/upbound/provider-aws-ecr:v2.5.0
+    serviceAccount: provider-aws
+    hostNetwork: true
+
+# Composition Functions to install (Function CRs — no DRC/hostNetwork; called by Crossplane over gRPC).
+functions: []
+
+# ProviderConfig CRDs the Healthy-gate Job waits to be Established before the config chart applies (each
+# installed asynchronously by its provider package).
+waitForCrds:
+  - providerconfigs.aws.upbound.io
+

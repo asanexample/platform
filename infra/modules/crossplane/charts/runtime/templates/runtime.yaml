@@ -1,52 +1,58 @@
 {{- $base := int .Values.webhookBasePort -}}
-{{- range $i, $svc := .Values.providerServices }}
-{{- $wport := add $base (mul $i 10) -}}
-{{- $mport := add $wport 1 -}}
-{{- $hport := add $wport 2 }}
-# One DeploymentRuntimeConfig per provider. It pins the provider pods' ServiceAccount (so the shared EKS Pod
-# Identity association resolves) AND runs the provider on hostNetwork. hostNetwork is required because the EKS
-# managed control plane cannot reach overlay (cluster-pool) pod IPs to invoke the provider's conversion/
-# validation webhooks ("Address is not allowed") — on hostNetwork the webhook is served on the node VPC IP,
-# which is routable. Each provider gets a unique port triplet (webhook/metrics/health) so hostNetwork pods
-# never collide on a node — including with Kyverno's hostNetwork webhooks (9443/9444) and the node's 8080.
+{{- range $i, $p := .Values.providers }}
+{{- $w := add $base (mul $i 10) -}}
+{{- $m := add $w 1 -}}
+{{- $h := add $w 2 }}
+# DeploymentRuntimeConfig pins the provider pods' ServiceAccount (so the Pod Identity association /
+# InjectedIdentity RBAC resolves). hostNetwork providers also get a unique webhook/metrics/health port
+# triplet so they never collide on a node (incl. with Kyverno's hostNetwork webhooks 9443/9444 / the node's
+# 8080) — the EKS control plane can't reach overlay pod IPs for a provider's conversion/validation webhook.
 apiVersion: pkg.crossplane.io/v1beta1
 kind: DeploymentRuntimeConfig
 metadata:
-  name: provider-aws-{{ $svc }}-runtime
+  name: {{ $p.name }}-runtime
 spec:
   serviceAccountTemplate:
     metadata:
-      name: {{ $.Values.serviceAccountName }}
+      name: {{ $p.serviceAccount }}
   deploymentTemplate:
     spec:
       selector: {}
       template:
         spec:
-          hostNetwork: true
-          dnsPolicy: ClusterFirstWithHostNet
           containers:
             - name: package-runtime
-              # Env is merged by name onto the package-generated container, so the Crossplane-injected
-              # TLS_*/POD_* env is preserved. The Service's targetPort=webhook follows the named port below.
+{{- if $p.hostNetwork }}
+              # Env merges by name onto the package-generated container (Crossplane-injected TLS_*/POD_* env
+              # is preserved); the Service's targetPort=webhook follows the named port below.
               env:
-                - name: WEBHOOK_PORT
-                  value: "{{ $wport }}"
-                - name: METRICS_BIND_ADDRESS
-                  value: ":{{ $mport }}"
-                - name: HEALTH_PROBE_BIND_ADDRESS
-                  value: ":{{ $hport }}"
+                - { name: WEBHOOK_PORT, value: "{{ $w }}" }
+                - { name: METRICS_BIND_ADDRESS, value: ":{{ $m }}" }
+                - { name: HEALTH_PROBE_BIND_ADDRESS, value: ":{{ $h }}" }
               ports:
-                - name: metrics
-                  containerPort: {{ $mport }}
-                - name: webhook
-                  containerPort: {{ $wport }}
+                - { name: metrics, containerPort: {{ $m }} }
+                - { name: webhook, containerPort: {{ $w }} }
+{{- end }}
+{{- if $p.hostNetwork }}
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+{{- end }}
 ---
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: provider-aws-{{ $svc }}
+  name: {{ $p.name }}
 spec:
-  package: {{ $.Values.providerRegistry }}/provider-aws-{{ $svc }}:{{ $.Values.providerVersion }}
+  package: {{ $p.package }}
   runtimeConfigRef:
-    name: provider-aws-{{ $svc }}-runtime
+    name: {{ $p.name }}-runtime
+{{- end }}
+{{- range $f := .Values.functions }}
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: {{ $f.name }}
+spec:
+  package: {{ $f.package }}
 {{- end }}

@@ -1,10 +1,11 @@
-# The aws.upbound.io ProviderConfig CRD is installed by the provider PACKAGE (asynchronously), not by the
-# Crossplane core chart. So before the config chart can apply a ProviderConfig, the providers must finish
-# installing. This Job (a post-install/upgrade hook that helm waits on) blocks until the declared providers
-# are Healthy and the ProviderConfig CRD is Established — gating helm_release.crossplane_config.
+# Provider/Function package CRDs (e.g. the aws.upbound.io / kubernetes.crossplane.io ProviderConfig CRDs)
+# are installed by the PACKAGES asynchronously, not by the core chart. So before the config chart can apply
+# ProviderConfigs (and before Compositions reference Functions), packages must finish installing. This Job
+# (a post-install/upgrade hook helm waits on) blocks until providers + functions are Healthy and the
+# required ProviderConfig CRDs are Established — gating helm_release.crossplane_config.
 #
-# Two single-purpose containers, each invoking the image's kubectl entrypoint directly (no shell needed):
-# an initContainer waits for providers Healthy; the main container waits for the CRD to be Established.
+# Single-purpose containers each invoke the image's kubectl entrypoint directly (no shell in the distroless
+# image): initContainers wait for providers (and functions) Healthy; the main container waits for the CRDs.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -18,7 +19,7 @@ metadata:
   name: crossplane-bootstrap-wait
 rules:
   - apiGroups: ["pkg.crossplane.io"]
-    resources: ["providers"]
+    resources: ["providers", "functions"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["apiextensions.k8s.io"]
     resources: ["customresourcedefinitions"]
@@ -70,17 +71,9 @@ spec:
       initContainers:
         - name: wait-providers-healthy
           image: {{ .Values.waitImage }}
-          args:
-            - wait
-            - --for=condition=Healthy
-            - provider.pkg.crossplane.io
-            - --all
-            - --timeout=600s
-          env:
-            - name: HOME
-              value: /tmp
-          volumeMounts:
-            - { name: home, mountPath: /tmp }
+          args: ["wait", "--for=condition=Healthy", "provider.pkg.crossplane.io", "--all", "--timeout=600s"]
+          env: [{ name: HOME, value: /tmp }]
+          volumeMounts: [{ name: home, mountPath: /tmp }]
           resources:
             requests: { cpu: 25m, memory: 64Mi }
             limits: { cpu: 100m, memory: 128Mi }
@@ -88,19 +81,32 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: { drop: ["ALL"] }
+{{- if .Values.functions }}
+        - name: wait-functions-healthy
+          image: {{ .Values.waitImage }}
+          args: ["wait", "--for=condition=Healthy", "function.pkg.crossplane.io", "--all", "--timeout=600s"]
+          env: [{ name: HOME, value: /tmp }]
+          volumeMounts: [{ name: home, mountPath: /tmp }]
+          resources:
+            requests: { cpu: 25m, memory: 64Mi }
+            limits: { cpu: 100m, memory: 128Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+{{- end }}
       containers:
-        - name: wait-providerconfig-crd
+        - name: wait-providerconfig-crds
           image: {{ .Values.waitImage }}
           args:
             - wait
             - --for=condition=established
-            - crd/providerconfigs.aws.upbound.io
+{{- range .Values.waitForCrds }}
+            - crd/{{ . }}
+{{- end }}
             - --timeout=180s
-          env:
-            - name: HOME
-              value: /tmp
-          volumeMounts:
-            - { name: home, mountPath: /tmp }
+          env: [{ name: HOME, value: /tmp }]
+          volumeMounts: [{ name: home, mountPath: /tmp }]
           resources:
             requests: { cpu: 25m, memory: 64Mi }
             limits: { cpu: 100m, memory: 128Mi }

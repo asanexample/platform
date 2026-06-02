@@ -4,5 +4,5 @@ description: >-
   Crossplane AWS ProviderConfig (EKS Pod Identity credential source). Applied as a separate release so the
   runtime chart's Healthy-gate Job guarantees the aws.upbound.io ProviderConfig CRD exists first.
 type: application
-version: 0.1.0
+version: 0.1.1
 appVersion: "2.5.0"

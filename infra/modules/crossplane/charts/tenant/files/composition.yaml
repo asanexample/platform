@@ -1,0 +1,250 @@
+# Tenant Composition (Crossplane v2, Pipeline mode). Renders a tenant's Kubernetes resources as
+# provider-kubernetes Objects via function-go-templating, then marks the XR ready via function-auto-ready.
+# Parity target: infra/modules/tenant/main.tf (namespace, quota, limits, NetworkPolicies, CNPs, RoleBinding).
+# NOTE: this file is shipped raw (.Files.Get) so Helm does not process the inline go-template delimiters.
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: tenant
+  labels:
+    crossplane.io/xrd: xtenants.platform.refplat.org
+spec:
+  compositeTypeRef:
+    apiVersion: platform.refplat.org/v1alpha1
+    kind: XTenant
+  mode: Pipeline
+  pipeline:
+    - step: render-resources
+      functionRef:
+        name: function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: |
+            {{- $spec := .observed.composite.resource.spec }}
+            {{- $team := $spec.team }}
+            {{- $ns := printf "team-%s" $team }}
+            {{- $q := $spec.resourceQuota }}
+            {{- $gw := $spec.gatewayNamespace | default "default" }}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: namespace
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: Namespace
+                  metadata:
+                    name: {{ $ns }}
+                    labels:
+                      app.kubernetes.io/managed-by: crossplane
+                      platform.refplat.org/tenant: {{ $team }}
+                      platform.refplat.org/mode: namespace
+                      pod-security.kubernetes.io/enforce: baseline
+                      pod-security.kubernetes.io/warn: restricted
+                      pod-security.kubernetes.io/audit: restricted
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: resourcequota
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: ResourceQuota
+                  metadata:
+                    name: tenant-quota
+                    namespace: {{ $ns }}
+                  spec:
+                    hard:
+                      requests.cpu: "{{ $q.cpu }}"
+                      requests.memory: "{{ $q.memory }}"
+                      limits.cpu: "{{ $q.cpu }}"
+                      limits.memory: "{{ $q.memory }}"
+                      pods: "{{ $q.pods }}"
+                      services: "{{ $q.services }}"
+                      services.loadbalancers: "{{ $q.loadbalancers }}"
+                      persistentvolumeclaims: "{{ $q.pvcs }}"
+                      requests.storage: "{{ $q.storage }}"
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: limitrange
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: LimitRange
+                  metadata:
+                    name: tenant-limits
+                    namespace: {{ $ns }}
+                  spec:
+                    limits:
+                      - type: Container
+                        default:
+                          cpu: 500m
+                          memory: 512Mi
+                        defaultRequest:
+                          cpu: 100m
+                          memory: 128Mi
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: netpol-default-deny-ingress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: networking.k8s.io/v1
+                  kind: NetworkPolicy
+                  metadata:
+                    name: default-deny-ingress
+                    namespace: {{ $ns }}
+                  spec:
+                    podSelector: {}
+                    policyTypes: ["Ingress"]
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: netpol-allow-gateway-ingress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: networking.k8s.io/v1
+                  kind: NetworkPolicy
+                  metadata:
+                    name: allow-gateway-ingress
+                    namespace: {{ $ns }}
+                  spec:
+                    podSelector: {}
+                    policyTypes: ["Ingress"]
+                    ingress:
+                      - from:
+                          - namespaceSelector:
+                              matchLabels:
+                                kubernetes.io/metadata.name: {{ $gw }}
+                          - namespaceSelector:
+                              matchLabels:
+                                kubernetes.io/metadata.name: kube-system
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: netpol-allow-dns-egress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: networking.k8s.io/v1
+                  kind: NetworkPolicy
+                  metadata:
+                    name: allow-dns-egress
+                    namespace: {{ $ns }}
+                  spec:
+                    podSelector: {}
+                    policyTypes: ["Egress"]
+                    egress:
+                      - ports:
+                          - port: 53
+                            protocol: UDP
+                          - port: 53
+                            protocol: TCP
+                      - to:
+                          - ipBlock:
+                              cidr: 0.0.0.0/0
+                              except: ["169.254.169.254/32"]
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: cnp-allow-gateway-envoy
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: cilium.io/v2
+                  kind: CiliumNetworkPolicy
+                  metadata:
+                    name: allow-gateway-envoy
+                    namespace: {{ $ns }}
+                  spec:
+                    endpointSelector: {}
+                    ingress:
+                      - fromEntities: ["ingress", "remote-node", "host"]
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: cnp-allow-pod-identity-egress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: cilium.io/v2
+                  kind: CiliumNetworkPolicy
+                  metadata:
+                    name: allow-pod-identity-egress
+                    namespace: {{ $ns }}
+                  spec:
+                    endpointSelector: {}
+                    egress:
+                      - toEntities: ["host"]
+                        toPorts:
+                          - ports:
+                              - port: "80"
+                                protocol: TCP
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: rolebinding-developers
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: rbac.authorization.k8s.io/v1
+                  kind: RoleBinding
+                  metadata:
+                    name: tenant-developers
+                    namespace: {{ $ns }}
+                  roleRef:
+                    apiGroup: rbac.authorization.k8s.io
+                    kind: ClusterRole
+                    name: tenant-developer
+                  subjects:
+                    - kind: Group
+                      name: {{ $ns }}:developers
+                      apiGroup: rbac.authorization.k8s.io
+    - step: ready
+      functionRef:
+        name: function-auto-ready
