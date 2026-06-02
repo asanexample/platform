@@ -13,7 +13,7 @@ their apps, while governance stays invariant by construction.
 
 The running infrastructure — multi-account AWS, private EKS, GitOps, a self-hosted observability stack, a
 signed supply chain — is real and production-shaped, but it is the **means, not the end**. The deliverable
-is the set of **patterns, contracts, and decisions**: 47 [architecture decision records](docs/adrs/) and a
+is the set of **patterns, contracts, and decisions**: 48 [architecture decision records](docs/adrs/) and a
 full [design-doc set](infra/docs/) you can study, adapt, or lift wholesale.
 
 > **Cloud scope — multi-cloud by design, AWS-first in practice.** A cloud-agnostic Kubernetes/platform layer
@@ -42,7 +42,7 @@ The platform-engineering capabilities an enterprise IDP needs — each implement
 - **Platform / DevEx engineers** adopting patterns — start with the [design docs](infra/docs/) (architecture,
   multi-tenancy, security, supply chain) and compose the [reusable modules](infra/modules/); `infra/live/`
   shows one opinionated composition.
-- **Architects** evaluating an approach — the [47 ADRs](docs/adrs/) record *why* each choice was made, and
+- **Architects** evaluating an approach — the [48 ADRs](docs/adrs/) record *why* each choice was made, and
   what was rejected.
 - **New team members** — the [Onboarding Guide](docs/onboarding.md) and the [Quick Start](#quick-start) below.
 
@@ -93,7 +93,7 @@ platctl kubeconfig
 platform/
 ├── cmd/platctl/                 # Go CLI for platform operations (bootstrap, teardown, validate, kubeconfig)
 ├── docs/                        # User-facing documentation
-│   ├── adrs/                    # 47 architecture decision records
+│   ├── adrs/                    # 48 architecture decision records
 │   ├── architecture/            # System design, supply chain, observability, tenant model, config hierarchy
 │   ├── compliance/              # SCP → control mapping
 │   ├── runbooks/                # Operational procedures
@@ -254,8 +254,9 @@ Plus [cloudflare/dns_delegation](infra/modules/cloudflare/dns_delegation/) (DNS 
 | Falco for runtime threat detection | [ADR-045](docs/adrs/045-falco-runtime-threat-detection.md) |
 | BACK stack for developer self-service | [ADR-046](docs/adrs/046-back-stack-for-developer-self-service.md) |
 | Pod Identity as the AWS-identity standard | [ADR-047](docs/adrs/047-pod-identity-as-aws-identity-standard.md) |
+| Federated per-cluster Crossplane | [ADR-048](docs/adrs/048-federated-per-cluster-crossplane.md) |
 
-All 47 ADRs: [docs/adrs/](docs/adrs/)
+All 48 ADRs: [docs/adrs/](docs/adrs/)
 
 ## Testing
 
@@ -282,4 +283,4 @@ scanning (Trivy IaC, Semgrep) — via OIDC federation, no stored credentials.
 | [App Supply-Chain Onboarding](docs/runbooks/app-supply-chain-onboarding.md) | Wire signing/SBOM/provenance into app CI |
 | [Tenant Onboarding](docs/runbooks/tenant-onboarding.md) | Add/remove teams via `teams.hcl` |
 | [EKS Cluster Access](docs/runbooks/eks-cluster-access.md) | kubectl setup for engineers |
-| [Architecture Decisions](docs/adrs/) | 47 ADRs documenting every significant choice |
+| [Architecture Decisions](docs/adrs/) | 48 ADRs documenting every significant choice |
