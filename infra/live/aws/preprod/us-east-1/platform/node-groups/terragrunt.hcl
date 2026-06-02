@@ -49,6 +49,9 @@ inputs = {
       max_size       = 4
       min_size       = 2
       labels         = { "node-role" = "system" }
+      # Cilium overlay decouples pods from ENI IPs; lift the kubelet cap off the t3.large
+      # ENI default (~35) to the Kubernetes default so density is bound by CPU/mem, not IPs.
+      max_pods = 110
     }
     # Workload nodes run tenant application pods
     workload = {
@@ -58,6 +61,7 @@ inputs = {
       max_size       = 6
       min_size       = 1
       labels         = { "node-role" = "workload" }
+      max_pods       = 110 # overlay: lift the ENI-based cap (see system node group)
     }
   }
 

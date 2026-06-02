@@ -21,6 +21,10 @@ variable "node_groups" {
     ami_type        = optional(string, "AL2023_x86_64_STANDARD")
     max_unavailable = optional(number, 1)
     labels          = optional(map(string), {})
+    # Override kubelet --max-pods. EKS/AL2023 defaults this to the instance's ENI IP
+    # capacity (e.g. ~35 on t3.large), which artificially caps pod density under a
+    # Cilium overlay (cluster-pool) where pods don't consume ENI IPs. Set higher for overlay.
+    max_pods = optional(number)
   }))
   default = {}
 }
