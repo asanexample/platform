@@ -45,10 +45,13 @@ inputs = {
     system = {
       subnet_ids     = [for name, id in dependency.networking.outputs.subnet_ids : id if can(regex("kubernetes$", name))]
       instance_types = ["t3.large"] # 2 vCPU / 8 GiB — sufficient for platform workloads
-      desired_size   = 2
-      max_size       = 4
-      min_size       = 2
-      labels         = { "node-role" = "system" }
+      # 3 nodes so the ASG covers all 3 AZs — single-replica observability StatefulSets
+      # (Mimir ingester/store-gateway, Prometheus) have AZ-pinned EBS volumes and need a
+      # node in each AZ to schedule. 2 nodes across 3 AZs always left one AZ uncovered.
+      desired_size = 3
+      max_size     = 4
+      min_size     = 3
+      labels       = { "node-role" = "system" }
       # Cilium overlay decouples pods from ENI IPs; lift the kubelet cap off the t3.large
       # ENI default (~35) to the Kubernetes default so density is bound by CPU/mem, not IPs.
       max_pods = 110
