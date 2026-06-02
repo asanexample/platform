@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-30
 
-**Status:** Accepted — narrows [ADR-018](018-irsa-for-pod-identity.md) for tenant workloads.
+**Status:** Accepted — narrows [ADR-018](018-irsa-for-pod-identity.md) for tenant workloads. Broadened by [ADR-047](047-pod-identity-as-aws-identity-standard.md) into the standard for **all** pod-level AWS access (platform components included); the tenant isolation rationale below is unchanged.
 
 ## Context
 

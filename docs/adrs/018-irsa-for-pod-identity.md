@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-23
 
-**Status:** Accepted — **narrowed for tenant workloads by [ADR-041](041-pod-identity-for-tenant-workloads.md)** (platform add-ons keep IRSA; *tenant* workloads use EKS Pod Identity).
+**Status:** Superseded by [ADR-047](047-pod-identity-as-aws-identity-standard.md) — EKS Pod Identity is now the standard for all pod-level AWS access (the agent objection cited here is moot). First narrowed for tenants by [ADR-041](041-pod-identity-for-tenant-workloads.md); existing IRSA add-ons keep working until they migrate at the planned rebuild.
 
 ## Context
 
