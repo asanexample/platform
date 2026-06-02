@@ -105,3 +105,9 @@ variable "helm_wait" {
   type        = bool
   default     = true
 }
+
+variable "webhook_host_network" {
+  description = "Run the external-secrets webhook on hostNetwork (node VPC IP) with port moved off 10250. Required on EKS with an overlay CNI (Cilium cluster-pool), where the managed control plane cannot route to overlay pod IPs. Leave false for VPC-routable (ENI) datapaths."
+  type        = bool
+  default     = false
+}

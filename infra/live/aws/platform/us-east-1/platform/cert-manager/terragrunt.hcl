@@ -71,5 +71,9 @@ inputs = {
   helm_chart_version = include.base.locals.helm_versions.cert_manager
   helm_wait          = true
 
+  # Cilium overlay (cluster-pool): EKS control plane can't reach overlay pod IPs, so the webhook
+  # runs on hostNetwork (node VPC IP, securePort 10260). Applied after the overlay cutover.
+  webhook_host_network = true
+
   tags = include.base.locals.tags
 }

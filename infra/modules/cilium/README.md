@@ -1,23 +1,57 @@
 # Cilium
 
-Deploys Cilium CNI via Helm with cloud-specific configurations for AWS (EKS), Azure (AKS), and GCP (GKE). On AWS, configures ENI-based IPAM, native routing, kube-proxy replacement, and L2 neighbor discovery. On Azure, enables AKS BYOCNI mode with node init. On GCP, uses Kubernetes IPAM with native routing. The module also installs Gateway API CRDs (experimental channel) and enables Cilium's Gateway API controller by default. Includes Hubble observability with relay, UI, and configurable metrics. A `cloud_provider` variable selects the appropriate cloud-specific Helm values overlay.
+Deploys Cilium CNI via Helm with a **configurable datapath** and cloud-specific plumbing for AWS (EKS), Azure (AKS), and GCP (GKE). The pod-networking datapath (IPAM mode, routing mode, tunnel protocol, pod CIDR, masquerade, MTU) is driven by variables and **defaults to an overlay** (`cluster-pool` IPAM + VXLAN tunnel) so pod IP space is decoupled from the VPC and a cluster can scale to many thousands of pods. Setting `ipam_mode="eni"` + `routing_mode="native"` switches AWS to VPC-native routing (pods get routable VPC IPs). A `cloud_provider` variable selects the irreducible per-cloud plumbing (e.g. ENI datapath enablement on AWS, AKS BYOCNI on Azure, GKE on GCP), kube-proxy replacement, and the Hubble TLS method. The module also installs Gateway API CRDs (experimental channel), enables Cilium's Gateway API controller by default, and includes Hubble observability (relay, UI, metrics).
+
+## Pod networking (datapath)
+
+| Variable | Overlay default | ENI native (AWS VPC-routable) |
+|----------|-----------------|-------------------------------|
+| `ipam_mode` | `cluster-pool` | `eni` |
+| `routing_mode` | `tunnel` | `native` |
+| `tunnel_protocol` | `vxlan` | _(n/a)_ |
+| `pod_cidr` | required (e.g. `10.240.0.0/16`) | `""` |
+| `pod_cidr_mask_size` | `24` (256 IPs/node) | _(n/a)_ |
+| `egress_masquerade_interfaces` | `""` (all) | `"ens+"` |
+
+**Overlay** decouples pod IPs from the VPC (pods draw from `pod_cidr`, encapsulated VXLAN between nodes) — pod density is bounded by `pod_cidr`, not the node subnet. **ENI native** gives pods routable VPC IPs (no encapsulation, VPC-level flow visibility) but density is bounded by the node subnet size and instance ENI limits. Per-cluster `pod_cidr`s must not overlap (keeps the design ClusterMesh-ready). See `infra/docs/08-kubernetes-network-design.md`.
 
 ## Usage
 
-### AWS (EKS with BYOCNI)
+### AWS (EKS with BYOCNI) — overlay (default)
 
 ```hcl
 module "cilium" {
   source = "../../modules/cilium"
 
-  cloud_provider       = "aws"
-  cluster_name         = "platform-use1-eks"
-  k8s_service_host     = "EXAMPLE.gr7.us-east-1.eks.amazonaws.com"
-  k8s_service_port     = "443"
-  kube_proxy_replacement = "true"
-  gateway_api_enabled  = true
+  cloud_provider   = "aws"
+  cluster_name     = "platform-use1-eks"
+  k8s_service_host = "EXAMPLE.gr7.us-east-1.eks.amazonaws.com"
+  k8s_service_port = "443"
 
-  hubble_tls_auto_method = "helm"
+  # Overlay datapath: pod IPs come from pod_cidr, decoupled from the VPC.
+  # ipam_mode/routing_mode/tunnel_protocol default to cluster-pool/tunnel/vxlan.
+  pod_cidr = "10.240.0.0/16"
+
+  tags = {
+    Environment = "platform"
+    ManagedBy   = "terraform"
+  }
+}
+```
+
+### AWS (EKS with BYOCNI) — ENI native (VPC-routable pods)
+
+```hcl
+module "cilium" {
+  source = "../../modules/cilium"
+
+  cloud_provider   = "aws"
+  cluster_name     = "platform-use1-eks"
+  k8s_service_host = "EXAMPLE.gr7.us-east-1.eks.amazonaws.com"
+
+  ipam_mode                    = "eni"
+  routing_mode                 = "native"
+  egress_masquerade_interfaces = "ens+" # AL2023 predictable iface names
 
   tags = {
     Environment = "platform"
@@ -168,6 +202,9 @@ No modules.
 - Gateway API CRDs are installed via `kubectl apply` using a `null_resource` provisioner. Set `gateway_api_crd_version` to `""` to skip CRD installation.
 - The `configHash` Helm value forces a rollout on any values change, even if the structural diff is empty.
 - Cilium is installed into `kube-system` by default (not a custom namespace).
+- **Switching `ipam_mode` on a running cluster is disruptive** (existing pods keep their old IPs with no matching CiliumNode PodCIDR). Roll it out by scaling node groups to 0, applying, then scaling back up — new nodes come up on the new datapath. The variable surface doubles as a clean rollback (flip back to `eni`/`native`).
+- **Overlay + IMDS:** with masquerade, verify tenant pods still cannot reach IMDS (`169.254.169.254`) — link-local must stay masquerade-excluded so the IMDSv2 hop-limit defense holds. See `infra/modules/tenant` and the security follow-ups.
+- `bpf_masquerade = true` requires `egress_masquerade_interfaces = ""` (eBPF masquerade ignores the interface glob); the module enforces this via a precondition.
 
 ## Related ADRs
 

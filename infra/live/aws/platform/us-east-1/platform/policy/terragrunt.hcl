@@ -66,6 +66,11 @@ inputs = {
   compliance_tier = include.base.locals.compliance_tier
   replica_count   = 3 # HA on the shared platform cluster
 
+  # Cilium overlay (cluster-pool): the EKS managed control plane can't route to overlay pod IPs,
+  # so the admission/cleanup webhook servers must run on hostNetwork (node VPC IP). Applied AFTER
+  # the overlay cutover (hostNetwork needs the overlay cilium's kubeProxyReplacement to reach the apiserver).
+  webhook_host_network = true
+
   allowed_registries  = [local.ecr_registry]
   tenant_registry_map = {} # no tenants on the platform cluster
 

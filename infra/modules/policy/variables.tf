@@ -264,6 +264,12 @@ variable "additional_policies" {
   default     = {}
 }
 
+variable "webhook_host_network" {
+  description = "Run the admission/cleanup webhook servers on hostNetwork (node VPC IP). Required on EKS with an overlay CNI (Cilium cluster-pool), where the managed control plane cannot route to overlay pod IPs. Leave false for VPC-routable (ENI) datapaths."
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Tags/labels to apply (sanitized to RFC-1123 for K8s labels)"
   type        = map(string)
