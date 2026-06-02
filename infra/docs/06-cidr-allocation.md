@@ -83,15 +83,23 @@ Subnets are computed from the VPC CIDR using `cidrsubnet()` — no manual calcul
 
 ## Kubernetes Network CIDRs
 
-Kubernetes overlay networks use separate, non-routable CIDR ranges:
+Cilium runs an **overlay** (cluster-pool IPAM + VXLAN), so pod IPs come from a private,
+non-routable pod CIDR decoupled from the VPC. Pod CIDRs are **per-cluster** (non-overlapping,
+so the design stays ClusterMesh-ready) and carved from a reserved `10.240.0.0/14` pod supernet:
 
-| Purpose | CIDR | Notes |
-|---------|------|-------|
-| Pod CIDR | `10.240.0.0/16` | Cilium VXLAN overlay — not routed on VPC |
-| Service CIDR | `10.241.0.0/16` | Cluster-internal only |
-| DNS Service IP | `10.241.0.10` | Within service CIDR |
+| Cluster | Pod CIDR | Per-node block |
+|---------|----------|----------------|
+| platform | `10.240.0.0/16` | `/24` (≈250 pods/node) |
+| preprod | `10.241.0.0/16` | `/24` |
+| prod (reserved) | `10.242.0.0/16` | — |
 
-These ranges are shared across clusters (overlay isolation prevents collision). Cross-cluster pod communication uses Cilium ClusterMesh at L7, not L3 routing.
+The **service** CIDR is EKS's default `172.20.0.0/16` (the `eks` module doesn't override
+`service_ipv4_cidr`); CoreDNS is at `172.20.0.10`. Pod CIDRs are authoritative in each
+cluster's `network.hcl` (`pod_cidr`). Cross-cluster pod communication (ClusterMesh) is
+deferred; node-to-node VXLAN carries pod traffic within a cluster.
+
+> The `kubernetes`-tier `/26` subnets above hold only node primary-ENI IPs in overlay mode —
+> not pods. See [Kubernetes Network Design](08-kubernetes-network-design.md).
 
 ## Authoritative CIDR Sources
 
