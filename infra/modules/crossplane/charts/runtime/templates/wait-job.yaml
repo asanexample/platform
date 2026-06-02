@@ -57,9 +57,16 @@ spec:
       serviceAccountName: crossplane-bootstrap-wait
       restartPolicy: Never
       securityContext:
+        # The kubectl image defaults to root; pin a numeric non-root uid to satisfy runAsNonRoot.
         runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
         seccompProfile:
           type: RuntimeDefault
+      volumes:
+        # kubectl writes its discovery cache under $HOME; provide a writable tmpfs since the root fs is read-only.
+        - name: home
+          emptyDir: {}
       initContainers:
         - name: wait-providers-healthy
           image: {{ .Values.waitImage }}
@@ -69,6 +76,11 @@ spec:
             - provider.pkg.crossplane.io
             - --all
             - --timeout=600s
+          env:
+            - name: HOME
+              value: /tmp
+          volumeMounts:
+            - { name: home, mountPath: /tmp }
           resources:
             requests: { cpu: 25m, memory: 64Mi }
             limits: { cpu: 100m, memory: 128Mi }
@@ -84,6 +96,11 @@ spec:
             - --for=condition=established
             - crd/providerconfigs.aws.upbound.io
             - --timeout=180s
+          env:
+            - name: HOME
+              value: /tmp
+          volumeMounts:
+            - { name: home, mountPath: /tmp }
           resources:
             requests: { cpu: 25m, memory: 64Mi }
             limits: { cpu: 100m, memory: 128Mi }

@@ -110,7 +110,7 @@ resource "aws_iam_role" "provisioner" {
   count = local.create ? 1 : 0
 
   name               = "crossplane-provisioner-${var.cluster_name}"
-  description        = "Crossplane AWS provider — tenant resource provisioning (ECR). EKS Pod Identity (ADR-046)."
+  description        = "Crossplane AWS provider - tenant resource provisioning (ECR). EKS Pod Identity (ADR-046)."
   assume_role_policy = data.aws_iam_policy_document.assume[0].json
   tags               = var.tags
 }

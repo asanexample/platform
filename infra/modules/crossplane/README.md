@@ -67,7 +67,9 @@ apply and tear it down by hand.
 
 ## Dependencies
 
-- **eks** — the cluster + the EKS Pod Identity agent (the credential path).
+- **eks** — the cluster + the EKS Pod Identity agent (the credential path). The platform `eks-addons` unit
+  must install the `eks-pod-identity-agent` addon (it serves `169.254.170.23`); platform add-ons otherwise
+  use IRSA, so the hub cluster did not have it until Crossplane needed it.
 - **node-groups** — providers need nodes to schedule on.
 - **policy** — the platform Kyverno unit must exclude `crossplane-system` (principals + namespace) **before**
   this unit applies; Crossplane's rbac-manager authors wildcard provider ClusterRoles at runtime that the
@@ -75,8 +77,15 @@ apply and tear it down by hand.
 
 ## Notes
 
+- **Providers run on `hostNetwork`** (per-provider `DeploymentRuntimeConfig`). The EKS managed control plane
+  cannot reach overlay (cluster-pool) pod IPs to invoke a provider's **conversion/validation webhook**
+  (`Address is not allowed`) — upjet CRDs like ecr `Repository` are multi-version, so the apiserver must
+  reach `/convert`. hostNetwork serves it on the node VPC IP. Each provider gets a unique port triplet
+  (`webhookBasePort + i*10` → webhook/metrics/health) to avoid node collisions with Kyverno's hostNetwork
+  webhooks (9443/9444) and the node's 8080. Same gotcha as cert-manager/ESO/Kyverno on this cluster.
 - **Provider auth is EKS Pod Identity only** (ADR-041): no SA annotation, no OIDC. The association is the
   sole credential grant; the `provider-aws` SA is platform-controlled and never used by tenant workloads.
+  Requires the `eks-pod-identity-agent` addon (see Dependencies).
 - **Least privilege, staged.** P1's provisioning role is **ECR `team-*` only**. Later phases extend it (IAM
   roles + Pod Identity associations for the `Tenant` Composition) — at which point a **permissions boundary**
   on created roles and an org SCP **`exempt_roles`** entry (the `DenyTeamTagTampering` SCP denies `Team`-key

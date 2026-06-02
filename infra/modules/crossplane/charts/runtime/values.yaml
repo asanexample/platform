@@ -11,5 +11,9 @@ providerVersion: v2.5.0
 providerServices:
   - ecr
 
+# Base port for the per-provider hostNetwork webhook. Each provider i uses webhook=base+i*10,
+# metrics=+1, health=+2 — kept clear of Kyverno's hostNetwork webhooks (9443/9444) and the node's 8080.
+webhookBasePort: 9450
+
 # kubectl image for the Healthy-gate Job (official, distroless; entrypoint is kubectl).
 waitImage: registry.k8s.io/kubectl:v1.35.0
