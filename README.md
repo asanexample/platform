@@ -42,7 +42,7 @@ The platform-engineering capabilities an enterprise IDP needs — each implement
 - **Platform / DevEx engineers** adopting patterns — start with the [design docs](infra/docs/) (architecture,
   multi-tenancy, security, supply chain) and compose the [reusable modules](infra/modules/); `infra/live/`
   shows one opinionated composition.
-- **Architects** evaluating an approach — the [45 ADRs](docs/adrs/) record *why* each choice was made, and
+- **Architects** evaluating an approach — the [46 ADRs](docs/adrs/) record *why* each choice was made, and
   what was rejected.
 - **New team members** — the [Onboarding Guide](docs/onboarding.md) and the [Quick Start](#quick-start) below.
 
@@ -93,7 +93,7 @@ platctl kubeconfig
 platform/
 ├── cmd/platctl/                 # Go CLI for platform operations (bootstrap, teardown, validate, kubeconfig)
 ├── docs/                        # User-facing documentation
-│   ├── adrs/                    # 45 architecture decision records
+│   ├── adrs/                    # 46 architecture decision records
 │   ├── architecture/            # System design, supply chain, observability, tenant model, config hierarchy
 │   ├── compliance/              # SCP → control mapping
 │   ├── runbooks/                # Operational procedures
@@ -252,8 +252,9 @@ Plus [cloudflare/dns_delegation](infra/modules/cloudflare/dns_delegation/) (DNS 
 | Self-hosted observability stack | [ADR-043](docs/adrs/043-self-hosted-observability-stack.md) |
 | Mimir for durable multi-tenant metrics | [ADR-044](docs/adrs/044-mimir-durable-multi-tenant-metrics.md) |
 | Falco for runtime threat detection | [ADR-045](docs/adrs/045-falco-runtime-threat-detection.md) |
+| BACK stack for developer self-service | [ADR-046](docs/adrs/046-back-stack-for-developer-self-service.md) |
 
-All 45 ADRs: [docs/adrs/](docs/adrs/)
+All 46 ADRs: [docs/adrs/](docs/adrs/)
 
 ## Testing
 
@@ -280,4 +281,4 @@ scanning (Trivy IaC, Semgrep) — via OIDC federation, no stored credentials.
 | [App Supply-Chain Onboarding](docs/runbooks/app-supply-chain-onboarding.md) | Wire signing/SBOM/provenance into app CI |
 | [Tenant Onboarding](docs/runbooks/tenant-onboarding.md) | Add/remove teams via `teams.hcl` |
 | [EKS Cluster Access](docs/runbooks/eks-cluster-access.md) | kubectl setup for engineers |
-| [Architecture Decisions](docs/adrs/) | 45 ADRs documenting every significant choice |
+| [Architecture Decisions](docs/adrs/) | 46 ADRs documenting every significant choice |
