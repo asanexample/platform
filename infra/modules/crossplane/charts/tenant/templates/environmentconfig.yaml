@@ -1,0 +1,19 @@
+{{- if .Values.environment }}
+# Cluster constants the Composition needs but that don't belong in a tenant's claim (ECR registry, account
+# IDs, cluster name, cross-account pull accounts, the permissions-boundary ARN). Loaded into the Composition
+# pipeline context by function-environment-configs; the go-template reads `.context[...]`. Helm-templated
+# here from the module's inputs, so it is per-cluster while the Composition stays cluster-agnostic. EnvironmentConfig
+# data is string-valued, so pullAccountIds is a JSON array string the template parses with fromJson.
+apiVersion: apiextensions.crossplane.io/v1beta1
+kind: EnvironmentConfig
+metadata:
+  name: tenant-cluster-config
+data:
+  ecrRegistry: {{ .Values.environment.ecrRegistry | quote }}
+  region: {{ .Values.environment.region | quote }}
+  workloadAccountId: {{ .Values.environment.workloadAccountId | quote }}
+  clusterName: {{ .Values.environment.clusterName | quote }}
+  permissionsBoundaryArn: {{ .Values.environment.permissionsBoundaryArn | quote }}
+  providerConfigEcr: {{ .Values.environment.providerConfigEcr | quote }}
+  pullAccountIds: {{ .Values.environment.pullAccountIds | toJson | quote }}
+{{- end }}

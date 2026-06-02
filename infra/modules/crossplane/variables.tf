@@ -152,6 +152,49 @@ variable "tenant_repo_prefix" {
   default     = "team-"
 }
 
+# ---------------------------------------------------------------------------
+# Tenant provisioning (P2b) — the privileged identity that creates tenant AWS resources
+# ---------------------------------------------------------------------------
+
+variable "enable_tenant_provisioning" {
+  description = <<-EOT
+    Grant the provider's provisioning role the (scoped) permissions to create tenant AWS resources: IAM
+    Pod-team roles + EKS Pod Identity associations in this (workload) account, and sts:AssumeRole into the
+    platform account for ECR. Also creates the deny-escalation permissions boundary attached to every
+    created role. Workload clusters only (preprod/prod), not the platform hub.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "ecr_provisioner_role_arn" {
+  description = "ARN of the platform-account role the provider assumes (assumeRoleChain) to create tenant ECR repositories cross-account. Empty disables the platform-ecr ProviderConfig."
+  type        = string
+  default     = ""
+}
+
+variable "tenant_role_name_prefix" {
+  description = "Name prefix for the IAM roles the provisioning role may create/manage (the tenant workload roles). Scopes iam:* on the provisioning role."
+  type        = string
+  default     = "Pod-team-"
+}
+
+# ---------------------------------------------------------------------------
+# Tenant API environment (P2b) — cluster constants injected into the Composition via EnvironmentConfig
+# ---------------------------------------------------------------------------
+
+variable "ecr_registry" {
+  description = "Platform-account ECR registry host (<platform-acct>.dkr.ecr.<region>.amazonaws.com). Used by the Composition for per-team image registry policies + ECR repo creation."
+  type        = string
+  default     = ""
+}
+
+variable "tenant_pull_account_ids" {
+  description = "AWS account IDs granted cross-account image pull on tenant ECR repos (the workload accounts). Mirrors the ecr unit's pull_account_ids."
+  type        = list(string)
+  default     = []
+}
+
 variable "tags" {
   description = "Tags applied to AWS resources created by this module."
   type        = map(string)

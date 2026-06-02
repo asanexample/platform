@@ -4,7 +4,11 @@ locals {
   # Tenant ECR repositories the provisioning role may manage: "repository/team-*" in the platform account.
   ecr_repo_arn = "arn:aws:ecr:${var.region}:${var.account_id}:repository/${var.tenant_repo_prefix}*"
 
-  enable_aws = local.create && length(var.provider_services) > 0
+  enable_aws                 = local.create && length(var.provider_services) > 0
+  enable_tenant_provisioning = local.create && var.enable_tenant_provisioning
+
+  # The IAM Pod-team-* roles the provisioning role may create/manage (in this workload account).
+  tenant_role_arn_pattern = "arn:aws:iam::${var.account_id}:role/${var.tenant_role_name_prefix}*"
 
   # AWS family providers share one SA (so a single Pod Identity association credentials them) and serve on
   # hostNetwork (their CRDs are multi-version → the EKS control plane must reach the conversion webhook).
@@ -103,10 +107,11 @@ resource "helm_release" "crossplane_config" {
   atomic    = var.helm_wait
 
   values = [yamlencode({
-    namespace          = var.namespace
-    providerConfigName = var.providerconfig_name
-    enableAws          = local.enable_aws
-    enableKubernetes   = var.enable_kubernetes_provider
+    namespace             = var.namespace
+    providerConfigName    = var.providerconfig_name
+    enableAws             = local.enable_aws
+    enableKubernetes      = var.enable_kubernetes_provider
+    ecrProvisionerRoleArn = var.ecr_provisioner_role_arn # platform-ecr ProviderConfig (assumeRoleChain)
   })]
 
   depends_on = [helm_release.crossplane_runtime]
@@ -131,6 +136,17 @@ resource "helm_release" "crossplane_tenant" {
 
   values = [yamlencode({
     providerConfigName = var.providerconfig_name
+    # Cluster constants for the Composition, injected via an EnvironmentConfig (the claim API stays clean).
+    environment = {
+      ecrRegistry             = var.ecr_registry
+      region                  = var.region
+      workloadAccountId       = var.account_id
+      clusterName             = var.cluster_name
+      pullAccountIds          = var.tenant_pull_account_ids
+      permissionsBoundaryArn  = local.enable_tenant_provisioning ? aws_iam_policy.tenant_boundary[0].arn : ""
+      providerConfigEcr       = var.ecr_provisioner_role_arn != "" ? "platform-ecr" : var.providerconfig_name
+      podIdentityServiceAccnt = var.provider_service_account
+    }
   })]
 
   depends_on = [helm_release.crossplane_config]
@@ -168,29 +184,134 @@ resource "aws_iam_role" "provisioner" {
   tags               = var.tags
 }
 
+# ---------------------------------------------------------------------------
+# Deny-escalation permissions boundary (P2b) — the cap on every Crossplane-created Pod-team role.
+# ---------------------------------------------------------------------------
+# Effective tenant-role perms = (the role's declared policy) ∩ (this boundary). Even if the provisioning
+# identity is tricked into attaching admin, the boundary keeps a tenant role from privilege escalation.
+data "aws_iam_policy_document" "tenant_boundary" {
+  count = local.enable_tenant_provisioning ? 1 : 0
+
+  statement {
+    sid       = "AllowAll"
+    effect    = "Allow"
+    actions   = ["*"]
+    resources = ["*"]
+  }
+  statement {
+    sid    = "DenyEscalation"
+    effect = "Deny"
+    actions = [
+      "iam:*",
+      "organizations:*",
+      "account:*",
+      "sts:AssumeRole",
+      "sts:AssumeRoleWithSAML",
+      "sts:AssumeRoleWithWebIdentity",
+    ]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_policy" "tenant_boundary" {
+  count = local.enable_tenant_provisioning ? 1 : 0
+
+  name        = "tenant-permissions-boundary-${var.cluster_name}"
+  description = "Deny-escalation boundary attached to every Crossplane-provisioned Pod-team-* role (S2)."
+  policy      = data.aws_iam_policy_document.tenant_boundary[0].json
+  tags        = var.tags
+}
+
 data "aws_iam_policy_document" "provisioner" {
   count = local.enable_aws ? 1 : 0
 
-  statement {
-    sid    = "TenantEcrRepositories"
-    effect = "Allow"
-    actions = [
-      "ecr:CreateRepository",
-      "ecr:DeleteRepository",
-      "ecr:DescribeRepositories",
-      "ecr:ListTagsForResource",
-      "ecr:TagResource",
-      "ecr:UntagResource",
-      "ecr:PutLifecyclePolicy",
-      "ecr:GetLifecyclePolicy",
-      "ecr:DeleteLifecyclePolicy",
-      "ecr:PutImageScanningConfiguration",
-      "ecr:PutImageTagMutability",
-      "ecr:SetRepositoryPolicy",
-      "ecr:GetRepositoryPolicy",
-      "ecr:DeleteRepositoryPolicy",
-    ]
-    resources = [local.ecr_repo_arn]
+  # Platform hub (P1): ECR repositories provisioned LOCALLY. Not used on a tenant-provisioning workload
+  # cluster (preprod), where ECR is cross-account (via the assumed platform role below).
+  dynamic "statement" {
+    for_each = local.enable_tenant_provisioning ? [] : [1]
+    content {
+      sid    = "TenantEcrRepositoriesLocal"
+      effect = "Allow"
+      actions = [
+        "ecr:CreateRepository", "ecr:DeleteRepository", "ecr:DescribeRepositories",
+        "ecr:ListTagsForResource", "ecr:TagResource", "ecr:UntagResource",
+        "ecr:PutLifecyclePolicy", "ecr:GetLifecyclePolicy", "ecr:DeleteLifecyclePolicy",
+        "ecr:PutImageScanningConfiguration", "ecr:PutImageTagMutability",
+        "ecr:SetRepositoryPolicy", "ecr:GetRepositoryPolicy", "ecr:DeleteRepositoryPolicy",
+      ]
+      resources = [local.ecr_repo_arn]
+    }
+  }
+
+  # Tenant provisioning (workload cluster): create Pod-team-* roles ONLY with the boundary attached.
+  dynamic "statement" {
+    for_each = local.enable_tenant_provisioning ? [1] : []
+    content {
+      sid       = "TenantIamCreateRoleBoundedOnly"
+      effect    = "Allow"
+      actions   = ["iam:CreateRole"]
+      resources = [local.tenant_role_arn_pattern]
+      condition {
+        test     = "StringEquals"
+        variable = "iam:PermissionsBoundary"
+        values   = [aws_iam_policy.tenant_boundary[0].arn]
+      }
+    }
+  }
+  # Manage the created roles (NO Put/DeleteRolePermissionsBoundary → cannot strip the boundary).
+  dynamic "statement" {
+    for_each = local.enable_tenant_provisioning ? [1] : []
+    content {
+      sid    = "TenantIamManageRoles"
+      effect = "Allow"
+      actions = [
+        "iam:DeleteRole", "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:GetRolePolicy",
+        "iam:ListRolePolicies", "iam:TagRole", "iam:UntagRole", "iam:GetRole", "iam:ListRoleTags",
+      ]
+      resources = [local.tenant_role_arn_pattern]
+    }
+  }
+  # PassRole the tenant roles to EKS Pod Identity only.
+  dynamic "statement" {
+    for_each = local.enable_tenant_provisioning ? [1] : []
+    content {
+      sid       = "TenantIamPassRole"
+      effect    = "Allow"
+      actions   = ["iam:PassRole"]
+      resources = [local.tenant_role_arn_pattern]
+      condition {
+        test     = "StringEquals"
+        variable = "iam:PassedToService"
+        values   = ["pods.eks.amazonaws.com"]
+      }
+    }
+  }
+  # EKS Pod Identity associations on this cluster.
+  dynamic "statement" {
+    for_each = local.enable_tenant_provisioning ? [1] : []
+    content {
+      sid    = "TenantPodIdentityAssociations"
+      effect = "Allow"
+      actions = [
+        "eks:CreatePodIdentityAssociation", "eks:DeletePodIdentityAssociation",
+        "eks:UpdatePodIdentityAssociation", "eks:DescribePodIdentityAssociation",
+        "eks:ListPodIdentityAssociations",
+      ]
+      resources = [
+        "arn:aws:eks:${var.region}:${var.account_id}:cluster/${var.cluster_name}",
+        "arn:aws:eks:${var.region}:${var.account_id}:podidentityassociation/${var.cluster_name}/*",
+      ]
+    }
+  }
+  # Assume the platform-account role to provision tenant ECR repos cross-account.
+  dynamic "statement" {
+    for_each = local.enable_tenant_provisioning && var.ecr_provisioner_role_arn != "" ? [1] : []
+    content {
+      sid       = "AssumePlatformEcrProvisioner"
+      effect    = "Allow"
+      actions   = ["sts:AssumeRole"]
+      resources = [var.ecr_provisioner_role_arn]
+    }
   }
 }
 

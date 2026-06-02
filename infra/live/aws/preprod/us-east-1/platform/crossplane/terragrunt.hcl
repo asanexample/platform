@@ -68,9 +68,9 @@ inputs = {
   helm_chart_version = include.base.locals.helm_versions.crossplane
   helm_wait          = true
 
-  # P2a (federated tenant control plane, ADR-048): the Tenant API + the K8s footprint only. No AWS providers
-  # yet — the Pod-team IAM role, Pod Identity association, and cross-account ECR arrive in P2b.
-  provider_services = []
+  # Federated tenant control plane (ADR-048). P2b: the full tenant footprint — K8s (provider-kubernetes) +
+  # AWS (provider-aws iam/eks locally; ecr cross-account into the platform account via assumeRoleChain).
+  provider_services = ["ecr", "iam", "eks"]
 
   enable_kubernetes_provider      = true
   kubernetes_provider_hostnetwork = true # Object CRD is multi-version → its conversion webhook must be reachable (overlay)
@@ -78,9 +78,19 @@ inputs = {
   functions = [
     { name = "function-go-templating", package = "xpkg.upbound.io/crossplane-contrib/function-go-templating:v0.12.1" },
     { name = "function-auto-ready", package = "xpkg.upbound.io/crossplane-contrib/function-auto-ready:v0.6.5" },
+    { name = "function-environment-configs", package = "xpkg.upbound.io/crossplane-contrib/function-environment-configs:v0.7.1" },
   ]
 
   enable_tenant_api = true
+
+  # Tenant provisioning identity (P2b): scoped IAM + EKS Pod Identity locally, plus assume the platform ECR
+  # role for cross-account repos. The deny-escalation permissions boundary is created in the module.
+  enable_tenant_provisioning = true
+  ecr_provisioner_role_arn   = "arn:aws:iam::${include.base.locals.account_ids["platform"]}:role/crossplane-ecr-provisioner"
+
+  # Cluster constants for the Composition's EnvironmentConfig: platform ECR registry + cross-account pull.
+  ecr_registry            = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com"
+  tenant_pull_account_ids = [include.base.locals.account_ids["preprod"], include.base.locals.account_ids["prod"]]
 
   tags = include.base.locals.tags
 }
