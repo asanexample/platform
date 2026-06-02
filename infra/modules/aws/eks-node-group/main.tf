@@ -84,6 +84,26 @@ resource "aws_launch_template" "this" {
     instance_metadata_tags      = "disabled"
   }
 
+  # AL2023 NodeConfig fragment to raise kubelet max-pods (EKS managed node groups merge this with
+  # their generated join config). Only emitted when max_pods is set. Body is intentionally
+  # un-indented: MIME boundaries and the NodeConfig YAML must start at column 0.
+  user_data = each.value.max_pods == null ? null : base64encode(<<-MIME
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="//"
+
+--//
+Content-Type: application/node.eks.aws
+
+apiVersion: node.eks.aws/v1alpha1
+kind: NodeConfig
+spec:
+  kubelet:
+    config:
+      maxPods: ${each.value.max_pods}
+--//--
+MIME
+  )
+
   tags = var.tags
 
   lifecycle {
