@@ -258,8 +258,9 @@ Plus [cloudflare/dns_delegation](infra/modules/cloudflare/dns_delegation/) (DNS 
 | BACK stack for developer self-service | [ADR-046](docs/adrs/046-back-stack-for-developer-self-service.md) |
 | Pod Identity as the AWS-identity standard | [ADR-047](docs/adrs/047-pod-identity-as-aws-identity-standard.md) |
 | Federated per-cluster Crossplane | [ADR-048](docs/adrs/048-federated-per-cluster-crossplane.md) |
+| Multi-tenancy model (Team / Tenant / Zone) | [ADR-049](docs/adrs/049-tenant-model-team-tenant-zone.md) |
 
-All 48 ADRs: [docs/adrs/](docs/adrs/)
+All 49 ADRs: [docs/adrs/](docs/adrs/)
 
 ## Testing
 

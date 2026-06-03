@@ -14,6 +14,14 @@
 > / "the `tenants` unit" as describing the historical mechanism; the Composition now produces the same
 > resources. The content is retained for historical context.
 
+<!-- -->
+
+> **Superseded in part (2026-06-03, [ADR-049](049-tenant-model-team-tenant-zone.md)):** the `team == tenant`
+> framing here — one team, one isolation boundary — is replaced by the **Team → Tenant → Zone** model (a Team
+> owns N Tenants; the Tenant is the isolation unit; compliance tier selects an isolation *spectrum* up to
+> dedicated cluster/account). The isolation **primitives** below are unchanged. ADR-049 is design-stage and
+> lands with the planned rebuild.
+
 ## Context
 
 The preprod EKS cluster (account <PREPROD_ACCOUNT_ID>) needs multi-tenant isolation for development teams.
