@@ -4,7 +4,17 @@
 > [ADR-033 — Defer vCluster Support](../adrs/033-defer-vcluster-tenant-support.md),
 > [ADR-041 — Pod Identity for Tenant Workloads](../adrs/041-pod-identity-for-tenant-workloads.md),
 > [ADR-046 — BACK stack for developer self-service](../adrs/046-back-stack-for-developer-self-service.md),
-> [ADR-047 — Pod Identity standard](../adrs/047-pod-identity-standard.md)
+> [ADR-047 — Pod Identity standard](../adrs/047-pod-identity-standard.md),
+> [ADR-049 — Multi-tenancy model (Team / Tenant / Zone)](../adrs/049-tenant-model-team-tenant-zone.md)
+
+<!-- -->
+
+> **Current model is `team == tenant`; the target model is ADR-049.** This document describes the **current**
+> preprod tenant model, where one team is one tenant is one namespace. The matured, scale/compliance/multi-cloud
+> model — **Team → Tenant → Zone** (ownership decoupled from isolation; a compliance-driven isolation spectrum
+> up to dedicated cluster/account; cloud-neutral placement with data residency) — is
+> [ADR-049](../adrs/049-tenant-model-team-tenant-zone.md). ADR-049 is **design-stage** and lands with the
+> planned rebuild, so everything below still describes how preprod runs **today**.
 
 <!-- -->
 

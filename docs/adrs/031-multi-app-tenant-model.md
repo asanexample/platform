@@ -4,6 +4,11 @@
 
 **Status:** Accepted
 
+> **Superseded in part (2026-06-03, [ADR-049](049-tenant-model-team-tenant-zone.md)):** the app/team identity
+> decoupling here carries forward — each app keeps its own identity — but the `team == tenant` container is
+> replaced by the **Team → Tenant → Zone** model, and per-app AWS identity, per-tenant placement, and
+> compliance now live in the v2 `Tenant` claim (design-stage; lands with the rebuild).
+
 ## Context
 
 ADR-027 established a hybrid tenant isolation model where each team declares its isolation mode
