@@ -179,6 +179,18 @@ variable "tenant_role_name_prefix" {
   default     = "Pod-team-"
 }
 
+variable "developer_role_name_prefix" {
+  description = "Name prefix for the per-team developer-access IAM roles the Composition provisions (P2c). Also scoped by the provisioning role's iam:* statements alongside tenant_role_name_prefix."
+  type        = string
+  default     = "DeveloperAccess-"
+}
+
+variable "management_account_id" {
+  description = "Management (org) AWS account ID. Used by the Composition's DeveloperAccess role trust policy to allow the per-team SSO permission set (Dev-<team>) in both the management and workload accounts to assume the role. Empty disables the SSO trust condition."
+  type        = string
+  default     = ""
+}
+
 # ---------------------------------------------------------------------------
 # Tenant API environment (P2b) — cluster constants injected into the Composition via EnvironmentConfig
 # ---------------------------------------------------------------------------

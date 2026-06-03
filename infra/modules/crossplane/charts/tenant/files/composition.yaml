@@ -43,6 +43,7 @@ spec:
             {{- $gw := $spec.gatewayNamespace | default "default" }}
             {{- $env := index .context "apiextensions.crossplane.io/environment" }}
             {{- $aws := $spec.aws | default dict }}
+            {{- $devAccess := $spec.developerAccess | default (dict "enabled" true) }}
             {{- $ecrCfg := $env.providerConfigEcr | default "default" }}
             {{- $pullAccts := list }}
             {{- if and $env $env.pullAccountIds }}{{- $pullAccts = $env.pullAccountIds | fromJson }}{{- end }}
@@ -400,6 +401,67 @@ spec:
               forProvider:
                 role: Pod-team-{{ $team }}
                 policy: {{ (dict "Version" "2012-10-17" "Statement" $stmts) | toJson | quote }}
+            {{- end }}
+            {{- if $devAccess.enabled }}
+            {{- /* Per-team developer cluster access (P2c, ADR-039/040): a DeveloperAccess-<team> IAM role
+                   trusted by the team's SSO permission set (Dev-<team>) in the management + workload accounts,
+                   mapped via an EKS access entry to the team-<team>:developers group (the RoleBinding above
+                   grants the actual namespace-scoped authz). */}}
+            {{- $devPrincipals := list (printf "arn:aws:iam::%s:root" $env.workloadAccountId) }}
+            {{- $devSsoArns := list (printf "arn:aws:iam::%s:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_Dev-%s_*" $env.workloadAccountId $team) }}
+            {{- if $env.managementAccountId }}
+            {{- $devPrincipals = append $devPrincipals (printf "arn:aws:iam::%s:root" $env.managementAccountId) }}
+            {{- $devSsoArns = append $devSsoArns (printf "arn:aws:iam::%s:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_Dev-%s_*" $env.managementAccountId $team) }}
+            {{- end }}
+            {{- $devTrust := dict "Version" "2012-10-17" "Statement" (list (dict "Effect" "Allow" "Principal" (dict "AWS" $devPrincipals) "Action" "sts:AssumeRole" "Condition" (dict "ArnLike" (dict "aws:PrincipalArn" $devSsoArns)))) }}
+            {{- $devPolicy := dict "Version" "2012-10-17" "Statement" (list (dict "Sid" "EKSAccess" "Effect" "Allow" "Action" (list "eks:DescribeCluster" "eks:ListClusters") "Resource" "*") (dict "Sid" "Identity" "Effect" "Allow" "Action" (list "sts:GetCallerIdentity") "Resource" "*")) }}
+            ---
+            apiVersion: iam.aws.upbound.io/v1beta1
+            kind: Role
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: developer-access-role
+                crossplane.io/external-name: DeveloperAccess-{{ $team }}
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                assumeRolePolicy: {{ $devTrust | toJson | quote }}
+                {{- if $env.permissionsBoundaryArn }}
+                permissionsBoundary: {{ $env.permissionsBoundaryArn | quote }}
+                {{- end }}
+                tags:
+                  Team: {{ $team }}
+            ---
+            apiVersion: iam.aws.upbound.io/v1beta1
+            kind: RolePolicy
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: developer-access-rolepolicy
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                role: DeveloperAccess-{{ $team }}
+                policy: {{ $devPolicy | toJson | quote }}
+            ---
+            apiVersion: eks.aws.upbound.io/v1beta1
+            kind: AccessEntry
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: developer-access-entry
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                region: {{ $env.region }}
+                clusterName: {{ $env.clusterName }}
+                principalArn: arn:aws:iam::{{ $env.workloadAccountId }}:role/DeveloperAccess-{{ $team }}
+                type: STANDARD
+                kubernetesGroups:
+                  - team-{{ $team }}:developers
+                tags:
+                  Team: {{ $team }}
             {{- end }}
             {{- range $app, $appcfg := $spec.apps }}
             ---

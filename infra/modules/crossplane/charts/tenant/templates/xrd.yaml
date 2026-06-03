@@ -108,6 +108,15 @@ spec:
                               type: string
                         required: ["actions", "resources"]
                       default: []
+                developerAccess:
+                  type: object
+                  description: Namespace-scoped developer cluster access (DeveloperAccess-<team> IAM role + EKS access entry → team-<team>:developers group). ADR-039/040.
+                  properties:
+                    enabled:
+                      type: boolean
+                      description: When true (default), provision the developer IAM role + EKS access entry. The RoleBinding is always created.
+                      default: true
+                  default: { enabled: true }
               required:
                 - team
             status:

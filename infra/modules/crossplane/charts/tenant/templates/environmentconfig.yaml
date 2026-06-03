@@ -12,6 +12,7 @@ data:
   ecrRegistry: {{ .Values.environment.ecrRegistry | quote }}
   region: {{ .Values.environment.region | quote }}
   workloadAccountId: {{ .Values.environment.workloadAccountId | quote }}
+  managementAccountId: {{ .Values.environment.managementAccountId | default "" | quote }}
   clusterName: {{ .Values.environment.clusterName | quote }}
   permissionsBoundaryArn: {{ .Values.environment.permissionsBoundaryArn | quote }}
   providerConfigEcr: {{ .Values.environment.providerConfigEcr | quote }}
