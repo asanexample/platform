@@ -99,5 +99,11 @@ inputs = {
       service   = "kube-prometheus-stack-grafana"
       port      = 80
     }
+    # Developer portal (Backstage, Phase 2 — ADR-051). Tailscale-only at backstage.aws.refplat.org.
+    backstage = {
+      namespace = "backstage"
+      service   = "backstage"
+      port      = 7007
+    }
   }
 }
