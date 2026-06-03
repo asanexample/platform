@@ -54,8 +54,12 @@ One `XTenant` claim → the Composition reconciles the **complete** tenant:
 - [ ] Active AWS SSO session for the **management** profile (`aws sso login --profile management`).
 - [ ] Your SSO identity can assume **PlatformDeployer** in the preprod and platform accounts.
 - [ ] `terragrunt` + `kubectl` configured; preprod reachable (Tailscale for kubectl).
-- [ ] The team's **`Dev-<team>` SSO permission set** exists in `identity-center` (mgmt account) — required
-      for the `DeveloperAccess-<team>` role trust to resolve to real users. Add it there if new.
+- [ ] If the team's developers need cluster/AWS access, plan to add their **AWS Identity Center** wiring —
+      the `Dev-<team>` permission set + `Developers-<team>` group + assignment + users. This is partly
+      manual (per-user invite/MFA, or external-IdP group management); see
+      [Step 4](#step-4--grant-developer-access-aws-identity-center). The claim's `DeveloperAccess-<team>`
+      role trusts the `Dev-<team>` SSO principal, so the role can exist before this — but no human can use it
+      until Identity Center is wired up.
 - [ ] The crossplane control plane is healthy: `kubectl --context preprod get providers.pkg.crossplane.io`
       (all Healthy) and `kubectl --context preprod get xrd xtenants.platform.refplat.org` (Established).
 
@@ -124,6 +128,120 @@ cd ../../../../platform/us-east-1/platform/argocd-apps && AWS_PROFILE=management
 
 The `XTenant` reconciles asynchronously (~1–2 min) — `terragrunt apply` returns before it's Ready.
 
+### Step 4 — Grant developer access (AWS Identity Center)
+
+The claim provisions the `DeveloperAccess-<team>` IAM role + the EKS access entry, but **a human reaches it
+through AWS Identity Center**: they sign in to the AWS access portal, select the `Dev-<team>` permission set
+on the preprod account (account-wide read + permission to assume `DeveloperAccess-<team>`), and from there
+get namespace-scoped kubectl. This wiring is **hand-maintained** in the `identity-center` unit (mgmt
+account) and has a few genuinely manual, console-only steps. Skip this step for a team with no human
+developers yet (e.g. a workload-only team).
+
+#### 4a. Add the team to the `identity-center` unit (HCL)
+
+Edit `infra/live/aws/mgmt/global/identity-center/terragrunt.hcl` — add three things, mirroring the existing
+`alpha`/`bravo` entries:
+
+```hcl
+# 1) permission_sets — a Dev-<team> set: account-wide read + assume only this team's DeveloperAccess role
+"Dev-charlie" = {
+  description      = "Developer access for team charlie (preprod)"
+  session_duration = "PT4H"
+  managed_policies = ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
+  inline_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "AssumeTeamDeveloperRole"
+        Effect   = "Allow"
+        Action   = "sts:AssumeRole"
+        Resource = "arn:aws:iam::${dependency.organizations.outputs.account_ids["Preprod"]}:role/DeveloperAccess-charlie"
+      },
+      {
+        # Per-team ABAC (#62): deny acting on another team's tagged resources
+        Sid      = "DenyOtherTeamsResources"
+        Effect   = "Deny"
+        Action   = "*"
+        Resource = "*"
+        Condition = {
+          StringNotEquals = { "aws:ResourceTag/Team" = ["charlie", "platform"] }
+          Null            = { "aws:ResourceTag/Team" = "false" }
+        }
+      },
+    ]
+  })
+}
+
+# 2) groups — the team's developer group
+"Developers-charlie" = { description = "Developers for team charlie" }
+
+# 3) account_assignments — bind the set to the group on Preprod (append to the list)
+{ account_id = dependency.organizations.outputs.account_ids["Preprod"], permission_set = "Dev-charlie", group = "Developers-charlie" },
+```
+
+Then add the developers (see 4b for which path applies):
+
+```hcl
+# users — only when AWS Identity Center is the identity source (NOT when syncing from an external IdP)
+"charlie-dev" = {
+  given_name  = "Charlie"
+  family_name = "Developer"
+  email       = "charlie-dev@example.com" # the person's real email
+  groups      = ["Developers-charlie"]
+}
+```
+
+Apply from the management account:
+
+```bash
+cd infra/live/aws/mgmt/global/identity-center
+AWS_PROFILE=management terragrunt apply
+```
+
+This creates the permission set, group, group memberships, and the account assignment via the AWS APIs — no
+console clicks for those.
+
+#### 4b. Provision the actual people — the manual part
+
+Which path applies depends on your **identity source** (IAM Identity Center → Settings → Identity source):
+
+- **AWS Identity Center is the identity source** (this repo's default — `users` are managed in HCL as in 4a).
+  Terraform creates each user, but AWS then requires **per-user, manual, browser steps**:
+  1. The user receives an **"Invitation to join IAM Identity Center"** email. (If it didn't arrive, an admin
+     can resend: IAM Identity Center console → **Users** → select the user → **Send email verification
+     link / Reset password**.)
+  2. The user clicks **Accept invitation**, sets a password, and **registers an MFA device** (required —
+     Identity Center enforces MFA by default). This cannot be done by Terraform.
+  3. (Optional) An admin can verify membership: console → **Groups** → `Developers-charlie` → confirm the
+     user is listed.
+
+- **External IdP via SCIM** (Okta / Entra ID / etc.). Do **not** put `users` in the HCL. Instead:
+  1. In the IdP, create/assign the user to a group that SCIM-provisions into Identity Center as
+     `Developers-charlie` (the group name must match the HCL `groups` + `account_assignments` entry).
+  2. Confirm the synced group appears: IAM Identity Center console → **Groups**.
+  3. The permission set + assignment from 4a still come from HCL; only users/groups live in the IdP.
+
+> One-time, **not per team:** ArgoCD SSO uses a SAML app created by hand in the Identity Center console (see
+> [onboarding.md](../onboarding.md)). New teams get ArgoCD access through their group → ArgoCD RBAC, so you
+> do **not** create a new SAML app per team.
+
+#### 4c. How the developer then gets access (hand this to them)
+
+```bash
+# One-time: configure an SSO profile (uses the AWS access portal / start URL)
+aws configure sso            # SSO start URL = the org's access-portal URL; region us-east-1
+# pick the Preprod account + the "Dev-charlie" role when prompted; name the profile e.g. charlie-dev
+
+# kubectl, scoped to their namespace (the DeveloperAccess-charlie role → team-charlie:developers RBAC)
+aws eks update-kubeconfig --name preprod-use1-eks --region us-east-1 \
+  --role-arn arn:aws:iam::<preprod-account>:role/DeveloperAccess-charlie --profile charlie-dev
+kubectl get pods -n team-charlie    # works; other namespaces are denied
+```
+
+The `Dev-charlie` permission set itself only grants account-wide **read** + `sts:AssumeRole` into
+`DeveloperAccess-charlie`; all cluster authority is the namespace-scoped RBAC the claim bound to
+`team-charlie:developers` (ADR-039/040).
+
 ---
 
 ## Verification
@@ -157,7 +275,11 @@ A compliant workload referencing `…/team-charlie/api:<tag>` should admit; a cr
    finalizers.
 2. Remove the team from `teams.hcl` and apply `policy` + `argocd-apps` (drops its verify-* policies + ArgoCD
    app).
-3. Remove the `Dev-<team>` permission set from `identity-center` if the team is fully gone.
+3. If the team is fully gone, remove its Identity Center wiring from the `identity-center` unit (the
+   `Dev-<team>` permission set, `Developers-<team>` group, its `users`, and the `account_assignments` entry)
+   and `terragrunt apply` from the mgmt account. With an external IdP, also remove the group/members there.
+   (Terraform deletes the SSO objects; no separate console step is needed to *deprovision*, unlike the
+   manual *activation* on onboarding.)
 4. Verify: `kubectl get xtenant <team>` (NotFound), `aws iam get-role --role-name Pod-team-<team>`
    (NoSuchEntity), the ECR repo is gone in the platform account.
 
