@@ -39,8 +39,8 @@ dedicated namespace with ResourceQuotas, LimitRanges, and Cilium NetworkPolicies
 
 Each team is one **`XTenant` claim**; a Crossplane Composition reconciles it into
 the namespace, RBAC, quotas, NetworkPolicies, per-team Kyverno guardrails, Pod
-Identity, and cross-account ECR. Claims are authored in the `tenant-claims`
-Terragrunt unit. See [Crossplane Tenant API](crossplane-tenant-api.md).
+Identity, and cross-account ECR. ArgoCD syncs the claim YAMLs from
+`gitops/tenant-claims/<env>/`. See [Crossplane Tenant API](crossplane-tenant-api.md).
 
 > **Note:** The tenant module also supports a vCluster mode for stronger isolation
 > (CRD independence, virtual control plane), but this is **deferred** (ADR-033).
@@ -265,7 +265,7 @@ on top. See ADR-033 for why vCluster mode is currently deferred.
 ### Per-team overrides
 
 A team's `XTenant` claim accepts a per-team `resourceQuota` override (set in the
-`tenant-claims` unit's inputs); omitting it uses the defaults above:
+team's `gitops/tenant-claims/<env>/<team>.yaml`); omitting it uses the defaults above:
 
 ```yaml
 spec:
@@ -294,12 +294,12 @@ feeds only two **non-provisioning** concerns:
 
 ```text
 +---------------------------+        +---------------------------+
-|  tenant-claims unit        |        |  teams.hcl                |
-|  XTenant per team          |        |  alpha (migrated=true)    |
+| gitops/tenant-claims/     |        |  teams.hcl                |
+|  XTenant per team (YAML)   |        |  alpha (migrated=true)    |
 |  alpha, bravo              |        |  bravo  (migrated=true)   |
 +-----------+---------------+         +-----------+---------------+
             |                                     |
-            | terragrunt apply                    | read_terragrunt_config()
+            | ArgoCD sync (tenant-claims-preprod) | read_terragrunt_config()
             v                                     |
    Crossplane Composition               +---------+---------+
    ──────────────────────               |                   |
@@ -339,8 +339,9 @@ so they are deliberately not part of the claim/Composition.
 
 ### Adding a new team
 
-Onboarding a team is now an `XTenant` claim in the `tenant-claims` unit (plus the
-`teams.hcl` entry for app delivery + supply-chain policies). Follow the
+Onboarding a team is now an `XTenant` claim YAML in `gitops/tenant-claims/<env>/`
+(synced by ArgoCD), plus the `teams.hcl` entry for app delivery + supply-chain
+policies. Follow the
 [tenant onboarding runbook](../runbooks/tenant-onboarding.md) — it walks the claim
 fields, the `migrated = true` flag, and verification. A minimal claim example
 lives at `infra/modules/crossplane/examples/tenant-gamma.yaml`.
