@@ -58,15 +58,16 @@ networking ─┘                        |
               cross-vpc-dns ─────────┤ (networking, preprod eks)
               gateway-config ────────┘ (eks, cilium, cert-mgr, ext-dns, argocd, r53)
               cluster-rbac ──────────┤ (eks) — platform-operator ClusterRole (ADR-040)
-              policy ────────────────┤ (eks, nodes) — Kyverno engine + ClusterPolicies (ADR-014), before tenants
-              crossplane ────────────┘ (eks, nodes, policy) — tenant control plane (ADR-046, platform only); after policy (needs the crossplane-system Kyverno exclusion)
+              policy ────────────────┤ (eks, nodes) — Kyverno engine + ClusterPolicies (ADR-014), before crossplane
+              crossplane ────────────┤ (eks, nodes, policy) — federated tenant control plane (ADR-046/048); after policy (needs the crossplane-system Kyverno exclusion)
+              tenant-claims ─────────┘ (crossplane) — applies the XTenant claims; the Composition provisions each tenant (ADR-046/048)
 
 tailscale-admin ─── (no cluster deps, manages tailnet ACLs/OAuth)
 cloudtrail ──────── (no deps, secrets audit logging)
 cloudflare-dns ──── (no deps)
 ```
 
-Preprod is similar but adds `tenants` (after `policy` + gateway-config) and `transit-gateway` as spoke.
+Preprod is similar but adds the federated `crossplane` + `tenant-claims` units (the Tenant control plane, ADR-048 — alpha/bravo are provisioned by `Tenant` claims, not the retired `tenants`/`pod-identity` units) and `transit-gateway` as spoke.
 
 Cross-environment units (on platform cluster): route53-delegation, ecr, github-oidc, argocd-apps.
 

@@ -18,11 +18,9 @@ inputs = {
   # The Team tag scopes per-team access (ABAC, #62) and cost attribution (#61).
   # IMMUTABLE_WITH_EXCLUSION: image tags stay immutable; cosign's sha256-* signature/attestation
   # tags are exempt so an image can carry multiple attestations (SBOM + SLSA provenance) — #114.
-  # team-alpha/demo migrated to the Tenant claim (BACK stack P3, #174): the Composition now owns alpha's ECR
-  # repo (provider-aws-ecr), so it's removed here to avoid two owners. bravo stays until it migrates too.
-  repositories = {
-    "team-bravo/demo" = { tag_mutability = "IMMUTABLE_WITH_EXCLUSION", tags = { Team = "bravo" } }
-  }
+  # team-alpha/demo and team-bravo/demo both migrated to Tenant claims (BACK stack P3, #174): the Composition
+  # owns the tenant ECR repos now (provider-aws-ecr). This unit retains only non-tenant/platform repos.
+  repositories = {}
 
   # Accounts granted cross-account image pull access
   pull_account_ids = [
