@@ -45,7 +45,9 @@ locals {
       }
     }
     bravo = {
-      mode      = "namespace"
+      mode = "namespace"
+      # Migrated to a Tenant claim (BACK stack P3, #174) — see alpha above. app delivery + Dev-bravo SSO stay.
+      migrated  = true
       hostnames = ["demo-bravo.preprod.aws.refplat.org"]
       apps = {
         demo = {
@@ -65,14 +67,10 @@ locals {
     }
   }
 
-  # Teams whose tenant INFRA has been migrated to a Crossplane Tenant claim (BACK stack P3). They are
-  # withdrawn from the Terragrunt infra loops below (the Composition owns that infra), but remain in
-  # local.teams so app delivery (argocd-apps) and the platform-owned supply-chain policies (verify-*) keep
-  # iterating them.
+  # All tenant infra (namespace, RBAC, Pod-team role + association, ECR, per-team restrict-* policies,
+  # DeveloperAccess + access entry) is provisioned by the Crossplane Tenant Composition (BACK stack P3,
+  # #174) for `migrated` teams. This file now only feeds APP DELIVERY (argocd-apps reads `teams`/`apps`)
+  # and the platform-owned SUPPLY-CHAIN policies (policy unit reads `teams` for verify-images/attestations).
+  # The old namespace_teams/aws_teams infra loops are gone with the tenant/pod-identity/s3-shared units.
   migrated_teams = [for k, v in local.teams : k if try(v.migrated, false)]
-
-  namespace_teams = { for k, v in local.teams : k => v if v.mode == "namespace" && !try(v.migrated, false) }
-  vcluster_teams  = { for k, v in local.teams : k => v if v.mode == "vcluster" && !try(v.migrated, false) }
-  # Teams that declare AWS access (Pod Identity role + association + bucket grants) AND are not yet migrated.
-  aws_teams = { for k, v in local.teams : k => v if try(v.aws, null) != null && !try(v.migrated, false) }
 }

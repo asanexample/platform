@@ -73,6 +73,22 @@ inputs = {
         policyStatements = []
       }
     }
+    # team-bravo — migrated off teams.hcl (#174). app-bravo isn't deployed yet, so the role + association are
+    # inert (provisioned for the cross-team isolation test). S3 dropped (demo); preview disabled.
+    bravo = {
+      team      = "bravo"
+      hostnames = ["demo-bravo.preprod.aws.refplat.org"]
+      apps = {
+        demo = {
+          repoPath = "k8s/preprod"
+          preview  = false
+        }
+      }
+      aws = {
+        serviceAccount   = "app-bravo"
+        policyStatements = []
+      }
+    }
   }
 
   tags = include.base.locals.tags

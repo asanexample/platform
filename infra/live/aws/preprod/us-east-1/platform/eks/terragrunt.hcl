@@ -26,24 +26,15 @@ dependency "iam_roles" {
   config_path = "../iam-roles"
 
   mock_outputs = {
-    role_arns = merge(
-      {
-        PlatformAdmin    = "arn:aws:iam::000000000000:role/PlatformAdmin"
-        PlatformDeployer = "arn:aws:iam::000000000000:role/PlatformDeployer"
-        ArgoCD           = "arn:aws:iam::000000000000:role/ArgoCD"
-      },
-      { for team, _ in local.namespace_teams :
-        "DeveloperAccess-${team}" => "arn:aws:iam::000000000000:role/DeveloperAccess-${team}"
-      },
-    )
+    role_arns = {
+      PlatformAdmin    = "arn:aws:iam::000000000000:role/PlatformAdmin"
+      PlatformDeployer = "arn:aws:iam::000000000000:role/PlatformDeployer"
+      ArgoCD           = "arn:aws:iam::000000000000:role/ArgoCD"
+    }
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-locals {
-  teams_config    = read_terragrunt_config("${get_terragrunt_dir()}/../teams.hcl")
-  namespace_teams = local.teams_config.locals.namespace_teams
-}
 
 inputs = {
   create       = true
@@ -84,17 +75,8 @@ inputs = {
       principal_arn = "arn:aws:iam::${include.base.locals.account_id}:role/OrganizationAccountAccessRole"
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
     }
-    },
-    # One group-mapped access entry per namespace team (Bridge B): maps the team's
-    # DeveloperAccess-<team> role to the Kubernetes group team-<team>:developers.
-    # Authorization is governed by the namespace-scoped RoleBinding the tenant
-    # module creates for that group — not by an AWS-managed access policy.
-    { for team, _ in local.namespace_teams :
-      "developer_${team}" => {
-        principal_arn     = dependency.iam_roles.outputs.role_arns["DeveloperAccess-${team}"]
-        type              = "STANDARD"
-        kubernetes_groups = ["team-${team}:developers"]
-      }
+    # Per-team developer access entries (DeveloperAccess-<team> → team-<team>:developers) are now provisioned
+    # by the Tenant Composition (eks.aws.upbound.io AccessEntry), not here — all teams migrated (BACK stack P3).
   })
 
   tags = include.base.locals.tags
