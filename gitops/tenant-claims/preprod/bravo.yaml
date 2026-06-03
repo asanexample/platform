@@ -1,0 +1,18 @@
+# Tenant claim for team-bravo (preprod). Synced by ArgoCD (app: tenant-claims-preprod) and reconciled by the
+# Crossplane Tenant Composition. This file is the source of truth for the tenant — edit/remove it via PR
+# (CODEOWNERS-gated). See docs/architecture/crossplane-tenant-api.md and docs/runbooks/tenant-onboarding.md.
+apiVersion: platform.refplat.org/v1alpha1
+kind: XTenant
+metadata:
+  name: bravo
+spec:
+  team: bravo
+  hostnames:
+    - demo-bravo.preprod.aws.refplat.org
+  apps:
+    demo:
+      repoPath: k8s/preprod
+      preview: false
+  aws:
+    serviceAccount: app-bravo
+    policyStatements: []

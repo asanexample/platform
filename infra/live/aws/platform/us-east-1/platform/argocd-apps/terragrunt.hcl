@@ -108,4 +108,12 @@ inputs = {
   cluster_name     = "preprod"
   cluster_server   = dependency.preprod_eks.outputs.cluster_endpoint
   argocd_namespace = dependency.argocd.outputs.namespace
+
+  # Tenant-claim delivery via ArgoCD (BACK stack Phase 1): sync the cluster-scoped XTenant claim YAMLs from
+  # the platform repo to preprod (replaces the tenant-claims Terragrunt unit). The argocd unit excludes the
+  # XTenant XR from selfHeal drift; the policy unit excludes ArgoCD's assumed-role from the S1 backstop.
+  enable_tenant_claims      = true
+  tenant_claims_repo_url    = "https://github.com/asanexample/platform"
+  tenant_claims_repo_branch = "main"
+  tenant_claims_repo_path   = "gitops/tenant-claims/preprod"
 }

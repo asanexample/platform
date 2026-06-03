@@ -157,6 +157,16 @@ inputs = {
         ".spec.template.metadata.labels.\"app.kubernetes.io/name\"",
       ]
     })
+
+    # GitOps tenant claims (BACK stack Phase 1): Crossplane writes back into the XTenant XR — `spec.crossplane`
+    # (compositionRef / compositionRevisionRef / resourceRefs) and the `composite.apiextensions.crossplane.io`
+    # finalizer — which are NOT in the git claim YAML. Without this, selfHeal would treat them as drift and
+    # strip them on sync, severing the composition binding and tearing the tenant. Ignore the XR fields
+    # Crossplane owns; the claim's own spec (team/hostnames/apps/aws) still syncs from git.
+    "resource.customizations.ignoreDifferences.platform.refplat.org_XTenant" = yamlencode({
+      jqPathExpressions = [".spec.crossplane"]
+      jsonPointers      = ["/metadata/finalizers"]
+    })
     "dex.config" = yamlencode({
       connectors = [{
         type = "saml"

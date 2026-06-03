@@ -1,0 +1,11 @@
+# Code owners — required reviewers for sensitive paths.
+#
+# Crossplane tenant claims: files under gitops/tenant-claims/ are the source of truth for tenant
+# provisioning. ArgoCD syncs them straight to the cluster, so a merge here PROVISIONS or (on removal)
+# OFFBOARDS a tenant — including its namespace, IAM roles, and ECR. Until Kyverno envelope enforcement lands
+# (BACK stack Phase 4), code review is the only guardrail on claim content (team/hostnames/policyStatements).
+#
+# NOTE: enforcement also requires a branch-protection rule on the default branch with
+# "Require review from Code Owners" enabled (a GitHub repo setting, not in this file). Expand the owner below
+# to the platform team handle (e.g. @asanexample/platform-admins) once it exists.
+/gitops/tenant-claims/   @gangster
