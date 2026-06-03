@@ -1,0 +1,125 @@
+variable "create" {
+  description = "Whether to deploy Backstage"
+  type        = bool
+  default     = true
+}
+
+variable "helm_release_name" {
+  description = "Helm release name"
+  type        = string
+  default     = "backstage"
+}
+
+variable "helm_repository" {
+  description = "Helm chart repository"
+  type        = string
+  default     = "https://backstage.github.io/charts"
+}
+
+variable "helm_chart" {
+  description = "Helm chart name"
+  type        = string
+  default     = "backstage"
+}
+
+variable "helm_chart_version" {
+  description = "Helm chart version (pinned in _versions.hcl)"
+  type        = string
+}
+
+variable "namespace" {
+  description = "Namespace for Backstage"
+  type        = string
+  default     = "backstage"
+}
+
+variable "helm_timeout" {
+  description = "Helm release timeout (seconds)"
+  type        = number
+  default     = 600
+}
+
+variable "helm_wait" {
+  description = "Wait for the release to become ready. Default false: the DB Cluster provisions async, so we verify pod health out of band rather than risk a wait timeout."
+  type        = bool
+  default     = false
+}
+
+# ---------------------------------------------------------------------------
+# Image (built + signed by the asanexample/backstage repo CI -> platform/backstage ECR)
+# ---------------------------------------------------------------------------
+
+variable "image_registry" {
+  description = "ECR registry host for the Backstage image"
+  type        = string
+  default     = "829808296602.dkr.ecr.us-east-1.amazonaws.com"
+}
+
+variable "image_repository" {
+  description = "ECR repository for the Backstage image"
+  type        = string
+  default     = "platform/backstage"
+}
+
+variable "image_tag" {
+  description = "Backstage image tag (the asanexample/backstage commit SHA)"
+  type        = string
+}
+
+variable "replica_count" {
+  description = "Backstage backend replicas"
+  type        = number
+  default     = 1
+}
+
+# ---------------------------------------------------------------------------
+# Database (configurable: in-cluster CloudNativePG for dev, RDS for prod — ADR-051)
+# ---------------------------------------------------------------------------
+
+variable "database" {
+  description = "Backstage database. mode = in-cluster (CloudNativePG) | rds. For in-cluster, instances/storage_size size the CNPG Cluster."
+  type = object({
+    mode         = optional(string, "in-cluster")
+    instances    = optional(number, 1)
+    storage_size = optional(string, "5Gi")
+  })
+  default = {}
+
+  validation {
+    condition     = contains(["in-cluster", "rds"], var.database.mode)
+    error_message = "database.mode must be 'in-cluster' or 'rds'."
+  }
+}
+
+variable "db_cluster_name" {
+  description = "Name of the CloudNativePG Cluster (in-cluster mode). CNPG creates <name>-rw Service + <name>-app Secret."
+  type        = string
+  default     = "backstage-db"
+}
+
+variable "rds_host" {
+  description = "RDS Postgres endpoint host (rds mode)."
+  type        = string
+  default     = ""
+}
+
+variable "rds_secret_name" {
+  description = "Name of the K8s Secret (ExternalSecret-synced) holding username/password for RDS (rds mode)."
+  type        = string
+  default     = ""
+}
+
+variable "resources" {
+  description = "Backstage backend container resource requests/limits"
+  type = object({
+    requests = optional(map(string), { cpu = "250m", memory = "512Mi" })
+    limits   = optional(map(string), { cpu = "1", memory = "1Gi" })
+  })
+  default = {}
+}
+
+variable "tags" {
+  description = "Tags (rendered as pod labels)"
+  type        = map(string)
+  default     = {}
+}

@@ -79,8 +79,14 @@ inputs = {
   # cluster-scoped restrict-wildcard-rbac policy would otherwise deny in Enforce — blocking the
   # install. Exclude the crossplane-system control-plane principals (justified like kube-system/argocd:
   # a platform RBAC controller, not a tenant) and the namespace. MUST be applied before the crossplane unit.
-  extra_exclude_principals = ["system:serviceaccount:crossplane-system:*"]
-  extra_exclude_namespaces = ["crossplane-system"]
+  # CloudNativePG (the Backstage DB operator, ADR-051) is the same case: its controller authors a
+  # per-Cluster Role (in the app namespace) that restrict-wildcard-rbac flags — exclude the cnpg-system
+  # operator principal (a trusted platform operator, not a tenant) so it can provision managed databases.
+  extra_exclude_principals = [
+    "system:serviceaccount:crossplane-system:*",
+    "system:serviceaccount:cnpg-system:*",
+  ]
+  extra_exclude_namespaces = ["crossplane-system", "cnpg-system"]
 
   helm_chart_version = include.base.locals.helm_versions.kyverno
   helm_wait          = true

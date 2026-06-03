@@ -20,7 +20,14 @@ inputs = {
   # tags are exempt so an image can carry multiple attestations (SBOM + SLSA provenance) — #114.
   # team-alpha/demo and team-bravo/demo both migrated to Tenant claims (BACK stack P3, #174): the Composition
   # owns the tenant ECR repos now (provider-aws-ecr). This unit retains only non-tenant/platform repos.
-  repositories = {}
+  repositories = {
+    # The developer portal's own image (Backstage; platform infra, not a tenant app — ADR-051). Built +
+    # cosign-signed by the asanexample/backstage repo's CI, pulled by the backstage Deployment on this cluster.
+    "platform/backstage" = {
+      tag_mutability = "IMMUTABLE_WITH_EXCLUSION" # image tags immutable; cosign sha256-* tags exempt
+      tags           = { Service = "backstage" }
+    }
+  }
 
   # Accounts granted cross-account image pull access
   pull_account_ids = [
