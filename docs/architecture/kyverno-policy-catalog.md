@@ -102,7 +102,7 @@ supported fallback for bespoke-build apps.
 | `verify-images-team-<team>` | Images under `…/team-<team>/*` are cosign-signed (`count: 1`) by the shared `trusted-ci/build-sign.yml` (`trusted_ci_build_subject_regexp`) gated per-team by the `githubWorkflowRepository` extension = `app-<team>` (`shared_signer_caller_repos`, ADR-050) **or**, as a fallback, by `app-<team>`'s own `deploy.yml@main` (pinned) / `preview.yml` (subjectRegExp — the PR OIDC ref varies); `mutateDigest` pins to digest | tenant (per-team) |
 
 Per-team identity isolation: the shared signer's cert **subject** is the same for all teams, so isolation
-moves to the `githubWorkflowRepository` cert extension — Fulcio sets it from the *calling* app repo's OIDC,
+moves to the `githubWorkflowRepository` cert extension — Fulcio sets it from the _calling_ app repo's OIDC,
 so one team cannot forge another's. A signature whose caller repo (or, for the fallback, whose app
 workflow) is not the team's does **not** satisfy that team's policy — the supply-chain analog of per-team
 registry scoping. Deployed on **preprod** (where tenants run); the platform cluster has no tenant
