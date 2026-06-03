@@ -42,6 +42,12 @@ variable "tenant_registry_map" {
   default     = {}
 }
 
+variable "migrated_teams" {
+  description = "Teams whose tenant infra (incl. per-team restrict-images/restrict-route-hostnames policies) is owned by the Crossplane Tenant Composition (BACK stack P3). The chart skips those per-team restrict-* policies for these teams to avoid name collisions; platform-owned verify-images/verify-attestations still apply to them."
+  type        = list(string)
+  default     = []
+}
+
 variable "exclude_namespaces" {
   description = "Infrastructure namespaces excluded from tenant-targeted and cluster-scoped policies so Kyverno never gates platform/system workloads."
   type        = list(string)

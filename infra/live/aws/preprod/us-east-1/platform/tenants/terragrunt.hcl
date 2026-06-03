@@ -80,7 +80,10 @@ generate "helm_provider" {
 inputs = {
   create = true
 
-  tenants = { for k, v in local.teams : k => {
+  # Iterate namespace_teams (not the raw teams map) so teams migrated to a Tenant claim (BACK stack P3) are
+  # excluded — their namespace + RBAC + quotas are owned by the Composition. vCluster teams are excluded too
+  # (this module provisions namespace-mode tenants; vCluster is deferred, ADR-033).
+  tenants = { for k, v in local.teams_config.locals.namespace_teams : k => {
     mode = v.mode
   } }
 

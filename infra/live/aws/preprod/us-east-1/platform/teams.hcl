@@ -18,6 +18,12 @@ locals {
   teams = {
     alpha = {
       mode = "namespace"
+      # Migrated to a Tenant claim (BACK stack P3, #174): its tenant INFRA (namespace, RBAC, Pod-team role +
+      # association, ECR repo, per-team restrict-* policies, DeveloperAccess + access entry) is now owned by
+      # the Composition via tenant-claims/alpha. This entry stays only so app delivery (argocd-apps) and the
+      # platform-owned supply-chain policies (verify-images/attestations, policy unit) keep working; the
+      # `migrated` flag withdraws alpha from every Terragrunt infra loop below.
+      migrated = true
       # Hostnames this team's Gateway-API routes may claim (Kyverno hostname guard, ADR-029).
       hostnames = ["demo.preprod.aws.refplat.org"]
       apps = {
@@ -59,8 +65,14 @@ locals {
     }
   }
 
-  namespace_teams = { for k, v in local.teams : k => v if v.mode == "namespace" }
-  vcluster_teams  = { for k, v in local.teams : k => v if v.mode == "vcluster" }
-  # Teams that declare AWS access (Pod Identity role + association + bucket grants).
-  aws_teams = { for k, v in local.teams : k => v if try(v.aws, null) != null }
+  # Teams whose tenant INFRA has been migrated to a Crossplane Tenant claim (BACK stack P3). They are
+  # withdrawn from the Terragrunt infra loops below (the Composition owns that infra), but remain in
+  # local.teams so app delivery (argocd-apps) and the platform-owned supply-chain policies (verify-*) keep
+  # iterating them.
+  migrated_teams = [for k, v in local.teams : k if try(v.migrated, false)]
+
+  namespace_teams = { for k, v in local.teams : k => v if v.mode == "namespace" && !try(v.migrated, false) }
+  vcluster_teams  = { for k, v in local.teams : k => v if v.mode == "vcluster" && !try(v.migrated, false) }
+  # Teams that declare AWS access (Pod Identity role + association + bucket grants) AND are not yet migrated.
+  aws_teams = { for k, v in local.teams : k => v if try(v.aws, null) != null && !try(v.migrated, false) }
 }

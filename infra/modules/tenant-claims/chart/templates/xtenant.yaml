@@ -1,0 +1,14 @@
+{{- /* One XTenant per .Values.tenants entry. The map key is the claim name; the value IS the XTenant spec
+       (team, hostnames, resourceQuota, apps, aws, developerAccess, complianceTier) — passed verbatim from
+       the unit's inputs, so the unit's HCL is the single, declarative source of truth for each tenant. */}}
+{{- range $name, $spec := .Values.tenants }}
+---
+apiVersion: platform.refplat.org/v1alpha1
+kind: XTenant
+metadata:
+  name: {{ $name }}
+  labels:
+    app.kubernetes.io/managed-by: tenant-claims
+spec:
+{{ toYaml $spec | indent 2 }}
+{{- end }}

@@ -101,6 +101,10 @@ locals {
     complianceTier          = var.compliance_tier
     allowedRegistries       = var.allowed_registries
     tenantRegistryMap       = var.tenant_registry_map
+    # Teams whose tenant infra (incl. the per-team restrict-* policies) is owned by the Crossplane Tenant
+    # Composition (BACK stack P3). The chart skips restrict-images/restrict-route-hostnames for these to
+    # avoid colliding with the Composition's; the platform-owned verify-images/attestations still apply.
+    migratedTeams           = var.migrated_teams
     excludeNamespaces       = concat(var.exclude_namespaces, var.extra_exclude_namespaces)
     excludePrincipals       = concat(var.exclude_principals, var.extra_exclude_principals)
     tenantNamespaceLabel    = var.tenant_namespace_label

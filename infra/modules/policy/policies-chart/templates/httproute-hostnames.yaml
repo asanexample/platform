@@ -1,6 +1,7 @@
 {{- if .Values.enableHttprouteGuard }}
 {{- range $team, $patterns := .Values.tenantHostnamePatterns }}
-{{- if $patterns }}
+{{- /* Skip teams migrated to a Tenant claim — the Composition owns their restrict-route-hostnames (P3). */}}
+{{- if and $patterns (not (has $team ($.Values.migratedTeams | default list))) }}
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
