@@ -221,6 +221,18 @@ variable "attest_caller_repos" {
   default     = {}
 }
 
+variable "trusted_ci_build_subject_regexp" {
+  description = "Anchored regex for the shared build-sign reusable workflow's keyless cert subject (asanexample/trusted-ci/build-sign.yml, any pinned ref). Dots escaped; ^...$ anchored. The image signature + SBOM for shared-signer teams (see shared_signer_caller_repos) are signed by this identity."
+  type        = string
+  default     = "^https://github\\.com/asanexample/trusted-ci/\\.github/workflows/build-sign\\.yml@.+$"
+}
+
+variable "shared_signer_caller_repos" {
+  description = "Per-team caller repo (org/repo, e.g. asanexample/app-alpha) for teams whose CI builds+signs via the SHARED trusted-ci build-sign reusable workflow. For these teams verify-images AND the verify-attestations SBOM accept — IN ADDITION to the team's own app-workflow identity (verify_subjects) — a signature whose subject matches trusted_ci_build_subject_regexp gated by the githubWorkflowRepository extension (= this caller repo). Teams absent here are app-signed only. Mirrors attest_caller_repos (provenance)."
+  type        = map(string)
+  default     = {}
+}
+
 variable "oidc_provider_arn" {
   description = "EKS OIDC provider ARN, for the Kyverno IRSA trust policy. Required when enable_image_verification = true."
   type        = string
