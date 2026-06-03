@@ -7,8 +7,16 @@ locals {
   enable_aws                 = local.create && length(var.provider_services) > 0
   enable_tenant_provisioning = local.create && var.enable_tenant_provisioning
 
-  # The IAM Pod-team-* roles the provisioning role may create/manage (in this workload account).
+  # The IAM Pod-team-* roles the provisioning role may create/manage (in this workload account). PassRole is
+  # scoped to these only (the workload roles handed to EKS Pod Identity).
   tenant_role_arn_pattern = "arn:aws:iam::${var.account_id}:role/${var.tenant_role_name_prefix}*"
+
+  # Roles the provisioning role may create/manage: the Pod-team-* workload roles AND the DeveloperAccess-*
+  # per-team developer-access roles (P2c). Both name prefixes, same account.
+  manageable_role_arn_patterns = [
+    local.tenant_role_arn_pattern,
+    "arn:aws:iam::${var.account_id}:role/${var.developer_role_name_prefix}*",
+  ]
 
   # AWS family providers share one SA (so a single Pod Identity association credentials them) and serve on
   # hostNetwork (their CRDs are multi-version → the EKS control plane must reach the conversion webhook).
@@ -159,6 +167,7 @@ resource "helm_release" "crossplane_tenant" {
       ecrRegistry             = var.ecr_registry
       region                  = var.region
       workloadAccountId       = var.account_id
+      managementAccountId     = var.management_account_id
       clusterName             = var.cluster_name
       pullAccountIds          = var.tenant_pull_account_ids
       permissionsBoundaryArn  = local.enable_tenant_provisioning ? aws_iam_policy.tenant_boundary[0].arn : ""
@@ -268,7 +277,7 @@ data "aws_iam_policy_document" "provisioner" {
       sid       = "TenantIamCreateRoleBoundedOnly"
       effect    = "Allow"
       actions   = ["iam:CreateRole"]
-      resources = [local.tenant_role_arn_pattern]
+      resources = local.manageable_role_arn_patterns
       condition {
         test     = "StringEquals"
         variable = "iam:PermissionsBoundary"
@@ -291,7 +300,7 @@ data "aws_iam_policy_document" "provisioner" {
         # On delete, the provider lists instance profiles for the role (to detach any) before DeleteRole.
         "iam:ListInstanceProfilesForRole",
       ]
-      resources = [local.tenant_role_arn_pattern]
+      resources = local.manageable_role_arn_patterns
     }
   }
   # PassRole the tenant roles to EKS Pod Identity only.
@@ -326,6 +335,27 @@ data "aws_iam_policy_document" "provisioner" {
       resources = [
         "arn:aws:eks:${var.region}:${var.account_id}:cluster/${var.cluster_name}",
         "arn:aws:eks:${var.region}:${var.account_id}:podidentityassociation/${var.cluster_name}/*",
+      ]
+    }
+  }
+  # EKS access entries on this cluster (P2c): map the per-team DeveloperAccess-<team> role to the
+  # team-<team>:developers Kubernetes group. Authorized on the cluster + access-entry resources.
+  dynamic "statement" {
+    for_each = local.enable_tenant_provisioning ? [1] : []
+    content {
+      sid    = "TenantEksAccessEntries"
+      effect = "Allow"
+      actions = [
+        "eks:CreateAccessEntry", "eks:DeleteAccessEntry", "eks:DescribeAccessEntry",
+        "eks:UpdateAccessEntry", "eks:ListAccessEntries",
+        # Group-mapped entries don't associate an AWS access policy, but upjet calls these on observe.
+        "eks:AssociateAccessPolicy", "eks:DisassociateAccessPolicy", "eks:ListAssociatedAccessPolicies",
+        # The entry carries a Team tag (create-with-tags needs eks:TagResource; Untag for drift/delete).
+        "eks:TagResource", "eks:UntagResource",
+      ]
+      resources = [
+        "arn:aws:eks:${var.region}:${var.account_id}:cluster/${var.cluster_name}",
+        "arn:aws:eks:${var.region}:${var.account_id}:access-entry/${var.cluster_name}/*",
       ]
     }
   }

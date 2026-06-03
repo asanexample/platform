@@ -95,5 +95,9 @@ inputs = {
   ecr_registry            = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com"
   tenant_pull_account_ids = [include.base.locals.account_ids["preprod"], include.base.locals.account_ids["prod"]]
 
+  # Management account ID — the Composition's DeveloperAccess-<team> trust allows the per-team SSO permission
+  # set (Dev-<team>) in both the management and preprod accounts to assume the role (P2c, ADR-039).
+  management_account_id = include.base.locals.account_ids["mgmt"]
+
   tags = include.base.locals.tags
 }
