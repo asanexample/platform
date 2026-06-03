@@ -27,7 +27,15 @@ locals {
   # (SLSA L3, #131). For these teams verify-attestations requires trusted-ci-signed provenance instead of
   # app-signed. Add a team here ONLY once its CI has dropped the hand-authored provenance step and wired
   # the trusted-ci job — otherwise its images fail the provenance check. (Later: a teams.hcl per-app flag.)
-  isolated_provenance_teams = ["alpha"]
+  isolated_provenance_teams = ["alpha", "bravo"]
+
+  # Teams whose app CI builds+signs the image (and SBOM) via the SHARED trusted-ci build-sign.yml reusable
+  # workflow (a thin caller — the supply-chain backbone abstracted out of per-app deploy.yml). For these
+  # teams verify-images and the verify-attestations SBOM ALSO accept the shared-signer identity (gated by
+  # the githubWorkflowRepository extension = the app repo), in addition to any app-signed identity. Add a
+  # team here once its deploy.yml/preview.yml call build-sign.yml. Bespoke apps that self-build stay
+  # app-signed (absent here). Mirrors isolated_provenance_teams (provenance).
+  shared_signer_teams = ["alpha", "bravo"]
 }
 
 dependency "eks" {
@@ -136,6 +144,14 @@ inputs = {
   # approach: two slsaprovenance attestations of different identities ERROR Kyverno's matching →
   # verifiedCount:0.) SBOM stays app-signed.
   attest_caller_repos = { for k in local.isolated_provenance_teams :
+    k => replace(values(local.teams[k].apps)[0].repo_url, "https://github.com/", "")
+  }
+
+  # Shared build-sign signer (the thin-caller supply-chain abstraction): for these teams verify-images and
+  # the verify-attestations SBOM ALSO accept the shared trusted-ci/build-sign.yml identity, gated by the
+  # githubWorkflowRepository extension (= the app repo). Derived like attest_caller_repos. The default
+  # trusted_ci_build_subject_regexp in the module matches build-sign.yml at any pinned ref.
+  shared_signer_caller_repos = { for k in local.shared_signer_teams :
     k => replace(values(local.teams[k].apps)[0].repo_url, "https://github.com/", "")
   }
 

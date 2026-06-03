@@ -58,6 +58,21 @@ spec:
                     rekor:
                       url: "{{ $.Values.rekorUrl }}"
                 {{- end }}
+                {{- $sharedRepo := index $.Values.sharedSignerCallerRepos $team }}
+                {{- if $sharedRepo }}
+                # Shared trusted-ci build-sign reusable workflow — same cert SUBJECT for every team; the
+                # per-team gate is the githubWorkflowRepository extension (= the CALLER app repo, which
+                # Fulcio sets from the calling repo's OIDC, so another team cannot forge it). Listed as an
+                # additional count:1 alternative so a team can be on the shared signer, its own app-signed
+                # identity (above), or both. squote: the anchored regex has backslash escapes.
+                - keyless:
+                    issuer: https://token.actions.githubusercontent.com
+                    subjectRegExp: {{ $.Values.trustedCiBuildSubjectRegExp | squote }}
+                    additionalExtensions:
+                      githubWorkflowRepository: {{ $sharedRepo | quote }}
+                    rekor:
+                      url: "{{ $.Values.rekorUrl }}"
+                {{- end }}
 ---
 {{- end }}
 {{- end }}

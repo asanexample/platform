@@ -63,6 +63,14 @@ rekorUrl: https://rekor.sigstore.dev
 trustedCiSubjectRegExp: '^https://github\.com/asanexample/trusted-ci/\.github/workflows/slsa-provenance\.yml@.+$'
 attestCallerRepos: {}
 
+# Shared build-sign reusable workflow (asanexample/trusted-ci/build-sign.yml — the thin-caller supply-chain
+# abstraction). For teams in sharedSignerCallerRepos, verify-images AND the verify-attestations SBOM ALSO
+# accept this shared identity (subject = trustedCiBuildSubjectRegExp), gated per-team by the cert's
+# githubWorkflowRepository extension (= the app repo), in addition to the team's own app-signed identity.
+# sharedSignerCallerRepos: tenant -> "<org>/app-<team>" (empty = every team is app-signed only).
+trustedCiBuildSubjectRegExp: '^https://github\.com/asanexample/trusted-ci/\.github/workflows/build-sign\.yml@.+$'
+sharedSignerCallerRepos: {}
+
 # Per-team Gateway-API route hostname guard (anti-squatting). tenant -> [allowed hostname patterns].
 enableHttprouteGuard: true
 tenantHostnamePatterns: {}

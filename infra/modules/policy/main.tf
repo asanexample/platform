@@ -122,11 +122,17 @@ locals {
 
     trustedCiSubjectRegExp = var.trusted_ci_subject_regexp
     attestCallerRepos      = var.attest_caller_repos
-    enableHttprouteGuard   = var.enable_httproute_guard
-    tenantHostnamePatterns = var.tenant_hostname_patterns
-    enableCleanup          = var.enable_cleanup
-    additionalPolicies     = var.additional_policies
-    commonLabels           = local.k8s_labels
+    # Shared build-sign reusable workflow (asanexample/trusted-ci/build-sign.yml): for teams in
+    # sharedSignerCallerRepos the image signature + SBOM may also be signed by this shared workflow
+    # (subject) gated by the githubWorkflowRepository extension (= the team's app repo), in addition
+    # to the team's own app-workflow identity. Mirrors the provenance attestCallerRepos pattern.
+    trustedCiBuildSubjectRegExp = var.trusted_ci_build_subject_regexp
+    sharedSignerCallerRepos     = var.shared_signer_caller_repos
+    enableHttprouteGuard        = var.enable_httproute_guard
+    tenantHostnamePatterns      = var.tenant_hostname_patterns
+    enableCleanup               = var.enable_cleanup
+    additionalPolicies          = var.additional_policies
+    commonLabels                = local.k8s_labels
   }
 }
 

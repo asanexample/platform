@@ -71,6 +71,19 @@ spec:
                         rekor:
                           url: "{{ $.Values.rekorUrl }}"
                     {{- end }}
+                    {{- $sharedRepo := index $.Values.sharedSignerCallerRepos $team }}
+                    {{- if $sharedRepo }}
+                    # Shared trusted-ci build-sign workflow signs the SBOM for shared-signer teams (same
+                    # subject for all, gated per-team by the githubWorkflowRepository extension). Additional
+                    # count:1 alternative alongside the team's own app-signed SBOM identity above.
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subjectRegExp: {{ $.Values.trustedCiBuildSubjectRegExp | squote }}
+                        additionalExtensions:
+                          githubWorkflowRepository: {{ $sharedRepo | quote }}
+                        rekor:
+                          url: "{{ $.Values.rekorUrl }}"
+                    {{- end }}
             # SLSA build provenance.
             - type: https://slsa.dev/provenance/v0.2
               attestors:
