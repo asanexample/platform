@@ -138,6 +138,9 @@ inputs = {
       trust_principals = {
         aws = ["arn:aws:iam::${include.base.locals.account_ids["preprod"]}:root"]
       }
+      # provider-upjet-aws passes session tags on the assumeRoleChain hop, so the trust policy must allow
+      # sts:TagSession alongside sts:AssumeRole (the preprod provisioner's identity policy grants both too).
+      trust_actions = ["sts:AssumeRole", "sts:TagSession"]
       trust_conditions = [
         {
           test     = "ArnLike"

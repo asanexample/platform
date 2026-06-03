@@ -414,7 +414,12 @@ spec:
                 name: {{ $ecrCfg }}
               forProvider:
                 region: {{ $env.region }}
-                imageTagMutability: IMMUTABLE
+                # Parity with the ecr module: image tags stay immutable, but cosign's sha256-* signature/
+                # attestation tags are exempted so they can be updated (multiple attestations per digest).
+                imageTagMutability: IMMUTABLE_WITH_EXCLUSION
+                imageTagMutabilityExclusionFilter:
+                  - filter: "sha256-*"
+                    filterType: WILDCARD
                 imageScanningConfiguration:
                   - scanOnPush: true
                 forceDelete: true

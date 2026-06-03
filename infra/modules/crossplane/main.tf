@@ -285,6 +285,11 @@ data "aws_iam_policy_document" "provisioner" {
       actions = [
         "iam:DeleteRole", "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:GetRolePolicy",
         "iam:ListRolePolicies", "iam:TagRole", "iam:UntagRole", "iam:GetRole", "iam:ListRoleTags",
+        # provider-upjet-aws observes a Role by also listing its *attached* (managed) policies, even though
+        # we only ever attach inline policies — without this the observe 403s and the MR never goes Ready.
+        "iam:ListAttachedRolePolicies",
+        # On delete, the provider lists instance profiles for the role (to detach any) before DeleteRole.
+        "iam:ListInstanceProfilesForRole",
       ]
       resources = [local.tenant_role_arn_pattern]
     }
@@ -314,6 +319,9 @@ data "aws_iam_policy_document" "provisioner" {
         "eks:CreatePodIdentityAssociation", "eks:DeletePodIdentityAssociation",
         "eks:UpdatePodIdentityAssociation", "eks:DescribePodIdentityAssociation",
         "eks:ListPodIdentityAssociations",
+        # The association carries a Team tag; CreatePodIdentityAssociation with tags needs eks:TagResource
+        # (and UntagResource for drift correction / delete).
+        "eks:TagResource", "eks:UntagResource",
       ]
       resources = [
         "arn:aws:eks:${var.region}:${var.account_id}:cluster/${var.cluster_name}",
@@ -325,9 +333,11 @@ data "aws_iam_policy_document" "provisioner" {
   dynamic "statement" {
     for_each = local.enable_tenant_provisioning && var.ecr_provisioner_role_arn != "" ? [1] : []
     content {
-      sid       = "AssumePlatformEcrProvisioner"
-      effect    = "Allow"
-      actions   = ["sts:AssumeRole"]
+      sid    = "AssumePlatformEcrProvisioner"
+      effect = "Allow"
+      # provider-upjet-aws passes session tags on the assumeRoleChain hop, so the chain needs sts:TagSession
+      # alongside sts:AssumeRole (the target role's trust policy must allow sts:TagSession too).
+      actions   = ["sts:AssumeRole", "sts:TagSession"]
       resources = [var.ecr_provisioner_role_arn]
     }
   }
