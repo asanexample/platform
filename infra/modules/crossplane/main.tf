@@ -27,7 +27,10 @@ locals {
     hostNetwork    = var.kubernetes_provider_hostnetwork
   }] : []
 
-  providers = concat(local.aws_providers, local.k8s_provider)
+  # k8s_provider FIRST so provider-kubernetes keeps list index 0 (and thus its port assignment) stable across
+  # phases — adding the aws providers must not re-index it (an index change rewrites its DRC ports, forcing a
+  # disruptive restart that can reschedule it onto a node where its fixed ports collide). New providers append.
+  providers = concat(local.k8s_provider, local.aws_providers)
 
   # ProviderConfig CRDs the wait-Job gates on (each installed asynchronously by its provider package).
   wait_for_crds = concat(

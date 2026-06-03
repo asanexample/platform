@@ -5,5 +5,5 @@ description: >-
   Identity), the Provider package CRs, and a post-install Job that blocks until the providers are Healthy
   (so the provider-installed ProviderConfig CRD exists before the config chart applies a ProviderConfig).
 type: application
-version: 0.1.2
+version: 0.1.3
 appVersion: "2.5.0"

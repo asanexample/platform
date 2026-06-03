@@ -72,8 +72,11 @@ inputs = {
   # AWS (provider-aws iam/eks locally; ecr cross-account into the platform account via assumeRoleChain).
   provider_services = ["ecr", "iam", "eks"]
 
-  enable_kubernetes_provider      = true
-  kubernetes_provider_hostnetwork = true # Object CRD is multi-version → its conversion webhook must be reachable (overlay)
+  enable_kubernetes_provider = true
+  # provider-kubernetes stays hostNetwork + list index 0 (its P2a config) so it does NOT churn when the aws
+  # providers are added — keeping it on its current node where its (hardcoded :8080/:8081/9443) ports are
+  # free. Its Object conversion webhook needs hostNetwork to be apiserver-reachable under the overlay.
+  kubernetes_provider_hostnetwork = true
 
   functions = [
     { name = "function-go-templating", package = "xpkg.upbound.io/crossplane-contrib/function-go-templating:v0.12.1" },

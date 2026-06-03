@@ -132,11 +132,19 @@ inputs = {
       description          = "Crossplane (preprod) cross-account tenant ECR provisioning"
       max_session_duration = 3600
 
+      # Trust the preprod account root + condition on the provisioning role name pattern (rather than the
+      # exact role ARN, which would not exist yet at create time — chicken-and-egg). Still scoped to only
+      # the preprod Crossplane provisioning role; order-independent.
       trust_principals = {
-        aws = [
-          "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:role/crossplane-provisioner-preprod-use1-eks",
-        ]
+        aws = ["arn:aws:iam::${include.base.locals.account_ids["preprod"]}:root"]
       }
+      trust_conditions = [
+        {
+          test     = "ArnLike"
+          variable = "aws:PrincipalArn"
+          values   = ["arn:aws:iam::${include.base.locals.account_ids["preprod"]}:role/crossplane-provisioner-*"]
+        },
+      ]
 
       inline_policies = {
         tenant-ecr = jsonencode({
