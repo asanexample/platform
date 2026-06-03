@@ -48,8 +48,8 @@ spec is the tenant-facing contract — no infra constants leak into it:
 | `aws` | — | `serviceAccount` (the named SA the Pod Identity association binds) + `policyStatements[]` (generic IAM granted to `Pod-team-<team>`, capped by the deny-escalation boundary) |
 | `developerAccess` | — (default `enabled: true`) | Provision `DeveloperAccess-<team>` + the EKS access entry |
 
-A minimal example lives in `infra/modules/crossplane/examples/tenant-gamma.yaml`; the live claims are in the
-`tenant-claims` unit's inputs.
+A minimal example lives in `infra/modules/crossplane/examples/tenant-gamma.yaml`; the live claims are YAML
+files in `gitops/tenant-claims/<env>/` (one `XTenant` per file).
 
 ## What the Composition provisions
 
@@ -102,20 +102,25 @@ to process its inline go-template `{{ }}`.
 
 ## Claim delivery & lifecycle
 
-Claims are authored in the [`tenant-claims`](../../infra/modules/tenant-claims/) Terragrunt unit (one
-`XTenant` per `tenants` map entry) and applied as **PlatformDeployer** — a platform principal, so it passes
-the S1 `restrict-tenant-control-plane` Kyverno backstop that denies `XTenant` creation by tenant principals.
-(When Backstage lands — BACK stack P5 — it will create/PR these same CRs; the delivery mechanism is
+Claims are **GitOps-delivered**: each is a YAML file (`gitops/tenant-claims/<env>/<team>.yaml`, one
+`XTenant`) merged to the platform repo via a CODEOWNERS-gated PR. The `tenant-claims-preprod` ArgoCD
+Application (in a dedicated `platform-tenants` AppProject whose `clusterResourceWhitelist` admits only
+`XTenant`) syncs that directory to the cluster with `selfHeal` + `prune` + ServerSideApply. ArgoCD applies
+as the assumed **`ArgoCD` IAM role** — a platform principal excluded from the S1
+`restrict-tenant-control-plane` Kyverno backstop that denies `XTenant` creation by tenant principals. (When
+Backstage lands — BACK stack P5 — it will scaffold these same claim YAMLs via PR; the delivery mechanism is
 pluggable.)
 
 ```text
-edit tenant-claims unit  ──terragrunt apply──▶  XTenant CR  ──Composition──▶  managed resources
-                                                    │                              (K8s + AWS)
-   kubectl get xtenant <team>  (SYNCED / READY) ◀───┘   kubectl get managed | grep <team>
+edit gitops/tenant-claims/<env>/<team>.yaml ──PR (CODEOWNERS)──▶ merge
+        │
+        └──ArgoCD (tenant-claims-<env> app) sync──▶ XTenant CR ──Composition──▶ managed resources
+                                                        │                            (K8s + AWS)
+   kubectl get xtenant <team>  (SYNCED / READY) ◀───────┘   kubectl get managed | grep <team>
 ```
 
-**Delete** = remove the entry from the unit + apply; the `XTenant` is deleted and the Composition tears down
-every managed resource (both AWS accounts + the cluster) via finalizers.
+**Delete** = remove the team's YAML via PR; ArgoCD's `prune` deletes the `XTenant` and the Composition tears
+down every managed resource (both AWS accounts + the cluster) via finalizers.
 
 ## Relationship to `teams.hcl`
 

@@ -93,10 +93,13 @@ generate "kubernetes_provider" {
 inputs = {
   create = true
 
+  # TEMP: app-bravo's GitHub repo does not exist yet, so its ArgoCD Application errors "Repository not
+  # found" (a phantom). Skip bravo's app delivery here until app-bravo is created (its own follow-up task),
+  # then restore it. bravo's tenant INFRA is unaffected (provisioned by its XTenant claim, GitOps-delivered).
   tenants = { for k, v in local.teams : k => {
     mode = v.mode
     apps = v.apps
-  } }
+  } if k != "bravo" }
 
   github_org               = "asanexample"
   github_token_secret_name = "github-appset-token"                                                                                # K8s secret created by generate block above
