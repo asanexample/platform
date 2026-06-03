@@ -60,3 +60,31 @@ variable "github_token_secret_name" {
   type        = string
   default     = ""
 }
+
+# ---------------------------------------------------------------------------
+# Tenant-claim delivery (BACK stack Phase 1): ArgoCD syncs XTenant claim YAMLs
+# ---------------------------------------------------------------------------
+
+variable "enable_tenant_claims" {
+  description = "Create the platform-tenants AppProject + Application that syncs Crossplane XTenant claim YAMLs from git to the target cluster (replaces the tenant-claims Terragrunt unit)."
+  type        = bool
+  default     = false
+}
+
+variable "tenant_claims_repo_url" {
+  description = "Git repo URL holding the XTenant claim YAMLs (the platform repo)."
+  type        = string
+  default     = ""
+}
+
+variable "tenant_claims_repo_branch" {
+  description = "Branch/revision for the claims repo."
+  type        = string
+  default     = "main"
+}
+
+variable "tenant_claims_repo_path" {
+  description = "Path within the claims repo to the XTenant YAMLs for the target cluster (e.g. gitops/tenant-claims/preprod)."
+  type        = string
+  default     = "gitops/tenant-claims/preprod"
+}

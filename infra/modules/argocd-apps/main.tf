@@ -117,6 +117,82 @@ resource "kubernetes_manifest" "application" {
 }
 
 # ---------------------------------------------------------------------------
+# Tenant claims (BACK stack Phase 1): a dedicated AppProject + Application that
+# syncs the cluster-scoped XTenant claim YAMLs from git. Replaces the
+# tenant-claims Terragrunt unit. ArgoCD applies as the assumed ArgoCD role,
+# which is excluded from the S1 restrict-tenant-control-plane backstop (policy
+# module). The XTenant ignoreDifferences customization (argocd unit) keeps
+# selfHeal from fighting Crossplane's spec.crossplane / finalizer injections.
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_manifest" "tenant_claims_project" {
+  for_each = var.enable_tenant_claims ? { enabled = true } : {}
+
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "AppProject"
+    metadata = {
+      name      = "platform-tenants"
+      namespace = var.argocd_namespace
+    }
+    spec = {
+      description = "Crossplane XTenant claims (platform-managed, GitOps delivery)"
+      sourceRepos = [var.tenant_claims_repo_url]
+      destinations = [{
+        server    = var.cluster_server
+        namespace = "crossplane-system"
+      }]
+      # Only the cluster-scoped XTenant claim — nothing else (no namespaced resources).
+      clusterResourceWhitelist = [
+        { group = "platform.refplat.org", kind = "XTenant" },
+      ]
+      namespaceResourceWhitelist = []
+    }
+  }
+}
+
+resource "kubernetes_manifest" "tenant_claims_app" {
+  for_each = var.enable_tenant_claims ? { enabled = true } : {}
+
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata = {
+      name      = "tenant-claims-preprod"
+      namespace = var.argocd_namespace
+      labels = {
+        "platform.refplat.org/component" = "tenant-claims"
+      }
+    }
+    spec = {
+      project = "platform-tenants"
+      source = {
+        repoURL        = var.tenant_claims_repo_url
+        targetRevision = var.tenant_claims_repo_branch
+        path           = var.tenant_claims_repo_path
+      }
+      destination = {
+        server    = var.cluster_server
+        namespace = "crossplane-system"
+      }
+      # Git is the source of truth: prune offboards a tenant when its YAML is removed (gated by CODEOWNERS
+      # on the claims path). ServerSideApply makes ArgoCD own only the fields it sets (the claim intent), so
+      # XRD-applied defaults (resourceQuota, complianceTier, …) and Crossplane's spec.crossplane/finalizers
+      # are NOT stripped by selfHeal; the ignoreDifferences in the argocd unit keeps the UI Synced.
+      syncPolicy = {
+        automated = {
+          selfHeal = true
+          prune    = true
+        }
+        syncOptions = ["CreateNamespace=false", "ServerSideApply=true"]
+      }
+    }
+  }
+
+  depends_on = [kubernetes_manifest.tenant_claims_project]
+}
+
+# ---------------------------------------------------------------------------
 # ApplicationSet: one per preview-enabled app (PR generator)
 # ---------------------------------------------------------------------------
 

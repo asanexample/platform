@@ -75,6 +75,12 @@ variable "exclude_principals" {
     # ARN; the wildcard covers every account + session name. PlatformAdmin is intentionally NOT here
     # (it is read+operate, not author — ADR-040).
     "arn:aws:sts::*:assumed-role/PlatformDeployer/*",
+    # ArgoCD delivers tenant claims via GitOps (BACK stack Phase 1). When it reconciles a managed (preprod)
+    # cluster it assumes the ArgoCD IAM role, so EKS presents it as the assumed-role ARN — NOT the argocd pod
+    # SA below (which only covers ArgoCD running *in-cluster*). Without this, restrict-tenant-control-plane
+    # would deny ArgoCD-applied XTenants. ArgoCD already holds cluster-admin on the managed cluster, so this
+    # grants no new privilege; the trust boundary is git review + ArgoCD RBAC.
+    "arn:aws:sts::*:assumed-role/ArgoCD/*",
     "system:serviceaccount:argocd:*",
     "system:serviceaccount:kube-system:*",
     "system:nodes:*",
