@@ -66,6 +66,48 @@ spec:
                   type: string
                   enum: ["standard", "hipaa", "pci"]
                   default: standard
+                apps:
+                  type: object
+                  description: Per-app entries — each gets an ECR repo team-<team>/<app> + (P3) cosign subjects.
+                  additionalProperties:
+                    type: object
+                    properties:
+                      repoPath:
+                        type: string
+                        default: k8s/preprod
+                      preview:
+                        type: boolean
+                        default: false
+                  default: {}
+                aws:
+                  type: object
+                  description: Tenant AWS access via EKS Pod Identity (ADR-041/047). Optional.
+                  properties:
+                    serviceAccount:
+                      type: string
+                      description: Named ServiceAccount the team's pods run as (the Pod Identity association binds it).
+                    policyStatements:
+                      type: array
+                      description: IAM statements granted to the Pod-team role (capped by the deny-escalation boundary).
+                      items:
+                        type: object
+                        properties:
+                          sid:
+                            type: string
+                          effect:
+                            type: string
+                            enum: ["Allow", "Deny"]
+                            default: Allow
+                          actions:
+                            type: array
+                            items:
+                              type: string
+                          resources:
+                            type: array
+                            items:
+                              type: string
+                        required: ["actions", "resources"]
+                      default: []
               required:
                 - team
             status:

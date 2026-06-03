@@ -125,6 +125,51 @@ inputs = {
       managed_policies = ["arn:aws:iam::aws:policy/AdministratorAccess"]
     }
 
+    # Cross-account ECR provisioning for the federated tenant control plane (ADR-048, BACK stack P2b). The
+    # preprod Crossplane provisioning role assumes this (assumeRoleChain) to create tenant ECR repos in the
+    # platform account. Scoped to repository/team-* only; nothing else. Trusted only by that one role.
+    crossplane-ecr-provisioner = {
+      description          = "Crossplane (preprod) cross-account tenant ECR provisioning"
+      max_session_duration = 3600
+
+      # Trust the preprod account root + condition on the provisioning role name pattern (rather than the
+      # exact role ARN, which would not exist yet at create time — chicken-and-egg). Still scoped to only
+      # the preprod Crossplane provisioning role; order-independent.
+      trust_principals = {
+        aws = ["arn:aws:iam::${include.base.locals.account_ids["preprod"]}:root"]
+      }
+      # provider-upjet-aws passes session tags on the assumeRoleChain hop, so the trust policy must allow
+      # sts:TagSession alongside sts:AssumeRole (the preprod provisioner's identity policy grants both too).
+      trust_actions = ["sts:AssumeRole", "sts:TagSession"]
+      trust_conditions = [
+        {
+          test     = "ArnLike"
+          variable = "aws:PrincipalArn"
+          values   = ["arn:aws:iam::${include.base.locals.account_ids["preprod"]}:role/crossplane-provisioner-*"]
+        },
+      ]
+
+      inline_policies = {
+        tenant-ecr = jsonencode({
+          Version = "2012-10-17"
+          Statement = [
+            {
+              Sid    = "TenantEcrRepositories"
+              Effect = "Allow"
+              Action = [
+                "ecr:CreateRepository", "ecr:DeleteRepository", "ecr:DescribeRepositories",
+                "ecr:ListTagsForResource", "ecr:TagResource", "ecr:UntagResource",
+                "ecr:PutLifecyclePolicy", "ecr:GetLifecyclePolicy", "ecr:DeleteLifecyclePolicy",
+                "ecr:PutImageScanningConfiguration", "ecr:PutImageTagMutability",
+                "ecr:SetRepositoryPolicy", "ecr:GetRepositoryPolicy", "ecr:DeleteRepositoryPolicy",
+              ]
+              Resource = "arn:aws:ecr:us-east-1:${include.base.locals.account_ids["platform"]}:repository/team-*"
+            },
+          ]
+        })
+      }
+    }
+
     DeveloperAccess = {
       description          = "Namespace-scoped developer cluster access"
       max_session_duration = 14400

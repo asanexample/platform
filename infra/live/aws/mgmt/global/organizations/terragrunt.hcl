@@ -17,7 +17,10 @@ inputs = {
   tags                = include.base.locals.tags
   allowed_regions     = ["us-east-1", "us-west-2"]
   required_tags       = ["Environment", "ManagedBy", "Owner"]
-  exempt_roles        = ["OrganizationAccountAccessRole", "github-actions-terratest", "PlatformDeployer"]
+  # crossplane-ecr-provisioner (platform) Team-tags tenant ECR repos; crossplane-provisioner-* (per workload
+  # cluster) Team-tags the Pod-team IAM roles it creates — both need the DenyTeamTagTampering exemption (BACK
+  # stack P2b / ADR-048). A wildcard covers preprod now + prod later.
+  exempt_roles = ["OrganizationAccountAccessRole", "github-actions-terratest", "PlatformDeployer", "crossplane-ecr-provisioner", "crossplane-provisioner-*"]
 
   organizational_units = {
     "Platform"            = { parent = null }

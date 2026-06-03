@@ -3,6 +3,11 @@
 {{- $w := add $base (mul $i 10) -}}
 {{- $m := add $w 1 -}}
 {{- $h := add $w 2 }}
+---
+# NB: this leading `---` is load-bearing — without it each Provider doc (below) concatenates with the next
+# iteration's DeploymentRuntimeConfig into one YAML document, and the duplicate apiVersion/kind keys make the
+# DRC silently win, dropping every Provider but the last. With one provider (P2a) there was no adjacent pair
+# to merge, so the bug only surfaced once multiple providers were installed.
 # DeploymentRuntimeConfig pins the provider pods' ServiceAccount (so the Pod Identity association /
 # InjectedIdentity RBAC resolves). hostNetwork providers also get a unique webhook/metrics/health port
 # triplet so they never collide on a node (incl. with Kyverno's hostNetwork webhooks 9443/9444 / the node's
@@ -46,6 +51,12 @@ spec:
   package: {{ $p.package }}
   runtimeConfigRef:
     name: {{ $p.name }}-runtime
+{{- if $p.skipDependencyResolution }}
+  # provider-family-aws is installed explicitly (above), so each member can skip dependency resolution —
+  # this keeps the shared family on a single pinned revision instead of letting each member resolve it
+  # independently and race on the Lock (crossplane-contrib/provider-aws#1749).
+  skipDependencyResolution: true
+{{- end }}
 {{- end }}
 {{- range $f := .Values.functions }}
 ---

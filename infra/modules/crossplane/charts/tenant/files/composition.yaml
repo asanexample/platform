@@ -14,6 +14,19 @@ spec:
     kind: XTenant
   mode: Pipeline
   pipeline:
+    # Load cluster constants (ECR registry, account IDs, cluster name, pull accounts, boundary ARN) into the
+    # pipeline context so the template can read them without them leaking into the tenant claim spec.
+    - step: load-environment
+      functionRef:
+        name: function-environment-configs
+      input:
+        apiVersion: environmentconfigs.fn.crossplane.io/v1beta1
+        kind: Input
+        spec:
+          environmentConfigs:
+            - type: Reference
+              ref:
+                name: tenant-cluster-config
     - step: render-resources
       functionRef:
         name: function-go-templating
@@ -28,6 +41,13 @@ spec:
             {{- $ns := printf "team-%s" $team }}
             {{- $q := $spec.resourceQuota }}
             {{- $gw := $spec.gatewayNamespace | default "default" }}
+            {{- $env := index .context "apiextensions.crossplane.io/environment" }}
+            {{- $aws := $spec.aws | default dict }}
+            {{- $ecrCfg := $env.providerConfigEcr | default "default" }}
+            {{- $pullAccts := list }}
+            {{- if and $env $env.pullAccountIds }}{{- $pullAccts = $env.pullAccountIds | fromJson }}{{- end }}
+            {{- $ecrPrincipals := list }}
+            {{- range $a := $pullAccts }}{{- $ecrPrincipals = append $ecrPrincipals (printf "arn:aws:iam::%s:root" $a) }}{{- end }}
             ---
             apiVersion: kubernetes.crossplane.io/v1alpha2
             kind: Object
@@ -245,6 +265,180 @@ spec:
                     - kind: Group
                       name: {{ $ns }}:developers
                       apiGroup: rbac.authorization.k8s.io
+            {{- if $env.ecrRegistry }}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: kyverno-restrict-images
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: kyverno.io/v1
+                  kind: ClusterPolicy
+                  metadata:
+                    name: restrict-images-team-{{ $team }}
+                    labels:
+                      app.kubernetes.io/managed-by: crossplane
+                      platform.refplat.org/tenant: {{ $team }}
+                  spec:
+                    background: true
+                    rules:
+                      - name: only-own-team-images
+                        match:
+                          any:
+                            - resources:
+                                kinds: ["Pod"]
+                                namespaces: ["{{ $ns }}"]
+                        validate:
+                          failureAction: Enforce
+                          message: "team-{{ $team }} workloads may only run images under {{ $env.ecrRegistry }}/{{ $ns }}/."
+                          foreach:
+                            - list: "request.object.spec.containers"
+                              pattern:
+                                image: "{{ $env.ecrRegistry }}/{{ $ns }}/*"
+                            - list: "request.object.spec.initContainers"
+                              pattern:
+                                image: "{{ $env.ecrRegistry }}/{{ $ns }}/*"
+                            - list: "request.object.spec.ephemeralContainers"
+                              pattern:
+                                image: "{{ $env.ecrRegistry }}/{{ $ns }}/*"
+            {{- end }}
+            {{- if $spec.hostnames }}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: kyverno-restrict-hostnames
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: kyverno.io/v1
+                  kind: ClusterPolicy
+                  metadata:
+                    name: restrict-route-hostnames-team-{{ $team }}
+                    labels:
+                      app.kubernetes.io/managed-by: crossplane
+                      platform.refplat.org/tenant: {{ $team }}
+                  spec:
+                    background: true
+                    rules:
+                      - name: allowed-hostnames
+                        match:
+                          any:
+                            - resources:
+                                kinds: ["HTTPRoute", "GRPCRoute", "TLSRoute"]
+                                namespaces: ["{{ $ns }}"]
+                        validate:
+                          failureAction: Enforce
+                          message: "team-{{ $team }} routes may only use: {{ $spec.hostnames | join ", " }}."
+                          foreach:
+                            - list: "request.object.spec.hostnames"
+                              deny:
+                                conditions:
+                                  all:
+                                    - key: "{{`{{ element }}`}}"
+                                      operator: AnyNotIn
+                                      value: {{ $spec.hostnames | toJson }}
+            {{- end }}
+            {{- if $aws.serviceAccount }}
+            ---
+            apiVersion: iam.aws.upbound.io/v1beta1
+            kind: Role
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: pod-team-role
+                crossplane.io/external-name: Pod-team-{{ $team }}
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                assumeRolePolicy: {{ (dict "Version" "2012-10-17" "Statement" (list (dict "Effect" "Allow" "Principal" (dict "Service" "pods.eks.amazonaws.com") "Action" (list "sts:AssumeRole" "sts:TagSession") "Condition" (dict "StringEquals" (dict "aws:SourceAccount" $env.workloadAccountId))))) | toJson | quote }}
+                {{- if $env.permissionsBoundaryArn }}
+                permissionsBoundary: {{ $env.permissionsBoundaryArn | quote }}
+                {{- end }}
+                tags:
+                  Team: {{ $team }}
+            ---
+            apiVersion: eks.aws.upbound.io/v1beta1
+            kind: PodIdentityAssociation
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: pod-identity-association
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                region: {{ $env.region }}
+                clusterName: {{ $env.clusterName }}
+                namespace: {{ $ns }}
+                serviceAccount: {{ $aws.serviceAccount }}
+                roleArn: arn:aws:iam::{{ $env.workloadAccountId }}:role/Pod-team-{{ $team }}
+            {{- end }}
+            {{- if $aws.policyStatements }}
+            {{- $stmts := list }}
+            {{- range $s := $aws.policyStatements }}
+            {{- $st := dict "Effect" ($s.effect | default "Allow") "Action" $s.actions "Resource" $s.resources }}
+            {{- if $s.sid }}{{- $st = merge $st (dict "Sid" $s.sid) }}{{- end }}
+            {{- $stmts = append $stmts $st }}
+            {{- end }}
+            ---
+            apiVersion: iam.aws.upbound.io/v1beta1
+            kind: RolePolicy
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: pod-team-rolepolicy
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                role: Pod-team-{{ $team }}
+                policy: {{ (dict "Version" "2012-10-17" "Statement" $stmts) | toJson | quote }}
+            {{- end }}
+            {{- range $app, $appcfg := $spec.apps }}
+            ---
+            apiVersion: ecr.aws.upbound.io/v1beta1
+            kind: Repository
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: ecr-repo-{{ $app }}
+                crossplane.io/external-name: {{ $ns }}/{{ $app }}
+            spec:
+              providerConfigRef:
+                name: {{ $ecrCfg }}
+              forProvider:
+                region: {{ $env.region }}
+                # Parity with the ecr module: image tags stay immutable, but cosign's sha256-* signature/
+                # attestation tags are exempted so they can be updated (multiple attestations per digest).
+                imageTagMutability: IMMUTABLE_WITH_EXCLUSION
+                imageTagMutabilityExclusionFilter:
+                  - filter: "sha256-*"
+                    filterType: WILDCARD
+                imageScanningConfiguration:
+                  - scanOnPush: true
+                forceDelete: true
+                tags:
+                  Team: {{ $team }}
+            ---
+            apiVersion: ecr.aws.upbound.io/v1beta1
+            kind: RepositoryPolicy
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: ecr-repopolicy-{{ $app }}
+            spec:
+              providerConfigRef:
+                name: {{ $ecrCfg }}
+              forProvider:
+                region: {{ $env.region }}
+                repository: {{ $ns }}/{{ $app }}
+                policy: {{ (dict "Version" "2012-10-17" "Statement" (list (dict "Sid" "CrossAccountPull" "Effect" "Allow" "Principal" (dict "AWS" $ecrPrincipals) "Action" (list "ecr:BatchGetImage" "ecr:GetDownloadUrlForLayer" "ecr:BatchCheckLayerAvailability")))) | toJson | quote }}
+            {{- end }}
     - step: ready
       functionRef:
         name: function-auto-ready
