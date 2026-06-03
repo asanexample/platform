@@ -59,6 +59,7 @@ locals {
     gateway_config      = "${local.source_base}/gateway-config"
     cluster_rbac        = "${local.source_base}//cluster-rbac"
     tenant              = "${local.source_base}//tenant"
+    tenant_claims       = "${local.source_base}//tenant-claims"
     policy              = "${local.source_base}//policy"
     tailscale           = "${local.source_base}/tailscale"
     tailscale_admin     = "${local.source_base}/tailscale-admin"

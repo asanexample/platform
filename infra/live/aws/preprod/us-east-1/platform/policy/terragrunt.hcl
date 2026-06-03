@@ -86,6 +86,9 @@ inputs = {
   # Cluster-wide tenant image floor + per-team scoping (team data stays at the unit level).
   allowed_registries  = [local.ecr_registry]
   tenant_registry_map = { for k, v in local.teams : k => "${local.ecr_registry}/team-${k}" }
+  # Teams migrated to a Tenant claim (BACK stack P3): the chart skips their per-team restrict-images /
+  # restrict-route-hostnames policies (the Composition owns those), but keeps verify-images/attestations.
+  migrated_teams = local.teams_config.locals.migrated_teams
 
   # Crossplane (the federated tenant control plane, ADR-046/048) runs here. Its rbac-manager authors wildcard
   # provider ClusterRoles at runtime as its own ServiceAccount (not the deployer), which the cluster-scoped
