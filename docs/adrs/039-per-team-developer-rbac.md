@@ -4,6 +4,15 @@
 
 **Status:** Accepted
 
+> **Amendment (2026-06-03, #174 / [ADR-046](046-back-stack-for-developer-self-service.md) +
+> [ADR-048](048-federated-per-cluster-crossplane.md)):** The **RBAC model is unchanged** (group-mapped:
+> `DeveloperAccess-<team>` → EKS access entry → group `team-<team>:developers` → namespace-scoped
+> RoleBinding). What changed is **who provisions it**: for migrated teams the `DeveloperAccess-<team>` IAM
+> role, the EKS access entry → `team-<team>:developers`, and the namespace RoleBinding are now rendered **per
+> team by the Crossplane Tenant Composition**, not by the Terragrunt `iam-roles`/`eks` per-team loops or the
+> `tenant` module (all removed/retired). Read the `iam-roles`/`eks`/`tenant` references below as the
+> historical mechanism.
+
 ## Context
 
 ADR-007 introduced a `DeveloperAccess` IAM role for "namespace-scoped kubectl." In practice the

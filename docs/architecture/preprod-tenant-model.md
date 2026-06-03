@@ -2,7 +2,24 @@
 
 > Related: [ADR-027 — Hybrid Tenant Isolation](../adrs/027-hybrid-tenant-isolation-model.md),
 > [ADR-033 — Defer vCluster Support](../adrs/033-defer-vcluster-tenant-support.md),
-> [ADR-041 — Pod Identity for Tenant Workloads](../adrs/041-pod-identity-for-tenant-workloads.md)
+> [ADR-041 — Pod Identity for Tenant Workloads](../adrs/041-pod-identity-for-tenant-workloads.md),
+> [ADR-046 — BACK stack for developer self-service](../adrs/046-back-stack-for-developer-self-service.md),
+> [ADR-047 — Pod Identity standard](../adrs/047-pod-identity-standard.md)
+
+<!-- -->
+
+> **Provisioning is now Crossplane.** This document describes the tenant
+> *isolation model* — what a tenant looks like on the cluster (namespace mode,
+> NetworkPolicies, RBAC, quotas, Pod Identity). That model is unchanged. What
+> changed is **how a tenant is provisioned**: tenants are now a single
+> declarative **`Tenant` claim** (`XTenant`) reconciled by a Crossplane
+> **Composition** (BACK stack P3, #174). Both teams (alpha, bravo) are migrated.
+> The previous Terragrunt path — the `infra/modules/tenant` module and the
+> `tenants`/`pod-identity` units — is **retired and deleted**. For the claim API
+> (XRD schema, Composition pipeline, claim lifecycle, federated topology) see
+> [Crossplane Tenant API](crossplane-tenant-api.md). Where this doc says "the
+> tenant module creates …", read it as "the Composition provisions …" — the
+> resulting cluster footprint is the same.
 
 ## Overview
 
@@ -10,8 +27,10 @@ The preprod EKS cluster (`preprod-use1-eks`, account `<PREPROD_ACCOUNT_ID>`) use
 **namespace-based tenant isolation** on a shared cluster. Each team gets a
 dedicated namespace with ResourceQuotas, LimitRanges, and Cilium NetworkPolicies.
 
-Teams are declared in `teams.hcl`. That single file drives namespace creation,
-EKS access entries, and ArgoCD app targeting.
+Each team is one **`XTenant` claim**; a Crossplane Composition reconciles it into
+the namespace, RBAC, quotas, NetworkPolicies, per-team Kyverno guardrails, Pod
+Identity, and cross-account ECR. Claims are authored in the `tenant-claims`
+Terragrunt unit. See [Crossplane Tenant API](crossplane-tenant-api.md).
 
 > **Note:** The tenant module also supports a vCluster mode for stronger isolation
 > (CRD independence, virtual control plane), but this is **deferred** (ADR-033).
@@ -71,8 +90,8 @@ Same architecture as team-alpha. Both teams use namespace isolation.
 
 ## Namespace Mode Detail
 
-The `tenant` module (`infra/modules/tenant/`) creates these resources for each
-team with `mode = "namespace"`:
+The Crossplane Tenant Composition provisions these resources for each team (the
+retired `tenant` module created the same set for `mode = "namespace"`):
 
 | Resource | Name | Purpose |
 |----------|------|---------|
@@ -128,7 +147,7 @@ Gateway API Gateway and are unreachable from the internet.
 
 ### Namespace mode policies
 
-The tenant module creates three Kubernetes NetworkPolicies and two
+The Composition provisions three Kubernetes NetworkPolicies and two
 CiliumNetworkPolicies per namespace:
 
 **default-deny-ingress** -- Matches all pods, blocks all ingress. This is the
@@ -235,15 +254,15 @@ on top. See ADR-033 for why vCluster mode is currently deferred.
 
 ### Per-team overrides
 
-The `tenants` variable in the tenant module accepts per-team `resource_quota`
-overrides. These are set in the `tenants/terragrunt.hcl` live config:
+A team's `XTenant` claim accepts a per-team `resourceQuota` override (set in the
+`tenant-claims` unit's inputs); omitting it uses the defaults above:
 
-```hcl
-resource_quota = {
-  cpu    = "8"
-  memory = "16Gi"
-  pods   = 40
-}
+```yaml
+spec:
+  resourceQuota:
+    cpu:    "8"
+    memory: "16Gi"
+    pods:   40
 ```
 
 Resource quotas apply at the team level (namespace-scoped), not per-app. All
@@ -252,90 +271,92 @@ apps within a team share the same quota.
 For vCluster tenants (when enabled), resource limits are managed by vCluster's
 built-in policy enforcement settings. See ADR-033 for current status.
 
-## teams.hcl as Single Source of Truth
+## Sources of Truth: the `XTenant` claim and `teams.hcl`
 
-`infra/live/aws/preprod/us-east-1/platform/teams.hcl` defines every team and
-its isolation mode. Multiple Terragrunt units read this file to derive their
-inputs:
+The **`XTenant` claim is the tenant source of truth** — it provisions the
+namespace, RBAC, quotas, NetworkPolicies, per-team Kyverno guardrails, the
+`Pod-team-<team>` role + Pod Identity association, the `DeveloperAccess-<team>`
+role + EKS access entry, and cross-account ECR. The Composition provisions all
+of it from that one CR. See [Crossplane Tenant API](crossplane-tenant-api.md).
+
+`teams.hcl` is **no longer** the tenant-provisioning source of truth. It now
+feeds only two **non-provisioning** concerns:
 
 ```text
-+---------------------------+
-|  teams.hcl                |
-|  alpha: mode=namespace    |
-|  bravo: mode=namespace    |
-+-----------+---------------+
-            |
-            |  read_terragrunt_config()
-            |
-   +--------+--------+------------------+
-   |                  |                  |
-   v                  v                  v
- eks/               tenants/         argocd-apps/
- terragrunt.hcl     terragrunt.hcl   terragrunt.hcl
-   |                  |                  |
-   v                  v                  v
- EKS access        Namespaces,        ArgoCD Application
- entries            ResourceQuotas,    per app + preview
-                    NetworkPolicies    ApplicationSets
++---------------------------+        +---------------------------+
+|  tenant-claims unit        |        |  teams.hcl                |
+|  XTenant per team          |        |  alpha (migrated=true)    |
+|  alpha, bravo              |        |  bravo  (migrated=true)   |
++-----------+---------------+         +-----------+---------------+
+            |                                     |
+            | terragrunt apply                    | read_terragrunt_config()
+            v                                     |
+   Crossplane Composition               +---------+---------+
+   ──────────────────────               |                   |
+   Namespace, RBAC, quota,              v                   v
+   NetworkPolicies, Kyverno          argocd-apps/        policy/
+   restrict-*, Pod Identity,         terragrunt.hcl      terragrunt.hcl
+   DeveloperAccess + access            |                   |
+   entry, ECR repos                    v                   v
+                                    ArgoCD Application   verify-images /
+                                    per app + preview    verify-attestations
+                                    ApplicationSets      (verify_subjects)
 ```
 
-**EKS access entries** (`eks/terragrunt.hcl`): each team's `DeveloperAccess-<team>`
-role gets a group-mapped access entry tying it to the Kubernetes group
-`team-<team>:developers`. Authorization is the namespace-scoped `tenant-developers`
-RoleBinding the tenant module creates (not an AWS-managed policy). See ADR-039.
+**EKS access entries** are now provisioned by the **Composition** (not `eks/`):
+each team's `DeveloperAccess-<team>` role gets a group-mapped access entry tying
+it to the Kubernetes group `team-<team>:developers`. Authorization is the
+namespace-scoped `tenant-developers` RoleBinding the Composition provisions (not
+an AWS-managed policy). See ADR-039. The per-team role/access-entry loops were
+removed from the `eks`/`iam-roles` units.
 
 - All teams: principal `DeveloperAccess-<name>` → group `team-<name>:developers`
 
-**Tenant resources** (`tenants/terragrunt.hcl`): Reads `teams.hcl`, splits by
-mode, and passes to the tenant module. The module creates namespace-mode
-resources directly and delegates vCluster-mode teams to the vCluster sub-module.
-
-**ArgoCD apps** (platform cluster): ArgoCD on the platform cluster creates
-Application resources targeting the preprod cluster. Each app's `repo_url`
-and `repo_path` from `teams.hcl` define the GitOps source; the destination
-namespace is derived from the team name and mode. Apps with `preview = true`
+**ArgoCD apps** (platform cluster, from `teams.hcl`): ArgoCD on the platform
+cluster creates Application resources targeting the preprod cluster. Each app's
+`repo_url` and `repo_path` from `teams.hcl` define the GitOps source; the
+destination namespace is derived from the team name. Apps with `preview = true`
 get an additional ApplicationSet that creates ephemeral Applications for open
-pull requests (ADR-032).
+pull requests (ADR-032). Migrated teams carry `migrated = true`, which withdraws
+them from the (now-removed) Terragrunt infra loops and tells the `policy` unit to
+skip the per-team `restrict-*` guardrails (the Composition owns those).
+
+**Supply-chain policies** (`policy/`, from `teams.hcl`): the platform-owned
+`verify-images-team-<team>` / `verify-attestations-team-<team>` policies read
+each team's repo→identity mapping. These stay platform-owned for **all** teams
+(including migrated ones) — a tenant must not own its own signature trust root,
+so they are deliberately not part of the claim/Composition.
 
 ### Adding a new team
 
-1. Add an entry to `teams.hcl`:
-
-   ```hcl
-   charlie = {
-     mode = "namespace"
-     apps = {
-       api = {
-         repo_url  = "https://github.com/asanexample/app-charlie"
-         repo_path = "k8s/preprod"
-         preview   = true
-       }
-     }
-   }
-   ```
-
-2. Run `terragrunt apply` in `eks/` (updates access entries) and `tenants/`
-   (creates namespace + policies).
-3. The ArgoCD Application is created automatically on the next sync.
+Onboarding a team is now an `XTenant` claim in the `tenant-claims` unit (plus the
+`teams.hcl` entry for app delivery + supply-chain policies). Follow the
+[tenant onboarding runbook](../runbooks/tenant-onboarding.md) — it walks the claim
+fields, the `migrated = true` flag, and verification. A minimal claim example
+lives at `infra/modules/crossplane/examples/tenant-gamma.yaml`.
 
 ## Tenant AWS Access (Pod Identity)
 
-Tenants reach AWS resources via **platform-managed EKS Pod Identity** (ADR-041), not IRSA. A team
-declares its needs in `teams.hcl` (`aws` block: a named ServiceAccount + S3 suffixes); the platform
-generates a `Pod-team-<team>` role, the bucket(s), and a `PodIdentityAssociation` binding
-`(cluster, team-<team>, <serviceAccount>) → role`. Pods running as that named SA receive credentials
-from the Pod Identity agent — no `eks.amazonaws.com/role-arn` annotation (which stays denied as a
-backstop).
+Tenants reach AWS resources via **platform-managed EKS Pod Identity** (ADR-041/047), not IRSA. A team
+declares its needs in its **`XTenant` claim** (`aws.serviceAccount` + `aws.policyStatements`); the
+Composition provisions a `Pod-team-<team>` role (trust `pods.eks.amazonaws.com` + an `aws:SourceAccount`
+condition, with a deny-escalation permissions boundary), its RolePolicy from the claim's
+`policyStatements`, and a `PodIdentityAssociation` binding `(cluster, team-<team>, <serviceAccount>) →
+role`. Pods running as that named SA receive credentials from the Pod Identity agent — no
+`eks.amazonaws.com/role-arn` annotation (which stays denied as a backstop).
 
-**Isolation is default-deny, by construction.** A team's role identity policy is scoped to the exact
-bucket ARNs it declares (no wildcard), and each bucket's resource policy grants only the owning team's
-role. Both the bucket name and its sole reader derive from the team key (`<org>-team-<team>-<suffix>` →
-`Pod-team-<team>`), so a team can only ever access `<org>-team-<itself>-*` — a cross-grant is
-structurally impossible (the same posture as per-team ECR `team-<team>/*`). Cross-account S3 (bucket in
-the platform account, role in preprod) requires **both** the identity policy and the bucket policy to
-allow it; neither is true for another team. Tenants cannot create associations (an AWS API call), and
-the egress NetworkPolicy blocks IMDS so they cannot steal the node role. See the runbook
-[`tenant-aws-access-pod-identity.md`](../runbooks/tenant-aws-access-pod-identity.md).
+**Generic AWS access, not S3 buckets.** Access to arbitrary AWS is via the claim's generic
+`aws.policyStatements` (IAM statements granted to the `Pod-team-<team>` role, capped by the
+deny-escalation boundary). The earlier per-team S3 buckets were a **demo** of the cross-account pattern
+and are **not** provisioned — there is no S3-shared unit.
+
+**Isolation is default-deny, by construction.** A team's `Pod-team-<team>` role is named from the team
+key and grants only what its own claim declares; the deny-escalation boundary prevents privilege growth.
+Tenants cannot create Pod Identity associations or `XTenant` claims (the S1 `restrict-tenant-control-plane`
+backstop denies tenant principals), and the egress NetworkPolicy blocks IMDS so they cannot steal the
+node role. See the runbook
+[`tenant-aws-access-pod-identity.md`](../runbooks/tenant-aws-access-pod-identity.md) and the
+[Crossplane Tenant API](crossplane-tenant-api.md).
 
 ## PR Preview Environments
 

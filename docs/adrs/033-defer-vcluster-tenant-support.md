@@ -6,6 +6,12 @@
 
 **Supersedes:** Partially supersedes ADR-027 (vCluster mode is deferred, not removed)
 
+> **Amendment (2026-06-03, #174 / [ADR-046](046-back-stack-for-developer-self-service.md)):** The
+> `infra/modules/tenant` module referenced below is **retired (deleted)** — tenant provisioning is now the
+> Crossplane Tenant Composition. The vCluster decision is unchanged (all teams use namespace mode); but if
+> vCluster isolation is ever revisited it would be delivered as a mode of the **Crossplane Composition**, not
+> via the old `tenant` module's vCluster code path.
+
 ## Context
 
 ADR-027 established a hybrid tenant isolation model with two modes: namespace (lightweight

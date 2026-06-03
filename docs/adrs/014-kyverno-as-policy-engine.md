@@ -7,6 +7,15 @@ module (`infra/modules/policy/`) and the live `policy` units on preprod and plat
 Admission (`enforce=baseline` on tenant namespaces, ADR-027/ADR-039) remains the admission floor;
 Kyverno layers above it. See **Deployment** and **Rollout & Roadmap** below.
 
+> **Amendment (2026-06-03, #174 / [ADR-046](046-back-stack-for-developer-self-service.md)):** Tenant policy
+> ownership is now **split**. The **per-tenant guardrails** — `restrict-images` (per-team ECR registry
+> scoping) and `restrict-route-hostnames` (per-team Gateway hostname allow-list) — are provisioned **per team
+> by the Crossplane Tenant Composition** (ADR-046), not by the `policy` unit's `tenant_registry_map`. The
+> **platform-owned supply-chain verification** — `verify-images` (cosign keyless) and `verify-attestations`
+> (SLSA, ADR-042) — stays in the `policy` module/unit and is deployed for **all** teams, including
+> Crossplane-migrated ones, via the `migrated_teams` input. The engine, cluster-scoped policies, mutate
+> defaults, and PSA floor are unchanged.
+
 ## Context
 
 Kubernetes clusters need admission-time policy enforcement to prevent misconfigurations from being

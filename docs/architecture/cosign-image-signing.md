@@ -232,6 +232,15 @@ images its own pipeline signed — the supply-chain analog of the per-team ECR-p
 rules. The team data (which repo signs for which team) is **not** in the module; it comes from
 `teams.hcl` at the Terragrunt unit and is passed in as `verify_subjects`.
 
+> **These policies stay platform-owned — for *every* team.** `verify-images` (and `verify-attestations`,
+> §10b) live in the `policy` Terragrunt unit for **all** teams, including those migrated to a Crossplane
+> `XTenant` claim. They are **deliberately not** part of the Tenant claim/Composition: a tenant must not
+> own its own signature **trust root** (it could then trust its own forged identity). So while the claim
+> owns a migrated team's *guardrail* policies (`restrict-*`), the signature/attestation **trust** policies
+> remain platform-owned. `teams.hcl` still supplies the per-team repo→identity mapping (`verify_subjects`)
+> for the `policy` unit — that mapping is read for migrated teams too. See
+> [Crossplane Tenant API](crossplane-tenant-api.md) ("supply-chain split") and ADR-014/046.
+
 Where the identities come from (`infra/live/aws/preprod/us-east-1/platform/policy/terragrunt.hcl`):
 
 ```hcl

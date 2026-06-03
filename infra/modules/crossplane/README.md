@@ -9,12 +9,21 @@ Two roles, selected by inputs:
 
 - **Platform (hub) cluster** — Upbound AWS provider family (Pod Identity) for shared AWS provisioning (P1:
   ECR repositories).
-- **Workload clusters (preprod/prod)** — `provider-kubernetes` (in-cluster) + Composition Functions + the
-  **`Tenant` XRD/Composition**, which renders a tenant's Kubernetes resources (namespace, quota, limits,
-  NetworkPolicies, CiliumNetworkPolicies, developer RoleBinding) — parity with `infra/modules/tenant`. AWS
-  per-tenant resources (IAM role, Pod Identity association, cross-account ECR) arrive in P2b.
+- **Workload clusters (preprod/prod)** — `provider-kubernetes` (in-cluster) + the Upbound AWS provider
+  family (`ecr`/`iam`/`eks`, Pod Identity) + Composition Functions + the **`Tenant` XRD/Composition**
+  (`charts/tenant`). A single `Tenant` claim provisions a **complete** tenant: the Kubernetes side
+  (namespace, ResourceQuota/LimitRange, NetworkPolicies, CiliumNetworkPolicies, developer RoleBinding,
+  per-team Kyverno `restrict-images`/`restrict-route-hostnames`) **and** the AWS side (`Pod-team-<team>` IAM
+  role + EKS Pod Identity association, `DeveloperAccess-<team>` IAM role + EKS access entry, cross-account
+  ECR repo). This is the **sole** tenant provisioner — the old `infra/modules/tenant` module and the
+  `tenants`/`pod-identity`/`s3-shared` Terragrunt units are **retired** (BACK stack P3, #174).
 
-Foundational/platform infra stays on Terragrunt.
+Claims are delivered by the `tenant-claims` Terragrunt unit (see [`infra/modules/tenant-claims`](../tenant-claims/)).
+The cosign/SLSA supply-chain policies (`verify-images`/`verify-attestations`) are **not** in the claim — they
+stay platform-owned in the `policy` module (applied to all teams, including migrated ones via its
+`migrated_teams` input). Foundational/platform infra stays on Terragrunt. See
+[`docs/architecture/crossplane-tenant-api.md`](../../../docs/architecture/crossplane-tenant-api.md) for the
+XRD schema, Composition pipeline, and claim lifecycle.
 
 ## Usage
 
@@ -42,15 +51,19 @@ module "crossplane" {
   account_id         = "<preprod-account-id>"
   helm_chart_version = "2.3.1"
 
-  provider_services               = []   # AWS arrives in P2b
+  provider_services               = ["ecr", "iam", "eks"] # AWS footprint of a tenant
   enable_kubernetes_provider      = true
   kubernetes_provider_hostnetwork = true # Object CRD is multi-version → conversion webhook must be reachable
   functions = [
     { name = "function-go-templating", package = "xpkg.upbound.io/crossplane-contrib/function-go-templating:v0.12.1" },
     { name = "function-auto-ready", package = "xpkg.upbound.io/crossplane-contrib/function-auto-ready:v0.6.5" },
+    { name = "function-environment-configs", package = "xpkg.upbound.io/crossplane-contrib/function-environment-configs:v0.7.1" },
   ]
-  enable_tenant_api = true
-  tags              = local.tags
+  enable_tenant_api          = true
+  enable_tenant_provisioning = true # scoped provisioning IAM + deny-escalation boundary
+  ecr_provisioner_role_arn   = "arn:aws:iam::<platform-account-id>:role/crossplane-ecr-provisioner"
+  management_account_id      = "<mgmt-account-id>" # DeveloperAccess-<team> SSO trust
+  tags                       = local.tags
 }
 ```
 
@@ -114,10 +127,13 @@ apply and tear it down by hand.
 - **Provider auth is EKS Pod Identity only** (ADR-041): no SA annotation, no OIDC. The association is the
   sole credential grant; the `provider-aws` SA is platform-controlled and never used by tenant workloads.
   Requires the `eks-pod-identity-agent` addon (see Dependencies).
-- **Least privilege, staged.** P1's provisioning role is **ECR `team-*` only**. Later phases extend it (IAM
-  roles + Pod Identity associations for the `Tenant` Composition) — at which point a **permissions boundary**
-  on created roles and an org SCP **`exempt_roles`** entry (the `DenyTeamTagTampering` SCP denies `Team`-key
-  tagging) become required. The P1 demo avoids the `Team` tag for that reason.
+- **Least privilege.** On a workload cluster the provisioning role (`enable_tenant_provisioning`) is scoped
+  to exactly the tenant footprint: create/manage `Pod-team-*` and `DeveloperAccess-*` IAM roles (CreateRole
+  conditioned on the **deny-escalation permissions boundary**, no boundary-editing verbs), EKS Pod Identity
+  associations + access entries on this cluster, and `sts:AssumeRole`+`sts:TagSession` into the platform
+  `crossplane-ecr-provisioner` role for cross-account ECR. Tenant-tagging needs an org SCP `exempt_roles`
+  entry (`crossplane-provisioner-*`) since `DenyTeamTagTampering` blocks `Team`-key tagging otherwise. On the
+  hub cluster the role is ECR-only (the P1 demo avoids the `Team` tag for that reason).
 - **Blast radius.** Excluding `crossplane-system` from RBAC hardening concentrates privilege there; keep it
   locked (no tenant workloads/RBAC). Tenants must only ever submit namespaced XRs, never raw managed
   resources or ProviderConfigs.
@@ -126,4 +142,4 @@ apply and tear it down by hand.
 - **Destroy.** Managed resources carry finalizers; delete all MRs before destroying the release or namespace
   teardown hangs.
 - **v2 API model.** Composite resources are namespaced and the legacy Claim type is deprecated; the
-  `Tenant` XRD/Composition (P2) is authored against v2.
+  `Tenant` XRD/Composition is authored against v2 (`apiextensions.crossplane.io/v2`, cluster-scoped XR).

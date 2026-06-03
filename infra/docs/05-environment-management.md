@@ -16,7 +16,7 @@ Only **AWS** is deployed (5 accounts). Azure/GCP are planned (no `live/azure`, `
 | mgmt | <MGMT_ACCOUNT_ID> | Organizations, Identity Center, Terraform state, GitHub OIDC | Yes |
 | platform | <PLATFORM_ACCOUNT_ID> | EKS hub cluster + platform services + observability + IAM roles | Yes (full stack) |
 | test | <TEST_ACCOUNT_ID> | Terratest CI sandbox | Yes (GitHub OIDC + PlatformDeployer) |
-| preprod | <PREPROD_ACCOUNT_ID> | Pre-production tenant workloads | **Yes (full tenant cluster: EKS, tenants, Kyverno Enforce, Falco, Pod Identity)** |
+| preprod | <PREPROD_ACCOUNT_ID> | Pre-production tenant workloads | **Yes (full tenant cluster: EKS, Crossplane-Composition tenants, Kyverno Enforce, Falco, Pod Identity)** |
 | prod | <PROD_ACCOUNT_ID> | Production workloads | Networking + org scaffolding (no cluster yet) |
 
 ## Isolation Boundaries
@@ -145,7 +145,7 @@ module. The state key mirrors the directory path:
 
 ```text
 live/aws/platform/us-east-1/platform/eks/terraform.tfstate
-live/aws/preprod/us-east-1/platform/tenants/terraform.tfstate
+live/aws/preprod/us-east-1/platform/tenant-claims/terraform.tfstate
 ```
 
 This prevents cross-environment state collisions and limits the blast

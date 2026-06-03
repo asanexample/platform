@@ -26,7 +26,7 @@
 
 | Cloud | Status | What's Deployed |
 |-------|--------|-----------------|
-| AWS | **Live** | **Platform** account: full EKS hub in us-east-1 (networking, IAM, EKS, Cilium, node groups, ArgoCD, cert-manager, external-dns/secrets, Kyverno, Tailscale, gateway ingress, **observability + Mimir**). **Preprod** account: a full tenant cluster (EKS, Cilium, tenants/Kyverno-Enforce, public gateway, **Falco**, Pod Identity). **Prod** account: networking + org scaffolding (no cluster yet). |
+| AWS | **Live** | **Platform** account: full EKS hub in us-east-1 (networking, IAM, EKS, Cilium, node groups, ArgoCD, cert-manager, external-dns/secrets, Kyverno, Tailscale, gateway ingress, **observability + Mimir**). **Preprod** account: a full tenant cluster (EKS, Cilium, Crossplane-Composition-provisioned tenants/Kyverno-Enforce, public gateway, **Falco**, Pod Identity — ADR-046/047/048). **Prod** account: networking + org scaffolding (no cluster yet). |
 | Azure | **Planned** | No `live/azure` or `modules/azure` exists yet. The shared modules and config hierarchy are parameterized so Azure can be added without restructuring (ADR-001/008). |
 | GCP | **Planned** | Same as Azure — reserved in the CIDR plan (ADR-015), not yet present. |
 
@@ -240,7 +240,7 @@ The EKS API endpoint is private-only. Two access methods:
 
 Azure and GCP are **not deployed** and there are no `modules/azure`, `modules/gcp`,
 `live/azure`, or `live/gcp` trees today. The platform is multi-cloud *by design*:
-the shared modules (Cilium, ArgoCD, cert-manager, External Secrets, tenant, etc.)
+the shared modules (Cilium, ArgoCD, cert-manager, External Secrets, Crossplane, etc.)
 are cloud-agnostic, the live hierarchy is cloud-parameterized (`live/{cloud}/…`),
 and the CIDR plan reserves non-overlapping ranges per cloud (ADR-015), so a second
 cloud can be added without restructuring. When Azure lands it would reuse the shared

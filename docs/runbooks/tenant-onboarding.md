@@ -1,533 +1,318 @@
 # Runbook: Tenant Team Onboarding (Preprod EKS)
 
 > **On-call scope:** Platform Engineering
+> **Model:** Tenants are provisioned by the Crossplane **Tenant control plane** via an `XTenant` claim (BACK
+> stack P3, [ADR-046](../adrs/046-back-stack-for-developer-self-service.md) /
+> [ADR-048](../adrs/048-federated-per-cluster-crossplane.md)). A single claim provisions the complete tenant.
+> The old Terragrunt path (`tenants`/`pod-identity`/`s3-shared` units, the `tenant` module) is **retired**.
 > **Live configurations:**
 >
-> - `infra/live/aws/preprod/us-east-1/platform/teams.hcl`
-> - `infra/live/aws/preprod/us-east-1/platform/tenants/terragrunt.hcl`
-> - `infra/live/aws/preprod/us-east-1/platform/iam-roles/terragrunt.hcl`
-> - `infra/live/aws/preprod/us-east-1/platform/eks/terragrunt.hcl`
-> - `infra/live/aws/mgmt/global/identity-center/terragrunt.hcl`
-> - `infra/live/aws/platform/us-east-1/platform/ecr/terragrunt.hcl`
-> - `infra/live/aws/platform/us-east-1/platform/argocd-apps/terragrunt.hcl`
-> - `infra/live/aws/platform/us-east-1/platform/github-oidc/terragrunt.hcl`
+> - `infra/live/aws/preprod/us-east-1/platform/tenant-claims/terragrunt.hcl` — **the claim** (primary)
+> - `infra/live/aws/preprod/us-east-1/platform/teams.hcl` — app-delivery + supply-chain inputs only
+> - `infra/live/aws/mgmt/global/identity-center/terragrunt.hcl` — the team's `Dev-<team>` SSO permission set
+> - `infra/live/aws/platform/us-east-1/platform/argocd-apps/terragrunt.hcl` — app delivery (ArgoCD)
+> - `infra/live/aws/platform/us-east-1/platform/github-oidc/terragrunt.hcl` — app CI OIDC (signing)
 >
-> **Last reviewed:** 2026-05-29
+> **Last reviewed:** 2026-06-03
+
+See [Crossplane Tenant API](../architecture/crossplane-tenant-api.md) for the XRD schema, what the
+Composition provisions, and the claim lifecycle.
 
 ---
 
 ## Table of Contents
 
-1. [Prerequisites](#prerequisites)
-2. [Isolation Mode](#isolation-mode)
-3. [Onboarding Steps](#onboarding-steps)
-4. [Verification Commands](#verification-commands)
+1. [What a claim provisions](#what-a-claim-provisions)
+2. [Prerequisites](#prerequisites)
+3. [Onboarding a new team](#onboarding-a-new-team)
+4. [Verification](#verification)
 5. [Offboarding](#offboarding)
-6. [Troubleshooting](#troubleshooting)
+6. [Migrating a team off the legacy `teams.hcl` path](#migrating-a-team-off-the-legacy-teamshcl-path)
+7. [Troubleshooting](#troubleshooting)
+
+---
+
+## What a claim provisions
+
+One `XTenant` claim → the Composition reconciles the **complete** tenant:
+
+- **Kubernetes:** namespace `team-<team>`, ResourceQuota, LimitRange, default-deny + allow NetworkPolicies,
+  CiliumNetworkPolicies, the `team-<team>:developers` RoleBinding, and the per-team Kyverno
+  `restrict-images` + `restrict-route-hostnames` policies.
+- **AWS (preprod):** `Pod-team-<team>` IAM role (deny-escalation boundary) + EKS Pod Identity association;
+  `DeveloperAccess-<team>` IAM role + EKS access entry → the `team-<team>:developers` group.
+- **AWS (platform account, cross-account):** the `team-<team>/<app>` ECR repo + pull policy, per app.
+
+**Not** provisioned by the claim (still platform-owned / separate): the cosign/SLSA
+`verify-images`/`verify-attestations` policies (the `policy` unit), the `Dev-<team>` SSO permission set
+(`identity-center`), and app delivery (the ArgoCD Application, `argocd-apps`).
 
 ---
 
 ## Prerequisites
 
-Before starting, confirm the following:
-
-- [ ] You have an active AWS SSO session for the **management** profile
-  (`aws sso login --profile management`).
-- [ ] Your SSO identity can assume **PlatformDeployer** in both the platform
-  (<PLATFORM_ACCOUNT_ID>) and preprod (<PREPROD_ACCOUNT_ID>) accounts.
-- [ ] You have `terragrunt`, `kubectl`, and `argocd` CLI tools installed.
-- [ ] You have kubeconfig configured for the preprod cluster:
-
-  ```bash
-  AWS_PROFILE=management aws eks update-kubeconfig \
-    --name preprod-use1-eks \
-    --region us-east-1 \
-    --role-arn arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/PlatformAdmin
-  ```
-
-- [ ] You have the following information from the requesting team:
-  - Team name (lowercase, alphanumeric + hyphens)
-  - GitHub organization and repository name (under `asanexample/`)
-  - Resource quota requirements (if non-default)
-  - Whether apps need PR preview environments (`preview = true`)
-  - Whether repos are private (requires ArgoCD credential template + GitHub
-    token for PR previews — see ADR-032)
-- [ ] You are working on a feature branch (not `main`).
+- [ ] Active AWS SSO session for the **management** profile (`aws sso login --profile management`).
+- [ ] Your SSO identity can assume **PlatformDeployer** in the preprod and platform accounts.
+- [ ] `terragrunt` + `kubectl` configured; preprod reachable (Tailscale for kubectl).
+- [ ] If the team's developers need cluster/AWS access, plan to add their **AWS Identity Center** wiring —
+      the `Dev-<team>` permission set + `Developers-<team>` group + assignment + users. This is partly
+      manual (per-user invite/MFA, or external-IdP group management); see
+      [Step 4](#step-4--grant-developer-access-aws-identity-center). The claim's `DeveloperAccess-<team>`
+      role trusts the `Dev-<team>` SSO principal, so the role can exist before this — but no human can use it
+      until Identity Center is wired up.
+- [ ] The crossplane control plane is healthy: `kubectl --context preprod get providers.pkg.crossplane.io`
+      (all Healthy) and `kubectl --context preprod get xrd xtenants.platform.refplat.org` (Established).
 
 ---
 
-## Isolation Mode
+## Onboarding a new team
 
-All teams use **namespace isolation** (`mode = "namespace"`). Each team gets a
-`team-<name>` namespace with ResourceQuota, LimitRange, and Cilium NetworkPolicies.
+### Step 1 — Author the `XTenant` claim
 
-| | **Namespace** (`mode = "namespace"`) |
-|---|---|
-| **What's created** | `team-<name>` namespace, ResourceQuota, LimitRange, NetworkPolicy |
-| **Isolation level** | Namespace-scoped RBAC + NetworkPolicy |
-| **CRD access** | Shared cluster CRDs only |
-| **Resource overhead** | Minimal |
-| **Default quotas** | 4 CPU, 8 Gi memory, 20 pods |
-| **EKS access entry** | Per-team `DeveloperAccess-<name>` role, group-mapped to `team-<name>:developers` and bound (namespace-scoped) to `tenant-developer` (ADR-039) |
-
-> **Note:** The tenant module also supports a `vcluster` mode for stronger
-> isolation (CRD independence, virtual control plane), but this is currently
-> **deferred** (ADR-033) because the open-source vCluster chart cannot sync
-> HTTPRoute resources to the host cluster's Gateway.
-
----
-
-## Onboarding Steps
-
-All Terragrunt commands below assume `AWS_PROFILE=management` is set. Export it
-once at the start of the session:
-
-```bash
-export AWS_PROFILE=management
-```
-
-### Step 1: Add Team to `teams.hcl`
-
-Edit `infra/live/aws/preprod/us-east-1/platform/teams.hcl` and add the new team
-to the `teams` map:
+Add an entry to `tenants` in
+`infra/live/aws/preprod/us-east-1/platform/tenant-claims/terragrunt.hcl`. The map value **is** the claim
+spec:
 
 ```hcl
-locals {
-  teams = {
-    # Existing teams
-    alpha = {
-      mode = "namespace"
-      apps = {
-        demo = {
-          repo_url  = "https://github.com/asanexample/app-alpha"
-          repo_path = "k8s/preprod"
-          preview   = true
-        }
-      }
+tenants = {
+  # ...existing teams...
+  charlie = {
+    team      = "charlie"
+    hostnames = ["charlie.preprod.aws.refplat.org"] # must be in the team's allow-list (drives restrict-route-hostnames)
+    apps = {
+      api = { repoPath = "k8s/preprod", preview = true } # → ECR repo team-charlie/api
     }
-    bravo = {
-      mode = "namespace"
-      apps = {
-        demo = {
-          repo_url  = "https://github.com/asanexample/app-bravo"
-          repo_path = "k8s/preprod"
-          preview   = false
-        }
-      }
+    aws = {
+      serviceAccount = "app-charlie" # the named SA the app's pods run as
+      # Generic IAM granted to Pod-team-charlie (capped by the deny-escalation boundary). Empty = no AWS perms.
+      # NOTE: S3 buckets are NOT created (that was a demo) — grant access to existing resources here.
+      policyStatements = []
     }
-
-    # NEW: Add your team here
-    charlie = {
-      mode      = "namespace"
-      hostnames = ["api.preprod.aws.refplat.org"] # REQUIRED for ingress — Kyverno denies HTTPRoutes
-                                                  # whose hostname isn't in this allow-list (ADR-029)
-      apps = {
-        api = {
-          repo_url  = "https://github.com/asanexample/app-charlie"
-          repo_path = "k8s/preprod"
-          preview   = true
-        }
-      }
-      # OPTIONAL: per-team AWS access via EKS Pod Identity (ADR-041). Declaring an `aws` block
-      # provisions a Pod-team-charlie role + scoped buckets; apply the `pod-identity` (preprod) and
-      # `s3-shared` (platform) units after `tenants`. See tenant-aws-access-pod-identity.md.
-      # aws = { service_account = "app-charlie", s3 = { "data" = { access = "read", prefix = "" } } }
-    }
+    # resourceQuota omitted → XRD defaults (cpu 4, memory 8Gi, pods 20, …)
+    # developerAccess omitted → enabled by default
   }
-
-  namespace_teams = { for k, v in local.teams : k => v if v.mode == "namespace" }
-  vcluster_teams  = { for k, v in local.teams : k => v if v.mode == "vcluster" }
 }
 ```
 
-Each team can have multiple apps. Each app entry has `repo_url` and `repo_path`
-telling ArgoCD where to find the Kubernetes manifests. Set `preview = true` to
-enable PR preview environments (see ADR-032). The team-level **`hostnames`** list is
-the Gateway allow-list enforced by Kyverno (ADR-029) — **omitting it means every
-HTTPRoute the team creates is rejected at admission**, so capture the team's hostnames
-up front. The optional `aws` block grants per-team AWS access via Pod Identity (ADR-041).
-Confirm these values with the team before proceeding.
+### Step 2 — Register the team for app delivery + supply chain (`teams.hcl`)
 
-Teams with multiple services add multiple app entries:
+The claim owns infra; `teams.hcl` still drives **app delivery** (ArgoCD) and the **supply-chain policies**.
+Add the team with `migrated = true` so it is excluded from the (retired) Terragrunt infra loops and the
+`policy` unit skips its `restrict-*` (the Composition owns those):
 
 ```hcl
 charlie = {
-  mode = "namespace"
+  mode      = "namespace"
+  migrated  = true
+  hostnames = ["charlie.preprod.aws.refplat.org"]
   apps = {
     api = {
-      repo_url  = "https://github.com/asanexample/charlie-api"
+      repo_url  = "https://github.com/asanexample/app-charlie"
       repo_path = "k8s/preprod"
       preview   = true
     }
-    worker = {
-      repo_url  = "https://github.com/asanexample/charlie-worker"
-      repo_path = "k8s/preprod"
-    }
   }
 }
 ```
 
-### Step 2: Add ECR Repository
-
-Edit `infra/live/aws/platform/us-east-1/platform/ecr/terragrunt.hcl` and add a
-repository entry for the new team:
-
-```hcl
-repositories = {
-  "team-alpha/demo"    = {}
-  "team-bravo/demo"    = {}
-  "team-charlie/api"   = {}   # NEW
-}
-```
-
-ECR repos follow `team-<team>/<app>` naming (e.g., `team-charlie/api` for the
-`api` app owned by team `charlie`). Create one ECR repo per app entry in
-`teams.hcl`.
-
-> **Kyverno (ADR-014):** the per-team image-registry policy (`restrict-images-team-<team>`,
-> admitting only `…/team-<team>/*`) is generated automatically — the `policy` unit derives
-> `tenant_registry_map` from `teams.hcl`, so no extra step is needed for the new team. It applies in
-> `Audit` until the cluster is flipped to `Enforce` (see [kyverno-break-glass](kyverno-break-glass.md)).
-
-The ECR module lives in the **platform** account (<PLATFORM_ACCOUNT_ID>). Cross-account
-pull access for preprod (<PREPROD_ACCOUNT_ID>) and prod (<PROD_ACCOUNT_ID>) is already
-configured via the `pull_account_ids` input.
-
-### Step 3: Add the team to the GitHub OIDC unit
-
-Edit `infra/live/aws/platform/us-east-1/platform/github-oidc/terragrunt.hcl` and
-add the team to the `teams` map:
-
-```hcl
-locals {
-  teams = {
-    alpha   = { github_repo = "app-alpha" }
-    bravo   = { github_repo = "app-bravo" }
-    charlie = { github_repo = "app-charlie" }   # NEW
-  }
-}
-```
-
-This generates a dedicated `github-actions-ecr-push-charlie` IAM role that trusts
-**only** `asanexample/app-charlie` (OIDC `sub`) and can push **only** to that team's
-`team-charlie/*` ECR repos (per-team isolation — ADR-039 / issue #60). The team's
-GitHub Actions workflow must then assume `arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/github-actions-ecr-push-charlie`.
-
-### Step 4: Apply Changes
-
-Apply changes across both accounts. The order matters -- `ecr` and `github-oidc`
-are independent, but `tenants` must come before `argocd-apps` since ArgoCD targets
-the tenant namespace.
-
-**Preprod account** (IAM role + EKS access entry + tenant resources). Apply
-`iam-roles` first so the per-team `DeveloperAccess-<name>` role exists before the
-`eks` access entry references it, and before `tenants` creates the RoleBinding:
+### Step 3 — Apply
 
 ```bash
-cd infra/live/aws/preprod/us-east-1/platform/iam-roles
-terragrunt apply
+cd infra/live/aws/preprod/us-east-1/platform/tenant-claims
+AWS_PROFILE=management terragrunt apply        # creates the XTenant; Crossplane reconciles it
 
-cd ../eks
-terragrunt apply
-
-cd ../tenants
-terragrunt apply
+# Then apply the units that read teams.hcl for delivery + supply chain:
+cd ../policy        && AWS_PROFILE=management terragrunt apply   # per-team verify-* policies
+cd ../../../../platform/us-east-1/platform/argocd-apps && AWS_PROFILE=management terragrunt apply  # ArgoCD app
 ```
 
-**Platform account** (ECR, GitHub OIDC, ArgoCD apps):
+The `XTenant` reconciles asynchronously (~1–2 min) — `terragrunt apply` returns before it's Ready.
 
-```bash
-cd infra/live/aws/platform/us-east-1/platform/ecr
-terragrunt apply
+### Step 4 — Grant developer access (AWS Identity Center)
 
-cd ../github-oidc
-terragrunt apply
+The claim provisions the `DeveloperAccess-<team>` IAM role + the EKS access entry, but **a human reaches it
+through AWS Identity Center**: they sign in to the AWS access portal, select the `Dev-<team>` permission set
+on the preprod account (account-wide read + permission to assume `DeveloperAccess-<team>`), and from there
+get namespace-scoped kubectl. This wiring is **hand-maintained** in the `identity-center` unit (mgmt
+account) and has a few genuinely manual, console-only steps. Skip this step for a team with no human
+developers yet (e.g. a workload-only team).
 
-cd ../argocd-apps
-terragrunt apply
-```
+#### 4a. Add the team to the `identity-center` unit (HCL)
 
-**What each apply does:**
-
-| Unit | Account | Resources Created |
-|---|---|---|
-| `iam-roles` | preprod | `DeveloperAccess-charlie` IAM role (trusted by the `Dev-charlie` SSO set) |
-| `eks` | preprod | Group-mapped access entry for `DeveloperAccess-charlie` → group `team-charlie:developers` |
-| `tenants` | preprod | Namespace (`team-charlie`) with PSA labels, ResourceQuota, LimitRange, NetworkPolicy, CiliumNetworkPolicy, and the `tenant-developers` RoleBinding |
-| `ecr` | platform | ECR repository `team-charlie/api` |
-| `github-oidc` | platform | Updates OIDC trust policy to include new repo |
-| `argocd-apps` | platform | ArgoCD Application targeting the team's Git repo |
-
-> **If the team declared an `aws` block** (Pod Identity), also apply the **`pod-identity`** unit
-> (preprod — creates the `Pod-team-<team>` role + association) and **`s3-shared`** unit (platform —
-> the cross-account buckets, if used). See [tenant-aws-access-pod-identity.md](tenant-aws-access-pod-identity.md).
->
-> **App images must be cosign-signed** to pass admission (`verify-images`/`verify-attestations` on
-> preprod). Onboard the app's CI per [app-supply-chain-onboarding.md](app-supply-chain-onboarding.md)
-> (build → push → `cosign sign` keyless → SBOM + SLSA provenance attestations).
-
-### Step 5: Add the Team's SSO Permission Set + Group (IaC)
-
-Identity Center is managed as code. Edit
-`infra/live/aws/mgmt/global/identity-center/terragrunt.hcl` and add a per-team
-permission set, group, and account assignment (mirroring the `Dev-alpha` /
-`Developers-alpha` entries):
+Edit `infra/live/aws/mgmt/global/identity-center/terragrunt.hcl` — add three things, mirroring the existing
+`alpha`/`bravo` entries:
 
 ```hcl
-# permission_sets
+# 1) permission_sets — a Dev-<team> set: account-wide read + assume only this team's DeveloperAccess role
 "Dev-charlie" = {
   description      = "Developer access for team charlie (preprod)"
   session_duration = "PT4H"
   managed_policies = ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
   inline_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Sid      = "AssumeTeamDeveloperRole"
-      Effect   = "Allow"
-      Action   = "sts:AssumeRole"
-      Resource = "arn:aws:iam::${dependency.organizations.outputs.account_ids["Preprod"]}:role/DeveloperAccess-charlie"
-    }]
+    Statement = [
+      {
+        Sid      = "AssumeTeamDeveloperRole"
+        Effect   = "Allow"
+        Action   = "sts:AssumeRole"
+        Resource = "arn:aws:iam::${dependency.organizations.outputs.account_ids["Preprod"]}:role/DeveloperAccess-charlie"
+      },
+      {
+        # Per-team ABAC (#62): deny acting on another team's tagged resources
+        Sid      = "DenyOtherTeamsResources"
+        Effect   = "Deny"
+        Action   = "*"
+        Resource = "*"
+        Condition = {
+          StringNotEquals = { "aws:ResourceTag/Team" = ["charlie", "platform"] }
+          Null            = { "aws:ResourceTag/Team" = "false" }
+        }
+      },
+    ]
   })
 }
 
-# groups
+# 2) groups — the team's developer group
 "Developers-charlie" = { description = "Developers for team charlie" }
 
-# account_assignments
+# 3) account_assignments — bind the set to the group on Preprod (append to the list)
 { account_id = dependency.organizations.outputs.account_ids["Preprod"], permission_set = "Dev-charlie", group = "Developers-charlie" },
+```
+
+Then add the developers (see 4b for which path applies):
+
+```hcl
+# users — only when AWS Identity Center is the identity source (NOT when syncing from an external IdP)
+"charlie-dev" = {
+  given_name  = "Charlie"
+  family_name = "Developer"
+  email       = "charlie-dev@example.com" # the person's real email
+  groups      = ["Developers-charlie"]
+}
 ```
 
 Apply from the management account:
 
 ```bash
 cd infra/live/aws/mgmt/global/identity-center
-terragrunt apply
+AWS_PROFILE=management terragrunt apply
 ```
 
-Then add the team's developers to the `Developers-charlie` group (via SCIM or the
-SSO console). After that, a developer runs `aws sso login` with the `Dev-charlie`
-permission set, assumes `DeveloperAccess-charlie`, and gets kubectl access scoped
-to `team-charlie` only. The `Dev-charlie` set also grants account-wide read-only
-AWS access (preprod posture).
+This creates the permission set, group, group memberships, and the account assignment via the AWS APIs — no
+console clicks for those.
 
-### Step 6: Verify
+#### 4b. Provision the actual people — the manual part
 
-See the full [Verification Commands](#verification-commands) section below.
+Which path applies depends on your **identity source** (IAM Identity Center → Settings → Identity source):
+
+- **AWS Identity Center is the identity source** (this repo's default — `users` are managed in HCL as in 4a).
+  Terraform creates each user, but AWS then requires **per-user, manual, browser steps**:
+  1. The user receives an **"Invitation to join IAM Identity Center"** email. (If it didn't arrive, an admin
+     can resend: IAM Identity Center console → **Users** → select the user → **Send email verification
+     link / Reset password**.)
+  2. The user clicks **Accept invitation**, sets a password, and **registers an MFA device** (required —
+     Identity Center enforces MFA by default). This cannot be done by Terraform.
+  3. (Optional) An admin can verify membership: console → **Groups** → `Developers-charlie` → confirm the
+     user is listed.
+
+- **External IdP via SCIM** (Okta / Entra ID / etc.). Do **not** put `users` in the HCL. Instead:
+  1. In the IdP, create/assign the user to a group that SCIM-provisions into Identity Center as
+     `Developers-charlie` (the group name must match the HCL `groups` + `account_assignments` entry).
+  2. Confirm the synced group appears: IAM Identity Center console → **Groups**.
+  3. The permission set + assignment from 4a still come from HCL; only users/groups live in the IdP.
+
+> One-time, **not per team:** ArgoCD SSO uses a SAML app created by hand in the Identity Center console (see
+> [onboarding.md](../onboarding.md)). New teams get ArgoCD access through their group → ArgoCD RBAC, so you
+> do **not** create a new SAML app per team.
+
+#### 4c. How the developer then gets access (hand this to them)
+
+```bash
+# One-time: configure an SSO profile (uses the AWS access portal / start URL)
+aws configure sso            # SSO start URL = the org's access-portal URL; region us-east-1
+# pick the Preprod account + the "Dev-charlie" role when prompted; name the profile e.g. charlie-dev
+
+# kubectl, scoped to their namespace (the DeveloperAccess-charlie role → team-charlie:developers RBAC)
+aws eks update-kubeconfig --name preprod-use1-eks --region us-east-1 \
+  --role-arn arn:aws:iam::<preprod-account>:role/DeveloperAccess-charlie --profile charlie-dev
+kubectl get pods -n team-charlie    # works; other namespaces are denied
+```
+
+The `Dev-charlie` permission set itself only grants account-wide **read** + `sts:AssumeRole` into
+`DeveloperAccess-charlie`; all cluster authority is the namespace-scoped RBAC the claim bound to
+`team-charlie:developers` (ADR-039/040).
 
 ---
 
-## Verification Commands
-
-Run these checks after completing the onboarding steps. Replace `charlie` with
-the actual team name.
-
-### Namespace Exists
+## Verification
 
 ```bash
-kubectl get namespace team-charlie
+# The claim + its managed resources
+kubectl --context preprod get xtenant charlie                 # SYNCED=True READY=True
+kubectl --context preprod get managed | grep charlie          # all Object + aws.upbound.io MRs Ready
+
+# Kubernetes side
+kubectl --context preprod get ns team-charlie
+kubectl --context preprod get resourcequota,rolebinding -n team-charlie
+kubectl --context preprod get clusterpolicy | grep charlie    # restrict-* (claim) + verify-* (policy unit) = 4
+
+# AWS side
+aws iam get-role --role-name Pod-team-charlie --profile preprod                          # boundary + Team tag
+aws eks describe-access-entry --cluster-name preprod-use1-eks \
+  --principal-arn arn:aws:iam::<preprod>:role/DeveloperAccess-charlie --profile preprod   # → team-charlie:developers
+aws ecr describe-repositories --repository-names team-charlie/api --profile platform      # cross-account repo
 ```
 
-### Resource Quota Applied
-
-```bash
-kubectl get resourcequota tenant-quota -n team-charlie -o yaml
-# Verify: requests.cpu=4, requests.memory=8Gi, pods=20
-```
-
-### Network Policies in Place
-
-```bash
-kubectl get networkpolicy -n team-charlie
-# Expected: default-deny-ingress, allow-gateway-ingress, allow-dns-egress
-# (allow-dns-egress denies egress to 169.254.169.254/32 — the IMDS endpoint)
-
-kubectl get ciliumnetworkpolicy -n team-charlie
-# Expected: allow-gateway-envoy, allow-pod-identity-egress (the latter lets pods reach the
-# Pod Identity agent for AWS creds — ADR-041)
-```
-
-### Pod Security Admission Labels
-
-```bash
-kubectl get namespace team-charlie -o jsonpath='{.metadata.labels}' | tr ',' '\n' | grep pod-security
-# Expected: enforce=baseline, warn=restricted, audit=restricted
-```
-
-### EKS Access Entry + RBAC
-
-```bash
-# The per-team access entry maps DeveloperAccess-charlie to the team's K8s group
-aws eks describe-access-entry \
-  --cluster-name preprod-use1-eks \
-  --principal-arn arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/DeveloperAccess-charlie \
-  --region us-east-1 \
-  --query 'accessEntry.kubernetesGroups'
-# Verify: ["team-charlie:developers"]
-
-# The RoleBinding granting that group edit rights exists in the team namespace
-kubectl get rolebinding tenant-developers -n team-charlie -o yaml
-# Verify: roleRef -> ClusterRole/tenant-developer, subject Group team-charlie:developers
-```
-
-### ArgoCD Application Created
-
-```bash
-# Via CLI (requires ArgoCD login)
-argocd app list | grep charlie
-
-# Via kubectl on the platform cluster
-kubectl get application -n argocd -l "platform.refplat.org/tenant=charlie"
-```
-
-### ECR Repository Accessible
-
-```bash
-aws ecr describe-repositories \
-  --repository-names team-charlie/api \
-  --region us-east-1 \
-  --profile platform
-```
-
-### GitHub OIDC Trust Policy
-
-```bash
-# Per-team role: trusts only the team's repo and pushes only to team-charlie/*
-aws iam get-role \
-  --role-name github-actions-ecr-push-charlie \
-  --profile platform \
-  --query 'Role.AssumeRolePolicyDocument' | grep app-charlie
-aws iam get-role-policy \
-  --role-name github-actions-ecr-push-charlie --policy-name github-actions-ecr-push-charlie-inline \
-  --profile platform --query 'PolicyDocument.Statement[?Sid==`ECRPush`].Resource'  # only team-charlie/*
-```
+A compliant workload referencing `…/team-charlie/api:<tag>` should admit; a cross-team image is denied by
+`restrict-images-team-charlie`.
 
 ---
 
 ## Offboarding
 
-To remove a team, reverse the onboarding process. Coordinate with the team to
-confirm all workloads are drained before proceeding.
+1. Remove the team's entry from the `tenant-claims` unit and `terragrunt apply` — the `XTenant` is deleted
+   and the Composition tears down **every** managed resource (the namespace + AWS, both accounts) via
+   finalizers.
+2. Remove the team from `teams.hcl` and apply `policy` + `argocd-apps` (drops its verify-* policies + ArgoCD
+   app).
+3. If the team is fully gone, remove its Identity Center wiring from the `identity-center` unit (the
+   `Dev-<team>` permission set, `Developers-<team>` group, its `users`, and the `account_assignments` entry)
+   and `terragrunt apply` from the mgmt account. With an external IdP, also remove the group/members there.
+   (Terraform deletes the SSO objects; no separate console step is needed to *deprovision*, unlike the
+   manual *activation* on onboarding.)
+4. Verify: `kubectl get xtenant <team>` (NotFound), `aws iam get-role --role-name Pod-team-<team>`
+   (NoSuchEntity), the ECR repo is gone in the platform account.
 
-### Checklist
+---
 
-- [ ] Notify the team of the offboarding date and confirm they have migrated or
-  backed up any data.
-- [ ] Remove the team entry from `teams.hcl`.
-- [ ] Apply `tenants` to destroy the namespace and its resources:
+## Migrating a team off the legacy `teams.hcl` path
 
-  ```bash
-  cd infra/live/aws/preprod/us-east-1/platform/tenants
-  AWS_PROFILE=management terragrunt apply
-  ```
+Only relevant for a team that predates the claim model (alpha + bravo are already migrated). The mechanics
+are the same as a normal cutover; the one wrinkle is **state already exists**:
 
-- [ ] Apply `eks` to remove the team's group-mapped access entry:
+1. Author the `XTenant` (Step 1) and set `migrated = true` (Step 2).
+2. **ECR:** if the team's `team-<team>/<app>` repo holds live images, `terragrunt state rm` it from the `ecr`
+   unit **before** applying (so the repo survives untracked); the claim's Repository MR then **adopts** it
+   (external-name match) — no image loss. If the repo is empty, just let the `ecr` unit destroy it and the
+   claim recreate it.
+3. Apply the teams.hcl-consumer units (`iam-roles`, `eks`, `policy`; `ecr`, `s3-shared` on platform) — the
+   `migrated` flag withdraws the team's Terragrunt infra. Then apply `tenant-claims`.
+4. The namespace is briefly destroyed then recreated by the claim; ArgoCD resyncs the app once it returns
+   (downtime is acceptable on preprod). Verify as above + confirm `terragrunt plan` is clean.
 
-  ```bash
-  cd infra/live/aws/preprod/us-east-1/platform/eks
-  AWS_PROFILE=management terragrunt apply
-  ```
-
-- [ ] Apply `iam-roles` to destroy the team's `DeveloperAccess-<name>` role:
-
-  ```bash
-  cd infra/live/aws/preprod/us-east-1/platform/iam-roles
-  AWS_PROFILE=management terragrunt apply
-  ```
-
-- [ ] Apply `argocd-apps` to remove the ArgoCD Application:
-
-  ```bash
-  cd infra/live/aws/platform/us-east-1/platform/argocd-apps
-  AWS_PROFILE=management terragrunt apply
-  ```
-
-- [ ] Remove the ECR repository from `ecr/terragrunt.hcl` and apply. Note: this
-  deletes all images in the repository. Confirm the team no longer needs them.
-
-  ```bash
-  cd infra/live/aws/platform/us-east-1/platform/ecr
-  AWS_PROFILE=management terragrunt apply
-  ```
-
-- [ ] Remove the repo from `github-oidc/terragrunt.hcl` and apply:
-
-  ```bash
-  cd infra/live/aws/platform/us-east-1/platform/github-oidc
-  AWS_PROFILE=management terragrunt apply
-  ```
-
-- [ ] Remove the team's `Dev-<name>` permission set, `Developers-<name>` group, and
-  account assignment from `identity-center/terragrunt.hcl` and apply:
-
-  ```bash
-  cd infra/live/aws/mgmt/global/identity-center
-  AWS_PROFILE=management terragrunt apply
-  ```
-
-- [ ] Commit all changes on a feature branch and open a PR.
+> After the overnight scale-to-zero/restore, ArgoCD may fail to reach preprod (`ComparisonError … i/o
+> timeout`) because the preprod EKS API ENI IPs changed and the cross-vpc-dns record went stale — re-apply
+> `platform/.../cross-vpc-dns` to refresh, then hard-refresh the ArgoCD app.
 
 ---
 
 ## Troubleshooting
 
-### `terragrunt apply` fails on `tenants` with "Unauthorized"
-
-The Kubernetes provider cannot reach the EKS API. Confirm:
-
-1. You have an active SSO session: `aws sts get-caller-identity --profile management`
-2. The PlatformDeployer role exists in preprod: check `iam-roles` unit output.
-3. If the cluster API is private-only, connect via Tailscale or SSM tunnel first
-   (see [EKS Cluster Access](eks-cluster-access.md)).
-
-### Namespace exists but ArgoCD app shows "Missing"
-
-The `argocd-apps` unit runs on the **platform** cluster and targets the preprod
-cluster via `argocd-clusters`. Verify:
-
-1. The ArgoCD cluster secret for preprod is healthy:
-   `argocd cluster list | grep preprod`
-2. The `repo_url` in `teams.hcl` is correct and the repo is accessible to ArgoCD.
-3. The `repo_path` directory exists in the team's repository.
-
-### Developer cannot assume their DeveloperAccess-<team> role
-
-1. Confirm the `Dev-<team>` permission set, `Developers-<team>` group, and assignment
-   were applied (Step 5), and the user is a member of that group.
-2. Verify the role's trust policy allows the team's SSO permission set — the
-   `aws:PrincipalArn` condition must match `AWSReservedSSO_Dev-<team>_*`.
-3. Check the team's group-mapped access entry exists:
-
-   ```bash
-   aws eks describe-access-entry \
-     --cluster-name preprod-use1-eks \
-     --principal-arn arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/DeveloperAccess-<team> \
-     --region us-east-1
-   ```
-
-4. If the developer authenticates but is forbidden, confirm the `tenant-developers`
-   RoleBinding exists in `team-<team>` (the `tenants` unit creates it) and its subject
-   group matches the access entry's `kubernetesGroups`.
-
-### ECR push from GitHub Actions fails with "Not Authorized"
-
-1. Verify the team is in the `teams` map in `github-oidc/terragrunt.hcl` (which
-   generates `github-actions-ecr-push-<team>`).
-2. Confirm the workflow assumes the **per-team** role ARN
-   (`github-actions-ecr-push-<team>`), not the old shared `github-actions-ecr-push`
-   (removed in #60), and that its trust includes the repo:
-
-   ```bash
-   aws iam get-role --role-name github-actions-ecr-push-<team> --profile platform \
-     --query 'Role.AssumeRolePolicyDocument'
-   ```
-
-3. Check the GitHub Actions workflow uses the correct (per-team) role ARN and region.
-4. Ensure the ECR repository name in the push step matches `ecr/terragrunt.hcl`
-   (format: `team-<name>/app`) and is under the calling team's `team-<team>/*` prefix.
-
-### Pods stuck in Pending
-
-1. Check node capacity: `kubectl describe nodes | grep -A5 "Allocated resources"`
-2. Verify the `team-<name>` namespace resource quota has not been exhausted:
-   `kubectl describe resourcequota tenant-quota -n team-<name>`
-3. Ensure Cilium is healthy: `cilium status`
+| Symptom | Cause / fix |
+| ------- | ----------- |
+| `XTenant` stuck `SYNCED=False` | An MR failed — `kubectl describe xtenant <team>` and `kubectl get managed \| grep <team>`; check the failing MR's `Synced` condition message (often a missing provisioner IAM verb or a Kyverno denial). |
+| `XTenant` SYNCED but `READY=False` | A managed resource isn't Ready yet (provider reconcile lag) or a K8s `Object` was rejected by Kyverno — check the Object's status. |
+| AWS MR 403 (e.g. `eks:TagResource`, `iam:ListInstanceProfilesForRole`) | The `crossplane-provisioner-<cluster>` role is missing a verb — add it in the `crossplane` module's provisioner policy and apply. |
+| Cross-account ECR MR `AccessDenied … sts:TagSession` | The platform `crossplane-ecr-provisioner` trust must allow `sts:TagSession` (not just `AssumeRole`); the preprod provisioner needs both too. |
+| Claim creation denied by `restrict-tenant-control-plane` | The claim must be applied by a **platform** principal (PlatformDeployer via the `tenant-claims` unit), not a tenant principal. |
+| Per-team `restrict-images`/`restrict-route-hostnames` appear twice / `AlreadyExists` | The team is in both the claim and the `policy` unit's non-migrated set — ensure `migrated = true` in `teams.hcl`. |
