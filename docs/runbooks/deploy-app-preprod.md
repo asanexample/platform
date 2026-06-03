@@ -354,7 +354,8 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
       # NOTE: this snippet omits signing. The image must be cosign-signed (+ SBOM + SLSA provenance)
       # to pass admission (verify-images/verify-attestations are in Enforce on preprod). Wire that in
-      # per docs/runbooks/app-supply-chain-onboarding.md — see app-alpha/.github/workflows/deploy.yml.
+      # per docs/runbooks/app-supply-chain-onboarding.md — the app is a thin caller of the shared
+      # trusted-ci build-sign/provenance workflows; see app-bravo (the generic reference).
 ```
 
 ### Manual Push (Local)

@@ -160,11 +160,14 @@ and [ADR-040](docs/adrs/040-platform-engineer-access-model.md).
 
 ### Software supply chain (cross-cutting)
 
-App CI (in the app repos) builds images, **cosign keyless-signs** them, attaches a **CycloneDX SBOM** and a
-**SLSA Build L3** provenance attestation (signed by an isolated `trusted-ci` identity), then pins the deploy
-manifest to the signed digest. **Kyverno verifies all of it at admission**, per team — only images signed by
-the team's own CI, carrying a valid SBOM + provenance, are admitted. See
-[Supply-Chain Overview](docs/architecture/supply-chain-overview.md).
+App CI (a **thin caller** in each app repo) invokes the shared `trusted-ci` reusable workflows: `build-sign.yml`
+builds the image, **cosign keyless-signs** it, and attaches a **CycloneDX SBOM**, while `slsa-provenance.yml`
+issues the **SLSA Build L3** provenance attestation — both under an isolated `trusted-ci` identity, with
+per-team isolation carried by the cosign cert's `githubWorkflowRepository` extension (the caller app repo). CI
+then pins the deploy manifest to the signed digest. **Kyverno verifies all of it at admission**, per team —
+only images signed by the shared signer for that team's repo (plus an app-signed fallback for bespoke apps),
+carrying a valid SBOM + provenance, are admitted ([ADR-050](docs/adrs/050-shared-build-sign-reusable-workflow.md)).
+See [Supply-Chain Overview](docs/architecture/supply-chain-overview.md).
 
 ### Compliance tiers
 

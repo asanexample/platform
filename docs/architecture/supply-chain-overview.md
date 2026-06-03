@@ -8,6 +8,7 @@ It is deliberately a high-level integration story. The deep dives live elsewhere
 
 - **Keyless signing mechanics** (OIDC → Fulcio → Rekor, per-team identity): [`cosign-image-signing.md`](cosign-image-signing.md)
 - **SLSA Build L3 design** (the isolated `trusted-ci` provenance signer): [ADR-042](../adrs/042-isolated-build-provenance-slsa-l3.md)
+- **Shared image + SBOM signer** (the isolated `trusted-ci/build-sign.yml` reusable workflow; app repos as thin callers): [ADR-050](../adrs/050-shared-build-sign-reusable-workflow.md)
 - **Policy engine** (Kyverno, audit→enforce rollout): [ADR-014](../adrs/014-kyverno-as-policy-engine.md)
 - **What's enforced per cluster**: [`kyverno-policy-catalog.md`](kyverno-policy-catalog.md)
 - **Onboard an app to the pipeline**: [`../runbooks/app-supply-chain-onboarding.md`](../runbooks/app-supply-chain-onboarding.md)
@@ -25,9 +26,9 @@ is not good enough. The supply chain answers four questions at **admission time*
 | Threat | Without controls | Control |
 |--------|------------------|---------|
 | **Tampered / unknown image** — an attacker pushes a malicious image (or swaps a digest) and it gets deployed | Any image in ECR runs | **cosign signature** — only images signed by a known CI identity are admitted |
-| **Cross-tenant image use** — team B runs team A's image (or pushes into A's repo) | Namespace isolation only; images are shared | **Per-team signing identity** — `verify-images-team-<team>` admits only images signed by `app-<team>`'s own workflow |
+| **Cross-tenant image use** — team B runs team A's image (or pushes into A's repo) | Namespace isolation only; images are shared | **Per-team signing identity** — `verify-images-team-<team>` admits only images signed by the shared `trusted-ci/build-sign.yml` workflow whose `githubWorkflowRepository` cert extension is `app-<team>` (ADR-050); a bespoke-build app's own workflow is a supported fallback |
 | **No proof of origin** — "where did this image come from? what's in it?" is unanswerable | Opaque | **SLSA provenance + SBOM** attestations — signed statements of *how* it was built and *what's inside* |
-| **Forged provenance** — a compromised app build claims "I am a trusted build" about itself | Self-attestation proves nothing | **Isolated provenance signer** (`trusted-ci`) — provenance is signed by an identity the app's own build cannot assume (ADR-042) |
+| **Forged image / provenance / SBOM** — a compromised app build signs its own malicious artifact and claims "I am a trusted build" | Self-signing/self-attestation proves nothing | **Isolated signer** (`trusted-ci`) — image + SBOM signing (`build-sign.yml`) and provenance (`slsa-provenance.yml`) run in a trust domain the app's own build cannot assume; per-team gating is the `githubWorkflowRepository` cert extension (ADR-042, ADR-050) |
 
 **Drivers.** This is a reference Internal Developer Platform; supply-chain integrity is table stakes for the
 compliance tiers it models (see [ADR-013 compliance-tier model](../adrs/013-compliance-tier-model.md)) and
@@ -43,19 +44,20 @@ One commit to an app repo's `main` produces a signed, attested, provenance-beari
 admits — with **no window** where ArgoCD could deploy an image whose attestations don't yet exist.
 
 ```text
- DEVELOPER                 APP CI (app-<team> repo, GitHub Actions OIDC identity)
+ DEVELOPER                 APP CI — app-<team> repo's deploy.yml/preview.yml is a THIN CALLER (ADR-050)
  ─────────                 ───────────────────────────────────────────────────────────────
- git push main  ─────────▶ build job
+ git push main  ─────────▶ build-sign job  (uses asanexample/trusted-ci/...build-sign.yml@<pinned-sha>)
                              1. assume role github-actions-ecr-push-<team>  (OIDC → AWS, ADR-036)
                              2. docker build + push  →  ECR team-<team>/<app>:<sha>
                              3. cosign sign   <repo>@<digest>           (keyless: OIDC → Fulcio cert → Rekor)
                              4. syft → CycloneDX SBOM
-                                cosign attest --type cyclonedx          (keyless, same identity)
-                           provenance job  (needs: build)
-                             5. uses asanexample/trusted-ci/...slsa-provenance.yml@<pinned-sha>
-                                → SLSA provenance (slsa.dev/provenance/v0.2), signed by the
-                                  ISOLATED trusted-ci identity the app build cannot forge (ADR-042)
-                           deploy job  (needs: [build, provenance])     ← barrier: all attestations exist
+                                cosign attest --type cyclonedx          (keyless, same workflow)
+                                ↳ signed by the ISOLATED trusted-ci build-sign.yml identity the app
+                                  cannot assume; per-team gate = githubWorkflowRepository = app-<team> (ADR-050)
+                           provenance job  (uses asanexample/trusted-ci/...slsa-provenance.yml@<pinned-sha>)
+                             5. → SLSA provenance (slsa.dev/provenance/v0.2), signed by the same
+                                  ISOLATED trusted-ci trust domain the app build cannot forge (ADR-042)
+                           deploy job  (needs: [build-sign, provenance])  ← barrier: all attestations exist
                              6. pin k8s manifest to <repo>@<digest>, git commit + push
                                                                          │
  ┌───────────────────────────────────────────────────────────────────── ▼ ─────────────┐
@@ -65,13 +67,14 @@ admits — with **no window** where ArgoCD could deploy an image whose attestati
  └───────────────────────────────────────────────────────────────────── │ ─────────────┘
                                                                           ▼
  KYVERNO admission (platform + preprod clusters)   ◀── Pod create in team-<team> namespace
-   verify-images-team-<team>        : image signed by app-<team>'s workflow?         (Enforce)
-   verify-attestations-team-<team>  : CycloneDX SBOM present + signed by app-<team>? (audit→Enforce)
-                                      SLSA provenance present + signed by trusted-ci? (per ADR-042)
+   verify-images-team-<team>        : image signed by trusted-ci build-sign.yml,        (Enforce)
+                                      githubWorkflowRepository = app-<team>? (or app fallback)
+   verify-attestations-team-<team>  : CycloneDX SBOM present + signed by build-sign.yml? (audit→Enforce)
+                                      SLSA provenance present + signed by trusted-ci? (per ADR-042/050)
    → admit (mutate image to digest) ──▶ Pod runs        |        → deny ──▶ Pod rejected at admission
 ```
 
-The **`needs: [build, provenance]` barrier on the deploy job is load-bearing**: the digest ArgoCD picks up
+The **`needs: [build-sign, provenance]` barrier on the deploy job is load-bearing**: the digest ArgoCD picks up
 already carries its signature, SBOM, *and* provenance, so Kyverno's Enforce-mode `verify-attestations` never
 sees an image whose attestations are still in flight.
 
@@ -94,12 +97,17 @@ Each mechanism answers a different question; together they form a verifiable cha
 **The trust anchor is the identity, not a key.** Kyverno doesn't hold a public key to check against. It
 verifies that the Fulcio cert on each signature/attestation was issued to the **expected GitHub workflow
 identity** (`issuer: https://token.actions.githubusercontent.com`, `subject: <workflow ref>`) and that the
-entry is in **Rekor**. Per-team isolation falls out of this: `app-alpha`'s images are signed by
-`app-alpha`'s workflow ref, which `app-bravo`'s policy does not list. See
+entry is in **Rekor**. Since the image + SBOM are now signed by the shared
+`trusted-ci/build-sign.yml` reusable workflow (ADR-050), the cert **subject** is the same for every
+team; **per-team isolation moves to the `githubWorkflowRepository` cert extension**, which Fulcio sets
+from the *calling* app repo's OIDC and which one team cannot forge for another. So `app-alpha`'s images
+carry `githubWorkflowRepository: …/app-alpha`, which `app-bravo`'s policy does not list. (App-signed
+identities remain a supported fallback for bespoke-build apps.) See
 [`cosign-image-signing.md`](cosign-image-signing.md) for the full keyless mechanics.
 
-**Predicate types must match end-to-end.** The app emits `cosign attest --type cyclonedx`
-(`https://cyclonedx.org/bom`) and the `trusted-ci` job emits `slsa.dev/provenance/v0.2`; Kyverno's
+**Predicate types must match end-to-end.** The shared `trusted-ci/build-sign.yml` job emits
+`cosign attest --type cyclonedx` (`https://cyclonedx.org/bom`) and the `trusted-ci/slsa-provenance.yml`
+job emits `slsa.dev/provenance/v0.2`; Kyverno's
 `verify-attestations-team-<team>` requires *exactly* those predicate types. A mismatch (e.g. cosign v3's new
 bundle format vs. Kyverno's default attestor) is a silent rejection — which is why the app pins **cosign
 v2.5.2** for the legacy `.att` format (see the onboarding runbook).
@@ -109,23 +117,29 @@ v2.5.2** for the legacy `.att` format (see the onboarding runbook).
 ## 4. The two verification policies (what Kyverno actually checks)
 
 Both are generated per team from `teams.hcl` (`verifySubjects`, `tenantRegistryMap`, `attestCallerRepos`) by
-the `policy` module. Each has its **own** `validationFailureAction`/`failurePolicy` so signatures can be
-**Enforce** while attestations roll out **Audit-first**. `webhookTimeoutSeconds: 30` covers the signature
-fetch + Rekor lookup.
+the `policy` module, plus the module-level `trusted_ci_build_subject_regexp` + `shared_signer_caller_repos`
+inputs that admit the shared `build-sign.yml` signer (ADR-050). Each has its **own**
+`validationFailureAction`/`failurePolicy` so signatures can be **Enforce** while attestations roll out
+**Audit-first**. `webhookTimeoutSeconds: 30` covers the signature fetch + Rekor lookup.
 
 **`verify-images-team-<team>`** (signatures) — `infra/modules/policy/policies-chart/templates/verify-images.yaml`
 
 - Scope: Pods in `team-<team>` using images under the team's ECR repo (`tenantRegistryMap[team]/*`).
-- Admits an image signed (keyless) by **any one** (`count: 1`) of the team's identities: the stable
-  `deploy_subject` (main-branch workflow) **or** the `preview_subject_regexp` (PR previews — the OIDC ref
-  varies per PR, so it's matched by regex).
+- Admits an image signed (keyless) by **any one** (`count: 1`) of these alternatives: the shared
+  **`trusted-ci/build-sign.yml`** signer (`trusted_ci_build_subject_regexp`) gated per-team by the cert's
+  **`githubWorkflowRepository`** extension = the team's caller repo (`shared_signer_caller_repos`, ADR-050)
+  — **or**, as a bespoke-build fallback, the team's own app identity: the stable `deploy_subject`
+  (main-branch workflow) **or** the `preview_subject_regexp` (PR previews — the OIDC ref varies per PR, so
+  it's matched by regex).
 - On **Enforce**, `mutateDigest: true` pins the admitted image to its digest (Kyverno forbids mutation in
   Audit, so pinning only happens once enforcing).
 
 **`verify-attestations-team-<team>`** (SBOM + provenance) — `.../verify-attestations.yaml`
 
 - Requires two attestations on the image:
-  - **SBOM** (`https://cyclonedx.org/bom`) signed by the team's own workflow identity.
+  - **SBOM** (`https://cyclonedx.org/bom`). Accepts (`count: 1`) the shared **`trusted-ci/build-sign.yml`**
+    signer (`trusted_ci_build_subject_regexp`, gated per-team by the **`githubWorkflowRepository`**
+    extension = the team's caller repo, ADR-050) — **or**, as a fallback, the team's own workflow identity.
   - **SLSA provenance** (`https://slsa.dev/provenance/v0.2`). For teams that have adopted the isolated
     signer (those in `attestCallerRepos`), it must be signed by the **`trusted-ci`** reusable workflow
     (`trustedCiSubjectRegExp`), gated per-team by the cert's **`githubWorkflowRepository`** extension = the
@@ -150,12 +164,18 @@ provenance the tenant cannot forge). Status against [SLSA v1.0 Build track](http
 | **L3 — Isolated build environment** (secrets/runner isolation) | ⚠️ Partial | GitHub Actions provides per-job ephemeral runners + OIDC isolation; we do **not** run the dedicated SLSA `slsa-github-generator` (rejected for ECR credential-passing reasons — ADR-042 §"Why not off-the-shelf"). The isolation we rely on is the OIDC identity boundary, not a separate signing enclave. |
 
 **Beyond the Build track:** image **signatures** (integrity + per-team identity) and the **CycloneDX SBOM**
-are layered on top — these aren't SLSA *levels* but are part of the same admission gate. Source-track and
-reproducible-build requirements are **out of scope** today.
+are layered on top — these aren't SLSA *levels* but are part of the same admission gate. Both are now
+signed by the **same isolated `trusted-ci/build-sign.yml`** identity the app build cannot assume
+(per-team gating via the `githubWorkflowRepository` cert extension, ADR-050), so they inherit the same
+tenant-cannot-forge property as the L3 provenance rather than relying on the app's own self-signing.
+Source-track and reproducible-build requirements are **out of scope** today.
 
 **Rollout state:** signatures (`verify-images`) are **Enforce** on preprod + platform. Attestations
 (`verify-attestations`, incl. the L3 trusted-ci provenance) are **Enforce on preprod**; consult
-[`kyverno-policy-catalog.md`](kyverno-policy-catalog.md) for the authoritative per-cluster status.
+[`kyverno-policy-catalog.md`](kyverno-policy-catalog.md) for the authoritative per-cluster status. The
+shared `trusted-ci/build-sign.yml` image + SBOM signer (ADR-050) went **live on preprod (Enforce) on
+2026-06-03**, with `alpha` and `bravo` migrated to thin-caller `deploy.yml`/`preview.yml` (`app-bravo` is
+the generic reference).
 
 ---
 

@@ -6,7 +6,9 @@
 federation) and builds on the image-signing/attestation chain (platform #108). **P1–P3 done on preprod
 (2026-05-30): app-alpha emits trusted-ci as its SOLE provenance signer and preprod Kyverno
 verify-attestations is in Enforce requiring it — Build L3 achieved on preprod.** P4 (platform-cluster
-replication) pending.
+replication) pending. **Generalized by [ADR-050](050-shared-build-sign-reusable-workflow.md)**, which moved
+**image + SBOM** signing into a sibling shared reusable workflow (`trusted-ci/build-sign.yml`) using the same
+isolated trust domain and `githubWorkflowRepository`-extension gating this ADR established for provenance.
 
 ## Context
 

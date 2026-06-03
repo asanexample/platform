@@ -38,24 +38,34 @@ Walk the chain (stop at the first failure):
 
    ```bash
    cosign verify "$IMAGE@$DIGEST" \
-     --certificate-identity-regexp "https://github.com/asanexample/app-<team>/.+" \
+     --certificate-identity-regexp "^https://github.com/asanexample/trusted-ci/.github/workflows/build-sign.yml@" \
+     --certificate-github-workflow-repository asanexample/app-<team> \
      --certificate-oidc-issuer https://token.actions.githubusercontent.com
    ```
 
-   - *No signature* → the app CI didn't sign (or signed the **tag**, not the digest). Fix the workflow
-     ([onboarding runbook](app-supply-chain-onboarding.md)) and rebuild.
-   - *Signed by a different identity* → wrong repo/workflow, or the team's `verifySubjects` in `teams.hcl`
-     don't list this repo. Fix `teams.hcl` + re-apply the `policy` unit.
+   The cert **subject** is the shared `build-sign.yml` reusable workflow (signing is no longer per-app);
+   per-team isolation is the `githubWorkflowRepository` extension (= the caller app repo). Policy also
+   admits an app-signed fallback for bespoke apps.
+
+   - *No signature* → the app's thin CI didn't call the shared `build-sign` workflow (or signed the
+     **tag**, not the digest). Fix the workflow ([onboarding runbook](app-supply-chain-onboarding.md))
+     and rebuild.
+   - *Signed by a different identity* → wrong caller repo (the `githubWorkflowRepository` extension), or
+     the team's `verifySubjects` in `teams.hcl` don't list this repo. Fix `teams.hcl` + re-apply the
+     `policy` unit.
 
 2. **Are the attestations present + the right predicate types?**
 
    ```bash
-   cosign verify-attestation "$IMAGE@$DIGEST" --type cyclonedx      --certificate-identity-regexp ... --certificate-oidc-issuer ...
-   cosign verify-attestation "$IMAGE@$DIGEST" --type slsaprovenance  --certificate-identity-regexp "https://github.com/asanexample/trusted-ci/.+" --certificate-oidc-issuer ...
+   cosign verify-attestation "$IMAGE@$DIGEST" --type cyclonedx      --certificate-identity-regexp "^https://github.com/asanexample/trusted-ci/.github/workflows/build-sign.yml@"      --certificate-oidc-issuer ...
+   cosign verify-attestation "$IMAGE@$DIGEST" --type slsaprovenance  --certificate-identity-regexp "^https://github.com/asanexample/trusted-ci/.github/workflows/slsa-provenance.yml@" --certificate-oidc-issuer ...
    ```
 
-   - *Missing SBOM* → Syft/attest step failed or used the wrong `--type`.
-   - *Missing/forged provenance* → the `trusted-ci` job didn't run, or the build job **self-attested**
+   The SBOM is now produced + signed by the shared `build-sign.yml` reusable workflow; the SLSA
+   provenance by the separate `slsa-provenance.yml` — both under `trusted-ci`.
+
+   - *Missing SBOM* → Syft/attest step in the shared `build-sign` workflow failed or used the wrong `--type`.
+   - *Missing/forged provenance* → the `slsa-provenance` job didn't run, or the build job **self-attested**
      provenance (two identities → `verifiedCount: 0`). Remove the self-attest; rely only on `trusted-ci`.
    - *cosign v3 used* → new bundle format ≠ Kyverno's default attestor → pin **v2.5.2**.
 
