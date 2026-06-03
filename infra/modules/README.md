@@ -11,7 +11,7 @@ only on AWS.
 modules/
 ├── aws/           # AWS-specific modules (19)
 ├── cloudflare/    # Cloudflare modules (1)
-└── <shared>/      # Cloud-agnostic modules (18 — cilium, argocd, policy, observability, tenant, …)
+└── <shared>/      # Cloud-agnostic modules (19 — cilium, argocd, policy, observability, crossplane, …)
 ```
 
 ## Shared Modules (cloud-agnostic)
@@ -24,6 +24,7 @@ modules/
 | [cert-manager](cert-manager/) | cert-manager Helm with IRSA for DNS-01 challenges |
 | [cilium](cilium/) | Cilium CNI — BYOCNI, kube-proxy replacement, Gateway API, Hubble |
 | [cluster-rbac](cluster-rbac/) | platform-operator ClusterRole — least-privilege kubectl (ADR-040) |
+| [crossplane](crossplane/) | Crossplane v2 control plane — hub ECR provisioning + per-cluster Tenant XRD/Composition (ADR-046/048) |
 | [external-dns](external-dns/) | ExternalDNS Helm with IRSA, Gateway API source support |
 | [external-secrets](external-secrets/) | External Secrets Operator Helm with IRSA |
 | [falco](falco/) | Runtime threat detection (eBPF) — module available, not yet deployed |
@@ -34,7 +35,7 @@ modules/
 | [secret-stores](secret-stores/) | ClusterSecretStore for Secrets Manager and SSM Parameter Store |
 | [tailscale](tailscale/) | Tailscale Operator, subnet router, split DNS |
 | [tailscale-admin](tailscale-admin/) | Tailnet ACL management, OAuth client provisioning |
-| [tenant](tenant/) | Namespace tenant isolation — quotas, limits, NetworkPolicies, Pod Identity (ADR-041) |
+| [tenant-claims](tenant-claims/) | Helm chart rendering XTenant claims, delivered by the `tenant-claims` unit (ADR-046/048) |
 | [vcluster](vcluster/) | vCluster Helm deployment (deferred -- see ADR-033) |
 
 ## AWS Modules

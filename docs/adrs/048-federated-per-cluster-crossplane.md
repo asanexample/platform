@@ -2,10 +2,13 @@
 
 **Date:** 2026-06-02
 
-**Status:** Accepted — refines [ADR-046](046-back-stack-for-developer-self-service.md). ADR-046 adopted
-Crossplane as the tenant control plane and described it running on the platform (hub) cluster. This ADR
-sets the **topology**: Crossplane runs on **each workload cluster** and provisions that cluster's tenants
-locally, rather than a single hub reaching across clusters. The rest of ADR-046 is unchanged.
+**Status:** Accepted — **implemented (#174); migration complete.** The federated Composition is live on
+preprod and both teams (alpha, bravo) are provisioned by `Tenant` claims; the legacy Terragrunt tenant units
+(`tenants`, `pod-identity`, and the platform `s3-shared` unit) and the `infra/modules/tenant` module are
+retired. Refines [ADR-046](046-back-stack-for-developer-self-service.md). ADR-046 adopted Crossplane as the
+tenant control plane and described it running on the platform (hub) cluster. This ADR sets the **topology**:
+Crossplane runs on **each workload cluster** and provisions that cluster's tenants locally, rather than a
+single hub reaching across clusters. The rest of ADR-046 is unchanged.
 
 ## Context
 

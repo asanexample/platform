@@ -2,9 +2,13 @@
 
 **Date:** 2026-06-02
 
-**Status:** Accepted — not yet implemented. Establishes the target architecture for developer self-service now
-that the platform foundation is in place. Builds on GitOps ([ADR-021](021-argocd-for-gitops.md)), the tenant
-model ([ADR-027](027-hybrid-tenant-isolation-model.md)/[031](031-multi-app-tenant-model.md)), Pod Identity
+**Status:** Accepted — **implemented (P1–P3, #174).** Tenant provisioning is now Crossplane `Tenant` claims:
+both teams (alpha, bravo) are migrated and provisioned by the Composition; the `infra/modules/tenant` module
+and the preprod `tenants`/`pod-identity` units and the platform `s3-shared` unit are **retired** (deleted), and
+the per-team role/access-entry loops were removed from the `iam-roles` and `eks` units. Establishes the target
+architecture for developer self-service now that the platform foundation is in place. Builds on GitOps
+([ADR-021](021-argocd-for-gitops.md)), the tenant model
+([ADR-027](027-hybrid-tenant-isolation-model.md)/[031](031-multi-app-tenant-model.md)), Pod Identity
 ([ADR-041](041-pod-identity-for-tenant-workloads.md)), and policy-as-code ([ADR-014](014-kyverno-as-policy-engine.md)).
 
 ## Context
@@ -65,9 +69,25 @@ Adopt the **BACK stack** as the target architecture for developer self-service, 
 responsibility:
 
 - **Crossplane = the tenant control plane.** Model **tenant-facing** capabilities — namespace +
-  ResourceQuota/LimitRange/default-deny NetworkPolicy, ECR repo, IAM/EKS Pod Identity, per-team Kyverno
-  policy, and route-hostname allow-list — as a **`Tenant` (X)RD + Composition** that a team *claims*. This is
-  a near 1:1 replacement of the `tenant` module + the per-team `teams.hcl` wiring, reconciled continuously.
+  ResourceQuota/LimitRange/default-deny NetworkPolicy + CiliumNetworkPolicies, ECR repo, IAM/EKS Pod Identity,
+  per-team Kyverno policy, and route-hostname allow-list — as a **`Tenant` (X)RD + Composition** that a team
+  *claims*. This is a near 1:1 replacement of the `tenant` module + the per-team `teams.hcl` wiring, reconciled
+  continuously.
+- **Supply-chain split.** The Composition provisions only the **per-tenant guardrails** — the Kyverno
+  `restrict-images` (per-team ECR registry scoping) and `restrict-route-hostnames` (per-team Gateway hostname
+  allow-list) ClusterPolicies. The **platform-owned supply-chain verification** — cosign keyless
+  `verify-images` and SLSA `verify-attestations` ([ADR-042](042-isolated-build-provenance-slsa-l3.md)) — stays
+  in the `policy` unit/module (ADR-014), deployed for **all** teams (including migrated ones), not in the
+  Composition. `teams.hcl` therefore still feeds app delivery (argocd-apps) and these platform-owned
+  supply-chain policies; migrated teams carry `migrated = true`.
+- **Claim delivery.** Tenant claims are authored in the **`tenant-claims` Terragrunt unit** (a
+  platform-controlled path) and reconciled by the per-cluster Composition (per [ADR-048](048-federated-per-cluster-crossplane.md));
+  Backstage (P5) later scaffolds claims into that same path. A single `Tenant` claim (kind `XTenant`,
+  `apiVersion platform.refplat.org/v1alpha1`) renders the full tenant footprint: namespace + RBAC +
+  ResourceQuota/LimitRange + NetworkPolicies/CiliumNetworkPolicies; per-team `restrict-images` /
+  `restrict-route-hostnames`; the `Pod-team-<team>` IAM role + EKS Pod Identity association; the
+  `DeveloperAccess-<team>` IAM role + EKS access entry → `team-<team>:developers`; and the cross-account ECR
+  repo.
 - **Foundational infra stays on Terragrunt.** Organizations/SCPs, accounts, networking, EKS, node groups, and
   state are **not** moved to Crossplane: they bootstrap the very cluster Crossplane runs on, change rarely, and
   are operator-, not developer-, facing. OpenTofu + Terragrunt remains the foundation layer; Crossplane is the

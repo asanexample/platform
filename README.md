@@ -27,7 +27,7 @@ The platform-engineering capabilities an enterprise IDP needs — each implement
 
 | Capability | How it shows up here |
 |------------|----------------------|
-| **Self-service via contract** | Teams declare identity, apps, hostnames, and AWS access in `teams.hcl`; the platform provisions namespaces, ECR repos, IAM, and policy from it ([ADR-031](docs/adrs/031-multi-app-tenant-model.md)). *This is the interim contract — the north star is portal-driven self-service; see [Where this is heading](#where-this-is-heading--the-back-stack).* |
+| **Self-service via declarative claim** | A team is a single `Tenant` claim; a Crossplane Composition reconciles it into namespaces, RBAC, ECR repos, IAM/Pod Identity, developer access, and policy ([ADR-046](docs/adrs/046-back-stack-for-developer-self-service.md)/[048](docs/adrs/048-federated-per-cluster-crossplane.md)). *A Backstage portal front door is the remaining piece — see [Where this is heading](#where-this-is-heading--the-back-stack).* |
 | **Golden paths / paved roads** | GitOps delivery (ArgoCD), signed-digest promotion, and per-PR preview environments are the supported, opinionated route to production ([ADR-021](docs/adrs/021-argocd-for-gitops.md)/[032](docs/adrs/032-pr-preview-environments.md)) |
 | **Guardrails, not gates** | Policy-as-code at every layer — org SCPs and Kyverno admission — lets teams move fast without breaking governance ([ADR-014](docs/adrs/014-kyverno-as-policy-engine.md)) |
 | **Multi-tenancy** | Team identity decoupled from app identity; namespace isolation with default-deny networking, quotas, and per-team EKS Pod Identity for AWS access ([ADR-027](docs/adrs/027-hybrid-tenant-isolation-model.md)/[041](docs/adrs/041-pod-identity-for-tenant-workloads.md)) |
@@ -48,21 +48,23 @@ The platform-engineering capabilities an enterprise IDP needs — each implement
 
 ## Where this is heading — the BACK stack
 
-Today's self-service is a **declarative contract** (`teams.hcl`) reconciled by the platform team via
-Terragrunt. That's deliberate — the **thinnest viable platform** that proves the tenancy, security, and
-supply-chain model first. With that foundation in place, the next phase is true developer self-service on the
-**BACK stack**:
+Tenant provisioning runs on the **BACK stack**. A team is a single declarative **`Tenant` claim**
+(`XTenant`) that a Crossplane **Composition** reconciles into the complete tenant — namespace, RBAC, quotas,
+networking, per-team policy, IAM/Pod Identity, developer access, and cross-account ECR. The remaining piece
+is the **Backstage** front door:
 
 | | Role | Status |
 |---|------|--------|
-| **B — [Backstage](https://backstage.io/)** | Internal Developer Portal — service catalog + software templates; the self-service front door (replaces hand-edited `teams.hcl` onboarding) | Planned |
+| **B — [Backstage](https://backstage.io/)** | Internal Developer Portal — service catalog + software templates; the self-service front door that creates the `Tenant` claim | Planned (P5) |
 | **A — ArgoCD** | GitOps reconciliation engine | **In place** |
-| **C — [Crossplane](https://www.crossplane.io/)** | Infrastructure control plane — tenant capabilities (namespaces, ECR, IAM, Pod Identity, policy) modeled as Compositions/XRDs and **claimed through the Kubernetes API**, continuously reconciled (replaces Terragrunt for tenant-facing provisioning) | Planned |
+| **C — [Crossplane](https://www.crossplane.io/)** | Infrastructure control plane — tenant capabilities (namespaces, ECR, IAM, Pod Identity, policy, developer access) modeled as an XRD/Composition and **claimed through the Kubernetes API**, continuously reconciled. **The sole tenant provisioner** ([ADR-046](docs/adrs/046-back-stack-for-developer-self-service.md)/[048](docs/adrs/048-federated-per-cluster-crossplane.md)) | **Shipped (P1–P3)** — see [Crossplane Tenant API](docs/architecture/crossplane-tenant-api.md) |
 | **K — Kubernetes** | The universal control plane everything rides on | **In place** |
 
-The end state: a developer picks a Backstage template, which scaffolds a repo and a Crossplane claim; ArgoCD
-applies it; Crossplane provisions the resources; Kubernetes runs them — portal-driven, GitOps-reconciled,
-self-served. The patterns in this repo (multi-tenancy, policy-as-code, signed supply chain, observability)
+`teams.hcl` is no longer the tenant-provisioning source of truth (the `XTenant` claim is); it now only feeds
+app delivery (ArgoCD) and the platform-owned supply-chain policies. The end state: a developer picks a
+Backstage template, which scaffolds a repo and a `Tenant` claim; ArgoCD applies it; Crossplane provisions the
+resources; Kubernetes runs them — portal-driven, GitOps-reconciled, self-served. The patterns in this repo
+(multi-tenancy, policy-as-code, signed supply chain, observability)
 are the substrate that stack composes onto. This work begins now that the foundation is established.
 
 ## Quick Start
@@ -108,7 +110,7 @@ platform/
 │   ├── modules/                 # Reusable OpenTofu modules
 │   │   ├── aws/                 # 19 AWS modules
 │   │   ├── cloudflare/          # 1 Cloudflare module (dns_delegation)
-│   │   └── (shared)             # 18 cloud-agnostic modules (cilium, argocd, policy, observability, tenant, …)
+│   │   └── (shared)             # cloud-agnostic modules (cilium, argocd, policy, crossplane, tenant-claims, observability, …)
 │   ├── tests/                   # Terratest integration tests (Go)
 │   └── root.hcl                 # Root Terragrunt config (S3 state, providers, terraform_binary)
 └── scripts/                     # Helper scripts (eks-tunnel, bootstrap, teardown)
@@ -197,7 +199,8 @@ The full dependency DAG is documented in [CLAUDE.md](CLAUDE.md). The preferred d
 | [secret-stores](infra/modules/secret-stores/) | ClusterSecretStore for AWS Secrets Manager and SSM |
 | [tailscale](infra/modules/tailscale/) | Tailscale Operator, subnet router, split DNS |
 | [tailscale-admin](infra/modules/tailscale-admin/) | Tailnet ACL and OAuth client management |
-| [tenant](infra/modules/tenant/) | Namespace isolation — quotas, limits, NetworkPolicies, Pod Identity (ADR-041) |
+| [crossplane](infra/modules/crossplane/) | Crossplane v2 control plane — hub (ECR provisioning) + per-cluster `Tenant` XRD/Composition; the tenant control plane (ADR-046/048) |
+| [tenant-claims](infra/modules/tenant-claims/) | Renders `XTenant` claims that the Composition reconciles into complete tenants (ADR-046/048) |
 | [vcluster](infra/modules/vcluster/) | vCluster Helm (deferred — ADR-033) |
 
 ### AWS (19)
@@ -281,6 +284,6 @@ scanning (Trivy IaC, Semgrep) — via OIDC federation, no stored credentials.
 | [Observability Current State](docs/architecture/observability-current-state.md) | As-built Prometheus/Grafana/Mimir hub |
 | [Deploy App to Preprod](docs/runbooks/deploy-app-preprod.md) | Developer guide: manifests, ECR, ArgoCD |
 | [App Supply-Chain Onboarding](docs/runbooks/app-supply-chain-onboarding.md) | Wire signing/SBOM/provenance into app CI |
-| [Tenant Onboarding](docs/runbooks/tenant-onboarding.md) | Add/remove teams via `teams.hcl` |
+| [Tenant Onboarding](docs/runbooks/tenant-onboarding.md) | Add/remove teams via a Crossplane `Tenant` claim |
 | [EKS Cluster Access](docs/runbooks/eks-cluster-access.md) | kubectl setup for engineers |
 | [Architecture Decisions](docs/adrs/) | 48 ADRs documenting every significant choice |

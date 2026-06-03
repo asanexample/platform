@@ -23,6 +23,14 @@ The module is **cloud-agnostic and holds no team-specific data** — per-tenant 
 - **Tenant scoping.** Tenant-targeted policies match the `platform.refplat.org/tenant` namespace
   label; infra namespaces are excluded. Cluster-scoped policies (RBAC, default-namespace) skip
   platform controllers via the `exclude_principals` allow-list.
+- **Split with the Crossplane Tenant Composition (BACK stack P3).** For tenants migrated to a `Tenant`
+  claim (passed in `migrated_teams`), this module **skips** the per-team `restrict-images-team-<k>` and
+  `restrict-route-hostnames-team-<k>` policies — the Composition provisions those (so the claim owns the
+  per-tenant guardrails). This module **keeps** owning the platform-wide floor and, for **all** teams
+  (migrated or not), the cosign/SLSA supply-chain policies `verify-images-team-<k>` /
+  `verify-attestations-team-<k>` — signature/attestation trust roots are a platform security control, not a
+  per-tenant knob. `teams.hcl` (which feeds `tenant_registry_map`/`verify_subjects` here) is still the team
+  registry for those.
 
 ## Phase 1 policy set
 
@@ -70,6 +78,7 @@ module "policy" {
     alpha = "829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha"
     bravo = "829808296602.dkr.ecr.us-east-1.amazonaws.com/team-bravo"
   }
+  migrated_teams = ["alpha", "bravo"] # Composition owns their restrict-*; verify-* stays here
 
   helm_chart_version = "3.8.1"
   tags               = { Environment = "preprod", ManagedBy = "terraform" }
@@ -104,6 +113,7 @@ If a policy blocks legitimate admission, patch the generated webhook configurati
 | `compliance_tier` | `standard`/`hipaa`/`pci` | `string` | `"standard"` |
 | `allowed_registries` | Registry prefixes admitted in tenant namespaces | `list(string)` | `[]` |
 | `tenant_registry_map` | tenant key → allowed image prefix | `map(string)` | `{}` |
+| `migrated_teams` | Teams whose per-team `restrict-*` policies the Crossplane Tenant Composition owns (skipped here) | `list(string)` | `[]` |
 | `exclude_namespaces` | Infra namespaces excluded from policies | `list(string)` | (see variables.tf) |
 | `exclude_principals` | Principal wildcards skipped by cluster-scoped policies | `list(string)` | (see variables.tf) |
 | `tenant_namespace_label` | Namespace label marking tenants | `string` | `"platform.refplat.org/tenant"` |

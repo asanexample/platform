@@ -4,7 +4,7 @@
 
 Multi-cloud IaC platform using OpenTofu (v1.11) + Terragrunt (v1.x). Currently targets AWS only (Azure/GCP removed).
 
-- **Shared modules** (`infra/modules/`): argocd, argocd-apps, argocd-clusters, cert-manager, cilium, cloudflare/dns_delegation, cluster-rbac, crossplane, external-dns, external-secrets, gateway-config, policy, secret-stores, tailscale, tailscale-admin, tenant, vcluster
+- **Shared modules** (`infra/modules/`): argocd, argocd-apps, argocd-clusters, cert-manager, cilium, cloudflare/dns_delegation, cluster-rbac, crossplane, external-dns, external-secrets, gateway-config, policy, secret-stores, tailscale, tailscale-admin, tenant-claims, vcluster
 - **AWS modules** (`infra/modules/aws/`): cloudtrail, cross-vpc-dns, ecr, eks, eks-addons, eks-node-group, github_oidc, iam_roles, identity_center, networking, organizations, route53, route53_delegation, ssm-bastion, state_bootstrap, transit-gateway
 - **Live configs**: `infra/live/aws/` -- environment-specific Terragrunt units
 
@@ -161,7 +161,7 @@ The **Test** account (`157263244316`, Terratest sandbox) is a standard `Platform
 |------|---------|---------|
 | **PlatformAdmin** | Platform, PreProd | kubectl operate/debug + SSM tunnel — least-privilege (read+operate, NOT author; cluster authoring via ArgoCD, AWS via PlatformDeployer, emergencies via break-glass — ADR-040) |
 | **PlatformDeployer** | Platform, PreProd | Terragrunt apply, Helm/K8s providers |
-| **DeveloperAccess-\<team\>** | PreProd | Per-team, namespace-scoped kubectl (one role per team, generated from `teams.hcl`; group-mapped RBAC — see ADR-039) |
+| **DeveloperAccess-\<team\>** | PreProd | Per-team, namespace-scoped kubectl (one role per team, provisioned by the Crossplane Tenant Composition + an EKS access entry → `team-<team>:developers`; group-mapped RBAC — see ADR-039) |
 | **TerraformStateAccess** | Management | S3 state bucket + DynamoDB lock table |
 | **OrganizationAccountAccessRole** | All accounts | Break-glass only |
 
@@ -183,9 +183,9 @@ The **Test** account (`157263244316`, Terratest sandbox) is a standard `Platform
 - **Cross-VPC DNS** — two modes via `dns_method`: custom PHZ (cheap, manual IP updates) or Route53 Resolver endpoints (robust, ~$365/mo). EKS-managed PHZs are inaccessible, so we maintain our own.
 - **Tailscale Operator** — subnet router advertising VPC CIDR to tailnet. Split DNS managed by `tailscale` K8s unit. OAuth from Secrets Manager.
 - **Internal Gateway NLB** — `internal` scheme, services only reachable through Tailscale. TLS via Let's Encrypt DNS-01.
-- **Multi-app tenant model** (`teams.hcl`) — team identity (isolation) decoupled from app identity (deployment). ECR: `team-<team>/<app>`. Namespace isolation only; vCluster deferred (ADR-033).
+- **Multi-app tenant model** — team identity (isolation) decoupled from app identity (deployment). ECR: `team-<team>/<app>`. Namespace isolation only; vCluster deferred (ADR-033). Tenants are provisioned by the **Crossplane `Tenant` Composition** via an `XTenant` claim (the `tenant-claims` unit) — the sole provisioner since BACK stack P3 (#174); the old `tenant` module + `tenants`/`pod-identity`/`s3-shared` units are retired. `teams.hcl` now only feeds app delivery (`argocd-apps`) + the platform-owned supply-chain policies (`policy` unit); migrated teams carry `migrated = true`. See `docs/architecture/crossplane-tenant-api.md`.
 - **PR preview environments** — ArgoCD ApplicationSet PR generator. Apps with `preview = true` get ephemeral deployments. Kustomize patches rewrite HTTPRoute hostnames.
-- **Kyverno policy engine** (3.8.1 / app v1.18.1, ADR-014) — `policy` module deploys the HA engine + a bundled local `policies-chart` of ClusterPolicies, layered above the PSA `baseline` floor. Per-tenant image-registry scoping + cross-team IRSA-annotation backstop (tenant AWS access is Pod Identity, ADR-041) + RBAC hardening. **Audit-first** (`validation_failure_action`) then flip to Enforce. No team data in the module (per-tenant map from `teams.hcl` at the unit). Phased rollout (Phases 2–5: mutate/generate, cosign verifyImages, CLI shift-left, reporting/cleanup).
+- **Kyverno policy engine** (3.8.1 / app v1.18.1, ADR-014) — `policy` module deploys the HA engine + a bundled local `policies-chart` of ClusterPolicies, layered above the PSA `baseline` floor. Per-tenant image-registry scoping + cross-team IRSA-annotation backstop (tenant AWS access is Pod Identity, ADR-041) + RBAC hardening. **Audit-first** (`validation_failure_action`) then flip to Enforce. No team data in the module (per-tenant map from `teams.hcl` at the unit). **Supply-chain split (ADR-046)**: per-team `restrict-images`/`restrict-route-hostnames` are owned by the Crossplane Tenant Composition (the unit's `migrated_teams` input makes the `policy` module skip them); the platform-owned cosign/SLSA `verify-images`/`verify-attestations` stay here for all teams. Phased rollout (Phases 2–5: mutate/generate, cosign verifyImages, CLI shift-left, reporting/cleanup).
 
 ## Authoring Policy-Compliant Workloads (Kyverno)
 
@@ -207,10 +207,10 @@ Full per-cluster list: `docs/architecture/kyverno-policy-catalog.md`. When writi
 - **Resource requests AND limits** (cpu + memory) on every container
 - **`livenessProbe` and `readinessProbe`** on every container
 - Services must be **`ClusterIP`** — `LoadBalancer`/`NodePort` are denied (ingress is via the shared Gateway / `HTTPRoute`)
-- **HTTPRoute/GRPCRoute/TLSRoute hostnames** must be in the team's allow-list in `teams.hcl` (`hostnames`) — claiming another team's or a platform hostname (or omitting hostnames) is denied (ADR-029)
+- **HTTPRoute/GRPCRoute/TLSRoute hostnames** must be in the team's allow-list (the `Tenant` claim's `hostnames`) — claiming another team's or a platform hostname (or omitting hostnames) is denied (ADR-029)
 - Workloads only in `team-*` namespaces — **never `default`**
 - **Do not** set `securityContext.allowPrivilegeEscalation: true` or `seccompProfile.type: Unconfined` (backstop policies deny them)
-- Tenant AWS access is via **platform-managed EKS Pod Identity** (association → named ServiceAccount; ADR-041): use a **named** ServiceAccount (never `default`) and set `serviceAccountName`; declare the access in `teams.hcl` (`aws` block). ServiceAccounts must **not** carry an `eks.amazonaws.com/role-arn` annotation — IRSA is platform-only; a tenant annotation is denied (backstop `disallow-irsa-annotation-cross-team`)
+- Tenant AWS access is via **platform-managed EKS Pod Identity** (association → named ServiceAccount; ADR-041/047): use a **named** ServiceAccount (never `default`) and set `serviceAccountName`; declare the access in the `Tenant` claim (`aws.serviceAccount` + `aws.policyStatements`), not `teams.hcl`. ServiceAccounts must **not** carry an `eks.amazonaws.com/role-arn` annotation — IRSA is platform-only; a tenant annotation is denied (backstop `disallow-irsa-annotation-cross-team`)
 - **Images must be cosign-signed** by the app's own GitHub workflow (keyless; Phase 3, preprod). App CI signs after the ECR push (`cosign sign --yes …@<digest>`); Kyverno's `verify-images-team-<team>` admits only images signed by `app-<team>`'s `deploy.yml`/`preview.yml` identity. Unsigned or another team's image is rejected. Full explainer (how keyless signing/Fulcio/Rekor/IRSA fit together): `docs/architecture/cosign-image-signing.md`.
 - **No** `cluster-admin` (Cluster)RoleBindings or wildcard (`*`) verbs/resources in Roles
 

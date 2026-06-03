@@ -4,6 +4,16 @@
 
 **Status:** Accepted (vCluster mode deferred — see ADR-033)
 
+> **Amendment (2026-06-03, #174 / [ADR-046](046-back-stack-for-developer-self-service.md) +
+> [ADR-048](048-federated-per-cluster-crossplane.md)):** The isolation **model** described below — namespace
+> mode, the ResourceQuota/LimitRange/NetworkPolicy/CiliumNetworkPolicy set, PSA `baseline`, and the
+> group-mapped developer RBAC — is **unchanged**. What changed is the **provisioning mechanism**: these
+> resources are now rendered by the **Crossplane `Tenant` Composition** (a `Tenant` claim, kind `XTenant`),
+> reconciled continuously per cluster — **not** by the `infra/modules/tenant` module or the `tenants`
+> Terragrunt unit, both of which are **retired (deleted)**. Read every reference below to "the tenant module"
+> / "the `tenants` unit" as describing the historical mechanism; the Composition now produces the same
+> resources. The content is retained for historical context.
+
 ## Context
 
 The preprod EKS cluster (account <PREPROD_ACCOUNT_ID>) needs multi-tenant isolation for development teams.

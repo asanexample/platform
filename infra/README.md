@@ -1,149 +1,41 @@
-# Multi-Cloud Infrastructure as Code
+# Infrastructure as Code
 
-This repository contains Infrastructure as Code (IaC) for managing resources across multiple cloud providers (AWS, Azure, GCP) using Terraform with Terragrunt.
+This directory contains the Infrastructure as Code (IaC) for the platform, managed with
+**OpenTofu** (v1.11) + **Terragrunt**. The platform is **AWS-only** today — the Azure and
+GCP modules/live trees were removed. The shared Kubernetes modules are written
+cloud-agnostically so a second cloud could be added without restructuring, but only AWS is
+exercised.
 
 ## Repository Structure
 
-```
+```text
 infra/
-├── _envcommon/              # Common configurations for environments
-├── modules/                 # Reusable modules
+├── modules/                 # Reusable OpenTofu modules
 │   ├── aws/                 # AWS-specific modules
-│   ├── azure/               # Azure-specific modules
-│   ├── gcp/                 # GCP-specific modules
-│   └── common/              # Cross-cloud abstraction modules
-└── live/                    # Live infrastructure
-    ├── global/              # Global resources
-    └── aws/azure/gcp        # Per-cloud resources
-        └── env/region/      # Environment & region-specific
+│   ├── cloudflare/          # Cloudflare (DNS delegation)
+│   └── <shared>/            # Cloud-agnostic modules (Cilium, ArgoCD, policy, crossplane, …)
+├── live/aws/                # Environment-specific Terragrunt units (platform, preprod, prod, mgmt)
+├── docs/                    # Infrastructure documentation (see 02-architecture-overview.md)
+└── tests/aws/<module>/      # Terratest (Go) per module
 ```
 
 ## Getting Started
 
-### Prerequisites
+- Prerequisites: OpenTofu >= 1.6 (1.11 local), Terragrunt, AWS CLI.
+- Plan/apply from any live unit directory:
 
-- Terraform >= 1.6.0
-- Terragrunt >= 0.45.0
-- Azure CLI (for Azure resources)
-- AWS CLI (for AWS resources)
-- Google Cloud SDK (for GCP resources)
+  ```bash
+  cd infra/live/aws/platform/us-east-1/platform/<unit>
+  terragrunt plan
+  terragrunt apply
+  ```
 
-### Environment Setup
+- Bootstrap/teardown the whole stack with `platctl bootstrap` / `platctl teardown`.
 
-Set the required environment variables:
+## Documentation
 
-```bash
-# Common
-export TF_VAR_environment="dev"
-export TF_VAR_cost_center="Engineering"
-export TF_VAR_owner="Platform Team"
-
-# Azure
-export TF_VAR_azure_subscription_id="your-subscription-id"
-export TF_VAR_azure_tenant_id="your-tenant-id"
-export TF_VAR_azure_region="eastus"
-
-# AWS (when needed)
-export TF_VAR_aws_region="us-east-1"
-
-# GCP (when needed)
-export TF_VAR_gcp_project_id="your-project-id"
-export TF_VAR_gcp_region="us-east1"
-```
-
-### Deployment
-
-To deploy a specific component:
-
-```bash
-cd infra/live/azure/dev/eastus/networking
-terragrunt plan
-terragrunt apply
-```
-
-To deploy all components in an environment:
-
-```bash
-cd infra/live/azure/dev
-terragrunt run-all plan
-terragrunt run-all apply
-```
-
-## Testing
-
-This repository uses Terraform's native testing framework for validating modules:
-
-```bash
-# Run all tests
-make test
-
-# Test a specific module
-make test-module MODULE=networking
-
-# Test modules in a specific category
-make test-category CATEGORY=storage
-
-# Test modules matching a pattern
-make test-pattern PATTERN=aks
-```
-
-The testing targets in the Makefile run tests for all Azure modules and provide a summary of results. Tests are designed to validate module configurations without creating actual resources.
-
-## Available Modules
-
-The following reusable modules are available:
-
-### Azure Modules
-
-- **Networking**: Virtual network, subnets, NSGs, and related networking resources
-- **Storage Account**: Azure Storage Accounts with configurable settings
-- **Storage Container**: Blob containers with access control and metadata
-- **Key Vault**: Azure Key Vault with RBAC/access policies, network rules, and private endpoints
-- **Hosting**: Combined networking, storage, and key vault setup for complete application hosting
-- **Naming**: Standardized resource naming following Azure best practices
-- **Terraform State**: Backend storage for Terraform state files
-
-## Naming Conventions
-
-Resources follow standardized naming patterns using the Azure naming module. This ensures consistency across all resources and compliance with Azure's naming restrictions.
-
-### General Pattern
-CAF-aligned: `{type}-{workload}-{env}-{region}`
-
-For no-hyphen resources (storage accounts, container registries): `{type}{abbreviated_workload}{env}{region}`
-
-Examples:
-- `rg-platform-dev-eus` (Azure resource group)
-- `vnet-platform-prod-wus` (Azure virtual network)
-- `stplatdeveus` (Storage account, no hyphens, abbreviated workload)
-
-See the [NAMING_CONVENTIONS.md](docs/NAMING_CONVENTIONS.md) document for detailed naming rules and patterns.
-
-### Using the Naming Module
-
-All infrastructure modules now use the naming module internally, which enforces standardized naming:
-
-```hcl
-module "naming" {
-  source = "../../modules/azure/naming"
-  
-  workload    = "platform"
-  environment = "dev"
-  region_abbv = "eus"
-}
-```
-
-## Tagging Strategy
-
-All resources are tagged with:
-- Environment
-- ManagedBy
-- Project
-- CostCenter
-- Owner
-
-Environment-specific resources may have additional tags.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details. 
+The full configuration hierarchy, deployment ordering, IAM roles, architecture decisions,
+and key commands live in the repo-root [`CLAUDE.md`](../CLAUDE.md) and under
+[`infra/docs/`](docs/) (start with
+[02-architecture-overview.md](docs/02-architecture-overview.md) and
+[17-available-modules.md](docs/17-available-modules.md)).

@@ -55,7 +55,8 @@ Deployed via Helm / the Kubernetes provider onto any cluster; reusable across cl
 | `gateway-config` | Cilium Gateway API: Gateway, HTTPRoutes, ClusterIssuer (internal/public NLB) (ADR-017/029) |
 | `tailscale` / `tailscale-admin` | Tailscale subnet-router operator + tailnet ACL/OAuth management (ADR-011) |
 | `policy` | Kyverno engine + bundled ClusterPolicies (validate/mutate + cosign verify) (ADR-014) — see below |
-| `tenant` | Per-team namespace, ResourceQuota, LimitRange, NetworkPolicies, RBAC (ADR-027) |
+| `crossplane` | Crossplane v2 control plane — hub ECR provisioning + per-cluster `Tenant` XRD/Composition (ADR-046/048) |
+| `tenant-claims` | Helm chart rendering `XTenant` claims, delivered by the `tenant-claims` unit (ADR-046/048) |
 | `cluster-rbac` | `platform-operator` ClusterRole for the operate-not-author access model (ADR-040) |
 | `observability` | kube-prometheus-stack hub: Prometheus + Grafana + Alertmanager (ADR-043) |
 | `observability-mimir` | Grafana Mimir — durable, S3-backed, multi-tenant metrics store (ADR-044) |
@@ -116,7 +117,7 @@ intended contract a second cloud would satisfy.
 | VPC/VNet + subnets + routing + NAT | Implemented | Planned (same output contract) |
 | Kubernetes networking | Implemented (EKS) | Planned (AKS / GKE) |
 | Cross-cloud interface outputs + `create` toggle | Implemented | Planned |
-| Cilium, ArgoCD, cert-manager, External Secrets, Kyverno, observability, tenant | Implemented (shared) | Reused as-is when the cloud lands |
+| Cilium, ArgoCD, cert-manager, External Secrets, Kyverno, observability, Crossplane | Implemented (shared) | Reused as-is when the cloud lands |
 
 ## Module Usage Guidelines
 

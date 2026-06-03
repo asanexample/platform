@@ -4,6 +4,14 @@
 
 **Status:** Accepted — narrows [ADR-018](018-irsa-for-pod-identity.md) for tenant workloads. Broadened by [ADR-047](047-pod-identity-as-aws-identity-standard.md) into the standard for **all** pod-level AWS access (platform components included); the tenant isolation rationale below is unchanged.
 
+> **Amendment (2026-06-03, #174 / [ADR-046](046-back-stack-for-developer-self-service.md)):** The shipped
+> pattern is a **generic `aws.policyStatements`** block on the `Pod-team-<team>` role — declared in the
+> `XTenant` claim and rendered by the Crossplane Tenant Composition (which also creates the role and its EKS
+> Pod Identity association). The `teams.hcl` `aws.s3` **bucket demo shown below is illustrative only** and is
+> **not provisioned** — the platform `s3-shared` unit and the per-team buckets were dropped; tenant AWS access
+> is granted by the policy statements a team declares, not a fixed S3 shape. Pod Identity is now the platform
+> **standard** for all pod-level AWS access ([ADR-047](047-pod-identity-as-aws-identity-standard.md)).
+
 ## Context
 
 [ADR-018](018-irsa-for-pod-identity.md) chose **IRSA** for pod-level AWS access on EKS and explicitly
