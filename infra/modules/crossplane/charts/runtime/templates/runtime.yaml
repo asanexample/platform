@@ -46,6 +46,12 @@ spec:
   package: {{ $p.package }}
   runtimeConfigRef:
     name: {{ $p.name }}-runtime
+{{- if $p.skipDependencyResolution }}
+  # Installing multiple same-family providers (provider-aws-*) makes them contend on the single Lock while
+  # each resolves the shared provider-family-aws dependency, and only one wins (crossplane-contrib
+  # provider-aws#1749). The family is installed explicitly above, so each member skips resolution.
+  skipDependencyResolution: true
+{{- end }}
 {{- end }}
 {{- range $f := .Values.functions }}
 ---

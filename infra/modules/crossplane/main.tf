@@ -12,19 +12,34 @@ locals {
 
   # AWS family providers share one SA (so a single Pod Identity association credentials them) and serve on
   # hostNetwork (their CRDs are multi-version → the EKS control plane must reach the conversion webhook).
-  aws_providers = [for svc in var.provider_services : {
-    name           = "provider-aws-${svc}"
-    package        = "${var.provider_registry}/provider-aws-${svc}:${var.provider_version}"
-    serviceAccount = var.provider_service_account
-    hostNetwork    = true
-  }]
+  # The family provider is installed EXPLICITLY (first) and every member sets skipDependencyResolution, so
+  # the members don't contend on the Lock resolving the shared family dependency (only one wins otherwise —
+  # crossplane-contrib/provider-aws#1749). The family has single-version CRDs → no hostNetwork.
+  aws_providers = local.enable_aws ? concat(
+    [{
+      name                     = "provider-family-aws"
+      package                  = "${var.provider_registry}/provider-family-aws:${var.provider_version}"
+      serviceAccount           = var.provider_service_account
+      hostNetwork              = false
+      skipDependencyResolution = true
+    }],
+    [for svc in var.provider_services : {
+      name                     = "provider-aws-${svc}"
+      package                  = "${var.provider_registry}/provider-aws-${svc}:${var.provider_version}"
+      serviceAccount           = var.provider_service_account
+      hostNetwork              = true
+      skipDependencyResolution = true
+    }]
+  ) : []
 
-  # provider-kubernetes runs in-cluster (InjectedIdentity); its own SA carries a scoped ClusterRole.
+  # provider-kubernetes runs in-cluster (InjectedIdentity); its own SA carries a scoped ClusterRole. It has
+  # no package dependencies; skipDependencyResolution avoids any Lock contention with the aws providers.
   k8s_provider = var.enable_kubernetes_provider ? [{
-    name           = "provider-kubernetes"
-    package        = var.kubernetes_provider_package
-    serviceAccount = "provider-kubernetes"
-    hostNetwork    = var.kubernetes_provider_hostnetwork
+    name                     = "provider-kubernetes"
+    package                  = var.kubernetes_provider_package
+    serviceAccount           = "provider-kubernetes"
+    hostNetwork              = var.kubernetes_provider_hostnetwork
+    skipDependencyResolution = true
   }] : []
 
   # k8s_provider FIRST so provider-kubernetes keeps list index 0 (and thus its port assignment) stable across
