@@ -109,10 +109,16 @@ inputs = {
   # Preprod VPC CIDR — advertised to tailnet so VPN clients can reach private resources
   advertise_routes = ["10.101.0.0/16"]
 
-  # Route DNS queries for these domains through VPC DNS resolver (AmazonProvidedDNS at VPC CIDR + 2)
+  # Route DNS queries for these domains through VPC DNS resolver (AmazonProvidedDNS at VPC CIDR + 2).
+  #
+  # NB: `us-east-1.eks.amazonaws.com` is SHARED by both clusters' EKS endpoints, and `tailscale_dns_split_nameservers`
+  # is tailnet-global keyed by domain — so platform + preprod were both writing this key (10.100.0.2 vs 10.101.0.2)
+  # and last-writer-wins silently broke whichever lost. Point it at the PLATFORM resolver (10.100.0.2), which
+  # resolves BOTH clusters' endpoints (platform directly + preprod via cross-vpc-dns), so the two units now agree
+  # on a single correct value regardless of apply order. preprod-only hostnames keep the preprod resolver. (#206)
   split_dns = {
-    "us-east-1.eks.amazonaws.com" = ["10.101.0.2"] # Resolves private EKS API endpoints
-    "preprod.aws.refplat.org"     = ["10.101.0.2"] # Resolves preprod service hostnames
+    "us-east-1.eks.amazonaws.com" = ["10.100.0.2"] # Shared EKS domain — platform resolver resolves both clusters
+    "preprod.aws.refplat.org"     = ["10.101.0.2"] # Preprod-only service hostnames
   }
 
   helm_chart_version = include.base.locals.helm_versions.tailscale_operator
