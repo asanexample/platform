@@ -63,10 +63,20 @@ echo "Instance: $INSTANCE_ID"
 echo "Tunnel:   localhost:$LOCAL_PORT -> $EKS_HOST:443"
 echo ""
 echo "kubeconfig updated — kubectl is ready to use in another terminal."
-echo "Press Ctrl+C to close the tunnel."
+echo "Tunnel auto-reconnects on SSM idle-timeout/disconnect. Press Ctrl+C to stop."
 
-aws ssm start-session \
-  --region "$REGION" \
-  --target "$INSTANCE_ID" \
-  --document-name AWS-StartPortForwardingSessionToRemoteHost \
-  --parameters "{\"host\":[\"$EKS_HOST\"],\"portNumber\":[\"443\"],\"localPortNumber\":[\"$LOCAL_PORT\"]}"
+# SSM port-forwarding sessions die after the Session Manager idle timeout (~20m of no traffic) or on any
+# network blip. A single start-session would then leave kubectl hanging until you re-run this. Loop it so
+# the tunnel self-heals: when the session ends, reconnect within ~2s (localhost:$LOCAL_PORT has only a brief
+# gap; kubectl retries succeed). Ctrl+C (SIGINT) breaks the loop and closes the tunnel cleanly.
+trap 'echo; echo "Tunnel closed."; exit 0' INT TERM
+while true; do
+  aws ssm start-session \
+    --region "$REGION" \
+    --target "$INSTANCE_ID" \
+    --document-name AWS-StartPortForwardingSessionToRemoteHost \
+    --parameters "{\"host\":[\"$EKS_HOST\"],\"portNumber\":[\"443\"],\"localPortNumber\":[\"$LOCAL_PORT\"]}" \
+    || true
+  echo "$(date '+%H:%M:%S') tunnel dropped (idle timeout or disconnect) — reconnecting…"
+  sleep 2
+done
