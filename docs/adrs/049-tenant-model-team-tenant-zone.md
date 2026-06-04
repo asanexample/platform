@@ -13,6 +13,14 @@ into [ADR-027](027-hybrid-tenant-isolation-model.md) (hybrid isolation) and
 unchanged. The isolation *primitives* of ADR-027 (namespace mode, NetworkPolicies, RBAC, quotas) are
 unchanged; what changes is how tenancy is **modelled** above them.
 
+> **This model is the schema that [ADR-053](053-identity-and-cross-system-authorization-strategy.md) consumes.**
+> ADR-053's "access model as code" generates every system's RBAC from the **Team envelope** defined here, and
+> Keycloak's group/role taxonomy mirrors this Team model. The two ADRs are co-dependent and both land with the
+> rebuild, so **finalizing this schema is the first implementation step** — the identity/authz plumbing reads
+> from it. That finalized schema (all four objects) is [tenant-api-v2.md](../architecture/tenant-api-v2.md). Note the two distinct authorization planes that both derive from this model: the **envelope**
+> (`tier ∈ allowedTiers`, quota, allowed envs/locations) is enforced at *admission* by Kyverno on the `Tenant`
+> CR; the **developer-access posture** (`environment × tier`, below) is *user RBAC*, propagated by ADR-053.
+
 ## Context
 
 The current model is `team == tenant == namespace`: the `team` key on a `Tenant` claim *is* the tenant, 1:1:1
@@ -66,8 +74,10 @@ A Tenant declares **intent + constraints**; a **placement** step resolves them t
 axes are independent:
 
 1. **Hardening** (`tier`: `standard` / `pci` / `hipaa` / …) — *how locked down*. The tier is a **reference to
-   a platform-defined profile**, not a set of primitives; the profile decides the isolation strength and
-   policy set (developers pick the level, the platform decides what the level means).
+   a platform-defined profile**, not a set of primitives; the profile bundles three platform-decided postures
+   — **isolation** strength + policy set, **recovery** (RPO/RTO/retention), and **availability** (AZ spread/SLO)
+   — all keyed off the one `tier` (developers pick the level, the platform decides what the level means; see
+   [tenant-api-v2.md](../architecture/tenant-api-v2.md#tier-profiles--isolation--recovery--availability)).
 2. **Tenancy** (`pooled` / `dedicated(customer)`) — *shared with peers, or a private home for one customer*.
 3. **Location** (`residency`) — *which `(cloud, region)` it may sit in*. "Region" generalizes to
    `(cloud, region)` = a **location**, so **data residency and multi-cloud are the same mechanism**: a tenant
@@ -109,7 +119,8 @@ thin new layer that routes a Tenant claim to the right cluster's control plane.
 
 The claim is **pure intent + constraints** — it never names a cloud, region, account, cluster, or namespace
 (those are derived by placement, written back to `status`). Illustrative shape (v2 API,
-`platform.refplat.org/v1alpha2`):
+`platform.refplat.org/v1alpha2`); the **finalized, normative schema for all four objects** lives in
+[tenant-api-v2.md](../architecture/tenant-api-v2.md):
 
 ```yaml
 kind: Tenant
@@ -231,5 +242,16 @@ is operate/debug, never authoring:
 - Until the rebuild, the **interim** model stands: `team == tenant`, `teams.hcl` for delivery + supply-chain,
   the `tenant-claims` Terragrunt unit for delivery, and the manual Identity Center steps
   (see [tenant-onboarding](../runbooks/tenant-onboarding.md)).
-- Open, explicitly deferred: the **dedicated-zone vending mechanism** (behind a cloud-neutral interface) and
-  the **aggregate-quota controller** (report-first).
+- Open, explicitly deferred — **reserved in the v2 schema** ([tenant-api-v2.md](../architecture/tenant-api-v2.md#reserved-dimensions-modeled-now-realized-post-rebuild)),
+  realized post-rebuild so the API needn't break to gain them: the **dedicated-zone vending mechanism** (behind
+  a cloud-neutral interface), the **aggregate-quota controller** (report-first), the **data-services paved
+  road** (+ its data-residency attestation), per-tier **recovery/availability** realization (a backup/DR
+  system — [ADR-054](054-platform-resilience-and-business-continuity.md)), **encryption key custody**
+  (BYOK/HYOK), and tenant/customer **lifecycle-exit** (certified destruction, retention holds). **Consumption
+  guarantees** (QoS/priority — `quota` is a cap, not a reservation) are a named, conscious omission.
+- Related platform-capability ADRs that surround this model:
+  [ADR-054](054-platform-resilience-and-business-continuity.md) (resilience/DR — realizes the tier recovery +
+  availability postures), [ADR-055](055-compliance-assurance-and-continuous-control-evidence.md) (compliance
+  *assurance* over the tier controls), [ADR-056](056-progressive-delivery-and-safe-rollback.md) (safe prod
+  rollout, gated by the tier SLO), and [ADR-057](057-service-identity-and-east-west-zero-trust.md) (east-west
+  mTLS — refines the tier's network posture).
