@@ -269,3 +269,33 @@ dig +short A sso.aws.refplat.org @"$(dig +short NS aws.refplat.org | head -1)"
 - **NLB hairpin (if DNS resolves but the backend still can't reach Dex):** the backstage pod reaches Dex by
   hairpinning out to the internal NLB and back in. If the token/discovery call hangs or resets only from in-cluster,
   suspect NLB loopback; the gateway NLB should use `target-type: ip` (Cilium gateway pods) which generally avoids it.
+
+### Logged out on every page refresh (no session persistence) — KNOWN LIMITATION
+
+**Symptom:** after signing in, every page reload bounces back to the sign-in screen.
+
+**Cause (architectural, not a misconfig):** the upstream IdP is Identity Center via Dex's **SAML** connector.
+The SAML 2.0 protocol has no non-interactive re-query, so **Dex ignores `offline_access` and never issues a
+refresh token** (<https://dexidp.io/docs/connectors/saml/>). Backstage keeps its session in memory and restores
+it on reload via a silent `GET /api/auth/<provider>/refresh`, which exchanges a refresh-token cookie — and that
+cookie is only set when the IdP returned a refresh token. With SAML there is none, so `/refresh` **always 401s**
+and the session cannot survive a reload. This is a known Backstage gap for refresh-less providers
+([backstage#15999](https://github.com/backstage/backstage/issues/15999), [#5109](https://github.com/backstage/backstage/issues/5109)).
+
+**What does NOT fix it (verified empirically — don't re-try):**
+
+- `offline_access` on the frontend `defaultScopes` or the backend `additionalScopes` — Dex/SAML ignores it.
+- `sessionDuration` — only sets the cookie max-age; the cookie is still gated on a refresh token.
+- The `SignInPage` `auto` prop — re-auth succeeds, but the next background `/refresh` 401 discards the session,
+  so it re-fires → **infinite re-auth loop** (observed: `start`→`handler/frame 200`→`refresh 401`… every ~10s).
+- The experimental redirect flow (`enableExperimentalRedirectFlow`) — same `/refresh` dependency → loops.
+
+**The fix (follow-up, not yet implemented):** front Backstage with an **auth proxy** (oauth2-proxy) that does
+the Dex OIDC flow once and holds its **own** durable session cookie (independent of upstream refresh tokens),
+injecting `X-Auth-Request-*` identity headers. Backstage then uses `ProxiedSignInPage` + the `oauth2Proxy`
+backend provider, so its `/refresh` reads the always-present headers and succeeds on every reload. Scope: a Dex
+static client for the proxy, an oauth2-proxy deployment in the `backstage` namespace, repointing the
+`backstage.aws.refplat.org` HTTPRoute at the proxy, and the Backstage frontend/back-end provider swap.
+
+Until then the portal is **click-to-sign-in**: usable, but each reload requires clicking "Sign In" (the popup
+completes without re-entering credentials while the Identity Center session is alive).
