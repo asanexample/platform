@@ -1,0 +1,22 @@
+# team-alpha, translated from the live v1alpha1 claim (gitops/tenant-claims/preprod/alpha.yaml) to v1alpha2.
+# The v1 `team: alpha` + app `demo` becomes Team alpha → Tenant "demo" (preprod); per-app identity moves onto
+# the app entry. Used to prove the v2 schema accepts today's real tenants.
+apiVersion: platform.refplat.org/v1alpha2
+kind: XTenant
+metadata:
+  name: alpha-demo-preprod
+spec:
+  team: alpha
+  name: demo
+  environment: preprod
+  tier: standard
+  hostnames:
+    - demo.preprod.aws.refplat.org
+  apps:
+    demo:
+      repo: github.com/asanexample/app-alpha
+      repoPath: k8s/preprod
+      preview: true
+      serviceAccount: app-alpha
+  developerAccess:
+    enabled: true

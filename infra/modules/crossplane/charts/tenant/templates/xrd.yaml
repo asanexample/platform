@@ -13,6 +13,8 @@ spec:
     kind: XTenant
     plural: xtenants
   versions:
+    # v1alpha1 stays the referenceable / storage version until the rebuild cutover (delivery plan A6); the
+    # live Composition binds to it. v1alpha2 below is served-only for now.
     - name: v1alpha1
       served: true
       referenceable: true
@@ -125,3 +127,235 @@ spec:
                 namespace:
                   type: string
                   description: The provisioned tenant namespace.
+    # ---------------------------------------------------------------------------
+    # v1alpha2 — the target Tenant API (ADR-049, docs/architecture/tenant-api-v2.md).
+    # Served alongside v1alpha1; NOT yet referenceable (the v2 Composition + storage flip land at the rebuild
+    # cutover, delivery plan A6). Structural + self-contained validation only — cross-object envelope checks
+    # (tier ∈ Team.allowedTiers, quota ≤ Team.quotaCap, residency ⊆ Team.allowedLocations) are enforced by
+    # Kyverno against the projected Team CR (plan A2), not here.
+    # ---------------------------------------------------------------------------
+    - name: v1alpha2
+      served: true
+      referenceable: false
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - team
+                - name
+                - environment
+              properties:
+                team:
+                  type: string
+                  description: Owning Team key → envelope + SSO group. Must reference an existing Team.
+                name:
+                  type: string
+                  description: Tenant name within the Team (e.g. payments-api). Namespace is "<team>-<name>".
+                environment:
+                  type: string
+                  enum: ["preprod", "prod"]
+                  description: Tenants are realized per environment.
+                tier:
+                  type: string
+                  enum: ["standard", "elevated", "pci", "hipaa"]
+                  default: standard
+                  description: Reference to a platform hardening profile (isolation + recovery + availability).
+                tenancy:
+                  type: object
+                  description: pooled (default) or a dedicated home for one customer.
+                  default: { mode: pooled }
+                  properties:
+                    mode:
+                      type: string
+                      enum: ["pooled", "dedicated"]
+                      default: pooled
+                    customer:
+                      type: string
+                      description: Required when mode is dedicated (→ a Customer).
+                  x-kubernetes-validations:
+                    - rule: "self.mode != 'dedicated' || has(self.customer)"
+                      message: "tenancy.customer is required when tenancy.mode is 'dedicated'"
+                residency:
+                  type: object
+                  description: HARD, attested placement constraint.
+                  default: { allowedLocations: ["*"] }
+                  properties:
+                    allowedLocations:
+                      type: array
+                      description: Jurisdiction ("eu") or exact "cloud:region"; must be ⊆ Team.allowedLocations (Kyverno).
+                      items:
+                        type: string
+                      default: ["*"]
+                quota:
+                  type: object
+                  description: Per-tenant request; validated ≤ Team.quotaCap by Kyverno.
+                  default: {}
+                  properties:
+                    cpu:
+                      type: string
+                      default: "4"
+                    memory:
+                      type: string
+                      default: "8Gi"
+                    pods:
+                      type: integer
+                      default: 20
+                    services:
+                      type: integer
+                      default: 20
+                    loadbalancers:
+                      type: integer
+                      default: 0
+                    pvcs:
+                      type: integer
+                      default: 10
+                    storage:
+                      type: string
+                      default: "50Gi"
+                hostnames:
+                  type: array
+                  description: Gateway-API route hostnames this Tenant may claim (ADR-029).
+                  items:
+                    type: string
+                  default: []
+                apps:
+                  type: object
+                  description: Per-app delivery + identity + permissions, unified.
+                  default: {}
+                  additionalProperties:
+                    type: object
+                    required:
+                      - repo
+                    properties:
+                      repo:
+                        type: string
+                        description: Git repo with the app's K8s manifests (ArgoCD source + ECR repo team-<team>/<app>).
+                      repoPath:
+                        type: string
+                        description: Manifest dir; defaults to k8s/<environment>, derived by placement when omitted.
+                      preview:
+                        type: boolean
+                        default: false
+                      serviceAccount:
+                        type: string
+                        description: Named SA the app runs as; a cloud-neutral identity is minted + bound. No IRSA annotation.
+                      permissions:
+                        type: object
+                        description: Cloud-KEYED grants attached to serviceAccount (the identity binding stays neutral).
+                        properties:
+                          aws:
+                            type: object
+                            properties:
+                              policyStatements:
+                                type: array
+                                description: IAM statements for the app's role, capped by the deny-escalation boundary.
+                                default: []
+                                items:
+                                  type: object
+                                  required:
+                                    - actions
+                                    - resources
+                                  properties:
+                                    sid:
+                                      type: string
+                                    effect:
+                                      type: string
+                                      enum: ["Allow", "Deny"]
+                                      default: Allow
+                                    actions:
+                                      type: array
+                                      items:
+                                        type: string
+                                    resources:
+                                      type: array
+                                      items:
+                                        type: string
+                developerAccess:
+                  type: object
+                  description: Names WHO (the posture is derived from environment × tier, ADR-040).
+                  default: { enabled: true }
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: true
+                    group:
+                      type: string
+                      description: Override the Team developerGroup — REQUIRED for regulated prod (enforced by Kyverno).
+                encryption:
+                  type: object
+                  description: "Reserved (deferred): key custody (BYOK/HYOK). Inert until the KMS paved-road ships."
+                  properties:
+                    keyCustody:
+                      type: string
+                      enum: ["platform-managed", "customer-managed", "customer-hosted"]
+                      default: platform-managed
+                lifecycle:
+                  type: object
+                  description: Tenant lifecycle; the exit counterpart to onboarding.
+                  default: { phase: active }
+                  properties:
+                    phase:
+                      type: string
+                      enum: ["active", "suspended", "decommissioning"]
+                      default: active
+                      description: decommissioning triggers ordered teardown → destruction/retention → exit attestation.
+                dataServices:
+                  type: object
+                  description: "Reserved (deferred): cloud-neutral stateful deps; inherits residency + tier recovery. Inert until the data paved-road (#106/#107)."
+                  default: {}
+                  additionalProperties:
+                    type: object
+                    required:
+                      - kind
+                    properties:
+                      kind:
+                        type: string
+                        enum: ["relational", "cache", "objectstore", "stream"]
+                        description: Cloud-neutral category (never a product).
+                      engine:
+                        type: string
+                        description: Interface hint (postgres/mysql/redis/kafka) — the API, not the implementation.
+                      class:
+                        type: string
+                        description: Platform-defined size/durability class.
+                      serviceAccount:
+                        type: string
+                      backup:
+                        type: object
+                        description: Optional override that may only STRENGTHEN the tier recovery default.
+                        properties:
+                          retention:
+                            type: string
+                          rpo:
+                            type: string
+            status:
+              type: object
+              properties:
+                placement:
+                  type: object
+                  description: Concrete coordinates resolved by placement (never authored).
+                  properties:
+                    cloud:
+                      type: string
+                    region:
+                      type: string
+                    account:
+                      type: string
+                    cluster:
+                      type: string
+                    zone:
+                      type: string
+                    namespace:
+                      type: string
+                lifecycle:
+                  type: object
+                  properties:
+                    phase:
+                      type: string
+                    retentionUntil:
+                      type: string
+                    exitAttestation:
+                      type: string

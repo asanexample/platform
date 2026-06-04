@@ -1,0 +1,20 @@
+# team-bravo, translated from the live v1alpha1 claim (gitops/tenant-claims/preprod/bravo.yaml) to v1alpha2.
+apiVersion: platform.refplat.org/v1alpha2
+kind: XTenant
+metadata:
+  name: bravo-demo-preprod
+spec:
+  team: bravo
+  name: demo
+  environment: preprod
+  tier: standard
+  hostnames:
+    - demo-bravo.preprod.aws.refplat.org
+  apps:
+    demo:
+      repo: github.com/asanexample/app-bravo
+      repoPath: k8s/preprod
+      preview: false
+      serviceAccount: app-bravo
+  developerAccess:
+    enabled: true
