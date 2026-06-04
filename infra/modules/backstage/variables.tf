@@ -181,3 +181,37 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# ---------------------------------------------------------------------------
+# Kubernetes plugin (Phase 2.4a) — read-only live cluster view
+# ---------------------------------------------------------------------------
+
+variable "enable_kubernetes_plugin" {
+  description = "Enable the Backstage Kubernetes plugin: create the EKS Pod Identity reader role + this-cluster access entry and inject the kubernetes app-config layer."
+  type        = bool
+  default     = false
+}
+
+variable "cluster_name" {
+  description = "This (platform) EKS cluster name — for the Pod Identity association and the cluster-View access entry."
+  type        = string
+  default     = ""
+}
+
+variable "remote_cluster_role_arns" {
+  description = "Cross-account read-only Backstage role ARNs the reader role may assume (e.g. the preprod Backstage role) for the Kubernetes plugin."
+  type        = list(string)
+  default     = []
+}
+
+variable "kubernetes_clusters" {
+  description = "Clusters surfaced by the Kubernetes plugin (rendered into the kubernetes app-config). authProvider is always aws; set assume_role for cross-account clusters."
+  type = list(object({
+    name        = string
+    url         = string
+    ca_data     = string
+    region      = optional(string, "us-east-1")
+    assume_role = optional(string)
+  }))
+  default = []
+}

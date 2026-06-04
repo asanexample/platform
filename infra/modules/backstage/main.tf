@@ -51,7 +51,32 @@ locals {
   # placeholders) + the type-scoped catalog.rules (Phase 2.2 consolidation, asanexample/backstage#3), so the only
   # remaining chart appConfig layer is the OIDC session secret. The App's appId/privateKey are still injected
   # from the secret via github_env.
-  extra_app_config = local.oidc_app_config
+  enable_k8s = var.create && var.enable_kubernetes_plugin
+
+  # Kubernetes plugin (Phase 2.4a): live cluster view. Injected as an appConfig layer (env-specific cluster
+  # endpoints/CA/assume-role belong in the unit, not the image). authProvider=aws uses the pod's EKS Pod
+  # Identity creds for THIS cluster; cross-account clusters set assumeRole (the read-only preprod Backstage role).
+  kubernetes_app_config = local.enable_k8s ? {
+    kubernetes = {
+      serviceLocatorMethod = { type = "multiTenant" }
+      clusterLocatorMethods = [{
+        type = "config"
+        clusters = [for c in var.kubernetes_clusters : merge({
+          name         = c.name
+          url          = c.url
+          authProvider = "aws"
+          caData       = c.ca_data
+          region       = c.region
+          # AmazonEKSViewPolicy doesn't grant the aggregated metrics.k8s.io API, so the optional pod-metrics
+          # lookup 403s and shows a spurious "problem retrieving objects" warning. Skip it (workloads/health
+          # still render). Grant metrics RBAC + flip this off later if CPU/memory usage is wanted.
+          skipMetricsLookup = true
+        }, try(c.assume_role, null) != null && try(c.assume_role, "") != "" ? { assumeRole = c.assume_role } : {})]
+      }]
+    }
+  } : {}
+
+  extra_app_config = merge(local.oidc_app_config, local.kubernetes_app_config)
 
   backstage_values = {
     # We bring our own Postgres (CNPG or RDS) — never the chart's bundled bitnami Postgres.
@@ -67,8 +92,8 @@ locals {
     serviceAccount = {
       create = true
       name   = "backstage"
-      # No IRSA annotation: 2.0 needs no AWS access (guest auth, DB only). Pod Identity for the
-      # Identity Store / catalog projection is added in 2.1/2.3.
+      # No IRSA annotation, ever: AWS access (the 2.4a Kubernetes-plugin reader role) is granted via EKS
+      # Pod Identity association (below), not an SA annotation — the platform standard (ADR-047).
     }
 
     # The chart's NetworkPolicy restricts ingress to the backstage pod (egress stays open for now —
@@ -266,6 +291,81 @@ resource "kubernetes_secret_v1" "session" {
 }
 
 # ---------------------------------------------------------------------------
+# Kubernetes plugin AWS access (Phase 2.4a) — read-only, EKS Pod Identity.
+# The `backstage` ServiceAccount is bound (Pod Identity, no SA annotation — ADR-047) to a reader role with
+# cluster-View access on THIS (platform) cluster, plus permission to assume the cross-account read-only
+# Backstage role(s) on the workload cluster(s). All read-only: AmazonEKSViewPolicy excludes Secrets.
+# The role uses a name_prefix so the workload-account Backstage role can trust it via an ArnLike pattern.
+# ---------------------------------------------------------------------------
+
+data "aws_iam_policy_document" "k8s_reader_trust" {
+  count = local.enable_k8s ? 1 : 0
+
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole", "sts:TagSession"]
+    principals {
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "k8s_reader" {
+  count = local.enable_k8s ? 1 : 0
+
+  name_prefix        = "${var.cluster_name}-backstage-"
+  assume_role_policy = data.aws_iam_policy_document.k8s_reader_trust[0].json
+  tags               = var.tags
+}
+
+# Allow assuming the cross-account read-only Backstage role(s) on the workload cluster(s).
+resource "aws_iam_role_policy" "k8s_reader_remote" {
+  count = local.enable_k8s && length(var.remote_cluster_role_arns) > 0 ? 1 : 0
+
+  name = "remote-cluster-read"
+  role = aws_iam_role.k8s_reader[0].id
+
+  # sts:TagSession as well as sts:AssumeRole — the Backstage k8s AWS auth assumes the cross-account role
+  # with a tagged session (the target role's trust must also allow TagSession).
+  policy = jsonencode({
+    Version   = "2012-10-17"
+    Statement = [{ Effect = "Allow", Action = ["sts:AssumeRole", "sts:TagSession"], Resource = var.remote_cluster_role_arns }]
+  })
+}
+
+resource "aws_eks_pod_identity_association" "k8s_reader" {
+  count = local.enable_k8s ? 1 : 0
+
+  cluster_name    = var.cluster_name
+  namespace       = var.namespace
+  service_account = "backstage"
+  role_arn        = aws_iam_role.k8s_reader[0].arn
+  tags            = var.tags
+}
+
+# Read-only access on the platform cluster itself (the workload clusters grant their own access entries).
+resource "aws_eks_access_entry" "k8s_reader" {
+  count = local.enable_k8s ? 1 : 0
+
+  cluster_name  = var.cluster_name
+  principal_arn = aws_iam_role.k8s_reader[0].arn
+  type          = "STANDARD"
+}
+
+resource "aws_eks_access_policy_association" "k8s_reader" {
+  count = local.enable_k8s ? 1 : 0
+
+  cluster_name  = var.cluster_name
+  principal_arn = aws_iam_role.k8s_reader[0].arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
+
+  access_scope { type = "cluster" }
+
+  depends_on = [aws_eks_access_entry.k8s_reader]
+}
+
+# ---------------------------------------------------------------------------
 # Backstage (official chart, our image)
 # ---------------------------------------------------------------------------
 
@@ -291,5 +391,7 @@ resource "helm_release" "backstage" {
     kubernetes_manifest.oidc_external_secret,
     kubernetes_secret_v1.session,
     kubernetes_manifest.github_app_external_secret,
+    # Pod Identity must exist before the pod starts, or it gets no AWS creds until a restart.
+    aws_eks_pod_identity_association.k8s_reader,
   ]
 }
