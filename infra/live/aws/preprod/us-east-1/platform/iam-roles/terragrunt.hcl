@@ -154,6 +154,10 @@ inputs = {
     Backstage = {
       description = "Cross-account read-only cluster access for the Backstage portal (platform hub)"
 
+      # Backstage's k8s AWS auth assumes this role with a tagged session, so the trust must allow TagSession
+      # in addition to AssumeRole (the reader role's identity policy grants the matching permissions).
+      trust_actions = ["sts:AssumeRole", "sts:TagSession"]
+
       trust_principals = {
         aws = ["arn:aws:iam::${include.base.locals.account_ids["platform"]}:root"] # Platform account
       }

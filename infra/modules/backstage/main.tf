@@ -322,9 +322,11 @@ resource "aws_iam_role_policy" "k8s_reader_remote" {
   name = "remote-cluster-read"
   role = aws_iam_role.k8s_reader[0].id
 
+  # sts:TagSession as well as sts:AssumeRole — the Backstage k8s AWS auth assumes the cross-account role
+  # with a tagged session (the target role's trust must also allow TagSession).
   policy = jsonencode({
     Version   = "2012-10-17"
-    Statement = [{ Effect = "Allow", Action = "sts:AssumeRole", Resource = var.remote_cluster_role_arns }]
+    Statement = [{ Effect = "Allow", Action = ["sts:AssumeRole", "sts:TagSession"], Resource = var.remote_cluster_role_arns }]
   })
 }
 
