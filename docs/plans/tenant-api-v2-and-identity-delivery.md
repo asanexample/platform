@@ -22,6 +22,13 @@ Every item below is tagged:
 
 The discipline: get every 🟢 to apply-ready and render-clean, *then* do the 🔴 cutover in one pass.
 
+> **Data posture.** Losing data during the rebuild is **expected and fine** — it's a deliberate
+> destroy-and-recreate. The rebuild is **not** treated as lossy and is **not** gated on backups. The single
+> success criterion is **full reconstructability from code**: `platctl bootstrap` / `terragrunt run --all apply`
+> rebuild the entire platform from scratch with **no manual steps and no hidden/orphaned state**. The rebuild
+> *is* the reproducibility test. (ADR-054's backup/DR concerns *unplanned* production failure + regulated-tenant
+> recovery on the running platform — still relevant, but **not a rebuild prerequisite**.)
+
 ## Validation strategy (how we test without breaking prod)
 
 - **`crossplane render`** — render a Composition against an example claim **offline, no cluster**. The bulk of
@@ -59,7 +66,9 @@ independent of the model.
 | -- | ----------- | --- | ---------- | ---- |
 | **A1** | `v1alpha2` XRD authored in the crossplane module, **served alongside** `v1alpha1` (not yet `referenceable`/storage) + an offline `crossplane render` / schema-validation CI harness over the canonical + translated alpha/bravo claims | 🟢 | — | render + kind dry-run |
 | **B1** | Keycloak module + unit — brokering to Identity Center (SAML up), CNPG-backed, HA, Tailscale-internal; stood up **alongside** Dex (not yet the app IdP) | 🟢 | CNPG (live) | plan-only + manual login |
-| **S0** | Pre-teardown safety slice of [ADR-054](../adrs/054-platform-resilience-and-business-continuity.md): **state-backend cross-region replication + CNPG backups to S3**. *Recommended before any teardown — today there is no backup story, so a teardown is lossy.* | 🟢 | — | plan-only + restore drill |
+
+*(No pre-teardown backup slice — data loss in the rebuild is expected and fine; see the Data posture note above.
+The rebuild's bar is reconstructability, not preservation.)*
 
 ### Phase 1 — The keystone (🟢)
 
@@ -85,7 +94,9 @@ independent of the model.
 
 ### Phase 4 — The cutover (🔴 = the rebuild itself)
 
-Pre-flight gate: every 🟢 renders/plans clean **and** passed a sandbox smoke apply. Then, in one pass:
+Pre-flight gate: every 🟢 renders/plans clean, passed a sandbox smoke apply, **and a full `platctl bootstrap`
+rebuild in the sandbox proves the platform reconstructs from code with zero manual steps** (the rebuild's real
+success criterion). Then, in one pass:
 
 | ID | Deliverable | Tag |
 | -- | ----------- | --- |
@@ -97,7 +108,7 @@ Pre-flight gate: every 🟢 renders/plans clean **and** passed a sandbox smoke a
 
 The remaining capability ADRs, sequenced after the model+identity land — none block the cutover:
 
-- [ADR-054](../adrs/054-platform-resilience-and-business-continuity.md) remainder — DR drills, multi-region triggers (the S0 backup slice already shipped in Phase 0).
+- [ADR-054](../adrs/054-platform-resilience-and-business-continuity.md) — backup/DR, DR drills, multi-region triggers for the **running** platform (unplanned failure + regulated-tenant recovery). *Not* a rebuild prerequisite — the intentional rebuild is expected to lose data.
 - [ADR-055](../adrs/055-compliance-assurance-and-continuous-control-evidence.md) — compliance assurance / continuous evidence.
 - [ADR-056](../adrs/056-progressive-delivery-and-safe-rollback.md) — Argo Rollouts progressive delivery.
 - [ADR-057](../adrs/057-service-identity-and-east-west-zero-trust.md) — Cilium mTLS / SPIFFE east-west.
@@ -112,7 +123,7 @@ A5 ─────────────────────────�
 ```
 
 - **Longest chain:** A1 → A2 → A3 → A4 → cutover. Start A1 immediately; it gates everything.
-- **Run in parallel now:** B1 (Keycloak) and S0 (backup safety) have no model dependency.
+- **Run in parallel now:** B1 (Keycloak) has no model dependency.
 - **Most value-per-effort first PR:** **A1** — it makes the schema executable and gives A2/A3/B2 something to
   compile against; non-destructive; de-risks the whole rebuild.
 
