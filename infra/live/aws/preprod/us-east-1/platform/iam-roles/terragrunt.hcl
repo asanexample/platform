@@ -148,6 +148,28 @@ inputs = {
       managed_policies = []
     }
 
+    # Cross-account READ-ONLY cluster access for the Backstage portal (platform hub). The portal's EKS Pod
+    # Identity reader role on the platform cluster assumes this to surface preprod workloads in the catalog
+    # (Kubernetes plugin, 2.4a). View-only — the eks unit grants it AmazonEKSViewPolicy (excludes Secrets).
+    Backstage = {
+      description = "Cross-account read-only cluster access for the Backstage portal (platform hub)"
+
+      trust_principals = {
+        aws = ["arn:aws:iam::${include.base.locals.account_ids["platform"]}:root"] # Platform account
+      }
+
+      # Only the Backstage reader role from the platform EKS cluster (name_prefix platform-use1-eks-backstage-).
+      trust_conditions = [
+        {
+          test     = "ArnLike"
+          variable = "aws:PrincipalArn"
+          values   = ["arn:aws:iam::${include.base.locals.account_ids["platform"]}:role/platform-use1-eks-backstage-*"]
+        },
+      ]
+
+      managed_policies = []
+    }
+
   }
 
   tags = include.base.locals.tags

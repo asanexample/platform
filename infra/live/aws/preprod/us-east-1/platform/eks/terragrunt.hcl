@@ -71,6 +71,12 @@ inputs = {
       principal_arn = dependency.iam_roles.outputs.role_arns["ArgoCD"]
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
     }
+    # Backstage on the platform cluster assumes this role for READ-ONLY live cluster view (Kubernetes
+    # plugin, 2.4a). View, not ClusterAdmin — the portal only reads; AmazonEKSViewPolicy excludes Secrets.
+    backstage = {
+      principal_arn = dependency.iam_roles.outputs.role_arns["Backstage"]
+      policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
+    }
     break_glass = {
       principal_arn = "arn:aws:iam::${include.base.locals.account_id}:role/OrganizationAccountAccessRole"
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"

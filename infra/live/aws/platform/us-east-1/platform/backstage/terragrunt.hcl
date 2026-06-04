@@ -63,6 +63,28 @@ dependency "dex" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+# Cross-environment dependencies (Phase 2.4a Kubernetes plugin): the portal reads the preprod workload
+# cluster read-only. Endpoint/CA come from the preprod eks unit; the cross-account read-only role ARN that
+# this pod assumes comes from the preprod iam-roles unit (the `Backstage` role).
+dependency "preprod_eks" {
+  config_path = "../../../../preprod/us-east-1/platform/eks"
+
+  mock_outputs = {
+    cluster_endpoint              = "https://mock-preprod-endpoint"
+    cluster_certificate_authority = "bW9jaw=="
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
+dependency "preprod_iam_roles" {
+  config_path = "../../../../preprod/us-east-1/platform/iam-roles"
+
+  mock_outputs = {
+    role_arns = { Backstage = "arn:aws:iam::000000000000:role/Backstage" }
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
 generate "helm_provider" {
   path      = "helm-provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -106,7 +128,7 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  image_tag = "25f871680c6fe2f3b8a4935d1fbf5c64c4819aa9"
+  image_tag = "bdad1ee4e7d0e37baa043970f631b3cbdbe05d9c"
 
   # Split-horizon for OIDC SSO (Phase 2.1): the backend reaches Dex's issuer (sso.aws.refplat.org)
   # in-cluster via the Cilium gateway ClusterIP, not public DNS / the internal-NLB hairpin. The IP is
@@ -123,6 +145,26 @@ inputs = {
     instances    = 1
     storage_size = "5Gi"
   }
+
+  # Kubernetes plugin (Phase 2.4a): read-only live view of this (platform) cluster via the pod's EKS Pod
+  # Identity reader role, and of the preprod workload cluster by assuming the cross-account read-only
+  # `Backstage` role there. View-only (AmazonEKSViewPolicy excludes Secrets); ADR-051 §live-plugins.
+  enable_kubernetes_plugin = true
+  cluster_name             = dependency.eks.outputs.cluster_id
+  remote_cluster_role_arns = [dependency.preprod_iam_roles.outputs.role_arns["Backstage"]]
+  kubernetes_clusters = [
+    {
+      name    = "platform"
+      url     = dependency.eks.outputs.cluster_endpoint
+      ca_data = dependency.eks.outputs.cluster_certificate_authority
+    },
+    {
+      name        = "preprod"
+      url         = dependency.preprod_eks.outputs.cluster_endpoint
+      ca_data     = dependency.preprod_eks.outputs.cluster_certificate_authority
+      assume_role = dependency.preprod_iam_roles.outputs.role_arns["Backstage"]
+    },
+  ]
 
   tags = include.base.locals.tags
 }
