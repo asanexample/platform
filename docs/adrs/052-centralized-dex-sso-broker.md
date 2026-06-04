@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-03
 
-**Status:** Accepted — supports the Backstage portal (ADR-051, pending) and mirrors the ArgoCD SSO pattern
+**Status:** Accepted — supports the Backstage portal ([ADR-051](051-backstage-developer-portal.md)) and mirrors the ArgoCD SSO pattern
 ([ADR-012](012-argocd-sso-via-dex-saml.md)). First client: Backstage (BACK-stack Phase 2.1).
 
 ## Context
