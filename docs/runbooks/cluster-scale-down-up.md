@@ -74,6 +74,7 @@ the cause** (don't chase it).
 order (PR #208). **Live unblock:** set `us-east-1.eks.amazonaws.com → 10.100.0.2` in the **Tailscale admin → DNS
 → Nameservers/Split DNS** (terragrunt `-target` can't do it — the unit's `kubernetes_manifest` resources need the
 cluster API, which is the very thing that's down). Diagnose with:
+
 ```bash
 tailscale dns status | grep -A5 'Split DNS'          # what's live
 nslookup <platform-eks-host> 10.100.0.2              # platform resolver → resolves both clusters
