@@ -122,6 +122,27 @@ edit gitops/tenant-claims/<env>/<team>.yaml ──PR (CODEOWNERS)──▶ merge
 **Delete** = remove the team's YAML via PR; ArgoCD's `prune` deletes the `XTenant` and the Composition tears
 down every managed resource (both AWS accounts + the cluster) via finalizers.
 
+## Catalog projection (Backstage)
+
+The same claim files are the source of truth for the **Backstage software catalog** (BACK stack Phase 2.3a).
+A custom backend entity provider — `plugins/platform-projection` in the [backstage repo](https://github.com/asanexample/backstage) —
+reads `gitops/tenant-claims/**/*.yaml` from git via the **read-only GitHub App** (no AWS, no cluster
+credential) on a 30-minute schedule and projects each `XTenant` into catalog entities ([ADR-049] forward-compat
+model):
+
+| Catalog entity | From the claim | Notes |
+|---|---|---|
+| `Group <team>` | `spec.team` | `spec.type: team`; supersedes the seed Group |
+| `System <tenant>` | `metadata.name` | `owner: group:<team>`; carries **`zone`/`tier`** as first-class attributes (degenerate `default`/`standard` until the XRD gains them); `links` from `hostnames` |
+| `Resource`s | the Composition's footprint | a **curated** mirror — `team-<team>` namespace + quota, `ecr-team-<team>-<app>` per app, `Pod-team-<team>` + `DeveloperAccess-<team>` IAM roles, the `restrict-images`/`restrict-route-hostnames` Kyverno policies; each `owner: group:<team>`, `system: <tenant>` |
+
+App `Component`s (discovered separately from the app repos' `catalog-info.yaml`) set `spec.system: <team>`, so
+each tenant System *contains* its app. The projection is **authoritative** for Groups/Systems/Resources; the
+discovered Components only self-assert ownership (acceptable trust posture for an internal read-only portal).
+The Resource set is deterministic and curated — widen the mapping in `provider.ts` if a deeper audit lens is
+wanted. The projection emits entities directly (provider roots), so it bypasses `catalog.rules`; a trusted
+`url` pattern branch is kept belt-and-suspenders.
+
 ## Relationship to `teams.hcl`
 
 `teams.hcl` is **no longer the tenant-provisioning source of truth** — the `XTenant` claim is. It now only
@@ -144,3 +165,4 @@ aws ecr describe-repositories --repository-names team-<team>/<app> --profile pla
 ```
 
 [#174]: https://github.com/asanexample/platform/issues/174
+[ADR-049]: ../adrs/049-tenant-model-team-tenant-zone.md
