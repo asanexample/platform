@@ -88,8 +88,13 @@ locals {
   argocd_app_config = local.enable_argocd ? {
     argocd = {
       appLocatorMethods = [{
-        type      = "config"
-        instances = [for i in var.argocd_instances : { name = i.name, url = i.url, token = "$${ARGOCD_AUTH_TOKEN}" }]
+        type = "config"
+        # `url` = the in-cluster API the backend calls; `frontendUrl` (when set) = the browser-facing UI for
+        # "open in ArgoCD" links (the backend url is unreachable from the browser). token via env.
+        instances = [for i in var.argocd_instances : merge(
+          { name = i.name, url = i.url, token = "$${ARGOCD_AUTH_TOKEN}" },
+          try(i.frontend_url, null) != null ? { frontendUrl = i.frontend_url } : {},
+        )]
       }]
     }
   } : {}

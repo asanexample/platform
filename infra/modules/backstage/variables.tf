@@ -227,10 +227,11 @@ variable "enable_argocd_plugin" {
 }
 
 variable "argocd_instances" {
-  description = "ArgoCD instances surfaced by the plugin (rendered into argocd.appLocatorMethods). url is the in-cluster API (e.g. http://argocd-server.argocd.svc); the read-only token is injected via ARGOCD_AUTH_TOKEN."
+  description = "ArgoCD instances surfaced by the plugin (rendered into argocd.appLocatorMethods). `url` is the in-cluster API the BACKEND calls (e.g. http://argocd-server.argocd.svc); `frontend_url` is the browser-facing UI used for 'open in ArgoCD' links (e.g. https://argocd.aws.refplat.org). The read-only token is injected via ARGOCD_AUTH_TOKEN."
   type = list(object({
-    name = string
-    url  = string
+    name         = string
+    url          = string
+    frontend_url = optional(string)
   }))
   default = []
 }
