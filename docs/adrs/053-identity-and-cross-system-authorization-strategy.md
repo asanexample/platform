@@ -86,6 +86,22 @@ policy, Kubernetes RoleBindings, and the Backstage permission policy. This is th
 "future tools" and kills the per-system duplication. It is adopted **regardless of the IdP** and is the
 higher-leverage half of this ADR.
 
+### Relationship to ADR-049 (the model this consumes)
+
+This ADR is the *identity + enforcement* half; [ADR-049](049-tenant-model-team-tenant-zone.md) (Team / Tenant /
+Zone) is the *model* half — and the **Team envelope it defines is the single declarative source decision 3
+generates from.** Keycloak's group/role taxonomy mirrors the ADR-049 Team model; a Team is an SSO/Keycloak group
++ its envelope. The two ADRs are **co-dependent and both land with the rebuild**, so **finalizing the ADR-049
+schema is the first implementation step** — the Keycloak group taxonomy, the per-system RBAC generators, and the
+Backstage policy (#197) all read from it. (Backstage already forward-compat'd: the 2.3a catalog projection emits
+Systems carrying `zone`/`tier` so ADR-049 lands with no entity-model change.)
+
+They interlock across **two authorization planes**, both derived from the one Team model: (a) the **envelope** —
+what a Team's *claims/workloads* may do (`tier ∈ allowedTiers`, quota, envs/locations) — enforced at admission by
+**Kyverno on the `Tenant` CR**; and (b) **user RBAC** — what a *human* may do per system — which is *this* ADR's
+job, where ADR-049's `environment × tier` developer-access posture becomes the roles/claims generated outward.
+Same source, two enforcement planes.
+
 ## Consequences
 
 - **Unblocks #197** (Backstage group-based RBAC): designed to consume **OIDC group claims** Keycloak provides

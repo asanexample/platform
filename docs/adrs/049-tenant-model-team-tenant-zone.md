@@ -13,6 +13,14 @@ into [ADR-027](027-hybrid-tenant-isolation-model.md) (hybrid isolation) and
 unchanged. The isolation *primitives* of ADR-027 (namespace mode, NetworkPolicies, RBAC, quotas) are
 unchanged; what changes is how tenancy is **modelled** above them.
 
+> **This model is the schema that [ADR-053](053-identity-and-cross-system-authorization-strategy.md) consumes.**
+> ADR-053's "access model as code" generates every system's RBAC from the **Team envelope** defined here, and
+> Keycloak's group/role taxonomy mirrors this Team model. The two ADRs are co-dependent and both land with the
+> rebuild, so **finalizing this schema is the first implementation step** — the identity/authz plumbing reads
+> from it. Note the two distinct authorization planes that both derive from this model: the **envelope**
+> (`tier ∈ allowedTiers`, quota, allowed envs/locations) is enforced at *admission* by Kyverno on the `Tenant`
+> CR; the **developer-access posture** (`environment × tier`, below) is *user RBAC*, propagated by ADR-053.
+
 ## Context
 
 The current model is `team == tenant == namespace`: the `team` key on a `Tenant` claim *is* the tenant, 1:1:1
