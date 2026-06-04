@@ -106,7 +106,7 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  image_tag = "b571100eda45ec14fe39c635b508efbe9337667d"
+  image_tag = "dbe894d9014037b43802f285bb3f7d27cff59349"
 
   # Split-horizon for OIDC SSO (Phase 2.1): the backend reaches Dex's issuer (sso.aws.refplat.org)
   # in-cluster via the Cilium gateway ClusterIP, not public DNS / the internal-NLB hairpin. The IP is
