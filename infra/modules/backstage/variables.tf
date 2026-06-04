@@ -118,6 +118,64 @@ variable "resources" {
   default = {}
 }
 
+# ---------------------------------------------------------------------------
+# OIDC SSO (Phase 2.1 — auth via the Dex broker, ADR-051)
+# ---------------------------------------------------------------------------
+
+variable "enable_oidc" {
+  description = "Wire OIDC SSO: sync the Dex client secret (platform/backstage/oidc) into the namespace and inject it as OIDC_CLIENT_SECRET. The image's app-config.production.yaml configures the provider."
+  type        = bool
+  default     = true
+}
+
+variable "oidc_secret_name" {
+  description = "Secrets Manager path holding the shared Dex OIDC client secret (created by the dex module)."
+  type        = string
+  default     = "platform/backstage/oidc"
+}
+
+variable "oidc_secret_key" {
+  description = "Key/property within the OIDC Secrets Manager secret (and the synced K8s Secret)."
+  type        = string
+  default     = "client-secret"
+}
+
+variable "secret_store_name" {
+  description = "Name of the ClusterSecretStore (External Secrets) to read Secrets Manager."
+  type        = string
+  default     = "aws-secrets-manager"
+}
+
+# ---------------------------------------------------------------------------
+# GitHub catalog discovery (Phase 2.2 — read-only GitHub App, ADR-051)
+# ---------------------------------------------------------------------------
+
+variable "enable_github_discovery" {
+  description = "Sync the read-only GitHub App credential (github_app_secret_name) into the namespace and inject it as GITHUB_APP_ID/GITHUB_APP_PRIVATE_KEY. The image's app-config wires integrations.github.apps + catalog.providers.github."
+  type        = bool
+  default     = true
+}
+
+variable "github_app_secret_name" {
+  description = "Secrets Manager path holding the GitHub App credential as JSON {appId, privateKey}. Created manually; see docs/runbooks/backstage-github-app.md."
+  type        = string
+  default     = "platform/backstage/github-app"
+}
+
+variable "host_aliases" {
+  description = <<-DESC
+    Pod /etc/hosts entries. Used for split-horizon resolution of the OIDC issuer hostname
+    (sso.aws.refplat.org) to the in-cluster Cilium gateway ClusterIP, so the backend's OIDC
+    discovery + token exchange with Dex stay IN-CLUSTER (TLS still validates via the wildcard
+    cert at the gateway) instead of depending on public DNS resolving the internal-NLB hairpin.
+  DESC
+  type = list(object({
+    ip        = string
+    hostnames = list(string)
+  }))
+  default = []
+}
+
 variable "tags" {
   description = "Tags (rendered as pod labels)"
   type        = map(string)

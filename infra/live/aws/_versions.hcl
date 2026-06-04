@@ -67,6 +67,7 @@ locals {
     crossplane          = "${local.source_base}/crossplane"
     cloudnative_pg      = "${local.source_base}/cloudnative-pg"
     backstage           = "${local.source_base}/backstage"
+    dex                 = "${local.source_base}/dex"
   }
 
   # Helm chart version pins — single source of truth across environments
@@ -84,5 +85,6 @@ locals {
     crossplane            = "2.3.1"  # Crossplane v2 (ADR-046)
     cloudnative_pg        = "0.28.2" # CNPG operator chart (app v1.29.1) — Backstage DB (ADR-051)
     backstage             = "2.8.1"  # official backstage Helm chart (points at our platform/backstage image)
+    dex                   = "0.24.1" # dexidp/dex chart (app v2.44.0) — centralized SAML->OIDC broker (ADR-051)
   }
 }

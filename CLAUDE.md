@@ -56,11 +56,14 @@ networking ─┘                        |
               tailscale ─────────────┤ (eks, nodes, ext-secrets)
               transit-gateway (hub) ─┤ (networking)
               cross-vpc-dns ─────────┤ (networking, preprod eks)
-              gateway-config ────────┘ (eks, cilium, cert-mgr, ext-dns, argocd, r53)
+              gateway-config ────────┘ (eks, cilium, cert-mgr, ext-dns, argocd, dex, r53)
               cluster-rbac ──────────┤ (eks) — platform-operator ClusterRole (ADR-040)
               policy ────────────────┤ (eks, nodes) — Kyverno engine + ClusterPolicies (ADR-014), before crossplane
               crossplane ────────────┤ (eks, nodes, policy) — federated tenant control plane (ADR-046/048); after policy (needs the crossplane-system Kyverno exclusion)
-              tenant-claims ─────────┘ (crossplane) — applies the XTenant claims; the Composition provisions each tenant (ADR-046/048)
+              tenant-claims ─────────┤ (crossplane) — applies the XTenant claims; the Composition provisions each tenant (ADR-046/048)
+              cloudnative-pg ────────┤ (eks, nodes) — CNPG operator for the Backstage DB (ADR-051)
+              dex ───────────────────┤ (eks, nodes, ext-secrets, secret-stores) — centralized SAML→OIDC SSO broker (ADR-052)
+              backstage ─────────────┘ (eks, nodes, cnpg, ext-secrets, secret-stores, dex) — developer portal (ADR-051); after dex for OIDC SSO
 
 tailscale-admin ─── (no cluster deps, manages tailnet ACLs/OAuth)
 cloudtrail ──────── (no deps, secrets audit logging)

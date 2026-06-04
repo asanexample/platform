@@ -8,7 +8,7 @@ include "root" {
 }
 
 terraform {
-  source = include.base.locals.module_source.backstage
+  source = include.base.locals.module_source.dex
 }
 
 dependency "eks" {
@@ -29,19 +29,8 @@ dependency "node_groups" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-# Orders Backstage after the CloudNativePG operator (the in-cluster DB Cluster CR needs the CRDs + the
-# reconciling controller to exist).
-dependency "cloudnative_pg" {
-  config_path = "../cloudnative-pg"
-
-  mock_outputs = {
-    namespace = "cnpg-system"
-  }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
-}
-
-# OIDC (Phase 2.1): the ExternalSecret needs the operator + ClusterSecretStore, and the client secret
-# (platform/backstage/oidc) is created by the dex module — so Backstage applies after all three.
+# Orders Dex after External Secrets (the ExternalSecret CRD + operator) and the secret-stores unit
+# (the aws-secrets-manager ClusterSecretStore) — both are needed to sync the OIDC client secret.
 dependency "external_secrets" {
   config_path = "../external-secrets"
 
@@ -53,13 +42,6 @@ dependency "secret_stores" {
   config_path = "../secret-stores"
 
   mock_outputs                            = {}
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
-}
-
-dependency "dex" {
-  config_path = "../dex"
-
-  mock_outputs                            = { namespace = "dex" }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
@@ -102,27 +84,12 @@ generate "kubernetes_provider" {
 inputs = {
   create = true
 
-  helm_chart_version = include.base.locals.helm_versions.backstage
+  helm_chart_version = include.base.locals.helm_versions.dex
 
-  # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
-  # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  image_tag = "b571100eda45ec14fe39c635b508efbe9337667d"
-
-  # Split-horizon for OIDC SSO (Phase 2.1): the backend reaches Dex's issuer (sso.aws.refplat.org)
-  # in-cluster via the Cilium gateway ClusterIP, not public DNS / the internal-NLB hairpin. The IP is
-  # the `cilium-gateway-platform-gateway` Service ClusterIP (default ns) — stable for the Service's life;
-  # if that Service is recreated, refresh this. TLS still validates (wildcard *.aws.refplat.org at the gateway).
-  host_aliases = [{
-    ip        = "172.20.184.24"
-    hostnames = ["sso.aws.refplat.org"]
-  }]
-
-  # Phase 2.0: in-cluster CloudNativePG (dev). Flip to mode = "rds" (+ rds_host/rds_secret_name) for prod.
-  database = {
-    mode         = "in-cluster"
-    instances    = 1
-    storage_size = "5Gi"
-  }
+  # Identity Center SAML connector. New SAML app (ACS https://sso.aws.refplat.org/callback) => new
+  # signing cert; values live in secrets.hcl. See docs/runbooks/dex-sso.md for the manual app setup.
+  saml_sso_url = include.base.locals.all_vars.dex_sso_url
+  saml_ca_data = include.base.locals.all_vars.dex_sso_ca_data
 
   tags = include.base.locals.tags
 }
