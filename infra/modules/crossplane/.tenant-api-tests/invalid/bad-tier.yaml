@@ -1,0 +1,10 @@
+# MUST FAIL: tier outside the enum (standard/elevated/pci/hipaa).
+apiVersion: platform.refplat.org/v1alpha2
+kind: XTenant
+metadata:
+  name: bad-tier
+spec:
+  team: alpha
+  name: demo
+  environment: preprod
+  tier: ultra

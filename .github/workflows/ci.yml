@@ -193,6 +193,28 @@ jobs:
           fi
           echo "✅ Broken sample correctly rejected by the shift-left gate."
 
+  # Offline schema validation of the Tenant API XRD (delivery-plan A1, ADR-049). Validates the example claims
+  # against the v1alpha2 OpenAPI schema + CEL rules with `crossplane beta validate` — no cluster. The CLI is
+  # installed at a pinned version (download + SHA-256 verify, no `curl | sh`), matching the Trivy job's posture.
+  tenant-api-schema:
+    name: Tenant API Schema
+    runs-on: ubuntu-latest
+    env:
+      CROSSPLANE_VERSION: "v2.2.1" # pin to the CLI the XRD was authored/validated against
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Crossplane CLI (download release binary + verify SHA-256)
+        run: |
+          base="https://releases.crossplane.io/stable/${CROSSPLANE_VERSION}/bin/linux_amd64"
+          curl -fsSL "${base}/crank" -o crossplane
+          curl -fsSL "${base}/crank.sha256" -o crank.sha256
+          echo "$(cat crank.sha256)  crossplane" | sha256sum -c -
+          sudo install -m 0755 crossplane /usr/local/bin/crossplane
+          rm -f crossplane crank.sha256
+          crossplane version --client
+      - name: Validate Tenant API example claims against the XRD
+        run: infra/modules/crossplane/.tenant-api-tests/run.sh
+
   tflint:
     name: TFLint
     runs-on: ubuntu-latest
@@ -258,7 +280,7 @@ jobs:
           # (exit 0, always written) then the BLOCKING table gate (exit 1) so the
           # findings are visible in the log when the gate fails.
           iac() { trivy config infra/modules --severity HIGH,CRITICAL \
-            --skip-dirs '**/.terraform' --skip-dirs '**/.kyverno-tests' \
+            --skip-dirs '**/.terraform' --skip-dirs '**/.kyverno-tests' --skip-dirs '**/.tenant-api-tests' \
             --ignorefile "$PWD/.trivyignore.yaml" "$@"; }
           iac --format sarif --output trivy-iac.sarif --exit-code 0
           echo "::group::Trivy IaC findings"; iac --format table --exit-code 1; echo "::endgroup::"
