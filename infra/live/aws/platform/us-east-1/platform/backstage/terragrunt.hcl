@@ -129,7 +129,7 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  image_tag = "5035a506f55a9ff3edfdb4dfc6654b4779a6828e"
+  image_tag = "1ad200cc87995e7eff3218dc075c5eaaf97737c7"
 
   # Split-horizon for OIDC SSO (Phase 2.1): the backend reaches Dex's issuer (sso.aws.refplat.org)
   # in-cluster via the Cilium gateway ClusterIP, not public DNS / the internal-NLB hairpin. The IP is
@@ -169,6 +169,16 @@ inputs = {
       assume_role = dependency.preprod_iam_roles.outputs.role_arns["Backstage"]
     },
   ]
+
+  # ArgoCD plugin (Phase 2.4b): read-only deployment view. The backend reaches our self-hosted ArgoCD
+  # in-cluster over HTTP (server.insecure=true; the :443 Service port also maps to plaintext 8080, so https
+  # would fail TLS). Read-only token (account `backstage`, role:readonly) synced from Secrets Manager
+  # (platform/argocd/backstage-token) → ARGOCD_AUTH_TOKEN. Components link via `argocd/app-selector`.
+  enable_argocd_plugin = true
+  argocd_instances = [{
+    name = "platform"
+    url  = "http://argocd-server.argocd.svc"
+  }]
 
   tags = include.base.locals.tags
 }

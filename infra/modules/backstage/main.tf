@@ -76,7 +76,25 @@ locals {
     }
   } : {}
 
-  extra_app_config = merge(local.oidc_app_config, local.kubernetes_app_config)
+  # ArgoCD plugin (Phase 2.4b): the Roadie plugin reads our self-hosted ArgoCD read-only via a token. Instance
+  # url(s) are env-specific (set in the unit); the token is supplied via the ARGOCD_AUTH_TOKEN env (synced from
+  # Secrets Manager by the ExternalSecret below). $${...} escapes HCL so the literal ${ARGOCD_AUTH_TOKEN} reaches
+  # Backstage's argocd config for the config loader to substitute.
+  enable_argocd     = var.create && var.enable_argocd_plugin
+  argocd_k8s_secret = "backstage-argocd-token"
+  argocd_env = local.enable_argocd ? [
+    { name = "ARGOCD_AUTH_TOKEN", valueFrom = { secretKeyRef = { name = local.argocd_k8s_secret, key = var.argocd_token_secret_key } } },
+  ] : []
+  argocd_app_config = local.enable_argocd ? {
+    argocd = {
+      appLocatorMethods = [{
+        type      = "config"
+        instances = [for i in var.argocd_instances : { name = i.name, url = i.url, token = "$${ARGOCD_AUTH_TOKEN}" }]
+      }]
+    }
+  } : {}
+
+  extra_app_config = merge(local.oidc_app_config, local.kubernetes_app_config, local.argocd_app_config)
 
   backstage_values = {
     # We bring our own Postgres (CNPG or RDS) — never the chart's bundled bitnami Postgres.
@@ -137,7 +155,7 @@ locals {
         { name = "POSTGRES_PORT", value = "5432" },
         { name = "POSTGRES_USER", valueFrom = { secretKeyRef = { name = local.db_secret, key = local.db_user_key } } },
         { name = "POSTGRES_PASSWORD", valueFrom = { secretKeyRef = { name = local.db_secret, key = local.db_pass_key } } },
-      ], local.oidc_env, local.github_env)
+      ], local.oidc_env, local.github_env, local.argocd_env)
 
       # Extra app-config layer (chart renders it to a ConfigMap and appends --config): OIDC session
       # support (auth.session.secret) + the complete integrations.github (Phase 2.2). Empty {} when both off.
@@ -280,6 +298,36 @@ resource "kubernetes_manifest" "github_app_external_secret" {
 }
 
 # ---------------------------------------------------------------------------
+# ArgoCD read-only token (Phase 2.4b) — synced from Secrets Manager (platform/argocd/backstage-token, minted
+# out-of-band against the read-only `backstage` ArgoCD account; see docs/runbooks/backstage-argocd.md) into the
+# backstage namespace as backstage-argocd-token, then injected as ARGOCD_AUTH_TOKEN.
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_manifest" "argocd_token_external_secret" {
+  count = local.enable_argocd ? 1 : 0
+
+  manifest = {
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = local.argocd_k8s_secret
+      namespace = var.namespace
+    }
+    spec = {
+      refreshInterval = "1h"
+      secretStoreRef  = { name = var.secret_store_name, kind = "ClusterSecretStore" }
+      target          = { name = local.argocd_k8s_secret, creationPolicy = "Owner" }
+      data = [{
+        secretKey = var.argocd_token_secret_key
+        remoteRef = { key = var.argocd_token_secret_name, property = var.argocd_token_secret_key }
+      }]
+    }
+  }
+
+  depends_on = [kubernetes_namespace_v1.backstage]
+}
+
+# ---------------------------------------------------------------------------
 # Session-signing secret (Phase 2.1) — backstage-only, generated here (not shared, so no
 # Secrets Manager round-trip needed). Backed AUTH_SESSION_SECRET; stable across applies.
 # ---------------------------------------------------------------------------
@@ -403,6 +451,7 @@ resource "helm_release" "backstage" {
     kubernetes_manifest.oidc_external_secret,
     kubernetes_secret_v1.session,
     kubernetes_manifest.github_app_external_secret,
+    kubernetes_manifest.argocd_token_external_secret,
     # Pod Identity must exist before the pod starts, or it gets no AWS creds until a restart.
     aws_eks_pod_identity_association.k8s_reader,
   ]

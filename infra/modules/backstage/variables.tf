@@ -215,3 +215,34 @@ variable "kubernetes_clusters" {
   }))
   default = []
 }
+
+# ---------------------------------------------------------------------------
+# ArgoCD plugin (Phase 2.4b) — read-only deployment view via the Roadie plugin
+# ---------------------------------------------------------------------------
+
+variable "enable_argocd_plugin" {
+  description = "Enable the Backstage ArgoCD plugin: inject the argocd app-config (appLocatorMethods/instances) + sync the read-only ArgoCD token into ARGOCD_AUTH_TOKEN."
+  type        = bool
+  default     = false
+}
+
+variable "argocd_instances" {
+  description = "ArgoCD instances surfaced by the plugin (rendered into argocd.appLocatorMethods). url is the in-cluster API (e.g. http://argocd-server.argocd.svc); the read-only token is injected via ARGOCD_AUTH_TOKEN."
+  type = list(object({
+    name = string
+    url  = string
+  }))
+  default = []
+}
+
+variable "argocd_token_secret_name" {
+  description = "Secrets Manager path holding the read-only ArgoCD API token (minted out-of-band against the `backstage` account; see docs/runbooks/backstage-argocd.md)."
+  type        = string
+  default     = "platform/argocd/backstage-token"
+}
+
+variable "argocd_token_secret_key" {
+  description = "Key/property within the ArgoCD token Secrets Manager secret (and the synced K8s Secret / env)."
+  type        = string
+  default     = "token"
+}
