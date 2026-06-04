@@ -67,8 +67,23 @@ locals {
     }
   } : {}
 
+  # Catalog rules (anti-spoofing) scoped by location TYPE. The image's per-location `rules` use an exact
+  # target matcher that doesn't match the resolved file path, so the seed Groups got blocked. Override the
+  # global rules here (the appConfig array replaces the image's catalog.rules; locations/providers are kept):
+  #   - in-image `file` locations (the trusted seed Groups) may register org entities;
+  #   - everything else (github `url` discovery = untrusted app self-assertion) is Components-only, so app
+  #     repos can't inject a Group/System/User or forge ownership.
+  catalog_app_config = local.github_enabled ? {
+    catalog = {
+      rules = [
+        { allow = ["Group", "User", "Location"], locations = [{ type = "file" }] },
+        { allow = ["Component", "Location"] },
+      ]
+    }
+  } : {}
+
   # Combined extra app-config layer (chart appConfig -> ConfigMap -> appended to the --config chain).
-  extra_app_config = merge(local.oidc_app_config, local.github_app_config)
+  extra_app_config = merge(local.oidc_app_config, local.github_app_config, local.catalog_app_config)
 
   backstage_values = {
     # We bring our own Postgres (CNPG or RDS) — never the chart's bundled bitnami Postgres.
