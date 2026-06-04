@@ -37,6 +37,16 @@ locals {
   # $${...} escapes HCL interpolation so the literal ${AUTH_SESSION_SECRET} reaches Backstage.
   oidc_app_config = local.enable_oidc ? { auth = { session = { secret = "$${AUTH_SESSION_SECRET}" } } } : {}
 
+  # GitHub App for catalog discovery (Phase 2.2). The read-only App's appId + private key (synced from
+  # platform/backstage/github-app by the ExternalSecret below) feed integrations.github.apps in the image's
+  # app-config.production.yaml. Empty env when disabled.
+  github_enabled    = var.create && var.enable_github_discovery
+  github_k8s_secret = "backstage-github-app"
+  github_env = local.github_enabled ? [
+    { name = "GITHUB_APP_ID", valueFrom = { secretKeyRef = { name = local.github_k8s_secret, key = "appId" } } },
+    { name = "GITHUB_APP_PRIVATE_KEY", valueFrom = { secretKeyRef = { name = local.github_k8s_secret, key = "privateKey" } } },
+  ] : []
+
   backstage_values = {
     # We bring our own Postgres (CNPG or RDS) — never the chart's bundled bitnami Postgres.
     postgresql = { enabled = false }
@@ -84,7 +94,7 @@ locals {
         { name = "POSTGRES_PORT", value = "5432" },
         { name = "POSTGRES_USER", valueFrom = { secretKeyRef = { name = local.db_secret, key = local.db_user_key } } },
         { name = "POSTGRES_PASSWORD", valueFrom = { secretKeyRef = { name = local.db_secret, key = local.db_pass_key } } },
-      ], local.oidc_env)
+      ], local.oidc_env, local.github_env)
 
       # Extra app-config layer (chart renders it to a ConfigMap and appends --config). Enables OIDC
       # session support (auth.session.secret). Empty {} when OIDC is disabled.
@@ -197,6 +207,36 @@ resource "kubernetes_manifest" "oidc_external_secret" {
 }
 
 # ---------------------------------------------------------------------------
+# GitHub App credential (Phase 2.2) — read-only App for catalog discovery.
+# Created manually in Secrets Manager (the private key is GitHub-generated); see
+# docs/runbooks/backstage-github-app.md. JSON keys: appId, privateKey.
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_manifest" "github_app_external_secret" {
+  count = local.github_enabled ? 1 : 0
+
+  manifest = {
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = local.github_k8s_secret
+      namespace = var.namespace
+    }
+    spec = {
+      refreshInterval = "1h"
+      secretStoreRef  = { name = var.secret_store_name, kind = "ClusterSecretStore" }
+      target          = { name = local.github_k8s_secret, creationPolicy = "Owner" }
+      data = [
+        { secretKey = "appId", remoteRef = { key = var.github_app_secret_name, property = "appId" } },
+        { secretKey = "privateKey", remoteRef = { key = var.github_app_secret_name, property = "privateKey" } },
+      ]
+    }
+  }
+
+  depends_on = [kubernetes_namespace_v1.backstage]
+}
+
+# ---------------------------------------------------------------------------
 # Session-signing secret (Phase 2.1) — backstage-only, generated here (not shared, so no
 # Secrets Manager round-trip needed). Backed AUTH_SESSION_SECRET; stable across applies.
 # ---------------------------------------------------------------------------
@@ -244,5 +284,6 @@ resource "helm_release" "backstage" {
     kubernetes_manifest.db,
     kubernetes_manifest.oidc_external_secret,
     kubernetes_secret_v1.session,
+    kubernetes_manifest.github_app_external_secret,
   ]
 }

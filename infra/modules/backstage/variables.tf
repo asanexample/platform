@@ -146,6 +146,22 @@ variable "secret_store_name" {
   default     = "aws-secrets-manager"
 }
 
+# ---------------------------------------------------------------------------
+# GitHub catalog discovery (Phase 2.2 — read-only GitHub App, ADR-051)
+# ---------------------------------------------------------------------------
+
+variable "enable_github_discovery" {
+  description = "Sync the read-only GitHub App credential (github_app_secret_name) into the namespace and inject it as GITHUB_APP_ID/GITHUB_APP_PRIVATE_KEY. The image's app-config wires integrations.github.apps + catalog.providers.github."
+  type        = bool
+  default     = true
+}
+
+variable "github_app_secret_name" {
+  description = "Secrets Manager path holding the GitHub App credential as JSON {appId, privateKey}. Created manually; see docs/runbooks/backstage-github-app.md."
+  type        = string
+  default     = "platform/backstage/github-app"
+}
+
 variable "host_aliases" {
   description = <<-DESC
     Pod /etc/hosts entries. Used for split-horizon resolution of the OIDC issuer hostname
