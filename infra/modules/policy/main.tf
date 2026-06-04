@@ -30,6 +30,14 @@ locals {
   engine_values = {
     features = {
       logging = { verbosity = var.engine_log_verbosity }
+      # On hostNetwork the controller-runtime manager metrics server (:8080) becomes a HOST port. It is
+      # redundant with Kyverno's own Prometheus metrics (the metering port, 8000/8001) and, on a rapid
+      # restart, the host :8080 socket lingers so the next start fails "bind: address already in use" →
+      # the admission controller CrashLoopBackOffs (observed after a node-churn/scale-up, when its manager
+      # restarted on an informer-sync timeout and could no longer rebind :8080, blocking all tenant
+      # admission). Disabling it on hostNetwork removes the failure mode; relocating the port would just
+      # move the lingering-socket problem. "0" disables (chart default ":8080").
+      controllerRuntimeMetrics = { bindAddress = var.webhook_host_network ? "0" : ":8080" }
     }
     admissionController = {
       replicas  = var.replica_count
