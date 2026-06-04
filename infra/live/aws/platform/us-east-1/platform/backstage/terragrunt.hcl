@@ -170,5 +170,15 @@ inputs = {
     },
   ]
 
+  # ArgoCD plugin (Phase 2.4b): read-only deployment view. The backend reaches our self-hosted ArgoCD
+  # in-cluster over HTTP (server.insecure=true; the :443 Service port also maps to plaintext 8080, so https
+  # would fail TLS). Read-only token (account `backstage`, role:readonly) synced from Secrets Manager
+  # (platform/argocd/backstage-token) → ARGOCD_AUTH_TOKEN. Components link via `argocd/app-selector`.
+  enable_argocd_plugin = true
+  argocd_instances = [{
+    name = "platform"
+    url  = "http://argocd-server.argocd.svc"
+  }]
+
   tags = include.base.locals.tags
 }

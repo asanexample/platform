@@ -133,10 +133,17 @@ inputs = {
     g, a4b884e8-f021-7042-5f38-65d571afff7c, role:admin
     g, a4c85418-d071-7051-9bee-c5a90ee7963e, role:developer
     g, c4b87428-8051-7073-9af0-a31f4b94daac, role:readonly
+    g, backstage, role:readonly
   CSV
 
   argocd_cm_extra = {
     "url" = "https://argocd.aws.refplat.org"
+
+    # Read-only, token-only local account for the Backstage ArgoCD plugin (2.4b). `apiKey` lets it hold an
+    # API token but not log in interactively; RBAC binds it to the built-in role:readonly (see rbac_policy_csv,
+    # `g, backstage, role:readonly`). The token is minted out-of-band + stored in Secrets Manager
+    # (platform/argocd/backstage-token) — see docs/runbooks/backstage-argocd.md. ADR-051: read-only, never admin.
+    "accounts.backstage" = "apiKey"
 
     # Kyverno Phase 2 (#73): the policy engine mutates these fields at admission (safe-default
     # securityContext / automountServiceAccountToken / identity labels). Tell ArgoCD to ignore the
