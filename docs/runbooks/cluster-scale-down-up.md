@@ -116,6 +116,46 @@ context server is the real `*.eks.amazonaws.com` endpoint, *then* test.
 
 Came up mid-turbulence, readiness probe stuck at 503. `kubectl delete` the pod for a clean restart.
 
+### 7. A whole cluster unreachable over Tailscale: the subnet-router pod wedged in `NeedsLogin`
+
+**Symptom:** after a long downtime (the node group was at zero overnight), `kubectl --context preprod` *resolves*
+(so this is NOT the split-DNS conflict #1) but **times out on connect** — the cluster's entire Tailscale route
+(e.g. `10.101.0.0/16`) is gone. The `ts-<cluster>-subnet-router-…-0` pod is in **CrashLoopBackOff**.
+
+**Root cause:** the subnet-router pod's stored tailscale node key went **invalid** during the long downtime, so
+on restart tailscaled is in `NeedsLogin` and asks the operator to reissue an auth key
+(`Requesting a new auth key from operator` → `Waiting … max wait 10m0s`). But the operator reports
+`ConnectorReady=True` (it only tracks that it *created* the resources, not that the pod *authenticated*), so it
+**never mints a new key** into the secret's `reissue_authkey` field → the pod times out after 10 min →
+`tailscaled got signal terminated` → CrashLoop → the route is never advertised → the cluster is unreachable.
+The operator's per-cycle `Connector resources synced` log is a red herring — it's "synced" because, to the
+operator, nothing is wrong. (The original single-use auth key in `cap-*.hujson` was consumed at first login and is
+not re-minted on reissue.)
+
+**Diagnose** (needs PlatformDeployer — PlatformAdmin can't read `tailscale.com` CRs / secrets; reach the cluster
+via the SSM tunnel since Tailscale is the very thing that's down):
+
+```bash
+kubectl -n tailscale-system get pods                              # subnet-router pod CrashLoopBackOff?
+kubectl -n tailscale-system logs <pod> --previous | tail -20      # "NeedsLogin" + "timeout waiting for auth key reissue"
+kubectl -n tailscale-system get secret <pod> \
+  -o jsonpath='{.data.reissue_authkey}' | wc -c                   # 0 ⇒ operator never wrote a key
+```
+
+**Fix:** force a clean re-provision — delete the wedged **state secret** and the **pod**. The operator recreates
+the secret with a freshly-minted auth key and the pod re-registers as a new tailnet device; the route auto-approves
+via the ACL `autoApprovers` (`tag:k8s` → the VPC CIDR).
+
+```bash
+kubectl -n tailscale-system delete secret ts-<cluster>-subnet-router-<hash>-0
+kubectl -n tailscale-system delete pod    ts-<cluster>-subnet-router-<hash>-0 --grace-period=0 --force
+# pod returns 1/1; `tailscale status` shows the device + its route; then verify kubectl over the REAL
+# endpoint with the tunnel KILLED (failure mode #5) — incident 2026-06-04.
+```
+
+The old device lingers in the tailnet as a stale offline entry — clean it up in the Tailscale admin (or let it
+expire). The router's function doesn't depend on a stable tailnet IP, so the new device is fine.
+
 ## Prevention
 
 - **Split-DNS conflict:** PR #208 makes both units agree on `10.100.0.2` for the shared EKS domain. Do not let
