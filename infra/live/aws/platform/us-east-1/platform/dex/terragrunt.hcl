@@ -8,7 +8,7 @@ include "root" {
 }
 
 terraform {
-  source = include.base.locals.module_source.backstage
+  source = include.base.locals.module_source.dex
 }
 
 dependency "eks" {
@@ -29,19 +29,8 @@ dependency "node_groups" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-# Orders Backstage after the CloudNativePG operator (the in-cluster DB Cluster CR needs the CRDs + the
-# reconciling controller to exist).
-dependency "cloudnative_pg" {
-  config_path = "../cloudnative-pg"
-
-  mock_outputs = {
-    namespace = "cnpg-system"
-  }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
-}
-
-# OIDC (Phase 2.1): the ExternalSecret needs the operator + ClusterSecretStore, and the client secret
-# (platform/backstage/oidc) is created by the dex module — so Backstage applies after all three.
+# Orders Dex after External Secrets (the ExternalSecret CRD + operator) and the secret-stores unit
+# (the aws-secrets-manager ClusterSecretStore) — both are needed to sync the OIDC client secret.
 dependency "external_secrets" {
   config_path = "../external-secrets"
 
@@ -53,13 +42,6 @@ dependency "secret_stores" {
   config_path = "../secret-stores"
 
   mock_outputs                            = {}
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
-}
-
-dependency "dex" {
-  config_path = "../dex"
-
-  mock_outputs                            = { namespace = "dex" }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
@@ -102,18 +84,12 @@ generate "kubernetes_provider" {
 inputs = {
   create = true
 
-  helm_chart_version = include.base.locals.helm_versions.backstage
+  helm_chart_version = include.base.locals.helm_versions.dex
 
-  # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
-  # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  image_tag = "c0259c7b32b23d6c0412c0aa00619ad7c798d54f"
-
-  # Phase 2.0: in-cluster CloudNativePG (dev). Flip to mode = "rds" (+ rds_host/rds_secret_name) for prod.
-  database = {
-    mode         = "in-cluster"
-    instances    = 1
-    storage_size = "5Gi"
-  }
+  # Identity Center SAML connector. New SAML app (ACS https://sso.aws.refplat.org/callback) => new
+  # signing cert; values live in secrets.hcl. See docs/runbooks/dex-sso.md for the manual app setup.
+  saml_sso_url = include.base.locals.all_vars.dex_sso_url
+  saml_ca_data = include.base.locals.all_vars.dex_sso_ca_data
 
   tags = include.base.locals.tags
 }

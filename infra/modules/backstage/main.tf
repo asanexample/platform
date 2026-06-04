@@ -18,6 +18,16 @@ locals {
   db_user_key = local.in_cluster_db ? "username" : "username"
   db_pass_key = local.in_cluster_db ? "password" : "password"
 
+  enable_oidc     = var.create && var.enable_oidc
+  oidc_k8s_secret = "backstage-oidc"
+
+  # OIDC client secret (shared with Dex's staticClient) injected as OIDC_CLIENT_SECRET, referenced by
+  # app-config.production.yaml's auth.providers.oidc.production.clientSecret. Synced from Secrets Manager
+  # by the ExternalSecret below. Empty list when OIDC is disabled.
+  oidc_env = local.enable_oidc ? [
+    { name = "OIDC_CLIENT_SECRET", valueFrom = { secretKeyRef = { name = local.oidc_k8s_secret, key = var.oidc_secret_key } } },
+  ] : []
+
   backstage_values = {
     # We bring our own Postgres (CNPG or RDS) — never the chart's bundled bitnami Postgres.
     postgresql = { enabled = false }
@@ -56,12 +66,12 @@ locals {
       command = ["node", "packages/backend"]
       args    = ["--config", "app-config.yaml", "--config", "app-config.production.yaml"]
 
-      extraEnvVars = [
+      extraEnvVars = concat([
         { name = "POSTGRES_HOST", value = local.db_host },
         { name = "POSTGRES_PORT", value = "5432" },
         { name = "POSTGRES_USER", valueFrom = { secretKeyRef = { name = local.db_secret, key = local.db_user_key } } },
         { name = "POSTGRES_PASSWORD", valueFrom = { secretKeyRef = { name = local.db_secret, key = local.db_pass_key } } },
-      ]
+      ], local.oidc_env)
 
       resources = var.resources
 
@@ -140,6 +150,36 @@ resource "kubernetes_manifest" "db" {
 }
 
 # ---------------------------------------------------------------------------
+# OIDC client secret (Phase 2.1) — synced from Secrets Manager by External Secrets.
+# The secret itself is created by the dex module (platform/backstage/oidc); here we just
+# project it into the backstage namespace as the K8s Secret backstage-oidc.
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_manifest" "oidc_external_secret" {
+  count = local.enable_oidc ? 1 : 0
+
+  manifest = {
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = local.oidc_k8s_secret
+      namespace = var.namespace
+    }
+    spec = {
+      refreshInterval = "1h"
+      secretStoreRef  = { name = var.secret_store_name, kind = "ClusterSecretStore" }
+      target          = { name = local.oidc_k8s_secret, creationPolicy = "Owner" }
+      data = [{
+        secretKey = var.oidc_secret_key
+        remoteRef = { key = var.oidc_secret_name, property = var.oidc_secret_key }
+      }]
+    }
+  }
+
+  depends_on = [kubernetes_namespace_v1.backstage]
+}
+
+# ---------------------------------------------------------------------------
 # Backstage (official chart, our image)
 # ---------------------------------------------------------------------------
 
@@ -162,5 +202,6 @@ resource "helm_release" "backstage" {
   depends_on = [
     kubernetes_namespace_v1.backstage,
     kubernetes_manifest.db,
+    kubernetes_manifest.oidc_external_secret,
   ]
 }

@@ -52,6 +52,18 @@ dependency "argocd" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+# The `sso` HTTPRoute is created in the dex namespace, so Dex must exist first.
+dependency "dex" {
+  config_path = "../dex"
+
+  mock_outputs = {
+    namespace    = "dex"
+    service_name = "dex"
+    service_port = 5556
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
 dependency "route53" {
   config_path = "../route53"
 
@@ -104,6 +116,13 @@ inputs = {
       namespace = "backstage"
       service   = "backstage"
       port      = 7007
+    }
+    # Centralized Dex SSO broker (Phase 2.1 — ADR-051). Tailscale-only at sso.aws.refplat.org;
+    # OIDC issuer for Backstage (and future apps). TLS at the gateway; Dex listens HTTP on 5556.
+    sso = {
+      namespace = dependency.dex.outputs.namespace
+      service   = dependency.dex.outputs.service_name
+      port      = dependency.dex.outputs.service_port
     }
   }
 }

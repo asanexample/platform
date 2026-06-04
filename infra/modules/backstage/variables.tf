@@ -118,6 +118,34 @@ variable "resources" {
   default = {}
 }
 
+# ---------------------------------------------------------------------------
+# OIDC SSO (Phase 2.1 — auth via the Dex broker, ADR-051)
+# ---------------------------------------------------------------------------
+
+variable "enable_oidc" {
+  description = "Wire OIDC SSO: sync the Dex client secret (platform/backstage/oidc) into the namespace and inject it as OIDC_CLIENT_SECRET. The image's app-config.production.yaml configures the provider."
+  type        = bool
+  default     = true
+}
+
+variable "oidc_secret_name" {
+  description = "Secrets Manager path holding the shared Dex OIDC client secret (created by the dex module)."
+  type        = string
+  default     = "platform/backstage/oidc"
+}
+
+variable "oidc_secret_key" {
+  description = "Key/property within the OIDC Secrets Manager secret (and the synced K8s Secret)."
+  type        = string
+  default     = "client-secret"
+}
+
+variable "secret_store_name" {
+  description = "Name of the ClusterSecretStore (External Secrets) to read Secrets Manager."
+  type        = string
+  default     = "aws-secrets-manager"
+}
+
 variable "tags" {
   description = "Tags (rendered as pod labels)"
   type        = map(string)

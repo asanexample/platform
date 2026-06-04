@@ -17,6 +17,11 @@ locals {
   argocd_sso_url     = local._secrets.locals.argocd_sso_url
   argocd_sso_ca_data = local._secrets.locals.argocd_sso_ca_data
 
+  # Dex SSO broker (Identity Center SAML). try()-guarded so existing units don't break before the
+  # manual Dex SAML app is set up and these keys are added to secrets.hcl (see docs/runbooks/dex-sso.md).
+  dex_sso_url     = try(local._secrets.locals.dex_sso_url, "")
+  dex_sso_ca_data = try(local._secrets.locals.dex_sso_ca_data, "")
+
   # Environment -> AWS account ID mapping (safety validation)
   # Used by _base.hcl to verify env.hcl account_id matches the expected value.
   environment_account_map = local._secrets.locals.account_ids
