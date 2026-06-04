@@ -91,7 +91,7 @@ higher-leverage half of this ADR.
 This ADR is the *identity + enforcement* half; [ADR-049](049-tenant-model-team-tenant-zone.md) (Team / Tenant /
 Zone) is the *model* half — and the **Team envelope it defines is the single declarative source decision 3
 generates from.** Keycloak's group/role taxonomy mirrors the ADR-049 Team model; a Team is an SSO/Keycloak group
-+ its envelope. The two ADRs are **co-dependent and both land with the rebuild**, so **finalizing the ADR-049
+plus its envelope. The two ADRs are **co-dependent and both land with the rebuild**, so **finalizing the ADR-049
 schema is the first implementation step** — the Keycloak group taxonomy, the per-system RBAC generators, and the
 Backstage policy (#197) all read from it. (Backstage already forward-compat'd: the 2.3a catalog projection emits
 Systems carrying `zone`/`tier` so ADR-049 lands with no entity-model change.)
