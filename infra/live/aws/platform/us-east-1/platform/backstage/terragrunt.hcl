@@ -70,6 +70,7 @@ dependency "preprod_eks" {
   config_path = "../../../../preprod/us-east-1/platform/eks"
 
   mock_outputs = {
+    cluster_id                    = "mock-preprod-cluster"
     cluster_endpoint              = "https://mock-preprod-endpoint"
     cluster_certificate_authority = "bW9jaw=="
   }
@@ -152,14 +153,17 @@ inputs = {
   enable_kubernetes_plugin = true
   cluster_name             = dependency.eks.outputs.cluster_id
   remote_cluster_role_arns = [dependency.preprod_iam_roles.outputs.role_arns["Backstage"]]
+  # NB: `name` MUST be the real EKS cluster name — Backstage's AWS auth uses it as the EKS token's
+  # `x-k8s-aws-id` (AwsIamStrategy), so a display name like "preprod" yields a token for the wrong cluster
+  # and the API returns 401. Use the eks units' cluster_id (platform-use1-eks / preprod-use1-eks).
   kubernetes_clusters = [
     {
-      name    = "platform"
+      name    = dependency.eks.outputs.cluster_id
       url     = dependency.eks.outputs.cluster_endpoint
       ca_data = dependency.eks.outputs.cluster_certificate_authority
     },
     {
-      name        = "preprod"
+      name        = dependency.preprod_eks.outputs.cluster_id
       url         = dependency.preprod_eks.outputs.cluster_endpoint
       ca_data     = dependency.preprod_eks.outputs.cluster_certificate_authority
       assume_role = dependency.preprod_iam_roles.outputs.role_arns["Backstage"]
