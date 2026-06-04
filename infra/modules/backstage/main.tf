@@ -21,12 +21,21 @@ locals {
   enable_oidc     = var.create && var.enable_oidc
   oidc_k8s_secret = "backstage-oidc"
 
-  # OIDC client secret (shared with Dex's staticClient) injected as OIDC_CLIENT_SECRET, referenced by
-  # app-config.production.yaml's auth.providers.oidc.production.clientSecret. Synced from Secrets Manager
-  # by the ExternalSecret below. Empty list when OIDC is disabled.
+  session_k8s_secret = "backstage-session"
+
+  # OIDC needs OIDC_CLIENT_SECRET (shared with Dex's staticClient, synced from Secrets Manager by the
+  # ExternalSecret below) and a session-signing secret (AUTH_SESSION_SECRET — backstage-only, generated
+  # here). The OAuth handshake stores state in a session cookie, so the oidc provider fails with
+  # "authentication requires session support" unless auth.session.secret is set. Empty when OIDC disabled.
   oidc_env = local.enable_oidc ? [
     { name = "OIDC_CLIENT_SECRET", valueFrom = { secretKeyRef = { name = local.oidc_k8s_secret, key = var.oidc_secret_key } } },
+    { name = "AUTH_SESSION_SECRET", valueFrom = { secretKeyRef = { name = local.session_k8s_secret, key = "session-secret" } } },
   ] : []
+
+  # Injected as an extra app-config layer via the chart's appConfig (rendered to a ConfigMap + appended
+  # to the --config chain). The ConfigMap holds only the ${ENV} placeholder; the value is in the env var.
+  # $${...} escapes HCL interpolation so the literal ${AUTH_SESSION_SECRET} reaches Backstage.
+  oidc_app_config = local.enable_oidc ? { auth = { session = { secret = "$${AUTH_SESSION_SECRET}" } } } : {}
 
   backstage_values = {
     # We bring our own Postgres (CNPG or RDS) — never the chart's bundled bitnami Postgres.
@@ -61,6 +70,10 @@ locals {
       replicas       = var.replica_count
       containerPorts = { backend = 7007 }
 
+      # Split-horizon: resolve the OIDC issuer host to the in-cluster gateway so backend<->Dex
+      # traffic never leaves the cluster (see var.host_aliases). Empty list = no aliases.
+      hostAliases = var.host_aliases
+
       # The chart overrides the image CMD, so re-supply the production config chain (both files are baked
       # into our image). Without the --config args the backend would load only the dev app-config.yaml.
       command = ["node", "packages/backend"]
@@ -72,6 +85,10 @@ locals {
         { name = "POSTGRES_USER", valueFrom = { secretKeyRef = { name = local.db_secret, key = local.db_user_key } } },
         { name = "POSTGRES_PASSWORD", valueFrom = { secretKeyRef = { name = local.db_secret, key = local.db_pass_key } } },
       ], local.oidc_env)
+
+      # Extra app-config layer (chart renders it to a ConfigMap and appends --config). Enables OIDC
+      # session support (auth.session.secret). Empty {} when OIDC is disabled.
+      appConfig = local.oidc_app_config
 
       resources = var.resources
 
@@ -180,6 +197,29 @@ resource "kubernetes_manifest" "oidc_external_secret" {
 }
 
 # ---------------------------------------------------------------------------
+# Session-signing secret (Phase 2.1) — backstage-only, generated here (not shared, so no
+# Secrets Manager round-trip needed). Backed AUTH_SESSION_SECRET; stable across applies.
+# ---------------------------------------------------------------------------
+
+resource "random_password" "session" {
+  count   = local.enable_oidc ? 1 : 0
+  length  = 64
+  special = false
+}
+
+resource "kubernetes_secret_v1" "session" {
+  count = local.enable_oidc ? 1 : 0
+
+  metadata {
+    name      = local.session_k8s_secret
+    namespace = var.namespace
+  }
+  data = { "session-secret" = random_password.session[0].result }
+
+  depends_on = [kubernetes_namespace_v1.backstage]
+}
+
+# ---------------------------------------------------------------------------
 # Backstage (official chart, our image)
 # ---------------------------------------------------------------------------
 
@@ -203,5 +243,6 @@ resource "helm_release" "backstage" {
     kubernetes_namespace_v1.backstage,
     kubernetes_manifest.db,
     kubernetes_manifest.oidc_external_secret,
+    kubernetes_secret_v1.session,
   ]
 }

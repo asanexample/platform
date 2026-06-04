@@ -58,4 +58,11 @@ coupling; the issuer leaks ArgoCD's identity).
 - **Upstream image.** Dex runs the upstream `ghcr.io/dexidp/dex` image (not our ECR, so not cosign-signed by
   us); pinned via the pinned chart's appVersion, with optional digest-pin. No cluster-wide `verify-images`
   policy applies to the `dex` namespace (those are scoped to `team-*`).
+- **Identity Center won't carry groups over SAML.** It does not emit group memberships as a SAML attribute, so
+  group-*claim*-based in-app RBAC (a later phase) can't rely on the assertion — it needs the catalog/Identity
+  Store or a real IdP. Group *assignment* still works as the entitlement gate; the missing piece is the claim.
+- **Per-app SAML signing cert + manual mappings are the operational toll.** Each Identity Center SAML app has
+  its own signing certificate (not instance-wide) and its attribute mappings are blank until set by hand — both
+  are console-only and were the main bring-up friction (see `../runbooks/dex-sso.md`). A future Keycloak/IdP that
+  exposes these via API would remove that toil.
 - **The Keycloak seam is now explicit.** Replacing Dex with Keycloak means repointing one issuer URL, not N.

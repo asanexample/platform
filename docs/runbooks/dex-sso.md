@@ -60,17 +60,21 @@ from ArgoCD's — it has its own ACS URL and therefore its own signing certifica
 (Both must equal `<issuer>/callback`. The module derives this from `dex_issuer` as the SAML connector's
 `redirectURI`/`entityIssuer`.)
 
-### Step 2: Configure attribute mappings
+### Step 2: Configure attribute mappings (do NOT skip — a blank Subject = `Federate 403`)
 
-| Attribute | Value | Format |
+Edit attribute mappings and set **both** of these. The `Subject` row exists by default but its "Maps to"
+field is **empty** — you must fill it. Leaving it blank makes Identity Center fail with `Federate 403 Forbidden`
+(surfaced as the generic "No access" page), because it can't build the assertion's NameID.
+
+| User attribute in the application | Maps to (IAM Identity Center) | Format |
 |-----------|-------|--------|
-| `Subject` | `${user:email}` | emailAddress |
+| `Subject` | `${user:email}` | **emailAddress** |
 | `email` | `${user:email}` | unspecified |
-| `groups` | `${user:groups}` | unspecified |
 
-The `groups` attribute is plumbed through for future group-based RBAC. Use "unspecified" format so Identity
-Center sends short attribute names (`email`, `groups`) — the Dex SAML connector uses those short names
-(`usernameAttr`/`emailAttr = email`, `groupsAttr = groups`), not full SAML URIs.
+> **Do NOT add a `groups → ${user:groups}` mapping.** Identity Center does **not** support emitting group
+> memberships as a SAML attribute that way — it fails the assertion. Dex's connector keeps `groupsAttr: groups`
+> but simply receives no groups (Backstage 2.1 is login-only, so that's fine). Group-based in-app RBAC (a later
+> phase) needs a different source — Identity Center won't carry it over SAML.
 
 ### Step 3: Assign groups (the authorization boundary)
 
@@ -83,22 +87,36 @@ Assign the application to the intended Identity Center groups only — see
 
 ### Step 4: Extract values for `secrets.hcl`
 
-1. Copy the **IAM Identity Center SAML sign-in URL** from the application details.
-2. Download the **SAML metadata XML** from the application details.
-3. Extract the certificate from the `<ds:X509Certificate>` element, wrap in PEM headers, and base64-encode:
+**`dex_sso_url`** — the SAML sign-in URL. Copy it from the app details, OR derive it via CLI (it's
+`base64("<account>_ins-<app-ARN-suffix>")`; get the suffix from `aws sso-admin list-applications`):
 
 ```bash
-xmllint --xpath '//*[local-name()="X509Certificate"]/text()' metadata.xml \
-  | fold -w 64 \
-  | { echo "-----BEGIN CERTIFICATE-----"; cat; echo "-----END CERTIFICATE-----"; } \
-  > signing-cert.pem
-base64 -i signing-cert.pem | tr -d '\n'
+# app ARN suffix = the apl-XXXX id, e.g. 722325d0aff3184d
+printf 'https://portal.sso.us-east-1.amazonaws.com/saml/assertion/%s\n' \
+  "$(printf '851725353202_ins-<app-ARN-suffix>' | base64)"
 ```
 
-> **Warning:** Do NOT use the certificate from the console's "Download certificate" button — it can differ
-> from the actual signing certificate. Always extract it from the SAML metadata XML.
+**`dex_sso_ca_data`** — the app's signing cert. **Per-application, NOT instance-wide** — do NOT reuse
+`argocd_sso_ca_data` (each Identity Center SAML app has its own cert; the wrong one gives Dex
+`verify signature: Could not verify certificate against trusted certs`). There's no CLI for it, so download
+**this app's** metadata XML (app details → **IAM Identity Center metadata** → Download) and extract:
 
-1. Add both values to `infra/live/aws/secrets.hcl` (gitignored; see `secrets.hcl.example`):
+```bash
+F="path/to/Dex (Platform SSO)_*.xml"
+cert=$(xmllint --xpath 'string((//*[local-name()="X509Certificate"])[1])' "$F" | tr -d '[:space:]')
+{ echo "-----BEGIN CERTIFICATE-----"; echo "$cert" | fold -w 64; echo "-----END CERTIFICATE-----"; } > signing-cert.pem
+openssl x509 -in signing-cert.pem -noout -subject   # sanity: must parse (CN=amazonaws.com, OU=IDAS)
+base64 < signing-cert.pem | tr -d '\n'              # -> dex_sso_ca_data
+```
+
+> **Gotcha:** the `-----END CERTIFICATE-----` marker MUST be on its own line. The naive
+> `xmllint | fold | { echo; cat; echo; }` recipe glues it onto the last base64 line (no trailing newline) and
+> Dex rejects it with `parse cert: trailing data`. The `echo "$cert" | fold` form above adds the newline; the
+> `openssl` check catches a bad PEM before you deploy.
+>
+> Do NOT use the console's "Download certificate" button — it can differ from the metadata's signing cert.
+
+Add both to `infra/live/aws/secrets.hcl` (gitignored; see `secrets.hcl.example`):
 
 ```hcl
 dex_sso_url     = "<SAML sign-in URL>"
@@ -175,9 +193,41 @@ A change to the Dex config rolls the pods automatically.
 kubectl --context platform logs -n dex -l app.kubernetes.io/name=dex
 ```
 
+- `parse cert: trailing data: "...-----END CERTIFICATE-----"`: the PEM in `dex_sso_ca_data` is malformed —
+  the END marker is glued to the last base64 line. Rebuild it with a newline (Step 4's `echo "$cert" | fold`
+  form) and `openssl x509 ... -noout -subject` to validate before re-applying.
+- `cannot create temp file: open /tmp/... read-only file system`: Dex writes its env-substituted config to
+  `/tmp` at startup, so `readOnlyRootFilesystem: true` needs a writable `/tmp` emptyDir (already in the module).
 - `failed to load connector`: SSO URL wrong or certificate malformed.
 - `x509: certificate signed by unknown authority`: `dex_sso_ca_data` missing or incorrectly encoded.
 - API-server/RBAC errors creating CRDs: confirm `rbac.createClusterScoped` is on (kubernetes storage needs it).
+
+### Identity Center "No access" page (CloudTrail shows `Federate` → 403)
+
+Auth succeeds but issuing the assertion is denied. CloudTrail (`aws cloudtrail lookup-events
+--lookup-attributes AttributeKey=EventName,AttributeValue=Federate`) shows `Authenticate` OK then
+`Federate 403 Forbidden`. Almost always **attribute mappings**, not entitlement:
+
+- **#1 cause: the `Subject` mapping is blank** (Step 2). Fill it (`${user:email}`, format `emailAddress`).
+- The user must be **assigned** to the app (a group they're in, or directly). The user also needs a **primary
+  email** in Identity Center. (Note: group assignment is sufficient; a direct user assignment is equivalent.)
+
+### Dex: `verify signature: ... Could not verify certificate against trusted certs`
+
+`dex_sso_ca_data` is the **wrong cert** — likely reused from another app (ArgoCD) or instance-wide. The signing
+cert is **per-application**. Re-extract from **this** app's metadata XML (Step 4) and re-apply.
+
+### Backstage 500: `Authentication failed, authentication requires session support`
+
+The oidc provider needs `auth.session.secret`. The module injects it (generated `AUTH_SESSION_SECRET` env +
+an `appConfig` layer); if you see this, confirm the backstage pod has that env and the
+`/app/app-config-from-configmap.yaml` `--config` arg.
+
+### Backstage 500: `getaddrinfo ENOTFOUND sso.aws.refplat.org` (from the pod)
+
+The backend can't resolve its own issuer hostname (public DNS / internal-NLB hairpin). The module pins it to the
+in-cluster gateway via `host_aliases` (Backstage unit) → `sso.aws.refplat.org` = the `cilium-gateway-*`
+ClusterIP. If the gateway Service is recreated and its ClusterIP changes, refresh that value.
 
 ### Backstage shows "Sign in" but the popup errors
 

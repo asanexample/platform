@@ -108,6 +108,15 @@ inputs = {
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
   image_tag = "c0259c7b32b23d6c0412c0aa00619ad7c798d54f"
 
+  # Split-horizon for OIDC SSO (Phase 2.1): the backend reaches Dex's issuer (sso.aws.refplat.org)
+  # in-cluster via the Cilium gateway ClusterIP, not public DNS / the internal-NLB hairpin. The IP is
+  # the `cilium-gateway-platform-gateway` Service ClusterIP (default ns) — stable for the Service's life;
+  # if that Service is recreated, refresh this. TLS still validates (wildcard *.aws.refplat.org at the gateway).
+  host_aliases = [{
+    ip        = "172.20.184.24"
+    hostnames = ["sso.aws.refplat.org"]
+  }]
+
   # Phase 2.0: in-cluster CloudNativePG (dev). Flip to mode = "rds" (+ rds_host/rds_secret_name) for prod.
   database = {
     mode         = "in-cluster"

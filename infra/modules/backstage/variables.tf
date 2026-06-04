@@ -146,6 +146,20 @@ variable "secret_store_name" {
   default     = "aws-secrets-manager"
 }
 
+variable "host_aliases" {
+  description = <<-DESC
+    Pod /etc/hosts entries. Used for split-horizon resolution of the OIDC issuer hostname
+    (sso.aws.refplat.org) to the in-cluster Cilium gateway ClusterIP, so the backend's OIDC
+    discovery + token exchange with Dex stay IN-CLUSTER (TLS still validates via the wildcard
+    cert at the gateway) instead of depending on public DNS resolving the internal-NLB hairpin.
+  DESC
+  type = list(object({
+    ip        = string
+    hostnames = list(string)
+  }))
+  default = []
+}
+
 variable "tags" {
   description = "Tags (rendered as pod labels)"
   type        = map(string)
