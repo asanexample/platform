@@ -8,7 +8,7 @@ include "root" {
 }
 
 terraform {
-  source = include.base.locals.module_source.dex
+  source = include.base.locals.module_source.oauth2_proxy
 }
 
 dependency "eks" {
@@ -29,8 +29,8 @@ dependency "node_groups" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-# Orders Dex after External Secrets (the ExternalSecret CRD + operator) and the secret-stores unit
-# (the aws-secrets-manager ClusterSecretStore) — both are needed to sync the OIDC client secret.
+# External Secrets operator (ExternalSecret CRD) + the aws-secrets-manager ClusterSecretStore — both
+# needed to sync the client-secret (and cookie-secret) into the backstage namespace.
 dependency "external_secrets" {
   config_path = "../external-secrets"
 
@@ -42,6 +42,22 @@ dependency "secret_stores" {
   config_path = "../secret-stores"
 
   mock_outputs                            = {}
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
+# Dex creates the OIDC client secret at platform/oauth2-proxy/oidc (static_clients = oauth2-proxy).
+dependency "dex" {
+  config_path = "../dex"
+
+  mock_outputs                            = { namespace = "dex" }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
+# Backstage owns the namespace and is the upstream this proxy fronts. Order after it.
+dependency "backstage" {
+  config_path = "../backstage"
+
+  mock_outputs                            = { namespace = "backstage", service_name = "backstage", service_port = 7007 }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
@@ -84,32 +100,17 @@ generate "kubernetes_provider" {
 inputs = {
   create = true
 
-  helm_chart_version = include.base.locals.helm_versions.dex
+  helm_chart_version = include.base.locals.helm_versions.oauth2_proxy
 
-  # OIDC clients Dex serves. Overrides the module default (which has only `backstage`), so the full
-  # list must be repeated here (a list input replaces, it does not merge). Each id auto-provisions a
-  # generated secret in Secrets Manager (platform/<id>/oidc) + an ExternalSecret. The `oauth2-proxy`
-  # client fronts Backstage to give it a durable session cookie (SAML/Dex issues no refresh token, so
-  # Backstage's own /refresh always 401s — #202; see docs/runbooks/dex-sso.md).
-  static_clients = [
-    {
-      id            = "backstage"
-      name          = "Backstage"
-      redirect_uris = ["https://backstage.aws.refplat.org/api/auth/oidc/handler/frame"]
-      secret_env    = "BACKSTAGE_CLIENT_SECRET"
-    },
-    {
-      id            = "oauth2-proxy"
-      name          = "OAuth2 Proxy (Backstage)"
-      redirect_uris = ["https://backstage.aws.refplat.org/oauth2/callback"]
-      secret_env    = "OAUTH2_PROXY_CLIENT_SECRET"
-    },
-  ]
+  namespace = dependency.backstage.outputs.namespace
 
-  # Identity Center SAML connector. New SAML app (ACS https://sso.aws.refplat.org/callback) => new
-  # signing cert; values live in secrets.hcl. See docs/runbooks/dex-sso.md for the manual app setup.
-  saml_sso_url = include.base.locals.all_vars.dex_sso_url
-  saml_ca_data = include.base.locals.all_vars.dex_sso_ca_data
+  # Split-horizon: resolve the Dex issuer host to the in-cluster gateway so proxy<->Dex traffic never
+  # leaves the cluster. Same value as the backstage unit's host_aliases; if the gateway Service ClusterIP
+  # changes, update both (dynamic resolution tracked in #195).
+  host_aliases = [{
+    ip        = "172.20.184.24"
+    hostnames = ["sso.aws.refplat.org"]
+  }]
 
   tags = include.base.locals.tags
 }

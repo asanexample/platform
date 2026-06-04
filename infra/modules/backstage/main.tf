@@ -98,7 +98,19 @@ locals {
 
     # The chart's NetworkPolicy restricts ingress to the backstage pod (egress stays open for now —
     # the portal must reach the DB, GitHub and AWS; a tightened egress policy is a 2.1 hardening step).
-    networkPolicy = { enabled = true }
+    #
+    # SECURITY (#202): Backstage's oauth2Proxy auth provider trusts the X-Forwarded-* identity headers
+    # WITHOUT verification, so the only thing preventing an in-cluster pod from spoofing them and
+    # impersonating any user is this ingress restriction — lock :7007 to ONLY the oauth2-proxy pod (same
+    # namespace). Cilium unions allow-rules across policies, so this MUST be the chart's own policy (not a
+    # separate CNP, which would just widen the allow). The podSelector value is the matchLabels map (the
+    # chart nests it under podSelector.matchLabels). Keep this as long as ProxiedSignInPage is in use.
+    networkPolicy = {
+      enabled = true
+      ingressRules = {
+        podSelector = { "app.kubernetes.io/name" = "oauth2-proxy" }
+      }
+    }
 
     backstage = {
       image = {

@@ -4,7 +4,7 @@
 
 Multi-cloud IaC platform using OpenTofu (v1.11) + Terragrunt (v1.x). Currently targets AWS only (Azure/GCP removed).
 
-- **Shared modules** (`infra/modules/`): argocd, argocd-apps, argocd-clusters, cert-manager, cilium, cloudflare/dns_delegation, cluster-rbac, crossplane, external-dns, external-secrets, gateway-config, policy, secret-stores, tailscale, tailscale-admin, tenant-claims, vcluster
+- **Shared modules** (`infra/modules/`): argocd, argocd-apps, argocd-clusters, cert-manager, cilium, cloudflare/dns_delegation, cluster-rbac, crossplane, external-dns, external-secrets, gateway-config, oauth2-proxy, policy, secret-stores, tailscale, tailscale-admin, tenant-claims, vcluster
 - **AWS modules** (`infra/modules/aws/`): cloudtrail, cross-vpc-dns, ecr, eks, eks-addons, eks-node-group, github_oidc, iam_roles, identity_center, networking, organizations, route53, route53_delegation, ssm-bastion, state_bootstrap, transit-gateway
 - **Live configs**: `infra/live/aws/` -- environment-specific Terragrunt units
 
@@ -63,7 +63,8 @@ networking ─┘                        |
               tenant-claims ─────────┤ (crossplane) — applies the XTenant claims; the Composition provisions each tenant (ADR-046/048)
               cloudnative-pg ────────┤ (eks, nodes) — CNPG operator for the Backstage DB (ADR-051)
               dex ───────────────────┤ (eks, nodes, ext-secrets, secret-stores) — centralized SAML→OIDC SSO broker (ADR-052)
-              backstage ─────────────┘ (eks, nodes, cnpg, ext-secrets, secret-stores, dex) — developer portal (ADR-051); after dex for OIDC SSO
+              backstage ─────────────┤ (eks, nodes, cnpg, ext-secrets, secret-stores, dex) — developer portal (ADR-051); after dex for OIDC SSO
+              oauth2-proxy ──────────┘ (eks, nodes, ext-secrets, secret-stores, dex, backstage) — auth proxy fronting Backstage for durable sessions (#202); in the backstage ns, gateway routes backstage→oauth2-proxy→backstage
 
 tailscale-admin ─── (no cluster deps, manages tailnet ACLs/OAuth)
 cloudtrail ──────── (no deps, secrets audit logging)
