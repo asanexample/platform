@@ -67,6 +67,10 @@ locals {
           authProvider = "aws"
           caData       = c.ca_data
           region       = c.region
+          # AmazonEKSViewPolicy doesn't grant the aggregated metrics.k8s.io API, so the optional pod-metrics
+          # lookup 403s and shows a spurious "problem retrieving objects" warning. Skip it (workloads/health
+          # still render). Grant metrics RBAC + flip this off later if CPU/memory usage is wanted.
+          skipMetricsLookup = true
         }, try(c.assume_role, null) != null && try(c.assume_role, "") != "" ? { assumeRole = c.assume_role } : {})]
       }]
     }
