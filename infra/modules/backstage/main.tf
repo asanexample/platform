@@ -47,6 +47,29 @@ locals {
     { name = "GITHUB_APP_PRIVATE_KEY", valueFrom = { secretKeyRef = { name = local.github_k8s_secret, key = "privateKey" } } },
   ] : []
 
+  # Provide the COMPLETE integrations.github via the chart appConfig layer (loaded last, so its array replaces
+  # the image's app-config.production.yaml entry). appId/privateKey come from the App secret (env). Backstage's
+  # integration schema ALSO requires clientId/clientSecret, but installation-token catalog discovery never uses
+  # them (they're OAuth/sign-in creds) — so they're placeholders. This App is discovery-only, not a sign-in
+  # provider; we deliberately don't mint a real, unused OAuth client secret. (Fold these into the image's
+  # app-config on the next backstage image build so this override becomes redundant.)
+  github_app_config = local.github_enabled ? {
+    integrations = {
+      github = [{
+        host = "github.com"
+        apps = [{
+          appId        = "$${GITHUB_APP_ID}"
+          privateKey   = "$${GITHUB_APP_PRIVATE_KEY}"
+          clientId     = "discovery-only-unused"
+          clientSecret = "discovery-only-unused"
+        }]
+      }]
+    }
+  } : {}
+
+  # Combined extra app-config layer (chart appConfig -> ConfigMap -> appended to the --config chain).
+  extra_app_config = merge(local.oidc_app_config, local.github_app_config)
+
   backstage_values = {
     # We bring our own Postgres (CNPG or RDS) — never the chart's bundled bitnami Postgres.
     postgresql = { enabled = false }
@@ -96,9 +119,9 @@ locals {
         { name = "POSTGRES_PASSWORD", valueFrom = { secretKeyRef = { name = local.db_secret, key = local.db_pass_key } } },
       ], local.oidc_env, local.github_env)
 
-      # Extra app-config layer (chart renders it to a ConfigMap and appends --config). Enables OIDC
-      # session support (auth.session.secret). Empty {} when OIDC is disabled.
-      appConfig = local.oidc_app_config
+      # Extra app-config layer (chart renders it to a ConfigMap and appends --config): OIDC session
+      # support (auth.session.secret) + the complete integrations.github (Phase 2.2). Empty {} when both off.
+      appConfig = local.extra_app_config
 
       resources = var.resources
 
