@@ -112,10 +112,12 @@ inputs = {
       port      = 80
     }
     # Developer portal (Backstage, Phase 2 — ADR-051). Tailscale-only at backstage.aws.refplat.org.
+    # Fronted by oauth2-proxy (#202): the gateway routes to the proxy, which owns the durable session
+    # cookie and forwards authenticated traffic to the backstage Service (same namespace) on 7007.
     backstage = {
       namespace = "backstage"
-      service   = "backstage"
-      port      = 7007
+      service   = "oauth2-proxy"
+      port      = 4180
     }
     # Centralized Dex SSO broker (Phase 2.1 — ADR-051). Tailscale-only at sso.aws.refplat.org;
     # OIDC issuer for Backstage (and future apps). TLS at the gateway; Dex listens HTTP on 5556.
