@@ -78,3 +78,38 @@ printf '%s' "$SS" | grep -q 'githubWorkflowRepository: "asanexample/app-alpha"' 
 # bravo (NOT in sharedSignerCallerRepos): verify-images must NOT carry a build-sign caller gate.
 printf '%s' "$SS" | awk '/name: verify-images-team-bravo/,0' | grep -q 'githubWorkflowRepository: "asanexample/app-bravo"' && { echo "FAIL: bravo must NOT carry a shared-signer gate when absent"; exit 1; }
 echo "shared-signer render-check passed (alpha=shared+app-signed, bravo=app-signed only)."
+
+# ---------------------------------------------------------------------------
+# Tenant envelope policy (restrict-tenant-envelope, ADR-049 A2b). It reads the projected Team CR via an
+# apiCall, which `kyverno test` can't unit-test offline (the per-resource values mock is removed in 1.18 and
+# globalValues is uniform per run). So we drive `kyverno apply` once per Team envelope — mocking the Team via
+# globalValues — and assert the per-rule outcomes. Behavioral, cluster-free.
+# ---------------------------------------------------------------------------
+echo "Testing tenant-envelope policy (envelope plane) ..."
+ENVPOL="$DIR/rendered/tenant-envelope.yaml"
+helm template kpp "$CHART" --show-only templates/tenant-envelope.yaml >"$ENVPOL"
+ED="$DIR/tenant-envelope"
+run_env() { kyverno apply "$ENVPOL" --resource "$ED/$1" --values-file "$ED/$2" 2>&1 || true; }
+must_flag() { # output resource rule
+  printf '%s' "$1" | grep -q "XTenant/$2 failed" || { echo "FAIL: envelope: $2 should be flagged"; printf '%s\n' "$1"; exit 1; }
+  printf '%s' "$1" | grep -q "$3"                 || { echo "FAIL: envelope: $2 expected rule '$3'"; printf '%s\n' "$1"; exit 1; }
+}
+must_admit() { # output resource
+  if printf '%s' "$1" | grep -q "XTenant/$2 failed"; then echo "FAIL: envelope: $2 should pass"; printf '%s\n' "$1"; exit 1; fi
+}
+
+OUT="$(run_env resources-payments.yaml values-payments.yaml)"
+must_admit "$OUT" ok
+must_admit "$OUT" wildok
+must_flag  "$OUT" badtier   "tier-within-envelope"
+must_flag  "$OUT" badloc    "residency-within-envelope"
+must_flag  "$OUT" overquota "quota-within-cap"
+
+OUT="$(run_env resources-alpha.yaml values-alpha.yaml)"
+must_admit "$OUT" okalpha
+must_flag  "$OUT" badenv "environment-within-envelope"
+
+OUT="$(run_env resources-ghost.yaml values-ghost.yaml)"
+must_flag  "$OUT" ghostteam "team-must-exist"
+
+echo "tenant-envelope policy checks passed (tier/env/residency/quota/team-existence)."
