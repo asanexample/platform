@@ -1,0 +1,274 @@
+# Tenant Composition v2 (Crossplane v2, Pipeline mode) — ADR-049 / delivery-plan A3.
+#
+# Renders a v1alpha2 XTenant into its tenant footprint. THIS IS THE A3a CUT: the Kubernetes footprint only
+# (namespace <team>-<name>, quota, limits, NetworkPolicies, CiliumNetworkPolicies, developer RoleBinding).
+# The AWS per-app identity (A3b) and cross-account ECR (A3c) are appended in follow-ups.
+#
+# NOT YET WIRED: v1alpha2 is served-only (v1alpha1 stays referenceable until the rebuild cutover, A6), so a
+# Composition can't bind to it on a live cluster yet. This file is render-tested offline (crossplane render)
+# by .tenant-api-tests; it becomes the active Composition at the cutover. Shipped raw (.Files.Get) so Helm
+# leaves the go-template delimiters intact.
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: tenant-v2
+  labels:
+    crossplane.io/xrd: xtenants.platform.refplat.org
+spec:
+  compositeTypeRef:
+    apiVersion: platform.refplat.org/v1alpha2
+    kind: XTenant
+  mode: Pipeline
+  pipeline:
+    - step: load-environment
+      functionRef:
+        name: function-environment-configs
+      input:
+        apiVersion: environmentconfigs.fn.crossplane.io/v1beta1
+        kind: Input
+        spec:
+          environmentConfigs:
+            - type: Reference
+              ref:
+                name: tenant-cluster-config
+    - step: render-resources
+      functionRef:
+        name: function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: |
+            {{- $spec := .observed.composite.resource.spec }}
+            {{- $team := $spec.team }}
+            {{- $name := $spec.name }}
+            {{- $ns := printf "%s-%s" $team $name }}
+            {{- $environment := $spec.environment }}
+            {{- $tier := $spec.tier | default "standard" }}
+            {{- $q := $spec.quota | default dict }}
+            {{- $gw := "default" }}
+            {{- $cfg := index .context "apiextensions.crossplane.io/environment" }}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: namespace
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: Namespace
+                  metadata:
+                    name: {{ $ns }}
+                    labels:
+                      app.kubernetes.io/managed-by: crossplane
+                      platform.refplat.org/tenant: {{ $team }}
+                      platform.refplat.org/tenant-name: {{ $name }}
+                      platform.refplat.org/environment: {{ $environment }}
+                      platform.refplat.org/tier: {{ $tier }}
+                      platform.refplat.org/mode: namespace
+                      pod-security.kubernetes.io/enforce: baseline
+                      pod-security.kubernetes.io/warn: restricted
+                      pod-security.kubernetes.io/audit: restricted
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: resourcequota
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: ResourceQuota
+                  metadata:
+                    name: tenant-quota
+                    namespace: {{ $ns }}
+                  spec:
+                    hard:
+                      requests.cpu: "{{ $q.cpu }}"
+                      requests.memory: "{{ $q.memory }}"
+                      limits.cpu: "{{ $q.cpu }}"
+                      limits.memory: "{{ $q.memory }}"
+                      pods: "{{ $q.pods }}"
+                      services: "{{ $q.services }}"
+                      services.loadbalancers: "{{ $q.loadbalancers }}"
+                      persistentvolumeclaims: "{{ $q.pvcs }}"
+                      requests.storage: "{{ $q.storage }}"
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: limitrange
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: LimitRange
+                  metadata:
+                    name: tenant-limits
+                    namespace: {{ $ns }}
+                  spec:
+                    limits:
+                      - type: Container
+                        default:
+                          cpu: 500m
+                          memory: 512Mi
+                        defaultRequest:
+                          cpu: 100m
+                          memory: 128Mi
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: netpol-default-deny-ingress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: networking.k8s.io/v1
+                  kind: NetworkPolicy
+                  metadata:
+                    name: default-deny-ingress
+                    namespace: {{ $ns }}
+                  spec:
+                    podSelector: {}
+                    policyTypes: ["Ingress"]
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: netpol-allow-gateway-ingress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: networking.k8s.io/v1
+                  kind: NetworkPolicy
+                  metadata:
+                    name: allow-gateway-ingress
+                    namespace: {{ $ns }}
+                  spec:
+                    podSelector: {}
+                    policyTypes: ["Ingress"]
+                    ingress:
+                      - from:
+                          - namespaceSelector:
+                              matchLabels:
+                                kubernetes.io/metadata.name: {{ $gw }}
+                          - namespaceSelector:
+                              matchLabels:
+                                kubernetes.io/metadata.name: kube-system
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: netpol-allow-dns-egress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: networking.k8s.io/v1
+                  kind: NetworkPolicy
+                  metadata:
+                    name: allow-dns-egress
+                    namespace: {{ $ns }}
+                  spec:
+                    podSelector: {}
+                    policyTypes: ["Egress"]
+                    egress:
+                      - ports:
+                          - port: 53
+                            protocol: UDP
+                          - port: 53
+                            protocol: TCP
+                      - to:
+                          - ipBlock:
+                              cidr: 0.0.0.0/0
+                              except: ["169.254.169.254/32"]
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: cnp-allow-gateway-envoy
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: cilium.io/v2
+                  kind: CiliumNetworkPolicy
+                  metadata:
+                    name: allow-gateway-envoy
+                    namespace: {{ $ns }}
+                  spec:
+                    endpointSelector: {}
+                    ingress:
+                      - fromEntities: ["ingress", "remote-node", "host"]
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: cnp-allow-pod-identity-egress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: cilium.io/v2
+                  kind: CiliumNetworkPolicy
+                  metadata:
+                    name: allow-pod-identity-egress
+                    namespace: {{ $ns }}
+                  spec:
+                    endpointSelector: {}
+                    egress:
+                      - toEntities: ["host"]
+                        toPorts:
+                          - ports:
+                              - port: "80"
+                                protocol: TCP
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: rolebinding-developers
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: rbac.authorization.k8s.io/v1
+                  kind: RoleBinding
+                  metadata:
+                    name: tenant-developers
+                    namespace: {{ $ns }}
+                  roleRef:
+                    apiGroup: rbac.authorization.k8s.io
+                    kind: ClusterRole
+                    name: tenant-developer
+                  subjects:
+                    - kind: Group
+                      name: {{ $ns }}:developers
+                      apiGroup: rbac.authorization.k8s.io
+    - step: ready
+      functionRef:
+        name: function-auto-ready
