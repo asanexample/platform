@@ -14,9 +14,12 @@ Per-app OIDC clients and the Team→group/role taxonomy are later slices; ArgoCD
   URL + signing cert, NameID=Email, `principal_type=SUBJECT`, `trust_email`, `sync_mode=FORCE`).
 - `keycloak_attribute_importer_identity_provider_mapper` — imports the SAML email onto the Keycloak user.
 - **Per-app OIDC clients** (`var.clients`: ArgoCD, Backstage, oauth2-proxy) — confidential
-  `keycloak_openid_client` + a `groups` claim mapper each, with a generated secret stored in Secrets Manager at
-  `platform/keycloak/<id>-oidc` (a Keycloak-specific path — no collision with Dex's `platform/<id>/oidc` during
-  coexistence). Nothing consumes these yet; apps repoint at the B3/B4 cutover.
+  `keycloak_openid_client` + a `groups` claim mapper + a `roles` claim mapper each, with a generated secret
+  stored in Secrets Manager at `platform/keycloak/<id>-oidc` (a Keycloak-specific path — no collision with Dex's
+  `platform/<id>/oidc` during coexistence). Nothing consumes these yet; apps repoint at the B3/B4 cutover.
+- **Team taxonomy** (`var.teams`, from the canonical `infra/live/aws/_teams.hcl`) — one `keycloak_group` per
+  Team + the ADR-049 developer-access realm roles (`tenant-operate` for preprod, `tenant-view` for prod),
+  assigned to each group by its envelope. The clients' `groups`/`roles` mappers carry these as named claims.
 
 ## Usage
 
@@ -46,8 +49,15 @@ Validate-only in CI (the provider needs a live admin API). Verified during devel
 ephemeral Keycloak (`docker run quay.io/keycloak/keycloak:26.6.3 start-dev`) — realm + broker + mapper create
 cleanly and re-plan is idempotent. Apply is rebuild-gated.
 
+## Membership (out of scope — a dependency for B3/B4)
+
+The taxonomy defines groups/roles as code but does NOT assign *which users* are in each group (Identity Center
+can't emit groups over SAML). Membership comes later via **SCIM** or manual assignment. Until then the
+`groups`/`roles` claims are **empty for every user** — so the ArgoCD/Backstage cutovers (B3/B4) can authenticate
+but cannot grant group-based access yet. Membership is a prerequisite for those cutovers delivering real authz.
+
 ## Not here (→ later)
 
-The Team-driven group/role taxonomy from the canonical registry (which populates the `groups` claim), the
-ArgoCD OIDC cutover (B3), Backstage RBAC (#197, B4), and the Dex→Keycloak issuer cutover. The client secrets
-live in Secrets Manager but no app reads them yet — wiring the app ExternalSecrets is part of B3/B4.
+Group **membership** (SCIM); the ArgoCD OIDC cutover (B3) + Backstage RBAC (#197, B4) that consume the claims;
+wiring the app ExternalSecrets (the client secrets sit in Secrets Manager, unread); per-environment registry
+filtering; full `teams.hcl` consolidation; the Dex→Keycloak issuer cutover.

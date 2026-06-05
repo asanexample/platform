@@ -6,6 +6,22 @@ locals {
 
   clients         = local.create ? var.clients : {}
   oidc_secret_key = "client-secret"
+
+  teams = local.create ? var.teams : {}
+
+  # ADR-049 standing developer-access posture by environment (elevation is break-glass, not a standing role).
+  role_for_env = {
+    preprod = "tenant-operate"
+    prod    = "tenant-view"
+  }
+  posture_roles = ["tenant-operate", "tenant-view"]
+
+  # Roles each team's group gets, derived from its envelope.allowedEnvironments.
+  team_role_names = {
+    for t, cfg in local.teams : t => distinct(compact([
+      for env in try(cfg.envelope.allowedEnvironments, []) : lookup(local.role_for_env, env, "")
+    ]))
+  }
 }
 
 # ---------------------------------------------------------------------------
@@ -121,4 +137,49 @@ resource "keycloak_openid_group_membership_protocol_mapper" "groups" {
   name       = "groups"
   claim_name = "groups"
   full_path  = false
+}
+
+# Emit the user's realm roles as a `roles` claim per client (alongside `groups`). NOTE: this emits ALL realm
+# roles incl. Keycloak defaults (offline_access, default-roles-platform, …); apps filter to the tenant-* roles.
+resource "keycloak_openid_user_realm_role_protocol_mapper" "roles" {
+  for_each = local.clients
+
+  realm_id    = keycloak_realm.this[0].id
+  client_id   = keycloak_openid_client.this[each.key].id
+  name        = "roles"
+  claim_name  = "roles"
+  multivalued = true
+}
+
+# ---------------------------------------------------------------------------
+# Team taxonomy — Keycloak groups + developer-access roles, generated from the canonical registry (ADR-053).
+# One group per Team (the named `groups` claim apps consume); realm roles for the ADR-049 posture, assigned to
+# each group by its envelope. Group MEMBERSHIP (which users) is out of scope (SCIM/manual) — claims stay empty
+# until membership lands, which the B3/B4 app cutovers depend on.
+# ---------------------------------------------------------------------------
+
+resource "keycloak_group" "team" {
+  for_each = local.teams
+
+  realm_id = keycloak_realm.this[0].id
+  name     = each.key
+}
+
+resource "keycloak_role" "posture" {
+  for_each = local.create ? toset(local.posture_roles) : toset([])
+
+  realm_id = keycloak_realm.this[0].id
+  name     = each.value
+  description = (each.value == "tenant-operate"
+    ? "Standing developer access in preprod — operate (ADR-049/040; elevation via break-glass)."
+  : "Standing developer access in prod — view (operate via break-glass; ADR-049/040).")
+}
+
+resource "keycloak_group_roles" "team" {
+  for_each = local.teams
+
+  realm_id   = keycloak_realm.this[0].id
+  group_id   = keycloak_group.team[each.key].id
+  exhaustive = true
+  role_ids   = [for r in local.team_role_names[each.key] : keycloak_role.posture[r].id]
 }

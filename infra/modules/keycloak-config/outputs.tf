@@ -32,3 +32,13 @@ output "client_secret_names" {
   description = "Secrets Manager secret names holding each client's secret (key: client-secret). Apps consume these at the B3/B4 cutover."
   value       = { for k, v in aws_secretsmanager_secret.client : k => v.name }
 }
+
+output "group_names" {
+  description = "Keycloak groups created from the Team registry (one per Team)."
+  value       = keys(local.teams)
+}
+
+output "realm_roles" {
+  description = "Developer-access realm roles."
+  value       = [for r in keycloak_role.posture : r.name]
+}
