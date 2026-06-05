@@ -6,7 +6,9 @@
 planned rebuild ([ADR-049](049-tenant-model-team-tenant-zone.md)). Complements the AWS+Kubernetes RBAC of
 [ADR-039](039-per-team-developer-rbac.md)/[ADR-040](040-platform-engineer-access-model.md)/[ADR-041](041-pod-identity-for-tenant-workloads.md)/[ADR-047](047-pod-identity-as-aws-identity-standard.md);
 charts the eventual replacement of the Dex broker ([ADR-052](052-centralized-dex-sso-broker.md)). Unblocks the
-deferred Backstage RBAC (#197).
+deferred Backstage RBAC (#197). **Refined by [ADR-059](059-identity-topology-pluggable-idp-seam.md)** — the
+"Identity Center is the user store, Keycloak brokers up" framing is one instance of a topology where the upstream
+IdP (Okta / Entra / Google / IdC / standalone) is pluggable behind the Keycloak seam.
 
 ## Context
 
