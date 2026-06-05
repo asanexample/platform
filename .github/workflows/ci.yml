@@ -214,12 +214,15 @@ jobs:
           # intermittently returns 403 to GitHub runner IPs (retries don't beat a sustained block). Pinned by
           # the multi-arch index digest (the supply-chain anchor); xpkg.crossplane.io avoids Docker Hub limits.
           img="xpkg.crossplane.io/crossplane/crossplane@${CROSSPLANE_IMAGE_DIGEST}"
-          docker pull "$img"
+          docker pull --platform linux/amd64 "$img"
           cid="$(docker create "$img")"
-          docker cp "$cid:/bin/crossplane" crossplane
+          # /bin/crossplane is a symlink into /nix/store (the image is Nix-built distroless), so copy the
+          # symlink, resolve its target, then copy the real binary out — arch-agnostic, no shell in the image.
+          docker cp "$cid:/bin/crossplane" crossplane.link
+          docker cp "$cid:$(readlink crossplane.link)" crossplane
           docker rm "$cid" >/dev/null
           sudo install -m 0755 crossplane /usr/local/bin/crossplane
-          rm -f crossplane
+          rm -f crossplane crossplane.link
           crossplane version --client
       - name: Validate Tenant API example claims against the XRD
         run: infra/modules/crossplane/.tenant-api-tests/run.sh
@@ -241,12 +244,15 @@ jobs:
           # intermittently returns 403 to GitHub runner IPs (retries don't beat a sustained block). Pinned by
           # the multi-arch index digest (the supply-chain anchor); xpkg.crossplane.io avoids Docker Hub limits.
           img="xpkg.crossplane.io/crossplane/crossplane@${CROSSPLANE_IMAGE_DIGEST}"
-          docker pull "$img"
+          docker pull --platform linux/amd64 "$img"
           cid="$(docker create "$img")"
-          docker cp "$cid:/bin/crossplane" crossplane
+          # /bin/crossplane is a symlink into /nix/store (the image is Nix-built distroless), so copy the
+          # symlink, resolve its target, then copy the real binary out — arch-agnostic, no shell in the image.
+          docker cp "$cid:/bin/crossplane" crossplane.link
+          docker cp "$cid:$(readlink crossplane.link)" crossplane
           docker rm "$cid" >/dev/null
           sudo install -m 0755 crossplane /usr/local/bin/crossplane
-          rm -f crossplane
+          rm -f crossplane crossplane.link
           crossplane version --client
       - name: Render the v2 Composition and assert the tenant footprint
         run: infra/modules/crossplane/.tenant-api-tests/render.sh
