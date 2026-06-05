@@ -64,6 +64,18 @@ dependency "dex" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+# The `keycloak` HTTPRoute is created in the keycloak namespace (ADR-053, B1 — alongside Dex).
+dependency "keycloak" {
+  config_path = "../keycloak"
+
+  mock_outputs = {
+    namespace    = "keycloak"
+    service_name = "keycloak"
+    service_port = 80
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
 dependency "route53" {
   config_path = "../route53"
 
@@ -125,6 +137,13 @@ inputs = {
       namespace = dependency.dex.outputs.namespace
       service   = dependency.dex.outputs.service_name
       port      = dependency.dex.outputs.service_port
+    }
+    # Keycloak app IdP (ADR-053, B1). Tailscale-only at keycloak.aws.refplat.org, alongside Dex's sso route;
+    # becomes the sso.* issuer at the Dex cutover. TLS at the gateway; Keycloak Service serves HTTP on 80.
+    keycloak = {
+      namespace = dependency.keycloak.outputs.namespace
+      service   = dependency.keycloak.outputs.service_name
+      port      = dependency.keycloak.outputs.service_port
     }
   }
 }

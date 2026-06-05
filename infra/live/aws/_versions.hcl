@@ -68,6 +68,7 @@ locals {
     cloudnative_pg      = "${local.source_base}/cloudnative-pg"
     backstage           = "${local.source_base}/backstage"
     dex                 = "${local.source_base}/dex"
+    keycloak            = "${local.source_base}/keycloak"
     oauth2_proxy        = "${local.source_base}/oauth2-proxy"
   }
 
@@ -87,6 +88,7 @@ locals {
     cloudnative_pg        = "0.28.2" # CNPG operator chart (app v1.29.1) — Backstage DB (ADR-051)
     backstage             = "2.8.1"  # official backstage Helm chart (points at our platform/backstage image)
     dex                   = "0.24.1" # dexidp/dex chart (app v2.44.0) — centralized SAML->OIDC broker (ADR-051)
+    keycloak              = "7.2.0"  # codecentric/keycloakx chart; Keycloak 26.6.3 via image-tag override — app IdP (ADR-053, B1)
     oauth2_proxy          = "10.6.0" # oauth2-proxy chart (app v7.15.2 — CVE-2026-40575 floor) — Backstage auth proxy (#202)
   }
 }
