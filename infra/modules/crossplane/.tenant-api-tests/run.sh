@@ -47,6 +47,31 @@ validate_dir "$xrd" "invalid Tenant claims" "${here}/invalid" reject
 validate_dir "$team_crd" "valid Team records"   "${here}/teams"         pass
 validate_dir "$team_crd" "invalid Team records" "${here}/teams-invalid" reject
 
+# Registry → projection (the crossplane-teams chart, delivery-plan A2). Render the canonical registry into
+# projected Team CRs and (a) validate them against the Team CRD, (b) assert the canonical-only fields are
+# dropped. Needs helm; skip gracefully if absent (the CI job installs it).
+if command -v helm >/dev/null 2>&1; then
+  echo "== Team registry projection (crossplane-teams chart) =="
+  proj="${here}/rendered-teams.yaml"
+  helm template teams "${here}/../charts/teams" -f "${here}/registry-values.yaml" > "$proj"
+  if ! crossplane beta validate "$team_crd" "$proj"; then
+    echo "::error::projected Team CRs failed validation against the Team CRD"
+    fail=1
+  fi
+  for t in payments alpha bravo; do
+    grep -q "name: ${t}$" "$proj" || { echo "::error::projection missing Team '${t}'"; fail=1; }
+  done
+  # canonical-only fields must NOT leak into the projected CRs
+  for leaked in displayName developerGroup costCenter contacts; do
+    if grep -q "${leaked}" "$proj"; then echo "::error::projection leaked canonical-only field '${leaked}'"; fail=1; fi
+  done
+  rm -f "$proj"
+  echo
+else
+  echo "(helm not found — skipping projection render check)"
+  echo
+fi
+
 if [ "$fail" -ne 0 ]; then
   echo "Tenant API schema validation FAILED"
   exit 1
