@@ -7,11 +7,15 @@ terraform {
       source  = "keycloak/keycloak"
       version = "~> 5.7"
     }
-    # Not used by this module's resources, but the unit injects a data.aws_secretsmanager_secret_version (the
-    # Keycloak admin credential) via a generate block, and this versions.tf is the one Terragrunt uses.
+    # Per-app OIDC client secrets are generated + stored in Secrets Manager (and the unit injects the admin
+    # credential data source via a generate block, using this versions.tf).
     aws = {
       source  = "hashicorp/aws"
       version = ">= 6.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = ">= 3.0"
     }
   }
 }

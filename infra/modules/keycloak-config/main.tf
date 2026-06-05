@@ -3,6 +3,9 @@ locals {
 
   # SP entity id Keycloak presents to Identity Center. The IdC SAML app's audience must equal this.
   sp_entity_id = var.saml_entity_id != "" ? var.saml_entity_id : "${var.keycloak_url}/realms/${var.realm_name}"
+
+  clients         = local.create ? var.clients : {}
+  oidc_secret_key = "client-secret"
 }
 
 # ---------------------------------------------------------------------------
@@ -63,4 +66,59 @@ resource "keycloak_attribute_importer_identity_provider_mapper" "email" {
   extra_config = {
     syncMode = "INHERIT" # inherit the IdP's sync_mode (FORCE)
   }
+}
+
+# ---------------------------------------------------------------------------
+# Per-app OIDC clients — each app's registration in the realm (ADR-053).
+# Confidential clients with a generated secret (stored in Secrets Manager, Keycloak-specific path so it does
+# NOT collide with Dex's platform/<id>/oidc during coexistence) + a `groups` claim mapper. Apps repoint to
+# these at the B3/B4 cutover; nothing consumes them yet.
+# ---------------------------------------------------------------------------
+
+resource "random_password" "client" {
+  for_each = local.clients
+
+  length  = 40
+  special = false # alphanumeric — safe across the SM->ESO->app path
+}
+
+resource "aws_secretsmanager_secret" "client" {
+  for_each = local.clients
+
+  name                    = "platform/keycloak/${each.key}-oidc"
+  description             = "Keycloak OIDC client secret for ${each.value.name} (realm ${var.realm_name})."
+  recovery_window_in_days = var.secret_recovery_window_days
+  tags                    = var.tags
+}
+
+resource "aws_secretsmanager_secret_version" "client" {
+  for_each = local.clients
+
+  secret_id     = aws_secretsmanager_secret.client[each.key].id
+  secret_string = jsonencode({ (local.oidc_secret_key) = random_password.client[each.key].result })
+}
+
+resource "keycloak_openid_client" "this" {
+  for_each = local.clients
+
+  realm_id              = keycloak_realm.this[0].id
+  client_id             = each.key
+  name                  = each.value.name
+  enabled               = true
+  access_type           = "CONFIDENTIAL"
+  standard_flow_enabled = true
+  valid_redirect_uris   = each.value.redirect_uris
+  client_secret         = random_password.client[each.key].result
+}
+
+# Emit the user's group memberships as a `groups` claim (bare names, not /path) — the access-model claim apps
+# consume. Inert until the Team→group taxonomy slice populates groups.
+resource "keycloak_openid_group_membership_protocol_mapper" "groups" {
+  for_each = local.clients
+
+  realm_id   = keycloak_realm.this[0].id
+  client_id  = keycloak_openid_client.this[each.key].id
+  name       = "groups"
+  claim_name = "groups"
+  full_path  = false
 }

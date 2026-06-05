@@ -22,3 +22,13 @@ output "broker_endpoint" {
   description = "SAML broker ACS endpoint (the IdC app's ACS/audience target)."
   value       = "${var.keycloak_url}/realms/${var.realm_name}/broker/${var.saml_idp_alias}/endpoint"
 }
+
+output "client_ids" {
+  description = "Registered OIDC client IDs."
+  value       = keys(local.clients)
+}
+
+output "client_secret_names" {
+  description = "Secrets Manager secret names holding each client's secret (key: client-secret). Apps consume these at the B3/B4 cutover."
+  value       = { for k, v in aws_secretsmanager_secret.client : k => v.name }
+}

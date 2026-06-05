@@ -13,6 +13,10 @@ Per-app OIDC clients and the Team→group/role taxonomy are later slices; ArgoCD
 - `keycloak_saml_identity_provider` `aws-sso` — the Identity Center broker (mirrors the Dex connector: IdC SSO
   URL + signing cert, NameID=Email, `principal_type=SUBJECT`, `trust_email`, `sync_mode=FORCE`).
 - `keycloak_attribute_importer_identity_provider_mapper` — imports the SAML email onto the Keycloak user.
+- **Per-app OIDC clients** (`var.clients`: ArgoCD, Backstage, oauth2-proxy) — confidential
+  `keycloak_openid_client` + a `groups` claim mapper each, with a generated secret stored in Secrets Manager at
+  `platform/keycloak/<id>-oidc` (a Keycloak-specific path — no collision with Dex's `platform/<id>/oidc` during
+  coexistence). Nothing consumes these yet; apps repoint at the B3/B4 cutover.
 
 ## Usage
 
@@ -44,5 +48,6 @@ cleanly and re-plan is idempotent. Apply is rebuild-gated.
 
 ## Not here (→ later)
 
-Per-app OIDC clients (ArgoCD/Backstage/oauth2-proxy), the Team-driven group/role taxonomy from the canonical
-registry, the ArgoCD OIDC cutover (B3), Backstage RBAC (#197, B4), and the Dex→Keycloak issuer cutover.
+The Team-driven group/role taxonomy from the canonical registry (which populates the `groups` claim), the
+ArgoCD OIDC cutover (B3), Backstage RBAC (#197, B4), and the Dex→Keycloak issuer cutover. The client secrets
+live in Secrets Manager but no app reads them yet — wiring the app ExternalSecrets is part of B3/B4.
