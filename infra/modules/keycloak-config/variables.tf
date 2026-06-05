@@ -22,35 +22,66 @@ variable "realm_display_name" {
 }
 
 # ---------------------------------------------------------------------------
-# Identity Center SAML broker (federate auth UP to AWS SSO; mirrors the Dex connector)
+# Upstream identity provider — the broker Keycloak federates authentication UP to.
+# Pluggable per ADR-059: SAML (AWS Identity Center today) or OIDC (Okta / Entra / Google). Everything downstream
+# of Keycloak is invariant; only this block changes per environment. Presets: docs/runbooks/keycloak-upstream-idp.md
 # ---------------------------------------------------------------------------
 
-variable "saml_idp_alias" {
-  description = "Alias of the SAML identity provider (broker). The broker endpoint is <keycloak_url>/realms/<realm>/broker/<alias>/endpoint."
-  type        = string
-  default     = "aws-sso"
+variable "upstream" {
+  description = <<-DESC
+    The upstream IdP Keycloak brokers authentication to (ADR-059). `protocol` selects SAML (e.g. AWS Identity
+    Center) or OIDC (Okta / Entra / Google); fill the matching sub-object. `group_claim` is the name of the group
+    claim/attribute the upstream emits — set it (e.g. "groups") to drive the per-team membership mappers; ""
+    (the default, and AWS IdC's reality) leaves them inert. The broker endpoint is
+    <keycloak_url>/realms/<realm>/broker/<alias>/endpoint.
+  DESC
+  type = object({
+    alias           = optional(string, "aws-sso")
+    display_name    = optional(string, "AWS SSO")
+    protocol        = string # "saml" | "oidc"
+    group_claim     = optional(string, "")
+    email_attribute = optional(string, "email")
+    saml = optional(object({
+      sso_url                = string
+      ca_data                = string # BARE base64 cert body (no PEM headers); see docs/runbooks/keycloak-sso.md
+      entity_id              = optional(string, "")
+      name_id_format         = optional(string, "Email")
+      principal_type         = optional(string, "SUBJECT")
+      want_assertions_signed = optional(bool, true)
+    }), null)
+    oidc = optional(object({
+      authorization_url = string
+      token_url         = string
+      user_info_url     = optional(string, "")
+      jwks_url          = optional(string, "")
+      client_id         = string
+      default_scopes    = optional(string, "openid email profile groups")
+    }), null)
+  })
+
+  validation {
+    condition     = contains(["saml", "oidc"], var.upstream.protocol)
+    error_message = "upstream.protocol must be \"saml\" or \"oidc\"."
+  }
+  validation {
+    condition     = var.upstream.protocol != "saml" || var.upstream.saml != null
+    error_message = "upstream.saml must be set when protocol = \"saml\"."
+  }
+  validation {
+    condition     = var.upstream.protocol != "oidc" || var.upstream.oidc != null
+    error_message = "upstream.oidc must be set when protocol = \"oidc\"."
+  }
+  validation {
+    condition     = var.upstream.protocol != "oidc" || var.upstream_oidc_client_secret != ""
+    error_message = "upstream_oidc_client_secret must be set when protocol = \"oidc\"."
+  }
 }
 
-variable "saml_sso_url" {
-  description = "Identity Center SAML SSO (IdP) URL — the single_sign_on_service_url. From secrets.hcl (keycloak_sso_url)."
+variable "upstream_oidc_client_secret" {
+  description = "OIDC client secret for the upstream broker app (required when upstream.protocol = \"oidc\"; from secrets.hcl). Unused for SAML."
   type        = string
-}
-
-variable "saml_ca_data" {
-  description = "Identity Center IdP signing certificate as the BARE base64 cert body (no PEM -----BEGIN/END----- headers or newlines). See docs/runbooks/keycloak-sso.md. From secrets.hcl (keycloak_sso_ca_data)."
-  type        = string
-}
-
-variable "saml_entity_id" {
-  description = "SP entity id Keycloak presents to Identity Center (the IdC app's SAML audience must match). Empty derives <keycloak_url>/realms/<realm_name>."
-  type        = string
+  sensitive   = true
   default     = ""
-}
-
-variable "saml_email_attribute" {
-  description = "Name of the email attribute in the IdC SAML assertion, imported to the Keycloak user's email."
-  type        = string
-  default     = "email"
 }
 
 # ---------------------------------------------------------------------------

@@ -14,13 +14,23 @@ output "issuer" {
 }
 
 output "broker_alias" {
-  description = "Alias of the Identity Center SAML broker."
-  value       = var.saml_idp_alias
+  description = "Alias of the upstream identity provider (broker)."
+  value       = var.upstream.alias
+}
+
+output "broker_protocol" {
+  description = "Protocol of the upstream broker (saml | oidc)."
+  value       = var.upstream.protocol
 }
 
 output "broker_endpoint" {
-  description = "SAML broker ACS endpoint (the IdC app's ACS/audience target)."
-  value       = "${var.keycloak_url}/realms/${var.realm_name}/broker/${var.saml_idp_alias}/endpoint"
+  description = "Broker callback endpoint — the upstream app's ACS (SAML) / redirect URI (OIDC) target."
+  value       = "${var.keycloak_url}/realms/${var.realm_name}/broker/${var.upstream.alias}/endpoint"
+}
+
+output "group_membership_mappers" {
+  description = "Teams whose upstream group is mapped to a Keycloak group (empty when the upstream emits no groups)."
+  value       = keys(local.team_group_bindings)
 }
 
 output "client_ids" {
