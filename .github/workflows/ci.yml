@@ -200,20 +200,24 @@ jobs:
     name: Tenant API Schema
     runs-on: ubuntu-latest
     env:
-      CROSSPLANE_VERSION: "v2.2.1" # pin to the CLI the XRD was authored/validated against
-      # Pinned digest of the v2.2.1 linux_amd64 `crank` binary. We pin it literally rather than fetching the
-      # co-located crank.sha256, because (a) that published checksum does NOT match the binary — a crossplane
-      # release bug (verified 2026-06-04) — and (b) a checksum served from the same host as the binary is no
-      # real integrity control. Bump alongside CROSSPLANE_VERSION (recompute from the HTTPS download).
-      CROSSPLANE_SHA256: "9a1985e5c132433448d10e399b85960acf11ad57d296059ea6bd8f3aa28d6e3d"
+      CROSSPLANE_VERSION: "v2.2.1" # for readability/bumps; the actual pin is the digest below
+      # Multi-arch index digest of xpkg.crossplane.io/crossplane/crossplane:v2.2.1 (the crank CLI lives at
+      # /bin/crossplane in this image). Bump alongside CROSSPLANE_VERSION (re-resolve with
+      # `docker buildx imagetools inspect <ref>`).
+      CROSSPLANE_IMAGE_DIGEST: "sha256:3a680497a08851ed75b60d48bdefa63a1bd1eed69dee81eaded50959904775ad"
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4 # the harness renders the crossplane-teams chart (registry → projection)
-      - name: Install Crossplane CLI (download release binary + verify pinned SHA-256)
+      - name: Install Crossplane CLI (extract from the OCI image — the releases CDN 403s from CI)
         run: |
-          url="https://releases.crossplane.io/stable/${CROSSPLANE_VERSION}/bin/linux_amd64/crank"
-          curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors "$url" -o crossplane
-          echo "${CROSSPLANE_SHA256}  crossplane" | sha256sum -c -
+          # Source the crank CLI from the registry-backed image rather than releases.crossplane.io, which
+          # intermittently returns 403 to GitHub runner IPs (retries don't beat a sustained block). Pinned by
+          # the multi-arch index digest (the supply-chain anchor); xpkg.crossplane.io avoids Docker Hub limits.
+          img="xpkg.crossplane.io/crossplane/crossplane@${CROSSPLANE_IMAGE_DIGEST}"
+          docker pull "$img"
+          cid="$(docker create "$img")"
+          docker cp "$cid:/bin/crossplane" crossplane
+          docker rm "$cid" >/dev/null
           sudo install -m 0755 crossplane /usr/local/bin/crossplane
           rm -f crossplane
           crossplane version --client
@@ -227,15 +231,20 @@ jobs:
     name: Tenant Composition Render
     runs-on: ubuntu-latest
     env:
-      CROSSPLANE_VERSION: "v2.2.1"
-      CROSSPLANE_SHA256: "9a1985e5c132433448d10e399b85960acf11ad57d296059ea6bd8f3aa28d6e3d"
+      CROSSPLANE_VERSION: "v2.2.1" # for readability/bumps; the actual pin is the digest below
+      CROSSPLANE_IMAGE_DIGEST: "sha256:3a680497a08851ed75b60d48bdefa63a1bd1eed69dee81eaded50959904775ad"
     steps:
       - uses: actions/checkout@v4
-      - name: Install Crossplane CLI (download release binary + verify pinned SHA-256)
+      - name: Install Crossplane CLI (extract from the OCI image — the releases CDN 403s from CI)
         run: |
-          url="https://releases.crossplane.io/stable/${CROSSPLANE_VERSION}/bin/linux_amd64/crank"
-          curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors "$url" -o crossplane
-          echo "${CROSSPLANE_SHA256}  crossplane" | sha256sum -c -
+          # Source the crank CLI from the registry-backed image rather than releases.crossplane.io, which
+          # intermittently returns 403 to GitHub runner IPs (retries don't beat a sustained block). Pinned by
+          # the multi-arch index digest (the supply-chain anchor); xpkg.crossplane.io avoids Docker Hub limits.
+          img="xpkg.crossplane.io/crossplane/crossplane@${CROSSPLANE_IMAGE_DIGEST}"
+          docker pull "$img"
+          cid="$(docker create "$img")"
+          docker cp "$cid:/bin/crossplane" crossplane
+          docker rm "$cid" >/dev/null
           sudo install -m 0755 crossplane /usr/local/bin/crossplane
           rm -f crossplane
           crossplane version --client
