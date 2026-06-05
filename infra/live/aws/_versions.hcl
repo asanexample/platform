@@ -69,6 +69,7 @@ locals {
     backstage           = "${local.source_base}/backstage"
     dex                 = "${local.source_base}/dex"
     keycloak            = "${local.source_base}/keycloak"
+    keycloak_config     = "${local.source_base}/keycloak-config"
     oauth2_proxy        = "${local.source_base}/oauth2-proxy"
   }
 
