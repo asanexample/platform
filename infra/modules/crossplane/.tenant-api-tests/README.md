@@ -26,10 +26,21 @@ registry into projected `Team` CRs (the envelope subset) and validates them — 
 on a cluster. The module installs the chart via `helm_release "crossplane_teams"` with `var.teams` (default
 empty); the live registry is supplied at the unit. Needs `helm` (the CI job installs it).
 
+There are two harnesses:
+
+- **`run.sh`** — fast, no cluster, no Docker: schema validation (claims/teams) + the registry projection.
+  CI job **Tenant API Schema**.
+- **`render.sh`** — `crossplane render` of the **v2 Composition** (`../charts/tenant/files/composition-v2.yaml`,
+  delivery-plan A3) via Docker-run Pipeline functions; asserts the rendered tenant footprint
+  (namespace `<team>-<name>`, quota, netpols, RoleBinding). Fixtures in `render/` (pinned `functions.yaml` +
+  a sample `environmentconfig.yaml`). CI job **Tenant Composition Render**. A3a = the K8s footprint; AWS
+  per-app identity (A3b) and ECR (A3c) extend the Composition.
+
 Run locally:
 
 ```bash
-infra/modules/crossplane/.tenant-api-tests/run.sh    # needs the crossplane CLI on PATH
+infra/modules/crossplane/.tenant-api-tests/run.sh       # crossplane CLI + helm
+infra/modules/crossplane/.tenant-api-tests/render.sh    # crossplane CLI + docker
 ```
 
 Scope: this validates the **schemas only** (structure + enums + CEL). The Team CRD lands here; the **Kyverno

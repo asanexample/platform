@@ -220,6 +220,28 @@ jobs:
       - name: Validate Tenant API example claims against the XRD
         run: infra/modules/crossplane/.tenant-api-tests/run.sh
 
+  # Offline `crossplane render` of the v2 Tenant Composition (delivery-plan A3). Runs the Pipeline functions
+  # via Docker (pre-installed on the runner) and asserts the rendered footprint — no cluster. Separate from the
+  # fast schema job because it pulls function images (minutes, not seconds).
+  tenant-composition-render:
+    name: Tenant Composition Render
+    runs-on: ubuntu-latest
+    env:
+      CROSSPLANE_VERSION: "v2.2.1"
+      CROSSPLANE_SHA256: "9a1985e5c132433448d10e399b85960acf11ad57d296059ea6bd8f3aa28d6e3d"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Crossplane CLI (download release binary + verify pinned SHA-256)
+        run: |
+          url="https://releases.crossplane.io/stable/${CROSSPLANE_VERSION}/bin/linux_amd64/crank"
+          curl -fsSL "$url" -o crossplane
+          echo "${CROSSPLANE_SHA256}  crossplane" | sha256sum -c -
+          sudo install -m 0755 crossplane /usr/local/bin/crossplane
+          rm -f crossplane
+          crossplane version --client
+      - name: Render the v2 Composition and assert the tenant footprint
+        run: infra/modules/crossplane/.tenant-api-tests/render.sh
+
   tflint:
     name: TFLint
     runs-on: ubuntu-latest

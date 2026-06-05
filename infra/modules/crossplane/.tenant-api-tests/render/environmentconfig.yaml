@@ -1,0 +1,15 @@
+# Sample cluster-constants EnvironmentConfig the Composition's load-environment step merges. Dummy values —
+# render only needs the shape (the real one is Helm-templated per-cluster by the module).
+apiVersion: apiextensions.crossplane.io/v1beta1
+kind: EnvironmentConfig
+metadata:
+  name: tenant-cluster-config
+data:
+  ecrRegistry: "111122223333.dkr.ecr.us-east-1.amazonaws.com"
+  region: "us-east-1"
+  workloadAccountId: "111122223333"
+  managementAccountId: "444455556666"
+  clusterName: "preprod-use1-eks"
+  permissionsBoundaryArn: "arn:aws:iam::111122223333:policy/tenant-boundary"
+  providerConfigEcr: "platform-ecr"
+  pullAccountIds: '["111122223333","777788889999"]'
