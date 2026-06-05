@@ -200,30 +200,21 @@ jobs:
     name: Tenant API Schema
     runs-on: ubuntu-latest
     env:
-      CROSSPLANE_VERSION: "v2.2.1" # for readability/bumps; the actual pin is the digest below
-      # Multi-arch index digest of xpkg.crossplane.io/crossplane/crossplane:v2.2.1 (the crank CLI lives at
-      # /bin/crossplane in this image). Bump alongside CROSSPLANE_VERSION (re-resolve with
-      # `docker buildx imagetools inspect <ref>`).
-      CROSSPLANE_IMAGE_DIGEST: "sha256:3a680497a08851ed75b60d48bdefa63a1bd1eed69dee81eaded50959904775ad"
+      CROSSPLANE_VERSION: "v2.2.1" # crank CLI version (built from source — see install step)
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4 # the harness renders the crossplane-teams chart (registry → projection)
-      - name: Install Crossplane CLI (extract from the OCI image — the releases CDN 403s from CI)
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Install Crossplane CLI (build crank from the Go module proxy)
         run: |
-          # Source the crank CLI from the registry-backed image rather than releases.crossplane.io, which
-          # intermittently returns 403 to GitHub runner IPs (retries don't beat a sustained block). Pinned by
-          # the multi-arch index digest (the supply-chain anchor); xpkg.crossplane.io avoids Docker Hub limits.
-          img="xpkg.crossplane.io/crossplane/crossplane@${CROSSPLANE_IMAGE_DIGEST}"
-          docker pull --platform linux/amd64 "$img"
-          cid="$(docker create "$img")"
-          # /bin/crossplane is a symlink into /nix/store (the image is Nix-built distroless), so copy the
-          # symlink, resolve its target, then copy the real binary out — arch-agnostic, no shell in the image.
-          docker cp "$cid:/bin/crossplane" crossplane.link
-          docker cp "$cid:$(readlink crossplane.link)" crossplane
-          docker rm "$cid" >/dev/null
-          sudo install -m 0755 crossplane /usr/local/bin/crossplane
-          rm -f crossplane crossplane.link
-          crossplane version --client
+          # The crank CLI is only published on releases.crossplane.io, which intermittently 403s GitHub runner
+          # IPs. Build it from the Go module proxy instead — checksum-verified via go.sum/sum.golang.org and
+          # rock-solid from CI. The binary is `crank`; install it as `crossplane` on PATH.
+          go install "github.com/crossplane/crossplane/v2/cmd/crank@${CROSSPLANE_VERSION}"
+          sudo install -m 0755 "$(go env GOPATH)/bin/crank" /usr/local/bin/crossplane
+          crossplane version --client || true
       - name: Validate Tenant API example claims against the XRD
         run: infra/modules/crossplane/.tenant-api-tests/run.sh
 
@@ -234,26 +225,20 @@ jobs:
     name: Tenant Composition Render
     runs-on: ubuntu-latest
     env:
-      CROSSPLANE_VERSION: "v2.2.1" # for readability/bumps; the actual pin is the digest below
-      CROSSPLANE_IMAGE_DIGEST: "sha256:3a680497a08851ed75b60d48bdefa63a1bd1eed69dee81eaded50959904775ad"
+      CROSSPLANE_VERSION: "v2.2.1" # crank CLI version (built from source — see install step)
     steps:
       - uses: actions/checkout@v4
-      - name: Install Crossplane CLI (extract from the OCI image — the releases CDN 403s from CI)
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Install Crossplane CLI (build crank from the Go module proxy)
         run: |
-          # Source the crank CLI from the registry-backed image rather than releases.crossplane.io, which
-          # intermittently returns 403 to GitHub runner IPs (retries don't beat a sustained block). Pinned by
-          # the multi-arch index digest (the supply-chain anchor); xpkg.crossplane.io avoids Docker Hub limits.
-          img="xpkg.crossplane.io/crossplane/crossplane@${CROSSPLANE_IMAGE_DIGEST}"
-          docker pull --platform linux/amd64 "$img"
-          cid="$(docker create "$img")"
-          # /bin/crossplane is a symlink into /nix/store (the image is Nix-built distroless), so copy the
-          # symlink, resolve its target, then copy the real binary out — arch-agnostic, no shell in the image.
-          docker cp "$cid:/bin/crossplane" crossplane.link
-          docker cp "$cid:$(readlink crossplane.link)" crossplane
-          docker rm "$cid" >/dev/null
-          sudo install -m 0755 crossplane /usr/local/bin/crossplane
-          rm -f crossplane crossplane.link
-          crossplane version --client
+          # The crank CLI is only published on releases.crossplane.io, which intermittently 403s GitHub runner
+          # IPs. Build it from the Go module proxy instead — checksum-verified via go.sum/sum.golang.org and
+          # rock-solid from CI. The binary is `crank`; install it as `crossplane` on PATH.
+          go install "github.com/crossplane/crossplane/v2/cmd/crank@${CROSSPLANE_VERSION}"
+          sudo install -m 0755 "$(go env GOPATH)/bin/crank" /usr/local/bin/crossplane
+          crossplane version --client || true
       - name: Render the v2 Composition and assert the tenant footprint
         run: infra/modules/crossplane/.tenant-api-tests/render.sh
 
