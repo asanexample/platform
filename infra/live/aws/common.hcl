@@ -22,6 +22,11 @@ locals {
   dex_sso_url     = try(local._secrets.locals.dex_sso_url, "")
   dex_sso_ca_data = try(local._secrets.locals.dex_sso_ca_data, "")
 
+  # Keycloak app-IdP broker (Identity Center SAML, ADR-053). try()-guarded like Dex's — set after the manual
+  # Keycloak SAML app exists (docs/runbooks/keycloak-sso.md). ca_data is the bare base64 cert body.
+  keycloak_sso_url     = try(local._secrets.locals.keycloak_sso_url, "")
+  keycloak_sso_ca_data = try(local._secrets.locals.keycloak_sso_ca_data, "")
+
   # Environment -> AWS account ID mapping (safety validation)
   # Used by _base.hcl to verify env.hcl account_id matches the expected value.
   environment_account_map = local._secrets.locals.account_ids
