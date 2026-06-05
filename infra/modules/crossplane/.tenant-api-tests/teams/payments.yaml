@@ -1,0 +1,14 @@
+# Canonical projected Team — mirrors docs/architecture/tenant-api-v2.md. Envelope permits the canonical
+# payments-api-prod Tenant (tier pci, env prod, residency eu, dedicated → needs maxDedicatedZones > 0).
+apiVersion: platform.refplat.org/v1alpha2
+kind: Team
+metadata:
+  name: payments
+spec:
+  ssoGroup: payments-eng
+  envelope:
+    allowedTiers: [standard, elevated, pci]
+    allowedEnvironments: [preprod, prod]
+    allowedLocations: ["eu", "us"]
+    quotaCap: { cpu: "64", memory: 128Gi, pods: 400 }
+    maxDedicatedZones: 2

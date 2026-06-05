@@ -1,0 +1,7 @@
+# MUST FAIL: spec.envelope is required.
+apiVersion: platform.refplat.org/v1alpha2
+kind: Team
+metadata:
+  name: missing-envelope
+spec:
+  ssoGroup: Dev-orphan
