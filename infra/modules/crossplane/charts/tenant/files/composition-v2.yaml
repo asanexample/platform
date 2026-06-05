@@ -49,6 +49,11 @@ spec:
             {{- $q := $spec.quota | default dict }}
             {{- $gw := "default" }}
             {{- $cfg := index .context "apiextensions.crossplane.io/environment" }}
+            {{- $ecrCfg := $cfg.providerConfigEcr | default "default" }}
+            {{- $pullAccts := list }}
+            {{- if and $cfg $cfg.pullAccountIds }}{{- $pullAccts = $cfg.pullAccountIds | fromJson }}{{- end }}
+            {{- $ecrPrincipals := list }}
+            {{- range $a := $pullAccts }}{{- $ecrPrincipals = append $ecrPrincipals (printf "arn:aws:iam::%s:root" $a) }}{{- end }}
             ---
             apiVersion: kubernetes.crossplane.io/v1alpha2
             kind: Object
@@ -269,10 +274,50 @@ spec:
                     - kind: Group
                       name: {{ $ns }}:developers
                       apiGroup: rbac.authorization.k8s.io
-            {{- /* Per-app AWS identity (ADR-049/041/047, A3b): each app with a serviceAccount gets its OWN
-                   IAM role + EKS Pod Identity association (+ a RolePolicy from its cloud-keyed permissions) —
-                   the fix for the single Pod-team limitation. Role name Pod-<team>-<name>-<app>. */}}
+            {{- /* Per-app delivery surface. ECR (A3c) is team-scoped — team-<team>/<app> — so an app's image
+                   is built once and promoted across the team's tenants/environments (not rebuilt per tenant);
+                   app names are unique within a team. Per-app AWS identity (A3b) follows. */}}
             {{- range $app, $appcfg := $spec.apps }}
+            {{- if $cfg.ecrRegistry }}
+            ---
+            apiVersion: ecr.aws.upbound.io/v1beta1
+            kind: Repository
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: ecr-repo-{{ $app }}
+                crossplane.io/external-name: team-{{ $team }}/{{ $app }}
+            spec:
+              providerConfigRef:
+                name: {{ $ecrCfg }}
+              forProvider:
+                region: {{ $cfg.region }}
+                # Parity with the ecr module: tags immutable, but cosign sha256-* signature/attestation tags
+                # are exempted so they can be (re)written.
+                imageTagMutability: IMMUTABLE_WITH_EXCLUSION
+                imageTagMutabilityExclusionFilter:
+                  - filter: "sha256-*"
+                    filterType: WILDCARD
+                imageScanningConfiguration:
+                  - scanOnPush: true
+                forceDelete: true
+                tags:
+                  Team: {{ $team }}
+            {{- if $ecrPrincipals }}
+            ---
+            apiVersion: ecr.aws.upbound.io/v1beta1
+            kind: RepositoryPolicy
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: ecr-repopolicy-{{ $app }}
+            spec:
+              providerConfigRef:
+                name: {{ $ecrCfg }}
+              forProvider:
+                region: {{ $cfg.region }}
+                repository: team-{{ $team }}/{{ $app }}
+                policy: {{ (dict "Version" "2012-10-17" "Statement" (list (dict "Sid" "CrossAccountPull" "Effect" "Allow" "Principal" (dict "AWS" $ecrPrincipals) "Action" (list "ecr:BatchGetImage" "ecr:GetDownloadUrlForLayer" "ecr:BatchCheckLayerAvailability")))) | toJson | quote }}
+            {{- end }}
+            {{- end }}
             {{- if $appcfg.serviceAccount }}
             {{- $role := printf "Pod-%s-%s" $ns $app }}
             ---

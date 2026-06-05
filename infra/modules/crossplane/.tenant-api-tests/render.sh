@@ -30,7 +30,10 @@ printf '%s' "$OUT" | grep -q 'name: alpha-demo:developers'        || { echo "::e
 printf '%s' "$OUT" | grep -q 'external-name: Pod-alpha-demo-demo' || { echo "::error::per-app role Pod-alpha-demo-demo not rendered"; exit 1; }
 printf '%s' "$OUT" | grep -q 'serviceAccount: app-alpha'          || { echo "::error::Pod Identity association SA wrong"; exit 1; }
 rp=$(printf '%s' "$OUT" | grep -c 'kind: RolePolicy' || true); [ "$rp" -eq 0 ] || { echo "::error::alpha app has no permissions → expected 0 RolePolicy, got $rp"; exit 1; }
-echo "  ✓ alpha OK (9 K8s Objects, namespace alpha-demo, per-app role Pod-alpha-demo-demo, 0 RolePolicy)"
+# ECR (team-scoped): team-alpha/demo repo + cross-account pull policy
+printf '%s' "$OUT" | grep -q 'external-name: team-alpha/demo' || { echo "::error::ECR repo team-alpha/demo not rendered"; exit 1; }
+printf '%s' "$OUT" | grep -q 'kind: RepositoryPolicy'         || { echo "::error::ECR RepositoryPolicy not rendered"; exit 1; }
+echo "  ✓ alpha OK (9 K8s Objects, namespace alpha-demo, per-app role Pod-alpha-demo-demo, ECR team-alpha/demo)"
 
 echo "== render canonical (pci/dedicated, app api w/ permissions) → per-app identity + RolePolicy =="
 OUT="$(render "${here}/claims/canonical.yaml")"
@@ -40,6 +43,7 @@ printf '%s' "$OUT" | grep -q 'external-name: Pod-payments-payments-api-api' || {
 printf '%s' "$OUT" | grep -q 'serviceAccount: payments-api'    || { echo "::error::canonical association SA wrong"; exit 1; }
 printf '%s' "$OUT" | grep -q 's3:GetObject'                    || { echo "::error::canonical per-app RolePolicy missing the granted action"; exit 1; }
 printf '%s' "$OUT" | grep -q 'ReadCustomerBucket'              || { echo "::error::canonical per-app RolePolicy Sid missing"; exit 1; }
-echo "  ✓ canonical OK (namespace payments-payments-api, tier pci, per-app role + RolePolicy)"
+printf '%s' "$OUT" | grep -q 'external-name: team-payments/api' || { echo "::error::ECR repo team-payments/api not rendered"; exit 1; }
+echo "  ✓ canonical OK (namespace payments-payments-api, tier pci, per-app role + RolePolicy, ECR team-payments/api)"
 
-echo "v2 Composition render checks passed (A3b — K8s footprint + per-app AWS identity)."
+echo "v2 Composition render checks passed (A3c — K8s footprint + per-app AWS identity + ECR)."

@@ -212,7 +212,7 @@ jobs:
       - name: Install Crossplane CLI (download release binary + verify pinned SHA-256)
         run: |
           url="https://releases.crossplane.io/stable/${CROSSPLANE_VERSION}/bin/linux_amd64/crank"
-          curl -fsSL "$url" -o crossplane
+          curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors "$url" -o crossplane
           echo "${CROSSPLANE_SHA256}  crossplane" | sha256sum -c -
           sudo install -m 0755 crossplane /usr/local/bin/crossplane
           rm -f crossplane
@@ -234,7 +234,7 @@ jobs:
       - name: Install Crossplane CLI (download release binary + verify pinned SHA-256)
         run: |
           url="https://releases.crossplane.io/stable/${CROSSPLANE_VERSION}/bin/linux_amd64/crank"
-          curl -fsSL "$url" -o crossplane
+          curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors "$url" -o crossplane
           echo "${CROSSPLANE_SHA256}  crossplane" | sha256sum -c -
           sudo install -m 0755 crossplane /usr/local/bin/crossplane
           rm -f crossplane
