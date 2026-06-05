@@ -52,3 +52,46 @@ variable "saml_email_attribute" {
   type        = string
   default     = "email"
 }
+
+# ---------------------------------------------------------------------------
+# Per-app OIDC clients
+# ---------------------------------------------------------------------------
+
+variable "clients" {
+  description = <<-DESC
+    OIDC clients to register in the realm. Each gets a confidential client + a `groups` claim mapper + a
+    generated secret stored in Secrets Manager at platform/keycloak/<id>-oidc (a Keycloak-specific path, so it
+    does NOT collide with Dex's platform/<id>/oidc during coexistence). Apps repoint to these at the B3/B4
+    cutover. Add a client here to onboard another app.
+  DESC
+  type = map(object({
+    name          = string
+    redirect_uris = list(string)
+  }))
+  default = {
+    argocd = {
+      name          = "ArgoCD"
+      redirect_uris = ["https://argocd.aws.refplat.org/auth/callback", "http://localhost:8085/auth/callback"]
+    }
+    backstage = {
+      name          = "Backstage"
+      redirect_uris = ["https://backstage.aws.refplat.org/api/auth/oidc/handler/frame"]
+    }
+    "oauth2-proxy" = {
+      name          = "OAuth2 Proxy (Backstage)"
+      redirect_uris = ["https://backstage.aws.refplat.org/oauth2/callback"]
+    }
+  }
+}
+
+variable "secret_recovery_window_days" {
+  description = "Secrets Manager recovery window for generated client secrets. 0 = force-delete (setup-friendly); raise for prod."
+  type        = number
+  default     = 0
+}
+
+variable "tags" {
+  description = "Tags applied to the generated Secrets Manager client secrets."
+  type        = map(string)
+  default     = {}
+}
