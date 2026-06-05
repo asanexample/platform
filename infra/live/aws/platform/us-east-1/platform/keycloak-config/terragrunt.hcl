@@ -62,11 +62,21 @@ inputs = {
 
   keycloak_url = dependency.keycloak.outputs.issuer
 
-  # Identity Center SAML broker. A SEPARATE Identity Center SAML app from Dex's/ArgoCD's (its own signing cert),
-  # ACS/audience = https://keycloak.aws.refplat.org/realms/platform/broker/aws-sso/endpoint. Values live in
-  # secrets.hcl; saml_ca_data is the BARE base64 cert body (no PEM headers). See docs/runbooks/keycloak-sso.md.
-  saml_sso_url = include.base.locals.all_vars.keycloak_sso_url
-  saml_ca_data = include.base.locals.all_vars.keycloak_sso_ca_data
+  # Upstream IdP = AWS Identity Center over SAML (ADR-059 scenario C). A SEPARATE Identity Center SAML app from
+  # Dex's/ArgoCD's (its own signing cert), ACS/audience = .../realms/platform/broker/aws-sso/endpoint. Values
+  # live in secrets.hcl; ca_data is the BARE base64 cert body (no PEM headers). See docs/runbooks/keycloak-sso.md.
+  # group_claim = "" — IdC emits no group claims, so the per-team membership mappers stay inert until a
+  # group-emitting upstream (Okta/Entra/Google) is wired (docs/runbooks/keycloak-upstream-idp.md).
+  upstream = {
+    alias        = "aws-sso"
+    display_name = "AWS SSO"
+    protocol     = "saml"
+    group_claim  = ""
+    saml = {
+      sso_url = include.base.locals.all_vars.keycloak_sso_url
+      ca_data = include.base.locals.all_vars.keycloak_sso_ca_data
+    }
+  }
 
   # Per-app OIDC clients use the module defaults (ArgoCD/Backstage/oauth2-proxy). Secrets are tagged for SM.
   tags = include.base.locals.tags

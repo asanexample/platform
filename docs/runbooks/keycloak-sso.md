@@ -16,8 +16,9 @@ In the AWS Identity Center console → Applications → Add application → **cu
 - **Application SAML audience:** `https://keycloak.aws.refplat.org/realms/platform`
   (must equal the broker's `entity_id` — the realm URL the module derives)
 
-> The realm is `platform`; the broker alias is `aws-sso`. If you change `realm_name`/`saml_idp_alias` in the
-> `keycloak-config` inputs, update both URLs above.
+> The realm is `platform`; the broker alias is `aws-sso`. If you change `realm_name`/`upstream.alias` in the
+> `keycloak-config` inputs, update both URLs above. (For non-SAML upstreams — Okta/Entra/Google — see
+> [keycloak-upstream-idp.md](keycloak-upstream-idp.md).)
 
 ## 2. Attribute mappings (console-only)
 
