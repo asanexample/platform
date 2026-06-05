@@ -11,6 +11,12 @@ terraform {
   source = include.base.locals.module_source.keycloak_config
 }
 
+# Canonical Team registry (single source of truth, ADR-053) — read directly (not via _base.hcl, to keep the
+# blast radius to this unit + the crossplane unit). Drives the Keycloak groups + developer-access roles.
+locals {
+  teams = read_terragrunt_config(find_in_parent_folders("aws/_teams.hcl")).locals.teams
+}
+
 # Configures the running Keycloak (deployed by the keycloak unit) via the keycloak/keycloak provider — B2,
 # ADR-053. The provider talks to the LIVE admin API, so this unit is not CI-plan-tested; apply is rebuild-gated
 # (and needs Keycloak actually serving + the deployer on Tailscale to reach keycloak.aws.refplat.org).
@@ -64,4 +70,7 @@ inputs = {
 
   # Per-app OIDC clients use the module defaults (ArgoCD/Backstage/oauth2-proxy). Secrets are tagged for SM.
   tags = include.base.locals.tags
+
+  # Team taxonomy — one Keycloak group per Team + the developer-access roles, from the canonical registry.
+  teams = local.teams
 }

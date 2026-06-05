@@ -90,6 +90,21 @@ variable "secret_recovery_window_days" {
   default     = 0
 }
 
+# ---------------------------------------------------------------------------
+# Team taxonomy (the canonical Team registry → Keycloak groups + roles)
+# ---------------------------------------------------------------------------
+
+variable "teams" {
+  description = <<-DESC
+    Canonical Team registry (from infra/live/aws/_teams.hcl, ADR-049/053). Map of team name -> { ssoGroup,
+    envelope{allowedEnvironments,...}, and canonical-only fields }. Generates one Keycloak group per team + the
+    developer-access roles assigned by envelope. Type `any` to match the crossplane module's `var.teams`. Empty
+    = no groups. NOTE: group MEMBERSHIP (which users) is out of scope (SCIM/manual) — claims stay empty until then.
+  DESC
+  type        = any
+  default     = {}
+}
+
 variable "tags" {
   description = "Tags applied to the generated Secrets Manager client secrets."
   type        = map(string)

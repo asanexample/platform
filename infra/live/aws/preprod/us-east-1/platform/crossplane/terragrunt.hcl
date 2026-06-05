@@ -11,6 +11,13 @@ terraform {
   source = include.base.locals.module_source.crossplane
 }
 
+# Canonical Team registry (single source of truth, ADR-053) — read directly (same file the keycloak-config
+# unit reads). Projected here as Team CRs (the envelope Kyverno's restrict-tenant-envelope reads). NOTE: this
+# passes the whole registry; all teams are preprod today, so per-env filtering is a future refinement.
+locals {
+  teams = read_terragrunt_config(find_in_parent_folders("aws/_teams.hcl")).locals.teams
+}
+
 dependency "eks" {
   config_path = "../eks"
 
@@ -98,6 +105,9 @@ inputs = {
   # Management account ID — the Composition's DeveloperAccess-<team> trust allows the per-team SSO permission
   # set (Dev-<team>) in both the management and preprod accounts to assume the role (P2c, ADR-039).
   management_account_id = include.base.locals.account_ids["mgmt"]
+
+  # Canonical Team registry → projected Team CRs (ADR-049/053). Was empty; this starts the envelope projection.
+  teams = local.teams
 
   tags = include.base.locals.tags
 }
