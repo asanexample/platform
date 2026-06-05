@@ -253,5 +253,7 @@ is operate/debug, never authoring:
   [ADR-054](054-platform-resilience-and-business-continuity.md) (resilience/DR — realizes the tier recovery +
   availability postures), [ADR-055](055-compliance-assurance-and-continuous-control-evidence.md) (compliance
   *assurance* over the tier controls), [ADR-056](056-progressive-delivery-and-safe-rollback.md) (safe prod
-  rollout, gated by the tier SLO), and [ADR-057](057-service-identity-and-east-west-zero-trust.md) (east-west
-  mTLS — refines the tier's network posture).
+  rollout, gated by the tier SLO), [ADR-057](057-service-identity-and-east-west-zero-trust.md) (east-west
+  mTLS — refines the tier's network posture), and
+  [ADR-058](058-per-cloud-tenant-composition-strategy.md) (how the neutral claim is realized per cloud —
+  shared XRD, per-cloud Compositions selected by placement).

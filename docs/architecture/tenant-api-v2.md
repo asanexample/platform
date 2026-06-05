@@ -24,7 +24,9 @@ defined here (ADR-053, decision 3).
   author-facing parts of Team/Customer) **never** names a cloud, region, account, cluster, or namespace.
   Those are *derived by placement* and written to `status`. The single deliberate exception is
   `Tenant.spec.apps.<app>.permissions`, which is **explicitly cloud-keyed** (`permissions.aws.…`) while the
-  identity binding it attaches to (`serviceAccount`) stays neutral.
+  identity binding it attaches to (`serviceAccount`) stays neutral. *How* this neutral claim is realized on more
+  than one cloud — a shared XRD with one Composition per cloud (neutral K8s core + per-cloud identity/registry
+  overlays), selected by placement — is [ADR-058](../adrs/058-per-cloud-tenant-composition-strategy.md).
 - **Location, not region.** A *location* is a `(cloud, region)` pair. A *jurisdiction* (`"eu"`, `"us"`) is a
   named set of acceptable locations. Author-facing fields take a jurisdiction or an exact `cloud:region`
   string; they never take a bare region. This is what makes data residency and multi-cloud the same
