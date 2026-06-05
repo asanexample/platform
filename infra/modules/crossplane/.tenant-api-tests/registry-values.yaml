@@ -1,0 +1,32 @@
+# Sample canonical Team registry for the projection test (the input to the crossplane-teams chart).
+# Full records — including canonical-only fields (displayName/developerGroup/costCenter/contacts) that the
+# projection MUST drop. run.sh renders this and validates the projected Team CRs against the Team CRD, and
+# asserts the canonical-only fields do not leak into the projection.
+teams:
+  payments:
+    ssoGroup: payments-eng
+    displayName: Payments Engineering
+    developerGroup: payments-eng
+    costCenter: "cc-2001"
+    contacts: ["payments-leads@example.com"]
+    envelope:
+      allowedTiers: [standard, elevated, pci]
+      allowedEnvironments: [preprod, prod]
+      allowedLocations: ["eu", "us"]
+      quotaCap: { cpu: "64", memory: 128Gi, pods: 400 }
+      maxDedicatedZones: 2
+  alpha:
+    ssoGroup: Dev-alpha
+    displayName: Team Alpha
+    costCenter: "cc-1001"
+    contacts: ["alpha@example.com"]
+    envelope:
+      allowedTiers: [standard]
+      allowedEnvironments: [preprod]
+      quotaCap: { cpu: "8", memory: 16Gi, pods: 40 }
+  bravo:
+    ssoGroup: Dev-bravo
+    envelope:
+      allowedTiers: [standard]
+      allowedEnvironments: [preprod]
+      quotaCap: { cpu: "8", memory: 16Gi, pods: 40 }

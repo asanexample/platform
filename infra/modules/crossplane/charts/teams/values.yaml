@@ -1,0 +1,23 @@
+# Canonical Team registry → projected Team CRs (ADR-049 A2; docs/architecture/tenant-api-v2.md).
+#
+# This `teams` map IS the canonical registry (full records). The template projects ONLY the
+# admission-relevant envelope subset onto the cluster as Team CRs; the rest of a canonical record
+# (displayName / developerGroup / costCenter / contacts) is canonical-only and intentionally NOT projected
+# (it belongs to the registry/Backstage, not the cluster). Default empty: nothing rendered.
+#
+# Shape — team name -> :
+#   ssoGroup:        required   the Identity Center / Keycloak group (root of both authz planes)
+#   displayName:     optional   canonical-only (not projected)
+#   developerGroup:  optional   canonical-only
+#   costCenter:      optional   canonical-only
+#   contacts:        optional   canonical-only ([]string)
+#   envelope:        required
+#     allowedTiers:        required   []  (standard|elevated|pci|hipaa)
+#     allowedEnvironments: required   []  (preprod|prod)
+#     allowedLocations:    optional   []  (default ["*"] applied by the CRD)
+#     quotaCap:            optional   { cpu, memory, pods }
+#     maxDedicatedZones:   optional   int (default 0)
+teams: {}
+
+# Extra labels stamped on every projected Team CR.
+commonLabels: {}

@@ -16,7 +16,15 @@ invalid/       XTenant claims that MUST be rejected — bad tier enum, dedicated
                missing required field
 teams/         valid projected Team records that MUST pass — payments (canonical) + alpha/bravo
 teams-invalid/ Team records that MUST be rejected — bad tier enum, missing envelope
+registry-values.yaml  canonical Team registry (full records) — input to the crossplane-teams chart;
+                      run.sh renders it, validates the projection against the Team CRD, and asserts the
+                      canonical-only fields (displayName/developerGroup/costCenter/contacts) are dropped
 ```
+
+The **registry → projection** step (delivery-plan A2) renders the `../charts/teams` chart from the canonical
+registry into projected `Team` CRs (the envelope subset) and validates them — the mechanism that puts Team CRs
+on a cluster. The module installs the chart via `helm_release "crossplane_teams"` with `var.teams` (default
+empty); the live registry is supplied at the unit. Needs `helm` (the CI job installs it).
 
 Run locally:
 

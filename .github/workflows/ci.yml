@@ -208,6 +208,7 @@ jobs:
       CROSSPLANE_SHA256: "9a1985e5c132433448d10e399b85960acf11ad57d296059ea6bd8f3aa28d6e3d"
     steps:
       - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4 # the harness renders the crossplane-teams chart (registry → projection)
       - name: Install Crossplane CLI (download release binary + verify pinned SHA-256)
         run: |
           url="https://releases.crossplane.io/stable/${CROSSPLANE_VERSION}/bin/linux_amd64/crank"

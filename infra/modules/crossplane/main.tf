@@ -180,6 +180,27 @@ resource "helm_release" "crossplane_tenant" {
 }
 
 # ---------------------------------------------------------------------------
+# Team registry projection (local chart): canonical Team records -> projected Team CRs
+# ---------------------------------------------------------------------------
+# The envelope subset Kyverno's restrict-tenant-envelope reads during XTenant admission (ADR-049 A2). After
+# the tenant chart so the Team CRD exists. Default empty (var.teams = {}) renders nothing — additive.
+
+resource "helm_release" "crossplane_teams" {
+  count = local.create && var.enable_tenant_api ? 1 : 0
+
+  name      = "crossplane-teams"
+  chart     = "${path.module}/charts/teams"
+  namespace = var.namespace
+  timeout   = var.helm_timeout
+  wait      = var.helm_wait
+  atomic    = var.helm_wait
+
+  values = [yamlencode({ teams = var.teams })]
+
+  depends_on = [helm_release.crossplane_tenant]
+}
+
+# ---------------------------------------------------------------------------
 # Scoped provisioning identity (IAM) + EKS Pod Identity association
 # ---------------------------------------------------------------------------
 # The AWS provider assumes this role to provision tenant resources. P1 scope: ECR repositories under
