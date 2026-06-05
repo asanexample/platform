@@ -1,0 +1,5 @@
+# References a Team with no projected CR — team-must-exist must flag it.
+apiVersion: platform.refplat.org/v1alpha2
+kind: XTenant
+metadata: { name: ghostteam }
+spec: { team: ghost, name: a, environment: prod, tier: standard, residency: { allowedLocations: ["*"] }, quota: { cpu: "4", memory: 8Gi, pods: 20 } }

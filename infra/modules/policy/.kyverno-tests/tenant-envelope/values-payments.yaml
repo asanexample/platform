@@ -1,0 +1,14 @@
+# Mocks the projected Team CR the envelope policy's apiCall would fetch (offline). globalValues is uniform
+# per run, so each Team envelope has its own resources/values pair.
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Values
+metadata: { name: values }
+globalValues:
+  team:
+    metadata: { name: payments }
+    spec:
+      envelope:
+        allowedTiers: ["standard", "elevated", "pci"]
+        allowedEnvironments: ["preprod", "prod"]
+        allowedLocations: ["eu", "us"]
+        quotaCap: { cpu: "64", memory: "128Gi", pods: 400 }

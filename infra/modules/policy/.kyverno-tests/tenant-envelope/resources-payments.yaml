@@ -1,0 +1,28 @@
+# XTenant claims tested against the `payments` Team envelope (see values-payments.yaml):
+#   allowedTiers [standard,elevated,pci] · allowedEnvironments [preprod,prod] · allowedLocations [eu,us]
+#   quotaCap {cpu 64, memory 128Gi, pods 400}
+# ok / wildok must pass; badtier / badloc / overquota must be flagged.
+apiVersion: platform.refplat.org/v1alpha2
+kind: XTenant
+metadata: { name: ok }
+spec: { team: payments, name: a, environment: prod, tier: pci, residency: { allowedLocations: ["eu"] }, quota: { cpu: "8", memory: 16Gi, pods: 40 } }
+---
+apiVersion: platform.refplat.org/v1alpha2
+kind: XTenant
+metadata: { name: wildok }   # residency "*" → no constraint, must pass even though team is eu/us
+spec: { team: payments, name: a, environment: prod, tier: pci, residency: { allowedLocations: ["*"] }, quota: { cpu: "8", memory: 16Gi, pods: 40 } }
+---
+apiVersion: platform.refplat.org/v1alpha2
+kind: XTenant
+metadata: { name: badtier }   # hipaa ∉ allowedTiers
+spec: { team: payments, name: a, environment: prod, tier: hipaa, residency: { allowedLocations: ["eu"] }, quota: { cpu: "8", memory: 16Gi, pods: 40 } }
+---
+apiVersion: platform.refplat.org/v1alpha2
+kind: XTenant
+metadata: { name: badloc }   # apac ∉ allowedLocations [eu,us]
+spec: { team: payments, name: a, environment: prod, tier: pci, residency: { allowedLocations: ["apac"] }, quota: { cpu: "8", memory: 16Gi, pods: 40 } }
+---
+apiVersion: platform.refplat.org/v1alpha2
+kind: XTenant
+metadata: { name: overquota }   # memory 200Gi > cap 128Gi
+spec: { team: payments, name: a, environment: prod, tier: pci, residency: { allowedLocations: ["eu"] }, quota: { cpu: "8", memory: 200Gi, pods: 40 } }

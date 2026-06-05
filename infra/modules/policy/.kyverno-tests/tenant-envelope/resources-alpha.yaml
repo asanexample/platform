@@ -1,0 +1,10 @@
+# Tested against the `alpha` Team envelope (preprod-only). okalpha passes; badenv (prod) is flagged.
+apiVersion: platform.refplat.org/v1alpha2
+kind: XTenant
+metadata: { name: okalpha }
+spec: { team: alpha, name: a, environment: preprod, tier: standard, residency: { allowedLocations: ["*"] }, quota: { cpu: "4", memory: 8Gi, pods: 20 } }
+---
+apiVersion: platform.refplat.org/v1alpha2
+kind: XTenant
+metadata: { name: badenv }
+spec: { team: alpha, name: a, environment: prod, tier: standard, residency: { allowedLocations: ["*"] }, quota: { cpu: "4", memory: 8Gi, pods: 20 } }

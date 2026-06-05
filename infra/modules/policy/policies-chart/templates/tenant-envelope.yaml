@@ -1,0 +1,151 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-tenant-envelope
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Restrict Tenant Envelope
+    policies.kyverno.io/category: Security, Multi-Tenancy
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: XTenant, Team
+    policies.kyverno.io/description: >-
+      The envelope plane (ADR-049 / ADR-053): an XTenant claim may only request what its owning Team's
+      envelope permits. Reads the projected Team CR and checks tier / environment / residency / quota against
+      the envelope. Complements the S1 restrict-tenant-control-plane backstop (which governs WHO may manage
+      tenant control-plane resources); this governs WHAT they may request. Stateless checks only — aggregate
+      caps (team total quota, dedicated-zone count) are the report-first rollup controller's job. Audit-first
+      (delivery-plan A2b); flips to Enforce at the rebuild cutover (A6).
+spec:
+  background: true
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    # A Tenant must reference a Team that has been projected onto this cluster (its envelope is knowable).
+    - name: team-must-exist
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1alpha2/XTenant
+      {{- include "kpp.teamContext" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: >-
+          Tenant references Team '{{`{{ request.object.spec.team }}`}}', which has no projected Team CR on
+          this cluster — its envelope is unknown. A Tenant must reference an existing Team.
+        deny:
+          conditions:
+            all:
+              - key: "{{`{{ team.metadata.name || '' }}`}}"
+                operator: NotEquals
+                value: "{{`{{ request.object.spec.team }}`}}"
+
+    # tier ∈ Team.envelope.allowedTiers
+    - name: tier-within-envelope
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1alpha2/XTenant
+      {{- include "kpp.teamContext" . | nindent 6 }}
+      {{- include "kpp.teamExistsPrecondition" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: >-
+          spec.tier '{{`{{ request.object.spec.tier }}`}}' is not within Team
+          '{{`{{ request.object.spec.team }}`}}' envelope.allowedTiers
+          {{`{{ team.spec.envelope.allowedTiers }}`}}.
+        deny:
+          conditions:
+            any:
+              - key: "{{`{{ request.object.spec.tier }}`}}"
+                operator: AnyNotIn
+                value: "{{`{{ team.spec.envelope.allowedTiers }}`}}"
+
+    # environment ∈ Team.envelope.allowedEnvironments
+    - name: environment-within-envelope
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1alpha2/XTenant
+      {{- include "kpp.teamContext" . | nindent 6 }}
+      {{- include "kpp.teamExistsPrecondition" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: >-
+          spec.environment '{{`{{ request.object.spec.environment }}`}}' is not within Team
+          '{{`{{ request.object.spec.team }}`}}' envelope.allowedEnvironments
+          {{`{{ team.spec.envelope.allowedEnvironments }}`}}.
+        deny:
+          conditions:
+            any:
+              - key: "{{`{{ request.object.spec.environment }}`}}"
+                operator: AnyNotIn
+                value: "{{`{{ team.spec.envelope.allowedEnvironments }}`}}"
+
+    # residency.allowedLocations ⊆ Team.envelope.allowedLocations.
+    # Skipped when the tenant residency itself contains "*" (no constraint — placement narrows to the Team's
+    # set). When the Team allows "*", nothing is denied.
+    - name: residency-within-envelope
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1alpha2/XTenant
+      {{- include "kpp.teamContext" . | nindent 6 }}
+      preconditions:
+        all:
+          - key: "{{`{{ team.metadata.name || '' }}`}}"
+            operator: Equals
+            value: "{{`{{ request.object.spec.team }}`}}"
+          # skip when the tenant residency itself carries "*" (no constraint). NOTE: "*" must be passed to the
+          # JMESPath contains() as a string arg — a bare "*" as a Kyverno operator key is treated as a wildcard.
+          - key: "{{`{{ contains(request.object.spec.residency.allowedLocations, '*') }}`}}"
+            operator: Equals
+            value: false
+          # skip when the Team allows "*" (anywhere) — nothing to constrain.
+          - key: "{{`{{ contains(team.spec.envelope.allowedLocations, '*') }}`}}"
+            operator: Equals
+            value: false
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: >-
+          spec.residency.allowedLocations {{`{{ request.object.spec.residency.allowedLocations }}`}} are not
+          within Team '{{`{{ request.object.spec.team }}`}}' envelope.allowedLocations
+          {{`{{ team.spec.envelope.allowedLocations }}`}}.
+        deny:
+          conditions:
+            any:
+              - key: "{{`{{ request.object.spec.residency.allowedLocations }}`}}"
+                operator: AnyNotIn
+                value: "{{`{{ team.spec.envelope.allowedLocations }}`}}"
+
+    # quota ≤ Team.envelope.quotaCap (quantity-aware). Absent cap = unlimited for that dimension.
+    - name: quota-within-cap
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1alpha2/XTenant
+      {{- include "kpp.teamContext" . | nindent 6 }}
+      {{- include "kpp.teamExistsPrecondition" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: >-
+          spec.quota (cpu {{`{{ request.object.spec.quota.cpu }}`}}, memory
+          {{`{{ request.object.spec.quota.memory }}`}}, pods {{`{{ request.object.spec.quota.pods }}`}})
+          exceeds Team '{{`{{ request.object.spec.team }}`}}' envelope.quotaCap
+          {{`{{ team.spec.envelope.quotaCap }}`}}.
+        deny:
+          conditions:
+            any:
+              - key: "{{`{{ request.object.spec.quota.cpu }}`}}"
+                operator: GreaterThan
+                value: "{{`{{ team.spec.envelope.quotaCap.cpu || '1000000' }}`}}"
+              - key: "{{`{{ request.object.spec.quota.memory }}`}}"
+                operator: GreaterThan
+                value: "{{`{{ team.spec.envelope.quotaCap.memory || '1Ei' }}`}}"
+              - key: "{{`{{ request.object.spec.quota.pods }}`}}"
+                operator: GreaterThan
+                value: "{{`{{ team.spec.envelope.quotaCap.pods || '1000000' }}`}}"
