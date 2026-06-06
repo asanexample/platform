@@ -18,6 +18,11 @@ locals {
   admin_k8s_secret = "keycloak-admin"
   admin_secret_sm  = "platform/keycloak/admin"
 
+  # Self-owned ingress (ADR-053/059): Keycloak owns its HTTPRoute so the endpoint is up before keycloak-config
+  # configures the realm through it. Host derived from hostname_url; backend is the keycloak Service.
+  create_route = local.create && var.create_route
+  route_host   = replace(replace(var.hostname_url, "https://", ""), "http://", "")
+
   # ---------------------------------------------------------------------------
   # Keycloak env (KC 26: production `start`, behind a TLS-terminating proxy).
   # extraEnv is a templated YAML *string* in the chart. Admin bootstrap + proxy/hostname go here so we use
@@ -223,4 +228,71 @@ resource "helm_release" "keycloak" {
     kubernetes_manifest.db,
     kubernetes_manifest.admin_external_secret,
   ]
+}
+
+# ---------------------------------------------------------------------------
+# Ingress — Keycloak owns its HTTPRoute on the shared Gateway (ADR-053/059).
+# Created with Keycloak (before keycloak-config) so the realm can be configured through this endpoint. Attaches to
+# the foundational `gateway` unit's Gateway via parentRef (cross-namespace; the Gateway allows routes from All).
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_manifest" "http_route" {
+  count = local.create_route ? 1 : 0
+
+  manifest = {
+    apiVersion = "gateway.networking.k8s.io/v1"
+    kind       = "HTTPRoute"
+    metadata = {
+      name      = var.helm_release_name
+      namespace = var.namespace
+    }
+    spec = {
+      parentRefs = [{
+        name        = var.gateway_name
+        namespace   = var.gateway_namespace
+        sectionName = "https"
+      }]
+      hostnames = [local.route_host]
+      rules = [{
+        backendRefs = [{
+          name = var.helm_release_name
+          port = 80
+        }]
+      }]
+    }
+  }
+
+  depends_on = [helm_release.keycloak]
+}
+
+resource "kubernetes_manifest" "http_redirect_route" {
+  count = local.create_route ? 1 : 0
+
+  manifest = {
+    apiVersion = "gateway.networking.k8s.io/v1"
+    kind       = "HTTPRoute"
+    metadata = {
+      name      = "${var.helm_release_name}-redirect"
+      namespace = var.namespace
+    }
+    spec = {
+      parentRefs = [{
+        name        = var.gateway_name
+        namespace   = var.gateway_namespace
+        sectionName = "http"
+      }]
+      hostnames = [local.route_host]
+      rules = [{
+        filters = [{
+          type = "RequestRedirect"
+          requestRedirect = {
+            scheme     = "https"
+            statusCode = 301
+          }
+        }]
+      }]
+    }
+  }
+
+  depends_on = [helm_release.keycloak]
 }

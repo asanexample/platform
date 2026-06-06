@@ -53,6 +53,19 @@ dependency "cloudnative_pg" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+# Foundational shared Gateway (ADR-053/059). Keycloak owns its HTTPRoute on it, so the endpoint is live BEFORE
+# keycloak-config (which configures the realm through keycloak.aws.refplat.org). gateway has no app deps, so this
+# does not create a cycle.
+dependency "gateway" {
+  config_path = "../gateway"
+
+  mock_outputs = {
+    gateway_name      = "platform-gateway"
+    gateway_namespace = "default"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
 generate "helm_provider" {
   path      = "helm-provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -98,6 +111,11 @@ inputs = {
   # SAML broker, OIDC clients, and group/role mappers (the access-model-as-code) land in B2; Dex still owns
   # sso.aws.refplat.org until the rebuild cutover. See ADR-053.
   hostname_url = "https://keycloak.aws.refplat.org"
+
+  # Keycloak self-owns its HTTPRoute on the shared Gateway (ADR-059) — so the endpoint is up before keycloak-config.
+  create_route      = true
+  gateway_name      = dependency.gateway.outputs.gateway_name
+  gateway_namespace = dependency.gateway.outputs.gateway_namespace
 
   tags = include.base.locals.tags
 }

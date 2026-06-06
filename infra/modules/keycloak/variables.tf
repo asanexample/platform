@@ -154,3 +154,25 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# ---------------------------------------------------------------------------
+# Ingress — Keycloak self-owns its HTTPRoute on the shared Gateway (ADR-053/059)
+# ---------------------------------------------------------------------------
+
+variable "create_route" {
+  description = "Create Keycloak's HTTPRoute (+ HTTP→HTTPS redirect) on the shared Gateway. Off by default; the unit enables it (needs the gateway dependency)."
+  type        = bool
+  default     = false
+}
+
+variable "gateway_name" {
+  description = "Name of the shared Gateway to attach Keycloak's HTTPRoute to (parentRef)."
+  type        = string
+  default     = "platform-gateway"
+}
+
+variable "gateway_namespace" {
+  description = "Namespace of the shared Gateway (parentRef)."
+  type        = string
+  default     = "default"
+}

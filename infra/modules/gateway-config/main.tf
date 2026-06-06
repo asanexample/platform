@@ -3,109 +3,9 @@ locals {
 }
 
 # ---------------------------------------------------------------------------
-# ClusterIssuer — Let's Encrypt production via Route53 DNS01
-# ---------------------------------------------------------------------------
-
-resource "kubernetes_manifest" "cluster_issuer" {
-  count = local.create ? 1 : 0
-
-  manifest = {
-    apiVersion = "cert-manager.io/v1"
-    kind       = "ClusterIssuer"
-    metadata = {
-      name = var.cluster_issuer_name
-    }
-    spec = {
-      acme = {
-        server = "https://acme-v02.api.letsencrypt.org/directory"
-        email  = var.letsencrypt_email
-        privateKeySecretRef = {
-          name = "${var.cluster_issuer_name}-account-key"
-        }
-        solvers = [{
-          dns01 = {
-            route53 = {
-              region       = var.route53_region
-              hostedZoneID = var.route53_hosted_zone_id
-            }
-          }
-        }]
-      }
-    }
-  }
-}
-
-# ---------------------------------------------------------------------------
-# Gateway — Cilium Gateway API with TLS termination
-# GatewayClass "cilium" is created by the Cilium Helm chart, not managed here.
-# ---------------------------------------------------------------------------
-
-resource "kubernetes_manifest" "gateway" {
-  count = local.create ? 1 : 0
-
-  manifest = {
-    apiVersion = "gateway.networking.k8s.io/v1"
-    kind       = "Gateway"
-    metadata = {
-      name      = var.gateway_name
-      namespace = var.gateway_namespace
-      annotations = {
-        "cert-manager.io/cluster-issuer" = var.cluster_issuer_name
-      }
-    }
-    spec = {
-      gatewayClassName = "cilium"
-      infrastructure = {
-        # Both scheme and internal annotations set for compat with LB Controller v1 and v2
-        annotations = merge(
-          {
-            "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
-          },
-          var.internal ? {
-            "service.beta.kubernetes.io/aws-load-balancer-scheme"   = "internal"
-            "service.beta.kubernetes.io/aws-load-balancer-internal" = "true"
-          } : {}
-        )
-      }
-      listeners = [
-        {
-          name     = "https"
-          protocol = "HTTPS"
-          port     = 443
-          hostname = "*.${var.domain}"
-          tls = {
-            mode = "Terminate"
-            certificateRefs = [{
-              name = "${var.gateway_name}-tls"
-            }]
-          }
-          allowedRoutes = {
-            namespaces = {
-              from = "All"
-            }
-          }
-        },
-        # HTTP listener exists only to support HTTP->HTTPS 301 redirects below
-        {
-          name     = "http"
-          protocol = "HTTP"
-          port     = 80
-          hostname = "*.${var.domain}"
-          allowedRoutes = {
-            namespaces = {
-              from = "All"
-            }
-          }
-        },
-      ]
-    }
-  }
-
-  depends_on = [kubernetes_manifest.cluster_issuer]
-}
-
-# ---------------------------------------------------------------------------
-# HTTPRoutes — one per hostname
+# App HTTPRoutes — one per hostname, attached to the shared Gateway (created by the `gateway` module/unit via
+# parentRef). The foundational Gateway + ClusterIssuer live in the `gateway` module (ADR-053/059); this unit owns
+# only the per-app routes. (Keycloak self-owns its route in the keycloak module so its endpoint is up early.)
 # ---------------------------------------------------------------------------
 
 resource "kubernetes_manifest" "http_routes" {
@@ -133,8 +33,6 @@ resource "kubernetes_manifest" "http_routes" {
       }]
     }
   }
-
-  depends_on = [kubernetes_manifest.gateway]
 }
 
 # ---------------------------------------------------------------------------
@@ -169,6 +67,4 @@ resource "kubernetes_manifest" "http_redirect_routes" {
       }]
     }
   }
-
-  depends_on = [kubernetes_manifest.gateway]
 }
