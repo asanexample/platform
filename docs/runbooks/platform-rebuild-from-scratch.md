@@ -27,15 +27,20 @@ This runbook uses `./bin/platctl`. Always **rebuild** before a rebuild run so th
 
 ### Tooling & access
 
-- OpenTofu (`tofu`, the `terraform_binary`) + Terragrunt installed; `./bin/platctl` built.
+- `tofu` (the `terraform_binary`), `terragrunt`, **`aws` CLI, and `kubectl`** installed; `./bin/platctl` built.
+  (`aws` + `kubectl` back the providers' exec-auth and the keycloak-config port-forward; `kubectl` is the same
+  binary `platctl validate` already uses.)
 - `.platctl.yaml` present at the repo root (gitignored). Copy `.platctl.yaml.example` → `.platctl.yaml` and fill
   in account IDs / regions / validate config.
 - `infra/live/aws/secrets.hcl` present (gitignored) and complete — account IDs, emails, and the SSO URLs/certs.
   See `secrets.hcl.example`.
 - **AWS SSO** logged in for every profile the DAG uses: `aws sso login --profile management` (and `platform`,
   `preprod` if separate). Tokens expire — re-login if you see `SSOProviderInvalidToken`.
-- **Tailscale**: the deployer must be on the tailnet. The gateway NLB is **internal**, so `keycloak-config`
-  (which talks to `https://keycloak.aws.refplat.org`) and any internal-only validate checks require Tailscale.
+- **Tailscale — NOT required to deploy.** The deploy path reaches the cluster via the EKS API (public during
+  bootstrap), and keycloak-config configures Keycloak via an in-cluster port-forward (§3) — no tailnet needed.
+  Tailscale is still required for **human/browser** access to the internal services and for `platctl validate`'s
+  internal-endpoint checks. (Day-2 config against a locked-down private cluster uses an SSM tunnel —
+  `scripts/eks-tunnel.sh` — also without Tailscale.)
 
 ### State backend (only if truly from zero)
 
@@ -93,26 +98,25 @@ then runs the **lockdown** phase (re-applies `platform/eks`/`preprod/eks` to dis
 down tailscale) and configures kubeconfig. Logs stream to `.platctl-logs/latest/`.
 
 **Identity ordering (ADR-059), for reference:** `gateway` (foundational, early — no app deps) → `keycloak`
-(self-owns its HTTPRoute on the gateway) → `keycloak-config`; separately `argocd → keycloak-config`;
-`gateway-config` carries the remaining app routes. This ordering is what lets keycloak-config reach Keycloak's
-endpoint during its apply.
+(self-owns its browser HTTPRoute on the gateway) → `keycloak-config`; separately `argocd → keycloak-config`;
+`gateway-config` carries the remaining app routes.
 
-### keycloak-config readiness (automatic — no `--resume` needed)
+### keycloak-config readiness (automatic, in-cluster — no Tailscale, no `--resume`)
 
-`keycloak-config` configures Keycloak through `https://keycloak.aws.refplat.org`, whose runtime readiness lags
-behind "apply complete" (LE wildcard cert issuance, NLB provisioning, DNS, pod startup). This is gated
-**deterministically** so the rebuild doesn't need a manual retry:
+`keycloak-config` configures Keycloak **in-cluster** via a kubectl **port-forward to the ClusterIP** — not the
+Tailscale-fronted gateway — so the deploy path needs no tailnet and doesn't depend on the gateway/cert/NLB/DNS:
 
 - The `keycloak` unit applies with **`helm_wait = true`** — its apply blocks until the Keycloak pod is Ready.
-- The `keycloak-config` unit has a Terragrunt **`before_hook`** (`scripts/wait-for-http.sh`) that polls the
-  master-realm `.well-known/openid-configuration` over the real TLS path until it returns 200 (10-min timeout),
-  **then** applies. One endpoint poll covers the whole chain (cert + NLB + DNS + pod) because it exercises the
-  exact path the keycloak provider uses.
+- The `keycloak-config` unit has a Terragrunt **`before_hook`** (`scripts/kc-portforward.sh up`) that opens a
+  background `kubectl port-forward svc/keycloak` (reaching the cluster via the EKS API + the deployer role, on a
+  throwaway kubeconfig), waits until Keycloak answers on `localhost:18080`, **then** applies — with the provider
+  pointed at `http://localhost:18080`. An **`after_hook`** (`run_on_error`) tears the forward down.
 
-So keycloak-config simply waits, then succeeds. The only prerequisite is the **deployer being on Tailscale** (the
-gate's poll, like keycloak-config itself, goes over the internal NLB). If the gate times out (e.g. deployer not on
-Tailscale, or the cert is genuinely stuck), it fails with a hint — fix the cause and `./bin/platctl bootstrap
---resume`. `--resume` is the fallback for real failures, **not** part of the happy path.
+So keycloak-config waits for its own in-cluster connection, then succeeds — deterministically. The provider talks
+to localhost; the realm/SAML config still uses the canonical `https://keycloak.aws.refplat.org` (the `keycloak_url`
+input). Prerequisite: **cluster API reachability**, which the rebuild already has (EKS endpoint public during
+bootstrap; or an SSM tunnel for a private day-2 cluster) — **not** Tailscale. If the forward can't establish or
+Keycloak never serves, the hook fails with a hint; fix and `./bin/platctl bootstrap --resume` (fallback only).
 
 ## 4. Validate
 
@@ -132,9 +136,11 @@ for SSO users — use the ArgoCD local `admin` (break-glass) for admin actions u
 - **`platctl: command not found`** → it's not on PATH; build it (`make build-platctl`) and run `./bin/platctl`.
 - **Stale `.platctl-state.json`** from a prior run → `--resume` to continue, or `rm .platctl-state.json` to start
   fresh (bootstrap will also prompt).
-- **`keycloak-config` readiness** is gated automatically (helm_wait + the `wait-for-http.sh` before_hook, §3) — no
-  `--resume` on the happy path. If the gate *times out*, it's a real problem (deployer not on Tailscale, or the
-  gateway cert is stuck): fix it, then `--resume`.
+- **`keycloak-config` readiness** is gated automatically (helm_wait + the `kc-portforward.sh` before_hook, §3) —
+  no `--resume` on the happy path, and no Tailscale. If the port-forward can't establish, it's a real problem
+  (cluster API unreachable — confirm the EKS endpoint is public during bootstrap, or use an SSM tunnel): fix it,
+  then `--resume`. A leaked `kubectl port-forward` (after a crash) can be cleared with
+  `bash scripts/kc-portforward.sh down <cluster> 18080`.
 - **Expired SSO** mid-run → `aws sso login --profile <p>`, then `--resume`.
 - **State lock** → `cd <unit-dir> && terragrunt force-unlock <id>` (platctl README).
 - The **gateway/keycloak split is a fresh apply** on a clean rebuild (the Gateway is created by the `gateway`
