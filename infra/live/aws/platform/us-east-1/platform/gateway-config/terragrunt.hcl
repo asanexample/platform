@@ -22,24 +22,15 @@ dependency "eks" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-dependency "cilium" {
-  config_path = "../cilium"
+# The foundational Gateway + ClusterIssuer live in the `gateway` unit (ADR-053/059); this unit owns only the
+# per-app routes and attaches them to that Gateway by name.
+dependency "gateway" {
+  config_path = "../gateway"
 
-  mock_outputs                            = {}
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
-}
-
-dependency "cert_manager" {
-  config_path = "../cert-manager"
-
-  mock_outputs                            = {}
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
-}
-
-dependency "external_dns" {
-  config_path = "../external-dns"
-
-  mock_outputs                            = {}
+  mock_outputs = {
+    gateway_name      = "platform-gateway"
+    gateway_namespace = "default"
+  }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
@@ -64,27 +55,6 @@ dependency "dex" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-# The `keycloak` HTTPRoute is created in the keycloak namespace (ADR-053, B1 — alongside Dex).
-dependency "keycloak" {
-  config_path = "../keycloak"
-
-  mock_outputs = {
-    namespace    = "keycloak"
-    service_name = "keycloak"
-    service_port = 80
-  }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
-}
-
-dependency "route53" {
-  config_path = "../route53"
-
-  mock_outputs = {
-    zone_id = "MOCK"
-  }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
-}
-
 generate "kubernetes_provider" {
   path      = "kubernetes-provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -103,13 +73,12 @@ generate "kubernetes_provider" {
 }
 
 inputs = {
-  create   = true
-  domain   = "aws.refplat.org"
-  internal = true # Internal NLB — platform services only reachable via Tailscale VPN
+  create = true
+  domain = "aws.refplat.org"
 
-  letsencrypt_email      = include.base.locals.admin_email # Let's Encrypt certificate renewal notifications
-  route53_hosted_zone_id = dependency.route53.outputs.zone_id
-  route53_region         = include.base.locals.region
+  # The shared Gateway is owned by the `gateway` unit; attach routes to it by name.
+  gateway_name      = dependency.gateway.outputs.gateway_name
+  gateway_namespace = dependency.gateway.outputs.gateway_namespace
 
   routes = {
     argocd = {
@@ -138,12 +107,7 @@ inputs = {
       service   = dependency.dex.outputs.service_name
       port      = dependency.dex.outputs.service_port
     }
-    # Keycloak app IdP (ADR-053, B1). Tailscale-only at keycloak.aws.refplat.org, alongside Dex's sso route;
-    # becomes the sso.* issuer at the Dex cutover. TLS at the gateway; Keycloak Service serves HTTP on 80.
-    keycloak = {
-      namespace = dependency.keycloak.outputs.namespace
-      service   = dependency.keycloak.outputs.service_name
-      port      = dependency.keycloak.outputs.service_port
-    }
+    # NOTE: the `keycloak` route is NOT here — Keycloak self-owns its HTTPRoute in the keycloak module (ADR-059)
+    # so its endpoint is live before keycloak-config configures the realm through it.
   }
 }

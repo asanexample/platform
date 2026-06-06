@@ -56,6 +56,7 @@ locals {
     external_dns        = "${local.source_base}/external-dns"
     external_secrets    = "${local.source_base}/external-secrets"
     secret_stores       = "${local.source_base}/secret-stores"
+    gateway             = "${local.source_base}/gateway"
     gateway_config      = "${local.source_base}/gateway-config"
     cluster_rbac        = "${local.source_base}//cluster-rbac"
     policy              = "${local.source_base}//policy"
