@@ -200,3 +200,47 @@ resource "helm_release" "argocd" {
 
   depends_on = [aws_iam_role.argocd]
 }
+
+# ---------------------------------------------------------------------------
+# OIDC client-secret ExternalSecret
+# Syncs the OIDC client secret from Secrets Manager into a Secret labeled `app.kubernetes.io/part-of: argocd`
+# (required, or ArgoCD won't resolve a `$<name>:<key>` reference in argocd-cm). mergePolicy=Merge keeps the
+# fetched data key while adding the label. Depends on the Helm release so the namespace exists. ADR-053/059.
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_manifest" "oidc_external_secret" {
+  count = local.create && var.oidc_external_secret_enabled ? 1 : 0
+
+  manifest = {
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = var.oidc_k8s_secret_name
+      namespace = var.namespace
+    }
+    spec = {
+      refreshInterval = "1h"
+      secretStoreRef  = { name = var.oidc_secret_store_name, kind = "ClusterSecretStore" }
+      target = {
+        name           = var.oidc_k8s_secret_name
+        creationPolicy = "Owner"
+        template = {
+          engineVersion = "v2"
+          mergePolicy   = "Merge"
+          metadata = {
+            labels = { "app.kubernetes.io/part-of" = "argocd" }
+          }
+        }
+      }
+      data = [{
+        secretKey = var.oidc_k8s_secret_key
+        remoteRef = {
+          key      = var.oidc_secret_manager_key
+          property = var.oidc_secret_manager_property
+        }
+      }]
+    }
+  }
+
+  depends_on = [helm_release.argocd]
+}

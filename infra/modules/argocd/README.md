@@ -1,6 +1,6 @@
 # ArgoCD
 
-Deploys ArgoCD via Helm with optional IRSA (IAM Roles for Service Accounts) on AWS EKS. Creates the ArgoCD Helm release with configurable HA replicas, RBAC policies, Dex SSO, ApplicationSet controller, and notifications. When IRSA is enabled, provisions an IAM role with ECR read-only access and optional cross-account `sts:AssumeRole` permissions for managing remote clusters. The IRSA role is annotated on the controller, server, and repo-server service accounts. Tags are converted to Kubernetes-safe pod labels. CiliumIdentity resources are excluded from ArgoCD management by default.
+Deploys ArgoCD via Helm with optional IRSA (IAM Roles for Service Accounts) on AWS EKS. Creates the ArgoCD Helm release with configurable HA replicas, RBAC policies, SSO (embedded Dex, or an external OIDC IdP such as Keycloak via an optional client-secret ExternalSecret), ApplicationSet controller, and notifications. When IRSA is enabled, provisions an IAM role with ECR read-only access and optional cross-account `sts:AssumeRole` permissions for managing remote clusters. The IRSA role is annotated on the controller, server, and repo-server service accounts. Tags are converted to Kubernetes-safe pod labels. CiliumIdentity resources are excluded from ArgoCD management by default.
 
 ## Usage
 
@@ -13,25 +13,25 @@ module "argocd" {
   oidc_provider_url = "oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE"
 
   high_availability = true
-  dex_enabled       = true
   rbac_scopes       = "[groups]"
+
+  # SSO via an external OIDC IdP (Keycloak — ADR-053/059). The client secret is synced from Secrets Manager into
+  # a part-of:argocd Secret and referenced from argocd-cm; the embedded Dex stays off (dex_enabled = false).
+  oidc_external_secret_enabled = true
+  oidc_secret_manager_key      = "platform/keycloak/argocd-oidc"
 
   remote_cluster_role_arns = [
     "arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/PlatformDeployer",
   ]
 
   argocd_cm_extra = {
-    "dex.config" = yamlencode({
-      connectors = [{
-        type = "saml"
-        id   = "aws-sso"
-        name = "AWS SSO"
-        config = {
-          ssoURL      = "https://portal.sso.us-east-1.amazonaws.com/saml/..."
-          caData      = "base64-cert-data"
-          redirectURI = "https://argocd.aws.refplat.org/api/dex/callback"
-        }
-      }]
+    "oidc.config" = yamlencode({
+      name            = "Keycloak"
+      issuer          = "https://keycloak.aws.refplat.org/realms/platform"
+      clientID        = "argocd"
+      clientSecret    = "$argocd-keycloak-oidc:client-secret" # resolved from the synced Secret
+      cliClientID     = "argocd-cli"                          # public PKCE client for the CLI
+      requestedScopes = ["openid", "profile", "email", "groups"]
     })
   }
 
@@ -73,6 +73,7 @@ module "argocd" {
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.6.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 5.0 |
 | <a name="requirement_helm"></a> [helm](#requirement\_helm) | >= 3.0 |
+| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | >= 2.0 |
 
 ## Providers
 
@@ -80,6 +81,7 @@ module "argocd" {
 | ---- | ------- |
 | <a name="provider_aws"></a> [aws](#provider\_aws) | >= 5.0 |
 | <a name="provider_helm"></a> [helm](#provider\_helm) | >= 3.0 |
+| <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | >= 2.0 |
 
 ## Modules
 
@@ -94,6 +96,7 @@ No modules.
 | [aws_iam_role_policy_attachment.ecr_read](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
 | [aws_iam_role_policy_attachment.extra](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
 | [helm_release.argocd](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
+| [kubernetes_manifest.oidc_external_secret](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [aws_iam_policy_document.argocd_trust](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 
 ## Inputs
@@ -114,14 +117,20 @@ No modules.
 | <a name="input_helm_timeout"></a> [helm\_timeout](#input\_helm\_timeout) | Timeout for Helm operations in seconds | `number` | `900` | no |
 | <a name="input_helm_wait"></a> [helm\_wait](#input\_helm\_wait) | Whether to wait for Helm release to complete | `bool` | `true` | no |
 | <a name="input_high_availability"></a> [high\_availability](#input\_high\_availability) | Deploy ArgoCD in HA mode (2 replicas per component) | `bool` | `false` | no |
+| <a name="input_metrics_enabled"></a> [metrics\_enabled](#input\_metrics\_enabled) | Enable per-component Prometheus metrics Services + ServiceMonitors (controller/server/repoServer/applicationSet). Requires the Prometheus-operator CRDs (the observability hub, #102). Off by default. | `bool` | `false` | no |
 | <a name="input_namespace"></a> [namespace](#input\_namespace) | Kubernetes namespace to install ArgoCD into | `string` | `"argocd"` | no |
 | <a name="input_notifications_enabled"></a> [notifications\_enabled](#input\_notifications\_enabled) | Enable ArgoCD notifications controller | `bool` | `false` | no |
+| <a name="input_oidc_external_secret_enabled"></a> [oidc\_external\_secret\_enabled](#input\_oidc\_external\_secret\_enabled) | Create the OIDC client-secret ExternalSecret (for SSO via Keycloak/any OIDC IdP). | `bool` | `false` | no |
+| <a name="input_oidc_k8s_secret_key"></a> [oidc\_k8s\_secret\_key](#input\_oidc\_k8s\_secret\_key) | Key in the synced Kubernetes Secret (the part after the colon in the argocd-cm $ref). | `string` | `"client-secret"` | no |
+| <a name="input_oidc_k8s_secret_name"></a> [oidc\_k8s\_secret\_name](#input\_oidc\_k8s\_secret\_name) | Name of the synced Kubernetes Secret (referenced from argocd-cm as $<name>:<key>). | `string` | `"argocd-keycloak-oidc"` | no |
 | <a name="input_oidc_provider_arn"></a> [oidc\_provider\_arn](#input\_oidc\_provider\_arn) | ARN of the EKS OIDC provider for IRSA. Empty string disables IRSA. | `string` | `""` | no |
 | <a name="input_oidc_provider_url"></a> [oidc\_provider\_url](#input\_oidc\_provider\_url) | OIDC provider URL (without https:// prefix) for IRSA trust policy | `string` | `""` | no |
-| <a name="input_projects"></a> [projects](#input\_projects) | ArgoCD project definitions | `any` | `{}` | no |
+| <a name="input_oidc_secret_manager_key"></a> [oidc\_secret\_manager\_key](#input\_oidc\_secret\_manager\_key) | AWS Secrets Manager secret name/path holding the OIDC client secret (e.g. platform/keycloak/argocd-oidc). | `string` | `""` | no |
+| <a name="input_oidc_secret_manager_property"></a> [oidc\_secret\_manager\_property](#input\_oidc\_secret\_manager\_property) | JSON property within the Secrets Manager secret holding the client secret. | `string` | `"client-secret"` | no |
+| <a name="input_oidc_secret_store_name"></a> [oidc\_secret\_store\_name](#input\_oidc\_secret\_store\_name) | ClusterSecretStore name External Secrets reads from. | `string` | `"aws-secrets-manager"` | no |
 | <a name="input_rbac_default_policy"></a> [rbac\_default\_policy](#input\_rbac\_default\_policy) | Default RBAC policy (role:readonly, role:admin, or empty) | `string` | `"role:readonly"` | no |
 | <a name="input_rbac_policy_csv"></a> [rbac\_policy\_csv](#input\_rbac\_policy\_csv) | RBAC policy rules in ArgoCD CSV format | `string` | `"p, role:org-admin, applications, *, */*, allow\np, role:org-admin, clusters, get, *, allow\np, role:org-admin, repositories, *, *, allow\np, role:org-admin, logs, get, *, allow\np, role:org-admin, exec, create, */*, allow\ng, org-admin, role:org-admin\n"` | no |
-| <a name="input_rbac_scopes"></a> [rbac\_scopes](#input\_rbac\_scopes) | OIDC scopes to inspect for RBAC (e.g., '[groups]' for Dex group claims) | `string` | `""` | no |
+| <a name="input_rbac_scopes"></a> [rbac\_scopes](#input\_rbac\_scopes) | OIDC scopes to inspect for RBAC (e.g., '[groups]' for named group claims) | `string` | `""` | no |
 | <a name="input_reconciliation_timeout"></a> [reconciliation\_timeout](#input\_reconciliation\_timeout) | How often ArgoCD re-syncs applications | `string` | `"180s"` | no |
 | <a name="input_remote_cluster_role_arns"></a> [remote\_cluster\_role\_arns](#input\_remote\_cluster\_role\_arns) | Cross-account IAM role ARNs that ArgoCD needs to assume for remote cluster management | `list(string)` | `[]` | no |
 | <a name="input_repositories"></a> [repositories](#input\_repositories) | Repository credentials for ArgoCD (map of repo objects) | `any` | `{}` | no |
@@ -145,10 +154,12 @@ No modules.
 
 - IRSA is enabled automatically when `oidc_provider_arn` is non-empty. Setting it to `""` disables IAM role creation.
 - The module uses `replace = true` on the Helm release, so failed installs are replaced rather than upgraded in-place.
-- SSO configuration (Dex/SAML) is injected via `argocd_cm_extra` to keep the module cloud-agnostic -- the SAML app in Identity Center must be created manually.
+- SSO configuration (Dex/SAML, or external OIDC) is injected via `argocd_cm_extra` to keep the module cloud-agnostic.
+- For external OIDC (Keycloak — ADR-053/059), set `oidc_external_secret_enabled = true`: the module syncs the client secret from Secrets Manager into a Secret **labeled `app.kubernetes.io/part-of: argocd`** (required for ArgoCD to resolve a `$<name>:<key>` reference in `argocd-cm`). Requires External Secrets + a ClusterSecretStore. The CLI should use a separate **public** PKCE client via `oidc.config.cliClientID` (never the confidential secret).
 - A `configHash` value forces Helm to detect config drift even when values don't change structurally.
 
 ## Related ADRs
 
 - ADR-021: ArgoCD for GitOps Delivery
-- ADR-012: ArgoCD SSO via Dex and SAML
+- ADR-012: ArgoCD SSO via Dex and SAML (superseded by ADR-053 for app SSO)
+- ADR-053 / ADR-059: Keycloak app-IdP + pluggable identity seam (the OIDC cutover)

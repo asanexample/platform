@@ -101,8 +101,9 @@ variable "clients" {
   }))
   default = {
     argocd = {
-      name          = "ArgoCD"
-      redirect_uris = ["https://argocd.aws.refplat.org/auth/callback", "http://localhost:8085/auth/callback"]
+      name = "ArgoCD"
+      # Browser flow only — the ArgoCD CLI (localhost) uses the PUBLIC argocd-cli client (var.public_clients).
+      redirect_uris = ["https://argocd.aws.refplat.org/auth/callback"]
     }
     backstage = {
       name          = "Backstage"
@@ -113,6 +114,19 @@ variable "clients" {
       redirect_uris = ["https://backstage.aws.refplat.org/oauth2/callback"]
     }
   }
+}
+
+variable "public_clients" {
+  description = <<-DESC
+    PUBLIC OIDC clients (PKCE S256, NO client secret, no Secrets Manager entry) — for CLIs that can't safely hold
+    a confidential secret (e.g. the ArgoCD CLI). Each gets the same `groups`/`roles` claim mappers as the
+    confidential clients so CLI tokens carry the access-model claims. See ADR-059.
+  DESC
+  type = map(object({
+    name          = string
+    redirect_uris = list(string)
+  }))
+  default = {}
 }
 
 variable "secret_recovery_window_days" {
@@ -134,6 +148,17 @@ variable "teams" {
   DESC
   type        = any
   default     = {}
+}
+
+variable "platform_groups" {
+  description = <<-DESC
+    Non-team platform realm groups (e.g. platform-admins, ADR-059), separate from teams: each gets a Keycloak
+    group (emitted in the `groups` claim) and — when it carries an `ssoGroup` and the upstream emits groups — an
+    advanced-group membership mapper. No tenant envelope/roles (apps match the group name directly). Empty
+    ssoGroup leaves membership to a group-emitting upstream / manual assignment (claims stay empty under AWS IdC).
+  DESC
+  type        = map(object({ ssoGroup = optional(string, "") }))
+  default     = { "platform-admins" = {} }
 }
 
 variable "tags" {

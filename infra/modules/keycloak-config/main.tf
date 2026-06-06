@@ -11,9 +11,11 @@ locals {
   sp_entity_id = try(local.up.saml.entity_id, "") != "" ? local.up.saml.entity_id : "${var.keycloak_url}/realms/${var.realm_name}"
 
   clients         = local.create ? var.clients : {}
+  public_clients  = local.create ? var.public_clients : {}
   oidc_secret_key = "client-secret"
 
-  teams = local.create ? var.teams : {}
+  teams           = local.create ? var.teams : {}
+  platform_groups = local.create ? var.platform_groups : {}
 
   # ADR-049 standing developer-access posture by environment (elevation is break-glass, not a standing role).
   role_for_env = {
@@ -33,6 +35,11 @@ locals {
   # (group_claim = "", e.g. AWS IdC — ADR-059 scenario C). each value is the team's ssoGroup (the match value).
   team_group_bindings = local.up.group_claim == "" ? {} : {
     for t, cfg in local.teams : t => try(cfg.ssoGroup, "")
+    if try(cfg.ssoGroup, "") != ""
+  }
+  # Same, for non-team platform groups (e.g. platform-admins) that declare an ssoGroup.
+  platform_group_bindings = local.up.group_claim == "" ? {} : {
+    for g, cfg in local.platform_groups : g => cfg.ssoGroup
     if try(cfg.ssoGroup, "") != ""
   }
   group_mapper_type = local.is_saml ? "saml-advanced-group-idp-mapper" : "oidc-advanced-group-idp-mapper"
@@ -199,6 +206,45 @@ resource "keycloak_openid_user_realm_role_protocol_mapper" "roles" {
 }
 
 # ---------------------------------------------------------------------------
+# Public OIDC clients — for CLIs that can't hold a confidential secret (e.g. the ArgoCD CLI). PKCE S256, NO
+# secret, no Secrets Manager entry. Same `groups`/`roles` claim mappers as the confidential clients so CLI
+# tokens carry the access-model claims (ADR-059).
+# ---------------------------------------------------------------------------
+
+resource "keycloak_openid_client" "public" {
+  for_each = local.public_clients
+
+  realm_id                   = keycloak_realm.this[0].id
+  client_id                  = each.key
+  name                       = each.value.name
+  enabled                    = true
+  access_type                = "PUBLIC"
+  standard_flow_enabled      = true
+  valid_redirect_uris        = each.value.redirect_uris
+  pkce_code_challenge_method = "S256"
+}
+
+resource "keycloak_openid_group_membership_protocol_mapper" "public_groups" {
+  for_each = local.public_clients
+
+  realm_id   = keycloak_realm.this[0].id
+  client_id  = keycloak_openid_client.public[each.key].id
+  name       = "groups"
+  claim_name = "groups"
+  full_path  = false
+}
+
+resource "keycloak_openid_user_realm_role_protocol_mapper" "public_roles" {
+  for_each = local.public_clients
+
+  realm_id    = keycloak_realm.this[0].id
+  client_id   = keycloak_openid_client.public[each.key].id
+  name        = "roles"
+  claim_name  = "roles"
+  multivalued = true
+}
+
+# ---------------------------------------------------------------------------
 # Team taxonomy — Keycloak groups + developer-access roles, generated from the canonical registry (ADR-053).
 # One group per Team (the named `groups` claim apps consume); realm roles for the ADR-049 posture, assigned to
 # each group by its envelope. Membership (which users join each group) is driven by the upstream group mappers
@@ -231,6 +277,15 @@ resource "keycloak_group_roles" "team" {
   role_ids   = [for r in local.team_role_names[each.key] : keycloak_role.posture[r].id]
 }
 
+# Non-team platform groups (e.g. platform-admins, ADR-059) — emitted in the `groups` claim like team groups, but
+# no tenant envelope/roles; apps (ArgoCD/Backstage) match the group name directly (e.g. platform-admins → admin).
+resource "keycloak_group" "platform" {
+  for_each = local.platform_groups
+
+  realm_id = keycloak_realm.this[0].id
+  name     = each.key
+}
+
 # ---------------------------------------------------------------------------
 # Upstream group → Keycloak group membership (ADR-059, the membership mechanism). One advanced-group IdP mapper
 # per Team: when the brokered login's group claim/attribute (var.upstream.group_claim) carries the team's
@@ -260,6 +315,33 @@ resource "keycloak_custom_identity_provider_mapper" "team_group" {
 
   depends_on = [
     keycloak_group.team,
+    keycloak_saml_identity_provider.upstream,
+    keycloak_oidc_identity_provider.upstream,
+  ]
+}
+
+# Same membership mechanism for the non-team platform groups (e.g. platform-admins). Inert under AWS IdC.
+resource "keycloak_custom_identity_provider_mapper" "platform_group" {
+  for_each = local.platform_group_bindings
+
+  realm                    = keycloak_realm.this[0].id
+  name                     = "group-${each.key}"
+  identity_provider_alias  = local.broker_alias
+  identity_provider_mapper = local.group_mapper_type
+
+  extra_config = merge(
+    {
+      syncMode                 = "INHERIT"
+      group                    = "/${each.key}"
+      "are.claim.values.regex" = "false"
+    },
+    local.is_saml
+    ? { attributes = jsonencode([{ key = local.up.group_claim, value = each.value }]) }
+    : { claims = jsonencode([{ key = local.up.group_claim, value = each.value }]) }
+  )
+
+  depends_on = [
+    keycloak_group.platform,
     keycloak_saml_identity_provider.upstream,
     keycloak_oidc_identity_provider.upstream,
   ]
