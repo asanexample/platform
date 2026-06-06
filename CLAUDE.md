@@ -65,7 +65,7 @@ networking ─┘                        |
               cloudnative-pg ────────┤ (eks, nodes) — CNPG operator for the Backstage DB (ADR-051)
               dex ───────────────────┤ (eks, nodes, ext-secrets, secret-stores) — centralized SAML→OIDC SSO broker (ADR-052)
               keycloak ──────────────┤ (eks, nodes, ext-secrets, secret-stores, cnpg, gateway) — app-facing OIDC IdP, CNPG-backed (ADR-053, B1); self-owns its HTTPRoute on the shared Gateway (ADR-059) so its endpoint is up before keycloak-config; alongside dex
-              keycloak-config ───────┤ (keycloak) — realm + Identity Center SAML broker via the keycloak TF provider (ADR-053, B2); apply needs keycloak serving
+              keycloak-config ───────┤ (keycloak, eks) — realm + Identity Center SAML broker via the keycloak TF provider (ADR-053, B2); configures Keycloak over an in-cluster kubectl port-forward (scripts/kc-portforward.sh, ADR-059) so deploy needs cluster API access, NOT Tailscale; apply needs keycloak serving (helm_wait)
 
               backstage ─────────────┤ (eks, nodes, cnpg, ext-secrets, secret-stores, dex) — developer portal (ADR-051); after dex for OIDC SSO
               oauth2-proxy ──────────┘ (eks, nodes, ext-secrets, secret-stores, dex, backstage) — auth proxy fronting Backstage for durable sessions (#202); in the backstage ns, gateway routes backstage→oauth2-proxy→backstage
@@ -82,6 +82,9 @@ Cross-environment units (on platform cluster): route53-delegation, ecr, github-o
 EKS uses BYOCNI (`bootstrap_self_managed_addons = false`), so Cilium must be deployed before node groups join. EKS managed add-ons (coredns) are in a separate `eks-addons` unit since addon pods need the CNI to schedule.
 
 ### Apply / Destroy
+
+Full from-scratch teardown + rebuild via `platctl`: `docs/runbooks/platform-rebuild-from-scratch.md` (note:
+`platctl` is built to `./bin/platctl` via `make build-platctl` — it is not on PATH by default).
 
 ```bash
 # Apply (from any env's unit directory, e.g. infra/live/aws/platform/us-east-1/platform/)

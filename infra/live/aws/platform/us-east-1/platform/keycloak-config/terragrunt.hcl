@@ -9,6 +9,32 @@ include "root" {
 
 terraform {
   source = include.base.locals.module_source.keycloak_config
+
+  # In-cluster configuration path (ADR-059). keycloak-config configures Keycloak via a kubectl port-forward to the
+  # ClusterIP (the provider points at localhost:18080 below), NOT the Tailscale-fronted gateway — so the deployer
+  # does not need the tailnet to deploy, and keycloak-config no longer depends on the gateway/cert/NLB/DNS. The
+  # port-forward reaches the cluster the same way Terragrunt does (aws eks + the deployer role); the EKS API is
+  # public during bootstrap (SSM/eks-tunnel.sh for a private day-2 cluster). start_pf also waits for Keycloak to
+  # serve over the forward (deterministic readiness — Keycloak itself is gated by helm_wait on the keycloak unit).
+  before_hook "start_pf" {
+    commands = ["apply", "plan"]
+    execute = [
+      "bash", "${get_repo_root()}/scripts/kc-portforward.sh", "up",
+      dependency.eks.outputs.cluster_id,
+      include.base.locals.region,
+      include.base.locals.deployer_role_arn,
+      dependency.keycloak.outputs.namespace,
+      dependency.keycloak.outputs.service_name,
+      "${dependency.keycloak.outputs.service_port}",
+      "18080",
+    ]
+  }
+
+  after_hook "stop_pf" {
+    commands     = ["apply", "plan"]
+    run_on_error = true
+    execute      = ["bash", "${get_repo_root()}/scripts/kc-portforward.sh", "down", dependency.eks.outputs.cluster_id, "18080"]
+  }
 }
 
 # Canonical Team registry (single source of truth, ADR-053) — read directly (not via _base.hcl, to keep the
@@ -18,8 +44,8 @@ locals {
 }
 
 # Configures the running Keycloak (deployed by the keycloak unit) via the keycloak/keycloak provider — B2,
-# ADR-053. The provider talks to the LIVE admin API, so this unit is not CI-plan-tested; apply is rebuild-gated
-# (and needs Keycloak actually serving + the deployer on Tailscale to reach keycloak.aws.refplat.org).
+# ADR-053. The provider talks to the LIVE admin API over an in-cluster port-forward (see the start_pf hook), so
+# this unit is not CI-plan-tested; apply is rebuild-gated (needs Keycloak serving + cluster API access).
 dependency "keycloak" {
   config_path = "../keycloak"
 
@@ -28,6 +54,16 @@ dependency "keycloak" {
     service_name = "keycloak"
     service_port = 80
     issuer       = "https://keycloak.aws.refplat.org"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
+# Needed for the port-forward (cluster name); region + deployer role come from include.base.locals.
+dependency "eks" {
+  config_path = "../eks"
+
+  mock_outputs = {
+    cluster_id = "mock-cluster"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
@@ -47,8 +83,10 @@ generate "keycloak_provider" {
       kc_admin = jsondecode(data.aws_secretsmanager_secret_version.kc_admin.secret_string)
     }
 
+    # Connect via the localhost port-forward (the start_pf hook), NOT the gateway hostname — keeps the deploy path
+    # off Tailscale (ADR-059). The realm/SP config still uses the canonical issuer via the keycloak_url input.
     provider "keycloak" {
-      url       = "${dependency.keycloak.outputs.issuer}"
+      url       = "http://localhost:18080"
       client_id = "admin-cli"
       username  = local.kc_admin.username
       password  = local.kc_admin.password

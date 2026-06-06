@@ -112,6 +112,11 @@ inputs = {
   # sso.aws.refplat.org until the rebuild cutover. See ADR-053.
   hostname_url = "https://keycloak.aws.refplat.org"
 
+  # Block the apply until Keycloak's pod is Ready (DB up + admin secret synced + serving) rather than returning
+  # as soon as the Helm release is created. Makes "keycloak applied" mean "keycloak serving", so keycloak-config
+  # (and its readiness gate) act on real readiness, and a stuck pod fails here with a clear error (ADR-059).
+  helm_wait = true
+
   # Keycloak self-owns its HTTPRoute on the shared Gateway (ADR-059) — so the endpoint is up before keycloak-config.
   create_route      = true
   gateway_name      = dependency.gateway.outputs.gateway_name
