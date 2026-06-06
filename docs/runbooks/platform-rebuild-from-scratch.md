@@ -97,23 +97,22 @@ down tailscale) and configures kubeconfig. Logs stream to `.platctl-logs/latest/
 `gateway-config` carries the remaining app routes. This ordering is what lets keycloak-config reach Keycloak's
 endpoint during its apply.
 
-### The keycloak-config readiness step (use `--resume`)
+### keycloak-config readiness (automatic — no `--resume` needed)
 
-`keycloak-config` configures Keycloak through `https://keycloak.aws.refplat.org`, which depends on **runtime
-readiness** that can lag behind "apply complete": the LE wildcard cert (`platform-gateway-tls`) being issued, the
-internal NLB being provisioned, DNS propagating, and the deployer being on Tailscale. terragrunt ordering does
-**not** wait for these, so keycloak-config's first run *may* fail with a TLS/connection error. **This is not a
-real failure.** Recover by waiting for readiness, then resuming:
+`keycloak-config` configures Keycloak through `https://keycloak.aws.refplat.org`, whose runtime readiness lags
+behind "apply complete" (LE wildcard cert issuance, NLB provisioning, DNS, pod startup). This is gated
+**deterministically** so the rebuild doesn't need a manual retry:
 
-```bash
-# 1. Confirm the gateway cert is Ready (and Keycloak is serving), over Tailscale:
-./bin/platctl validate --check gateway                       # Certificate platform-gateway-tls Ready?
-curl -sf https://keycloak.aws.refplat.org/realms/master/.well-known/openid-configuration >/dev/null && echo reachable
-# 2. Resume — completed units are skipped, keycloak-config retries:
-./bin/platctl bootstrap --resume
-```
+- The `keycloak` unit applies with **`helm_wait = true`** — its apply blocks until the Keycloak pod is Ready.
+- The `keycloak-config` unit has a Terragrunt **`before_hook`** (`scripts/wait-for-http.sh`) that polls the
+  master-realm `.well-known/openid-configuration` over the real TLS path until it returns 200 (10-min timeout),
+  **then** applies. One endpoint poll covers the whole chain (cert + NLB + DNS + pod) because it exercises the
+  exact path the keycloak provider uses.
 
-(Resumability is the intended mechanism here — there is no HTTP pre-flight check type in `manual_steps`.)
+So keycloak-config simply waits, then succeeds. The only prerequisite is the **deployer being on Tailscale** (the
+gate's poll, like keycloak-config itself, goes over the internal NLB). If the gate times out (e.g. deployer not on
+Tailscale, or the cert is genuinely stuck), it fails with a hint — fix the cause and `./bin/platctl bootstrap
+--resume`. `--resume` is the fallback for real failures, **not** part of the happy path.
 
 ## 4. Validate
 
@@ -133,7 +132,9 @@ for SSO users — use the ArgoCD local `admin` (break-glass) for admin actions u
 - **`platctl: command not found`** → it's not on PATH; build it (`make build-platctl`) and run `./bin/platctl`.
 - **Stale `.platctl-state.json`** from a prior run → `--resume` to continue, or `rm .platctl-state.json` to start
   fresh (bootstrap will also prompt).
-- **`keycloak-config` TLS/connection failure** → readiness timing; wait + `--resume` (§3).
+- **`keycloak-config` readiness** is gated automatically (helm_wait + the `wait-for-http.sh` before_hook, §3) — no
+  `--resume` on the happy path. If the gate *times out*, it's a real problem (deployer not on Tailscale, or the
+  gateway cert is stuck): fix it, then `--resume`.
 - **Expired SSO** mid-run → `aws sso login --profile <p>`, then `--resume`.
 - **State lock** → `cd <unit-dir> && terragrunt force-unlock <id>` (platctl README).
 - The **gateway/keycloak split is a fresh apply** on a clean rebuild (the Gateway is created by the `gateway`

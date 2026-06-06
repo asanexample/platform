@@ -9,6 +9,22 @@ include "root" {
 
 terraform {
   source = include.base.locals.module_source.keycloak_config
+
+  # Deterministic readiness gate (ADR-059). keycloak-config configures Keycloak through its LIVE HTTPS endpoint,
+  # which becomes ready asynchronously after the gateway/keycloak applies return (LE cert issuance, NLB
+  # provisioning, DNS, pod startup). Terragrunt ordering doesn't wait for that, so without this the first apply
+  # could hit an unready endpoint and need `platctl bootstrap --resume`. Block apply until the endpoint actually
+  # responds — verifying the real TLS path the keycloak provider will use. (Needs the deployer on Tailscale, the
+  # same reachability keycloak-config itself requires.) The master realm always exists, so it's a clean probe.
+  before_hook "wait_for_keycloak" {
+    commands = ["apply"]
+    execute = [
+      "bash",
+      "${get_repo_root()}/scripts/wait-for-http.sh",
+      "${dependency.keycloak.outputs.issuer}/realms/master/.well-known/openid-configuration",
+      "600",
+    ]
+  }
 }
 
 # Canonical Team registry (single source of truth, ADR-053) — read directly (not via _base.hcl, to keep the
