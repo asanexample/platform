@@ -55,23 +55,30 @@ overrides:
 
   platform/route53:
     implicit_deps: ["platform/iam-roles"]
+    # Zones hold records (incl. external-dns-created ones); force_destroy to allow zone deletion on teardown.
+    teardown_args: ["-var", "force_destroy=true"]
 
   preprod/route53:
     implicit_deps: ["preprod/iam-roles"]
+    teardown_args: ["-var", "force_destroy=true"]
 
   platform/route53-delegation:
     implicit_deps: ["platform/route53", "preprod/route53"]
+
+  # ECR repos hold images (Backstage, per-team app images); force_delete to allow deletion on teardown.
+  platform/ecr:
+    teardown_args: ["-var", "force_delete=true"]
+
+  # Mimir's S3 metrics bucket holds objects; force_destroy to empty + delete it on teardown.
+  platform/mimir:
+    teardown_args: ["-var", "force_destroy=true"]
 
   preprod/cert-manager:
     hook: crd_two_stage
     hook_target: "helm_release.cert_manager[0]"
 
-  preprod/tenants:
-    hook: crd_two_stage
-    hook_target: "module.vcluster"
-
   platform/argocd-apps:
-    implicit_deps: ["platform/argocd", "platform/argocd-clusters", "preprod/tenants"]
+    implicit_deps: ["platform/argocd", "platform/argocd-clusters"]
 
   platform/cloudtrail:
     teardown_args: ["-var", "force_destroy=true"]

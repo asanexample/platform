@@ -17,7 +17,7 @@ terraform {
   # public during bootstrap (SSM/eks-tunnel.sh for a private day-2 cluster). start_pf also waits for Keycloak to
   # serve over the forward (deterministic readiness — Keycloak itself is gated by helm_wait on the keycloak unit).
   before_hook "start_pf" {
-    commands = ["apply", "plan"]
+    commands = ["apply", "plan", "destroy"]
     execute = [
       "bash", "${get_repo_root()}/scripts/kc-portforward.sh", "up",
       dependency.eks.outputs.cluster_id,
@@ -31,7 +31,7 @@ terraform {
   }
 
   after_hook "stop_pf" {
-    commands     = ["apply", "plan"]
+    commands     = ["apply", "plan", "destroy"]
     run_on_error = true
     execute      = ["bash", "${get_repo_root()}/scripts/kc-portforward.sh", "down", dependency.eks.outputs.cluster_id, "18080"]
   }

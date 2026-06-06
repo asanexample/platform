@@ -83,8 +83,33 @@ and prompts if missing; the rest you must ensure yourself. For a from-scratch re
 
 platctl runs an **unlock** phase first (re-applies `bootstrap_args`, e.g. re-enabling the EKS public endpoint so
 the API is reachable for destroy), then `teardown_args` (e.g. `force_destroy=true`), skips empty-state units, and
-destroys in reverse dependency order. If an SCP blocks a destroy (KMS keys, flow logs), see the platctl README
-"SCP-blocked destroy" (state-rm the resource, then destroy). Teardown is resumable: `./bin/platctl teardown --resume`.
+destroys in reverse dependency order. Resumable: `./bin/platctl teardown --resume`.
+
+**Scope (verify before destroying):** platctl only manages the `platform` + `preprod` environments — it does
+**not** touch the management account (org, Identity Center, the **S3 state backend**) or test. Confirm the
+`--dry-run` unit list contains only `platform/*` + `preprod/*`; the state backend must survive (it holds the
+state the rebuild reads from). **Your real `.platctl.yaml` must carry the `teardown_args` from
+`.platctl.yaml.example`** (force_destroy/force_delete for route53, ecr, mimir, cloudtrail) or those units won't
+destroy.
+
+**Supervise the first teardown.** These units have never been torn down; expect to clear 1–2 stuck ones, then
+`--resume`. Watch list (ordering + helm-uninstall should handle them, but verify):
+
+- **keycloak-config** — destroys via the port-forward while Keycloak is still up; only fails if Keycloak is
+  *already* gone (a re-run) → `cd` the unit + `terragrunt state rm 'keycloak_*'`, then continue.
+- **Crossplane** Provider/Function/XRD/Composition CRs have **finalizers** — terraform deletes the CRs before the
+  helm release (controller still up), so they should drain; if one hangs, `kubectl delete` / patch off the
+  finalizer, then `--resume`.
+- **Kyverno** (`policy`) — confirm its destroy removed the `*WebhookConfiguration`s; a dangling
+  `failurePolicy=Fail` webhook would block later API ops.
+- **Cilium Gateway NLB** — deleted by the EKS cloud-controller when the Gateway/Service is removed (gateway
+  destroys before cilium/eks); if an NLB/ENI lingers and blocks `networking`, delete it + retry.
+- **CNPG PVCs/EBS** — cleaned by the operator when the Cluster CR is deleted (keycloak destroys before
+  cloudnative-pg); verify none linger.
+- **KMS** keys enter a 7–30 day deletion window — expected, not a blocker (key is ID-based; alias is deleted), so
+  the rebuild is unaffected.
+- **SCP-blocked** resources (KMS, flow logs) are auto-handled; if one slips through, see the platctl README
+  "SCP-blocked destroy" (state-rm + manual delete), then `--resume`.
 
 ## 3. Bootstrap
 
