@@ -204,6 +204,31 @@ variable "remote_cluster_role_arns" {
   default     = []
 }
 
+# ---------------------------------------------------------------------------
+# Teardown — robust cluster auth for the destroy-time namespace drain.
+# On teardown the namespace hung ~5m in Terminating (deadline exceeded) waiting
+# on CNPG-left content (pods/PVCs) after the Cluster CR was gone. A when=destroy
+# step deletes + force-clears that content first via scripts/k8s-finalizer-clear.sh.
+# ---------------------------------------------------------------------------
+
+variable "region" {
+  description = "AWS region of the cluster (for destroy-time namespace drain auth)"
+  type        = string
+  default     = ""
+}
+
+variable "deployer_role_arn" {
+  description = "IAM role ARN to assume for the destroy-time namespace drain (the PlatformDeployer)"
+  type        = string
+  default     = ""
+}
+
+variable "finalizer_clear_script" {
+  description = "Absolute path to scripts/k8s-finalizer-clear.sh (passed from the unit via get_repo_root())"
+  type        = string
+  default     = ""
+}
+
 variable "kubernetes_clusters" {
   description = "Clusters surfaced by the Kubernetes plugin (rendered into the kubernetes app-config). authProvider is always aws; set assume_role for cross-account clusters."
   type = list(object({

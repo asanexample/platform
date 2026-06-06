@@ -109,5 +109,9 @@ inputs = {
   # Canonical Team registry → projected Team CRs (ADR-049/053). Was empty; this starts the envelope projection.
   teams = local.teams
 
+  # Destroy-time CR finalizer cleanup auth (scripts/k8s-finalizer-clear.sh) — see crd_finalizer_cleanup.
+  deployer_role_arn      = include.base.locals.deployer_role_arn
+  finalizer_clear_script = "${get_repo_root()}/scripts/k8s-finalizer-clear.sh"
+
   tags = include.base.locals.tags
 }

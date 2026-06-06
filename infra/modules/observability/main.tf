@@ -203,6 +203,34 @@ resource "kubernetes_namespace" "this" {
   }
 }
 
+# Teardown: drain the namespace's stateful workloads before it is deleted. The namespace otherwise hangs in
+# Terminating (the observed ~5m "context deadline exceeded") on Succeeded prometheus/mimir/alertmanager pods
+# (no finalizer, kubelet never confirmed) pinning their pvc-protection PVCs. This runs FIRST on teardown
+# (depends_on the namespace AND the helm release => reverse-order destroy puts it before both). It deletes the
+# StatefulSets/Deployments/DaemonSets first so the helm-managed pods can't recreate, then force-evicts the
+# leftover pods. NB: PVCs are deliberately NOT force-cleared — that orphans the EBS volume (bypasses the CSI
+# delete). Evicting the pods releases pvc-protection, so the namespace-controller deletes the PVCs through CSI,
+# which cleans the EBS properly (CSI outlives this unit per the DAG). Best-effort + self-authenticating.
+resource "null_resource" "namespace_drain" {
+  count = local.create ? 1 : 0
+
+  triggers = {
+    script    = var.finalizer_clear_script
+    cluster   = var.cluster_name
+    region    = var.aws_region
+    role_arn  = var.deployer_role_arn
+    namespace = var.namespace
+    refs      = "statefulsets.apps deployments.apps daemonsets.apps pods"
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = "bash ${self.triggers.script} --delete ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} ${self.triggers.namespace} ${self.triggers.refs}"
+  }
+
+  depends_on = [kubernetes_namespace.this, helm_release.kube_prometheus_stack]
+}
+
 # ---------------------------------------------------------------------------
 # Network policies — default-deny ingress; allow intra-namespace; Grafana reachable
 # (gateway path). Egress left open (Prometheus scrapes cluster-wide). Full store-endpoint

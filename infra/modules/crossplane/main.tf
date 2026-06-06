@@ -201,6 +201,57 @@ resource "helm_release" "crossplane_teams" {
 }
 
 # ---------------------------------------------------------------------------
+# Teardown: drain Crossplane CR finalizers before the helm uninstalls
+# ---------------------------------------------------------------------------
+# Provider/ProviderRevision/Function/XRD/Composition/ProviderConfig/Usage CRs carry finalizers the package +
+# apiextensions managers drain asynchronously (uninstalling provider packages, deleting generated CRDs). That
+# drain runs longer than the helm uninstall timeout → "Error uninstalling release ... context deadline exceeded"
+# (the observed preprod/crossplane teardown failure). This runs FIRST on teardown (depends_on every release =>
+# reverse-order destroy) and DELETEs + force-clears those CRs (--delete): deletion sets deletionTimestamp, the
+# finalizer strip then forces removal regardless of the controller. The cluster is being torn down, so orphaned
+# in-cluster packages don't matter — the goal is letting the helm uninstalls find the CRs already drained.
+# Best-effort + self-authenticating (scripts/k8s-finalizer-clear.sh); a missing CRD is a no-op.
+resource "null_resource" "crd_finalizer_cleanup" {
+  count = local.create ? 1 : 0
+
+  triggers = {
+    script   = var.finalizer_clear_script
+    cluster  = var.cluster_name
+    region   = var.region
+    role_arn = var.deployer_role_arn
+    # All cluster-scoped. apiextensions first (XRD/Composition/Usage), then packages (Provider/Function +
+    # revisions + DeploymentRuntimeConfig), then the per-provider ProviderConfigs.
+    refs = join(" ", [
+      "compositeresourcedefinitions.apiextensions.crossplane.io",
+      "compositions.apiextensions.crossplane.io",
+      "environmentconfigs.apiextensions.crossplane.io",
+      "usages.apiextensions.crossplane.io",
+      "providers.pkg.crossplane.io",
+      "functions.pkg.crossplane.io",
+      "configurations.pkg.crossplane.io",
+      "providerrevisions.pkg.crossplane.io",
+      "functionrevisions.pkg.crossplane.io",
+      "deploymentruntimeconfigs.pkg.crossplane.io",
+      "providerconfigs.aws.upbound.io",
+      "providerconfigs.kubernetes.crossplane.io",
+    ])
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = "bash ${self.triggers.script} --delete ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} - ${self.triggers.refs}"
+  }
+
+  depends_on = [
+    helm_release.crossplane,
+    helm_release.crossplane_runtime,
+    helm_release.crossplane_config,
+    helm_release.crossplane_tenant,
+    helm_release.crossplane_teams,
+  ]
+}
+
+# ---------------------------------------------------------------------------
 # Scoped provisioning identity (IAM) + EKS Pod Identity association
 # ---------------------------------------------------------------------------
 # The AWS provider assumes this role to provision tenant resources. P1 scope: ECR repositories under

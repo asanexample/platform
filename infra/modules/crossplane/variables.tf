@@ -62,6 +62,27 @@ variable "helm_timeout" {
 }
 
 # ---------------------------------------------------------------------------
+# Teardown — robust cluster auth for the destroy-time CR finalizer cleanup.
+# Crossplane Provider/XRD/Composition/ProviderConfig CRs carry finalizers the
+# package/apiextensions managers drain asynchronously; on teardown that drain
+# outlives the helm uninstall timeout (the observed "context deadline exceeded").
+# A when=destroy step deletes + force-clears those CRs first (cluster is being
+# destroyed, so orphaned packages don't matter) via scripts/k8s-finalizer-clear.sh.
+# ---------------------------------------------------------------------------
+
+variable "deployer_role_arn" {
+  description = "IAM role ARN to assume for destroy-time CR finalizer cleanup (the PlatformDeployer)"
+  type        = string
+  default     = ""
+}
+
+variable "finalizer_clear_script" {
+  description = "Absolute path to scripts/k8s-finalizer-clear.sh (passed from the unit via get_repo_root())"
+  type        = string
+  default     = ""
+}
+
+# ---------------------------------------------------------------------------
 # AWS providers (Upbound provider-family-aws)
 # ---------------------------------------------------------------------------
 

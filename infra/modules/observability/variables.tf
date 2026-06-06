@@ -16,6 +16,26 @@ variable "aws_region" {
 }
 
 # ---------------------------------------------------------------------------
+# Teardown — robust cluster auth for the destroy-time namespace drain.
+# Like backstage, the namespace hung ~5m in Terminating (deadline exceeded)
+# on Succeeded prometheus/mimir/alertmanager pods (no finalizer, kubelet never
+# confirmed) pinning their pvc-protection PVCs. A when=destroy step deletes the
+# stateful workloads + force-clears pods/PVCs first via scripts/k8s-finalizer-clear.sh.
+# ---------------------------------------------------------------------------
+
+variable "deployer_role_arn" {
+  description = "IAM role ARN to assume for the destroy-time namespace drain (the PlatformDeployer)"
+  type        = string
+  default     = ""
+}
+
+variable "finalizer_clear_script" {
+  description = "Absolute path to scripts/k8s-finalizer-clear.sh (passed from the unit via get_repo_root())"
+  type        = string
+  default     = ""
+}
+
+# ---------------------------------------------------------------------------
 # Helm (kube-prometheus-stack)
 # ---------------------------------------------------------------------------
 

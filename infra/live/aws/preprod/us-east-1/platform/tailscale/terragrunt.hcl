@@ -123,5 +123,10 @@ inputs = {
 
   helm_chart_version = include.base.locals.helm_versions.tailscale_operator
 
+  # Destroy-time finalizer cleanup auth (scripts/k8s-finalizer-clear.sh) — see the module's crd_finalizer_cleanup.
+  region                 = include.base.locals.region
+  deployer_role_arn      = include.base.locals.deployer_role_arn
+  finalizer_clear_script = "${get_repo_root()}/scripts/k8s-finalizer-clear.sh"
+
   tags = include.base.locals.tags
 }
