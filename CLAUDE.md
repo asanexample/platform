@@ -51,7 +51,7 @@ networking ─┘                        |
               external-dns ──────────┤ (eks, nodes, r53)
               external-secrets ──────┤ (eks, nodes)
               secret-stores ─────────┤ (eks, nodes, ext-secrets)
-              argocd ────────────────┤ (eks, nodes)
+              argocd ────────────────┤ (eks, nodes, keycloak-config) — SSO via Keycloak OIDC + team-scoped RBAC (ADR-053/059, B3); the keycloak-config dep also transitively orders argocd after the ESO/secret-store chain for its OIDC ExternalSecret
               argocd-clusters ──────┤ (argocd, preprod eks+iam-roles)
               tailscale ─────────────┤ (eks, nodes, ext-secrets)
               transit-gateway (hub) ─┤ (networking)

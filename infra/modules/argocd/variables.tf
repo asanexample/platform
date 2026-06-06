@@ -165,9 +165,52 @@ variable "rbac_policy_csv" {
 }
 
 variable "rbac_scopes" {
-  description = "OIDC scopes to inspect for RBAC (e.g., '[groups]' for Dex group claims)"
+  description = "OIDC scopes to inspect for RBAC (e.g., '[groups]' for named group claims)"
   type        = string
   default     = ""
+}
+
+# ---------------------------------------------------------------------------
+# OIDC client-secret ExternalSecret
+# Pulls an OIDC client secret from AWS Secrets Manager into a Secret labeled `app.kubernetes.io/part-of: argocd`
+# so argocd-cm can reference it as `$<oidc_k8s_secret_name>:<oidc_k8s_secret_key>`. Generic (any OIDC provider);
+# used for the Keycloak SSO cutover (ADR-053/059). Requires External Secrets + a ClusterSecretStore.
+# ---------------------------------------------------------------------------
+
+variable "oidc_external_secret_enabled" {
+  description = "Create the OIDC client-secret ExternalSecret (for SSO via Keycloak/any OIDC IdP)."
+  type        = bool
+  default     = false
+}
+
+variable "oidc_secret_store_name" {
+  description = "ClusterSecretStore name External Secrets reads from."
+  type        = string
+  default     = "aws-secrets-manager"
+}
+
+variable "oidc_secret_manager_key" {
+  description = "AWS Secrets Manager secret name/path holding the OIDC client secret (e.g. platform/keycloak/argocd-oidc)."
+  type        = string
+  default     = ""
+}
+
+variable "oidc_secret_manager_property" {
+  description = "JSON property within the Secrets Manager secret holding the client secret."
+  type        = string
+  default     = "client-secret"
+}
+
+variable "oidc_k8s_secret_name" {
+  description = "Name of the synced Kubernetes Secret (referenced from argocd-cm as $<name>:<key>)."
+  type        = string
+  default     = "argocd-keycloak-oidc"
+}
+
+variable "oidc_k8s_secret_key" {
+  description = "Key in the synced Kubernetes Secret (the part after the colon in the argocd-cm $ref)."
+  type        = string
+  default     = "client-secret"
 }
 
 # ---------------------------------------------------------------------------

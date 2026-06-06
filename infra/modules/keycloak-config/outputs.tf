@@ -34,8 +34,13 @@ output "group_membership_mappers" {
 }
 
 output "client_ids" {
-  description = "Registered OIDC client IDs."
+  description = "Registered confidential OIDC client IDs."
   value       = keys(local.clients)
+}
+
+output "public_client_ids" {
+  description = "Registered public (PKCE, no-secret) OIDC client IDs — e.g. CLI clients."
+  value       = keys(local.public_clients)
 }
 
 output "client_secret_names" {
@@ -46,6 +51,11 @@ output "client_secret_names" {
 output "group_names" {
   description = "Keycloak groups created from the Team registry (one per Team)."
   value       = keys(local.teams)
+}
+
+output "platform_group_names" {
+  description = "Non-team platform groups (e.g. platform-admins)."
+  value       = keys(local.platform_groups)
 }
 
 output "realm_roles" {

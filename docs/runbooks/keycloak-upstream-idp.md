@@ -110,3 +110,7 @@ upstream = {
   entirely is the **SCIM** story (ADR-059 item 4, deferred).
 - **Apply is rebuild-gated.** Changing `upstream` is applied by the `keycloak-config` unit against the live
   Keycloak admin API; it is not CI-plan-tested (the provider needs a live API).
+- **App consumers (B3+):** apps authorize from these claims. ArgoCD (B3, ADR-053/059) brokers via the `argocd`
+  OIDC client, maps team groups → team-scoped AppProject roles and `platform-admins` → org-admin, and uses the
+  public `argocd-cli` client for CLI login. Until membership is populated (a group-emitting upstream / SCIM) the
+  claims are empty, so ArgoCD admin is via the local break-glass account.

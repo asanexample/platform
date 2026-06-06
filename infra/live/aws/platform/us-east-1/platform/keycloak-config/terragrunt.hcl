@@ -81,6 +81,16 @@ inputs = {
   # Per-app OIDC clients use the module defaults (ArgoCD/Backstage/oauth2-proxy). Secrets are tagged for SM.
   tags = include.base.locals.tags
 
+  # Public PKCE client for the ArgoCD CLI (no secret — B3, ADR-059): the CLI can't safely hold the confidential
+  # `argocd` client's secret, so it uses this. argocd-cm sets oidc.config.cliClientID = argocd-cli.
+  public_clients = {
+    "argocd-cli" = {
+      name          = "ArgoCD CLI"
+      redirect_uris = ["http://localhost:8085/auth/callback"]
+    }
+  }
+
   # Team taxonomy — one Keycloak group per Team + the developer-access roles, from the canonical registry.
+  # platform_groups defaults to { platform-admins } in the module (the non-team admin group ArgoCD maps to org-admin).
   teams = local.teams
 }

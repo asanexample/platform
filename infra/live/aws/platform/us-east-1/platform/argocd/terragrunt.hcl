@@ -11,6 +11,33 @@ terraform {
   source = include.base.locals.module_source.argocd
 }
 
+locals {
+  # Canonical Team registry (same source as keycloak-config + crossplane) — drives team-scoped ArgoCD RBAC (B3).
+  teams = read_terragrunt_config(find_in_parent_folders("aws/_teams.hcl")).locals.teams
+
+  # Team-scoped RBAC, generated from the registry (ADR-053). Each team group → a role scoped to its AppProject
+  # (project name == team key): get/sync/logs only — the operate posture; NO create/delete/exec, NO cluster/repo,
+  # NO `default` project. platform-admins → org-admin. Default policy is deny (rbac_default_policy = ""). The
+  # `backstage` local account stays read-only (its ArgoCD plugin token). Named claims replace the old IdC UUIDs.
+  argocd_rbac_csv = join("\n", concat([
+    "p, role:org-admin, applications, *, */*, allow",
+    "p, role:org-admin, clusters, get, *, allow",
+    "p, role:org-admin, repositories, *, *, allow",
+    "p, role:org-admin, logs, get, *, allow",
+    "p, role:org-admin, exec, create, */*, allow",
+    "g, platform-admins, role:org-admin",
+    ], flatten([
+      for t, _cfg in local.teams : [
+        "p, role:team-${t}, applications, get, ${t}/*, allow",
+        "p, role:team-${t}, applications, sync, ${t}/*, allow",
+        "p, role:team-${t}, logs, get, ${t}/*, allow",
+        "g, ${t}, role:team-${t}",
+      ]
+    ]), [
+    "g, backstage, role:readonly",
+  ]))
+}
+
 dependency "eks" {
   config_path = "../eks"
 
@@ -38,6 +65,20 @@ dependency "preprod_iam_roles" {
     role_arns = {
       ArgoCD = "arn:aws:iam::000000000000:role/ArgoCD"
     }
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
+# B3 (ADR-053/059): ArgoCD SSO now brokers through Keycloak, so it runs AFTER keycloak-config. This single
+# dependency also transitively orders argocd after the whole Keycloak chain (keycloak → cnpg/secret-stores/
+# external-secrets), guaranteeing the ESO CRD + ClusterSecretStore exist for the OIDC ExternalSecret and that the
+# argocd OIDC client secret is already in Secrets Manager. Provides the realm issuer + the SM secret name.
+dependency "keycloak_config" {
+  config_path = "../keycloak-config"
+
+  mock_outputs = {
+    issuer              = "https://keycloak.aws.refplat.org/realms/platform"
+    client_secret_names = { argocd = "platform/keycloak/argocd-oidc" }
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
@@ -116,25 +157,19 @@ inputs = {
   # Prometheus metrics + ServiceMonitors for the observability hub dashboards (#102 P1).
   metrics_enabled = true
 
-  dex_enabled = true
-  rbac_scopes = "[groups]"
+  # SSO is now Keycloak OIDC (B3, ADR-053/059) — ArgoCD's embedded Dex is disabled (Keycloak brokers up to IdC).
+  dex_enabled = false
+  rbac_scopes = "[groups]" # named team / platform-admins group claims (not the roles claim, not UUIDs)
 
-  # Group UUIDs are IAM Identity Center group IDs (Admins, Developers, ReadOnly)
-  rbac_policy_csv = <<-CSV
-    p, role:org-admin, applications, *, */*, allow
-    p, role:org-admin, clusters, get, *, allow
-    p, role:org-admin, repositories, *, *, allow
-    p, role:org-admin, logs, get, *, allow
-    p, role:org-admin, exec, create, */*, allow
-    g, org-admin, role:org-admin
-    p, role:developer, applications, get, */*, allow
-    p, role:developer, applications, sync, */*, allow
-    p, role:developer, logs, get, *, allow
-    g, a4b884e8-f021-7042-5f38-65d571afff7c, role:admin
-    g, a4c85418-d071-7051-9bee-c5a90ee7963e, role:developer
-    g, c4b87428-8051-7073-9af0-a31f4b94daac, role:readonly
-    g, backstage, role:readonly
-  CSV
+  # Default-deny: only explicitly-granted groups get any access (no platform-wide readonly). Team isolation +
+  # platform-admins → org-admin, generated from the canonical registry. See locals.argocd_rbac_csv.
+  rbac_default_policy = ""
+  rbac_policy_csv     = local.argocd_rbac_csv
+
+  # OIDC client secret (Keycloak `argocd` confidential client) → synced from Secrets Manager into a part-of:argocd
+  # Secret that argocd-cm references as $argocd-keycloak-oidc:client-secret.
+  oidc_external_secret_enabled = true
+  oidc_secret_manager_key      = dependency.keycloak_config.outputs.client_secret_names["argocd"]
 
   argocd_cm_extra = {
     "url" = "https://argocd.aws.refplat.org"
@@ -174,22 +209,17 @@ inputs = {
       jqPathExpressions = [".spec.crossplane"]
       jsonPointers      = ["/metadata/finalizers"]
     })
-    "dex.config" = yamlencode({
-      connectors = [{
-        type = "saml"
-        id   = "aws-sso"
-        name = "AWS SSO"
-        config = {
-          ssoURL             = include.base.locals.all_vars.argocd_sso_url
-          caData             = include.base.locals.all_vars.argocd_sso_ca_data
-          redirectURI        = "https://argocd.aws.refplat.org/api/dex/callback"
-          entityIssuer       = "https://argocd.aws.refplat.org/api/dex/callback"
-          nameIDPolicyFormat = "emailAddress"
-          usernameAttr       = "email"
-          emailAttr          = "email"
-          groupsAttr         = "groups"
-        }
-      }]
+    # SSO via Keycloak OIDC (B3, ADR-053/059) — replaces the embedded Dex SAML connector. The browser flow uses
+    # the confidential `argocd` client (clientSecret resolved from the synced Secret); the CLI uses the PUBLIC
+    # `argocd-cli` client (PKCE, no secret) via cliClientID. `groups` claim carries team / platform-admins names.
+    # (No `essential` on groups — an empty/absent claim must not block login while membership is unpopulated.)
+    "oidc.config" = yamlencode({
+      name            = "Keycloak"
+      issuer          = dependency.keycloak_config.outputs.issuer
+      clientID        = "argocd"
+      clientSecret    = "$argocd-keycloak-oidc:client-secret"
+      cliClientID     = "argocd-cli"
+      requestedScopes = ["openid", "profile", "email", "groups"]
     })
   }
 
