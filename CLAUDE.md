@@ -83,6 +83,9 @@ EKS uses BYOCNI (`bootstrap_self_managed_addons = false`), so Cilium must be dep
 
 ### Apply / Destroy
 
+Full from-scratch teardown + rebuild via `platctl`: `docs/runbooks/platform-rebuild-from-scratch.md` (note:
+`platctl` is built to `./bin/platctl` via `make build-platctl` — it is not on PATH by default).
+
 ```bash
 # Apply (from any env's unit directory, e.g. infra/live/aws/platform/us-east-1/platform/)
 terragrunt run --all apply
