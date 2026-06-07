@@ -92,7 +92,8 @@ inputs = {
 
   # Ship metrics to Mimir for durable, long-range storage (#102 P2). Tenant = platform (the hub's own
   # metrics). Setting this also makes the Mimir datasource Grafana's default (Prometheus stays selectable).
-  mimir_remote_write_url = "http://mimir-gateway.observability.svc/api/v1/push"
+  # Empty when Mimir is disabled (cost-profile toggle) — Prometheus keeps local retention only.
+  mimir_remote_write_url = include.base.locals.enable_mimir ? "http://mimir-gateway.observability.svc/api/v1/push" : ""
 
   # Alertmanager → SNS (critical alerts → email)
   oidc_provider_arn = dependency.eks.outputs.oidc_provider_arn

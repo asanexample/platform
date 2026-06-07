@@ -49,4 +49,13 @@ locals {
     # (ECR repos, per-team IAM roles) override this with their team (#61).
     Team = "platform"
   }
+
+  # ---------------------------------------------------------------------------
+  # Cost / environment profile (dev = cost-optimized). Flip these to go prod-grade.
+  # Overridable per-env in env.hcl (the env layer wins in _base.hcl's all_vars merge).
+  # See docs/plans/cost-optimized-dev-rebuild.md.
+  # ---------------------------------------------------------------------------
+  single_az_nodes = true    # true: node groups in ONE AZ (cheapest, no AZ resilience). false: spread all AZs.
+  node_arch       = "arm64" # "arm64" = Graviton (t4g, ~20% cheaper). "amd64" = t3 / x86.
+  enable_mimir    = false   # false: Prometheus-only (no durable long-range store). true: deploy Mimir.
 }
