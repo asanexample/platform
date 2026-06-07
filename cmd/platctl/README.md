@@ -67,6 +67,26 @@ Destroys all Terragrunt units in reverse dependency order (dependents first).
 
 Same flags as `bootstrap` (`--env`, `--dry-run`, `--resume`, `--yes`, `--concurrency`).
 
+### `platctl down` / `platctl up`
+
+Park and restore an environment's worker capacity — for dropping an idle environment's cost without a full
+teardown.
+
+- `platctl down --env <env>` scales every managed node group in the env's cluster to `desiredSize=0, minSize=0`
+  via the EKS API. The **control plane and all EBS volumes survive** (e.g. CNPG databases), so it is
+  non-destructive; `--yes` skips the confirmation.
+- `platctl up --env <env>` re-applies the env's `node-groups` unit (terragrunt), restoring the configured sizes
+  from the HCL.
+
+```bash
+platctl down --env preprod    # park overnight (~5-min resume, data intact)
+platctl up   --env preprod    # bring it back
+```
+
+Cost spectrum by idle duration: minimal-always-on (active testing) → `down` (overnight; control plane + NAT still
+bill) → `teardown --env` (idle days+; ~$0, full rebuild to restore). The cluster/region/profile come from the
+`kubeconfig:` entry whose `alias` matches the env.
+
 ### `platctl status`
 
 Shows the state of the last operation by reading `.platctl-state.json`.

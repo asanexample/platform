@@ -29,6 +29,12 @@ variable "node_groups" {
   default = {}
 }
 
+variable "single_az" {
+  description = "Cost/dev profile: place every node group in a SINGLE AZ (the first of its subnet_ids, sorted) instead of spreading across all. No AZ resilience — intended for build/test. gp3 is WaitForFirstConsumer, so EBS volumes follow the pods into that AZ."
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)

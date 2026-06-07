@@ -53,6 +53,14 @@ locals {
   account_id      = local.env_vars.locals.account_id
 
   # ---------------------------------------------------------------------------
+  # Cost / environment-profile toggles (defaults in common.hcl; env.hcl may override).
+  # See docs/plans/cost-optimized-dev-rebuild.md.
+  # ---------------------------------------------------------------------------
+  single_az_nodes = try(local.all_vars.single_az_nodes, true)
+  node_arch       = try(local.all_vars.node_arch, "arm64")
+  enable_mimir    = try(local.all_vars.enable_mimir, false)
+
+  # ---------------------------------------------------------------------------
   # Module sources and version pins (from _versions.hcl)
   # ---------------------------------------------------------------------------
   module_source = local.version_vars.locals.module_source

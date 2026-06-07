@@ -121,10 +121,12 @@ resource "aws_eks_node_group" "this" {
   cluster_name    = var.cluster_name
   node_group_name = each.key
   node_role_arn   = aws_iam_role.node[0].arn
-  subnet_ids      = each.value.subnet_ids
-  instance_types  = each.value.instance_types
-  capacity_type   = each.value.capacity_type
-  ami_type        = each.value.ami_type
+  # single_az (cost/dev profile) pins the group to one AZ — the first subnet by sorted ID, so every group on the
+  # same subnet list picks the same AZ. Spread across all subnets otherwise.
+  subnet_ids     = var.single_az && length(each.value.subnet_ids) > 0 ? slice(sort(each.value.subnet_ids), 0, 1) : each.value.subnet_ids
+  instance_types = each.value.instance_types
+  capacity_type  = each.value.capacity_type
+  ami_type       = each.value.ami_type
 
   launch_template {
     id      = aws_launch_template.this[each.key].id

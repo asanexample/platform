@@ -79,7 +79,9 @@ generate "kubernetes_provider" {
 }
 
 inputs = {
-  create       = true
+  # Cost-profile toggle: off in dev (Prometheus-only, no durable long-range store). Flip enable_mimir in
+  # common.hcl to deploy it. create=false applies as a no-op (empty state, skipped on teardown).
+  create       = include.base.locals.enable_mimir
   cluster_name = dependency.eks.outputs.cluster_id
   aws_region   = include.base.locals.region
 
