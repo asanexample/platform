@@ -73,22 +73,6 @@ resource "kubernetes_manifest" "proxy_class" {
   depends_on = [helm_release.tailscale_operator]
 }
 
-# Remove ProxyClass finalizers before destroy — operator adds finalizers that block deletion if the operator pod is already gone
-resource "null_resource" "proxy_class_finalizer_cleanup" {
-  count = local.create && length(var.advertise_routes) > 0 ? 1 : 0
-
-  triggers = {
-    proxy_class_name = "${var.cluster_name}-subnet-router"
-  }
-
-  provisioner "local-exec" {
-    when    = destroy
-    command = "kubectl patch proxyclass ${self.triggers.proxy_class_name} --type=merge -p '{\"metadata\":{\"finalizers\":null}}' 2>/dev/null || true"
-  }
-
-  depends_on = [kubernetes_manifest.proxy_class]
-}
-
 resource "kubernetes_manifest" "connector" {
   count = local.create && length(var.advertise_routes) > 0 ? 1 : 0
 
@@ -110,21 +94,31 @@ resource "kubernetes_manifest" "connector" {
   depends_on = [kubernetes_manifest.proxy_class]
 }
 
-# Remove finalizers before destroy so the Connector deletion doesn't block
-# waiting for the operator to process the finalizer (which may time out).
-resource "null_resource" "connector_finalizer_cleanup" {
+# Strip the operator-managed finalizers off the Connector + ProxyClass before destroy, so their deletion
+# doesn't hang waiting for the (concurrently-removed) operator to process them. Runs FIRST on teardown
+# (depends_on => reverse-order destroy). Uses scripts/k8s-finalizer-clear.sh, which sets up its own cluster
+# auth (aws eks update-kubeconfig + the deployer role) — the previous bare `kubectl patch` had no guaranteed
+# context during teardown and silently no-op'd, which is what hung the subnet-router delete. Best-effort.
+resource "null_resource" "crd_finalizer_cleanup" {
   count = local.create && length(var.advertise_routes) > 0 ? 1 : 0
 
   triggers = {
-    connector_name = "${var.cluster_name}-${var.connector_hostname}"
+    script   = var.finalizer_clear_script
+    cluster  = var.cluster_name
+    region   = var.region
+    role_arn = var.deployer_role_arn
+    refs     = "connector/${var.cluster_name}-${var.connector_hostname} proxyclass/${var.cluster_name}-subnet-router"
   }
 
   provisioner "local-exec" {
-    when    = destroy
-    command = "kubectl patch connector ${self.triggers.connector_name} --type=merge -p '{\"metadata\":{\"finalizers\":null}}' 2>/dev/null || true"
+    when = destroy
+    # cluster-scoped CRs (Connector/ProxyClass) -> namespace arg is "-". --delete so the provisioner issues the
+    # deletion itself (operator, still up, deprovisions the tailnet device) and force-clears the finalizer in one
+    # shot — terraform's later manifest delete is then a clean no-op, with no window for the operator to re-add.
+    command = "bash ${self.triggers.script} --delete ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} - ${self.triggers.refs}"
   }
 
-  depends_on = [kubernetes_manifest.connector]
+  depends_on = [kubernetes_manifest.connector, kubernetes_manifest.proxy_class]
 }
 
 # ---------------------------------------------------------------------------

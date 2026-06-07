@@ -92,20 +92,50 @@ state the rebuild reads from). **Your real `.platctl.yaml` must carry the `teard
 `.platctl.yaml.example`** (force_destroy/force_delete for route53, ecr, mimir, cloudtrail) or those units won't
 destroy.
 
-**Supervise the first teardown.** These units have never been torn down; expect to clear 1–2 stuck ones, then
-`--resume`. Watch list (ordering + helm-uninstall should handle them, but verify):
+**Automated finalizer/drain cleanup (the first live teardown surfaced these; now durable in-module).** Several
+controller-managed resources used to hang `terraform destroy`/helm-uninstall because they outlive the controller
+being torn down — two sub-classes: (a) **CRs with a controller finalizer** the controller can no longer remove,
+and (b) **`Succeeded` pods stuck `Terminating` with no finalizer** (the kubelet never confirms them) that pin
+their `pvc-protection` PVCs and so block namespace termination. Each module now runs a `when = destroy` step that
+self-authenticates to the cluster (`scripts/k8s-finalizer-clear.sh` — `aws eks update-kubeconfig` + the deployer
+role; the old bare `kubectl patch` silently no-op'd with no context) and drains them **before** the delete:
+
+- **tailscale** (`crd_finalizer_cleanup`) — the subnet-router `Connector`/`ProxyClass`: delete + clear finalizers
+  so the manifest delete doesn't time out (the observed `Timed out waiting for ... subnet-router`).
+- **crossplane** (`crd_finalizer_cleanup`) — Provider/Function/XRD/Composition/ProviderConfig/Usage CRs: delete +
+  force-clear before the helm uninstalls, which otherwise hit `context deadline exceeded` on the async drain.
+- **backstage** (`namespace_drain`) — delete the CNPG `Cluster` + force-evict stuck pods so the namespace doesn't
+  hang ~5m in `Terminating`.
+- **observability** (`namespace_drain`) — delete the prometheus/mimir/alertmanager StatefulSets (so pods can't
+  recreate) + force-evict the stuck `Succeeded` pods; same namespace-hang symptom.
+
+> The drains evict **pods only**, never PVCs: force-clearing a PVC's finalizer orphans its EBS volume (bypasses
+> the CSI delete). Evicting the pod releases `pvc-protection`, so the namespace-controller deletes the PVC through
+> CSI (still up at that point per the DAG), which cleans the EBS properly.
+
+The helper takes `[--delete]` (delete-then-clear, for resources nothing else removes) and is bash-3.2-safe; it
+enumerates names before patching (`kubectl patch` has no `--all`). It can also be run **manually** to unstick a
+live teardown mid-flight, e.g.:
+`bash scripts/k8s-finalizer-clear.sh --delete <cluster> <region> <deployer-role-arn> - connectors.tailscale.com`.
+
+**Supervise the first teardown anyway.** Resumable, data-loss OK. Remaining watch list:
 
 - **keycloak-config** — destroys via the port-forward while Keycloak is still up; only fails if Keycloak is
   *already* gone (a re-run) → `cd` the unit + `terragrunt state rm 'keycloak_*'`, then continue.
-- **Crossplane** Provider/Function/XRD/Composition CRs have **finalizers** — terraform deletes the CRs before the
-  helm release (controller still up), so they should drain; if one hangs, `kubectl delete` / patch off the
-  finalizer, then `--resume`.
+- **State lock** (`Error acquiring the state lock`, DynamoDB) — locks are per-unit, so this is a stale lock from
+  an interrupted/earlier run, not contention: `terragrunt force-unlock -force <id> --working-dir <unit-dir>`, then
+  `--resume`. (Get the id from the DynamoDB lock item's `Info.ID`.)
+- **Cilium Gateway NLB → `networking` `DependencyViolation`** — now automated. The internal NLB
+  (`kubernetes.io/service-name: default/cilium-gateway-platform-gateway`) is created by the in-cluster
+  cloud-controller, so once `eks` is destroyed nothing can delete it; its ENIs then block subnet/VPC deletion. The
+  `networking` unit has a **pre-destroy hook** (`before_hook "sweep_orphaned_lbs"` → `scripts/vpc-orphan-lb-sweep.sh`)
+  that deletes any k8s-tagged LB in the VPC and waits for its ENIs to release before `terraform destroy` runs.
+  Manual fallback if it's ever bypassed: find the LB by the `kubernetes.io/service-name` tag, `elbv2
+  delete-load-balancer`, wait for ENIs to clear, then `--resume`.
+- **Orphaned EBS backstop** — the drains avoid it, but if any `available` volumes remain post-teardown:
+  `aws ec2 describe-volumes --filters Name=status,Values=available` then `delete-volume` each (data-loss OK).
 - **Kyverno** (`policy`) — confirm its destroy removed the `*WebhookConfiguration`s; a dangling
   `failurePolicy=Fail` webhook would block later API ops.
-- **Cilium Gateway NLB** — deleted by the EKS cloud-controller when the Gateway/Service is removed (gateway
-  destroys before cilium/eks); if an NLB/ENI lingers and blocks `networking`, delete it + retry.
-- **CNPG PVCs/EBS** — cleaned by the operator when the Cluster CR is deleted (keycloak destroys before
-  cloudnative-pg); verify none linger.
 - **KMS** keys enter a 7–30 day deletion window — expected, not a blocker (key is ID-based; alias is deleted), so
   the rebuild is unaffected.
 - **SCP-blocked** resources (KMS, flow logs) are auto-handled; if one slips through, see the platctl README

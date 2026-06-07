@@ -102,5 +102,9 @@ inputs = {
   # Grafana served Tailscale-only via the platform internal Gateway (gateway-config adds the HTTPRoute).
   grafana_hostname = "grafana.aws.refplat.org"
 
+  # Destroy-time namespace drain auth (scripts/k8s-finalizer-clear.sh) — see the module's namespace_drain.
+  deployer_role_arn      = include.base.locals.deployer_role_arn
+  finalizer_clear_script = "${get_repo_root()}/scripts/k8s-finalizer-clear.sh"
+
   tags = include.base.locals.tags
 }

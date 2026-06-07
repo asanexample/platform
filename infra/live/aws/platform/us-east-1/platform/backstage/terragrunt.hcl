@@ -181,5 +181,10 @@ inputs = {
     frontend_url = "https://argocd.aws.refplat.org"  # browser → "open in ArgoCD" links (gateway, public)
   }]
 
+  # Destroy-time namespace drain auth (scripts/k8s-finalizer-clear.sh) — see the module's namespace_drain.
+  region                 = include.base.locals.region
+  deployer_role_arn      = include.base.locals.deployer_role_arn
+  finalizer_clear_script = "${get_repo_root()}/scripts/k8s-finalizer-clear.sh"
+
   tags = include.base.locals.tags
 }

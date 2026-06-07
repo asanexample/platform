@@ -72,5 +72,9 @@ inputs = {
   # extend provider_services (and the module's provisioning IAM policy) for the Tenant Composition.
   provider_services = ["ecr"]
 
+  # Destroy-time CR finalizer cleanup auth (scripts/k8s-finalizer-clear.sh) — see crd_finalizer_cleanup.
+  deployer_role_arn      = include.base.locals.deployer_role_arn
+  finalizer_clear_script = "${get_repo_root()}/scripts/k8s-finalizer-clear.sh"
+
   tags = include.base.locals.tags
 }

@@ -201,6 +201,34 @@ resource "kubernetes_namespace_v1" "backstage" {
   }
 }
 
+# Teardown: drain the namespace's stateful contents before it is deleted. The namespace otherwise hangs in
+# Terminating (the observed ~5m "context deadline exceeded") because a CNPG-left pod outlives the Cluster CR
+# (terraform deletes the Cluster in ~1s, but its Succeeded pod stays stuck with no finalizer, the kubelet never
+# confirming it) and pins its pvc-protection PVC. This runs FIRST on teardown (depends_on the namespace AND the
+# db => reverse-order destroy puts it before both): it deletes the CNPG Cluster and force-evicts the stuck pods.
+# NB: PVCs are deliberately NOT force-cleared here — doing so orphans the EBS volume (it bypasses the CSI
+# delete). Evicting the pod releases pvc-protection, so the namespace-controller deletes the PVC through CSI,
+# which cleans the EBS properly (CSI outlives this unit per the DAG). Best-effort + self-authenticating.
+resource "null_resource" "namespace_drain" {
+  count = local.create ? 1 : 0
+
+  triggers = {
+    script    = var.finalizer_clear_script
+    cluster   = var.cluster_name
+    region    = var.region
+    role_arn  = var.deployer_role_arn
+    namespace = var.namespace
+    refs      = "clusters.postgresql.cnpg.io pods"
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = "bash ${self.triggers.script} --delete ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} ${self.triggers.namespace} ${self.triggers.refs}"
+  }
+
+  depends_on = [kubernetes_namespace_v1.backstage, kubernetes_manifest.db]
+}
+
 # ---------------------------------------------------------------------------
 # In-cluster Postgres (CloudNativePG Cluster) — dev DB; RDS is the prod toggle
 # ---------------------------------------------------------------------------

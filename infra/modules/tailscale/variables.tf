@@ -103,3 +103,29 @@ variable "helm_wait" {
   type        = bool
   default     = true
 }
+
+# ---------------------------------------------------------------------------
+# Teardown — robust cluster auth for the destroy-time finalizer cleanup.
+# The Connector/ProxyClass carry operator-managed finalizers; on teardown the
+# operator is being removed too, so a `kubectl patch` to strip them must set up
+# its own auth (the old bare `kubectl` had no guaranteed context and silently
+# no-op'd, hanging the delete). These feed scripts/k8s-finalizer-clear.sh.
+# ---------------------------------------------------------------------------
+
+variable "region" {
+  description = "AWS region of the cluster (for destroy-time finalizer cleanup auth)"
+  type        = string
+  default     = ""
+}
+
+variable "deployer_role_arn" {
+  description = "IAM role ARN to assume for destroy-time finalizer cleanup (the PlatformDeployer)"
+  type        = string
+  default     = ""
+}
+
+variable "finalizer_clear_script" {
+  description = "Absolute path to scripts/k8s-finalizer-clear.sh (passed from the unit via get_repo_root())"
+  type        = string
+  default     = ""
+}
