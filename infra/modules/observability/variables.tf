@@ -173,6 +173,12 @@ variable "gateway_namespace" {
   default     = ""
 }
 
+variable "secret_recovery_window_days" {
+  description = "Secrets Manager recovery window for the generated Grafana admin secret. 0 = force-delete (setup-friendly); raise for prod."
+  type        = number
+  default     = 0
+}
+
 variable "tags" {
   description = "Tags/labels to apply (sanitized to RFC-1123 for K8s labels)."
   type        = map(string)
