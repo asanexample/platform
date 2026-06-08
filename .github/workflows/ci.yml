@@ -107,9 +107,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Terragrunt
         run: |
-          LATEST=$(curl -s https://api.github.com/repos/gruntwork-io/terragrunt/releases/latest | jq -r .tag_name)
-          curl -sL "https://github.com/gruntwork-io/terragrunt/releases/download/${LATEST}/terragrunt_linux_amd64" -o /usr/local/bin/terragrunt
+          # Pinned + fail-closed. The old `releases/latest` lookup hit the UNAUTHENTICATED GitHub API (rate-limit
+          # prone, non-reproducible), and `curl -sL` without --fail silently saved the 4xx body ("Not Found") AS
+          # the binary — so the next step died with "/usr/local/bin/terragrunt: line 1: Not: command not found"
+          # (exit 127). -f makes curl fail on HTTP errors; --version verifies a real binary landed.
+          TG_VERSION="v1.0.3"
+          curl -fsSL "https://github.com/gruntwork-io/terragrunt/releases/download/${TG_VERSION}/terragrunt_linux_amd64" -o /usr/local/bin/terragrunt
           chmod +x /usr/local/bin/terragrunt
+          terragrunt --version
       - name: Check HCL formatting
         run: terragrunt hcl fmt --check
 
