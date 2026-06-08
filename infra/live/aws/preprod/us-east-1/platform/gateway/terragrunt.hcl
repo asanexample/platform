@@ -8,9 +8,13 @@ include "root" {
 }
 
 terraform {
-  source = include.base.locals.module_source.gateway_config
+  source = include.base.locals.module_source.gateway
 }
 
+# Foundational shared Gateway + ClusterIssuer for the preprod workload cluster (ADR-053/059). Created EARLY —
+# no app deps — so tenant HTTPRoutes (delivered by ArgoCD into team-* namespaces) have ingress to attach to.
+# Mirrors the platform gateway unit; preprod was missing this when the shared Gateway was split out of the
+# gateway-config unit, so `preprod-gateway` (every tenant route's parentRef) had no creator.
 dependency "eks" {
   config_path = "../eks"
 
@@ -52,18 +56,6 @@ dependency "route53" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-# The shared Gateway (preprod-gateway) is created by the sibling `gateway` unit; per-app HTTPRoutes here attach
-# to it by name, so this orders gateway-config AFTER the Gateway exists (mirrors the platform split).
-dependency "gateway" {
-  config_path = "../gateway"
-
-  mock_outputs = {
-    gateway_name      = "preprod-gateway"
-    gateway_namespace = "default"
-  }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
-}
-
 generate "kubernetes_provider" {
   path      = "kubernetes-provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -82,14 +74,15 @@ generate "kubernetes_provider" {
 }
 
 inputs = {
-  create = true
-  domain = "preprod.aws.refplat.org"
+  create   = true
+  domain   = "preprod.aws.refplat.org" # preprod's delegated subdomain (tenant hostnames: <app>.preprod.aws.refplat.org)
+  internal = false                     # Public (internet-facing) NLB — preprod tenant apps are reachable from the internet
 
-  # The shared Gateway is owned by the `gateway` unit; attach routes to it by name. (NLB scheme / cert / DNS
-  # are set on the `gateway` unit now — the old internal/letsencrypt/route53 inputs here were ignored by the
-  # gateway-config module after the Gateway split out, so they're removed.)
-  gateway_name      = dependency.gateway.outputs.gateway_name
-  gateway_namespace = dependency.gateway.outputs.gateway_namespace
+  letsencrypt_email      = include.base.locals.admin_email
+  route53_hosted_zone_id = dependency.route53.outputs.zone_id
+  route53_region         = include.base.locals.region
 
-  routes = {}
+  # gateway_name overrides the module default (platform-gateway) — tenant HTTPRoutes on preprod parentRef
+  # `preprod-gateway` (namespace default). cluster_issuer_name uses the module default (letsencrypt-prod).
+  gateway_name = "preprod-gateway"
 }
