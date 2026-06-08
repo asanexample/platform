@@ -76,7 +76,7 @@ generate "kubernetes_provider" {
 inputs = {
   create   = true
   domain   = "preprod.aws.refplat.org" # preprod's delegated subdomain (tenant hostnames: <app>.preprod.aws.refplat.org)
-  internal = true                      # Internal NLB — reachable only via Tailscale, same posture as the platform gateway
+  internal = false                     # Public (internet-facing) NLB — preprod tenant apps are reachable from the internet
 
   letsencrypt_email      = include.base.locals.admin_email
   route53_hosted_zone_id = dependency.route53.outputs.zone_id

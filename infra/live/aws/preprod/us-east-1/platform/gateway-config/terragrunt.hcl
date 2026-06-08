@@ -52,6 +52,18 @@ dependency "route53" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+# The shared Gateway (preprod-gateway) is created by the sibling `gateway` unit; per-app HTTPRoutes here attach
+# to it by name, so this orders gateway-config AFTER the Gateway exists (mirrors the platform split).
+dependency "gateway" {
+  config_path = "../gateway"
+
+  mock_outputs = {
+    gateway_name      = "preprod-gateway"
+    gateway_namespace = "default"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
 generate "kubernetes_provider" {
   path      = "kubernetes-provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -70,15 +82,14 @@ generate "kubernetes_provider" {
 }
 
 inputs = {
-  create   = true
-  domain   = "preprod.aws.refplat.org"
-  internal = false # Public NLB — preprod services accessible from the internet
+  create = true
+  domain = "preprod.aws.refplat.org"
 
-  gateway_name = "preprod-gateway"
-
-  letsencrypt_email      = include.base.locals.admin_email # Let's Encrypt certificate renewal notifications
-  route53_hosted_zone_id = dependency.route53.outputs.zone_id
-  route53_region         = include.base.locals.region
+  # The shared Gateway is owned by the `gateway` unit; attach routes to it by name. (NLB scheme / cert / DNS
+  # are set on the `gateway` unit now — the old internal/letsencrypt/route53 inputs here were ignored by the
+  # gateway-config module after the Gateway split out, so they're removed.)
+  gateway_name      = dependency.gateway.outputs.gateway_name
+  gateway_namespace = dependency.gateway.outputs.gateway_namespace
 
   routes = {}
 }
