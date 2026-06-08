@@ -152,6 +152,39 @@ resource "kubernetes_manifest" "db" {
 }
 
 # ---------------------------------------------------------------------------
+# Teardown: drain the CNPG database before the namespace is deleted.
+# ---------------------------------------------------------------------------
+# The namespace delete (kubernetes_namespace_v1.keycloak, destroyed last) finalizes only once every object in
+# it is gone — but the CNPG database leaves a PersistentVolumeClaim stuck Terminating (the `kubernetes.io/
+# pvc-protection` finalizer is held while its instance pod lingers; under teardown node pressure that pod gets
+# stuck Completed and is never reaped). So the namespace hangs ~5m and the destroy times out ("context deadline
+# exceeded") — the observed platform/keycloak teardown failure. This runs FIRST on teardown (depends_on the
+# namespace => reverse-order destroy) and force-deletes the CNPG Cluster (clearing its finalizer so the operator
+# stops reconciling instances), then the pods (releasing pvc-protection), then the PVCs — so the namespace
+# finalizes cleanly. Best-effort + self-authenticating (scripts/k8s-finalizer-clear.sh); a missing kind no-ops.
+resource "null_resource" "cnpg_finalizer_cleanup" {
+  count = local.create && local.in_cluster_db && var.finalizer_clear_script != "" ? 1 : 0
+
+  triggers = {
+    script    = var.finalizer_clear_script
+    cluster   = var.cluster_name
+    region    = var.region
+    role_arn  = var.deployer_role_arn
+    namespace = var.namespace
+    # Order matters: the Cluster first (stops the operator recreating instances), then pods (frees
+    # pvc-protection), then the PVCs. Kind-only refs => the script enumerates every object of that kind.
+    refs = "cluster.postgresql.cnpg.io pod persistentvolumeclaim"
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = "bash ${self.triggers.script} --delete ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} ${self.triggers.namespace} ${self.triggers.refs}"
+  }
+
+  depends_on = [kubernetes_namespace_v1.keycloak]
+}
+
+# ---------------------------------------------------------------------------
 # Admin credential — generated here, stored in Secrets Manager (platform/keycloak/admin),
 # synced into the keycloak namespace as the K8s Secret keycloak-admin by External Secrets.
 # ---------------------------------------------------------------------------
