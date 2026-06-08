@@ -57,6 +57,10 @@ locals {
     { for k, g in keycloak_group.team : k => g.id },
     { for k, g in keycloak_group.platform : k => g.id },
   )
+
+  # Default client scopes every client gets. The keycloak_openid_client_default_scopes resource is EXHAUSTIVE,
+  # so this lists the Keycloak 26 built-in default client scopes PLUS our `groups` scope.
+  default_client_scopes = ["acr", "basic", "email", "profile", "roles", "web-origins", "groups"]
 }
 
 # ---------------------------------------------------------------------------
@@ -195,16 +199,37 @@ resource "keycloak_openid_client" "this" {
   client_secret         = random_password.client[each.key].result
 }
 
-# Emit the user's group memberships as a `groups` claim (bare names, not /path) — the access-model claim apps
-# consume. Inert until the Team→group taxonomy slice populates groups.
+# `groups` is a first-class realm CLIENT SCOPE (not a per-client mapper) so any standard OIDC app can request
+# `scope=groups` canonically (ArgoCD, Grafana, …) without an `invalid_scope` error. The group-membership mapper
+# lives on the scope (bare names, not /path), and the scope is assigned as a DEFAULT scope to every client below,
+# so the `groups` claim is in every token AND the scope is requestable.
+resource "keycloak_openid_client_scope" "groups" {
+  count = local.create ? 1 : 0
+
+  realm_id               = keycloak_realm.this[0].id
+  name                   = "groups"
+  description            = "Group memberships as a bare-name `groups` claim — the access-model claim apps consume."
+  include_in_token_scope = true
+}
+
 resource "keycloak_openid_group_membership_protocol_mapper" "groups" {
+  count = local.create ? 1 : 0
+
+  realm_id        = keycloak_realm.this[0].id
+  client_scope_id = keycloak_openid_client_scope.groups[0].id
+  name            = "groups"
+  claim_name      = "groups"
+  full_path       = false
+}
+
+# Assign the groups scope to every confidential client. EXHAUSTIVE (the resource manages a client's COMPLETE
+# default-scope set), so the Keycloak 26 built-in defaults must be listed too (local.default_client_scopes).
+resource "keycloak_openid_client_default_scopes" "confidential" {
   for_each = local.clients
 
-  realm_id   = keycloak_realm.this[0].id
-  client_id  = keycloak_openid_client.this[each.key].id
-  name       = "groups"
-  claim_name = "groups"
-  full_path  = false
+  realm_id       = keycloak_realm.this[0].id
+  client_id      = keycloak_openid_client.this[each.key].id
+  default_scopes = local.default_client_scopes
 }
 
 # Emit the user's realm roles as a `roles` claim per client (alongside `groups`). NOTE: this emits ALL realm
@@ -238,14 +263,13 @@ resource "keycloak_openid_client" "public" {
   pkce_code_challenge_method = "S256"
 }
 
-resource "keycloak_openid_group_membership_protocol_mapper" "public_groups" {
+# Public clients get the same `groups` scope (default) — so CLI tokens carry the access-model claim.
+resource "keycloak_openid_client_default_scopes" "public" {
   for_each = local.public_clients
 
-  realm_id   = keycloak_realm.this[0].id
-  client_id  = keycloak_openid_client.public[each.key].id
-  name       = "groups"
-  claim_name = "groups"
-  full_path  = false
+  realm_id       = keycloak_realm.this[0].id
+  client_id      = keycloak_openid_client.public[each.key].id
+  default_scopes = local.default_client_scopes
 }
 
 resource "keycloak_openid_user_realm_role_protocol_mapper" "public_roles" {
@@ -346,6 +370,15 @@ resource "keycloak_user" "seed" {
   initial_password {
     value     = random_password.user[each.key].result
     temporary = true # forces a password change on first login
+  }
+
+  lifecycle {
+    # temporary=true makes Keycloak set an UPDATE_PASSWORD required action, which it then CLEARS once the user
+    # changes their password at first login. We don't manage required_actions, so terraform would otherwise keep
+    # trying to reset them on every apply — stripping the forced-change before a user logs in, or re-adding it
+    # after they've changed their password. Let Keycloak/the user own it. (initial_password is write-only —
+    # ignored so a password the user has since rotated isn't reset back to the generated seed value.)
+    ignore_changes = [required_actions, initial_password]
   }
 }
 
