@@ -55,7 +55,8 @@ locals {
       serviceAccount = {
         annotations = local.irsa_annotations
       }
-      metrics = local.metrics
+      metrics   = local.metrics
+      resources = try(var.component_resources["controller"], {})
     }
 
     server = {
@@ -66,7 +67,8 @@ locals {
       serviceAccount = {
         annotations = local.irsa_annotations
       }
-      metrics = local.metrics
+      metrics   = local.metrics
+      resources = try(var.component_resources["server"], {})
     }
 
     repoServer = {
@@ -74,13 +76,19 @@ locals {
       serviceAccount = {
         annotations = local.irsa_annotations
       }
-      metrics = local.metrics
+      metrics   = local.metrics
+      resources = try(var.component_resources["repoServer"], {})
     }
 
     applicationSet = {
-      enabled  = var.applicationset_enabled
-      replicas = var.high_availability ? 2 : 1
-      metrics  = local.metrics
+      enabled   = var.applicationset_enabled
+      replicas  = var.high_availability ? 2 : 1
+      metrics   = local.metrics
+      resources = try(var.component_resources["applicationSet"], {})
+    }
+
+    redis = {
+      resources = try(var.component_resources["redis"], {})
     }
 
     notifications = {

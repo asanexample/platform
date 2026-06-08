@@ -99,6 +99,27 @@ variable "high_availability" {
   default     = false
 }
 
+variable "component_resources" {
+  description = <<-DESC
+    Per-component resource requests/limits for the ArgoCD pods (controller, server, repoServer, applicationSet,
+    redis). The upstream chart ships NONE, so on a packed/small cluster the bursty application-controller can be
+    CPU-starved under contention → a sluggish UI. Defaults set modest requests to GUARANTEE a baseline and
+    deliberately set NO cpu limit (a cpu limit would throttle the controller's reconcile/cache-rebuild bursts).
+    Override per component as needed; an omitted component falls back to no resources (chart default).
+  DESC
+  type = map(object({
+    requests = optional(map(string), {})
+    limits   = optional(map(string), {})
+  }))
+  default = {
+    controller     = { requests = { cpu = "250m", memory = "512Mi" } }
+    server         = { requests = { cpu = "100m", memory = "128Mi" } }
+    repoServer     = { requests = { cpu = "100m", memory = "256Mi" } }
+    applicationSet = { requests = { cpu = "50m", memory = "128Mi" } }
+    redis          = { requests = { cpu = "50m", memory = "64Mi" } }
+  }
+}
+
 variable "metrics_enabled" {
   description = "Enable per-component Prometheus metrics Services + ServiceMonitors (controller/server/repoServer/applicationSet). Requires the Prometheus-operator CRDs (the observability hub, #102). Off by default."
   type        = bool
