@@ -275,9 +275,18 @@ resource "null_resource" "crd_finalizer_cleanup" {
       "providerconfigs.kubernetes.crossplane.io",
     ])
     # ORPHANS (controller-generated at runtime, in NO chart, so nothing else deletes them): --delete them,
-    # else they linger with finalizers and block their CRD's removal. Usage (apiextensions) + the package
-    # revisions (Provider/FunctionRevision).
+    # else they linger with finalizers and block their CRD's removal.
+    #
+    # ProviderConfigUsage is FIRST and load-bearing: each managed resource creates one, and while ANY usage
+    # references a ProviderConfig, crossplane core keeps the `in-use.crossplane.io` finalizer on that
+    # ProviderConfig — and RE-ADDS it if we only clear it. So clearing the ProviderConfig finalizer alone is
+    # futile (the config chart's helm uninstall then hangs ~10m waiting for a delete that core keeps blocking,
+    # -> "context deadline exceeded"). Deleting the usages makes core release the in-use finalizer, so the
+    # ProviderConfig (cleared in pass 1) actually deletes and the uninstall completes. Then the apiextensions
+    # Usage + the package revisions (Provider/FunctionRevision).
     refs_orphan = join(" ", [
+      "providerconfigusages.aws.upbound.io",
+      "providerconfigusages.kubernetes.crossplane.io",
       "usages.apiextensions.crossplane.io",
       "providerrevisions.pkg.crossplane.io",
       "functionrevisions.pkg.crossplane.io",
