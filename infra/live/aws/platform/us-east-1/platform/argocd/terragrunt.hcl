@@ -220,6 +220,11 @@ inputs = {
       clientSecret    = "$argocd-keycloak-oidc:client-secret"
       cliClientID     = "argocd-cli"
       requestedScopes = ["openid", "profile", "email", "groups"]
+      # RP-initiated logout: logging out of ArgoCD also ends the Keycloak SSO session (ArgoCD substitutes
+      # {{token}} with the id_token). Without this, ArgoCD logout only clears the local session, so Keycloak
+      # silently re-authenticates the same user on the next login. post_logout_redirect_uri must be allowed by
+      # the Keycloak `argocd` client (valid_post_logout_redirect_uris = argocd.aws.refplat.org/*).
+      logoutURL = "${dependency.keycloak_config.outputs.issuer}/protocol/openid-connect/logout?post_logout_redirect_uri=https://argocd.aws.refplat.org/&id_token_hint={{token}}"
     })
   }
 

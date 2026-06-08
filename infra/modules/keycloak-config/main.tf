@@ -197,6 +197,10 @@ resource "keycloak_openid_client" "this" {
   standard_flow_enabled = true
   valid_redirect_uris   = each.value.redirect_uris
   client_secret         = random_password.client[each.key].result
+
+  # RP-initiated logout: allow these post-logout redirect targets (Keycloak validates the
+  # post_logout_redirect_uri the app sends to the end-session endpoint). "+" = inherit valid_redirect_uris.
+  valid_post_logout_redirect_uris = length(each.value.post_logout_redirect_uris) > 0 ? each.value.post_logout_redirect_uris : ["+"]
 }
 
 # `groups` is a first-class realm CLIENT SCOPE (not a per-client mapper) so any standard OIDC app can request

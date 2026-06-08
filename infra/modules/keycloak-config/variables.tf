@@ -120,12 +120,17 @@ variable "clients" {
   type = map(object({
     name          = string
     redirect_uris = list(string)
+    # Allowed post-logout redirect URIs (RP-initiated OIDC logout). Empty -> "+" (inherit redirect_uris).
+    post_logout_redirect_uris = optional(list(string), [])
   }))
   default = {
     argocd = {
       name = "ArgoCD"
       # Browser flow only — the ArgoCD CLI (localhost) uses the PUBLIC argocd-cli client (var.public_clients).
       redirect_uris = ["https://argocd.aws.refplat.org/auth/callback"]
+      # RP-initiated logout: ArgoCD's logout redirects here via Keycloak's end-session endpoint (so logging out
+      # of ArgoCD also ends the Keycloak SSO session, not just the local ArgoCD session).
+      post_logout_redirect_uris = ["https://argocd.aws.refplat.org/*"]
     }
     backstage = {
       name          = "Backstage"
