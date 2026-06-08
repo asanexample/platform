@@ -7,9 +7,14 @@ locals {
   verify_failure_policy = var.verify_failure_action == "Enforce" ? "Fail" : "Ignore"
   attest_failure_policy = var.attest_failure_action == "Enforce" ? "Fail" : "Ignore"
 
-  # Cleanup controller webhook server port — moved off 9443 on hostNetwork to avoid colliding with the
-  # admission controllers (which also bind 9443 on the host). Its health probes must follow it.
-  cleanup_server_port = var.webhook_host_network ? 9444 : 9443
+  # Webhook server ports on hostNetwork — each hostNetwork webhook pod claims a NODE port, so they must be
+  # distinct to co-exist on a node. 9443 is ALSO claimed by Crossplane's provider-kubernetes, whose Object-CRD
+  # conversion webhook binds controller-runtime's hardcoded :9443 (unconfigurable in provider-kubernetes
+  # v1.2.1) on hostNetwork — so the admission controller (previously 9443) collided with it whenever they
+  # co-scheduled, crash-looping the provider. Move admission off 9443 (the only side we can configure): admission
+  # 9445, cleanup 9444. Probes must follow (the chart defaults them to 9443); autoUpdateWebhooks re-registers.
+  admission_server_port = var.webhook_host_network ? 9445 : 9443
+  cleanup_server_port   = var.webhook_host_network ? 9444 : 9443
 
   # Kyverno needs ECR read (IRSA) to fetch cosign signatures for verifyImages (Phase 3).
   create_irsa = local.create && var.enable_image_verification && var.oidc_provider_arn != ""
@@ -39,7 +44,7 @@ locals {
       # move the lingering-socket problem. "0" disables (chart default ":8080").
       controllerRuntimeMetrics = { bindAddress = var.webhook_host_network ? "0" : ":8080" }
     }
-    admissionController = {
+    admissionController = merge({
       replicas  = var.replica_count
       podLabels = local.k8s_labels
       # EKS + Cilium overlay (cluster-pool): the EKS managed control plane reaches admission
@@ -52,7 +57,39 @@ locals {
       # webhook injects AWS_REGION/creds from this annotation). Empty when verification is off.
       # The chart nests the SA under rbac.serviceAccount.
       rbac = { serviceAccount = { annotations = local.irsa_sa_annotations } }
-    }
+      # Webhook server port off 9443 on hostNetwork (see local.admission_server_port) so it never collides
+      # with provider-kubernetes' hardcoded :9443. The service's targetPort follows webhookServer.port, and
+      # autoUpdateWebhooks repoints the webhook configs — so the API-server path (kyverno-svc:443) is unchanged.
+      webhookServer = { port = local.admission_server_port }
+      }, var.webhook_host_network ? {
+      # The probes' httpGet port must follow the server (chart defaults them to 9443). Full blocks (all keys on
+      # every probe so the conditional branch is a single consistent type) = the chart's admission defaults with
+      # only the port changed; partial overrides risk losing a default field.
+      startupProbe = {
+        httpGet             = { path = "/health/liveness", port = local.admission_server_port, scheme = "HTTPS" }
+        failureThreshold    = 20
+        initialDelaySeconds = 2
+        periodSeconds       = 6
+        successThreshold    = 1
+        timeoutSeconds      = 1
+      }
+      livenessProbe = {
+        httpGet             = { path = "/health/liveness", port = local.admission_server_port, scheme = "HTTPS" }
+        failureThreshold    = 2
+        initialDelaySeconds = 15
+        periodSeconds       = 30
+        successThreshold    = 1
+        timeoutSeconds      = 5
+      }
+      readinessProbe = {
+        httpGet             = { path = "/health/readiness", port = local.admission_server_port, scheme = "HTTPS" }
+        failureThreshold    = 6
+        initialDelaySeconds = 5
+        periodSeconds       = 10
+        successThreshold    = 1
+        timeoutSeconds      = 5
+      }
+    } : {})
     # Leader-elected controllers: a single active replica regardless of count.
     backgroundController = { replicas = 1 }
     reportsController = {
