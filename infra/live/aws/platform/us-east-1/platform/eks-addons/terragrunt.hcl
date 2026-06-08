@@ -76,6 +76,16 @@ inputs = {
     # (the tenant control plane, ADR-046), whose AWS provider authenticates via Pod Identity. Platform
     # add-ons otherwise use IRSA; this brings the hub cluster in line with preprod. AWS-managed DaemonSet.
     eks-pod-identity-agent = {}
+    # Serves the metrics.k8s.io API (`kubectl top`, HPA resource metrics). The platform's observability stack
+    # (kube-prometheus-stack) covers dashboards/alerting but does NOT provide this API, so without this addon
+    # `kubectl top` and any HPA are unavailable. No IRSA — reads the kubelet summary API only.
+    # hostNetwork: the EKS control plane can't reach overlay (Cilium BYOCNI) pod IPs, so a default (ClusterIP)
+    # metrics-server fails the aggregated-API discovery check (FailedDiscoveryCheck) — same wall the Crossplane
+    # providers + Kyverno webhooks hit. On hostNetwork the apiserver reaches it via the routable node IP.
+    # containerPort default (10251) is free on worker nodes (kube-scheduler runs on the managed control plane).
+    metrics-server = {
+      configuration_values = jsonencode({ hostNetwork = { enabled = true } })
+    }
   }
 
   # gp3 cluster-default StorageClass for dynamic PVCs (observability hub / Mimir, #102 P2).
