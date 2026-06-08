@@ -67,6 +67,31 @@ and prompts if missing; the rest you must ensure yourself. For a from-scratch re
 > entries for the Keycloak/Dex SAML values (`file_contains` on secrets.hcl) and the Backstage GitHub App
 > (`secret_exists`) would make bootstrap pre-flight catch them. Recommended follow-up.
 
+### First-rebuild gotchas (learned 2026-06-07 — the first real from-scratch bootstrap)
+
+Do these / be aware of these before/at bootstrap; each cost a `--resume` cycle the first time:
+
+1. **Bootstrap `iam-roles` via break-glass FIRST.** `iam-roles` creates `PlatformDeployer` (which every other unit
+   assumes), so it can't run via the deployer — it runs raw as your SSO admin, which the `DenyTeamTagTampering`
+   SCP blocks from `iam:TagRole`. Run **`./scripts/bootstrap-iam-roles.sh`** (assumes the SCP-exempt
+   `OrganizationAccountAccessRole`) before `platctl bootstrap`, then bootstrap/resume normally.
+2. **Disable Tailscale DNS on the runner.** If you're connected to the tailnet, its split-DNS
+   (`*.eks.amazonaws.com → VPC resolver`) hijacks EKS-API resolution but the subnet router isn't up yet →
+   keycloak/dex/tailscale fail with `i/o timeout`. Run **`sudo tailscale set --accept-dns=false`** during the
+   bootstrap (re-enable after). *(Durable fix TODO: teardown should clear the tailnet split-DNS.)*
+3. **SSO token can corrupt under concurrency.** Parallel units refreshing the SSO token at once can clobber
+   `~/.aws/sso/cache` → `get_aws_account_id() ... failed to parse cached SSO token file`. Just
+   **`aws sso login`** again and `--resume`. *(Durable fix TODO: platctl should pre-warm creds before the waves.)*
+4. **Backstage image must be re-pushed.** ECR is force-deleted on teardown, so the pinned Backstage image is gone.
+   After the early `ecr`/`github-oidc` waves recreate the repo + OIDC role, merge the Backstage build → it pushes
+   a fresh (arm64) image; bump `backstage` unit `image_tag` to that SHA.
+5. **preprod `policy` ↔ `crossplane` circular dep.** Two policies match Crossplane CRDs (`XTenant`,
+   `ProviderConfig`) that don't exist until crossplane deploys — but crossplane depends on policy. Kyverno churns
+   its webhook config on the missing CRDs and the bulk policy install can't fully converge on the leaner preprod.
+   `policy`'s helm release is now `atomic = false` (partial installs stick), which helps; the real fix is to move
+   `restrict-tenant-envelope`/`restrict-tenant-control-plane` into the `crossplane`/`tenant-claims` unit (deployed
+   after the CRDs exist). **Open follow-up.**
+
 ### Preview the plan
 
 ```bash

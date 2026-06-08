@@ -37,9 +37,22 @@ up)
     rm -f "$pidf"
   fi
 
-  # Throwaway kubeconfig. Auth mirrors the units' exec-auth: the deployer role + ambient AWS creds.
+  # The hook runs with the unit's profile (management), but the cluster lives in the workload account — assume
+  # the deployer role so update-kubeconfig's describe-cluster (and kubectl's token) hit the right account.
+  # NOTE: passing `--role-arn` alone does NOT fix this — it only sets kubectl's exec auth, not the describe call.
+  creds=$(aws sts assume-role --role-arn "$role_arn" --role-session-name kc-portforward \
+    --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' --output text) || {
+    echo "kc-portforward: failed to assume $role_arn" >&2
+    exit 1
+  }
+  read -r AKI SAK ST <<<"$creds"
+  export AWS_ACCESS_KEY_ID="$AKI" AWS_SECRET_ACCESS_KEY="$SAK" AWS_SESSION_TOKEN="$ST"
+  unset AWS_PROFILE
+
+  # Throwaway kubeconfig. Ambient creds are now the deployer (in the cluster's account), so no --role-arn is
+  # needed; the nohup'd kubectl below inherits these creds for its get-token exec.
   rm -f "$kcfg"
-  aws eks update-kubeconfig --name "$cluster" --region "$region" --role-arn "$role_arn" --kubeconfig "$kcfg" >/dev/null
+  aws eks update-kubeconfig --name "$cluster" --region "$region" --kubeconfig "$kcfg" >/dev/null
 
   echo "kc-portforward: port-forward svc/${svc} (ns ${ns}) localhost:${local_port} -> ${remote_port} [${cluster}]"
   # nohup (not setsid — macOS lacks setsid) so the forward survives this script exiting.

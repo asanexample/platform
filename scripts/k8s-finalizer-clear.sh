@@ -31,7 +31,19 @@ shift 4
 kcfg="$(mktemp)"
 trap 'rm -f "$kcfg"' EXIT
 
-if ! aws eks update-kubeconfig --name "$cluster" --region "$region" --role-arn "$role_arn" \
+# Assume the deployer role first: the when=destroy provisioner runs with the unit's profile (management), but the
+# cluster is in the workload account, so update-kubeconfig's describe-cluster must run as the deployer. (Passing
+# --role-arn alone only sets kubectl's exec auth, not the describe call — so without this the lookup 404s and the
+# whole helper silently no-ops, leaving the finalizer in place.) Best-effort: if assume-role fails, fall through.
+creds="$(aws sts assume-role --role-arn "$role_arn" --role-session-name finalizer-clear \
+  --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' --output text 2>/dev/null)"
+if [ -n "$creds" ] && [ "$creds" != "None" ]; then
+  read -r AKI SAK ST <<<"$creds"
+  export AWS_ACCESS_KEY_ID="$AKI" AWS_SECRET_ACCESS_KEY="$SAK" AWS_SESSION_TOKEN="$ST"
+  unset AWS_PROFILE
+fi
+
+if ! aws eks update-kubeconfig --name "$cluster" --region "$region" \
   --kubeconfig "$kcfg" >/dev/null 2>&1; then
   echo "k8s-finalizer-clear: cluster '$cluster' unreachable (likely already destroyed) — nothing to clear"
   exit 0

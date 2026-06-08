@@ -255,7 +255,8 @@ resource "kubernetes_manifest" "http_route" {
       hostnames = [local.route_host]
       rules = [{
         backendRefs = [{
-          name = var.helm_release_name
+          # The keycloakx chart names the HTTP Service <release>-http (not <release>).
+          name = "${var.helm_release_name}-http"
           port = 80
         }]
       }]

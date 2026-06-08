@@ -4,8 +4,8 @@ output "namespace" {
 }
 
 output "service_name" {
-  description = "Keycloak Service name (gateway-config route backend)"
-  value       = var.helm_release_name
+  description = "Keycloak HTTP Service name (the keycloakx chart names it <release>-http; used as the port-forward / route backend)"
+  value       = "${var.helm_release_name}-http"
 }
 
 output "service_port" {
