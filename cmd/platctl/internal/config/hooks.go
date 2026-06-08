@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/gangster/platform/cmd/platctl/internal/cloud"
@@ -80,6 +81,88 @@ func (h *SecretCleanupHook) Execute(ctx context.Context, runner engine.Runner, u
 	}
 
 	return runner.Run(ctx, unit, action, args...)
+}
+
+// StatePurgeHook removes resources whose address contains any of the given substrings from the unit's
+// Terraform state BEFORE a destroy, then runs the destroy. Used for keycloak-config: the keycloak_* realm /
+// client / protocol-mapper / group resources are deleted one-by-one over a port-forward against a Keycloak
+// that is itself destroyed wholesale (CNPG database and all) in the very next wave — so the hundreds of
+// per-object DELETE calls only serve to time out ("context deadline exceeded" / "Plugin did not respond")
+// and fail the teardown. Dropping them from state lets the unit destroy cleanly; the realm content vanishes
+// with the database. Apply is a straight pass-through (no purge).
+type StatePurgeHook struct {
+	Patterns []string // address substrings; any state address containing one is removed before destroy
+	Binary   string   // terragrunt binary (defaults to "terragrunt")
+}
+
+// Execute purges matching state addresses before destroy; best-effort (never blocks the destroy).
+func (h *StatePurgeHook) Execute(ctx context.Context, runner engine.Runner, unit *engine.Unit, action engine.Action, args ...string) error {
+	if action != engine.Destroy || len(h.Patterns) == 0 {
+		return runner.Run(ctx, unit, action, args...)
+	}
+
+	addrs, err := h.matchingAddrs(ctx, unit)
+	if err != nil {
+		fmt.Printf("state purge: could not list state for %s (%v) — proceeding with destroy\n", unit.Name, err)
+		return runner.Run(ctx, unit, action, args...)
+	}
+	if len(addrs) > 0 {
+		fmt.Printf("state purge: removing %d resource(s) from %s state before destroy (patterns: %s)\n",
+			len(addrs), unit.Name, strings.Join(h.Patterns, ","))
+		rmArgs := append([]string{"state", "rm"}, addrs...)
+		if out, err := h.terragrunt(ctx, unit, rmArgs...); err != nil {
+			fmt.Printf("  warning: state rm failed (%v): %s — proceeding with destroy\n", err, strings.TrimSpace(out))
+		}
+	}
+	return runner.Run(ctx, unit, action, args...)
+}
+
+func (h *StatePurgeHook) matchingAddrs(ctx context.Context, unit *engine.Unit) ([]string, error) {
+	out, err := h.terragrunt(ctx, unit, "state", "list")
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(out))
+	}
+	var addrs []string
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		for _, p := range h.Patterns {
+			if strings.Contains(line, p) {
+				addrs = append(addrs, line)
+				break
+			}
+		}
+	}
+	return addrs, nil
+}
+
+func (h *StatePurgeHook) terragrunt(ctx context.Context, unit *engine.Unit, args ...string) (string, error) {
+	bin := h.Binary
+	if bin == "" {
+		bin = "terragrunt"
+	}
+	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.Dir = unit.Path
+	env := os.Environ()
+	if profile, ok := unit.Auth["profile"]; ok {
+		const prefix = "AWS_PROFILE="
+		replaced := false
+		for i, e := range env {
+			if strings.HasPrefix(e, prefix) {
+				env[i] = prefix + profile
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			env = append(env, prefix+profile)
+		}
+	}
+	cmd.Env = env
+	out, err := cmd.CombinedOutput()
+	return string(out), err
 }
 
 // ENIIPValidationHook queries EKS ENI IPs and compares them to the values
@@ -177,6 +260,17 @@ func ResolveHook(override UnitOverride, awsClient cloud.AWSClient, interactive b
 			Client:      awsClient,
 			Interactive: interactive,
 		}
+
+	case "state_purge":
+		var patterns []string
+		if raw, ok := override.HookConfig["patterns"]; ok {
+			for _, p := range strings.Split(raw, ",") {
+				if p = strings.TrimSpace(p); p != "" {
+					patterns = append(patterns, p)
+				}
+			}
+		}
+		return &StatePurgeHook{Patterns: patterns}
 
 	case "secret_cleanup":
 		defaultProfile := override.HookConfig["profile"]

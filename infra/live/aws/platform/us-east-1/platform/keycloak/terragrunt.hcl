@@ -122,5 +122,11 @@ inputs = {
   gateway_name      = dependency.gateway.outputs.gateway_name
   gateway_namespace = dependency.gateway.outputs.gateway_namespace
 
+  # Teardown: drain the CNPG Cluster + PVC finalizers before the namespace delete (else it hangs Terminating).
+  finalizer_clear_script = "${get_repo_root()}/scripts/k8s-finalizer-clear.sh"
+  cluster_name           = dependency.eks.outputs.cluster_id
+  region                 = include.base.locals.region
+  deployer_role_arn      = include.base.locals.deployer_role_arn
+
   tags = include.base.locals.tags
 }

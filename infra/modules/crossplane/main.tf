@@ -129,8 +129,15 @@ resource "helm_release" "crossplane_config" {
   chart     = "${path.module}/charts/config"
   namespace = var.namespace
   timeout   = var.helm_timeout
-  wait      = var.helm_wait
-  atomic    = var.helm_wait
+  # NOT wait/atomic on this release: it owns the provider ProviderConfigs, which destroy BEFORE the providers
+  # (crossplane_runtime) — so at uninstall time the provider controller is still running and re-adds the
+  # ProviderConfig's `in-use.crossplane.io` finalizer faster than the teardown cleanup clears it. With wait=true
+  # the helm uninstall then blocks ~10m on the ProviderConfig deletion and fails ("context deadline exceeded" —
+  # the platform/preprod crossplane teardown failure). wait=false lets helm issue the delete and return; the
+  # finalizer-cleared ProviderConfig is reaped when the provider/CRD are torn down. Install needs no wait either:
+  # ProviderConfigs/RBAC are plain config objects with no readiness gate.
+  wait   = false
+  atomic = false
 
   values = [yamlencode({
     namespace             = var.namespace
@@ -254,27 +261,55 @@ resource "null_resource" "crd_finalizer_cleanup" {
     cluster  = var.cluster_name
     region   = var.region
     role_arn = var.deployer_role_arn
-    # All cluster-scoped. apiextensions first (XRD/Composition/Usage), then packages (Provider/Function +
-    # revisions + DeploymentRuntimeConfig), then the per-provider ProviderConfigs.
-    refs = join(" ", [
+    # Two classes of CR, handled differently to avoid racing the helm uninstalls that follow:
+    #
+    # HELM-OWNED (these CRs are rendered by the crossplane charts, so the helm uninstall is the deleter):
+    # CLEAR FINALIZERS ONLY — do NOT --delete them. Pre-clearing the finalizer means the later helm uninstall
+    # deletes them instantly instead of hanging on the (concurrently-removed) controller's finalizer drain. If
+    # we ALSO --delete here we delete the object out from under helm, and the uninstall then fails with
+    # "failed to delete release" (the observed platform/crossplane teardown failure on the config chart's
+    # ProviderConfigs). XRD/Composition/EnvironmentConfig (tenant chart), Provider/Function/Configuration +
+    # DeploymentRuntimeConfig (runtime chart), and both ProviderConfigs (config chart).
+    refs_helm_owned = join(" ", [
       "compositeresourcedefinitions.apiextensions.crossplane.io",
       "compositions.apiextensions.crossplane.io",
       "environmentconfigs.apiextensions.crossplane.io",
-      "usages.apiextensions.crossplane.io",
       "providers.pkg.crossplane.io",
       "functions.pkg.crossplane.io",
       "configurations.pkg.crossplane.io",
-      "providerrevisions.pkg.crossplane.io",
-      "functionrevisions.pkg.crossplane.io",
       "deploymentruntimeconfigs.pkg.crossplane.io",
       "providerconfigs.aws.upbound.io",
       "providerconfigs.kubernetes.crossplane.io",
     ])
+    # ORPHANS (controller-generated at runtime, in NO chart, so nothing else deletes them): --delete them,
+    # else they linger with finalizers and block their CRD's removal.
+    #
+    # ProviderConfigUsage is FIRST and load-bearing: each managed resource creates one, and while ANY usage
+    # references a ProviderConfig, crossplane core keeps the `in-use.crossplane.io` finalizer on that
+    # ProviderConfig — and RE-ADDS it if we only clear it. So clearing the ProviderConfig finalizer alone is
+    # futile (the config chart's helm uninstall then hangs ~10m waiting for a delete that core keeps blocking,
+    # -> "context deadline exceeded"). Deleting the usages makes core release the in-use finalizer, so the
+    # ProviderConfig (cleared in pass 1) actually deletes and the uninstall completes. Then the apiextensions
+    # Usage + the package revisions (Provider/FunctionRevision).
+    refs_orphan = join(" ", [
+      "providerconfigusages.aws.upbound.io",
+      "providerconfigusages.kubernetes.crossplane.io",
+      "usages.apiextensions.crossplane.io",
+      "providerrevisions.pkg.crossplane.io",
+      "functionrevisions.pkg.crossplane.io",
+    ])
   }
 
+  # Pass 1 — helm-owned CRs: clear finalizers only (helm uninstall deletes the objects).
   provisioner "local-exec" {
     when    = destroy
-    command = "bash ${self.triggers.script} --delete ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} - ${self.triggers.refs}"
+    command = "bash ${self.triggers.script} ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} - ${self.triggers.refs_helm_owned}"
+  }
+
+  # Pass 2 — orphan CRs: delete + clear finalizers (nothing else removes them).
+  provisioner "local-exec" {
+    when    = destroy
+    command = "bash ${self.triggers.script} --delete ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} - ${self.triggers.refs_orphan}"
   }
 
   depends_on = [

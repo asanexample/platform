@@ -61,23 +61,20 @@ resource "kubernetes_cluster_role" "platform_operator" {
     verbs      = ["patch"]
   }
 
-  # Debug: read Kyverno PolicyReports + policies — the primary surface for
-  # understanding WHY a resource was admitted/rejected (e.g. verifyImages
-  # signature/attestation results). Read-only; AmazonEKSViewPolicy's view role
-  # doesn't cover these CRD groups, and authoring stays in GitOps (ADR-040).
+  # Debug: cluster-wide READ on EVERYTHING, including custom resources. The
+  # AmazonEKSViewPolicy access entry only reads the fixed built-in resource set
+  # (like the `view` role), so it can't read CRDs — crossplane (XTenant,
+  # ProviderConfig, ProviderConfigUsage, Provider), tailscale (Connector),
+  # cnpg (Cluster), kyverno (PolicyReports) — which is exactly what an operator
+  # needs to debug a stuck reconcile/teardown (e.g. which finalizer is blocking
+  # deletion). Read-only: get/list/watch, no authoring (that stays in GitOps,
+  # ADR-040). Note `view` deliberately omits Secrets, but this role already has
+  # pods/exec — an operator can read any mounted secret by execing into its pod —
+  # so withholding Secret GET here is no real boundary; granting it directly just
+  # makes debugging honest. This supersedes the old per-CRD-group read rules.
   rule {
-    api_groups = ["wgpolicyk8s.io"]
-    resources  = ["policyreports", "clusterpolicyreports"]
-    verbs      = ["get", "list", "watch"]
-  }
-  rule {
-    api_groups = ["kyverno.io"]
-    resources  = ["policies", "clusterpolicies", "policyexceptions"]
-    verbs      = ["get", "list", "watch"]
-  }
-  rule {
-    api_groups = ["reports.kyverno.io"]
-    resources  = ["ephemeralreports", "clusterephemeralreports"]
+    api_groups = ["*"]
+    resources  = ["*"]
     verbs      = ["get", "list", "watch"]
   }
 }

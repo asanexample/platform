@@ -103,19 +103,25 @@ type UnitOverride struct {
 	HookTarget    string            `yaml:"hook_target,omitempty"`
 	HookConfig    map[string]string `yaml:"hook_config,omitempty"`
 	ImplicitDeps  []string          `yaml:"implicit_deps,omitempty"`
+	// TeardownSkip keeps a unit out of teardown — it stays in the graph (so its dependents still order
+	// correctly) but is never destroyed. Used for bootstrap-tier infra that must survive a rebuild, like
+	// iam-roles (the PlatformDeployer role the next bootstrap assumes) — analogous to the state backend,
+	// which teardown already leaves alone. Without it, recreating the role needs the break-glass
+	// OrganizationAccountAccessRole path (scripts/bootstrap-iam-roles.sh).
+	TeardownSkip bool `yaml:"teardown_skip,omitempty"`
 }
 
 // ManualStep defines a prerequisite that requires user action before a unit can be applied.
 type ManualStep struct {
-	Name         string      `yaml:"name"`
-	Before       string      `yaml:"before"`       // Unit name this step must complete before
-	Instructions string      `yaml:"instructions"` // Human-readable instructions
-	Check        StepCheck   `yaml:"check"`        // Automated check for whether the step is done
+	Name         string    `yaml:"name"`
+	Before       string    `yaml:"before"`       // Unit name this step must complete before
+	Instructions string    `yaml:"instructions"` // Human-readable instructions
+	Check        StepCheck `yaml:"check"`        // Automated check for whether the step is done
 }
 
 // StepCheck defines how to verify a manual step has been completed.
 type StepCheck struct {
-	Type     string `yaml:"type"`      // "secret_exists" or "file_contains"
+	Type     string `yaml:"type"` // "secret_exists" or "file_contains"
 	SecretID string `yaml:"secret_id,omitempty"`
 	Profile  string `yaml:"profile,omitempty"`
 	File     string `yaml:"file,omitempty"`
@@ -163,7 +169,7 @@ func (c *Config) validate() error {
 	}
 	for name, override := range c.Overrides {
 		if override.Hook != "" {
-			valid := map[string]bool{"crd_two_stage": true, "eni_ip_validation": true, "secret_cleanup": true}
+			valid := map[string]bool{"crd_two_stage": true, "eni_ip_validation": true, "secret_cleanup": true, "state_purge": true}
 			if !valid[override.Hook] {
 				return fmt.Errorf("override %q: unknown hook %q", name, override.Hook)
 			}

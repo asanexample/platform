@@ -16,8 +16,12 @@ terraform {
   # port-forward reaches the cluster the same way Terragrunt does (aws eks + the deployer role); the EKS API is
   # public during bootstrap (SSM/eks-tunnel.sh for a private day-2 cluster). start_pf also waits for Keycloak to
   # serve over the forward (deterministic readiness — Keycloak itself is gated by helm_wait on the keycloak unit).
+  # NOT on destroy: teardown drops the keycloak_* resources from state first (platctl state_purge hook), since
+  # Keycloak's database — and thus the whole realm — is destroyed wholesale in the next wave, so there's nothing
+  # to delete over the forward. Port-forwarding on destroy only adds a dependency on a schedulable Keycloak pod,
+  # which fails ("pod is not running, Current status=Pending") under teardown node pressure.
   before_hook "start_pf" {
-    commands = ["apply", "plan", "destroy"]
+    commands = ["apply", "plan"]
     execute = [
       "bash", "${get_repo_root()}/scripts/kc-portforward.sh", "up",
       dependency.eks.outputs.cluster_id,
@@ -31,7 +35,7 @@ terraform {
   }
 
   after_hook "stop_pf" {
-    commands     = ["apply", "plan", "destroy"]
+    commands     = ["apply", "plan"]
     run_on_error = true
     execute      = ["bash", "${get_repo_root()}/scripts/kc-portforward.sh", "down", dependency.eks.outputs.cluster_id, "18080"]
   }
@@ -91,6 +95,12 @@ generate "keycloak_provider" {
       username  = local.kc_admin.username
       password  = local.kc_admin.password
       realm     = "master"
+      # Defer login to first use instead of authenticating at provider-configure time. On teardown the
+      # keycloak_* resources are dropped from state first (platctl state_purge) and the port-forward no longer
+      # runs, so nothing uses this provider — without this it would still try an initial login to a gone
+      # Keycloak ("failed to perform initial login") and fail the destroy. Apply is unaffected: it logs in
+      # when the first realm resource is created.
+      initial_login = false
     }
   EOF
 }

@@ -156,6 +156,34 @@ variable "tags" {
 }
 
 # ---------------------------------------------------------------------------
+# Teardown: drain the CNPG database CR + PVC finalizers before the namespace delete
+# ---------------------------------------------------------------------------
+
+variable "finalizer_clear_script" {
+  description = "Path to scripts/k8s-finalizer-clear.sh. When set (and the in-cluster DB is used), a destroy-time provisioner force-deletes the CNPG Cluster + its pods/PVCs so the namespace can finalize. Empty disables it."
+  type        = string
+  default     = ""
+}
+
+variable "cluster_name" {
+  description = "EKS cluster name — for the teardown finalizer-clear provisioner (aws eks update-kubeconfig)."
+  type        = string
+  default     = ""
+}
+
+variable "region" {
+  description = "AWS region — for the teardown finalizer-clear provisioner."
+  type        = string
+  default     = ""
+}
+
+variable "deployer_role_arn" {
+  description = "Deployer role ARN the teardown finalizer-clear provisioner assumes for cluster access."
+  type        = string
+  default     = ""
+}
+
+# ---------------------------------------------------------------------------
 # Ingress — Keycloak self-owns its HTTPRoute on the shared Gateway (ADR-053/059)
 # ---------------------------------------------------------------------------
 

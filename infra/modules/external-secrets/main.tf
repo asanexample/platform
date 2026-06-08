@@ -32,6 +32,12 @@ locals {
     webhook = {
       hostNetwork = var.webhook_host_network
       port        = var.webhook_host_network ? 10261 : 10250
+      # Fail-open: the validating webhook fires on ExternalSecret CREATE/UPDATE *and DELETE*, so if its backend
+      # is unavailable (e.g. the webhook pod is Pending/evicted under teardown node pressure) a default
+      # failurePolicy=Fail blocks DELETION of every ExternalSecret — "no endpoints available for service
+      # external-secrets-webhook" — and strands the owning units (dex/keycloak/oauth2-proxy/backstage) on
+      # teardown. A down admission webhook must never brick the resource lifecycle; Ignore lets deletes proceed.
+      failurePolicy = "Ignore"
       metrics = {
         listen = {
           port = var.webhook_host_network ? 10262 : 8080

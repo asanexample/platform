@@ -19,10 +19,15 @@ overrides:
   platform/iam-roles:
     auth:
       profile: platform
+    # Bootstrap-tier: keep PlatformDeployer alive across teardown so the next bootstrap can assume it
+    # (recreating it otherwise needs the break-glass OrganizationAccountAccessRole path,
+    # scripts/bootstrap-iam-roles.sh). Like the state backend, teardown leaves this alone.
+    teardown_skip: true
 
   preprod/iam-roles:
     auth:
       profile: preprod
+    teardown_skip: true
 
   platform/tailscale-admin:
     implicit_deps: ["preprod/iam-roles"]
@@ -36,6 +41,14 @@ overrides:
 
   preprod/eks:
     bootstrap_args: ["-var", "endpoint_public_access=true"]
+
+  # On teardown, drop the keycloak_* realm/client/mapper/group resources from state before destroy: they're
+  # deleted granularly over a port-forward against a Keycloak that's destroyed wholesale (CNPG DB and all) in
+  # the next wave, so the per-object DELETEs only time out. The realm content vanishes with the database.
+  platform/keycloak-config:
+    hook: state_purge
+    hook_config:
+      patterns: "keycloak_"
 
   platform/tailscale:
     hook: crd_two_stage

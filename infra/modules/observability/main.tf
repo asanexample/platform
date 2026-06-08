@@ -311,7 +311,10 @@ resource "aws_secretsmanager_secret" "grafana_admin" {
 
   name        = local.grafana_admin_sm_name
   description = "Grafana admin credential (observability hub). Interim until SSO lands."
-  tags        = var.tags
+  # 0 = force-delete on destroy so a teardown→rebuild can recreate the same name; otherwise the default
+  # 30-day recovery window leaves it "scheduled for deletion" and CreateSecret fails on the next bootstrap.
+  recovery_window_in_days = var.secret_recovery_window_days
+  tags                    = var.tags
 }
 
 resource "aws_secretsmanager_secret_version" "grafana_admin" {
