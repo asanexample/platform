@@ -9,7 +9,10 @@
 # (repos/hostnames/apps) for policy + argocd-apps; fully subsuming it is a rebuild cleanup.
 #
 # Per team:
-#   ssoGroup     required  the Identity Center group (membership linkage; group MEMBERSHIP is not yet wired)
+#   ssoGroup     optional  upstream IdP group name, ONLY used when federating a group-emitting upstream
+#                          (Okta/Entra/Google) — it drives the IdP-group→Keycloak-group mapper. Ignored in the
+#                          default standalone mode (Keycloak is the IdP of record), where membership comes from
+#                          the keycloak-config `users` seed / the Keycloak admin UI (ADR-053/059).
 #   displayName  optional  canonical-only (Backstage); not projected to the cluster or Keycloak
 #   envelope     required
 #     allowedTiers        required  [] (standard|elevated|pci|hipaa)

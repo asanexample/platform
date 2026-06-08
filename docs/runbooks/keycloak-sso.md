@@ -1,5 +1,10 @@
 # Keycloak SSO — Identity Center SAML broker setup
 
+> **OPTIONAL — federation only.** By default Keycloak is the **IdP of record** (ADR-053/059): identity lives in
+> the `platform` realm and nothing brokers up, so this setup is **not** required. Follow it only when you choose
+> to federate to AWS Identity Center (set `upstream` in the `keycloak-config` unit). For Okta/Entra/Google
+> presets see [keycloak-upstream-idp.md](keycloak-upstream-idp.md).
+
 How to wire Keycloak's `aws-sso` SAML identity-provider broker (ADR-053, B2) to AWS Identity Center, so
 Keycloak federates authentication **up** to AWS SSO. Mirrors the Dex setup (`dex-sso.md`) — Keycloak gets its
 **own** Identity Center SAML application (separate from Dex's and ArgoCD's), hence its own signing certificate.

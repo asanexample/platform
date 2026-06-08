@@ -29,12 +29,15 @@ variable "realm_display_name" {
 
 variable "upstream" {
   description = <<-DESC
-    The upstream IdP Keycloak brokers authentication to (ADR-059). `protocol` selects SAML (e.g. AWS Identity
-    Center) or OIDC (Okta / Entra / Google); fill the matching sub-object. `group_claim` is the name of the group
-    claim/attribute the upstream emits — set it (e.g. "groups") to drive the per-team membership mappers; ""
-    (the default, and AWS IdC's reality) leaves them inert. The broker endpoint is
+    OPTIONAL upstream IdP to federate to (ADR-059). `null` (the DEFAULT) makes Keycloak the IdP of record —
+    identity lives in this realm (see `users`), nothing brokers up, fully self-contained. Set this object to
+    federate instead: `protocol` selects SAML (e.g. AWS Identity Center) or OIDC (Okta / Entra / Google); fill the
+    matching sub-object. `group_claim` is the group claim/attribute the upstream emits — set it (e.g. "groups") to
+    drive the per-team membership mappers; "" leaves them inert (AWS IdC's reality). Nothing DOWNSTREAM of the
+    realm changes when this swaps — apps, claims, and the access model are invariant. Broker endpoint:
     <keycloak_url>/realms/<realm>/broker/<alias>/endpoint.
   DESC
+  default     = null
   type = object({
     alias           = optional(string, "aws-sso")
     display_name    = optional(string, "AWS SSO")
@@ -59,20 +62,21 @@ variable "upstream" {
     }), null)
   })
 
+  # All validations are null-safe — they only apply when federation is configured (upstream != null).
   validation {
-    condition     = contains(["saml", "oidc"], var.upstream.protocol)
+    condition     = var.upstream == null || contains(["saml", "oidc"], var.upstream.protocol)
     error_message = "upstream.protocol must be \"saml\" or \"oidc\"."
   }
   validation {
-    condition     = var.upstream.protocol != "saml" || var.upstream.saml != null
+    condition     = var.upstream == null || var.upstream.protocol != "saml" || var.upstream.saml != null
     error_message = "upstream.saml must be set when protocol = \"saml\"."
   }
   validation {
-    condition     = var.upstream.protocol != "oidc" || var.upstream.oidc != null
+    condition     = var.upstream == null || var.upstream.protocol != "oidc" || var.upstream.oidc != null
     error_message = "upstream.oidc must be set when protocol = \"oidc\"."
   }
   validation {
-    condition     = var.upstream.protocol != "oidc" || var.upstream_oidc_client_secret != ""
+    condition     = var.upstream == null || var.upstream.protocol != "oidc" || var.upstream_oidc_client_secret != ""
     error_message = "upstream_oidc_client_secret must be set when protocol = \"oidc\"."
   }
 }
@@ -82,6 +86,24 @@ variable "upstream_oidc_client_secret" {
   type        = string
   sensitive   = true
   default     = ""
+}
+
+variable "users" {
+  description = <<-DESC
+    Realm users seeded as code — the membership source when Keycloak is the IdP of record (upstream = null).
+    Map of username -> { email, first_name, last_name, groups }. `groups` are realm group names (team groups
+    from `teams`, e.g. "alpha", or platform groups, e.g. "platform-admins"); membership drives the group→role→
+    claim flow directly (no upstream needed). Each user gets a TEMPORARY (must-change-on-first-login) password
+    generated into Secrets Manager at platform/keycloak/seed-user/<username>. Empty (default) = no seeded users —
+    use this with a federated `upstream` instead, where membership flows from the upstream group claim.
+  DESC
+  type = map(object({
+    email      = string
+    first_name = optional(string, "")
+    last_name  = optional(string, "")
+    groups     = optional(list(string), [])
+  }))
+  default = {}
 }
 
 # ---------------------------------------------------------------------------
