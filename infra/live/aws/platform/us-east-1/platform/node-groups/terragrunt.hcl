@@ -40,8 +40,11 @@ locals {
   # Graviton (arm64/t4g) vs x86 (t3), driven by include.base.locals.node_arch. (Subnet/single-AZ selection
   # can't live here — terragrunt locals can't read dependency outputs — so it's passed to the module as
   # single_az + the full kubernetes subnet list; the module restricts to one AZ when single_az = true.)
-  _arm         = include.base.locals.node_arch == "arm64"
-  sys_instance = local._arm ? "t4g.large" : "t3.large"
+  _arm = include.base.locals.node_arch == "arm64"
+  # System nodes host the whole platform control plane (ArgoCD, Keycloak, Backstage, Crossplane + providers,
+  # Cilium, observability). xlarge (4 vCPU / 16 GiB) — large (2 vCPU) starved the bursty ArgoCD controller under
+  # contention (sluggish UI). Workload (tenant) pods stay on the separate Spot pool below.
+  sys_instance = local._arm ? "t4g.xlarge" : "t3.xlarge"
   ami_type     = local._arm ? "AL2023_ARM_64_STANDARD" : "AL2023_x86_64_STANDARD"
   spot_pool    = local._arm ? ["t4g.large", "t4g.xlarge", "m6g.large", "m7g.large"] : ["t3.large", "t3a.large", "m5.large", "m6i.large"]
 }
@@ -58,7 +61,7 @@ inputs = {
     # System nodes run platform components (Cilium, ArgoCD, cert-manager, Keycloak, Crossplane, etc.)
     system = {
       subnet_ids     = [for name, id in dependency.networking.outputs.subnet_ids : id if can(regex("kubernetes$", name))]
-      instance_types = [local.sys_instance] # 2 vCPU / 8 GiB (t4g.large Graviton in the dev profile)
+      instance_types = [local.sys_instance] # 4 vCPU / 16 GiB (t4g.xlarge Graviton in the dev profile)
       ami_type       = local.ami_type
       # Dev profile: 2 nodes. With Mimir off and single-AZ placement, the old "cover all 3 AZs for the
       # AZ-pinned observability StatefulSets" reason is gone — count is now RAM/CPU-bound. The stack is
