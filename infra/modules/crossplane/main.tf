@@ -30,6 +30,7 @@ locals {
       serviceAccount           = var.provider_service_account
       hostNetwork              = false
       skipDependencyResolution = true
+      avoidKyvernoWebhookNode  = false
     }],
     [for svc in var.provider_services : {
       name                     = "provider-aws-${svc}"
@@ -37,6 +38,7 @@ locals {
       serviceAccount           = var.provider_service_account
       hostNetwork              = true
       skipDependencyResolution = true
+      avoidKyvernoWebhookNode  = false
     }]
   ) : []
 
@@ -48,6 +50,9 @@ locals {
     serviceAccount           = "provider-kubernetes"
     hostNetwork              = var.kubernetes_provider_hostnetwork
     skipDependencyResolution = true
+    # Conversion webhook binds controller-runtime's default :9443 (WEBHOOK_PORT doesn't move it); under
+    # hostNetwork that collides with Kyverno's admission controller on its node. Anti-affinity keeps them apart.
+    avoidKyvernoWebhookNode = var.kubernetes_provider_hostnetwork
   }] : []
 
   # k8s_provider FIRST so provider-kubernetes keeps list index 0 (and thus its port assignment) stable across
