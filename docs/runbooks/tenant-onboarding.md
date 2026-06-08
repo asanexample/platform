@@ -78,12 +78,14 @@ metadata:
   name: charlie
 spec:
   team: charlie
-  hostnames:
-    - charlie.preprod.aws.refplat.org # must be in the team's allow-list (drives restrict-route-hostnames)
+  # Route hostnames are DERIVED, not declared (ADR-060): each app gets <app>-<team>.<baseDomain> — here
+  # api-charlie.preprod.aws.refplat.org — plus an <app>-<team>-pr-* preview wildcard. The Composition derives
+  # the restrict-route-hostnames allow-list and argocd-apps injects the same host into the app's HTTPRoute, so
+  # app repos do NOT hardcode it. Add an explicit `hostnames:` list ONLY for an extra vanity host.
   apps:
     api:
       repoPath: k8s/preprod
-      preview: true # → ECR repo team-charlie/api
+      preview: true # → ECR repo team-charlie/api; host api-charlie.preprod.aws.refplat.org
   aws:
     serviceAccount: app-charlie # the named SA the app's pods run as
     # Generic IAM granted to Pod-team-charlie (capped by the deny-escalation boundary). Empty = no AWS perms.
