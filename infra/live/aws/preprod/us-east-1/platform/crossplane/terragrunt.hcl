@@ -93,6 +93,14 @@ inputs = {
 
   enable_tenant_api = true
 
+  # ArgoCD delivers the XTenant claims (tenant-claims-preprod app) from the platform cluster, authenticating to
+  # this remote cluster via the cross-account `ArgoCD` IAM role — so its admission username is that role's
+  # assumed-role ARN, not the in-cluster argocd SA. Allow it past restrict-tenant-control-plane (ADR-046/048).
+  # Scoped to THIS (preprod) account; the `ArgoCD` role + EKS access entry are platform-owned.
+  tenant_policy_values = {
+    extraExcludePrincipals = ["arn:aws:sts::${include.base.locals.account_ids["preprod"]}:assumed-role/ArgoCD/*"]
+  }
+
   # Tenant provisioning identity (P2b): scoped IAM + EKS Pod Identity locally, plus assume the platform ECR
   # role for cross-account repos. The deny-escalation permissions boundary is created in the module.
   enable_tenant_provisioning = true
