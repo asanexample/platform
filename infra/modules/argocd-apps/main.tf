@@ -94,6 +94,21 @@ resource "kubernetes_manifest" "application" {
           commonLabels = {
             "app.kubernetes.io/instance" = "stable"
           }
+          # Inject the base HTTPRoute hostname from the (app, team, domain) convention (ADR-060), so the app
+          # repo doesn't hardcode it: <app>-<team>.<domain>. The Tenant Composition derives the matching
+          # restrict-route-hostnames allow-list entry from the same identity.
+          patches = var.preview_domain != "" ? [
+            {
+              target = { kind = "HTTPRoute" }
+              patch = yamlencode([
+                {
+                  op    = "replace"
+                  path  = "/spec/hostnames/0"
+                  value = "${each.value.app_key}-${each.value.team_key}.${var.preview_domain}"
+                },
+              ])
+            }
+          ] : []
         }
       }
       destination = {
@@ -266,9 +281,10 @@ resource "kubernetes_manifest" "preview_appset" {
                     {
                       op   = "replace"
                       path = "/spec/hostnames/0"
-                      # team-scoped so two teams sharing an app_key (e.g. both "demo") don't collide on the same
-                      # preview hostname; the team's Tenant claim allow-lists "<team>-<app>-pr-*.<preview_domain>".
-                      value = "${each.value.team_key}-${each.value.app_key}-pr-{{.number}}.${var.preview_domain}"
+                      # <app>-<team>-pr-<n>, matching the base host convention (demo-<team>) and the Composition's
+                      # derived restrict-route-hostnames wildcard <app>-<team>-pr-* (ADR-060). Team-scoped, so
+                      # two teams sharing an app_key (e.g. both "demo") never collide on a preview hostname.
+                      value = "${each.value.app_key}-${each.value.team_key}-pr-{{.number}}.${var.preview_domain}"
                     },
                   ])
                 }

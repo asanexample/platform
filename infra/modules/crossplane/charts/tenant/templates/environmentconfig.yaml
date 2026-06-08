@@ -10,6 +10,7 @@ metadata:
   name: tenant-cluster-config
 data:
   ecrRegistry: {{ .Values.environment.ecrRegistry | quote }}
+  baseDomain: {{ .Values.environment.baseDomain | default "" | quote }}
   region: {{ .Values.environment.region | quote }}
   workloadAccountId: {{ .Values.environment.workloadAccountId | quote }}
   managementAccountId: {{ .Values.environment.managementAccountId | default "" | quote }}

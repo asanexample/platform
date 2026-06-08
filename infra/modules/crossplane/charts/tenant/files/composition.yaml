@@ -308,7 +308,18 @@ spec:
                               pattern:
                                 image: "{{ $env.ecrRegistry }}/{{ $ns }}/*"
             {{- end }}
-            {{- if $spec.hostnames }}
+            {{- /* ADR-060: derive allowed route hostnames per app — <app>-<team>.<baseDomain> + the
+                   <app>-<team>-pr-* preview wildcard — from the (app, team, baseDomain) convention.
+                   $spec.hostnames is retained as an ADDITIVE override (vanity hosts). */}}
+            {{- $allowed := $spec.hostnames | default list }}
+            {{- if $env.baseDomain }}
+            {{- range $app, $appcfg := $spec.apps }}
+            {{- $allowed = append $allowed (printf "%s-%s.%s" $app $team $env.baseDomain) }}
+            {{- $allowed = append $allowed (printf "%s-%s-pr-*.%s" $app $team $env.baseDomain) }}
+            {{- end }}
+            {{- end }}
+            {{- $allowed = $allowed | uniq }}
+            {{- if $allowed }}
             ---
             apiVersion: kubernetes.crossplane.io/v1alpha2
             kind: Object
@@ -338,7 +349,7 @@ spec:
                                 namespaces: ["{{ $ns }}"]
                         validate:
                           failureAction: Enforce
-                          message: "team-{{ $team }} routes may only use: {{ $spec.hostnames | join ", " }}."
+                          message: "team-{{ $team }} routes may only use: {{ $allowed | join ", " }}."
                           foreach:
                             - list: "request.object.spec.hostnames"
                               deny:
@@ -346,7 +357,7 @@ spec:
                                   all:
                                     - key: "{{`{{ element }}`}}"
                                       operator: AnyNotIn
-                                      value: {{ $spec.hostnames | toJson }}
+                                      value: {{ $allowed | toJson }}
             {{- end }}
             {{- if $aws.serviceAccount }}
             ---

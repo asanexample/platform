@@ -234,6 +234,12 @@ variable "ecr_registry" {
   default     = ""
 }
 
+variable "base_domain" {
+  description = "Per-cluster ingress domain for tenant app hostnames (e.g. preprod.aws.refplat.org). The Composition derives each app's allowed route hostnames from it as <app>-<team>.<base_domain> + the <app>-<team>-pr-* preview wildcard (ADR-060). Empty = derive nothing (only explicit spec.hostnames are allowed)."
+  type        = string
+  default     = ""
+}
+
 variable "tenant_pull_account_ids" {
   description = "AWS account IDs granted cross-account image pull on tenant ECR repos (the workload accounts). Mirrors the ecr unit's pull_account_ids."
   type        = list(string)

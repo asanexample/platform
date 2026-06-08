@@ -6,6 +6,7 @@ metadata:
   name: tenant-cluster-config
 data:
   ecrRegistry: "111122223333.dkr.ecr.us-east-1.amazonaws.com"
+  baseDomain: "preprod.aws.refplat.org"
   region: "us-east-1"
   workloadAccountId: "111122223333"
   managementAccountId: "444455556666"

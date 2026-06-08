@@ -177,6 +177,7 @@ resource "helm_release" "crossplane_tenant" {
     # Cluster constants for the Composition, injected via an EnvironmentConfig (the claim API stays clean).
     environment = {
       ecrRegistry             = var.ecr_registry
+      baseDomain              = var.base_domain
       region                  = var.region
       workloadAccountId       = var.account_id
       managementAccountId     = var.management_account_id
