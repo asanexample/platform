@@ -110,6 +110,11 @@ inputs = {
   ecr_registry            = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com"
   tenant_pull_account_ids = [include.base.locals.account_ids["preprod"], include.base.locals.account_ids["prod"]]
 
+  # Tenant app ingress domain — the Composition derives each app's allowed route hostnames as
+  # <app>-<team>.<base_domain> + the <app>-<team>-pr-* preview wildcard (ADR-060). Matches the argocd-apps
+  # preview_domain (which injects the actual route hostnames from the same convention).
+  base_domain = "preprod.aws.refplat.org"
+
   # Management account ID — the Composition's DeveloperAccess-<team> trust allows the per-team SSO permission
   # set (Dev-<team>) in both the management and preprod accounts to assume the role (P2c, ADR-039).
   management_account_id = include.base.locals.account_ids["mgmt"]
