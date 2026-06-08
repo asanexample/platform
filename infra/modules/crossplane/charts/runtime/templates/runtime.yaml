@@ -42,6 +42,22 @@ spec:
           hostNetwork: true
           dnsPolicy: ClusterFirstWithHostNet
 {{- end }}
+{{- if $p.avoidKyvernoWebhookNode }}
+          # provider-kubernetes serves the Object conversion webhook on controller-runtime's default :9443 and
+          # does NOT honour WEBHOOK_PORT for it (unlike metrics/health). With hostNetwork that :9443 bind is
+          # node-level and collides with Kyverno's hostNetwork admission controller (also :9443), crash-looping
+          # the provider ("listen tcp :9443: bind: address already in use"). Hard anti-affinity keeps it off any
+          # node running kyverno-admission-controller so the port is free. (aws providers have no conversion
+          # webhook, so they don't bind :9443 and don't need this.)
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/part-of: kyverno
+                      app.kubernetes.io/component: admission-controller
+{{- end }}
 ---
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
