@@ -225,7 +225,10 @@ resource "kubernetes_manifest" "preview_appset" {
                 secretName = var.github_token_secret_name
                 key        = "token"
               }
-            } : {}
+            } : {},
+            # Opt-in previews: only PRs carrying ALL these labels get an environment (excludes Dependabot and
+            # other routine PRs that build no app image). Empty list = preview every open PR.
+            length(var.preview_pr_labels) > 0 ? { labels = var.preview_pr_labels } : {}
           )
           requeueAfterSeconds = 60 # Poll GitHub for new/updated PRs every 60s
         }

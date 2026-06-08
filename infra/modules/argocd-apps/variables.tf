@@ -55,6 +55,17 @@ variable "preview_domain" {
   default     = ""
 }
 
+variable "preview_pr_labels" {
+  description = <<-DESC
+    Labels a PR must carry for the PR generator to create a preview environment (ApplicationSet pullRequest
+    `github.labels` — ALL must be present). Makes previews OPT-IN: only PRs explicitly labeled get an env, so
+    routine PRs (notably Dependabot dependency bumps, which build no app image and would just fail the
+    cosign/hostname policy gates) don't spawn failing preview Applications. Empty = preview every open PR.
+  DESC
+  type        = list(string)
+  default     = ["preview"]
+}
+
 variable "github_token_secret_name" {
   description = "Name of the Kubernetes Secret in the ArgoCD namespace containing the GitHub PAT (key: token)"
   type        = string
