@@ -3,7 +3,7 @@ kind: ClusterPolicy
 metadata:
   name: restrict-tenant-envelope
   labels:
-    {{- include "kpp.labels" . | nindent 4 }}
+    {{- include "ktp.labels" . | nindent 4 }}
   annotations:
     policies.kyverno.io/title: Restrict Tenant Envelope
     policies.kyverno.io/category: Security, Multi-Tenancy
@@ -27,7 +27,7 @@ spec:
           - resources:
               kinds:
                 - platform.refplat.org/v1alpha2/XTenant
-      {{- include "kpp.teamContext" . | nindent 6 }}
+      {{- include "ktp.teamContext" . | nindent 6 }}
       validate:
         failureAction: {{ .Values.envelopeFailureAction }}
         message: >-
@@ -47,8 +47,8 @@ spec:
           - resources:
               kinds:
                 - platform.refplat.org/v1alpha2/XTenant
-      {{- include "kpp.teamContext" . | nindent 6 }}
-      {{- include "kpp.teamExistsPrecondition" . | nindent 6 }}
+      {{- include "ktp.teamContext" . | nindent 6 }}
+      {{- include "ktp.teamExistsPrecondition" . | nindent 6 }}
       validate:
         failureAction: {{ .Values.envelopeFailureAction }}
         message: >-
@@ -69,8 +69,8 @@ spec:
           - resources:
               kinds:
                 - platform.refplat.org/v1alpha2/XTenant
-      {{- include "kpp.teamContext" . | nindent 6 }}
-      {{- include "kpp.teamExistsPrecondition" . | nindent 6 }}
+      {{- include "ktp.teamContext" . | nindent 6 }}
+      {{- include "ktp.teamExistsPrecondition" . | nindent 6 }}
       validate:
         failureAction: {{ .Values.envelopeFailureAction }}
         message: >-
@@ -93,7 +93,7 @@ spec:
           - resources:
               kinds:
                 - platform.refplat.org/v1alpha2/XTenant
-      {{- include "kpp.teamContext" . | nindent 6 }}
+      {{- include "ktp.teamContext" . | nindent 6 }}
       preconditions:
         all:
           - key: "{{`{{ team.metadata.name || '' }}`}}"
@@ -128,8 +128,8 @@ spec:
           - resources:
               kinds:
                 - platform.refplat.org/v1alpha2/XTenant
-      {{- include "kpp.teamContext" . | nindent 6 }}
-      {{- include "kpp.teamExistsPrecondition" . | nindent 6 }}
+      {{- include "ktp.teamContext" . | nindent 6 }}
+      {{- include "ktp.teamExistsPrecondition" . | nindent 6 }}
       validate:
         failureAction: {{ .Values.envelopeFailureAction }}
         message: >-

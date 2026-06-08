@@ -3,9 +3,6 @@
 
 # Audit (record PolicyReport, admit) or Enforce (reject at admission).
 validationFailureAction: Audit
-# Envelope policy (restrict-tenant-envelope, ADR-049 A2b) action — independent so it rolls Audit-first
-# while the pod policies are Enforce; flips to Enforce at the rebuild cutover (delivery-plan A6).
-envelopeFailureAction: Audit
 # Generated-webhook failure policy: Ignore (fail-open, used during Audit) or Fail (fail-closed).
 failurePolicy: Ignore
 # Compliance tier: standard | hipaa | pci. Restricted-grade pod policies render only for hipaa/pci.

@@ -155,6 +155,10 @@ jobs:
           kyverno version
       - name: Render policies and run tests
         run: infra/modules/policy/.kyverno-tests/run.sh
+      - name: Render & test tenant control-plane policies (crossplane)
+        # restrict-tenant-envelope / restrict-tenant-control-plane moved to the crossplane module (they match
+        # Crossplane CRDs, so they install after them — see charts/tenant-policies/Chart.yaml). Same tooling.
+        run: infra/modules/crossplane/.kyverno-tests/run.sh
 
   # Dogfoods the shift-left composite action (.github/actions/kyverno-validate) against committed
   # sample apps, proving it works without the app repos: the compliant app must pass, the broken app

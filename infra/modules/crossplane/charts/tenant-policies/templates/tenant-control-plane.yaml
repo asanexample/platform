@@ -3,7 +3,7 @@ kind: ClusterPolicy
 metadata:
   name: restrict-tenant-control-plane
   labels:
-    {{- include "kpp.labels" . | nindent 4 }}
+    {{- include "ktp.labels" . | nindent 4 }}
   annotations:
     policies.kyverno.io/title: Restrict Tenant Control-Plane Resources
     policies.kyverno.io/category: Security, Multi-Tenancy
@@ -29,7 +29,7 @@ spec:
                 - platform.refplat.org/v1alpha1/XTenant
                 - aws.upbound.io/v1beta1/ProviderConfig
                 - kubernetes.crossplane.io/v1alpha1/ProviderConfig
-      {{- include "kpp.skipPlatformPrincipals" . | nindent 6 }}
+      {{- include "ktp.skipPlatformPrincipals" . | nindent 6 }}
       validate:
         failureAction: {{ .Values.validationFailureAction }}
         message: "Tenant control-plane resources (XTenant / ProviderConfig) may only be managed by platform principals, not tenants."
