@@ -129,8 +129,15 @@ resource "helm_release" "crossplane_config" {
   chart     = "${path.module}/charts/config"
   namespace = var.namespace
   timeout   = var.helm_timeout
-  wait      = var.helm_wait
-  atomic    = var.helm_wait
+  # NOT wait/atomic on this release: it owns the provider ProviderConfigs, which destroy BEFORE the providers
+  # (crossplane_runtime) — so at uninstall time the provider controller is still running and re-adds the
+  # ProviderConfig's `in-use.crossplane.io` finalizer faster than the teardown cleanup clears it. With wait=true
+  # the helm uninstall then blocks ~10m on the ProviderConfig deletion and fails ("context deadline exceeded" —
+  # the platform/preprod crossplane teardown failure). wait=false lets helm issue the delete and return; the
+  # finalizer-cleared ProviderConfig is reaped when the provider/CRD are torn down. Install needs no wait either:
+  # ProviderConfigs/RBAC are plain config objects with no readiness gate.
+  wait   = false
+  atomic = false
 
   values = [yamlencode({
     namespace             = var.namespace
