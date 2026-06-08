@@ -13,12 +13,20 @@ failurePolicy: Fail
 # Requesting-principal (userInfo.username) wildcards skipped by restrict-tenant-control-plane so platform
 # controllers can author XTenant/ProviderConfig. crossplane-system is REQUIRED — the Composition's
 # provider-kubernetes + the composite controller create ProviderConfigs as crossplane-system principals.
+# `system:serviceaccount:argocd:*` is ArgoCD's IN-cluster identity (same-cluster GitOps).
 excludePrincipals:
   - "system:serviceaccount:argocd:*"
   - "system:serviceaccount:kube-system:*"
   - "system:serviceaccount:crossplane-system:*"
   - "system:nodes:*"
   - "system:kube-controller-manager"
+
+# Additional skip principals, appended to excludePrincipals. Env-specific, so passed by the unit rather than
+# hardcoded here. Use for ArgoCD's REMOTE-cluster identity: when ArgoCD (on the platform cluster) delivers
+# XTenant claims to a workload cluster it authenticates via the cross-account `ArgoCD` IAM role (EKS access
+# entry), so its username is the assumed-role ARN — e.g. "arn:aws:sts::<acct>:assumed-role/ArgoCD/*" — NOT the
+# in-cluster SA above. Scoped to the cluster's own account (no account wildcard).
+extraExcludePrincipals: []
 
 # Labels stamped on every ClusterPolicy.
 commonLabels: {}

@@ -26,6 +26,9 @@ preconditions:
 {{- range .Values.excludePrincipals }}
         - {{ . | quote }}
 {{- end }}
+{{- range .Values.extraExcludePrincipals }}
+        - {{ . | quote }}
+{{- end }}
 {{- end -}}
 
 {{/*
