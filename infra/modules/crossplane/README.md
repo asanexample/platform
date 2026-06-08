@@ -21,7 +21,16 @@ Two roles, selected by inputs:
 Claims are delivered by the `tenant-claims` Terragrunt unit (see [`infra/modules/tenant-claims`](../tenant-claims/)).
 The cosign/SLSA supply-chain policies (`verify-images`/`verify-attestations`) are **not** in the claim — they
 stay platform-owned in the `policy` module (applied to all teams, including migrated ones via its
-`migrated_teams` input). Foundational/platform infra stays on Terragrunt. See
+`migrated_teams` input).
+
+The two Kyverno policies that govern the tenant **control plane** itself — `restrict-tenant-envelope`
+([ADR-049](../../../docs/adrs/049-tenant-model-team-tenant-zone.md)) and `restrict-tenant-control-plane` (ADR-046/048) — **do**
+live here (`charts/tenant-policies`, a `helm_release` gated on `enable_tenant_api`, installed after the Team
+projection). They match Crossplane CRDs (`XTenant`, the projected `Team`, the provider `ProviderConfig`s), so
+they must install *after* those CRDs exist. They were deliberately moved out of the `policy` module, which
+deploys *before* Crossplane (to pre-create the `crossplane-system` exclusion) — shipping them there made Kyverno
+churn its webhook config on the not-yet-existing kinds and stalled the policy install. Tests:
+`.kyverno-tests/run.sh` (run by the same CI job as the policy module's). Foundational/platform infra stays on Terragrunt. See
 [`docs/architecture/crossplane-tenant-api.md`](../../../docs/architecture/crossplane-tenant-api.md) for the
 XRD schema, Composition pipeline, and claim lifecycle.
 

@@ -1,0 +1,12 @@
+apiVersion: v2
+name: crossplane-tenant-policies
+description: >-
+  The two Kyverno ClusterPolicies that govern the Crossplane tenant control plane — restrict-tenant-envelope
+  (ADR-049, an XTenant may only request what its Team envelope permits) and restrict-tenant-control-plane
+  (ADR-046/048, XTenant/ProviderConfig may be managed only by platform principals). They match Crossplane CRDs
+  (XTenant, Team, the provider ProviderConfigs), so they live HERE — installed after the tenant chart, once
+  those CRDs exist — not in the policy unit, which deploys BEFORE Crossplane and would make Kyverno churn on the
+  not-yet-existing kinds (the preprod policy↔crossplane convergence failure). Workload clusters only.
+type: application
+version: 0.1.0
+appVersion: "1.18.1"

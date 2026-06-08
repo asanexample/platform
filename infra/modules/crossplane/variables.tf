@@ -163,6 +163,12 @@ variable "providerconfig_name" {
   default     = "default"
 }
 
+variable "tenant_policy_values" {
+  description = "Overrides for the tenant control-plane Kyverno policies chart (restrict-tenant-envelope + restrict-tenant-control-plane), merged over its values.yaml. Keys: validationFailureAction (control-plane, default Enforce), envelopeFailureAction (default Audit — set Enforce at the ADR-049 A6 cutover), failurePolicy, excludePrincipals, commonLabels. Default {} keeps the chart defaults, which reproduce what the policy unit passed pre-move. Only applied when enable_tenant_api."
+  type        = any
+  default     = {}
+}
+
 variable "wait_image" {
   description = "kubectl image for the post-install Job that blocks until providers are Healthy (so the aws.upbound.io ProviderConfig CRD — installed by the provider package, not the core chart — exists before ProviderConfig is applied)."
   type        = string

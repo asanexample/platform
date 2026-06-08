@@ -201,6 +201,41 @@ resource "helm_release" "crossplane_teams" {
 }
 
 # ---------------------------------------------------------------------------
+# Tenant control-plane Kyverno policies (local chart)
+# ---------------------------------------------------------------------------
+# restrict-tenant-envelope (ADR-049) + restrict-tenant-control-plane (ADR-046/048). They match Crossplane
+# CRDs — XTenant, the projected Team, and the provider ProviderConfigs — so they live with the tenant control
+# plane, NOT in the policy unit. The policy unit deploys BEFORE crossplane (it must, to pre-create the
+# crossplane-system Kyverno exclusion), so if these two policies shipped there Kyverno would churn its webhook
+# config resolving the not-yet-existing XTenant/ProviderConfig kinds — which is exactly what stalled the preprod
+# `policy` install (a single transient validate-policy webhook timeout rolling the whole bundle back). Installed
+# here, after crossplane_teams, every kind they match already exists, so admission registration is clean.
+#
+# Gated on enable_tenant_api (workload clusters): where there's no tenant control plane there's no XTenant CRD
+# and ProviderConfigs are platform-managed only, so neither policy has anything to guard.
+resource "helm_release" "crossplane_tenant_policies" {
+  count = local.create && var.enable_tenant_api ? 1 : 0
+
+  name      = "crossplane-tenant-policies"
+  chart     = "${path.module}/charts/tenant-policies"
+  namespace = var.namespace
+  timeout   = var.helm_timeout
+  wait      = var.helm_wait
+  # NOT atomic: ClusterPolicies are additive/idempotent and Kyverno can still briefly churn its webhook config
+  # during a bulk install, so one transient validate-policy webhook timeout shouldn't roll back both policies
+  # (same reasoning as the policy module's policies-chart release). Leaving partial state lets a retry converge.
+  atomic          = false
+  cleanup_on_fail = false
+
+  # Defaults (chart values.yaml) reproduce what the policy unit passed for these two policies pre-move:
+  # control-plane Enforce, envelope Audit-first, failurePolicy Fail, crossplane-system in the skip list. The
+  # unit can override (e.g. envelopeFailureAction=Enforce at the A6 cutover) via var.tenant_policy_values.
+  values = [yamlencode(var.tenant_policy_values)]
+
+  depends_on = [helm_release.crossplane_teams]
+}
+
+# ---------------------------------------------------------------------------
 # Teardown: drain Crossplane CR finalizers before the helm uninstalls
 # ---------------------------------------------------------------------------
 # Provider/ProviderRevision/Function/XRD/Composition/ProviderConfig/Usage CRs carry finalizers the package +
@@ -248,6 +283,7 @@ resource "null_resource" "crd_finalizer_cleanup" {
     helm_release.crossplane_config,
     helm_release.crossplane_tenant,
     helm_release.crossplane_teams,
+    helm_release.crossplane_tenant_policies,
   ]
 }
 

@@ -85,12 +85,13 @@ Do these / be aware of these before/at bootstrap; each cost a `--resume` cycle t
 4. **Backstage image must be re-pushed.** ECR is force-deleted on teardown, so the pinned Backstage image is gone.
    After the early `ecr`/`github-oidc` waves recreate the repo + OIDC role, merge the Backstage build → it pushes
    a fresh (arm64) image; bump `backstage` unit `image_tag` to that SHA.
-5. **preprod `policy` ↔ `crossplane` circular dep.** Two policies match Crossplane CRDs (`XTenant`,
-   `ProviderConfig`) that don't exist until crossplane deploys — but crossplane depends on policy. Kyverno churns
-   its webhook config on the missing CRDs and the bulk policy install can't fully converge on the leaner preprod.
-   `policy`'s helm release is now `atomic = false` (partial installs stick), which helps; the real fix is to move
-   `restrict-tenant-envelope`/`restrict-tenant-control-plane` into the `crossplane`/`tenant-claims` unit (deployed
-   after the CRDs exist). **Open follow-up.**
+5. **preprod `policy` ↔ `crossplane` circular dep — FIXED.** Two policies matched Crossplane CRDs (`XTenant`,
+   `ProviderConfig`) that don't exist until crossplane deploys — but crossplane depends on policy. Kyverno churned
+   its webhook config on the missing CRDs and the bulk policy install couldn't fully converge on the leaner preprod.
+   `restrict-tenant-envelope`/`restrict-tenant-control-plane` now live in the **crossplane** module
+   (`charts/tenant-policies`, a `helm_release` gated on `enable_tenant_api`, installed after `crossplane_teams`), so
+   every CRD they match already exists at install time — no churn. The `policy` unit no longer ships them (and its
+   `atomic = false` from the same incident stays, as defence-in-depth for the remaining bulk install).
 
 ### Preview the plan
 

@@ -1,0 +1,24 @@
+# Defaults are overridden by the Terraform module (helm_release values). They exist here so `helm template`
+# works standalone (the .kyverno-tests harness). These mirror what the policy module's policies-chart used to
+# pass for these two policies before they moved here (preprod is Enforce).
+
+# restrict-tenant-control-plane action: Audit (record PolicyReport, admit) or Enforce (reject at admission).
+validationFailureAction: Enforce
+# restrict-tenant-envelope action (ADR-049 A2b) — independent so it rolls Audit-first while the control-plane
+# policy is Enforce; flips to Enforce at the rebuild cutover (delivery-plan A6).
+envelopeFailureAction: Audit
+# Generated-webhook failure policy: Ignore (fail-open) or Fail (fail-closed). Fail under Enforce.
+failurePolicy: Fail
+
+# Requesting-principal (userInfo.username) wildcards skipped by restrict-tenant-control-plane so platform
+# controllers can author XTenant/ProviderConfig. crossplane-system is REQUIRED — the Composition's
+# provider-kubernetes + the composite controller create ProviderConfigs as crossplane-system principals.
+excludePrincipals:
+  - "system:serviceaccount:argocd:*"
+  - "system:serviceaccount:kube-system:*"
+  - "system:serviceaccount:crossplane-system:*"
+  - "system:nodes:*"
+  - "system:kube-controller-manager"
+
+# Labels stamped on every ClusterPolicy.
+commonLabels: {}
