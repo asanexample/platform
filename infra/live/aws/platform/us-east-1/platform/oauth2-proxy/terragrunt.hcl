@@ -45,11 +45,12 @@ dependency "secret_stores" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-# Dex creates the OIDC client secret at platform/oauth2-proxy/oidc (static_clients = oauth2-proxy).
-dependency "dex" {
-  config_path = "../dex"
+# keycloak-config registers the `oauth2-proxy` OIDC client + writes its secret to
+# platform/keycloak/oauth2-proxy-oidc (B4 cutover — Keycloak is the IdP of record, ADR-053/059). Order after it.
+dependency "keycloak_config" {
+  config_path = "../keycloak-config"
 
-  mock_outputs                            = { namespace = "dex" }
+  mock_outputs                            = {}
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
@@ -104,12 +105,19 @@ inputs = {
 
   namespace = dependency.backstage.outputs.namespace
 
-  # Split-horizon: resolve the Dex issuer host to the in-cluster gateway so proxy<->Dex traffic never
-  # leaves the cluster. Same value as the backstage unit's host_aliases; if the gateway Service ClusterIP
-  # changes, update both (dynamic resolution tracked in #195).
+  # B4 cutover: front Backstage with Keycloak (the IdP of record), not Dex. Issuer + client/secret come from the
+  # keycloak-config `oauth2-proxy` client; the module's oidc_client_id ("oauth2-proxy") + client_secret_key
+  # ("client-secret") defaults already match Keycloak.
+  oidc_issuer_url    = "https://keycloak.aws.refplat.org/realms/platform"
+  client_secret_name = "platform/keycloak/oauth2-proxy-oidc"
+
+  # Split-horizon: resolve the issuer host to the in-cluster gateway ClusterIP so proxy<->Keycloak traffic never
+  # leaves the cluster (avoids the internal-NLB hairpin). NOTE: this ClusterIP is hardcoded and CHANGES every
+  # rebuild — update it (and the backstage unit's) to the current `cilium-gateway-platform-gateway` ClusterIP
+  # after each rebuild until dynamic resolution lands (#195).
   host_aliases = [{
-    ip        = "172.20.184.24"
-    hostnames = ["sso.aws.refplat.org"]
+    ip        = "172.20.31.49"
+    hostnames = ["keycloak.aws.refplat.org"]
   }]
 
   tags = include.base.locals.tags

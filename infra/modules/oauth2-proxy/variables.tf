@@ -60,13 +60,13 @@ variable "replica_count" {
 # ---------------------------------------------------------------------------
 
 variable "oidc_issuer_url" {
-  description = "OIDC issuer (the Dex broker). The proxy fetches discovery + does the code exchange here."
+  description = "OIDC issuer the proxy fetches discovery from + does the code exchange against. Keycloak realm by default (the IdP of record, ADR-053/059); was Dex pre-cutover."
   type        = string
   default     = "https://sso.aws.refplat.org"
 }
 
 variable "oidc_client_id" {
-  description = "OIDC client id — must match the Dex staticClient id (dex unit static_clients)."
+  description = "OIDC client id — must match the IdP client (the keycloak-config `oauth2-proxy` client)."
   type        = string
   default     = "oauth2-proxy"
 }
@@ -102,13 +102,13 @@ variable "cookie_expire" {
 }
 
 variable "email_domains" {
-  description = "Email domains allowed to authenticate. '*' = any identity the upstream (Identity Center via Dex) authenticates; the real authZ gate is the Identity Center SAML-app assignment."
+  description = "Email domains allowed to authenticate. '*' = any identity the IdP (Keycloak) authenticates; the real authZ gate is realm membership / the app's own RBAC."
   type        = list(string)
   default     = ["*"]
 }
 
 variable "host_aliases" {
-  description = "Pod hostAliases — resolve the OIDC issuer host to the in-cluster gateway ClusterIP so proxy<->Dex traffic stays in-cluster (same split-horizon as the backstage unit)."
+  description = "Pod hostAliases — resolve the OIDC issuer host to the in-cluster gateway ClusterIP so proxy<->IdP traffic stays in-cluster (same split-horizon as the backstage unit)."
   type = list(object({
     ip        = string
     hostnames = list(string)
@@ -121,13 +121,13 @@ variable "host_aliases" {
 # ---------------------------------------------------------------------------
 
 variable "client_secret_name" {
-  description = "Secrets Manager path holding the Dex OIDC client secret for this client (created by the dex module's static_clients = oauth2-proxy)."
+  description = "Secrets Manager path holding the OIDC client secret (the keycloak-config `oauth2-proxy` client writes platform/keycloak/oauth2-proxy-oidc)."
   type        = string
   default     = "platform/oauth2-proxy/oidc"
 }
 
 variable "client_secret_key" {
-  description = "Key/property within the OIDC Secrets Manager secret (and the dex-side K8s secret)."
+  description = "Key/property within the OIDC Secrets Manager secret."
   type        = string
   default     = "client-secret"
 }

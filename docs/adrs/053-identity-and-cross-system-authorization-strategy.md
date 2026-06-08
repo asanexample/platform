@@ -10,6 +10,29 @@ deferred Backstage RBAC (#197). **Refined by [ADR-059](059-identity-topology-plu
 "Identity Center is the user store, Keycloak brokers up" framing is one instance of a topology where the upstream
 IdP (Okta / Entra / Google / IdC / standalone) is pluggable behind the Keycloak seam.
 
+## Amendment — 2026-06-08: Keycloak is the IdP of record by default
+
+The original framing made **AWS Identity Center the user store** and Keycloak a broker *up* to it (ADR-059
+scenario C). Building the Team→group/role taxonomy surfaced that this is the **wrong default**: IdC can't emit
+group claims, so the access model sat inert behind a broker that couldn't feed it — and hard-requiring an AWS
+Organization with Identity Center makes a *reference* platform un-forkable. We are therefore flipping the default:
+
+- **Default = Keycloak is the IdP of record.** Identity, membership, and the group→role taxonomy live in the
+  `platform` realm (users seeded as code; see the `keycloak-config` module's `users` input). The access model is
+  live with no upstream — this is ADR-059 **scenario B ("Keycloak-as-hub"), promoted from "a bootstrap" to the
+  realized default.** `upstream = null` in `keycloak-config`.
+- **Federation is an opt-in layer, not the foundation.** Set `keycloak-config`'s `upstream` to broker to a
+  corporate IdP (Okta / Entra / Google over OIDC, or AWS IdC over SAML) when an environment has one. **Nothing
+  downstream changes** — apps, OIDC claims, the access-as-code generators, and AWS access are all invariant
+  (the whole point of the ADR-052/059 vendor-neutral seam). With a *group-emitting* upstream the membership gap
+  closes automatically (the IdP-group→Keycloak-group mapper); with IdC it stays manual.
+- **Unchanged:** everything else in this ADR. Keycloak as the app-facing OIDC IdP, access-as-code from
+  `_teams.hcl`, native per-system enforcement, and AWS account access via Identity Center permission sets
+  (orthogonal to the *app* IdP — IdC stays the AWS-access SoR regardless of the upstream choice).
+
+Net: this is a **default flip within the ADR-059 pluggable seam**, not a new direction — it makes the realized
+build match scenario B and treats IdC-as-app-IdP as one optional federation mode among several.
+
 ## Context
 
 Many systems on the platform need authorization, and the list only grows: **AWS** (accounts/IAM), **ArgoCD**,

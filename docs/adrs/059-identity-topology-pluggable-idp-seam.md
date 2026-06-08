@@ -11,6 +11,27 @@ seam and the **upstream IdP is pluggable.** Builds on the realized B1/B2 work (t
 ([ADR-049](049-tenant-model-team-tenant-zone.md)); informs the deferred membership/SCIM work and the
 ArgoCD/Backstage cutovers (B3/B4, #197).
 
+## Amendment — 2026-06-08: Scenario B is the realized default
+
+This ADR already framed the upstream IdP as pluggable and called the AWS-IdC topology (scenario C) "a bootstrap,
+not the destination." We are now making that concrete: **the realized default is scenario B — Keycloak is the IdP
+of record** (owns users + memberships in the `platform` realm), with scenarios A (Okta/Entra federation) and C
+(AWS IdC) as **opt-in `upstream` configurations**, not the baseline.
+
+- **`keycloak-config` defaults to `upstream = null`** (standalone). Users are seeded as code (the `users` input)
+  and placed directly into team / platform groups, so the **membership binding is local** and the
+  group→role→claim flow is live with no upstream — closing the membership gap by construction rather than waiting
+  on a group-emitting upstream.
+- **The seam is unchanged** — federation is still a one-block swap: set `upstream` to SAML (IdC) or OIDC
+  (Okta/Entra/Google) and *nothing downstream moves*. With a group-emitting upstream, membership flips from the
+  local `users` seed to the IdP-group→Keycloak-group mapper (decision 3's default mechanism); with IdC it stays
+  on the `_teams.hcl`/UI fallback.
+- **Membership source of truth by mode:** standalone → seeded `users` (+ admin UI); federated-with-groups →
+  upstream group claim; federated-IdC → `_teams.hcl` / UI. The three reference scenarios below are unchanged; only
+  *which one is the default* moves (C → B).
+
+AWS access stays on Identity Center permission sets in every mode (directory-based, orthogonal to the app IdP).
+
 ## Context
 
 Building the Team→group/role taxonomy (B2) surfaced a **membership gap**: OIDC apps (ArgoCD, Backstage,

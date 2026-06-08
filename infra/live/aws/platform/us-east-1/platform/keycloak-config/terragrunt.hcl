@@ -110,19 +110,32 @@ inputs = {
 
   keycloak_url = dependency.keycloak.outputs.issuer
 
-  # Upstream IdP = AWS Identity Center over SAML (ADR-059 scenario C). A SEPARATE Identity Center SAML app from
-  # Dex's/ArgoCD's (its own signing cert), ACS/audience = .../realms/platform/broker/aws-sso/endpoint. Values
-  # live in secrets.hcl; ca_data is the BARE base64 cert body (no PEM headers). See docs/runbooks/keycloak-sso.md.
-  # group_claim = "" — IdC emits no group claims, so the per-team membership mappers stay inert until a
-  # group-emitting upstream (Okta/Entra/Google) is wired (docs/runbooks/keycloak-upstream-idp.md).
-  upstream = {
-    alias        = "aws-sso"
-    display_name = "AWS SSO"
-    protocol     = "saml"
-    group_claim  = ""
-    saml = {
-      sso_url = include.base.locals.all_vars.keycloak_sso_url
-      ca_data = include.base.locals.all_vars.keycloak_sso_ca_data
+  # Identity source = Keycloak itself (the IdP of record — ADR-053/059 default). `upstream` is omitted (null), so
+  # nothing brokers up to an external IdP; identity + membership live in this realm via `users` below. To federate
+  # a corporate IdP later (Okta/Entra/Google over OIDC, or AWS IdC over SAML) set `upstream = { … }` here and drop
+  # the seed users — NOTHING downstream changes (apps, claims, access model). Presets: docs/runbooks/keycloak-upstream-idp.md.
+
+  # Seed users (membership source in standalone mode). Each is placed in its realm group(s), so the
+  # group→role→claim flow is live immediately. Passwords are temporary (must-change on first login) and generated
+  # into Secrets Manager at platform/keycloak/seed-user/<username> — read them with `platctl` / the AWS console.
+  users = {
+    "admin" = {
+      email      = "admin@${split("@", include.base.locals.admin_email)[1]}"
+      first_name = "Platform"
+      last_name  = "Admin"
+      groups     = ["platform-admins"]
+    }
+    "dev-alpha" = {
+      email      = "dev-alpha@${split("@", include.base.locals.admin_email)[1]}"
+      first_name = "Dev"
+      last_name  = "Alpha"
+      groups     = ["alpha"]
+    }
+    "dev-bravo" = {
+      email      = "dev-bravo@${split("@", include.base.locals.admin_email)[1]}"
+      first_name = "Dev"
+      last_name  = "Bravo"
+      groups     = ["bravo"]
     }
   }
 

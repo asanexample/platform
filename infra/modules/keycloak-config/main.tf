@@ -1,11 +1,16 @@
 locals {
   create = var.create
 
-  # Upstream broker (ADR-059): one of SAML | OIDC is realized; the alias is the stable downstream-facing seam.
+  # Identity source (ADR-059, pluggable seam). DEFAULT: upstream = null -> Keycloak is the IdP of record
+  # (standalone; identity lives in this realm via local.users). OPTIONAL federation: set var.upstream to broker
+  # auth UP to SAML (e.g. AWS IdC) or OIDC (Okta/Entra/Google) — exactly one IdP is realized; the alias is the
+  # stable downstream-facing seam. Every local.up.* read is null-safe so the standalone path needs no upstream.
   up           = var.upstream
-  is_saml      = local.create && local.up.protocol == "saml"
-  is_oidc      = local.create && local.up.protocol == "oidc"
-  broker_alias = local.up.alias
+  has_upstream = local.create && local.up != null
+  is_saml      = local.has_upstream && try(local.up.protocol, "") == "saml"
+  is_oidc      = local.has_upstream && try(local.up.protocol, "") == "oidc"
+  broker_alias = try(local.up.alias, "")
+  group_claim  = try(local.up.group_claim, "")
 
   # SP entity id Keycloak presents to a SAML upstream. The IdP app's audience must equal this.
   sp_entity_id = try(local.up.saml.entity_id, "") != "" ? local.up.saml.entity_id : "${var.keycloak_url}/realms/${var.realm_name}"
@@ -16,6 +21,7 @@ locals {
 
   teams           = local.create ? var.teams : {}
   platform_groups = local.create ? var.platform_groups : {}
+  users           = local.create ? var.users : {}
 
   # ADR-049 standing developer-access posture by environment (elevation is break-glass, not a standing role).
   role_for_env = {
@@ -31,18 +37,26 @@ locals {
     ]))
   }
 
-  # Per-team upstream-group → Keycloak-group bindings. Empty (mappers inert) when the upstream emits no groups
-  # (group_claim = "", e.g. AWS IdC — ADR-059 scenario C). each value is the team's ssoGroup (the match value).
-  team_group_bindings = local.up.group_claim == "" ? {} : {
+  # Per-team upstream-group → Keycloak-group bindings — the membership mechanism for a FEDERATED upstream that
+  # emits groups. Empty (mappers inert) when standalone (no upstream) or when the upstream emits no groups
+  # (group_claim = "", e.g. AWS IdC). In standalone mode membership comes from local.users instead. Each value is
+  # the team's ssoGroup (the match value).
+  team_group_bindings = local.group_claim == "" ? {} : {
     for t, cfg in local.teams : t => try(cfg.ssoGroup, "")
     if try(cfg.ssoGroup, "") != ""
   }
   # Same, for non-team platform groups (e.g. platform-admins) that declare an ssoGroup.
-  platform_group_bindings = local.up.group_claim == "" ? {} : {
+  platform_group_bindings = local.group_claim == "" ? {} : {
     for g, cfg in local.platform_groups : g => cfg.ssoGroup
     if try(cfg.ssoGroup, "") != ""
   }
   group_mapper_type = local.is_saml ? "saml-advanced-group-idp-mapper" : "oidc-advanced-group-idp-mapper"
+
+  # Realm group name -> id, across team + platform groups — so seeded users can be placed in groups by name.
+  group_id_by_name = merge(
+    { for k, g in keycloak_group.team : k => g.id },
+    { for k, g in keycloak_group.platform : k => g.id },
+  )
 }
 
 # ---------------------------------------------------------------------------
@@ -119,7 +133,7 @@ resource "keycloak_oidc_identity_provider" "upstream" {
 # Import the upstream email onto the Keycloak user. SAML uses attribute_name; OIDC uses claim_name — the unused
 # one stays null. identity_provider_alias is the (string) broker alias, so depends_on pins the IdP ordering.
 resource "keycloak_attribute_importer_identity_provider_mapper" "email" {
-  count = local.create ? 1 : 0
+  count = local.has_upstream ? 1 : 0
 
   realm                   = keycloak_realm.this[0].id
   name                    = "email"
@@ -284,6 +298,65 @@ resource "keycloak_group" "platform" {
 
   realm_id = keycloak_realm.this[0].id
   name     = each.key
+}
+
+# ---------------------------------------------------------------------------
+# Seeded realm users — the membership source when Keycloak is the IdP of record (ADR-053/059 default, upstream =
+# null). Each user is placed directly into its realm groups, so the group→role→claim flow is live without any
+# upstream. Passwords are TEMPORARY (must change on first login) and generated into Secrets Manager — never in
+# git. When federating instead (var.upstream set), leave var.users empty and let membership flow from the
+# upstream group claim. (NOT a substitute for a corporate IdP's lifecycle — seed/admin accounts for non-prod.)
+# ---------------------------------------------------------------------------
+
+resource "random_password" "user" {
+  for_each = local.users
+
+  length           = 24
+  special          = true
+  override_special = "-_.!@" # readable + safe to paste; the user rotates it on first login anyway
+}
+
+resource "aws_secretsmanager_secret" "user" {
+  for_each = local.users
+
+  name                    = "platform/keycloak/seed-user/${each.key}"
+  description             = "Temporary (must-change) seed password for Keycloak realm '${var.realm_name}' user '${each.key}'."
+  recovery_window_in_days = var.secret_recovery_window_days
+  tags                    = var.tags
+}
+
+resource "aws_secretsmanager_secret_version" "user" {
+  for_each = local.users
+
+  secret_id     = aws_secretsmanager_secret.user[each.key].id
+  secret_string = jsonencode({ username = each.key, password = random_password.user[each.key].result })
+}
+
+resource "keycloak_user" "seed" {
+  for_each = local.users
+
+  realm_id       = keycloak_realm.this[0].id
+  username       = each.key
+  email          = each.value.email
+  email_verified = true
+  enabled        = true
+  first_name     = each.value.first_name
+  last_name      = each.value.last_name
+
+  initial_password {
+    value     = random_password.user[each.key].result
+    temporary = true # forces a password change on first login
+  }
+}
+
+# Exhaustive group membership for each seeded user — by group name (team or platform group).
+resource "keycloak_user_groups" "seed" {
+  for_each = { for u, cfg in local.users : u => cfg if length(cfg.groups) > 0 }
+
+  realm_id   = keycloak_realm.this[0].id
+  user_id    = keycloak_user.seed[each.key].id
+  exhaustive = true
+  group_ids  = [for g in each.value.groups : local.group_id_by_name[g]]
 }
 
 # ---------------------------------------------------------------------------
