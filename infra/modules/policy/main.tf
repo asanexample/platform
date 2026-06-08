@@ -249,14 +249,19 @@ resource "helm_release" "kyverno" {
 # apply), avoiding the kubernetes_manifest chicken-and-egg. depends_on guarantees CRDs exist first.
 
 resource "helm_release" "policies" {
-  count           = local.create ? 1 : 0
-  name            = "kyverno-platform-policies"
-  chart           = "${path.module}/policies-chart"
-  namespace       = var.namespace
-  timeout         = var.helm_timeout
-  wait            = var.helm_wait
-  atomic          = var.helm_wait
-  cleanup_on_fail = true
+  count     = local.create ? 1 : 0
+  name      = "kyverno-platform-policies"
+  chart     = "${path.module}/policies-chart"
+  namespace = var.namespace
+  timeout   = var.helm_timeout
+  wait      = var.helm_wait
+  # NOT atomic: the ClusterPolicies are additive/idempotent, and during the initial bulk install Kyverno churns
+  # its webhook config (more so while it spins resolving the not-yet-existing crossplane CRDs — XTenant/
+  # ProviderConfig), so an individual policy create can hit a transient validate-policy webhook timeout. With
+  # atomic+cleanup that single timeout rolls back ALL policies, so the install never accumulates progress and
+  # can't converge on retry. Leaving partial state lets each retry create the remaining policies until complete.
+  atomic          = false
+  cleanup_on_fail = false
 
   values = [
     yamlencode(local.policies_values),
