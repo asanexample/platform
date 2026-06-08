@@ -214,12 +214,17 @@ inputs = {
     # `argocd-cli` client (PKCE, no secret) via cliClientID. `groups` claim carries team / platform-admins names.
     # (No `essential` on groups — an empty/absent claim must not block login while membership is unpopulated.)
     "oidc.config" = yamlencode({
-      name            = "Keycloak"
-      issuer          = dependency.keycloak_config.outputs.issuer
-      clientID        = "argocd"
-      clientSecret    = "$argocd-keycloak-oidc:client-secret"
-      cliClientID     = "argocd-cli"
-      requestedScopes = ["openid", "profile", "email", "groups"]
+      name         = "Keycloak"
+      issuer       = dependency.keycloak_config.outputs.issuer
+      clientID     = "argocd"
+      clientSecret = "$argocd-keycloak-oidc:client-secret"
+      cliClientID  = "argocd-cli"
+      # NO "groups" scope: Keycloak has no registered `groups` client scope (requesting it → invalid_scope).
+      # Our keycloak-config emits the `groups` claim via a per-CLIENT protocol mapper, so it's in every token
+      # regardless of requested scopes — ArgoCD reads it for RBAC (rbac_scopes = "[groups]") without asking for
+      # a scope. (To let apps request a first-class `groups` scope canonically, add a Keycloak groups client
+      # scope in keycloak-config instead — tracked as a follow-up.)
+      requestedScopes = ["openid", "profile", "email"]
     })
   }
 
