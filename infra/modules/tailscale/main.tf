@@ -107,7 +107,11 @@ resource "null_resource" "crd_finalizer_cleanup" {
     cluster  = var.cluster_name
     region   = var.region
     role_arn = var.deployer_role_arn
-    refs     = "connector/${var.cluster_name}-${var.connector_hostname} proxyclass/${var.cluster_name}-subnet-router"
+    # Fully-qualified resource names (group-suffixed) are REQUIRED: Dex also registers a `connectors` kind
+    # (connectors.dex.coreos.com), so the bare `connector/...` is ambiguous and `kubectl` resolves it to the
+    # wrong group — the patch silently no-ops ("nothing to clear") and the Connector's finalizer is never
+    # removed, hanging its deletion until the wait times out (~10m). Qualify to tailscale.com to disambiguate.
+    refs = "connectors.tailscale.com/${var.cluster_name}-${var.connector_hostname} proxyclasses.tailscale.com/${var.cluster_name}-subnet-router"
   }
 
   provisioner "local-exec" {

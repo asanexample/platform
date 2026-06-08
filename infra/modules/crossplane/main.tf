@@ -254,27 +254,46 @@ resource "null_resource" "crd_finalizer_cleanup" {
     cluster  = var.cluster_name
     region   = var.region
     role_arn = var.deployer_role_arn
-    # All cluster-scoped. apiextensions first (XRD/Composition/Usage), then packages (Provider/Function +
-    # revisions + DeploymentRuntimeConfig), then the per-provider ProviderConfigs.
-    refs = join(" ", [
+    # Two classes of CR, handled differently to avoid racing the helm uninstalls that follow:
+    #
+    # HELM-OWNED (these CRs are rendered by the crossplane charts, so the helm uninstall is the deleter):
+    # CLEAR FINALIZERS ONLY — do NOT --delete them. Pre-clearing the finalizer means the later helm uninstall
+    # deletes them instantly instead of hanging on the (concurrently-removed) controller's finalizer drain. If
+    # we ALSO --delete here we delete the object out from under helm, and the uninstall then fails with
+    # "failed to delete release" (the observed platform/crossplane teardown failure on the config chart's
+    # ProviderConfigs). XRD/Composition/EnvironmentConfig (tenant chart), Provider/Function/Configuration +
+    # DeploymentRuntimeConfig (runtime chart), and both ProviderConfigs (config chart).
+    refs_helm_owned = join(" ", [
       "compositeresourcedefinitions.apiextensions.crossplane.io",
       "compositions.apiextensions.crossplane.io",
       "environmentconfigs.apiextensions.crossplane.io",
-      "usages.apiextensions.crossplane.io",
       "providers.pkg.crossplane.io",
       "functions.pkg.crossplane.io",
       "configurations.pkg.crossplane.io",
-      "providerrevisions.pkg.crossplane.io",
-      "functionrevisions.pkg.crossplane.io",
       "deploymentruntimeconfigs.pkg.crossplane.io",
       "providerconfigs.aws.upbound.io",
       "providerconfigs.kubernetes.crossplane.io",
     ])
+    # ORPHANS (controller-generated at runtime, in NO chart, so nothing else deletes them): --delete them,
+    # else they linger with finalizers and block their CRD's removal. Usage (apiextensions) + the package
+    # revisions (Provider/FunctionRevision).
+    refs_orphan = join(" ", [
+      "usages.apiextensions.crossplane.io",
+      "providerrevisions.pkg.crossplane.io",
+      "functionrevisions.pkg.crossplane.io",
+    ])
   }
 
+  # Pass 1 — helm-owned CRs: clear finalizers only (helm uninstall deletes the objects).
   provisioner "local-exec" {
     when    = destroy
-    command = "bash ${self.triggers.script} --delete ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} - ${self.triggers.refs}"
+    command = "bash ${self.triggers.script} ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} - ${self.triggers.refs_helm_owned}"
+  }
+
+  # Pass 2 — orphan CRs: delete + clear finalizers (nothing else removes them).
+  provisioner "local-exec" {
+    when    = destroy
+    command = "bash ${self.triggers.script} --delete ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} - ${self.triggers.refs_orphan}"
   }
 
   depends_on = [

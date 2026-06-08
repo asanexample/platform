@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -56,7 +57,7 @@ to target a single environment.`,
 			}
 
 			if dryRun {
-				return printTeardownPlan(g)
+				return printTeardownPlan(g, cfg)
 			}
 
 			statePath := filepath.Join(repoRoot, ".platctl-state.json")
@@ -143,6 +144,16 @@ to target a single environment.`,
 
 			_ = yes // will be used for interactive prompts in Phase 3
 
+			// teardown_skip units (e.g. iam-roles) are kept out of teardown — collect them once so the
+			// pre-destroy / empty-state / run phases all leave them untouched. They stay in the graph so
+			// dependents still order correctly; they're simply never destroyed.
+			teardownSkip := make(map[string]bool)
+			for name, override := range cfg.Overrides {
+				if override.TeardownSkip && g.Unit(name) != nil {
+					teardownSkip[name] = true
+				}
+			}
+
 			// Pre-destroy: apply teardown_args to update resource attributes in state.
 			// Passing -var force_destroy=true during destroy doesn't work because
 			// providers read the attribute from state, not the plan config.
@@ -154,6 +165,9 @@ to target a single environment.`,
 					}
 				}
 				for name, args := range teardownArgs {
+					if teardownSkip[name] {
+						continue
+					}
 					unit := g.Unit(name)
 					if unit == nil {
 						continue
@@ -198,6 +212,19 @@ to target a single environment.`,
 					fmt.Printf("Skipping %d units with empty state\n", skipped)
 				}
 				eng.State = state
+			}
+
+			// Keep teardown_skip units alive: mark them completed so the engine never destroys them. Done
+			// here (not via graph removal) so dependents still resolve their dependency edges for ordering.
+			// Applies to both fresh and --resume runs.
+			if len(teardownSkip) > 0 && eng.State != nil {
+				names := make([]string, 0, len(teardownSkip))
+				for name := range teardownSkip {
+					eng.State.MarkCompleted(name)
+					names = append(names, name)
+				}
+				sort.Strings(names)
+				fmt.Printf("Keeping %d unit(s) (teardown_skip, will NOT be destroyed): %s\n", len(names), strings.Join(names, ", "))
 			}
 
 			if err := eng.Run(cmd.Context(), engine.Destroy, nil); err != nil {
@@ -250,7 +277,7 @@ func unitHasState(unit *engine.Unit, binary string) bool {
 	return len(strings.TrimSpace(string(out))) > 0
 }
 
-func printTeardownPlan(g *engine.Graph) error {
+func printTeardownPlan(g *engine.Graph, cfg *config.Config) error {
 	rev, err := g.Reverse()
 	if err != nil {
 		return fmt.Errorf("reversing graph: %w", err)
@@ -261,7 +288,19 @@ func printTeardownPlan(g *engine.Graph) error {
 		return err
 	}
 
-	fmt.Printf("Teardown plan: %d units in %d waves (reverse order)\n\n", g.Len(), len(waves))
+	skip := make(map[string]bool)
+	for name, override := range cfg.Overrides {
+		if override.TeardownSkip {
+			skip[name] = true
+		}
+	}
+
+	destroyCount := g.Len() - len(skip)
+	fmt.Printf("Teardown plan: %d units to destroy in %d waves (reverse order)", destroyCount, len(waves))
+	if len(skip) > 0 {
+		fmt.Printf("; %d kept (teardown_skip)", len(skip))
+	}
+	fmt.Print("\n\n")
 
 	for i, wave := range waves {
 		fmt.Printf("Wave %d", i+1)
@@ -270,7 +309,11 @@ func printTeardownPlan(g *engine.Graph) error {
 		}
 		fmt.Println()
 		for _, u := range wave {
-			fmt.Printf("  %-35s destroy\n", u.Name)
+			action := "destroy"
+			if skip[u.Name] {
+				action = "KEEP (teardown_skip)"
+			}
+			fmt.Printf("  %-35s %s\n", u.Name, action)
 		}
 		fmt.Println()
 	}

@@ -250,6 +250,53 @@ func TestResolveHook_ENIValidation(t *testing.T) {
 	}
 }
 
+func TestResolveHook_StatePurge(t *testing.T) {
+	override := UnitOverride{
+		Hook:       "state_purge",
+		HookConfig: map[string]string{"patterns": "keycloak_, foo_bar ,"},
+	}
+	hook := ResolveHook(override, nil, false)
+	sp, ok := hook.(*StatePurgeHook)
+	if !ok {
+		t.Fatalf("expected StatePurgeHook, got %T", hook)
+	}
+	// Comma-split, trimmed, empty entries dropped.
+	if len(sp.Patterns) != 2 || sp.Patterns[0] != "keycloak_" || sp.Patterns[1] != "foo_bar" {
+		t.Fatalf("expected [keycloak_ foo_bar], got %v", sp.Patterns)
+	}
+}
+
+func TestStatePurgeHook_ApplyPassthrough(t *testing.T) {
+	hook := &StatePurgeHook{Patterns: []string{"keycloak_"}}
+	runner := &mockRunner{}
+	unit := &engine.Unit{Name: "platform/keycloak-config", Path: "/tmp/test"}
+
+	// Apply must never purge — single straight-through Run with the action preserved.
+	if err := hook.Execute(context.Background(), runner, unit, engine.Apply, "-var", "x=1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(runner.calls) != 1 || runner.calls[0].Action != engine.Apply {
+		t.Fatalf("expected 1 apply call, got %v", runner.calls)
+	}
+	if len(runner.calls[0].Args) != 2 || runner.calls[0].Args[0] != "-var" {
+		t.Fatalf("expected args forwarded, got %v", runner.calls[0].Args)
+	}
+}
+
+func TestStatePurgeHook_DestroyNoPatterns(t *testing.T) {
+	hook := &StatePurgeHook{Patterns: nil}
+	runner := &mockRunner{}
+	unit := &engine.Unit{Name: "platform/keycloak-config", Path: "/tmp/test"}
+
+	// No patterns -> straight destroy, no terragrunt state calls.
+	if err := hook.Execute(context.Background(), runner, unit, engine.Destroy); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(runner.calls) != 1 || runner.calls[0].Action != engine.Destroy {
+		t.Fatalf("expected 1 destroy call, got %v", runner.calls)
+	}
+}
+
 func TestSecretCleanupHook_DeletesExisting(t *testing.T) {
 	client := &mockAWSClient{secretExists: true}
 	hook := &SecretCleanupHook{
