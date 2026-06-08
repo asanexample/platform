@@ -95,6 +95,12 @@ generate "keycloak_provider" {
       username  = local.kc_admin.username
       password  = local.kc_admin.password
       realm     = "master"
+      # Defer login to first use instead of authenticating at provider-configure time. On teardown the
+      # keycloak_* resources are dropped from state first (platctl state_purge) and the port-forward no longer
+      # runs, so nothing uses this provider — without this it would still try an initial login to a gone
+      # Keycloak ("failed to perform initial login") and fail the destroy. Apply is unaffected: it logs in
+      # when the first realm resource is created.
+      initial_login = false
     }
   EOF
 }
