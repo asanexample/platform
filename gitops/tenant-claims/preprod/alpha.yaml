@@ -9,6 +9,10 @@ spec:
   team: alpha
   hostnames:
     - demo.preprod.aws.refplat.org
+    # PR preview environments (app `demo`, preview: true). The ApplicationSet rewrites each preview's HTTPRoute
+    # hostname to "<team>-<app>-pr-<number>.<preview_domain>"; this wildcard lets restrict-route-hostnames admit
+    # them (Kyverno AnyNotIn matches `*`). Team-scoped, so it only covers team-alpha's own preview subdomains.
+    - alpha-demo-pr-*.preprod.aws.refplat.org
   apps:
     demo:
       repoPath: k8s/preprod

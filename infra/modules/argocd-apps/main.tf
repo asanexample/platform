@@ -264,9 +264,11 @@ resource "kubernetes_manifest" "preview_appset" {
                   target = { kind = "HTTPRoute" }
                   patch = yamlencode([
                     {
-                      op    = "replace"
-                      path  = "/spec/hostnames/0"
-                      value = "${each.value.app_key}-pr-{{.number}}.${var.preview_domain}"
+                      op   = "replace"
+                      path = "/spec/hostnames/0"
+                      # team-scoped so two teams sharing an app_key (e.g. both "demo") don't collide on the same
+                      # preview hostname; the team's Tenant claim allow-lists "<team>-<app>-pr-*.<preview_domain>".
+                      value = "${each.value.team_key}-${each.value.app_key}-pr-{{.number}}.${var.preview_domain}"
                     },
                   ])
                 }
