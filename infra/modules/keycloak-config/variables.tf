@@ -136,10 +136,6 @@ variable "clients" {
       name          = "Backstage"
       redirect_uris = ["https://backstage.aws.refplat.org/api/auth/oidc/handler/frame"]
     }
-    "oauth2-proxy" = {
-      name          = "OAuth2 Proxy (Backstage)"
-      redirect_uris = ["https://backstage.aws.refplat.org/oauth2/callback"]
-    }
   }
 }
 

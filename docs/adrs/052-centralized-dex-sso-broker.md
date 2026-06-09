@@ -3,9 +3,9 @@
 **Date:** 2026-06-03
 
 **Status:** Accepted, then **superseded by [ADR-053](053-identity-and-cross-system-authorization-strategy.md) /
-[ADR-059](059-identity-topology-pluggable-idp-seam.md)** — Keycloak is now the app-facing IdP of record; Dex is
-legacy/being retired. This ADR documents the Phase-2.1 Dex broker for history. Current model:
-[identity-and-sso](../architecture/identity-and-sso.md).
+[ADR-059](059-identity-topology-pluggable-idp-seam.md) and REMOVED** — Keycloak is the app-facing IdP of
+record; Dex (and the oauth2-proxy that fronted Backstage) were retired once Backstage moved to direct Keycloak
+OIDC. This ADR is kept for history. Current model: [identity-and-sso](../architecture/identity-and-sso.md).
 
 ## Context
 

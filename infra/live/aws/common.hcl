@@ -17,11 +17,6 @@ locals {
   argocd_sso_url     = local._secrets.locals.argocd_sso_url
   argocd_sso_ca_data = local._secrets.locals.argocd_sso_ca_data
 
-  # Dex SSO broker (Identity Center SAML). try()-guarded so existing units don't break before the
-  # manual Dex SAML app is set up and these keys are added to secrets.hcl (see docs/runbooks/dex-sso.md).
-  dex_sso_url     = try(local._secrets.locals.dex_sso_url, "")
-  dex_sso_ca_data = try(local._secrets.locals.dex_sso_ca_data, "")
-
   # Keycloak app-IdP broker (Identity Center SAML, ADR-053). try()-guarded like Dex's — set after the manual
   # Keycloak SAML app exists (docs/runbooks/keycloak-sso.md). ca_data is the bare base64 cert body.
   keycloak_sso_url     = try(local._secrets.locals.keycloak_sso_url, "")
