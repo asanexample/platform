@@ -12,8 +12,13 @@ terraform {
 }
 
 locals {
-  teams_config = read_terragrunt_config("${get_terragrunt_dir()}/../teams.hcl")
-  teams        = local.teams_config.locals.teams
+  # Claim-as-single-source (ADR-061): the XTenant claim YAMLs are the sole registry of team→app delivery.
+  # Key each claim by spec.team; the supply-chain identities below derive from spec.apps.<app>.repo (owner/repo).
+  # Replaces the retired app-delivery teams.hcl.
+  claims_dir = "${get_repo_root()}/gitops/tenant-claims/preprod"
+  claims = { for f in fileset(local.claims_dir, "*.yaml") :
+    yamldecode(file("${local.claims_dir}/${f}")).spec.team => yamldecode(file("${local.claims_dir}/${f}"))
+  }
 
   # Tenant images live in the platform account's ECR (apps push there — see #60).
   ecr_registry = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com"
@@ -93,10 +98,10 @@ inputs = {
 
   # Cluster-wide tenant image floor + per-team scoping (team data stays at the unit level).
   allowed_registries  = [local.ecr_registry]
-  tenant_registry_map = { for k, v in local.teams : k => "${local.ecr_registry}/team-${k}" }
-  # Teams migrated to a Tenant claim (BACK stack P3): the chart skips their per-team restrict-images /
+  tenant_registry_map = { for team, _ in local.claims : team => "${local.ecr_registry}/team-${team}" }
+  # Every team with a Tenant claim is migrated (BACK stack P3): the chart skips their per-team restrict-images /
   # restrict-route-hostnames policies (the Composition owns those), but keeps verify-images/attestations.
-  migrated_teams = local.teams_config.locals.migrated_teams
+  migrated_teams = keys(local.claims)
 
   # Crossplane (the federated tenant control plane, ADR-046/048) runs here. Its rbac-manager authors wildcard
   # provider ClusterRoles at runtime as its own ServiceAccount (not the deployer), which the cluster-scoped
@@ -126,15 +131,17 @@ inputs = {
   # A LIST per team (count:1 attestor): the asanexample identity plus, during the org migration, the
   # legacy gangster identity (same repo path under the old org). distinct/compact collapse the legacy
   # entry away once local.legacy_org = "".
-  verify_subjects = { for k, v in local.teams : k => [
-    for url in distinct(compact([
-      values(v.apps)[0].repo_url,
-      local.legacy_org == "" ? "" : replace(values(v.apps)[0].repo_url, "asanexample", local.legacy_org),
-      ])) : {
-      deploy_subject         = "${url}/.github/workflows/deploy.yml@refs/heads/main"
-      preview_subject_regexp = "${url}/.github/workflows/preview.yml@refs/.*"
-    }
-  ] }
+  verify_subjects = { for team, claim in local.claims : team => flatten([
+    for _app, appcfg in claim.spec.apps : [
+      for url in distinct(compact([
+        "https://github.com/${appcfg.repo}",
+        local.legacy_org == "" ? "" : "https://github.com/${replace(appcfg.repo, "asanexample", local.legacy_org)}",
+        ])) : {
+        deploy_subject         = "${url}/.github/workflows/deploy.yml@refs/heads/main"
+        preview_subject_regexp = "${url}/.github/workflows/preview.yml@refs/.*"
+      }
+    ]
+  ]) }
 
   # SLSA Build L3 (#131, ADR-042): for adopted teams (local.isolated_provenance_teams), verify-attestations
   # requires the SLSA provenance to be signed by the ISOLATED trusted-ci reusable workflow instead of the
@@ -144,7 +151,7 @@ inputs = {
   # approach: two slsaprovenance attestations of different identities ERROR Kyverno's matching →
   # verifiedCount:0.) SBOM stays app-signed.
   attest_caller_repos = { for k in local.isolated_provenance_teams :
-    k => replace(values(local.teams[k].apps)[0].repo_url, "https://github.com/", "")
+    k => values(local.claims[k].spec.apps)[0].repo
   }
 
   # Shared build-sign signer (the thin-caller supply-chain abstraction): for these teams verify-images and
@@ -152,15 +159,15 @@ inputs = {
   # githubWorkflowRepository extension (= the app repo). Derived like attest_caller_repos. The default
   # trusted_ci_build_subject_regexp in the module matches build-sign.yml at any pinned ref.
   shared_signer_caller_repos = { for k in local.shared_signer_teams :
-    k => replace(values(local.teams[k].apps)[0].repo_url, "https://github.com/", "")
+    k => values(local.claims[k].spec.apps)[0].repo
   }
 
   # Phase 5 — Gateway-API route hostname guard (anti-squatting on the shared wildcard listener).
   # For MIGRATED teams the Crossplane Tenant Composition owns restrict-route-hostnames (derived from the
   # XTenant claim, ADR-060/061), so the chart skips them here — this map is the fallback for any
-  # not-yet-migrated team. teams.hcl no longer carries hostnames; default to [] when absent.
+  # not-yet-migrated team. Derived from the claim's spec.domains aliases ([] when absent).
   enable_httproute_guard   = true
-  tenant_hostname_patterns = { for k, v in local.teams : k => try(v.hostnames, []) }
+  tenant_hostname_patterns = { for team, claim in local.claims : team => try([for d in claim.spec.domains : d.host], []) }
   enable_cleanup           = true
 
   tags = include.base.locals.tags

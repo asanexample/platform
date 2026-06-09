@@ -12,6 +12,8 @@ spec:
   # beyond the derived default, declare it under `spec.domains` (ADR-061).
   apps:
     demo:
+      # owner/repo — the single source the delivery consumers (argocd-apps, policy, github-oidc) derive from.
+      repo: asanexample/app-bravo
       repoPath: k8s/preprod
       preview: false
   aws:
