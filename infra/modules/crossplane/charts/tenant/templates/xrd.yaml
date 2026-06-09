@@ -271,11 +271,32 @@ spec:
                     storage:
                       type: string
                       default: "50Gi"
-                hostnames:
+                domains:
                   type: array
-                  description: Gateway-API route hostnames this Tenant may claim (ADR-029).
+                  description: >-
+                    Tier-1/2 route domains for this tenant (ADR-061, the authoritative hostname field — replaces
+                    the earlier `hostnames` string list). The generated canonical host (<app>-<team>.<baseDomain>)
+                    is implicit and never declared here — list only ADDITIONAL aliases (a cleaner vanity label
+                    under our domain). The Composition unions these with the generated host into the
+                    restrict-route-hostnames allow-list, and argocd-apps injects the same union into the app's
+                    HTTPRoute. External custom domains + the status.domains verification state machine are Phase 2.
                   items:
-                    type: string
+                    type: object
+                    properties:
+                      host:
+                        type: string
+                        description: The fully-qualified route hostname (e.g. shop.preprod.aws.refplat.org).
+                      canonical:
+                        type: boolean
+                        description: When true, the user-canonical URL (drives 301/SEO in a later phase; inert in Phase 1).
+                        default: false
+                      dns:
+                        type: string
+                        enum: ["managed", "external"]
+                        description: DNS provider mode — managed (platform-owned zone) or external (customer-managed). Inert in Phase 1; wired in Phase 2.
+                        default: managed
+                    required:
+                      - host
                   default: []
                 apps:
                   type: object
@@ -406,6 +427,35 @@ spec:
                       type: string
                     namespace:
                       type: string
+                domains:
+                  type: array
+                  description: >-
+                    Per-domain ingress state (ADR-061). The Composition writes one entry per generated canonical
+                    host + each spec.domains alias. Kyverno admits a route host only while its entry is Active.
+                    Phase 2a populates host/state/mode/reason (+ message); dnsTarget/lastTransitionTime are driven
+                    by the Phase 2b external-domain provisioning.
+                  items:
+                    type: object
+                    properties:
+                      host:
+                        type: string
+                      state:
+                        type: string
+                        enum: ["Pending", "DelegationRequired", "VerificationRequired", "Verifying", "Issuing", "Active", "Error", "Deleting"]
+                      mode:
+                        type: string
+                        enum: ["platform-managed", "customer-managed"]
+                      dnsTarget:
+                        type: array
+                        description: Nameservers (DelegationRequired) or CNAME target (VerificationRequired) the customer must point at.
+                        items:
+                          type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
                 lifecycle:
                   type: object
                   properties:

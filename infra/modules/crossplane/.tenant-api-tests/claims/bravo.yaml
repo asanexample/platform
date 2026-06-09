@@ -8,11 +8,10 @@ spec:
   name: demo
   environment: preprod
   tier: standard
-  hostnames:
-    - demo-bravo.preprod.aws.refplat.org
+  # No `domains` — the generated host demo-bravo.preprod.aws.refplat.org (<app>-<team>) is implicit.
   apps:
     demo:
-      repo: github.com/asanexample/app-bravo
+      repo: asanexample/app-bravo # owner/repo
       repoPath: k8s/preprod
       preview: false
       serviceAccount: app-bravo
