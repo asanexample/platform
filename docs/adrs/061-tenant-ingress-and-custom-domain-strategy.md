@@ -164,6 +164,38 @@ either bites; the seam keeps that a backend swap, not a rewrite.
 - **Phase 3 — self-service + observability.** Backstage domain UX (add a domain, watch the state machine, get
   the delegation/CNAME target), quotas + abuse limits, apex/redirect polish.
 
+## Delivery status & cost (2026-06)
+
+- **Phase 1 — ✅ shipped (#264).** `spec.domains` is the sole source; the Composition allow-list, argocd-apps
+  injection, and the shift-left CI all read the claim; `teams.hcl` hostnames retired.
+- **Phase 2a — ✅ shipped (#266).** `status.domains` + Active-gated `restrict-route-hostnames`: a host is
+  admitted only while its status entry is `Active`. The whole state machine runs **inside the Composition**
+  (`function-go-templating` reads observed composed-resource status and writes the XR status) — **no separate
+  controller**; proven offline in the [spike](../spikes/adr-061-phase2-ingress-spike.md).
+- **Free tier — live now ($0).** Vanity hostnames **under the existing wildcard base domain**
+  (`*.preprod.aws.refplat.org`) are served for free by the existing Gateway + wildcard cert + external-dns; a
+  tenant declares one in `spec.domains` and 2a marks it `Active` immediately. This covers the "cleaner label"
+  need at zero cost as long as the label stays under that wildcard.
+- **Phase 2b (external custom domains, e.g. `shop.acme.com`) — DEFERRED for cost.** Domains we don't own can't
+  reuse the wildcard cert, and on **Cilium 1.19.4** per-domain HTTPS listeners can't be added to the shared
+  Gateway ([#44123](https://github.com/cilium/cilium/issues/44123) breaks the coexisting wildcard listener —
+  see the spike). So 2b needs extra infra and is **not free**; it is deferred until a concrete customer domain
+  exists. **Cheapest path when needed:**
+  - **Cloudflare for SaaS** custom hostnames — **free for ≤100 hostnames**; custom-origin is free-tier (the
+    Enterprise-only Host-header override / Origin Rules path is NOT needed — avoid it).
+  - A **dedicated origin Gateway** (one catch-all HTTPS listener + a single origin cert), **isolated** from the
+    shared Gateway so the Cilium multi-cert bugs can't touch live tenant ingress. Cost ≈ **one shared NLB
+    (~$16/mo, flat for all custom domains)**. A free **Cloudflare Tunnel** (`cloudflared` pod) can replace the
+    NLB for ~$0 recurring, trading dollars for more moving parts.
+  - The Composition composes a per-domain `CustomHostname` (the Crossplane Cloudflare provider exists, Q5) and
+    drives `status.domains` `Pending → VerificationRequired (CNAME + TXT) → Verifying → Active` from the
+    observed `ssl.status`, using the Phase-2a status-loop pattern. The Cloudflare API token is delivered to a
+    Secret-based ProviderConfig via the existing external-secrets path (`platform/cloudflare/api-token`).
+  - **Routing reality:** Cloudflare keeps `Host` = the customer domain to the origin, which cannot attach to
+    the shared `*.preprod…` listener (Gateway-API hostname intersection) — hence the *dedicated* catch-all
+    Gateway above, **not** a new listener on the shared one.
+- **Phase 2c (customer-managed DNS) / Phase 3 (Backstage UX)** — deferred with 2b.
+
 ## Relationships
 
 - **Extends** [ADR-060](060-tenant-app-hostname-convention.md) (the generated/derived hostname).
