@@ -46,6 +46,7 @@ allow-list in every case** (no-regression — live alpha/bravo never stranded); 
 admitted **only** once its cert is Ready.
 
 **Two mechanics worth recording for the build:**
+
 - **Read observed composed status:** `index $observed "<composition-resource-name>"` then
   `.resource.status.conditions`. **Gotcha:** inside `{{ range }}`, Go rebinds `.` to the element — capture
   `{{- $observed := .observed.resources | default dict }}` *before* the loop, or `.observed` is nil inside it.
@@ -79,6 +80,7 @@ listener (or multiple cert refs) to the shared Gateway. **Open Cilium bugs make 
   cert when SNI is absent.
 
 **Verdict: do not add per-domain listeners to the shared Gateway.** Two viable paths for tier-3:
+
 1. **Edge offload (recommended)** — terminate the custom domain's TLS at **Cloudflare for SaaS** (Q5 confirms
    the provider), origin = the tenant's wildcard host (`<app>-<team>.<base>`). The shared Cilium Gateway is
    untouched; Cilium's multi-cert limitations are sidestepped entirely. This is the ADR's documented edge lever
@@ -108,6 +110,7 @@ delegated NS to us → `cert Ready ⇒ Active`, no separate verification poller.
 ## Q4 — cert-manager / external-dns multi-zone — ✅ PROVEN (small delta)
 
 Both IRSA policies are **single-zone** today:
+
 - cert-manager: `resources = [var.route53_hosted_zone_arn]` (`infra/modules/cert-manager/main.tf:99`).
 - external-dns: `resources = [var.route53_hosted_zone_arn]` + `domain_filters = ["preprod.aws.refplat.org"]`
   (`infra/modules/external-dns/main.tf:82`, live `terragrunt.hcl:72`).
@@ -132,6 +135,7 @@ this makes edge offload the pragmatic primary for tier-3 external domains.
 ## Recommended Phase 2 decomposition
 
 **2a — status.domains state machine + Active-gating (next; low-risk, ~Phase-1-sized, NO new infra).**
+
 - Add `status.domains[]` to the v1alpha1 XRD (host, state, mode, dnsTarget, reason, message, lastTransitionTime).
 - Composition (Q1 pattern): write `status.domains`; generated + tier-1/2 → `Active` immediately; tier-3 entries
   → `Pending` (no backing resources yet); build the allow-list = `{generated, tier-1/2} ∪ {Active}`.
