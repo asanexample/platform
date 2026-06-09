@@ -4,11 +4,11 @@
 apiVersion: platform.refplat.org/v1alpha2
 kind: XTenant
 metadata:
-  name: alpha-demo-preprod
+  name: alpha-demo-dev
 spec:
   team: alpha
   name: demo
-  environment: preprod
+  environment: dev
   tier: standard
   # No `domains` — the generated host demo-alpha.preprod.aws.refplat.org (<app>-<team>) is implicit; declare
   # spec.domains only for an ADDITIONAL vanity alias (ADR-061). Matches the live v1alpha1 claim (no domains).

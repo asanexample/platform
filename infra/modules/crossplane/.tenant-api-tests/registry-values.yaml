@@ -11,7 +11,7 @@ teams:
     contacts: ["payments-leads@example.com"]
     envelope:
       allowedTiers: [standard, elevated, pci]
-      allowedEnvironments: [preprod, prod]
+      allowedEnvironments: [dev, prod]
       allowedLocations: ["eu", "us"]
       quotaCap: { cpu: "64", memory: 128Gi, pods: 400 }
       maxDedicatedZones: 2
@@ -22,11 +22,11 @@ teams:
     contacts: ["alpha@example.com"]
     envelope:
       allowedTiers: [standard]
-      allowedEnvironments: [preprod]
+      allowedEnvironments: [dev]
       quotaCap: { cpu: "8", memory: 16Gi, pods: 40 }
   bravo:
     ssoGroup: Dev-bravo
     envelope:
       allowedTiers: [standard]
-      allowedEnvironments: [preprod]
+      allowedEnvironments: [dev]
       quotaCap: { cpu: "8", memory: 16Gi, pods: 40 }

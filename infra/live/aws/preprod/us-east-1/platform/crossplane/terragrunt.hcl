@@ -86,12 +86,19 @@ inputs = {
 
   enable_tenant_api = true
 
+  # A7 cutover: the retired v1 `tenant` module no longer owns the shared `tenant-developer` ClusterRole, so the
+  # tenant chart creates it (the Composition's per-tenant RoleBindings bind to it).
+  create_developer_cluster_role = true
+
   # ArgoCD delivers the XTenant claims (tenant-claims-preprod app) from the platform cluster, authenticating to
   # this remote cluster via the cross-account `ArgoCD` IAM role — so its admission username is that role's
   # assumed-role ARN, not the in-cluster argocd SA. Allow it past restrict-tenant-control-plane (ADR-046/048).
   # Scoped to THIS (preprod) account; the `ArgoCD` role + EKS access entry are platform-owned.
   tenant_policy_values = {
     extraExcludePrincipals = ["arn:aws:sts::${include.base.locals.account_ids["preprod"]}:assumed-role/ArgoCD/*"]
+    # A6 cutover: the envelope policy (restrict-tenant-envelope) flips Audit → Enforce — an XTenant that exceeds
+    # its Team envelope (tier/environment/quota/residency) is now rejected at admission, not just reported.
+    envelopeFailureAction = "Enforce"
   }
 
   # Tenant provisioning identity (P2b): scoped IAM + EKS Pod Identity locally, plus assume the platform ECR

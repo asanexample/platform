@@ -6,5 +6,5 @@ metadata:
 spec:
   team: alpha
   name: demo
-  environment: preprod
+  environment: dev
   tier: ultra

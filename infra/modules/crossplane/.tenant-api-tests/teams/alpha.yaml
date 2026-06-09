@@ -7,5 +7,5 @@ spec:
   ssoGroup: Dev-alpha
   envelope:
     allowedTiers: [standard]
-    allowedEnvironments: [preprod]
+    allowedEnvironments: [dev]
     quotaCap: { cpu: "8", memory: 16Gi, pods: 40 }

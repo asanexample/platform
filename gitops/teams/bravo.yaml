@@ -10,7 +10,7 @@ spec:
   ssoGroup: Dev-bravo
   envelope:
     allowedTiers: ["standard"]
-    allowedEnvironments: ["preprod"]
+    allowedEnvironments: ["dev", "test", "uat", "staging", "prod"]
     allowedLocations: ["*"]
     quotaCap:
       cpu: "8"

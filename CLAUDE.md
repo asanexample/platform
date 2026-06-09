@@ -199,9 +199,9 @@ The **Test** account (`157263244316`, Terratest sandbox) is a standard `Platform
 ## Authoring Policy-Compliant Workloads (Kyverno)
 
 Kyverno is in **Enforce** mode on **preprod and platform** — non-compliant resources in tenant
-namespaces (those labeled `platform.refplat.org/tenant`, e.g. `team-*`) are **rejected at admission**.
-Full per-cluster list: `docs/architecture/kyverno-policy-catalog.md`. When writing tenant manifests
-(app repos' `k8s/`, or anything applied to a `team-*` namespace):
+namespaces (those labeled `platform.refplat.org/tenant`, named `<team>-<name>-<env>`, e.g. `alpha-demo-dev`)
+are **rejected at admission**. Full per-cluster list: `docs/architecture/kyverno-policy-catalog.md`. When
+writing tenant manifests (app repos' `k8s/`, or anything applied to a tenant namespace):
 
 **Auto-injected by `mutate` — do NOT bother setting (Kyverno adds them when absent):**
 
@@ -217,7 +217,7 @@ Full per-cluster list: `docs/architecture/kyverno-policy-catalog.md`. When writi
 - **`livenessProbe` and `readinessProbe`** on every container
 - Services must be **`ClusterIP`** — `LoadBalancer`/`NodePort` are denied (ingress is via the shared Gateway / `HTTPRoute`)
 - **HTTPRoute/GRPCRoute/TLSRoute hostnames** must be in the team's allow-list (the `Tenant` claim's `hostnames`) — claiming another team's or a platform hostname (or omitting hostnames) is denied (ADR-029)
-- Workloads only in `team-*` namespaces — **never `default`**
+- Workloads only in tenant namespaces (`<team>-<name>-<env>`, e.g. `alpha-demo-dev`) — **never `default`**
 - **Do not** set `securityContext.allowPrivilegeEscalation: true` or `seccompProfile.type: Unconfined` (backstop policies deny them)
 - Tenant AWS access is via **platform-managed EKS Pod Identity** (association → named ServiceAccount; ADR-041/047): use a **named** ServiceAccount (never `default`) and set `serviceAccountName`; declare the access in the `Tenant` claim (`aws.serviceAccount` + `aws.policyStatements`), not `teams.hcl`. ServiceAccounts must **not** carry an `eks.amazonaws.com/role-arn` annotation — IRSA is platform-only; a tenant annotation is denied (backstop `disallow-irsa-annotation-cross-team`)
 - **Images must be cosign-signed** (keyless; Enforce on preprod). App CI is a **thin caller** of the shared, app-team-unwritable `asanexample/trusted-ci/build-sign.yml` reusable workflow (build → push → sign → SBOM) + `slsa-provenance.yml` (provenance) — the supply-chain backbone is NOT copied per app (ADR-050; `app-bravo` is the generic starter). Kyverno's `verify-images-team-<team>` admits images signed by the shared `build-sign.yml` identity **gated to the team** by the cert's `githubWorkflowRepository` extension (= the app repo); a per-team app-signed identity (`app-<team>`'s `deploy.yml`/`preview.yml`) is also accepted as a fallback for bespoke-build apps. Another team's image is rejected. Full explainer: `docs/architecture/cosign-image-signing.md`, `docs/runbooks/app-supply-chain-onboarding.md`.

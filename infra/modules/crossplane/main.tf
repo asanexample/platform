@@ -174,6 +174,9 @@ resource "helm_release" "crossplane_tenant" {
 
   values = [yamlencode({
     providerConfigName = var.providerconfig_name
+    # The shared tenant-developer ClusterRole the Composition's per-tenant RoleBindings reference. The retired v1
+    # `tenant` module used to own it (coexistence → default false); on a fresh v2 build the tenant chart creates it.
+    createDeveloperClusterRole = var.create_developer_cluster_role
     # Cluster constants for the Composition, injected via an EnvironmentConfig (the claim API stays clean).
     environment = {
       ecrRegistry             = var.ecr_registry

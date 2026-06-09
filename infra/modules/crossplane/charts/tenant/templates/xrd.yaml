@@ -13,186 +13,18 @@ spec:
     kind: XTenant
     plural: xtenants
   versions:
-    # v1alpha1 stays the referenceable / storage version until the rebuild cutover (delivery plan A6); the
-    # live Composition binds to it. v1alpha2 below is served-only for now.
-    - name: v1alpha1
-      served: true
-      referenceable: true
-      schema:
-        openAPIV3Schema:
-          type: object
-          properties:
-            spec:
-              type: object
-              properties:
-                team:
-                  type: string
-                  description: Team name. The tenant namespace is "team-<team>".
-                gatewayNamespace:
-                  type: string
-                  description: Namespace of the shared Gateway (ingress source).
-                  default: default
-                domains:
-                  type: array
-                  description: >-
-                    Tier-1/2 route domains for this tenant (ADR-061). The generated canonical host
-                    (<app>-<team>.<baseDomain>) is implicit and never declared here — list only ADDITIONAL
-                    aliases (a cleaner vanity label under our domain). The Composition unions these with the
-                    generated host into the restrict-route-hostnames allow-list, and argocd-apps injects the
-                    same union into the app's HTTPRoute. External custom domains + the status.domains
-                    verification state machine are Phase 2.
-                  items:
-                    type: object
-                    properties:
-                      host:
-                        type: string
-                        description: The fully-qualified route hostname (e.g. shop.preprod.aws.refplat.org).
-                      canonical:
-                        type: boolean
-                        description: When true, the user-canonical URL (drives 301/SEO in a later phase; inert in Phase 1).
-                        default: false
-                      dns:
-                        type: string
-                        enum: ["managed", "external"]
-                        description: DNS provider mode — managed (platform-owned zone) or external (customer-managed). Inert in Phase 1; wired in Phase 2.
-                        default: managed
-                    required:
-                      - host
-                  default: []
-                resourceQuota:
-                  type: object
-                  description: Per-namespace ResourceQuota. Defaults match the tenant module.
-                  properties:
-                    cpu:
-                      type: string
-                      default: "4"
-                    memory:
-                      type: string
-                      default: "8Gi"
-                    pods:
-                      type: integer
-                      default: 20
-                    services:
-                      type: integer
-                      default: 20
-                    loadbalancers:
-                      type: integer
-                      default: 0
-                    pvcs:
-                      type: integer
-                      default: 10
-                    storage:
-                      type: string
-                      default: "50Gi"
-                  default: {}
-                complianceTier:
-                  type: string
-                  enum: ["standard", "hipaa", "pci"]
-                  default: standard
-                apps:
-                  type: object
-                  description: Per-app entries — each gets an ECR repo team-<team>/<app> + (P3) cosign subjects.
-                  additionalProperties:
-                    type: object
-                    properties:
-                      repo:
-                        type: string
-                        description: >-
-                          owner/repo of the app's source (ArgoCD source + cosign/OIDC identity). The delivery
-                          consumers (argocd-apps, policy, github-oidc) derive from this — claim-as-single-source.
-                          Optional in v1alpha1 (the v1 Composition does not read it); REQUIRED in v1alpha2.
-                      repoPath:
-                        type: string
-                        default: k8s/preprod
-                      preview:
-                        type: boolean
-                        default: false
-                  default: {}
-                aws:
-                  type: object
-                  description: Tenant AWS access via EKS Pod Identity (ADR-041/047). Optional.
-                  properties:
-                    serviceAccount:
-                      type: string
-                      description: Named ServiceAccount the team's pods run as (the Pod Identity association binds it).
-                    policyStatements:
-                      type: array
-                      description: IAM statements granted to the Pod-team role (capped by the deny-escalation boundary).
-                      items:
-                        type: object
-                        properties:
-                          sid:
-                            type: string
-                          effect:
-                            type: string
-                            enum: ["Allow", "Deny"]
-                            default: Allow
-                          actions:
-                            type: array
-                            items:
-                              type: string
-                          resources:
-                            type: array
-                            items:
-                              type: string
-                        required: ["actions", "resources"]
-                      default: []
-                developerAccess:
-                  type: object
-                  description: Namespace-scoped developer cluster access (DeveloperAccess-<team> IAM role + EKS access entry → team-<team>:developers group). ADR-039/040.
-                  properties:
-                    enabled:
-                      type: boolean
-                      description: When true (default), provision the developer IAM role + EKS access entry. The RoleBinding is always created.
-                      default: true
-                  default: { enabled: true }
-              required:
-                - team
-            status:
-              type: object
-              properties:
-                namespace:
-                  type: string
-                  description: The provisioned tenant namespace.
-                domains:
-                  type: array
-                  description: >-
-                    Per-domain ingress state (ADR-061). The Composition writes one entry per generated
-                    canonical host + each spec.domains alias. Kyverno admits a route host only while its entry
-                    is Active. Phase 2a populates host/state/mode/reason (+ message); dnsTarget/lastTransition
-                    Time are driven by the Phase 2b external-domain provisioning.
-                  items:
-                    type: object
-                    properties:
-                      host:
-                        type: string
-                      state:
-                        type: string
-                        enum: ["Pending", "DelegationRequired", "VerificationRequired", "Verifying", "Issuing", "Active", "Error", "Deleting"]
-                      mode:
-                        type: string
-                        enum: ["platform-managed", "customer-managed"]
-                      dnsTarget:
-                        type: array
-                        description: Nameservers (DelegationRequired) or CNAME target (VerificationRequired) the customer must point at.
-                        items:
-                          type: string
-                      reason:
-                        type: string
-                      message:
-                        type: string
-                      lastTransitionTime:
-                        type: string
     # ---------------------------------------------------------------------------
-    # v1alpha2 — the target Tenant API (ADR-049, docs/architecture/tenant-api-v2.md).
-    # Served alongside v1alpha1; NOT yet referenceable (the v2 Composition + storage flip land at the rebuild
-    # cutover, delivery plan A6). Structural + self-contained validation only — cross-object envelope checks
-    # (tier ∈ Team.allowedTiers, quota ≤ Team.quotaCap, residency ⊆ Team.allowedLocations) are enforced by
-    # Kyverno against the projected Team CR (plan A2), not here.
+    # v1alpha2 — the Tenant API (ADR-049, docs/architecture/tenant-api-v2.md). The storage + referenceable
+    # version: Composition v2 (tenant-v2) binds to it. v1alpha1 was dropped at the rebuild cutover (A6) — no
+    # stored v1alpha1 objects survive a from-scratch build. Structural + self-contained validation only;
+    # cross-object envelope checks (tier ∈ Team.allowedTiers, quota ≤ Team.quotaCap, residency ⊆
+    # Team.allowedLocations, environment ∈ Team.allowedEnvironments) are enforced by Kyverno against the
+    # projected Team CR (restrict-tenant-envelope), not here.
     # ---------------------------------------------------------------------------
     - name: v1alpha2
       served: true
-      referenceable: false
+      referenceable: true
+      storage: true
       schema:
         openAPIV3Schema:
           type: object
@@ -212,8 +44,12 @@ spec:
                   description: Tenant name within the Team (e.g. payments-api). Namespace is "<team>-<name>".
                 environment:
                   type: string
-                  enum: ["preprod", "prod"]
-                  description: Tenants are realized per environment.
+                  enum: ["dev", "test", "uat", "staging", "prod"]
+                  description: >-
+                    The promotion stage this Tenant is realized in (a Tenant is authored per (team, name,
+                    environment); the namespace is "<team>-<name>-<environment>"). Must be in the owning Team's
+                    allowedEnvironments (Kyverno). The hosting account/cluster (e.g. the preprod account holds the
+                    non-prod stages) is a placement concern, not this field.
                 tier:
                   type: string
                   enum: ["standard", "elevated", "pci", "hipaa"]

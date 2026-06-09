@@ -206,6 +206,12 @@ variable "ecr_provisioner_role_arn" {
   default     = ""
 }
 
+variable "create_developer_cluster_role" {
+  description = "Create the shared `tenant-developer` ClusterRole the Composition's per-tenant RoleBindings bind to. False on clusters where the retired v1 `tenant` module owned it (coexistence); true on a fresh v2 build."
+  type        = bool
+  default     = false
+}
+
 variable "ecr_orphan_sweep_role_arn" {
   description = "ARN of a role in the platform/ECR account to assume on teardown to force-delete orphaned tenant ECR repos (team-*) the Composition created — typically the platform PlatformDeployer (assumable by the teardown's profile). Empty disables the sweep."
   type        = string

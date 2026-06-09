@@ -3,7 +3,7 @@
 apiVersion: platform.refplat.org/v1alpha2
 kind: XTenant
 metadata:
-  name: payments-api-prod
+  name: payments-payments-api-prod
 spec:
   team: payments
   name: payments-api
