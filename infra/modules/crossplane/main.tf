@@ -7,11 +7,12 @@ locals {
   enable_aws                 = local.create && length(var.provider_services) > 0
   enable_tenant_provisioning = local.create && var.enable_tenant_provisioning
 
-  # The IAM Pod-team-* roles the provisioning role may create/manage (in this workload account). PassRole is
-  # scoped to these only (the workload roles handed to EKS Pod Identity).
+  # The per-app Pod-* workload IAM roles (v2: Pod-<team>-<name>-<env>-<app>) the provisioning role may
+  # create/manage (in this workload account). PassRole is scoped to these only (the roles handed to EKS
+  # Pod Identity).
   tenant_role_arn_pattern = "arn:aws:iam::${var.account_id}:role/${var.tenant_role_name_prefix}*"
 
-  # Roles the provisioning role may create/manage: the Pod-team-* workload roles AND the DeveloperAccess-*
+  # Roles the provisioning role may create/manage: the Pod-* workload roles AND the DeveloperAccess-*
   # per-team developer-access roles (P2c). Both name prefixes, same account.
   manageable_role_arn_patterns = [
     local.tenant_role_arn_pattern,
