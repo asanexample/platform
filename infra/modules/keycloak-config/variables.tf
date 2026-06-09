@@ -135,6 +135,10 @@ variable "clients" {
     backstage = {
       name          = "Backstage"
       redirect_uris = ["https://backstage.aws.refplat.org/api/auth/oidc/handler/frame"]
+      # RP-initiated logout: the Backstage sidebar "Sign out" redirects here via Keycloak's end-session
+      # endpoint so logging out of Backstage also ends the Keycloak SSO session (not just the local Backstage
+      # session). Mirrors argocd above. See packages/app/src/modules/auth in the asanexample/backstage repo.
+      post_logout_redirect_uris = ["https://backstage.aws.refplat.org/*"]
     }
   }
 }
