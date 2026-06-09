@@ -23,6 +23,14 @@ locals {
 
   session_k8s_secret = "backstage-session"
 
+  # Split-horizon host-alias for the OIDC issuer → the gateway's CURRENT ClusterIP (looked up below, not
+  # hardcoded), plus any caller-supplied extras. Self-corrects on apply if the gateway Service is recreated.
+  gateway_host_alias = var.create && var.oidc_gateway_alias_host != "" ? [{
+    ip        = data.kubernetes_service_v1.gateway[0].spec[0].cluster_ip
+    hostnames = [var.oidc_gateway_alias_host]
+  }] : []
+  host_aliases = concat(var.host_aliases, local.gateway_host_alias)
+
   # OIDC needs OIDC_CLIENT_SECRET (shared with Dex's staticClient, synced from Secrets Manager by the
   # ExternalSecret below) and a session-signing secret (AUTH_SESSION_SECRET — backstage-only, generated
   # here). The OAuth handshake stores state in a session cookie, so the oidc provider fails with
@@ -138,9 +146,10 @@ locals {
       replicas       = var.replica_count
       containerPorts = { backend = 7007 }
 
-      # Split-horizon: resolve the OIDC issuer host to the in-cluster gateway so backend<->Dex
-      # traffic never leaves the cluster (see var.host_aliases). Empty list = no aliases.
-      hostAliases = var.host_aliases
+      # Split-horizon: pin the OIDC issuer host to the gateway's ClusterIP (looked up dynamically below —
+      # never hardcoded) so the backend reaches Keycloak via the gateway Envoy directly, not the flaky
+      # internal-NLB hairpin. Plus any caller-supplied extra aliases.
+      hostAliases = local.host_aliases
 
       # The chart overrides the image CMD, so re-supply the production config chain (both files are baked
       # into our image). Without the --config args the backend would load only the dev app-config.yaml.
@@ -480,4 +489,18 @@ resource "helm_release" "backstage" {
     # Pod Identity must exist before the pod starts, or it gets no AWS creds until a restart.
     aws_eks_pod_identity_association.k8s_reader,
   ]
+}
+
+# ---------------------------------------------------------------------------
+# Gateway ClusterIP lookup (split-horizon OIDC host-alias — see local.gateway_host_alias).
+# Reads the CURRENT ClusterIP of the shared Cilium gateway Service so the OIDC issuer host-alias is never a
+# hardcoded snapshot; it re-resolves on every apply (self-heals if the Service is recreated).
+# ---------------------------------------------------------------------------
+data "kubernetes_service_v1" "gateway" {
+  count = var.create && var.oidc_gateway_alias_host != "" ? 1 : 0
+
+  metadata {
+    name      = var.gateway_service_name
+    namespace = var.gateway_service_namespace
+  }
 }
