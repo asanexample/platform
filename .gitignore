@@ -70,6 +70,11 @@ bin/
 # Secrets (real values, gitignored — see secrets.hcl.example for structure)
 **/secrets.hcl
 
+# Private keys / certs (e.g. downloaded GitHub App keys — store in Secrets Manager, never commit)
+*.pem
+*.key
+*.p12
+
 # platctl config (contains account IDs — see .platctl.yaml.example)
 .platctl.yaml
 
