@@ -25,12 +25,15 @@ dependency "ecr" {
 }
 
 locals {
-  # Team -> GitHub app repo. Hand-maintained alongside the ecr `repositories` list
-  # in this account (see tenant-onboarding runbook). Each team gets its own ECR
-  # push role that can push ONLY to its own team-<team>/* repos.
-  teams = {
-    alpha = { github_repo = "app-alpha" }
-    bravo = { github_repo = "app-bravo" }
+  # Claim-as-single-source (ADR-061): the per-team app repos come from the XTenant claims (spec.apps.<app>.repo,
+  # owner/repo), not a hand-maintained list. Each team gets its own ECR push role that can push ONLY to its own
+  # team-<team>/* repos and trusts ONLY that team's repo(s). One app per team today; take every app's repo name.
+  claims_dir = "${get_repo_root()}/gitops/tenant-claims/preprod"
+  claims = { for f in fileset(local.claims_dir, "*.yaml") :
+    yamldecode(file("${local.claims_dir}/${f}")).spec.team => yamldecode(file("${local.claims_dir}/${f}"))
+  }
+  team_repo_names = { for team, claim in local.claims :
+    team => [for _app, cfg in claim.spec.apps : split("/", cfg.repo)[1]]
   }
 }
 
@@ -42,9 +45,9 @@ inputs = {
   # team-<team>/* ECR repos. The repo ARN is CONSTRUCTED (wildcard), not read from the `ecr` unit — the
   # tenant ECR repos are owned by the Crossplane Tenant Composition now (BACK stack P3), so the `ecr` unit
   # no longer lists them. (Keying off `ecr` here would silently drop every team's role — #174 regression.)
-  roles = merge({ for team, cfg in local.teams :
+  roles = merge({ for team, repo_names in local.team_repo_names :
     "github-actions-ecr-push-${team}" => {
-      repos    = [cfg.github_repo]
+      repos    = repo_names
       branches = ["main"]         # push on merge to main
       events   = ["pull_request"] # and PR preview builds
       tags     = { Team = team }  # per-team attribution / ABAC (#61)

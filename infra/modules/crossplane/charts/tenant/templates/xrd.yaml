@@ -95,6 +95,12 @@ spec:
                   additionalProperties:
                     type: object
                     properties:
+                      repo:
+                        type: string
+                        description: >-
+                          owner/repo of the app's source (ArgoCD source + cosign/OIDC identity). The delivery
+                          consumers (argocd-apps, policy, github-oidc) derive from this — claim-as-single-source.
+                          Optional in v1alpha1 (the v1 Composition does not read it); REQUIRED in v1alpha2.
                       repoPath:
                         type: string
                         default: k8s/preprod

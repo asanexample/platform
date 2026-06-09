@@ -7,8 +7,8 @@
 > The old Terragrunt path (`tenants`/`pod-identity`/`s3-shared` units, the `tenant` module) is **retired**.
 > **Live configurations:**
 >
-> - `gitops/tenant-claims/preprod/<team>.yaml` — **the claim** (one `XTenant`, synced by ArgoCD — primary)
-> - `infra/live/aws/preprod/us-east-1/platform/teams.hcl` — app-delivery + supply-chain inputs only
+> - `gitops/tenant-claims/preprod/<team>.yaml` — **the claim** (one `XTenant`, synced by ArgoCD — the SINGLE
+>   source: infra, app delivery, and supply-chain identities all derive from it, ADR-061)
 > - `infra/live/aws/mgmt/global/identity-center/terragrunt.hcl` — the team's `Dev-<team>` SSO permission set
 > - `infra/live/aws/platform/us-east-1/platform/argocd-apps/terragrunt.hcl` — app delivery (ArgoCD)
 > - `infra/live/aws/platform/us-east-1/platform/github-oidc/terragrunt.hcl` — app CI OIDC (signing)
@@ -27,8 +27,7 @@ Composition provisions, and the claim lifecycle.
 3. [Onboarding a new team](#onboarding-a-new-team)
 4. [Verification](#verification)
 5. [Offboarding](#offboarding)
-6. [Migrating a team off the legacy `teams.hcl` path](#migrating-a-team-off-the-legacy-teamshcl-path)
-7. [Troubleshooting](#troubleshooting)
+6. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -57,7 +56,7 @@ One `XTenant` claim → the Composition reconciles the **complete** tenant:
 - [ ] If the team's developers need cluster/AWS access, plan to add their **AWS Identity Center** wiring —
       the `Dev-<team>` permission set + `Developers-<team>` group + assignment + users. This is partly
       manual (per-user invite/MFA, or external-IdP group management); see
-      [Step 4](#step-4--grant-developer-access-aws-identity-center). The claim's `DeveloperAccess-<team>`
+      [Step 3](#step-3--grant-developer-access-aws-identity-center). The claim's `DeveloperAccess-<team>`
       role trusts the `Dev-<team>` SSO principal, so the role can exist before this — but no human can use it
       until Identity Center is wired up.
 - [ ] The crossplane control plane is healthy: `kubectl --context preprod get providers.pkg.crossplane.io`
@@ -86,6 +85,7 @@ spec:
   #     - host: charlie.preprod.aws.refplat.org
   apps:
     api:
+      repo: asanexample/app-charlie # owner/repo — the SINGLE source argocd-apps/policy/github-oidc derive from
       repoPath: k8s/preprod
       preview: true # → ECR repo team-charlie/api; host api-charlie.preprod.aws.refplat.org
   aws:
@@ -97,42 +97,27 @@ spec:
   # developerAccess omitted → enabled by default
 ```
 
-### Step 2 — Register the team for app delivery + supply chain (`teams.hcl`)
+### Step 2 — Apply
 
-The claim owns infra; `teams.hcl` still drives **app delivery** (ArgoCD) and the **supply-chain policies**.
-Add the team with `migrated = true` so it is excluded from the (retired) Terragrunt infra loops and the
-`policy` unit skips its `restrict-*` (the Composition owns those):
-
-```hcl
-charlie = {
-  mode     = "namespace"
-  migrated = true
-  # Route hostnames live in the XTenant claim (spec.domains, ADR-061), not here.
-  apps = {
-    api = {
-      repo_url  = "https://github.com/asanexample/app-charlie"
-      repo_path = "k8s/preprod"
-      preview   = true
-    }
-  }
-}
-```
-
-### Step 3 — Apply
+The claim is the single source — there is **no separate `teams.hcl` to edit** (retired, ADR-061). The
+delivery + supply-chain Terragrunt units (`argocd-apps`, `policy`, `github-oidc`) derive everything they need
+(app repo, ECR push identity, cosign subjects, route-hostname allow-list) from the claim's
+`spec.apps.<app>.repo` + `spec.domains` by `fileset`+`yamldecode` over `gitops/tenant-claims/preprod/`.
 
 Open a PR with the claim YAML (`gitops/tenant-claims/preprod/charlie.yaml`) — the path is CODEOWNERS-gated.
 On merge, the `tenant-claims-preprod` ArgoCD Application syncs it to the preprod cluster (`selfHeal` +
 `prune` + ServerSideApply) and the Composition reconciles it (~1–2 min). **No Terragrunt, no
 `terragrunt apply`** for the claim itself.
 
-The units that read `teams.hcl` for delivery + supply chain are still Terragrunt — apply them as before:
+Then apply the delivery + supply-chain units so they pick up the new claim:
 
 ```bash
-cd infra/live/aws/preprod/us-east-1/platform/policy && AWS_PROFILE=management terragrunt apply   # per-team verify-* policies
-cd ../../../../platform/us-east-1/platform/argocd-apps && AWS_PROFILE=management terragrunt apply  # ArgoCD app
+cd infra/live/aws/preprod/us-east-1/platform/policy && AWS_PROFILE=management terragrunt apply          # per-team verify-* policies
+cd ../../../../platform/us-east-1/platform/argocd-apps && AWS_PROFILE=management terragrunt apply        # ArgoCD app delivery
+cd ../github-oidc && AWS_PROFILE=management terragrunt apply                                             # app CI ECR-push OIDC role
 ```
 
-### Step 4 — Grant developer access (AWS Identity Center)
+### Step 3 — Grant developer access (AWS Identity Center)
 
 The claim provisions the `DeveloperAccess-<team>` IAM role + the EKS access entry, but **a human reaches it
 through AWS Identity Center**: they sign in to the AWS access portal, select the `Dev-<team>` permission set
@@ -277,8 +262,8 @@ A compliant workload referencing `…/team-charlie/api:<tag>` should admit; a cr
 1. Remove the team's `gitops/tenant-claims/preprod/<team>.yaml` via PR — on merge, the `tenant-claims-preprod`
    ArgoCD Application prunes the `XTenant` and the Composition cascades the teardown of **every** managed
    resource (the namespace + AWS, both accounts) via finalizers.
-2. Remove the team from `teams.hcl` and apply `policy` + `argocd-apps` (drops its verify-* policies + ArgoCD
-   app).
+2. Apply `policy` + `argocd-apps` + `github-oidc` — with the claim file gone they no longer derive the team,
+   so its verify-* policies, ArgoCD app, and ECR-push role are dropped.
 3. If the team is fully gone, remove its Identity Center wiring from the `identity-center` unit (the
    `Dev-<team>` permission set, `Developers-<team>` group, its `users`, and the `account_assignments` entry)
    and `terragrunt apply` from the mgmt account. With an external IdP, also remove the group/members there.
@@ -286,28 +271,6 @@ A compliant workload referencing `…/team-charlie/api:<tag>` should admit; a cr
    manual *activation* on onboarding.)
 4. Verify: `kubectl get xtenant <team>` (NotFound), `aws iam get-role --role-name Pod-team-<team>`
    (NoSuchEntity), the ECR repo is gone in the platform account.
-
----
-
-## Migrating a team off the legacy `teams.hcl` path
-
-Only relevant for a team that predates the claim model (alpha + bravo are already migrated). The mechanics
-are the same as a normal cutover; the one wrinkle is **state already exists**:
-
-1. Author the `XTenant` (Step 1) and set `migrated = true` (Step 2).
-2. **ECR:** if the team's `team-<team>/<app>` repo holds live images, `terragrunt state rm` it from the `ecr`
-   unit **before** applying (so the repo survives untracked); the claim's Repository MR then **adopts** it
-   (external-name match) — no image loss. If the repo is empty, just let the `ecr` unit destroy it and the
-   claim recreate it.
-3. Apply the teams.hcl-consumer units (`iam-roles`, `eks`, `policy`; `ecr`, `s3-shared` on platform) — the
-   `migrated` flag withdraws the team's Terragrunt infra. Then commit the team's claim YAML to
-   `gitops/tenant-claims/preprod/` (PR → ArgoCD syncs it).
-4. The namespace is briefly destroyed then recreated by the claim; ArgoCD resyncs the app once it returns
-   (downtime is acceptable on preprod). Verify as above + confirm `terragrunt plan` is clean.
-
-> After the overnight scale-to-zero/restore, ArgoCD may fail to reach preprod (`ComparisonError … i/o
-> timeout`) because the preprod EKS API ENI IPs changed and the cross-vpc-dns record went stale — re-apply
-> `platform/.../cross-vpc-dns` to refresh, then hard-refresh the ArgoCD app.
 
 ---
 
@@ -320,4 +283,4 @@ are the same as a normal cutover; the one wrinkle is **state already exists**:
 | AWS MR 403 (e.g. `eks:TagResource`, `iam:ListInstanceProfilesForRole`) | The `crossplane-provisioner-<cluster>` role is missing a verb — add it in the `crossplane` module's provisioner policy and apply. |
 | Cross-account ECR MR `AccessDenied … sts:TagSession` | The platform `crossplane-ecr-provisioner` trust must allow `sts:TagSession` (not just `AssumeRole`); the preprod provisioner needs both too. |
 | Claim creation denied by `restrict-tenant-control-plane` | The claim must be applied by a **platform** principal — ArgoCD (the `platform-tenants` Application, assuming the `ArgoCD` IAM role) is that principal, excluded from the S1 backstop; a tenant principal is denied. |
-| Per-team `restrict-images`/`restrict-route-hostnames` appear twice / `AlreadyExists` | The team is in both the claim and the `policy` unit's non-migrated set — ensure `migrated = true` in `teams.hcl`. |
+| Per-team `restrict-images`/`restrict-route-hostnames` appear twice / `AlreadyExists` | A team is owned by both the Composition (claim) and the `policy` unit's non-migrated path. Every team with a claim is auto-migrated (`policy` derives `migrated_teams = keys(claims)`); confirm the team has a claim file under `gitops/tenant-claims/preprod/`. |

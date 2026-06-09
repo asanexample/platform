@@ -12,17 +12,13 @@ terraform {
 }
 
 locals {
-  teams_config = read_terragrunt_config("${get_repo_root()}/infra/live/aws/preprod/us-east-1/platform/teams.hcl")
-  teams        = local.teams_config.locals.teams
-
-  # Tier-1/2 route aliases come from the XTenant claim (spec.domains, ADR-061) — the claim is the sole source,
-  # NOT teams.hcl. Read each team's claim YAML and extract the declared hosts ([] when absent / no claim).
+  # Claim-as-single-source (ADR-061): app delivery is derived entirely from the XTenant claim YAMLs — apps
+  # (repo/repoPath/preview) and the tier-1/2 route aliases (spec.domains). Replaces the retired teams.hcl.
+  # Key each claim by spec.team; one tenant per team today (namespace isolation, ADR-033).
   claims_dir = "${get_repo_root()}/gitops/tenant-claims/preprod"
-  team_domains = { for k, v in local.teams : k => (
-    fileexists("${local.claims_dir}/${k}.yaml")
-    ? try([for d in yamldecode(file("${local.claims_dir}/${k}.yaml")).spec.domains : d.host], [])
-    : []
-  ) }
+  claims = { for f in fileset(local.claims_dir, "*.yaml") :
+    yamldecode(file("${local.claims_dir}/${f}")).spec.team => yamldecode(file("${local.claims_dir}/${f}"))
+  }
 }
 
 dependency "eks" {
@@ -102,10 +98,14 @@ generate "kubernetes_provider" {
 inputs = {
   create = true
 
-  tenants = { for k, v in local.teams : k => {
-    mode    = v.mode
-    domains = local.team_domains[k]
-    apps    = v.apps
+  tenants = { for team, claim in local.claims : team => {
+    mode    = "namespace" # namespace isolation only; vCluster deferred (ADR-033)
+    domains = try([for d in claim.spec.domains : d.host], [])
+    apps = { for app, cfg in claim.spec.apps : app => {
+      repo_url  = "https://github.com/${cfg.repo}"
+      repo_path = try(cfg.repoPath, "k8s/preprod")
+      preview   = try(cfg.preview, false)
+    } }
   } }
 
   github_org               = "asanexample"

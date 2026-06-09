@@ -151,9 +151,14 @@ A5 ─────────────────────────�
     projection off) and the `keycloak-config`/`argocd` consumers read the git YAMLs (`fileset`+`yamldecode`).
     `_teams.hcl` retired. Plan-verified: crossplane = the single intended Helm-values diff, argocd = no-op,
     argocd-apps = the new `teams` project+app.
-  - 🟡 the **delivery-consumer migration** (policy/github-oidc/argocd-apps → v1alpha2 claims), the v2 **claim
-    translation**, **A6 cutover** (storage flip → v1alpha2, bind Composition v2, envelope audit→enforce), and
-    the rebuild.
+  - ✅ **Delivery-consumer migration / claim-as-single-source** ([ADR-061](../adrs/061-tenant-ingress-and-custom-domain-strategy.md))
+    — `policy`, `github-oidc`, and `argocd-apps` now derive (`fileset`+`yamldecode`) from the `XTenant` claim
+    YAMLs (`spec.apps.<app>.repo` owner/repo + `spec.domains`), not the retired app-delivery `teams.hcl`. `repo`
+    added to the v1alpha1 `apps` XRD schema (additive — no ArgoCD prune/drift) + the live claims. Plan-verified
+    v1-parity: all six derived maps byte-identical (offline); github-oidc = no-op, policy = only a pre-existing
+    live-drift diff (hostnames→[], inert for migrated teams), argocd-apps = no new diff.
+  - 🟡 the v2 **claim translation** (rewrite claims to v1alpha2: name/environment/tier), **A6 cutover** (storage
+    flip → v1alpha2, bind Composition v2, envelope audit→enforce), and the rebuild.
 - 🔵 **Deferred for the dev env:** **A4 placement** + **A5 Zones/Customer/vending** — degenerate on a single
   workload cluster (every claim lands on preprod); build when a second zone exists.
 - 📋 Execution plan for the remaining work: BACK Phase 3 self-service ([ADR-062](../adrs/062-self-service-tenant-provisioning.md))
