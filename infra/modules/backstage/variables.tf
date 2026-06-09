@@ -162,13 +162,32 @@ variable "github_app_secret_name" {
   default     = "platform/backstage/github-app"
 }
 
-variable "host_aliases" {
+variable "oidc_gateway_alias_host" {
   description = <<-DESC
-    Pod /etc/hosts entries. Used for split-horizon resolution of the OIDC issuer hostname
-    (sso.aws.refplat.org) to the in-cluster Cilium gateway ClusterIP, so the backend's OIDC
-    discovery + token exchange with Dex stay IN-CLUSTER (TLS still validates via the wildcard
-    cert at the gateway) instead of depending on public DNS resolving the internal-NLB hairpin.
+    Hostname to pin (via /etc/hosts) to the in-cluster Cilium gateway ClusterIP — the OIDC issuer host
+    (keycloak.aws.refplat.org). The backend's OIDC discovery + token exchange then hit the gateway's Envoy
+    directly instead of the public name's internal-NLB hairpin (which is flaky), while TLS still validates
+    (wildcard cert at the gateway). The ClusterIP is looked up dynamically from the gateway Service — NOT
+    hardcoded — so it self-corrects on every apply if the Service is recreated. Empty = no alias.
   DESC
+  type        = string
+  default     = ""
+}
+
+variable "gateway_service_name" {
+  description = "Name of the Cilium gateway LoadBalancer Service whose ClusterIP backs oidc_gateway_alias_host."
+  type        = string
+  default     = "cilium-gateway-platform-gateway"
+}
+
+variable "gateway_service_namespace" {
+  description = "Namespace of the Cilium gateway Service (the shared Gateway lives in `default`)."
+  type        = string
+  default     = "default"
+}
+
+variable "host_aliases" {
+  description = "Extra pod /etc/hosts entries (in addition to the dynamically-resolved oidc_gateway_alias_host)."
   type = list(object({
     ip        = string
     hostnames = list(string)

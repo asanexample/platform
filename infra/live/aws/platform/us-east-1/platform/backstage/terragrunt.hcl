@@ -142,14 +142,10 @@ inputs = {
   # provider that this unit's OIDC wiring expects.
   image_tag = "9ac698bf8c128253e152193b0ab936ff2e93d55f"
 
-  # Split-horizon for OIDC SSO: the backend reaches Keycloak's issuer (keycloak.aws.refplat.org) in-cluster
-  # via the Cilium gateway ClusterIP, not public DNS / the internal-NLB hairpin. The IP is the
-  # `cilium-gateway-platform-gateway` Service ClusterIP (default ns) — stable for the Service's life; if that
-  # Service is recreated, refresh this. TLS still validates (wildcard *.aws.refplat.org at the gateway).
-  host_aliases = [{
-    ip        = "172.20.184.24"
-    hostnames = ["keycloak.aws.refplat.org"]
-  }]
+  # Split-horizon for OIDC: pin keycloak.aws.refplat.org to the gateway's ClusterIP so the backend hits the
+  # gateway Envoy directly (the public-name → internal-NLB hairpin is flaky). The ClusterIP is resolved
+  # DYNAMICALLY by the module from the gateway Service — no hardcoded IP — so it self-corrects on apply.
+  oidc_gateway_alias_host = "keycloak.aws.refplat.org"
 
   # Phase 2.0: in-cluster CloudNativePG (dev). Flip to mode = "rds" (+ rds_host/rds_secret_name) for prod.
   database = {
