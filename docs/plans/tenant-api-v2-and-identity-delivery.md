@@ -152,8 +152,8 @@ A5 ─────────────────────────�
     `_teams.hcl` retired. Plan-verified: crossplane = the single intended Helm-values diff, argocd = no-op,
     argocd-apps = the new `teams` project+app.
   - 🟡 the **delivery-consumer migration** (policy/github-oidc/argocd-apps → v1alpha2 claims), the v2 **claim
-    translation**, and **A6 cutover** (storage flip → v1alpha2, bind Composition v2, envelope audit→enforce)
-    + the rebuild.
+    translation**, **A6 cutover** (storage flip → v1alpha2, bind Composition v2, envelope audit→enforce), and
+    the rebuild.
 - 🔵 **Deferred for the dev env:** **A4 placement** + **A5 Zones/Customer/vending** — degenerate on a single
   workload cluster (every claim lands on preprod); build when a second zone exists.
 - 📋 Execution plan for the remaining work: BACK Phase 3 self-service ([ADR-062](../adrs/062-self-service-tenant-provisioning.md))
