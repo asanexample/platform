@@ -131,12 +131,10 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # This SHA (asanexample/backstage#23) adds group-based RBAC (#197): the OIDC sign-in resolver attaches
-  # Keycloak `groups` as ownershipEntityRefs, and a custom permission policy gates writes (platform-admins
-  # full access; team members manage only their own team's entities; everyone reads). Builds on the
-  # direct-Keycloak-OIDC (#20) + logout (#21/#22) builds. No keycloak-config change needed — the groups
-  # claim already flows as a default client scope.
-  image_tag = "980de395712bddd98907a84ed238fab23c614ee7"
+  # This SHA (asanexample/backstage#24) updates the platform-projection plugin to the v2 Tenant API
+  # (v1alpha2 claims: namespace <team>-<name>-<env>, per-app Pod roles, per-namespace policy names,
+  # spec.domains). Builds on group-based RBAC #197 (#23) + direct-Keycloak-OIDC (#20) + logout (#21/#22).
+  image_tag = "c1243fafb87bd09218bcc3a9550a3501b971663d"
 
   # Split-horizon for OIDC: pin keycloak.aws.refplat.org to the gateway's ClusterIP so the backend hits the
   # gateway Envoy directly (the public-name → internal-NLB hairpin is flaky). The ClusterIP is resolved
