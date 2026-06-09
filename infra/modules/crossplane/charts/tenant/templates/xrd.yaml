@@ -148,6 +148,35 @@ spec:
                 namespace:
                   type: string
                   description: The provisioned tenant namespace.
+                domains:
+                  type: array
+                  description: >-
+                    Per-domain ingress state (ADR-061). The Composition writes one entry per generated
+                    canonical host + each spec.domains alias. Kyverno admits a route host only while its entry
+                    is Active. Phase 2a populates host/state/mode/reason (+ message); dnsTarget/lastTransition
+                    Time are driven by the Phase 2b external-domain provisioning.
+                  items:
+                    type: object
+                    properties:
+                      host:
+                        type: string
+                      state:
+                        type: string
+                        enum: ["Pending", "DelegationRequired", "VerificationRequired", "Verifying", "Issuing", "Active", "Error", "Deleting"]
+                      mode:
+                        type: string
+                        enum: ["platform-managed", "customer-managed"]
+                      dnsTarget:
+                        type: array
+                        description: Nameservers (DelegationRequired) or CNAME target (VerificationRequired) the customer must point at.
+                        items:
+                          type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
     # ---------------------------------------------------------------------------
     # v1alpha2 — the target Tenant API (ADR-049, docs/architecture/tenant-api-v2.md).
     # Served alongside v1alpha1; NOT yet referenceable (the v2 Composition + storage flip land at the rebuild
