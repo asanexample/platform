@@ -2,9 +2,12 @@
 
 **Date:** 2026-06-03
 
-**Status:** Proposed — **design-stage, not yet implemented.** This ADR sets the target multi-tenancy model;
-the breaking parts (the v2 claim schema, namespace naming, the `Zone`/`Customer` objects) land with the
-**planned rebuild**, not as an in-place migration. It **supersedes the `team == tenant` assumption** baked
+**Status:** Accepted — **partially built, cutover pending (updated 2026-06-09).** The v1alpha2 XRD, the `Team`
+object with its envelope Kyverno policy (audit), and Composition v2 are built and render-tested in CI. The
+remaining work — the delivery-consumer migration, the git-native Team
+([ADR-063](063-team-as-first-class-git-object.md)), and the storage-flip cutover — lands with the **planned
+rebuild** (not an in-place migration). `Zone`/`Customer`/placement are **deferred** until a second zone exists
+(degenerate on the single-cluster dev env). It **supersedes the `team == tenant` assumption** baked
 into [ADR-027](027-hybrid-tenant-isolation-model.md) (hybrid isolation) and
 [ADR-031](031-multi-app-tenant-model.md) (multi-app tenant model). It **builds on**
 [ADR-046](046-back-stack-for-developer-self-service.md) (BACK stack),

@@ -136,7 +136,19 @@ A5 ─────────────────────────�
 - **Reserved dimensions** (`dataServices`, BYOK, lifecycle) — stubbed inert in A3; realized in Phase 5+ on
   their own paved-road timelines.
 
-## Where we are
+## Where we are (updated 2026-06-09 — most tracks are done; this is now the last mile + cutover)
 
-- ✅ **Done:** the finalized schema ([tenant-api-v2.md](../architecture/tenant-api-v2.md)) + ADRs 049/053/054–057.
-- ⏭️ **Next:** Phase 0 — **A1** (the `v1alpha2` XRD + offline render harness), with B1/S0 parallelizable.
+- ✅ **Track A built + render-tested (CI):** **A1** v1alpha2 XRD (served, not yet storage), **A2** Team CRD +
+  projection + **envelope Kyverno policy (audit mode)**, **A3** Composition v2 (namespace `<team>-<name>`,
+  per-app Pod-Identity, per-app ECR). Offline-renderable via `.tenant-api-tests/{run,render}.sh`.
+- ✅ **Track B largely LIVE:** **B1** Keycloak, **B3** ArgoCD OIDC, **B4** Backstage RBAC (#197), **B5**
+  Dex→Keycloak (Dex + oauth2-proxy retired) — all landed live. B2 (access-model-as-code generators) partial
+  (keycloak-config generates groups/roles).
+- 🟡 **Not done (the remaining work):** the **delivery-consumer migration** (policy/github-oidc/argocd-apps →
+  v1alpha2 claims), the **git-native Team** refinement ([ADR-063](../adrs/063-team-as-first-class-git-object.md),
+  retire `_teams.hcl`), the v2 **claim translation**, and **A6 cutover** (storage flip → v1alpha2, bind
+  Composition v2, envelope audit→enforce) + the rebuild.
+- 🔵 **Deferred for the dev env:** **A4 placement** + **A5 Zones/Customer/vending** — degenerate on a single
+  workload cluster (every claim lands on preprod); build when a second zone exists.
+- 📋 Execution plan for the remaining work: BACK Phase 3 self-service ([ADR-062](../adrs/062-self-service-tenant-provisioning.md))
+  is built **on top of** this cutover, after the rebuild.

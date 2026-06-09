@@ -2,8 +2,11 @@
 
 **Date:** 2026-06-04
 
-**Status:** Accepted (strategy/direction). Implementation is **phased** — the IdP swap (Keycloak) lands with the
-planned rebuild ([ADR-049](049-tenant-model-team-tenant-zone.md)). Complements the AWS+Kubernetes RBAC of
+**Status:** Accepted — **largely delivered (updated 2026-06-09).** Keycloak is the live app-facing IdP; ArgoCD +
+Backstage sign in via Keycloak OIDC; **Dex + oauth2-proxy retired**; Backstage group-based RBAC shipped (#197).
+What remains is the access-model-as-code *generators* reading the git-native Team
+([ADR-063](063-team-as-first-class-git-object.md)), landing with the rebuild cutover
+([ADR-049](049-tenant-model-team-tenant-zone.md)). Complements the AWS+Kubernetes RBAC of
 [ADR-039](039-per-team-developer-rbac.md)/[ADR-040](040-platform-engineer-access-model.md)/[ADR-041](041-pod-identity-for-tenant-workloads.md)/[ADR-047](047-pod-identity-as-aws-identity-standard.md);
 charts the eventual replacement of the Dex broker ([ADR-052](052-centralized-dex-sso-broker.md)). Unblocks the
 deferred Backstage RBAC (#197). **Refined by [ADR-059](059-identity-topology-pluggable-idp-seam.md)** — the

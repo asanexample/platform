@@ -53,18 +53,24 @@ already exists, skip this.
 `platctl bootstrap` pre-flight-checks the ones with a `manual_steps` entry (via `secret_exists`/`file_contains`)
 and prompts if missing; the rest you must ensure yourself. For a from-scratch rebuild you need:
 
+> **⚠️ Identity prereqs UPDATED 2026-06-09 — Dex + per-app SAML retired.** Keycloak is now the app-facing IdP
+> (ADR-053/059); **ArgoCD and Backstage sign in via Keycloak OIDC**, not their own Identity Center SAML apps,
+> and **Dex + oauth2-proxy are gone** (B5). So the old Dex/ArgoCD SAML rows below are removed. Keycloak runs as
+> the **IdP of record by default** — `keycloak-config` seeds the realm users — so **no Identity Center SAML app
+> is required** for a standard rebuild; an upstream SAML/OIDC broker app is **optional** and only needed if you
+> federate Keycloak to a corporate IdP.
+
 | Prerequisite | Where | Runbook |
 | ------------ | ----- | ------- |
-| Identity Center **SAML app for Dex** → `dex_sso_url`/`dex_sso_ca_data` (cert = **base64-of-PEM**) | secrets.hcl | [dex-sso.md](dex-sso.md) |
-| Identity Center **SAML app for ArgoCD** → `argocd_sso_url`/`argocd_sso_ca_data` | secrets.hcl | [argocd-sso.md](argocd-sso.md) |
-| Identity Center **SAML app for Keycloak** → `keycloak_sso_url`/`keycloak_sso_ca_data` (cert = **BARE base64 body**, differs from Dex) | secrets.hcl | [keycloak-sso.md](keycloak-sso.md) |
+| *(optional)* Identity Center **SAML/OIDC app for Keycloak upstream federation** → `keycloak_sso_url`/`keycloak_sso_ca_data` — only if federating to a corporate IdP; omit for the default standalone (seeded users) | secrets.hcl | [keycloak-sso.md](keycloak-sso.md) |
 | **Cloudflare API token**, **Tailscale API key/OAuth** | Secrets Manager | (platctl manual_steps) |
-| **Backstage GitHub App** → `platform/backstage/github-app` | Secrets Manager | [backstage-github-app.md](backstage-github-app.md) |
+| **Backstage GitHub App** (read-only discovery) → `platform/backstage/github-app` | Secrets Manager | [backstage-github-app.md](backstage-github-app.md) |
+| *(Phase 3)* **Backstage Scaffolder GitHub App** (write) → `platform/backstage/scaffolder-github-app` | Secrets Manager | [backstage-scaffolder-github-app.md](backstage-scaffolder-github-app.md) |
 | **ECR images** (Backstage at the pinned SHA; app images) pushed | ECR | app CI |
 | **ArgoCD `backstage` token** → `platform/argocd/backstage-token` | Secrets Manager | [backstage-argocd.md](backstage-argocd.md) — **minted after ArgoCD is up** (post-bootstrap or a resume pass) |
 
-> **Gap to close:** `.platctl.yaml.example` only has `manual_steps` for cloudflare/tailscale/argocd-saml. Adding
-> entries for the Keycloak/Dex SAML values (`file_contains` on secrets.hcl) and the Backstage GitHub App
+> **Gap to close:** `.platctl.yaml.example` only has `manual_steps` for cloudflare/tailscale. Adding entries for
+> the (optional) Keycloak upstream SAML values (`file_contains` on secrets.hcl) and the Backstage GitHub App(s)
 > (`secret_exists`) would make bootstrap pre-flight catch them. Recommended follow-up.
 
 ### First-rebuild gotchas (learned 2026-06-07 — the first real from-scratch bootstrap)
