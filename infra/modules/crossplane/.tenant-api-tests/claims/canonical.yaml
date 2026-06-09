@@ -18,11 +18,14 @@ spec:
     cpu: "8"
     memory: 16Gi
     pods: 40
-  hostnames:
-    - bigbank.payments.example.com
+  # External custom alias (not under our wildcard) — exercises the tier-3 status.domains=Pending path (ADR-061).
+  domains:
+    - host: bigbank.payments.example.com
+      canonical: true
+      dns: external
   apps:
     api:
-      repo: github.com/asanexample/payments-api
+      repo: asanexample/payments-api
       repoPath: k8s/prod
       preview: false
       serviceAccount: payments-api

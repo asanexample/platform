@@ -157,7 +157,7 @@ one requires cluster RBAC, the S1 self-provisioning gate). Logical identity = `(
 | `tenancy` | — | object | `{ mode: pooled }` | `mode: pooled \| dedicated`; `customer` **required iff** `mode: dedicated` (→ a `Customer`). Dedicated consumes one of the Team's `maxDedicatedZones`. |
 | `residency` | — | object | `{ allowedLocations: ["*"] }` | `allowedLocations: []string` — **hard, attested** placement constraint (jurisdiction or `cloud:region`). Must be ⊆ the Team's `allowedLocations`. Placement fails (not silently relaxes) if no Zone satisfies it. |
 | `quota` | — | object | tier profile default | `cpu`/`memory`/`pods` (+ optional `services`/`loadbalancers`/`pvcs`/`storage`). Validated ≤ the Team's `quotaCap`. |
-| `hostnames` | — | `[]string` | `[]` | Gateway-API route hostnames this Tenant may claim (feeds `restrict-route-hostnames`, ADR-029). |
+| `domains` | — | `[]object` | `[]` | ADDITIONAL route hostname aliases (`{ host, canonical, dns }`) — the authoritative hostname field (ADR-061, supersedes the earlier `hostnames` string list). The generated `<app>-<team>.<baseDomain>` host is implicit and never declared. The Composition unions these with the generated host into `restrict-route-hostnames` and writes per-host `status.domains` state (tier-1/2 → Active; external → Pending). |
 | `apps` | — | map | `{}` | `<app> → AppSpec`. Delivery + per-app identity + per-app permissions, unified. See below. |
 | `developerAccess` | — | object | `{ enabled: true }` | `enabled: bool`; `group: string` (override the Team `developerGroup`). The override is **required** for regulated (`pci`/`hipaa`) prod. Names only *who* — the *posture* is derived (see [Developer access](#developer-access-posture)). |
 | `dataServices` | — | map | `{}` | 🔒 **Reserved.** `<name> → DataServiceSpec` — cloud-neutral stateful dependencies (DB / cache / object store / stream). Realized data **inherits the Tenant's `residency`** — placement validates the data's location ⊆ `allowedLocations`, closing the *compute-residency-without-data-residency* gap — and the tier's recovery posture. Provisioning lands with the data paved-road (#106/#107). |
@@ -209,10 +209,11 @@ spec:
   tenancy: { mode: dedicated, customer: bigbank }   # pooled (default) | dedicated(customer)
   residency: { allowedLocations: ["eu"] }       # HARD constraint, ⊆ Team.allowedLocations
   quota: { cpu: "8", memory: 16Gi, pods: 40 }   # validated ≤ Team.envelope.quotaCap
-  hostnames: ["bigbank.payments.example.com"]
+  domains:                                       # ADDITIONAL aliases only; <app>-<team>.<baseDomain> is implicit (ADR-061)
+    - { host: bigbank.payments.example.com, canonical: true, dns: external }
   apps:
     api:
-      repo: github.com/asanexample/payments-api
+      repo: asanexample/payments-api             # owner/repo
       repoPath: k8s/prod
       preview: false
       serviceAccount: payments-api              # → a cloud-neutral identity is minted + bound

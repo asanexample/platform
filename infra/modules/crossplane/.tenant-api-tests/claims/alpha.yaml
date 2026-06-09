@@ -10,11 +10,11 @@ spec:
   name: demo
   environment: preprod
   tier: standard
-  hostnames:
-    - demo.preprod.aws.refplat.org
+  # No `domains` — the generated host demo-alpha.preprod.aws.refplat.org (<app>-<team>) is implicit; declare
+  # spec.domains only for an ADDITIONAL vanity alias (ADR-061). Matches the live v1alpha1 claim (no domains).
   apps:
     demo:
-      repo: github.com/asanexample/app-alpha
+      repo: asanexample/app-alpha # owner/repo (the Step-2 consumer-derivation format)
       repoPath: k8s/preprod
       preview: true
       serviceAccount: app-alpha

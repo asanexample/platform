@@ -41,6 +41,7 @@ spec:
         inline:
           template: |
             {{- $spec := .observed.composite.resource.spec }}
+            {{- $xrName := .observed.composite.resource.metadata.name }}
             {{- $team := $spec.team }}
             {{- $name := $spec.name }}
             {{- $ns := printf "%s-%s" $team $name }}
@@ -376,6 +377,97 @@ spec:
                 policy: {{ (dict "Version" "2012-10-17" "Statement" $stmts) | toJson | quote }}
             {{- end }}
             {{- end }}
+            {{- end }}
+            {{- /* ADR-060/061 (Phase 2a): build the restrict-route-hostnames allow-list AND the XR
+                   status.domains state. The generated host <app>-<team>.<baseDomain> (+ the -pr-* preview
+                   wildcard) is the system anchor — ALWAYS Active + always admitted (no-regression rule).
+                   Declared $spec.domains aliases are gated by tier: tier-1/2 (under our wildcard, host ends
+                   with .<baseDomain>) are platform-owned → Active on creation; tier-3 external hosts have no
+                   backing infra yet → Pending (provisioned in Phase 2b), so NOT admitted. Kyverno admits a
+                   host only while Active — verification is the security boundary (ADR-061 §5). Ported from the
+                   v1 Composition: namespace is <team>-<name> and the status is v1alpha2; the generated host
+                   keeps the v1 <app>-<team> shape (app-repo HTTPRoute continuity — tenant-in-host is deferred
+                   with the degenerate one-tenant-per-team case, like placement/Zones). */}}
+            {{- $base := $cfg.baseDomain }}
+            {{- $allowed := list }}
+            {{- $statusByHost := dict }}
+            {{- if $base }}
+            {{- range $app, $appcfg := $spec.apps }}
+            {{- $gen := printf "%s-%s.%s" $app $team $base }}
+            {{- $allowed = append $allowed $gen }}
+            {{- $allowed = append $allowed (printf "%s-%s-pr-*.%s" $app $team $base) }}
+            {{- $statusByHost = set $statusByHost $gen (dict "host" $gen "state" "Active" "mode" "platform-managed" "reason" "GeneratedHost") }}
+            {{- end }}
+            {{- end }}
+            {{- range $d := $spec.domains | default list }}
+            {{- $host := $d.host }}
+            {{- if and $base (hasSuffix (printf ".%s" $base) $host) }}
+            {{- $allowed = append $allowed $host }}
+            {{- if not (hasKey $statusByHost $host) }}{{- $statusByHost = set $statusByHost $host (dict "host" $host "state" "Active" "mode" "platform-managed" "reason" "PlatformDomain") }}{{- end }}
+            {{- else }}
+            {{- if not (hasKey $statusByHost $host) }}{{- $statusByHost = set $statusByHost $host (dict "host" $host "state" "Pending" "mode" "platform-managed" "reason" "AwaitingProvisioning" "message" "External custom domains are provisioned in Phase 2b (ADR-061).") }}{{- end }}
+            {{- end }}
+            {{- end }}
+            {{- $allowed = $allowed | uniq }}
+            {{- $statusDomains := list }}
+            {{- range $h := (keys $statusByHost | sortAlpha) }}{{- $statusDomains = append $statusDomains (index $statusByHost $h) }}{{- end }}
+            {{- if $statusDomains }}
+            ---
+            apiVersion: platform.refplat.org/v1alpha2
+            kind: XTenant
+            metadata:
+              name: {{ $xrName }}
+            status:
+              domains:
+              {{- range $sd := $statusDomains }}
+                - host: {{ $sd.host }}
+                  state: {{ $sd.state }}
+                  mode: {{ $sd.mode }}
+                  reason: {{ $sd.reason }}
+                  {{- if $sd.message }}
+                  message: {{ $sd.message | quote }}
+                  {{- end }}
+              {{- end }}
+            {{- end }}
+            {{- if $allowed }}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: kyverno-restrict-hostnames
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: kyverno.io/v1
+                  kind: ClusterPolicy
+                  metadata:
+                    name: restrict-route-hostnames-team-{{ $team }}
+                    labels:
+                      app.kubernetes.io/managed-by: crossplane
+                      platform.refplat.org/tenant: {{ $team }}
+                  spec:
+                    background: true
+                    rules:
+                      - name: allowed-hostnames
+                        match:
+                          any:
+                            - resources:
+                                kinds: ["HTTPRoute", "GRPCRoute", "TLSRoute"]
+                                namespaces: ["{{ $ns }}"]
+                        validate:
+                          failureAction: Enforce
+                          message: "team-{{ $team }} routes may only use: {{ $allowed | join ", " }}."
+                          foreach:
+                            - list: "request.object.spec.hostnames"
+                              deny:
+                                conditions:
+                                  all:
+                                    - key: "{{`{{ element }}`}}"
+                                      operator: AnyNotIn
+                                      value: {{ $allowed | toJson }}
             {{- end }}
     - step: ready
       functionRef:
