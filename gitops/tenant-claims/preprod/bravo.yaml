@@ -1,21 +1,19 @@
-# Tenant claim for team-bravo (preprod). Synced by ArgoCD (app: tenant-claims-preprod) and reconciled by the
-# Crossplane Tenant Composition. This file is the source of truth for the tenant — edit/remove it via PR
-# (CODEOWNERS-gated). See docs/architecture/crossplane-tenant-api.md and docs/runbooks/tenant-onboarding.md.
-apiVersion: platform.refplat.org/v1alpha1
+# Tenant claim for Team bravo, Tenant "demo", stage "dev" (v1alpha2). See alpha.yaml for the model.
+apiVersion: platform.refplat.org/v1alpha2
 kind: XTenant
 metadata:
-  name: bravo
+  name: bravo-demo-dev
 spec:
   team: bravo
-  # Route hostnames are DERIVED from (app, team, baseDomain) by the Composition (ADR-060): demo-bravo.preprod.
-  # aws.refplat.org (+ a demo-bravo-pr-* preview wildcard if preview were enabled). To add a vanity alias
-  # beyond the derived default, declare it under `spec.domains` (ADR-061).
+  name: demo
+  environment: dev
+  tier: standard
+  # Generated host: demo-bravo-dev.preprod.aws.refplat.org (no preview wildcard — preview is false).
   apps:
     demo:
-      # owner/repo — the single source the delivery consumers (argocd-apps, policy, github-oidc) derive from.
-      repo: asanexample/app-bravo
+      repo: asanexample/app-bravo # owner/repo
       repoPath: k8s/preprod
       preview: false
-  aws:
-    serviceAccount: app-bravo
-    policyStatements: []
+      serviceAccount: app-bravo
+  developerAccess:
+    enabled: true

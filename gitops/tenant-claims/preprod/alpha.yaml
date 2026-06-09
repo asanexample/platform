@@ -1,24 +1,24 @@
-# Tenant claim for team-alpha (preprod). Synced by ArgoCD (app: tenant-claims-preprod) and reconciled by the
-# Crossplane Tenant Composition. This file is the source of truth for the tenant — edit/remove it via PR
-# (CODEOWNERS-gated). See docs/architecture/crossplane-tenant-api.md and docs/runbooks/tenant-onboarding.md.
-apiVersion: platform.refplat.org/v1alpha1
+# Tenant claim for Team alpha, Tenant "demo", stage "dev" (v1alpha2). Synced by ArgoCD (app:
+# tenant-claims-preprod) and reconciled by the Crossplane Tenant Composition v2. This file is the source of
+# truth — edit/remove it via PR (CODEOWNERS-gated). One claim per (team, name, environment); the namespace is
+# <team>-<name>-<env> (alpha-demo-dev). See docs/architecture/tenant-api-v2.md and docs/runbooks/tenant-onboarding.md.
+apiVersion: platform.refplat.org/v1alpha2
 kind: XTenant
 metadata:
-  name: alpha
+  name: alpha-demo-dev
 spec:
   team: alpha
-  # Route hostnames are DERIVED from (app, team, baseDomain) by the Composition (ADR-060): each app gets
-  # <app>-<team>.<baseDomain> (here demo-alpha.preprod.aws.refplat.org) + the <app>-<team>-pr-* preview
-  # wildcard. argocd-apps injects the same host into the HTTPRoute, so nothing is hardcoded. To add a
-  # vanity alias beyond the derived default, declare it under `spec.domains` (ADR-061), e.g.:
-  #   domains:
-  #     - host: shop.preprod.aws.refplat.org
+  name: demo
+  environment: dev
+  tier: standard
+  # Route hostnames are DERIVED (ADR-060): the generated host demo-alpha-dev.preprod.aws.refplat.org +
+  # the demo-alpha-dev-pr-* preview wildcard. argocd-apps injects the same host into the HTTPRoute. Declare a
+  # `domains` alias only for an extra vanity host (ADR-061).
   apps:
     demo:
-      # owner/repo — the single source the delivery consumers (argocd-apps, policy, github-oidc) derive from.
-      repo: asanexample/app-alpha
+      repo: asanexample/app-alpha # owner/repo — the single source argocd-apps/policy/github-oidc derive from
       repoPath: k8s/preprod
       preview: true
-  aws:
-    serviceAccount: app-alpha
-    policyStatements: []
+      serviceAccount: app-alpha # named SA the app's pods run as (Pod Identity association binds it)
+  developerAccess:
+    enabled: true

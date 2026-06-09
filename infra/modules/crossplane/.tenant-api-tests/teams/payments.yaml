@@ -8,7 +8,7 @@ spec:
   ssoGroup: payments-eng
   envelope:
     allowedTiers: [standard, elevated, pci]
-    allowedEnvironments: [preprod, prod]
+    allowedEnvironments: [dev, prod]
     allowedLocations: ["eu", "us"]
     quotaCap: { cpu: "64", memory: 128Gi, pods: 400 }
     maxDedicatedZones: 2

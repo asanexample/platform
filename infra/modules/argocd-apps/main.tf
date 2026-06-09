@@ -15,6 +15,7 @@ locals {
       for app_key, app in team.apps : "${team_key}-${app_key}" => {
         team_key    = team_key
         app_key     = app_key
+        env         = team.environment
         repo_url    = app.repo_url
         repo_path   = coalesce(app.repo_path, "k8s/preprod")
         repo_branch = coalesce(app.repo_branch, "main")
@@ -99,8 +100,8 @@ resource "kubernetes_manifest" "application" {
             "app.kubernetes.io/instance" = "stable"
           }
           # Inject the route hostnames so the app repo doesn't hardcode them (ADR-060/061): the generated
-          # host <app>-<team>.<domain> unioned with the team's tier-1/2 aliases (spec.domains in the claim).
-          # Replaces the WHOLE hostnames array — the app ships a single placeholder host. The Tenant
+          # host <app>-<team>-<env>.<domain> unioned with the team's tier-1/2 aliases (spec.domains in the
+          # claim). Replaces the WHOLE hostnames array — the app ships a single placeholder host. The Tenant
           # Composition derives the matching restrict-route-hostnames allow-list from the same identity.
           patches = var.preview_domain != "" ? [
             {
@@ -109,7 +110,7 @@ resource "kubernetes_manifest" "application" {
                 {
                   op    = "replace"
                   path  = "/spec/hostnames"
-                  value = concat(["${each.value.app_key}-${each.value.team_key}.${var.preview_domain}"], each.value.aliases)
+                  value = concat(["${each.value.app_key}-${each.value.team_key}-${each.value.env}.${var.preview_domain}"], each.value.aliases)
                 },
               ])
             }
@@ -369,10 +370,10 @@ resource "kubernetes_manifest" "preview_appset" {
                     {
                       op   = "replace"
                       path = "/spec/hostnames/0"
-                      # <app>-<team>-pr-<n>, matching the base host convention (demo-<team>) and the Composition's
-                      # derived restrict-route-hostnames wildcard <app>-<team>-pr-* (ADR-060). Team-scoped, so
-                      # two teams sharing an app_key (e.g. both "demo") never collide on a preview hostname.
-                      value = "${each.value.app_key}-${each.value.team_key}-pr-{{.number}}.${var.preview_domain}"
+                      # <app>-<team>-<env>-pr-<n>, matching the base host convention (demo-<team>-<env>) and the
+                      # Composition's derived restrict-route-hostnames wildcard <app>-<team>-<env>-pr-* (ADR-060).
+                      # Team+env-scoped, so a team's stages (or two teams sharing an app_key) never collide.
+                      value = "${each.value.app_key}-${each.value.team_key}-${each.value.env}-pr-{{.number}}.${var.preview_domain}"
                     },
                   ])
                 }

@@ -2,11 +2,11 @@
 apiVersion: platform.refplat.org/v1alpha2
 kind: XTenant
 metadata:
-  name: bravo-demo-preprod
+  name: bravo-demo-dev
 spec:
   team: bravo
   name: demo
-  environment: preprod
+  environment: dev
   tier: standard
   # No `domains` — the generated host demo-bravo.preprod.aws.refplat.org (<app>-<team>) is implicit.
   apps:

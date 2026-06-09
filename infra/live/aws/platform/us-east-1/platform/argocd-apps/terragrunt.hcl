@@ -99,8 +99,11 @@ inputs = {
   create = true
 
   tenants = { for team, claim in local.claims : team => {
-    mode    = "namespace" # namespace isolation only; vCluster deferred (ADR-033)
-    domains = try([for d in claim.spec.domains : d.host], [])
+    mode        = "namespace" # namespace isolation only; vCluster deferred (ADR-033)
+    environment = claim.spec.environment
+    # v2 namespace = <team>-<name>-<env> (matches Composition v2); overrides the module's team-<team> default.
+    namespace = "${team}-${claim.spec.name}-${claim.spec.environment}"
+    domains   = try([for d in claim.spec.domains : d.host], [])
     apps = { for app, cfg in claim.spec.apps : app => {
       repo_url  = "https://github.com/${cfg.repo}"
       repo_path = try(cfg.repoPath, "k8s/preprod")

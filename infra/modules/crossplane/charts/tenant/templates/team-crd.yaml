@@ -58,7 +58,7 @@ spec:
                       minItems: 1
                       items:
                         type: string
-                        enum: ["preprod", "prod"]
+                        enum: ["dev", "test", "uat", "staging", "prod"]
                     allowedLocations:
                       type: array
                       description: Jurisdictions/locations the Team's Tenants may sit in; a Tenant residency must be ⊆ this. "*" = anywhere operated.

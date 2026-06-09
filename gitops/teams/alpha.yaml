@@ -13,7 +13,7 @@ spec:
   ssoGroup: Dev-alpha
   envelope:
     allowedTiers: ["standard"]
-    allowedEnvironments: ["preprod"]
+    allowedEnvironments: ["dev", "test", "uat", "staging", "prod"]
     allowedLocations: ["*"]
     quotaCap:
       cpu: "8"
