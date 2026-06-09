@@ -147,7 +147,7 @@ inputs = {
   # `cilium-gateway-platform-gateway` Service ClusterIP (default ns) — stable for the Service's life; if that
   # Service is recreated, refresh this. TLS still validates (wildcard *.aws.refplat.org at the gateway).
   host_aliases = [{
-    ip        = "172.20.184.24"
+    ip        = "172.20.31.49"
     hostnames = ["keycloak.aws.refplat.org"]
   }]
 
