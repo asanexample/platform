@@ -7,17 +7,16 @@ catalog discovery, and the live Kubernetes / ArgoCD plugins.
 
 ## What it deploys
 
-- **Namespace** `backstage` (hardened pod: runAsNonRoot, drop ALL, seccomp RuntimeDefault) — also home to
-  `dex`-synced secrets and the `oauth2-proxy` release (which shares this namespace).
+- **Namespace** `backstage` (hardened pod: runAsNonRoot, drop ALL, seccomp RuntimeDefault).
 - **Backstage** Helm release on port `7007`, `ClusterIP` (ingress is the Cilium Gateway via a `gateway-config`
-  HTTPRoute, not a K8s Ingress). The chart's bundled bitnami Postgres is disabled. A NetworkPolicy locks
-  `:7007` to **only the oauth2-proxy pod** (the portal trusts `X-Forwarded-*` identity headers blindly — #202).
+  HTTPRoute, not a K8s Ingress). The chart's bundled bitnami Postgres is disabled. No ingress NetworkPolicy —
+  Backstage authenticates each request itself via direct Keycloak OIDC, so the gateway routes to it directly.
 - **Postgres**: in-cluster via a CloudNativePG `Cluster` (`<db_cluster_name>-rw` Service + `<db_cluster_name>-app`
   Secret; a managed `backstage` role with `CREATEDB` for per-plugin DBs) — `database.mode = rds` is the prod toggle.
-- **OIDC SSO** (`enable_oidc`): syncs the shared Dex client secret (`platform/backstage/oidc`) via External
-  Secrets and injects `OIDC_CLIENT_SECRET` + a TF-generated `AUTH_SESSION_SECRET`. **Note:** the *active* login
-  path is **oauth2-proxy → Keycloak** (the `oauth2Proxy` header provider, #202); this Dex OIDC wiring is a
-  transitional remnant being retired. See [identity-and-sso](../../../docs/architecture/identity-and-sso.md).
+- **OIDC SSO** (`enable_oidc`): syncs the **Keycloak** `backstage` client secret
+  (`platform/keycloak/backstage-oidc`, created by keycloak-config) via External Secrets and injects
+  `OIDC_CLIENT_SECRET` + a TF-generated `AUTH_SESSION_SECRET`. The image's app-config wires the direct-Keycloak
+  `oidc` sign-in provider. See [identity-and-sso](../../../docs/architecture/identity-and-sso.md).
 - **GitHub catalog discovery** (`enable_github_discovery`): syncs the read-only GitHub App credential
   (`platform/backstage/github-app`) and injects `GITHUB_APP_ID` / `GITHUB_APP_PRIVATE_KEY`.
 - **Kubernetes plugin** (`enable_kubernetes_plugin`, default off): an EKS Pod Identity reader role
@@ -45,7 +44,7 @@ catalog discovery, and the live Kubernetes / ArgoCD plugins.
 
 ## Dependencies (live unit)
 
-`eks`, `node-groups`, `cloudnative-pg`, `external-secrets`, `secret-stores`, `dex` (OIDC). No IRSA SA
+`eks`, `node-groups`, `cloudnative-pg`, `external-secrets`, `secret-stores`, `keycloak-config` (the OIDC client secret). No IRSA SA
 annotation — AWS access is EKS Pod Identity (ADR-047). Exposure is wired by `gateway-config`.
 
 ## Related ADRs & runbooks

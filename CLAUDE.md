@@ -4,7 +4,7 @@
 
 Multi-cloud IaC platform using OpenTofu (v1.11) + Terragrunt (v1.x). Currently targets AWS only (Azure/GCP removed).
 
-- **Shared modules** (`infra/modules/`): argocd, argocd-apps, argocd-clusters, cert-manager, cilium, cloudflare/dns_delegation, cluster-rbac, crossplane, external-dns, external-secrets, gateway-config, oauth2-proxy, policy, secret-stores, tailscale, tailscale-admin, tenant-claims, vcluster
+- **Shared modules** (`infra/modules/`): argocd, argocd-apps, argocd-clusters, cert-manager, cilium, cloudflare/dns_delegation, cluster-rbac, crossplane, external-dns, external-secrets, gateway-config, policy, secret-stores, tailscale, tailscale-admin, tenant-claims, vcluster
 - **AWS modules** (`infra/modules/aws/`): cloudtrail, cross-vpc-dns, ecr, eks, eks-addons, eks-node-group, github_oidc, iam_roles, identity_center, networking, organizations, route53, route53_delegation, ssm-bastion, state_bootstrap, transit-gateway
 - **Live configs**: `infra/live/aws/` -- environment-specific Terragrunt units
 
@@ -57,18 +57,16 @@ networking ─┘                        |
               transit-gateway (hub) ─┤ (networking)
               cross-vpc-dns ─────────┤ (networking, preprod eks)
               gateway ───────────────┤ (eks, cilium, cert-mgr, ext-dns, r53) — foundational shared Gateway + ClusterIssuer (ADR-059); EARLY, no app deps, so ingress is up before keycloak-config
-              gateway-config ────────┘ (eks, gateway, argocd, dex) — per-app HTTPRoutes only (argocd/grafana/backstage/sso); the Gateway moved to the `gateway` unit, keycloak self-routes
+              gateway-config ────────┘ (eks, gateway, argocd) — per-app HTTPRoutes only (argocd/grafana/backstage); the Gateway moved to the `gateway` unit, keycloak self-routes
               cluster-rbac ──────────┤ (eks) — platform-operator ClusterRole (ADR-040)
               policy ────────────────┤ (eks, nodes) — Kyverno engine + ClusterPolicies (ADR-014), before crossplane
               crossplane ────────────┤ (eks, nodes, policy) — federated tenant control plane (ADR-046/048); after policy (needs the crossplane-system Kyverno exclusion)
               tenant-claims ─────────┤ (crossplane) — applies the XTenant claims; the Composition provisions each tenant (ADR-046/048)
               cloudnative-pg ────────┤ (eks, nodes) — CNPG operator for the Backstage DB (ADR-051)
-              dex ───────────────────┤ (eks, nodes, ext-secrets, secret-stores) — centralized SAML→OIDC SSO broker (ADR-052)
-              keycloak ──────────────┤ (eks, nodes, ext-secrets, secret-stores, cnpg, gateway) — app-facing OIDC IdP, CNPG-backed (ADR-053, B1); self-owns its HTTPRoute on the shared Gateway (ADR-059) so its endpoint is up before keycloak-config; alongside dex
-              keycloak-config ───────┤ (keycloak, eks) — realm + seeded realm users (Keycloak is the IdP of record by default; optional upstream federation, ADR-053/059) + OIDC clients + team group/role taxonomy via the keycloak TF provider (B2); configures Keycloak over an in-cluster kubectl port-forward (scripts/kc-portforward.sh, ADR-059) so deploy needs cluster API access, NOT Tailscale; apply needs keycloak serving (helm_wait)
+              keycloak ──────────────┤ (eks, nodes, ext-secrets, secret-stores, cnpg, gateway) — app-facing OIDC IdP, CNPG-backed (ADR-053, B1); self-owns its HTTPRoute on the shared Gateway (ADR-059) so its endpoint is up before keycloak-config
+              keycloak-config ───────┤ (keycloak, eks) — realm + seeded realm users (Keycloak is the IdP of record by default; optional upstream federation, ADR-053/059) + OIDC clients (argocd, backstage) + team group/role taxonomy via the keycloak TF provider (B2); configures Keycloak over an in-cluster kubectl port-forward (scripts/kc-portforward.sh, ADR-059) so deploy needs cluster API access, NOT Tailscale; apply needs keycloak serving (helm_wait)
 
-              backstage ─────────────┤ (eks, nodes, cnpg, ext-secrets, secret-stores, dex) — developer portal (ADR-051); after dex for OIDC SSO
-              oauth2-proxy ──────────┘ (eks, nodes, ext-secrets, secret-stores, dex, backstage) — auth proxy fronting Backstage for durable sessions (#202); in the backstage ns, gateway routes backstage→oauth2-proxy→backstage
+              backstage ─────────────┘ (eks, nodes, cnpg, ext-secrets, secret-stores, keycloak-config) — developer portal (ADR-051); signs in DIRECTLY against Keycloak (OIDC; the `backstage` client). Dex + oauth2-proxy retired — Keycloak OIDC issues refresh tokens, killing the #202 logout-on-refresh reason for the proxy
 
 tailscale-admin ─── (no cluster deps, manages tailnet ACLs/OAuth)
 cloudtrail ──────── (no deps, secrets audit logging)

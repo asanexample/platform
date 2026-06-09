@@ -1,9 +1,10 @@
 # Runbook: Dex SSO Broker
 
-> ⚠️ **Legacy / being retired.** Dex was the platform's first SSO broker (ADR-052). **Keycloak superseded it**
-> (ADR-053): ArgoCD uses Keycloak directly and Backstage uses oauth2-proxy→Keycloak. Dex is still deployed but
-> is **not the active login path for any app** — **do not add new OIDC clients to Dex**; add them to Keycloak
-> (`keycloak-config`). Current model: [identity-and-sso](../architecture/identity-and-sso.md). Kept for history.
+> ⚠️ **REMOVED.** Dex (and the oauth2-proxy that fronted Backstage) were retired once Backstage moved to
+> **direct Keycloak OIDC** — both `dex` and `oauth2-proxy` units/modules are gone. ArgoCD and Backstage now
+> authenticate directly against Keycloak. This runbook is kept only for history; for the live model see
+> [identity-and-sso](../architecture/identity-and-sso.md) and, for login problems,
+> [identity-sso-troubleshooting](identity-sso-troubleshooting.md).
 >
 > **Identity Provider:** AWS Identity Center (SAML 2.0 via Dex)
 > **Issuer / URL:** `https://sso.aws.refplat.org` (requires Tailscale VPN)
