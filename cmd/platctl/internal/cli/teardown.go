@@ -85,6 +85,18 @@ to target a single environment.`,
 				},
 			}
 
+			// Initialize + persist a fresh teardown state up-front (all units Pending) so `platctl status`
+			// and `status --watch` reflect THIS run immediately. The Unlock and Pre-destroy-apply phases
+			// below run before the destroy-wave engine that owns the state file, and they take minutes; without
+			// this, the on-disk .platctl-state.json still describes the PREVIOUS (completed) operation, so
+			// `status --watch` reads IsComplete()==true and exits at once — looking like the teardown already
+			// finished. A non-resume run owns the state file outright; --resume keeps the prior run's state.
+			if !resume {
+				if err := store.Save(statePath, engine.NewState("teardown", g.Units())); err != nil {
+					return fmt.Errorf("initializing teardown state: %w", err)
+				}
+			}
+
 			// Unlock phase: reverse lockdown before destroying.
 			// Re-apply lockdown units with bootstrap_args to restore access.
 			// Only runs if the unit has resources in state (avoids recreating destroyed infra).
@@ -186,7 +198,7 @@ to target a single environment.`,
 			// Checks run in parallel to avoid sequential ~30s per unit.
 			if !resume {
 				units := g.Units()
-				state := engine.NewState("destroy", units)
+				state := engine.NewState("teardown", units)
 				type stateResult struct {
 					name     string
 					hasState bool

@@ -99,6 +99,11 @@ inputs = {
   enable_tenant_provisioning = true
   ecr_provisioner_role_arn   = "arn:aws:iam::${include.base.locals.account_ids["platform"]}:role/crossplane-ecr-provisioner"
 
+  # Teardown: force-delete orphaned tenant ECR repos (team-*) the Composition created cross-account. Uses the
+  # platform PlatformDeployer (assumable by the teardown profile); the in-account ecr-provisioner role is only
+  # reachable via the provider's assumeRoleChain, not a local-exec. Sibling of the IAM orphan sweep (ADR-046/048).
+  ecr_orphan_sweep_role_arn = "arn:aws:iam::${include.base.locals.account_ids["platform"]}:role/PlatformDeployer"
+
   # Cluster constants for the Composition's EnvironmentConfig: platform ECR registry + cross-account pull.
   ecr_registry            = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com"
   tenant_pull_account_ids = [include.base.locals.account_ids["preprod"], include.base.locals.account_ids["prod"]]
