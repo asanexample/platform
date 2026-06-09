@@ -356,6 +356,26 @@ resource "null_resource" "tenant_iam_orphan_sweep" {
   }
 }
 
+# Sibling of the IAM sweep for the cross-account tenant ECR repos (team-<team>/<app>) the Composition created
+# in the platform account. Uninstalling Crossplane orphans them too; they don't block teardown (a rebuild
+# re-adopts them by external-name), but a clean teardown removes them so each cycle starts pristine. Gated on a
+# sweep role being provided (the platform PlatformDeployer — the in-account ecr-provisioner role is NOT
+# assumable by the teardown profile, only via the provider's assumeRoleChain). Best-effort; never blocks destroy.
+resource "null_resource" "tenant_ecr_orphan_sweep" {
+  count = local.enable_tenant_provisioning && var.ecr_orphan_sweep_role_arn != "" ? 1 : 0
+
+  triggers = {
+    script   = "${dirname(var.finalizer_clear_script)}/tenant-ecr-orphan-sweep.sh"
+    role_arn = var.ecr_orphan_sweep_role_arn
+    region   = var.region
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = "bash ${self.triggers.script} ${self.triggers.role_arn} ${self.triggers.region}"
+  }
+}
+
 # ---------------------------------------------------------------------------
 # Scoped provisioning identity (IAM) + EKS Pod Identity association
 # ---------------------------------------------------------------------------

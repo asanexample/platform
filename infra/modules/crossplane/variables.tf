@@ -206,6 +206,12 @@ variable "ecr_provisioner_role_arn" {
   default     = ""
 }
 
+variable "ecr_orphan_sweep_role_arn" {
+  description = "ARN of a role in the platform/ECR account to assume on teardown to force-delete orphaned tenant ECR repos (team-*) the Composition created — typically the platform PlatformDeployer (assumable by the teardown's profile). Empty disables the sweep."
+  type        = string
+  default     = ""
+}
+
 variable "tenant_role_name_prefix" {
   description = "Name prefix for the IAM roles the provisioning role may create/manage (the tenant workload roles). Scopes iam:* on the provisioning role."
   type        = string
