@@ -144,10 +144,16 @@ A5 ─────────────────────────�
 - ✅ **Track B largely LIVE:** **B1** Keycloak, **B3** ArgoCD OIDC, **B4** Backstage RBAC (#197), **B5**
   Dex→Keycloak (Dex + oauth2-proxy retired) — all landed live. B2 (access-model-as-code generators) partial
   (keycloak-config generates groups/roles).
-- 🟡 **Not done (the remaining work):** the **delivery-consumer migration** (policy/github-oidc/argocd-apps →
-  v1alpha2 claims), the **git-native Team** refinement ([ADR-063](../adrs/063-team-as-first-class-git-object.md),
-  retire `_teams.hcl`), the v2 **claim translation**, and **A6 cutover** (storage flip → v1alpha2, bind
-  Composition v2, envelope audit→enforce) + the rebuild.
+- 🟡 **In progress / not done (the remaining work):**
+  - ✅ **Git-native Team** ([ADR-063](../adrs/063-team-as-first-class-git-object.md)) — `Team` CRs authored as
+    YAML in `gitops/teams/{alpha,bravo}.yaml`, ArgoCD-synced via a new `teams` app (`argocd-apps` module,
+    `sync-wave: "-1"` ahead of tenant-claims); the `crossplane` unit now passes `teams = {}` (CRD stays, Helm
+    projection off) and the `keycloak-config`/`argocd` consumers read the git YAMLs (`fileset`+`yamldecode`).
+    `_teams.hcl` retired. Plan-verified: crossplane = the single intended Helm-values diff, argocd = no-op,
+    argocd-apps = the new `teams` project+app.
+  - 🟡 the **delivery-consumer migration** (policy/github-oidc/argocd-apps → v1alpha2 claims), the v2 **claim
+    translation**, **A6 cutover** (storage flip → v1alpha2, bind Composition v2, envelope audit→enforce), and
+    the rebuild.
 - 🔵 **Deferred for the dev env:** **A4 placement** + **A5 Zones/Customer/vending** — degenerate on a single
   workload cluster (every claim lands on preprod); build when a second zone exists.
 - 📋 Execution plan for the remaining work: BACK Phase 3 self-service ([ADR-062](../adrs/062-self-service-tenant-provisioning.md))

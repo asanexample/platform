@@ -76,6 +76,34 @@ variable "github_token_secret_name" {
 }
 
 # ---------------------------------------------------------------------------
+# Git-native Team delivery (ADR-063): ArgoCD syncs Team CRs from git
+# ---------------------------------------------------------------------------
+
+variable "enable_teams" {
+  description = "Create the platform-teams AppProject + Application that syncs git-native Team CRs to the target cluster (replaces the crossplane-teams Helm projection, ADR-063)."
+  type        = bool
+  default     = false
+}
+
+variable "teams_repo_url" {
+  description = "Git repo URL holding the Team CR YAMLs (the platform repo)."
+  type        = string
+  default     = ""
+}
+
+variable "teams_repo_branch" {
+  description = "Branch/revision for the Team CRs repo."
+  type        = string
+  default     = "main"
+}
+
+variable "teams_repo_path" {
+  description = "Path within the repo to the Team CR YAMLs (e.g. gitops/teams)."
+  type        = string
+  default     = "gitops/teams"
+}
+
+# ---------------------------------------------------------------------------
 # Tenant-claim delivery (BACK stack Phase 1): ArgoCD syncs XTenant claim YAMLs
 # ---------------------------------------------------------------------------
 

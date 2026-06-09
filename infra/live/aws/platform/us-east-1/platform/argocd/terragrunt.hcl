@@ -12,8 +12,12 @@ terraform {
 }
 
 locals {
-  # Canonical Team registry (same source as keycloak-config + crossplane) — drives team-scoped ArgoCD RBAC (B3).
-  teams = read_terragrunt_config(find_in_parent_folders("aws/_teams.hcl")).locals.teams
+  # Git-native Team registry (ADR-063) — same gitops/teams/*.yaml the keycloak-config unit reads and ArgoCD
+  # syncs. Only the team KEYS (metadata.name) matter here; they drive team-scoped ArgoCD RBAC (B3).
+  teams_dir = "${get_repo_root()}/gitops/teams"
+  teams = { for f in fileset(local.teams_dir, "*.yaml") :
+    yamldecode(file("${local.teams_dir}/${f}")).metadata.name => yamldecode(file("${local.teams_dir}/${f}")).spec
+  }
 
   # Team-scoped RBAC, generated from the registry (ADR-053). Each team group → a role scoped to its AppProject
   # (project name == team key): get/sync/logs only — the operate posture; NO create/delete/exec, NO cluster/repo,

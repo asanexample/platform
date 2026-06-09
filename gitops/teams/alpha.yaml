@@ -1,0 +1,22 @@
+# Team alpha — first-class git-native governance object (ADR-063).
+# The envelope is the bound on every Tenant this team may author; Kyverno reads the projected Team CR during
+# XTenant admission (restrict-tenant-envelope). Platform-authored (admin-only); developers author Tenants, not
+# this. Source of truth for the team's identity (ssoGroup) + envelope — replaces the retired _teams.hcl.
+apiVersion: platform.refplat.org/v1alpha2
+kind: Team
+metadata:
+  name: alpha
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/part-of: tenant-api
+spec:
+  ssoGroup: Dev-alpha
+  envelope:
+    allowedTiers: ["standard"]
+    allowedEnvironments: ["preprod"]
+    allowedLocations: ["*"]
+    quotaCap:
+      cpu: "8"
+      memory: 16Gi
+      pods: 40
+    maxDedicatedZones: 0
