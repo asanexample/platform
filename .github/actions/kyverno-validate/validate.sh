@@ -7,11 +7,13 @@
 #   TEAM            tenant key (e.g. alpha) — namespace is team-<TEAM>
 #   MANIFESTS_PATH  path to the app's kustomize dir (kustomization.yaml)
 #   POLICIES_CHART  path to infra/modules/policy/policies-chart
-#   ECR_REGISTRY    platform ECR host (e.g. 829808296602.dkr.ecr.us-east-1.amazonaws.com)
-#   HOSTNAMES_JSON  JSON array of the team's allowed route hostnames (default [])
-#   TENANT_LABEL    tenant namespace label key (default platform.refplat.org/tenant)
+#   ECR_REGISTRY      platform ECR host (e.g. 829808296602.dkr.ecr.us-east-1.amazonaws.com)
+#   HOSTNAMES_JSON    JSON array of the team's allowed route hostnames (default [])
+#   INJECT_HOSTS_JSON JSON array of route hostnames to inject into the app's routes (mirrors argocd-apps).
+#                     Empty/unset → no injection (validate the manifest's own hostnames).
+#   TENANT_LABEL      tenant namespace label key (default platform.refplat.org/tenant)
 #
-# Requires: helm, kubectl (for `kubectl kustomize`), kyverno CLI (pin to the chart appVersion).
+# Requires: helm, kubectl (for `kubectl kustomize`), kyverno CLI (pin to the chart appVersion), yq (inject).
 set -euo pipefail
 
 TEAM="${TEAM:?set TEAM}"
@@ -19,6 +21,7 @@ MANIFESTS_PATH="${MANIFESTS_PATH:?set MANIFESTS_PATH}"
 POLICIES_CHART="${POLICIES_CHART:?set POLICIES_CHART}"
 ECR_REGISTRY="${ECR_REGISTRY:?set ECR_REGISTRY}"
 HOSTNAMES_JSON="${HOSTNAMES_JSON:-[]}"
+INJECT_HOSTS_JSON="${INJECT_HOSTS_JSON:-}"
 TENANT_LABEL="${TENANT_LABEL:-platform.refplat.org/tenant}"
 
 WORK="$(mktemp -d)"
@@ -41,6 +44,16 @@ helm template kpp "$POLICIES_CHART" \
 
 echo "▸ Rendering app manifests from ${MANIFESTS_PATH} ..."
 kubectl kustomize "$MANIFESTS_PATH" >"$WORK/resources.yaml"
+
+# Inject the derived route hostnames the way argocd-apps does at deploy (ADR-060/061), so the app repo can
+# ship a placeholder host and the shift-left validates the SAME hostnames admission will see. Replaces the
+# whole spec.hostnames on every Gateway-API route; leaves non-route resources (and other violations) intact.
+if [ -n "$INJECT_HOSTS_JSON" ] && [ "$INJECT_HOSTS_JSON" != "[]" ]; then
+  echo "▸ Injecting route hostnames ${INJECT_HOSTS_JSON} ..."
+  INJECT_HOSTS_JSON="$INJECT_HOSTS_JSON" yq -i \
+    '(select(.kind == "HTTPRoute" or .kind == "GRPCRoute" or .kind == "TLSRoute") | .spec.hostnames) = env(INJECT_HOSTS_JSON)' \
+    "$WORK/resources.yaml"
+fi
 
 # Without a live cluster the CLI needs to be told the team namespace carries the tenant label, so the
 # tenant-scoped policies (which match on it) apply.

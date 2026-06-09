@@ -9,8 +9,10 @@ spec:
   team: alpha
   # Route hostnames are DERIVED from (app, team, baseDomain) by the Composition (ADR-060): each app gets
   # <app>-<team>.<baseDomain> (here demo-alpha.preprod.aws.refplat.org) + the <app>-<team>-pr-* preview
-  # wildcard. argocd-apps injects the same host into the HTTPRoute, so nothing is hardcoded. Only add an
-  # explicit `hostnames:` list for an EXTRA vanity host beyond the derived defaults.
+  # wildcard. argocd-apps injects the same host into the HTTPRoute, so nothing is hardcoded. To add a
+  # vanity alias beyond the derived default, declare it under `spec.domains` (ADR-061), e.g.:
+  #   domains:
+  #     - host: shop.preprod.aws.refplat.org
   apps:
     demo:
       repoPath: k8s/preprod

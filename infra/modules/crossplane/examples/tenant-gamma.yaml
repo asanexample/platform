@@ -15,8 +15,10 @@ metadata:
 spec:
   team: gamma
   gatewayNamespace: default
-  hostnames:
-    - demo-gamma.preprod.aws.refplat.org
+  # spec.domains aliases (ADR-061). This throwaway test team declares no apps, so no host is auto-derived;
+  # the alias is what its routes may claim for the parity check.
+  domains:
+    - host: demo-gamma.preprod.aws.refplat.org
   resourceQuota:
     cpu: "4"
     memory: 8Gi

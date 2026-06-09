@@ -21,9 +21,11 @@ what admission does in-cluster:
 1. **Render** the platform tenant policies for the team — `helm template` the same `policies-chart` the
    cluster runs, with `mutate` ON (so the auto-injected `securityContext`/labels are present, matching
    the cluster), `verifyImages` OFF (the image isn't built/signed at PR time), and `cleanup` OFF
-   (runtime GC, not an admission check). The team's allowed route hostnames come from `teams.hcl` (via
-   `hcl2json`), the single source of truth.
-2. **Render the app manifests** — `kubectl kustomize <manifests-path>`.
+   (runtime GC, not an admission check). The team's allowed route hostnames are DERIVED from its `XTenant`
+   claim (`gitops/tenant-claims/<env>/<team>.yaml`, via `yq`) — the single source of truth (ADR-060/061).
+2. **Render the app manifests** — `kubectl kustomize <manifests-path>` — then **inject** the derived route
+   host (`<app>-<team>.<base>` + any `spec.domains` aliases) into every Gateway-API route, the same as
+   argocd-apps does at deploy, so the app repo ships a placeholder and the check sees what admission sees.
 3. **Apply** — `kyverno apply <policies> --resource <manifests> --values-file <ns-labels>`, telling the
    CLI the `team-<team>` namespace carries the tenant label so the tenant-scoped policies match.
 4. **Fail** the build if the parsed summary reports any `fail` or `error`.
@@ -49,8 +51,9 @@ jobs:
         uses: asanexample/platform/.github/actions/kyverno-validate@main
         with:
           team: alpha                 # this app's team
+          app: demo                   # this app's key (the route host is <app>-<team>.<base>)
           manifests-path: k8s/preprod # the kustomize dir to check
-          # env: preprod              # (default) which teams.hcl supplies allowed hostnames
+          # env: preprod              # (default) which env's XTenant claim supplies the team's hostnames
 ```
 
 Cross-repo private action use requires the org setting **Settings → Actions → General → Access →
@@ -61,8 +64,9 @@ surfaces across all apps immediately.
 ## What it catches (and what it doesn't)
 
 **Catches** (same as admission): wrong/cross-team image registry, mutable/`:latest` tag, missing
-resource requests/limits, missing liveness/readiness probes, `LoadBalancer`/`NodePort` services, and
-route hostnames outside the team's `teams.hcl` allow-list.
+resource requests/limits, missing liveness/readiness probes, `LoadBalancer`/`NodePort` services. Route
+hostnames are **injected** from the claim before validation (as in production), so an app cannot squat a
+host via its manifest — the guard is enforced against the injected, claim-derived host.
 
 **Does not** (by design — these need the cluster or the built image):
 
@@ -81,9 +85,10 @@ authority (and is the only thing that enforces signatures).
 The platform CI job **`Kyverno Shift-Left (dogfood)`** (in `.github/workflows/ci.yml`) runs the action
 against two committed sample apps in `infra/modules/policy/.kyverno-tests/sample-app/`:
 
-- `compliant/` — must **pass** (and the run asserts `teams.hcl` hostname extraction resolved).
-- `broken/` — must **fail** (it trips 7 distinct policies: registry, `:latest`, probes, limits,
-  `LoadBalancer`, cross-team image, hostname-squat).
+- `compliant/` — ships a `placeholder.invalid` host and must **pass** after the claim-derived host is
+  injected (the run asserts the `XTenant` claim hostname derivation resolved).
+- `broken/` — must **fail** (it trips the registry, `:latest`, probes, limits, `LoadBalancer`, and
+  cross-team-image policies; the route host is injected, so squatting is not the failure here).
 
 This proves the action end-to-end without needing the app repos, and guards against policy/template
 drift breaking the gate.

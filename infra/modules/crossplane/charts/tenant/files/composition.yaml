@@ -308,10 +308,11 @@ spec:
                               pattern:
                                 image: "{{ $env.ecrRegistry }}/{{ $ns }}/*"
             {{- end }}
-            {{- /* ADR-060: derive allowed route hostnames per app — <app>-<team>.<baseDomain> + the
-                   <app>-<team>-pr-* preview wildcard — from the (app, team, baseDomain) convention.
-                   $spec.hostnames is retained as an ADDITIVE override (vanity hosts). */}}
-            {{- $allowed := $spec.hostnames | default list }}
+            {{- /* ADR-060/061: derive allowed route hostnames per app — <app>-<team>.<baseDomain> + the
+                   <app>-<team>-pr-* preview wildcard — from the (app, team, baseDomain) convention, then
+                   UNION the tier-1/2 aliases declared in $spec.domains (the claim is the sole source). */}}
+            {{- $allowed := list }}
+            {{- range $d := $spec.domains | default list }}{{- $allowed = append $allowed $d.host }}{{- end }}
             {{- if $env.baseDomain }}
             {{- range $app, $appcfg := $spec.apps }}
             {{- $allowed = append $allowed (printf "%s-%s.%s" $app $team $env.baseDomain) }}

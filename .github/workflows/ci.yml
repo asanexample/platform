@@ -166,8 +166,9 @@ jobs:
         run: infra/modules/crossplane/.kyverno-tests/run.sh
 
   # Dogfoods the shift-left composite action (.github/actions/kyverno-validate) against committed
-  # sample apps, proving it works without the app repos: the compliant app must pass, the broken app
-  # must fail, and the teams.hcl hostname extraction must resolve. This is what app-repo PR CI runs.
+  # sample apps, proving it works without the app repos: the compliant app (which ships a placeholder
+  # host) must pass after the claim-derived hostname is injected, the broken app must fail, and the
+  # XTenant-claim hostname derivation must resolve. This is what app-repo PR CI runs.
   kyverno-shift-left:
     name: Kyverno Shift-Left (dogfood)
     runs-on: ubuntu-latest
@@ -178,20 +179,22 @@ jobs:
         uses: ./.github/actions/kyverno-validate
         with:
           team: alpha
+          app: demo
           manifests-path: infra/modules/policy/.kyverno-tests/sample-app/compliant
           env: preprod
-      - name: Assert hostname extraction (hcl2json → teams.hcl) resolved
+      - name: Assert hostname derivation (XTenant claim) resolved
         shell: bash
         run: |
-          echo "extracted hostnames: ${{ steps.compliant.outputs.hostnames }}"
-          echo '${{ steps.compliant.outputs.hostnames }}' | grep -q 'demo.preprod.aws.refplat.org' \
-            || { echo "::error::hostname extraction from teams.hcl failed (got '${{ steps.compliant.outputs.hostnames }}')"; exit 1; }
+          echo "derived hostnames: ${{ steps.compliant.outputs.hostnames }}"
+          echo '${{ steps.compliant.outputs.hostnames }}' | grep -q 'demo-alpha.preprod.aws.refplat.org' \
+            || { echo "::error::hostname derivation from the XTenant claim failed (got '${{ steps.compliant.outputs.hostnames }}')"; exit 1; }
       - name: Validate broken sample (must fail)
         id: broken
         continue-on-error: true
         uses: ./.github/actions/kyverno-validate
         with:
           team: alpha
+          app: demo
           manifests-path: infra/modules/policy/.kyverno-tests/sample-app/broken
           env: preprod
       - name: Assert broken sample was rejected

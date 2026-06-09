@@ -32,11 +32,32 @@ spec:
                   type: string
                   description: Namespace of the shared Gateway (ingress source).
                   default: default
-                hostnames:
+                domains:
                   type: array
-                  description: Gateway-API route hostnames the team may claim (enforced in P2b).
+                  description: >-
+                    Tier-1/2 route domains for this tenant (ADR-061). The generated canonical host
+                    (<app>-<team>.<baseDomain>) is implicit and never declared here — list only ADDITIONAL
+                    aliases (a cleaner vanity label under our domain). The Composition unions these with the
+                    generated host into the restrict-route-hostnames allow-list, and argocd-apps injects the
+                    same union into the app's HTTPRoute. External custom domains + the status.domains
+                    verification state machine are Phase 2.
                   items:
-                    type: string
+                    type: object
+                    properties:
+                      host:
+                        type: string
+                        description: The fully-qualified route hostname (e.g. shop.preprod.aws.refplat.org).
+                      canonical:
+                        type: boolean
+                        description: When true, the user-canonical URL (drives 301/SEO in a later phase; inert in Phase 1).
+                        default: false
+                      dns:
+                        type: string
+                        enum: ["managed", "external"]
+                        description: DNS provider mode — managed (platform-owned zone) or external (customer-managed). Inert in Phase 1; wired in Phase 2.
+                        default: managed
+                    required:
+                      - host
                   default: []
                 resourceQuota:
                   type: object

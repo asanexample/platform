@@ -14,6 +14,15 @@ terraform {
 locals {
   teams_config = read_terragrunt_config("${get_repo_root()}/infra/live/aws/preprod/us-east-1/platform/teams.hcl")
   teams        = local.teams_config.locals.teams
+
+  # Tier-1/2 route aliases come from the XTenant claim (spec.domains, ADR-061) — the claim is the sole source,
+  # NOT teams.hcl. Read each team's claim YAML and extract the declared hosts ([] when absent / no claim).
+  claims_dir = "${get_repo_root()}/gitops/tenant-claims/preprod"
+  team_domains = { for k, v in local.teams : k => (
+    fileexists("${local.claims_dir}/${k}.yaml")
+    ? try([for d in yamldecode(file("${local.claims_dir}/${k}.yaml")).spec.domains : d.host], [])
+    : []
+  ) }
 }
 
 dependency "eks" {
@@ -94,8 +103,9 @@ inputs = {
   create = true
 
   tenants = { for k, v in local.teams : k => {
-    mode = v.mode
-    apps = v.apps
+    mode    = v.mode
+    domains = local.team_domains[k]
+    apps    = v.apps
   } }
 
   github_org               = "asanexample"

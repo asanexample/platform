@@ -1,5 +1,6 @@
-# Violation: hostname is not in team-alpha's allow-list (teams.hcl) — squats a hostname the team
-# doesn't own. The route hostname guard denies it.
+# The hostname here is overwritten by the platform's inject step (ADR-060/061), the same as in production —
+# an app cannot squat a route host via its manifest. This sample's FAILURE comes from deployment.yaml
+# (non-ECR :latest image, no probes, no resources), which injection does not touch.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
