@@ -43,18 +43,6 @@ dependency "argocd" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-# The `sso` HTTPRoute is created in the dex namespace, so Dex must exist first.
-dependency "dex" {
-  config_path = "../dex"
-
-  mock_outputs = {
-    namespace    = "dex"
-    service_name = "dex"
-    service_port = 5556
-  }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
-}
-
 generate "kubernetes_provider" {
   path      = "kubernetes-provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -93,19 +81,12 @@ inputs = {
       port      = 80
     }
     # Developer portal (Backstage, Phase 2 — ADR-051). Tailscale-only at backstage.aws.refplat.org.
-    # Fronted by oauth2-proxy (#202): the gateway routes to the proxy, which owns the durable session
-    # cookie and forwards authenticated traffic to the backstage Service (same namespace) on 7007.
+    # Routed directly to the Backstage Service on 7007 — Backstage authenticates each request itself via
+    # direct Keycloak OIDC, so the oauth2-proxy front (and Dex) are retired.
     backstage = {
       namespace = "backstage"
-      service   = "oauth2-proxy"
-      port      = 4180
-    }
-    # Centralized Dex SSO broker (Phase 2.1 — ADR-051). Tailscale-only at sso.aws.refplat.org;
-    # OIDC issuer for Backstage (and future apps). TLS at the gateway; Dex listens HTTP on 5556.
-    sso = {
-      namespace = dependency.dex.outputs.namespace
-      service   = dependency.dex.outputs.service_name
-      port      = dependency.dex.outputs.service_port
+      service   = "backstage"
+      port      = 7007
     }
     # NOTE: the `keycloak` route is NOT here — Keycloak self-owns its HTTPRoute in the keycloak module (ADR-059)
     # so its endpoint is live before keycloak-config configures the realm through it.
