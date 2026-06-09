@@ -219,9 +219,9 @@ variable "ecr_orphan_sweep_role_arn" {
 }
 
 variable "tenant_role_name_prefix" {
-  description = "Name prefix for the IAM roles the provisioning role may create/manage (the tenant workload roles). Scopes iam:* on the provisioning role."
+  description = "Name prefix for the IAM roles the provisioning role may create/manage (the tenant workload roles). Scopes iam:* on the provisioning role. v2 (Tenant API): per-app roles are Pod-<team>-<name>-<env>-<app>, so the prefix is Pod- (the v1 Pod-team-<team> single-role convention is retired); escalation stays capped by the S2 boundary condition, which is name-agnostic."
   type        = string
-  default     = "Pod-team-"
+  default     = "Pod-"
 }
 
 variable "developer_role_name_prefix" {
