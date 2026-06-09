@@ -156,10 +156,11 @@ inputs = {
   }
 
   # Phase 5 — Gateway-API route hostname guard (anti-squatting on the shared wildcard listener).
-  # Each team's routes may only claim the hostnames it declares in teams.hcl. (When PR previews get a
-  # dedicated preview_domain, add an app-scoped "<app>-pr-*.<domain>" pattern here.)
+  # For MIGRATED teams the Crossplane Tenant Composition owns restrict-route-hostnames (derived from the
+  # XTenant claim, ADR-060/061), so the chart skips them here — this map is the fallback for any
+  # not-yet-migrated team. teams.hcl no longer carries hostnames; default to [] when absent.
   enable_httproute_guard   = true
-  tenant_hostname_patterns = { for k, v in local.teams : k => v.hostnames }
+  tenant_hostname_patterns = { for k, v in local.teams : k => try(v.hostnames, []) }
   enable_cleanup           = true
 
   tags = include.base.locals.tags

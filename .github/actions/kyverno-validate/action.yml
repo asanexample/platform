@@ -1,22 +1,33 @@
 name: Kyverno Validate (shift-left)
 description: >-
-  Render the platform tenant Kyverno policies for a team and apply them to an app's manifests, failing
-  the build on any violation — the same checks admission enforces, run pre-merge. Cluster-free; needs no
-  AWS credentials or secrets, so it is safe on pull_request (including forks). Image signature
-  verification is intentionally skipped (the image isn't built/signed at PR time); admission remains the
-  enforcement point.
+  Render the platform tenant Kyverno policies for a team, INJECT the derived route hostnames into the app's
+  manifests (the way argocd-apps does at deploy, ADR-060/061), then apply the policies — the same checks
+  admission enforces, run pre-merge. The team's allowed hostnames are DERIVED from its XTenant claim
+  (gitops/tenant-claims/<env>/<team>.yaml), the sole source of truth. Cluster-free; needs no AWS credentials
+  or secrets, so it is safe on pull_request (including forks). Image signature verification is intentionally
+  skipped (the image isn't built/signed at PR time); admission remains the enforcement point.
 inputs:
   team:
     description: Tenant team key (namespace is team-<team>), e.g. "alpha".
     required: true
+  app:
+    description: >-
+      App key (the route host is <app>-<team>.<base-domain>). Optional — when omitted, inferred from the
+      claim's sole spec.apps entry (required for multi-app teams).
+    required: false
+    default: ""
   manifests-path:
     description: Path in the calling repo to the app's kustomize dir (contains kustomization.yaml).
     required: false
     default: k8s/preprod
   env:
-    description: Platform environment whose teams.hcl supplies the team's allowed route hostnames.
+    description: Platform environment whose XTenant claim supplies the team's apps + domain aliases.
     required: false
     default: preprod
+  base-domain:
+    description: Base domain for derived route hostnames (must match the cluster's EnvironmentConfig baseDomain).
+    required: false
+    default: preprod.aws.refplat.org
   ecr-registry:
     description: Platform ECR host that tenant images must come from.
     required: false
@@ -25,13 +36,13 @@ inputs:
     description: Kyverno CLI version — pin to the cluster chart's appVersion so semantics match.
     required: false
     default: "1.18.1"
-  hcl2json-version:
-    description: hcl2json release version used to read teams.hcl.
+  yq-version:
+    description: mikefarah yq release version used to read the XTenant claim + inject route hostnames.
     required: false
-    default: "0.6.4"
+    default: "4.44.3"
 outputs:
   hostnames:
-    description: The team's allowed route hostnames extracted from teams.hcl (JSON array).
+    description: The team's allowed route hostnames derived from its XTenant claim (JSON array).
     value: ${{ steps.hostnames.outputs.json }}
 runs:
   using: composite
@@ -51,34 +62,70 @@ runs:
         tar -C /tmp -xzf /tmp/kyverno.tgz kyverno
         sudo install -m 0755 /tmp/kyverno /usr/local/bin/kyverno
         kyverno version
-    - name: Install hcl2json
+    - name: Install yq
       shell: bash
       env:
-        HCL2JSON_VERSION: ${{ inputs.hcl2json-version }}
+        YQ_VERSION: ${{ inputs.yq-version }}
       run: |
         set -euo pipefail
-        url="https://github.com/tmccombs/hcl2json/releases/download/v${HCL2JSON_VERSION}/hcl2json_linux_amd64"
-        curl -fsSL "$url" -o /tmp/hcl2json
-        sudo install -m 0755 /tmp/hcl2json /usr/local/bin/hcl2json
-    - name: Extract team hostnames from teams.hcl
+        url="https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_amd64"
+        curl -fsSL "$url" -o /tmp/yq
+        sudo install -m 0755 /tmp/yq /usr/local/bin/yq
+        yq --version
+    # Derive the team's allowed route hostnames the SAME way the Crossplane Tenant Composition does (ADR-060/
+    # 061), from its XTenant claim (the sole source of truth) — not teams.hcl:
+    #   allow-list (the Kyverno guard, team-wide): per app  <app>-<team>.<base> + <app>-<team>-pr-*.<base>,
+    #                                              plus every spec.domains[].host alias.
+    #   inject set (this app, mirrors argocd-apps): <app>-<team>.<base> + the aliases (single-app teams only).
+    - name: Derive route hostnames from the XTenant claim
       id: hostnames
       shell: bash
       env:
         ACTION_PATH: ${{ github.action_path }}
         ENV_NAME: ${{ inputs.env }}
         TEAM: ${{ inputs.team }}
+        APP: ${{ inputs.app }}
+        BASE_DOMAIN: ${{ inputs.base-domain }}
       run: |
         set -euo pipefail
-        teams_hcl="${ACTION_PATH}/../../../infra/live/aws/${ENV_NAME}/us-east-1/platform/teams.hcl"
-        if [ -f "$teams_hcl" ]; then
-          # `locals` is a block (array); `teams` and the per-team maps are attributes (objects).
-          json="$(hcl2json < "$teams_hcl" | jq -c --arg t "${TEAM}" '.locals[0].teams[$t].hostnames // []')"
-        else
-          echo "::warning::teams.hcl not found at $teams_hcl — hostname guard will be skipped."
-          json="[]"
+        claim="${ACTION_PATH}/../../../gitops/tenant-claims/${ENV_NAME}/${TEAM}.yaml"
+        if [ ! -f "$claim" ]; then
+          echo "::error::XTenant claim not found at $claim — cannot derive the team's route hostnames."
+          exit 1
         fi
-        echo "json=$json" >> "$GITHUB_OUTPUT"
-        echo "team-${TEAM} hostnames: $json"
+        mapfile -t apps < <(yq '.spec.apps | keys | .[]' "$claim")
+        if [ "${#apps[@]}" -eq 0 ]; then
+          echo "::error::claim ${claim} declares no spec.apps."
+          exit 1
+        fi
+        if [ -z "$APP" ]; then
+          if [ "${#apps[@]}" -ne 1 ]; then
+            echo "::error::team-${TEAM} has ${#apps[@]} apps — pass the 'app' input to select one."
+            exit 1
+          fi
+          APP="${apps[0]}"
+        fi
+        # spec.domains[].host aliases (may be absent → empty; traversing a missing key yields no output).
+        mapfile -t aliases < <(yq '.spec.domains[].host' "$claim")
+
+        # allow-list (team-wide)
+        allow="$( {
+          for a in "${apps[@]}"; do
+            printf '%s\n' "${a}-${TEAM}.${BASE_DOMAIN}" "${a}-${TEAM}-pr-*.${BASE_DOMAIN}"
+          done
+          printf '%s\n' "${aliases[@]}"
+        } | jq -R -s -c 'split("\n") | map(select(length>0)) | unique' )"
+
+        # inject set (this app); aliases only when the team is single-app (matches argocd-apps targeting).
+        inject="$( {
+          printf '%s\n' "${APP}-${TEAM}.${BASE_DOMAIN}"
+          if [ "${#apps[@]}" -eq 1 ]; then printf '%s\n' "${aliases[@]}"; fi
+        } | jq -R -s -c 'split("\n") | map(select(length>0))' )"
+
+        echo "json=$allow" >> "$GITHUB_OUTPUT"
+        echo "inject=$inject" >> "$GITHUB_OUTPUT"
+        echo "team-${TEAM} app-${APP} allow-list: $allow"
+        echo "team-${TEAM} app-${APP} inject: $inject"
     - name: Validate manifests against platform policies
       shell: bash
       env:
@@ -87,4 +134,5 @@ runs:
         POLICIES_CHART: ${{ github.action_path }}/../../../infra/modules/policy/policies-chart
         ECR_REGISTRY: ${{ inputs.ecr-registry }}
         HOSTNAMES_JSON: ${{ steps.hostnames.outputs.json }}
+        INJECT_HOSTS_JSON: ${{ steps.hostnames.outputs.inject }}
       run: ${{ github.action_path }}/validate.sh

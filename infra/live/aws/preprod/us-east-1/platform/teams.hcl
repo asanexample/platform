@@ -24,8 +24,6 @@ locals {
       # platform-owned supply-chain policies (verify-images/attestations, policy unit) keep working; the
       # `migrated` flag withdraws alpha from every Terragrunt infra loop below.
       migrated = true
-      # Hostnames this team's Gateway-API routes may claim (Kyverno hostname guard, ADR-029).
-      hostnames = ["demo.preprod.aws.refplat.org"]
       apps = {
         demo = {
           repo_url  = "https://github.com/asanexample/app-alpha"
@@ -47,8 +45,7 @@ locals {
     bravo = {
       mode = "namespace"
       # Migrated to a Tenant claim (BACK stack P3, #174) — see alpha above. app delivery + Dev-bravo SSO stay.
-      migrated  = true
-      hostnames = ["demo-bravo.preprod.aws.refplat.org"]
+      migrated = true
       apps = {
         demo = {
           repo_url  = "https://github.com/asanexample/app-bravo"

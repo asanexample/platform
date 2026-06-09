@@ -40,7 +40,7 @@ spec is the tenant-facing contract — no infra constants leak into it:
 | Field | Required | Purpose |
 | ----- | -------- | ------- |
 | `team` | yes | Team key; drives the `team-<team>` namespace and every per-team resource name |
-| `hostnames` | — | Gateway-API hostnames the team may claim (feeds `restrict-route-hostnames`, ADR-029) |
+| `domains` | — | Tier-1/2 vanity aliases (`[]` of `{ host, canonical?, dns? }`, ADR-061). Unioned with the implicit generated host into `restrict-route-hostnames`; the generated host is never declared |
 | `gatewayNamespace` | — (default `default`) | Namespace of the shared Gateway (ingress source) |
 | `resourceQuota` | — (defaults match the old tenant module) | `cpu`/`memory`/`pods`/`services`/`loadbalancers`/`pvcs`/`storage` |
 | `complianceTier` | — (default `standard`) | `standard`/`hipaa`/`pci` |

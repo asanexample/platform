@@ -1,4 +1,6 @@
-# Hostname is in team-alpha's allow-list (teams.hcl hostnames) — passes the route hostname guard.
+# The app ships a PLACEHOLDER host — the platform injects the real derived host at deploy (argocd-apps,
+# ADR-060/061) and the shift-left injects the same (<app>-<team>.<base>) before validating, so this passes
+# the route hostname guard. Never hardcode the real host here.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -11,7 +13,7 @@ spec:
     - name: preprod-gateway
       namespace: default
   hostnames:
-    - demo.preprod.aws.refplat.org
+    - placeholder.invalid
   rules:
     - backendRefs:
         - name: demo

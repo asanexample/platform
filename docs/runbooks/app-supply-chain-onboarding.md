@@ -25,8 +25,9 @@ and swap team/app/hostname/Dockerfile. (ADR-050.)
 Before your CI can push or be trusted, your team must exist in the platform config. This is the
 [tenant-onboarding runbook](tenant-onboarding.md) — confirm it's done:
 
-1. **Team + app in `teams.hcl`** — defines the `team-<team>` namespace, the ECR repo `team-<team>/<app>`, the
-   team's `hostnames`, and the per-team **signing identities** the policy will trust.
+1. **Team + app onboarded** — the `XTenant` claim defines the `team-<team>` namespace, the ECR repo
+   `team-<team>/<app>`, and the route hostnames (`spec.domains` + the derived host); `teams.hcl` carries the
+   per-team **signing identities** the policy will trust.
 2. **ECR push role** — `arn:aws:iam::829808296602:role/github-actions-ecr-push-<team>`, trusting your repo's
    GitHub OIDC (see [ADR-036](../adrs/036-github-actions-oidc-federation.md)). `build-sign.yml` assumes this.
 3. **Trust your team's shared-signer identity** — your repo (`asanexample/app-<team>`) listed in the policy

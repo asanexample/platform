@@ -8,8 +8,8 @@ metadata:
 spec:
   team: bravo
   # Route hostnames are DERIVED from (app, team, baseDomain) by the Composition (ADR-060): demo-bravo.preprod.
-  # aws.refplat.org (+ a demo-bravo-pr-* preview wildcard if preview were enabled). Only add an explicit
-  # `hostnames:` list for an EXTRA vanity host beyond the derived defaults.
+  # aws.refplat.org (+ a demo-bravo-pr-* preview wildcard if preview were enabled). To add a vanity alias
+  # beyond the derived default, declare it under `spec.domains` (ADR-061).
   apps:
     demo:
       repoPath: k8s/preprod

@@ -9,6 +9,9 @@ variable "tenants" {
   type = map(object({
     mode      = optional(string, "namespace")
     namespace = optional(string)
+    # Tier-1/2 route aliases declared in the team's XTenant claim (spec.domains[].host, ADR-061). Unioned
+    # with the generated host and injected into the app's HTTPRoute. Sourced from the claim, not teams.hcl.
+    domains = optional(list(string), [])
     apps = map(object({
       repo_url    = string
       repo_path   = optional(string, "k8s/preprod")

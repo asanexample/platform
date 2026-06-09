@@ -204,7 +204,7 @@ inputs = {
     # (compositionRef / compositionRevisionRef / resourceRefs) and the `composite.apiextensions.crossplane.io`
     # finalizer — which are NOT in the git claim YAML. Without this, selfHeal would treat them as drift and
     # strip them on sync, severing the composition binding and tearing the tenant. Ignore the XR fields
-    # Crossplane owns; the claim's own spec (team/hostnames/apps/aws) still syncs from git.
+    # Crossplane owns; the claim's own spec (team/domains/apps/aws) still syncs from git.
     "resource.customizations.ignoreDifferences.platform.refplat.org_XTenant" = yamlencode({
       jqPathExpressions = [".spec.crossplane"]
       jsonPointers      = ["/metadata/finalizers"]

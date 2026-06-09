@@ -20,6 +20,10 @@ locals {
         repo_branch = coalesce(app.repo_branch, "main")
         namespace   = local.tenant_namespaces[team_key]
         preview     = coalesce(app.preview, false)
+        # Tier-1/2 vanity aliases (ADR-061), unioned with the generated host on injection. A team-level
+        # alias maps unambiguously to an app only when the team has exactly one app; multi-app targeting
+        # is a Phase-3 follow-up, so aliases are dropped for multi-app teams.
+        aliases = length(team.apps) == 1 ? team.domains : []
       }
     }
   ]...)
@@ -94,17 +98,18 @@ resource "kubernetes_manifest" "application" {
           commonLabels = {
             "app.kubernetes.io/instance" = "stable"
           }
-          # Inject the base HTTPRoute hostname from the (app, team, domain) convention (ADR-060), so the app
-          # repo doesn't hardcode it: <app>-<team>.<domain>. The Tenant Composition derives the matching
-          # restrict-route-hostnames allow-list entry from the same identity.
+          # Inject the route hostnames so the app repo doesn't hardcode them (ADR-060/061): the generated
+          # host <app>-<team>.<domain> unioned with the team's tier-1/2 aliases (spec.domains in the claim).
+          # Replaces the WHOLE hostnames array — the app ships a single placeholder host. The Tenant
+          # Composition derives the matching restrict-route-hostnames allow-list from the same identity.
           patches = var.preview_domain != "" ? [
             {
               target = { kind = "HTTPRoute" }
               patch = yamlencode([
                 {
                   op    = "replace"
-                  path  = "/spec/hostnames/0"
-                  value = "${each.value.app_key}-${each.value.team_key}.${var.preview_domain}"
+                  path  = "/spec/hostnames"
+                  value = concat(["${each.value.app_key}-${each.value.team_key}.${var.preview_domain}"], each.value.aliases)
                 },
               ])
             }
