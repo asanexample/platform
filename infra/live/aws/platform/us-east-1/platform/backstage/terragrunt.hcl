@@ -40,12 +40,21 @@ dependency "cloudnative_pg" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-# OIDC (Phase 2.1): the ExternalSecret needs the operator + ClusterSecretStore, and the client secret
-# (platform/backstage/oidc) is created by the dex module — so Backstage applies after all three.
+# OIDC: the ExternalSecret needs the operator + ClusterSecretStore, and the Keycloak `backstage` client
+# secret (platform/keycloak/backstage-oidc) is created by keycloak-config — so Backstage applies after all.
 dependency "external_secrets" {
   config_path = "../external-secrets"
 
   mock_outputs                            = { namespace = "external-secrets" }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
+# Ordering: Backstage's OIDC client secret (platform/keycloak/backstage-oidc) is provisioned by keycloak-config,
+# so Backstage must apply after it (the ExternalSecret would otherwise have nothing to sync).
+dependency "keycloak_config" {
+  config_path = "../keycloak-config"
+
+  mock_outputs                            = { issuer = "https://keycloak.aws.refplat.org" }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
@@ -129,15 +138,18 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
+  # ⚠️ BEFORE APPLYING THIS CHANGE: bump to the asanexample/backstage `main` SHA built after PR #20 merges
+  #    (the direct-Keycloak-OIDC image). The OIDC re-wiring here only works with that image — the current
+  #    SHA below still ships the oauth2Proxy provider.
   image_tag = "5f86794a9550311c8c12507c84a1861fc8827774"
 
-  # Split-horizon for OIDC SSO (Phase 2.1): the backend reaches Dex's issuer (sso.aws.refplat.org)
-  # in-cluster via the Cilium gateway ClusterIP, not public DNS / the internal-NLB hairpin. The IP is
-  # the `cilium-gateway-platform-gateway` Service ClusterIP (default ns) — stable for the Service's life;
-  # if that Service is recreated, refresh this. TLS still validates (wildcard *.aws.refplat.org at the gateway).
+  # Split-horizon for OIDC SSO: the backend reaches Keycloak's issuer (keycloak.aws.refplat.org) in-cluster
+  # via the Cilium gateway ClusterIP, not public DNS / the internal-NLB hairpin. The IP is the
+  # `cilium-gateway-platform-gateway` Service ClusterIP (default ns) — stable for the Service's life; if that
+  # Service is recreated, refresh this. TLS still validates (wildcard *.aws.refplat.org at the gateway).
   host_aliases = [{
     ip        = "172.20.184.24"
-    hostnames = ["sso.aws.refplat.org"]
+    hostnames = ["keycloak.aws.refplat.org"]
   }]
 
   # Phase 2.0: in-cluster CloudNativePG (dev). Flip to mode = "rds" (+ rds_host/rds_secret_name) for prod.

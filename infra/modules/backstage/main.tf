@@ -119,20 +119,12 @@ locals {
       # Pod Identity association (below), not an SA annotation — the platform standard (ADR-047).
     }
 
-    # The chart's NetworkPolicy restricts ingress to the backstage pod (egress stays open for now —
-    # the portal must reach the DB, GitHub and AWS; a tightened egress policy is a 2.1 hardening step).
-    #
-    # SECURITY (#202): Backstage's oauth2Proxy auth provider trusts the X-Forwarded-* identity headers
-    # WITHOUT verification, so the only thing preventing an in-cluster pod from spoofing them and
-    # impersonating any user is this ingress restriction — lock :7007 to ONLY the oauth2-proxy pod (same
-    # namespace). Cilium unions allow-rules across policies, so this MUST be the chart's own policy (not a
-    # separate CNP, which would just widen the allow). The podSelector value is the matchLabels map (the
-    # chart nests it under podSelector.matchLabels). Keep this as long as ProxiedSignInPage is in use.
+    # No ingress NetworkPolicy. Backstage now authenticates every request itself via direct Keycloak OIDC
+    # (the `oidc` provider), so it is safe to be reached directly through the gateway — unlike the prior
+    # `oauth2Proxy` header-trust provider, which required locking :7007 to the oauth2-proxy pod (the proxy
+    # is retired). The portal is Tailscale-only externally; egress stays open (DB/GitHub/AWS/Keycloak).
     networkPolicy = {
-      enabled = true
-      ingressRules = {
-        podSelector = { "app.kubernetes.io/name" = "oauth2-proxy" }
-      }
+      enabled = false
     }
 
     backstage = {

@@ -123,15 +123,15 @@ variable "resources" {
 # ---------------------------------------------------------------------------
 
 variable "enable_oidc" {
-  description = "Wire OIDC SSO: sync the Dex client secret (platform/backstage/oidc) into the namespace and inject it as OIDC_CLIENT_SECRET. The image's app-config.production.yaml configures the provider."
+  description = "Wire OIDC SSO: sync the Keycloak `backstage` client secret into the namespace as OIDC_CLIENT_SECRET + generate the Backstage session-signing secret (AUTH_SESSION_SECRET). The image's app-config.production.yaml configures the direct-Keycloak `oidc` provider."
   type        = bool
   default     = true
 }
 
 variable "oidc_secret_name" {
-  description = "Secrets Manager path holding the shared Dex OIDC client secret (created by the dex module)."
+  description = "Secrets Manager path holding the Keycloak OIDC client secret (the `backstage` confidential client, created by keycloak-config)."
   type        = string
-  default     = "platform/backstage/oidc"
+  default     = "platform/keycloak/backstage-oidc"
 }
 
 variable "oidc_secret_key" {
