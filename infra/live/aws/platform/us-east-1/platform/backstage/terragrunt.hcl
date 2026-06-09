@@ -131,12 +131,12 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # This SHA is the direct-Keycloak-OIDC build (asanexample/backstage#20) + the sidebar Sign out /
-  # RP-initiated logout (asanexample/backstage#21, schema fix #22) — it ships the `oidc` sign-in provider
-  # this unit's OIDC wiring expects, plus the logout that pairs with the backstage client's
-  # post_logout_redirect_uris (keycloak-config). Apply keycloak-config BEFORE this so Keycloak accepts the
-  # post-logout redirect.
-  image_tag = "9b67406f8935bd24c9b0880dc29e8001aa75957c"
+  # This SHA (asanexample/backstage#23) adds group-based RBAC (#197): the OIDC sign-in resolver attaches
+  # Keycloak `groups` as ownershipEntityRefs, and a custom permission policy gates writes (platform-admins
+  # full access; team members manage only their own team's entities; everyone reads). Builds on the
+  # direct-Keycloak-OIDC (#20) + logout (#21/#22) builds. No keycloak-config change needed — the groups
+  # claim already flows as a default client scope.
+  image_tag = "980de395712bddd98907a84ed238fab23c614ee7"
 
   # Split-horizon for OIDC: pin keycloak.aws.refplat.org to the gateway's ClusterIP so the backend hits the
   # gateway Envoy directly (the public-name → internal-NLB hairpin is flaky). The ClusterIP is resolved
