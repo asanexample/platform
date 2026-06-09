@@ -35,11 +35,11 @@ helm template ktp "$CHART" --show-only templates/tenant-envelope.yaml >"$ENVPOL"
 ED="$DIR/tenant-envelope"
 run_env() { kyverno apply "$ENVPOL" --resource "$ED/$1" --values-file "$ED/$2" 2>&1 || true; }
 must_flag() { # output resource rule
-  printf '%s' "$1" | grep -q "XTenant/$2 failed" || { echo "FAIL: envelope: $2 should be flagged"; printf '%s\n' "$1"; exit 1; }
-  printf '%s' "$1" | grep -q "$3"                 || { echo "FAIL: envelope: $2 expected rule '$3'"; printf '%s\n' "$1"; exit 1; }
+  grep -q "XTenant/$2 failed" <<<"$1" || { echo "FAIL: envelope: $2 should be flagged"; printf '%s\n' "$1"; exit 1; }
+  grep -q "$3"                 <<<"$1" || { echo "FAIL: envelope: $2 expected rule '$3'"; printf '%s\n' "$1"; exit 1; }
 }
 must_admit() { # output resource
-  if printf '%s' "$1" | grep -q "XTenant/$2 failed"; then echo "FAIL: envelope: $2 should pass"; printf '%s\n' "$1"; exit 1; fi
+  if grep -q "XTenant/$2 failed" <<<"$1"; then echo "FAIL: envelope: $2 should pass"; printf '%s\n' "$1"; exit 1; fi
 }
 
 OUT="$(run_env resources-payments.yaml values-payments.yaml)"
