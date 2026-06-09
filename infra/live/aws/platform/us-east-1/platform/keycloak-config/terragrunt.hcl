@@ -139,7 +139,7 @@ inputs = {
     }
   }
 
-  # Per-app OIDC clients use the module defaults (ArgoCD/Backstage/oauth2-proxy). Secrets are tagged for SM.
+  # Per-app OIDC clients use the module defaults (ArgoCD + Backstage, both direct OIDC). Secrets are tagged for SM.
   tags = include.base.locals.tags
 
   # Public PKCE client for the ArgoCD CLI (no secret — B3, ADR-059): the CLI can't safely hold the confidential

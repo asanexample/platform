@@ -4,12 +4,11 @@
 the pieces fit together.** This is the architecture explainer; the step-by-step setup/operations live in the
 runbooks linked at the end.
 
-> **Current state — as of 2026-06.** **Keycloak is the app-facing identity provider (IdP) of record.** ArgoCD
-> logs in against Keycloak directly; Backstage logs in against Keycloak through an oauth2-proxy in front of it.
-> **Dex is legacy** — it is still deployed and still holds client config, but no app uses it as the active
-> login path anymore; it is being retired. Identity is **standalone** today (users live in Keycloak, no
-> corporate IdP wired in); federating to Okta/Entra/AWS Identity Center is an opt-in backend change that
-> changes nothing for the apps.
+> **Current state — as of 2026-06.** **Keycloak is the app-facing identity provider (IdP) of record**, and
+> **both ArgoCD and Backstage authenticate against it directly over OIDC.** (Dex and the oauth2-proxy that used
+> to front Backstage were retired once Backstage moved to direct Keycloak OIDC — see the history note below.)
+> Identity is **standalone** today (users live in Keycloak, no corporate IdP wired in); federating to
+> Okta/Entra/AWS Identity Center is an opt-in backend change that changes nothing for the apps.
 
 ## The one-paragraph mental model
 
@@ -35,21 +34,16 @@ flowchart TB
 
     CFG["keycloak-config (IaC)<br/>reads _teams.hcl →<br/>groups, roles, clients, mappers"]
 
-    subgraph apps["Apps (downstream — consume Keycloak OIDC)"]
-        ARGO["ArgoCD<br/>(direct OIDC)"]
-        O2P["oauth2-proxy<br/>(durable session)"]
+    subgraph apps["Apps (downstream — consume Keycloak OIDC directly)"]
+        ARGO["ArgoCD"]
         BS["Backstage"]
     end
-
-    DEX["Dex (LEGACY,<br/>being retired)"]:::legacy
 
     OKTA -. "broker (opt-in)" .-> REALM
     IDC -. "broker (opt-in)" .-> REALM
     CFG --> REALM
     REALM -->|OIDC id token: email, groups| ARGO
-    REALM -->|OIDC| O2P
-    O2P -->|X-Auth-* headers| BS
-    classDef legacy stroke-dasharray: 5 5,fill:#eee;
+    REALM -->|OIDC id token: email, groups| BS
 ```
 
 - **Keycloak** (`infra/modules/keycloak`, namespace `keycloak`, CloudNativePG-backed) — the OIDC IdP the apps
@@ -61,14 +55,14 @@ flowchart TB
   developer-access **roles** (`tenant-operate`, `tenant-view`), the per-app **OIDC clients**, the **claim
   mappers** that put group names into the `groups` claim, the optional **upstream broker**, and (in standalone
   mode) the **seed users**. All of it derived from `infra/live/aws/_teams.hcl`.
-- **oauth2-proxy** (`infra/modules/oauth2-proxy`, in the `backstage` namespace) — a small reverse proxy that
-  sits **in front of Backstage**. It runs the OIDC login against Keycloak and then holds a **durable session
-  cookie**, injecting `X-Auth-Request-*` identity headers into Backstage. It exists to fix "logged out on every
-  refresh" (see *Why oauth2-proxy exists* below, #202).
 - **ArgoCD** — consumes Keycloak OIDC **directly** (its own embedded Dex is off: `dex_enabled = false`).
-- **Dex** (`infra/modules/dex`, **LEGACY**) — the platform's first SSO broker (ADR-052). Superseded by Keycloak
-  (ADR-053). Still deployed and still carries a `backstage` client + an oauth2-proxy callback as transitional
-  remnants, but is **not the active login path for any app** today and is slated for removal.
+- **Backstage** — consumes Keycloak OIDC **directly** (the `oidc` sign-in provider; the `backstage` confidential
+  client). It is reached directly through the gateway and authenticates each request itself.
+
+> **History (retired):** Backstage used to be fronted by an **oauth2-proxy** that held a durable session and
+> injected headers, and before that the platform brokered SSO through **Dex** (SAML → Identity Center). Both
+> were removed when Backstage moved to direct Keycloak OIDC — Keycloak issues refresh tokens, so the proxy's
+> reason to exist (#202) is gone. See *Why oauth2-proxy existed* below.
 
 ## How a login actually works
 
@@ -91,28 +85,24 @@ The **ArgoCD CLI** uses a separate **public** Keycloak client (`argocd-cli`, PKC
 
 ### Signing into Backstage
 
-Backstage is **fronted by oauth2-proxy**, so the login you actually do is oauth2-proxy's:
+Backstage authenticates **directly against Keycloak**, just like ArgoCD:
 
-1. You hit `backstage.aws.refplat.org`; the gateway routes to **oauth2-proxy**.
-2. oauth2-proxy runs OIDC against **Keycloak** (`client_id=oauth2-proxy`, issuer = the Keycloak realm) and, on
-   success, sets its **own durable session cookie** and proxies you to Backstage, injecting
-   `X-Auth-Request-Email` / `X-Auth-Request-Groups` headers.
-3. Backstage's **`oauth2Proxy` sign-in provider** (ProxiedSignInPage) trusts those headers to identify you. A
-   NetworkPolicy locks Backstage's `:7007` so **only the oauth2-proxy pod** can reach it (the headers are only
-   trustworthy because nothing else can set them).
+1. You hit `backstage.aws.refplat.org`; the gateway routes straight to the Backstage Service (`:7007`).
+2. Backstage's **`oidc` sign-in provider** redirects you to Keycloak (`client_id=backstage`, the realm
+   discovery `metadataUrl`). You authenticate; Keycloak issues an OIDC id token with `email` + `groups`.
+3. The Backstage backend exchanges the code (confidential client; secret synced from
+   `platform/keycloak/backstage-oidc` via an ExternalSecret) and establishes the Backstage session. Because
+   Keycloak issues a **refresh token**, the silent `/refresh` on reload succeeds — the session survives without
+   a fronting proxy.
 
-> A legacy **Dex** OIDC provider config still lingers in the Backstage unit (`enable_oidc`, the
-> `sso.aws.refplat.org` host-alias) from the pre-oauth2-proxy era. It is **not** the active path — the
-> oauth2-proxy→Keycloak flow above is. It will go away with Dex.
+### Why oauth2-proxy existed (history — retired, #202)
 
-### Why oauth2-proxy exists (the durable-session fix, #202)
-
-Backstage's own session refresh expects the IdP to issue an OAuth **refresh token**. The pre-Keycloak setup
-(SAML via Dex) issued none, so Backstage's `/refresh` returned 401 and you were bounced to the login screen on
-**every page reload**. oauth2-proxy solves this by owning the session itself: it sets `cookie-refresh = 0` (no
-doomed upstream-token refresh) and keeps **its own** cookie valid for `cookie-expire`. So the session is the
-proxy's cookie, independent of any refresh token. (This is why Backstage uses the header-based `oauth2Proxy`
-provider rather than a direct OIDC provider.)
+Backstage's session refresh expects the IdP to issue an OAuth **refresh token**. The original SSO went
+Backstage → **Dex** → Identity Center over **SAML**, which issues *no* refresh token — so Backstage's
+`/refresh` returned 401 and you were logged out on **every reload**. The fix at the time was an **oauth2-proxy**
+in front of Backstage that held its own durable cookie and injected identity headers. Moving the upstream to
+**Keycloak (OIDC, which issues refresh tokens)** removed that root cause, so Backstage now does direct OIDC and
+both Dex and oauth2-proxy were **retired**.
 
 ## Where permissions come from — the access model
 
@@ -167,12 +157,12 @@ standalone and adopt a corporate IdP later without touching the apps.
 
 | Thing | Status |
 |-------|--------|
-| ArgoCD → Keycloak OIDC | ✅ done |
-| Backstage → oauth2-proxy → Keycloak | ✅ done |
+| ArgoCD → Keycloak OIDC (direct) | ✅ done |
+| Backstage → Keycloak OIDC (direct) | ✅ done |
 | Standalone identity (seed users) | ✅ current |
-| Dex serving any app | ❌ legacy; no active path; pending removal |
+| Dex + oauth2-proxy | ❌ removed (Backstage moved to direct Keycloak OIDC) |
 | Upstream federation (Okta/Entra/IdC) | ⏳ designed + supported, **not wired** |
-| Hostname `keycloak.aws.refplat.org` → `sso.aws.refplat.org` | ⏳ planned at the Dex retirement |
+| Hostname `keycloak.aws.refplat.org` → `sso.aws.refplat.org` | ⏳ optional future change |
 | Keycloak→AWS group sync (SCIM) so app groups drive AWS access | ⏳ future (ADR-059); AWS access is manual in IdC today |
 | Backstage group-based RBAC (#197) | ⏳ future |
 

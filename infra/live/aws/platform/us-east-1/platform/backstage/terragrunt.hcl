@@ -65,13 +65,6 @@ dependency "secret_stores" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-dependency "dex" {
-  config_path = "../dex"
-
-  mock_outputs                            = { namespace = "dex" }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
-}
-
 # Cross-environment dependencies (Phase 2.4a Kubernetes plugin): the portal reads the preprod workload
 # cluster read-only. Endpoint/CA come from the preprod eks unit; the cross-account read-only role ARN that
 # this pod assumes comes from the preprod iam-roles unit (the `Backstage` role).
