@@ -30,6 +30,21 @@ locals {
   ]...)
 
   preview_apps = { for k, v in local.applications : k => v if v.preview && var.github_org != "" }
+
+  # Sync retry for every Application targeting the remote (preprod) cluster. Without it, ArgoCD abandons a
+  # failed sync after 5 attempts on a revision and won't auto-retry until the revision changes — so a transient
+  # bootstrap window (the lockdown's EKS endpoint toggle churns the API ENIs and the cross-vpc-dns PHZ record
+  # lags; CRDs registering; cluster cache warming) leaves apps stuck SyncFailed/Unknown until a human syncs.
+  # ~12 attempts over ~45 min rides out any such window; steady-state syncs are unaffected (retry only fires
+  # on failure).
+  sync_retry = {
+    limit = 12
+    backoff = {
+      duration    = "30s"
+      factor      = 2
+      maxDuration = "5m"
+    }
+  }
 }
 
 # ---------------------------------------------------------------------------
@@ -127,9 +142,11 @@ resource "kubernetes_manifest" "application" {
           prune    = true
         }
         syncOptions = ["CreateNamespace=false"] # Namespace lifecycle managed by the tenant module
+        retry       = local.sync_retry
         } : {
         automated   = null
         syncOptions = null
+        retry       = null
       }
     }
   }
@@ -213,6 +230,7 @@ resource "kubernetes_manifest" "teams_app" {
           prune    = true
         }
         syncOptions = ["CreateNamespace=false", "ServerSideApply=true"]
+        retry       = local.sync_retry
       }
     }
   }
@@ -289,6 +307,7 @@ resource "kubernetes_manifest" "tenant_claims_app" {
           prune    = true
         }
         syncOptions = ["CreateNamespace=false", "ServerSideApply=true"]
+        retry       = local.sync_retry
       }
     }
   }
@@ -390,6 +409,7 @@ resource "kubernetes_manifest" "preview_appset" {
               prune    = true
             }
             syncOptions = ["CreateNamespace=false"]
+            retry       = local.sync_retry
           }
         }
       }

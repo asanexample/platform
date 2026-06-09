@@ -163,6 +163,11 @@ lockdown:
     description: Disable public EKS endpoint
   - unit: preprod/eks
     description: Disable public EKS endpoint
+  # MUST follow the EKS endpoint toggles: disabling public access churns the cluster API ENIs, leaving the
+  # cross-vpc-dns PHZ A-record stale — ArgoCD (platform) then can't resolve/reach the preprod API and every
+  # preprod-targeting Application degrades to Unknown/SyncFailed. Re-applying refreshes the dynamic ENI lookup.
+  - unit: platform/cross-vpc-dns
+    description: Refresh preprod EKS API PHZ records (ENIs churn on endpoint toggle)
   - unit: platform/tailscale
     description: Enable split DNS for private EKS resolution
   - unit: preprod/tailscale
