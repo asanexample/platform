@@ -10,5 +10,5 @@ description: >-
 type: application
 # 0.2.0: add ArgoCD's remote-cluster assumed-role identity to excludePrincipals so GitOps-delivered XTenant
 # claims aren't denied on workload clusters (ArgoCD authenticates remotely via the cross-account ArgoCD IAM role).
-version: 0.2.0
+version: 0.2.1
 appVersion: "1.18.1"

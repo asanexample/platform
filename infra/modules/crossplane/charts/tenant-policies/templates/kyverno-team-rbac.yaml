@@ -1,0 +1,21 @@
+# RBAC for the envelope policy's Team lookup. The restrict-tenant-envelope rules fetch the projected Team CR
+# via a Kyverno apiCall (ktp.teamContext: GET /apis/platform.refplat.org/v1alpha2/teams/<team>), which executes
+# as the Kyverno controllers' ServiceAccounts. Without this grant the call is Forbidden and silently resolves
+# to the context default ({}), so team-must-exist denies EVERY claim with "no projected Team CR" even when the
+# Team exists — invisible under Audit, fatal under Enforce (bit the v2 rebuild's first tenant sync).
+#
+# Kyverno aggregates ClusterRoles by label: aggregate-to-admission-controller (webhook-time apiCalls) and
+# aggregate-to-reports-controller (background: true re-evaluation). Ships with this chart so the grant exists
+# wherever the envelope policy exists.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kyverno-read-platform-teams
+  labels:
+    rbac.kyverno.io/aggregate-to-admission-controller: "true"
+    rbac.kyverno.io/aggregate-to-reports-controller: "true"
+    {{- include "ktp.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["platform.refplat.org"]
+    resources: ["teams"]
+    verbs: ["get", "list", "watch"]
