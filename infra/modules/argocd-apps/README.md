@@ -126,8 +126,11 @@ No modules.
 - Preview ApplicationSets use Kustomize `namePrefix` (`pr-<number>-`) and `commonLabels` (`app.kubernetes.io/instance: pr-<number>`) to isolate preview pods from stable deployments.
 - Preview hostname rewriting patches `HTTPRoute` hostnames to `<app>-pr-<number>.<preview_domain>`.
 - The `github_org` variable must be set for PR preview generators to be created; if empty, preview ApplicationSets are skipped.
+- `enable_teams` adds a `platform-teams` AppProject + `teams` Application that syncs the git-native `Team` CRs (`teams_repo_path`, e.g. `gitops/teams`) to the target cluster — replacing the `crossplane-teams` Helm projection (ADR-063). The Team CRs are Kyverno admission inputs (envelope / team-must-exist), so the app carries a `sync-wave: "-1"` ahead of the tenant-claims app; selfHeal converges a claim transiently rejected before its Team lands.
+- `enable_tenant_claims` adds a `platform-tenants` AppProject + `tenant-claims-<env>` Application that syncs the cluster-scoped `XTenant` claim YAMLs (`tenant_claims_repo_path`) from git.
 
 ## Related ADRs
 
 - ADR-031: Multi-App Tenant Model
 - ADR-032: PR Preview Environments
+- ADR-063: Git-Native Team Object

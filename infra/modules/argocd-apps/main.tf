@@ -137,6 +137,89 @@ resource "kubernetes_manifest" "application" {
 }
 
 # ---------------------------------------------------------------------------
+# Git-native Team objects (ADR-063): a dedicated AppProject + Application that
+# syncs the cluster-scoped Team CRs from git. Replaces the crossplane-teams Helm
+# projection (the crossplane unit now passes var.teams = {}); the Team CRD itself
+# still ships with the crossplane tenant chart. The Team CR is what Kyverno reads
+# during XTenant admission (restrict-tenant-envelope + team-must-exist), so this
+# app must reconcile BEFORE the tenant-claims app: the sync-wave annotation
+# declares that priority, and ArgoCD's selfHeal converges the case where a claim
+# is transiently rejected because its Team is not yet applied (eventual GitOps
+# consistency — the next reconcile admits it once the Team CR exists).
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_manifest" "teams_project" {
+  for_each = var.enable_teams ? { enabled = true } : {}
+
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "AppProject"
+    metadata = {
+      name      = "platform-teams"
+      namespace = var.argocd_namespace
+    }
+    spec = {
+      description = "Git-native Team governance objects (platform-managed, ADR-063)"
+      sourceRepos = [var.teams_repo_url]
+      destinations = [{
+        server    = var.cluster_server
+        namespace = "crossplane-system"
+      }]
+      # Only the cluster-scoped Team — nothing else.
+      clusterResourceWhitelist = [
+        { group = "platform.refplat.org", kind = "Team" },
+      ]
+      namespaceResourceWhitelist = []
+    }
+  }
+}
+
+resource "kubernetes_manifest" "teams_app" {
+  for_each = var.enable_teams ? { enabled = true } : {}
+
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata = {
+      name      = "teams"
+      namespace = var.argocd_namespace
+      labels = {
+        "platform.refplat.org/component" = "teams"
+      }
+      # Sync-wave priority: Teams ahead of the tenant-claims app (default wave 0),
+      # so the envelope/team-must-exist admission inputs land first.
+      annotations = {
+        "argocd.argoproj.io/sync-wave" = "-1"
+      }
+    }
+    spec = {
+      project = "platform-teams"
+      source = {
+        repoURL        = var.teams_repo_url
+        targetRevision = var.teams_repo_branch
+        path           = var.teams_repo_path
+      }
+      destination = {
+        server    = var.cluster_server
+        namespace = "crossplane-system"
+      }
+      # Git is the source of truth: prune offboards a Team when its YAML is removed
+      # (gated by CODEOWNERS on the teams path). ServerSideApply so the status
+      # subresource (rollup controller) is not stripped by selfHeal.
+      syncPolicy = {
+        automated = {
+          selfHeal = true
+          prune    = true
+        }
+        syncOptions = ["CreateNamespace=false", "ServerSideApply=true"]
+      }
+    }
+  }
+
+  depends_on = [kubernetes_manifest.teams_project]
+}
+
+# ---------------------------------------------------------------------------
 # Tenant claims (BACK stack Phase 1): a dedicated AppProject + Application that
 # syncs the cluster-scoped XTenant claim YAMLs from git. Replaces the
 # tenant-claims Terragrunt unit. ArgoCD applies as the assumed ArgoCD role,

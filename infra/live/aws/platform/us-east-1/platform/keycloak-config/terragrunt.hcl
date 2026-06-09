@@ -41,10 +41,15 @@ terraform {
   }
 }
 
-# Canonical Team registry (single source of truth, ADR-053) — read directly (not via _base.hcl, to keep the
-# blast radius to this unit + the crossplane unit). Drives the Keycloak groups + developer-access roles.
+# Canonical Team registry — the git-native Team CRs (ADR-063), the same YAMLs ArgoCD syncs to the cluster.
+# Each gitops/teams/<team>.yaml is a Team CR; key by metadata.name and expose spec ({ ssoGroup, envelope }),
+# which is exactly what the keycloak-config module consumes (groups + envelope→developer-access roles).
+# Reads from git, not _teams.hcl (retired) — git is now the single source of truth for Team identity.
 locals {
-  teams = read_terragrunt_config(find_in_parent_folders("aws/_teams.hcl")).locals.teams
+  teams_dir = "${get_repo_root()}/gitops/teams"
+  teams = { for f in fileset(local.teams_dir, "*.yaml") :
+    yamldecode(file("${local.teams_dir}/${f}")).metadata.name => yamldecode(file("${local.teams_dir}/${f}")).spec
+  }
 }
 
 # Configures the running Keycloak (deployed by the keycloak unit) via the keycloak/keycloak provider — B2,

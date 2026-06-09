@@ -119,6 +119,15 @@ inputs = {
   cluster_server   = dependency.preprod_eks.outputs.cluster_endpoint
   argocd_namespace = dependency.argocd.outputs.namespace
 
+  # Git-native Team delivery via ArgoCD (ADR-063): sync the cluster-scoped Team CRs from the platform repo to
+  # preprod (replaces the crossplane-teams Helm projection — the crossplane unit now passes teams = {}). The
+  # Team CRs are admission inputs for Kyverno's envelope/team-must-exist, so this app carries a sync-wave ahead
+  # of tenant-claims.
+  enable_teams      = true
+  teams_repo_url    = "https://github.com/asanexample/platform"
+  teams_repo_branch = "main"
+  teams_repo_path   = "gitops/teams"
+
   # Tenant-claim delivery via ArgoCD (BACK stack Phase 1): sync the cluster-scoped XTenant claim YAMLs from
   # the platform repo to preprod (replaces the tenant-claims Terragrunt unit). The argocd unit excludes the
   # XTenant XR from selfHeal drift; the policy unit excludes ArgoCD's assumed-role from the S1 backstop.
