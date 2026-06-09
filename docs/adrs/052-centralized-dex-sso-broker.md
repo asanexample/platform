@@ -2,8 +2,10 @@
 
 **Date:** 2026-06-03
 
-**Status:** Accepted — supports the Backstage portal ([ADR-051](051-backstage-developer-portal.md)) and mirrors the ArgoCD SSO pattern
-([ADR-012](012-argocd-sso-via-dex-saml.md)). First client: Backstage (BACK-stack Phase 2.1).
+**Status:** Accepted, then **superseded by [ADR-053](053-identity-and-cross-system-authorization-strategy.md) /
+[ADR-059](059-identity-topology-pluggable-idp-seam.md)** — Keycloak is now the app-facing IdP of record; Dex is
+legacy/being retired. This ADR documents the Phase-2.1 Dex broker for history. Current model:
+[identity-and-sso](../architecture/identity-and-sso.md).
 
 ## Context
 

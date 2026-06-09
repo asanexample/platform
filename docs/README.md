@@ -1,11 +1,16 @@
 # Documentation Index
 
 This repository manages infrastructure with OpenTofu modules orchestrated by
-Terragrunt. It is **multi-cloud by design but AWS-first today** — only `live/aws/`
-is deployed; Azure and GCP are planned and the layout is parameterized for them.
-All cloud resources are defined declaratively, version-controlled, and deployed
-through a layered configuration hierarchy that promotes consistency across
-environments.
+Terragrunt. It is **multi-cloud by design; AWS is the only cloud deployed** — only
+`live/aws/` exists. The shared modules are written cloud-agnostically and the layout
+is parameterized for Azure/GCP, but those are **designed-for, not built** (no
+`live/azure/` or `live/gcp/`) and not planned for 2026. All cloud resources are
+defined declaratively, version-controlled, and deployed through a layered
+configuration hierarchy that promotes consistency across environments.
+
+> **Current identity state:** **Keycloak** is the app-facing IdP of record (ArgoCD
+> direct; Backstage via oauth2-proxy). Dex is legacy. See
+> [Identity & SSO](architecture/identity-and-sso.md).
 
 ## Start Here
 
@@ -13,12 +18,17 @@ environments.
 |----------|-------------|
 | [Onboarding Guide](onboarding.md) | New team member quickstart: prerequisites, first deploy, daily workflows |
 | [User Guide](user-guide.md) | Complete reference for module configuration, deployments, and day-2 operations |
+| [Glossary](glossary.md) | Platform-specific terms (tenant, the seam, generated host, Pod Identity, …) defined in one place |
 
 ## How It Works
 
 | Document | Description |
 |----------|-------------|
 | [Architecture](architecture/) | System design, network topology, and multi-cloud strategy |
+| [Identity & SSO](architecture/identity-and-sso.md) | How login works: Keycloak (IdP of record), oauth2-proxy, the access model, the pluggable seam |
+| [Gateway & Ingress](architecture/gateway-and-ingress.md) | Cilium Gateway → NLB → cert-manager → external-dns → Kyverno hostname guard (ADR-060/061) |
+| [Secrets & External Secrets](architecture/secrets-and-external-secrets.md) | Secrets Manager → ESO ClusterSecretStore → ExternalSecret → k8s Secret; platform vs tenant |
+| [Crossplane Composition Authoring](architecture/crossplane-composition-authoring.md) | The *how* behind the Tenant API: XRD, Pipeline functions, the status-loop pattern |
 | [Supply-Chain Overview](architecture/supply-chain-overview.md) | Why + end-to-end flow: SBOM, cosign, SLSA provenance, Rekor, Kyverno, and the SLSA Build L3 matrix |
 | [Observability Current State](architecture/observability-current-state.md) | As-built P1 hub + P2 Mimir: topology, multi-tenancy/security model, storage |
 | [Preprod Tenant Model](architecture/preprod-tenant-model.md) | Namespace-based tenant isolation architecture |
@@ -41,7 +51,10 @@ environments.
 | [Observability Access](runbooks/observability-access.md) | Access Grafana (Tailscale + creds), dashboards, query Mimir, alerting |
 | [Observability Troubleshooting](runbooks/observability-troubleshooting.md) | Grafana/Prometheus/Mimir/storage diagnostics + apply gotchas |
 | [EKS Cluster Access](runbooks/eks-cluster-access.md) | kubectl setup for platform engineers and developers |
-| [ArgoCD SSO](runbooks/argocd-sso.md) | SSO setup, troubleshooting, and group-based RBAC |
+| [SSO Troubleshooting](runbooks/identity-sso-troubleshooting.md) | "Can't log in / no permissions" master triage across ArgoCD, Backstage, Keycloak |
+| [Debug Ingress & DNS](runbooks/debug-ingress-and-dns.md) | App unreachable / TLS fails / hostname rejected — external-dns, cert-manager, HTTPRoute, Kyverno |
+| [Debug ArgoCD Sync](runbooks/debug-argocd-sync.md) | OutOfSync/Unknown, cross-account reachability, ApplicationSet PR-preview failures |
+| [ArgoCD SSO](runbooks/argocd-sso.md) | ⚠️ legacy (embedded Dex); current model is Keycloak — see Identity & SSO |
 | [Transit Gateway Operations](runbooks/transit-gateway-operations.md) | Hub/spoke TGW: add spokes, verify connectivity, troubleshoot |
 | [Upgrade Procedures](runbooks/upgrade-procedures.md) | EKS, Cilium, Helm chart, and toolchain version upgrades |
 | [User Guide](user-guide.md) | Greenfield and brownfield deployments, day-2 operations |
@@ -82,7 +95,7 @@ environments.
 
 ```text
 docs/               You are here -- user-facing documentation
-infra/modules/      Reusable OpenTofu modules (aws/ + shared; azure/, gcp/ planned)
+infra/modules/      Reusable OpenTofu modules (aws/ + shared; azure/, gcp/ scaffolded, not built)
 infra/live/aws/     Terragrunt live configurations per env/region/workload (AWS only today)
 infra/tests/        Terratest (Go) module integration tests
 infra/docs/         Infrastructure design documentation (numbered series)

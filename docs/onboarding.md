@@ -5,6 +5,11 @@ through everything you need to get productive: installing prerequisites,
 understanding the repository layout, deploying your first stack, and making
 your first change.
 
+> **New here?** Skim the [Glossary](glossary.md) for the platform vocabulary, and
+> [Identity & SSO](architecture/identity-and-sso.md) for how login/permissions work
+> (it's the part most people find confusing). For "I can't log in," go straight to
+> [SSO Troubleshooting](runbooks/identity-sso-troubleshooting.md).
+
 ---
 
 ## Prerequisites
