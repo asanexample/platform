@@ -329,6 +329,34 @@ resource "null_resource" "crd_finalizer_cleanup" {
 }
 
 # ---------------------------------------------------------------------------
+# Teardown: sweep orphaned Crossplane-provisioned tenant IAM roles (AWS-side)
+# ---------------------------------------------------------------------------
+# crd_finalizer_cleanup (above) drains the IN-CLUSTER Crossplane CRs so the helm uninstalls succeed — but
+# uninstalling Crossplane never deletes the EXTERNAL AWS resources its Composition created. The per-tenant
+# Pod-<...> workload roles and the DeveloperAccess-<team> roles persist with this deny-escalation boundary
+# attached as their PermissionsBoundary, so aws_iam_policy.tenant_boundary then fails to delete ("DeleteConflict:
+# Cannot delete a policy attached to entities"), failing the whole unit teardown (observed on preprod). This
+# sweep deletes exactly those roles (only ones carrying this boundary — by the S2 condition the provisioner can
+# create roles ONLY with it, so every match is a tenant role). It depends_on the boundary, so its when=destroy
+# provisioner runs BEFORE the boundary is deleted (reverse-order destroy). The script always exits 0 — best-effort,
+# never blocks destroy. Reuses the scripts/ dir of finalizer_clear_script so no extra unit wiring is needed.
+resource "null_resource" "tenant_iam_orphan_sweep" {
+  count = local.enable_tenant_provisioning ? 1 : 0
+
+  triggers = {
+    script       = "${dirname(var.finalizer_clear_script)}/tenant-iam-orphan-sweep.sh"
+    boundary_arn = aws_iam_policy.tenant_boundary[0].arn
+    region       = var.region
+    role_arn     = var.deployer_role_arn
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = "bash ${self.triggers.script} ${self.triggers.boundary_arn} ${self.triggers.region} ${self.triggers.role_arn}"
+  }
+}
+
+# ---------------------------------------------------------------------------
 # Scoped provisioning identity (IAM) + EKS Pod Identity association
 # ---------------------------------------------------------------------------
 # The AWS provider assumes this role to provision tenant resources. P1 scope: ECR repositories under
