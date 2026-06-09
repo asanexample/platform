@@ -1,5 +1,10 @@
 # Runbook: ArgoCD SSO
 
+> ⚠️ **Legacy.** This describes the original setup — ArgoCD's **embedded Dex** bridging AWS Identity Center
+> (SAML). **ArgoCD now logs in against Keycloak OIDC directly** (`dex_enabled = false`). For the current model
+> see [identity-and-sso](../architecture/identity-and-sso.md); for login problems see
+> [identity-sso-troubleshooting](identity-sso-troubleshooting.md). Kept for history.
+>
 > **Identity Provider:** AWS Identity Center (SAML 2.0 via Dex)
 > **URL:** `https://argocd.aws.refplat.org` (requires Tailscale VPN)
 >
