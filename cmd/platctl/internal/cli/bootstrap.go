@@ -2,10 +2,12 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -279,14 +281,16 @@ func runBootstrap(cmd *cobra.Command, envFilter string, resume, yes bool, concur
 		return err
 	}
 
-	// Lockdown phase: re-apply units without bootstrap overrides
+	// Lockdown phase: re-apply units without bootstrap overrides. The EKS endpoint-access toggle serializes
+	// against any other in-flight cluster update (addons, version), so it can race one and get a transient
+	// ResourceInUseException — retry with backoff so lockdown completes without a manual re-run.
 	for _, lock := range cfg.Lockdown {
 		unit := g.Unit(lock.Unit)
 		if unit == nil {
 			continue
 		}
 		fmt.Printf("\nLockdown: %s (%s)\n", lock.Unit, lock.Description)
-		if err := runner.Run(cmd.Context(), unit, engine.Apply); err != nil {
+		if err := applyLockdownWithRetry(cmd.Context(), runner, unit); err != nil {
 			return fmt.Errorf("lockdown %s: %w", lock.Unit, err)
 		}
 	}
@@ -302,6 +306,34 @@ func runBootstrap(cmd *cobra.Command, envFilter string, resume, yes bool, concur
 
 	fmt.Println("\nBootstrap complete.")
 	return nil
+}
+
+const (
+	lockdownMaxAttempts = 8
+	lockdownBackoff     = 45 * time.Second
+)
+
+// applyLockdownWithRetry applies a lockdown unit, retrying the transient EKS "update in progress" conflict
+// (the endpoint-access change serializes against any other in-flight cluster update) with a fixed backoff —
+// up to ~6 minutes, which covers a typical EKS config update. Non-transient errors return immediately.
+func applyLockdownWithRetry(ctx context.Context, runner engine.Runner, unit *engine.Unit) error {
+	var err error
+	for attempt := 1; attempt <= lockdownMaxAttempts; attempt++ {
+		err = runner.Run(ctx, unit, engine.Apply)
+		if err == nil || !engine.IsTransientEKSUpdate(err) {
+			return err
+		}
+		if attempt < lockdownMaxAttempts {
+			fmt.Printf("  EKS update in progress — retrying lockdown in %s (attempt %d/%d)\n",
+				lockdownBackoff, attempt, lockdownMaxAttempts)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(lockdownBackoff):
+			}
+		}
+	}
+	return err
 }
 
 // findRepoRoot walks up from cwd looking for a .git directory.

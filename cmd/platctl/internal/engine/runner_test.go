@@ -170,3 +170,30 @@ func TestBuildEnv_Azure(t *testing.T) {
 		t.Fatal("expected ARM_SUBSCRIPTION_ID=abc-123 in env")
 	}
 }
+
+func TestIsTransientEKSUpdate(t *testing.T) {
+	// The real error observed when the lockdown's endpoint-access toggle races another EKS cluster update.
+	output := `Error: updating EKS Cluster (platform-use1-eks) VPC configuration: operation error EKS: UpdateClusterConfig, https response error StatusCode: 409, RequestID: feac13d8, ResourceInUseException: Cannot EndpointAccessUpdate because cluster platform-use1-eks currently has an update in progress`
+	transient := &RunError{Unit: "platform/eks", Action: Apply, ExitCode: 1, Output: output}
+	if !IsTransientEKSUpdate(transient) {
+		t.Fatal("expected the EKS update-in-progress conflict to be detected as transient")
+	}
+
+	other := &RunError{Unit: "platform/eks", Action: Apply, ExitCode: 1, Output: "Error: some other failure"}
+	if IsTransientEKSUpdate(other) {
+		t.Fatal("unrelated RunError must not be classified transient")
+	}
+
+	if IsTransientEKSUpdate(errorsNew("plain error")) {
+		t.Fatal("a non-RunError must not be classified transient")
+	}
+	if IsTransientEKSUpdate(nil) {
+		t.Fatal("nil must not be classified transient")
+	}
+}
+
+func errorsNew(s string) error { return &simpleErr{s} }
+
+type simpleErr struct{ s string }
+
+func (e *simpleErr) Error() string { return e.s }

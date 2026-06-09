@@ -3,6 +3,7 @@ package engine
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -52,7 +53,21 @@ func (e *LockError) Error() string {
 var (
 	scpPattern  = regexp.MustCompile(`(?i)service.control.policy|service_control_policy`)
 	lockPattern = regexp.MustCompile(`Lock Info:\s*ID:\s*([a-f0-9-]+)`)
+	// eksUpdatePattern matches EKS's "another config update in progress" conflict. EKS serializes
+	// cluster-config updates (endpoint-access toggles, addon/version updates), so a concurrent update returns
+	// ResourceInUseException instead of waiting — transient: the in-flight update finishes in a few minutes.
+	eksUpdatePattern = regexp.MustCompile(`(?i)resourceinuseexception|currently has an update in progress`)
 )
+
+// IsTransientEKSUpdate reports whether err is the transient EKS "update in progress" conflict, which a caller
+// should retry after a short backoff (e.g. the lockdown's endpoint-access change racing another cluster update).
+func IsTransientEKSUpdate(err error) bool {
+	var re *RunError
+	if errors.As(err, &re) {
+		return eksUpdatePattern.MatchString(re.Output)
+	}
+	return false
+}
 
 // DefaultSCPProtectedTypes are AWS resource types commonly blocked by Service Control Policies.
 var DefaultSCPProtectedTypes = []string{"aws_kms_key", "aws_kms_alias", "aws_flow_log"}
