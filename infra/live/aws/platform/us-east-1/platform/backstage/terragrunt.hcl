@@ -138,10 +138,9 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # ⚠️ BEFORE APPLYING THIS CHANGE: bump to the asanexample/backstage `main` SHA built after PR #20 merges
-  #    (the direct-Keycloak-OIDC image). The OIDC re-wiring here only works with that image — the current
-  #    SHA below still ships the oauth2Proxy provider.
-  image_tag = "5f86794a9550311c8c12507c84a1861fc8827774"
+  # This SHA is the direct-Keycloak-OIDC build (asanexample/backstage#20) — it ships the `oidc` sign-in
+  # provider that this unit's OIDC wiring expects.
+  image_tag = "9ac698bf8c128253e152193b0ab936ff2e93d55f"
 
   # Split-horizon for OIDC SSO: the backend reaches Keycloak's issuer (keycloak.aws.refplat.org) in-cluster
   # via the Cilium gateway ClusterIP, not public DNS / the internal-NLB hairpin. The IP is the
