@@ -76,3 +76,7 @@ bin/
 # OS files
 .DS_Store
 **/.DS_Store
+
+# Local tooling (not committed)
+.claude/
+.specify/
