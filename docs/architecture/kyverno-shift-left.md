@@ -74,6 +74,10 @@ host via its manifest — the guard is enforced against the injected, claim-deri
   Admission still enforces it. See [cosign-image-signing.md](cosign-image-signing.md).
 - **PR-preview hostname rewrites** — preview `HTTPRoute` transforms happen via Kustomize patches in the
   ApplicationSet, validated at admission, not here.
+- **Domain `Active` state** (ADR-061 Phase 2) — shift-left derives hostnames from the claim's `spec.domains`
+  (intent); it cannot read live `status.domains`, so it can't tell whether an external (tier-3) domain has
+  reached `Active`. Admission is the authority — it admits a host only while Active. (Moot until Phase 2b
+  introduces non-`Active` external domains; generated + tier-1/2 hosts are always Active.)
 - Anything depending on **live cluster state** (the namespace tenant label is *simulated* via a values
   file).
 

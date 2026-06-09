@@ -51,6 +51,20 @@ spec is the tenant-facing contract — no infra constants leak into it:
 A minimal example lives in `infra/modules/crossplane/examples/tenant-gamma.yaml`; the live claims are YAML
 files in `gitops/tenant-claims/<env>/` (one `XTenant` per file).
 
+### `status.domains` — the ingress state machine (ADR-061 Phase 2)
+
+The Composition writes `status.domains[]` (`{ host, state, mode, reason, message?, dnsTarget?,
+lastTransitionTime? }`) — one entry per generated canonical host + each `spec.domains` alias — and the
+`restrict-route-hostnames` allow-list admits a host **only while its entry is `Active`**. Verification is the
+security boundary: a tenant cannot route a domain whose state is not yet `Active`.
+
+- **Generated host** (`<app>-<team>.<base>`) + tier-1/2 aliases (host under `.<baseDomain>`, our wildcard
+  cert) → `Active` immediately (platform-owned).
+- **Tier-3 external** hosts → `Pending` (`AwaitingProvisioning`) and **not admitted** until **Phase 2b** wires
+  the per-domain DNS/cert (then they transition `Pending → … → Active`, observed from the backing resources —
+  the [spike](../spikes/adr-061-phase2-ingress-spike.md) proved this runs inside `function-go-templating`, no
+  controller). 2a populates `host/state/mode/reason` only.
+
 ## What the Composition provisions
 
 The Composition (`infra/modules/crossplane/charts/tenant/files/composition.yaml`, mode `Pipeline`) renders,
