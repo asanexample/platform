@@ -1,0 +1,136 @@
+# New Team (#280, ADR-062 §1 + ADR-063): admin-only template that authors the git-native Team CR
+# (identity + envelope) as a PR to gitops/teams/ — HUMAN REVIEW, never automerge (a Team grants an
+# envelope; a privilege grant warrants review — enforced by CODEOWNERS on /gitops/teams/ + branch
+# protection, not by anything in this template). Execution is admin-only via the #197 permission policy.
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: new-team
+  title: New Team
+  description: >-
+    Onboard a team (platform admins only): authors the git-native Team object — identity (ssoGroup) +
+    envelope (the bound on every Tenant the team may author) — as a reviewed pull request. Nothing is
+    provisioned until the PR is merged and the consumers converge.
+  tags:
+    - platform
+    - governance
+spec:
+  owner: group:default/platform
+  type: team
+
+  parameters:
+    - title: Team identity
+      required:
+        - name
+      properties:
+        name:
+          title: Team name
+          type: string
+          description: >-
+            Short lowercase identifier, letters/digits only (no hyphens — the team is parsed back out of
+            <team>-<tenant>-<env> namespace names, so a hyphen would make that split ambiguous).
+          pattern: '^[a-z][a-z0-9]{1,15}$'
+          maxLength: 16
+        ssoGroup:
+          title: SSO group (optional)
+          type: string
+          description: >-
+            Keycloak group this team maps to (root of both authz planes, ADR-053). Leave empty for the
+            platform convention Dev-<name>.
+
+    - title: Envelope
+      description: >-
+        The bound on every Tenant this team may author — Kyverno enforces it at claim admission
+        (restrict-tenant-envelope). Grant the minimum that serves the team; widening later is a
+        one-line reviewed PR.
+      required:
+        - allowedTiers
+        - allowedEnvironments
+      properties:
+        allowedTiers:
+          title: Allowed tiers
+          type: array
+          minItems: 1
+          uniqueItems: true
+          default: ['standard']
+          items:
+            type: string
+            enum: ['standard', 'elevated', 'pci', 'hipaa']
+        allowedEnvironments:
+          title: Allowed environments
+          type: array
+          description: >-
+            Stage ladder subset. Default dev-only — non-dev stages are gated on the per-stage ECR (G1)
+            and stage-aware dev-access (G3) fast-follows.
+          minItems: 1
+          uniqueItems: true
+          default: ['dev']
+          items:
+            type: string
+            enum: ['dev', 'test', 'uat', 'staging', 'prod']
+        cpu:
+          title: CPU cap
+          type: string
+          description: Per-tenant ceiling and (report-first) aggregate cap.
+          default: '8'
+          pattern: '^[0-9]+m?$'
+        memory:
+          title: Memory cap
+          type: string
+          default: 16Gi
+          pattern: '^[0-9]+(Mi|Gi)$'
+        pods:
+          title: Pod cap
+          type: integer
+          default: 40
+          minimum: 1
+
+  steps:
+    - id: render
+      name: Render the Team CR
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          name: ${{ parameters.name }}
+          ssoGroup: ${{ parameters.ssoGroup if parameters.ssoGroup else 'Dev-' + parameters.name }}
+          allowedTiers: ${{ parameters.allowedTiers }}
+          allowedEnvironments: ${{ parameters.allowedEnvironments }}
+          cpu: ${{ parameters.cpu }}
+          memory: ${{ parameters.memory }}
+          pods: ${{ parameters.pods }}
+
+    - id: pr
+      name: Open the onboarding PR (human review)
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?owner=asanexample&repo=platform
+        branchName: team/onboard-${{ parameters.name }}
+        targetBranchName: main
+        title: 'feat(teams): onboard team ${{ parameters.name }}'
+        commitMessage: 'feat(teams): onboard team ${{ parameters.name }}'
+        description: |
+          Onboards team **${{ parameters.name }}** — adds the git-native Team CR (ADR-063).
+
+          Requested via the Backstage **New Team** template by `${{ user.ref | default('unknown', true) }}` (ADR-062 §4 audit attribution).
+
+          | | |
+          |---|---|
+          | ssoGroup | `${{ parameters.ssoGroup if parameters.ssoGroup else 'Dev-' + parameters.name }}` |
+          | allowedTiers | `${{ parameters.allowedTiers | join(', ') }}` |
+          | allowedEnvironments | `${{ parameters.allowedEnvironments | join(', ') }}` |
+          | quotaCap | cpu ${{ parameters.cpu }}, memory ${{ parameters.memory }}, pods ${{ parameters.pods }} |
+
+          **Review checklist (this PR grants an envelope — never automerge, ADR-062 §1):**
+          - [ ] Team name is right and unclaimed; ssoGroup matches the intended Keycloak group
+          - [ ] Envelope is the minimum that serves the team (non-dev environments are gated on G1/G3)
+          - [ ] CI `Tenant API Schema` green (validates gitops/teams/ against the Team CRD)
+
+          **After merge:** ArgoCD's `teams` app syncs the CR (Kyverno then accepts this team's Tenant
+          claims); apply `keycloak-config` (group + dev-access from the envelope) and `argocd`/`argocd-apps`
+          (RBAC + delivery read the Team YAMLs) to converge the consumers.
+
+  output:
+    links:
+      - title: Onboarding pull request (needs review)
+        url: ${{ steps.pr.output.remoteUrl }}

@@ -47,6 +47,11 @@ validate_dir "$xrd" "invalid Tenant claims" "${here}/invalid" reject
 validate_dir "$team_crd" "valid Team records"   "${here}/teams"         pass
 validate_dir "$team_crd" "invalid Team records" "${here}/teams-invalid" reject
 
+# Live git-native Team objects (gitops/teams/ — what ArgoCD actually syncs). Gives Team-onboarding PRs
+# (the Backstage New Team template, #280) a real schema gate in CI, not just human review.
+repo_root="$(cd "${here}/../../../.." && pwd)"
+validate_dir "$team_crd" "live Team objects (gitops/teams)" "${repo_root}/gitops/teams" pass
+
 # Registry → projection (the crossplane-teams chart, delivery-plan A2). Render the canonical registry into
 # projected Team CRs and (a) validate them against the Team CRD, (b) assert the canonical-only fields are
 # dropped. Needs helm; skip gracefully if absent (the CI job installs it).
