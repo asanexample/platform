@@ -64,11 +64,13 @@ one-job-per-pod isolation as cleanly.
 
 **4. Actions Runner Controller (ARC) on the platform EKS cluster (chosen).** ARC is the Kubernetes-
 native runner autoscaler: a controller manages **runner scale sets** that register with GitHub and
-spin up **ephemeral, one-job-per-pod** runners on demand. It is deployed and reconciled by ArgoCD
-like every other platform workload (ADR-021), runs inside the VPC with native reach to the platform
-API, scales to zero when idle, and gives each job a fresh pod with no persisted state. This matches
-the platform's existing operational model (K8s-native, GitOps-delivered, ephemeral) better than any
-alternative.
+spin up **ephemeral, one-job-per-pod** runners on demand. It is deployed by **Terragrunt
+(`helm_release`)** like every other platform add-on (backstage, crossplane, cert-manager,
+external-secrets) — *not* via ArgoCD, which on this platform is reserved for tenant workloads (app
+repos, Team CRs, XTenant claims), not control-plane infrastructure. It runs inside the VPC with native
+reach to the platform API, scales to zero when idle, and gives each job a fresh pod with no persisted
+state. This matches the platform's existing operational model (Terragrunt-delivered Helm release,
+K8s-native, ephemeral) better than any alternative.
 
 ### Where to host: platform cluster vs. per-cluster runner sets
 
@@ -101,9 +103,15 @@ path for AWS-only units and for non-cluster CI (lint, validate, build/sign).
 
 Concretely:
 
-1. **ARC controller + runner scale sets**, packaged as a shared module and delivered as an ArgoCD
-   Application (consistent with ADR-021). Runners are **ephemeral** (one job per pod, no reuse) and
-   **scale to zero** when idle.
+1. **ARC controller + runner scale sets**, packaged as a shared module under `infra/modules/` and
+   deployed by **Terragrunt (`helm_release`)** — the same delivery path as backstage, crossplane, and
+   cert-manager. ArgoCD is *not* used here; on this platform it delivers tenant workloads, not the
+   control plane. Because ARC is precisely what lets CI manage the cluster, the
+   `actions-runner-controller` unit is itself the **one cluster-facing unit that stays on local apply /
+   `platctl` (break-glass)** — it cannot bootstrap itself; every other cluster-facing unit graduates to
+   CI behind it. Runners are **ephemeral** (one job per pod, no reuse) and **scale to zero** when idle.
+   Registration is **repo-level** (the `platform` repo) for the privileged infra-apply pool — the
+   tightest trust surface; broader scopes (org-level, app CI) are added later as separate pools.
 2. **Runner identity via Pod Identity, not stored secrets.** Runner pods get AWS access through EKS
    Pod Identity (ADR-047) bound to a **dedicated, narrowly-scoped CI ServiceAccount** — not the app
    pods' identities, not a node role. For Terragrunt applies, that identity is trusted to assume
@@ -121,7 +129,10 @@ Concretely:
 6. **`platctl` (local apply / bootstrap) is retained as break-glass.** Because the runners live on the
    platform cluster, a bad apply that degrades the cluster can also degrade the runners that would fix
    it (the ADR-011 "cluster down → access down → SSM fallback" failure mode). The local apply path and
-   `platctl bootstrap` must remain fully functional for recovery and initial bring-up.
+   `platctl bootstrap` must remain fully functional for recovery and initial bring-up. Concretely:
+   because ARC is itself Terragrunt-deployed, the `actions-runner-controller` unit is applied **locally**
+   (it cannot bootstrap itself) — it is the permanent floor of the local-apply path, and the bootstrap
+   ordering must bring it up before any CI-driven apply can run.
 
 This ADR decides the **mechanism** (ARC on the platform cluster) and its security shape. The **rollout**
 — which units move to apply-on-merge, and in what order — is owned by #305 (Phase 1: post-merge
@@ -142,8 +153,8 @@ superseded incrementally as those phases land, not in one cut-over.
   default against cross-job contamination and idle cost.
 - **No stored AWS credentials.** Runner AWS access is Pod Identity → assume-role, short-lived and
   auditable in CloudTrail (consistent with ADR-036/047), rather than keys on a VM.
-- **Consistent operational model.** ARC is GitOps-delivered and K8s-native like everything else; no
-  new VM fleet to patch or scale.
+- **Consistent operational model.** ARC is a Terragrunt-deployed Helm release and K8s-native like every
+  other platform add-on; no new VM fleet to patch or scale.
 - **Audit-grade apply trail.** Every CI apply ties to a merge commit, a workflow run, and an OIDC/Pod
   Identity principal.
 
