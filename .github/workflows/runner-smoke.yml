@@ -37,10 +37,16 @@ jobs:
 
       - name: Assume PlatformDeployer + reach the PRIVATE EKS API
         run: |
-          # update-kubeconfig with --role-arn makes kubectl's exec auth assume PlatformDeployer — this is the
-          # exact path terragrunt's helm/kubernetes providers use. It proves: (1) the PR-D trust admits the
-          # runner role, (2) the runner is in-VPC and can reach the private API, (3) PlatformDeployer's access
-          # entry grants cluster access.
-          aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_REGION" --role-arn "$DEPLOYER_ARN"
+          # Explicitly assume PlatformDeployer (proves the PR-D trust admits the runner role), then talk to the
+          # cluster AS PlatformDeployer — which holds the perms (eks:DescribeCluster) + the EKS access entry.
+          # NB: `aws eks update-kubeconfig --role-arn` does NOT assume the role for its own DescribeCluster call
+          # (that runs as the runner role, which has no cluster perms by design), so we assume up-front here —
+          # the same shape a CI apply would use before invoking terragrunt.
+          creds=$(aws sts assume-role --role-arn "$DEPLOYER_ARN" --role-session-name runner-smoke --query Credentials --output json)
+          export AWS_ACCESS_KEY_ID="$(echo "$creds" | jq -r .AccessKeyId)"
+          export AWS_SECRET_ACCESS_KEY="$(echo "$creds" | jq -r .SecretAccessKey)"
+          export AWS_SESSION_TOKEN="$(echo "$creds" | jq -r .SessionToken)"
+          echo "Now acting as (should be PlatformDeployer):"; aws sts get-caller-identity
+          aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_REGION"
           kubectl get namespaces
-          echo "✅ in-VPC runner reached the private EKS API as PlatformDeployer"
+          echo "✅ in-VPC runner assumed PlatformDeployer and reached the private EKS API"
