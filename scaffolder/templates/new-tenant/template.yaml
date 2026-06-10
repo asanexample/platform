@@ -159,3 +159,10 @@ spec:
     links:
       - title: Provisioning pull request (auto-merges when the gate passes)
         url: ${{ steps.pr.output.remoteUrl }}
+      # The tenant's catalog entity — where the ArgoCD + Kubernetes cards show live provisioning status
+      # (#284, ADR-064). Projection-sourced (from the claim), so it appears within ~5 min of the PR merging;
+      # the link resolves once it exists. (entityRef, not catalog:register — the entity isn't a repo
+      # catalog-info.yaml.)
+      - title: Tenant dashboard (provisioning status — appears within a few minutes)
+        icon: dashboard
+        entityRef: system:default/${{ parameters.team | replace('group:default/', '') }}-${{ parameters.name }}-${{ parameters.environment }}
