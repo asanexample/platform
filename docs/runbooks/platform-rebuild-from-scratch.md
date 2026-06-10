@@ -32,8 +32,11 @@ This runbook uses `./bin/platctl`. Always **rebuild** before a rebuild run so th
   binary `platctl validate` already uses.)
 - `.platctl.yaml` present at the repo root (gitignored). Copy `.platctl.yaml.example` → `.platctl.yaml` and fill
   in account IDs / regions / validate config.
-- `infra/live/aws/secrets.hcl` present (gitignored) and complete — account IDs, emails, and the SSO URLs/certs.
-  See `secrets.hcl.example`.
+- **Config secrets** are read from the committed, SOPS-encrypted `infra/live/aws/secrets.enc.yaml` (ADR-066),
+  decrypted inline via the management `platform-sops` KMS key — which survives teardown (see below), so a standard
+  rebuild needs nothing here. The gitignored plaintext `infra/live/aws/secrets.hcl` is only needed to **edit** the
+  secrets (`AWS_PROFILE=management sops infra/live/aws/secrets.enc.yaml`) or for a **true from-zero greenfield**
+  bootstrap (next section). See `secrets.hcl.example` for the structure.
 - **AWS SSO** logged in for every profile the DAG uses: `aws sso login --profile management` (and `platform`,
   `preprod` if separate). Tokens expire — re-login if you see `SSOProviderInvalidToken`.
 - **Tailscale — NOT required to deploy.** The deploy path reaches the cluster via the EKS API (public during
@@ -47,6 +50,30 @@ This runbook uses `./bin/platctl`. Always **rebuild** before a rebuild run so th
 The S3 state bucket + DynamoDB lock table are bootstrapped once via the `state_bootstrap` unit with a local
 backend, then state is migrated to S3 — see [ADR-006](../adrs/006-state-bootstrap-pattern.md). If the backend
 already exists, skip this.
+
+### SOPS config key (only if truly from zero)
+
+Config secrets are decrypted from the committed `secrets.enc.yaml` via the `platform-sops` KMS key (ADR-066), a
+bootstrap-floor resource in `infra/live/aws/mgmt/global/sops-kms`. Like the state backend it lives **outside** both
+platctl env-teardown trees and carries `prevent_destroy`, so a normal teardown/rebuild leaves it untouched and the
+committed ciphertext stays decryptable — **nothing to do**.
+
+Only on a **true greenfield** (the key has never existed) is there a chicken-and-egg: every terragrunt config-load
+(`root.hcl`/`common.hcl`) decrypts `secrets.enc.yaml`, so even `state-bootstrap` and `sops-kms` themselves can't
+load config before the key exists. Break it with **`TG_SOPS_BOOTSTRAP=1`**, which makes the config chain read the
+local plaintext `secrets.hcl` instead (you must have it present). One-time sequence:
+
+1. Apply the key — `cd infra/live/aws/mgmt/global/sops-kms && AWS_PROFILE=management TG_SOPS_BOOTSTRAP=1 terragrunt apply`
+   (and `state-bootstrap` the same way if the backend is also from zero). Note the new key ARN.
+2. Re-key the committed config to the new key: set the new ARN in `.sops.yaml`, then **regenerate** the flat
+   plaintext YAML from `secrets.hcl` (top-level keys = its `locals` — the shape `secrets.enc.yaml` already has;
+   `terragrunt` can `yamlencode` it) and `AWS_PROFILE=management sops -e <plaintext>.yaml > infra/live/aws/secrets.enc.yaml`,
+   then commit. The prior `secrets.enc.yaml` was bound to a key ARN that no longer exists, so it can't be decrypted
+   or `updatekeys`-rotated in place — it must be re-encrypted from plaintext. (Don't `sops -e` the HCL directly —
+   that encrypts the HCL text, not the structured map.)
+3. Drop `TG_SOPS_BOOTSTRAP` — all subsequent runs decrypt normally. The ARC runner is granted `kms:Decrypt` on the
+   new key by the `actions-runner-controller` unit (scoped by the `alias/platform-sops` alias, so the random ARN
+   doesn't need wiring).
 
 ### Manual prerequisites (not automated)
 

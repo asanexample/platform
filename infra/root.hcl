@@ -83,7 +83,9 @@ locals {
   _path_parts_cloud = split("/", path_relative_to_include())
   _cloud            = try(local._path_parts_cloud[1], "aws")
 
-  _secrets = yamldecode(sops_decrypt_file("${get_repo_root()}/infra/live/aws/secrets.enc.yaml"))
+  # Config secrets, ADR-066: decrypted from the committed SOPS secrets.enc.yaml. TG_SOPS_BOOTSTRAP=1 falls back to
+  # the plaintext secrets.hcl for greenfield bootstrap (before the platform-sops key exists). See common.hcl.
+  _secrets = get_env("TG_SOPS_BOOTSTRAP", "") == "1" ? read_terragrunt_config("${get_repo_root()}/infra/live/aws/secrets.hcl").locals : yamldecode(sops_decrypt_file("${get_repo_root()}/infra/live/aws/secrets.enc.yaml"))
 
   environment = get_env("TF_VAR_environment", "dev")
 
