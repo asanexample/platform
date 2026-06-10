@@ -19,6 +19,11 @@ inputs = {
       description          = "Cross-account access to S3 state bucket and DynamoDB lock table"
       max_session_duration = 3600 # 1 hour — sufficient for automated Terraform runs
 
+      # Terragrunt assumes this role with a TAGGED session (same as PlatformDeployer), so the trust must allow
+      # sts:TagSession in addition to sts:AssumeRole — else a tagged assume 403s on TagSession (e.g. the in-VPC
+      # ARC runner reading dependency state). The caller also needs sts:TagSession (actions-runner-controller).
+      trust_actions = ["sts:AssumeRole", "sts:TagSession"]
+
       trust_principals = {
         aws = [
           "arn:aws:iam::${include.base.locals.account_ids["platform"]}:root", # Platform account

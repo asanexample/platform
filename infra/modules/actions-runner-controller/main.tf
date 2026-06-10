@@ -111,12 +111,13 @@ resource "aws_iam_role_policy" "runner_assume_deployer" {
         Resource = [var.deployer_role_arn]
       },
       {
-        # Terragrunt assumes the state role SEPARATELY for the S3/DynamoDB backend (root.hcl remote_state) —
-        # a plain AssumeRole (no session tags), in the management account. Without this a CI apply can't read
-        # or lock state. The state role already trusts the platform-account root unconditionally.
+        # Terragrunt assumes the state role SEPARATELY for the S3/DynamoDB backend (root.hcl remote_state) — in
+        # the management account. It uses a TAGGED session (like PlatformDeployer), so sts:TagSession is required
+        # alongside AssumeRole; without it a tagged assume 403s on TagSession (state read/lock fails). The state
+        # role's trust must also allow sts:TagSession (mgmt/global/state-access).
         Sid      = "AssumeTerraformStateAccess"
         Effect   = "Allow"
-        Action   = ["sts:AssumeRole"]
+        Action   = ["sts:AssumeRole", "sts:TagSession"]
         Resource = [var.state_role_arn]
       },
       ], var.sops_key_arn_pattern == "" ? [] : [{
