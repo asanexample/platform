@@ -1,0 +1,46 @@
+name: Runner smoke test
+
+# Proves the self-hosted ARC pool end to end (ADR-065 / #323): a job lands on an in-VPC runner, gets AWS
+# creds from its Pod Identity, assumes PlatformDeployer (the PR-D trust), reaches the PRIVATE EKS API that
+# hosted runners can't, and has the baked-in toolchain. Manual-only — this is a proof, not a gate. The real
+# apply-on-merge workflows are #305.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CLUSTER_NAME: platform-use1-eks
+  AWS_REGION: us-east-1
+  DEPLOYER_ARN: arn:aws:iam::829808296602:role/PlatformDeployer
+
+jobs:
+  smoke:
+    # The ARC runner scale set (gha-runner-scale-set, runnerScaleSetName=platform-infra).
+    runs-on: platform-infra
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain is baked in
+        run: |
+          tofu version
+          terragrunt --version
+          kubectl version --client
+          aws --version
+
+      - name: Runner identity (EKS Pod Identity)
+        run: |
+          echo "Runner's AWS identity (should be the platform-use1-eks-arc-runner role):"
+          aws sts get-caller-identity
+
+      - name: Assume PlatformDeployer + reach the PRIVATE EKS API
+        run: |
+          # update-kubeconfig with --role-arn makes kubectl's exec auth assume PlatformDeployer — this is the
+          # exact path terragrunt's helm/kubernetes providers use. It proves: (1) the PR-D trust admits the
+          # runner role, (2) the runner is in-VPC and can reach the private API, (3) PlatformDeployer's access
+          # entry grants cluster access.
+          aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_REGION" --role-arn "$DEPLOYER_ARN"
+          kubectl get namespaces
+          echo "✅ in-VPC runner reached the private EKS API as PlatformDeployer"
