@@ -174,17 +174,12 @@ lockdown:
     description: Enable split DNS for preprod.aws.refplat.org resolution
 
 validate:
+  # NS / TGW-id / EKS-endpoint values CHURN on every rebuild, so validate DISCOVERS them (Route53 delegation
+  # set, the account's TGW, the remote cluster's EKS endpoint). expected_ns / transit_gateway.id /
+  # cross_vpc_dns.endpoint remain optional overrides.
   dns:
     zone: aws.refplat.org
-    expected_ns:
-      - ns-example1.awsdns-00.com.
-      - ns-example2.awsdns-00.net.
-      - ns-example3.awsdns-00.org.
-      - ns-example4.awsdns-00.co.uk.
-  transit_gateway:
-    id: tgw-XXXXXXXXXXXXXXXXX
-  cross_vpc_dns:
-    endpoint: XXXXXXXXXX.gr7.us-east-1.eks.amazonaws.com
+    profile: platform # account owning the hosted zone (NS discovery)
   tailscale:
     vpc_cidrs:
       platform: "10.100.0.0/16"
@@ -201,6 +196,21 @@ validate:
     - name: argocd
       url: https://argocd.aws.refplat.org/
       env: platform
+    - name: keycloak
+      url: https://keycloak.aws.refplat.org/
+      env: platform
+    - name: grafana
+      url: https://grafana.aws.refplat.org/
+      env: platform
+    - name: backstage
+      url: https://backstage.aws.refplat.org/
+      env: platform
+  # Units whose EMPTY state is intentional — their state check passes instead of false-failing:
+  # mimir is off in the cost-optimized dev profile; preprod gateway-config has no per-app routes (the
+  # platform cluster hosts argocd/grafana/backstage routes; tenant routes ship in the app repos).
+  expected_empty_units:
+    - platform/mimir
+    - preprod/gateway-config
   iam:
     state_bucket: tfstate-mgmt-<MGMT_ACCOUNT_ID>
     accounts:

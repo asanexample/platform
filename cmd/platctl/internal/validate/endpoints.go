@@ -25,6 +25,12 @@ func (e *EndpointCheck) Check(ctx context.Context) CheckResult {
 
 	out, err := e.Run(ctx, "curl", "-sI", "--max-time", "10", e.URL)
 	if err != nil {
+		// One retry: endpoint probes ride the tailnet, and a parallel check burst can transiently time a
+		// connection out (observed exit 28 on a service that answered in <1s moments later).
+		time.Sleep(2 * time.Second)
+		out, err = e.Run(ctx, "curl", "-sI", "--max-time", "10", e.URL)
+	}
+	if err != nil {
 		outStr := strings.TrimSpace(string(out))
 		details = append(details,
 			fmt.Sprintf("Connection to '%s' failed", e.URL),

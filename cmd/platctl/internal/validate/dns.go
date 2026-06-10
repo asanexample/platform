@@ -9,22 +9,81 @@ import (
 )
 
 // DNSDelegationCheck verifies that a DNS zone's NS records at a public
-// resolver match the expected nameservers (typically Route53).
+// resolver match the expected nameservers (typically Route53). The expected set is DISCOVERED from the
+// Route53 hosted zone's delegation set when not configured — the assigned nameservers change whenever the
+// zone is recreated (every rebuild), so a hardcoded expected_ns goes stale; the config stays as an optional
+// override. Profile selects the AWS profile owning the zone (for discovery).
 type DNSDelegationCheck struct {
 	Name       string
 	Zone       string
-	ExpectedNS []string
+	ExpectedNS []string // optional override; discovered from Route53 when empty
+	Profile    string
 	Run        CommandRunner
 }
 
 // CheckName returns the display name for skip messages.
 func (d *DNSDelegationCheck) CheckName() string { return d.Name }
 
+// discoverExpectedNS reads the hosted zone's delegation set from Route53.
+func (d *DNSDelegationCheck) discoverExpectedNS(ctx context.Context) ([]string, error) {
+	args := []string{
+		"route53", "list-hosted-zones-by-name",
+		"--dns-name", d.Zone,
+		"--query", fmt.Sprintf("HostedZones[?Name=='%s.' && Config.PrivateZone==`false`].Id", d.Zone),
+		"--output", "text",
+	}
+	if d.Profile != "" {
+		args = append(args, "--profile", d.Profile)
+	}
+	out, err := d.Run(ctx, "aws", args...)
+	if err != nil {
+		return nil, fmt.Errorf("listing hosted zones: %s", strings.TrimSpace(string(out)))
+	}
+	zoneID := strings.TrimSpace(string(out))
+	if zoneID == "" || zoneID == "None" {
+		return nil, fmt.Errorf("no public hosted zone found for %s", d.Zone)
+	}
+
+	args = []string{
+		"route53", "get-hosted-zone",
+		"--id", zoneID,
+		"--query", "DelegationSet.NameServers",
+		"--output", "text",
+	}
+	if d.Profile != "" {
+		args = append(args, "--profile", d.Profile)
+	}
+	out, err = d.Run(ctx, "aws", args...)
+	if err != nil {
+		return nil, fmt.Errorf("reading delegation set: %s", strings.TrimSpace(string(out)))
+	}
+	ns := strings.Fields(strings.TrimSpace(string(out)))
+	if len(ns) == 0 {
+		return nil, fmt.Errorf("hosted zone %s has no delegation set", zoneID)
+	}
+	return ns, nil
+}
+
 // Check runs dig against 8.8.8.8 and compares the returned NS records
 // to the expected set. Comparison is case-insensitive and ignores trailing dots.
 func (d *DNSDelegationCheck) Check(ctx context.Context) CheckResult {
 	start := time.Now()
 	var details []string
+
+	expectedNS := d.ExpectedNS
+	if len(expectedNS) == 0 {
+		discovered, derr := d.discoverExpectedNS(ctx)
+		if derr != nil {
+			return CheckResult{
+				Name:    d.Name,
+				Status:  "failed",
+				Message: fmt.Sprintf("cannot discover Route53 NS for %s", d.Zone),
+				Details: []string{derr.Error()},
+				Elapsed: time.Since(start),
+			}
+		}
+		expectedNS = discovered
+	}
 
 	out, err := d.Run(ctx, "dig", "NS", d.Zone, "@8.8.8.8", "+short")
 	if err != nil {
@@ -70,8 +129,8 @@ func (d *DNSDelegationCheck) Check(ctx context.Context) CheckResult {
 	actualNS := parseNSRecords(outStr)
 
 	// Normalize expected NS records
-	expected := make([]string, len(d.ExpectedNS))
-	for i, ns := range d.ExpectedNS {
+	expected := make([]string, len(expectedNS))
+	for i, ns := range expectedNS {
 		expected[i] = normalizeNS(ns)
 	}
 	sort.Strings(expected)
