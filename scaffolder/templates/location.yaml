@@ -1,0 +1,13 @@
+# Catalog Location aggregating the platform's scaffolder templates (BACK Phase 3, ADR-062).
+# Registered by the portal image's app-config.production.yaml (catalog.locations). Templates here are
+# platform-owned and CODEOWNERS-protected: a template defines what a self-service run can do, so changes
+# get the same review bar as the sensitive infra paths.
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: scaffolder-templates
+  description: Platform-owned Backstage scaffolder templates (self-service provisioning, ADR-062)
+spec:
+  type: url
+  targets:
+    - ./hello-world/template.yaml

@@ -171,6 +171,13 @@ inputs = {
     },
   ]
 
+  # Scaffolder (BACK Phase 3, ADR-062): inject the separate GitHub WRITE App credential
+  # (platform/backstage/scaffolder-github-app — Contents+PRs read/write, installed on asanexample/platform
+  # only) as SCAFFOLDER_GITHUB_APP_ID/_PRIVATE_KEY. The image's app-config wires the App + the /create page +
+  # the platform-repo template location (scaffolder/templates/). Template execution is admin-only (the #197
+  # permission policy). See docs/runbooks/backstage-scaffolder-github-app.md.
+  enable_scaffolder = true
+
   # ArgoCD plugin (Phase 2.4b): read-only deployment view. The backend reaches our self-hosted ArgoCD
   # in-cluster over HTTP (server.insecure=true; the :443 Service port also maps to plaintext 8080, so https
   # would fail TLS). Read-only token (account `backstage`, role:readonly) synced from Secrets Manager

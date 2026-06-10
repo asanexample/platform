@@ -162,6 +162,22 @@ variable "github_app_secret_name" {
   default     = "platform/backstage/github-app"
 }
 
+# ---------------------------------------------------------------------------
+# Scaffolder GitHub write App (Phase 3 — ADR-062 §5, BACK self-service)
+# ---------------------------------------------------------------------------
+
+variable "enable_scaffolder" {
+  description = "Sync the scaffolder's GitHub WRITE App credential (scaffolder_github_app_secret_name) into the namespace and inject it as SCAFFOLDER_GITHUB_APP_ID/SCAFFOLDER_GITHUB_APP_PRIVATE_KEY. The image's app-config wires it as the second integrations.github.apps entry (the App is installed on asanexample/platform only). See docs/runbooks/backstage-scaffolder-github-app.md."
+  type        = bool
+  default     = false
+}
+
+variable "scaffolder_github_app_secret_name" {
+  description = "Secrets Manager path holding the scaffolder GitHub write App credential as JSON {appId, privateKey}. Created manually; see docs/runbooks/backstage-scaffolder-github-app.md."
+  type        = string
+  default     = "platform/backstage/scaffolder-github-app"
+}
+
 variable "oidc_gateway_alias_host" {
   description = <<-DESC
     Hostname to pin (via /etc/hosts) to the in-cluster Cilium gateway ClusterIP — the OIDC issuer host

@@ -1,0 +1,31 @@
+# Smoke-test template (#279, ADR-062 foundation): proves the scaffolder pipeline end-to-end — template
+# discovery from this repo, the /create form, task execution, RBAC (execution is admin-only via the #197
+# permission policy) — without touching GitHub or AWS. The real provisioning templates (New Team #280,
+# New Tenant #281) replace this as the catalog grows; keep it as a cheap health probe.
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: hello-world
+  title: Hello World (scaffolder smoke test)
+  description: Logs a message in a scaffolder task. Verifies the self-service pipeline without side effects.
+  tags:
+    - platform
+    - smoke-test
+spec:
+  owner: group:default/platform
+  type: debug
+
+  parameters:
+    - title: Message
+      properties:
+        message:
+          title: Message to log
+          type: string
+          default: Hello from the platform scaffolder
+
+  steps:
+    - id: log
+      name: Log the message
+      action: debug:log
+      input:
+        message: ${{ parameters.message }}
