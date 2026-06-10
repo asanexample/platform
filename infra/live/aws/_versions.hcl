@@ -70,6 +70,8 @@ locals {
     backstage           = "${local.source_base}/backstage"
     keycloak            = "${local.source_base}/keycloak"
     keycloak_config     = "${local.source_base}/keycloak-config"
+
+    actions_runner_controller = "${local.source_base}/actions-runner-controller"
   }
 
   # Helm chart version pins — single source of truth across environments
@@ -88,5 +90,7 @@ locals {
     cloudnative_pg        = "0.28.2" # CNPG operator chart (app v1.29.1) — Backstage DB (ADR-051)
     backstage             = "2.8.1"  # official backstage Helm chart (points at our platform/backstage image)
     keycloak              = "7.2.0"  # codecentric/keycloakx chart; Keycloak 26.6.3 via image-tag override — app IdP (ADR-053, B1)
+    arc_controller        = "0.14.2" # gha-runner-scale-set-controller (ADR-065 / #323)
+    arc_runner_set        = "0.14.2" # gha-runner-scale-set — pinned in lockstep with the controller
   }
 }
