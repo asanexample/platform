@@ -102,7 +102,7 @@ resource "aws_iam_role_policy" "runner_assume_deployer" {
   role  = aws_iam_role.runner[0].id
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
+    Statement = concat([
       {
         # Providers, secrets, and the keycloak port-forward run as PlatformDeployer.
         Sid      = "AssumePlatformDeployer"
@@ -119,7 +119,18 @@ resource "aws_iam_role_policy" "runner_assume_deployer" {
         Action   = ["sts:AssumeRole"]
         Resource = [var.state_role_arn]
       },
-    ]
+      ], var.sops_key_arn_pattern == "" ? [] : [{
+        # Decrypt the SOPS config key (ADR-066). root.hcl/common.hcl decrypt secrets.enc.yaml at config-eval.
+        # The key lives in the management account (cross-account KMS needs the caller's IAM too), scoped to the
+        # platform-sops key by alias so this isn't a blanket decrypt on management's keys.
+        Sid      = "DecryptSopsConfig"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt", "kms:DescribeKey"]
+        Resource = [var.sops_key_arn_pattern]
+        Condition = {
+          "ForAnyValue:StringEquals" = { "kms:ResourceAliases" = var.sops_key_alias }
+        }
+    }])
   })
 }
 

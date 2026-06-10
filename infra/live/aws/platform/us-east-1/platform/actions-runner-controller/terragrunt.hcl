@@ -116,5 +116,11 @@ inputs = {
   # the platform-account root unconditionally — granting the runner role AssumeRole on it is the only change.
   state_role_arn = "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:role/TerraformStateAccess"
 
+  # The runner decrypts the SOPS config key (ADR-066) at config-eval time — it lives in the management account
+  # (cross-account KMS needs the caller's IAM too). Scoped to the platform-sops key by alias condition, so this
+  # is not a blanket decrypt on management's KMS keys.
+  sops_key_arn_pattern = "arn:aws:kms:us-east-1:${include.base.locals.account_ids["mgmt"]}:key/*"
+  sops_key_alias       = "alias/platform-sops"
+
   tags = include.base.locals.tags
 }

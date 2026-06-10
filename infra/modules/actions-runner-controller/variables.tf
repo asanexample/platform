@@ -120,6 +120,18 @@ variable "state_role_arn" {
   type        = string
 }
 
+variable "sops_key_arn_pattern" {
+  description = "Resource pattern for the SOPS config-decryption KMS key (e.g. arn:aws:kms:us-east-1:<mgmt>:key/*). Paired with sops_key_alias to scope kms:Decrypt to just the platform-sops key (cross-account, ADR-066). Empty disables the grant."
+  type        = string
+  default     = ""
+}
+
+variable "sops_key_alias" {
+  description = "Alias of the SOPS key, used in a kms:ResourceAliases condition to scope the decrypt grant."
+  type        = string
+  default     = "alias/platform-sops"
+}
+
 variable "runner_service_account" {
   description = "ServiceAccount name for the runner pods (bound to the runner IAM role via Pod Identity)."
   type        = string
