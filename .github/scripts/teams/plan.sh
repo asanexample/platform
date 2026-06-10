@@ -21,14 +21,23 @@ overall_rc=0
   echo
 } > "$PLAN_MD"
 
+# Toolchain banner in the runner log (helps catch version drift between the image and /.tool-versions).
+echo "Toolchain: $(terragrunt --version 2>&1 | head -1) | $(tofu --version 2>&1 | head -1)"
+
 for unit in $UNITS; do
   raw="$(mktemp)"
-  if (cd "$BASE/$unit" && terragrunt plan -no-color -input=false) > "$raw" 2>&1; then
+  # Explicit `init` before `plan`: on a cold runner checkout terragrunt's implicit auto-init doesn't fire the
+  # same way it does locally, so the backend/dependency state is never set up and plan fails with "Backend
+  # initialization required". Initializing explicitly is the standard CI pattern and makes the run deterministic.
+  if (cd "$BASE/$unit" && terragrunt init -input=false -no-color && terragrunt plan -no-color -input=false) > "$raw" 2>&1; then
     status="planned"
   else
     status="PLAN FAILED"
     overall_rc=1
   fi
+  # Echo the FULL combined output to the runner log (collapsible). The PR comment truncates to the last
+  # MAX_LINES, which can hide an early root error (e.g. an init/auth failure); the log always keeps everything.
+  printf '::group::terragrunt %s — %s\n' "$unit" "$status"; cat "$raw"; printf '::endgroup::\n'
   lines=$(wc -l < "$raw")
   {
     echo "<details><summary><code>${unit}</code> — ${status}</summary>"
