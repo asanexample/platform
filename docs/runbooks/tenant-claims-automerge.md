@@ -34,8 +34,15 @@
 4. **Schema** — `crossplane beta validate` against the BASE XRD.
 5. **Composition render** — `crossplane render` with the BASE Composition v2 + the
    `.tenant-api-tests/render/` fixtures must succeed.
-6. **IAM lockout** — any `spec.apps.*.permissions.aws.policyStatements` fails the gate until the
-   IAM-safety work (#282) ships its permissions-boundary + allow-set validation.
+6. **IAM deny-set** (ADR-062 §4, #282) — `spec.apps.*.permissions.aws.policyStatements` is allowed but
+   **deny-set-validated**: any action whose lowercased service prefix is a sensitive service
+   (`iam`/`sts`/`organizations`/`account`), or a bare `*`/`*:*` wildcard, is rejected. The check lives in the
+   `restrict-tenant-envelope` Kyverno policy (`policystatements-no-escalation` rule), so the envelope dry-run
+   above covers it — and every minted role is additionally capped by the **AWS permissions boundary** (the hard
+   runtime ceiling, already live: `tenant-permissions-boundary-<cluster>`, attached by the Composition,
+   un-strippable by the provisioner). The deny-set is intentionally ⊇ the boundary. **Not resource-scoped:**
+   `s3:*` on `resources: ["*"]` (all account buckets) passes — broad but not escalation; per-team resource
+   prefixes are a documented follow-up, not #282.
 7. **Requester attribution** — scaffolder-authored claims must carry the
    `platform.refplat.org/requested-by` annotation (ADR-062 §4; presence-only in v1, see threat model).
 8. **Aggregate quota** (stateful, per team): sum of the team's claims' quotas in the PR-result tree
@@ -96,8 +103,10 @@ or every open PR deadlocks waiting for a check that never reports.
   bypasses the portal templates, so the server-side team-membership check doesn't bind it, and the
   `requested-by` annotation is presence-only. Blast radius is bounded by every team's envelope, the IAM
   lockout, and the claims-only path restriction (anything else needs an admin approval of the exact SHA).
-  Mitigations: key custody/rotation (`backstage-scaffolder-github-app.md`), and — future hardening with
-  #282 — a portal-signed claim attestation the gate verifies, making the stamp non-spoofable.
+  Mitigations: key custody/rotation (`backstage-scaffolder-github-app.md`), and — future hardening — a
+  portal-signed claim attestation the gate verifies, making the stamp non-spoofable. Note the IAM blast radius
+  is bounded regardless: the policyStatements deny-set (above) + the un-strippable AWS permissions boundary cap
+  what any claimed role can do.
 - **Merges via auto-merge don't trigger `push: main` workflows** (GITHUB_TOKEN actor): ci.yml's main-push
   run is skipped for automerged claims. Provisioning is unaffected (ArgoCD pulls git directly); the same
   validations already ran on the PR. Swap to an App-token-armed merge later if main-branch CI records

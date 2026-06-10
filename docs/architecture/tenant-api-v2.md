@@ -172,7 +172,7 @@ one requires cluster RBAC, the S1 self-provisioning gate). Logical identity = `(
 | `repoPath` | — | string | `k8s/<environment>` | Path to the manifest dir. |
 | `preview` | — | boolean | `false` | Create a PR-preview ApplicationSet (ADR-032). |
 | `serviceAccount` | — | string | — | Named SA the app's pods run as. A **cloud-neutral** identity is minted and bound to `(namespace, serviceAccount)` (AWS today = a Pod Identity association → `Pod-<team>-<app>`). Must not carry an IRSA annotation (backstop). |
-| `permissions` | — | object | `{}` | **Cloud-keyed** grants attached to `serviceAccount`. `permissions.aws.policyStatements: []` (sid/effect/actions/resources — same shape as v1alpha1 `aws.policyStatements`), capped by the deny-escalation boundary. Per-app, not per-team — the fix for the single-`Pod-team` limitation. |
+| `permissions` | — | object | `{}` | **Cloud-keyed** grants attached to `serviceAccount`. `permissions.aws.policyStatements: []` (sid/effect/actions/resources — same shape as v1alpha1 `aws.policyStatements`). **Capped two ways (ADR-062 §4, #282):** the AWS deny-escalation permissions boundary (hard runtime ceiling, un-strippable) AND a deny-set check at CI + admission (`restrict-tenant-envelope/policystatements-no-escalation`) rejecting `iam`/`sts`/`organizations`/`account` actions + bare `*` wildcards. Per-app, not per-team — the fix for the single-`Pod-team` limitation. |
 
 `dataServices.<name>` (DataServiceSpec) — 🔒 Reserved:
 

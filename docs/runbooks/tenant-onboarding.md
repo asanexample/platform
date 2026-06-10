@@ -90,8 +90,15 @@ spec:
       preview: true # → ECR repo team-charlie/api; host api-charlie.preprod.aws.refplat.org
   aws:
     serviceAccount: app-charlie # the named SA the app's pods run as
-    # Generic IAM granted to Pod-team-charlie (capped by the deny-escalation boundary). Empty = no AWS perms.
-    # NOTE: S3 buckets are NOT created (that was a demo) — grant access to existing resources here.
+    # Generic IAM granted to the app's Pod-Identity role. Empty = no AWS perms. Existing resources only
+    # (no buckets are created for you). DENY-SET-VALIDATED (ADR-062 §4, #282) at CI + admission: the
+    # iam/sts/organizations/account services and bare `*`/`*:*` wildcards are REJECTED; everything else
+    # (e.g. s3:GetObject, sqs:*, dynamodb:*) is allowed and additionally capped by the AWS permissions
+    # boundary at runtime. Example of a compliant statement:
+    #   policyStatements:
+    #     - sid: ReadTeamBucket
+    #       actions: ["s3:GetObject", "s3:ListBucket"]
+    #       resources: ["arn:aws:s3:::team-charlie-*", "arn:aws:s3:::team-charlie-*/*"]
     policyStatements: []
   # resourceQuota omitted → XRD defaults (cpu 4, memory 8Gi, pods 20, …)
   # developerAccess omitted → enabled by default

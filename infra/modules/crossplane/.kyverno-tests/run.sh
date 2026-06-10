@@ -56,4 +56,15 @@ must_flag  "$OUT" badenv "environment-within-envelope"
 OUT="$(run_env resources-ghost.yaml values-ghost.yaml)"
 must_flag  "$OUT" ghostteam "team-must-exist"
 
-echo "tenant-envelope policy checks passed (tier/env/residency/quota/team-existence)."
+# policystatements-no-escalation (ADR-062 §4, #282) — platform-global IAM deny-set. All within the alpha
+# envelope so only the IAM rule can flag.
+OUT="$(run_env resources-iam.yaml values-iam.yaml)"
+must_admit "$OUT" iamok      # compliant s3 statement
+must_admit "$OUT" iamnoperm  # no permissions block (foreach no-op)
+must_flag  "$OUT" iambad   "policystatements-no-escalation"  # iam:CreateUser
+must_flag  "$OUT" iamcase  "policystatements-no-escalation"  # IAM:PassRole (case-evasion)
+must_flag  "$OUT" iamsts   "policystatements-no-escalation"  # sts:* (subsumption)
+must_flag  "$OUT" iamstar  "policystatements-no-escalation"  # bare *
+must_flag  "$OUT" iammulti "policystatements-no-escalation"  # escalation hidden in a 2nd app
+
+echo "tenant-envelope policy checks passed (tier/env/residency/quota/team-existence/iam-escalation)."
