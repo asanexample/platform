@@ -131,10 +131,10 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # This SHA (asanexample/backstage#29) adds tenant provisioning visibility (#284, ADR-064): the projection
-  # stamps the Kubernetes annotations + lifecyclePhase on the tenant System, app.extensions widens the ArgoCD
-  # cards to System entities, and the projection refresh drops to 5 min. Builds on set-lifecycle-phase (#28).
-  image_tag = "e8157b8411f16fc9a760ee887bb49fd7cd0d1f9f"
+  # This SHA (asanexample/backstage#30) scopes the Roadie ArgoCD full-page tab to kind:component so it stops
+  # rendering blank on the tenant System (a tenant is multi-app → app-selector, not the app-name the tab
+  # needs); the tenant page keeps the working ArgoCD overview card. Builds on tenant visibility (#29, #284).
+  image_tag = "16305a7fdbfc641bb30f8d6118fb2cda96e11b2d"
 
   # Split-horizon for OIDC: pin keycloak.aws.refplat.org to the gateway's ClusterIP so the backend hits the
   # gateway Envoy directly (the public-name → internal-NLB hairpin is flaky). The ClusterIP is resolved
