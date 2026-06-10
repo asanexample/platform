@@ -11,7 +11,9 @@ permissions:
 
 env:
   TEST_AWS_REGION: us-west-2
-  TOFU_VERSION: "1.9.0"
+  # Canonical pin — keep in sync with /.tool-versions (the single source of truth). This weekly Terratest
+  # workflow uses a workflow-level env (one place to change) rather than the `versions` job in ci.yml.
+  TOFU_VERSION: "1.12.1"
   GO_VERSION: "1.22"
 
 jobs:

@@ -1,0 +1,17 @@
+# Canonical CLI tool versions for the platform — the single source of truth.
+#
+# Consumed by:
+#   - local dev      : `mise install` (or asdf) reads this file natively
+#   - CI             : .github/workflows/*.yml read these pins (see the `versions` job in ci.yml)
+#   - runner image   : the platform/gha-runner image build passes these as --build-args (ADR-065)
+#
+# Bump a version HERE and everything else follows — that's the point: the self-hosted runner, CI, and
+# your laptop can't drift apart. Latest stable as of 2026-06-10, with one deliberate exception:
+# kubectl tracks the CLUSTER's minor (v1.35.x), not absolute latest, to stay within the ±1 skew policy —
+# bump it when the cluster minor moves. Helm stays on the 3.x line by choice (the helm CLI is debug-only;
+# chart installs go through the Terraform helm provider, pinned in _versions.hcl).
+opentofu 1.12.1
+terragrunt 1.0.7
+kubectl 1.35.5
+helm 3.21.0
+awscli 2.35.1
