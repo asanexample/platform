@@ -1,0 +1,78 @@
+name: Teams — plan on PR
+
+# Plan the access-model units (keycloak-config, argocd, argocd-apps) for a `gitops/teams/**` PR and post the
+# terragrunt plan as a sticky comment for review (#305 Phase 1, ADR-053). Runs on the in-VPC `platform-infra`
+# ARC runner — the only place a plan can reach the private EKS API + the keycloak port-forward.
+#
+# SECURITY: `pull_request_target` runs the workflow, the units, the modules, the scripts, and root.hcl all from
+# the trusted BASE. The PR's content is overlaid ONLY as `gitops/teams` DATA (the units read it via `fileset`);
+# nothing from the PR head is ever executed, templated, or interpolated.
+
+on:
+  pull_request_target:
+    branches: [main]
+    paths:
+      - gitops/teams/**
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write # post/update the sticky plan comment
+
+concurrency:
+  group: teams-plan-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    # In-VPC self-hosted runner (ARC). The toolchain (tofu/terragrunt/kubectl/aws/jq) is baked into the image;
+    # AWS creds come from the runner's Pod Identity, which terragrunt uses to assume PlatformDeployer (forced
+    # via TG_FORCE_DEPLOYER, since the runner is in-account) + TerraformStateAccess.
+    runs-on: platform-infra
+    env:
+      TG_FORCE_DEPLOYER: "1"
+      AWS_REGION: us-east-1
+    steps:
+      - name: Checkout base (trusted)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+
+      # Overlay ONLY the PR's gitops/teams as data — sparse, path-scoped, no credentials. Nothing here runs;
+      # the scripts/units that read it are the trusted base above.
+      # nosemgrep: yaml.github-actions.security.pull-request-target-code-checkout.pull-request-target-code-checkout
+      - name: Checkout PR team data (untrusted, data-only)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr-head
+          sparse-checkout: gitops/teams
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Overlay PR team data into the base tree
+        run: |
+          set -euo pipefail
+          rm -rf gitops/teams
+          mkdir -p gitops
+          cp -a pr-head/gitops/teams gitops/teams
+          rm -rf pr-head
+          echo "Team files under review:"; ls -1 gitops/teams
+
+      - name: Terragrunt plan the access-model units
+        env:
+          BASE: infra/live/aws/platform/us-east-1/platform
+          UNITS: keycloak-config argocd argocd-apps
+          PLAN_MD: ${{ runner.temp }}/teams-plan.md
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash .github/scripts/teams/plan.sh
+
+      - name: Post sticky plan comment
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MARKER: "<!-- teams-plan -->"
+          BODY_FILE: ${{ runner.temp }}/teams-plan.md
+        run: bash .github/scripts/teams/sticky-comment.sh
