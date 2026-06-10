@@ -131,10 +131,10 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # This SHA (asanexample/backstage#25) adds the scaffolder foundation (#279, ADR-062): the /create page,
-  # the write App as the second integrations.github.apps entry, and the platform-repo template location
-  # (scaffolder/templates/). Builds on the v2 platform-projection (#24) + RBAC #197 (#23).
-  image_tag = "97270c688a6e2d2b2a69ec68c6b8c7778dfb9b00"
+  # This SHA (asanexample/backstage#26) fixes the catalog rule glob for the platform repo (the old
+  # '**asanexample/platform**' pattern never matched — minimatch globstar semantics — so #25's Template
+  # ingestion was rejected). Builds on the scaffolder foundation (#25, #279/ADR-062) + projection v2 (#24).
+  image_tag = "a4437662f268f957aed59b7f4329f82611a3e17c"
 
   # Split-horizon for OIDC: pin keycloak.aws.refplat.org to the gateway's ClusterIP so the backend hits the
   # gateway Envoy directly (the public-name → internal-NLB hairpin is flaky). The ClusterIP is resolved
