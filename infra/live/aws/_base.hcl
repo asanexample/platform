@@ -67,7 +67,7 @@ locals {
   helm_versions = local.version_vars.locals.helm_versions
 
   # ---------------------------------------------------------------------------
-  # Secrets (via common.hcl -> secrets.hcl chain)
+  # Secrets (via common.hcl -> SOPS secrets.enc.yaml chain, ADR-066)
   # ---------------------------------------------------------------------------
   account_ids    = local.common_vars.locals.account_ids
   admin_email    = local.common_vars.locals.admin_email

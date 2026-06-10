@@ -3,28 +3,28 @@
 
 locals {
   # Load secrets (account IDs, emails, SSO config)
-  _secrets = read_terragrunt_config("${get_repo_root()}/infra/live/aws/secrets.hcl")
+  _secrets = yamldecode(sops_decrypt_file("${get_repo_root()}/infra/live/aws/secrets.enc.yaml"))
 
   # Account IDs and emails (flattened from secrets)
-  account_ids    = local._secrets.locals.account_ids
-  admin_email    = local._secrets.locals.admin_email
-  account_emails = local._secrets.locals.account_emails
+  account_ids    = local._secrets.account_ids
+  admin_email    = local._secrets.admin_email
+  account_emails = local._secrets.account_emails
 
   # External service IDs
-  cloudflare_zone_id = local._secrets.locals.cloudflare_zone_id
+  cloudflare_zone_id = local._secrets.cloudflare_zone_id
 
   # ArgoCD SSO (Identity Center SAML)
-  argocd_sso_url     = local._secrets.locals.argocd_sso_url
-  argocd_sso_ca_data = local._secrets.locals.argocd_sso_ca_data
+  argocd_sso_url     = local._secrets.argocd_sso_url
+  argocd_sso_ca_data = local._secrets.argocd_sso_ca_data
 
   # Keycloak app-IdP broker (Identity Center SAML, ADR-053). try()-guarded like Dex's — set after the manual
   # Keycloak SAML app exists (docs/runbooks/keycloak-sso.md). ca_data is the bare base64 cert body.
-  keycloak_sso_url     = try(local._secrets.locals.keycloak_sso_url, "")
-  keycloak_sso_ca_data = try(local._secrets.locals.keycloak_sso_ca_data, "")
+  keycloak_sso_url     = try(local._secrets.keycloak_sso_url, "")
+  keycloak_sso_ca_data = try(local._secrets.keycloak_sso_ca_data, "")
 
   # Environment -> AWS account ID mapping (safety validation)
   # Used by _base.hcl to verify env.hcl account_id matches the expected value.
-  environment_account_map = local._secrets.locals.account_ids
+  environment_account_map = local._secrets.account_ids
 
   # Project variables
   workload = "platform"

@@ -67,8 +67,10 @@ bin/
 .platctl-logs/
 .platctl-state.json
 
-# Secrets (real values, gitignored — see secrets.hcl.example for structure)
+# Secrets — plaintext forms are gitignored; only the SOPS-encrypted secrets.enc.yaml is committed (ADR-066).
+# secrets.hcl is kept locally as a DR copy + the source for re-encryption. See secrets.hcl.example for structure.
 **/secrets.hcl
+**/secrets.yaml
 
 # Private keys / certs (e.g. downloaded GitHub App keys — store in Secrets Manager, never commit)
 *.pem
