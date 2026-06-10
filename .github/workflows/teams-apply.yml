@@ -29,6 +29,10 @@ jobs:
     env:
       TG_FORCE_DEPLOYER: "1"
       AWS_REGION: us-east-1
+      # Read dependency outputs straight from their S3 state instead of `tofu output` in each dependency's cache —
+      # the cold runner checkout doesn't init those caches, so the output path fails "Backend initialization
+      # required" for every dependency; reading from state sidesteps it (the deps are already deployed). (#305)
+      TG_DEPENDENCY_FETCH_OUTPUT_FROM_STATE: "true"
     steps:
       - name: Checkout the merged commit (trusted)
         uses: actions/checkout@v4
