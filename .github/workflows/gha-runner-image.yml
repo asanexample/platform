@@ -1,0 +1,97 @@
+name: Build runner image
+
+# Builds the platform's self-hosted ARC runner image (docker/gha-runner/Dockerfile) and pushes it,
+# cosign-signed + SBOM'd, to the PLATFORM ECR repo platform/gha-runner (ADR-065 / #323). The toolchain
+# versions are read from /.tool-versions (the single source of truth) and passed as build-args, so a version
+# bump there rebuilds the image automatically. Scoped by path so ordinary IaC changes don't trigger a rebuild.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docker/gha-runner/**
+      - .tool-versions
+      - .github/workflows/gha-runner-image.yml
+  workflow_dispatch:
+
+permissions:
+  id-token: write # OIDC: AWS (ECR push) + cosign keyless signing
+  contents: read
+
+env:
+  ECR_REGISTRY: 829808296602.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REPO: platform/gha-runner
+
+jobs:
+  build:
+    # Native arm64 runner: the platform is all-Graviton, so the image must be arm64.
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read toolchain versions from /.tool-versions
+        id: tools
+        run: |
+          while read -r tool version _; do
+            case "$tool" in '' | \#*) continue ;; esac
+            echo "${tool}=${version}" >> "$GITHUB_OUTPUT"
+          done < .tool-versions
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::829808296602:role/github-actions-ecr-push-gha-runner
+          aws-region: us-east-1
+
+      - uses: aws-actions/amazon-ecr-login@v2
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/gha-runner
+          file: docker/gha-runner/Dockerfile
+          push: true
+          platforms: linux/arm64 # arm64-only — the platform is all-Graviton
+          tags: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}:${{ github.sha }}
+          build-args: |
+            TOFU_VERSION=${{ steps.tools.outputs.opentofu }}
+            TERRAGRUNT_VERSION=${{ steps.tools.outputs.terragrunt }}
+            KUBECTL_VERSION=${{ steps.tools.outputs.kubectl }}
+            HELM_VERSION=${{ steps.tools.outputs.helm }}
+            AWSCLI_VERSION=${{ steps.tools.outputs.awscli }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: "v2.5.2"
+
+      - name: Sign image (cosign keyless)
+        run: cosign sign --yes "${ECR_REGISTRY}/${ECR_REPO}@${{ steps.build.outputs.digest }}"
+
+      - name: Install Syft (download release binary + verify SHA-256)
+        env:
+          SYFT_VERSION: "1.44.0"
+        run: |
+          set -euo pipefail
+          # Match the runner arch — this job runs on a native arm64 runner (ubuntu-24.04-arm).
+          case "$(uname -m)" in
+            x86_64) goarch=amd64 ;;
+            aarch64 | arm64) goarch=arm64 ;;
+            *) echo "unsupported arch: $(uname -m)" >&2; exit 1 ;;
+          esac
+          base="https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}"
+          asset="syft_${SYFT_VERSION}_linux_${goarch}.tar.gz"
+          curl -sfL "${base}/${asset}" -o "${asset}"
+          curl -sfL "${base}/syft_${SYFT_VERSION}_checksums.txt" -o syft_checksums.txt
+          grep " ${asset}\$" syft_checksums.txt | sha256sum -c -
+          tar xzf "${asset}" syft && sudo install -m 0755 syft /usr/local/bin/syft
+
+      - name: Generate + attest SBOM (CycloneDX, cosign keyless)
+        env:
+          REF: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}@${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          syft "$REF" -o cyclonedx-json=sbom.cdx.json
+          cosign attest --yes --type cyclonedx --predicate sbom.cdx.json "$REF"

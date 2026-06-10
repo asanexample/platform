@@ -27,6 +27,12 @@ inputs = {
       tag_mutability = "IMMUTABLE_WITH_EXCLUSION" # image tags immutable; cosign sha256-* tags exempt
       tags           = { Service = "backstage" }
     }
+    # The self-hosted ARC runner image (platform infra; ADR-065 / #323). Built + cosign-signed by this repo's
+    # gha-runner-image.yml from docker/gha-runner/, pulled by the ARC runner scale set on the platform cluster.
+    "platform/gha-runner" = {
+      tag_mutability = "IMMUTABLE_WITH_EXCLUSION" # image tags immutable; cosign sha256-* tags exempt
+      tags           = { Service = "gha-runner" }
+    }
   }
 
   # Accounts granted cross-account image pull access
