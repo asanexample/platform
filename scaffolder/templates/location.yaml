@@ -11,3 +11,4 @@ spec:
   type: url
   targets:
     - ./hello-world/template.yaml
+    - ./new-team/template.yaml
