@@ -38,9 +38,14 @@ while IFS=$'\t' read -r filename status previous; do
   fi
 done < <(jq -r '.[] | [.filename, .status, (.previous_filename // "")] | @tsv' <<<"$files_json")
 
+has_teams=false
+{ [ "${#team_files[@]}" -gt 0 ] || [ "${#team_deleted_files[@]}" -gt 0 ]; } && has_teams=true
+
 out="${GITHUB_OUTPUT:-/dev/stdout}"
 {
   echo "team_files=${team_files[*]:-}"
   echo "team_deleted_files=${team_deleted_files[*]:-}"
   echo "non_team_changes=${non_team_changes}"
+  echo "has_teams=${has_teams}" # gates the validation steps — the workflow runs on every PR (required-check
+  #                               compatible) but only validates + comments when teams actually changed.
 } >>"$out"
