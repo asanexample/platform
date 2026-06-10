@@ -1,7 +1,8 @@
 # New Team (#280, ADR-062 §1 + ADR-063): admin-only template that authors the git-native Team CR
 # (identity + envelope) as a PR to gitops/teams/ — HUMAN REVIEW, never automerge (a Team grants an
-# envelope; a privilege grant warrants review — enforced by CODEOWNERS on /gitops/teams/ + branch
-# protection, not by anything in this template). Execution is admin-only via the #197 permission policy.
+# envelope; a privilege grant warrants review). Machine-enforced since #281: the Tenant Claims Gate FAILS
+# scaffolder-authored PRs outside the claim paths until an admin approves the current head SHA, and the
+# verify step below restricts execution to platform admins server-side.
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
@@ -86,6 +87,15 @@ spec:
           minimum: 1
 
   steps:
+    # Server-side admin gate (#281): the permission policy now lets ANY team member create scaffolder
+    # tasks (New Tenant self-service), so the admin restriction for THIS template is enforced here —
+    # template steps are server-stored, so the step can't be stripped by a client.
+    - id: verify
+      name: Verify platform-admin membership
+      action: platform:verify-team-membership
+      input:
+        requireAdmin: true
+
     - id: render
       name: Render the Team CR
       action: fetch:template

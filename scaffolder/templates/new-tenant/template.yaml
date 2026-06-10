@@ -1,0 +1,157 @@
+# New Tenant (#281, ADR-062 §1-2): TEAM-SCOPED self-service — a team member provisions a Tenant within
+# their Team's envelope. The PR this opens AUTO-MERGES when the Tenant Claims Gate passes (schema +
+# envelope dry-run + render + aggregate quota + path restriction); Kyverno enforces the envelope again at
+# admission. Authorization is layered: the permission policy lets team members run templates at all; the
+# platform:verify-team-membership step (server-stored — cannot be stripped by a client) binds the run to
+# the requester's own team; the gate + admission bound what the resulting claim can do.
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: new-tenant
+  title: New Tenant
+  description: >-
+    Provision a tenant for your team: an isolated namespace with quota, network policy, per-app ECR +
+    deploy identity, and GitOps delivery — bounded by your Team's envelope. Opens a PR that auto-merges
+    once CI proves the claim is in-envelope; no platform-team approval needed.
+  tags:
+    - self-service
+    - tenant
+spec:
+  owner: group:default/platform
+  type: tenant
+
+  parameters:
+    - title: Tenant
+      required:
+        - team
+        - name
+        - environment
+      properties:
+        team:
+          title: Team
+          type: string
+          description: Your team — membership is verified server-side; you can only provision for a team you belong to.
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+              spec.type: team
+            defaultKind: Group
+            allowArbitraryValues: false
+        name:
+          title: Tenant name
+          type: string
+          description: >-
+            Short lowercase identifier, letters/digits only (the namespace becomes <team>-<name>-<env>).
+            One tenant per (team, name, environment).
+          pattern: '^[a-z][a-z0-9]{1,15}$'
+          maxLength: 16
+        environment:
+          title: Environment
+          type: string
+          description: >-
+            Stage ladder. Must be within your Team envelope's allowedEnvironments (the gate and Kyverno
+            both enforce this — out-of-envelope stages fail the PR).
+          enum: ['dev', 'test', 'uat', 'staging', 'prod']
+          default: dev
+
+    - title: App & quota
+      required:
+        - appName
+        - repo
+      properties:
+        appName:
+          title: App name
+          type: string
+          description: The app key under spec.apps (often the same as the tenant name).
+          pattern: '^[a-z][a-z0-9-]{0,30}$'
+        repo:
+          title: GitHub repository (owner/repo)
+          type: string
+          description: >-
+            The app repo — the single source argocd-apps/policy/github-oidc derive delivery, supply-chain
+            identity, and ECR push access from.
+          pattern: '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
+        preview:
+          title: PR preview environments
+          type: boolean
+          default: false
+        serviceAccount:
+          title: Service account (optional)
+          type: string
+          description: Named SA the app's pods run as (Pod Identity binds to it). Defaults to app-<team>.
+          pattern: '^[a-z][a-z0-9-]{0,30}$'
+        cpu:
+          title: CPU quota (optional)
+          type: string
+          description: Per-tenant cap; defaults to the platform default (4). Counted against the Team's aggregate quotaCap.
+          pattern: '^[0-9]+m?$'
+        memory:
+          title: Memory quota (optional)
+          type: string
+          description: Defaults to 8Gi.
+          pattern: '^[0-9]+(Mi|Gi)$'
+        pods:
+          title: Pod quota (optional)
+          type: integer
+          description: Defaults to 20.
+          minimum: 1
+
+  steps:
+    - id: verify
+      name: Verify team membership
+      action: platform:verify-team-membership
+      input:
+        team: ${{ parameters.team }}
+
+    - id: render
+      name: Render the Tenant claim
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          team: ${{ (parameters.team | parseEntityRef).name }}
+          name: ${{ parameters.name }}
+          environment: ${{ parameters.environment }}
+          appName: ${{ parameters.appName }}
+          repo: ${{ parameters.repo }}
+          preview: ${{ parameters.preview }}
+          serviceAccount: ${{ parameters.serviceAccount }}
+          cpu: ${{ parameters.cpu }}
+          memory: ${{ parameters.memory }}
+          pods: ${{ parameters.pods }}
+          requestedBy: ${{ user.ref | default('unknown', true) }}
+
+    - id: pr
+      name: Open the provisioning PR (auto-merges when the gate passes)
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?owner=asanexample&repo=platform
+        branchName: tenant/${{ (parameters.team | parseEntityRef).name }}-${{ parameters.name }}-${{ parameters.environment }}
+        targetBranchName: main
+        title: 'feat(tenants): provision ${{ (parameters.team | parseEntityRef).name }}-${{ parameters.name }}-${{ parameters.environment }}'
+        commitMessage: |
+          feat(tenants): provision ${{ (parameters.team | parseEntityRef).name }}-${{ parameters.name }}-${{ parameters.environment }}
+
+          Requested-by: ${{ user.ref | default('unknown', true) }}
+        description: |
+          Provisions tenant **${{ (parameters.team | parseEntityRef).name }}-${{ parameters.name }}-${{ parameters.environment }}** (ADR-062 self-service).
+
+          Requested via the Backstage **New Tenant** template by `${{ user.ref | default('unknown', true) }}` — team membership verified server-side (ADR-062 §1/§4).
+
+          | | |
+          |---|---|
+          | team | `${{ (parameters.team | parseEntityRef).name }}` |
+          | environment | `${{ parameters.environment }}` |
+          | app | `${{ parameters.appName }}` → `${{ parameters.repo }}` |
+
+          **This PR auto-merges when the Tenant Claims Gate passes** (schema, envelope dry-run, composition
+          render, aggregate quota, path restriction) — see `docs/runbooks/tenant-claims-automerge.md`. On
+          merge, ArgoCD syncs the claim and Crossplane provisions; Kyverno re-enforces the envelope at
+          admission. If the app repo is NEW, the delivery consumers (`policy`, `argocd-apps`, `github-oidc`)
+          still need a terragrunt apply — see `docs/runbooks/tenant-onboarding.md`.
+
+  output:
+    links:
+      - title: Provisioning pull request (auto-merges when the gate passes)
+        url: ${{ steps.pr.output.remoteUrl }}
