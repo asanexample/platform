@@ -16,9 +16,10 @@ dependency "ecr" {
 
   mock_outputs = {
     repository_arns = {
-      "team-alpha/demo"    = "arn:aws:ecr:us-east-1:000000000000:repository/team-alpha/demo"
-      "team-bravo/demo"    = "arn:aws:ecr:us-east-1:000000000000:repository/team-bravo/demo"
-      "platform/backstage" = "arn:aws:ecr:us-east-1:000000000000:repository/platform/backstage"
+      "team-alpha/demo"     = "arn:aws:ecr:us-east-1:000000000000:repository/team-alpha/demo"
+      "team-bravo/demo"     = "arn:aws:ecr:us-east-1:000000000000:repository/team-bravo/demo"
+      "platform/backstage"  = "arn:aws:ecr:us-east-1:000000000000:repository/platform/backstage"
+      "platform/gha-runner" = "arn:aws:ecr:us-east-1:000000000000:repository/platform/gha-runner"
     }
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
@@ -110,6 +111,41 @@ inputs = {
               "ecr:CompleteLayerUpload",
             ]
             Resource = [dependency.ecr.outputs.repository_arns["platform/backstage"]]
+          },
+        ]
+      })
+    }
+    # The self-hosted ARC runner image-build role (ADR-065 / #323). Trusts ONLY the asanexample/platform repo
+    # on main; can push ONLY to platform/gha-runner. Deliberately a SEPARATE role from the repo's other trusts
+    # (Terratest in the test account; the future deployer role) — least privilege, no shared blast radius.
+    "github-actions-ecr-push-gha-runner" = {
+      repos    = ["platform"]
+      branches = ["main"]
+      events   = [] # main only — the image rebuilds on merge (no PR preview builds)
+      tags     = { Service = "gha-runner" }
+
+      inline_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [
+          {
+            Sid      = "ECRAuth"
+            Effect   = "Allow"
+            Action   = ["ecr:GetAuthorizationToken"]
+            Resource = "*"
+          },
+          {
+            Sid    = "ECRPush"
+            Effect = "Allow"
+            Action = [
+              "ecr:BatchCheckLayerAvailability",
+              "ecr:GetDownloadUrlForLayer",
+              "ecr:BatchGetImage",
+              "ecr:PutImage",
+              "ecr:InitiateLayerUpload",
+              "ecr:UploadLayerPart",
+              "ecr:CompleteLayerUpload",
+            ]
+            Resource = [dependency.ecr.outputs.repository_arns["platform/gha-runner"]]
           },
         ]
       })
