@@ -10,5 +10,7 @@ description: >-
 type: application
 # 0.2.0: add ArgoCD's remote-cluster assumed-role identity to excludePrincipals so GitOps-delivered XTenant
 # claims aren't denied on workload clusters (ArgoCD authenticates remotely via the cross-account ArgoCD IAM role).
-version: 0.2.1
+# 0.3.0: add policystatements-no-escalation to restrict-tenant-envelope (ADR-062 §4, #282) — deny-set on
+# self-service IAM policyStatements (sensitive-service prefixes + bare wildcards), lifting the gate's lockout.
+version: 0.3.0
 appVersion: "1.18.1"

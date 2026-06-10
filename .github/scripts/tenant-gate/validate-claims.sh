@@ -75,9 +75,11 @@ for claim in $CLAIM_FILES; do
   team_yaml="${TEAMS_DIR}/${team}.yaml"
   [ -f "$team_yaml" ] || fail "${claim}: Team '${team}' does not exist on the base branch (gitops/teams/) — onboard the team first (New Team flow)"
 
-  # --- IAM lockout (until #282) ---------------------------------------------------------------------
-  iam="$(yq '[.spec.apps[]? | select(.permissions.aws.policyStatements != null)] | length' "$f")"
-  [ "$iam" = "0" ] || fail "${claim}: spec.apps.*.permissions.aws.policyStatements is locked until the IAM-safety gate ships (#282) — remove it"
+  # --- self-service IAM (ADR-062 §4, #282) ----------------------------------------------------------
+  # No lockout: spec.apps.*.permissions.aws.policyStatements is now ALLOWED but deny-set-validated. The check
+  # lives in restrict-tenant-envelope (policystatements-no-escalation), so the envelope dry-run below catches
+  # escalation requests (iam/sts/organizations/account services + bare wildcards) for free — and the minted
+  # role is boundary-capped at runtime regardless. No separate gate logic needed.
 
   # --- requester attribution (scaffolder-authored PRs, ADR-062 §4) ----------------------------------
   if [ "$BOT_AUTHOR" = "true" ]; then
@@ -99,7 +101,7 @@ for claim in $CLAIM_FILES; do
   out="$(kyverno apply "$ENVPOL" --resource "$normalized" --values-file "$values" 2>&1 || true)"
   if grep -q " failed" <<<"$out"; then
     printf '%s\n' "$out" >&2
-    fail "${claim}: envelope dry-run DENIED (restrict-tenant-envelope) — claim exceeds Team '${team}' envelope"
+    fail "${claim}: DENIED by restrict-tenant-envelope (the kyverno output above names the rule — envelope tier/env/residency/quota, or IAM policystatements-no-escalation)"
   fi
   grep -Eq 'pass: [1-9]' <<<"$out" || { printf '%s\n' "$out" >&2; fail "${claim}: envelope dry-run evaluated no rules (vacuous pass) — gate bug or policy drift"; }
 

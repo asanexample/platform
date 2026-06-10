@@ -140,7 +140,7 @@ jobs:
           go install -ldflags "-X github.com/crossplane/crossplane/v2/internal/version.version=${CROSSPLANE_VERSION}" "github.com/crossplane/crossplane/v2/cmd/crank@${CROSSPLANE_VERSION}"
           sudo install -m 0755 "$(go env GOPATH)/bin/crank" /usr/local/bin/crossplane
 
-      - name: Validate claims (shape, team, schema, envelope dry-run, render, IAM lockout)
+      - name: Validate claims (shape, team, schema, envelope + IAM dry-run, render)
         if: steps.classify.outputs.claim_files != ''
         env:
           BASE_DIR: ${{ github.workspace }}/base

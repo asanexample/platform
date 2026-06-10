@@ -28,5 +28,19 @@ excludePrincipals:
 # in-cluster SA above. Scoped to the cluster's own account (no account wildcard).
 extraExcludePrincipals: []
 
+# Platform-global deny-set for self-service IAM (ADR-062 §4, #282). An app's claim may author
+# spec.apps.<app>.permissions.aws.policyStatements; this is the set of AWS services whose actions are
+# REJECTED outright (the policystatements-no-escalation rule denies any action whose lowercased service
+# prefix is in this list — and, because a bare `*`/`*:*` action has the prefix `*` which set-wildcard-matches
+# any entry here, those broad wildcards are caught too). Mirrors + is intentionally ⊇ the AWS permissions
+# boundary (iam/organizations/account + all of sts; the boundary denies sts:AssumeRole*, we deny the whole
+# service). Being stricter than the boundary never grants more. NOT resource-scoped (e.g. s3:* on * still
+# passes — least-privilege resource prefixes are a documented follow-up, not this).
+iamSensitiveServices:
+  - iam
+  - sts
+  - organizations
+  - account
+
 # Labels stamped on every ClusterPolicy.
 commonLabels: {}

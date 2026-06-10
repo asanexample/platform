@@ -51,6 +51,9 @@ printf '%s' "$OUT" | grep -q 'external-name: Pod-payments-payments-api-prod-api'
 printf '%s' "$OUT" | grep -q 'serviceAccount: payments-api'    || { echo "::error::canonical association SA wrong"; exit 1; }
 printf '%s' "$OUT" | grep -q 's3:GetObject'                    || { echo "::error::canonical per-app RolePolicy missing the granted action"; exit 1; }
 printf '%s' "$OUT" | grep -q 'ReadCustomerBucket'              || { echo "::error::canonical per-app RolePolicy Sid missing"; exit 1; }
+# The deny-escalation permissions boundary (ADR-062 §4, #282) must be attached to every minted role — the hard
+# runtime ceiling behind the policyStatements deny-set. Sourced from EnvironmentConfig.permissionsBoundaryArn.
+printf '%s' "$OUT" | grep -q 'permissionsBoundary: arn:aws:iam::111122223333:policy/tenant-boundary' || { echo "::error::minted role missing the permissions boundary"; exit 1; }
 printf '%s' "$OUT" | grep -q 'external-name: team-payments/api' || { echo "::error::ECR repo team-payments/api not rendered"; exit 1; }
 # External custom domain (not under our wildcard) → status.domains Pending (NOT admitted); the generated host
 # api-payments-prod.preprod.aws.refplat.org stays Active.
