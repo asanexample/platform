@@ -35,6 +35,7 @@ modules/
 | [secret-stores](secret-stores/) | ClusterSecretStore for Secrets Manager and SSM Parameter Store |
 | [tailscale](tailscale/) | Tailscale Operator, subnet router, split DNS |
 | [tailscale-admin](tailscale-admin/) | Tailnet ACL management, OAuth client provisioning |
+| [actions-runner-controller](actions-runner-controller/) | Self-hosted GitHub Actions runners (ARC) — in-VPC CI for cluster-facing applies (ADR-065) |
 | [tenant-claims](tenant-claims/) | Helm chart rendering XTenant claims, delivered by the `tenant-claims` unit (ADR-046/048) |
 | [vcluster](vcluster/) | vCluster Helm deployment (deferred -- see ADR-033) |
 

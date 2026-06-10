@@ -70,7 +70,8 @@ are the substrate that stack composes onto. This work begins now that the founda
 ## Quick Start
 
 ```bash
-# Prerequisites: OpenTofu 1.11, Terragrunt 1.x, AWS CLI v2, kubectl, helm
+# Prerequisites: the CLI toolchain pinned in /.tool-versions (OpenTofu, Terragrunt, kubectl, helm, AWS CLI v2).
+# `mise install` (or asdf) installs the exact versions; CI and the self-hosted runner image read the same file.
 
 # Authenticate (SSO via IAM Identity Center)
 aws sso login --profile management
@@ -182,7 +183,7 @@ The full dependency DAG is documented in [CLAUDE.md](CLAUDE.md). The preferred d
 
 ## Modules
 
-### Shared — cloud-agnostic (18)
+### Shared — cloud-agnostic (19)
 
 | Module | Description |
 |--------|-------------|
@@ -202,6 +203,7 @@ The full dependency DAG is documented in [CLAUDE.md](CLAUDE.md). The preferred d
 | [secret-stores](infra/modules/secret-stores/) | ClusterSecretStore for AWS Secrets Manager and SSM |
 | [tailscale](infra/modules/tailscale/) | Tailscale Operator, subnet router, split DNS |
 | [tailscale-admin](infra/modules/tailscale-admin/) | Tailnet ACL and OAuth client management |
+| [actions-runner-controller](infra/modules/actions-runner-controller/) | Self-hosted GitHub Actions runners (ARC) on the platform cluster — in-VPC CI for cluster-facing applies (ADR-065) |
 | [crossplane](infra/modules/crossplane/) | Crossplane v2 control plane — hub (ECR provisioning) + per-cluster `Tenant` XRD/Composition; the tenant control plane (ADR-046/048) |
 | [tenant-claims](infra/modules/tenant-claims/) | Renders `XTenant` claims that the Composition reconciles into complete tenants (ADR-046/048) |
 | [vcluster](infra/modules/vcluster/) | vCluster Helm (deferred — ADR-033) |

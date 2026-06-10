@@ -2,7 +2,9 @@
 
 **Date:** 2026-06-10
 
-**Status:** Proposed
+**Status:** Accepted — implemented for the platform-cluster increment (2026-06-10). The `platform-infra`
+runner pool is live and registered (idle at 0). Preprod / cross-VPC runners and the apply-on-merge rollout
+(#305) remain deferred follow-ups.
 
 ## Context
 
@@ -178,6 +180,13 @@ superseded incrementally as those phases land, not in one cut-over.
   alternative for cluster-facing applies; it was not justified when only AWS-only access was needed.
 - **Idle latency / cold starts.** Scale-to-zero means the first job after idle waits for a runner pod to
   schedule and register. Acceptable for infra applies; tunable with a warm-pool minimum if needed.
+- **Kyverno RBAC-hardening collision (found on first apply).** The ARC controller authors a per-listener
+  `Role` in the runners namespace, which the cluster-scoped `restrict-wildcard-rbac` policy denies in Enforce
+  — leaving the listener pod uncreated and the scale set unregistered. ARC is a trusted platform operator
+  (like Crossplane's rbac-manager and CloudNativePG), so its controller principal + namespaces are added to
+  the `policy` unit's `extra_exclude_principals` / `extra_exclude_namespaces` (`system:serviceaccount:arc-systems:*`,
+  `arc-systems`, `arc-runners`). On a rebuild the `policy` unit applies before ARC (it's early in the DAG), so
+  the exclusion is in place first; only the first-time apply needed a controller restart to clear the backoff.
 
 ## References
 

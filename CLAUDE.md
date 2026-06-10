@@ -4,7 +4,7 @@
 
 Multi-cloud IaC platform using OpenTofu (v1.12.1) + Terragrunt (v1.0.7). Currently targets AWS only (Azure/GCP removed). CLI tool versions (tofu, terragrunt, kubectl, helm, awscli) are pinned canonically in `/.tool-versions` — the single source of truth read by local dev (mise/asdf), CI, and the self-hosted runner image.
 
-- **Shared modules** (`infra/modules/`): argocd, argocd-apps, argocd-clusters, cert-manager, cilium, cloudflare/dns_delegation, cluster-rbac, crossplane, external-dns, external-secrets, gateway-config, policy, secret-stores, tailscale, tailscale-admin, tenant-claims, vcluster
+- **Shared modules** (`infra/modules/`): actions-runner-controller, argocd, argocd-apps, argocd-clusters, cert-manager, cilium, cloudflare/dns_delegation, cluster-rbac, crossplane, external-dns, external-secrets, gateway-config, policy, secret-stores, tailscale, tailscale-admin, tenant-claims, vcluster
 - **AWS modules** (`infra/modules/aws/`): cloudtrail, cross-vpc-dns, ecr, eks, eks-addons, eks-node-group, github_oidc, iam_roles, identity_center, networking, organizations, route53, route53_delegation, ssm-bastion, state_bootstrap, transit-gateway
 - **Live configs**: `infra/live/aws/` -- environment-specific Terragrunt units
 
@@ -71,6 +71,8 @@ networking ─┘                        |
 tailscale-admin ─── (no cluster deps, manages tailnet ACLs/OAuth)
 cloudtrail ──────── (no deps, secrets audit logging)
 cloudflare-dns ──── (no deps)
+
+actions-runner-controller ─ (eks, nodes, ext-secrets, secret-stores; policy must carry the arc-systems/arc-runners excludes first) — self-hosted GitHub Actions runners (ARC) on the platform cluster for in-VPC CI (ADR-065 / #323). **Applied LOCALLY / via platctl (break-glass)** — it's what lets CI manage the cluster, so it can't bootstrap itself. Manual prereq: the GitHub App + its Secrets Manager secret (docs/runbooks/arc-github-app.md).
 ```
 
 Preprod is similar but adds the federated `crossplane` + `tenant-claims` units (the Tenant control plane, ADR-048 — alpha/bravo are provisioned by `Tenant` claims, not the retired `tenants`/`pod-identity` units) and `transit-gateway` as spoke.

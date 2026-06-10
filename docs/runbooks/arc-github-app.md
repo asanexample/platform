@@ -32,6 +32,9 @@ Create it, then note the **App ID**.
 - On the App page → **Private keys** → **Generate a private key** (downloads a `.pem`).
 - **Install App** → install on the **`platform`** repo only (repo-scoped pool). After installing, the URL is
   `.../installations/<INSTALLATION_ID>` — note the **Installation ID**.
+- Shortcut for the IDs (no UI hunting): once installed,
+  `gh api /orgs/asanexample/installations --jq '.installations[] | select(.app_slug=="asanexample-arc-runners") | {app_id, installation_id: .id}'`
+  prints both the **App ID** and **Installation ID**.
 
 ## 3. Store in Secrets Manager
 

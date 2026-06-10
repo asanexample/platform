@@ -1,7 +1,7 @@
 # Infrastructure as Code
 
 This directory contains the Infrastructure as Code (IaC) for the platform, managed with
-**OpenTofu** (v1.11) + **Terragrunt**. The platform is **AWS-only** today — the Azure and
+**OpenTofu** + **Terragrunt** (CLI versions pinned in `/.tool-versions`). The platform is **AWS-only** today — the Azure and
 GCP modules/live trees were removed. The shared Kubernetes modules are written
 cloud-agnostically so a second cloud could be added without restructuring, but only AWS is
 exercised.
@@ -21,7 +21,7 @@ infra/
 
 ## Getting Started
 
-- Prerequisites: OpenTofu >= 1.6 (1.11 local), Terragrunt, AWS CLI.
+- Prerequisites: the CLI toolchain in `/.tool-versions` (OpenTofu, Terragrunt, AWS CLI) — `mise install` to match CI/prod; OpenTofu floor is `>= 1.6`.
 - Plan/apply from any live unit directory:
 
   ```bash

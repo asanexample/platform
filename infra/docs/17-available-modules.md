@@ -54,6 +54,7 @@ Deployed via Helm / the Kubernetes provider onto any cluster; reusable across cl
 | `secret-stores` | ClusterSecretStore (Secrets Manager + SSM backends) (ADR-024) |
 | `gateway-config` | Cilium Gateway API: Gateway, HTTPRoutes, ClusterIssuer (internal/public NLB) (ADR-017/029) |
 | `tailscale` / `tailscale-admin` | Tailscale subnet-router operator + tailnet ACL/OAuth management (ADR-011) |
+| `actions-runner-controller` | Self-hosted GitHub Actions runners (ARC) on the platform cluster — in-VPC CI for cluster-facing applies; local/break-glass unit (ADR-065 / #323) |
 | `policy` | Kyverno engine + bundled ClusterPolicies (validate/mutate + cosign verify) (ADR-014) — see below |
 | `crossplane` | Crossplane v2 control plane — hub ECR provisioning + per-cluster `Tenant` XRD/Composition (ADR-046/048) |
 | `tenant-claims` | Helm chart rendering `XTenant` claims, delivered by the `tenant-claims` unit (ADR-046/048) |

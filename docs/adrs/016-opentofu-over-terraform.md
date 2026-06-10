@@ -55,7 +55,7 @@ terraform_binary = "tofu"
 
 ### Compatibility
 
-OpenTofu (currently **v1.11**, floor `>= 1.6.0`) is a drop-in replacement for Terraform 1.6.x:
+OpenTofu (pinned in `/.tool-versions`, currently **v1.12.1**; floor `>= 1.6.0`) is a drop-in replacement for Terraform 1.6.x:
 
 - All existing HCL modules work without modification
 - Provider lock files use `registry.opentofu.org` but resolve the same provider binaries

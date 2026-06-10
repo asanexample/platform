@@ -26,7 +26,7 @@
 
 | Cloud | Status | What's Deployed |
 |-------|--------|-----------------|
-| AWS | **Live** | **Platform** account: full EKS hub in us-east-1 (networking, IAM, EKS, Cilium, node groups, ArgoCD, cert-manager, external-dns/secrets, Kyverno, Tailscale, gateway ingress, **observability + Mimir**). **Preprod** account: a full tenant cluster (EKS, Cilium, Crossplane-Composition-provisioned tenants/Kyverno-Enforce, public gateway, **Falco**, Pod Identity — ADR-046/047/048). **Prod** account: networking + org scaffolding (no cluster yet). |
+| AWS | **Live** | **Platform** account: full EKS hub in us-east-1 (networking, IAM, EKS, Cilium, node groups, ArgoCD, cert-manager, external-dns/secrets, Kyverno, Tailscale, gateway ingress, **observability + Mimir**, Backstage, **self-hosted runners (ARC)** — ADR-065). **Preprod** account: a full tenant cluster (EKS, Cilium, Crossplane-Composition-provisioned tenants/Kyverno-Enforce, public gateway, **Falco**, Pod Identity — ADR-046/047/048). **Prod** account: networking + org scaffolding (no cluster yet). |
 | Azure | **Planned** | No `live/azure` or `modules/azure` exists yet. The shared modules and config hierarchy are parameterized so Azure can be added without restructuring (ADR-001/008). |
 | GCP | **Planned** | Same as Azure — reserved in the CIDR plan (ADR-015), not yet present. |
 
@@ -292,7 +292,7 @@ lock table.
 
 | Component | Version |
 |-----------|---------|
-| OpenTofu | >= 1.6.0 (CI uses 1.9.0; 1.11 in use locally) |
+| OpenTofu | floor `>= 1.6.0`; exact pin in `/.tool-versions` (1.12.1) — CI + local + the runner image all read it |
 | Terragrunt | Latest (installed in CI from GitHub releases) |
 | AWS Provider | 6.47.0 |
 | Helm Provider | >= 3.0 |
