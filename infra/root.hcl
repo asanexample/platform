@@ -89,9 +89,16 @@ locals {
 
   environment_vars = read_terragrunt_config(find_in_parent_folders("env.hcl", "${get_terragrunt_dir()}/dummy.hcl"))
 
-  aws_region      = get_env("TF_VAR_aws_region", "us-east-1")
-  aws_account_id  = try(local.environment_vars.locals.account_id, "")
-  aws_assume_role = local.aws_account_id != "" ? local.aws_account_id != get_aws_account_id() : false
+  aws_region     = get_env("TF_VAR_aws_region", "us-east-1")
+  aws_account_id = try(local.environment_vars.locals.account_id, "")
+
+  # CI escape hatch (#305 / ADR-065). The normal rule assumes PlatformDeployer only when the caller's account
+  # differs from the target — true for an operator running from `management`, but NOT for the in-VPC ARC runner,
+  # which lives IN the platform account. Without this, an in-account runner would run the providers as its bare
+  # (non-admin) role. `TG_FORCE_DEPLOYER=1` forces the assume even in-account, making the runner a faithful
+  # stand-in for the operator's cross-account identity. Default off → byte-identical for local operators.
+  force_deployer  = get_env("TG_FORCE_DEPLOYER", "") == "1"
+  aws_assume_role = local.force_deployer || (local.aws_account_id != "" ? local.aws_account_id != get_aws_account_id() : false)
 
   cost_center = get_env("TF_VAR_cost_center", "Engineering")
   owner       = get_env("TF_VAR_owner", "Platform Team")
