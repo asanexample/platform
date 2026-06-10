@@ -1,0 +1,13 @@
+# Smoke test for the Tenant Claims Gate (#281) — a valid, in-envelope charlie claim. NOT for merging.
+apiVersion: platform.refplat.org/v1alpha2
+kind: XTenant
+metadata:
+  name: charlie-web-dev
+spec:
+  team: charlie
+  name: web
+  environment: dev
+  apps:
+    web:
+      repo: asanexample/app-charlie
+      serviceAccount: app-charlie
