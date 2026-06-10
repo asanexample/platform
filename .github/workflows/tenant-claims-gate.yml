@@ -1,0 +1,175 @@
+# Tenant Claims Gate (ADR-062 §3-4, #281) — the required check that makes tenant-claim PR automerge safe.
+#
+# CI-GATE INTEGRITY (§4): the trigger is `pull_request_target` + `pull_request_review`, so THIS definition
+# and every script it calls run from the PROTECTED BASE BRANCH — a PR cannot edit the gate that judges it.
+# The PR's content is checked out separately, sparse, credential-free, and treated strictly as YAML DATA:
+# never execute, helm-template, or interpolate anything from the head checkout.
+#
+# Decision table (see docs/runbooks/tenant-claims-automerge.md for the full model):
+#   author            diff                          outcome
+#   scaffolder App    ⊆ claim paths, checks pass    gate green + auto-merge armed (merges when ALL required checks pass)
+#   scaffolder App    ⊆ claim paths, check fails    gate red, no merge
+#   scaffolder App    anything else (New Team, …)   gate red until an admin APPROVES the CURRENT head SHA
+#                                                   (stale approvals don't count — in-gate dismiss-stale), never auto-armed
+#   human             touches claims                claims validated, never auto-armed
+#   human             no claims                     trivially green
+name: Tenant Claims Gate
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  contents: write # gh pr merge --auto
+  pull-requests: write
+
+concurrency:
+  group: tenant-claims-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  KYVERNO_VERSION: "1.18.1" # pin to the chart's appVersion (helm_versions.kyverno = 3.8.1)
+  CROSSPLANE_VERSION: "v2.2.1" # crank CLI (built from the Go module proxy — see install step)
+  MAX_TENANTS_PER_TEAM: "10"
+  SCAFFOLDER_APP_LOGIN: "asanexample-backstage-scaffolder[bot]"
+
+jobs:
+  gate:
+    name: Tenant Claims Gate
+    runs-on: ubuntu-latest
+    steps:
+      # The trusted side: gate scripts, XRD, Composition, tenant-policies chart, Team CRs — all from BASE.
+      - name: Checkout base (trusted)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          path: base
+
+      # The untrusted side: ONLY the claims tree, no credentials, data-only.
+      - name: Checkout head claims (untrusted, data-only)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: head
+          persist-credentials: false
+          sparse-checkout: |
+            gitops/tenant-claims
+          sparse-checkout-cone-mode: true
+
+      - name: Classify diff
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: base/.github/scripts/tenant-gate/classify-diff.sh
+
+      - name: Identify author
+        id: author
+        env:
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          bot=false
+          # The write App only ever pushes branches in this repo; a fork claiming the name buys nothing
+          # (it would be a different login), but require same-repo anyway — belt and braces.
+          if [ "$AUTHOR" = "$SCAFFOLDER_APP_LOGIN" ] && [ "$HEAD_REPO" = "$GITHUB_REPOSITORY" ]; then
+            bot=true
+          fi
+          echo "bot=$bot" >>"$GITHUB_OUTPUT"
+
+      # ADR-062 §1: App-authored PRs outside the claim surface (New Team onboarding, or anything a
+      # compromised App key might try) merge only after HUMAN review — machine-enforced here. The approval
+      # must be on the CURRENT head SHA: without a required-review rule GitHub never dismisses stale
+      # approvals, so an approve-then-push sequence would otherwise pass with unreviewed content.
+      - name: Require current-SHA admin approval (App-authored, non-claim diff)
+        if: steps.author.outputs.bot == 'true' && steps.classify.outputs.non_claim_changes == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          approvers=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" --paginate \
+            --jq 'group_by(.user.login) | map(max_by(.submitted_at))
+                  | .[] | select(.state == "APPROVED" and .commit_id == env.HEAD_SHA) | .user.login')
+          for login in $approvers; do
+            perm=$(gh api "repos/${REPO}/collaborators/${login}/permission" --jq .permission)
+            if [ "$perm" = "admin" ] || [ "$perm" = "maintain" ]; then
+              echo "approved by ${login} (${perm}) at ${HEAD_SHA} — pass"
+              exit 0
+            fi
+          done
+          echo "::error::scaffolder-authored PR touches non-claim paths — requires an admin/maintainer APPROVING review of the CURRENT commit (${HEAD_SHA}). New Team PRs never automerge (ADR-062 §1)."
+          exit 1
+
+      - name: Reject scaffolder-authored claim deletions
+        if: steps.author.outputs.bot == 'true' && steps.classify.outputs.claim_deletions == 'true'
+        run: |
+          echo "::error::the scaffolder never deletes claims — deprovisioning is a human flow until #283"
+          exit 1
+
+      # ---- tooling, only when there are claims to validate -------------------------------------------
+      - uses: azure/setup-helm@v4
+        if: steps.classify.outputs.claim_files != ''
+      - name: Install Kyverno CLI
+        if: steps.classify.outputs.claim_files != ''
+        run: |
+          curl -fsSL "https://github.com/kyverno/kyverno/releases/download/v${KYVERNO_VERSION}/kyverno-cli_v${KYVERNO_VERSION}_linux_x86_64.tar.gz" -o kyverno.tgz
+          tar xzf kyverno.tgz kyverno
+          sudo install -m 0755 kyverno /usr/local/bin/kyverno
+      - uses: actions/setup-go@v5
+        if: steps.classify.outputs.claim_files != ''
+        with:
+          go-version: stable
+      - name: Install Crossplane CLI (build crank from the Go module proxy)
+        if: steps.classify.outputs.claim_files != ''
+        run: |
+          # releases.crossplane.io intermittently 403s runner IPs; the module proxy is checksum-verified
+          # and reliable. -ldflags injects the version `beta validate` needs for the base-schema image.
+          go install -ldflags "-X github.com/crossplane/crossplane/v2/internal/version.version=${CROSSPLANE_VERSION}" "github.com/crossplane/crossplane/v2/cmd/crank@${CROSSPLANE_VERSION}"
+          sudo install -m 0755 "$(go env GOPATH)/bin/crank" /usr/local/bin/crossplane
+
+      - name: Validate claims (shape, team, schema, envelope dry-run, render, IAM lockout)
+        if: steps.classify.outputs.claim_files != ''
+        env:
+          BASE_DIR: ${{ github.workspace }}/base
+          HEAD_DIR: ${{ github.workspace }}/head
+          CLAIM_FILES: ${{ steps.classify.outputs.claim_files }}
+          CLAIM_FILES_ADDED: ${{ steps.classify.outputs.claim_files_added }}
+          BOT_AUTHOR: ${{ steps.author.outputs.bot }}
+        run: base/.github/scripts/tenant-gate/validate-claims.sh
+
+      - name: Aggregate quota (stateful — sum of team claims ≤ quotaCap)
+        if: steps.classify.outputs.claim_files != ''
+        env:
+          BASE_DIR: ${{ github.workspace }}/base
+          HEAD_DIR: ${{ github.workspace }}/head
+          CLAIM_FILES: ${{ steps.classify.outputs.claim_files }}
+          CLAIM_DELETED_FILES: ${{ steps.classify.outputs.claim_deleted_files }}
+        run: base/.github/scripts/tenant-gate/aggregate-quota.sh
+
+      # Arm GitHub auto-merge ONLY for App-authored, claims-only, fully-validated PRs. GitHub performs the
+      # merge once ALL required checks pass (this job racing ci.yml is therefore harmless). Idempotent for
+      # synchronize/review re-runs. NB: pushes merged via GITHUB_TOKEN don't trigger main's push workflows
+      # (documented in the runbook; ArgoCD pulls git directly, so provisioning is unaffected).
+      - name: Arm auto-merge
+        if: >
+          steps.author.outputs.bot == 'true' &&
+          steps.classify.outputs.non_claim_changes == 'false' &&
+          steps.classify.outputs.claim_deletions == 'false' &&
+          steps.classify.outputs.claim_files != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -n "$(gh pr view "$PR_NUMBER" --json autoMergeRequest --jq '.autoMergeRequest // empty')" ]; then
+            echo "auto-merge already armed"
+          else
+            gh pr merge "$PR_NUMBER" --auto --squash
+            echo "auto-merge armed (squash) — merges when all required checks pass"
+          fi
