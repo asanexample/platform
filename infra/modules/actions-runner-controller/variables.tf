@@ -115,6 +115,11 @@ variable "deployer_role_arn" {
   type        = string
 }
 
+variable "state_role_arn" {
+  description = "TerraformStateAccess role ARN (in the management account) the runner assumes for the S3/DynamoDB backend. Terragrunt assumes this SEPARATELY from PlatformDeployer (root.hcl remote_state.role_arn), so a CI apply needs both."
+  type        = string
+}
+
 variable "runner_service_account" {
   description = "ServiceAccount name for the runner pods (bound to the runner IAM role via Pod Identity)."
   type        = string
