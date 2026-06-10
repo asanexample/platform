@@ -73,9 +73,13 @@ inputs = {
     }
     # Backstage on the platform cluster assumes this role for READ-ONLY live cluster view (Kubernetes
     # plugin, 2.4a). View, not ClusterAdmin — the portal only reads; AmazonEKSViewPolicy excludes Secrets.
+    # The `backstage-readers` group maps to the backstage-read-tenant-api ClusterRole (tenant-policies chart)
+    # for reading XTenant status — the provisioning-status card + notifier (#285); AmazonEKSViewPolicy is an
+    # EKS-managed authorizer that doesn't cover custom resources, so the group binding adds them on top.
     backstage = {
-      principal_arn = dependency.iam_roles.outputs.role_arns["Backstage"]
-      policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
+      principal_arn     = dependency.iam_roles.outputs.role_arns["Backstage"]
+      policy_arn        = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
+      kubernetes_groups = ["backstage-readers"]
     }
     break_glass = {
       principal_arn = "arn:aws:iam::${include.base.locals.account_id}:role/OrganizationAccountAccessRole"

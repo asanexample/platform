@@ -12,5 +12,7 @@ type: application
 # claims aren't denied on workload clusters (ArgoCD authenticates remotely via the cross-account ArgoCD IAM role).
 # 0.3.0: add policystatements-no-escalation to restrict-tenant-envelope (ADR-062 §4, #282) — deny-set on
 # self-service IAM policyStatements (sensitive-service prefixes + bare wildcards), lifting the gate's lockout.
-version: 0.3.0
+# 0.4.0: add backstage-read-tenant-api ClusterRole (aggregate-to-view) so the Backstage reader can read XTenant
+# status for the provisioning-status card + notifier (#285, ADR-064 §2).
+version: 0.4.0
 appVersion: "1.18.1"
