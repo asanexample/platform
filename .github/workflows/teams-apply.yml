@@ -1,0 +1,39 @@
+name: Teams — apply on merge
+
+# Converge the access-model units (keycloak-config -> argocd -> argocd-apps) after a `gitops/teams/**` change
+# merges to main (#305 Phase 1, ADR-053). Runs on the in-VPC `platform-infra` ARC runner. Inherently
+# merge-commit-only (push:main). This is the apply half of the New Team flow: a human-reviewed PR (carrying the
+# `teams-plan` comment) merges -> Keycloak groups/roles + ArgoCD RBAC converge with zero operator action,
+# always from the merged SHA (no more stale-local-checkout no-ops).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - gitops/teams/**
+
+permissions:
+  contents: read
+
+concurrency:
+  # Serialize Terragrunt applies (belt-and-suspenders with the DynamoDB state lock); never cancel a running
+  # apply mid-flight (that could leave the lock held / state partial). Shared group for all apply workflows.
+  group: terragrunt-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    # In-VPC self-hosted runner. Toolchain baked into the image; AWS via Pod Identity -> terragrunt force-assumes
+    # PlatformDeployer (TG_FORCE_DEPLOYER, since the runner is in-account) + TerraformStateAccess.
+    runs-on: platform-infra
+    env:
+      TG_FORCE_DEPLOYER: "1"
+      AWS_REGION: us-east-1
+    steps:
+      - name: Checkout the merged commit (trusted)
+        uses: actions/checkout@v4
+
+      - name: Terragrunt apply the access-model units
+        env:
+          BASE: infra/live/aws/platform/us-east-1/platform
+        run: bash .github/scripts/teams/apply.sh
