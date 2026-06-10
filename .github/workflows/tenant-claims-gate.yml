@@ -171,11 +171,14 @@ jobs:
           steps.classify.outputs.claim_files != ''
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+        # --repo everywhere: the workspace root is not a git repo (checkouts live in base/ and head/),
+        # so gh cannot infer the repository from context.
         run: |
-          if [ -n "$(gh pr view "$PR_NUMBER" --json autoMergeRequest --jq '.autoMergeRequest // empty')" ]; then
+          if [ -n "$(gh pr view "$PR_NUMBER" --repo "$REPO" --json autoMergeRequest --jq '.autoMergeRequest // empty')" ]; then
             echo "auto-merge already armed"
           else
-            gh pr merge "$PR_NUMBER" --auto --squash
+            gh pr merge "$PR_NUMBER" --repo "$REPO" --auto --squash
             echo "auto-merge armed (squash) — merges when all required checks pass"
           fi
