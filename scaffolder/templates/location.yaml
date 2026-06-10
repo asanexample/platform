@@ -13,3 +13,4 @@ spec:
     - ./hello-world/template.yaml
     - ./new-team/template.yaml
     - ./new-tenant/template.yaml
+    - ./deprovision-tenant/template.yaml
