@@ -1,0 +1,26 @@
+# Deprovisioning grace state (ADR-062 #283): a decommissioning tenant. Proves the Composition zeroes the
+# ResourceQuota (reversible suspend — no pod can run) while everything else (namespace, IAM, ECR) is retained.
+# Explicit quota so the override is unambiguous (active would render these numbers; decommissioning → 0).
+apiVersion: platform.refplat.org/v1alpha2
+kind: XTenant
+metadata:
+  name: alpha-demo-dev
+spec:
+  team: alpha
+  name: demo
+  environment: dev
+  tier: standard
+  quota:
+    cpu: "4"
+    memory: 8Gi
+    pods: 20
+  lifecycle:
+    phase: decommissioning
+  apps:
+    demo:
+      repo: asanexample/app-alpha
+      repoPath: k8s/preprod
+      preview: true
+      serviceAccount: app-alpha
+  developerAccess:
+    enabled: true

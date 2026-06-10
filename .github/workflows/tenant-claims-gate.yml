@@ -116,7 +116,36 @@ jobs:
       - name: Reject scaffolder-authored claim deletions
         if: steps.author.outputs.bot == 'true' && steps.classify.outputs.claim_deletions == 'true'
         run: |
-          echo "::error::the scaffolder never deletes claims — deprovisioning is a human flow until #283"
+          echo "::error::the scaffolder never deletes claims — the hard-delete is a human, reviewed PR (ADR-062 #283). Use the Deprovision template to decommission, then open a deletion PR."
+          exit 1
+
+      # Deprovisioning guard (ADR-062 #283) for HUMAN-authored claim deletions (bot deletions already rejected).
+      # Two controls: the tenant must have been decommissioned first (a reversible grace window), AND the
+      # destroy must be reviewed — a current-SHA admin/maintainer approval (main has no required-review rule, so
+      # without this a member with merge rights could self-merge an irreversible delete; GitHub blocks
+      # self-approval, forcing a platform reviewer).
+      - name: Guard claim deletions (decommission-first + reviewed)
+        if: steps.classify.outputs.claim_deletions == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_DIR: ${{ github.workspace }}/base
+          CLAIM_DELETED_FILES: ${{ steps.classify.outputs.claim_deleted_files }}
+        run: |
+          base/.github/scripts/tenant-gate/validate-deletions.sh
+          approvers=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" --paginate \
+            --jq 'group_by(.user.login) | map(max_by(.submitted_at))
+                  | .[] | select(.state == "APPROVED" and .commit_id == env.HEAD_SHA) | .user.login')
+          for login in $approvers; do
+            perm=$(gh api "repos/${REPO}/collaborators/${login}/permission" --jq .permission)
+            if [ "$perm" = "admin" ] || [ "$perm" = "maintain" ]; then
+              echo "delete approved by ${login} (${perm}) at ${HEAD_SHA} — pass"
+              exit 0
+            fi
+          done
+          echo "::error::a tenant deletion (irreversible destroy) requires an admin/maintainer APPROVING review of the CURRENT commit (${HEAD_SHA}) — ADR-062 #283."
           exit 1
 
       # ---- tooling, only when there are claims to validate -------------------------------------------

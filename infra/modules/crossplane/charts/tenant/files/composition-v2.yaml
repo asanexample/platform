@@ -48,6 +48,14 @@ spec:
             {{- $ns := printf "%s-%s-%s" $team $name $environment }}
             {{- $tier := $spec.tier | default "standard" }}
             {{- $q := $spec.quota | default dict }}
+            {{- /* Lifecycle (ADR-062 #283): suspended/decommissioning = a REVERSIBLE grace state. We zero the
+                   ResourceQuota (pods + cpu/memory) so no new/rescheduled pod can run — workloads drain on the
+                   next reconcile — while the namespace, policies, IAM, and ECR are all retained. Flipping the
+                   phase back to active restores the quota. Nothing is destroyed until the claim is removed. */}}
+            {{- $phase := (($spec.lifecycle | default dict).phase) | default "active" }}
+            {{- $suspended := or (eq $phase "suspended") (eq $phase "decommissioning") }}
+            {{- $qCpu := $q.cpu }}{{- $qMem := $q.memory }}{{- $qPods := $q.pods }}
+            {{- if $suspended }}{{- $qCpu = "0" }}{{- $qMem = "0" }}{{- $qPods = "0" }}{{- end }}
             {{- $gw := "default" }}
             {{- $cfg := index .context "apiextensions.crossplane.io/environment" }}
             {{- $ecrCfg := $cfg.providerConfigEcr | default "default" }}
@@ -98,11 +106,11 @@ spec:
                     namespace: {{ $ns }}
                   spec:
                     hard:
-                      requests.cpu: "{{ $q.cpu }}"
-                      requests.memory: "{{ $q.memory }}"
-                      limits.cpu: "{{ $q.cpu }}"
-                      limits.memory: "{{ $q.memory }}"
-                      pods: "{{ $q.pods }}"
+                      requests.cpu: "{{ $qCpu }}"
+                      requests.memory: "{{ $qMem }}"
+                      limits.cpu: "{{ $qCpu }}"
+                      limits.memory: "{{ $qMem }}"
+                      pods: "{{ $qPods }}"
                       services: "{{ $q.services }}"
                       services.loadbalancers: "{{ $q.loadbalancers }}"
                       persistentvolumeclaims: "{{ $q.pvcs }}"
@@ -288,6 +296,11 @@ spec:
                 gotemplating.fn.crossplane.io/composition-resource-name: ecr-repo-{{ $app }}
                 crossplane.io/external-name: team-{{ $team }}/{{ $app }}
             spec:
+              # Orphan on delete (ADR-062 #283): the ECR repo is team-scoped (team-<team>/<app>) and SHARED
+              # across the team's tenants/stages, so removing one tenant claim must NOT destroy images another
+              # tenant still uses (and there's no accidental image-loss path on deprovision). Cleanup is a
+              # deliberate manual purge / the cluster-teardown ECR orphan sweep — never a tenant delete.
+              deletionPolicy: Orphan
               providerConfigRef:
                 name: {{ $ecrCfg }}
               forProvider:
@@ -311,6 +324,7 @@ spec:
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: ecr-repopolicy-{{ $app }}
             spec:
+              deletionPolicy: Orphan # follows the repo (shared, retained on deprovision — ADR-062 #283)
               providerConfigRef:
                 name: {{ $ecrCfg }}
               forProvider:

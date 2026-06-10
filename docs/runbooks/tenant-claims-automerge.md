@@ -17,7 +17,8 @@
 | scaffolder App | only `gitops/tenant-claims/preprod/*.yaml` adds/modifies, all checks pass | gate green, **auto-merge armed** |
 | scaffolder App | same, any check fails | gate red, no merge |
 | scaffolder App | anything else (New Team PRs, or a compromised key straying) | gate red until an **admin approves the current head SHA**; never auto-armed |
-| scaffolder App | deletes/renames a claim | gate red (deprovisioning is a human flow until #283) |
+| scaffolder App | deletes/renames a claim | gate red (the hard-delete is a human, reviewed PR — ADR-062 #283; use the Deprovision template to decommission first) |
+| human | deletes a claim | allowed only if the tenant is `decommissioning` on base AND an admin approves the current SHA; never auto-armed (see [tenant-deprovisioning.md](tenant-deprovisioning.md)) |
 | human | touches claims | claims fully validated; **never auto-armed** |
 | human | no claims | gate trivially green |
 

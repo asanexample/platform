@@ -41,7 +41,20 @@ printf '%s' "$OUT" | grep -q 'image: .*/team-alpha/\*'                        ||
 printf '%s' "$OUT" | grep -q 'name: restrict-route-hostnames-alpha-demo-dev' || { echo "::error::restrict-route-hostnames policy not rendered"; exit 1; }
 printf '%s' "$OUT" | grep -q 'demo-alpha-dev.preprod.aws.refplat.org'        || { echo "::error::generated host demo-alpha-dev not in the allow-list"; exit 1; }
 printf '%s' "$OUT" | grep -q 'reason: GeneratedHost'                         || { echo "::error::status.domains GeneratedHost entry missing"; exit 1; }
-echo "  ✓ alpha OK (11 K8s Objects, ns alpha-demo-dev, role Pod-alpha-demo-dev-demo, ECR team-alpha/demo, restrict-images + route-hostname guards)"
+# ECR is retained on tenant delete (ADR-062 #283): the Repository + its policy carry deletionPolicy: Orphan so
+# removing a claim never destroys the team-scoped/shared images. Two Orphans (Repository + RepositoryPolicy).
+op=$(printf '%s' "$OUT" | grep -c 'deletionPolicy: Orphan' || true); [ "$op" -ge 2 ] || { echo "::error::ECR Repository/RepositoryPolicy must be deletionPolicy: Orphan (got $op)"; exit 1; }
+echo "  ✓ alpha OK (11 K8s Objects, ns alpha-demo-dev, role Pod-alpha-demo-dev-demo, ECR team-alpha/demo Orphan, restrict-images + route-hostname guards)"
+
+echo "== render decommissioning (lifecycle.phase) → reversible suspend: ResourceQuota zeroed, footprint retained =="
+OUT="$(render "${here}/claims/decommissioning.yaml")"
+printf '%s' "$OUT" | grep -q 'pods: "0"'         || { echo "::error::decommissioning must zero the ResourceQuota pods"; printf '%s\n' "$OUT"; exit 1; }
+printf '%s' "$OUT" | grep -q 'requests.cpu: "0"' || { echo "::error::decommissioning must zero requests.cpu"; exit 1; }
+# Everything else is RETAINED (reversible) — namespace, the minted role, ECR all still render.
+printf '%s' "$OUT" | grep -q 'name: alpha-demo-dev$'                 || { echo "::error::decommissioning must retain the namespace"; exit 1; }
+printf '%s' "$OUT" | grep -q 'external-name: Pod-alpha-demo-dev-demo' || { echo "::error::decommissioning must retain the per-app role"; exit 1; }
+printf '%s' "$OUT" | grep -q 'external-name: team-alpha/demo'         || { echo "::error::decommissioning must retain the ECR repo"; exit 1; }
+echo "  ✓ decommissioning OK (quota zeroed, namespace + role + ECR retained — reversible)"
 
 echo "== render canonical (pci/dedicated, app api w/ permissions) → per-app identity + RolePolicy =="
 OUT="$(render "${here}/claims/canonical.yaml")"

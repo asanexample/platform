@@ -52,6 +52,9 @@ for team in $teams; do
   sum_cpu=0 sum_mem=0 sum_pods=0 count=0
   for f in "${merged}/${CLAIMS_REL}"/*.yaml; do
     [ "$(yq '.spec.team' "$f")" = "$team" ] || continue
+    # A decommissioning tenant is winding down (its quota is zeroed by the Composition) — don't count it
+    # against the team's aggregate cap (ADR-062 #283).
+    [ "$(yq '.spec.lifecycle.phase // "active"' "$f")" = "decommissioning" ] && continue
     count=$((count + 1))
     norm="$("$NORMALIZE" "$f" "$XRD")"
     sum_cpu=$((sum_cpu + $(to_millicores "$(yq '.spec.quota.cpu' - <<<"$norm")")))
