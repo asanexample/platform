@@ -1,0 +1,6 @@
+# actionlint config. Declares our self-hosted runner labels so `runs-on:` against them isn't flagged as an
+# unknown label. `platform-infra` is the ARC runner scale set name (ADR-065 / #323) — workflows target it
+# directly (ARC scale sets register under their name, not the generic `self-hosted` label).
+self-hosted-runner:
+  labels:
+    - platform-infra

@@ -122,6 +122,24 @@ inputs = {
         },
       ]
 
+      # ARC self-hosted runners (ADR-065 / #323): the platform-cluster runner pool's Pod Identity role may
+      # assume PlatformDeployer to run terragrunt from CI. A SEPARATE statement (the SSO ArnLike above can't be
+      # appended to). Uses the account-root principal + an ArnLike on the runner role's ARN, so this is valid
+      # even before the ARC module creates that role (a condition, not a hard principal — no ordering cycle).
+      extra_trust_statements = [
+        {
+          actions    = ["sts:AssumeRole", "sts:TagSession"]
+          principals = { aws = ["arn:aws:iam::${include.base.locals.account_ids["platform"]}:root"] }
+          conditions = [
+            {
+              test     = "ArnLike"
+              variable = "aws:PrincipalArn"
+              values   = ["arn:aws:iam::${include.base.locals.account_ids["platform"]}:role/platform-use1-eks-arc-runner"]
+            },
+          ]
+        },
+      ]
+
       managed_policies = ["arn:aws:iam::aws:policy/AdministratorAccess"]
     }
 

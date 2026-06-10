@@ -50,6 +50,33 @@ data "aws_iam_policy_document" "trust" {
       }
     }
   }
+
+  # Additional trust statements (OR-ed with the primary one) — each with its own principals + conditions, so a
+  # role can admit a second principal under a different gate than the primary statement.
+  dynamic "statement" {
+    for_each = each.value.extra_trust_statements
+    content {
+      effect  = "Allow"
+      actions = statement.value.actions
+
+      dynamic "principals" {
+        for_each = statement.value.principals
+        content {
+          type        = lookup({ aws = "AWS", service = "Service", federated = "Federated" }, principals.key, "AWS")
+          identifiers = principals.value
+        }
+      }
+
+      dynamic "condition" {
+        for_each = statement.value.conditions
+        content {
+          test     = condition.value.test
+          variable = condition.value.variable
+          values   = condition.value.values
+        }
+      }
+    }
+  }
 }
 
 resource "aws_iam_role" "this" {

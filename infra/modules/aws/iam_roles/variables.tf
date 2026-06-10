@@ -20,6 +20,18 @@ variable "roles" {
       variable = string
       values   = list(string)
     })), [])
+    # Additional trust statements, OR-ed with the primary one above. Use when a role must trust a second
+    # principal under DIFFERENT conditions — e.g. PlatformDeployer's primary statement is SSO-admin-only, but
+    # it must ALSO admit the ARC runner role (no SSO condition). Same principal/condition shape as above.
+    extra_trust_statements = optional(list(object({
+      actions    = optional(list(string), ["sts:AssumeRole"])
+      principals = map(list(string))
+      conditions = optional(list(object({
+        test     = string
+        variable = string
+        values   = list(string)
+      })), [])
+    })), [])
     managed_policies = optional(list(string), [])
     inline_policies  = optional(map(string), {})
     tags             = optional(map(string), {}) # merged onto var.tags (e.g. { Team = "alpha" })
