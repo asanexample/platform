@@ -5,5 +5,8 @@ description: >-
   Composition that renders a tenant's Kubernetes resources (namespace, quota, limits, NetworkPolicies,
   CiliumNetworkPolicies, developer RoleBinding) via provider-kubernetes. Federated per-cluster (ADR-048).
 type: application
-version: 0.1.3
+# 0.2.0: deprovisioning safety (ADR-062 #283) — lifecycle.phase suspended/decommissioning zeroes the
+# ResourceQuota (reversible suspend); ECR Repository/RepositoryPolicy → deletionPolicy: Orphan (images retained
+# on tenant delete; the repo is team-scoped/shared).
+version: 0.2.0
 appVersion: "1.0.0"
