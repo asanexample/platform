@@ -131,10 +131,10 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # This SHA (asanexample/backstage#28) adds platform:set-lifecycle-phase (the deprovisioning edit action for
-  # the Deprovision Tenant template, #283/ADR-062). Builds on verify-team-membership (#27) + the scaffolder
-  # foundation (#25).
-  image_tag = "90ad78deb4daf6b0fc4a000ba015315e7fe33b72"
+  # This SHA (asanexample/backstage#29) adds tenant provisioning visibility (#284, ADR-064): the projection
+  # stamps the Kubernetes annotations + lifecyclePhase on the tenant System, app.extensions widens the ArgoCD
+  # cards to System entities, and the projection refresh drops to 5 min. Builds on set-lifecycle-phase (#28).
+  image_tag = "e8157b8411f16fc9a760ee887bb49fd7cd0d1f9f"
 
   # Split-horizon for OIDC: pin keycloak.aws.refplat.org to the gateway's ClusterIP so the backend hits the
   # gateway Envoy directly (the public-name → internal-NLB hairpin is flaky). The ClusterIP is resolved
