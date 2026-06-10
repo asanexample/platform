@@ -131,10 +131,11 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # This SHA (asanexample/backstage#30) scopes the Roadie ArgoCD full-page tab to kind:component so it stops
-  # rendering blank on the tenant System (a tenant is multi-app → app-selector, not the app-name the tab
-  # needs); the tenant page keeps the working ArgoCD overview card. Builds on tenant visibility (#29, #284).
-  image_tag = "16305a7fdbfc641bb30f8d6118fb2cda96e11b2d"
+  # This SHA (asanexample/backstage#33, #285) is the Tenant Status card (vertical deploy timeline on the tenant
+  # System, via the k8s proxy) + the tenant-ready notifier, plus the #33 polish: humanized durations and a
+  # coherence gate that hides misleading +Δ/"time to ready" on re-synced (mature) tenants, degrading to honest
+  # absolute timestamps. Needs platform#322's backstage-read-tenant-api RBAC (already applied).
+  image_tag = "d0ea08264c65c29c28aaa05ba1e224964e195373"
 
   # Split-horizon for OIDC: pin keycloak.aws.refplat.org to the gateway's ClusterIP so the backend hits the
   # gateway Envoy directly (the public-name → internal-NLB hairpin is flaky). The ClusterIP is resolved
