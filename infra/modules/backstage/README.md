@@ -19,6 +19,10 @@ catalog discovery, and the live Kubernetes / ArgoCD plugins.
   `oidc` sign-in provider. See [identity-and-sso](../../../docs/architecture/identity-and-sso.md).
 - **GitHub catalog discovery** (`enable_github_discovery`): syncs the read-only GitHub App credential
   (`platform/backstage/github-app`) and injects `GITHUB_APP_ID` / `GITHUB_APP_PRIVATE_KEY`.
+- **Scaffolder write App** (`enable_scaffolder`, default off): syncs the separate GitHub **write** App
+  credential (`platform/backstage/scaffolder-github-app` — Contents+PRs read/write on `asanexample/platform`
+  only, ADR-062 §5) and injects `SCAFFOLDER_GITHUB_APP_ID` / `SCAFFOLDER_GITHUB_APP_PRIVATE_KEY` for the
+  self-service templates (BACK Phase 3).
 - **Kubernetes plugin** (`enable_kubernetes_plugin`, default off): an EKS Pod Identity reader role
   (AmazonEKSViewPolicy) on this cluster, plus assume-role into cross-account read-only Backstage roles, with the
   `kubernetes` app-config rendered from `kubernetes_clusters`.
@@ -32,8 +36,8 @@ catalog discovery, and the live Kubernetes / ArgoCD plugins.
 
 - `image_tag` (required), `helm_chart_version` (required) — the image tag is the `asanexample/backstage` commit SHA.
 - `database` (`mode` / `instances` / `storage_size`), `db_cluster_name`, or `rds_host` + `rds_secret_name`.
-- `enable_oidc` / `enable_github_discovery` / `enable_kubernetes_plugin` / `enable_argocd_plugin` feature flags
-  and their per-feature secret-name + cluster/instance inputs.
+- `enable_oidc` / `enable_github_discovery` / `enable_scaffolder` / `enable_kubernetes_plugin` /
+  `enable_argocd_plugin` feature flags and their per-feature secret-name + cluster/instance inputs.
 - `host_aliases` — split-horizon resolution of the OIDC issuer host to the in-cluster gateway.
 - `cluster_name`, `region`, `deployer_role_arn`, `finalizer_clear_script` — for Pod Identity + the destroy drain.
 
@@ -52,3 +56,4 @@ annotation — AWS access is EKS Pod Identity (ADR-047). Exposure is wired by `g
 - ADR-051: Backstage developer portal
 - `docs/runbooks/backstage-argocd.md` — minting the read-only ArgoCD token
 - `docs/runbooks/backstage-github-app.md` — the read-only GitHub App credential
+- `docs/runbooks/backstage-scaffolder-github-app.md` — the scaffolder's separate GitHub write App (ADR-062)

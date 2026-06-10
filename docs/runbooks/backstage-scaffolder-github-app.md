@@ -61,11 +61,40 @@ Secrets Manager now. (`*.pem`/`*.key` are gitignored so it can't be committed, b
 
 ## How it's consumed
 
-The `backstage` module (`infra/modules/backstage`) syncs this secret to a K8s Secret via an ExternalSecret
-and injects `SCAFFOLDER_GITHUB_APP_ID` / `SCAFFOLDER_GITHUB_APP_PRIVATE_KEY`; `app-config.production.yaml`
-registers it as a second `integrations.github.apps` entry. Backstage's `publish:github:pull-request` action
-picks the App that has access to the target repo — so the write App is used only for `asanexample/platform`.
-Wiring tracked in #279.
+The `backstage` module (`infra/modules/backstage`, `enable_scaffolder = true`) syncs this secret to a K8s
+Secret via an ExternalSecret and injects `SCAFFOLDER_GITHUB_APP_ID` / `SCAFFOLDER_GITHUB_APP_PRIVATE_KEY`;
+`app-config.production.yaml` registers it as a second `integrations.github.apps` entry. Wiring tracked in #279.
+
+### How Backstage picks between the two Apps (load-bearing)
+
+Backstage resolves GitHub credentials per request from `integrations.github.apps`:
+
+- **Repo-scoped requests** (file reads, `publish:github:pull-request`) try each App **in config order** and
+  use the first whose installation covers the repo; Apps that don't cover it are skipped.
+- **Org-level requests** (the catalog org discovery provider — no repo in the URL) always take the **first**
+  App's token, regardless of installation repo selection.
+
+Two consequences:
+
+1. **Config order:** the read-only discovery App must stay **first** (org discovery breaks on the write App's
+   token, which only sees `platform`); the write App is second.
+2. **Disjoint installations:** the read App was also installed on `platform` (Phase 2.3, for the projection).
+   Because repo-scoped lookups take the *first covering* App, that installation **shadows the write App** —
+   the scaffolder would get a read-only token and PR creation 403s. One-time migration, **after** the portal
+   runs an image with both Apps in config and **before** any PR-opening template ships (#280/#281): read App →
+   Install App → Configure → remove `platform` (keep `app-alpha`, `app-bravo`, `backstage`). Platform-repo
+   *reads* (the projection, the template location) then resolve to the write App — fine, its Contents scope
+   includes read.
+
+### Verify after deploy
+
+```bash
+kubectl --context platform get externalsecret -n backstage backstage-scaffolder-github-app  # SecretSynced=True
+```
+
+In the portal: **Create** (`/create`) lists the platform templates (`scaffolder/templates/` in this repo); as
+a platform admin, run **Hello World (scaffolder smoke test)** and see the task log. As a non-admin, templates
+are visible but execution is **denied** (#197 policy: non-catalog writes are admin-only).
 
 ## Rotation / revocation
 

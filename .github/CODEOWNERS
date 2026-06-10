@@ -9,3 +9,7 @@
 # "Require review from Code Owners" enabled (a GitHub repo setting, not in this file). Expand the owner below
 # to the platform team handle (e.g. @asanexample/platform-admins) once it exists.
 /gitops/tenant-claims/   @gangster
+
+# Scaffolder templates: a template defines what a self-service portal run can author (and, once #281 lands,
+# what can auto-merge), so template changes are platform-only — same review bar as the claim paths (ADR-062 §4).
+/scaffolder/             @gangster

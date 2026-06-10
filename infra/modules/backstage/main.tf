@@ -59,6 +59,20 @@ locals {
   # placeholders) + the type-scoped catalog.rules (Phase 2.2 consolidation, asanexample/backstage#3), so the only
   # remaining chart appConfig layer is the OIDC session secret. The App's appId/privateKey are still injected
   # from the secret via github_env.
+
+  # Scaffolder GitHub write App (BACK Phase 3, ADR-062 §5) — a SEPARATE App from the read-only discovery one,
+  # installed on ONLY asanexample/platform with Contents + Pull Requests read/write (no admin, no
+  # branch-protection bypass). appId + private key (synced from platform/backstage/scaffolder-github-app by
+  # the ExternalSecret below) feed the second integrations.github.apps entry in the image's
+  # app-config.production.yaml. The two Apps' installations must stay disjoint — see
+  # docs/runbooks/backstage-scaffolder-github-app.md. Empty env when disabled.
+  scaffolder_enabled    = var.create && var.enable_scaffolder
+  scaffolder_k8s_secret = "backstage-scaffolder-github-app"
+  scaffolder_env = local.scaffolder_enabled ? [
+    { name = "SCAFFOLDER_GITHUB_APP_ID", valueFrom = { secretKeyRef = { name = local.scaffolder_k8s_secret, key = "appId" } } },
+    { name = "SCAFFOLDER_GITHUB_APP_PRIVATE_KEY", valueFrom = { secretKeyRef = { name = local.scaffolder_k8s_secret, key = "privateKey" } } },
+  ] : []
+
   enable_k8s = var.create && var.enable_kubernetes_plugin
 
   # Kubernetes plugin (Phase 2.4a): live cluster view. Injected as an appConfig layer (env-specific cluster
@@ -161,7 +175,7 @@ locals {
         { name = "POSTGRES_PORT", value = "5432" },
         { name = "POSTGRES_USER", valueFrom = { secretKeyRef = { name = local.db_secret, key = local.db_user_key } } },
         { name = "POSTGRES_PASSWORD", valueFrom = { secretKeyRef = { name = local.db_secret, key = local.db_pass_key } } },
-      ], local.oidc_env, local.github_env, local.argocd_env)
+      ], local.oidc_env, local.github_env, local.scaffolder_env, local.argocd_env)
 
       # Extra app-config layer (chart renders it to a ConfigMap and appends --config): OIDC session
       # support (auth.session.secret) + the complete integrations.github (Phase 2.2). Empty {} when both off.
@@ -332,6 +346,36 @@ resource "kubernetes_manifest" "github_app_external_secret" {
 }
 
 # ---------------------------------------------------------------------------
+# Scaffolder GitHub write App credential (Phase 3, ADR-062 §5) — the separate write App the scaffolder uses
+# to open PRs against asanexample/platform. Created manually in Secrets Manager (the private key is
+# GitHub-generated); see docs/runbooks/backstage-scaffolder-github-app.md. JSON keys: appId, privateKey.
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_manifest" "scaffolder_github_app_external_secret" {
+  count = local.scaffolder_enabled ? 1 : 0
+
+  manifest = {
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = local.scaffolder_k8s_secret
+      namespace = var.namespace
+    }
+    spec = {
+      refreshInterval = "1h"
+      secretStoreRef  = { name = var.secret_store_name, kind = "ClusterSecretStore" }
+      target          = { name = local.scaffolder_k8s_secret, creationPolicy = "Owner" }
+      data = [
+        { secretKey = "appId", remoteRef = { key = var.scaffolder_github_app_secret_name, property = "appId" } },
+        { secretKey = "privateKey", remoteRef = { key = var.scaffolder_github_app_secret_name, property = "privateKey" } },
+      ]
+    }
+  }
+
+  depends_on = [kubernetes_namespace_v1.backstage]
+}
+
+# ---------------------------------------------------------------------------
 # ArgoCD read-only token (Phase 2.4b) — synced from Secrets Manager (platform/argocd/backstage-token, minted
 # out-of-band against the read-only `backstage` ArgoCD account; see docs/runbooks/backstage-argocd.md) into the
 # backstage namespace as backstage-argocd-token, then injected as ARGOCD_AUTH_TOKEN.
@@ -485,6 +529,7 @@ resource "helm_release" "backstage" {
     kubernetes_manifest.oidc_external_secret,
     kubernetes_secret_v1.session,
     kubernetes_manifest.github_app_external_secret,
+    kubernetes_manifest.scaffolder_github_app_external_secret,
     kubernetes_manifest.argocd_token_external_secret,
     # Pod Identity must exist before the pod starts, or it gets no AWS creds until a restart.
     aws_eks_pod_identity_association.k8s_reader,

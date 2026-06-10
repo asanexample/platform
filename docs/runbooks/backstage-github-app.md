@@ -40,7 +40,9 @@ App/decision — never widen this one.
 
 App page → **Install App** → install into the `asanexample` org → **Only select repositories** →
 **`app-alpha`, `app-bravo`, `backstage`**. (NOT all repos, NOT `platform` — discovery surface = install scope.
-`platform` is added in Phase 2.3 when the projection reads it.)
+`platform` was added in Phase 2.3 for the projection, then **removed again in Phase 3**: platform-repo reads
+now resolve to the scaffolder write App, whose installation must not be shadowed by this one — the two Apps'
+installations stay disjoint. See `backstage-scaffolder-github-app.md`.)
 
 ### Step 3: Store the credential in Secrets Manager
 
