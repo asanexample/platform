@@ -1,0 +1,105 @@
+name: Teams — gate on PR
+
+# Validate Team-envelope changes (gitops/teams/**) on a PR: schema shape, enum bounds, the envelope
+# escalation deny-set (quotaCap / maxDedicatedZones / privileged ssoGroup — none of which the CRD bounds),
+# and a destructive-deletion guard. The sibling of the Tenant Claims Gate, minus the automerge arm: Team
+# objects GRANT envelopes and stay deliberately HUMAN-reviewed (CODEOWNERS @gangster, ADR-062 §1) — this is
+# the automated backstop a reviewer can't eyeball, and is meant to be a REQUIRED status check on main.
+#
+# CI-GATE INTEGRITY: `pull_request_target` means THIS definition and every script it calls run from the
+# PROTECTED BASE BRANCH — a PR cannot edit the gate that judges it. The PR's Team CRs are checked out
+# separately, sparse, credential-free, and read strictly as YAML DATA (yq only); nothing from the head
+# checkout is ever executed, templated, or interpolated.
+
+on:
+  pull_request_target:
+    branches: [main]
+    paths:
+      - gitops/teams/**
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write # post/update the sticky gate comment
+
+concurrency:
+  group: teams-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Teams Gate
+    runs-on: ubuntu-latest # pure YAML validation — no cluster/private-API access needed
+    env:
+      # Envelope deny-set (the CRD does not bound these). Tune here; gate.sh has matching defaults.
+      MAX_QUOTA_CPU: "64"
+      MAX_QUOTA_MEMORY: "256Gi"
+      MAX_QUOTA_PODS: "500"
+      MAX_DEDICATED_ZONES: "0" # dedicated zones are platform-gated; pooled-only for now
+      DENIED_SSO_GROUPS: "platform-admins"
+    steps:
+      # Trusted: the gate scripts + the Team CRD all come from BASE. (nosemgrep — the rule flags any checkout
+      # under pull_request_target; this is the protected base, and the PR head below is sparse, data-only.)
+      # nosemgrep: yaml.github-actions.security.pull-request-target-code-checkout.pull-request-target-code-checkout
+      - name: Checkout base (trusted)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          path: base
+
+      # Untrusted: ONLY the teams tree, sparse, no credentials, data-only. Nothing here runs; gate.sh (from
+      # base) reads these files with yq as data.
+      # nosemgrep: yaml.github-actions.security.pull-request-target-code-checkout.pull-request-target-code-checkout
+      - name: Checkout PR teams (untrusted, data-only)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: head
+          sparse-checkout: gitops/teams
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Install yq
+        run: |
+          sudo curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Classify diff
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bash base/.github/scripts/teams/classify-teams.sh
+
+      - name: Validate Team envelopes
+        id: gate
+        env:
+          BASE_DIR: ${{ github.workspace }}/base
+          HEAD_DIR: ${{ github.workspace }}/head
+          TEAM_FILES: ${{ steps.classify.outputs.team_files }}
+          TEAM_DELETED_FILES: ${{ steps.classify.outputs.team_deleted_files }}
+          REPORT_MD: ${{ runner.temp }}/teams-gate.md
+        run: |
+          set +e
+          bash base/.github/scripts/teams/gate.sh
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Post sticky gate comment
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MARKER: "<!-- teams-gate -->"
+          BODY_FILE: ${{ runner.temp }}/teams-gate.md
+        run: bash base/.github/scripts/teams/sticky-comment.sh
+
+      - name: Enforce gate result
+        if: always()
+        run: |
+          if [ "${{ steps.gate.outputs.rc }}" != "0" ]; then
+            echo "Teams gate failed — see the sticky comment on the PR." >&2
+            exit 1
+          fi
