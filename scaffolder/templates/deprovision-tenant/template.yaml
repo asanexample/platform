@@ -1,0 +1,119 @@
+# Deprovision Tenant (#283, ADR-062): team-scoped, REVERSIBLE deprovisioning. "Decommission" suspends the
+# tenant (the Composition zeroes its ResourceQuota — workloads stop, everything else retained); "Reactivate"
+# restores it. Both are reversible claim EDITS that automerge. The irreversible step — actually removing the
+# claim — is a SEPARATE human PR that the Tenant Claims Gate requires to be decommission-first + admin-reviewed
+# (see docs/runbooks/tenant-deprovisioning.md). This template never deletes.
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: deprovision-tenant
+  title: Deprovision Tenant
+  description: >-
+    Wind a tenant down (or back up): decommission suspends it reversibly (quota → 0, everything retained);
+    reactivate restores it. The final purge (removing the claim, which deletes the namespace) is a separate
+    reviewed PR — see the deprovisioning runbook.
+  tags:
+    - self-service
+    - tenant
+    - lifecycle
+spec:
+  owner: group:default/platform
+  type: tenant
+
+  parameters:
+    - title: Tenant
+      required:
+        - team
+        - name
+        - environment
+        - action
+        - confirm
+      properties:
+        team:
+          title: Team
+          type: string
+          description: Your team — membership is verified server-side.
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+              spec.type: team
+            defaultKind: Group
+            allowArbitraryValues: true
+        name:
+          title: Tenant name
+          type: string
+          pattern: '^[a-z][a-z0-9]{1,15}$'
+          description: The tenant to act on (locates <team>-<name>-<env>.yaml).
+        environment:
+          title: Environment
+          type: string
+          enum: ['dev', 'test', 'uat', 'staging', 'prod']
+          default: dev
+        action:
+          title: Action
+          type: string
+          enum: ['decommission', 'reactivate']
+          default: decommission
+          description: >-
+            decommission = reversible suspend (quota → 0); reactivate = restore. Neither deletes — purging the
+            tenant is a separate reviewed PR.
+        confirm:
+          title: Confirm tenant name
+          type: string
+          description: Type the full tenant name (<team>-<name>-<env>) to confirm — checked server-side.
+
+  steps:
+    - id: verify
+      name: Verify team membership
+      action: platform:verify-team-membership
+      input:
+        team: ${{ parameters.team }}
+
+    - id: fetch
+      name: Fetch the current claim
+      action: fetch:plain:file
+      input:
+        url: https://github.com/asanexample/platform/blob/main/gitops/tenant-claims/preprod/${{ parameters.team | replace('group:default/', '') }}-${{ parameters.name }}-${{ parameters.environment }}.yaml
+        targetPath: gitops/tenant-claims/preprod/${{ parameters.team | replace('group:default/', '') }}-${{ parameters.name }}-${{ parameters.environment }}.yaml
+
+    - id: patch
+      name: Set the lifecycle phase
+      action: platform:set-lifecycle-phase
+      input:
+        claimPath: gitops/tenant-claims/preprod/${{ parameters.team | replace('group:default/', '') }}-${{ parameters.name }}-${{ parameters.environment }}.yaml
+        phase: ${{ 'decommissioning' if parameters.action == 'decommission' else 'active' }}
+        confirm: ${{ parameters.confirm }}
+        requestedBy: ${{ user.ref | default('unknown', true) }}
+
+    - id: pr
+      name: Open the deprovisioning PR
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?owner=asanexample&repo=platform
+        branchName: tenant/${{ parameters.action }}-${{ parameters.team | replace('group:default/', '') }}-${{ parameters.name }}-${{ parameters.environment }}
+        targetBranchName: main
+        title: "chore(tenants): ${{ parameters.action }} ${{ parameters.team | replace('group:default/', '') }}-${{ parameters.name }}-${{ parameters.environment }}"
+        commitMessage: |
+          chore(tenants): ${{ parameters.action }} ${{ parameters.team | replace('group:default/', '') }}-${{ parameters.name }}-${{ parameters.environment }}
+
+          Requested-by: ${{ user.ref | default('unknown', true) }}
+        description: |
+          **${{ parameters.action | capitalize }}** tenant `${{ parameters.team | replace('group:default/', '') }}-${{ parameters.name }}-${{ parameters.environment }}` (ADR-062 deprovisioning).
+
+          Requested via the Backstage **Deprovision Tenant** template by `${{ user.ref | default('unknown', true) }}`.
+
+          {% if parameters.action == 'decommission' %}
+          This **reversibly suspends** the tenant: the Composition zeroes its ResourceQuota (workloads drain;
+          namespace, IAM, ECR all retained). It **auto-merges** when the gate passes. To restore, run this
+          template again with action **reactivate**. To fully purge (delete the namespace), open a separate PR
+          removing the claim file — the gate requires it to be decommissioned first + admin-reviewed
+          (`docs/runbooks/tenant-deprovisioning.md`).
+          {% else %}
+          This **restores** the tenant to active (quota reinstated). It auto-merges when the gate passes.
+          {% endif %}
+
+  output:
+    links:
+      - title: Deprovisioning pull request
+        url: ${{ steps.pr.output.remoteUrl }}
