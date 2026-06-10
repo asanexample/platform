@@ -12,17 +12,16 @@ terraform {
 }
 
 # SOPS config-encryption key (ADR-066). Encrypts infra/live/aws/secrets.enc.yaml; root.hcl + common.hcl decrypt
-# it inline. It's bootstrap-tier — every other unit's config load depends on this key existing.
-#
-# NOTE (#305 / ADR-066): this unit is created here while the config is still plaintext (secrets.hcl). Once the
-# config flips to SOPS (root.hcl/common.hcl -> sops_decrypt_file), re-applying this unit decrypts secrets.enc.yaml
-# with the key it already owns — fine on day 2. Making it from-scratch-bootstrap-safe (no secrets chain) is a
-# documented follow-up; the platform is not being rebuilt now.
+# it inline. It lives in MANAGEMENT, alongside the state backend (ADR-006) — the bootstrap floor that is never
+# torn down — so the committed secrets.enc.yaml stays decryptable across teardown/rebuild. `prevent_destroy`
+# (in the module) is the seatbelt; teardown tooling (platctl) must also exclude this unit, like state_bootstrap.
 inputs = {
   create     = true
   alias_name = "platform-sops"
 
-  # Operators authenticate from management or platform (SSO AdministratorAccess) — encrypt + decrypt.
+  # Operators authenticate from management (and occasionally platform) as SSO AdministratorAccess — encrypt +
+  # decrypt so `sops` editing works. Management operators decrypt this key same-account; platform operators
+  # cross-account (their SSO admin IAM allows it).
   operator_account_roots = [
     "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:root",
     "arn:aws:iam::${include.base.locals.account_ids["platform"]}:root",
@@ -32,7 +31,8 @@ inputs = {
     "arn:aws:iam::${include.base.locals.account_ids["platform"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
   ]
 
-  # The ARC runner reads config in CI (decrypt only); same account as the key, granted by the key policy.
+  # The ARC runner (platform account) reads config in CI — decrypt only, CROSS-account. The key policy admits
+  # it here; the runner role's IAM also grants kms:Decrypt (cross-account KMS needs both — actions-runner-controller).
   decrypt_principal_arns = [
     "arn:aws:iam::${include.base.locals.account_ids["platform"]}:role/platform-use1-eks-arc-runner",
   ]

@@ -62,6 +62,13 @@ resource "aws_kms_key" "sops" {
   enable_key_rotation     = true
   policy                  = data.aws_iam_policy_document.key[0].json
   tags                    = var.tags
+
+  # Bootstrap-floor: this key encrypts the committed secrets.enc.yaml, so destroying it would make EVERY
+  # config load (root.hcl/common.hcl) undecryptable and brick a rebuild. It must survive teardown — like the
+  # state backend (ADR-006). prevent_destroy is the seatbelt; teardown tooling must also exclude this unit.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_kms_alias" "sops" {
