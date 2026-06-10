@@ -13,12 +13,12 @@ remote_state {
   }
 
   config = {
-    bucket         = local._secrets.locals.state_bucket
+    bucket         = local._secrets.state_bucket
     key            = "${path_relative_to_include()}/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
     dynamodb_table = "terraform-locks"
-    role_arn       = local._secrets.locals.state_role_arn
+    role_arn       = local._secrets.state_role_arn
   }
 }
 
@@ -83,7 +83,7 @@ locals {
   _path_parts_cloud = split("/", path_relative_to_include())
   _cloud            = try(local._path_parts_cloud[1], "aws")
 
-  _secrets = read_terragrunt_config("${get_repo_root()}/infra/live/aws/secrets.hcl")
+  _secrets = yamldecode(sops_decrypt_file("${get_repo_root()}/infra/live/aws/secrets.enc.yaml"))
 
   environment = get_env("TF_VAR_environment", "dev")
 

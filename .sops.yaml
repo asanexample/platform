@@ -1,0 +1,5 @@
+# SOPS creation rules (ADR-066). secrets.enc.yaml is encrypted to the management-account platform-sops key;
+# root.hcl + common.hcl decrypt it inline. Edit with: sops infra/live/aws/secrets.enc.yaml
+creation_rules:
+  - path_regex: infra/live/aws/secrets\.enc\.yaml$
+    kms: "arn:aws:kms:us-east-1:851725353202:key/4e6e7994-8b65-4af7-bc90-0bb0e6a3e2a5"

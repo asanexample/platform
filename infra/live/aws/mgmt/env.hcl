@@ -1,11 +1,11 @@
 locals {
-  _secrets = read_terragrunt_config("${get_repo_root()}/infra/live/aws/secrets.hcl")
+  _secrets = yamldecode(sops_decrypt_file("${get_repo_root()}/infra/live/aws/secrets.enc.yaml"))
 
   env           = "mgmt"
   environment   = "mgmt"
   workload      = "management"
   account_alias = "management-aws"
-  account_id    = local._secrets.locals.account_ids["mgmt"]
+  account_id    = local._secrets.account_ids["mgmt"]
 
   tags = {
     Environment        = local.environment
