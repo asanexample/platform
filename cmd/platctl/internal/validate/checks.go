@@ -25,6 +25,9 @@ type StateCheck struct {
 	Name   string
 	Unit   *engine.Unit
 	Binary string // "terragrunt" or "tofu"
+	// EmptyOK marks units whose empty state is intentional (e.g. mimir under the cost profile, a
+	// gateway-config with no per-app routes on that cluster) — configured via validate.expected_empty_units.
+	EmptyOK bool
 }
 
 // CheckName returns the check name for skip messages.
@@ -73,6 +76,14 @@ func (s *StateCheck) Check(ctx context.Context) CheckResult {
 
 	lines := strings.TrimSpace(string(out))
 	if lines == "" {
+		if s.EmptyOK {
+			return CheckResult{
+				Name:    s.Name,
+				Status:  "ok",
+				Message: "state empty as expected (unit disabled in this profile)",
+				Elapsed: elapsed,
+			}
+		}
 		return CheckResult{
 			Name:    s.Name,
 			Status:  "failed",
@@ -597,7 +608,10 @@ func (a *ArgoCDAppCheck) Check(ctx context.Context) CheckResult {
 // TGWAttachmentCheck — Transit Gateway attachment state
 // ---------------------------------------------------------------------------
 
-// TGWAttachmentCheck validates that all Transit Gateway attachments are available.
+// TGWAttachmentCheck validates that all Transit Gateway attachments are available. The TGW ID is DISCOVERED
+// when not configured (the ID churns on every rebuild, so hardcoding it in .platctl.yaml yields a check that
+// silently goes stale — the placeholder-config failure mode); validate.transit_gateway.id remains an optional
+// override for accounts with multiple TGWs.
 type TGWAttachmentCheck struct {
 	Name  string
 	Auth  map[string]string
@@ -615,9 +629,13 @@ func (t *TGWAttachmentCheck) Check(ctx context.Context) CheckResult {
 
 	args := []string{
 		"ec2", "describe-transit-gateway-attachments",
-		"--filters", fmt.Sprintf("Name=transit-gateway-id,Values=%s", t.TGWID),
 		"--region", region,
 		"--output", "json",
+	}
+	// Scope to a specific TGW only when configured; otherwise validate every attachment visible in the
+	// account/region (the hub account has exactly the platform TGW; spokes see the RAM share).
+	if t.TGWID != "" {
+		args = append(args, "--filters", fmt.Sprintf("Name=transit-gateway-id,Values=%s", t.TGWID))
 	}
 	if profile, ok := t.Auth["profile"]; ok {
 		args = append(args, "--profile", profile)
@@ -637,9 +655,9 @@ func (t *TGWAttachmentCheck) Check(ctx context.Context) CheckResult {
 
 	type tgwAttachment struct {
 		TransitGatewayAttachmentID string `json:"TransitGatewayAttachmentId"`
-		State                     string `json:"State"`
-		ResourceID                string `json:"ResourceId"`
-		ResourceType              string `json:"ResourceType"`
+		State                      string `json:"State"`
+		ResourceID                 string `json:"ResourceId"`
+		ResourceType               string `json:"ResourceType"`
 	}
 	type tgwResponse struct {
 		Attachments []tgwAttachment `json:"TransitGatewayAttachments"`
@@ -656,18 +674,16 @@ func (t *TGWAttachmentCheck) Check(ctx context.Context) CheckResult {
 		}
 	}
 
-	if len(resp.Attachments) == 0 {
-		return CheckResult{
-			Name:    t.Name,
-			Status:  "failed",
-			Message: "no TGW attachments found",
-			Elapsed: elapsed,
-		}
-	}
-
+	// Skip tombstones: recently-deleted attachments linger in the API with State=deleted/deleting (e.g. from
+	// the previous teardown) and are not a health signal for the current build.
 	available := 0
+	total := 0
 	var notAvailable []string
 	for _, att := range resp.Attachments {
+		if att.State == "deleted" || att.State == "deleting" {
+			continue
+		}
+		total++
 		if att.State == "available" {
 			available++
 		} else {
@@ -677,11 +693,20 @@ func (t *TGWAttachmentCheck) Check(ctx context.Context) CheckResult {
 		}
 	}
 
+	if total == 0 {
+		return CheckResult{
+			Name:    t.Name,
+			Status:  "failed",
+			Message: "no TGW attachments found",
+			Elapsed: elapsed,
+		}
+	}
+
 	if len(notAvailable) > 0 {
 		return CheckResult{
 			Name:    t.Name,
 			Status:  "failed",
-			Message: fmt.Sprintf("%d/%d attachments available", available, len(resp.Attachments)),
+			Message: fmt.Sprintf("%d/%d attachments available", available, total),
 			Details: notAvailable,
 			Elapsed: elapsed,
 		}
@@ -690,7 +715,7 @@ func (t *TGWAttachmentCheck) Check(ctx context.Context) CheckResult {
 	return CheckResult{
 		Name:    t.Name,
 		Status:  "ok",
-		Message: fmt.Sprintf("%d/%d attachments available", available, len(resp.Attachments)),
+		Message: fmt.Sprintf("%d/%d attachments available", available, total),
 		Elapsed: elapsed,
 	}
 }
@@ -701,22 +726,60 @@ func (t *TGWAttachmentCheck) Check(ctx context.Context) CheckResult {
 
 // CrossVPCDNSCheck validates that a DNS endpoint resolves via a specific resolver IP.
 // The resolver IP is typically the VPC DNS resolver (VPC CIDR base + 2), reachable
-// through Tailscale's subnet router.
+// through Tailscale's subnet router. The endpoint is DISCOVERED from the remote EKS cluster when not
+// configured (the endpoint hostname churns on every rebuild — hardcoding it is the placeholder-config
+// failure mode that neutered this check while the cross-vpc-dns PHZ was actually stale).
 type CrossVPCDNSCheck struct {
 	Name       string
-	Endpoint   string
+	Endpoint   string // optional override; discovered from ClusterName when empty
 	ResolverIP string
-	Run        CommandRunner
+	// ClusterName + Auth locate the remote EKS cluster whose API endpoint the PHZ must resolve.
+	ClusterName string
+	Auth        map[string]string
+	Run         CommandRunner
 }
 
 // CheckName returns the check name for skip messages.
 func (d *CrossVPCDNSCheck) CheckName() string { return d.Name }
 
-// Check runs `dig ENDPOINT @RESOLVER_IP +short` and expects IP addresses.
+// Check resolves the endpoint (discovering it from EKS when unset) via the VPC resolver.
 func (d *CrossVPCDNSCheck) Check(ctx context.Context) CheckResult {
 	start := time.Now()
 
-	out, err := d.Run(ctx, "dig", d.Endpoint, "@"+d.ResolverIP, "+short")
+	endpoint := d.Endpoint
+	if endpoint == "" {
+		args := []string{
+			"eks", "describe-cluster",
+			"--name", d.ClusterName,
+			"--region", cloud.RegionFromAuth(d.Auth),
+			"--query", "cluster.endpoint",
+			"--output", "text",
+		}
+		if profile, ok := d.Auth["profile"]; ok {
+			args = append(args, "--profile", profile)
+		}
+		out, err := d.Run(ctx, "aws", args...)
+		if err != nil {
+			return CheckResult{
+				Name:    d.Name,
+				Status:  "failed",
+				Message: fmt.Sprintf("cannot discover EKS endpoint for %s", d.ClusterName),
+				Details: []string{strings.TrimSpace(string(out))},
+				Elapsed: time.Since(start),
+			}
+		}
+		endpoint = strings.TrimPrefix(strings.TrimSpace(string(out)), "https://")
+		if endpoint == "" {
+			return CheckResult{
+				Name:    d.Name,
+				Status:  "failed",
+				Message: fmt.Sprintf("empty EKS endpoint for %s", d.ClusterName),
+				Elapsed: time.Since(start),
+			}
+		}
+	}
+
+	out, err := d.Run(ctx, "dig", endpoint, "@"+d.ResolverIP, "+short")
 	elapsed := time.Since(start)
 
 	output := strings.TrimSpace(string(out))
@@ -736,7 +799,7 @@ func (d *CrossVPCDNSCheck) Check(ctx context.Context) CheckResult {
 			Status:  "failed",
 			Message: "no DNS records returned",
 			Details: []string{
-				fmt.Sprintf("dig %s @%s +short returned empty", d.Endpoint, d.ResolverIP),
+				fmt.Sprintf("dig %s @%s +short returned empty", endpoint, d.ResolverIP),
 				"check PHZ records and VPC association",
 			},
 			Elapsed: elapsed,
@@ -980,23 +1043,26 @@ func ResolveCheckers(
 				Unit:   u,
 				Binary: "terragrunt",
 			})
-			if cfg != nil && cfg.TransitGateway.ID != "" {
-				tgwAuth := u.Auth
-				if p, ok := clusterProfileByEnv[env]; ok && p != "" {
-					tgwAuth = map[string]string{"profile": p}
-					for k, v := range u.Auth {
-						if k != "profile" {
-							tgwAuth[k] = v
-						}
+			// The TGW ID is discovered when not configured (it churns every rebuild).
+			tgwID := ""
+			if cfg != nil {
+				tgwID = cfg.TransitGateway.ID
+			}
+			tgwAuth := u.Auth
+			if p, ok := clusterProfileByEnv[env]; ok && p != "" {
+				tgwAuth = map[string]string{"profile": p}
+				for k, v := range u.Auth {
+					if k != "profile" {
+						tgwAuth[k] = v
 					}
 				}
-				checks = append(checks, &TGWAttachmentCheck{
-					Name:  u.Name + "/attachments",
-					Auth:  tgwAuth,
-					TGWID: cfg.TransitGateway.ID,
-					Run:   run,
-				})
 			}
+			checks = append(checks, &TGWAttachmentCheck{
+				Name:  u.Name + "/attachments",
+				Auth:  tgwAuth,
+				TGWID: tgwID,
+				Run:   run,
+			})
 
 		case "cross-vpc-dns":
 			checks = append(checks, &StateCheck{
@@ -1004,15 +1070,35 @@ func ResolveCheckers(
 				Unit:   u,
 				Binary: "terragrunt",
 			})
-			if cfg != nil && cfg.CrossVPCDNS.Endpoint != "" && kubeCtx != "" {
-				// VPC DNS resolver: CIDR base + 2 (e.g., 10.100.0.2 for 10.100.0.0/16)
-				resolverIP := vpcResolverIP(cfg, env)
-				if resolverIP != "" {
+			// VPC DNS resolver: CIDR base + 2 (e.g., 10.100.0.2 for 10.100.0.0/16). The PHZ lives in THIS
+			// unit's VPC and must resolve the REMOTE cluster's API endpoint; the endpoint hostname is
+			// discovered from each remote env's EKS cluster (it churns every rebuild — a configured
+			// validate.cross_vpc_dns.endpoint remains an optional override).
+			if resolverIP := vpcResolverIP(cfg, env); resolverIP != "" {
+				override := ""
+				if cfg != nil {
+					override = cfg.CrossVPCDNS.Endpoint
+				}
+				for remoteEnv, clusterName := range clusterNameByEnv {
+					if remoteEnv == env || clusterName == "" {
+						continue
+					}
+					remoteAuth := u.Auth
+					if p, ok := clusterProfileByEnv[remoteEnv]; ok && p != "" {
+						remoteAuth = map[string]string{"profile": p}
+						for k, v := range u.Auth {
+							if k != "profile" {
+								remoteAuth[k] = v
+							}
+						}
+					}
 					checks = append(checks, &CrossVPCDNSCheck{
-						Name:       u.Name + "/dns",
-						Endpoint:   cfg.CrossVPCDNS.Endpoint,
-						ResolverIP: resolverIP,
-						Run:        run,
+						Name:        u.Name + "/dns/" + remoteEnv,
+						Endpoint:    override,
+						ResolverIP:  resolverIP,
+						ClusterName: clusterName,
+						Auth:        remoteAuth,
+						Run:         run,
 					})
 				}
 			}
@@ -1052,15 +1138,18 @@ func ResolveCheckers(
 				Binary: "terragrunt",
 			})
 
-		case "tenants":
+		case "crossplane":
 			checks = append(checks, &StateCheck{
 				Name:   u.Name + "/state",
 				Unit:   u,
 				Binary: "terragrunt",
 			})
+			// v2 Tenant API (ADR-049): XTenants Synced+Ready, <team>-<name>-<env> namespaces with the tenant
+			// baseline, Team CRs projected. Self-skips on clusters without the XTenant CRD (no tenant API),
+			// so this is safe to wire for every crossplane unit.
 			if kubeCtx != "" {
 				checks = append(checks, &TenantCheck{
-					Name:        u.Name + "/namespaces",
+					Name:        u.Name + "/tenants",
 					KubeContext: kubeCtx,
 					Run:         run,
 				})
@@ -1087,6 +1176,20 @@ func ResolveCheckers(
 				Unit:   u,
 				Binary: "terragrunt",
 			})
+		}
+	}
+
+	// Units whose empty state is intentional (validate.expected_empty_units — e.g. mimir under the cost
+	// profile) pass their state check instead of false-failing.
+	if cfg != nil && len(cfg.ExpectedEmptyUnits) > 0 {
+		expected := make(map[string]bool, len(cfg.ExpectedEmptyUnits))
+		for _, name := range cfg.ExpectedEmptyUnits {
+			expected[name] = true
+		}
+		for _, c := range checks {
+			if sc, ok := c.(*StateCheck); ok && expected[sc.Unit.Name] {
+				sc.EmptyOK = true
+			}
 		}
 	}
 

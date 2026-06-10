@@ -43,6 +43,16 @@ If Phase 1 fails, Phase 2 is skipped to avoid cascading failures from expired cr
 	return cmd
 }
 
+// overrideProfile returns a copy of auth with the profile replaced (other keys, e.g. region, kept).
+func overrideProfile(auth map[string]string, profile string) map[string]string {
+	out := make(map[string]string, len(auth)+1)
+	for k, v := range auth {
+		out[k] = v
+	}
+	out["profile"] = profile
+	return out
+}
+
 func runValidate(cmd *cobra.Command, envFilter, checkFilter string, concurrency int) error {
 	repoRoot, err := findRepoRoot()
 	if err != nil {
@@ -147,7 +157,12 @@ func runValidate(cmd *cobra.Command, envFilter, checkFilter string, concurrency 
 			}
 		}
 		if platformCtx != "" {
+			// The NLB lives in the CLUSTER's account, so the elbv2 lookup must run as that account's
+			// profile (the kubeconfig entry), not the deploy profile (management) — which sees no NLBs.
 			gwAuth := cfg.AuthForUnit("platform", "gateway-config")
+			if p := clusterProfileByEnv["platform"]; p != "" {
+				gwAuth = overrideProfile(gwAuth, p)
+			}
 			otherChecks = append(otherChecks, &validate.GatewayHealthCheck{
 				Name:             "gateway",
 				KubeContext:      platformCtx,
@@ -165,6 +180,9 @@ func runValidate(cmd *cobra.Command, envFilter, checkFilter string, concurrency 
 		preprodCtx := kubeContextByEnv["preprod"]
 		if preprodCtx != "" && (envFilter == "" || envFilter == "preprod") {
 			gwAuth := cfg.AuthForUnit("preprod", "gateway-config")
+			if p := clusterProfileByEnv["preprod"]; p != "" {
+				gwAuth = overrideProfile(gwAuth, p)
+			}
 			otherChecks = append(otherChecks, &validate.GatewayHealthCheck{
 				Name:             "preprod/gateway",
 				KubeContext:      preprodCtx,
@@ -177,22 +195,25 @@ func runValidate(cmd *cobra.Command, envFilter, checkFilter string, concurrency 
 		}
 	}
 
-	// Cross-cutting: DNS delegation
-	if cfg.Validate.DNS.Zone != "" && len(cfg.Validate.DNS.ExpectedNS) > 0 {
+	// Cross-cutting: DNS delegation. expected_ns is an optional override — when absent the check discovers
+	// the expected set from the Route53 zone's delegation set (it churns whenever the zone is recreated).
+	if cfg.Validate.DNS.Zone != "" {
 		otherChecks = append(otherChecks, &validate.DNSDelegationCheck{
 			Name:       "dns/" + cfg.Validate.DNS.Zone,
 			Zone:       cfg.Validate.DNS.Zone,
 			ExpectedNS: cfg.Validate.DNS.ExpectedNS,
+			Profile:    cfg.Validate.DNS.Profile,
 			Run:        run,
 		})
 	}
 
 	// Cross-cutting: Preprod DNS delegation
-	if cfg.Validate.PreprodDNS.Zone != "" && len(cfg.Validate.PreprodDNS.ExpectedNS) > 0 {
+	if cfg.Validate.PreprodDNS.Zone != "" {
 		otherChecks = append(otherChecks, &validate.DNSDelegationCheck{
 			Name:       "dns/" + cfg.Validate.PreprodDNS.Zone,
 			Zone:       cfg.Validate.PreprodDNS.Zone,
 			ExpectedNS: cfg.Validate.PreprodDNS.ExpectedNS,
+			Profile:    cfg.Validate.PreprodDNS.Profile,
 			Run:        run,
 		})
 	}

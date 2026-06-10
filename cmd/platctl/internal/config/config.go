@@ -29,12 +29,19 @@ type ValidateConfig struct {
 	PreprodGateway GatewayValidation     `yaml:"preprod_gateway"`
 	Endpoints      []EndpointValidation  `yaml:"endpoints"`
 	IAM            IAMValidation         `yaml:"iam"`
+	// ExpectedEmptyUnits lists units whose EMPTY Terragrunt state is intentional (e.g. mimir under the
+	// cost profile, a gateway-config with no per-app routes on that cluster); their state check passes
+	// instead of false-failing. Full unit names ("platform/mimir").
+	ExpectedEmptyUnits []string `yaml:"expected_empty_units"`
 }
 
-// DNSValidation configures the DNS delegation check.
+// DNSValidation configures the DNS delegation check. ExpectedNS is an optional override — when empty the
+// check discovers the expected nameservers from the Route53 hosted zone (they churn when the zone is
+// recreated). Profile is the AWS profile owning the zone (for discovery).
 type DNSValidation struct {
 	Zone       string   `yaml:"zone"`
 	ExpectedNS []string `yaml:"expected_ns"`
+	Profile    string   `yaml:"profile"`
 }
 
 // TGWValidation configures the Transit Gateway attachment check.
