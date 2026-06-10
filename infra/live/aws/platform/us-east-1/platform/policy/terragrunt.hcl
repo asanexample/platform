@@ -82,11 +82,15 @@ inputs = {
   # CloudNativePG (the Backstage DB operator, ADR-051) is the same case: its controller authors a
   # per-Cluster Role (in the app namespace) that restrict-wildcard-rbac flags — exclude the cnpg-system
   # operator principal (a trusted platform operator, not a tenant) so it can provision managed databases.
+  # ARC (the self-hosted runner controller, ADR-065 / #323) is the same again: its controller authors a
+  # per-listener Role in arc-runners that restrict-wildcard-rbac denies in Enforce — exclude the arc-systems
+  # controller principal + the ARC namespaces (a trusted platform operator, not a tenant).
   extra_exclude_principals = [
     "system:serviceaccount:crossplane-system:*",
     "system:serviceaccount:cnpg-system:*",
+    "system:serviceaccount:arc-systems:*",
   ]
-  extra_exclude_namespaces = ["crossplane-system", "cnpg-system"]
+  extra_exclude_namespaces = ["crossplane-system", "cnpg-system", "arc-systems", "arc-runners"]
 
   helm_chart_version = include.base.locals.helm_versions.kyverno
   helm_wait          = true
