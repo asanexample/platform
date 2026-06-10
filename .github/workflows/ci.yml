@@ -10,21 +10,47 @@ permissions:
   contents: read
 
 jobs:
+  # Single source of truth for CLI tool versions: read /.tool-versions once and expose each pin as a job
+  # output, so every job below installs the SAME version operators + the self-hosted runner image use.
+  # Bump versions in /.tool-versions, never inline here.
+  versions:
+    name: Tool Versions
+    runs-on: ubuntu-latest
+    outputs:
+      opentofu: ${{ steps.read.outputs.opentofu }}
+      terragrunt: ${{ steps.read.outputs.terragrunt }}
+      helm: ${{ steps.read.outputs.helm }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: read
+        name: Read /.tool-versions
+        run: |
+          while read -r tool version _; do
+            case "$tool" in '' | \#*) continue ;; esac
+            echo "${tool}=${version}" >> "$GITHUB_OUTPUT"
+          done < .tool-versions
+
   tofu-fmt:
     name: OpenTofu Format
     runs-on: ubuntu-latest
+    needs: versions
     steps:
       - uses: actions/checkout@v4
       - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ needs.versions.outputs.opentofu }}
       - name: Check formatting
         run: tofu fmt -check -recursive infra/modules/
 
   tofu-validate:
     name: OpenTofu Validate
     runs-on: ubuntu-latest
+    needs: versions
     steps:
       - uses: actions/checkout@v4
       - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ needs.versions.outputs.opentofu }}
       - name: Validate all modules
         run: |
           read -r -d '' AWS_VERSIONS << 'TFEOF' || true
@@ -103,15 +129,18 @@ jobs:
   terragrunt-hclfmt:
     name: Terragrunt HCL Format
     runs-on: ubuntu-latest
+    needs: versions
     steps:
       - uses: actions/checkout@v4
       - name: Install Terragrunt
+        env:
+          # Version from /.tool-versions (the `versions` job); the release tag is v-prefixed.
+          TG_VERSION: v${{ needs.versions.outputs.terragrunt }}
         run: |
           # Pinned + fail-closed. The old `releases/latest` lookup hit the UNAUTHENTICATED GitHub API (rate-limit
           # prone, non-reproducible), and `curl -sL` without --fail silently saved the 4xx body ("Not Found") AS
           # the binary — so the next step died with "/usr/local/bin/terragrunt: line 1: Not: command not found"
           # (exit 127). -f makes curl fail on HTTP errors; --version verifies a real binary landed.
-          TG_VERSION="v1.0.3"
           curl -fsSL "https://github.com/gruntwork-io/terragrunt/releases/download/${TG_VERSION}/terragrunt_linux_amd64" -o /usr/local/bin/terragrunt
           chmod +x /usr/local/bin/terragrunt
           terragrunt --version
@@ -146,12 +175,16 @@ jobs:
   kyverno-policy-test:
     name: Kyverno Policy Test
     runs-on: ubuntu-latest
+    needs: versions
     env:
       # Pin to the chart's appVersion (helm_versions.kyverno = 3.8.1) so test semantics match.
       KYVERNO_VERSION: "1.18.1"
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
+        with:
+          # Canonical Helm pin from /.tool-versions — keep CLI rendering on the 3.x line (not floating to v4).
+          version: v${{ needs.versions.outputs.helm }}
       - name: Install Kyverno CLI
         run: |
           curl -fsSL "https://github.com/kyverno/kyverno/releases/download/v${KYVERNO_VERSION}/kyverno-cli_v${KYVERNO_VERSION}_linux_x86_64.tar.gz" -o kyverno.tgz
@@ -211,11 +244,15 @@ jobs:
   tenant-api-schema:
     name: Tenant API Schema
     runs-on: ubuntu-latest
+    needs: versions
     env:
       CROSSPLANE_VERSION: "v2.2.1" # crank CLI version (built from source — see install step)
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4 # the harness renders the crossplane-teams chart (registry → projection)
+        with:
+          # Canonical Helm pin from /.tool-versions — keep CLI rendering on the 3.x line (not floating to v4).
+          version: v${{ needs.versions.outputs.helm }}
       - uses: actions/setup-go@v5
         with:
           go-version: stable
