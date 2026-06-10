@@ -32,6 +32,11 @@ jobs:
     env:
       TG_FORCE_DEPLOYER: "1"
       AWS_REGION: us-east-1
+      # Read dependency outputs (eks/keycloak/argocd-clusters) straight from their S3 state instead of running
+      # `tofu output` in each dependency's cache. On the cold runner checkout terragrunt doesn't init those
+      # dependency caches, so the `tofu output` path fails with "Backend initialization required" for every
+      # dependency; reading from state sidesteps it (the deps are already deployed). (#305)
+      TG_DEPENDENCY_FETCH_OUTPUT_FROM_STATE: "true"
     steps:
       # Trusted: pins the base ref explicitly. (nosemgrep — the rule flags any checkout under
       # pull_request_target; this one is the protected base, and the PR head below is data-only.)
