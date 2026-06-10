@@ -42,13 +42,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # The trusted side: gate scripts, XRD, Composition, tenant-policies chart, Team CRs — all from BASE.
+      # nosemgrep: yaml.github-actions.security.pull-request-target-code-checkout.pull-request-target-code-checkout
       - name: Checkout base (trusted)
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.ref }}
           path: base
 
-      # The untrusted side: ONLY the claims tree, no credentials, data-only.
+      # The untrusted side: ONLY the claims tree, no credentials, data-only. This is the deliberate,
+      # mitigated form of the pattern semgrep's pull-request-target-code-checkout rule warns about:
+      # nothing from this checkout is ever executed or templated — the scripts that read it run from
+      # the BASE checkout above (see the header comment), the checkout is sparse to the claims dir,
+      # carries no credentials, and validate-claims.sh additionally rejects symlinks/multi-doc/oversize.
+      # nosemgrep: yaml.github-actions.security.pull-request-target-code-checkout.pull-request-target-code-checkout
       - name: Checkout head claims (untrusted, data-only)
         uses: actions/checkout@v4
         with:
