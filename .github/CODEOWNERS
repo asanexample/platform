@@ -1,19 +1,23 @@
-# Code owners — required reviewers for sensitive paths.
+# Code owners — review-request signal for sensitive paths.
 #
-# Crossplane tenant claims: files under gitops/tenant-claims/ are the source of truth for tenant
-# provisioning. ArgoCD syncs them straight to the cluster, so a merge here PROVISIONS or (on removal)
-# OFFBOARDS a tenant — including its namespace, IAM roles, and ECR. Until Kyverno envelope enforcement lands
-# (BACK stack Phase 4), code review is the only guardrail on claim content (team/hostnames/policyStatements).
-#
-# NOTE: enforcement also requires a branch-protection rule on the default branch with
-# "Require review from Code Owners" enabled (a GitHub repo setting, not in this file). Expand the owner below
-# to the platform team handle (e.g. @asanexample/platform-admins) once it exists.
-/gitops/tenant-claims/   @gangster
+# NOTE on enforcement (ADR-062): main's branch protection requires STATUS CHECKS, not reviews — a global
+# required-review rule would block the tenant-claims automerge path (GitHub cannot require reviews
+# per-path). So entries here REQUEST review; the hard guarantees are:
+#   - tenant claims: the Tenant Claims Gate (schema/envelope/quota/path checks) + Kyverno envelope
+#     enforcement at admission — deliberately NOT review-gated, that's what makes self-service automerge
+#     safe (claims are bounded by the Team envelope, so per-tenant approval is delegated to CI).
+#   - Team objects & scaffolder templates: the gate FAILS scaffolder-authored PRs touching these paths
+#     until an admin approves the current commit (machine-enforced human review, ADR-062 §1).
+#   - everything else: the collaborator set (who can push/merge at all) is the actual control.
 
-# Team objects GRANT envelopes (ADR-062 §1: New Team is human-review, never automerge) — the scaffolder's
-# onboarding PRs land here and must take a platform review.
+# Team objects GRANT envelopes (ADR-062 §1: New Team is human-review, never automerge).
 /gitops/teams/           @gangster
 
-# Scaffolder templates: a template defines what a self-service portal run can author (and, once #281 lands,
-# what can auto-merge), so template changes are platform-only — same review bar as the claim paths (ADR-062 §4).
+# Scaffolder templates: a template defines what a self-service portal run can author (and what can
+# auto-merge), so template changes are platform-only — same review bar as the sensitive infra paths.
 /scaffolder/             @gangster
+
+# CI workflows and the tenant-claims gate scripts: the gate judges automerge, so changes here deserve
+# eyes (signal only — see the note above; pull_request_target already prevents a PR from editing the
+# gate that evaluates it).
+/.github/                @gangster
