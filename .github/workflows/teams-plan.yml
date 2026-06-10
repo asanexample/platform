@@ -33,6 +33,9 @@ jobs:
       TG_FORCE_DEPLOYER: "1"
       AWS_REGION: us-east-1
     steps:
+      # Trusted: pins the base ref explicitly. (nosemgrep — the rule flags any checkout under
+      # pull_request_target; this one is the protected base, and the PR head below is data-only.)
+      # nosemgrep: yaml.github-actions.security.pull-request-target-code-checkout.pull-request-target-code-checkout
       - name: Checkout base (trusted)
         uses: actions/checkout@v4
         with:
