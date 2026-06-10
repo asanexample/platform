@@ -131,10 +131,10 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # This SHA (asanexample/backstage#26) fixes the catalog rule glob for the platform repo (the old
-  # '**asanexample/platform**' pattern never matched — minimatch globstar semantics — so #25's Template
-  # ingestion was rejected). Builds on the scaffolder foundation (#25, #279/ADR-062) + projection v2 (#24).
-  image_tag = "a4437662f268f957aed59b7f4329f82611a3e17c"
+  # This SHA (asanexample/backstage#27) adds platform:verify-team-membership (the server-side team-scoping
+  # action for the self-service templates, #281/ADR-062 §1) + the permission-policy change letting team
+  # members create scaffolder tasks. Builds on the catalog glob fix (#26) + scaffolder foundation (#25).
+  image_tag = "517ad7af0620f32d7c05bee03f28fdfc3680e20a"
 
   # Split-horizon for OIDC: pin keycloak.aws.refplat.org to the gateway's ClusterIP so the backend hits the
   # gateway Envoy directly (the public-name → internal-NLB hairpin is flaky). The ClusterIP is resolved
