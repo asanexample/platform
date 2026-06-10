@@ -1,0 +1,20 @@
+# Team delta — THROWAWAY test team for the #305 Phase 1 CI loop (teams-plan → teams-apply). Safe to remove.
+# Mirrors the Team CR schema (ADR-063): identity (ssoGroup) + the envelope Kyverno reads during XTenant admission.
+apiVersion: platform.refplat.org/v1alpha2
+kind: Team
+metadata:
+  name: delta
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/part-of: tenant-api
+spec:
+  ssoGroup: Dev-delta
+  envelope:
+    allowedTiers: ["standard"]
+    allowedEnvironments: ["dev", "test", "uat", "staging", "prod"]
+    allowedLocations: ["*"]
+    quotaCap:
+      cpu: "8"
+      memory: 16Gi
+      pods: 40
+    maxDedicatedZones: 0
