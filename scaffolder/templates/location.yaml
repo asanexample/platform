@@ -12,3 +12,4 @@ spec:
   targets:
     - ./hello-world/template.yaml
     - ./new-team/template.yaml
+    - ./new-tenant/template.yaml
