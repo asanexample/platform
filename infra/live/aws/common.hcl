@@ -2,8 +2,13 @@
 # This file contains global configuration for the AWS platform
 
 locals {
-  # Load secrets (account IDs, emails, SSO config)
-  _secrets = yamldecode(sops_decrypt_file("${get_repo_root()}/infra/live/aws/secrets.enc.yaml"))
+  # Load config secrets (account IDs, emails, SSO config), ADR-066. Normally decrypted inline from the committed
+  # SOPS secrets.enc.yaml via the management platform-sops KMS key. TG_SOPS_BOOTSTRAP=1 is the greenfield escape:
+  # it falls back to the local plaintext secrets.hcl, needed ONLY on a true from-zero bootstrap before that key
+  # exists (its own unit + state-bootstrap include root.hcl, so they can't decrypt what isn't created yet). Both
+  # branches yield the same FLAT map, so local._secrets.X accessors are identical. Terragrunt short-circuits the
+  # conditional, so the un-taken branch's file is never read (mirrors root.hcl's TG_FORCE_DEPLOYER escape).
+  _secrets = get_env("TG_SOPS_BOOTSTRAP", "") == "1" ? read_terragrunt_config("${get_repo_root()}/infra/live/aws/secrets.hcl").locals : yamldecode(sops_decrypt_file("${get_repo_root()}/infra/live/aws/secrets.enc.yaml"))
 
   # Account IDs and emails (flattened from secrets)
   account_ids    = local._secrets.account_ids

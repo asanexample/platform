@@ -16,6 +16,9 @@ environments:
   #     profile: management
 
 overrides:
+  # NOTE: the management bootstrap floor — state-bootstrap, state-access, and sops-kms (the ADR-066 config key) —
+  # lives under infra/live/aws/mgmt/global/, OUTSIDE both env-teardown trees, so platctl never discovers or
+  # destroys it (no teardown_skip needed; that's only for floor units WITHIN an env tree, like iam-roles below).
   platform/iam-roles:
     auth:
       profile: platform
