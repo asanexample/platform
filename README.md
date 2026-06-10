@@ -293,3 +293,5 @@ scanning (Trivy IaC, Semgrep) — via OIDC federation, no stored credentials.
 | [Tenant Onboarding](docs/runbooks/tenant-onboarding.md) | Add/remove teams via a Crossplane `Tenant` claim |
 | [EKS Cluster Access](docs/runbooks/eks-cluster-access.md) | kubectl setup for engineers |
 | [Architecture Decisions](docs/adrs/) | 48 ADRs documenting every significant choice |
+
+<!-- teams-gate non-teams trigger test -->
