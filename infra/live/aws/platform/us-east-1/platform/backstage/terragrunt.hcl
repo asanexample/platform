@@ -131,10 +131,10 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # This SHA (asanexample/backstage#24) updates the platform-projection plugin to the v2 Tenant API
-  # (v1alpha2 claims: namespace <team>-<name>-<env>, per-app Pod roles, per-namespace policy names,
-  # spec.domains). Builds on group-based RBAC #197 (#23) + direct-Keycloak-OIDC (#20) + logout (#21/#22).
-  image_tag = "c1243fafb87bd09218bcc3a9550a3501b971663d"
+  # This SHA (asanexample/backstage#25) adds the scaffolder foundation (#279, ADR-062): the /create page,
+  # the write App as the second integrations.github.apps entry, and the platform-repo template location
+  # (scaffolder/templates/). Builds on the v2 platform-projection (#24) + RBAC #197 (#23).
+  image_tag = "97270c688a6e2d2b2a69ec68c6b8c7778dfb9b00"
 
   # Split-horizon for OIDC: pin keycloak.aws.refplat.org to the gateway's ClusterIP so the backend hits the
   # gateway Envoy directly (the public-name → internal-NLB hairpin is flaky). The ClusterIP is resolved
