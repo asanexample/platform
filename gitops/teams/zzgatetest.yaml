@@ -1,15 +1,15 @@
-# Throwaway team to exercise teams-gate. Intentionally violates the envelope deny-set.
+# Throwaway team to exercise teams-gate — now COMPLIANT (should pass).
 apiVersion: platform.refplat.org/v1alpha2
 kind: Team
 metadata:
   name: zzgatetest
 spec:
-  ssoGroup: platform-admins
+  ssoGroup: Dev-zzgatetest
   envelope:
-    allowedTiers: ["gold"]
-    allowedEnvironments: ["dev"]
+    allowedTiers: ["standard"]
+    allowedEnvironments: ["dev", "test"]
     quotaCap:
-      cpu: "200"
-      memory: 1Ti
-      pods: 9999
-    maxDedicatedZones: 5
+      cpu: "8"
+      memory: 16Gi
+      pods: 40
+    maxDedicatedZones: 0
