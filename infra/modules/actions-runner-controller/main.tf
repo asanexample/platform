@@ -70,10 +70,10 @@ resource "kubernetes_manifest" "github_app_external_secret" {
 # ---------------------------------------------------------------------------
 # Runner AWS identity (EKS Pod Identity)
 #
-# Runner pods get AWS creds via Pod Identity bound to a dedicated, narrowly-scoped role whose ONLY power is
-# to assume PlatformDeployer (to run terragrunt). The access is INERT until PlatformDeployer's trust admits
-# this role — a separate, isolated change so the privilege grant reviews on its own (ADR-065). This is the
-# infra-apply pool's identity; app/CI runner pools must use distinct ones.
+# Runner pods get AWS creds via Pod Identity bound to a dedicated, narrowly-scoped role whose only powers are
+# to assume PlatformDeployer (providers/secrets/port-forward) and the TerraformStateAccess role (the S3/DynamoDB
+# backend — terragrunt assumes it separately) — i.e. exactly what a CI `terragrunt apply` needs, nothing more.
+# This is the infra-apply pool's identity; app/CI runner pools must use distinct ones (ADR-065).
 # ---------------------------------------------------------------------------
 
 data "aws_iam_policy_document" "runner_trust" {
@@ -98,15 +98,28 @@ resource "aws_iam_role" "runner" {
 # sts:TagSession as well as AssumeRole — terragrunt's exec auth assumes PlatformDeployer with a tagged session.
 resource "aws_iam_role_policy" "runner_assume_deployer" {
   count = local.create ? 1 : 0
-  name  = "assume-platform-deployer"
+  name  = "assume-apply-roles"
   role  = aws_iam_role.runner[0].id
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["sts:AssumeRole", "sts:TagSession"]
-      Resource = [var.deployer_role_arn]
-    }]
+    Statement = [
+      {
+        # Providers, secrets, and the keycloak port-forward run as PlatformDeployer.
+        Sid      = "AssumePlatformDeployer"
+        Effect   = "Allow"
+        Action   = ["sts:AssumeRole", "sts:TagSession"]
+        Resource = [var.deployer_role_arn]
+      },
+      {
+        # Terragrunt assumes the state role SEPARATELY for the S3/DynamoDB backend (root.hcl remote_state) —
+        # a plain AssumeRole (no session tags), in the management account. Without this a CI apply can't read
+        # or lock state. The state role already trusts the platform-account root unconditionally.
+        Sid      = "AssumeTerraformStateAccess"
+        Effect   = "Allow"
+        Action   = ["sts:AssumeRole"]
+        Resource = [var.state_role_arn]
+      },
+    ]
   })
 }
 

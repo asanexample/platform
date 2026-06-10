@@ -111,5 +111,10 @@ inputs = {
   # PlatformDeployer's trust admits the role (a separate, isolated change — the actual privilege grant).
   deployer_role_arn = include.base.locals.deployer_role_arn
 
+  # Terragrunt assumes the state-backend role (root.hcl remote_state.role_arn) SEPARATELY from PlatformDeployer,
+  # so a CI apply on the runner needs to assume it too. It lives in the management account and already trusts
+  # the platform-account root unconditionally — granting the runner role AssumeRole on it is the only change.
+  state_role_arn = "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:role/TerraformStateAccess"
+
   tags = include.base.locals.tags
 }
