@@ -9,7 +9,12 @@ Backstage GitHub-App pattern, `backstage-github-app.md`).
 
 ## 1. Create the GitHub App (org `asanexample`)
 
-Settings → Developer settings → GitHub Apps → **New GitHub App**:
+Open the org's **New GitHub App** form directly:
+
+<https://github.com/organizations/asanexample/settings/apps/new>
+
+(Equivalent path: the org's Settings → Developer settings → GitHub Apps → **New GitHub App**. Create it as an
+**org-owned** App — not a personal one — so ownership survives any one person leaving.) Fill in:
 
 - **Name:** `asanexample-arc-runners` (or similar)
 - **Homepage URL:** any (e.g. the repo URL)
