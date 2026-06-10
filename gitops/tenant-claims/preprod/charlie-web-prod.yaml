@@ -1,0 +1,13 @@
+# Smoke test for the Tenant Claims Gate (#281) — OVER-ENVELOPE (prod vs dev-only). Must fail the gate.
+apiVersion: platform.refplat.org/v1alpha2
+kind: XTenant
+metadata:
+  name: charlie-web-prod
+spec:
+  team: charlie
+  name: web
+  environment: prod
+  apps:
+    web:
+      repo: asanexample/app-charlie
+      serviceAccount: app-charlie
