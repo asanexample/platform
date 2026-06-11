@@ -1,0 +1,531 @@
+# Environment Composition v3 (Crossplane v2, Pipeline mode) — ADR-067 / L2a (#383).
+#
+# Renders a v1alpha3 XEnvironment into its footprint: the Kubernetes footprint (namespace
+# <team>-<product>-<stage>[-<customer>], quota, limits, NetworkPolicies, CiliumNetworkPolicies, developer
+# RoleBinding) + per-SERVICE AWS identity (product-scoped ECR team-<team>/<product>-<service>, Pod-Identity)
+# + the per-namespace image-registry + route-hostname guards.
+#
+# ADDITIVE (ADR-067 cutover model): this binds the v3 XEnvironment XRD and coexists with the live v2 Composition
+# (tenant-v2, XTenant). Render-tested offline (crossplane render) by .tenant-api-tests; it becomes active at the
+# rebuild cutover, when v2 is removed. Shipped raw (.Files.Get) so Helm leaves the go-template delimiters intact.
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: environment-v3
+  labels:
+    crossplane.io/xrd: xenvironments.platform.refplat.org
+spec:
+  compositeTypeRef:
+    apiVersion: platform.refplat.org/v1alpha3
+    kind: XEnvironment
+  mode: Pipeline
+  pipeline:
+    - step: load-environment
+      functionRef:
+        name: function-environment-configs
+      input:
+        apiVersion: environmentconfigs.fn.crossplane.io/v1beta1
+        kind: Input
+        spec:
+          environmentConfigs:
+            - type: Reference
+              ref:
+                name: tenant-cluster-config
+    - step: render-resources
+      functionRef:
+        name: function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: |
+            {{- $spec := .observed.composite.resource.spec }}
+            {{- $xrName := .observed.composite.resource.metadata.name }}
+            {{- $team := $spec.team }}
+            {{- $product := $spec.product }}
+            {{- $stage := $spec.stage }}
+            {{- $customer := $spec.customer | default "" }}
+            {{- /* Namespace <team>-<product>-<stage>[-<customer>]; truncate-and-hash if it would exceed the
+                   63-char DNS-1123 limit (ADR-070 / platform-domain-api open-gap #10). Friendly when short. */}}
+            {{- $nsRaw := printf "%s-%s-%s" $team $product $stage }}
+            {{- if $customer }}{{- $nsRaw = printf "%s-%s-%s-%s" $team $product $customer $stage }}{{- end }}
+            {{- $ns := $nsRaw }}
+            {{- if gt (len $nsRaw) 63 }}{{- $ns = printf "%s-%s" (substr 0 56 $nsRaw) (substr 0 6 (sha256sum $nsRaw)) }}{{- end }}
+            {{- $tier := $spec.tier | default "standard" }}
+            {{- $q := $spec.quota | default dict }}
+            {{- /* Lifecycle (ADR-062 #283): suspended/decommissioning = a REVERSIBLE grace state — zero the
+                   ResourceQuota (no pod runs; workloads drain) while everything else is retained. */}}
+            {{- $phase := (($spec.lifecycle | default dict).phase) | default "active" }}
+            {{- $suspended := or (eq $phase "suspended") (eq $phase "decommissioning") }}
+            {{- $qCpu := $q.cpu }}{{- $qMem := $q.memory }}{{- $qPods := $q.pods }}
+            {{- if $suspended }}{{- $qCpu = "0" }}{{- $qMem = "0" }}{{- $qPods = "0" }}{{- end }}
+            {{- $gw := "default" }}
+            {{- $cfg := index .context "apiextensions.crossplane.io/environment" }}
+            {{- $ecrCfg := $cfg.providerConfigEcr | default "default" }}
+            {{- $pullAccts := list }}
+            {{- if and $cfg $cfg.pullAccountIds }}{{- $pullAccts = $cfg.pullAccountIds | fromJson }}{{- end }}
+            {{- $ecrPrincipals := list }}
+            {{- range $a := $pullAccts }}{{- $ecrPrincipals = append $ecrPrincipals (printf "arn:aws:iam::%s:root" $a) }}{{- end }}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: namespace
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: Namespace
+                  metadata:
+                    name: {{ $ns }}
+                    labels:
+                      app.kubernetes.io/managed-by: crossplane
+                      platform.refplat.org/team: {{ $team }}
+                      platform.refplat.org/product: {{ $product }}
+                      platform.refplat.org/stage: {{ $stage }}
+                      {{- if $customer }}
+                      platform.refplat.org/customer: {{ $customer }}
+                      {{- end }}
+                      platform.refplat.org/tier: {{ $tier }}
+                      platform.refplat.org/mode: namespace
+                      pod-security.kubernetes.io/enforce: baseline
+                      pod-security.kubernetes.io/warn: restricted
+                      pod-security.kubernetes.io/audit: restricted
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: resourcequota
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: ResourceQuota
+                  metadata:
+                    name: environment-quota
+                    namespace: {{ $ns }}
+                  spec:
+                    hard:
+                      requests.cpu: "{{ $qCpu }}"
+                      requests.memory: "{{ $qMem }}"
+                      limits.cpu: "{{ $qCpu }}"
+                      limits.memory: "{{ $qMem }}"
+                      pods: "{{ $qPods }}"
+                      services: "{{ $q.services }}"
+                      services.loadbalancers: "{{ $q.loadbalancers }}"
+                      persistentvolumeclaims: "{{ $q.pvcs }}"
+                      requests.storage: "{{ $q.storage }}"
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: limitrange
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: LimitRange
+                  metadata:
+                    name: environment-limits
+                    namespace: {{ $ns }}
+                  spec:
+                    limits:
+                      - type: Container
+                        default:
+                          cpu: 500m
+                          memory: 512Mi
+                        defaultRequest:
+                          cpu: 100m
+                          memory: 128Mi
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: netpol-default-deny-ingress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: networking.k8s.io/v1
+                  kind: NetworkPolicy
+                  metadata:
+                    name: default-deny-ingress
+                    namespace: {{ $ns }}
+                  spec:
+                    podSelector: {}
+                    policyTypes: ["Ingress"]
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: netpol-allow-gateway-ingress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: networking.k8s.io/v1
+                  kind: NetworkPolicy
+                  metadata:
+                    name: allow-gateway-ingress
+                    namespace: {{ $ns }}
+                  spec:
+                    podSelector: {}
+                    policyTypes: ["Ingress"]
+                    ingress:
+                      - from:
+                          - namespaceSelector:
+                              matchLabels:
+                                kubernetes.io/metadata.name: {{ $gw }}
+                          - namespaceSelector:
+                              matchLabels:
+                                kubernetes.io/metadata.name: kube-system
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: netpol-allow-dns-egress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: networking.k8s.io/v1
+                  kind: NetworkPolicy
+                  metadata:
+                    name: allow-dns-egress
+                    namespace: {{ $ns }}
+                  spec:
+                    podSelector: {}
+                    policyTypes: ["Egress"]
+                    egress:
+                      - ports:
+                          - port: 53
+                            protocol: UDP
+                          - port: 53
+                            protocol: TCP
+                      - to:
+                          - ipBlock:
+                              cidr: 0.0.0.0/0
+                              except: ["169.254.169.254/32"]
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: cnp-allow-gateway-envoy
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: cilium.io/v2
+                  kind: CiliumNetworkPolicy
+                  metadata:
+                    name: allow-gateway-envoy
+                    namespace: {{ $ns }}
+                  spec:
+                    endpointSelector: {}
+                    ingress:
+                      - fromEntities: ["ingress", "remote-node", "host"]
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: cnp-allow-pod-identity-egress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: cilium.io/v2
+                  kind: CiliumNetworkPolicy
+                  metadata:
+                    name: allow-pod-identity-egress
+                    namespace: {{ $ns }}
+                  spec:
+                    endpointSelector: {}
+                    egress:
+                      - toEntities: ["host"]
+                        toPorts:
+                          - ports:
+                              - port: "80"
+                                protocol: TCP
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: rolebinding-developers
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: rbac.authorization.k8s.io/v1
+                  kind: RoleBinding
+                  metadata:
+                    name: environment-developers
+                    namespace: {{ $ns }}
+                  roleRef:
+                    apiGroup: rbac.authorization.k8s.io
+                    kind: ClusterRole
+                    name: tenant-developer
+                  subjects:
+                    - kind: Group
+                      name: {{ $ns }}:developers
+                      apiGroup: rbac.authorization.k8s.io
+            {{- /* Per-SERVICE delivery surface. ECR is PRODUCT-scoped — team-<team>/<product>-<service> (ADR-067
+                   §7) — built once and promoted across stages. Identity/ECR provision for every declared service
+                   regardless of `image` (a no-image service is provisioned-but-not-yet-deployed; the workload is
+                   the ApplicationSet's concern, L2b). */}}
+            {{- range $svc, $svccfg := $spec.services }}
+            {{- $repo := printf "team-%s/%s-%s" $team $product $svc }}
+            {{- if $cfg.ecrRegistry }}
+            ---
+            apiVersion: ecr.aws.upbound.io/v1beta1
+            kind: Repository
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: ecr-repo-{{ $svc }}
+                crossplane.io/external-name: {{ $repo }}
+            spec:
+              # Orphan on delete (ADR-062 #283): product-scoped + shared across stages, so removing one
+              # Environment must NOT destroy images another stage still uses.
+              deletionPolicy: Orphan
+              providerConfigRef:
+                name: {{ $ecrCfg }}
+              forProvider:
+                region: {{ $cfg.region }}
+                imageTagMutability: IMMUTABLE_WITH_EXCLUSION
+                imageTagMutabilityExclusionFilter:
+                  - filter: "sha256-*"
+                    filterType: WILDCARD
+                imageScanningConfiguration:
+                  - scanOnPush: true
+                forceDelete: true
+                tags:
+                  Team: {{ $team }}
+                  Product: {{ $product }}
+            {{- if $ecrPrincipals }}
+            ---
+            apiVersion: ecr.aws.upbound.io/v1beta1
+            kind: RepositoryPolicy
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: ecr-repopolicy-{{ $svc }}
+            spec:
+              deletionPolicy: Orphan
+              providerConfigRef:
+                name: {{ $ecrCfg }}
+              forProvider:
+                region: {{ $cfg.region }}
+                repository: {{ $repo }}
+                policy: {{ (dict "Version" "2012-10-17" "Statement" (list (dict "Sid" "CrossAccountPull" "Effect" "Allow" "Principal" (dict "AWS" $ecrPrincipals) "Action" (list "ecr:BatchGetImage" "ecr:GetDownloadUrlForLayer" "ecr:BatchCheckLayerAvailability")))) | toJson | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if $svccfg.serviceAccount }}
+            {{- /* Pod-Identity role Pod-<team>-<product>-<stage>-<service>; truncate-and-hash if it would exceed
+                   the 64-char IAM role-name limit (the tightest derived name). */}}
+            {{- $roleRaw := printf "Pod-%s-%s-%s-%s" $team $product $stage $svc }}
+            {{- $role := $roleRaw }}
+            {{- if gt (len $roleRaw) 64 }}{{- $role = printf "%s-%s" (substr 0 57 $roleRaw) (substr 0 6 (sha256sum $roleRaw)) }}{{- end }}
+            ---
+            apiVersion: iam.aws.upbound.io/v1beta1
+            kind: Role
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: pod-role-{{ $svc }}
+                crossplane.io/external-name: {{ $role }}
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                assumeRolePolicy: {{ (dict "Version" "2012-10-17" "Statement" (list (dict "Effect" "Allow" "Principal" (dict "Service" "pods.eks.amazonaws.com") "Action" (list "sts:AssumeRole" "sts:TagSession") "Condition" (dict "StringEquals" (dict "aws:SourceAccount" $cfg.workloadAccountId))))) | toJson | quote }}
+                {{- if $cfg.permissionsBoundaryArn }}
+                permissionsBoundary: {{ $cfg.permissionsBoundaryArn | quote }}
+                {{- end }}
+                tags:
+                  Team: {{ $team }}
+                  Product: {{ $product }}
+                  Stage: {{ $stage }}
+                  Service: {{ $svc }}
+            ---
+            apiVersion: eks.aws.upbound.io/v1beta1
+            kind: PodIdentityAssociation
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: pod-identity-{{ $svc }}
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                region: {{ $cfg.region }}
+                clusterName: {{ $cfg.clusterName }}
+                namespace: {{ $ns }}
+                serviceAccount: {{ $svccfg.serviceAccount }}
+                roleArn: arn:aws:iam::{{ $cfg.workloadAccountId }}:role/{{ $role }}
+            {{- $awsPerms := (($svccfg.permissions | default dict).aws | default dict) }}
+            {{- if $awsPerms.policyStatements }}
+            {{- $stmts := list }}
+            {{- range $s := $awsPerms.policyStatements }}
+            {{- $st := dict "Effect" ($s.effect | default "Allow") "Action" $s.actions "Resource" $s.resources }}
+            {{- if $s.sid }}{{- $st = merge $st (dict "Sid" $s.sid) }}{{- end }}
+            {{- $stmts = append $stmts $st }}
+            {{- end }}
+            ---
+            apiVersion: iam.aws.upbound.io/v1beta1
+            kind: RolePolicy
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: pod-rolepolicy-{{ $svc }}
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                role: {{ $role }}
+                policy: {{ (dict "Version" "2012-10-17" "Statement" $stmts) | toJson | quote }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- /* Per-PRODUCT image-registry guard (ADR-014/067): workloads in this namespace may run only images
+                   under the product's ECR scope team-<team>/<product>-* (all the product's services). */}}
+            {{- if $cfg.ecrRegistry }}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: kyverno-restrict-images
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: kyverno.io/v1
+                  kind: ClusterPolicy
+                  metadata:
+                    name: restrict-images-{{ $ns }}
+                    labels:
+                      app.kubernetes.io/managed-by: crossplane
+                      platform.refplat.org/team: {{ $team }}
+                  spec:
+                    background: true
+                    rules:
+                      - name: only-own-product-images
+                        match:
+                          any:
+                            - resources:
+                                kinds: ["Pod"]
+                                namespaces: ["{{ $ns }}"]
+                        validate:
+                          failureAction: Enforce
+                          message: "{{ $product }} workloads may only run images under {{ $cfg.ecrRegistry }}/team-{{ $team }}/{{ $product }}-."
+                          foreach:
+                            - list: "request.object.spec.containers"
+                              pattern:
+                                image: "{{ $cfg.ecrRegistry }}/team-{{ $team }}/{{ $product }}-*"
+                            - list: "request.object.spec.initContainers"
+                              pattern:
+                                image: "{{ $cfg.ecrRegistry }}/team-{{ $team }}/{{ $product }}-*"
+                            - list: "request.object.spec.ephemeralContainers"
+                              pattern:
+                                image: "{{ $cfg.ecrRegistry }}/team-{{ $team }}/{{ $product }}-*"
+            {{- end }}
+            {{- /* Route hostnames (ADR-060/061/069). The generated host <product>-<team>-<stage>.<baseDomain>
+                   (+ -pr-* preview wildcard) is the system anchor — ALWAYS Active + admitted. Bound domains
+                   (Environment.domains, already ⊆ Product.domains at admission — Kyverno #387) are unioned in.
+                   NOTE (open-gap #3): the generated host does not yet encode a Service (multi-service) or a
+                   Customer (per-customer); that ADR-060/061 extension is pending. */}}
+            {{- $base := $cfg.baseDomain }}
+            {{- $allowed := list }}
+            {{- $statusByHost := dict }}
+            {{- if $base }}
+            {{- $gen := printf "%s-%s-%s.%s" $product $team $stage $base }}
+            {{- $allowed = append $allowed $gen }}
+            {{- $allowed = append $allowed (printf "%s-%s-%s-pr-*.%s" $product $team $stage $base) }}
+            {{- $statusByHost = set $statusByHost $gen (dict "host" $gen "state" "Active" "mode" "platform-managed" "reason" "GeneratedHost") }}
+            {{- end }}
+            {{- range $host := $spec.domains | default list }}
+            {{- $allowed = append $allowed $host }}
+            {{- if not (hasKey $statusByHost $host) }}{{- $statusByHost = set $statusByHost $host (dict "host" $host "state" "Active" "mode" "platform-managed" "reason" "BoundDomain") }}{{- end }}
+            {{- end }}
+            {{- $allowed = $allowed | uniq }}
+            {{- $statusDomains := list }}
+            {{- range $h := (keys $statusByHost | sortAlpha) }}{{- $statusDomains = append $statusDomains (index $statusByHost $h) }}{{- end }}
+            {{- if $statusDomains }}
+            ---
+            apiVersion: platform.refplat.org/v1alpha3
+            kind: XEnvironment
+            metadata:
+              name: {{ $xrName }}
+            status:
+              domains:
+              {{- range $sd := $statusDomains }}
+                - host: {{ $sd.host }}
+                  state: {{ $sd.state }}
+                  mode: {{ $sd.mode }}
+                  reason: {{ $sd.reason }}
+                  {{- if $sd.message }}
+                  message: {{ $sd.message | quote }}
+                  {{- end }}
+              {{- end }}
+            {{- end }}
+            {{- if $allowed }}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: kyverno-restrict-hostnames
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: kyverno.io/v1
+                  kind: ClusterPolicy
+                  metadata:
+                    name: restrict-route-hostnames-{{ $ns }}
+                    labels:
+                      app.kubernetes.io/managed-by: crossplane
+                      platform.refplat.org/team: {{ $team }}
+                  spec:
+                    background: true
+                    rules:
+                      - name: allowed-hostnames
+                        match:
+                          any:
+                            - resources:
+                                kinds: ["HTTPRoute", "GRPCRoute", "TLSRoute"]
+                                namespaces: ["{{ $ns }}"]
+                        validate:
+                          failureAction: Enforce
+                          message: "{{ $product }} routes may only use: {{ $allowed | join ", " }}."
+                          foreach:
+                            - list: "request.object.spec.hostnames"
+                              deny:
+                                conditions:
+                                  all:
+                                    - key: "{{`{{ element }}`}}"
+                                      operator: AnyNotIn
+                                      value: {{ $allowed | toJson }}
+            {{- end }}
+    - step: ready
+      functionRef:
+        name: function-auto-ready

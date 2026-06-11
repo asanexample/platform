@@ -75,3 +75,36 @@ printf '%s' "$OUT" | grep -q 'reason: AwaitingProvisioning'       || { echo "::e
 echo "  ✓ canonical OK (namespace payments-payments-api-prod, tier pci, per-app role + RolePolicy, ECR team-payments/api, external domain Pending)"
 
 echo "v2 Composition render checks passed (A3c — K8s footprint + per-app AWS identity + ECR)."
+
+# ===========================================================================================================
+# v3 Environment Composition (ADR-067 / L2a #383) — ADDITIVE alongside v2. Renders v1alpha3 XEnvironment claims
+# (.tenant-api-tests/environments/) against composition-v3.yaml: product-scoped ECR/identity + the v3 footprint.
+# ===========================================================================================================
+compv3="${here}/../charts/tenant/files/composition-v3.yaml"
+renderv3() { crossplane render "$1" "$compv3" "$fns" --extra-resources "$envcfg" 2>/dev/null; }
+
+echo "== render v3 demo-dev (first-deploy: web service, no image) → footprint + product-scoped ECR/identity =="
+OUT="$(renderv3 "${here}/environments/demo-dev.yaml")"
+printf '%s' "$OUT" | grep -q 'name: alpha-demo-dev$'                  || { echo "::error::v3 namespace alpha-demo-dev not rendered"; printf '%s\n' "$OUT"; exit 1; }
+printf '%s' "$OUT" | grep -q 'platform.refplat.org/product: demo'     || { echo "::error::v3 product label missing"; exit 1; }
+printf '%s' "$OUT" | grep -q 'platform.refplat.org/stage: dev'        || { echo "::error::v3 stage label missing"; exit 1; }
+printf '%s' "$OUT" | grep -q 'external-name: team-alpha/demo-web'     || { echo "::error::v3 product-scoped ECR team-alpha/demo-web not rendered"; exit 1; }
+printf '%s' "$OUT" | grep -q 'external-name: Pod-alpha-demo-dev-web'  || { echo "::error::v3 Pod role Pod-alpha-demo-dev-web not rendered"; exit 1; }
+printf '%s' "$OUT" | grep -q 'name: alpha-demo-dev:developers'        || { echo "::error::v3 developer RoleBinding group wrong"; exit 1; }
+printf '%s' "$OUT" | grep -q 'team-alpha/demo-\*'                     || { echo "::error::v3 restrict-images scope should be team-alpha/demo-*"; exit 1; }
+printf '%s' "$OUT" | grep -q 'demo-alpha-dev.preprod.aws.refplat.org' || { echo "::error::v3 generated host demo-alpha-dev not in the allow-list"; exit 1; }
+echo "  ✓ v3 demo-dev OK (ns alpha-demo-dev, ECR team-alpha/demo-web, role Pod-alpha-demo-dev-web, restrict-images team-alpha/demo-*)"
+
+echo "== render v3 shop-bigbank-prod (per-customer pci prod, image + permissions) → customer-ns + RolePolicy =="
+OUT="$(renderv3 "${here}/environments/shop-bigbank-prod.yaml")"
+printf '%s' "$OUT" | grep -q 'name: alpha-shop-bigbank-prod$'        || { echo "::error::v3 per-customer namespace alpha-shop-bigbank-prod not rendered"; exit 1; }
+printf '%s' "$OUT" | grep -q 'platform.refplat.org/customer: bigbank' || { echo "::error::v3 customer label missing"; exit 1; }
+printf '%s' "$OUT" | grep -q 'external-name: team-alpha/shop-api'     || { echo "::error::v3 ECR team-alpha/shop-api not rendered"; exit 1; }
+printf '%s' "$OUT" | grep -q 'external-name: Pod-alpha-shop-prod-api' || { echo "::error::v3 Pod role Pod-alpha-shop-prod-api not rendered"; exit 1; }
+printf '%s' "$OUT" | grep -q 's3:GetObject'                          || { echo "::error::v3 per-service RolePolicy missing the granted action"; exit 1; }
+printf '%s' "$OUT" | grep -q 'permissionsBoundary'                   || { echo "::error::v3 minted role missing the permissions boundary"; exit 1; }
+printf '%s' "$OUT" | grep -q 'host: shop.example.com'                || { echo "::error::v3 bound domain shop.example.com not in status.domains"; exit 1; }
+printf '%s' "$OUT" | grep -q 'reason: BoundDomain'                   || { echo "::error::v3 bound domain should be reason BoundDomain"; exit 1; }
+echo "  ✓ v3 shop-bigbank-prod OK (customer-ns, ECR team-alpha/shop-api, role + RolePolicy + boundary, bound domain Active)"
+
+echo "v3 Environment Composition render checks passed (L2a — product-scoped footprint + identity)."
