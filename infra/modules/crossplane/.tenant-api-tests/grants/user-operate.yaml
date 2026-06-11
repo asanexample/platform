@@ -1,0 +1,7 @@
+apiVersion: platform.refplat.org/v1alpha3
+kind: AccessGrant
+metadata: { name: carol-on-alpha-shop }
+spec:
+  target: { team: alpha, product: shop }
+  subject: user:carol@corp
+  posture: operate

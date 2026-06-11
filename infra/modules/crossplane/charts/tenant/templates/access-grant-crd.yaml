@@ -1,0 +1,76 @@
+# The projected AccessGrant CR (ADR-068, docs/architecture/platform-domain-api.md — "AccessGrant").
+#
+# A plain, cluster-scoped, data-only CRD (not a Crossplane composite). Cross-team (or within-team-restricted)
+# product access, authored in the OWNING team's git domain and projected onto each cluster so Kyverno can
+# admission-validate it (ownership: target.team owns the product; Team-group subject; no escalation / no platform
+# target; regulated TTL; per-product cap). The full access realization (Keycloak roles, RBAC fan-out) is P4;
+# this CR is the admission + projection surface. Default team membership grants nothing to write — only cross-team
+# or restrictWithinTeam deviations are objects.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: accessgrants.platform.refplat.org
+spec:
+  group: platform.refplat.org
+  scope: Cluster
+  names:
+    kind: AccessGrant
+    plural: accessgrants
+    singular: accessgrant
+    categories:
+      - tenant-api
+  versions:
+    - name: v1alpha3
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - target
+                - subject
+              properties:
+                target:
+                  type: object
+                  description: What is being granted. Lives in target.team's git domain (admission checks target.team owns the product).
+                  required:
+                    - team
+                    - product
+                  properties:
+                    team:
+                      type: string
+                    product:
+                      type: string
+                    service:
+                      type: string
+                      description: Optional — narrows to one service (soft at the k8s layer; honored in Backstage/ArgoCD scoping).
+                subject:
+                  type: string
+                  description: "user:<id> | group:team-<b> — group subjects must be Team groups (no ad-hoc groups; Kyverno)."
+                  pattern: "^(user:|group:team-).+"
+                posture:
+                  type: string
+                  enum: ["view", "operate"]
+                  default: view
+                  description: Cap; effective = min(cap, stage×tier posture). A grant only narrows, never escalates.
+                expiresAt:
+                  type: string
+                  description: Optional TTL (RFC3339 date). Mandatory for regulated (pci/hipaa) targets (Kyverno).
+      additionalPrinterColumns:
+        - name: Target
+          type: string
+          jsonPath: .spec.target.product
+        - name: Subject
+          type: string
+          jsonPath: .spec.subject
+        - name: Posture
+          type: string
+          jsonPath: .spec.posture
+        - name: Expires
+          type: string
+          jsonPath: .spec.expiresAt

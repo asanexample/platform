@@ -1,0 +1,5 @@
+# MUST FAIL: subject must be user:<id> or group:team-<b> (no ad-hoc groups).
+apiVersion: platform.refplat.org/v1alpha3
+kind: AccessGrant
+metadata: { name: bad-subject }
+spec: { target: { team: alpha, product: demo }, subject: group:squad-x }

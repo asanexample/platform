@@ -107,3 +107,90 @@ spec:
         - name: Tenants
           type: integer
           jsonPath: .status.tenantCount
+    # -------------------------------------------------------------------------------------------------------
+    # v1alpha3 — the v3 envelope (ADR-067): allowedEnvironments → allowedStages, maxDedicatedZones →
+    # maxDedicatedIsolation {cluster, account}, + maxCrossTeamGrantsPerProduct (ADR-068). Served-only (storage
+    # stays v1alpha2 until the cutover); added ADDITIVELY so v2 gitops/teams + the teams-gate keep working while
+    # the v3 surface is render-tested. conversion None (no stored objects to convert; deploy is rebuild-gated).
+    # -------------------------------------------------------------------------------------------------------
+    - name: v1alpha3
+      served: true
+      storage: false
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - ssoGroup
+                - envelope
+              properties:
+                ssoGroup:
+                  type: string
+                  description: The upstream IdP / Keycloak group this Team maps to (root of both authz planes).
+                envelope:
+                  type: object
+                  description: The bound on every Product/Environment the Team may author.
+                  required:
+                    - allowedTiers
+                    - allowedStages
+                    - quotaCap
+                  properties:
+                    allowedTiers:
+                      type: array
+                      minItems: 1
+                      items:
+                        type: string
+                        enum: ["standard", "elevated", "pci", "hipaa"]
+                    allowedStages:
+                      type: array
+                      minItems: 1
+                      items:
+                        type: string
+                        enum: ["dev", "test", "uat", "staging", "prod"]
+                    allowedLocations:
+                      type: array
+                      items:
+                        type: string
+                      default: ["*"]
+                    quotaCap:
+                      type: object
+                      properties:
+                        cpu: { type: string }
+                        memory: { type: string }
+                        pods: { type: integer }
+                    maxDedicatedIsolation:
+                      type: object
+                      description: How many Environments may dial to the expensive isolation rungs. 0 = pooled namespace/nodes only.
+                      default: { cluster: 0, account: 0 }
+                      properties:
+                        cluster: { type: integer, default: 0, minimum: 0 }
+                        account: { type: integer, default: 0, minimum: 0 }
+                    maxCrossTeamGrantsPerProduct:
+                      type: integer
+                      description: Cap on active inbound AccessGrants per Product (ADR-068 §9 sprawl backstop).
+                      default: 10
+                      minimum: 0
+            status:
+              type: object
+              properties:
+                productCount: { type: integer }
+                environmentCount: { type: integer }
+                dedicatedIsolationInUse:
+                  type: object
+                  properties:
+                    cluster: { type: integer }
+                    account: { type: integer }
+      additionalPrinterColumns:
+        - name: SSO Group
+          type: string
+          jsonPath: .spec.ssoGroup
+        - name: Stages
+          type: string
+          jsonPath: .spec.envelope.allowedStages
+        - name: Environments
+          type: integer
+          jsonPath: .status.environmentCount

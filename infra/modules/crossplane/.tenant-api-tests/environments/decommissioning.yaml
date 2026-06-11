@@ -1,0 +1,11 @@
+# Environment in the reversible-suspend lifecycle phase (ADR-062).
+apiVersion: platform.refplat.org/v1alpha3
+kind: XEnvironment
+metadata: { name: demo-staging }
+spec:
+  team: alpha
+  product: demo
+  stage: staging
+  lifecycle: { phase: decommissioning }
+  services:
+    web: { image: "123.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo-web@sha256:def", serviceAccount: demo-web }
