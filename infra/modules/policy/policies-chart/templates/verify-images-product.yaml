@@ -1,0 +1,82 @@
+{{- /*
+v3 (ADR-069 §6 / ADR-067): per-PRODUCT image-signature verification. The v2 verify-images.yaml is per-TEAM
+(team-<team>/* images, namespace team-<team>); this is the product-scoped analog — team-<team>/<product>-*
+images in the product's environment namespaces — gated by the cert's githubWorkflowRepository extension = the
+Product's repo (the shared trusted-ci/build-sign.yml signer model, ADR-050/068). ADDITIVE: renders only when
+verifySubjectsProduct is populated (empty by default → inert), alongside the live per-team policies. The v2→v3
+cutover removes verify-images.yaml.
+*/ -}}
+{{- if .Values.enableImageVerification }}
+{{- range $key, $p := .Values.verifySubjectsProduct }}
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-images-product-{{ $p.team }}-{{ $p.product }}
+  labels:
+    {{- include "kpp.labels" $ | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Verify Image Signatures — {{ $p.team }}/{{ $p.product }}
+    policies.kyverno.io/category: Supply Chain, Multi-Tenancy
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Admits only images under team-{{ $p.team }}/{{ $p.product }}- that are cosign-signed (keyless) by the
+      Product's own CI — the shared trusted-ci build-sign workflow gated to this product by the cert's
+      githubWorkflowRepository extension (= {{ $p.repo }}). A signature from another product's repo does not
+      satisfy this policy (supply-chain analog of the product-scoped registry isolation). mutateDigest pins
+      admitted images to their digest.
+spec:
+  validationFailureAction: {{ $.Values.verifyFailureAction }}
+  webhookTimeoutSeconds: 30
+  failurePolicy: {{ $.Values.verifyFailurePolicy }}
+  background: false
+  rules:
+    - name: verify-signed
+      match:
+        any:
+          # The product's environment namespaces carry team + product labels (set by the v3 Composition),
+          # so select by label rather than enumerating <team>-<product>-<stage>[-<customer>] names.
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  platform.refplat.org/team: {{ $p.team }}
+                  platform.refplat.org/product: {{ $p.product }}
+      verifyImages:
+        - imageReferences:
+            - "{{ $p.registryPrefix }}-*"
+          mutateDigest: {{ eq $.Values.verifyFailureAction "Enforce" }}
+          verifyDigest: true
+          required: true
+          attestors:
+            - count: 1
+              entries:
+                # Shared trusted-ci build-sign reusable workflow — same cert SUBJECT for every product; the
+                # per-product gate is the githubWorkflowRepository extension (= the Product repo, which Fulcio
+                # sets from the calling repo's OIDC, so another product cannot forge it). squote: the anchored
+                # regex carries backslash escapes.
+                - keyless:
+                    issuer: https://token.actions.githubusercontent.com
+                    subjectRegExp: {{ $.Values.trustedCiBuildSubjectRegExp | squote }}
+                    additionalExtensions:
+                      githubWorkflowRepository: {{ $p.repo | quote }}
+                    rekor:
+                      url: "{{ $.Values.rekorUrl }}"
+                {{- range $i := ($p.appSubjects | default list) }}
+                # Optional per-product app-signed identities (bespoke-build products that sign with their own
+                # deploy/preview workflows rather than the shared signer).
+                - keyless:
+                    issuer: https://token.actions.githubusercontent.com
+                    subject: "{{ $i.deploy_subject }}"
+                    rekor:
+                      url: "{{ $.Values.rekorUrl }}"
+                - keyless:
+                    issuer: https://token.actions.githubusercontent.com
+                    subjectRegExp: "{{ $i.preview_subject_regexp }}"
+                    rekor:
+                      url: "{{ $.Values.rekorUrl }}"
+                {{- end }}
+---
+{{- end }}
+{{- end }}
