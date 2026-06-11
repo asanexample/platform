@@ -503,6 +503,13 @@ should be resolved before P1 implementation starts.
    today), torn down on PR close. They are **not** `XEnvironment` claims, so `stage` stays `dev…prod` (no
    `preview` value) and there is no per-preview envelope/gitops object. (L2b owns the PR generator.)
 
+10. **✅ Namespace / derived-name length — RESOLVED.** Per-component DNS-1123 limits for friendliness, plus a
+    **deterministic truncate-and-hash fallback** on any derived identifier that would exceed its ceiling —
+    namespace (63), **IAM role (64, the tightest** since `Pod-<team>-<product>-<stage>-<service>` carries the
+    service), label (63). On overflow, truncate the variable portion to fit and append `-` + the first **6 hex of
+    `sha256("<team>/<product>/<stage>/<customer?>/<service?>")`**. Friendly names in the common (short) case;
+    always-valid in the edge case. Apply uniformly in the Composition (L2a).
+
 11. **🔴 App-level config & secrets — UNDESIGNED platform capability (major gap).** The model has rich per-env
     *infra* (quota, isolation, resources) but **nothing** for per-stage **application config + secrets** (DB
     URLs, feature flags, API keys, env-specific env-vars) — the most common developer need. Today tenants get
@@ -512,13 +519,6 @@ should be resolved before P1 implementation starts.
     schema is being baked, so wherever config/secrets eventually attach (likely `Environment.spec.services.<svc>`)
     is a **schema decision that must precede F1 freezing the XEnvironment shape** — or we knowingly add it later
     and accept the breaking change.
-
-10. **✅ Namespace / derived-name length — RESOLVED.** Per-component DNS-1123 limits for friendliness, plus a
-    **deterministic truncate-and-hash fallback** on any derived identifier that would exceed its ceiling —
-    namespace (63), **IAM role (64, the tightest** since `Pod-<team>-<product>-<stage>-<service>` carries the
-    service), label (63). On overflow, truncate the variable portion to fit and append `-` + the first **6 hex of
-    `sha256("<team>/<product>/<stage>/<customer?>/<service?>")`**. Friendly names in the common (short) case;
-    always-valid in the edge case. Apply uniformly in the Composition (L2a).
 
 ## Migration from v1alpha2
 
