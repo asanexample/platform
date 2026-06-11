@@ -21,9 +21,9 @@ flow through the whole v3 stack — which **surfaced real integration gaps** (th
 | L2b — ApplicationSet + verify-images-product + per-Product OIDC | ✅ merged | yes |
 | #387 — restrict-environment-envelope | ✅ merged | yes |
 | #389 — registry-sync apps | ✅ merged | yes |
-| **#388 — product-gate + environment-gate (CI)** | ⛔ TODO | **yes** — without them the new gitops paths have no shift-left gate; the v2 teams-gate/tenant-claims-gate reject v3 |
+| #388 — product-gate + environment-gate (CI) | ✅ merged (#400) | yes |
 | **L2c — projection rewrite (System/Component/Environment)** | ⛔ TODO | **yes (portal)** — else Backstage shows stale v2 tenant Systems |
-| **L3b — golden-path-starters + app-repo restructure** | ⛔ TODO | **yes** — the ApplicationSet syncs `k8s/overlays/<stage>`; existing apps are flat `k8s/preprod/` (see Gap 2) |
+| L3b — app-repo restructure (`k8s/base` + `overlays/<stage>`) | ✅ done for the live apps (app-alpha, app-bravo) | yes — see Gap 2 |
 | L3a — New Product scaffolder | ◻ for self-service | no (apps can be hand-migrated) |
 
 ## The cutover procedure (ordered)
@@ -79,20 +79,25 @@ must make **v1alpha3 the storage version** and the gitops Teams must be authored
 clean (nothing stored to convert), but this is an explicit, easy-to-miss cutover step. *(Same applies to the
 Product/AccessGrant apiCalls — all must be the stored/served version the policies query.)*
 
-### 🔴 Gap 2 — existing app repos are the wrong shape for the ApplicationSet
+### ✅ Gap 2 — existing app repos are the wrong shape for the ApplicationSet — RESOLVED
 
 The per-Product ApplicationSet syncs **`<repo>/k8s/overlays/<stage>`** (ns/host-agnostic base + per-stage
-overlays). The live apps (`app-alpha`, `app-bravo`) are **flat `k8s/preprod/` with a hardcoded namespace**. So
-the ApplicationSet would find no `k8s/overlays/dev` and deploy nothing. **Fix:** restructure each app repo to the
-v3 layout (this is L3b's `_platform` overlay shape) *before* it can be delivered by v3 — or recreate it via New
-Product. **This is per-app migration work that must precede the cutover for any app we want live on v3.**
+overlays); the live apps were **flat `k8s/preprod/` with a hardcoded namespace**. **Done (#376):** both
+`app-alpha` ([#34](https://github.com/asanexample/app-alpha/pull/34)) and `app-bravo`
+([#9](https://github.com/asanexample/app-bravo/pull/9)) now carry `k8s/base/` (ns-/host-agnostic, image
+product-scoped `team-<team>/demo-web`) + `k8s/overlays/{dev,test,uat,staging,prod}/`, **additively** —
+`k8s/preprod/` is kept byte-identical so v2 delivery is untouched, and a CI job asserts every overlay builds
+ns-agnostic. **Remaining at cutover:** rewire each app's `deploy.yml` to push the product-scoped image and pin
+the digest into `overlays/<stage>` (the first-deploy image-prep, Gap 4), then remove `k8s/preprod/`.
 
-### 🟡 Gap 3 — the gates are hard-cutover-blocking, not optional
+### 🟡 Gap 3 — the gates are hard-cutover-blocking, not optional — PARTIALLY ADDRESSED
 
 `teams-gate` hard-pins `apiVersion: v1alpha2` + `allowedEnvironments`; `tenant-claims-gate` parses XTenant
 fields. The moment the cutover writes v1alpha3 Teams + `gitops/environments`, **both gates fail every PR** unless
-swapped in the *same* change. So #388 (product-gate + environment-gate) + the teams-gate v3 bump are part of the
-cutover commit, not a follow-up.
+swapped in the *same* change. **Done (#388 / #400):** the `product-gate` + `environment-gate` (the new
+`v3 gitops Gate`) are merged and inert (classify-first; the v3 surfaces are empty until cutover). **Still in the
+cutover commit:** the `teams-gate` v1alpha3 bump + retiring `tenant-claims-gate` in favour of the
+`environment-gate` — those must land in the *same* change that migrates the gitops data.
 
 ### 🟡 Gap 4 — the digest's first home on a fresh build
 
@@ -106,9 +111,9 @@ runbook's image-prep step.
 
 In priority order (all cutover-blocking except L3a):
 
-1. **#388** — `product-gate` + `environment-gate` + teams-gate v3 (Gap 3).
-2. **App-repo restructure / L3b starters** — the `k8s/overlays/<stage>` ns-agnostic layout (Gap 2).
-3. **L2c** — the projection rewrite (portal correctness).
+1. ~~**#388** — `product-gate` + `environment-gate`~~ ✅ merged (#400). teams-gate v3 bump stays in the cutover commit (Gap 3).
+2. ~~**App-repo restructure / L3b**~~ ✅ done for the live apps — `app-alpha`, `app-bravo` on `k8s/base` + `overlays/<stage>` (Gap 2).
+3. **L2c** — the projection rewrite (portal correctness). ◀ next cutover-blocking target.
 4. **The cutover commit itself** — flip storage to v1alpha3 (Gap 1), migrate gitops, flip gates, remove v2.
 5. Rebuild-runbook deltas — image-prep ordering (Gap 4), the new gitops paths, the v3 unit inputs.
 
