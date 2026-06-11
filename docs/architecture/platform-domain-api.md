@@ -162,7 +162,7 @@ admission policy (image-registry scoping — the registry path is now product-sc
 | `tenancy` | — | enum | `pooled` | `pooled` (customers are a logical/app-level concern) \| `per-customer` (a dedicated Environment per Customer at prod). ADR-067 §6. |
 | `defaultIsolation` | — | object | tier floor | The Isolation an Environment inherits unless it dials up (see [Isolation](#isolation-the-graduated-dial)). For `per-customer` products this defaults from the **Customer** (ADR-067 §4). |
 | `restrictWithinTeam` | — | boolean | `false` | If true, even team members need an explicit `AccessGrant` for this Product (ADR-068 §4). **Auto-true** when `tier` ∈ {`pci`,`hipaa`} on any Environment (separation of duties). |
-| `domains` | — | `[]object` | `[]` | ADDITIONAL route hostname aliases (`{ host, canonical, dns }`, ADR-061). The generated canonical host is implicit and never declared — today's convention is `<product>-<team>-<stage>.<baseDomain>` (per-env `baseDomain`, e.g. `shop-alpha-dev.preprod.aws.refplat.org`). **⚠️ Open (see [Open questions](#open-questions--known-gaps)):** this convention does **not** yet encode a *Service* (multi-service products) or a *Customer* (per-customer prod) — both must be added before P1's multi-service flow / P3's per-customer model. |
+| `domains` | — | `[]object` | `[]` | The vanity hostnames this Product **owns** — the allowed set (`{ host, dns }`, ADR-061), validated against team ownership at admission. An Environment may **bind** a subset (`Environment.domains ⊆ Product.domains`, ADR-069 §2) — so a dev Environment cannot claim the prod vanity host. The generated canonical host is implicit and never declared — today's convention is `<product>-<team>-<stage>.<baseDomain>` (per-env `baseDomain`, e.g. `shop-alpha-dev.preprod.aws.refplat.org`). **⚠️ Open (see [Open questions](#open-questions--known-gaps)):** the generated host does **not** yet encode a *Service* (multi-service products) or a *Customer* (per-customer prod) — both must be added before P1's multi-service flow / P3's per-customer model. |
 
 ```yaml
 apiVersion: platform.refplat.org/v1alpha3
@@ -225,7 +225,8 @@ declares *what* it needs at a stage, never *where* it lands; Placement resolves 
 | `isolation` | — | object | from Product/Customer/tier | The graduated dial (compute level + data axis), defaulting from the Customer (per-customer) or Product, floored by `tier`. See [Isolation](#isolation-the-graduated-dial). |
 | `residency` | — | object | `{ allowedLocations: ["*"] }` | **Hard, attested** placement constraint (jurisdiction or `cloud:region`). Must be ⊆ the Team's `allowedLocations`. Placement fails (never silently relaxes) if no placement satisfies it. |
 | `quota` | — | object | tier profile default | `cpu`/`memory`/`pods` (+ optional `services`/`loadbalancers`/`pvcs`/`storage`). Validated ≤ the Team's `quotaCap`. |
-| `services` | — | map | `{}` | `<service> → ServiceDeploySpec`. Per-stage delivery for each of the Product's deployed Services: `{ repoPath?, preview?, serviceAccount?, permissions? }` (overrides/echoes the `Service` defaults). The artifact deployed is a **digest** promoted into this stage (see [Promotion](#promotion)). |
+| `domains` | — | `[]string` | `[]` | The vanity hosts **bound** in *this* Environment — a subset of `Product.domains` (the owned set). `Environment.domains ⊆ Product.domains` is enforced at admission (ADR-069 §2), so e.g. only the prod Environment binds `shop.example.com`. Unioned with the generated host into the Kyverno `restrict-route-hostnames` allow-list + `status.domains`. |
+| `services` | — | map | `{}` | `<service> → ServiceDeploySpec`. Per-stage **realization** of each deployed Service: `{ image (digest), repoPath?, preview?, serviceAccount?, permissions? }`. `image` is the immutable `…@sha256:` digest promoted into this stage ([Promotion](#promotion)); `serviceAccount`/`permissions` **override** the `Service` defaults (effective = override else default). |
 | `lifecycle` | — | object | `{ phase: active }` | `phase: active \| suspended \| decommissioning`. Reversible suspend zeroes the ResourceQuota (ADR-062 #283); hard-delete is gated decommission-first + reviewed; ECR retained (`Orphan`). |
 
 ### status (derived — never authored)
@@ -439,13 +440,12 @@ This schema is internally consistent but **not yet complete** — splitting `app
 decision (most a small design pass / ADR) **before its phase ships**; the two marked ⛔ are **foundational** and
 should be resolved before P1 implementation starts.
 
-1. **⛔ Delivery source-of-truth split (revisits ADR-061).** Today `repo` lives on the **per-Environment claim**
-   (`spec.apps.<app>.repo`), and `argocd-apps` / `policy` / `github-oidc` derive everything from that one claim
-   ("claim-as-single-source"). Here, `repo` is a **Product** property (stage-invariant) and Services are separate
-   — so delivery now reads **two** objects (Product for repo/domains/tenancy, Environment for stage/services/
-   quota). That **breaks ADR-061's single-claim principle** and means `argocd-apps` must produce one Application
-   per **(Environment × Service)** with per-stage overlays (today it's one per `(team, app)`). *Needs an ADR-061
-   revision / delivery-source redesign — the foundation P1.2/P1.5/P1.6 build on.*
+1. **✅ Delivery source-of-truth split — RESOLVED by [ADR-069](../adrs/069-delivery-source-of-truth-product-environment.md).**
+   Delivery now reads **two** git objects joined leaf-up (Product registry for repo/owned-domains/image-scope;
+   Environment for stage/services/digest/bound-domains/quota) under "one home per fact"; `argocd-apps` becomes
+   **one ApplicationSet per Product** generating one Application per `(Environment × Service)` from git (no
+   per-change apply); `github-oidc` derives one OIDC role per Product; the Composition keys `restrict-images` off
+   the projected `Product` CR. This is the foundation P1.2/P1.5/P1.6 + P2 build on.
 
 2. **⛔ Catalog cardinality: a Service deploys to N Environments.** Backstage's `Component` belongs to exactly
    **one** `System`, but a Service runs in many Environments (dev/staging/prod, and per-customer). So
@@ -455,10 +455,11 @@ should be resolved before P1 implementation starts.
    / `Resource` (no `Domain`, no `Component`) — so P1.3 (Product-as-Domain) must add `Domain` + `Component` + a
    deployed-to relation, not just rename. *Needs the catalog mapping nailed before P1.3.*
 
-3. **Hostname under multi-service + per-customer.** The generated host `<product>-<team>-<stage>` encodes the
-   stage (good) but **not a Service** (a multi-service product needs per-service routing) or a **Customer**
-   (per-customer prod). ADR-060/061 need an extension — e.g. `<service>-<product>-<team>-<stage>` and a customer
-   component/subdomain — before P1's multi-service flow and P3's per-customer model.
+3. **Hostname under multi-service + per-customer** *(partly addressed: ADR-069 §2 added the domains owns/binds
+   split, closing the ownership half).* The generated host `<product>-<team>-<stage>` encodes the stage (good)
+   but **not a Service** (a multi-service product needs per-service routing) or a **Customer** (per-customer
+   prod). ADR-060/061 still need a generated-host extension — e.g. `<service>-<product>-<team>-<stage>` and a
+   customer component/subdomain — before P1's multi-service flow and P3's per-customer model.
 
 4. **New Product lifecycle.** A Product is first-class but its *creation* is unspecified: does **New Service**
    create the Product when it creates the repo (one repo : one product), or is there a separate **New Product**
