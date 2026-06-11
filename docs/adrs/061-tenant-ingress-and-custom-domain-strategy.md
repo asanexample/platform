@@ -1,7 +1,11 @@
 # ADR-061: Tenant Ingress & Custom Domain Strategy
 
 **Date:** 2026-06-08
-**Status:** Accepted — strategy/direction. Extends [ADR-060](060-tenant-app-hostname-convention.md).
+**Status:** Accepted — strategy/direction. Extends [ADR-060](060-tenant-app-hostname-convention.md). **Refined by
+[ADR-069](069-delivery-source-of-truth-product-environment.md)** — once [ADR-067](067-idp-domain-model.md) split
+`app → Product/Service` and `Tenant → Environment`, this ADR's *claim-as-single-source* could no longer hold
+(delivery reads two objects); ADR-069 replaces it with **"one home per fact"** across the Product registry +
+Environment claims, keeping the git-native `fileset`-derived model.
 
 ## Context
 
