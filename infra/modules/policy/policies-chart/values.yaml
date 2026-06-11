@@ -53,6 +53,11 @@ verifyFailurePolicy: Ignore
 # A LIST per tenant: count:1 attestor admits any one. 2+ entries support a zero-downtime signing-
 # identity transition (accept old+new org identities until images are re-signed, then drop the old).
 verifySubjects: {}
+
+# v3 (ADR-069 §6): per-PRODUCT signature trust. Map "<team>-<product>" -> { team, product, registryPrefix
+# (<registry>/team-<team>/<product>), repo (the Product repo, gates githubWorkflowRepository), appSubjects? }.
+# Empty = inert (the per-team verifySubjects above is the live path until the v3 cutover).
+verifySubjectsProduct: {}
 rekorUrl: https://rekor.sigstore.dev
 
 # Isolated build provenance (SLSA Build L3, #131/ADR-042). For teams in attestCallerRepos the SLSA
