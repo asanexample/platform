@@ -7,6 +7,8 @@ validationFailureAction: Enforce
 # restrict-tenant-envelope action (ADR-049 A2b) — independent so it rolls Audit-first while the control-plane
 # policy is Enforce; flips to Enforce at the rebuild cutover (delivery-plan A6).
 envelopeFailureAction: Audit
+# v3 (ADR-067 #387): render restrict-environment-envelope (the XEnvironment envelope). Inert until the cutover.
+enableEnvironmentEnvelope: false
 # Generated-webhook failure policy: Ignore (fail-open) or Fail (fail-closed). Fail under Enforce.
 failurePolicy: Fail
 
