@@ -1,0 +1,7 @@
+{{/*
+The v3 Environment Composition (environment-v3, bound to v1alpha3 XEnvironment) carries an inline go-template
+whose {{ }} must NOT be processed by Helm. It is shipped as a raw file and emitted verbatim via .Files.Get, so
+the gotemplating delimiters reach Crossplane intact. ADDITIVE — coexists with the v2 Composition (tenant-v2)
+until the rebuild cutover removes v2 (ADR-067 / L2a #383).
+*/ -}}
+{{ .Files.Get "files/composition-v3.yaml" }}
