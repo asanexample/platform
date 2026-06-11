@@ -37,7 +37,7 @@ Team ─owns─▶ Product ─owns─▶ Service                         (Servic
   │             │   │
   │             │   └─served-to─▶ Customer                    (the consumer / SaaS "tenant"; internal or external)
   │             │
-  │             └─runs-at-a-Stage-as─▶ Environment = (Product × Stage [× Customer])   ← the namespace = Backstage System
+  │             └─runs-at-a-Stage-as─▶ Environment = (Product × Stage [× Customer])   ← the namespace; catalog `kind: Environment` (§10)
   │                                       ├─isolated-by─▶ Isolation (compute ladder + a separate data axis)
   │                                       └─placed-on──▶ Placement (cloud / region / account / cluster)
   │
@@ -54,7 +54,7 @@ Service ─depends-on─▶ Resource (DB / queue / bucket), per Environment   (s
 | **Service** | Product 1:N Service | A deployable unit (e.g. `api`). Sourced from one repo; has a product-scoped image + runtime identity. |
 | **Repo** | Repo 1:N Service | Source. Service-per-repo (default) **or** a monorepo. **Constrained to one Product.** |
 | **Stage** | a shared *dimension* | A promotion rung: `dev / test / uat / staging / prod`. (Was "environment.") |
-| **Environment** | Product 1:N Environment | A Product running at a Stage `(Product × Stage[, × Customer])` — a namespace, the deployable. **= Backstage System.** (Was "Tenant.") |
+| **Environment** | Product 1:N Environment | A Product running at a Stage `(Product × Stage[, × Customer])` — a namespace, the deployable. **= catalog `kind: Environment`** (§10). (Was "Tenant.") |
 | **Customer** | Product 0:N Customer | A consumer of a product (internal or external) — the tenant-in-spirit. Attaches at **prod** (+ opt-in UAT). |
 | **Isolation** | per Environment | *How hard* an environment is isolated — a compute ladder + a separate data axis (§5). |
 | **Placement** | Environment 1:N Placement | *Where* it physically lands: cloud / region / account / cluster (HA/DR/residency). |
@@ -65,7 +65,7 @@ Service ─depends-on─▶ Resource (DB / queue / bucket), per Environment   (s
 - **Customer** is the SaaS-sense tenant (the consumer). **Environment** is the `(Product × Stage[, Customer])`
   namespace. **Stage** is the dev→prod rung. **"Tenant" retires as a noun** — it was stuck on the namespace
   while the real tenant is the Customer; "multi-tenant" / "tenant isolation" survive only as *adjectives*.
-- **Timing:** these terms are used in **all new surfaces now** (this ADR, the catalog Domain/System/Component,
+- **Timing:** these terms are used in **all new surfaces now** (this ADR, the catalog System/Component/Environment,
   "New Service", new docs). The **code/CR rename** (`XTenant`, `tenant-claims/`, `restrict-tenant-envelope`, the
   gate, `spec.environment`) **rides the planned from-scratch rebuild** ([[project_planned_rebuild]]) — no
   in-place migration. Until then code keeps the legacy names; this ADR is the mapping of record.
@@ -167,18 +167,42 @@ only for genuine app-level deltas (replicas, resources, flags). (The current `ap
 The projection renders the model into the catalog:
 
 ```text
-Team       = Group
- Product   = Domain          ← groups its environments for the cross-stage / cross-customer view
-  Environment = System       ← the namespace (incl. per-customer prod, e.g. shop-bigco-prod)
-   Service  = Component       ← discovered from the repo's catalog-info.yaml
+Group                    = Team
+ (Domain, optional)      = a business area above Products (e.g. commerce ⊇ shop, checkout)
+  System                 = Product            ← the services that cooperate; holds the Components
+   Component             = Service            ← one per service, env-agnostic; from catalog-info.yaml
+   Environment (custom kind) = Environment    ← the provisioned (Product × Stage[, × Customer]) deployment
+    Resource             = per-env infra (DB / ECR / IAM / quota / policy)
 ```
+
+**Why this mapping** (it is *not* the obvious `Product=Domain, Environment=System`):
+
+- A Backstage **`System` is "components that work together to perform a function"** — that is the **Product**,
+  not a deployment. So **Product = `System`** and Service `Component`s nest in it natively.
+- Backstage prescribes **one `Component` per service, never one per environment** — a developer finds *one*
+  service entity and sees its deployments side-by-side via plugins. So a Service `Component` carries **spanning**
+  selectors (`backstage.io/kubernetes-label-selector`, `argocd/app-selector`, no namespace pin) and surfaces all
+  its environments; there are **no per-`(service × env)`** entities.
+- An **Environment** is a *deployment*, modeled by a relation, not membership. Backstage has no native kind for
+  it (the long-running [maintainer thread #16389](https://github.com/backstage/backstage/issues/16389) converges
+  on `kind: Environment` + `Component –deployedTo→ Environment`). We adopt a **custom `kind: Environment`** — our
+  platform *provisions* environments as first-class, ownable, status-bearing objects, so it earns its own kind.
+  It carries the **namespace-pinned** annotations + the provisioning status card (ADR-064), and `deployedTo` ties
+  it to its Services.
+- `Domain` is **optional** — emitted only where a real business-area grouping above Products exists, never forced.
+
+This refines an earlier sketch (`Product=Domain, Environment=System`), which conflated the Product with its
+deployments and broke `Component.spec.system`'s single-System constraint. The field-level catalog contract +
+the `platform-projection` delta live in
+[platform-domain-api.md](../architecture/platform-domain-api.md#open-questions--known-gaps); the rewrite is
+ADR-067 **P1.3** (#373).
 
 ### 11. Current platform → target (phasing)
 
 | Concern | Today (degenerate) | Target |
 |---|---|---|
 | Team | ✓ Team CR + envelope + `Dev-<team>` | — |
-| Product | implicit (`name`, ≈ app) | first-class → **Domain** per `(team, product)` |
+| Product | implicit (`name`, ≈ app) | first-class → **`System`** per `(team, product)` (§10) |
 | Service / image | `spec.apps.<app>`, `team-<team>/<app>` | distinct from product; **product-scoped** `team-<team>/<product>-<service>` |
 | Repo↔Service | 1:1 assumed | **1:N** (monorepo), one repo : one product |
 | Environment | tenant `team-name-env` = System ✓ | ns-agnostic manifests + platform injection; rename Tenant→Environment |
@@ -191,7 +215,7 @@ Team       = Group
 
 **Phases** (each its own ADR/issues, built against this model):
 
-1. **New Service** + **multi-env starter** (ns-agnostic base/overlays + injection) + **Product-as-Domain** +
+1. **New Service** + **multi-env starter** (ns-agnostic base/overlays + injection) + **Product-as-`System`** (§10) +
    **product-scoped image identity**. (The reframed "repo-on-demand.")
 2. **Promotion** (auto ≤ staging, gated prod).
 3. **Customers + graduated isolation** (per-customer environments; the compute dial).
@@ -204,7 +228,7 @@ Secondary/parallel: **monorepo "add a service to an existing repo"** (issue #358
 
 ## Consequences
 
-- **A single coherent north star** with a consistent vocabulary; the catalog (Group/Domain/System/Component) is a
+- **A single coherent north star** with a consistent vocabulary; the catalog (Group/System/Component/Environment) is a
   faithful rendering, and every later feature has an obvious home.
 - **The expensive separations are made cheaply, up front:** ownership/access, stage/placement, and isolation as a
   *dial* (not a binary) avoid re-plumbing RBAC, delivery, and customer isolation once cross-team work, DR, and

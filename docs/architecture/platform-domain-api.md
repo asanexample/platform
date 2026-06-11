@@ -46,9 +46,9 @@ the rebuild implements and that the access-model-as-code generators ([ADR-053](.
   | Object | Authored by | Representation |
   | ------ | ----------- | -------------- |
   | **Team** | Platform team (a Team is granted) | Registry → Backstage `Group`; **projected as a `Team` CR** per cluster for admission |
-  | **Product** | Team lead (self-service, "New Product") | Registry → Backstage `Domain`; **projected as a `Product` CR** for per-product policy |
-  | **Service** | Developer (self-service, "New Service") | Repo-native `catalog-info.yaml` → Backstage `Component` |
-  | **Environment** | Team lead / developer (self-service) | Crossplane `XEnvironment` XR (`v1alpha3`), GitOps-delivered |
+  | **Product** | Team lead (self-service, "New Product") | Registry → Backstage `System`; **projected as a `Product` CR** for per-product policy (catalog mapping: [ADR-067 §10](../adrs/067-idp-domain-model.md)) |
+  | **Service** | Developer (self-service, "New Service") | Repo-native `catalog-info.yaml` → Backstage `Component` (in the Product `System`; selectors span all envs) |
+  | **Environment** | Team lead / developer (self-service) | Crossplane `XEnvironment` XR (`v1alpha3`), GitOps-delivered → projected as a custom Backstage **`kind: Environment`** (ADR-067 §10) |
   | **Customer** | Platform / sales ops | Registry → Backstage entity; referenced by per-customer Environments |
   | **AccessGrant** | Owning team's `team-admin` (self-service) | `AccessGrant` CR in the owning team's git domain ([ADR-068](../adrs/068-product-scoped-and-cross-team-access-model.md)) |
 
@@ -149,13 +149,14 @@ spec:
 ## Object 2 — Product
 
 A **deployable owned by exactly one Team** (the ownership tree's middle node). It carries the delivery identity,
-the tenancy model, and the default isolation its Environments inherit. Surfaces in the catalog as a **Domain**
-(ADR-067 §10), grouping its Environments across stages/customers. Projected as a `Product` CR so per-product
-admission policy (image-registry scoping — the registry path is now product-scoped, ADR-046/067) can read it.
+the tenancy model, and the default isolation its Environments inherit. Surfaces in the catalog as a **`System`**
+(the functional unit — its Service `Component`s nest in it; [ADR-067 §10](../adrs/067-idp-domain-model.md)).
+Projected as a `Product` CR so per-product admission policy (image-registry scoping — the registry path is now
+product-scoped, ADR-046/067) can read it.
 
 | Field | Required | Type | Default | Purpose |
 | ----- | -------- | ---- | ------- | ------- |
-| `name` | yes | string | — | Product key (kebab-case), unique within the Team. Drives the catalog `Domain`, the image path `team-<team>/<product>-…`, and the `<team>-<product>-` namespace prefix. |
+| `name` | yes | string | — | Product key (kebab-case), unique within the Team. Drives the catalog `System`, the image path `team-<team>/<product>-…`, and the `<team>-<product>-` namespace prefix. |
 | `team` | yes | string | — | Owning Team. Must reference an existing `Team`. |
 | `displayName` | — | string | `name` | Human label. |
 | `repo` | yes | string | — | The single `owner/repo` that sources this Product's Service(s) (one repo : one product). The claim-as-source registry for `argocd-apps` / `policy` / `github-oidc` (ADR-061). |
@@ -447,13 +448,13 @@ should be resolved before P1 implementation starts.
    per-change apply); `github-oidc` derives one OIDC role per Product; the Composition keys `restrict-images` off
    the projected `Product` CR. This is the foundation P1.2/P1.5/P1.6 + P2 build on.
 
-2. **⛔ Catalog cardinality: a Service deploys to N Environments.** Backstage's `Component` belongs to exactly
-   **one** `System`, but a Service runs in many Environments (dev/staging/prod, and per-customer). So
-   "Service = Component, Environment = System" cannot both be ownership edges. **Resolution direction:** a Service
-   is a `Component` owned by the **Product `Domain`** (not by an env-System); each Environment is a `System` the
-   Component is *deployed-to* via a relation, not *owned-by*. The current projection emits only `System` / `Group`
-   / `Resource` (no `Domain`, no `Component`) — so P1.3 (Product-as-Domain) must add `Domain` + `Component` + a
-   deployed-to relation, not just rename. *Needs the catalog mapping nailed before P1.3.*
+2. **✅ Catalog cardinality — RESOLVED in [ADR-067 §10](../adrs/067-idp-domain-model.md) (post-research).**
+   Backstage prescribes **one `Component` per service** (plugins span environments via label-selectors), and a
+   `System` is the functional unit — so **Product = `System`** (Components nest natively), **Service = `Component`**
+   (spanning selectors), and **Environment = a custom `kind: Environment`** related by `deployedTo` (per the
+   maintainer direction in backstage#16389), carrying the namespace-pinned annotations + the #285 status card.
+   The projection rewrite (emit `System`/`Component`/`Environment`, re-point #285/#284 from `kind=system`) is
+   P1.3 (#373).
 
 3. **Hostname under multi-service + per-customer** *(partly addressed: ADR-069 §2 added the domains owns/binds
    split, closing the ownership half).* The generated host `<product>-<team>-<stage>` encodes the stage (good)
