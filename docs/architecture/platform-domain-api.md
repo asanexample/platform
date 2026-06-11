@@ -162,7 +162,7 @@ admission policy (image-registry scoping — the registry path is now product-sc
 | `tenancy` | — | enum | `pooled` | `pooled` (customers are a logical/app-level concern) \| `per-customer` (a dedicated Environment per Customer at prod). ADR-067 §6. |
 | `defaultIsolation` | — | object | tier floor | The Isolation an Environment inherits unless it dials up (see [Isolation](#isolation-the-graduated-dial)). For `per-customer` products this defaults from the **Customer** (ADR-067 §4). |
 | `restrictWithinTeam` | — | boolean | `false` | If true, even team members need an explicit `AccessGrant` for this Product (ADR-068 §4). **Auto-true** when `tier` ∈ {`pci`,`hipaa`} on any Environment (separation of duties). |
-| `domains` | — | `[]object` | `[]` | ADDITIONAL route hostname aliases (`{ host, canonical, dns }`, ADR-061). The generated `<product>-<team>.<baseDomain>` host is implicit and never declared. |
+| `domains` | — | `[]object` | `[]` | ADDITIONAL route hostname aliases (`{ host, canonical, dns }`, ADR-061). The generated canonical host is implicit and never declared — today's convention is `<product>-<team>-<stage>.<baseDomain>` (per-env `baseDomain`, e.g. `shop-alpha-dev.preprod.aws.refplat.org`). **⚠️ Open (see [Open questions](#open-questions--known-gaps)):** this convention does **not** yet encode a *Service* (multi-service products) or a *Customer* (per-customer prod) — both must be added before P1's multi-service flow / P3's per-customer model. |
 
 ```yaml
 apiVersion: platform.refplat.org/v1alpha3
@@ -190,9 +190,17 @@ Environment claim (below) per stage.
 | `name` | yes | string | — | Service key, unique within the Product. Drives the image artifact `team-<team>/<product>-<service>`. |
 | `product` | yes | string | — | Owning Product. |
 | `repoPath` | — | string | `/` (repo root) | Sub-path within the Product's repo (monorepo: one path per Service). |
-| `serviceAccount` | — | string | — | Named SA the Service's pods run as. A **cloud-neutral** identity is minted + bound to `(namespace, serviceAccount)` (AWS = a Pod Identity association). Must not carry an IRSA annotation (backstop). |
-| `permissions` | — | object | `{}` | **Cloud-keyed** grants attached to `serviceAccount`. `permissions.aws.policyStatements: []` — **deny-set-validated** at CI + admission (no `iam`/`sts`/`organizations`/`account` actions or bare `*`) AND boundary-capped at runtime (ADR-062 §4). |
+| `serviceAccount` | — | string | `name` | **Default** SA the Service's pods run as. A **cloud-neutral** identity is minted + bound to `(namespace, serviceAccount)` **per Environment** (AWS = a Pod Identity association). Must not carry an IRSA annotation (backstop). |
+| `permissions` | — | object | `{}` | **Default cloud-keyed** grants attached to `serviceAccount`. `permissions.aws.policyStatements: []` — **deny-set-validated** at CI + admission (no `iam`/`sts`/`organizations`/`account` actions or bare `*`) AND boundary-capped at runtime (ADR-062 §4). |
 | `resources` | — | map | `{}` | 🔒 **Reserved.** `<name> → ResourceSpec` — the Service→Resource dependency graph (DB / cache / objectstore / stream). Realized **per Environment**; carries the **data-isolation axis** (`shared` \| per-customer `dedicated`). See [Resource](#resource-serviceresource-dependencies). |
+
+> **Service vs `Environment.services` (authority split).** The **`Service`** object is the *static contract* —
+> repo-native (`catalog-info.yaml`), the same across every stage: identity name, default permissions, and the
+> resource-dependency *declarations*. The **`Environment.spec.services.<svc>`** entry (below) is the *per-stage
+> realization* — which **digest** is deployed (promotion), the `repoPath`/`preview`, and any per-stage **override**
+> of `serviceAccount`/`permissions` (e.g. prod needs a tighter policy than dev). Effective value = the
+> `Environment` override if present, else the `Service` default. The Service never names a digest; the Environment
+> never re-declares the static contract.
 
 ## Object 4 — Environment
 
@@ -423,6 +431,63 @@ arrived), reading the projected `Team` / `Product` CRs:
 - **Stateful / aggregate, report-first:** sum of Environment quotas ≤ cap, dedicated-isolation in use ≤
   `maxDedicatedIsolation`, active grants per product ≤ `maxCrossTeamGrantsPerProduct`. A rollup controller
   writes `Team.status` and alerts; hard-enforce only if a Team actually pushes a cap.
+
+## Open questions & known gaps
+
+This schema is internally consistent but **not yet complete** — splitting `app → Product/Service` and
+`Tenant → Environment` opens structural questions the v1alpha2 model never had to answer. Each below needs a
+decision (most a small design pass / ADR) **before its phase ships**; the two marked ⛔ are **foundational** and
+should be resolved before P1 implementation starts.
+
+1. **⛔ Delivery source-of-truth split (revisits ADR-061).** Today `repo` lives on the **per-Environment claim**
+   (`spec.apps.<app>.repo`), and `argocd-apps` / `policy` / `github-oidc` derive everything from that one claim
+   ("claim-as-single-source"). Here, `repo` is a **Product** property (stage-invariant) and Services are separate
+   — so delivery now reads **two** objects (Product for repo/domains/tenancy, Environment for stage/services/
+   quota). That **breaks ADR-061's single-claim principle** and means `argocd-apps` must produce one Application
+   per **(Environment × Service)** with per-stage overlays (today it's one per `(team, app)`). *Needs an ADR-061
+   revision / delivery-source redesign — the foundation P1.2/P1.5/P1.6 build on.*
+
+2. **⛔ Catalog cardinality: a Service deploys to N Environments.** Backstage's `Component` belongs to exactly
+   **one** `System`, but a Service runs in many Environments (dev/staging/prod, and per-customer). So
+   "Service = Component, Environment = System" cannot both be ownership edges. **Resolution direction:** a Service
+   is a `Component` owned by the **Product `Domain`** (not by an env-System); each Environment is a `System` the
+   Component is *deployed-to* via a relation, not *owned-by*. The current projection emits only `System` / `Group`
+   / `Resource` (no `Domain`, no `Component`) — so P1.3 (Product-as-Domain) must add `Domain` + `Component` + a
+   deployed-to relation, not just rename. *Needs the catalog mapping nailed before P1.3.*
+
+3. **Hostname under multi-service + per-customer.** The generated host `<product>-<team>-<stage>` encodes the
+   stage (good) but **not a Service** (a multi-service product needs per-service routing) or a **Customer**
+   (per-customer prod). ADR-060/061 need an extension — e.g. `<service>-<product>-<team>-<stage>` and a customer
+   component/subdomain — before P1's multi-service flow and P3's per-customer model.
+
+4. **New Product lifecycle.** A Product is first-class but its *creation* is unspecified: does **New Service**
+   create the Product when it creates the repo (one repo : one product), or is there a separate **New Product**
+   step (team-lead) that New Service then attaches to? Affects the P1.2 scaffolder flow.
+
+5. **Customer onboarding fan-out.** Onboarding a Customer to a `per-customer` Product must provision a
+   per-customer Environment (prod, opt-in UAT) — and across *every* such Product the customer consumes. There is
+   no described mechanism for that fan-out (N customers × M products). *A P3 provisioning concern; flag now so the
+   Customer object carries what the fan-out needs.*
+
+6. **Promotion artifact tracking.** Promote-by-digest needs a home for "which digest is in which stage" and the
+   bump proposal/record. `Environment.spec.services.<svc>` holds the *current* digest, but the cross-stage
+   ledger + the gated-bump workflow are unspecified (P2 / #377).
+
+7. **Cost & showback granularity.** `costCenter` is **Team-level only.** The Product (a `Domain`) is the natural
+   product-line cost unit, and per-customer Environments need per-customer **chargeback**. The cost model needs a
+   Product + Customer attribution axis (ties to the upcoming cost-management effort).
+
+8. **East-west / service identity.** The `Service` object names a workload identity for *AWS* access (Pod
+   Identity) but is not connected to **service-to-service** identity ([ADR-057](../adrs/057-service-identity-and-east-west-zero-trust.md)
+   — SPIFFE/mTLS). How Services in an Environment authenticate to each other and to their `Resource`s is unmodeled.
+
+9. **Preview / ephemeral environments.** PR previews ([ADR-032](../adrs/032-pr-preview-environments.md)) exist
+   today as per-app ApplicationSets with `-pr-*` hosts. Their place in the Environment model is undefined — a
+   transient Environment at a `preview` pseudo-stage, or a sub-variant of a stage? Affects naming, quota, and TTL.
+
+10. **Namespace-length ceiling.** `<team>-<product>-<customer>-<stage>` can exceed the k8s 63-char namespace
+    limit for long names. A deterministic truncation/hash rule is needed (today's `<team>-<name>-<env>` rarely
+    hits it; adding product + customer makes it real).
 
 ## Migration from v1alpha2
 
