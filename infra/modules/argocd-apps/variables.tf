@@ -133,3 +133,22 @@ variable "tenant_claims_repo_path" {
   type        = string
   default     = "gitops/tenant-claims/preprod"
 }
+
+# ---------------------------------------------------------------------------
+# v3 delivery (ADR-069 / L2b #384) — ADDITIVE alongside the v2 `tenants` inputs above.
+# ---------------------------------------------------------------------------
+variable "products" {
+  description = "v3: per-Product delivery, keyed <team>-<product>. One ApplicationSet per product; its git-files generator fans out over gitops/environments/<team>/<product>/*.yaml → one Application per Environment (decision c)."
+  type = map(object({
+    team     = string # owning team
+    product  = string # product short name (the gitops/environments/<team>/<product>/ dir)
+    repo_url = string # the app repo (Product.repo), https URL — the Application source
+  }))
+  default = {}
+}
+
+variable "platform_repo_url" {
+  description = "v3: the platform GitOps repo the per-Product ApplicationSet git-files generator reads Environment claims from (gitops/environments/). Empty disables v3 delivery."
+  type        = string
+  default     = ""
+}

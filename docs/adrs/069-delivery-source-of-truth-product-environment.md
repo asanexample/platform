@@ -77,19 +77,23 @@ fans out over `gitops/environments/<team>/<product>/` × the Product's Services 
   `Product` CR, and the `github-oidc` trust (§5). The **preview** ApplicationSet (already a PR generator,
   ADR-032) folds into the same per-Product family.
 
-### 4. Promotion: digest in the Environment claim, promote-by-PR, kustomize injection
+### 4. Promotion & digest — the mechanism is **P2's** decision; L2b injects only namespace + host
 
-- **Digest home:** `Environment.spec.services.<svc>.image` — an immutable `…@sha256:` digest. The Environment
-  owns its deployed version (§2). **Git is the promotion ledger** — "what's in staging" is the staging
-  Environment YAML; no separate ledger object.
-- **Promotion = a digest-bump PR:** **bot-opened, auto-merged ≤ staging**; **gated for prod** — the
-  `release-approver` reviews the bump, **author ≠ approver** (ADR-067 §8 / ADR-068 §7). The gate and the audit
-  trail are free because every promotion is a reviewable commit.
-- **Injection:** the ApplicationSet's Application template injects **namespace + hostname + digest** into the
-  ns/host-agnostic manifests via **kustomize** (`images:` for the digest, patches for namespace + the HTTPRoute
-  host) — extending the host-injection pattern `argocd-apps` uses today. One kustomize `base/` per Service;
-  per-stage `overlays/` only for real deltas; prod-hardening from `stage × tier`. *(No ArgoCD Image Updater /
-  auto-writeback — auto-writing prod would bypass the gate.)*
+> **Revised during the L2b spike (#384).** The ApplicationSet **does not inject the digest.** ArgoCD's
+> ApplicationSet template cannot natively build a *variable-length* per-service kustomize `images:` list from an
+> Environment's `services` map (it needs the advanced `templatePatch`, only verifiable on a live cluster). More
+> importantly, **where the digest lives and how it is promoted should not be locked in by the delivery layer.**
+
+- **L2b (delivery):** the per-Product ApplicationSet syncs the app repo's per-stage overlay
+  (`<Product.repo>/k8s/overlays/<stage>`) and injects only **namespace + hostname** — both *static per
+  environment*, so no dynamic list / `templatePatch`. **Whatever digest is committed in that overlay deploys**
+  (apps already commit their digest to their own overlay today, so nothing breaks meanwhile).
+- **Promotion / digest home → P2 ([#377](../adrs/067-idp-domain-model.md)).** Promote-by-PR (bot-merged ≤
+  staging, `release-approver`-gated prod, author ≠ approver — ADR-067 §8 / ADR-068 §7) stays the model, but the
+  *digest's home* — the app-repo overlay (native, decentralised, what CI does today) **or** the platform
+  Environment claim (centralised ledger, requires a propagation step into the overlay) — is decided in P2 with
+  full promotion context. `Environment.spec.services.<svc>.image` stays **optional/reserved** until then.
+- *(No ArgoCD Image Updater / auto-writeback — auto-writing prod would bypass the gate.)*
 
 ### 5. `github-oidc` derives one OIDC role per Product from the registry
 
