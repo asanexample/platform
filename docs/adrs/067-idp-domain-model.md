@@ -81,6 +81,18 @@ Service ─depends-on─▶ Resource (DB / queue / bucket), per Environment   (s
 The access *posture* (operate vs view, break-glass) stays derived from `stage × tier` (ADR-040); this ADR only
 says **who is scoped** to a product is a different edge from **who owns** it.
 
+> **Access-model impact (ADR-053).** Today the access model is purely **team-scoped** — `Dev-<team>` grants the
+> whole of a team's footprint, and the [ADR-053](053-identity-and-cross-system-authorization-strategy.md)
+> "access-model-as-code" generators + the Keycloak group/role taxonomy mirror **only** the Team. Product-scoped
+> access and cross-team grants have **no representation** in that taxonomy: the only way to express "a dev on
+> another team's product" is to drop them into `Dev-<other-team>`, which over-grants exactly what this section
+> forbids. So **P4 below requires extending the Keycloak taxonomy and the ADR-053 generators from Team → Team +
+> Product + cross-team grant**, and a distinct **release-approver** posture (separation of duties) for gated prod
+> promotion (§8). That detailed identity design is **deferred to its own working session / an ADR-053 revision**,
+> not specified here. **End-user / Customer authentication** (consumers signing in to a product, §6) is a
+> *separate* plane from developer access — out of scope for this ADR, likely served via the ADR-052/059 upstream
+> broker seam.
+
 ### 4. Stage / Environment / Placement (a stage is not a place)
 
 - **Stage** = a logical promotion rung — what a developer reasons about and promotes to.
@@ -181,7 +193,9 @@ Team       = Group
    **product-scoped image identity**. (The reframed "repo-on-demand.")
 2. **Promotion** (auto ≤ staging, gated prod).
 3. **Customers + graduated isolation** (per-customer environments; the compute dial).
-4. **Product-level access grants** (cross-team collaboration).
+4. **Product-level access grants** (cross-team collaboration) — extends the **ADR-053** Keycloak taxonomy +
+   access-model-as-code generators from Team → Team + Product + grant, and adds a release-approver posture for
+   gated prod. (Its own working session / ADR-053 revision.)
 5. **Placement / multi-cluster** (HA/DR) + **Service→Resource dependencies** (data isolation).
 
 Secondary/parallel: **monorepo "add a service to an existing repo"** (issue #358).
@@ -214,6 +228,9 @@ Secondary/parallel: **monorepo "add a service to an existing repo"** (issue #358
   [ADR-064](064-backstage-provisioning-visibility.md) (visibility) — the golden path implements toward this.
 - **Access posture** derives from `stage × tier` per [ADR-040](040-platform-engineer-access-model.md); this ADR
   separates *who is scoped to a product* from *who owns it*.
+- **Consumed by** [ADR-053](053-identity-and-cross-system-authorization-strategy.md): its access-model-as-code
+  generators + Keycloak taxonomy currently mirror only the Team and must extend to **Product + cross-team grants**
+  (P4 §3). End-user/Customer auth is a separate plane (the ADR-052/059 broker seam), not this ADR.
 - **Delivery** (namespace/host injection, per-stage paths) builds on [ADR-061](061-tenant-ingress-and-custom-domain-strategy.md)
   (claim-as-source) and [ADR-060](060-tenant-app-hostname-convention.md) (hostname convention).
 - **Monorepo** "add a service to an existing repo": issue #358.
