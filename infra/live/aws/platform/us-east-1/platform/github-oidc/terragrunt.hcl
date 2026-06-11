@@ -36,6 +36,53 @@ locals {
   team_repo_names = { for team, claim in local.claims :
     team => [for _app, cfg in claim.spec.apps : split("/", cfg.repo)[1]]
   }
+
+  # ---------------------------------------------------------------------------
+  # v3 (ADR-069 §5) — one OIDC ECR-push role per PRODUCT, derived from the Product registry
+  # (gitops/products/<team>/<product>.yaml): trusts only the Product's repo, pushes only to its product-scoped
+  # ECR (team-<team>/<product>-*). ADDITIVE + GATED: `v3_delivery_enabled` stays false until the cutover, so the
+  # fileset is not even evaluated and no v3 roles are created on apply (it coexists with the v2 per-team roles).
+  # The v2->v3 cutover flips this true and removes the per-team derivation above.
+  # ---------------------------------------------------------------------------
+  v3_delivery_enabled = false
+  products_dir        = "${get_repo_root()}/gitops/products"
+  products = local.v3_delivery_enabled ? {
+    for f in fileset(local.products_dir, "**/*.yaml") :
+    yamldecode(file("${local.products_dir}/${f}")).metadata.name => {
+      team    = yamldecode(file("${local.products_dir}/${f}")).spec.team
+      product = trimsuffix(basename(f), ".yaml") # short name (the filename) = the gitops/.../<product>.yaml stem
+      repo    = yamldecode(file("${local.products_dir}/${f}")).spec.repo
+    }
+  } : {}
+  product_roles = { for key, p in local.products :
+    "github-actions-ecr-push-product-${key}" => {
+      repos    = [split("/", p.repo)[1]] # the Product's repo (one repo : one product)
+      branches = ["main", "refs/tags/*"] # main + release tags
+      events   = ["pull_request"]        # + PR preview builds (preview = true)
+      tags     = { Team = p.team, Product = p.product }
+      inline_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [
+          { Sid = "ECRAuth", Effect = "Allow", Action = ["ecr:GetAuthorizationToken"], Resource = "*" },
+          {
+            Sid    = "ECRPush"
+            Effect = "Allow"
+            Action = [
+              "ecr:BatchCheckLayerAvailability",
+              "ecr:GetDownloadUrlForLayer",
+              "ecr:BatchGetImage",
+              "ecr:PutImage",
+              "ecr:InitiateLayerUpload",
+              "ecr:UploadLayerPart",
+              "ecr:CompleteLayerUpload",
+            ]
+            # Only this product's repos (team-<team>/<product>-*), Composition-created. Wildcard by construction.
+            Resource = ["arn:aws:ecr:${include.base.locals.region}:${include.base.locals.account_id}:repository/team-${p.team}/${p.product}-*"]
+          },
+        ]
+      })
+    }
+  }
 }
 
 inputs = {
@@ -150,7 +197,7 @@ inputs = {
         ]
       })
     }
-  })
+  }, local.product_roles) # v3 per-Product roles (ADR-069 §5) — empty until the cutover flips v3_delivery_enabled
 
   tags = include.base.locals.tags
 }
