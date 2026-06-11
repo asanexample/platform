@@ -462,9 +462,22 @@ should be resolved before P1 implementation starts.
    prod). ADR-060/061 still need a generated-host extension — e.g. `<service>-<product>-<team>-<stage>` and a
    customer component/subdomain — before P1's multi-service flow and P3's per-customer model.
 
-4. **New Product lifecycle.** A Product is first-class but its *creation* is unspecified: does **New Service**
-   create the Product when it creates the repo (one repo : one product), or is there a separate **New Product**
-   step (team-lead) that New Service then attaches to? Affects the P1.2 scaffolder flow.
+4. **✅ New Product lifecycle — RESOLVED.** There is an **explicit `New Product`** scaffolder template (the
+   primary repo-on-demand flow), separate from `New Service`:
+   - **New Product** (within-envelope **team-self-service**, automerge gate — like New-Tenant): pick team +
+     product + **language (Go / Node / Python)** + first-service name → creates the repo **`<team>-<product>`**
+     on-demand, seeded from the chosen **language skeleton + the shared platform overlay**; opens the
+     platform-repo PR adding `gitops/products/<team>/<product>.yaml` + the `dev` `XEnvironment` claim (image
+     initially empty). The first CI build fills the digest via an auto-merged bump → first deploy = first
+     promotion to `dev`.
+   - **New Service** = add a Service to an **existing** Product's repo (the monorepo flow, **#358**).
+   - **Golden-path starters** live in a dedicated **`asanexample/golden-path-starters`** repo: `/go`, `/node`,
+     `/python` skeletons (app source + Dockerfile + the runtime contract: `/healthz`, `/readyz`, `PORT`,
+     graceful shutdown, non-root, `ClusterIP`, named SA) **+ a `/_platform` shared overlay** (`k8s/base` +
+     overlays, the `trusted-ci/build-sign.yml` thin-caller CI, `catalog-info.yaml`). The platform contract is
+     authored **once** in `_platform` and composed onto every language — adding a language is a new skeleton, not
+     a flow change. The CI is language-agnostic (build-sign is Dockerfile-based). **Prereq:** create the starters
+     repo + grant the scaffolder App read access.
 
 5. **Customer onboarding fan-out.** Onboarding a Customer to a `per-customer` Product must provision a
    per-customer Environment (prod, opt-in UAT) — and across *every* such Product the customer consumes. There is
@@ -487,9 +500,12 @@ should be resolved before P1 implementation starts.
    today as per-app ApplicationSets with `-pr-*` hosts. Their place in the Environment model is undefined — a
    transient Environment at a `preview` pseudo-stage, or a sub-variant of a stage? Affects naming, quota, and TTL.
 
-10. **Namespace-length ceiling.** `<team>-<product>-<customer>-<stage>` can exceed the k8s 63-char namespace
-    limit for long names. A deterministic truncation/hash rule is needed (today's `<team>-<name>-<env>` rarely
-    hits it; adding product + customer makes it real).
+10. **✅ Namespace / derived-name length — RESOLVED.** Per-component DNS-1123 limits for friendliness, plus a
+    **deterministic truncate-and-hash fallback** on any derived identifier that would exceed its ceiling —
+    namespace (63), **IAM role (64, the tightest** since `Pod-<team>-<product>-<stage>-<service>` carries the
+    service), label (63). On overflow, truncate the variable portion to fit and append `-` + the first **6 hex of
+    `sha256("<team>/<product>/<stage>/<customer?>/<service?>")`**. Friendly names in the common (short) case;
+    always-valid in the edge case. Apply uniformly in the Composition (L2a).
 
 ## Migration from v1alpha2
 
