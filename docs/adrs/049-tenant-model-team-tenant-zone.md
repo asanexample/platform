@@ -2,12 +2,18 @@
 
 **Date:** 2026-06-03
 
-**Status:** Accepted — **partially built, cutover pending (updated 2026-06-09).** The v1alpha2 XRD, the `Team`
+**Status:** Accepted — **partially built, cutover pending (updated 2026-06-09).** **Partly superseded by
+[ADR-067](067-idp-domain-model.md) (2026-06-11):** its rigid `Zone`/`Customer` model is replaced by ADR-067's
+graduated **Isolation** dial (a compute ladder `namespace→nodes→cluster→account` + a *separate* data-isolation
+axis) decided per-environment, and the **`Tenant`→`Environment`** / env→**`Stage`** vocabulary; ADR-049's core
+insight (ownership and isolation are independent axes) is **retained and extended** there. The v1alpha2 XRD, the `Team`
 object with its envelope Kyverno policy (audit), and Composition v2 are built and render-tested in CI. The
 remaining work — the delivery-consumer migration, the git-native Team
 ([ADR-063](063-team-as-first-class-git-object.md)), and the storage-flip cutover — lands with the **planned
-rebuild** (not an in-place migration). `Zone`/`Customer`/placement are **deferred** until a second zone exists
-(degenerate on the single-cluster dev env). It **supersedes the `team == tenant` assumption** baked
+rebuild** (not an in-place migration). `Zone`/`Customer`/placement remain **deferred** (degenerate on the
+single-cluster dev env) **and are redesigned in [ADR-067](067-idp-domain-model.md)** — `Zone` → the graduated
+`Isolation` dial, `Customer` → a first-class consumer (prod + opt-in UAT, pooled or per-customer), placement
+split out as its own axis. It **supersedes the `team == tenant` assumption** baked
 into [ADR-027](027-hybrid-tenant-isolation-model.md) (hybrid isolation) and
 [ADR-031](031-multi-app-tenant-model.md) (multi-app tenant model). It **builds on**
 [ADR-046](046-back-stack-for-developer-self-service.md) (BACK stack),
