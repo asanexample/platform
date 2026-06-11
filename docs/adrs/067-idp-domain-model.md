@@ -30,7 +30,7 @@ is adopted **now** in every new surface; the **code rename rides the planned reb
 
 ### 1. The entity model
 
-```
+```text
 Team ─owns─▶ Product ─owns─▶ Service                         (Service is the deployable unit)
   │             │   │           ▲
   │             │   │   Repo ─sources (1:N)─┘                 (monorepo = many services; one repo : ONE product)
@@ -115,6 +115,7 @@ axes**, not one cluster-or-nothing zone:
   the common "shared compute, dedicated database" ask — so it is **not** a rung on the compute ladder.
 
 Two further rules:
+
 - **Per-environment, defaulting from the Customer:** a customer sets a sensible default; any single environment
   can dial up (prod harder than staging).
 - **Compliance tier is a floor, not the whole story:** a regulated tier (`pci`/`hipaa`) forces a **minimum**
@@ -124,6 +125,7 @@ Two further rules:
 ### 6. Customers (pooled vs per-customer)
 
 A **Customer** is any consumer of a product — **internal or external**. A product chooses its tenancy model:
+
 - **Pooled** — shared infra; customers are a logical/app-level concern (data partitioning, not a namespace each).
 - **Per-customer** — a dedicated **Environment per customer**, at its chosen Isolation level (default
   `dedicated-namespace`).
@@ -164,7 +166,7 @@ only for genuine app-level deltas (replicas, resources, flags). (The current `ap
 
 The projection renders the model into the catalog:
 
-```
+```text
 Team       = Group
  Product   = Domain          ← groups its environments for the cross-stage / cross-customer view
   Environment = System       ← the namespace (incl. per-customer prod, e.g. shop-bigco-prod)
