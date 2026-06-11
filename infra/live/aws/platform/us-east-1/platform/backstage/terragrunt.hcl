@@ -131,11 +131,12 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # This SHA (asanexample/backstage#33, #285) is the Tenant Status card (vertical deploy timeline on the tenant
-  # System, via the k8s proxy) + the tenant-ready notifier, plus the #33 polish: humanized durations and a
-  # coherence gate that hides misleading +Δ/"time to ready" on re-synced (mature) tenants, degrading to honest
-  # absolute timestamps. Needs platform#322's backstage-read-tenant-api RBAC (already applied).
-  image_tag = "d0ea08264c65c29c28aaa05ba1e224964e195373"
+  # This SHA (asanexample/backstage#34) projects a catalog Group per Team CR (every team visible + pickable,
+  # not only teams with claims; enriched with envelope + tenant count) + the frontend polish: a Team Tenants
+  # card on team Group pages (owned tenants w/ env/tier/lifecycle, linking to each tenant's live #285 status)
+  # and a "Teams" sidebar item → catalog filtered to team Groups. Makes team↔tenant navigation/relationships
+  # first-class. (Prior d0ea0826 = #33/#285 Tenant Status card + notifier.)
+  image_tag = "7d63565b710aa7e1836c0b246ad697dcd3a0902a"
 
   # Split-horizon for OIDC: pin keycloak.aws.refplat.org to the gateway's ClusterIP so the backend hits the
   # gateway Envoy directly (the public-name → internal-NLB hairpin is flaky). The ClusterIP is resolved
