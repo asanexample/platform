@@ -1,0 +1,9 @@
+apiVersion: platform.refplat.org/v1alpha3
+kind: Product
+metadata: { name: alpha-shop }
+spec:
+  team: alpha
+  repo: asanexample/alpha-shop
+  tenancy: per-customer
+  defaultIsolation: { compute: dedicated-cluster }
+  domains: [{ host: shop.example.com, dns: external }]

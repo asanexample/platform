@@ -1,0 +1,10 @@
+apiVersion: platform.refplat.org/v1alpha3
+kind: Team
+metadata: { name: alpha }
+spec:
+  ssoGroup: Dev-alpha
+  envelope:
+    allowedTiers: [standard, elevated]
+    allowedStages: [dev, test, staging, prod]
+    quotaCap: { cpu: "16", memory: 32Gi, pods: 80 }
+    maxDedicatedIsolation: { cluster: 1, account: 0 }

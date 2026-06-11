@@ -1,0 +1,7 @@
+# MUST FAIL: allowedStages value outside the enum (v1alpha3).
+apiVersion: platform.refplat.org/v1alpha3
+kind: Team
+metadata: { name: bad-stage }
+spec:
+  ssoGroup: x
+  envelope: { allowedTiers: [standard], allowedStages: [production], quotaCap: { cpu: "1" } }

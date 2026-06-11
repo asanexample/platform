@@ -1,0 +1,10 @@
+# Minimal dev Environment, first-deploy state (no image yet).
+apiVersion: platform.refplat.org/v1alpha3
+kind: XEnvironment
+metadata: { name: demo-dev }
+spec:
+  team: alpha
+  product: demo
+  stage: dev
+  services:
+    web: { repoPath: services/web, serviceAccount: demo-web }

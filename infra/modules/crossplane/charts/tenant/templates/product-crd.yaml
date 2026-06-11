@@ -1,0 +1,84 @@
+# The projected Product CR (ADR-067, docs/architecture/platform-domain-api.md — "Object 2").
+#
+# A plain, cluster-scoped, data-only CRD (not a Crossplane composite). The admission-relevant mirror of a
+# Product's delivery identity, written onto each cluster by the model-as-code sync from the git Product
+# registry (gitops/products/<team>/<product>.yaml) so Kyverno can read it during XEnvironment admission —
+# per-product image-registry scoping (team-<team>/<product>-*), the tenancy model (customer-iff-per-customer-
+# prod), and the owned-domains set (Environment.domains ⊆ Product.domains). Delivery (argocd-apps, github-oidc)
+# derives from the git registry directly; this CR is the admission mirror. Authored by team leads, never developers.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: products.platform.refplat.org
+spec:
+  group: platform.refplat.org
+  scope: Cluster
+  names:
+    kind: Product
+    plural: products
+    singular: product
+    categories:
+      - tenant-api
+  versions:
+    - name: v1alpha3
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - team
+                - repo
+              properties:
+                team:
+                  type: string
+                  description: Owning Team. An XEnvironment's team must equal this (Kyverno).
+                repo:
+                  type: string
+                  description: The single owner/repo that sources this Product's Service(s) (one repo per product).
+                tenancy:
+                  type: string
+                  enum: ["pooled", "per-customer"]
+                  default: pooled
+                  description: pooled (customers are a logical concern) | per-customer (a dedicated Environment per Customer at prod).
+                defaultIsolation:
+                  type: object
+                  description: The Isolation an Environment inherits unless it dials up (floored by tier).
+                  properties:
+                    compute:
+                      type: string
+                      enum: ["shared-namespace", "dedicated-namespace", "dedicated-nodes", "dedicated-cluster", "dedicated-account"]
+                restrictWithinTeam:
+                  type: boolean
+                  default: false
+                  description: If true, even team members need an explicit AccessGrant (ADR-068 §4). Auto-true for pci/hipaa.
+                domains:
+                  type: array
+                  description: The vanity hostnames this Product OWNS (the allowed set). An Environment binds a subset by host.
+                  default: []
+                  items:
+                    type: object
+                    required:
+                      - host
+                    properties:
+                      host:
+                        type: string
+                      dns:
+                        type: string
+                        enum: ["managed", "external"]
+                        default: managed
+      additionalPrinterColumns:
+        - name: Team
+          type: string
+          jsonPath: .spec.team
+        - name: Repo
+          type: string
+          jsonPath: .spec.repo
+        - name: Tenancy
+          type: string
+          jsonPath: .spec.tenancy

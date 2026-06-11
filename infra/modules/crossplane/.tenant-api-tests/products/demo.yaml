@@ -1,0 +1,4 @@
+apiVersion: platform.refplat.org/v1alpha3
+kind: Product
+metadata: { name: alpha-demo }
+spec: { team: alpha, repo: asanexample/alpha-demo, tenancy: pooled, defaultIsolation: { compute: dedicated-namespace } }

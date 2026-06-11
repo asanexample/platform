@@ -7,8 +7,12 @@ set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 charts="${here}/../charts/tenant/templates"
-xrd="${charts}/xrd.yaml"             # XTenant XRD (the Tenant claim)
-team_crd="${charts}/team-crd.yaml"   # projected Team CRD (the envelope)
+xrd="${charts}/xrd.yaml"                       # XTenant XRD (v2, the live Tenant claim)
+team_crd="${charts}/team-crd.yaml"             # projected Team CRD (v1alpha2 storage + v1alpha3 served)
+# v3 (ADR-067) — added ADDITIVELY alongside v2 (the cutover removes v2 in a future cycle).
+xenv_xrd="${charts}/xenvironment-xrd.yaml"     # XEnvironment XRD (v3, the Environment claim)
+product_crd="${charts}/product-crd.yaml"       # projected Product CRD (delivery identity)
+grant_crd="${charts}/access-grant-crd.yaml"    # projected AccessGrant CRD (ADR-068)
 
 command -v crossplane >/dev/null 2>&1 || { echo "::error::crossplane CLI not found on PATH"; exit 1; }
 
@@ -51,6 +55,23 @@ validate_dir "$team_crd" "invalid Team records" "${here}/teams-invalid" reject
 # (the Backstage New Team template, #280) a real schema gate in CI, not just human review.
 repo_root="$(cd "${here}/../../../.." && pwd)"
 validate_dir "$team_crd" "live Team objects (gitops/teams)" "${repo_root}/gitops/teams" pass
+
+# ===========================================================================================================
+# v3 API (ADR-067) — XEnvironment + Product + AccessGrant + the v1alpha3 Team envelope. Added ADDITIVELY: the
+# v2 surface above is unchanged and still validated; the v2→v3 cutover (removing v2) is a future cycle.
+# ===========================================================================================================
+validate_dir "$xenv_xrd"    "valid Environment claims (v3)"   "${here}/environments"          pass
+validate_dir "$xenv_xrd"    "invalid Environment claims (v3)" "${here}/environments-invalid"  reject
+validate_dir "$product_crd" "valid Product records (v3)"      "${here}/products"              pass
+validate_dir "$product_crd" "invalid Product records (v3)"    "${here}/products-invalid"      reject
+validate_dir "$grant_crd"   "valid AccessGrant records (v3)"  "${here}/grants"                pass
+validate_dir "$grant_crd"   "invalid AccessGrant records (v3)" "${here}/grants-invalid"       reject
+validate_dir "$team_crd"    "valid Team records (v1alpha3)"   "${here}/teams-v3"              pass
+validate_dir "$team_crd"    "invalid Team records (v1alpha3)" "${here}/teams-v3-invalid"     reject
+
+# Live v3 git-native objects (the new gitops layout). crossplane beta validate recurses the per-team subdirs.
+validate_dir "$product_crd" "live Product objects (gitops/products)"          "${repo_root}/gitops/products"     pass
+validate_dir "$xenv_xrd"    "live Environment objects (gitops/environments)"  "${repo_root}/gitops/environments" pass
 
 # Registry → projection (the crossplane-teams chart, delivery-plan A2). Render the canonical registry into
 # projected Team CRs and (a) validate them against the Team CRD, (b) assert the canonical-only fields are

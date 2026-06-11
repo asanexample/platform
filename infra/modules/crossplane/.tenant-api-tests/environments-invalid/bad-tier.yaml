@@ -1,0 +1,5 @@
+# MUST FAIL: tier outside the enum.
+apiVersion: platform.refplat.org/v1alpha3
+kind: XEnvironment
+metadata: { name: bad-tier }
+spec: { team: alpha, product: demo, stage: dev, tier: ultra }

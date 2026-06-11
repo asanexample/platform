@@ -1,0 +1,297 @@
+# The Environment API. Crossplane v2 XRD, Cluster-scoped: an XEnvironment provisions a namespace + cluster-scoped
+# policies (it is not "in" a namespace), and Cluster scope composes resources across namespaces. Being
+# cluster-scoped also means creating an XEnvironment requires cluster RBAC — developers cannot self-provision
+# (security gate S1); claims are delivered by a platform-controlled GitOps path.
+#
+# v3 (ADR-067, docs/architecture/platform-domain-api.md) renames Tenant → Environment and re-scopes it from
+# (team, name, environment) to (team, product, stage[, customer]). The owning `team` is carried EXPLICITLY (not
+# derived from Product): the namespace <team>-<product>-<stage>, the Pod-Identity role, and the Kyverno envelope
+# policy all need it, and a Crossplane Composition go-template cannot cross-CR-lookup the Product to fetch it.
+# `team == Product.team` is checked at admission (Kyverno).
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xenvironments.platform.refplat.org
+spec:
+  scope: Cluster
+  group: platform.refplat.org
+  names:
+    kind: XEnvironment
+    plural: xenvironments
+  versions:
+    # ---------------------------------------------------------------------------
+    # v1alpha3 — the Environment API (ADR-067). The storage + referenceable version: Composition v3 binds to it.
+    # Greenfield rename of the v1alpha2 XTenant (no stored v1alpha2 objects survive the from-scratch rebuild).
+    # Structural + self-contained validation only; cross-object envelope checks (team == Product.team, tier ∈
+    # Team.allowedTiers, stage ∈ Team.allowedStages, quota ≤ Team.quotaCap, residency ⊆ Team.allowedLocations,
+    # isolation ≥ tier-floor, image registry ⊆ team-<team>/<product>, customer set iff per-customer prod) are
+    # enforced by Kyverno against the projected Team + Product CRs (restrict-environment-envelope), not here.
+    # ---------------------------------------------------------------------------
+    - name: v1alpha3
+      served: true
+      referenceable: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - team
+                - product
+                - stage
+              properties:
+                team:
+                  type: string
+                  description: >-
+                    Owning Team key — carried EXPLICITLY (validated == Product.team by Kyverno). Drives the
+                    <team>-<product>-<stage> namespace, the Pod-Identity role, and the envelope lookup.
+                product:
+                  type: string
+                  description: >-
+                    Owning Product within the Team (the leaf-up join key → repo/owned-domains/tenancy from the
+                    Product registry). Must reference an existing Product whose team == this team.
+                stage:
+                  type: string
+                  enum: ["dev", "test", "uat", "staging", "prod"]
+                  description: >-
+                    The promotion rung this Environment realizes (a rung, not a place). The namespace is
+                    "<team>-<product>-<stage>" ("-<customer>" appended for per-customer). Must be in the owning
+                    Team's allowedStages (Kyverno). The hosting account/cluster is a placement concern.
+                customer:
+                  type: string
+                  description: >-
+                    The Customer this Environment serves. Required iff the Product is per-customer AND stage ∈
+                    {prod, uat} (Kyverno, reading the Product CR); forbidden otherwise. Customer-existence
+                    validation lands with P3 (no projected Customer CR in F1).
+                tier:
+                  type: string
+                  enum: ["standard", "elevated", "pci", "hipaa"]
+                  default: standard
+                  description: >-
+                    Reference to a platform hardening profile (isolation FLOOR + recovery + availability).
+                    Effective isolation = max(tier-floor, spec.isolation.compute).
+                isolation:
+                  type: object
+                  description: The graduated isolation dial (ADR-067 §5). Defaults from Customer/Product/tier; floored by tier.
+                  properties:
+                    compute:
+                      type: string
+                      enum: ["shared-namespace", "dedicated-namespace", "dedicated-nodes", "dedicated-cluster", "dedicated-account"]
+                      description: >-
+                        Compute boundary (the ladder). Omitted → resolved by the Composition from the Customer/
+                        Product default, floored by tier. `dedicated-cluster`/`-account` count against the Team's
+                        maxDedicatedIsolation. The DATA axis is a separate per-resource concern (services.resources).
+                residency:
+                  type: object
+                  description: HARD, attested placement constraint.
+                  default: { allowedLocations: ["*"] }
+                  properties:
+                    allowedLocations:
+                      type: array
+                      description: Jurisdiction ("eu") or exact "cloud:region"; must be ⊆ Team.allowedLocations (Kyverno).
+                      items:
+                        type: string
+                      default: ["*"]
+                quota:
+                  type: object
+                  description: Per-Environment request; validated ≤ Team.quotaCap by Kyverno.
+                  default: {}
+                  properties:
+                    cpu:
+                      type: string
+                      default: "4"
+                    memory:
+                      type: string
+                      default: "8Gi"
+                    pods:
+                      type: integer
+                      default: 20
+                    services:
+                      type: integer
+                      default: 20
+                    loadbalancers:
+                      type: integer
+                      default: 0
+                    pvcs:
+                      type: integer
+                      default: 10
+                    storage:
+                      type: string
+                      default: "50Gi"
+                domains:
+                  type: array
+                  description: >-
+                    The vanity hostnames BOUND in this Environment — a subset of Product.domains (the owned set),
+                    checked by host (Kyverno, ADR-069 §2), so a dev Environment cannot claim the prod vanity host.
+                    The generated canonical host (<product>-<team>-<stage>.<baseDomain>) is implicit and never
+                    declared here. The Composition unions these with the generated host into restrict-route-hostnames.
+                  items:
+                    type: string
+                  default: []
+                services:
+                  type: object
+                  description: Per-stage realization of each deployed Service (delivery + identity + permissions).
+                  default: {}
+                  additionalProperties:
+                    type: object
+                    properties:
+                      image:
+                        type: string
+                        description: >-
+                          The immutable "…@sha256:" digest deployed in this stage (promote-by-PR). OPTIONAL — an
+                          entry with no image is declared-but-not-yet-deployed (the New-Product first-deploy
+                          state): the namespace/quota/identity still provision; the per-Product ApplicationSet
+                          skips this (Environment × Service) pair until the first digest-bump.
+                      repoPath:
+                        type: string
+                        description: Sub-path within the Product's repo (monorepo). Overrides the Service default.
+                      preview:
+                        type: boolean
+                        default: false
+                      serviceAccount:
+                        type: string
+                        description: Named SA the Service runs as; overrides the Service default. A cloud-neutral identity is minted + bound. No IRSA annotation.
+                      permissions:
+                        type: object
+                        description: Cloud-KEYED grants attached to serviceAccount (the identity binding stays neutral). Overrides the Service default.
+                        properties:
+                          aws:
+                            type: object
+                            properties:
+                              policyStatements:
+                                type: array
+                                description: IAM statements for the Service's role, capped by the deny-escalation boundary.
+                                default: []
+                                items:
+                                  type: object
+                                  required:
+                                    - actions
+                                    - resources
+                                  properties:
+                                    sid:
+                                      type: string
+                                    effect:
+                                      type: string
+                                      enum: ["Allow", "Deny"]
+                                      default: Allow
+                                    actions:
+                                      type: array
+                                      items:
+                                        type: string
+                                    resources:
+                                      type: array
+                                      items:
+                                        type: string
+                      config:
+                        type: object
+                        description: >-
+                          Reserved (ADR-070): per-stage NON-secret env (KEY: value) → a ConfigMap. In git
+                          (reviewable). Inert until the secrets paved-road ships.
+                        additionalProperties:
+                          type: string
+                      secrets:
+                        type: array
+                        description: >-
+                          Reserved (ADR-070): the secret keys bound in this stage (NAMES only). Values NEVER in
+                          git — written via the portal/platctl to the store, synced by an ESO ExternalSecret.
+                          Inert until the secrets paved-road ships.
+                        items:
+                          type: string
+                      resources:
+                        type: object
+                        description: >-
+                          Reserved (ADR-067 §7): cloud-neutral Service→Resource deps (DB/cache/objectstore/stream)
+                          carrying the data-isolation axis. Inert until the data paved-road ships.
+                        additionalProperties:
+                          type: object
+                          required:
+                            - kind
+                          properties:
+                            kind:
+                              type: string
+                              enum: ["relational", "cache", "objectstore", "stream"]
+                            engine:
+                              type: string
+                            class:
+                              type: string
+                            isolation:
+                              type: string
+                              enum: ["shared", "dedicated"]
+                lifecycle:
+                  type: object
+                  description: Environment lifecycle; the exit counterpart to onboarding (ADR-062).
+                  default: { phase: active }
+                  properties:
+                    phase:
+                      type: string
+                      enum: ["active", "suspended", "decommissioning"]
+                      default: active
+                      description: suspended/decommissioning zeroes the ResourceQuota (reversible); decommissioning triggers ordered teardown.
+                encryption:
+                  type: object
+                  description: "Reserved (deferred): key custody (BYOK/HYOK). Inert until the KMS paved-road ships."
+                  properties:
+                    keyCustody:
+                      type: string
+                      enum: ["platform-managed", "customer-managed", "customer-hosted"]
+                      default: platform-managed
+            status:
+              type: object
+              properties:
+                placement:
+                  type: object
+                  description: Concrete coordinates resolved by placement (never authored). `zone` is retired (ADR-067).
+                  properties:
+                    cloud:
+                      type: string
+                    region:
+                      type: string
+                    account:
+                      type: string
+                    cluster:
+                      type: string
+                    namespace:
+                      type: string
+                isolationRealized:
+                  type: object
+                  description: The effective max(tier-floor, chosen) compute level the placement realizes.
+                  properties:
+                    compute:
+                      type: string
+                domains:
+                  type: array
+                  description: >-
+                    Per-domain ingress state (ADR-061). The Composition writes one entry per generated canonical
+                    host + each bound domain. Kyverno admits a route host only while its entry is Active.
+                  items:
+                    type: object
+                    properties:
+                      host:
+                        type: string
+                      state:
+                        type: string
+                        enum: ["Pending", "DelegationRequired", "VerificationRequired", "Verifying", "Issuing", "Active", "Error", "Deleting"]
+                      mode:
+                        type: string
+                        enum: ["platform-managed", "customer-managed"]
+                      dnsTarget:
+                        type: array
+                        items:
+                          type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                lifecycle:
+                  type: object
+                  properties:
+                    phase:
+                      type: string
+                    retentionUntil:
+                      type: string
+                    exitAttestation:
+                      type: string

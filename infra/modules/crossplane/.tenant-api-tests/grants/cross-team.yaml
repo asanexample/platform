@@ -1,0 +1,8 @@
+apiVersion: platform.refplat.org/v1alpha3
+kind: AccessGrant
+metadata: { name: bravo-on-alpha-demo }
+spec:
+  target: { team: alpha, product: demo, service: api }
+  subject: group:team-bravo
+  posture: view
+  expiresAt: "2026-09-01"

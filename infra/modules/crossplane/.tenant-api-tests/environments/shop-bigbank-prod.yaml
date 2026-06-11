@@ -1,0 +1,22 @@
+# Full per-customer regulated prod Environment (dialed-up isolation, residency, bound domain, AWS permissions).
+apiVersion: platform.refplat.org/v1alpha3
+kind: XEnvironment
+metadata: { name: shop-bigbank-prod }
+spec:
+  team: alpha
+  product: shop
+  stage: prod
+  customer: bigbank
+  tier: pci
+  isolation: { compute: dedicated-cluster }
+  residency: { allowedLocations: ["eu"] }
+  quota: { cpu: "8", memory: 16Gi, pods: 40 }
+  domains: ["shop.example.com"]
+  services:
+    api:
+      image: "123.dkr.ecr.us-east-1.amazonaws.com/team-alpha/shop-api@sha256:abc"
+      serviceAccount: shop-api
+      permissions:
+        aws:
+          policyStatements:
+            - { sid: ReadBucket, effect: Allow, actions: ["s3:GetObject"], resources: ["arn:aws:s3:::asanexample-team-alpha-*/*"] }
