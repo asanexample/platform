@@ -49,7 +49,7 @@ the rebuild implements and that the access-model-as-code generators ([ADR-053](.
   | **Product** | Team lead (self-service, "New Product") | Registry → Backstage `System`; **projected as a `Product` CR** for per-product policy (catalog mapping: [ADR-067 §10](../adrs/067-idp-domain-model.md)) |
   | **Service** | Developer (self-service, "New Service") | Repo-native `catalog-info.yaml` → Backstage `Component` (in the Product `System`; selectors span all envs) |
   | **Environment** | Team lead / developer (self-service) | Crossplane `XEnvironment` XR (`v1alpha3`), GitOps-delivered → projected as a custom Backstage **`kind: Environment`** (ADR-067 §10) |
-  | **Customer** | Platform / sales ops | Registry → Backstage entity; referenced by per-customer Environments |
+  | **Customer** | Platform / sales ops | Registry → Backstage entity; referenced by per-customer Environments. **No projected CR in F1** — customer *existence* validation lands with P3; F1's projected-CRD set is **four**: the `XEnvironment` XRD + the `Team` / `Product` / `AccessGrant` CRDs. The `customer`-set-iff-per-customer-prod check is structural (reads the `Product` CR). |
   | **AccessGrant** | Owning team's `team-admin` (self-service) | `AccessGrant` CR in the owning team's git domain ([ADR-068](../adrs/068-product-scoped-and-cross-team-access-model.md)) |
 
 ## Vocabulary & relationships
@@ -163,7 +163,7 @@ product-scoped, ADR-046/067) can read it.
 | `tenancy` | — | enum | `pooled` | `pooled` (customers are a logical/app-level concern) \| `per-customer` (a dedicated Environment per Customer at prod). ADR-067 §6. |
 | `defaultIsolation` | — | object | tier floor | The Isolation an Environment inherits unless it dials up (see [Isolation](#isolation-the-graduated-dial)). For `per-customer` products this defaults from the **Customer** (ADR-067 §4). |
 | `restrictWithinTeam` | — | boolean | `false` | If true, even team members need an explicit `AccessGrant` for this Product (ADR-068 §4). **Auto-true** when `tier` ∈ {`pci`,`hipaa`} on any Environment (separation of duties). |
-| `domains` | — | `[]object` | `[]` | The vanity hostnames this Product **owns** — the allowed set (`{ host, dns }`, ADR-061), validated against team ownership at admission. An Environment may **bind** a subset (`Environment.domains ⊆ Product.domains`, ADR-069 §2) — so a dev Environment cannot claim the prod vanity host. The generated canonical host is implicit and never declared — today's convention is `<product>-<team>-<stage>.<baseDomain>` (per-env `baseDomain`, e.g. `shop-alpha-dev.preprod.aws.refplat.org`). **⚠️ Open (see [Open questions](#open-questions--known-gaps)):** the generated host does **not** yet encode a *Service* (multi-service products) or a *Customer* (per-customer prod) — both must be added before P1's multi-service flow / P3's per-customer model. |
+| `domains` | — | `[]object` | `[]` | The vanity hostnames this Product **owns** — the allowed set (`{ host, dns }`, ADR-061), validated against team ownership at admission. An Environment **binds** a subset via `Environment.domains` (a `[]string` of `host`s); the subset check is **by `host`** (`{e.host} ⊆ {p.host}`) — so a dev Environment cannot claim the prod vanity host. The generated canonical host is implicit and never declared — today's convention is `<product>-<team>-<stage>.<baseDomain>` (per-env `baseDomain`, e.g. `shop-alpha-dev.preprod.aws.refplat.org`). **⚠️ Open (see [Open questions](#open-questions--known-gaps)):** the generated host does **not** yet encode a *Service* (multi-service products) or a *Customer* (per-customer prod) — both must be added before P1's multi-service flow / P3's per-customer model. |
 
 ```yaml
 apiVersion: platform.refplat.org/v1alpha3
@@ -176,7 +176,7 @@ spec:
   tenancy: per-customer                  # a dedicated Environment per Customer at prod
   defaultIsolation: { compute: dedicated-namespace }
   domains:
-    - { host: shop.example.com, canonical: true, dns: external }
+    - { host: shop.example.com, dns: external }   # owned set; an Environment binds a subset by host
 ```
 
 ## Object 3 — Service
@@ -211,7 +211,7 @@ declares *what* it needs at a stage, never *where* it lands; Placement resolves 
 `status`.
 
 `apiVersion: platform.refplat.org/v1alpha3`, `kind: XEnvironment`, **cluster-scoped**. Logical identity =
-`(product, stage, customer?)`; `metadata.name` is conventionally `<product>-<stage>` (pooled) or
+`(team, product, stage, customer?)`; `metadata.name` is conventionally `<product>-<stage>` (pooled) or
 `<product>-<customer>-<stage>` (per-customer). Namespace = `<team>-<name>` (e.g. `alpha-shop-dev`,
 `alpha-shop-bigco-prod`).
 
@@ -219,7 +219,8 @@ declares *what* it needs at a stage, never *where* it lands; Placement resolves 
 
 | Field | Required | Type | Default | Purpose |
 | ----- | -------- | ---- | ------- | ------- |
-| `product` | yes | string | — | Owning Product → Team (envelope, identity, default isolation). Must reference an existing `Product`. |
+| `team` | yes | string | — | Owning Team — **carried explicitly** (not derived from Product). Validated `== Product.team` at admission. *Why denormalized:* the namespace `<team>-<product>-<stage>`, the Pod-Identity role, and the Kyverno envelope policy all need `team`, and a Crossplane Composition go-template **cannot cross-CR-lookup** the Product to fetch it. |
+| `product` | yes | string | — | Owning Product (the leaf-up join key → repo/owned-domains/tenancy from the Product registry). Must reference an existing `Product` (whose `team` must equal this `team`). |
 | `stage` | yes | enum | — | `dev` / `test` / `staging` / `uat` / `prod`. Must be in the Team's `allowedStages`. The promotion rung — **not** a place. |
 | `customer` | iff per-customer prod | string | — | The `Customer` this Environment serves. **Required iff** the Product is `per-customer` **and** `stage` ∈ {`prod`,`uat`}; forbidden otherwise (ADR-067 §6/§7 — customers attach at prod, optionally customer-UAT; dev/test/staging stay internal/pooled). |
 | `tier` | — | enum | `standard` | Hardening profile (`standard`/`elevated`/`pci`/`hipaa`). Must be in `allowedTiers`. Sets the isolation **floor**. |
@@ -227,7 +228,7 @@ declares *what* it needs at a stage, never *where* it lands; Placement resolves 
 | `residency` | — | object | `{ allowedLocations: ["*"] }` | **Hard, attested** placement constraint (jurisdiction or `cloud:region`). Must be ⊆ the Team's `allowedLocations`. Placement fails (never silently relaxes) if no placement satisfies it. |
 | `quota` | — | object | tier profile default | `cpu`/`memory`/`pods` (+ optional `services`/`loadbalancers`/`pvcs`/`storage`). Validated ≤ the Team's `quotaCap`. |
 | `domains` | — | `[]string` | `[]` | The vanity hosts **bound** in *this* Environment — a subset of `Product.domains` (the owned set). `Environment.domains ⊆ Product.domains` is enforced at admission (ADR-069 §2), so e.g. only the prod Environment binds `shop.example.com`. Unioned with the generated host into the Kyverno `restrict-route-hostnames` allow-list + `status.domains`. |
-| `services` | — | map | `{}` | `<service> → ServiceDeploySpec`. Per-stage **realization** of each deployed Service: `{ image (digest), repoPath?, preview?, serviceAccount?, permissions? }`. `image` is the immutable `…@sha256:` digest promoted into this stage ([Promotion](#promotion)); `serviceAccount`/`permissions` **override** the `Service` defaults (effective = override else default). |
+| `services` | — | map | `{}` | `<service> → ServiceDeploySpec`. Per-stage **realization** of each deployed Service: `{ image?, repoPath?, preview?, serviceAccount?, permissions? }`. `image` is the immutable `…@sha256:` digest promoted into this stage ([Promotion](#promotion)) — **optional**: an entry with **no `image`** is *declared but not yet deployed* (the New-Product first-deploy state). The Environment still provisions namespace/quota/identity; the per-Product ApplicationSet **skips (Environment × Service) pairs with no digest**, and the first auto digest-bump generates the workload. `serviceAccount`/`permissions` **override** the `Service` defaults (effective = override else default). |
 | `lifecycle` | — | object | `{ phase: active }` | `phase: active \| suspended \| decommissioning`. Reversible suspend zeroes the ResourceQuota (ADR-062 #283); hard-delete is gated decommission-first + reviewed; ECR retained (`Orphan`). |
 
 ### status (derived — never authored)
@@ -496,9 +497,21 @@ should be resolved before P1 implementation starts.
    Identity) but is not connected to **service-to-service** identity ([ADR-057](../adrs/057-service-identity-and-east-west-zero-trust.md)
    — SPIFFE/mTLS). How Services in an Environment authenticate to each other and to their `Resource`s is unmodeled.
 
-9. **Preview / ephemeral environments.** PR previews ([ADR-032](../adrs/032-pr-preview-environments.md)) exist
-   today as per-app ApplicationSets with `-pr-*` hosts. Their place in the Environment model is undefined — a
-   transient Environment at a `preview` pseudo-stage, or a sub-variant of a stage? Affects naming, quota, and TTL.
+9. **✅ Preview / ephemeral environments — RESOLVED: runtime-only, not a gitops Environment.** PR previews
+   ([ADR-032](../adrs/032-pr-preview-environments.md)) stay **delivery-layer ephemerals** — generated by the
+   per-Product ApplicationSet's **PR generator** into the `dev` Environment's namespace with the `-pr-*` host (as
+   today), torn down on PR close. They are **not** `XEnvironment` claims, so `stage` stays `dev…prod` (no
+   `preview` value) and there is no per-preview envelope/gitops object. (L2b owns the PR generator.)
+
+11. **🔴 App-level config & secrets — UNDESIGNED platform capability (major gap).** The model has rich per-env
+    *infra* (quota, isolation, resources) but **nothing** for per-stage **application config + secrets** (DB
+    URLs, feature flags, API keys, env-specific env-vars) — the most common developer need. Today tenants get
+    secrets via ESO (`external-secrets`/`secret-stores`); there is no per-Environment app-config/secret model in
+    *any* of the v3 docs, and the kustomize `base/` is deliberately config-agnostic. **This is a whole platform
+    capability we have not designed** — being tracked for a dedicated design session, **not** resolved here. The
+    schema is being baked, so wherever config/secrets eventually attach (likely `Environment.spec.services.<svc>`)
+    is a **schema decision that must precede F1 freezing the XEnvironment shape** — or we knowingly add it later
+    and accept the breaking change.
 
 10. **✅ Namespace / derived-name length — RESOLVED.** Per-component DNS-1123 limits for friendliness, plus a
     **deterministic truncate-and-hash fallback** on any derived identifier that would exceed its ceiling —

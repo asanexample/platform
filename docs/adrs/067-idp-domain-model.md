@@ -133,7 +133,7 @@ A **Customer** is any consumer of a product — **internal or external**. A prod
 Customers attach at **`prod`** (the live, customer-facing stage), with a **per-customer pre-prod/UAT as an
 opt-in**. **`dev` / `test` / `staging` stay internal and pooled** — so the `Product × Stage × Customer` fan-out is
 bounded to prod (+ optional customer-UAT), not multiplied across every stage. (Per-customer dedication is gated
-by the Team envelope's `maxDedicatedZones`/equivalent.)
+by the Team envelope's `maxDedicatedIsolation` `{ cluster, account }`.)
 
 ### 7. Repo ≠ Service; identity is per-repo, artifacts are per-service
 
