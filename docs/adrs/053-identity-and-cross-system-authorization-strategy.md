@@ -11,7 +11,11 @@ What remains is the access-model-as-code *generators* reading the git-native Tea
 charts the eventual replacement of the Dex broker ([ADR-052](052-centralized-dex-sso-broker.md)). Unblocks the
 deferred Backstage RBAC (#197). **Refined by [ADR-059](059-identity-topology-pluggable-idp-seam.md)** — the
 "Identity Center is the user store, Keycloak brokers up" framing is one instance of a topology where the upstream
-IdP (Okta / Entra / Google / IdC / standalone) is pluggable behind the Keycloak seam.
+IdP (Okta / Entra / Google / IdC / standalone) is pluggable behind the Keycloak seam. **Extended by
+[ADR-068](068-product-scoped-and-cross-team-access-model.md)** — once [ADR-067](067-idp-domain-model.md) made
+**Product** first-class, this strategy's team-scoped taxonomy could no longer express product-scoped or
+cross-team access; ADR-068 specifies the concrete model (the `AccessGrant` object, `access:<team>/<product>`
+roles, the `release-approver`/`team-admin` roles, and OIDC-native cluster auth) that the generators realize.
 
 ## Amendment — 2026-06-08: Keycloak is the IdP of record by default
 
