@@ -222,6 +222,11 @@ Secondary/parallel: **monorepo "add a service to an existing repo"** (issue #358
 
 ## Relationships
 
+- **Normative schema:** the field-level contract for this model is
+  [platform-domain-api.md](../architecture/platform-domain-api.md) (the v1alpha3 Team / Product / Service /
+  Environment / Customer schemas), which supersedes the ADR-049
+  [tenant-api-v2.md](../architecture/tenant-api-v2.md). Reconciling that schema is the first implementation step
+  (P1's foundation — every later phase reads from it).
 - **Supersedes** the Zone/Customer model of [ADR-049](049-tenant-model-team-tenant-zone.md); **refines** its
   Team/Tenant separation (promotes **Product**, splits **Stage vs Placement**, splits **Ownership vs Access**,
   replaces **Zone** with graduated **Isolation**).

@@ -1,5 +1,13 @@
 # Tenant API v2 — Team / Tenant / Zone / Customer Schemas
 
+> **⚠️ Superseded (model) by [platform-domain-api.md](platform-domain-api.md) — the ADR-067 contract.**
+> [ADR-067](../adrs/067-idp-domain-model.md) refined this model: **Tenant → Environment**, **env → Stage**,
+> **Zone → Isolation dial + Placement**, and **app → Product / Service** (with Customer promoted to a
+> first-class consumer). The **Team envelope** and **per-app/Service cloud-keyed identity** designed here carry
+> forward; the `Tenant`/`Zone` vocabulary and per-team scoping do not. This doc is retained as the ADR-049
+> record and the v1alpha2 predecessor of the [v1alpha3 schema](platform-domain-api.md#migration-from-v1alpha2);
+> read the successor for the current target.
+
 The finalized, normative object schemas for the multi-tenancy model of
 [ADR-049](../adrs/049-tenant-model-team-tenant-zone.md). ADR-049 sets the *direction* (separate ownership
 from isolation from placement); this document is the *contract* — the concrete field names, types, defaults,
