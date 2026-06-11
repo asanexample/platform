@@ -1,0 +1,237 @@
+{{- /*
+v3 (ADR-067/069 §6, #387): the envelope plane for the XEnvironment claim — the product-scoped analog of
+restrict-tenant-envelope. An XEnvironment may only request what its owning Team's envelope permits, and must be
+consistent with its Product (team-ownership, per-customer tenancy). Reads the projected Team + Product CRs.
+ADDITIVE + GATED: renders only when enableEnvironmentEnvelope is true (the v2 restrict-tenant-envelope stays the
+live path until the cutover, which flips this on and removes the v2 policy). Stateless checks only — aggregate
+caps (team totals, dedicated-isolation count, per-product grant cap) are the rollup controller's job.
+*/ -}}
+{{- if .Values.enableEnvironmentEnvelope }}
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-environment-envelope
+  labels:
+    {{- include "ktp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Restrict Environment Envelope
+    policies.kyverno.io/category: Security, Multi-Tenancy
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: XEnvironment, Team, Product
+    policies.kyverno.io/description: >-
+      The v3 envelope plane (ADR-067): an XEnvironment may only request what its Team envelope permits (tier /
+      stage / residency / quota) and must agree with its Product (team-ownership, per-customer tenancy). Reads
+      the projected Team + Product CRs.
+spec:
+  background: true
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    # The Environment must reference a Team projected onto this cluster (its envelope is knowable).
+    - name: team-must-exist
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1alpha3/XEnvironment
+      {{- include "ktp.envContext" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: >-
+          Environment references Team '{{`{{ request.object.spec.team }}`}}', which has no projected Team CR on
+          this cluster — its envelope is unknown.
+        deny:
+          conditions:
+            all:
+              - key: "{{`{{ team.metadata.name || '' }}`}}"
+                operator: NotEquals
+                value: "{{`{{ request.object.spec.team }}`}}"
+
+    # spec.team must equal the owning Product's team (no cross-team Environment for someone else's product).
+    - name: team-matches-product
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1alpha3/XEnvironment
+      {{- include "ktp.envContext" . | nindent 6 }}
+      {{- include "ktp.productExistsPrecondition" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: >-
+          spec.team '{{`{{ request.object.spec.team }}`}}' does not match Product
+          '{{`{{ request.object.spec.product }}`}}' owner '{{`{{ product.spec.team }}`}}'.
+        deny:
+          conditions:
+            any:
+              - key: "{{`{{ request.object.spec.team }}`}}"
+                operator: NotEquals
+                value: "{{`{{ product.spec.team }}`}}"
+
+    # tier ∈ Team.envelope.allowedTiers
+    - name: tier-within-envelope
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1alpha3/XEnvironment
+      {{- include "ktp.envContext" . | nindent 6 }}
+      {{- include "ktp.teamExistsPrecondition" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: >-
+          spec.tier '{{`{{ request.object.spec.tier }}`}}' is not within Team
+          '{{`{{ request.object.spec.team }}`}}' envelope.allowedTiers
+          {{`{{ team.spec.envelope.allowedTiers }}`}}.
+        deny:
+          conditions:
+            any:
+              - key: "{{`{{ request.object.spec.tier }}`}}"
+                operator: AnyNotIn
+                value: "{{`{{ team.spec.envelope.allowedTiers }}`}}"
+
+    # stage ∈ Team.envelope.allowedStages  (v3 rename of environment/allowedEnvironments)
+    - name: stage-within-envelope
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1alpha3/XEnvironment
+      {{- include "ktp.envContext" . | nindent 6 }}
+      {{- include "ktp.teamExistsPrecondition" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: >-
+          spec.stage '{{`{{ request.object.spec.stage }}`}}' is not within Team
+          '{{`{{ request.object.spec.team }}`}}' envelope.allowedStages
+          {{`{{ team.spec.envelope.allowedStages }}`}}.
+        deny:
+          conditions:
+            any:
+              - key: "{{`{{ request.object.spec.stage }}`}}"
+                operator: AnyNotIn
+                value: "{{`{{ team.spec.envelope.allowedStages }}`}}"
+
+    # residency.allowedLocations ⊆ Team.envelope.allowedLocations
+    - name: residency-within-envelope
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1alpha3/XEnvironment
+      {{- include "ktp.envContext" . | nindent 6 }}
+      preconditions:
+        all:
+          - key: "{{`{{ team.metadata.name || '' }}`}}"
+            operator: Equals
+            value: "{{`{{ request.object.spec.team }}`}}"
+          - key: "{{`{{ contains(request.object.spec.residency.allowedLocations, '*') }}`}}"
+            operator: Equals
+            value: false
+          - key: "{{`{{ contains(team.spec.envelope.allowedLocations, '*') }}`}}"
+            operator: Equals
+            value: false
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: >-
+          spec.residency.allowedLocations {{`{{ request.object.spec.residency.allowedLocations }}`}} are not
+          within Team '{{`{{ request.object.spec.team }}`}}' envelope.allowedLocations
+          {{`{{ team.spec.envelope.allowedLocations }}`}}.
+        deny:
+          conditions:
+            any:
+              - key: "{{`{{ request.object.spec.residency.allowedLocations }}`}}"
+                operator: AnyNotIn
+                value: "{{`{{ team.spec.envelope.allowedLocations }}`}}"
+
+    # A per-customer Product requires spec.customer at prod/uat; pooled products must not set it.
+    - name: customer-iff-per-customer-prod
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1alpha3/XEnvironment
+      {{- include "ktp.envContext" . | nindent 6 }}
+      {{- include "ktp.productExistsPrecondition" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: >-
+          spec.customer is REQUIRED for a per-customer Product at prod/uat and forbidden otherwise (Product
+          '{{`{{ request.object.spec.product }}`}}' tenancy '{{`{{ product.spec.tenancy }}`}}', stage
+          '{{`{{ request.object.spec.stage }}`}}').
+        deny:
+          conditions:
+            any:
+              # per-customer + prod/uat but no customer
+              - all:
+                  - key: "{{`{{ product.spec.tenancy }}`}}"
+                    operator: Equals
+                    value: per-customer
+                  - key: "{{`{{ request.object.spec.stage }}`}}"
+                    operator: AnyIn
+                    value: ["prod", "uat"]
+                  - key: "{{`{{ request.object.spec.customer || '' }}`}}"
+                    operator: Equals
+                    value: ""
+              # customer set on a pooled product (or a non-prod/uat stage)
+              - all:
+                  - key: "{{`{{ request.object.spec.customer || '' }}`}}"
+                    operator: NotEquals
+                    value: ""
+                  - key: "{{`{{ product.spec.tenancy || 'pooled' }}`}}"
+                    operator: NotEquals
+                    value: per-customer
+
+    # Self-service IAM deny-escalation (ADR-062 §4, #282) — v3 reads spec.services.<svc>.permissions (was apps).
+    - name: policystatements-no-escalation
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1alpha3/XEnvironment
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: >-
+          a Service's permissions.aws.policyStatements requests a disallowed IAM action — the services
+          {{ .Values.iamSensitiveServices | join ", " }} (and bare '*' wildcards) are denied; the minted role
+          is also capped by the AWS permissions boundary (ADR-062 §4).
+        foreach:
+          - list: "values(request.object.spec.services)[].permissions.aws.policyStatements[].actions[]"
+            deny:
+              conditions:
+                any:
+                  - key: "{{`{{ to_lower(split(element, (':'))[0]) }}`}}"
+                    operator: AnyIn
+                    value:
+{{- range .Values.iamSensitiveServices }}
+                      - {{ . | quote }}
+{{- end }}
+
+    # quota ≤ Team.envelope.quotaCap (quantity-aware). Absent cap = unlimited for that dimension.
+    - name: quota-within-cap
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1alpha3/XEnvironment
+      {{- include "ktp.envContext" . | nindent 6 }}
+      {{- include "ktp.teamExistsPrecondition" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: >-
+          spec.quota (cpu {{`{{ request.object.spec.quota.cpu }}`}}, memory
+          {{`{{ request.object.spec.quota.memory }}`}}, pods {{`{{ request.object.spec.quota.pods }}`}})
+          exceeds Team '{{`{{ request.object.spec.team }}`}}' envelope.quotaCap
+          {{`{{ team.spec.envelope.quotaCap }}`}}.
+        deny:
+          conditions:
+            any:
+              - key: "{{`{{ request.object.spec.quota.cpu }}`}}"
+                operator: GreaterThan
+                value: "{{`{{ team.spec.envelope.quotaCap.cpu || '1000000' }}`}}"
+              - key: "{{`{{ request.object.spec.quota.memory }}`}}"
+                operator: GreaterThan
+                value: "{{`{{ team.spec.envelope.quotaCap.memory || '1Ei' }}`}}"
+              - key: "{{`{{ request.object.spec.quota.pods }}`}}"
+                operator: GreaterThan
+                value: "{{`{{ team.spec.envelope.quotaCap.pods || '1000000' }}`}}"
+{{- end }}

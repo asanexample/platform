@@ -57,3 +57,29 @@ preconditions:
       operator: Equals
       value: "{{`{{ request.object.spec.team }}`}}"
 {{- end -}}
+
+{{/*
+v3 (ADR-067/069): context for the XEnvironment envelope — the projected Team CR (envelope) AND the projected
+Product CR (team-ownership + tenancy). The Product CR name is "<team>-<product>" (the registry metadata.name).
+Usage (under a rule):  {{- include "ktp.envContext" . | nindent 6 }}
+*/}}
+{{- define "ktp.envContext" -}}
+context:
+  - name: team
+    apiCall:
+      urlPath: "/apis/platform.refplat.org/v1alpha3/teams/{{`{{ request.object.spec.team }}`}}"
+      default: {}
+  - name: product
+    apiCall:
+      urlPath: "/apis/platform.refplat.org/v1alpha3/products/{{`{{ request.object.spec.team }}-{{ request.object.spec.product }}`}}"
+      default: {}
+{{- end -}}
+
+{{/* Precondition: only evaluate when the Product CR resolved. */}}
+{{- define "ktp.productExistsPrecondition" -}}
+preconditions:
+  all:
+    - key: "{{`{{ product.metadata.name || '' }}`}}"
+      operator: Equals
+      value: "{{`{{ request.object.spec.team }}-{{ request.object.spec.product }}`}}"
+{{- end -}}
