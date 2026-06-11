@@ -228,7 +228,7 @@ declares *what* it needs at a stage, never *where* it lands; Placement resolves 
 | `residency` | — | object | `{ allowedLocations: ["*"] }` | **Hard, attested** placement constraint (jurisdiction or `cloud:region`). Must be ⊆ the Team's `allowedLocations`. Placement fails (never silently relaxes) if no placement satisfies it. |
 | `quota` | — | object | tier profile default | `cpu`/`memory`/`pods` (+ optional `services`/`loadbalancers`/`pvcs`/`storage`). Validated ≤ the Team's `quotaCap`. |
 | `domains` | — | `[]string` | `[]` | The vanity hosts **bound** in *this* Environment — a subset of `Product.domains` (the owned set). `Environment.domains ⊆ Product.domains` is enforced at admission (ADR-069 §2), so e.g. only the prod Environment binds `shop.example.com`. Unioned with the generated host into the Kyverno `restrict-route-hostnames` allow-list + `status.domains`. |
-| `services` | — | map | `{}` | `<service> → ServiceDeploySpec`. Per-stage **realization** of each deployed Service: `{ image?, repoPath?, preview?, serviceAccount?, permissions? }`. `image` is the immutable `…@sha256:` digest promoted into this stage ([Promotion](#promotion)) — **optional**: an entry with **no `image`** is *declared but not yet deployed* (the New-Product first-deploy state). The Environment still provisions namespace/quota/identity; the per-Product ApplicationSet **skips (Environment × Service) pairs with no digest**, and the first auto digest-bump generates the workload. `serviceAccount`/`permissions` **override** the `Service` defaults (effective = override else default). |
+| `services` | — | map | `{}` | `<service> → ServiceDeploySpec`. Per-stage **realization** of each deployed Service: `{ image?, repoPath?, preview?, serviceAccount?, permissions? }`. `image` is the immutable `…@sha256:` digest promoted into this stage ([Promotion](#promotion)) — **optional**: an entry with **no `image`** is *declared but not yet deployed* (the New-Product first-deploy state). The Environment still provisions namespace/quota/identity; the per-Product ApplicationSet **skips (Environment × Service) pairs with no digest**, and the first auto digest-bump generates the workload. `serviceAccount`/`permissions` **override** the `Service` defaults (effective = override else default). Also 🔒 **reserved** ([ADR-070](../adrs/070-tenant-app-config-and-secrets.md)): `config` (per-stage non-secret env → a ConfigMap, in git) and `secrets` (the bound secret keys; **values never in git** — written via the portal/platctl to Secrets Manager, synced by an ESO `ExternalSecret`). |
 | `lifecycle` | — | object | `{ phase: active }` | `phase: active \| suspended \| decommissioning`. Reversible suspend zeroes the ResourceQuota (ADR-062 #283); hard-delete is gated decommission-first + reviewed; ECR retained (`Orphan`). |
 
 ### status (derived — never authored)
@@ -510,15 +510,13 @@ should be resolved before P1 implementation starts.
     `sha256("<team>/<product>/<stage>/<customer?>/<service?>")`**. Friendly names in the common (short) case;
     always-valid in the edge case. Apply uniformly in the Composition (L2a).
 
-11. **🔴 App-level config & secrets — UNDESIGNED platform capability (major gap).** The model has rich per-env
-    *infra* (quota, isolation, resources) but **nothing** for per-stage **application config + secrets** (DB
-    URLs, feature flags, API keys, env-specific env-vars) — the most common developer need. Today tenants get
-    secrets via ESO (`external-secrets`/`secret-stores`); there is no per-Environment app-config/secret model in
-    *any* of the v3 docs, and the kustomize `base/` is deliberately config-agnostic. **This is a whole platform
-    capability we have not designed** — being tracked for a dedicated design session, **not** resolved here. The
-    schema is being baked, so wherever config/secrets eventually attach (likely `Environment.spec.services.<svc>`)
-    is a **schema decision that must precede F1 freezing the XEnvironment shape** — or we knowingly add it later
-    and accept the breaking change.
+11. **✅ App-level config & secrets — DESIGNED: [ADR-070](../adrs/070-tenant-app-config-and-secrets.md).**
+    Portal-first (Backstage form / `platctl`, Backstage the sole broker, write-through) → cloud-native store
+    brokered by ESO (**Secrets Manager today**, per-cloud via the seam; **Vault parked behind a trigger**).
+    **Config-in-git** (`services.<svc>.config` → ConfigMap) vs **secrets-in-store** (never git → `ExternalSecret`);
+    the Service `catalog-info` declares which keys are which. **Prod writes gated** (separation of duties);
+    **reveal gated + audited** (symmetric with write, per-key, optional prod step-up — not blanket-hidden).
+    **F1 reserves** `services.<svc>.config`/`secrets`; the realization is the **secrets paved-road** phase.
 
 ## Migration from v1alpha2
 
