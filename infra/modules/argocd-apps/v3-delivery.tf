@@ -120,3 +120,83 @@ resource "kubernetes_manifest" "product_appset" {
 
   depends_on = [kubernetes_manifest.product_appproject]
 }
+
+# ===========================================================================================================
+# v3 registry-sync (ADR-069 §1 / #389) — project the git-native Product registry + Environment claims onto the
+# cluster as CRs, so Kyverno admission (restrict-environment-envelope) and the Composition can read them. The
+# dual-representation contract: delivery derives from the git registry; the cluster reads the projected CRs.
+# Mirrors the v2 teams/tenant-claims sync apps. ADDITIVE + GATED on var.platform_repo_url (the v3 gate).
+# ===========================================================================================================
+locals {
+  gitops_v3 = var.create && var.platform_repo_url != "" ? { enabled = true } : {}
+  # group/kind whitelists for each registry-sync project
+  v3_registry = {
+    products = { wave = "-2", kinds = [{ group = "platform.refplat.org", kind = "Product" }], path = "gitops/products" }
+    # XEnvironment claims (cluster-scoped Crossplane XR) — synced after Teams (-1) and Products (-2) so the
+    # envelope/team-matches-product admission inputs land first.
+    environments = { wave = "0", kinds = [{ group = "platform.refplat.org", kind = "XEnvironment" }], path = "gitops/environments" }
+  }
+}
+
+resource "kubernetes_manifest" "v3_registry_project" {
+  for_each = length(local.gitops_v3) > 0 ? local.v3_registry : {}
+
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "AppProject"
+    metadata = {
+      name      = "platform-${each.key}"
+      namespace = var.argocd_namespace
+    }
+    spec = {
+      description = "v3 ${each.key} registry projection (ADR-069 §1)"
+      sourceRepos = [var.platform_repo_url]
+      destinations = [{
+        server    = var.cluster_server
+        namespace = "crossplane-system"
+      }]
+      clusterResourceWhitelist   = each.value.kinds
+      namespaceResourceWhitelist = []
+    }
+  }
+}
+
+resource "kubernetes_manifest" "v3_registry_app" {
+  for_each = length(local.gitops_v3) > 0 ? local.v3_registry : {}
+
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata = {
+      name      = each.key
+      namespace = var.argocd_namespace
+      labels    = { "platform.refplat.org/component" = each.key }
+      annotations = {
+        "argocd.argoproj.io/sync-wave" = each.value.wave
+      }
+    }
+    spec = {
+      project = "platform-${each.key}"
+      source = {
+        repoURL        = var.platform_repo_url
+        targetRevision = var.platform_repo_branch
+        path           = each.value.path
+        directory = {
+          # the registry is nested per-team/per-product (gitops/<kind>/<team>/<product>.yaml)
+          recurse = true
+        }
+      }
+      destination = {
+        server    = var.cluster_server
+        namespace = "crossplane-system"
+      }
+      syncPolicy = {
+        automated   = { selfHeal = true, prune = true }
+        syncOptions = ["CreateNamespace=false", "ServerSideApply=true"]
+        retry       = local.sync_retry
+      }
+    }
+  }
+
+  depends_on = [kubernetes_manifest.v3_registry_project]
+}

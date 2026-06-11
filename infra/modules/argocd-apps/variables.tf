@@ -152,3 +152,9 @@ variable "platform_repo_url" {
   type        = string
   default     = ""
 }
+
+variable "platform_repo_branch" {
+  description = "v3: branch of the platform GitOps repo the registry-sync apps + the per-Product ApplicationSet track."
+  type        = string
+  default     = "main"
+}
