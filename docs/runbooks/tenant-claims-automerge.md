@@ -8,22 +8,25 @@
 >
 > **Last reviewed:** 2026-06-09
 
-> ### ⚠️ v3 supersedes this (2026-06-12)
->
-> The v2 Tenant Claims Gate was **retired at the v3 cutover**; its automerge + decommission-first deletion
-> model now lives in the **`v3 gitops Gate`** (`.github/workflows/v3-gitops-gate.yml`), which gates the v3
-> registry surfaces (`gitops/products/**`, `gitops/environments/**`). Same model — see that workflow's header
-> decision table. What's different for v3:
->
-> - **Scaffolder templates:** New Product, New Environment, Deprovision (not New Tenant). A bot-authored,
->   v3-registry-only, non-deletion, fully-validated PR arms auto-merge; deletions are decommission-first
->   (`spec.lifecycle.phase: decommissioning` on base) + a current-SHA admin approval.
-> - **Required checks (activation):** update `main`'s branch protection — **add** `v3 gitops Gate` +
->   `v3 gitops Approval`, **remove** the retired `Tenant Claims Gate` + `Kyverno Shift-Left (dogfood)`. Until
->   `v3 gitops Approval` is a required check, a registry deletion isn't gated on the approval (the gate still
->   posts the status, but branch protection isn't enforcing it). See the updated settings block below.
->
-> The rest of this runbook (CI-gate integrity, threat model, repo settings rationale) applies unchanged.
+---
+
+## ⚠️ v3 supersedes this (2026-06-12)
+
+The v2 Tenant Claims Gate was **retired at the v3 cutover**; its automerge + decommission-first deletion model
+now lives in the **`v3 gitops Gate`** (`.github/workflows/v3-gitops-gate.yml`), which gates the v3 registry
+surfaces (`gitops/products/**`, `gitops/environments/**`). Same model — see that workflow's header decision
+table. What's different for v3:
+
+- **Scaffolder templates:** New Product, New Environment, Deprovision (not New Tenant). A bot-authored,
+  v3-registry-only, non-deletion, fully-validated PR arms auto-merge; deletions are decommission-first
+  (`spec.lifecycle.phase: decommissioning` on base) + a current-SHA admin approval.
+- **Required checks (activation):** update `main`'s branch protection — **add** `v3 gitops Gate` +
+  `v3 gitops Approval`, **remove** the retired `Tenant Claims Gate` + `Kyverno Shift-Left (dogfood)`. Until
+  `v3 gitops Approval` is a required check, a registry deletion isn't gated on the approval (the gate still
+  posts the status, but branch protection isn't enforcing it). See the updated settings block below.
+
+The rest of this runbook (CI-gate integrity, threat model, repo settings rationale) applies unchanged — read
+"claim" as the v3 Environment/Product registry files and "Tenant Claims Gate" as "v3 gitops Gate".
 
 ---
 
