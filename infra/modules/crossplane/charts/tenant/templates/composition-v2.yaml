@@ -1,7 +1,0 @@
-{{/*
-The v2 Tenant Composition (tenant-v2, bound to v1alpha2) carries an inline go-template whose {{ }} must NOT be
-processed by Helm. It is shipped as a raw file and emitted verbatim via .Files.Get (Helm does not re-template
-the result), so the gotemplating delimiters reach Crossplane intact. Replaced the v1 composition (tenant-v1,
-v1alpha1) at the rebuild cutover (delivery-plan A6).
-*/ -}}
-{{ .Files.Get "files/composition-v2.yaml" }}

@@ -26,16 +26,9 @@ dependency "ecr" {
 }
 
 locals {
-  # Claim-as-single-source (ADR-061): the per-team app repos come from the XTenant claims (spec.apps.<app>.repo,
-  # owner/repo), not a hand-maintained list. Each team gets its own ECR push role that can push ONLY to its own
-  # team-<team>/* repos and trusts ONLY that team's repo(s). One app per team today; take every app's repo name.
-  claims_dir = "${get_repo_root()}/gitops/tenant-claims/preprod"
-  claims = { for f in fileset(local.claims_dir, "*.yaml") :
-    yamldecode(file("${local.claims_dir}/${f}")).spec.team => yamldecode(file("${local.claims_dir}/${f}"))
-  }
-  team_repo_names = { for team, claim in local.claims :
-    team => [for _app, cfg in claim.spec.apps : split("/", cfg.repo)[1]]
-  }
+  # v3 (ADR-067/069 §5): image-build OIDC roles derive PER-PRODUCT from the Product registry
+  # (gitops/products/<team>/<product>.yaml — see product_roles below). The v2 per-team derivation from the
+  # XTenant claims was removed at the cutover.
 
   # ---------------------------------------------------------------------------
   # v3 (ADR-069 §5) — one OIDC ECR-push role per PRODUCT, derived from the Product registry
@@ -89,45 +82,11 @@ inputs = {
   create     = true
   github_org = "asanexample"
 
-  # One push role per team: trusts only that team's repo (OIDC sub) and can push only to that team's
-  # team-<team>/* ECR repos. The repo ARN is CONSTRUCTED (wildcard), not read from the `ecr` unit — the
-  # tenant ECR repos are owned by the Crossplane Tenant Composition now (BACK stack P3), so the `ecr` unit
-  # no longer lists them. (Keying off `ecr` here would silently drop every team's role — #174 regression.)
-  roles = merge({ for team, repo_names in local.team_repo_names :
-    "github-actions-ecr-push-${team}" => {
-      repos    = repo_names
-      branches = ["main"]         # push on merge to main
-      events   = ["pull_request"] # and PR preview builds
-      tags     = { Team = team }  # per-team attribution / ABAC (#61)
-
-      inline_policy = jsonencode({
-        Version = "2012-10-17"
-        Statement = [
-          {
-            Sid      = "ECRAuth"
-            Effect   = "Allow"
-            Action   = ["ecr:GetAuthorizationToken"]
-            Resource = "*"
-          },
-          {
-            Sid    = "ECRPush"
-            Effect = "Allow"
-            Action = [
-              "ecr:BatchCheckLayerAvailability",
-              "ecr:GetDownloadUrlForLayer",
-              "ecr:BatchGetImage",
-              "ecr:PutImage",
-              "ecr:InitiateLayerUpload",
-              "ecr:UploadLayerPart",
-              "ecr:CompleteLayerUpload",
-            ]
-            # Only this team's repositories (team-<team>/*), Composition-created. Wildcard by construction.
-            Resource = ["arn:aws:ecr:${include.base.locals.region}:${include.base.locals.account_id}:repository/team-${team}/*"]
-          },
-        ]
-      })
-    }
-    }, {
+  # Image-build OIDC ECR-push roles: the platform infra roles (Backstage, the ARC runner) + the v3 per-Product
+  # roles (local.product_roles, ADR-069 §5 — one per Product, trusts only its repo, pushes only to
+  # team-<team>/<product>-*). The v2 per-team roles were removed at the cutover (the per-Product roles replace
+  # them; tenant ECR repos are Composition-owned, so nothing is read from the `ecr` unit).
+  roles = merge({
     # The developer portal's image-build role (Backstage; platform infra, ADR-051). Trusts ONLY the
     # asanexample/backstage repo on main; can push ONLY to platform/backstage.
     "github-actions-ecr-push-backstage" = {

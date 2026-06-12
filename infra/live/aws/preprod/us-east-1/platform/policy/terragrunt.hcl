@@ -31,25 +31,6 @@ locals {
     repo           = p.spec.repo
     registryPrefix = "${local.ecr_registry}/team-${p.spec.team}/${trimprefix(name, "${p.spec.team}-")}"
   } }
-
-  # Cosign identity transition complete (2026-05-29): app-alpha re-signed under asanexample and the
-  # running image (sha256:d60ea84) verified, so the legacy gangster identity is dropped. Left empty (not
-  # removed) to keep the dual-subject scaffold documented and reusable for the next org/identity change.
-  legacy_org = ""
-
-  # Teams whose app CI calls asanexample/trusted-ci's slsa-provenance.yml as the SOLE provenance signer
-  # (SLSA L3, #131). For these teams verify-attestations requires trusted-ci-signed provenance instead of
-  # app-signed. Add a team here ONLY once its CI has dropped the hand-authored provenance step and wired
-  # the trusted-ci job — otherwise its images fail the provenance check. (Later: a teams.hcl per-app flag.)
-  isolated_provenance_teams = ["alpha", "bravo"]
-
-  # Teams whose app CI builds+signs the image (and SBOM) via the SHARED trusted-ci build-sign.yml reusable
-  # workflow (a thin caller — the supply-chain backbone abstracted out of per-app deploy.yml). For these
-  # teams verify-images and the verify-attestations SBOM ALSO accept the shared-signer identity (gated by
-  # the githubWorkflowRepository extension = the app repo), in addition to any app-signed identity. Add a
-  # team here once its deploy.yml/preview.yml call build-sign.yml. Bespoke apps that self-build stay
-  # app-signed (absent here). Mirrors isolated_provenance_teams (provenance).
-  shared_signer_teams = ["alpha", "bravo"]
 }
 
 dependency "eks" {
