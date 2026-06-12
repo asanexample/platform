@@ -62,27 +62,6 @@ dependency "preprod_eks" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-generate "github_token_secret" {
-  path      = "github-token-secret.tf"
-  if_exists = "overwrite_terragrunt"
-  contents  = <<-EOF
-    data "aws_secretsmanager_secret_version" "github_pat" {
-      secret_id = "platform/github/argocd-pat"
-    }
-
-    resource "kubernetes_secret_v1" "github_appset_token" {
-      metadata {
-        name      = "github-appset-token"
-        namespace = "argocd"
-      }
-
-      data = {
-        token = data.aws_secretsmanager_secret_version.github_pat.secret_string
-      }
-    }
-  EOF
-}
-
 generate "kubernetes_provider" {
   path      = "kubernetes-provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -103,18 +82,11 @@ generate "kubernetes_provider" {
 inputs = {
   create = true
 
-  # v2 XTenant-claim delivery is RETIRED at the cutover (ADR-067/069) — the per-Product ApplicationSets below
-  # (products) replace it. Empty disables the legacy `tenants` Applications in the module.
-  tenants = {}
-
   # v3 per-Product delivery: one ApplicationSet per product, fanning out over the product's Environment claims
   # (gitops/environments/<team>/<product>/*.yaml) → one Application per Environment. Derived from gitops/products.
-  products = local.products
-
-  github_org               = "asanexample"
-  github_token_secret_name = "github-appset-token"                                                                                # K8s secret created by generate block above
-  ecr_registry             = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com" # Platform account ECR
-  preview_domain           = "preprod.aws.refplat.org"
+  # Replaces the retired v2 XTenant-claim delivery (the legacy `tenants` Applications were removed at the cutover).
+  products       = local.products
+  preview_domain = "preprod.aws.refplat.org"
 
   # Target cluster name in ArgoCD — the preprod cluster that ArgoCD manages,
   # not the platform cluster where ArgoCD runs
@@ -124,19 +96,16 @@ inputs = {
 
   # Git-native Team delivery via ArgoCD (ADR-063): sync the cluster-scoped Team CRs from the platform repo to
   # preprod (replaces the crossplane-teams Helm projection — the crossplane unit now passes teams = {}). The
-  # Team CRs are admission inputs for Kyverno's envelope/team-must-exist, so this app carries a sync-wave ahead
-  # of tenant-claims.
+  # Team CRs are admission inputs for Kyverno's envelope/team-matches-product, so this app carries a sync-wave
+  # ahead of the environments registry-sync app.
   enable_teams      = true
   teams_repo_url    = "https://github.com/asanexample/platform"
   teams_repo_branch = "main"
   teams_repo_path   = "gitops/teams"
 
-  # v3 cutover (ADR-067/069): the v2 XTenant claim sync is retired (enable_tenant_claims=false) and replaced by
-  # the v3 delivery surface, activated by platform_repo_url: the registry-sync apps (project gitops/products +
+  # v3 delivery surface, activated by platform_repo_url: the registry-sync apps (project gitops/products +
   # gitops/environments → cluster CRs, sync-wave -2/0) AND the per-Product ApplicationSet (delivers each app's
   # k8s/overlays/<stage>, injecting ns + host). Teams still sync via enable_teams above.
-  enable_tenant_claims = false
-
   platform_repo_url    = "https://github.com/asanexample/platform"
   platform_repo_branch = "main"
 }

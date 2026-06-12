@@ -1144,16 +1144,6 @@ func ResolveCheckers(
 				Unit:   u,
 				Binary: "terragrunt",
 			})
-			// v2 Tenant API (ADR-049): XTenants Synced+Ready, <team>-<name>-<env> namespaces with the tenant
-			// baseline, Team CRs projected. Self-skips on clusters without the XTenant CRD (no tenant API),
-			// so this is safe to wire for every crossplane unit.
-			if kubeCtx != "" {
-				checks = append(checks, &TenantCheck{
-					Name:        u.Name + "/tenants",
-					KubeContext: kubeCtx,
-					Run:         run,
-				})
-			}
 
 		case "argocd-apps":
 			checks = append(checks, &StateCheck{
