@@ -131,11 +131,11 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # This SHA (asanexample/backstage#36) adds the L2c v3 catalog projection (#35) + the #285 Tenant Status card
-  # re-point to the v3 Environment (cr-* annotations w/ a v1alpha2 xtenant fallback) — BACKWARD-COMPATIBLE +
-  # INERT: platformProjection.mode defaults to 'v2', so the live catalog + card behave identically to #34 until
-  # the cutover sets mode='v3'. (Prior 81e4b544 = #35 projection; 7d63565b = #34 Group-per-Team-CR + cards.)
-  image_tag = "15c5a0fc0052d07f10cf048bc24223b7726f150e"
+  # This SHA (asanexample/backstage#37) completes the L2c v3 frontend: projection (#35) + #285 card re-point (#36)
+  # + the kind:Environment relation processor (ownedBy/partOf) + team-tenants → Environments. BACKWARD-COMPATIBLE +
+  # INERT: platformProjection.mode defaults to 'v2', so the live catalog behaves identically until the cutover sets
+  # mode='v3' (a pure config flip — all L2c frontend code is now in this image). (Prior 15c5a0fc = #36; 81e4b544 = #35.)
+  image_tag = "4fbd38d36fe9821dd3f63c8d31493360cd8b8b67"
 
   # Split-horizon for OIDC: pin keycloak.aws.refplat.org to the gateway's ClusterIP so the backend hits the
   # gateway Envoy directly (the public-name → internal-NLB hairpin is flaky). The ClusterIP is resolved
