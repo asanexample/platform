@@ -111,7 +111,11 @@ resource "kubernetes_manifest" "product_appset" {
           syncPolicy = {
             automated   = { selfHeal = true, prune = true }
             syncOptions = ["CreateNamespace=false"]
-            retry       = local.sync_retry
+            # Fail-fast (not the 45-min sync_retry): a new Environment's first deploy syncs a `:placeholder`
+            # overlay until the app's CI pins the signed digest in a follow-up commit; a short retry lets the
+            # doomed pre-pin sync give up so selfHeal picks up the pin commit (revision change) without a manual
+            # terminate-op. The registry-sync app below keeps the long sync_retry.
+            retry = local.first_deploy_retry
           }
         }
       }
