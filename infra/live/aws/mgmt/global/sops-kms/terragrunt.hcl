@@ -19,16 +19,20 @@ inputs = {
   create     = true
   alias_name = "platform-sops"
 
-  # Operators authenticate from management (and occasionally platform) as SSO AdministratorAccess — encrypt +
-  # decrypt so `sops` editing works. Management operators decrypt this key same-account; platform operators
-  # cross-account (their SSO admin IAM allows it).
+  # Operators authenticate from management, platform AND preprod as SSO AdministratorAccess — encrypt + decrypt
+  # so `sops` editing works. Management operators decrypt same-account; platform/preprod cross-account (their SSO
+  # admin IAM allows it). Preprod is REQUIRED because the bootstrap-tier `preprod/iam-roles` unit runs under the
+  # preprod account-direct profile (it predates PlatformDeployer, so it can't assume the management base) and it
+  # decrypts secrets.enc.yaml at config-eval time — without this grant a from-scratch rebuild fails on preprod.
   operator_account_roots = [
     "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:root",
     "arn:aws:iam::${include.base.locals.account_ids["platform"]}:root",
+    "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:root",
   ]
   operator_principal_patterns = [
     "arn:aws:iam::${include.base.locals.account_ids["mgmt"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
     "arn:aws:iam::${include.base.locals.account_ids["platform"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
+    "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_*",
   ]
 
   # The ARC runner (platform account) reads config in CI — decrypt only, CROSS-account. The key policy admits
