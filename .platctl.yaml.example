@@ -57,6 +57,11 @@ overrides:
     hook: crd_two_stage
     hook_target: "helm_release.tailscale_operator[0]"
     bootstrap_args: ["-var", "split_dns={}"]
+    # platform/tailscale READS platform/tailscale/oauth (a Secrets Manager data source) which tailscale-admin
+    # CREATES and recreates via its secret_cleanup hook. Without this dep, a skipped/failed tailscale-admin lets
+    # platform/tailscale race ahead and read a pending-deletion secret → "couldn't find resource". Mirrors
+    # preprod/tailscale below (the ordering is usually masked because tailscale-admin's deps resolve far earlier).
+    implicit_deps: ["platform/tailscale-admin"]
 
   preprod/tailscale:
     hook: crd_two_stage
@@ -138,16 +143,9 @@ manual_steps:
       secret_id: platform/tailscale/api-key
       profile: platform
 
-  - name: argocd-saml
-    before: platform/argocd
-    instructions: |
-      Create SAML app in AWS Identity Center for ArgoCD SSO.
-      See scripts/bootstrap-platform.sh Phase 12 for details.
-      Then update infra/live/aws/secrets.hcl with argocd_sso_url.
-    check:
-      type: file_contains
-      file: infra/live/aws/secrets.hcl
-      pattern: "argocd_sso_url"
+  # NB: no argocd-saml manual_step — ArgoCD SSO brokers through Keycloak OIDC now (ADR-053/059, Dex+SAML retired).
+  # The OIDC client secret is provisioned by keycloak-config (an IaC unit ordered before argocd), so there is no
+  # manual prerequisite for ArgoCD sign-in.
 
 kubeconfig:
   - alias: platform
