@@ -100,7 +100,7 @@ inputs = {
 
   # The custom toolchain image built by gha-runner-image.yml (platform/gha-runner). Bump this SHA + re-apply
   # to roll a new runner build (a /.tool-versions bump triggers the rebuild → new SHA here).
-  runner_image = "829808296602.dkr.ecr.us-east-1.amazonaws.com/platform/gha-runner:7afcf0352ac71676043257eecc2f9065fdf468ca"
+  runner_image = "829808296602.dkr.ecr.us-east-1.amazonaws.com/platform/gha-runner:9304c681c44b0c5c318c5072fe6bf3a313e99889"
 
   # GitHub App creds in Secrets Manager (JSON: appId, installationId, privateKey). Created out-of-band —
   # see docs/runbooks/arc-github-app.md.
