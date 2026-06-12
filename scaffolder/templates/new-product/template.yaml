@@ -67,8 +67,10 @@ spec:
             Semgrep ruleset, and dependabot ecosystem are set accordingly.
           enum:
             - go
+            - nodejs
           enumNames:
             - "Go (net/http)"
+            - "Node.js (Express)"
           default: go
 
   steps:
