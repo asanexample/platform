@@ -1,0 +1,175 @@
+# New Environment (ADR-067 v3 / ADR-062 §1-2): TEAM-SCOPED self-service — a team member provisions an
+# Environment (a Product × Stage) within their Team's envelope. Opens a PR adding the XEnvironment claim to
+# gitops/environments/<team>/<product>/<stage>.yaml; the v3 gitops Gate validates it (schema + envelope
+# shift-left + Composition render) and Kyverno re-enforces the envelope at admission. Authorization is layered:
+# the permission policy lets team members run templates at all; platform:verify-team-membership (server-stored —
+# a client cannot strip it) binds the run to the requester's own team; the gate + admission bound the claim.
+#
+# Replaces the retired v2 "New Tenant" template (which emitted an XTenant into the removed
+# gitops/tenant-claims/preprod/ path). The repo is NO LONGER part of this claim — it lives in the Product
+# registry (gitops/products/<team>/<product>.yaml), which must already exist (one repo per Product).
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: new-environment
+  title: New Environment
+  description: >-
+    Provision an Environment (a Product at a Stage) for your team: an isolated namespace with quota, network
+    policy, Pod-Identity, and GitOps delivery — bounded by your Team's envelope. The Product must already
+    exist. Opens a PR validated by the v3 gitops Gate; once merged, ArgoCD syncs the claim and Crossplane
+    provisions.
+  tags:
+    - self-service
+    - environment
+spec:
+  owner: group:default/platform
+  type: environment
+
+  parameters:
+    - title: Environment
+      required:
+        - team
+        - product
+        - stage
+      properties:
+        team:
+          title: Team
+          type: string
+          description: Your team — membership is verified server-side; you can only provision for a team you belong to.
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+              spec.type: team
+            defaultKind: Group
+            # Arbitrary values allowed: a team with no projected entities yet isn't in the picker. Safe —
+            # platform:verify-team-membership + the gate's team-matches-product are the enforcement, not the picker.
+            allowArbitraryValues: true
+        product:
+          title: Product
+          type: string
+          description: >-
+            An EXISTING Product owned by your team (its repo, tenancy, and owned domains come from
+            gitops/products/<team>/<product>.yaml). The gate + admission reject a product whose team ≠ yours,
+            or one that doesn't exist. To create a Product, add its registry entry first.
+          pattern: '^[a-z][a-z0-9-]{0,30}$'
+          maxLength: 31
+        stage:
+          title: Stage
+          type: string
+          description: >-
+            The promotion rung (not a place). Must be within your Team envelope's allowedStages — the gate and
+            Kyverno both enforce this, so out-of-envelope stages fail the PR.
+          enum: ['dev', 'test', 'uat', 'staging', 'prod']
+          default: dev
+
+    - title: Service & quota
+      required:
+        - service
+      properties:
+        service:
+          title: Service name
+          type: string
+          description: >-
+            The Service under this Product to realize at this stage (its image pushes to
+            team-<team>/<product>-<service>). Usually "web".
+          pattern: '^[a-z][a-z0-9-]{0,30}$'
+          default: web
+        serviceAccount:
+          title: Service account (optional)
+          type: string
+          description: Named SA the service's pods run as (Pod Identity binds to it). Defaults to app-<team>.
+          pattern: '^[a-z][a-z0-9-]{0,30}$'
+        preview:
+          title: PR preview environments
+          type: boolean
+          default: false
+        tier:
+          title: Hardening tier
+          type: string
+          description: The isolation/compliance floor. Must be within your Team's allowedTiers.
+          enum: ['standard', 'elevated', 'pci', 'hipaa']
+          default: standard
+        cpu:
+          title: CPU quota (optional)
+          type: string
+          description: Per-Environment cap; defaults to the tier profile. Counted against the Team's aggregate quotaCap.
+          pattern: '^[0-9]+m?$'
+        memory:
+          title: Memory quota (optional)
+          type: string
+          description: Defaults to the tier profile (standard = 8Gi).
+          pattern: '^[0-9]+(Mi|Gi)$'
+        pods:
+          title: Pod quota (optional)
+          type: integer
+          description: Defaults to the tier profile (standard = 20).
+          minimum: 1
+
+  steps:
+    - id: verify
+      name: Verify team membership
+      action: platform:verify-team-membership
+      input:
+        team: ${{ parameters.team }}
+
+    - id: render
+      name: Render the Environment claim
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          team: ${{ parameters.team | replace('group:default/', '') }}
+          product: ${{ parameters.product }}
+          stage: ${{ parameters.stage }}
+          service: ${{ parameters.service }}
+          serviceAccount: ${{ parameters.serviceAccount }}
+          preview: ${{ parameters.preview }}
+          tier: ${{ parameters.tier }}
+          cpu: ${{ parameters.cpu }}
+          memory: ${{ parameters.memory }}
+          pods: ${{ parameters.pods }}
+          requestedBy: ${{ user.ref | default('unknown', true) }}
+
+    - id: pr
+      name: Open the provisioning PR (validated by the v3 gitops Gate)
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?owner=asanexample&repo=platform
+        branchName: environment/${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}-${{ parameters.stage }}
+        targetBranchName: main
+        title: "feat(environments): provision ${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}-${{ parameters.stage }}"
+        commitMessage: |
+          feat(environments): provision ${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}-${{ parameters.stage }}
+
+          Requested-by: ${{ user.ref | default('unknown', true) }}
+        description: |
+          Provisions Environment **${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}-${{ parameters.stage }}** (ADR-067 v3, ADR-062 self-service).
+
+          Requested via the Backstage **New Environment** template by `${{ user.ref | default('unknown', true) }}` — team membership verified server-side (ADR-062 §1/§4).
+
+          | | |
+          |---|---|
+          | team | `${{ parameters.team | replace('group:default/', '') }}` |
+          | product | `${{ parameters.product }}` |
+          | stage | `${{ parameters.stage }}` |
+          | service | `${{ parameters.service }}` |
+          | tier | `${{ parameters.tier }}` |
+
+          The **v3 gitops Gate** validates this PR (claim schema, envelope shift-left — team-matches-product,
+          stage/tier/quota-within-envelope — and Composition render). **Merge it** to provision (automerge for the
+          v3 gate is not yet armed — a reviewer merges). On merge, the `environments` registry-sync app projects
+          the claim and Crossplane provisions the namespace/quota/Pod-Identity/ECR; Kyverno re-enforces the
+          envelope at admission. The workload deploys once the Service's first CI build promotes a signed digest
+          into `<app-repo>/k8s/overlays/${{ parameters.stage }}`.
+
+  output:
+    links:
+      - title: Provisioning pull request (validated by the v3 gitops Gate)
+        url: ${{ steps.pr.output.remoteUrl }}
+      # The Environment's catalog entity — where the live provisioning status cards (#284/#285, K8s + ArgoCD)
+      # show, attached by the projection annotations. Projection-sourced (from the claim), so it appears within
+      # ~5 min of the PR merging; the link resolves once it exists.
+      - title: Environment dashboard (provisioning status — appears within a few minutes)
+        icon: dashboard
+        entityRef: environment:default/${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}-${{ parameters.stage }}

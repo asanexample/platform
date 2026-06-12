@@ -1,0 +1,38 @@
+# Environment (${{ values.team }} × ${{ values.product }} × ${{ values.stage }}) — developer-authored claim
+# (ADR-067, v1alpha3), via the Backstage **New Environment** template (ADR-062 self-service). Namespace
+# ${{ values.team }}-${{ values.product }}-${{ values.stage }}. Synced by ArgoCD (the `environments`
+# registry-sync app) and reconciled by the Crossplane Environment Composition (v3). One claim per
+# (product, stage[, customer]); the image digest is promoted in by PR (promote-by-PR, #377). This file is the
+# source of truth — change or remove it via PR. See docs/architecture/platform-domain-api.md.
+apiVersion: platform.refplat.org/v1alpha3
+kind: XEnvironment
+metadata:
+  # CLUSTER-scoped XR → name MUST be globally unique → team-prefixed <team>-<product>-<stage> (ADR-067; a bare
+  # <product>-<stage> collides across teams sharing a product name).
+  name: ${{ values.team }}-${{ values.product }}-${{ values.stage }}
+  annotations:
+    platform.refplat.org/requested-by: ${{ values.requestedBy }}
+spec:
+  team: ${{ values.team }} # validated == Product.team at the gate + admission (team-matches-product)
+  product: ${{ values.product }} # must reference an existing Product (gitops/products/${{ values.team }}/${{ values.product }}.yaml)
+  stage: ${{ values.stage }} # must be in the Team's allowedStages (envelope: stage-within-envelope)
+  tier: ${{ values.tier }}
+  {%- if values.cpu or values.memory or values.pods %}
+  quota: # per-Environment override; validated ≤ the Team's quotaCap (envelope: quota-within-cap)
+    {%- if values.cpu %}
+    cpu: "${{ values.cpu }}"
+    {%- endif %}
+    {%- if values.memory %}
+    memory: ${{ values.memory }}
+    {%- endif %}
+    {%- if values.pods %}
+    pods: ${{ values.pods }}
+    {%- endif %}
+  {%- endif %}
+  services:
+    ${{ values.service }}:
+      serviceAccount: ${{ values.serviceAccount if values.serviceAccount else 'app-' + values.team }} # Pod Identity binds this named SA
+      preview: ${{ values.preview }}
+      # image omitted — declared but NOT yet deployed (the first-deploy state). The Environment still
+      # provisions namespace/quota/identity; the per-Product ApplicationSet SKIPS this (Environment × Service)
+      # pair until the first CI build promotes an immutable …@sha256: digest into <app-repo>/k8s/overlays/${{ values.stage }}.
