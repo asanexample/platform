@@ -11,6 +11,14 @@ reference see [`cmd/platctl/README.md`](../../cmd/platctl/README.md).
 > are empty (the membership gap), so SSO authenticates users but grants no group-based access yet — ArgoCD admin
 > is via its local break-glass account until a group-emitting upstream lands.
 
+> **v3 cutover note (ADR-067):** the next rebuild is also the **v2→v3 cutover** (XTenant → XEnvironment; the
+> Team/Product/Service domain model). The cutover is a coordinated commit admin-merged *during* this teardown +
+> rebuild (teardown-before-merge). The full ordered procedure + the v3 deltas (the v3-only crossplane chart, the
+> argocd-apps `platform_repo_url` + gitops/products/environments sync, the github-oidc/policy v3 inputs, the
+> Backstage `mode:'v3'` flip, and **the Gap-4 app-image pre-build ordering**) live in
+> [`v3-cutover.md` → Rebuild-runbook deltas](v3-cutover.md#rebuild-runbook-deltas-platform-rebuild-from-scratchmd).
+> Read it alongside this runbook for the next rebuild.
+
 ## 0. Build platctl (it is NOT on your PATH by default)
 
 `platctl` is a Go binary that must be built; bare `platctl` will be "command not found".
@@ -119,11 +127,11 @@ Do these / be aware of these before/at bootstrap; each cost a `--resume` cycle t
 4. **Backstage image must be re-pushed.** ECR is force-deleted on teardown, so the pinned Backstage image is gone.
    After the early `ecr`/`github-oidc` waves recreate the repo + OIDC role, merge the Backstage build → it pushes
    a fresh (arm64) image; bump `backstage` unit `image_tag` to that SHA.
-5. **preprod `policy` ↔ `crossplane` circular dep — FIXED.** Two policies matched Crossplane CRDs (`XTenant`,
+5. **preprod `policy` ↔ `crossplane` circular dep — FIXED.** Two policies matched Crossplane CRDs (`XEnvironment`,
    `ProviderConfig`) that don't exist until crossplane deploys — but crossplane depends on policy. Kyverno churned
    its webhook config on the missing CRDs and the bulk policy install couldn't fully converge on the leaner preprod.
-   `restrict-tenant-envelope`/`restrict-tenant-control-plane` now live in the **crossplane** module
-   (`charts/tenant-policies`, a `helm_release` gated on `enable_tenant_api`, installed after `crossplane_teams`), so
+   `restrict-environment-envelope`/`restrict-tenant-control-plane` now live in the **crossplane** module
+   (`charts/tenant-policies`, a `helm_release` gated on `enable_tenant_api`, installed after `crossplane_tenant`), so
    every CRD they match already exists at install time — no churn. The `policy` unit no longer ships them (and its
    `atomic = false` from the same incident stays, as defence-in-depth for the remaining bulk install).
 
