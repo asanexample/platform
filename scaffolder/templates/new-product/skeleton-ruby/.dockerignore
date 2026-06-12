@@ -1,0 +1,12 @@
+# bundle reinstalls gems; runtime/test/repo metadata isn't needed in the image.
+.git
+.github
+k8s
+log
+tmp
+test
+storage
+*.md
+catalog-info.yaml
+.dockerignore
+Dockerfile

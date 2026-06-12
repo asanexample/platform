@@ -54,7 +54,9 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             # Immutable container filesystem — writes go to the emptyDir /tmp below. Regulated-tier ready.
-            readOnlyRootFilesystem: true
+            # Rails writes to /rails/{tmp,log} at runtime, so the Ruby starter ships RW-root (tighten it with
+            # emptyDir mounts at those paths if you need RO-root for a regulated tier).
+            readOnlyRootFilesystem: {% if values.language == 'ruby' %}false{% else %}true{% endif %}
             capabilities:
               drop: ["ALL"]
           resources:
