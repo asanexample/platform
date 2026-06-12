@@ -19,11 +19,6 @@ results:
     kind: Pod
     resources: [good-app]
     result: pass
-  - policy: restrict-images-team-alpha
-    rule: only-own-team-images
-    kind: Pod
-    resources: [good-app]
-    result: pass
   - policy: disallow-latest-tag
     rule: disallow-latest-tag
     kind: Pod
@@ -52,11 +47,6 @@ results:
   # --- violations are caught ---
   - policy: restrict-image-registries
     rule: validate-registry
-    kind: Pod
-    resources: [foreign-app]
-    result: fail
-  - policy: restrict-images-team-alpha
-    rule: only-own-team-images
     kind: Pod
     resources: [foreign-app]
     result: fail
@@ -106,19 +96,7 @@ results:
     kind: Pod
     resources: [good-app]
     result: pass
-  # --- Phase 5 HTTPRoute hostname guard ---
-  - policy: restrict-route-hostnames-team-alpha
-    rule: allowed-hostnames
-    kind: HTTPRoute
-    resources: [good-route]
-    result: pass
-  - policy: restrict-route-hostnames-team-alpha
-    rule: allowed-hostnames
-    kind: HTTPRoute
-    resources: [squat-route]
-    result: fail
-  - policy: restrict-route-hostnames-team-alpha
-    rule: require-hostnames
-    kind: HTTPRoute
-    resources: [empty-route]
-    result: fail
+  # NB the per-team restrict-images-team-* and restrict-route-hostnames-team-* policies moved to the Crossplane
+  # Composition (product-scoped, per-Environment) at the v3 cutover (ADR-067) — they no longer render from this
+  # chart, so their assertions were removed here. That coverage now lives in the Composition render test
+  # (infra/modules/crossplane/.tenant-api-tests/render.sh: restrict-images team-alpha/demo-* + restrict-route-hostnames).
