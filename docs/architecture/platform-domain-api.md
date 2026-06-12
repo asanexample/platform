@@ -211,8 +211,10 @@ declares *what* it needs at a stage, never *where* it lands; Placement resolves 
 `status`.
 
 `apiVersion: platform.refplat.org/v1alpha3`, `kind: XEnvironment`, **cluster-scoped**. Logical identity =
-`(team, product, stage, customer?)`; `metadata.name` is conventionally `<product>-<stage>` (pooled) or
-`<product>-<customer>-<stage>` (per-customer). Namespace = `<team>-<name>` (e.g. `alpha-shop-dev`,
+`(team, product, stage, customer?)`. Because the XR is cluster-scoped, `metadata.name` MUST be globally unique
+and is therefore **team-prefixed**: `<team>-<product>-<stage>` (pooled) or `<team>-<product>-<customer>-<stage>`
+(per-customer) — a bare `<product>-<stage>` collides across teams that share a product name (e.g. two teams each
+with a `demo` product). Namespace = the same `<team>-<product>-<stage>` (e.g. `alpha-shop-dev`,
 `alpha-shop-bigco-prod`).
 
 ### spec

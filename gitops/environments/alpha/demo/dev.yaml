@@ -4,7 +4,9 @@
 apiVersion: platform.refplat.org/v1alpha3
 kind: XEnvironment
 metadata:
-  name: demo-dev
+  # XEnvironment is CLUSTER-scoped, so the name must be globally unique — team-prefixed (matches the namespace
+  # <team>-<product>-<stage> + the v2 XTenant naming). Bare <product>-<stage> collides across teams (same product).
+  name: alpha-demo-dev
 spec:
   team: alpha
   product: demo
