@@ -76,7 +76,8 @@ is **admin-merged during the rebuild** (teardown-before-merge). Validated **offl
 | 5d | removed the 7 dead policy module vars + plumbing; removed the crossplane `charts/teams` Helm projection (charts/teams + helm_release + var.teams + unit `teams={}`; depends_on re-pointed to crossplane_tenant); orphaned registry-values.yaml + v3 README | ✅ done — tofu validate clean both modules |
 | 5 | crossplane `tenant` (0.3.0) + policy `policies-chart` (0.2.0) Chart.yaml bumps | ✅ done |
 | 6a | #285 Tenant Status card re-pointed to the v3 Environment (backstage#36, backward-compatible: cr-* annotations w/ v2 xtenant fallback, kind-agnostic filter+links) — merged + image rolled | ✅ done |
-| 6b | the rest of the L2c frontend (kind:Environment EntityPage + a catalog relation processor for ownedBy/partOf on the custom kind + the team-tenants card → Environments) + the `platformProjection.mode: 'v3'` activation flip — lands with the cutover backstage roll | ⛔ TODO |
+| 6b | L2c frontend part 2 (backstage#37): a catalog relation processor (ownedBy/partOf for kind:Environment) + the team-tenants card → Environments. kind:Environment uses the default entity page (cards attach by annotation filter, no dedicated EntityPage needed). Merged, image 4fbd38d3 | ✅ done |
+| 6c | the `platformProjection.mode: 'v3'` **activation flip** — all L2c frontend code is pre-positioned + deployed; the cutover sets `mode: 'v3'` in the backstage app-config (no new image needed) | ⛔ TODO (cutover step) |
 | — | app-repo `deploy.yml` rewire (push product-scoped image + pin digest into `overlays/<stage>`) + delete `k8s/preprod/` (Gap 4) | ⛔ TODO (per app repo) |
 | 7 | rebuild-runbook deltas (image-prep ordering, new gitops paths, v3 unit inputs) | ⛔ TODO |
 
