@@ -90,8 +90,9 @@ inputs = {
   # tenant chart creates it (the Composition's per-tenant RoleBindings bind to it).
   create_developer_cluster_role = true
 
-  # ArgoCD delivers the XTenant claims (tenant-claims-preprod app) from the platform cluster, authenticating to
-  # this remote cluster via the cross-account `ArgoCD` IAM role — so its admission username is that role's
+  # ArgoCD delivers the v3 XEnvironment claims (the `environments` registry-sync app, gitops/environments) from
+  # the platform cluster, authenticating to this remote cluster via the cross-account `ArgoCD` IAM role — so its
+  # admission username is that role's
   # assumed-role ARN, not the in-cluster argocd SA. Allow it past restrict-tenant-control-plane (ADR-046/048).
   # Scoped to THIS (preprod) account; the `ArgoCD` role + EKS access entry are platform-owned.
   tenant_policy_values = {

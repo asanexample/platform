@@ -12,12 +12,17 @@ terraform {
 }
 
 locals {
-  # Claim-as-single-source (ADR-061): app delivery is derived entirely from the XTenant claim YAMLs — apps
-  # (repo/repoPath/preview) and the tier-1/2 route aliases (spec.domains). Replaces the retired teams.hcl.
-  # Key each claim by spec.team; one tenant per team today (namespace isolation, ADR-033).
-  claims_dir = "${get_repo_root()}/gitops/tenant-claims/preprod"
-  claims = { for f in fileset(local.claims_dir, "*.yaml") :
-    yamldecode(file("${local.claims_dir}/${f}")).spec.team => yamldecode(file("${local.claims_dir}/${f}"))
+  # v3 delivery (ADR-067/069 §1, L2b #384): per-Product delivery derives from the git-native Product registry
+  # (gitops/products/<team>/<product>.yaml) — the sole source replacing the retired v2 XTenant claims. One
+  # ApplicationSet per product; the per-Environment fan-out reads gitops/environments/<team>/<product>/*.yaml.
+  # metadata.name = <team>-<product> (e.g. alpha-demo); spec.{team,repo} drive the Application source.
+  products_dir = "${get_repo_root()}/gitops/products"
+  products = { for f in fileset(local.products_dir, "**/*.yaml") :
+    yamldecode(file("${local.products_dir}/${f}")).metadata.name => {
+      team     = yamldecode(file("${local.products_dir}/${f}")).spec.team
+      product  = trimprefix(yamldecode(file("${local.products_dir}/${f}")).metadata.name, "${yamldecode(file("${local.products_dir}/${f}")).spec.team}-")
+      repo_url = "https://github.com/${yamldecode(file("${local.products_dir}/${f}")).spec.repo}"
+    }
   }
 }
 
@@ -98,18 +103,13 @@ generate "kubernetes_provider" {
 inputs = {
   create = true
 
-  tenants = { for team, claim in local.claims : team => {
-    mode        = "namespace" # namespace isolation only; vCluster deferred (ADR-033)
-    environment = claim.spec.environment
-    # v2 namespace = <team>-<name>-<env> (matches Composition v2); overrides the module's team-<team> default.
-    namespace = "${team}-${claim.spec.name}-${claim.spec.environment}"
-    domains   = try([for d in claim.spec.domains : d.host], [])
-    apps = { for app, cfg in claim.spec.apps : app => {
-      repo_url  = "https://github.com/${cfg.repo}"
-      repo_path = try(cfg.repoPath, "k8s/preprod")
-      preview   = try(cfg.preview, false)
-    } }
-  } }
+  # v2 XTenant-claim delivery is RETIRED at the cutover (ADR-067/069) — the per-Product ApplicationSets below
+  # (products) replace it. Empty disables the legacy `tenants` Applications in the module.
+  tenants = {}
+
+  # v3 per-Product delivery: one ApplicationSet per product, fanning out over the product's Environment claims
+  # (gitops/environments/<team>/<product>/*.yaml) → one Application per Environment. Derived from gitops/products.
+  products = local.products
 
   github_org               = "asanexample"
   github_token_secret_name = "github-appset-token"                                                                                # K8s secret created by generate block above
