@@ -197,39 +197,20 @@ resource "helm_release" "crossplane_tenant" {
 }
 
 # ---------------------------------------------------------------------------
-# Team registry projection (local chart): canonical Team records -> projected Team CRs
-# ---------------------------------------------------------------------------
-# The envelope subset Kyverno's restrict-tenant-envelope reads during XTenant admission (ADR-049 A2). After
-# the tenant chart so the Team CRD exists. Default empty (var.teams = {}) renders nothing — additive.
-
-resource "helm_release" "crossplane_teams" {
-  count = local.create && var.enable_tenant_api ? 1 : 0
-
-  name      = "crossplane-teams"
-  chart     = "${path.module}/charts/teams"
-  namespace = var.namespace
-  timeout   = var.helm_timeout
-  wait      = var.helm_wait
-  atomic    = var.helm_wait
-
-  values = [yamlencode({ teams = var.teams })]
-
-  depends_on = [helm_release.crossplane_tenant]
-}
-
-# ---------------------------------------------------------------------------
 # Tenant control-plane Kyverno policies (local chart)
 # ---------------------------------------------------------------------------
-# restrict-tenant-envelope (ADR-049) + restrict-tenant-control-plane (ADR-046/048). They match Crossplane
-# CRDs — XTenant, the projected Team, and the provider ProviderConfigs — so they live with the tenant control
-# plane, NOT in the policy unit. The policy unit deploys BEFORE crossplane (it must, to pre-create the
-# crossplane-system Kyverno exclusion), so if these two policies shipped there Kyverno would churn its webhook
-# config resolving the not-yet-existing XTenant/ProviderConfig kinds — which is exactly what stalled the preprod
-# `policy` install (a single transient validate-policy webhook timeout rolling the whole bundle back). Installed
-# here, after crossplane_teams, every kind they match already exists, so admission registration is clean.
+# restrict-environment-envelope (ADR-067 #387) + restrict-tenant-control-plane (ADR-046/048). They match
+# Crossplane CRDs — XEnvironment, the projected Team/Product, and the provider ProviderConfigs — so they live
+# with the tenant control plane, NOT in the policy unit. The policy unit deploys BEFORE crossplane (it must, to
+# pre-create the crossplane-system Kyverno exclusion), so if these two policies shipped there Kyverno would churn
+# its webhook config resolving the not-yet-existing XEnvironment/ProviderConfig kinds — which is exactly what
+# stalled the preprod `policy` install (a single transient validate-policy webhook timeout rolling the whole
+# bundle back). Installed here, AFTER crossplane_tenant (which creates the XEnvironment + Team/Product CRDs),
+# every kind they match already exists, so admission registration is clean. (Teams are now git-native —
+# gitops/teams, synced by argocd-apps — so the v2 crossplane-teams Helm projection was removed at the cutover.)
 #
-# Gated on enable_tenant_api (workload clusters): where there's no tenant control plane there's no XTenant CRD
-# and ProviderConfigs are platform-managed only, so neither policy has anything to guard.
+# Gated on enable_tenant_api (workload clusters): where there's no tenant control plane there's no XEnvironment
+# CRD and ProviderConfigs are platform-managed only, so neither policy has anything to guard.
 resource "helm_release" "crossplane_tenant_policies" {
   count = local.create && var.enable_tenant_api ? 1 : 0
 
@@ -246,10 +227,10 @@ resource "helm_release" "crossplane_tenant_policies" {
 
   # Defaults (chart values.yaml) reproduce what the policy unit passed for these two policies pre-move:
   # control-plane Enforce, envelope Audit-first, failurePolicy Fail, crossplane-system in the skip list. The
-  # unit can override (e.g. envelopeFailureAction=Enforce at the A6 cutover) via var.tenant_policy_values.
+  # unit can override (e.g. enableEnvironmentEnvelope=true at the cutover) via var.tenant_policy_values.
   values = [yamlencode(var.tenant_policy_values)]
 
-  depends_on = [helm_release.crossplane_teams]
+  depends_on = [helm_release.crossplane_tenant]
 }
 
 # ---------------------------------------------------------------------------
@@ -327,7 +308,6 @@ resource "null_resource" "crd_finalizer_cleanup" {
     helm_release.crossplane_runtime,
     helm_release.crossplane_config,
     helm_release.crossplane_tenant,
-    helm_release.crossplane_teams,
     helm_release.crossplane_tenant_policies,
   ]
 }

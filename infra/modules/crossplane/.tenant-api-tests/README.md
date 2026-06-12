@@ -1,50 +1,41 @@
-# Tenant API schema tests
+# Environment API schema + render tests
 
-Offline validation of the **Tenant API** schemas — the `XTenant` XRD (`../charts/tenant/templates/xrd.yaml`,
-delivery-plan **A1**) and the projected `Team` CRD (`../charts/tenant/templates/team-crd.yaml`, **A2**) — of
-the v2 tenant model ([ADR-049](../../../../docs/adrs/049-tenant-model-team-tenant-zone.md),
-[schema](../../../../docs/architecture/tenant-api-v2.md)).
+Offline validation of the **v3 Environment API** ([ADR-067](../../../../docs/adrs/067-idp-domain-model.md),
+[schema](../../../../docs/architecture/platform-domain-api.md)) — the `XEnvironment` XRD
+(`../charts/tenant/templates/xenvironment-xrd.yaml`) and the projected `Team` / `Product` / `AccessGrant` CRDs.
+**v3-only since the cutover** (the v1alpha2 `XTenant` surface was removed).
 
-`run.sh` uses `crossplane beta validate` to check example claims against the XRD's OpenAPI v3 schema **and**
-its `x-kubernetes-validations` CEL rules — **no cluster, no Composition**. It is the `v2` analogue of the
-Kyverno `.kyverno-tests` harness, and CI runs it via the **Tenant API Schema** job.
+Two harnesses, both cluster-free:
+
+- **`run.sh`** — `crossplane beta validate` checks the example claims/records against each XRD/CRD's OpenAPI v3
+  schema + `x-kubernetes-validations` CEL rules (no cluster, no Composition, no Docker). CI job **Tenant API
+  Schema**.
+- **`render.sh`** — `crossplane render` of the **v3 Composition** (`../charts/tenant/files/composition-v3.yaml`)
+  via Docker-run Pipeline functions; asserts the rendered Environment footprint (namespace
+  `<team>-<product>[-<customer>]-<stage>`, product-scoped ECR/Pod-Identity, quota, netpols, RoleBinding,
+  restrict-images/route-hostnames). Fixtures in `render/` (pinned `functions.yaml` + `environmentconfig.yaml`).
+  CI job **Tenant Composition Render**.
 
 ```text
-claims/        valid XTenant claims that MUST pass — canonical (every field + reserved dimensions)
-               + alpha/bravo translated from the live v1alpha1 claims (gitops/tenant-claims/preprod/)
-invalid/       XTenant claims that MUST be rejected — bad tier enum, dedicated-without-customer (CEL),
-               missing required field
-teams/         valid projected Team records that MUST pass — payments (canonical) + alpha/bravo
-teams-invalid/ Team records that MUST be rejected — bad tier enum, missing envelope
-registry-values.yaml  canonical Team registry (full records) — input to the crossplane-teams chart;
-                      run.sh renders it, validates the projection against the Team CRD, and asserts the
-                      canonical-only fields (displayName/developerGroup/costCenter/contacts) are dropped
+environments/          valid XEnvironment claims that MUST pass (demo-dev first-deploy, shop-bigbank-prod
+                       per-customer pci) — also used by render.sh
+environments-invalid/  XEnvironment claims that MUST be rejected (schema/enum/CEL)
+products/              valid Product records that MUST pass        ; products-invalid/  rejected
+grants/                valid AccessGrant records that MUST pass    ; grants-invalid/    rejected
+teams-v3/              valid v1alpha3 Team records that MUST pass  ; teams-v3-invalid/  rejected
 ```
 
-The **registry → projection** step (delivery-plan A2) renders the `../charts/teams` chart from the canonical
-registry into projected `Team` CRs (the envelope subset) and validates them — the mechanism that puts Team CRs
-on a cluster. The module installs the chart via `helm_release "crossplane_teams"` with `var.teams` (default
-empty); the live registry is supplied at the unit. Needs `helm` (the CI job installs it).
-
-There are two harnesses:
-
-- **`run.sh`** — fast, no cluster, no Docker: schema validation (claims/teams) + the registry projection.
-  CI job **Tenant API Schema**.
-- **`render.sh`** — `crossplane render` of the **v2 Composition** (`../charts/tenant/files/composition-v2.yaml`,
-  delivery-plan A3) via Docker-run Pipeline functions; asserts the rendered tenant footprint
-  (namespace `<team>-<name>`, quota, netpols, RoleBinding). Fixtures in `render/` (pinned `functions.yaml` +
-  a sample `environmentconfig.yaml`). CI job **Tenant Composition Render**. A3a = the K8s footprint; AWS
-  per-app identity (A3b) and ECR (A3c) extend the Composition.
+`run.sh` also validates the LIVE git-native objects (`gitops/teams`, `gitops/products`, `gitops/environments`)
+against the CRDs — giving onboarding PRs a real schema gate in CI, not just human review.
 
 Run locally:
 
 ```bash
-infra/modules/crossplane/.tenant-api-tests/run.sh       # crossplane CLI + helm
+infra/modules/crossplane/.tenant-api-tests/run.sh       # crossplane CLI (+ helm)
 infra/modules/crossplane/.tenant-api-tests/render.sh    # crossplane CLI + docker
 ```
 
-Scope: this validates the **schemas only** (structure + enums + CEL). The Team CRD lands here; the **Kyverno
-envelope policy that reads it** — the cross-object checks (tier ∈ `Team.allowedTiers`, quota ≤ cap, residency ⊆
-allowed locations) — is the next step (plan **A2b**, in the `policy` module). Rendering the tenant footprint
-from a claim is the v2 Composition (plan **A3**). `v1alpha2` is served-only — `v1alpha1` stays the
-referenceable/storage version until the rebuild cutover (plan **A6**).
+Scope: schemas + the Composition footprint. The **Kyverno envelope policy** that reads the projected Team/Product
+during admission (the cross-object checks: tier/stage ∈ envelope, team == Product.team, customer-iff,
+quota ≤ cap, IAM deny-set) is validated separately by the `../.kyverno-tests` behavioral suite
+(`restrict-environment-envelope`, #387).

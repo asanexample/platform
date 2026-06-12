@@ -36,18 +36,6 @@ variable "allowed_registries" {
   default     = []
 }
 
-variable "tenant_registry_map" {
-  description = "Map of tenant key -> allowed image prefix for that tenant's namespace (team-<key>). Supplied by the terragrunt unit from teams.hcl; the module holds no team-specific data."
-  type        = map(string)
-  default     = {}
-}
-
-variable "migrated_teams" {
-  description = "Teams whose tenant infra (incl. per-team restrict-images/restrict-route-hostnames policies) is owned by the Crossplane Tenant Composition (BACK stack P3). The chart skips those per-team restrict-* policies for these teams to avoid name collisions; platform-owned verify-images/verify-attestations still apply to them."
-  type        = list(string)
-  default     = []
-}
-
 variable "exclude_namespaces" {
   description = "Infrastructure namespaces excluded from tenant-targeted and cluster-scoped policies so Kyverno never gates platform/system workloads."
   type        = list(string)
@@ -215,22 +203,10 @@ variable "trusted_ci_subject_regexp" {
   default     = "^https://github\\.com/asanexample/trusted-ci/\\.github/workflows/slsa-provenance\\.yml@.+$"
 }
 
-variable "attest_caller_repos" {
-  description = "Per-team caller repo (org/repo, e.g. asanexample/app-alpha) for the verify-attestations githubWorkflowRepository extension gate. Key = tenant; supplied by the unit ONLY for teams that have adopted the isolated trusted-ci provenance job — for those teams the SLSA provenance attestation must be signed by trusted-ci (gated by this caller repo) instead of the app's own workflow. Teams absent here keep app-signed provenance. Empty = no team uses isolated provenance."
-  type        = map(string)
-  default     = {}
-}
-
 variable "trusted_ci_build_subject_regexp" {
   description = "Anchored regex for the shared build-sign reusable workflow's keyless cert subject (asanexample/trusted-ci/build-sign.yml, any pinned ref). Dots escaped; ^...$ anchored. The image signature + SBOM for shared-signer teams (see shared_signer_caller_repos) are signed by this identity."
   type        = string
   default     = "^https://github\\.com/asanexample/trusted-ci/\\.github/workflows/build-sign\\.yml@.+$"
-}
-
-variable "shared_signer_caller_repos" {
-  description = "Per-team caller repo (org/repo, e.g. asanexample/app-alpha) for teams whose CI builds+signs via the SHARED trusted-ci build-sign reusable workflow. For these teams verify-images AND the verify-attestations SBOM accept — IN ADDITION to the team's own app-workflow identity (verify_subjects) — a signature whose subject matches trusted_ci_build_subject_regexp gated by the githubWorkflowRepository extension (= this caller repo). Teams absent here are app-signed only. Mirrors attest_caller_repos (provenance)."
-  type        = map(string)
-  default     = {}
 }
 
 variable "oidc_provider_arn" {
@@ -257,15 +233,6 @@ variable "ecr_region" {
   default     = "us-east-1"
 }
 
-variable "verify_subjects" {
-  description = "Per-tenant cosign keyless identities (built from teams.hcl at the unit). Key = tenant; value is a LIST of accepted identities (count:1 attestor — any one verifies). A single-element list is the steady state; a 2+ element list supports a zero-downtime signing-identity transition (e.g. a GitHub org migration: accept both old and new org identities until images are re-signed, then drop the old). Per identity: deploy_subject is the exact main-branch workflow identity; preview_subject_regexp matches the PR-preview workflow (its OIDC ref varies per PR)."
-  type = map(list(object({
-    deploy_subject         = string
-    preview_subject_regexp = string
-  })))
-  default = {}
-}
-
 variable "verify_subjects_product" {
   description = "v3 (ADR-067/069 §6): per-PRODUCT cosign keyless verification, derived from gitops/products at the unit (the per-team verify_subjects analog). Key = <team>-<product>. team/product select the product's environment namespaces by label (set by the v3 Composition); repo is the githubWorkflowRepository gate for the shared trusted-ci build-sign signer; registryPrefix is team-<team>/<product> (the policy appends -*). appSubjects: optional per-product app-signed identities for bespoke-build products."
   type = map(object({
@@ -288,20 +255,9 @@ variable "rekor_url" {
 }
 
 # ---------------------------------------------------------------------------
-# Ingress hostname guard + cleanup (Phase 5)
+# Cleanup (Phase 5). The per-team route hostname guard (enable_httproute_guard / tenant_hostname_patterns) was
+# removed at the v3 cutover — restrict-route-hostnames is Composition-owned per-Environment (ADR-067/069 §2).
 # ---------------------------------------------------------------------------
-
-variable "enable_httproute_guard" {
-  description = "Deploy the per-team Gateway-API route hostname guard (anti-squatting on the shared wildcard listener, ADR-029). Renders only for teams present in tenant_hostname_patterns."
-  type        = bool
-  default     = true
-}
-
-variable "tenant_hostname_patterns" {
-  description = "Per-tenant allowed route hostnames/patterns (wildcards ok). Key = tenant; supplied by the unit from teams.hcl. A team's routes may only claim hostnames matching its list. Empty list for a team = no guard rendered for it."
-  type        = map(list(string))
-  default     = {}
-}
 
 variable "enable_cleanup" {
   description = "Deploy the ClusterCleanupPolicy that reaps finished CronJob-spawned Jobs in tenant namespaces."

@@ -87,11 +87,9 @@ inputs = {
   webhook_host_network = true
 
   # Cluster-wide tenant image floor. v3: restrict-images / restrict-route-hostnames are owned PER-ENVIRONMENT by
-  # the Crossplane Composition (product-scoped), so the chart renders no per-team versions — tenant_registry_map
-  # + migrated_teams are empty (the v2 per-team supply-chain maps are removed this cutover).
-  allowed_registries  = [local.ecr_registry]
-  tenant_registry_map = {}
-  migrated_teams      = []
+  # the Crossplane Composition (product-scoped), so the chart renders no per-team versions (the v2 per-team
+  # tenant_registry_map / migrated_teams / tenant_hostname_patterns inputs were removed this cutover).
+  allowed_registries = [local.ecr_registry]
 
   # Crossplane (the federated tenant control plane, ADR-046/048) runs here. Its rbac-manager authors wildcard
   # provider ClusterRoles at runtime as its own ServiceAccount (not the deployer), which the cluster-scoped
@@ -121,18 +119,12 @@ inputs = {
   # v3 (ADR-067/069 §6): per-PRODUCT cosign keyless verification (verify-images-product +
   # verify-attestations-product), derived from the Product registry above. Every product uses the SHARED
   # trusted-ci build-sign (signature + SBOM) and slsa-provenance (provenance) workflows, gated to the product by
-  # the cert's githubWorkflowRepository extension (= spec.repo). The v2 per-team verify_subjects / attest_caller_repos
-  # / shared_signer_caller_repos are emptied (removed this cutover) — the product policies replace them.
-  verify_subjects            = {}
-  verify_subjects_product    = local.verify_subjects_product
-  attest_caller_repos        = {}
-  shared_signer_caller_repos = {}
+  # the cert's githubWorkflowRepository extension (= spec.repo). The v2 per-team verify_subjects /
+  # attest_caller_repos / shared_signer_caller_repos inputs were removed this cutover — the product policies
+  # replace them.
+  verify_subjects_product = local.verify_subjects_product
 
-  # Phase 5 — Gateway-API route hostname guard. v3: the Composition owns restrict-route-hostnames per-Environment
-  # (product-scoped, ADR-067/069 §2), so the chart renders no per-team guard — this map is empty.
-  enable_httproute_guard   = true
-  tenant_hostname_patterns = {}
-  enable_cleanup           = true
+  enable_cleanup = true
 
   tags = include.base.locals.tags
 }

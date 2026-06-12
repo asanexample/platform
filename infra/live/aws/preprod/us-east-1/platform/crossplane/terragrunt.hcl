@@ -128,11 +128,10 @@ inputs = {
   # set (Dev-<team>) in both the management and preprod accounts to assume the role (P2c, ADR-039).
   management_account_id = include.base.locals.account_ids["mgmt"]
 
-  # Team CRs are now git-native (ADR-063): authored as YAML in gitops/teams/ and ArgoCD-synced (the `teams` app
-  # in the argocd-apps unit). The crossplane-teams Helm projection is therefore disabled — teams = {} renders no
-  # Team CRs — while the Team CRD itself still ships with the tenant chart (enable_tenant_api). Source of truth
-  # for the envelope Kyverno reads is the git-synced Team CR, not this module.
-  teams = {}
+  # Team CRs are git-native (ADR-063): authored as YAML in gitops/teams/ and ArgoCD-synced (the `teams` app in
+  # the argocd-apps unit). The v2 crossplane-teams Helm projection was removed at the v3 cutover; the Team CRD
+  # itself still ships with the tenant chart (enable_tenant_api). Source of truth for the envelope Kyverno reads
+  # is the git-synced Team CR.
 
   # Destroy-time CR finalizer cleanup auth (scripts/k8s-finalizer-clear.sh) — see crd_finalizer_cleanup.
   deployer_role_arn      = include.base.locals.deployer_role_arn

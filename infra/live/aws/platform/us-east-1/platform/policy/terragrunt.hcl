@@ -71,8 +71,7 @@ inputs = {
   # the overlay cutover (hostNetwork needs the overlay cilium's kubeProxyReplacement to reach the apiserver).
   webhook_host_network = true
 
-  allowed_registries  = [local.ecr_registry]
-  tenant_registry_map = {} # no tenants on the platform cluster
+  allowed_registries = [local.ecr_registry] # no tenants on the platform cluster
 
   # Crossplane (the tenant control plane, ADR-046) runs here. Its rbac-manager authors wildcard
   # provider ClusterRoles at runtime as its own ServiceAccount (not the deployer), which the
