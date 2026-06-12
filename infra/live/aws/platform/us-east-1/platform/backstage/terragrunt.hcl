@@ -131,12 +131,11 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # This SHA (asanexample/backstage#34) projects a catalog Group per Team CR (every team visible + pickable,
-  # not only teams with claims; enriched with envelope + tenant count) + the frontend polish: a Team Tenants
-  # card on team Group pages (owned tenants w/ env/tier/lifecycle, linking to each tenant's live #285 status)
-  # and a "Teams" sidebar item → catalog filtered to team Groups. Makes team↔tenant navigation/relationships
-  # first-class. (Prior d0ea0826 = #33/#285 Tenant Status card + notifier.)
-  image_tag = "7d63565b710aa7e1836c0b246ad697dcd3a0902a"
+  # This SHA (asanexample/backstage#35) adds the ADR-067 L2c v3 catalog projection (Product=System,
+  # Environment=custom kind) — INERT in this image: platformProjection.mode defaults to 'v2', so the catalog
+  # behaves identically to #34 until the cutover sets mode='v3'. (Prior 7d63565b = #34 Group-per-Team-CR +
+  # Team Tenants card + Teams sidebar.)
+  image_tag = "81e4b544ff627afe25497f3433bfb36d76da5dac"
 
   # Split-horizon for OIDC: pin keycloak.aws.refplat.org to the gateway's ClusterIP so the backend hits the
   # gateway Envoy directly (the public-name → internal-NLB hairpin is flaky). The ClusterIP is resolved
