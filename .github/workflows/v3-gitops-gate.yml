@@ -13,9 +13,18 @@ name: v3 gitops — gate on PR
 # the cutover (docs/runbooks/v3-cutover.md), so today this is inert; it activates the moment the first
 # gitops/products or gitops/environments file lands.
 #
-# NB (deferred): automerge arming + the deletion / decommission-first lifecycle (cf. the Tenant Claims Gate)
-# belong to v3 self-service (L3a) once the Environment deprovisioning semantics are defined — not here. This
-# gate is the schema+envelope backstop a reviewer can't eyeball.
+# AUTO-MERGE + DELETION GUARD (ADR-062 §3-4, the v3 successor to the Tenant Claims Gate). Decision table:
+#   author          diff                                outcome
+#   scaffolder App  ⊆ gitops/{products,environments},   gate green + auto-merge armed (merges when ALL
+#                   no deletions, validation passes      required checks pass)
+#   scaffolder App  ⊆ those paths, validation fails      gate red, no merge
+#   scaffolder App  a claim DELETION                     rejected (the bot never deletes — #283)
+#   human           a claim deletion                     decommission-first guard (Environment must be on
+#                                                        spec.lifecycle.phase: decommissioning at base) + a
+#                                                        current-SHA admin/maintainer approval (the "v3 gitops
+#                                                        Approval" commit status); never auto-armed
+#   human           adds/edits, no deletion              validated, never auto-armed
+# See docs/runbooks/tenant-claims-automerge.md for the full model (shared with the Teams/v2 gates).
 #
 # CI-GATE INTEGRITY: `pull_request_target` means THIS definition and every script it calls run from the
 # PROTECTED BASE BRANCH — a PR cannot edit the gate that judges it. The PR's registry files are checked out
@@ -26,9 +35,13 @@ on:
   pull_request_target:
     branches: [main]
     types: [opened, synchronize, reopened]
+  pull_request_review:
+    types: [submitted, dismissed]
 
 permissions:
-  contents: read
+  contents: write # gh pr merge --auto
+  pull-requests: write
+  statuses: write # publish the "v3 gitops Approval" commit status (last-write-wins; see the verdict step)
 
 concurrency:
   group: v3-gitops-gate-${{ github.event.pull_request.number }}
@@ -42,6 +55,7 @@ jobs:
       # IAM deny-set for Service policyStatements (mirrors the policy's iamSensitiveServices / #387).
       IAM_SENSITIVE: "iam sts organizations account"
       CROSSPLANE_VERSION: "v2.2.1" # crank CLI (built from the Go module proxy — see install step)
+      SCAFFOLDER_APP_LOGIN: "asanexample-backstage-scaffolder[bot]"
     steps:
       # Trusted: the gate scripts + the Team/Product registries (envelope + ownership authority) all come from
       # BASE. Always runs (classify needs the script).
@@ -82,7 +96,9 @@ jobs:
           persist-credentials: false
 
       - name: Install yq
-        if: steps.classify.outputs.any == 'true'
+        # needed by the validators (any==true) AND the decommission-first deletion guard (deletions==true,
+        # which can be a pure-deletion PR where any==false)
+        if: steps.classify.outputs.any == 'true' || steps.classify.outputs.deletions == 'true'
         run: |
           sudo curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
@@ -125,3 +141,93 @@ jobs:
           HEAD_DIR: ${{ github.workspace }}/head
           ENVIRONMENT_FILES: ${{ steps.classify.outputs.environment_files }}
         run: bash base/.github/scripts/v3-gate/render-environments.sh
+
+      # ---- auto-merge + deletion lifecycle (ADR-062 §3-4) -------------------------------------------
+      - name: Identify author
+        id: author
+        env:
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          bot=false
+          # The write App only ever pushes branches in this repo; require same-repo (a fork claiming the name
+          # would be a different login anyway — belt and braces).
+          if [ "$AUTHOR" = "$SCAFFOLDER_APP_LOGIN" ] && [ "$HEAD_REPO" = "$GITHUB_REPOSITORY" ]; then
+            bot=true
+          fi
+          echo "bot=$bot" >>"$GITHUB_OUTPUT"
+
+      - name: Reject scaffolder-authored claim deletions
+        if: steps.author.outputs.bot == 'true' && steps.classify.outputs.deletions == 'true'
+        run: |
+          echo "::error::the scaffolder never deletes registry files — the hard-delete is a human, reviewed PR (ADR-062 #283). Use the Deprovision template to decommission, then open a deletion PR."
+          exit 1
+
+      # Decommission-first guard (deterministic per-SHA, a hard gate) for ANY claim deletion (bot deletions are
+      # already rejected above). yq is installed below when there's anything to read.
+      - name: Guard claim deletions (decommission-first)
+        if: steps.classify.outputs.deletions == 'true'
+        env:
+          BASE_DIR: ${{ github.workspace }}/base
+          DELETED_FILES: ${{ steps.classify.outputs.deleted_files }}
+        run: bash base/.github/scripts/v3-gate/validate-deletions.sh
+
+      # Arm GitHub auto-merge ONLY for App-authored, v3-registry-only, non-deletion, fully-validated PRs. GitHub
+      # performs the merge once ALL required checks pass (this job racing ci.yml is harmless). Idempotent for
+      # synchronize/review re-runs. NB: GITHUB_TOKEN merges don't trigger main's push workflows — ArgoCD pulls
+      # git directly, so provisioning is unaffected.
+      - name: Arm auto-merge
+        if: >
+          steps.author.outputs.bot == 'true' &&
+          steps.classify.outputs.non_v3_changes == 'false' &&
+          steps.classify.outputs.deletions == 'false' &&
+          steps.classify.outputs.any == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        # --repo everywhere: the workspace root is not a git repo (checkouts live in base/ and head/).
+        run: |
+          if [ -n "$(gh pr view "$PR_NUMBER" --repo "$REPO" --json autoMergeRequest --jq '.autoMergeRequest // empty')" ]; then
+            echo "auto-merge already armed"
+          else
+            gh pr merge "$PR_NUMBER" --repo "$REPO" --auto --squash
+            echo "auto-merge armed (squash) — merges when all required checks pass"
+          fi
+
+      # The deletion admin-approval requirement is published HERE as a commit status — NOT a job failure — so it
+      # survives the pull_request_target → pull_request_review handoff (commit statuses are last-write-wins per
+      # (sha, context): the post-approval run overwrites the pre-approval failure, unblocking WITHOUT a manual
+      # re-run). Default success; required only for claim deletions. Make "v3 gitops Approval" the
+      # branch-protection required check for the deletion-approval gate.
+      - name: Publish approval verdict (commit status)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DELETIONS: ${{ steps.classify.outputs.deletions }}
+        run: |
+          set -euo pipefail
+          state=success
+          desc="no admin-approval requirement for this PR"
+          if [ "$DELETIONS" = "true" ]; then
+            approver=""
+            for login in $(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" --paginate \
+                  --jq 'group_by(.user.login) | map(max_by(.submitted_at))
+                        | .[] | select(.state == "APPROVED" and .commit_id == env.HEAD_SHA) | .user.login'); do
+              perm=$(gh api "repos/${REPO}/collaborators/${login}/permission" --jq .permission)
+              if [ "$perm" = "admin" ] || [ "$perm" = "maintain" ]; then approver="$login"; break; fi
+            done
+            if [ -n "$approver" ]; then
+              state=success; desc="deletion approved by ${approver} at ${HEAD_SHA:0:7}"
+            else
+              state=failure; desc="awaiting an admin/maintainer approval of the current commit (${HEAD_SHA:0:7}) — registry deletion (ADR-062 #283)"
+            fi
+          fi
+          gh api --method POST "repos/${REPO}/statuses/${HEAD_SHA}" \
+            -f state="$state" -f context="v3 gitops Approval" \
+            -f description="$desc" -f target_url="$RUN_URL" >/dev/null
+          echo "v3 gitops Approval = ${state} — ${desc}"
