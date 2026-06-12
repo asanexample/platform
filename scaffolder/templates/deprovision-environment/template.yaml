@@ -1,0 +1,123 @@
+# Deprovision Environment (ADR-062 v3): team-scoped, REVERSIBLE deprovisioning. "Decommission" suspends the
+# Environment (the Composition zeroes its ResourceQuota — workloads stop, everything else retained);
+# "Reactivate" restores it. Both are reversible claim EDITS to spec.lifecycle.phase. The irreversible step —
+# actually removing the claim — is a SEPARATE human PR (see docs/runbooks/tenant-deprovisioning.md). This
+# template never deletes. Replaces the retired v2 "Deprovision Tenant" (gitops/tenant-claims/preprod path).
+#
+# NB: the v3 gitops Gate does not yet arm automerge OR the decommission-first deletion guard (both deferred at
+# the cutover — see .github/workflows/v3-gitops-gate.yml) — so these PRs are reviewer-merged, and the purge PR
+# is not yet gate-enforced to be decommission-first. Until that lands, a reviewer enforces it.
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: deprovision-environment
+  title: Deprovision Environment
+  description: >-
+    Wind an Environment down (or back up): decommission suspends it reversibly (quota → 0, everything
+    retained); reactivate restores it. The final purge (removing the claim, which deletes the namespace) is a
+    separate reviewed PR — see the deprovisioning runbook.
+  tags:
+    - self-service
+    - environment
+    - lifecycle
+spec:
+  owner: group:default/platform
+  type: environment
+
+  parameters:
+    - title: Environment
+      required:
+        - team
+        - product
+        - stage
+        - action
+        - confirm
+      properties:
+        team:
+          title: Team
+          type: string
+          description: Your team — membership is verified server-side.
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+              spec.type: team
+            defaultKind: Group
+            allowArbitraryValues: true
+        product:
+          title: Product
+          type: string
+          pattern: '^[a-z][a-z0-9-]{0,30}$'
+          description: The Product whose Environment to act on (locates gitops/environments/<team>/<product>/<stage>.yaml).
+        stage:
+          title: Stage
+          type: string
+          enum: ['dev', 'test', 'uat', 'staging', 'prod']
+          default: dev
+        action:
+          title: Action
+          type: string
+          enum: ['decommission', 'reactivate']
+          default: decommission
+          description: >-
+            decommission = reversible suspend (quota → 0); reactivate = restore. Neither deletes — purging the
+            Environment is a separate reviewed PR.
+        confirm:
+          title: Confirm environment name
+          type: string
+          description: Type the full Environment name (<team>-<product>-<stage>) to confirm — checked server-side.
+
+  steps:
+    - id: verify
+      name: Verify team membership
+      action: platform:verify-team-membership
+      input:
+        team: ${{ parameters.team }}
+
+    - id: fetch
+      name: Fetch the current claim
+      action: fetch:plain:file
+      input:
+        url: https://github.com/asanexample/platform/blob/main/gitops/environments/${{ parameters.team | replace('group:default/', '') }}/${{ parameters.product }}/${{ parameters.stage }}.yaml
+        targetPath: gitops/environments/${{ parameters.team | replace('group:default/', '') }}/${{ parameters.product }}/${{ parameters.stage }}.yaml
+
+    - id: patch
+      name: Set the lifecycle phase
+      action: platform:set-lifecycle-phase
+      input:
+        claimPath: gitops/environments/${{ parameters.team | replace('group:default/', '') }}/${{ parameters.product }}/${{ parameters.stage }}.yaml
+        phase: ${{ 'decommissioning' if parameters.action == 'decommission' else 'active' }}
+        confirm: ${{ parameters.confirm }}
+        requestedBy: ${{ user.ref | default('unknown', true) }}
+
+    - id: pr
+      name: Open the deprovisioning PR
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?owner=asanexample&repo=platform
+        branchName: environment/${{ parameters.action }}-${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}-${{ parameters.stage }}
+        targetBranchName: main
+        title: "chore(environments): ${{ parameters.action }} ${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}-${{ parameters.stage }}"
+        commitMessage: |
+          chore(environments): ${{ parameters.action }} ${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}-${{ parameters.stage }}
+
+          Requested-by: ${{ user.ref | default('unknown', true) }}
+        description: |
+          **${{ parameters.action | capitalize }}** Environment `${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}-${{ parameters.stage }}` (ADR-062 deprovisioning).
+
+          Requested via the Backstage **Deprovision Environment** template by `${{ user.ref | default('unknown', true) }}`.
+
+          {% if parameters.action == 'decommission' %}
+          This **reversibly suspends** the Environment: the Composition zeroes its ResourceQuota (workloads
+          drain; namespace, IAM, ECR all retained). **Merge it** to apply (the v3 gitops Gate validates; automerge
+          is not yet armed). To restore, run this template again with action **reactivate**. To fully purge
+          (delete the namespace), open a separate PR removing the claim file — until the v3 gate's
+          decommission-first guard lands, a reviewer enforces decommission-first (`docs/runbooks/tenant-deprovisioning.md`).
+          {% else %}
+          This **restores** the Environment to active (quota reinstated). Merge it to apply (the v3 gitops Gate validates).
+          {% endif %}
+
+  output:
+    links:
+      - title: Deprovisioning pull request
+        url: ${{ steps.pr.output.remoteUrl }}
