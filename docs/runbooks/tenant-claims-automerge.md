@@ -20,6 +20,15 @@ table. What's different for v3:
 - **Scaffolder templates:** New Product, New Environment, Deprovision (not New Tenant). A bot-authored,
   v3-registry-only, non-deletion, fully-validated PR arms auto-merge; deletions are decommission-first
   (`spec.lifecycle.phase: decommissioning` on base) + a current-SHA admin approval.
+- **Deletion guards (`validate-deletions.sh`, two checks):**
+  - **Environment** — decommission-first: a `gitops/environments/**` claim may only be deleted if it was
+    already set to `spec.lifecycle.phase: decommissioning` on base (a prior, reversible Deprovision PR).
+  - **Product** — completeness: a `gitops/products/<team>/<product>.yaml` may only be deleted once it has **no
+    remaining Environments** (none under `gitops/environments/<team>/<product>/` on base that this PR doesn't
+    also delete). Deleting a Product with live Environments would orphan its per-Product OIDC role / ECR /
+    ApplicationSet and break the survivors' Composition render. Order: decommission + remove every Environment
+    first, then remove the Product (a single PR may bundle the Product with its already-decommissioned
+    Environments). Unit-tested by `.github/scripts/v3-gate/test-validate-deletions.sh`.
 - **Required checks (activation):** update `main`'s branch protection — **add** `v3 gitops Gate` +
   `v3 gitops Approval`, **remove** the retired `Tenant Claims Gate` + `Kyverno Shift-Left (dogfood)`. Until
   `v3 gitops Approval` is a required check, a registry deletion isn't gated on the approval (the gate still
