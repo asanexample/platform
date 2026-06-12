@@ -8,11 +8,11 @@ metadata:
     policies.kyverno.io/title: Restrict Tenant Control-Plane Resources
     policies.kyverno.io/category: Security, Multi-Tenancy
     policies.kyverno.io/severity: high
-    policies.kyverno.io/subject: XTenant, ProviderConfig
+    policies.kyverno.io/subject: XEnvironment, ProviderConfig
     policies.kyverno.io/description: >-
-      The Crossplane tenant control plane (ADR-046/048) — XTenant claims and provider ProviderConfigs —
+      The Crossplane tenant control plane (ADR-046/048/067) — XEnvironment claims and provider ProviderConfigs —
       grants the privileged provisioning identity. It may be managed only by platform principals (GitOps /
-      the deployer), never by tenants. XTenant is cluster-scoped (so tenants already lack RBAC to create it);
+      the deployer), never by tenants. XEnvironment is cluster-scoped (so tenants already lack RBAC to create it);
       this is defense-in-depth and makes the intent explicit. The composite controller + provider-kubernetes
       run as crossplane-system principals, which are in the platform allow-list, so the Composition itself is
       unaffected.
@@ -26,11 +26,11 @@ spec:
         any:
           - resources:
               kinds:
-                - platform.refplat.org/v1alpha1/XTenant
+                - platform.refplat.org/v1alpha3/XEnvironment
                 - aws.upbound.io/v1beta1/ProviderConfig
                 - kubernetes.crossplane.io/v1alpha1/ProviderConfig
       {{- include "ktp.skipPlatformPrincipals" . | nindent 6 }}
       validate:
         failureAction: {{ .Values.validationFailureAction }}
-        message: "Tenant control-plane resources (XTenant / ProviderConfig) may only be managed by platform principals, not tenants."
+        message: "Tenant control-plane resources (XEnvironment / ProviderConfig) may only be managed by platform principals, not tenants."
         deny: {}
