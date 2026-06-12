@@ -71,12 +71,14 @@ spec:
             - python
             - java
             - rust
+            - ruby
           enumNames:
             - "Go (net/http)"
             - "Node.js (Express)"
             - "Python (FastAPI)"
             - "Java (Spring Boot)"
             - "Rust (Axum)"
+            - "Ruby on Rails (API)"
           default: go
 
   steps:
