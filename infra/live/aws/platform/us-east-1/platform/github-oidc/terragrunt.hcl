@@ -44,7 +44,7 @@ locals {
   # fileset is not even evaluated and no v3 roles are created on apply (it coexists with the v2 per-team roles).
   # The v2->v3 cutover flips this true and removes the per-team derivation above.
   # ---------------------------------------------------------------------------
-  v3_delivery_enabled = false
+  v3_delivery_enabled = true # v3 cutover: per-Product OIDC roles active (the per-team v2 derivation is removed in the v2-removal step)
   products_dir        = "${get_repo_root()}/gitops/products"
   products = local.v3_delivery_enabled ? {
     for f in fileset(local.products_dir, "**/*.yaml") :

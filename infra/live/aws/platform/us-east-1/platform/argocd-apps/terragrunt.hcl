@@ -131,11 +131,12 @@ inputs = {
   teams_repo_branch = "main"
   teams_repo_path   = "gitops/teams"
 
-  # Tenant-claim delivery via ArgoCD (BACK stack Phase 1): sync the cluster-scoped XTenant claim YAMLs from
-  # the platform repo to preprod (replaces the tenant-claims Terragrunt unit). The argocd unit excludes the
-  # XTenant XR from selfHeal drift; the policy unit excludes ArgoCD's assumed-role from the S1 backstop.
-  enable_tenant_claims      = true
-  tenant_claims_repo_url    = "https://github.com/asanexample/platform"
-  tenant_claims_repo_branch = "main"
-  tenant_claims_repo_path   = "gitops/tenant-claims/preprod"
+  # v3 cutover (ADR-067/069): the v2 XTenant claim sync is retired (enable_tenant_claims=false) and replaced by
+  # the v3 delivery surface, activated by platform_repo_url: the registry-sync apps (project gitops/products +
+  # gitops/environments → cluster CRs, sync-wave -2/0) AND the per-Product ApplicationSet (delivers each app's
+  # k8s/overlays/<stage>, injecting ns + host). Teams still sync via enable_teams above.
+  enable_tenant_claims = false
+
+  platform_repo_url    = "https://github.com/asanexample/platform"
+  platform_repo_branch = "main"
 }

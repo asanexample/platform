@@ -96,9 +96,13 @@ inputs = {
   # Scoped to THIS (preprod) account; the `ArgoCD` role + EKS access entry are platform-owned.
   tenant_policy_values = {
     extraExcludePrincipals = ["arn:aws:sts::${include.base.locals.account_ids["preprod"]}:assumed-role/ArgoCD/*"]
-    # A6 cutover: the envelope policy (restrict-tenant-envelope) flips Audit → Enforce — an XTenant that exceeds
-    # its Team envelope (tier/environment/quota/residency) is now rejected at admission, not just reported.
-    envelopeFailureAction = "Enforce"
+    # v3 cutover (ADR-067): activate restrict-environment-envelope (#387) — the XEnvironment envelope check
+    # (team-matches-product, stage/tier/residency/quota within the Team envelope, policyStatements deny-set).
+    enableEnvironmentEnvelope = true
+    # Start the NEW v3 envelope in Audit for one clean reconcile (the v2 A6 precedent), then flip to Enforce
+    # post-rebuild. envelopeFailureAction is shared, but v2 restrict-tenant-envelope is removed in this same
+    # cutover commit, so this governs only the v3 envelope.
+    envelopeFailureAction = "Audit"
   }
 
   # Tenant provisioning identity (P2b): scoped IAM + EKS Pod Identity locally, plus assume the platform ECR
