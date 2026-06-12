@@ -22,7 +22,7 @@ flow through the whole v3 stack — which **surfaced real integration gaps** (th
 | #387 — restrict-environment-envelope | ✅ merged | yes |
 | #389 — registry-sync apps | ✅ merged | yes |
 | #388 — product-gate + environment-gate (CI) | ✅ merged (#400) | yes |
-| **L2c — projection rewrite (System/Component/Environment)** | ⛔ TODO | **yes (portal)** — else Backstage shows stale v2 tenant Systems |
+| L2c — projection rewrite (System/Component/Environment) | ✅ data layer done (backstage#35, mode-gated; image rolled inert via #403). Frontend re-point = cutover follow-up | yes (portal) |
 | L3b — app-repo restructure (`k8s/base` + `overlays/<stage>`) | ✅ done for the live apps (app-alpha, app-bravo) | yes — see Gap 2 |
 | L3a — New Product scaffolder | ◻ for self-service | no (apps can be hand-migrated) |
 
@@ -43,12 +43,15 @@ flow through the whole v3 stack — which **surfaced real integration gaps** (th
    - `github-oidc`: `v3_delivery_enabled = true` → per-Product OIDC roles; drop the per-team derivation.
    - `policy`: `enableEnvironmentEnvelope = true`, `enableImageVerification = true`, derive `verifySubjectsProduct`
      from `gitops/products`; (start `envelopeFailureAction: Audit`, flip to `Enforce` after a clean soak).
-4. **Swap the CI gates:** `teams-gate` → v1alpha3 schema; `tenant-claims-gate` → **`environment-gate`** + add
-   **`product-gate`** (#388).
+4. **Swap the CI gates:** `teams-gate` → v1alpha3 schema; retire `tenant-claims-gate` (the `v3 gitops Gate` —
+   `product-gate` + `environment-gate`, #388 — is already live and required).
 5. **Remove v2** (in the same change): `xrd.yaml` (XTenant XRD), `composition-v2.yaml` (+ wrapper),
    `tenant-envelope.yaml`, `verify-images.yaml` (per-team), the v2 `verifySubjects`/`tenantRegistryMap`
    derivations, the per-team github-oidc roles.
-6. **Roll the Backstage image** with the L2c projection (reads `gitops/products`+`environments`).
+6. **Flip the Backstage projection to v3** — set `platformProjection.mode: 'v3'` (the L2c image is already
+   rolled, inert, via #403; no new image needed). Land the L2c frontend follow-ups in the SAME backstage roll:
+   the `kind:Environment` EntityPage + a catalog relation processor (ownedBy/partOf for the custom kind) +
+   re-point the #285 status card to the `cr-*` annotations + the team-tenants card → Environments.
 7. **Run the rebuild** (the supervised op) — it deploys the above from scratch.
 
 ## End-to-end coherence trace — and the gaps it surfaced
@@ -113,8 +116,8 @@ In priority order (all cutover-blocking except L3a):
 
 1. ~~**#388** — `product-gate` + `environment-gate`~~ ✅ merged (#400). teams-gate v3 bump stays in the cutover commit (Gap 3).
 2. ~~**App-repo restructure / L3b**~~ ✅ done for the live apps — `app-alpha`, `app-bravo` on `k8s/base` + `overlays/<stage>` (Gap 2).
-3. **L2c** — the projection rewrite (portal correctness). ◀ next cutover-blocking target.
-4. **The cutover commit itself** — flip storage to v1alpha3 (Gap 1), migrate gitops, flip gates, remove v2.
+3. ~~**L2c projection**~~ ✅ data layer done (backstage#35, mode-gated; inert image rolled #403). The frontend re-point (kind:Environment EntityPage + relation processor + #285/team-tenants cards) lands with the cutover's backstage roll (step 6).
+4. **The cutover commit itself** — flip Team CRD storage to v1alpha3 (Gap 1), migrate gitops, flip gates + projection mode, remove v2. ◀ the remaining cutover-blocking work.
 5. Rebuild-runbook deltas — image-prep ordering (Gap 4), the new gitops paths, the v3 unit inputs.
 
 ## Rebuild-runbook deltas (`platform-rebuild-from-scratch.md`)
