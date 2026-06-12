@@ -1,0 +1,11 @@
+# test. Single replica (ephemeral CI/integration stage); digest pinned by CI per promote-by-PR (#377).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+replicas:
+  - name: app-${{ values.team }}-${{ values.product }}
+    count: 1
+images:
+  - name: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-${{ values.team }}/${{ values.product }}-${{ values.service }}
+    newTag: placeholder # CI replaces with the signed digest at deploy (promote-by-PR, #377)

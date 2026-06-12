@@ -1,0 +1,137 @@
+# New Product (ADR-067 v3 §"New Product lifecycle" / ADR-062): TEAM-SCOPED self-service repo-on-demand. A team
+# member creates a Product — a new app repo (app-<team>-<product>) seeded from the platform's golden starter +
+# the registry entry + the first `dev` Environment. Two publishes: (1) the new app repo, (2) a platform-repo PR
+# adding gitops/products/<team>/<product>.yaml + gitops/environments/<team>/<product>/dev.yaml. The first CI
+# build on the new repo pins the first signed digest → first deploy to dev.
+#
+# PREREQUISITES (deploy-time, NOT in this template):
+#   - The Backstage scaffolder GitHub App must be able to CREATE repos in the asanexample org (org-wide install +
+#     "Administration: write" / repo-creation). It is currently installed on asanexample/platform only — the
+#     publish:github step below needs it broadened, else repo creation 403s. See backstage-scaffolder-github-app.md.
+#   - The new repo derives its team from the app- prefix's FIRST segment (trusted-ci build-sign first-segment
+#     change) — so app-<team>-<product> resolves team=<team>; the deploy.yml pins that trusted-ci SHA.
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: new-product
+  title: New Product
+  description: >-
+    Create a new Product for your team: a new app repo seeded from the platform golden starter (Go + the shared
+    supply-chain CI), its Product registry entry, and a first `dev` Environment — all bounded by your Team's
+    envelope. The first CI build deploys it to dev.
+  tags:
+    - self-service
+    - product
+spec:
+  owner: group:default/platform
+  type: product
+
+  parameters:
+    - title: Product
+      required:
+        - team
+        - product
+      properties:
+        team:
+          title: Team
+          type: string
+          description: Your team — membership is verified server-side; you can only create Products for a team you belong to.
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+              spec.type: team
+            defaultKind: Group
+            allowArbitraryValues: true
+        product:
+          title: Product name
+          type: string
+          description: >-
+            Short lowercase identifier (the repo becomes app-<team>-<product>, the namespace
+            <team>-<product>-<stage>, the image team-<team>/<product>-<service>). Unique within your team.
+          pattern: '^[a-z][a-z0-9-]{1,30}$'
+          maxLength: 31
+        service:
+          title: First service name
+          type: string
+          description: The product's first Service (its image is team-<team>/<product>-<service>). Usually "web".
+          pattern: '^[a-z][a-z0-9-]{0,30}$'
+          default: web
+
+  steps:
+    - id: verify
+      name: Verify team membership
+      action: platform:verify-team-membership
+      input:
+        team: ${{ parameters.team }}
+
+    - id: render-app
+      name: Render the app repo from the golden starter
+      action: fetch:template
+      input:
+        url: ./skeleton
+        targetPath: ./app
+        values:
+          team: ${{ parameters.team | replace('group:default/', '') }}
+          product: ${{ parameters.product }}
+          service: ${{ parameters.service }}
+
+    - id: publish-app
+      name: Create the app repo (app-<team>-<product>)
+      action: publish:github
+      input:
+        repoUrl: github.com?owner=asanexample&repo=app-${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}
+        sourcePath: ./app
+        defaultBranch: main
+        repoVisibility: public
+        description: "${{ parameters.team | replace('group:default/', '') }}'s ${{ parameters.product }} product (scaffolded by the platform New Product template)."
+
+    - id: render-platform
+      name: Render the Product registry + dev Environment claim
+      action: fetch:template
+      input:
+        url: ./platform-skeleton
+        targetPath: ./platform
+        values:
+          team: ${{ parameters.team | replace('group:default/', '') }}
+          product: ${{ parameters.product }}
+          service: ${{ parameters.service }}
+          requestedBy: ${{ user.ref | default('unknown', true) }}
+
+    - id: pr
+      name: Open the platform PR (Product registry + dev Environment)
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?owner=asanexample&repo=platform
+        sourcePath: ./platform
+        branchName: product/${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}
+        targetBranchName: main
+        title: "feat(products): onboard ${{ parameters.team | replace('group:default/', '') }}/${{ parameters.product }}"
+        description: |
+          Onboards Product **${{ parameters.team | replace('group:default/', '') }}/${{ parameters.product }}** (ADR-067 v3, ADR-062 self-service).
+
+          Requested via the Backstage **New Product** template by `${{ user.ref | default('unknown', true) }}` — team membership verified server-side.
+
+          | | |
+          |---|---|
+          | team | `${{ parameters.team | replace('group:default/', '') }}` |
+          | product | `${{ parameters.product }}` |
+          | first service | `${{ parameters.service }}` |
+          | repo | [`asanexample/app-${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}`](https://github.com/asanexample/app-${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}) (created) |
+
+          Adds `gitops/products/<team>/<product>.yaml` (the registry entry, repo → the new app repo) + the `dev`
+          `XEnvironment` claim (image initially empty). The **v3 gitops Gate** validates schema + envelope shift-left
+          + Composition render. **Merge it** to provision (automerge for the v3 gate is not yet armed — a reviewer
+          merges). On merge: the `environments` registry-sync app projects the claim, Crossplane provisions the
+          namespace/quota/Pod-Identity/ECR, and the new repo's first CI build pins the first signed digest into
+          `k8s/overlays/dev` → first deploy.
+
+  output:
+    links:
+      - title: New app repository
+        url: ${{ steps['publish-app'].output.remoteUrl }}
+      - title: Onboarding pull request (validated by the v3 gitops Gate)
+        url: ${{ steps.pr.output.remoteUrl }}
+      - title: Product dashboard (appears after the PR merges)
+        icon: dashboard
+        entityRef: system:default/${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}

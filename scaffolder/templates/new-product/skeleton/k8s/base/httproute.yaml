@@ -1,0 +1,19 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: app-${{ values.team }}-${{ values.product }}
+spec:
+  parentRefs:
+    - name: preprod-gateway
+      namespace: default
+      sectionName: https
+  # Placeholder only — the platform injects the real host (ADR-067 platform-injection: the per-Product
+  # ApplicationSet patches /spec/hostnames/0 to <product>-<team>-<stage>.<baseDomain>, e.g.
+  # ${{ values.product }}-${{ values.team }}-dev.preprod.aws.refplat.org). Do NOT hardcode a real host here; `.invalid` fails safe
+  # (admission-rejected, never a wrong host) if the patch ever doesn't apply.
+  hostnames:
+    - placeholder.invalid
+  rules:
+    - backendRefs:
+        - name: app-${{ values.team }}-${{ values.product }}
+          port: 80

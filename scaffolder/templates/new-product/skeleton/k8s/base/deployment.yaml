@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-${{ values.team }}-${{ values.product }}
+  labels:
+    app: app-${{ values.team }}-${{ values.product }}
+    app.kubernetes.io/name: app-${{ values.team }}-${{ values.product }}
+    team: ${{ values.team }}
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: app-${{ values.team }}-${{ values.product }}
+  template:
+    metadata:
+      labels:
+        app: app-${{ values.team }}-${{ values.product }}
+        app.kubernetes.io/name: app-${{ values.team }}-${{ values.product }}
+        team: ${{ values.team }}
+    spec:
+      # Named SA — Pod Identity binds AWS creds here IF the Environment declares any (ADR-041). This starter
+      # needs no AWS, but keeps the named SA so the wiring is ready (and never the `default` SA).
+      serviceAccountName: app-${{ values.team }}
+      # App does not talk to the Kubernetes API — drop the SA token (least privilege). Required by the
+      # platform Kyverno policy restrict-automount-sa-token (also auto-injected by mutate when absent).
+      automountServiceAccountToken: false
+      containers:
+        - name: app-${{ values.team }}-${{ values.product }}
+          # Product-scoped ECR image (v3: team-<team>/<product>-<service>). The :placeholder tag is the
+          # pre-first-deploy seed; each overlay's `images:` pins the signed digest CI promotes per stage
+          # (promote-by-PR, #377). restrict-images admits team-${{ values.team }}/${{ values.product }}-* (the product's repos).
+          image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-${{ values.team }}/${{ values.product }}-${{ values.service }}:placeholder
+          ports:
+            - containerPort: 8080
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
