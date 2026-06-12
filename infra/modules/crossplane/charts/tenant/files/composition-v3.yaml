@@ -340,9 +340,12 @@ spec:
             {{- end }}
             {{- end }}
             {{- if $svccfg.serviceAccount }}
-            {{- /* Pod-Identity role Pod-<team>-<product>-<stage>-<service>; truncate-and-hash if it would exceed
-                   the 64-char IAM role-name limit (the tightest derived name). */}}
+            {{- /* Pod-Identity role Pod-<team>-<product>-<stage>-<service>, or Pod-<team>-<product>-<customer>-
+                   <stage>-<service> for a per-customer Environment — the role MUST carry the customer (mirroring
+                   the namespace) or two per-customer prod Environments of the same Product/Service collide on one
+                   IAM role. Truncate-and-hash if it would exceed the 64-char IAM role-name limit. */}}
             {{- $roleRaw := printf "Pod-%s-%s-%s-%s" $team $product $stage $svc }}
+            {{- if $customer }}{{- $roleRaw = printf "Pod-%s-%s-%s-%s-%s" $team $product $customer $stage $svc }}{{- end }}
             {{- $role := $roleRaw }}
             {{- if gt (len $roleRaw) 64 }}{{- $role = printf "%s-%s" (substr 0 57 $roleRaw) (substr 0 6 (sha256sum $roleRaw)) }}{{- end }}
             ---
@@ -365,6 +368,9 @@ spec:
                   Product: {{ $product }}
                   Stage: {{ $stage }}
                   Service: {{ $svc }}
+                  {{- if $customer }}
+                  Customer: {{ $customer }}
+                  {{- end }}
             ---
             apiVersion: eks.aws.upbound.io/v1beta1
             kind: PodIdentityAssociation

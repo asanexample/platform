@@ -1,21 +1,25 @@
-# Environment (${{ values.team }} × ${{ values.product }} × ${{ values.stage }}) — developer-authored claim
-# (ADR-067, v1alpha3), via the Backstage **New Environment** template (ADR-062 self-service). Namespace
-# ${{ values.team }}-${{ values.product }}-${{ values.stage }}. Synced by ArgoCD (the `environments`
-# registry-sync app) and reconciled by the Crossplane Environment Composition (v3). One claim per
-# (product, stage[, customer]); the image digest is promoted in by PR (promote-by-PR, #377). This file is the
-# source of truth — change or remove it via PR. See docs/architecture/platform-domain-api.md.
+# Environment (${{ values.team }} × ${{ values.product }} × ${{ values.stage }}${{ ' × ' + values.customer if values.customer }}) — developer-authored
+# claim (ADR-067, v1alpha3), via the Backstage **New Environment** template (ADR-062 self-service). Namespace
+# ${{ values.envName }}. Synced by ArgoCD (the `environments` registry-sync app) and reconciled by the Crossplane
+# Environment Composition (v3). One claim per (product, stage[, customer]); the image digest is promoted in by
+# PR (promote-by-PR, #377). This file is the source of truth — change or remove it via PR. See
+# docs/architecture/platform-domain-api.md.
 apiVersion: platform.refplat.org/v1alpha3
 kind: XEnvironment
 metadata:
-  # CLUSTER-scoped XR → name MUST be globally unique → team-prefixed <team>-<product>-<stage> (ADR-067; a bare
-  # <product>-<stage> collides across teams sharing a product name).
-  name: ${{ values.team }}-${{ values.product }}-${{ values.stage }}
+  # CLUSTER-scoped XR → name MUST be globally unique → team-prefixed <team>-<product>[-<customer>]-<stage>
+  # (ADR-067; a bare <product>-<stage> collides across teams, and a per-customer Environment without the
+  # customer collides across customers of one Product). Computed in the template (values.envName).
+  name: ${{ values.envName }}
   annotations:
     platform.refplat.org/requested-by: ${{ values.requestedBy }}
 spec:
   team: ${{ values.team }} # validated == Product.team at the gate + admission (team-matches-product)
   product: ${{ values.product }} # must reference an existing Product (gitops/products/${{ values.team }}/${{ values.product }}.yaml)
   stage: ${{ values.stage }} # must be in the Team's allowedStages (envelope: stage-within-envelope)
+  {%- if values.customer %}
+  customer: ${{ values.customer }} # per-customer Product at prod/uat only (gate + Kyverno: customer-iff-per-customer-prod)
+  {%- endif %}
   tier: ${{ values.tier }}
   {%- if values.cpu or values.memory or values.pods %}
   quota: # per-Environment override; validated ≤ the Team's quotaCap (envelope: quota-within-cap)
