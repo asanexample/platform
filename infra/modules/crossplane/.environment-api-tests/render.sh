@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Offline `crossplane render` test for the v3 Environment Composition (ADR-067 / L2a #383). Runs the Pipeline
 # functions via Docker and asserts the rendered Environment footprint — no cluster. Heavier than the schema
-# check (Docker + function image pulls), so it runs as its own CI job ("Tenant Composition Render"), not in
+# check (Docker + function image pulls), so it runs as its own CI job ("Environment Composition Render"), not in
 # run.sh. Requires crossplane + docker. v3-only since the cutover (the v2 Composition was removed).
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-comp="${here}/../charts/tenant/files/composition-v3.yaml"
+comp="${here}/../charts/environment-api/files/composition-v3.yaml"
 fns="${here}/render/functions.yaml"
 envcfg="${here}/render/environmentconfig.yaml"
 

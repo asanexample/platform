@@ -1,33 +1,33 @@
 #!/usr/bin/env bash
-# Renders the crossplane tenant-policies chart and tests its two control-plane Kyverno ClusterPolicies
-# (restrict-environment-envelope + restrict-tenant-control-plane). These moved out of the policy module's
-# policies-chart so they install AFTER the Crossplane CRDs exist (see charts/tenant-policies/Chart.yaml); the
+# Renders the crossplane environment-policies chart and tests its two control-plane Kyverno ClusterPolicies
+# (restrict-environment-envelope + restrict-environment-control-plane). These moved out of the policy module's
+# policies-chart so they install AFTER the Crossplane CRDs exist (see charts/environment-policies/Chart.yaml); the
 # tests moved with them. Cluster-free: matches CI. Requires `helm` and `kyverno` (pin the CLI to the chart's
 # appVersion). Run by the kyverno-policy-test CI job, which already has both tools.
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CHART="$DIR/../charts/tenant-policies"
+CHART="$DIR/../charts/environment-policies"
 mkdir -p "$DIR/rendered"
 
 # ---------------------------------------------------------------------------
-# restrict-tenant-control-plane — render-validity (the deny rule reads request.userInfo, which kyverno apply
+# restrict-environment-control-plane — render-validity (the deny rule reads request.userInfo, which kyverno apply
 # can't mock offline, so we assert the template renders the policy gating the right kinds + skip list).
 # ---------------------------------------------------------------------------
-echo "Rendering tenant-control-plane policy (template validity) ..."
-CPPOL="$DIR/rendered/tenant-control-plane.yaml"
-helm template ktp "$CHART" --show-only templates/tenant-control-plane.yaml >"$CPPOL"
-grep -q 'name: restrict-tenant-control-plane' "$CPPOL" || { echo "FAIL: control-plane policy did not render"; exit 1; }
+echo "Rendering environment-control-plane policy (template validity) ..."
+CPPOL="$DIR/rendered/environment-control-plane.yaml"
+helm template ktp "$CHART" --show-only templates/environment-control-plane.yaml >"$CPPOL"
+grep -q 'name: restrict-environment-control-plane' "$CPPOL" || { echo "FAIL: control-plane policy did not render"; exit 1; }
 grep -q 'platform.refplat.org/v1alpha3/XEnvironment' "$CPPOL" || { echo "FAIL: control-plane must match XEnvironment"; exit 1; }
 grep -q 'aws.upbound.io/v1beta1/ProviderConfig' "$CPPOL" || { echo "FAIL: control-plane must match the AWS ProviderConfig"; exit 1; }
 grep -q 'system:serviceaccount:crossplane-system:\*' "$CPPOL" || { echo "FAIL: control-plane must skip crossplane-system principals"; exit 1; }
-echo "tenant-control-plane render-check passed."
+echo "environment-control-plane render-check passed."
 
 # ---------------------------------------------------------------------------
 # restrict-environment-envelope (ADR-067 #387). It reads the projected Team + Product CRs via apiCalls, which
 # `kyverno test` can't unit-test offline (the per-resource values mock is removed in 1.18 and globalValues is
 # uniform per run). So we drive `kyverno apply` once per (Team, Product) mock — both via globalValues — and
-# assert the per-rule outcomes. Behavioral, cluster-free. The sibling v2 restrict-tenant-envelope test retired
+# assert the per-rule outcomes. Behavioral, cluster-free. The sibling v2 restrict-environment-envelope test retired
 # with the XTenant API.
 # ---------------------------------------------------------------------------
 echo "Testing environment-envelope policy (v3 envelope plane) ..."

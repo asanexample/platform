@@ -1,12 +1,12 @@
 {{- if .Values.createDeveloperClusterRole }}
 # Shared, cluster-wide developer role — equivalent to built-in "edit", under a name the platform owns so it
 # can be tightened per compliance tier. One per cluster (the Composition's per-team RoleBinding references
-# it). On a cluster where the `tenant` module already owns this (coexistence), leave createDeveloperClusterRole
-# false. Matches infra/modules/tenant/main.tf's tenant_developer.
+# it). On a cluster where the `environment` module already owns this (coexistence), leave createDeveloperClusterRole
+# false. The v1 tenant module that previously owned this ClusterRole is retired.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: tenant-developer
+  name: environment-developer
   labels:
     app.kubernetes.io/managed-by: crossplane
 aggregationRule:

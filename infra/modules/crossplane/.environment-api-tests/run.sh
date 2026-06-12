@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Offline schema-validation harness for the Environment API (ADR-067). Validates the example claims/records
 # against each XRD/CRD's OpenAPI v3 schema + CEL rules with `crossplane beta validate` — no cluster, no
-# Composition (that's render.sh). Driven in CI by the "Tenant API Schema" job; runnable locally with the
+# Composition (that's render.sh). Driven in CI by the "Environment API Schema" job; runnable locally with the
 # crossplane CLI. v3-only since the cutover (the v1alpha2 XTenant surface was removed).
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-charts="${here}/../charts/tenant/templates"
+charts="${here}/../charts/environment-api/templates"
 team_crd="${charts}/team-crd.yaml"             # projected Team CRD (v1alpha3)
 xenv_xrd="${charts}/xenvironment-xrd.yaml"     # XEnvironment XRD (v3, the Environment claim)
 product_crd="${charts}/product-crd.yaml"       # projected Product CRD (delivery identity)
@@ -65,7 +65,7 @@ validate_dir "$product_crd" "live Product objects (gitops/products)"          "$
 validate_dir "$xenv_xrd"    "live Environment objects (gitops/environments)"  "${repo_root}/gitops/environments" pass
 
 if [ "$fail" -ne 0 ]; then
-  echo "Tenant API schema validation FAILED"
+  echo "Environment API schema validation FAILED"
   exit 1
 fi
-echo "Tenant API schema validation OK"
+echo "Environment API schema validation OK"

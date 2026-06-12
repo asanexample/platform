@@ -1,8 +1,8 @@
 {{- /*
 v3 (ADR-067/069 §6, #387): the envelope plane for the XEnvironment claim — the product-scoped analog of
-restrict-tenant-envelope. An XEnvironment may only request what its owning Team's envelope permits, and must be
+restrict-environment-envelope. An XEnvironment may only request what its owning Team's envelope permits, and must be
 consistent with its Product (team-ownership, per-customer tenancy). Reads the projected Team + Product CRs.
-ADDITIVE + GATED: renders only when enableEnvironmentEnvelope is true (the v2 restrict-tenant-envelope stays the
+ADDITIVE + GATED: renders only when enableEnvironmentEnvelope is true (the v2 restrict-environment-envelope stays the
 live path until the cutover, which flips this on and removes the v2 policy). Stateless checks only — aggregate
 caps (team totals, dedicated-isolation count, per-product grant cap) are the rollup controller's job.
 */ -}}

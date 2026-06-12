@@ -4,7 +4,7 @@ output "namespace" {
 }
 
 output "provisioner_role_arn" {
-  description = "ARN of the IAM role the AWS provider assumes (via EKS Pod Identity) to provision tenant resources. Null when no AWS providers are installed (e.g. a K8s-only workload cluster)."
+  description = "ARN of the IAM role the AWS provider assumes (via EKS Pod Identity) to provision environment resources. Null when no AWS providers are installed (e.g. a K8s-only workload cluster)."
   value       = local.enable_aws ? aws_iam_role.provisioner[0].arn : null
 }
 

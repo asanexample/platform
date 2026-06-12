@@ -6,7 +6,7 @@
 # + the per-namespace image-registry + route-hostname guards.
 #
 # ADDITIVE (ADR-067 cutover model): this binds the v3 XEnvironment XRD and coexists with the live v2 Composition
-# (tenant-v2, XTenant). Render-tested offline (crossplane render) by .tenant-api-tests; it becomes active at the
+# (tenant-v2, XTenant). Render-tested offline (crossplane render) by .environment-api-tests; it becomes active at the
 # rebuild cutover, when v2 is removed. Shipped raw (.Files.Get) so Helm leaves the go-template delimiters intact.
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
@@ -30,7 +30,7 @@ spec:
           environmentConfigs:
             - type: Reference
               ref:
-                name: tenant-cluster-config
+                name: platform-cluster-config
     - step: render-resources
       functionRef:
         name: function-go-templating
@@ -285,7 +285,7 @@ spec:
                   roleRef:
                     apiGroup: rbac.authorization.k8s.io
                     kind: ClusterRole
-                    name: tenant-developer
+                    name: environment-developer
                   subjects:
                     - kind: Group
                       name: {{ $ns }}:developers

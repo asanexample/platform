@@ -5,7 +5,7 @@ Usage:  labels:
 */}}
 {{- define "ktp.labels" -}}
 app.kubernetes.io/managed-by: terraform
-app.kubernetes.io/part-of: crossplane-tenant-policies
+app.kubernetes.io/part-of: crossplane-environment-policies
 {{- range $k, $v := .Values.commonLabels }}
 {{ $k }}: {{ $v | quote }}
 {{- end }}
@@ -13,7 +13,7 @@ app.kubernetes.io/part-of: crossplane-tenant-policies
 
 {{/*
 Precondition skipping platform/system principals — for the CLUSTER-SCOPED control-plane policy (XTenant /
-ProviderConfig are cluster/control-plane resources that cannot be scoped by tenant namespace). Relies on
+ProviderConfig are cluster/control-plane resources that cannot be scoped by environment namespace). Relies on
 Kyverno set-operator wildcard support.
 Usage:  {{- include "ktp.skipPlatformPrincipals" . | nindent 6 }}
 */}}

@@ -4,7 +4,7 @@
 # resolves to the context default ({}), so team-must-exist would deny EVERY Environment ("no projected Team CR")
 # and — critically — the Product-reading rules (team-matches-product, customer-required/forbidden) would SILENTLY
 # SKIP (productExistsPrecondition never matches) — invisible under Audit, a real gap under Enforce. So BOTH teams
-# AND products must be readable (bit the v2 rebuild's first tenant sync; the missing `products` grant was a v3
+# AND products must be readable (bit the v2 rebuild's first environment sync; the missing `products` grant was a v3
 # cutover gap surfaced by the .kyverno-tests behavioral suite).
 #
 # Kyverno aggregates ClusterRoles by label: aggregate-to-admission-controller (webhook-time apiCalls) and

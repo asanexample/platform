@@ -11,7 +11,7 @@ spec:
 {{- if .Values.ecrProvisionerRoleArn }}
 ---
 # Cross-account ECR: Pod Identity base creds (the preprod provisioning role) chained into the platform
-# account via the scoped crossplane-ecr-provisioner role. Used by provider-aws-ecr to create tenant repos.
+# account via the scoped crossplane-ecr-provisioner role. Used by provider-aws-ecr to create environment repos.
 apiVersion: aws.upbound.io/v1beta1
 kind: ProviderConfig
 metadata:

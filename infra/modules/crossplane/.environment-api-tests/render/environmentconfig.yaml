@@ -3,7 +3,7 @@
 apiVersion: apiextensions.crossplane.io/v1beta1
 kind: EnvironmentConfig
 metadata:
-  name: tenant-cluster-config
+  name: platform-cluster-config
 data:
   ecrRegistry: "111122223333.dkr.ecr.us-east-1.amazonaws.com"
   baseDomain: "preprod.aws.refplat.org"
@@ -11,6 +11,6 @@ data:
   workloadAccountId: "111122223333"
   managementAccountId: "444455556666"
   clusterName: "preprod-use1-eks"
-  permissionsBoundaryArn: "arn:aws:iam::111122223333:policy/tenant-boundary"
+  permissionsBoundaryArn: "arn:aws:iam::111122223333:policy/environment-boundary"
   providerConfigEcr: "platform-ecr"
   pullAccountIds: '["111122223333","777788889999"]'

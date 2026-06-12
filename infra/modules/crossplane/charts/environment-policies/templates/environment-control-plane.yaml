@@ -1,18 +1,18 @@
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
-  name: restrict-tenant-control-plane
+  name: restrict-environment-control-plane
   labels:
     {{- include "ktp.labels" . | nindent 4 }}
   annotations:
-    policies.kyverno.io/title: Restrict Tenant Control-Plane Resources
+    policies.kyverno.io/title: Restrict Environment Control-Plane Resources
     policies.kyverno.io/category: Security, Multi-Tenancy
     policies.kyverno.io/severity: high
     policies.kyverno.io/subject: XEnvironment, ProviderConfig
     policies.kyverno.io/description: >-
-      The Crossplane tenant control plane (ADR-046/048/067) — XEnvironment claims and provider ProviderConfigs —
+      The Crossplane environment control plane (ADR-046/048/067) — XEnvironment claims and provider ProviderConfigs —
       grants the privileged provisioning identity. It may be managed only by platform principals (GitOps /
-      the deployer), never by tenants. XEnvironment is cluster-scoped (so tenants already lack RBAC to create it);
+      the deployer), never by environments. XEnvironment is cluster-scoped (so environments already lack RBAC to create it);
       this is defense-in-depth and makes the intent explicit. The composite controller + provider-kubernetes
       run as crossplane-system principals, which are in the platform allow-list, so the Composition itself is
       unaffected.
@@ -21,7 +21,7 @@ spec:
   background: false
   failurePolicy: {{ .Values.failurePolicy }}
   rules:
-    - name: deny-non-platform-tenant-control-plane
+    - name: deny-non-platform-environment-control-plane
       match:
         any:
           - resources:
@@ -32,5 +32,5 @@ spec:
       {{- include "ktp.skipPlatformPrincipals" . | nindent 6 }}
       validate:
         failureAction: {{ .Values.validationFailureAction }}
-        message: "Tenant control-plane resources (XEnvironment / ProviderConfig) may only be managed by platform principals, not tenants."
+        message: "Environment control-plane resources (XEnvironment / ProviderConfig) may only be managed by platform principals, not environments."
         deny: {}

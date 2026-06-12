@@ -18,7 +18,7 @@ spec:
     plural: teams
     singular: team
     categories:
-      - tenant-api
+      - environment-api
   versions:
     # v1alpha3 — the v3 envelope (ADR-067): allowedStages, maxDedicatedIsolation {cluster, account},
     # maxCrossTeamGrantsPerProduct (ADR-068). The sole version since the v3 cutover (v1alpha2 XTenant-era

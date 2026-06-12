@@ -19,7 +19,7 @@ variable "region" {
 }
 
 variable "account_id" {
-  description = "Platform AWS account ID that hosts the tenant ECR repositories the provisioning role manages."
+  description = "Platform AWS account ID that hosts the environment ECR repositories the provisioning role manages."
   type        = string
 }
 
@@ -102,18 +102,18 @@ variable "provider_services" {
   description = <<-EOT
     AWS provider-family members to install (e.g. "ecr", "iam", "eks"). P1 installs only "ecr" — the
     smallest footprint that proves reconciliation + drift correction. Later phases extend this (and the
-    provisioning IAM policy) as the Tenant Composition needs IAM roles / Pod Identity associations.
+    provisioning IAM policy) as the Environment Composition needs IAM roles / Pod Identity associations.
   EOT
   type        = list(string)
   default     = []
 }
 
 # ---------------------------------------------------------------------------
-# provider-kubernetes + Composition functions (federated tenant Composition, ADR-048)
+# provider-kubernetes + Composition functions (federated environment Composition, ADR-048)
 # ---------------------------------------------------------------------------
 
 variable "enable_kubernetes_provider" {
-  description = "Install provider-kubernetes (in-cluster InjectedIdentity) so a Composition can create the tenant's Kubernetes resources locally. Enabled on workload clusters (preprod/prod), not the platform hub."
+  description = "Install provider-kubernetes (in-cluster InjectedIdentity) so a Composition can create the environment's Kubernetes resources locally. Enabled on workload clusters (preprod/prod), not the platform hub."
   type        = bool
   default     = false
 }
@@ -139,14 +139,14 @@ variable "functions" {
   default = []
 }
 
-variable "enable_tenant_api" {
-  description = "Install the Tenant XRD + Composition (the federated tenant control plane). Workload clusters only."
+variable "enable_environment_api" {
+  description = "Install the Environment XRD + Composition (the federated environment control plane). Workload clusters only."
   type        = bool
   default     = false
 }
 
 variable "provider_service_account" {
-  description = "ServiceAccount name the provider pods run as (pinned via DeploymentRuntimeConfig so the Pod Identity association can target it). Tenant workloads never use this SA."
+  description = "ServiceAccount name the provider pods run as (pinned via DeploymentRuntimeConfig so the Pod Identity association can target it). Environment workloads never use this SA."
   type        = string
   default     = "provider-aws"
 }
@@ -157,8 +157,8 @@ variable "providerconfig_name" {
   default     = "default"
 }
 
-variable "tenant_policy_values" {
-  description = "Overrides for the tenant control-plane Kyverno policies chart (restrict-tenant-envelope + restrict-tenant-control-plane), merged over its values.yaml. Keys: validationFailureAction (control-plane, default Enforce), envelopeFailureAction (default Audit — set Enforce at the ADR-049 A6 cutover), failurePolicy, excludePrincipals, commonLabels. Default {} keeps the chart defaults, which reproduce what the policy unit passed pre-move. Only applied when enable_tenant_api."
+variable "environment_policy_values" {
+  description = "Overrides for the environment control-plane Kyverno policies chart (restrict-environment-envelope + restrict-environment-control-plane), merged over its values.yaml. Keys: validationFailureAction (control-plane, default Enforce), envelopeFailureAction (default Audit — set Enforce at the ADR-049 A6 cutover), failurePolicy, excludePrincipals, commonLabels. Default {} keeps the chart defaults, which reproduce what the policy unit passed pre-move. Only applied when enable_environment_api."
   type        = any
   default     = {}
 }
@@ -173,19 +173,19 @@ variable "wait_image" {
 # Scoped provisioning identity
 # ---------------------------------------------------------------------------
 
-variable "tenant_repo_prefix" {
-  description = "ECR repository name prefix the provisioning role may manage. Tenant repos are 'team-<team>/<app>', so 'team-' scopes the role to tenant repositories only."
+variable "environment_repo_prefix" {
+  description = "ECR repository name prefix the provisioning role may manage. Environment repos are 'team-<team>/<app>', so 'team-' scopes the role to environment repositories only."
   type        = string
   default     = "team-"
 }
 
 # ---------------------------------------------------------------------------
-# Tenant provisioning (P2b) — the privileged identity that creates tenant AWS resources
+# Environment provisioning (P2b) — the privileged identity that creates environment AWS resources
 # ---------------------------------------------------------------------------
 
-variable "enable_tenant_provisioning" {
+variable "enable_environment_provisioning" {
   description = <<-EOT
-    Grant the provider's provisioning role the (scoped) permissions to create tenant AWS resources: IAM
+    Grant the provider's provisioning role the (scoped) permissions to create environment AWS resources: IAM
     Pod-team roles + EKS Pod Identity associations in this (workload) account, and sts:AssumeRole into the
     platform account for ECR. Also creates the deny-escalation permissions boundary attached to every
     created role. Workload clusters only (preprod/prod), not the platform hub.
@@ -195,31 +195,31 @@ variable "enable_tenant_provisioning" {
 }
 
 variable "ecr_provisioner_role_arn" {
-  description = "ARN of the platform-account role the provider assumes (assumeRoleChain) to create tenant ECR repositories cross-account. Empty disables the platform-ecr ProviderConfig."
+  description = "ARN of the platform-account role the provider assumes (assumeRoleChain) to create environment ECR repositories cross-account. Empty disables the platform-ecr ProviderConfig."
   type        = string
   default     = ""
 }
 
 variable "create_developer_cluster_role" {
-  description = "Create the shared `tenant-developer` ClusterRole the Composition's per-tenant RoleBindings bind to. False on clusters where the retired v1 `tenant` module owned it (coexistence); true on a fresh v2 build."
+  description = "Create the shared `environment-developer` ClusterRole the Composition's per-environment RoleBindings bind to. False on clusters where the retired v1 `environment` module owned it (coexistence); true on a fresh v2 build."
   type        = bool
   default     = false
 }
 
 variable "ecr_orphan_sweep_role_arn" {
-  description = "ARN of a role in the platform/ECR account to assume on teardown to force-delete orphaned tenant ECR repos (team-*) the Composition created — typically the platform PlatformDeployer (assumable by the teardown's profile). Empty disables the sweep."
+  description = "ARN of a role in the platform/ECR account to assume on teardown to force-delete orphaned environment ECR repos (team-*) the Composition created — typically the platform PlatformDeployer (assumable by the teardown's profile). Empty disables the sweep."
   type        = string
   default     = ""
 }
 
-variable "tenant_role_name_prefix" {
-  description = "Name prefix for the IAM roles the provisioning role may create/manage (the tenant workload roles). Scopes iam:* on the provisioning role. v2 (Tenant API): per-app roles are Pod-<team>-<name>-<env>-<app>, so the prefix is Pod- (the v1 Pod-team-<team> single-role convention is retired); escalation stays capped by the S2 boundary condition, which is name-agnostic."
+variable "environment_role_name_prefix" {
+  description = "Name prefix for the IAM roles the provisioning role may create/manage (the environment workload roles). Scopes iam:* on the provisioning role. v2 (Environment API): per-app roles are Pod-<team>-<name>-<env>-<app>, so the prefix is Pod- (the v1 Pod-team-<team> single-role convention is retired); escalation stays capped by the S2 boundary condition, which is name-agnostic."
   type        = string
   default     = "Pod-"
 }
 
 variable "developer_role_name_prefix" {
-  description = "Name prefix for the per-team developer-access IAM roles the Composition provisions (P2c). Also scoped by the provisioning role's iam:* statements alongside tenant_role_name_prefix."
+  description = "Name prefix for the per-team developer-access IAM roles the Composition provisions (P2c). Also scoped by the provisioning role's iam:* statements alongside environment_role_name_prefix."
   type        = string
   default     = "DeveloperAccess-"
 }
@@ -231,7 +231,7 @@ variable "management_account_id" {
 }
 
 # ---------------------------------------------------------------------------
-# Tenant API environment (P2b) — cluster constants injected into the Composition via EnvironmentConfig
+# Environment API environment (P2b) — cluster constants injected into the Composition via EnvironmentConfig
 # ---------------------------------------------------------------------------
 
 variable "ecr_registry" {
@@ -241,13 +241,13 @@ variable "ecr_registry" {
 }
 
 variable "base_domain" {
-  description = "Per-cluster ingress domain for tenant app hostnames (e.g. preprod.aws.refplat.org). The Composition derives each app's allowed route hostnames from it as <app>-<team>.<base_domain> + the <app>-<team>-pr-* preview wildcard (ADR-060). Empty = derive nothing (only explicit spec.hostnames are allowed)."
+  description = "Per-cluster ingress domain for environment app hostnames (e.g. preprod.aws.refplat.org). The Composition derives each app's allowed route hostnames from it as <app>-<team>.<base_domain> + the <app>-<team>-pr-* preview wildcard (ADR-060). Empty = derive nothing (only explicit spec.hostnames are allowed)."
   type        = string
   default     = ""
 }
 
-variable "tenant_pull_account_ids" {
-  description = "AWS account IDs granted cross-account image pull on tenant ECR repos (the workload accounts). Mirrors the ecr unit's pull_account_ids."
+variable "environment_pull_account_ids" {
+  description = "AWS account IDs granted cross-account image pull on environment ECR repos (the workload accounts). Mirrors the ecr unit's pull_account_ids."
   type        = list(string)
   default     = []
 }

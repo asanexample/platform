@@ -8,15 +8,15 @@ spec:
   credentials:
     source: InjectedIdentity
 ---
-# Scoped RBAC for the provider-kubernetes ServiceAccount — exactly the resource types the Tenant Composition
+# Scoped RBAC for the provider-kubernetes ServiceAccount — exactly the resource types the Environment Composition
 # creates, NOT cluster-admin. Explicit verbs/resources only: no wildcards (passes restrict-wildcard-rbac),
 # and it never binds cluster-admin (passes restrict-binding-clusteradmin). Least-privilege per ADR-048.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: crossplane-tenant-provisioner
+  name: crossplane-environment-provisioner
 rules:
-  # Tenant namespace + governance objects.
+  # Environment namespace + governance objects.
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
@@ -29,16 +29,16 @@ rules:
   - apiGroups: ["cilium.io"]
     resources: ["ciliumnetworkpolicies"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # Developer RoleBindings into the tenant namespace (bound to the shared tenant-developer ClusterRole).
+  # Developer RoleBindings into the environment namespace (bound to the shared environment-developer ClusterRole).
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["rolebindings"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # Creating a RoleBinding to tenant-developer is an RBAC privilege grant; Kubernetes' escalation check
+  # Creating a RoleBinding to environment-developer is an RBAC privilege grant; Kubernetes' escalation check
   # requires the creator to hold the granted perms OR have "bind" on the referenced role. Grant "bind"
-  # scoped to exactly tenant-developer (resourceNames) — least privilege, no need to mirror edit's perms.
+  # scoped to exactly environment-developer (resourceNames) — least privilege, no need to mirror edit's perms.
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["clusterroles"]
-    resourceNames: ["tenant-developer"]
+    resourceNames: ["environment-developer"]
     verbs: ["bind"]
   # Per-team Kyverno policies (P2b) — cluster-scoped ClusterPolicies.
   - apiGroups: ["kyverno.io"]
@@ -48,11 +48,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: crossplane-tenant-provisioner
+  name: crossplane-environment-provisioner
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: crossplane-tenant-provisioner
+  name: crossplane-environment-provisioner
 subjects:
   - kind: ServiceAccount
     name: provider-kubernetes
