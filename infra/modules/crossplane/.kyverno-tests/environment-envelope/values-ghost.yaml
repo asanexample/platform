@@ -1,5 +1,7 @@
+# Both apiCalls return empty (no projected Team/Product) — the team-must-exist case.
 apiVersion: cli.kyverno.io/v1alpha1
 kind: Values
 metadata: { name: values }
 globalValues:
   team: {}
+  product: {}

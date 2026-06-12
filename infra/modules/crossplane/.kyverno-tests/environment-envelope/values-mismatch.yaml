@@ -1,0 +1,11 @@
+# Team alpha exists; the Product alpha-demo resolves but is owned by bravo → team-matches-product.
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Values
+metadata: { name: values }
+globalValues:
+  team:
+    metadata: { name: alpha }
+    spec: { envelope: { allowedTiers: ["standard"], allowedStages: ["dev"], allowedLocations: ["*"], quotaCap: { cpu: "8", memory: "16Gi", pods: 40 } } }
+  product:
+    metadata: { name: alpha-demo }
+    spec: { team: bravo, tenancy: pooled }

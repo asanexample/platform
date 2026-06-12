@@ -1,0 +1,11 @@
+# Product shop is per-customer (owned by alpha). At prod, customer is REQUIRED.
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Values
+metadata: { name: values }
+globalValues:
+  team:
+    metadata: { name: alpha }
+    spec: { envelope: { allowedTiers: ["standard"], allowedStages: ["dev", "prod"], allowedLocations: ["*"], quotaCap: { cpu: "8", memory: "16Gi", pods: 40 } } }
+  product:
+    metadata: { name: alpha-shop }
+    spec: { team: alpha, tenancy: per-customer }
