@@ -100,10 +100,12 @@ inputs = {
     # v3 cutover (ADR-067): activate restrict-environment-envelope (#387) — the XEnvironment envelope check
     # (team-matches-product, stage/tier/residency/quota within the Team envelope, policyStatements deny-set).
     enableEnvironmentEnvelope = true
-    # Start the NEW v3 envelope in Audit for one clean reconcile (the v2 A6 precedent), then flip to Enforce
-    # post-rebuild. envelopeFailureAction is shared, but v2 restrict-tenant-envelope is removed in this same
-    # cutover commit, so this governs only the v3 envelope.
-    envelopeFailureAction = "Audit"
+    # The v3 envelope soaked in Audit through the rebuild (one clean reconcile, the v2 A6 precedent) with ZERO
+    # violations across both tenants + their workloads, so it is now ENFORCE — out-of-envelope XEnvironment
+    # claims (wrong team-for-product, out-of-ladder stage/tier, over-quota, escalating policyStatements) are
+    # rejected at admission, not just audited. envelopeFailureAction governs only the v3 envelope (the v2
+    # restrict-tenant-envelope was removed at the cutover).
+    envelopeFailureAction = "Enforce"
   }
 
   # Tenant provisioning identity (P2b): scoped IAM + EKS Pod Identity locally, plus assume the platform ECR
