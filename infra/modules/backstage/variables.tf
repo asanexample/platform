@@ -307,3 +307,13 @@ variable "argocd_token_secret_key" {
   type        = string
   default     = "token"
 }
+
+variable "projection_mode" {
+  description = "platform-projection catalog mode (ADR-067). \"\" leaves the image default (v2). Set \"v3\" at the cutover to project Product=System / Environment=custom-kind (no new image needed — the L2c frontend ships in the image)."
+  type        = string
+  default     = ""
+  validation {
+    condition     = contains(["", "v2", "v3"], var.projection_mode)
+    error_message = "projection_mode must be \"\", \"v2\", or \"v3\"."
+  }
+}

@@ -198,49 +198,14 @@ jobs:
         # Crossplane CRDs, so they install after them — see charts/tenant-policies/Chart.yaml). Same tooling.
         run: infra/modules/crossplane/.kyverno-tests/run.sh
 
-  # Dogfoods the shift-left composite action (.github/actions/kyverno-validate) against committed
-  # sample apps, proving it works without the app repos: the compliant app (which ships a placeholder
-  # host) must pass after the claim-derived hostname is injected, the broken app must fail, and the
-  # XTenant-claim hostname derivation must resolve. This is what app-repo PR CI runs.
-  kyverno-shift-left:
-    name: Kyverno Shift-Left (dogfood)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Validate compliant sample (must pass)
-        id: compliant
-        uses: ./.github/actions/kyverno-validate
-        with:
-          team: alpha
-          app: demo
-          manifests-path: infra/modules/policy/.kyverno-tests/sample-app/compliant
-          env: preprod
-      - name: Assert hostname derivation (XTenant claim) resolved
-        shell: bash
-        run: |
-          echo "derived hostnames: ${{ steps.compliant.outputs.hostnames }}"
-          echo '${{ steps.compliant.outputs.hostnames }}' | grep -q 'demo-alpha.preprod.aws.refplat.org' \
-            || { echo "::error::hostname derivation from the XTenant claim failed (got '${{ steps.compliant.outputs.hostnames }}')"; exit 1; }
-      - name: Validate broken sample (must fail)
-        id: broken
-        continue-on-error: true
-        uses: ./.github/actions/kyverno-validate
-        with:
-          team: alpha
-          app: demo
-          manifests-path: infra/modules/policy/.kyverno-tests/sample-app/broken
-          env: preprod
-      - name: Assert broken sample was rejected
-        shell: bash
-        run: |
-          if [ "${{ steps.broken.outcome }}" != "failure" ]; then
-            echo "::error::Broken sample app should have FAILED policy validation but did not."; exit 1
-          fi
-          echo "✅ Broken sample correctly rejected by the shift-left gate."
+  # (The v2 "Kyverno Shift-Left (dogfood)" job was removed at the v3 cutover: the kyverno-validate composite
+  # action it dogfooded is v2-coupled — it derived the route host from the now-deleted XTenant claim and rendered
+  # the per-team restrict-images/route-hostnames policies, both retired (Composition-owned per-Environment now).
+  # The v3 app shift-left = the app-repo overlays-build guard + the platform v3 gitops Gate envelope check, #388.)
 
-  # Offline schema validation of the Tenant API XRD (delivery-plan A1, ADR-049). Validates the example claims
-  # against the v1alpha2 OpenAPI schema + CEL rules with `crossplane beta validate` — no cluster. The CLI is
-  # installed at a pinned version (download + SHA-256 verify, no `curl | sh`), matching the Trivy job's posture.
+  # Offline schema validation of the Environment API XRD (ADR-067). Validates the example claims against the
+  # v1alpha3 OpenAPI schema + CEL rules with `crossplane beta validate` — no cluster. The CLI is installed at a
+  # pinned version (download + SHA-256 verify, no `curl | sh`), matching the Trivy job's posture.
   tenant-api-schema:
     name: Tenant API Schema
     runs-on: ubuntu-latest

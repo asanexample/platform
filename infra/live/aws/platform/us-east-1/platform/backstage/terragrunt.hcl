@@ -137,6 +137,11 @@ inputs = {
   # mode='v3' (a pure config flip — all L2c frontend code is now in this image). (Prior 15c5a0fc = #36; 81e4b544 = #35.)
   image_tag = "4fbd38d36fe9821dd3f63c8d31493360cd8b8b67"
 
+  # v3 cutover (ADR-067): flip the platform-projection catalog mode to v3 (Product=System, Environment=custom
+  # kind). Injected as an appConfig layer that overrides the image's default 'v2' — no new image needed (the
+  # L2c frontend already ships in image_tag above).
+  projection_mode = "v3"
+
   # Split-horizon for OIDC: pin keycloak.aws.refplat.org to the gateway's ClusterIP so the backend hits the
   # gateway Envoy directly (the public-name → internal-NLB hairpin is flaky). The ClusterIP is resolved
   # DYNAMICALLY by the module from the gateway Service — no hardcoded IP — so it self-corrects on apply.

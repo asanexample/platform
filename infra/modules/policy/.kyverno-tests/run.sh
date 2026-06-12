@@ -35,49 +35,24 @@ if [ "$APPLIED" -lt 2 ]; then
 fi
 echo "Mutation smoke-check passed ($APPLIED mutations applied via autogen, 0 errors)."
 
-# Render-check the SLSA Build L3 isolated-provenance path (#131, ADR-042). It's now FOLDED INTO the main
-# verify-attestations policy: for a team in attestCallerRepos the SLSA provenance attestor is the isolated
-# trusted-ci workflow (gated by the per-team githubWorkflowRepository extension) instead of the app's own,
-# while the SBOM stays app-signed. verifyImages policies can't be unit-tested offline (cosign/Rekor needs
-# a live cluster — the Audit PolicyReport is the real gate); here we assert the template renders the right
-# attestor identity per team. alpha = adopted (trusted-ci provenance); bravo = not adopted (app provenance).
-echo "Rendering verify-attestations policy (isolated-provenance fold-in, template validity) ..."
-VA="$(helm template kpp "$CHART" \
+# Render-check the per-PRODUCT supply-chain verification (verify-images-product + verify-attestations-product,
+# ADR-067/069 §6 — the v3 successors to the per-team verify-images/verify-attestations, which moved here from
+# the retired per-team policies at the cutover). Every product uses the SHARED trusted-ci signer (build-sign for
+# the signature + SBOM, slsa-provenance for provenance), gated to the product by the cert's
+# githubWorkflowRepository extension (= the Product repo). verifyImages can't be unit-tested offline (cosign/Rekor
+# needs a live cluster — the Audit PolicyReport is the real gate); here we assert the templates render the right
+# identity per product, plus the optional bespoke app-signed identities.
+echo "Rendering per-product verify-images/attestations (template validity) ..."
+VP="$(helm template kpp "$CHART" \
   --set enableImageVerification=true \
   --set enableAttestationVerification=true \
-  --set-json 'tenantRegistryMap={"alpha":"829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha","bravo":"829808296602.dkr.ecr.us-east-1.amazonaws.com/team-bravo"}' \
-  --set-json 'attestCallerRepos={"alpha":"asanexample/app-alpha"}' \
-  --set-json 'verifySubjects={"alpha":[{"deploy_subject":"https://github.com/asanexample/app-alpha/.github/workflows/deploy.yml@refs/heads/main","preview_subject_regexp":"https://github.com/asanexample/app-alpha/.github/workflows/preview.yml@refs/.*"}],"bravo":[{"deploy_subject":"https://github.com/asanexample/app-bravo/.github/workflows/deploy.yml@refs/heads/main","preview_subject_regexp":"https://github.com/asanexample/app-bravo/.github/workflows/preview.yml@refs/.*"}]}')"
-# alpha (adopted): provenance attestor is trusted-ci, gated by the caller-repo extension.
-grep -q 'name: verify-attestations-team-alpha' <<<"$VA" || { echo "FAIL: alpha verify-attestations did not render"; exit 1; }
-grep -q 'asanexample/trusted-ci' <<<"$VA" || { echo "FAIL: alpha provenance must use the trusted-ci subject"; exit 1; }
-grep -q 'githubWorkflowRepository: "asanexample/app-alpha"' <<<"$VA" || { echo "FAIL: alpha per-team caller extension missing"; exit 1; }
-# bravo (not adopted): keeps app-signed provenance, no trusted-ci, no caller-repo gate.
-grep -q 'name: verify-attestations-team-bravo' <<<"$VA" || { echo "FAIL: bravo verify-attestations did not render"; exit 1; }
-grep -q 'githubWorkflowRepository: "asanexample/app-bravo"' <<<"$VA" && { echo "FAIL: bravo must NOT carry a trusted-ci caller gate"; exit 1; }
-echo "verify-attestations isolated-provenance render-check passed (alpha=trusted-ci, bravo=app)."
-
-# Render-check the shared build-sign signer path (the thin-caller supply-chain abstraction). For a team in
-# sharedSignerCallerRepos, verify-images AND the verify-attestations SBOM must render the shared
-# build-sign.yml subject gated by the per-team githubWorkflowRepository extension, IN ADDITION to the team's
-# own app-signed identity (still present). A team absent from sharedSignerCallerRepos must NOT get it.
-echo "Rendering shared-signer (build-sign) path (template validity) ..."
-SS="$(helm template kpp "$CHART" \
-  --set enableImageVerification=true \
-  --set enableAttestationVerification=true \
-  --set-json 'tenantRegistryMap={"alpha":"829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha","bravo":"829808296602.dkr.ecr.us-east-1.amazonaws.com/team-bravo"}' \
-  --set-json 'sharedSignerCallerRepos={"alpha":"asanexample/app-alpha"}' \
-  --set-json 'verifySubjects={"alpha":[{"deploy_subject":"https://github.com/asanexample/app-alpha/.github/workflows/deploy.yml@refs/heads/main","preview_subject_regexp":"https://github.com/asanexample/app-alpha/.github/workflows/preview.yml@refs/.*"}],"bravo":[{"deploy_subject":"https://github.com/asanexample/app-bravo/.github/workflows/deploy.yml@refs/heads/main","preview_subject_regexp":"https://github.com/asanexample/app-bravo/.github/workflows/preview.yml@refs/.*"}]}')"
-# alpha (shared signer): verify-images carries the build-sign subject + the per-team caller extension,
-# AND still carries the app-signed deploy subject (both accepted, count:1).
-awk '/name: verify-images-team-alpha/,/name: verify-images-team-bravo/' <<<"$SS" | grep 'build-sign' >/dev/null || { echo "FAIL: alpha verify-images missing the shared build-sign subject"; exit 1; }
-awk '/name: verify-images-team-alpha/,/name: verify-images-team-bravo/' <<<"$SS" | grep 'githubWorkflowRepository: "asanexample/app-alpha"' >/dev/null || { echo "FAIL: alpha verify-images missing the shared-signer caller extension"; exit 1; }
-awk '/name: verify-images-team-alpha/,/name: verify-images-team-bravo/' <<<"$SS" | grep 'app-alpha/.github/workflows/deploy.yml@refs/heads/main' >/dev/null || { echo "FAIL: alpha verify-images dropped its app-signed identity"; exit 1; }
-# verify-attestations SBOM for alpha also gets the shared-signer entry.
-grep -q 'githubWorkflowRepository: "asanexample/app-alpha"' <<<"$SS" || { echo "FAIL: alpha verify-attestations SBOM missing the shared-signer caller extension"; exit 1; }
-# bravo (NOT in sharedSignerCallerRepos): verify-images must NOT carry a build-sign caller gate.
-awk '/name: verify-images-team-bravo/,0' <<<"$SS" | grep 'githubWorkflowRepository: "asanexample/app-bravo"' >/dev/null && { echo "FAIL: bravo must NOT carry a shared-signer gate when absent"; exit 1; }
-echo "shared-signer render-check passed (alpha=shared+app-signed, bravo=app-signed only)."
+  --set-json 'verifySubjectsProduct={"alpha-demo":{"team":"alpha","product":"demo","repo":"asanexample/app-alpha","registryPrefix":"829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo"}}')"
+grep -q 'name: verify-images-product-alpha-demo' <<<"$VP" || { echo "FAIL: verify-images-product-alpha-demo did not render"; exit 1; }
+grep -q 'name: verify-attestations-product-alpha-demo' <<<"$VP" || { echo "FAIL: verify-attestations-product-alpha-demo did not render"; exit 1; }
+grep -q 'asanexample/trusted-ci' <<<"$VP" || { echo "FAIL: per-product verification must use the trusted-ci subject"; exit 1; }
+grep -q 'githubWorkflowRepository: "asanexample/app-alpha"' <<<"$VP" || { echo "FAIL: per-product caller extension (= the Product repo) missing"; exit 1; }
+grep -q 'team-alpha/demo-\*' <<<"$VP" || { echo "FAIL: per-product image scope team-alpha/demo-* missing"; exit 1; }
+echo "per-product verify-images/attestations render-check passed."
 
 # NOTE: the restrict-tenant-envelope / restrict-tenant-control-plane policies (and their tests) moved to the
 # crossplane module — infra/modules/crossplane/.kyverno-tests/run.sh — because they match Crossplane CRDs and
