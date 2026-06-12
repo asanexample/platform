@@ -31,6 +31,7 @@ spec:
       required:
         - team
         - product
+        - language
       properties:
         team:
           title: Team
@@ -57,6 +58,18 @@ spec:
           description: The product's first Service (its image is team-<team>/<product>-<service>). Usually "web".
           pattern: '^[a-z][a-z0-9-]{0,30}$'
           default: web
+        language:
+          title: Language
+          type: string
+          description: >-
+            The golden starter language. The repo is seeded from this language's framework starter (a minimal
+            HTTP service serving /healthz on :8080) + the shared k8s + supply-chain CI. Resources/probes,
+            Semgrep ruleset, and dependabot ecosystem are set accordingly.
+          enum:
+            - go
+          enumNames:
+            - "Go (net/http)"
+          default: go
 
   steps:
     - id: verify
@@ -66,10 +79,24 @@ spec:
         team: ${{ parameters.team }}
 
     - id: render-app
-      name: Render the app repo from the golden starter
+      name: Render the shared app scaffold (k8s + supply-chain CI)
       action: fetch:template
       input:
         url: ./skeleton
+        targetPath: ./app
+        values:
+          team: ${{ parameters.team | replace('group:default/', '') }}
+          product: ${{ parameters.product }}
+          service: ${{ parameters.service }}
+          # language drives the deployment's resource tier + startupProbe, the Semgrep ruleset, the dependabot
+          # ecosystem, and the CI test job in the SHARED files.
+          language: ${{ parameters.language }}
+
+    - id: render-lang
+      name: Render the ${{ parameters.language }} starter (app source + Dockerfile)
+      action: fetch:template
+      input:
+        url: ./skeleton-${{ parameters.language }}
         targetPath: ./app
         values:
           team: ${{ parameters.team | replace('group:default/', '') }}

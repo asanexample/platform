@@ -1,17 +1,17 @@
 # app-${{ values.team }}-${{ values.product }}
 
 Team `${{ values.team }}`'s **${{ values.product }}** product — scaffolded by the platform's **New Product** template
-(ADR-067 v3). A minimal containerized HTTP service (`${{ values.service }}`) plus the policy-compliant Kubernetes
-manifests and the thin CI that builds, signs, and ships it.
+(ADR-067 v3), language **`${{ values.language }}`**. A minimal containerized HTTP service (`${{ values.service }}`)
+plus the policy-compliant Kubernetes manifests and the thin CI that builds, signs, and ships it.
 
 ## What's here
 
 | Path | Purpose |
 |------|---------|
-| `cmd/server/main.go`, `go.mod` | Minimal stdlib Go HTTP server: `/healthz` (probe) + `/` (JSON). No cloud deps. |
-| `Dockerfile` | Multi-stage build → distroless `nonroot` (uid 65532). The only language-specific surface. |
-| `k8s/base/` + `k8s/overlays/<stage>/` | Namespace-/host-agnostic `base/` + thin per-stage overlays (`dev`/`test`/`uat`/`staging`/`prod`). The per-Product ApplicationSet syncs `k8s/overlays/<stage>`, injecting the namespace + host; `deploy.yml` pins the dev overlay's image digest (promotion to other stages is by PR). |
-| `.github/workflows/deploy.yml` / `preview.yml` | **Thin callers** of the shared supply-chain workflows in `asanexample/trusted-ci`. |
+| the app source + its build manifest | Minimal `${{ values.language }}` HTTP service: `GET /healthz` (probe) + `GET /` (JSON) on `:8080`, graceful SIGTERM shutdown. No cloud deps. |
+| `Dockerfile` | Multi-stage, **non-root**, multi-arch build → minimal (distroless where available) final image. The language-specific surface. |
+| `k8s/base/` + `k8s/overlays/<stage>/` | Namespace-/host-agnostic `base/` + thin per-stage overlays (`dev`/`test`/`uat`/`staging`/`prod`). The per-Product ApplicationSet syncs `k8s/overlays/<stage>`, injecting the namespace + host; `deploy.yml` pins the dev overlay's image digest (promotion to other stages is by PR). Resources/probes are sized for `${{ values.language }}`. |
+| `.github/workflows/` | `deploy.yml`/`preview.yml` (thin callers of `asanexample/trusted-ci`), `validate.yml` (overlay/ns guards + unit test), `security.yml` (Trivy + Semgrep). `dependabot.yml` keeps deps + base images current. |
 
 ## How the supply chain works
 

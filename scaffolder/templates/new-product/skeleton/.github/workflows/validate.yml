@@ -1,0 +1,70 @@
+name: Validate manifests
+
+# v3 manifest validation (ADR-067). The per-Product ApplicationSet syncs k8s/overlays/<stage> and injects the
+# namespace + host; admission (Kyverno) is the enforcement point. This job is the shift-left: it asserts every
+# stage overlay BUILDS and stays namespace-/host-agnostic + product-scoped, and runs the app's unit test.
+on:
+  pull_request:
+
+jobs:
+  overlays-build:
+    name: v3 overlays build (ns-agnostic)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build each stage overlay
+        run: |
+          set -euo pipefail
+          rc=0
+          for s in dev test uat staging prod; do
+            out="$(kubectl kustomize "k8s/overlays/$s")" || { echo "::error::overlays/$s failed to build"; rc=1; continue; }
+            # no resource may carry its own metadata.namespace (placement is ArgoCD destination.namespace).
+            if printf '%s' "$out" | grep -qE '^  namespace: '; then
+              echo "::error::overlays/$s: a resource has a hardcoded metadata.namespace (must be ns-agnostic)"; rc=1
+            fi
+            # the route host must stay the fail-safe placeholder (the platform injects the real host).
+            printf '%s' "$out" | grep -q 'placeholder.invalid' || { echo "::error::overlays/$s: HTTPRoute host placeholder missing"; rc=1; }
+            # the image must be product-scoped (team-${{ values.team }}/${{ values.product }}-<service>), never a bare v2 path.
+            printf '%s' "$out" | grep -qE 'image: .*/team-${{ values.team }}/${{ values.product }}-[a-z0-9-]+' || { echo "::error::overlays/$s: image is not product-scoped team-${{ values.team }}/${{ values.product }}-<service>"; rc=1; }
+            echo "overlays/$s: built"
+          done
+          exit $rc
+
+  test:
+    name: ${{ values.language }} unit test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      {%- if values.language == 'go' %}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - run: go test ./...
+      {%- elif values.language == 'nodejs' %}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm test
+      {%- elif values.language == 'python' %}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q
+      {%- elif values.language == 'java' %}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - run: mvn -B test
+      {%- elif values.language == 'rust' %}
+      - run: cargo test --locked
+      {%- elif values.language == 'ruby' %}
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - run: bin/rails test
+      {%- endif %}
