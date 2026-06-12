@@ -1,0 +1,13 @@
+# dev (the default stage). Single replica; the image digest is pinned by CI on each promote-by-PR (#377) —
+# the newTag line below is the seam CI rewrites to the signed digest. A NEW product starts at `placeholder`
+# (no digest yet); the first CI build on `main` pins the first signed digest → first deploy to dev.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+replicas:
+  - name: app-${{ values.team }}-${{ values.product }}
+    count: 1
+images:
+  - name: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-${{ values.team }}/${{ values.product }}-${{ values.service }}
+    newTag: placeholder # CI replaces with the signed digest at deploy (promote-by-PR, #377)

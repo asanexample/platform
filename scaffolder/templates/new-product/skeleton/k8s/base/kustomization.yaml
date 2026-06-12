@@ -1,0 +1,14 @@
+# Namespace- and host-agnostic base (ADR-067 platform-injection). The per-Product ApplicationSet sets the
+# destination namespace (<team>-<product>[-<customer>]-<stage>, Composition-created) and patches the real
+# host onto the HTTPRoute — so NO `namespace:` here and the route host is a fail-safe placeholder. Per-stage
+# overlays carry the image digest + any real stage deltas.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - serviceaccount.yaml
+  - deployment.yaml
+  - service.yaml
+  - httproute.yaml
+# Rewrite HTTPRoute backendRefs when a namePrefix is applied (PR previews). See name-reference.yaml.
+configurations:
+  - name-reference.yaml

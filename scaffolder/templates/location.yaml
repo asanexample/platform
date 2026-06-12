@@ -12,5 +12,6 @@ spec:
   targets:
     - ./hello-world/template.yaml
     - ./new-team/template.yaml
+    - ./new-product/template.yaml
     - ./new-environment/template.yaml
     - ./deprovision-environment/template.yaml

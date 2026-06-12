@@ -1,0 +1,15 @@
+# Kustomize nameReference transformer config.
+#
+# Gateway API's HTTPRoute is a CRD, so it is NOT in kustomize's built-in nameReference list. Without
+# this, applying a `namePrefix` (which ArgoCD's PR-preview ApplicationSet does, `pr-<N>-`) renames the
+# Service and the HTTPRoute object but leaves the route's spec.rules[].backendRefs[].name pointing at
+# the UN-prefixed (stable) Service — so a preview hostname would silently serve the stable pods.
+#
+# This teaches kustomize that an HTTPRoute backendRef name references a Service, so the same rename that
+# prefixes the Service also rewrites every backendRef to match. Generic: works for any service name and
+# any number of rules/backendRefs. See platform ADR-032 and issue #155.
+nameReference:
+  - kind: Service
+    fieldSpecs:
+      - kind: HTTPRoute
+        path: spec/rules/backendRefs/name
