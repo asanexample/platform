@@ -181,7 +181,7 @@ jobs:
       KYVERNO_VERSION: "1.18.1"
     steps:
       - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           # Canonical Helm pin from /.tool-versions — keep CLI rendering on the 3.x line (not floating to v4).
           version: v${{ needs.versions.outputs.helm }}
@@ -214,7 +214,7 @@ jobs:
       CROSSPLANE_VERSION: "v2.2.1" # crank CLI version (built from source — see install step)
     steps:
       - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4 # the harness renders the crossplane-teams chart (registry → projection)
+      - uses: azure/setup-helm@v5 # the harness renders the crossplane-teams chart (registry → projection)
         with:
           # Canonical Helm pin from /.tool-versions — keep CLI rendering on the 3.x line (not floating to v4).
           version: v${{ needs.versions.outputs.helm }}
