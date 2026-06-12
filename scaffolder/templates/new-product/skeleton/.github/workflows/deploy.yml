@@ -29,7 +29,7 @@ jobs:
     with:
       app: ${{ values.product }}-${{ values.service }} # product-scoped image: team-${{ values.team }}/${{ values.product }}-${{ values.service }} (Product "demo", Service "web")
       product: ${{ values.product }} # selects the per-Product OIDC role github-actions-ecr-push-product-${{ values.team }}-${{ values.product }} (ADR-069)
-      tag: ${{ github.sha }}
+      tag: {% raw %}${{ github.sha }}{% endraw %}
 
   provenance:
     needs: build
@@ -38,8 +38,8 @@ jobs:
       contents: read
     uses: asanexample/trusted-ci/.github/workflows/slsa-provenance.yml@1fbb75f51a76aa85f9d753b6d56f1da297991d4f
     with:
-      image: ${{ needs.build.outputs.image }}
-      digest: ${{ needs.build.outputs.digest }}
+      image: {% raw %}${{ needs.build.outputs.image }}{% endraw %}
+      digest: {% raw %}${{ needs.build.outputs.digest }}{% endraw %}
       product: ${{ values.product }} # selects the per-Product OIDC role github-actions-ecr-push-product-${{ values.team }}-${{ values.product }} (ADR-069)
 
   # Gated on BOTH build and provenance so the digest the ApplicationSet picks up already carries its signature,
@@ -59,8 +59,8 @@ jobs:
 
       - name: Pin the dev overlay to the signed digest
         env:
-          IMAGE: ${{ needs.build.outputs.image }}
-          DIGEST: ${{ needs.build.outputs.digest }}
+          IMAGE: {% raw %}${{ needs.build.outputs.image }}{% endraw %}
+          DIGEST: {% raw %}${{ needs.build.outputs.digest }}{% endraw %}
         run: |
           set -euo pipefail
           # Replace the kustomize images entry's newTag with the immutable digest (kustomize pins by digest).
@@ -74,5 +74,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add k8s/overlays/dev/kustomization.yaml
-          git diff --cached --quiet || git commit -m "deploy: pin dev to ${{ github.sha }}"
+          git diff --cached --quiet || git commit -m "deploy: pin dev to {% raw %}${{ github.sha }}{% endraw %}"
           git push

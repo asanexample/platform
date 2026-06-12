@@ -1,0 +1,8 @@
+# Keep the build context minimal — only go.mod + cmd/ are needed to build.
+.git
+.github
+k8s
+*.md
+catalog-info.yaml
+.dockerignore
+Dockerfile

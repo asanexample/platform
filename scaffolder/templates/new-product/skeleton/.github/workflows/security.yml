@@ -1,0 +1,77 @@
+name: Security scan
+
+# Shift-left supply-chain scanning (platform #108 / 108a). OSS scanners — this is a private repo without GitHub
+# Advanced Security, so findings surface in job logs + SARIF artifacts. The Trivy CLI is pinned + SHA-256
+# verified (aquasecurity/trivy-action + setup-trivy were compromised in 03/2026), and we do not `curl | sh`.
+# ENFORCING: blocks on HIGH/CRITICAL (baseline triaged clean first — Audit->Enforce, ADR-014). k8s/ manifests
+# are excluded from the IaC scan because the Kyverno shift-left gate (validate.yml) governs them and they rely
+# on admission mutation.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  trivy:
+    name: Trivy (deps + config)
+    runs-on: ubuntu-latest
+    env:
+      TRIVY_VERSION: "0.70.0" # pinned clean release; v0.69.4 was the malicious one
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Trivy CLI (download release binary + verify SHA-256)
+        run: |
+          base="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
+          asset="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -sfL "${base}/${asset}" -o "${asset}"
+          curl -sfL "${base}/trivy_${TRIVY_VERSION}_checksums.txt" -o trivy_checksums.txt
+          grep " ${asset}\$" trivy_checksums.txt | sha256sum -c -
+          tar xzf "${asset}" trivy
+          sudo install -m 0755 trivy /usr/local/bin/trivy
+          rm -f trivy "${asset}" trivy_checksums.txt
+          trivy --version
+      - name: Dependency SCA (lockfile) + Dockerfile config
+        run: |
+          # Vulnerabilities in the app's own dependencies — Trivy auto-detects the lockfile
+          # (go.mod / package-lock.json / requirements.txt / pom.xml / Cargo.lock / Gemfile.lock).
+          # SARIF artifact (exit 0) then the BLOCKING table gate (exit 1).
+          dep() { trivy fs . --scanners vuln --severity HIGH,CRITICAL "$@"; }
+          dep --format sarif --output trivy-deps.sarif --exit-code 0
+          echo "::group::Trivy dependency findings"; dep --format table --exit-code 1; echo "::endgroup::"
+          # Dockerfile misconfig. k8s/ manifests are governed by the Kyverno shift-left gate and rely on
+          # admission-time mutation (the platform auto-injects securityContext), so they are excluded here.
+          cfg() { trivy config . --skip-dirs k8s --severity HIGH,CRITICAL "$@"; }
+          cfg --format sarif --output trivy-config.sarif --exit-code 0
+          echo "::group::Trivy config findings"; cfg --format table --exit-code 1; echo "::endgroup::"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-sarif
+          path: trivy-*.sarif
+
+  semgrep:
+    name: Semgrep (SAST)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install Semgrep (pinned)
+        run: pip install --quiet semgrep==1.164.0 # latest stable; verify before bumping
+      - name: Static analysis (language / dockerfile / actions / secrets)
+        run: |
+          # --exclude '*.sarif' so the gate run doesn't scan the artifact the first run just wrote.
+          rulesets="--config p/{% if values.language == 'nodejs' %}javascript{% elif values.language == 'python' %}python{% elif values.language == 'java' %}java{% elif values.language == 'rust' %}rust{% elif values.language == 'ruby' %}ruby{% else %}golang{% endif %} --config p/dockerfile --config p/github-actions --config p/secrets"
+          semgrep scan $rulesets --exclude '*.sarif' --metrics off --sarif --output semgrep.sarif || true
+          echo "::group::Semgrep findings"
+          semgrep scan $rulesets --exclude '*.sarif' --metrics off --error
+          echo "::endgroup::"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: semgrep-sarif
+          path: semgrep.sarif

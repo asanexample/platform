@@ -1,0 +1,24 @@
+# Dependabot — dependency + GitHub Actions + base-image update PRs.
+# Free on private repos (unlike Code Scanning / GHAS). Part of platform #108 (108a).
+version: 2
+updates:
+  - package-ecosystem: "{% if values.language == 'nodejs' %}npm{% elif values.language == 'python' %}pip{% elif values.language == 'java' %}maven{% elif values.language == 'rust' %}cargo{% elif values.language == 'ruby' %}bundler{% else %}gomod{% endif %}"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "${{ values.language }}"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "ci"]
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "docker"]

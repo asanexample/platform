@@ -3,6 +3,8 @@ kind: Component
 metadata:
   name: ${{ values.team }}-${{ values.product }}-${{ values.service }}
   description: ${{ values.team }}'s ${{ values.product }} ${{ values.service }} service
+  tags:
+    - ${{ values.language }}
   annotations:
     github.com/project-slug: asanexample/app-${{ values.team }}-${{ values.product }}
     # The per-Product ArgoCD Application for the dev stage (the per-Product ApplicationSet names it

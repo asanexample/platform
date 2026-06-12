@@ -1,3 +1,10 @@
+{%- if values.language in ['java', 'ruby'] -%}
+{%- set cpuReq = '250m' -%}{%- set memReq = '320Mi' -%}{%- set cpuLim = '1' -%}{%- set memLim = '768Mi' -%}{%- set startFail = 36 -%}
+{%- elif values.language in ['nodejs', 'python'] -%}
+{%- set cpuReq = '100m' -%}{%- set memReq = '128Mi' -%}{%- set cpuLim = '500m' -%}{%- set memLim = '256Mi' -%}{%- set startFail = 18 -%}
+{%- else -%}
+{%- set cpuReq = '50m' -%}{%- set memReq = '64Mi' -%}{%- set cpuLim = '250m' -%}{%- set memLim = '128Mi' -%}{%- set startFail = 12 -%}
+{%- endif -%}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -24,6 +31,13 @@ spec:
       # App does not talk to the Kubernetes API — drop the SA token (least privilege). Required by the
       # platform Kyverno policy restrict-automount-sa-token (also auto-injected by mutate when absent).
       automountServiceAccountToken: false
+      # Explicit hardened pod securityContext (defense-in-depth — the platform mutate would inject the
+      # container-level bits, but a best-practice starter sets them outright). The image runs as a non-root
+      # user (Dockerfile USER), so runAsNonRoot is satisfiable.
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: app-${{ values.team }}-${{ values.product }}
           # Product-scoped ECR image (v3: team-<team>/<product>-<service>). The :placeholder tag is the
@@ -37,22 +51,41 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+          securityContext:
+            allowPrivilegeEscalation: false
+            # Immutable container filesystem — writes go to the emptyDir /tmp below. Regulated-tier ready.
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           resources:
             requests:
-              cpu: 50m
-              memory: 64Mi
+              cpu: ${{ cpuReq }}
+              memory: ${{ memReq }}
             limits:
-              cpu: 250m
-              memory: 128Mi
+              cpu: ${{ cpuLim }}
+              memory: ${{ memLim }}
+          # startupProbe gates liveness/readiness during boot, so a slow start (JVM/Rails warmup) never trips
+          # the liveness probe (failureThreshold is language-tiered: ${{ startFail }} × 5s grace).
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: ${{ startFail }}
           livenessProbe:
             httpGet:
               path: /healthz
               port: 8080
-            initialDelaySeconds: 5
             periodSeconds: 15
           readinessProbe:
             httpGet:
               path: /healthz
               port: 8080
-            initialDelaySeconds: 3
             periodSeconds: 10
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        # Writable scratch for a read-only root filesystem (the app/runtime's temp dir).
+        - name: tmp
+          emptyDir: {}

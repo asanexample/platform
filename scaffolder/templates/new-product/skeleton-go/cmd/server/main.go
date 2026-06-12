@@ -11,17 +11,19 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
-func main() {
-	version := getenv("VERSION", "dev")
-	namespace := getenv("NAMESPACE", "unknown")
-
+// newMux wires the routes — extracted so the unit test can exercise them without binding a port.
+func newMux(version, namespace string) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
@@ -38,15 +40,40 @@ func main() {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
+	return mux
+}
+
+func main() {
+	version := getenv("VERSION", "dev")
+	namespace := getenv("NAMESPACE", "unknown")
+
 	srv := &http.Server{
 		Addr:         ":8080",
-		Handler:      mux,
+		Handler:      newMux(version, namespace),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
 
-	log.Printf("starting app-${{ values.team }}-${{ values.product }} version=%s namespace=%s", version, namespace)
-	log.Fatal(srv.ListenAndServe())
+	// Serve in the background; block on SIGTERM/SIGINT (k8s sends SIGTERM on pod termination), then drain
+	// in-flight requests gracefully before exiting.
+	go func() {
+		log.Printf("starting app-${{ values.team }}-${{ values.product }} version=%s namespace=%s", version, namespace)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("server error: %v", err)
+		}
+	}()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	<-stop
+
+	log.Println("shutting down (draining in-flight requests)…")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("graceful shutdown failed: %v", err)
+	}
+	log.Println("stopped")
 }
 
 func getenv(key, def string) string {
