@@ -32,11 +32,12 @@ OUT="$(render "${here}/environments/shop-bigbank-prod.yaml")"
 printf '%s' "$OUT" | grep -q 'name: alpha-shop-bigbank-prod$'        || { echo "::error::v3 per-customer namespace alpha-shop-bigbank-prod not rendered"; exit 1; }
 printf '%s' "$OUT" | grep -q 'platform.refplat.org/customer: bigbank' || { echo "::error::v3 customer label missing"; exit 1; }
 printf '%s' "$OUT" | grep -q 'external-name: team-alpha/shop-api'     || { echo "::error::v3 ECR team-alpha/shop-api not rendered"; exit 1; }
-printf '%s' "$OUT" | grep -q 'external-name: Pod-alpha-shop-prod-api' || { echo "::error::v3 Pod role Pod-alpha-shop-prod-api not rendered"; exit 1; }
+printf '%s' "$OUT" | grep -q 'external-name: Pod-alpha-shop-bigbank-prod-api' || { echo "::error::v3 per-customer Pod role Pod-alpha-shop-bigbank-prod-api not rendered (the role MUST carry the customer or two per-customer prod Environments collide on one IAM role)"; exit 1; }
+printf '%s' "$OUT" | grep -q 'Customer: bigbank'                     || { echo "::error::v3 per-customer Pod role missing the Customer tag"; exit 1; }
 printf '%s' "$OUT" | grep -q 's3:GetObject'                          || { echo "::error::v3 per-service RolePolicy missing the granted action"; exit 1; }
 printf '%s' "$OUT" | grep -q 'permissionsBoundary'                   || { echo "::error::v3 minted role missing the permissions boundary"; exit 1; }
 printf '%s' "$OUT" | grep -q 'host: shop.example.com'                || { echo "::error::v3 bound domain shop.example.com not in status.domains"; exit 1; }
 printf '%s' "$OUT" | grep -q 'reason: BoundDomain'                   || { echo "::error::v3 bound domain should be reason BoundDomain"; exit 1; }
-echo "  ✓ v3 shop-bigbank-prod OK (customer-ns, ECR team-alpha/shop-api, role + RolePolicy + boundary, bound domain Active)"
+echo "  ✓ v3 shop-bigbank-prod OK (customer-ns, ECR team-alpha/shop-api, role Pod-alpha-shop-bigbank-prod-api + Customer tag + RolePolicy + boundary, bound domain Active)"
 
 echo "v3 Environment Composition render checks passed (L2a — product-scoped footprint + identity)."

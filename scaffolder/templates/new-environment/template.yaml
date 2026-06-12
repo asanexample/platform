@@ -62,6 +62,15 @@ spec:
             Kyverno both enforce this, so out-of-envelope stages fail the PR.
           enum: ['dev', 'test', 'uat', 'staging', 'prod']
           default: dev
+        customer:
+          title: Customer (per-customer Products only)
+          type: string
+          description: >-
+            Leave BLANK for pooled Products. Set ONLY for a per-customer Product at the prod/uat stage — it
+            dedicates this Environment to one customer (namespace <team>-<product>-<customer>-<stage>). The gate
+            and Kyverno enforce customer-iff-per-customer-prod, so a value on a pooled Product (or a non-prod/uat
+            stage) fails the PR, and omitting it on a per-customer prod/uat Product also fails.
+          pattern: '^[a-z][a-z0-9-]{0,30}$'
 
     - title: Service & quota
       required:
@@ -122,6 +131,14 @@ spec:
           team: ${{ parameters.team | replace('group:default/', '') }}
           product: ${{ parameters.product }}
           stage: ${{ parameters.stage }}
+          customer: ${{ parameters.customer }}
+          # The cluster-scoped XR name AND the claim filename MUST carry the customer for a per-customer
+          # Environment — otherwise two customers' prod Environments of one Product collide (one XR name, one
+          # <product>/<stage>.yaml). Computed here so the skeleton stays declarative: the name is
+          # <team>-<product>[-<customer>]-<stage> and the file [<customer>-]<stage>.yaml (customer-before-stage,
+          # matching the namespace + the shop-bigbank-prod convention).
+          envName: ${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}${{ "-" + parameters.customer if parameters.customer }}-${{ parameters.stage }}
+          fileStem: ${{ parameters.customer + "-" if parameters.customer }}${{ parameters.stage }}
           service: ${{ parameters.service }}
           serviceAccount: ${{ parameters.serviceAccount }}
           preview: ${{ parameters.preview }}
@@ -136,15 +153,15 @@ spec:
       action: publish:github:pull-request
       input:
         repoUrl: github.com?owner=asanexample&repo=platform
-        branchName: environment/${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}-${{ parameters.stage }}
+        branchName: environment/${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}${{ "-" + parameters.customer if parameters.customer }}-${{ parameters.stage }}
         targetBranchName: main
-        title: "feat(environments): provision ${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}-${{ parameters.stage }}"
+        title: "feat(environments): provision ${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}${{ '-' + parameters.customer if parameters.customer }}-${{ parameters.stage }}"
         commitMessage: |
-          feat(environments): provision ${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}-${{ parameters.stage }}
+          feat(environments): provision ${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}${{ '-' + parameters.customer if parameters.customer }}-${{ parameters.stage }}
 
           Requested-by: ${{ user.ref | default('unknown', true) }}
         description: |
-          Provisions Environment **${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}-${{ parameters.stage }}** (ADR-067 v3, ADR-062 self-service).
+          Provisions Environment **${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}${{ '-' + parameters.customer if parameters.customer }}-${{ parameters.stage }}** (ADR-067 v3, ADR-062 self-service).
 
           Requested via the Backstage **New Environment** template by `${{ user.ref | default('unknown', true) }}` — team membership verified server-side (ADR-062 §1/§4).
 
@@ -153,7 +170,8 @@ spec:
           | team | `${{ parameters.team | replace('group:default/', '') }}` |
           | product | `${{ parameters.product }}` |
           | stage | `${{ parameters.stage }}` |
-          | service | `${{ parameters.service }}` |
+          {% if parameters.customer %}| customer | `${{ parameters.customer }}` |
+          {% endif %}| service | `${{ parameters.service }}` |
           | tier | `${{ parameters.tier }}` |
 
           The **v3 gitops Gate** validates this PR (claim schema, envelope shift-left — team-matches-product,
@@ -172,4 +190,4 @@ spec:
       # ~5 min of the PR merging; the link resolves once it exists.
       - title: Environment dashboard (provisioning status — appears within a few minutes)
         icon: dashboard
-        entityRef: environment:default/${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}-${{ parameters.stage }}
+        entityRef: environment:default/${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}${{ '-' + parameters.customer if parameters.customer }}-${{ parameters.stage }}
