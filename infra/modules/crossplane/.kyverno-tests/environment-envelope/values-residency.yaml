@@ -1,0 +1,11 @@
+# Team rteam restricted to aws:us-east-1 (NOT '*') so the residency rule's precondition fires.
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Values
+metadata: { name: values }
+globalValues:
+  team:
+    metadata: { name: rteam }
+    spec: { envelope: { allowedTiers: ["standard"], allowedStages: ["dev"], allowedLocations: ["aws:us-east-1"], quotaCap: { cpu: "8", memory: "16Gi", pods: 40 } } }
+  product:
+    metadata: { name: rteam-app }
+    spec: { team: rteam, tenancy: pooled }

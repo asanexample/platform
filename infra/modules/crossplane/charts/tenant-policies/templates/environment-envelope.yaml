@@ -143,8 +143,10 @@ spec:
                 operator: AnyNotIn
                 value: "{{`{{ team.spec.envelope.allowedLocations }}`}}"
 
-    # A per-customer Product requires spec.customer at prod/uat; pooled products must not set it.
-    - name: customer-iff-per-customer-prod
+    # A per-customer Product requires spec.customer at prod/uat; pooled products must not set it. Split into two
+    # rules because Kyverno deny.conditions take a FLAT any/all list — nesting `all` blocks inside `any` ERRORS
+    # (the policy is skipped at admission). Each branch is its own flat-`all` rule.
+    - name: customer-required-per-customer-prod
       match:
         any:
           - resources:
@@ -155,31 +157,44 @@ spec:
       validate:
         failureAction: {{ .Values.envelopeFailureAction }}
         message: >-
-          spec.customer is REQUIRED for a per-customer Product at prod/uat and forbidden otherwise (Product
+          spec.customer is REQUIRED for a per-customer Product at prod/uat (Product
           '{{`{{ request.object.spec.product }}`}}' tenancy '{{`{{ product.spec.tenancy }}`}}', stage
           '{{`{{ request.object.spec.stage }}`}}').
         deny:
           conditions:
-            any:
-              # per-customer + prod/uat but no customer
-              - all:
-                  - key: "{{`{{ product.spec.tenancy }}`}}"
-                    operator: Equals
-                    value: per-customer
-                  - key: "{{`{{ request.object.spec.stage }}`}}"
-                    operator: AnyIn
-                    value: ["prod", "uat"]
-                  - key: "{{`{{ request.object.spec.customer || '' }}`}}"
-                    operator: Equals
-                    value: ""
-              # customer set on a pooled product (or a non-prod/uat stage)
-              - all:
-                  - key: "{{`{{ request.object.spec.customer || '' }}`}}"
-                    operator: NotEquals
-                    value: ""
-                  - key: "{{`{{ product.spec.tenancy || 'pooled' }}`}}"
-                    operator: NotEquals
-                    value: per-customer
+            all:
+              - key: "{{`{{ product.spec.tenancy }}`}}"
+                operator: Equals
+                value: per-customer
+              - key: "{{`{{ request.object.spec.stage }}`}}"
+                operator: AnyIn
+                value: ["prod", "uat"]
+              - key: "{{`{{ request.object.spec.customer || '' }}`}}"
+                operator: Equals
+                value: ""
+    # customer set on a pooled product → forbidden.
+    - name: customer-forbidden-on-pooled
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1alpha3/XEnvironment
+      {{- include "ktp.envContext" . | nindent 6 }}
+      {{- include "ktp.productExistsPrecondition" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: >-
+          spec.customer is set but Product '{{`{{ request.object.spec.product }}`}}' is not per-customer
+          (tenancy '{{`{{ product.spec.tenancy }}`}}').
+        deny:
+          conditions:
+            all:
+              - key: "{{`{{ request.object.spec.customer || '' }}`}}"
+                operator: NotEquals
+                value: ""
+              - key: "{{`{{ product.spec.tenancy || 'pooled' }}`}}"
+                operator: NotEquals
+                value: per-customer
 
     # Self-service IAM deny-escalation (ADR-062 §4, #282) — v3 reads spec.services.<svc>.permissions (was apps).
     - name: policystatements-no-escalation

@@ -6,12 +6,12 @@
 # as YAML DATA (yq only — never executed, templated, or interpolated). Teams are deliberately HUMAN-reviewed
 # (CODEOWNERS), so this gate is NOT an automerge arm; it's the automated guardrail a reviewer can't eyeball:
 #   1. data hygiene   — no symlinks / multi-doc / oversize; metadata.name matches the filename
-#   2. schema shape   — required fields present; allowedTiers/allowedEnvironments within the CRD enums; no
+#   2. schema shape   — required fields present; allowedTiers/allowedStages within the CRD enums; no
 #                       unknown keys (the CRD prunes them silently at admission → a typo would vanish)
-#   3. envelope deny-set (the security core) — the CRD does NOT bound quotaCap / maxDedicatedZones / ssoGroup,
+#   3. envelope deny-set (the security core) — the CRD does NOT bound quotaCap / maxDedicatedIsolation / ssoGroup,
 #                       so an over-permissive or privileged-group envelope would pass admission unflagged.
-#   4. deletion guard — a Team CR removal yanks an envelope out from under its tenants; deny while any
-#                       tenant-claim still references the team.
+#   4. deletion guard — a Team CR removal yanks an envelope out from under its environments; deny while any
+#                       Environment still references the team.
 #
 # Env in:
 #   BASE_DIR, HEAD_DIR        the two checkouts
@@ -21,7 +21,7 @@
 #   MAX_QUOTA_CPU             per-tenant cpu ceiling the envelope may grant   (default 64)
 #   MAX_QUOTA_MEMORY          per-tenant memory ceiling                       (default 256Gi)
 #   MAX_QUOTA_PODS            per-tenant pods ceiling                         (default 500)
-#   MAX_DEDICATED_ZONES       envelope.maxDedicatedZones ceiling             (default 0 — pooled only)
+#   MAX_DEDICATED_ISOLATION   envelope.maxDedicatedIsolation.{cluster,account} ceiling (default 0 — pooled only)
 #   DENIED_SSO_GROUPS         space/comma-separated privileged groups a team may NOT map to (default platform-admins)
 # Requires: yq (mikefarah), python3.
 set -uo pipefail
@@ -32,13 +32,13 @@ TEAM_DELETED_FILES="${TEAM_DELETED_FILES:-}"
 MAX_QUOTA_CPU="${MAX_QUOTA_CPU:-64}"
 MAX_QUOTA_MEMORY="${MAX_QUOTA_MEMORY:-256Gi}"
 MAX_QUOTA_PODS="${MAX_QUOTA_PODS:-500}"
-MAX_DEDICATED_ZONES="${MAX_DEDICATED_ZONES:-0}"
+MAX_DEDICATED_ISOLATION="${MAX_DEDICATED_ISOLATION:-0}"
 DENIED_SSO_GROUPS="${DENIED_SSO_GROUPS:-platform-admins}"
 
 NAME_RE='^[a-z][a-z0-9-]{1,30}$'
 VALID_TIERS=" standard elevated pci hipaa "
-VALID_ENVS=" dev test uat staging prod "
-TENANT_CLAIMS_DIR="${BASE_DIR}/gitops/tenant-claims"
+VALID_STAGES=" dev test uat staging prod "
+ENVIRONMENTS_DIR="${BASE_DIR}/gitops/environments"
 
 overall_rc=0
 errors=()      # human-readable failures (also emitted as ::error:: annotations)
@@ -85,7 +85,7 @@ for tf in $TEAM_FILES; do
 
   # --- identity / kind ------------------------------------------------------------------------------
   [ "$(yq '.kind' "$f")" = "Team" ] || note "${tf}: kind must be Team"
-  [ "$(yq '.apiVersion' "$f")" = "platform.refplat.org/v1alpha2" ] || note "${tf}: apiVersion must be platform.refplat.org/v1alpha2"
+  [ "$(yq '.apiVersion' "$f")" = "platform.refplat.org/v1alpha3" ] || note "${tf}: apiVersion must be platform.refplat.org/v1alpha3"
   metaname="$(yq '.metadata.name' "$f")"
   [[ "$metaname" =~ $NAME_RE ]] || note "${tf}: metadata.name '${metaname}' must match ${NAME_RE}"
   [ "$metaname" = "$team" ] || note "${tf}: metadata.name '${metaname}' must equal the filename '${team}'"
@@ -95,22 +95,22 @@ for tf in $TEAM_FILES; do
     case "$k" in ssoGroup | envelope) ;; *) note "${tf}: unknown spec key '${k}' (typo? it would be silently dropped)";; esac
   done
   for k in $(yq '.spec.envelope | keys | .[]' "$f" 2>/dev/null); do
-    case "$k" in allowedTiers | allowedEnvironments | allowedLocations | quotaCap | maxDedicatedZones) ;; *) note "${tf}: unknown spec.envelope key '${k}'";; esac
+    case "$k" in allowedTiers | allowedStages | allowedLocations | quotaCap | maxDedicatedIsolation | maxCrossTeamGrantsPerProduct) ;; *) note "${tf}: unknown spec.envelope key '${k}'";; esac
   done
 
   # --- required fields ------------------------------------------------------------------------------
   sso="$(yq '.spec.ssoGroup // ""' "$f")"
   [ -n "$sso" ] || note "${tf}: spec.ssoGroup is required"
   [ "$(yq '.spec.envelope.allowedTiers | length' "$f" 2>/dev/null || echo 0)" -ge 1 ] || note "${tf}: spec.envelope.allowedTiers must have ≥1 entry"
-  [ "$(yq '.spec.envelope.allowedEnvironments | length' "$f" 2>/dev/null || echo 0)" -ge 1 ] || note "${tf}: spec.envelope.allowedEnvironments must have ≥1 entry"
+  [ "$(yq '.spec.envelope.allowedStages | length' "$f" 2>/dev/null || echo 0)" -ge 1 ] || note "${tf}: spec.envelope.allowedStages must have ≥1 entry"
   [ "$(yq '.spec.envelope | has("quotaCap")' "$f")" = "true" ] || note "${tf}: spec.envelope.quotaCap is required"
 
   # --- enum bounds (mirror the CRD enums) -----------------------------------------------------------
   for t in $(yq '.spec.envelope.allowedTiers[]' "$f" 2>/dev/null); do
     [[ "$VALID_TIERS" == *" $t "* ]] || note "${tf}: allowedTiers '${t}' not in {standard,elevated,pci,hipaa}"
   done
-  for e in $(yq '.spec.envelope.allowedEnvironments[]' "$f" 2>/dev/null); do
-    [[ "$VALID_ENVS" == *" $e "* ]] || note "${tf}: allowedEnvironments '${e}' not in {dev,test,uat,staging,prod}"
+  for e in $(yq '.spec.envelope.allowedStages[]' "$f" 2>/dev/null); do
+    [[ "$VALID_STAGES" == *" $e "* ]] || note "${tf}: allowedStages '${e}' not in {dev,test,uat,staging,prod}"
   done
 
   # --- envelope deny-set (the CRD does NOT bound these) ---------------------------------------------
@@ -126,9 +126,11 @@ for tf in $TEAM_FILES; do
   [ -z "$cpu" ] || qty_le "$cpu" "$MAX_QUOTA_CPU" cpu || note "${tf}: quotaCap.cpu '${cpu}' exceeds the platform max ${MAX_QUOTA_CPU}"
   [ -z "$mem" ] || qty_le "$mem" "$MAX_QUOTA_MEMORY" memory || note "${tf}: quotaCap.memory '${mem}' exceeds the platform max ${MAX_QUOTA_MEMORY}"
   [ -z "$pods" ] || qty_le "$pods" "$MAX_QUOTA_PODS" int || note "${tf}: quotaCap.pods '${pods}' exceeds the platform max ${MAX_QUOTA_PODS}"
-  # maxDedicatedZones ceiling
-  mdz="$(yq '.spec.envelope.maxDedicatedZones // 0' "$f")"
-  qty_le "$mdz" "$MAX_DEDICATED_ZONES" int || note "${tf}: maxDedicatedZones '${mdz}' exceeds the allowed max ${MAX_DEDICATED_ZONES} (dedicated zones are platform-gated)"
+  # maxDedicatedIsolation ceiling (cluster + account dials — both platform-gated)
+  mdc="$(yq '.spec.envelope.maxDedicatedIsolation.cluster // 0' "$f")"
+  mda="$(yq '.spec.envelope.maxDedicatedIsolation.account // 0' "$f")"
+  qty_le "$mdc" "$MAX_DEDICATED_ISOLATION" int || note "${tf}: maxDedicatedIsolation.cluster '${mdc}' exceeds the allowed max ${MAX_DEDICATED_ISOLATION} (dedicated isolation is platform-gated)"
+  qty_le "$mda" "$MAX_DEDICATED_ISOLATION" int || note "${tf}: maxDedicatedIsolation.account '${mda}' exceeds the allowed max ${MAX_DEDICATED_ISOLATION} (dedicated isolation is platform-gated)"
 
   echo "   ${tf}: checked"
 done
@@ -141,15 +143,15 @@ for tf in $TEAM_DELETED_FILES; do
   base="$(basename "$tf")"; team="${base%.yaml}"; team="${team%.yml}"
   [ -f "$f" ] || continue
   refs=0
-  if [ -d "$TENANT_CLAIMS_DIR" ]; then
-    while IFS= read -r claim; do
-      [ "$(yq '.spec.team // ""' "$claim" 2>/dev/null)" = "$team" ] && refs=$((refs + 1))
-    done < <(find "$TENANT_CLAIMS_DIR" -type f \( -name '*.yaml' -o -name '*.yml' \))
+  if [ -d "$ENVIRONMENTS_DIR" ]; then
+    while IFS= read -r env; do
+      [ "$(yq '.spec.team // ""' "$env" 2>/dev/null)" = "$team" ] && refs=$((refs + 1))
+    done < <(find "$ENVIRONMENTS_DIR" -type f \( -name '*.yaml' -o -name '*.yml' \))
   fi
   if [ "$refs" -gt 0 ]; then
-    note "${tf}: cannot delete Team '${team}' — ${refs} tenant-claim(s) still reference it. Deprovision those tenants (decommission-first) before removing the team."
+    note "${tf}: cannot delete Team '${team}' — ${refs} Environment(s) still reference it. Decommission those Environments before removing the team."
   else
-    echo "   ${tf}: no referencing tenant-claims — delete permitted"
+    echo "   ${tf}: no referencing Environments — delete permitted"
   fi
 done
 
@@ -175,7 +177,7 @@ done
   fi
   echo
   echo "---"
-  echo "_Deny-set: quotaCap ≤ cpu \`${MAX_QUOTA_CPU}\` / mem \`${MAX_QUOTA_MEMORY}\` / pods \`${MAX_QUOTA_PODS}\`, maxDedicatedZones ≤ \`${MAX_DEDICATED_ZONES}\`, ssoGroup ∉ {\`${DENIED_SSO_GROUPS}\`}._"
+  echo "_Deny-set: quotaCap ≤ cpu \`${MAX_QUOTA_CPU}\` / mem \`${MAX_QUOTA_MEMORY}\` / pods \`${MAX_QUOTA_PODS}\`, maxDedicatedIsolation ≤ \`${MAX_DEDICATED_ISOLATION}\`, ssoGroup ∉ {\`${DENIED_SSO_GROUPS}\`}._"
 } >"$REPORT_MD"
 
 if [ "$overall_rc" -ne 0 ]; then

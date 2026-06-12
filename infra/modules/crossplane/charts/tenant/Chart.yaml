@@ -1,12 +1,13 @@
 apiVersion: v2
 name: crossplane-tenant
 description: >-
-  The Tenant API: a Crossplane v2 CompositeResourceDefinition (XTenant) + a function-go-templating
-  Composition that renders a tenant's Kubernetes resources (namespace, quota, limits, NetworkPolicies,
-  CiliumNetworkPolicies, developer RoleBinding) via provider-kubernetes. Federated per-cluster (ADR-048).
+  The Environment API (ADR-067): a Crossplane v2 CompositeResourceDefinition (XEnvironment) + a
+  function-go-templating Composition that renders an Environment's Kubernetes resources (namespace, quota,
+  limits, NetworkPolicies, CiliumNetworkPolicies, developer RoleBinding) via provider-kubernetes, plus the
+  projected Team / Product / AccessGrant CRDs. Federated per-cluster (ADR-048).
 type: application
-# 0.2.0: deprovisioning safety (ADR-062 #283) — lifecycle.phase suspended/decommissioning zeroes the
-# ResourceQuota (reversible suspend); ECR Repository/RepositoryPolicy → deletionPolicy: Orphan (images retained
-# on tenant delete; the repo is team-scoped/shared).
-version: 0.2.0
+# 0.3.0: v3 cutover (ADR-067) — XEnvironment is the sole composite; the v1alpha2 XTenant XRD + composition-v2 +
+# the v1alpha2 Team version are removed. (0.2.0: deprovisioning safety, ADR-062 #283 — lifecycle.phase zeroes the
+# ResourceQuota; ECR → deletionPolicy: Orphan.)
+version: 0.3.0
 appVersion: "1.0.0"

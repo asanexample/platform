@@ -1,0 +1,11 @@
+# okcust: per-customer prod WITH customer → admit. nocust: per-customer prod WITHOUT customer →
+# customer-required-per-customer-prod.
+apiVersion: platform.refplat.org/v1alpha3
+kind: XEnvironment
+metadata: { name: okcust }
+spec: { team: alpha, product: shop, stage: prod, customer: acme, tier: standard, residency: { allowedLocations: ["*"] }, quota: { cpu: "4", memory: 8Gi, pods: 20 } }
+---
+apiVersion: platform.refplat.org/v1alpha3
+kind: XEnvironment
+metadata: { name: nocust }
+spec: { team: alpha, product: shop, stage: prod, tier: standard, residency: { allowedLocations: ["*"] }, quota: { cpu: "4", memory: 8Gi, pods: 20 } }

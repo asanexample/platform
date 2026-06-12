@@ -145,11 +145,6 @@ locals {
     failurePolicy           = local.failure_policy
     complianceTier          = var.compliance_tier
     allowedRegistries       = var.allowed_registries
-    tenantRegistryMap       = var.tenant_registry_map
-    # Teams whose tenant infra (incl. the per-team restrict-* policies) is owned by the Crossplane Tenant
-    # Composition (BACK stack P3). The chart skips restrict-images/restrict-route-hostnames for these to
-    # avoid colliding with the Composition's; the platform-owned verify-images/attestations still apply.
-    migratedTeams           = var.migrated_teams
     excludeNamespaces       = concat(var.exclude_namespaces, var.extra_exclude_namespaces)
     excludePrincipals       = concat(var.exclude_principals, var.extra_exclude_principals)
     tenantNamespaceLabel    = var.tenant_namespace_label
@@ -158,23 +153,18 @@ locals {
     enableImageVerification = var.enable_image_verification
     verifyFailureAction     = var.verify_failure_action
     verifyFailurePolicy     = local.verify_failure_policy
-    verifySubjects          = var.verify_subjects
-    rekorUrl                = var.rekor_url
+    # v3 (ADR-067/069 §6): per-PRODUCT cosign verification. The v2 per-team verifySubjects / tenantRegistryMap /
+    # migratedTeams / attestCallerRepos / sharedSignerCallerRepos / tenantHostnamePatterns / enableHttprouteGuard
+    # were removed at the cutover (restrict-images / restrict-route-hostnames are Composition-owned per-Environment).
+    verifySubjectsProduct = var.verify_subjects_product
+    rekorUrl              = var.rekor_url
 
     enableAttestationVerification = var.enable_attestation_verification
     attestFailureAction           = var.attest_failure_action
     attestFailurePolicy           = local.attest_failure_policy
 
-    trustedCiSubjectRegExp = var.trusted_ci_subject_regexp
-    attestCallerRepos      = var.attest_caller_repos
-    # Shared build-sign reusable workflow (asanexample/trusted-ci/build-sign.yml): for teams in
-    # sharedSignerCallerRepos the image signature + SBOM may also be signed by this shared workflow
-    # (subject) gated by the githubWorkflowRepository extension (= the team's app repo), in addition
-    # to the team's own app-workflow identity. Mirrors the provenance attestCallerRepos pattern.
+    trustedCiSubjectRegExp      = var.trusted_ci_subject_regexp
     trustedCiBuildSubjectRegExp = var.trusted_ci_build_subject_regexp
-    sharedSignerCallerRepos     = var.shared_signer_caller_repos
-    enableHttprouteGuard        = var.enable_httproute_guard
-    tenantHostnamePatterns      = var.tenant_hostname_patterns
     enableCleanup               = var.enable_cleanup
     additionalPolicies          = var.additional_policies
     commonLabels                = local.k8s_labels

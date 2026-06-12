@@ -1,0 +1,30 @@
+# Tested against the alpha Team envelope + the pooled alpha-demo Product (values-alpha.yaml). okenv passes;
+# the rest each isolate ONE rule (everything else within-envelope) so the flagged rule is unambiguous.
+apiVersion: platform.refplat.org/v1alpha3
+kind: XEnvironment
+metadata: { name: okenv }
+spec: { team: alpha, product: demo, stage: dev, tier: standard, residency: { allowedLocations: ["*"] }, quota: { cpu: "4", memory: 8Gi, pods: 20 } }
+---
+# tier pci ∉ allowedTiers [standard] → tier-within-envelope.
+apiVersion: platform.refplat.org/v1alpha3
+kind: XEnvironment
+metadata: { name: badtier }
+spec: { team: alpha, product: demo, stage: dev, tier: pci, residency: { allowedLocations: ["*"] }, quota: { cpu: "4", memory: 8Gi, pods: 20 } }
+---
+# stage staging ∉ allowedStages [dev,prod] → stage-within-envelope.
+apiVersion: platform.refplat.org/v1alpha3
+kind: XEnvironment
+metadata: { name: badstage }
+spec: { team: alpha, product: demo, stage: staging, tier: standard, residency: { allowedLocations: ["*"] }, quota: { cpu: "4", memory: 8Gi, pods: 20 } }
+---
+# quota cpu 16 > cap 8 → quota-within-cap.
+apiVersion: platform.refplat.org/v1alpha3
+kind: XEnvironment
+metadata: { name: overquota }
+spec: { team: alpha, product: demo, stage: dev, tier: standard, residency: { allowedLocations: ["*"] }, quota: { cpu: "16", memory: 8Gi, pods: 20 } }
+---
+# customer set but Product is pooled → customer-iff-per-customer-prod (the "set-on-pooled" branch).
+apiVersion: platform.refplat.org/v1alpha3
+kind: XEnvironment
+metadata: { name: pooledcust }
+spec: { team: alpha, product: demo, stage: prod, customer: acme, tier: standard, residency: { allowedLocations: ["*"] }, quota: { cpu: "4", memory: 8Gi, pods: 20 } }

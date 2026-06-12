@@ -1,8 +1,11 @@
-# RBAC for the envelope policy's Team lookup. The restrict-tenant-envelope rules fetch the projected Team CR
-# via a Kyverno apiCall (ktp.teamContext: GET /apis/platform.refplat.org/v1alpha2/teams/<team>), which executes
-# as the Kyverno controllers' ServiceAccounts. Without this grant the call is Forbidden and silently resolves
-# to the context default ({}), so team-must-exist denies EVERY claim with "no projected Team CR" even when the
-# Team exists — invisible under Audit, fatal under Enforce (bit the v2 rebuild's first tenant sync).
+# RBAC for the envelope policy's apiCall lookups. restrict-environment-envelope (ADR-067 #387) fetches the
+# projected Team AND Product CRs via Kyverno apiCalls (ktp.envContext: GET /teams/<team> + /products/<team>-<product>),
+# which execute as the Kyverno controllers' ServiceAccounts. Without this grant the call is Forbidden and silently
+# resolves to the context default ({}), so team-must-exist would deny EVERY Environment ("no projected Team CR")
+# and — critically — the Product-reading rules (team-matches-product, customer-required/forbidden) would SILENTLY
+# SKIP (productExistsPrecondition never matches) — invisible under Audit, a real gap under Enforce. So BOTH teams
+# AND products must be readable (bit the v2 rebuild's first tenant sync; the missing `products` grant was a v3
+# cutover gap surfaced by the .kyverno-tests behavioral suite).
 #
 # Kyverno aggregates ClusterRoles by label: aggregate-to-admission-controller (webhook-time apiCalls) and
 # aggregate-to-reports-controller (background: true re-evaluation). Ships with this chart so the grant exists
@@ -17,5 +20,5 @@ metadata:
     {{- include "ktp.labels" . | nindent 4 }}
 rules:
   - apiGroups: ["platform.refplat.org"]
-    resources: ["teams"]
+    resources: ["teams", "products"]
     verbs: ["get", "list", "watch"]

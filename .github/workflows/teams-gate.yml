@@ -37,7 +37,7 @@ jobs:
       MAX_QUOTA_CPU: "64"
       MAX_QUOTA_MEMORY: "256Gi"
       MAX_QUOTA_PODS: "500"
-      MAX_DEDICATED_ZONES: "0" # dedicated zones are platform-gated; pooled-only for now
+      MAX_DEDICATED_ISOLATION: "0" # dedicated cluster/account isolation is platform-gated; pooled-only for now
       DENIED_SSO_GROUPS: "platform-admins"
     steps:
       # Trusted: the gate scripts + the Team CRD all come from BASE. Always runs (classify needs the script).

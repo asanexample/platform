@@ -1,4 +1,4 @@
-# Environment (alpha × demo × dev) — the developer-authored claim (ADR-067). Namespace alpha-demo-dev.
+# Environment (bravo × demo × dev) — the developer-authored claim (ADR-067). Namespace bravo-demo-dev.
 # Synced by ArgoCD, reconciled by the Crossplane Environment Composition (v3). One claim per (product, stage[,
 # customer]); the image digest is promoted in by PR (promote-by-PR). See docs/architecture/platform-domain-api.md.
 apiVersion: platform.refplat.org/v1alpha3
@@ -6,13 +6,13 @@ kind: XEnvironment
 metadata:
   name: demo-dev
 spec:
-  team: alpha
+  team: bravo
   product: demo
   stage: dev
   tier: standard
   services:
     web:
-      serviceAccount: app-alpha # matches app-alpha's k8s/base/serviceaccount.yaml (Pod Identity binds it)
-      preview: true # app-alpha publishes PR preview environments (carried over from the v2 claim)
+      serviceAccount: app-bravo # matches app-bravo's k8s/base/serviceaccount.yaml (Pod Identity binds it)
+      # preview omitted (false) — app-bravo does not publish PR previews (carried over from the v2 claim)
       # image omitted until the first CI build's digest-bump (the first-deploy state); the ApplicationSet
       # skips this (Environment × Service) pair until the digest lands in k8s/overlays/dev.

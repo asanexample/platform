@@ -1,9 +1,0 @@
-# MUST FAIL: required field `environment` omitted.
-apiVersion: platform.refplat.org/v1alpha2
-kind: XTenant
-metadata:
-  name: missing-environment
-spec:
-  team: alpha
-  name: demo
-  tier: standard

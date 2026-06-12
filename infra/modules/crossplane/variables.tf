@@ -151,12 +151,6 @@ variable "provider_service_account" {
   default     = "provider-aws"
 }
 
-variable "teams" {
-  description = "Canonical Team registry (ADR-049) projected onto the cluster as Team CRs — the envelope subset Kyverno's restrict-tenant-envelope reads. Map of team name -> { ssoGroup, envelope{...}, and canonical-only displayName/developerGroup/costCenter/contacts that are NOT projected }. Empty = no Team CRs. Requires enable_tenant_api (the Team CRD)."
-  type        = any
-  default     = {}
-}
-
 variable "providerconfig_name" {
   description = "Name of the ProviderConfig managed resources reference. 'default' is used when an MR omits providerConfigRef."
   type        = string

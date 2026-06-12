@@ -1,0 +1,5 @@
+# Team 'ghost' has no projected Team CR → team-must-exist flags.
+apiVersion: platform.refplat.org/v1alpha3
+kind: XEnvironment
+metadata: { name: ghostenv }
+spec: { team: ghost, product: svc, stage: dev, tier: standard }

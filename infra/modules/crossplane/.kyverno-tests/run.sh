@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Renders the crossplane tenant-policies chart and tests the two tenant control-plane Kyverno ClusterPolicies
-# (restrict-tenant-envelope + restrict-tenant-control-plane). These moved out of the policy module's
+# Renders the crossplane tenant-policies chart and tests its two control-plane Kyverno ClusterPolicies
+# (restrict-environment-envelope + restrict-tenant-control-plane). These moved out of the policy module's
 # policies-chart so they install AFTER the Crossplane CRDs exist (see charts/tenant-policies/Chart.yaml); the
 # tests moved with them. Cluster-free: matches CI. Requires `helm` and `kyverno` (pin the CLI to the chart's
 # appVersion). Run by the kyverno-policy-test CI job, which already has both tools.
@@ -18,53 +18,64 @@ echo "Rendering tenant-control-plane policy (template validity) ..."
 CPPOL="$DIR/rendered/tenant-control-plane.yaml"
 helm template ktp "$CHART" --show-only templates/tenant-control-plane.yaml >"$CPPOL"
 grep -q 'name: restrict-tenant-control-plane' "$CPPOL" || { echo "FAIL: control-plane policy did not render"; exit 1; }
-grep -q 'platform.refplat.org/v1alpha1/XTenant' "$CPPOL" || { echo "FAIL: control-plane must match XTenant"; exit 1; }
+grep -q 'platform.refplat.org/v1alpha3/XEnvironment' "$CPPOL" || { echo "FAIL: control-plane must match XEnvironment"; exit 1; }
 grep -q 'aws.upbound.io/v1beta1/ProviderConfig' "$CPPOL" || { echo "FAIL: control-plane must match the AWS ProviderConfig"; exit 1; }
 grep -q 'system:serviceaccount:crossplane-system:\*' "$CPPOL" || { echo "FAIL: control-plane must skip crossplane-system principals"; exit 1; }
 echo "tenant-control-plane render-check passed."
 
 # ---------------------------------------------------------------------------
-# restrict-tenant-envelope (ADR-049 A2b). It reads the projected Team CR via an apiCall, which `kyverno test`
-# can't unit-test offline (the per-resource values mock is removed in 1.18 and globalValues is uniform per run).
-# So we drive `kyverno apply` once per Team envelope — mocking the Team via globalValues — and assert the
-# per-rule outcomes. Behavioral, cluster-free. (Identical to the suite that lived in the policy module.)
+# restrict-environment-envelope (ADR-067 #387). It reads the projected Team + Product CRs via apiCalls, which
+# `kyverno test` can't unit-test offline (the per-resource values mock is removed in 1.18 and globalValues is
+# uniform per run). So we drive `kyverno apply` once per (Team, Product) mock — both via globalValues — and
+# assert the per-rule outcomes. Behavioral, cluster-free. The sibling v2 restrict-tenant-envelope test retired
+# with the XTenant API.
 # ---------------------------------------------------------------------------
-echo "Testing tenant-envelope policy (envelope plane) ..."
-ENVPOL="$DIR/rendered/tenant-envelope.yaml"
-helm template ktp "$CHART" --show-only templates/tenant-envelope.yaml >"$ENVPOL"
-ED="$DIR/tenant-envelope"
+echo "Testing environment-envelope policy (v3 envelope plane) ..."
+ENVPOL="$DIR/rendered/environment-envelope.yaml"
+helm template ktp "$CHART" --set enableEnvironmentEnvelope=true --show-only templates/environment-envelope.yaml >"$ENVPOL"
+ED="$DIR/environment-envelope"
 run_env() { kyverno apply "$ENVPOL" --resource "$ED/$1" --values-file "$ED/$2" 2>&1 || true; }
 must_flag() { # output resource rule
-  grep -q "XTenant/$2 failed" <<<"$1" || { echo "FAIL: envelope: $2 should be flagged"; printf '%s\n' "$1"; exit 1; }
-  grep -q "$3"                 <<<"$1" || { echo "FAIL: envelope: $2 expected rule '$3'"; printf '%s\n' "$1"; exit 1; }
+  grep -q "XEnvironment/$2 failed" <<<"$1" || { echo "FAIL: envelope: $2 should be flagged"; printf '%s\n' "$1"; exit 1; }
+  grep -q "$3"                     <<<"$1" || { echo "FAIL: envelope: $2 expected rule '$3'"; printf '%s\n' "$1"; exit 1; }
 }
 must_admit() { # output resource
-  if grep -q "XTenant/$2 failed" <<<"$1"; then echo "FAIL: envelope: $2 should pass"; printf '%s\n' "$1"; exit 1; fi
+  if grep -q "XEnvironment/$2 failed" <<<"$1"; then echo "FAIL: envelope: $2 should pass"; printf '%s\n' "$1"; exit 1; fi
 }
 
-OUT="$(run_env resources-payments.yaml values-payments.yaml)"
-must_admit "$OUT" ok
-must_admit "$OUT" wildok
-must_flag  "$OUT" badtier   "tier-within-envelope"
-must_flag  "$OUT" badloc    "residency-within-envelope"
-must_flag  "$OUT" overquota "quota-within-cap"
-
+# Team alpha (tiers [standard], stages [dev,prod], loc [*], quota cap) + pooled Product alpha-demo.
 OUT="$(run_env resources-alpha.yaml values-alpha.yaml)"
-must_admit "$OUT" okalpha
-must_flag  "$OUT" badenv "environment-within-envelope"
+must_admit "$OUT" okenv
+must_flag  "$OUT" badtier    "tier-within-envelope"
+must_flag  "$OUT" badstage   "stage-within-envelope"
+must_flag  "$OUT" overquota  "quota-within-cap"
+must_flag  "$OUT" pooledcust "customer-forbidden-on-pooled"
 
+# No projected Team → team-must-exist.
 OUT="$(run_env resources-ghost.yaml values-ghost.yaml)"
-must_flag  "$OUT" ghostteam "team-must-exist"
+must_flag  "$OUT" ghostenv "team-must-exist"
 
-# policystatements-no-escalation (ADR-062 §4, #282) — platform-global IAM deny-set. All within the alpha
-# envelope so only the IAM rule can flag.
+# Product alpha-demo resolves but is owned by bravo → team-matches-product.
+OUT="$(run_env resources-mismatch.yaml values-mismatch.yaml)"
+must_flag  "$OUT" mismatchenv "team-matches-product"
+
+# Team restricted to aws:us-east-1 → the residency precondition fires (it skips for '*' envelopes).
+OUT="$(run_env resources-residency.yaml values-residency.yaml)"
+must_admit "$OUT" okres
+must_flag  "$OUT" badloc "residency-within-envelope"
+
+# per-customer Product alpha-shop: customer REQUIRED at prod.
+OUT="$(run_env resources-customer.yaml values-customer.yaml)"
+must_admit "$OUT" okcust
+must_flag  "$OUT" nocust "customer-required-per-customer-prod"
+
+# policystatements-no-escalation (ADR-062 §4, #282) — platform-global IAM deny-set over spec.services. All
+# within the alpha envelope so only the IAM rule can flag.
 OUT="$(run_env resources-iam.yaml values-iam.yaml)"
 must_admit "$OUT" iamok      # compliant s3 statement
 must_admit "$OUT" iamnoperm  # no permissions block (foreach no-op)
 must_flag  "$OUT" iambad   "policystatements-no-escalation"  # iam:CreateUser
-must_flag  "$OUT" iamcase  "policystatements-no-escalation"  # IAM:PassRole (case-evasion)
-must_flag  "$OUT" iamsts   "policystatements-no-escalation"  # sts:* (subsumption)
-must_flag  "$OUT" iamstar  "policystatements-no-escalation"  # bare *
-must_flag  "$OUT" iammulti "policystatements-no-escalation"  # escalation hidden in a 2nd app
+must_flag  "$OUT" iamsts   "policystatements-no-escalation"  # sts:AssumeRole (service-prefix subsumption)
+must_flag  "$OUT" iammulti "policystatements-no-escalation"  # escalation hidden in a 2nd service
 
-echo "tenant-envelope policy checks passed (tier/env/residency/quota/team-existence/iam-escalation)."
+echo "environment-envelope policy checks passed (tier/stage/residency/quota/team-existence/team-product/customer/iam)."
