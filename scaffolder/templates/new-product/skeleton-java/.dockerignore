@@ -1,0 +1,9 @@
+# Maven rebuilds target/; tests + repo metadata aren't needed in the image.
+.git
+.github
+k8s
+target
+*.md
+catalog-info.yaml
+.dockerignore
+Dockerfile

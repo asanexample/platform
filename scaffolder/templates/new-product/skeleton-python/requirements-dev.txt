@@ -1,0 +1,3 @@
+# Test-only dependencies (NOT in the image). Installed in CI alongside requirements.txt.
+pytest==9.0.3
+httpx==0.28.1

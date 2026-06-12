@@ -1,0 +1,13 @@
+# pip reinstalls deps; tests + repo metadata aren't needed in the image.
+.git
+.github
+k8s
+tests
+requirements-dev.txt
+__pycache__
+*.pyc
+.pytest_cache
+*.md
+catalog-info.yaml
+.dockerignore
+Dockerfile

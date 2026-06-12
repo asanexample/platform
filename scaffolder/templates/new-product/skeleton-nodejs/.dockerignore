@@ -1,0 +1,10 @@
+# npm ci regenerates node_modules; tests + repo metadata aren't needed in the image.
+.git
+.github
+k8s
+node_modules
+test
+*.md
+catalog-info.yaml
+.dockerignore
+Dockerfile
