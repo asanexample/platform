@@ -18,7 +18,7 @@ spec:
     plural: accessgrants
     singular: accessgrant
     categories:
-      - tenant-api
+      - environment-api
   versions:
     - name: v1alpha3
       served: true

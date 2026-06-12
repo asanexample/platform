@@ -2,19 +2,19 @@
 
 Offline validation of the **v3 Environment API** ([ADR-067](../../../../docs/adrs/067-idp-domain-model.md),
 [schema](../../../../docs/architecture/platform-domain-api.md)) — the `XEnvironment` XRD
-(`../charts/tenant/templates/xenvironment-xrd.yaml`) and the projected `Team` / `Product` / `AccessGrant` CRDs.
+(`../charts/environment-api/templates/xenvironment-xrd.yaml`) and the projected `Team` / `Product` / `AccessGrant` CRDs.
 **v3-only since the cutover** (the v1alpha2 `XTenant` surface was removed).
 
 Two harnesses, both cluster-free:
 
 - **`run.sh`** — `crossplane beta validate` checks the example claims/records against each XRD/CRD's OpenAPI v3
-  schema + `x-kubernetes-validations` CEL rules (no cluster, no Composition, no Docker). CI job **Tenant API
+  schema + `x-kubernetes-validations` CEL rules (no cluster, no Composition, no Docker). CI job **Environment API
   Schema**.
-- **`render.sh`** — `crossplane render` of the **v3 Composition** (`../charts/tenant/files/composition-v3.yaml`)
+- **`render.sh`** — `crossplane render` of the **v3 Composition** (`../charts/environment-api/files/composition-v3.yaml`)
   via Docker-run Pipeline functions; asserts the rendered Environment footprint (namespace
   `<team>-<product>[-<customer>]-<stage>`, product-scoped ECR/Pod-Identity, quota, netpols, RoleBinding,
   restrict-images/route-hostnames). Fixtures in `render/` (pinned `functions.yaml` + `environmentconfig.yaml`).
-  CI job **Tenant Composition Render**.
+  CI job **Environment Composition Render**.
 
 ```text
 environments/          valid XEnvironment claims that MUST pass (demo-dev first-deploy, shop-bigbank-prod
@@ -31,8 +31,8 @@ against the CRDs — giving onboarding PRs a real schema gate in CI, not just hu
 Run locally:
 
 ```bash
-infra/modules/crossplane/.tenant-api-tests/run.sh       # crossplane CLI (+ helm)
-infra/modules/crossplane/.tenant-api-tests/render.sh    # crossplane CLI + docker
+infra/modules/crossplane/.environment-api-tests/run.sh       # crossplane CLI (+ helm)
+infra/modules/crossplane/.environment-api-tests/render.sh    # crossplane CLI + docker
 ```
 
 Scope: schemas + the Composition footprint. The **Kyverno envelope policy** that reads the projected Team/Product

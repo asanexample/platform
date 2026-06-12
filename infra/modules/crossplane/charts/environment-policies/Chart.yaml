@@ -1,18 +1,18 @@
 apiVersion: v2
-name: crossplane-tenant-policies
+name: crossplane-environment-policies
 description: >-
-  The two Kyverno ClusterPolicies that govern the Crossplane tenant control plane — restrict-tenant-envelope
-  (ADR-049, an XTenant may only request what its Team envelope permits) and restrict-tenant-control-plane
+  The two Kyverno ClusterPolicies that govern the Crossplane environment control plane — restrict-environment-envelope
+  (ADR-049, an XTenant may only request what its Team envelope permits) and restrict-environment-control-plane
   (ADR-046/048, XTenant/ProviderConfig may be managed only by platform principals). They match Crossplane CRDs
-  (XTenant, Team, the provider ProviderConfigs), so they live HERE — installed after the tenant chart, once
+  (XTenant, Team, the provider ProviderConfigs), so they live HERE — installed after the environment chart, once
   those CRDs exist — not in the policy unit, which deploys BEFORE Crossplane and would make Kyverno churn on the
   not-yet-existing kinds (the preprod policy↔crossplane convergence failure). Workload clusters only.
 type: application
 # 0.2.0: add ArgoCD's remote-cluster assumed-role identity to excludePrincipals so GitOps-delivered XTenant
 # claims aren't denied on workload clusters (ArgoCD authenticates remotely via the cross-account ArgoCD IAM role).
-# 0.3.0: add policystatements-no-escalation to restrict-tenant-envelope (ADR-062 §4, #282) — deny-set on
+# 0.3.0: add policystatements-no-escalation to restrict-environment-envelope (ADR-062 §4, #282) — deny-set on
 # self-service IAM policyStatements (sensitive-service prefixes + bare wildcards), lifting the gate's lockout.
-# 0.4.0: add backstage-read-tenant-api ClusterRole (aggregate-to-view) so the Backstage reader can read XTenant
+# 0.4.0: add backstage-read-environment-api ClusterRole (aggregate-to-view) so the Backstage reader can read XTenant
 # status for the provisioning-status card + notifier (#285, ADR-064 §2).
 version: 0.5.0
 appVersion: "1.18.1"

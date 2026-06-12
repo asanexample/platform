@@ -1,21 +1,21 @@
 locals {
   create = var.create
 
-  # Tenant ECR repositories the provisioning role may manage: "repository/team-*" in the platform account.
-  ecr_repo_arn = "arn:aws:ecr:${var.region}:${var.account_id}:repository/${var.tenant_repo_prefix}*"
+  # Environment ECR repositories the provisioning role may manage: "repository/team-*" in the platform account.
+  ecr_repo_arn = "arn:aws:ecr:${var.region}:${var.account_id}:repository/${var.environment_repo_prefix}*"
 
-  enable_aws                 = local.create && length(var.provider_services) > 0
-  enable_tenant_provisioning = local.create && var.enable_tenant_provisioning
+  enable_aws                      = local.create && length(var.provider_services) > 0
+  enable_environment_provisioning = local.create && var.enable_environment_provisioning
 
   # The per-app Pod-* workload IAM roles (v2: Pod-<team>-<name>-<env>-<app>) the provisioning role may
   # create/manage (in this workload account). PassRole is scoped to these only (the roles handed to EKS
   # Pod Identity).
-  tenant_role_arn_pattern = "arn:aws:iam::${var.account_id}:role/${var.tenant_role_name_prefix}*"
+  environment_role_arn_pattern = "arn:aws:iam::${var.account_id}:role/${var.environment_role_name_prefix}*"
 
   # Roles the provisioning role may create/manage: the Pod-* workload roles AND the DeveloperAccess-*
   # per-team developer-access roles (P2c). Both name prefixes, same account.
   manageable_role_arn_patterns = [
-    local.tenant_role_arn_pattern,
+    local.environment_role_arn_pattern,
     "arn:aws:iam::${var.account_id}:role/${var.developer_role_name_prefix}*",
   ]
 
@@ -72,7 +72,7 @@ locals {
 # Crossplane core (control plane)
 # ---------------------------------------------------------------------------
 # Installed as a Terragrunt-managed Helm add-on, like every other platform service (Kyverno, cert-manager,
-# Cilium). Crossplane is the *tenant* control plane (ADR-046); foundational/platform infra stays on
+# Cilium). Crossplane is the *environment* control plane (ADR-046); foundational/platform infra stays on
 # Terragrunt. The core chart installs the pkg.crossplane.io CRDs (Provider, DeploymentRuntimeConfig) and the
 # package + rbac managers.
 
@@ -157,17 +157,17 @@ resource "helm_release" "crossplane_config" {
 }
 
 # ---------------------------------------------------------------------------
-# Tenant API (local chart): the Tenant XRD + Composition + the shared tenant-developer ClusterRole
+# Environment API (local chart): the Environment XRD + Composition + the shared environment-developer ClusterRole
 # ---------------------------------------------------------------------------
-# Workload clusters only (ADR-048). The Composition (function-go-templating) renders a tenant's Kubernetes
+# Workload clusters only (ADR-048). The Composition (function-go-templating) renders a environment's Kubernetes
 # resources via provider-kubernetes. Applied after config so the kubernetes ProviderConfig + the function
 # exist. Crossplane core validates XRD/Composition at admission — see the README note on the overlay webhook.
 
-resource "helm_release" "crossplane_tenant" {
-  count = local.create && var.enable_tenant_api ? 1 : 0
+resource "helm_release" "crossplane_environment_api" {
+  count = local.create && var.enable_environment_api ? 1 : 0
 
-  name      = "crossplane-tenant"
-  chart     = "${path.module}/charts/tenant"
+  name      = "crossplane-environment-api"
+  chart     = "${path.module}/charts/environment-api"
   namespace = var.namespace
   timeout   = var.helm_timeout
   wait      = var.helm_wait
@@ -175,8 +175,8 @@ resource "helm_release" "crossplane_tenant" {
 
   values = [yamlencode({
     providerConfigName = var.providerconfig_name
-    # The shared tenant-developer ClusterRole the Composition's per-tenant RoleBindings reference. The retired v1
-    # `tenant` module used to own it (coexistence → default false); on a fresh v2 build the tenant chart creates it.
+    # The shared environment-developer ClusterRole the Composition's per-environment RoleBindings reference. The retired v1
+    # `environment` module used to own it (coexistence → default false); on a fresh v2 build the environment chart creates it.
     createDeveloperClusterRole = var.create_developer_cluster_role
     # Cluster constants for the Composition, injected via an EnvironmentConfig (the claim API stays clean).
     environment = {
@@ -186,8 +186,8 @@ resource "helm_release" "crossplane_tenant" {
       workloadAccountId       = var.account_id
       managementAccountId     = var.management_account_id
       clusterName             = var.cluster_name
-      pullAccountIds          = var.tenant_pull_account_ids
-      permissionsBoundaryArn  = local.enable_tenant_provisioning ? aws_iam_policy.tenant_boundary[0].arn : ""
+      pullAccountIds          = var.environment_pull_account_ids
+      permissionsBoundaryArn  = local.enable_environment_provisioning ? aws_iam_policy.environment_boundary[0].arn : ""
       providerConfigEcr       = var.ecr_provisioner_role_arn != "" ? "platform-ecr" : var.providerconfig_name
       podIdentityServiceAccnt = var.provider_service_account
     }
@@ -197,25 +197,25 @@ resource "helm_release" "crossplane_tenant" {
 }
 
 # ---------------------------------------------------------------------------
-# Tenant control-plane Kyverno policies (local chart)
+# Environment control-plane Kyverno policies (local chart)
 # ---------------------------------------------------------------------------
-# restrict-environment-envelope (ADR-067 #387) + restrict-tenant-control-plane (ADR-046/048). They match
+# restrict-environment-envelope (ADR-067 #387) + restrict-environment-control-plane (ADR-046/048). They match
 # Crossplane CRDs — XEnvironment, the projected Team/Product, and the provider ProviderConfigs — so they live
-# with the tenant control plane, NOT in the policy unit. The policy unit deploys BEFORE crossplane (it must, to
+# with the environment control plane, NOT in the policy unit. The policy unit deploys BEFORE crossplane (it must, to
 # pre-create the crossplane-system Kyverno exclusion), so if these two policies shipped there Kyverno would churn
 # its webhook config resolving the not-yet-existing XEnvironment/ProviderConfig kinds — which is exactly what
 # stalled the preprod `policy` install (a single transient validate-policy webhook timeout rolling the whole
-# bundle back). Installed here, AFTER crossplane_tenant (which creates the XEnvironment + Team/Product CRDs),
+# bundle back). Installed here, AFTER crossplane_environment_api (which creates the XEnvironment + Team/Product CRDs),
 # every kind they match already exists, so admission registration is clean. (Teams are now git-native —
 # gitops/teams, synced by argocd-apps — so the v2 crossplane-teams Helm projection was removed at the cutover.)
 #
-# Gated on enable_tenant_api (workload clusters): where there's no tenant control plane there's no XEnvironment
+# Gated on enable_environment_api (workload clusters): where there's no environment control plane there's no XEnvironment
 # CRD and ProviderConfigs are platform-managed only, so neither policy has anything to guard.
-resource "helm_release" "crossplane_tenant_policies" {
-  count = local.create && var.enable_tenant_api ? 1 : 0
+resource "helm_release" "crossplane_environment_policies" {
+  count = local.create && var.enable_environment_api ? 1 : 0
 
-  name      = "crossplane-tenant-policies"
-  chart     = "${path.module}/charts/tenant-policies"
+  name      = "crossplane-environment-policies"
+  chart     = "${path.module}/charts/environment-policies"
   namespace = var.namespace
   timeout   = var.helm_timeout
   wait      = var.helm_wait
@@ -227,10 +227,10 @@ resource "helm_release" "crossplane_tenant_policies" {
 
   # Defaults (chart values.yaml) reproduce what the policy unit passed for these two policies pre-move:
   # control-plane Enforce, envelope Audit-first, failurePolicy Fail, crossplane-system in the skip list. The
-  # unit can override (e.g. enableEnvironmentEnvelope=true at the cutover) via var.tenant_policy_values.
-  values = [yamlencode(var.tenant_policy_values)]
+  # unit can override (e.g. enableEnvironmentEnvelope=true at the cutover) via var.environment_policy_values.
+  values = [yamlencode(var.environment_policy_values)]
 
-  depends_on = [helm_release.crossplane_tenant]
+  depends_on = [helm_release.crossplane_environment_api]
 }
 
 # ---------------------------------------------------------------------------
@@ -259,7 +259,7 @@ resource "null_resource" "crd_finalizer_cleanup" {
     # deletes them instantly instead of hanging on the (concurrently-removed) controller's finalizer drain. If
     # we ALSO --delete here we delete the object out from under helm, and the uninstall then fails with
     # "failed to delete release" (the observed platform/crossplane teardown failure on the config chart's
-    # ProviderConfigs). XRD/Composition/EnvironmentConfig (tenant chart), Provider/Function/Configuration +
+    # ProviderConfigs). XRD/Composition/EnvironmentConfig (environment chart), Provider/Function/Configuration +
     # DeploymentRuntimeConfig (runtime chart), and both ProviderConfigs (config chart).
     refs_helm_owned = join(" ", [
       "compositeresourcedefinitions.apiextensions.crossplane.io",
@@ -307,29 +307,29 @@ resource "null_resource" "crd_finalizer_cleanup" {
     helm_release.crossplane,
     helm_release.crossplane_runtime,
     helm_release.crossplane_config,
-    helm_release.crossplane_tenant,
-    helm_release.crossplane_tenant_policies,
+    helm_release.crossplane_environment_api,
+    helm_release.crossplane_environment_policies,
   ]
 }
 
 # ---------------------------------------------------------------------------
-# Teardown: sweep orphaned Crossplane-provisioned tenant IAM roles (AWS-side)
+# Teardown: sweep orphaned Crossplane-provisioned environment IAM roles (AWS-side)
 # ---------------------------------------------------------------------------
 # crd_finalizer_cleanup (above) drains the IN-CLUSTER Crossplane CRs so the helm uninstalls succeed — but
-# uninstalling Crossplane never deletes the EXTERNAL AWS resources its Composition created. The per-tenant
+# uninstalling Crossplane never deletes the EXTERNAL AWS resources its Composition created. The per-environment
 # Pod-<...> workload roles and the DeveloperAccess-<team> roles persist with this deny-escalation boundary
-# attached as their PermissionsBoundary, so aws_iam_policy.tenant_boundary then fails to delete ("DeleteConflict:
+# attached as their PermissionsBoundary, so aws_iam_policy.environment_boundary then fails to delete ("DeleteConflict:
 # Cannot delete a policy attached to entities"), failing the whole unit teardown (observed on preprod). This
 # sweep deletes exactly those roles (only ones carrying this boundary — by the S2 condition the provisioner can
-# create roles ONLY with it, so every match is a tenant role). It depends_on the boundary, so its when=destroy
+# create roles ONLY with it, so every match is a environment role). It depends_on the boundary, so its when=destroy
 # provisioner runs BEFORE the boundary is deleted (reverse-order destroy). The script always exits 0 — best-effort,
 # never blocks destroy. Reuses the scripts/ dir of finalizer_clear_script so no extra unit wiring is needed.
-resource "null_resource" "tenant_iam_orphan_sweep" {
-  count = local.enable_tenant_provisioning ? 1 : 0
+resource "null_resource" "environment_iam_orphan_sweep" {
+  count = local.enable_environment_provisioning ? 1 : 0
 
   triggers = {
-    script       = "${dirname(var.finalizer_clear_script)}/tenant-iam-orphan-sweep.sh"
-    boundary_arn = aws_iam_policy.tenant_boundary[0].arn
+    script       = "${dirname(var.finalizer_clear_script)}/environment-iam-orphan-sweep.sh"
+    boundary_arn = aws_iam_policy.environment_boundary[0].arn
     region       = var.region
     role_arn     = var.deployer_role_arn
   }
@@ -340,16 +340,16 @@ resource "null_resource" "tenant_iam_orphan_sweep" {
   }
 }
 
-# Sibling of the IAM sweep for the cross-account tenant ECR repos (team-<team>/<app>) the Composition created
+# Sibling of the IAM sweep for the cross-account environment ECR repos (team-<team>/<app>) the Composition created
 # in the platform account. Uninstalling Crossplane orphans them too; they don't block teardown (a rebuild
 # re-adopts them by external-name), but a clean teardown removes them so each cycle starts pristine. Gated on a
 # sweep role being provided (the platform PlatformDeployer — the in-account ecr-provisioner role is NOT
 # assumable by the teardown profile, only via the provider's assumeRoleChain). Best-effort; never blocks destroy.
-resource "null_resource" "tenant_ecr_orphan_sweep" {
-  count = local.enable_tenant_provisioning && var.ecr_orphan_sweep_role_arn != "" ? 1 : 0
+resource "null_resource" "environment_ecr_orphan_sweep" {
+  count = local.enable_environment_provisioning && var.ecr_orphan_sweep_role_arn != "" ? 1 : 0
 
   triggers = {
-    script   = "${dirname(var.finalizer_clear_script)}/tenant-ecr-orphan-sweep.sh"
+    script   = "${dirname(var.finalizer_clear_script)}/environment-ecr-orphan-sweep.sh"
     role_arn = var.ecr_orphan_sweep_role_arn
     region   = var.region
   }
@@ -363,9 +363,9 @@ resource "null_resource" "tenant_ecr_orphan_sweep" {
 # ---------------------------------------------------------------------------
 # Scoped provisioning identity (IAM) + EKS Pod Identity association
 # ---------------------------------------------------------------------------
-# The AWS provider assumes this role to provision tenant resources. P1 scope: ECR repositories under
+# The AWS provider assumes this role to provision environment resources. P1 scope: ECR repositories under
 # "team-*" only (the demo + the eventual per-team ECR repos). Later phases EXTEND this policy (IAM roles +
-# Pod Identity associations for the Tenant Composition) — at which point a permissions boundary on
+# Pod Identity associations for the Environment Composition) — at which point a permissions boundary on
 # created roles and the org SCP exempt_roles entry (DenyTeamTagTampering) become required. Treat this
 # identity like the deployer role: broadly capable within its scope and a high-value target (ADR-046).
 
@@ -387,7 +387,7 @@ resource "aws_iam_role" "provisioner" {
   count = local.enable_aws ? 1 : 0
 
   name               = "crossplane-provisioner-${var.cluster_name}"
-  description        = "Crossplane AWS provider - tenant resource provisioning (ECR). EKS Pod Identity (ADR-046)."
+  description        = "Crossplane AWS provider - environment resource provisioning (ECR). EKS Pod Identity (ADR-046)."
   assume_role_policy = data.aws_iam_policy_document.assume[0].json
   tags               = var.tags
 }
@@ -395,10 +395,10 @@ resource "aws_iam_role" "provisioner" {
 # ---------------------------------------------------------------------------
 # Deny-escalation permissions boundary (P2b) — the cap on every Crossplane-created Pod-team role.
 # ---------------------------------------------------------------------------
-# Effective tenant-role perms = (the role's declared policy) ∩ (this boundary). Even if the provisioning
-# identity is tricked into attaching admin, the boundary keeps a tenant role from privilege escalation.
-data "aws_iam_policy_document" "tenant_boundary" {
-  count = local.enable_tenant_provisioning ? 1 : 0
+# Effective environment-role perms = (the role's declared policy) ∩ (this boundary). Even if the provisioning
+# identity is tricked into attaching admin, the boundary keeps a environment role from privilege escalation.
+data "aws_iam_policy_document" "environment_boundary" {
+  count = local.enable_environment_provisioning ? 1 : 0
 
   statement {
     sid       = "AllowAll"
@@ -421,24 +421,24 @@ data "aws_iam_policy_document" "tenant_boundary" {
   }
 }
 
-resource "aws_iam_policy" "tenant_boundary" {
-  count = local.enable_tenant_provisioning ? 1 : 0
+resource "aws_iam_policy" "environment_boundary" {
+  count = local.enable_environment_provisioning ? 1 : 0
 
-  name        = "tenant-permissions-boundary-${var.cluster_name}"
+  name        = "environment-permissions-boundary-${var.cluster_name}"
   description = "Deny-escalation boundary attached to every Crossplane-provisioned Pod-team-* role (S2)."
-  policy      = data.aws_iam_policy_document.tenant_boundary[0].json
+  policy      = data.aws_iam_policy_document.environment_boundary[0].json
   tags        = var.tags
 }
 
 data "aws_iam_policy_document" "provisioner" {
   count = local.enable_aws ? 1 : 0
 
-  # Platform hub (P1): ECR repositories provisioned LOCALLY. Not used on a tenant-provisioning workload
+  # Platform hub (P1): ECR repositories provisioned LOCALLY. Not used on a environment-provisioning workload
   # cluster (preprod), where ECR is cross-account (via the assumed platform role below).
   dynamic "statement" {
-    for_each = local.enable_tenant_provisioning ? [] : [1]
+    for_each = local.enable_environment_provisioning ? [] : [1]
     content {
-      sid    = "TenantEcrRepositoriesLocal"
+      sid    = "EnvironmentEcrRepositoriesLocal"
       effect = "Allow"
       actions = [
         "ecr:CreateRepository", "ecr:DeleteRepository", "ecr:DescribeRepositories",
@@ -451,26 +451,26 @@ data "aws_iam_policy_document" "provisioner" {
     }
   }
 
-  # Tenant provisioning (workload cluster): create Pod-team-* roles ONLY with the boundary attached.
+  # Environment provisioning (workload cluster): create Pod-team-* roles ONLY with the boundary attached.
   dynamic "statement" {
-    for_each = local.enable_tenant_provisioning ? [1] : []
+    for_each = local.enable_environment_provisioning ? [1] : []
     content {
-      sid       = "TenantIamCreateRoleBoundedOnly"
+      sid       = "EnvironmentIamCreateRoleBoundedOnly"
       effect    = "Allow"
       actions   = ["iam:CreateRole"]
       resources = local.manageable_role_arn_patterns
       condition {
         test     = "StringEquals"
         variable = "iam:PermissionsBoundary"
-        values   = [aws_iam_policy.tenant_boundary[0].arn]
+        values   = [aws_iam_policy.environment_boundary[0].arn]
       }
     }
   }
   # Manage the created roles (NO Put/DeleteRolePermissionsBoundary → cannot strip the boundary).
   dynamic "statement" {
-    for_each = local.enable_tenant_provisioning ? [1] : []
+    for_each = local.enable_environment_provisioning ? [1] : []
     content {
-      sid    = "TenantIamManageRoles"
+      sid    = "EnvironmentIamManageRoles"
       effect = "Allow"
       actions = [
         "iam:DeleteRole", "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:GetRolePolicy",
@@ -484,14 +484,14 @@ data "aws_iam_policy_document" "provisioner" {
       resources = local.manageable_role_arn_patterns
     }
   }
-  # PassRole the tenant roles to EKS Pod Identity only.
+  # PassRole the environment roles to EKS Pod Identity only.
   dynamic "statement" {
-    for_each = local.enable_tenant_provisioning ? [1] : []
+    for_each = local.enable_environment_provisioning ? [1] : []
     content {
-      sid       = "TenantIamPassRole"
+      sid       = "EnvironmentIamPassRole"
       effect    = "Allow"
       actions   = ["iam:PassRole"]
-      resources = [local.tenant_role_arn_pattern]
+      resources = [local.environment_role_arn_pattern]
       condition {
         test     = "StringEquals"
         variable = "iam:PassedToService"
@@ -501,9 +501,9 @@ data "aws_iam_policy_document" "provisioner" {
   }
   # EKS Pod Identity associations on this cluster.
   dynamic "statement" {
-    for_each = local.enable_tenant_provisioning ? [1] : []
+    for_each = local.enable_environment_provisioning ? [1] : []
     content {
-      sid    = "TenantPodIdentityAssociations"
+      sid    = "EnvironmentPodIdentityAssociations"
       effect = "Allow"
       actions = [
         "eks:CreatePodIdentityAssociation", "eks:DeletePodIdentityAssociation",
@@ -522,9 +522,9 @@ data "aws_iam_policy_document" "provisioner" {
   # EKS access entries on this cluster (P2c): map the per-team DeveloperAccess-<team> role to the
   # team-<team>:developers Kubernetes group. Authorized on the cluster + access-entry resources.
   dynamic "statement" {
-    for_each = local.enable_tenant_provisioning ? [1] : []
+    for_each = local.enable_environment_provisioning ? [1] : []
     content {
-      sid    = "TenantEksAccessEntries"
+      sid    = "EnvironmentEksAccessEntries"
       effect = "Allow"
       actions = [
         "eks:CreateAccessEntry", "eks:DeleteAccessEntry", "eks:DescribeAccessEntry",
@@ -540,9 +540,9 @@ data "aws_iam_policy_document" "provisioner" {
       ]
     }
   }
-  # Assume the platform-account role to provision tenant ECR repos cross-account.
+  # Assume the platform-account role to provision environment ECR repos cross-account.
   dynamic "statement" {
-    for_each = local.enable_tenant_provisioning && var.ecr_provisioner_role_arn != "" ? [1] : []
+    for_each = local.enable_environment_provisioning && var.ecr_provisioner_role_arn != "" ? [1] : []
     content {
       sid    = "AssumePlatformEcrProvisioner"
       effect = "Allow"
@@ -557,14 +557,14 @@ data "aws_iam_policy_document" "provisioner" {
 resource "aws_iam_role_policy" "provisioner" {
   count = local.enable_aws ? 1 : 0
 
-  name   = "tenant-provisioning"
+  name   = "environment-provisioning"
   role   = aws_iam_role.provisioner[0].id
   policy = data.aws_iam_policy_document.provisioner[0].json
 }
 
 # Binds (namespace, provider ServiceAccount) -> the provisioning role. This association is the ONLY thing
 # that credentials the provider pods (no SA annotation). The provider SA is platform-controlled and never
-# used by tenant workloads.
+# used by environment workloads.
 resource "aws_eks_pod_identity_association" "provisioner" {
   count = local.enable_aws ? 1 : 0
 

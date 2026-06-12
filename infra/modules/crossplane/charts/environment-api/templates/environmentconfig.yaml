@@ -1,5 +1,5 @@
 {{- if .Values.environment }}
-# Cluster constants the Composition needs but that don't belong in a tenant's claim (ECR registry, account
+# Cluster constants the Composition needs but that don't belong in a environment's claim (ECR registry, account
 # IDs, cluster name, cross-account pull accounts, the permissions-boundary ARN). Loaded into the Composition
 # pipeline context by function-environment-configs; the go-template reads `.context[...]`. Helm-templated
 # here from the module's inputs, so it is per-cluster while the Composition stays cluster-agnostic. EnvironmentConfig
@@ -7,7 +7,7 @@
 apiVersion: apiextensions.crossplane.io/v1beta1
 kind: EnvironmentConfig
 metadata:
-  name: tenant-cluster-config
+  name: platform-cluster-config
 data:
   ecrRegistry: {{ .Values.environment.ecrRegistry | quote }}
   baseDomain: {{ .Values.environment.baseDomain | default "" | quote }}

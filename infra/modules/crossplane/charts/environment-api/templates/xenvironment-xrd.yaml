@@ -3,7 +3,7 @@
 # cluster-scoped also means creating an XEnvironment requires cluster RBAC — developers cannot self-provision
 # (security gate S1); claims are delivered by a platform-controlled GitOps path.
 #
-# v3 (ADR-067, docs/architecture/platform-domain-api.md) renames Tenant → Environment and re-scopes it from
+# v3 (ADR-067, docs/architecture/platform-domain-api.md) renames Environment → Environment and re-scopes it from
 # (team, name, environment) to (team, product, stage[, customer]). The owning `team` is carried EXPLICITLY (not
 # derived from Product): the namespace <team>-<product>-<stage>, the Pod-Identity role, and the Kyverno envelope
 # policy all need it, and a Crossplane Composition go-template cannot cross-CR-lookup the Product to fetch it.

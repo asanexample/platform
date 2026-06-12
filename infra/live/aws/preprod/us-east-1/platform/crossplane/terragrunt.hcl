@@ -68,7 +68,7 @@ inputs = {
   helm_chart_version = include.base.locals.helm_versions.crossplane
   helm_wait          = true
 
-  # Federated tenant control plane (ADR-048). P2b: the full tenant footprint — K8s (provider-kubernetes) +
+  # Federated environment control plane (ADR-048). P2b: the full environment footprint — K8s (provider-kubernetes) +
   # AWS (provider-aws iam/eks locally; ecr cross-account into the platform account via assumeRoleChain).
   provider_services = ["ecr", "iam", "eks"]
 
@@ -84,45 +84,45 @@ inputs = {
     { name = "function-environment-configs", package = "xpkg.upbound.io/crossplane-contrib/function-environment-configs:v0.7.1" },
   ]
 
-  enable_tenant_api = true
+  enable_environment_api = true
 
-  # A7 cutover: the retired v1 `tenant` module no longer owns the shared `tenant-developer` ClusterRole, so the
-  # tenant chart creates it (the Composition's per-tenant RoleBindings bind to it).
+  # A7 cutover: the retired v1 `environment` module no longer owns the shared `environment-developer` ClusterRole, so the
+  # environment chart creates it (the Composition's per-environment RoleBindings bind to it).
   create_developer_cluster_role = true
 
   # ArgoCD delivers the v3 XEnvironment claims (the `environments` registry-sync app, gitops/environments) from
   # the platform cluster, authenticating to this remote cluster via the cross-account `ArgoCD` IAM role — so its
   # admission username is that role's
-  # assumed-role ARN, not the in-cluster argocd SA. Allow it past restrict-tenant-control-plane (ADR-046/048).
+  # assumed-role ARN, not the in-cluster argocd SA. Allow it past restrict-environment-control-plane (ADR-046/048).
   # Scoped to THIS (preprod) account; the `ArgoCD` role + EKS access entry are platform-owned.
-  tenant_policy_values = {
+  environment_policy_values = {
     extraExcludePrincipals = ["arn:aws:sts::${include.base.locals.account_ids["preprod"]}:assumed-role/ArgoCD/*"]
     # v3 cutover (ADR-067): activate restrict-environment-envelope (#387) — the XEnvironment envelope check
     # (team-matches-product, stage/tier/residency/quota within the Team envelope, policyStatements deny-set).
     enableEnvironmentEnvelope = true
     # The v3 envelope soaked in Audit through the rebuild (one clean reconcile, the v2 A6 precedent) with ZERO
-    # violations across both tenants + their workloads, so it is now ENFORCE — out-of-envelope XEnvironment
+    # violations across both environments + their workloads, so it is now ENFORCE — out-of-envelope XEnvironment
     # claims (wrong team-for-product, out-of-ladder stage/tier, over-quota, escalating policyStatements) are
     # rejected at admission, not just audited. envelopeFailureAction governs only the v3 envelope (the v2
-    # restrict-tenant-envelope was removed at the cutover).
+    # restrict-environment-envelope was removed at the cutover).
     envelopeFailureAction = "Enforce"
   }
 
-  # Tenant provisioning identity (P2b): scoped IAM + EKS Pod Identity locally, plus assume the platform ECR
+  # Environment provisioning identity (P2b): scoped IAM + EKS Pod Identity locally, plus assume the platform ECR
   # role for cross-account repos. The deny-escalation permissions boundary is created in the module.
-  enable_tenant_provisioning = true
-  ecr_provisioner_role_arn   = "arn:aws:iam::${include.base.locals.account_ids["platform"]}:role/crossplane-ecr-provisioner"
+  enable_environment_provisioning = true
+  ecr_provisioner_role_arn        = "arn:aws:iam::${include.base.locals.account_ids["platform"]}:role/crossplane-ecr-provisioner"
 
-  # Teardown: force-delete orphaned tenant ECR repos (team-*) the Composition created cross-account. Uses the
+  # Teardown: force-delete orphaned environment ECR repos (team-*) the Composition created cross-account. Uses the
   # platform PlatformDeployer (assumable by the teardown profile); the in-account ecr-provisioner role is only
   # reachable via the provider's assumeRoleChain, not a local-exec. Sibling of the IAM orphan sweep (ADR-046/048).
   ecr_orphan_sweep_role_arn = "arn:aws:iam::${include.base.locals.account_ids["platform"]}:role/PlatformDeployer"
 
   # Cluster constants for the Composition's EnvironmentConfig: platform ECR registry + cross-account pull.
-  ecr_registry            = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com"
-  tenant_pull_account_ids = [include.base.locals.account_ids["preprod"], include.base.locals.account_ids["prod"]]
+  ecr_registry                 = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com"
+  environment_pull_account_ids = [include.base.locals.account_ids["preprod"], include.base.locals.account_ids["prod"]]
 
-  # Tenant app ingress domain — the Composition derives each app's allowed route hostnames as
+  # Environment app ingress domain — the Composition derives each app's allowed route hostnames as
   # <app>-<team>.<base_domain> + the <app>-<team>-pr-* preview wildcard (ADR-060). Matches the argocd-apps
   # preview_domain (which injects the actual route hostnames from the same convention).
   base_domain = "preprod.aws.refplat.org"
@@ -133,7 +133,7 @@ inputs = {
 
   # Team CRs are git-native (ADR-063): authored as YAML in gitops/teams/ and ArgoCD-synced (the `teams` app in
   # the argocd-apps unit). The v2 crossplane-teams Helm projection was removed at the v3 cutover; the Team CRD
-  # itself still ships with the tenant chart (enable_tenant_api). Source of truth for the envelope Kyverno reads
+  # itself still ships with the environment chart (enable_environment_api). Source of truth for the envelope Kyverno reads
   # is the git-synced Team CR.
 
   # Destroy-time CR finalizer cleanup auth (scripts/k8s-finalizer-clear.sh) — see crd_finalizer_cleanup.

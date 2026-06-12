@@ -6,4 +6,4 @@ providerConfigName: default
 
 # Which ProviderConfigs to render.
 enableAws: false        # AWS family (Pod Identity) — workload + platform clusters that provision AWS
-enableKubernetes: false # provider-kubernetes (InjectedIdentity) — workload clusters with the Tenant API
+enableKubernetes: false # provider-kubernetes (InjectedIdentity) — workload clusters with the Environment API

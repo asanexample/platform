@@ -1,6 +1,0 @@
-# Injected by the crossplane Terraform module (helm_release.crossplane_tenant).
-providerConfigName: default
-
-# Create the shared `tenant-developer` ClusterRole here. Leave false on clusters where the `tenant` module
-# already owns it (coexistence — preprod has alpha/bravo on teams.hcl); set true on a fresh cluster.
-createDeveloperClusterRole: false

@@ -193,9 +193,9 @@ jobs:
           kyverno version
       - name: Render policies and run tests
         run: infra/modules/policy/.kyverno-tests/run.sh
-      - name: Render & test tenant control-plane policies (crossplane)
-        # restrict-tenant-envelope / restrict-tenant-control-plane moved to the crossplane module (they match
-        # Crossplane CRDs, so they install after them — see charts/tenant-policies/Chart.yaml). Same tooling.
+      - name: Render & test environment control-plane policies (crossplane)
+        # restrict-environment-envelope / restrict-environment-control-plane moved to the crossplane module (they match
+        # Crossplane CRDs, so they install after them — see charts/environment-policies/Chart.yaml). Same tooling.
         run: infra/modules/crossplane/.kyverno-tests/run.sh
 
   # (The v2 "Kyverno Shift-Left (dogfood)" job was removed at the v3 cutover: the kyverno-validate composite
@@ -206,8 +206,8 @@ jobs:
   # Offline schema validation of the Environment API XRD (ADR-067). Validates the example claims against the
   # v1alpha3 OpenAPI schema + CEL rules with `crossplane beta validate` — no cluster. The CLI is installed at a
   # pinned version (download + SHA-256 verify, no `curl | sh`), matching the Trivy job's posture.
-  tenant-api-schema:
-    name: Tenant API Schema
+  environment-api-schema:
+    name: Environment API Schema
     runs-on: ubuntu-latest
     needs: versions
     env:
@@ -230,14 +230,14 @@ jobs:
           go install -ldflags "-X github.com/crossplane/crossplane/v2/internal/version.version=${CROSSPLANE_VERSION}" "github.com/crossplane/crossplane/v2/cmd/crank@${CROSSPLANE_VERSION}"
           sudo install -m 0755 "$(go env GOPATH)/bin/crank" /usr/local/bin/crossplane
           crossplane version --client || true
-      - name: Validate Tenant API example claims against the XRD
-        run: infra/modules/crossplane/.tenant-api-tests/run.sh
+      - name: Validate Environment API example claims against the XRD
+        run: infra/modules/crossplane/.environment-api-tests/run.sh
 
-  # Offline `crossplane render` of the v2 Tenant Composition (delivery-plan A3). Runs the Pipeline functions
+  # Offline `crossplane render` of the v3 Environment Composition (delivery-plan A3). Runs the Pipeline functions
   # via Docker (pre-installed on the runner) and asserts the rendered footprint — no cluster. Separate from the
   # fast schema job because it pulls function images (minutes, not seconds).
-  tenant-composition-render:
-    name: Tenant Composition Render
+  environment-composition-render:
+    name: Environment Composition Render
     runs-on: ubuntu-latest
     env:
       CROSSPLANE_VERSION: "v2.2.1" # crank CLI version (built from source — see install step)
@@ -255,8 +255,8 @@ jobs:
           go install -ldflags "-X github.com/crossplane/crossplane/v2/internal/version.version=${CROSSPLANE_VERSION}" "github.com/crossplane/crossplane/v2/cmd/crank@${CROSSPLANE_VERSION}"
           sudo install -m 0755 "$(go env GOPATH)/bin/crank" /usr/local/bin/crossplane
           crossplane version --client || true
-      - name: Render the v2 Composition and assert the tenant footprint
-        run: infra/modules/crossplane/.tenant-api-tests/render.sh
+      - name: Render the v3 Composition and assert the environment footprint
+        run: infra/modules/crossplane/.environment-api-tests/render.sh
 
   tflint:
     name: TFLint
@@ -323,7 +323,7 @@ jobs:
           # (exit 0, always written) then the BLOCKING table gate (exit 1) so the
           # findings are visible in the log when the gate fails.
           iac() { trivy config infra/modules --severity HIGH,CRITICAL \
-            --skip-dirs '**/.terraform' --skip-dirs '**/.kyverno-tests' --skip-dirs '**/.tenant-api-tests' \
+            --skip-dirs '**/.terraform' --skip-dirs '**/.kyverno-tests' --skip-dirs '**/.environment-api-tests' \
             --ignorefile "$PWD/.trivyignore.yaml" "$@"; }
           iac --format sarif --output trivy-iac.sarif --exit-code 0
           echo "::group::Trivy IaC findings"; iac --format table --exit-code 1; echo "::endgroup::"

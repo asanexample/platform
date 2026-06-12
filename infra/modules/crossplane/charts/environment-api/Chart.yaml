@@ -1,5 +1,5 @@
 apiVersion: v2
-name: crossplane-tenant
+name: crossplane-environment-api
 description: >-
   The Environment API (ADR-067): a Crossplane v2 CompositeResourceDefinition (XEnvironment) + a
   function-go-templating Composition that renders an Environment's Kubernetes resources (namespace, quota,
