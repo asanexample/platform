@@ -1,4 +1,4 @@
-# Compliant tenant workload — passes every tenant Pod policy.
+# Compliant environment workload — passes every environment Pod policy.
 apiVersion: v1
 kind: Pod
 metadata:

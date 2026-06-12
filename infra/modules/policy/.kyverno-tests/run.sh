@@ -54,6 +54,6 @@ grep -q 'githubWorkflowRepository: "asanexample/app-alpha"' <<<"$VP" || { echo "
 grep -q 'team-alpha/demo-\*' <<<"$VP" || { echo "FAIL: per-product image scope team-alpha/demo-* missing"; exit 1; }
 echo "per-product verify-images/attestations render-check passed."
 
-# NOTE: the restrict-tenant-envelope / restrict-tenant-control-plane policies (and their tests) moved to the
+# NOTE: the restrict-environment-envelope / restrict-environment-control-plane policies (and their tests) moved to the
 # crossplane module — infra/modules/crossplane/.kyverno-tests/run.sh — because they match Crossplane CRDs and
-# must install after them (see infra/modules/crossplane/charts/tenant-policies/Chart.yaml).
+# must install after them (see infra/modules/crossplane/charts/environment-policies/Chart.yaml).

@@ -10,7 +10,7 @@ metadata:
     policies.kyverno.io/severity: medium
     policies.kyverno.io/subject: Pod, Workloads
     policies.kyverno.io/description: >-
-      Workloads must run in a tenant namespace (<team>-<name>-<env>), never the default namespace.
+      Workloads must run in an environment namespace (<team>-<product>-<stage>), never the default namespace.
       Cluster-scoped; platform controllers are skipped via the principal allow-list (the shared Gateway
       lives in default and is platform-managed).
 spec:
@@ -36,28 +36,29 @@ spec:
       {{- include "kpp.skipPlatformPrincipals" . | nindent 6 }}
       validate:
         failureAction: {{ .Values.validationFailureAction }}
-        message: "Running workloads in the default namespace is not allowed; use your tenant namespace (<team>-<name>-<env>)."
+        message: "Running workloads in the default namespace is not allowed; use your environment namespace (<team>-<product>-<stage>)."
         deny: {}
 ---
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
-  name: require-tenant-namespace-naming
+  name: require-environment-namespace-naming
   labels:
     {{- include "kpp.labels" . | nindent 4 }}
   annotations:
-    policies.kyverno.io/title: Require Tenant Namespace Naming
+    policies.kyverno.io/title: Require Environment Namespace Naming
     policies.kyverno.io/category: Operational Excellence, Multi-Tenancy
     policies.kyverno.io/severity: low
     policies.kyverno.io/subject: Namespace
     policies.kyverno.io/description: >-
-      Namespaces marked as tenants must follow the v2 <team>-<name>-<env> naming convention (Tenant API v2,
-      ADR-049): the env suffix is the promotion stage, so a team's stages can co-locate without collision.
+      Namespaces marked as environments must follow the <team>-<product>-<stage> naming convention (ADR-067;
+      per-customer is <team>-<product>-<customer>-<stage>): the suffix is the promotion stage, so a team's
+      stages can co-locate without collision.
 spec:
   background: true
   failurePolicy: {{ .Values.failurePolicy }}
   rules:
-    - name: tenant-namespace-name
+    - name: environment-namespace-name
       match:
         any:
           - resources:
@@ -65,19 +66,21 @@ spec:
                 - Namespace
               selector:
                 matchExpressions:
-                  - key: {{ .Values.tenantNamespaceLabel }}
+                  - key: {{ .Values.environmentNamespaceLabel }}
                     operator: Exists
       validate:
         failureAction: {{ .Values.validationFailureAction }}
-        message: "Tenant namespaces must be named <team>-<name>-<env> (env one of dev|test|uat|staging|prod)."
+        # v3 (ADR-067): Environment namespaces are <team>-<product>-<stage> or, per-customer,
+        # <team>-<product>-<customer>-<stage> — so the name always ends with -<stage>.
+        message: "Environment namespaces are <team>-<product>-<stage> (or <team>-<product>-<customer>-<stage>) and must end with a stage (dev|test|uat|staging|prod)."
         anyPattern:
           - metadata:
-              name: "*-*-dev"
+              name: "*-dev"
           - metadata:
-              name: "*-*-test"
+              name: "*-test"
           - metadata:
-              name: "*-*-uat"
+              name: "*-uat"
           - metadata:
-              name: "*-*-staging"
+              name: "*-staging"
           - metadata:
-              name: "*-*-prod"
+              name: "*-prod"

@@ -12,14 +12,14 @@ app.kubernetes.io/part-of: kyverno-platform-policies
 {{- end -}}
 
 {{/*
-namespaceSelector matching tenant namespaces (those carrying the tenant label).
+namespaceSelector matching environment namespaces (those carrying the environment label).
 Usage (under a resources: entry):
-          {{- include "kpp.tenantNamespaceSelector" . | nindent 6 }}
+          {{- include "kpp.environmentNamespaceSelector" . | nindent 6 }}
 */}}
-{{- define "kpp.tenantNamespaceSelector" -}}
+{{- define "kpp.environmentNamespaceSelector" -}}
 namespaceSelector:
   matchExpressions:
-    - key: {{ .Values.tenantNamespaceLabel }}
+    - key: {{ .Values.environmentNamespaceLabel }}
       operator: Exists
 {{- end -}}
 

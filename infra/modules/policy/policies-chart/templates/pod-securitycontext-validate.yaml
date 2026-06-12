@@ -23,7 +23,7 @@ spec:
           - resources:
               kinds:
                 - Pod
-              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
       validate:
         failureAction: {{ .Values.validationFailureAction }}
         message: "allowPrivilegeEscalation must not be true."
@@ -67,7 +67,7 @@ spec:
           - resources:
               kinds:
                 - Pod
-              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
       validate:
         failureAction: {{ .Values.validationFailureAction }}
         message: "seccompProfile.type Unconfined is not allowed (pod securityContext)."
@@ -83,7 +83,7 @@ spec:
           - resources:
               kinds:
                 - Pod
-              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
       validate:
         failureAction: {{ .Values.validationFailureAction }}
         message: "seccompProfile.type Unconfined is not allowed (container securityContext)."

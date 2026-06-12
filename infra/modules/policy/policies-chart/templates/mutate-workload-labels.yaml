@@ -11,8 +11,8 @@ metadata:
     policies.kyverno.io/severity: low
     policies.kyverno.io/subject: Pod
     policies.kyverno.io/description: >-
-      Adds the `team` cost-allocation/identity label when absent (the tenant key, derived from the
-      `team-<key>[-<env>]` namespace name — robust to multi-namespace tenants). Makes the team-label
+      Adds the `team` cost-allocation/identity label when absent (the environment key, derived from the
+      `team-<key>[-<env>]` namespace name — robust to multi-namespace environments). Makes the team-label
       requirement self-satisfying so apps need no label boilerplate. add-if-absent: never overrides an
       app's labels. (app.kubernetes.io/name can't be derived under autogen — pod templates have no
       name — so it is left to the app; it is no longer required by require-workload-labels.)
@@ -25,7 +25,7 @@ spec:
           - resources:
               kinds:
                 - Pod
-              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
       mutate:
         patchStrategicMerge:
           metadata:

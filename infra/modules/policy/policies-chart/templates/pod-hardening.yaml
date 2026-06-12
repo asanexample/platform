@@ -10,7 +10,7 @@ metadata:
     policies.kyverno.io/severity: medium
     policies.kyverno.io/subject: Pod
     policies.kyverno.io/description: >-
-      Tenant pods must set automountServiceAccountToken: false unless they genuinely need the API
+      Environment pods must set automountServiceAccountToken: false unless they genuinely need the API
       server — least privilege; reduces the in-pod credential blast radius (ties to #64 IRSA).
 spec:
   background: true
@@ -22,7 +22,7 @@ spec:
           - resources:
               kinds:
                 - Pod
-              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
       validate:
         failureAction: {{ .Values.validationFailureAction }}
         message: "automountServiceAccountToken must be set to false on the pod spec."
@@ -42,7 +42,7 @@ metadata:
     policies.kyverno.io/severity: medium
     policies.kyverno.io/subject: Pod
     policies.kyverno.io/description: >-
-      Tenant containers must define liveness and readiness probes so the platform can detect and
+      Environment containers must define liveness and readiness probes so the platform can detect and
       route around unhealthy workloads.
 spec:
   background: true
@@ -54,7 +54,7 @@ spec:
           - resources:
               kinds:
                 - Pod
-              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
       validate:
         failureAction: {{ .Values.validationFailureAction }}
         message: "Liveness and readiness probes are required on every container."
@@ -91,7 +91,7 @@ spec:
           - resources:
               kinds:
                 - Pod
-              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
       validate:
         failureAction: {{ .Values.validationFailureAction }}
         podSecurity:
@@ -122,7 +122,7 @@ spec:
           - resources:
               kinds:
                 - Pod
-              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
       validate:
         failureAction: {{ .Values.validationFailureAction }}
         message: "Containers must run with a read-only root filesystem."

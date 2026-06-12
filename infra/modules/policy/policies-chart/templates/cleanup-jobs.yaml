@@ -23,9 +23,9 @@ metadata:
     policies.kyverno.io/title: Cleanup Finished CronJob Jobs
     policies.kyverno.io/category: Cost, Operational Excellence
     policies.kyverno.io/description: >-
-      Reaps finished Jobs spawned by CronJobs in tenant namespaces. Scoped to CronJob-owned Jobs so it
+      Reaps finished Jobs spawned by CronJobs in environment namespaces. Scoped to CronJob-owned Jobs so it
       never deletes a Git-declared/ArgoCD-managed Job (which selfHeal would recreate → re-run loop).
-      Tenant namespaces only — never system/infra Jobs.
+      Environment namespaces only — never system/infra Jobs.
 spec:
   match:
     any:
@@ -34,7 +34,7 @@ spec:
             - Job
           namespaceSelector:
             matchExpressions:
-              - key: {{ .Values.tenantNamespaceLabel }}
+              - key: {{ .Values.environmentNamespaceLabel }}
                 operator: Exists
   conditions:
     all:

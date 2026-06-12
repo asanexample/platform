@@ -39,7 +39,7 @@ locals {
       # redundant with Kyverno's own Prometheus metrics (the metering port, 8000/8001) and, on a rapid
       # restart, the host :8080 socket lingers so the next start fails "bind: address already in use" →
       # the admission controller CrashLoopBackOffs (observed after a node-churn/scale-up, when its manager
-      # restarted on an informer-sync timeout and could no longer rebind :8080, blocking all tenant
+      # restarted on an informer-sync timeout and could no longer rebind :8080, blocking all environment
       # admission). Disabling it on hostNetwork removes the failure mode; relocating the port would just
       # move the lingering-socket problem. "0" disables (chart default ":8080").
       controllerRuntimeMetrics = { bindAddress = var.webhook_host_network ? "0" : ":8080" }
@@ -141,18 +141,18 @@ locals {
   # Policies (local chart) values — all dynamic, environment-specific knobs live here so the module
   # carries no team-specific data.
   policies_values = {
-    validationFailureAction = var.validation_failure_action
-    failurePolicy           = local.failure_policy
-    complianceTier          = var.compliance_tier
-    allowedRegistries       = var.allowed_registries
-    excludeNamespaces       = concat(var.exclude_namespaces, var.extra_exclude_namespaces)
-    excludePrincipals       = concat(var.exclude_principals, var.extra_exclude_principals)
-    tenantNamespaceLabel    = var.tenant_namespace_label
-    requiredWorkloadLabels  = var.required_workload_labels
-    enableMutateDefaults    = var.enable_mutate_defaults
-    enableImageVerification = var.enable_image_verification
-    verifyFailureAction     = var.verify_failure_action
-    verifyFailurePolicy     = local.verify_failure_policy
+    validationFailureAction   = var.validation_failure_action
+    failurePolicy             = local.failure_policy
+    complianceTier            = var.compliance_tier
+    allowedRegistries         = var.allowed_registries
+    excludeNamespaces         = concat(var.exclude_namespaces, var.extra_exclude_namespaces)
+    excludePrincipals         = concat(var.exclude_principals, var.extra_exclude_principals)
+    environmentNamespaceLabel = var.environment_namespace_label
+    requiredWorkloadLabels    = var.required_workload_labels
+    enableMutateDefaults      = var.enable_mutate_defaults
+    enableImageVerification   = var.enable_image_verification
+    verifyFailureAction       = var.verify_failure_action
+    verifyFailurePolicy       = local.verify_failure_policy
     # v3 (ADR-067/069 §6): per-PRODUCT cosign verification. The v2 per-team verifySubjects / tenantRegistryMap /
     # migratedTeams / attestCallerRepos / sharedSignerCallerRepos / tenantHostnamePatterns / enableHttprouteGuard
     # were removed at the cutover (restrict-images / restrict-route-hostnames are Composition-owned per-Environment).
