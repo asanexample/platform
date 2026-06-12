@@ -57,7 +57,7 @@ the rebuild implements and that the access-model-as-code generators ([ADR-053](.
 ```text
 Team ──owns──▶ Product ──owns──▶ Service ◀──sources(1:N)── Repo      (monorepo allowed; one repo : ONE product)
   │              │   └──served-to──▶ Customer                          (consumer; internal | external)
-  │              └──runs-at-a-Stage-as──▶ Environment = (Product × Stage[, × Customer])   ← the namespace = Backstage System
+  │              └──runs-at-a-Stage-as──▶ Environment = (Product × Stage[, × Customer])   ← the namespace = Backstage custom kind:Environment (§10)
   │                                          ├── Isolation  (compute ladder + a SEPARATE data axis)
   │                                          └── Placement  (cloud / region / account / cluster — derived)
 Developer ──member-of──▶ Team (default access) ; ──granted──▶ Product (explicit, cross-team — ADR-068)
