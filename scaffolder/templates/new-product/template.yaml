@@ -67,8 +67,16 @@ spec:
             Semgrep ruleset, and dependabot ecosystem are set accordingly.
           enum:
             - go
+            - nodejs
+            - python
+            - java
+            - rust
           enumNames:
             - "Go (net/http)"
+            - "Node.js (Express)"
+            - "Python (FastAPI)"
+            - "Java (Spring Boot)"
+            - "Rust (Axum)"
           default: go
 
   steps:
