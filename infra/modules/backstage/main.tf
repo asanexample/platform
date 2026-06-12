@@ -121,7 +121,13 @@ locals {
     }
   } : {}
 
-  extra_app_config = merge(local.oidc_app_config, local.kubernetes_app_config, local.argocd_app_config)
+  # platform-projection mode override (ADR-067 cutover): the image's app-config.production.yaml has no
+  # platformProjection.mode (defaults to 'v2'); set projection_mode = "v3" at the unit to flip the catalog to
+  # Product=System / Environment=custom-kind WITHOUT a new image (the L2c code is already in the image). Empty
+  # = leave the image default.
+  projection_app_config = var.projection_mode == "" ? {} : { platformProjection = { mode = var.projection_mode } }
+
+  extra_app_config = merge(local.oidc_app_config, local.kubernetes_app_config, local.argocd_app_config, local.projection_app_config)
 
   backstage_values = {
     # We bring our own Postgres (CNPG or RDS) — never the chart's bundled bitnami Postgres.
