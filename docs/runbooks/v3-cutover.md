@@ -78,8 +78,8 @@ is **admin-merged during the rebuild** (teardown-before-merge). Validated **offl
 | 6a | #285 Tenant Status card re-pointed to the v3 Environment (backstage#36, backward-compatible: cr-* annotations w/ v2 xtenant fallback, kind-agnostic filter+links) — merged + image rolled | ✅ done |
 | 6b | L2c frontend part 2 (backstage#37): a catalog relation processor (ownedBy/partOf for kind:Environment) + the team-tenants card → Environments. kind:Environment uses the default entity page (cards attach by annotation filter, no dedicated EntityPage needed). Merged, image 4fbd38d3 | ✅ done |
 | 6c | the `platformProjection.mode: 'v3'` **activation flip** — all L2c frontend code is pre-positioned + deployed; the cutover sets `mode: 'v3'` in the backstage app-config (no new image needed) | ⛔ TODO (cutover step) |
-| — | app-repo `deploy.yml` rewire (push product-scoped image + pin digest into `overlays/<stage>`) + delete `k8s/preprod/` (Gap 4) | ⛔ TODO (per app repo) |
-| 7 | rebuild-runbook deltas (image-prep ordering, new gitops paths, v3 unit inputs) | ⛔ TODO |
+| 7 | app-repo `deploy.yml` rewire (build `team-<team>/demo-web`; pin the digest into `overlays/dev` via yq) + `preview.yml`/`validate.yml` v3 + delete `k8s/preprod/` — **PRs prepared** (app-bravo#10, app-alpha#35), MERGE-AT-CUTOVER (the product-scoped ECR doesn't exist until the rebuild, so the build checks are expected-red until then — mirrors the v2-rebuild A9 PRs) | ✅ prepared |
+| 8 | rebuild-runbook deltas (image-prep ordering, new gitops paths, v3 unit inputs) | ⛔ TODO |
 
 **Naming locked by the migration:** Product = the v2 tenant `name` (`demo`); Service = `web` (single service;
 image `team-<team>/demo-web`, matching the F1 example + the Gap-2 app restructure); the named SA stays the app's
