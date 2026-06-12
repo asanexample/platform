@@ -12,16 +12,25 @@ terraform {
 }
 
 locals {
-  # Claim-as-single-source (ADR-061): the XTenant claim YAMLs are the sole registry of team→app delivery.
-  # Key each claim by spec.team; the supply-chain identities below derive from spec.apps.<app>.repo (owner/repo).
-  # Replaces the retired app-delivery teams.hcl.
-  claims_dir = "${get_repo_root()}/gitops/tenant-claims/preprod"
-  claims = { for f in fileset(local.claims_dir, "*.yaml") :
-    yamldecode(file("${local.claims_dir}/${f}")).spec.team => yamldecode(file("${local.claims_dir}/${f}"))
+  # v3 cutover (ADR-067/069 §6): the Product registry (gitops/products/<team>/<product>.yaml) is the sole source
+  # of the per-PRODUCT supply-chain identities. metadata.name = <team>-<product>; spec.{team,repo} drive the
+  # cosign/attestation gate. Replaces the v2 per-team derivation from gitops/tenant-claims (removed this cutover).
+  products_dir = "${get_repo_root()}/gitops/products"
+  products = { for f in fileset(local.products_dir, "**/*.yaml") :
+    yamldecode(file("${local.products_dir}/${f}")).metadata.name => yamldecode(file("${local.products_dir}/${f}"))
   }
 
   # Tenant images live in the platform account's ECR (apps push there — see #60).
   ecr_registry = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com"
+
+  # Per-PRODUCT cosign keyless verification (verify-images-product + verify-attestations-product): the shared
+  # trusted-ci signer model, gated to each product by the cert's githubWorkflowRepository extension (= spec.repo).
+  verify_subjects_product = { for name, p in local.products : name => {
+    team           = p.spec.team
+    product        = trimprefix(name, "${p.spec.team}-")
+    repo           = p.spec.repo
+    registryPrefix = "${local.ecr_registry}/team-${p.spec.team}/${trimprefix(name, "${p.spec.team}-")}"
+  } }
 
   # Cosign identity transition complete (2026-05-29): app-alpha re-signed under asanexample and the
   # running image (sha256:d60ea84) verified, so the legacy gangster identity is dropped. Left empty (not
@@ -96,12 +105,12 @@ inputs = {
   # pod IPs, so the admission/cleanup webhook servers must run on hostNetwork (node VPC IP).
   webhook_host_network = true
 
-  # Cluster-wide tenant image floor + per-team scoping (team data stays at the unit level).
+  # Cluster-wide tenant image floor. v3: restrict-images / restrict-route-hostnames are owned PER-ENVIRONMENT by
+  # the Crossplane Composition (product-scoped), so the chart renders no per-team versions — tenant_registry_map
+  # + migrated_teams are empty (the v2 per-team supply-chain maps are removed this cutover).
   allowed_registries  = [local.ecr_registry]
-  tenant_registry_map = { for team, _ in local.claims : team => "${local.ecr_registry}/team-${team}" }
-  # Every team with a Tenant claim is migrated (BACK stack P3): the chart skips their per-team restrict-images /
-  # restrict-route-hostnames policies (the Composition owns those), but keeps verify-images/attestations.
-  migrated_teams = keys(local.claims)
+  tenant_registry_map = {}
+  migrated_teams      = []
 
   # Crossplane (the federated tenant control plane, ADR-046/048) runs here. Its rbac-manager authors wildcard
   # provider ClusterRoles at runtime as its own ServiceAccount (not the deployer), which the cluster-scoped
@@ -127,47 +136,21 @@ inputs = {
   oidc_provider_arn               = dependency.eks.outputs.oidc_provider_arn
   oidc_provider_url               = dependency.eks.outputs.oidc_provider_url
   ecr_account_id                  = include.base.locals.account_ids["platform"]
-  # Per-team cosign keyless identities derived from each team's app repo (team data stays at the unit).
-  # A LIST per team (count:1 attestor): the asanexample identity plus, during the org migration, the
-  # legacy gangster identity (same repo path under the old org). distinct/compact collapse the legacy
-  # entry away once local.legacy_org = "".
-  verify_subjects = { for team, claim in local.claims : team => flatten([
-    for _app, appcfg in claim.spec.apps : [
-      for url in distinct(compact([
-        "https://github.com/${appcfg.repo}",
-        local.legacy_org == "" ? "" : "https://github.com/${replace(appcfg.repo, "asanexample", local.legacy_org)}",
-        ])) : {
-        deploy_subject         = "${url}/.github/workflows/deploy.yml@refs/heads/main"
-        preview_subject_regexp = "${url}/.github/workflows/preview.yml@refs/.*"
-      }
-    ]
-  ]) }
 
-  # SLSA Build L3 (#131, ADR-042): for adopted teams (local.isolated_provenance_teams), verify-attestations
-  # requires the SLSA provenance to be signed by the ISOLATED trusted-ci reusable workflow instead of the
-  # app's own — gated per-team by the cert's githubWorkflowRepository extension (= the team's app repo).
-  # The app dropped its hand-authored provenance step, so each image carries a SINGLE slsaprovenance
-  # attestation (trusted-ci) → a clean one-identity match. (Replaced the dead separate-Audit-policy
-  # approach: two slsaprovenance attestations of different identities ERROR Kyverno's matching →
-  # verifiedCount:0.) SBOM stays app-signed.
-  attest_caller_repos = { for k in local.isolated_provenance_teams :
-    k => values(local.claims[k].spec.apps)[0].repo
-  }
+  # v3 (ADR-067/069 §6): per-PRODUCT cosign keyless verification (verify-images-product +
+  # verify-attestations-product), derived from the Product registry above. Every product uses the SHARED
+  # trusted-ci build-sign (signature + SBOM) and slsa-provenance (provenance) workflows, gated to the product by
+  # the cert's githubWorkflowRepository extension (= spec.repo). The v2 per-team verify_subjects / attest_caller_repos
+  # / shared_signer_caller_repos are emptied (removed this cutover) — the product policies replace them.
+  verify_subjects            = {}
+  verify_subjects_product    = local.verify_subjects_product
+  attest_caller_repos        = {}
+  shared_signer_caller_repos = {}
 
-  # Shared build-sign signer (the thin-caller supply-chain abstraction): for these teams verify-images and
-  # the verify-attestations SBOM ALSO accept the shared trusted-ci/build-sign.yml identity, gated by the
-  # githubWorkflowRepository extension (= the app repo). Derived like attest_caller_repos. The default
-  # trusted_ci_build_subject_regexp in the module matches build-sign.yml at any pinned ref.
-  shared_signer_caller_repos = { for k in local.shared_signer_teams :
-    k => values(local.claims[k].spec.apps)[0].repo
-  }
-
-  # Phase 5 — Gateway-API route hostname guard (anti-squatting on the shared wildcard listener).
-  # For MIGRATED teams the Crossplane Tenant Composition owns restrict-route-hostnames (derived from the
-  # XTenant claim, ADR-060/061), so the chart skips them here — this map is the fallback for any
-  # not-yet-migrated team. Derived from the claim's spec.domains aliases ([] when absent).
+  # Phase 5 — Gateway-API route hostname guard. v3: the Composition owns restrict-route-hostnames per-Environment
+  # (product-scoped, ADR-067/069 §2), so the chart renders no per-team guard — this map is empty.
   enable_httproute_guard   = true
-  tenant_hostname_patterns = { for team, claim in local.claims : team => try([for d in claim.spec.domains : d.host], []) }
+  tenant_hostname_patterns = {}
   enable_cleanup           = true
 
   tags = include.base.locals.tags

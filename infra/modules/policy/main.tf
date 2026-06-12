@@ -159,6 +159,7 @@ locals {
     verifyFailureAction     = var.verify_failure_action
     verifyFailurePolicy     = local.verify_failure_policy
     verifySubjects          = var.verify_subjects
+    verifySubjectsProduct   = var.verify_subjects_product
     rekorUrl                = var.rekor_url
 
     enableAttestationVerification = var.enable_attestation_verification

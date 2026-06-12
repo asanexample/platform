@@ -1,0 +1,112 @@
+{{- if and .Values.enableImageVerification .Values.enableAttestationVerification }}
+{{- range $key, $p := .Values.verifySubjectsProduct }}
+{{- /*
+v3 (ADR-067/069 §6) per-PRODUCT attestation verification — the per-TEAM verify-attestations.yaml analog. On top
+of the signature (verify-images-product), a team-<team>/<product>-* image in the product's environment namespaces
+must carry a cosign-signed SBOM (CycloneDX) AND a SLSA build provenance attestation. Both come from the SHARED
+asanexample/trusted-ci reusable workflows (build-sign.yml for the SBOM, slsa-provenance.yml for provenance, the
+ADR-050 backbone every v3 app calls) — same cert SUBJECT for all, gated to this product by the certificate's
+githubWorkflowRepository extension (= the Product repo, which Fulcio sets from the calling repo's OIDC, so another
+product cannot forge it). Optional per-product app-signed identities (appSubjects) cover bespoke-build products.
+ADDITIVE: renders only when verifySubjectsProduct is populated (the cutover); the v2 verify-attestations.yaml is
+removed in the same change.
+*/}}
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-attestations-product-{{ $p.team }}-{{ $p.product }}
+  labels:
+    {{- include "kpp.labels" $ | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Verify Image Attestations — {{ $p.team }}/{{ $p.product }}
+    policies.kyverno.io/category: Supply Chain, Multi-Tenancy
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Requires team-{{ $p.team }}/{{ $p.product }}- images to carry a cosign-signed SBOM (CycloneDX) AND a SLSA
+      build provenance attestation from the shared asanexample/trusted-ci workflows, gated to this product by the
+      certificate's githubWorkflowRepository extension (= {{ $p.repo }}) — the full provenance chain layered on top
+      of the signature (verify-images-product-{{ $p.team }}-{{ $p.product }}). Predicate types match what the build
+      emits: `cosign attest --type cyclonedx` (https://cyclonedx.org/bom) and `--type slsaprovenance`
+      (https://slsa.dev/provenance/v0.2).
+spec:
+  # Own action/failurePolicy so the SBOM+provenance requirement can roll Audit-first while verify-images-product
+  # (signatures) stays Enforce. Digest pinning is done there; here we only fetch + verify the attestations.
+  validationFailureAction: {{ $.Values.attestFailureAction }}
+  webhookTimeoutSeconds: 30
+  failurePolicy: {{ $.Values.attestFailurePolicy }}
+  background: false
+  rules:
+    - name: require-sbom-and-provenance
+      match:
+        any:
+          # The product's environment namespaces carry team + product labels (set by the v3 Composition).
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  platform.refplat.org/team: {{ $p.team }}
+                  platform.refplat.org/product: {{ $p.product }}
+      verifyImages:
+        - imageReferences:
+            - "{{ $p.registryPrefix }}-*"
+          mutateDigest: false # verify-images-product pins the digest; don't double-mutate
+          verifyDigest: false
+          required: true
+          attestations:
+            # SBOM (CycloneDX) — signed by the shared trusted-ci build-sign workflow, gated to this product.
+            - type: https://cyclonedx.org/bom
+              attestors:
+                - count: 1
+                  entries:
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        # single-quoted: the anchored regex carries backslash escapes (\.).
+                        subjectRegExp: {{ $.Values.trustedCiBuildSubjectRegExp | squote }}
+                        additionalExtensions:
+                          githubWorkflowRepository: {{ $p.repo | quote }}
+                        rekor:
+                          url: "{{ $.Values.rekorUrl }}"
+                    {{- range $i := ($p.appSubjects | default list) }}
+                    # Optional bespoke-build app-signed SBOM identities.
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subject: "{{ $i.deploy_subject }}"
+                        rekor:
+                          url: "{{ $.Values.rekorUrl }}"
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subjectRegExp: "{{ $i.preview_subject_regexp }}"
+                        rekor:
+                          url: "{{ $.Values.rekorUrl }}"
+                    {{- end }}
+            # SLSA build provenance — signed by the isolated trusted-ci slsa-provenance workflow (SLSA Build L3,
+            # ADR-042), gated to this product. The app does not self-attest provenance under the v3 backbone.
+            - type: https://slsa.dev/provenance/v0.2
+              attestors:
+                - count: 1
+                  entries:
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subjectRegExp: {{ $.Values.trustedCiSubjectRegExp | squote }}
+                        additionalExtensions:
+                          githubWorkflowRepository: {{ $p.repo | quote }}
+                        rekor:
+                          url: "{{ $.Values.rekorUrl }}"
+                    {{- range $i := ($p.appSubjects | default list) }}
+                    # Optional bespoke-build app-signed provenance identities.
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subject: "{{ $i.deploy_subject }}"
+                        rekor:
+                          url: "{{ $.Values.rekorUrl }}"
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subjectRegExp: "{{ $i.preview_subject_regexp }}"
+                        rekor:
+                          url: "{{ $.Values.rekorUrl }}"
+                    {{- end }}
+---
+{{- end }}
+{{- end }}
