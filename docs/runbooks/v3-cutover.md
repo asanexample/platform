@@ -142,6 +142,17 @@ rebuild the app images must be **built + pushed first** (the per-Product OIDC ro
 must build images before/at ArgoCD sync, or the first sync deploys a not-yet-pushed image). Add to the rebuild
 runbook's image-prep step.
 
+**First-deploy OutOfSync is EXPECTED and self-converges (no manual step needed).** A brand-new Environment's
+overlay ships `:placeholder` until the app's first CI build commits the signed-digest pin — a *separate* commit
+after the build-trigger push. Between those two commits ArgoCD syncs the pre-pin revision, Kyverno
+`verify-images-product` rejects the unpinned image, and the App shows `OutOfSync`/`SyncFailed`. This is normal:
+the per-Product ApplicationSet now uses a **fail-fast retry** (`local.first_deploy_retry`, limit 4 / 15s→2m,
+vs the platform apps' 45-min `sync_retry`), so the doomed pre-pin sync gives up in ~minutes and `selfHeal`
+picks up the pin commit (a revision change) automatically — converging within ~one cycle of the pin landing.
+You should NOT need `argocd app terminate-op` anymore; if you want to shortcut the wait, it still works
+(`argocd app terminate-op <app> && argocd app get <app> --hard-refresh`). The proper end-state fix (build+pin in
+one revision) is the P2 promote-by-PR redesign (#377).
+
 ## What the trace makes the next build targets
 
 In priority order (all cutover-blocking except L3a):

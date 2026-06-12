@@ -45,6 +45,24 @@ locals {
       maxDuration = "5m"
     }
   }
+
+  # Fail-FAST retry for the per-Product ApplicationSet's generated Applications (v3-delivery). Their first
+  # deploy is special: a brand-new Environment's app overlay carries `:placeholder` (no digest yet) until the
+  # app's first CI build commits the signed-digest pin — a SEPARATE commit after the build-trigger push. ArgoCD
+  # auto-syncs the pre-pin revision, Kyverno verify-images-product rejects the unpinned image, and the long
+  # sync_retry above then keeps the operation hammering that stale revision for ~45 min, holding the lock so
+  # selfHeal can't pick up the pin commit until a human `argocd app terminate-op`s it. A short, low-limit retry
+  # makes the doomed pre-pin sync give up in ~minutes; the pin commit is a revision change, so selfHeal then
+  # auto-syncs HEAD and converges with no manual step. Steady-state deploys are unaffected (the overlay already
+  # carries a valid digest, so the sync succeeds and retry never fires). See docs/runbooks/v3-cutover.md.
+  first_deploy_retry = {
+    limit = 4
+    backoff = {
+      duration    = "15s"
+      factor      = 2
+      maxDuration = "2m"
+    }
+  }
 }
 
 # ---------------------------------------------------------------------------
