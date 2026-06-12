@@ -54,6 +54,31 @@ flow through the whole v3 stack — which **surfaced real integration gaps** (th
    re-point the #285 status card to the `cr-*` annotations + the team-tenants card → Environments.
 7. **Run the rebuild** (the supervised op) — it deploys the above from scratch.
 
+## Cutover commit — build status (`feat/v3-cutover` branch)
+
+The cutover commit is accumulated on the **`feat/v3-cutover`** branch — NOT mergeable via a normal gated PR (the
+base-branch v2 `teams-gate`/`tenant-claims-gate` would reject the v1alpha3 teams + claim deletions, Gap 3), so it
+is **admin-merged during the rebuild** (teardown-before-merge). Validated **offline** by the v3 gate scripts +
+`crossplane render` + the projection logic.
+
+| Step | Piece | Status |
+| ---- | ----- | ------ |
+| 1 | gitops/teams → v1alpha3 (`allowedStages`, `maxDedicatedIsolation`) | ✅ done (4 teams) |
+| 1 | gitops/products + environments (alpha, bravo) ; **charlie dropped** (throwaway — re-provision via v3 self-service); tenant-claims/ deleted | ✅ done — gate + render green |
+| 2 | Team CRD storage → v1alpha3 (Gap 1; v1alpha2 served:false) | ✅ done |
+| 3 | unit gate flips — argocd-apps `platform_repo_url`, github-oidc `v3_delivery_enabled=true`, policy `enableEnvironmentEnvelope`/`enableImageVerification`/`verifySubjectsProduct` | ⛔ TODO |
+| 4 | `teams-gate` → v1alpha3 (`allowedStages`, `maxDedicatedIsolation` object) ; retire `tenant-claims-gate` | ⛔ TODO |
+| 5 | remove v2 — XTenant `xrd.yaml`, `composition-v2.yaml`(+wrapper), `tenant-envelope.yaml`, per-team `verify-images.yaml`, v2 `verifySubjects`/`tenantRegistryMap` derivations, per-team github-oidc roles, the v1alpha2 Team version block | ⛔ TODO |
+| 5 | crossplane `tenant` + `tenant-policies` chart Chart.yaml version bumps (helm re-render) | ⛔ TODO |
+| 6 | Backstage `platformProjection.mode: 'v3'` + the L2c frontend follow-ups (kind:Environment EntityPage + relation processor + #285/team-tenants re-point) | ⛔ TODO |
+| — | app-repo `deploy.yml` rewire (push product-scoped image + pin digest into `overlays/<stage>`) + delete `k8s/preprod/` (Gap 4) | ⛔ TODO (per app repo) |
+| 7 | rebuild-runbook deltas (image-prep ordering, new gitops paths, v3 unit inputs) | ⛔ TODO |
+
+**Naming locked by the migration:** Product = the v2 tenant `name` (`demo`); Service = `web` (single service;
+image `team-<team>/demo-web`, matching the F1 example + the Gap-2 app restructure); the named SA stays the app's
+`app-<team>` (the app deployment's `serviceAccountName`). v2 `developerAccess` drops — subsumed by the ADR-068
+access model (no per-Environment field).
+
 ## End-to-end coherence trace — and the gaps it surfaced
 
 Walking one path — *New Product `alpha/shop` → first deploy* — through the v3 stack, checking every handoff:

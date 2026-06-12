@@ -1,5 +1,5 @@
 # Team bravo — first-class git-native governance object (ADR-063). See alpha.yaml for the model.
-apiVersion: platform.refplat.org/v1alpha2
+apiVersion: platform.refplat.org/v1alpha3
 kind: Team
 metadata:
   name: bravo
@@ -10,10 +10,10 @@ spec:
   ssoGroup: Dev-bravo
   envelope:
     allowedTiers: ["standard"]
-    allowedEnvironments: ["dev", "test", "uat", "staging", "prod"]
+    allowedStages: ["dev", "test", "uat", "staging", "prod"]
     allowedLocations: ["*"]
     quotaCap:
       cpu: "8"
       memory: 16Gi
       pods: 40
-    maxDedicatedZones: 0
+    maxDedicatedIsolation: { cluster: 0, account: 0 }

@@ -1,8 +1,8 @@
 # Team charlie — first-class git-native governance object (ADR-063).
-# The envelope is the bound on every Tenant this team may author; Kyverno reads the projected Team CR during
-# XTenant admission (restrict-tenant-envelope). Platform-authored (admin-only); developers author Tenants, not
-# this. Source of truth for the team's identity (ssoGroup) + envelope.
-apiVersion: platform.refplat.org/v1alpha2
+# The envelope is the bound on every Product/Environment this team may author; Kyverno reads the projected Team
+# CR during XEnvironment admission (restrict-environment-envelope, ADR-067). Platform-authored (admin-only);
+# developers author Products/Environments, not this. Source of truth for the team's identity (ssoGroup) + envelope.
+apiVersion: platform.refplat.org/v1alpha3
 kind: Team
 metadata:
   name: charlie
@@ -13,10 +13,10 @@ spec:
   ssoGroup: Dev-charlie
   envelope:
     allowedTiers: ["standard"]
-    allowedEnvironments: ["dev"]
+    allowedStages: ["dev"]
     allowedLocations: ["*"]
     quotaCap:
       cpu: "8"
       memory: 16Gi
       pods: 40
-    maxDedicatedZones: 0
+    maxDedicatedIsolation: { cluster: 0, account: 0 }

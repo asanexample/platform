@@ -20,9 +20,12 @@ spec:
     categories:
       - tenant-api
   versions:
+    # v1alpha2 — DEPRECATED at the v3 cutover (ADR-067). v1alpha3 is now the stored + served version; v1alpha2
+    # is retained (served:false) only so a CRD upgrade over any lingering v1alpha2 object doesn't hard-fail.
+    # A from-scratch rebuild has no stored v1alpha2 Teams, so this version block can be dropped entirely there.
     - name: v1alpha2
-      served: true
-      storage: true
+      served: false
+      storage: false
       schema:
         openAPIV3Schema:
           type: object
@@ -115,7 +118,7 @@ spec:
     # -------------------------------------------------------------------------------------------------------
     - name: v1alpha3
       served: true
-      storage: false
+      storage: true
       schema:
         openAPIV3Schema:
           type: object
