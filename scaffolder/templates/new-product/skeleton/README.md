@@ -39,5 +39,5 @@ admission. Nothing per-app to maintain — it lives in `trusted-ci`.
 - A new Service for this product → add `k8s/base/<service>.yaml` + its image; a new Stage/Environment → use the
   **New Environment** portal template (authors `gitops/environments/${{ values.team }}/${{ values.product }}/<stage>.yaml`).
 
-The team + product were registered in the platform repo (`gitops/products/${{ values.team }}/${{ values.product }}.yaml`
-+ the `dev` Environment claim) by the same New Product run. See `docs/runbooks/app-supply-chain-onboarding.md`.
+The team and product were registered in the platform repo — the `gitops/products/${{ values.team }}/${{ values.product }}.yaml`
+registry entry and the `dev` Environment claim — by the same New Product run. See `docs/runbooks/app-supply-chain-onboarding.md`.
