@@ -34,7 +34,7 @@ spec:
     - name: verify-signed
       match:
         any:
-          # The product's environment namespaces carry team + product labels (set by the v3 Composition),
+          # The product's environment namespaces carry team + product labels (set by the Composition),
           # so select by label rather than enumerating <team>-<product>-<stage>[-<customer>] names.
           - resources:
               kinds:

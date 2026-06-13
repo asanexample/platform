@@ -18,7 +18,7 @@
 | **Grace** | The environment sits suspended. Back up any app data now (see below). | — | A separate PR / time; not CI-time-gated. |
 | **Purge** | Remove the claim file → ArgoCD prune deletes the XEnvironment → Crossplane deletes the namespace. **ECR is orphaned (images kept).** | Largely — re-add the claim to recreate the namespace/IAM; ECR repo + images are reused. | A **human-authored, reviewed** PR (the gate requires it). |
 
-## What the gate enforces (`v3 gitops Gate`)
+## What the gate enforces (`gitops Gate`)
 
 - A claim may be **deleted only if it is `decommissioning` on the base branch** — you cannot one-shot delete an
   active environment (the decommission must merge first, in its own PR → a real reversible window).

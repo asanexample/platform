@@ -1,19 +1,19 @@
-name: v3 gitops — gate on PR
+name: gitops — gate on PR
 
-# Validate the ADR-067 v3 registry surfaces on a PR: the Product registry (gitops/products/**) and the
-# Environment claims (gitops/environments/**). Shift-left for the admission controls a v3 PR will hit:
+# Validate the ADR-067 registry surfaces on a PR: the Product registry (gitops/products/**) and the
+# Environment claims (gitops/environments/**). Shift-left for the admission controls a PR will hit:
 #   - Product: schema shape + enums + ownership (the owning Team exists) — see validate-products.sh
 #   - Environment: schema + enums + the ENVELOPE (stage/tier ∈ Team envelope, team == Product.team,
 #     customer-iff-per-customer-prod, the policyStatements IAM deny-set) — the same checks
 #     restrict-environment-envelope (#387) makes at admission, run pre-merge — see validate-environments.sh
 #
 # Sibling of the Teams Gate / Tenant Claims Gate. Validation-only and meant to be a REQUIRED status check on
-# main (the classify step short-circuits to trivially-green on non-v3 PRs, so a path filter — which would never
-# report on unrelated PRs and block them forever — is deliberately NOT used). The v3 surfaces are empty until
+# main (the classify step short-circuits to trivially-green on non-PRs, so a path filter — which would never
+# report on unrelated PRs and block them forever — is deliberately NOT used). The surface are empty until
 # the cutover (docs/runbooks/v3-cutover.md), so today this is inert; it activates the moment the first
 # gitops/products or gitops/environments file lands.
 #
-# AUTO-MERGE + DELETION GUARD (ADR-062 §3-4, the v3 successor to the Tenant Claims Gate). Decision table:
+# AUTO-MERGE + DELETION GUARD (ADR-062 §3-4, the successor to the Tenant Claims Gate). Decision table:
 #   author          diff                                outcome
 #   scaffolder App  ⊆ gitops/{products,environments},   gate green + auto-merge armed (merges when ALL
 #                   no deletions, validation passes      required checks pass)
@@ -21,7 +21,7 @@ name: v3 gitops — gate on PR
 #   scaffolder App  a claim DELETION                     rejected (the bot never deletes — #283)
 #   human           a claim deletion                     decommission-first guard (Environment must be on
 #                                                        spec.lifecycle.phase: decommissioning at base) + a
-#                                                        current-SHA admin/maintainer approval (the "v3 gitops
+#                                                        current-SHA admin/maintainer approval (the "gitops
 #                                                        Approval" commit status); never auto-armed
 #   human           adds/edits, no deletion              validated, never auto-armed
 # See docs/runbooks/tenant-claims-automerge.md for the full model (shared with the Teams/v2 gates).
@@ -41,15 +41,15 @@ on:
 permissions:
   contents: write # gh pr merge --auto
   pull-requests: write
-  statuses: write # publish the "v3 gitops Approval" commit status (last-write-wins; see the verdict step)
+  statuses: write # publish the "gitops Approval" commit status (last-write-wins; see the verdict step)
 
 concurrency:
-  group: v3-gitops-gate-${{ github.event.pull_request.number }}
+  group: gitops-gate-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   gate:
-    name: v3 gitops Gate
+    name: gitops Gate
     runs-on: ubuntu-latest # pure YAML validation — no cluster/private-API access needed
     env:
       # IAM deny-set for Service policyStatements (mirrors the policy's iamSensitiveServices / #387).
@@ -68,21 +68,21 @@ jobs:
           ref: ${{ github.event.pull_request.base.ref }}
           path: base
 
-      # Classify FIRST (cheap, gh-api only) so the rest short-circuits on non-v3 PRs → the job still reports
-      # the "v3 gitops Gate" check (required-check compatible) without doing any validation work.
+      # Classify FIRST (cheap, gh-api only) so the rest short-circuits on non-PRs → the job still reports
+      # the "gitops Gate" check (required-check compatible) without doing any validation work.
       - name: Classify diff
         id: classify
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: bash base/.github/scripts/v3-gate/classify-diff.sh
+        run: bash base/.github/scripts/gitops-gate/classify-diff.sh
 
-      # Untrusted: ONLY the v3 registry trees, sparse, no credentials, data-only. Nothing here runs; the
+      # Untrusted: ONLY the registry trees, sparse, no credentials, data-only. Nothing here runs; the
       # validators (from base) read these files with yq as data. A new Product added by the same PR is read
       # from head (the environment validator resolves the Product from head, falling back to base).
       # nosemgrep: yaml.github-actions.security.pull-request-target-code-checkout.pull-request-target-code-checkout
-      - name: Checkout PR v3 registry (untrusted, data-only)
+      - name: Checkout PR registry (untrusted, data-only)
         if: steps.classify.outputs.any == 'true'
         uses: actions/checkout@v4
         with:
@@ -110,7 +110,7 @@ jobs:
           BASE_DIR: ${{ github.workspace }}/base
           HEAD_DIR: ${{ github.workspace }}/head
           PRODUCT_FILES: ${{ steps.classify.outputs.product_files }}
-        run: bash base/.github/scripts/v3-gate/validate-products.sh
+        run: bash base/.github/scripts/gitops-gate/validate-products.sh
 
       - name: Validate Environments (schema + envelope shift-left)
         if: steps.classify.outputs.any == 'true' && steps.classify.outputs.environment_files != ''
@@ -118,9 +118,9 @@ jobs:
           BASE_DIR: ${{ github.workspace }}/base
           HEAD_DIR: ${{ github.workspace }}/head
           ENVIRONMENT_FILES: ${{ steps.classify.outputs.environment_files }}
-        run: bash base/.github/scripts/v3-gate/validate-environments.sh
+        run: bash base/.github/scripts/gitops-gate/validate-environments.sh
 
-      # --- composition render: prove each Environment claim BUILDS against the v3 Composition (the
+      # --- composition render: prove each Environment claim BUILDS against the Composition (the
       # Environment+Product join), catching schema/envelope-valid-but-render-breaking claims. Only when there
       # are Environment files. Docker is preinstalled on ubuntu-latest; crank is built from the Go module proxy
       # (releases.crossplane.io intermittently 403s runner IPs — same install as the Tenant Claims Gate).
@@ -140,7 +140,7 @@ jobs:
           BASE_DIR: ${{ github.workspace }}/base
           HEAD_DIR: ${{ github.workspace }}/head
           ENVIRONMENT_FILES: ${{ steps.classify.outputs.environment_files }}
-        run: bash base/.github/scripts/v3-gate/render-environments.sh
+        run: bash base/.github/scripts/gitops-gate/render-environments.sh
 
       # ---- auto-merge + deletion lifecycle (ADR-062 §3-4) -------------------------------------------
       - name: Identify author
@@ -170,16 +170,16 @@ jobs:
         env:
           BASE_DIR: ${{ github.workspace }}/base
           DELETED_FILES: ${{ steps.classify.outputs.deleted_files }}
-        run: bash base/.github/scripts/v3-gate/validate-deletions.sh
+        run: bash base/.github/scripts/gitops-gate/validate-deletions.sh
 
-      # Arm GitHub auto-merge ONLY for App-authored, v3-registry-only, non-deletion, fully-validated PRs. GitHub
+      # Arm GitHub auto-merge ONLY for App-authored, registry-only, non-deletion, fully-validated PRs. GitHub
       # performs the merge once ALL required checks pass (this job racing ci.yml is harmless). Idempotent for
       # synchronize/review re-runs. NB: GITHUB_TOKEN merges don't trigger main's push workflows — ArgoCD pulls
       # git directly, so provisioning is unaffected.
       - name: Arm auto-merge
         if: >
           steps.author.outputs.bot == 'true' &&
-          steps.classify.outputs.non_v3_changes == 'false' &&
+          steps.classify.outputs.non_registry_changes == 'false' &&
           steps.classify.outputs.deletions == 'false' &&
           steps.classify.outputs.any == 'true'
         env:
@@ -198,7 +198,7 @@ jobs:
       # The deletion admin-approval requirement is published HERE as a commit status — NOT a job failure — so it
       # survives the pull_request_target → pull_request_review handoff (commit statuses are last-write-wins per
       # (sha, context): the post-approval run overwrites the pre-approval failure, unblocking WITHOUT a manual
-      # re-run). Default success; required only for claim deletions. Make "v3 gitops Approval" the
+      # re-run). Default success; required only for claim deletions. Make "gitops Approval" the
       # branch-protection required check for the deletion-approval gate.
       - name: Publish approval verdict (commit status)
         if: always()
@@ -228,6 +228,6 @@ jobs:
             fi
           fi
           gh api --method POST "repos/${REPO}/statuses/${HEAD_SHA}" \
-            -f state="$state" -f context="v3 gitops Approval" \
+            -f state="$state" -f context="gitops Approval" \
             -f description="$desc" -f target_url="$RUN_URL" >/dev/null
-          echo "v3 gitops Approval = ${state} — ${desc}"
+          echo "gitops Approval = ${state} — ${desc}"

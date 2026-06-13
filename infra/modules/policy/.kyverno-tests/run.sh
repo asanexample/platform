@@ -36,7 +36,7 @@ fi
 echo "Mutation smoke-check passed ($APPLIED mutations applied via autogen, 0 errors)."
 
 # Render-check the per-PRODUCT supply-chain verification (verify-images-product + verify-attestations-product,
-# ADR-067/069 §6 — the v3 successors to the per-team verify-images/verify-attestations, which moved here from
+# ADR-067/069 §6 — the successors to the per-team verify-images/verify-attestations, which moved here from
 # the retired per-team policies at the cutover). Every product uses the SHARED trusted-ci signer (build-sign for
 # the signature + SBOM, slsa-provenance for provenance), gated to the product by the cert's
 # githubWorkflowRepository extension (= the Product repo). verifyImages can't be unit-tested offline (cosign/Rekor

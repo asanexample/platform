@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# v3 Environment gate (#388) — composition render. Proves each PR XEnvironment claim actually BUILDS against the
-# v3 Composition (the Environment+Product join, the go-templating function pipeline) — catching a claim that is
+# Environment gate (#388) — composition render. Proves each PR XEnvironment claim actually BUILDS against the
+# Composition (the Environment+Product join, the go-templating function pipeline) — catching a claim that is
 # schema/envelope-valid but render-breaking (a bad service config, an un-templatable value). Mirrors the Tenant
-# Claims Gate's render step (validate-claims.sh) for the v3 surface.
+# Claims Gate's render step (validate-claims.sh) for the surface.
 #
 # The Composition, functions, and EnvironmentConfig all come from the TRUSTED base; only the claim is from head,
 # and `crossplane render` reads it as data (no cluster, Docker-run functions).
@@ -16,7 +16,7 @@ set -uo pipefail
 : "${BASE_DIR:?}" "${HEAD_DIR:?}"
 ENVIRONMENT_FILES="${ENVIRONMENT_FILES:-}"
 
-COMPOSITION="${BASE_DIR}/infra/modules/crossplane/charts/tenant/files/composition-v3.yaml"
+COMPOSITION="${BASE_DIR}/infra/modules/crossplane/charts/tenant/files/composition.yaml"
 FIXTURES="${BASE_DIR}/infra/modules/crossplane/.tenant-api-tests/render"
 FNS="${FIXTURES}/functions.yaml"
 ENVCFG="${FIXTURES}/environmentconfig.yaml"

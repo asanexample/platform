@@ -9,7 +9,7 @@ type: application
 # 0.3.1: per-customer Environment completeness (#422) — the Pod-Identity role now carries the customer
 # (Pod-<team>-<product>-<customer>-<stage>-<svc> + a Customer tag) so two per-customer prod Environments of one
 # Product/Service no longer collide on one IAM role. Version bump so the helm provider re-renders the raw
-# composition-v3.yaml on an in-place upgrade (it only diffs on a chart version change).
+# composition.yaml on an in-place upgrade (it only diffs on a chart version change).
 # 0.3.0: v3 cutover (ADR-067) — XEnvironment is the sole composite; the v1alpha2 XTenant XRD + composition-v2 +
 # the v1alpha2 Team version are removed. (0.2.0: deprovisioning safety, ADR-062 #283 — lifecycle.phase zeroes the
 # ResourceQuota; ECR → deletionPolicy: Orphan.)

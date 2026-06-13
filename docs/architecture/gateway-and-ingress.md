@@ -92,7 +92,7 @@ The Environment Composition unions the generated host(s) with `spec.domains` int
 `ClusterPolicy` **`restrict-route-hostnames-<product>`** that **denies** any `HTTPRoute`/`GRPCRoute`/
 `TLSRoute` hostname not in the allow-list (Enforce). The allow-list and the matching `status.domains` entries
 are both rendered from the same template pass in
-`infra/modules/crossplane/charts/environment-api/files/composition-v3.yaml` — see
+`infra/modules/crossplane/charts/environment-api/files/composition.yaml` — see
 [crossplane-composition-authoring.md](crossplane-composition-authoring.md) for the mechanism. There is **no
 second registry**: the v2 `teams.hcl` hostnames were retired (ADR-061 Phase 1).
 

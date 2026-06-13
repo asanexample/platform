@@ -542,4 +542,4 @@ a breaking cutover landed with the rebuild — no in-place migration. Object- an
 | `status.placement { …, zone, namespace }` | `status.placement { cloud, region, account, cluster, namespace }` | `zone` dropped (retired); Stage may map to multiple placements. |
 
 The interim v2 model (`team == tenant`, the v1alpha2 `XTenant`) is retired: the rebuild replaced it with this
-v3 schema (`XEnvironment`, `v1beta1`), which is now what's deployed.
+schema (`XEnvironment`, `v1beta1`), which is now what's deployed.

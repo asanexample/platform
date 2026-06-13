@@ -13,12 +13,12 @@
 ## ⚠️ v3 supersedes this (2026-06-12)
 
 The v2 Environment Claims Gate was **retired at the v3 cutover**; its automerge + decommission-first deletion model
-now lives in the **`v3 gitops Gate`** (`.github/workflows/v3-gitops-gate.yml`), which gates the v3 registry
+now lives in the **`gitops Gate`** (`.github/workflows/gitops-gate.yml`), which gates the registry
 surfaces (`gitops/products/**`, `gitops/environments/**`). Same model — see that workflow's header decision
 table. What's different for v3:
 
 - **Scaffolder templates:** New Product, New Environment, Deprovision (not New Environment). A bot-authored,
-  v3-registry-only, non-deletion, fully-validated PR arms auto-merge; deletions are decommission-first
+  registry-only, non-deletion, fully-validated PR arms auto-merge; deletions are decommission-first
   (`spec.lifecycle.phase: decommissioning` on base) + a current-SHA admin approval.
 - **Deletion guards (`validate-deletions.sh`, two checks):**
   - **Environment** — decommission-first: a `gitops/environments/**` claim may only be deleted if it was
@@ -28,14 +28,14 @@ table. What's different for v3:
     also delete). Deleting a Product with live Environments would orphan its per-Product OIDC role / ECR /
     ApplicationSet and break the survivors' Composition render. Order: decommission + remove every Environment
     first, then remove the Product (a single PR may bundle the Product with its already-decommissioned
-    Environments). Unit-tested by `.github/scripts/v3-gate/test-validate-deletions.sh`.
-- **Required checks (activation):** update `main`'s branch protection — **add** `v3 gitops Gate` +
-  `v3 gitops Approval`, **remove** the retired `Environment Claims Gate` + `Kyverno Shift-Left (dogfood)`. Until
-  `v3 gitops Approval` is a required check, a registry deletion isn't gated on the approval (the gate still
+    Environments). Unit-tested by `.github/scripts/gitops-gate/test-validate-deletions.sh`.
+- **Required checks (activation):** update `main`'s branch protection — **add** `gitops Gate` +
+  `gitops Approval`, **remove** the retired `Environment Claims Gate` + `Kyverno Shift-Left (dogfood)`. Until
+  `gitops Approval` is a required check, a registry deletion isn't gated on the approval (the gate still
   posts the status, but branch protection isn't enforcing it). See the updated settings block below.
 
 The rest of this runbook (CI-gate integrity, threat model, repo settings rationale) applies unchanged — read
-"claim" as the v3 Environment/Product registry files and "Environment Claims Gate" as "v3 gitops Gate".
+"claim" as the Environment/Product registry files and "Environment Claims Gate" as "gitops Gate".
 
 ---
 
@@ -109,7 +109,7 @@ gh api -X PUT repos/asanexample/platform/branches/main/protection --input - <<'J
     {"context": "Kyverno Policy Test"},
     {"context": "Environment API Schema"}, {"context": "Environment Composition Render"},
     {"context": "TFLint"}, {"context": "Trivy (IaC + deps)"}, {"context": "Semgrep (SAST)"},
-    {"context": "v3 gitops Gate"}, {"context": "v3 gitops Approval"} ] },
+    {"context": "gitops Gate"}, {"context": "gitops Approval"} ] },
   "enforce_admins": false,
   "required_pull_request_reviews": null,
   "restrictions": null,

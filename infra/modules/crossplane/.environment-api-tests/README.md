@@ -1,16 +1,16 @@
 # Environment API schema + render tests
 
-Offline validation of the **v3 Environment API** ([ADR-067](../../../../docs/adrs/067-idp-domain-model.md),
+Offline validation of the **Environment API** ([ADR-067](../../../../docs/adrs/067-idp-domain-model.md),
 [schema](../../../../docs/architecture/platform-domain-api.md)) — the `XEnvironment` XRD
 (`../charts/environment-api/templates/xenvironment-xrd.yaml`) and the projected `Team` / `Product` / `AccessGrant` CRDs.
-**v3-only since the cutover** (the v1alpha2 `XTenant` surface was removed).
+**the sole API surface since the cutover** (the v1alpha2 `XTenant` surface was removed).
 
 Two harnesses, both cluster-free:
 
 - **`run.sh`** — `crossplane beta validate` checks the example claims/records against each XRD/CRD's OpenAPI v3
   schema + `x-kubernetes-validations` CEL rules (no cluster, no Composition, no Docker). CI job **Environment API
   Schema**.
-- **`render.sh`** — `crossplane render` of the **v3 Composition** (`../charts/environment-api/files/composition-v3.yaml`)
+- **`render.sh`** — `crossplane render` of the **Composition** (`../charts/environment-api/files/composition.yaml`)
   via Docker-run Pipeline functions; asserts the rendered Environment footprint (namespace
   `<team>-<product>[-<customer>]-<stage>`, product-scoped ECR/Pod-Identity, quota, netpols, RoleBinding,
   restrict-images/route-hostnames). Fixtures in `render/` (pinned `functions.yaml` + `environmentconfig.yaml`).
@@ -22,7 +22,7 @@ environments/          valid XEnvironment claims that MUST pass (demo-dev first-
 environments-invalid/  XEnvironment claims that MUST be rejected (schema/enum/CEL)
 products/              valid Product records that MUST pass        ; products-invalid/  rejected
 grants/                valid AccessGrant records that MUST pass    ; grants-invalid/    rejected
-teams-v3/              valid v1alpha3 Team records that MUST pass  ; teams-v3-invalid/  rejected
+teams/              valid v1alpha3 Team records that MUST pass  ; teams-invalid/  rejected
 ```
 
 `run.sh` also validates the LIVE git-native objects (`gitops/teams`, `gitops/products`, `gitops/environments`)

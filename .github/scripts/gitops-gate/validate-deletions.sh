@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# v3 gitops gate — deprovisioning guard (ADR-062 #283, the v3 successor to the Tenant Claims Gate's
+# gitops gate — deprovisioning guard (ADR-062 #283, the successor to the Tenant Claims Gate's
 # validate-deletions.sh). Removing an Environment claim hard-deletes the Environment (ArgoCD prune → Crossplane
 # tears down the namespace; ECR is retained via deletionPolicy: Orphan). To make a one-shot destroy-of-active
 # impossible, an Environment claim may only be deleted if it was first put into the `decommissioning` grace
@@ -23,7 +23,7 @@ set -euo pipefail
 : "${BASE_DIR:?}"
 DELETED_FILES="${DELETED_FILES:-}"
 
-fail() { echo "::error::v3-gate(deprovision): $*" >&2; exit 1; }
+fail() { echo "::error::gitops-gate(deprovision): $*" >&2; exit 1; }
 
 guarded=0
 for f in $DELETED_FILES; do
@@ -75,4 +75,4 @@ for f in $DELETED_FILES; do
   prod_guarded=$((prod_guarded + 1))
 done
 
-echo "v3-gate: ${guarded} Environment deletion(s) decommission-first; ${prod_guarded} Product deletion(s) completeness-checked"
+echo "gitops-gate: ${guarded} Environment deletion(s) decommission-first; ${prod_guarded} Product deletion(s) completeness-checked"

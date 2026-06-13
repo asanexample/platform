@@ -9,7 +9,7 @@ hop.
 Source of truth:
 
 - XRD — `infra/modules/crossplane/charts/environment-api/templates/xenvironment-xrd.yaml`
-- Composition — `infra/modules/crossplane/charts/environment-api/files/composition-v3.yaml`
+- Composition — `infra/modules/crossplane/charts/environment-api/files/composition.yaml`
 - Control plane (core, providers, ProviderConfig, identity) — `infra/modules/crossplane/main.tf`
 - Status-loop proof — [ADR-061 Phase 2 spike](../spikes/adr-061-phase2-ingress-spike.md) (Q1)
 
@@ -104,7 +104,7 @@ extra poller.
 **Writing composite status.** Emit a YAML doc whose `apiVersion`/`kind` are the **XR's own GVK**
 (`platform.refplat.org/v1beta1` / `XEnvironment`) with `metadata.name: {{ $xrName }}` and **NO
 `gotemplating.fn.crossplane.io/composition-resource-name` annotation**. Crossplane merges that into the
-composite's status. The live template does exactly this to publish `status.domains` (composition-v3.yaml around
+composite's status. The live template does exactly this to publish `status.domains` (composition.yaml around
 the `kind: XEnvironment` / `status: domains:` block):
 
 > **Gotcha — omit the resource-name annotation.** With the annotation present, the emitted XR is treated as a
@@ -167,7 +167,7 @@ When adding a resource or field:
 5. **Reading observed status?** Capture `$observed` before any `range`; gate on the observed condition.
 6. **Writing composite status?** Emit the XR's own GVK with **no** resource-name annotation.
 7. **Render-test offline** before applying:
-   `crossplane render xr.yaml composition-v3.yaml functions.yaml [--observed-resources <dir>]`.
+   `crossplane render xr.yaml composition.yaml functions.yaml [--observed-resources <dir>]`.
 
 ## Verification
 

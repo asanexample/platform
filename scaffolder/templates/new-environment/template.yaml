@@ -1,6 +1,6 @@
 # New Environment (ADR-067 v3 / ADR-062 §1-2): TEAM-SCOPED self-service — a team member provisions an
 # Environment (a Product × Stage) within their Team's envelope. Opens a PR adding the XEnvironment claim to
-# gitops/environments/<team>/<product>/<stage>.yaml; the v3 gitops Gate validates it (schema + envelope
+# gitops/environments/<team>/<product>/<stage>.yaml; the gitops Gate validates it (schema + envelope
 # shift-left + Composition render) and Kyverno re-enforces the envelope at admission. Authorization is layered:
 # the permission policy lets team members run templates at all; platform:verify-team-membership (server-stored —
 # a client cannot strip it) binds the run to the requester's own team; the gate + admission bound the claim.
@@ -16,7 +16,7 @@ metadata:
   description: >-
     Provision an Environment (a Product at a Stage) for your team: an isolated namespace with quota, network
     policy, Pod-Identity, and GitOps delivery — bounded by your Team's envelope. The Product must already
-    exist. Opens a PR validated by the v3 gitops Gate; once merged, ArgoCD syncs the claim and Crossplane
+    exist. Opens a PR validated by the gitops Gate; once merged, ArgoCD syncs the claim and Crossplane
     provisions.
   tags:
     - self-service
@@ -149,7 +149,7 @@ spec:
           requestedBy: ${{ user.ref | default('unknown', true) }}
 
     - id: pr
-      name: Open the provisioning PR (validated by the v3 gitops Gate)
+      name: Open the provisioning PR (validated by the gitops Gate)
       action: publish:github:pull-request
       input:
         repoUrl: github.com?owner=asanexample&repo=platform
@@ -174,16 +174,16 @@ spec:
           {% endif %}| service | `${{ parameters.service }}` |
           | tier | `${{ parameters.tier }}` |
 
-          The **v3 gitops Gate** validates this PR (claim schema, envelope shift-left — team-matches-product,
+          The **gitops Gate** validates this PR (claim schema, envelope shift-left — team-matches-product,
           stage/tier/quota-within-envelope — and Composition render). **Merge it** to provision (automerge for the
-          v3 gate is not yet armed — a reviewer merges). On merge, the `environments` registry-sync app projects
+          gate is not yet armed — a reviewer merges). On merge, the `environments` registry-sync app projects
           the claim and Crossplane provisions the namespace/quota/Pod-Identity/ECR; Kyverno re-enforces the
           envelope at admission. The workload deploys once the Service's first CI build promotes a signed digest
           into `<app-repo>/k8s/overlays/${{ parameters.stage }}`.
 
   output:
     links:
-      - title: Provisioning pull request (validated by the v3 gitops Gate)
+      - title: Provisioning pull request (validated by the gitops Gate)
         url: ${{ steps.pr.output.remoteUrl }}
       # The Environment's catalog entity — where the live provisioning status cards (#284/#285, K8s + ArgoCD)
       # show, attached by the projection annotations. Projection-sourced (from the claim), so it appears within

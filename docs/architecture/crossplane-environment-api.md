@@ -73,7 +73,7 @@ security boundary: an environment cannot route a domain whose state is not yet `
 
 ## What the Composition provisions
 
-The Composition (`infra/modules/crossplane/charts/environment-api/files/composition-v3.yaml`, mode `Pipeline`)
+The Composition (`infra/modules/crossplane/charts/environment-api/files/composition.yaml`, mode `Pipeline`)
 renders, from one claim:
 
 **Kubernetes** (via `provider-kubernetes` `Object`s):
@@ -169,7 +169,7 @@ wanted. The projection emits entities directly (provider roots), so it bypasses 
 The `XEnvironment` claim is the **sole environment-provisioning source of truth**; the retired v2 app-delivery
 `teams.hcl` is gone. The two non-provisioning concerns it once fed now derive from the git-native CRs:
 **app delivery** (`argocd-apps` reads the `Product` registry for `repo`/domains) and the **platform-owned
-supply-chain policies** (`policy` reads them for `verify_subjects`). A team migrated to the v3 model carries
+supply-chain policies** (`policy` reads them for `verify_subjects`). A team migrated to the model carries
 `migrated = true`, which withdraws it from the (now-removed) Terragrunt infra loops and tells the `policy` unit
 to skip its `restrict-*` guardrails.
 

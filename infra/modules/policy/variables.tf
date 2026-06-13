@@ -234,7 +234,7 @@ variable "ecr_region" {
 }
 
 variable "verify_subjects_product" {
-  description = "v3 (ADR-067/069 §6): per-PRODUCT cosign keyless verification, derived from gitops/products at the unit (the per-team verify_subjects analog). Key = <team>-<product>. team/product select the product's environment namespaces by label (set by the v3 Composition); repo is the githubWorkflowRepository gate for the shared trusted-ci build-sign signer; registryPrefix is team-<team>/<product> (the policy appends -*). appSubjects: optional per-product app-signed identities for bespoke-build products."
+  description = "v3 (ADR-067/069 §6): per-PRODUCT cosign keyless verification, derived from gitops/products at the unit (the per-team verify_subjects analog). Key = <team>-<product>. team/product select the product's environment namespaces by label (set by the Composition); repo is the githubWorkflowRepository gate for the shared trusted-ci build-sign signer; registryPrefix is team-<team>/<product> (the policy appends -*). appSubjects: optional per-product app-signed identities for bespoke-build products."
   type = map(object({
     team           = string
     product        = string

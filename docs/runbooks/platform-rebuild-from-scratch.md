@@ -16,7 +16,7 @@ reference see [`cmd/platctl/README.md`](../../cmd/platctl/README.md).
 > rebuild (teardown-before-merge). The full ordered procedure + the v3 deltas (the v3-only crossplane chart, the
 > argocd-apps `platform_repo_url` + gitops/products/environments sync, the github-oidc/policy v3 inputs, the
 > Backstage `mode:'v3'` flip, and **the Gap-4 app-image pre-build ordering**) live in
-> [`v3-cutover.md` → Rebuild-runbook deltas](v3-cutover.md#rebuild-runbook-deltas-platform-rebuild-from-scratchmd).
+> [`v3-cutover.md` → Rebuild-runbook deltas](../archive/v3-cutover.md#rebuild-runbook-deltas-platform-rebuild-from-scratchmd).
 > Read it alongside this runbook for the next rebuild.
 
 ## 0. Build platctl (it is NOT on your PATH by default)

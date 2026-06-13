@@ -20,7 +20,7 @@ spec:
     plural: xenvironments
   versions:
     # ---------------------------------------------------------------------------
-    # v1alpha3 — the Environment API (ADR-067). The storage + referenceable version: Composition v3 binds to it.
+    # v1alpha3 — the Environment API (ADR-067). The storage + referenceable version: Composition binds to it.
     # Greenfield rename of the v1alpha2 XTenant (no stored v1alpha2 objects survive the from-scratch rebuild).
     # Structural + self-contained validation only; cross-object envelope checks (team == Product.team, tier ∈
     # Team.allowedTiers, stage ∈ Team.allowedStages, quota ≤ Team.quotaCap, residency ⊆ Team.allowedLocations,

@@ -157,8 +157,8 @@ spec:
           | repo | [`asanexample/app-${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}`](https://github.com/asanexample/app-${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}) (created) |
 
           Adds `gitops/products/<team>/<product>.yaml` (the registry entry, repo → the new app repo) + the `dev`
-          `XEnvironment` claim (image initially empty). The **v3 gitops Gate** validates schema + envelope shift-left
-          + Composition render. **Merge it** to provision (automerge for the v3 gate is not yet armed — a reviewer
+          `XEnvironment` claim (image initially empty). The **gitops Gate** validates schema + envelope shift-left
+          + Composition render. **Merge it** to provision (automerge for the gate is not yet armed — a reviewer
           merges). On merge: the `environments` registry-sync app projects the claim, Crossplane provisions the
           namespace/quota/Pod-Identity/ECR, and the new repo's first CI build pins the first signed digest into
           `k8s/overlays/dev` → first deploy.
@@ -167,7 +167,7 @@ spec:
     links:
       - title: New app repository
         url: ${{ steps['publish-app'].output.remoteUrl }}
-      - title: Onboarding pull request (validated by the v3 gitops Gate)
+      - title: Onboarding pull request (validated by the gitops Gate)
         url: ${{ steps.pr.output.remoteUrl }}
       - title: Product dashboard (appears after the PR merges)
         icon: dashboard
