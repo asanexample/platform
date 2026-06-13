@@ -132,14 +132,13 @@ inputs = {
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
   # This SHA (asanexample/backstage#37) completes the L2c frontend: projection (#35) + #285 card re-point (#36)
-  # + the kind:Environment relation processor (ownedBy/partOf) + team-tenants → Environments. BACKWARD-COMPATIBLE +
-  # INERT: platformProjection.mode defaults to 'v2', so the live catalog behaves identically until the cutover sets
-  # mode='v3' (a pure config flip — all L2c frontend code is now in this image). (Prior 15c5a0fc = #36; 81e4b544 = #35.)
-  image_tag = "4fbd38d36fe9821dd3f63c8d31493360cd8b8b67"
+  # + the kind:Environment relation processor (ownedBy/partOf) + team-tenants → Environments. 133e7862
+  # (backstage#38) bumps the platform-projection live-CR pointer to query XEnvironment at v1beta1 — required
+  # after the API graduation (v1alpha3 → v1beta1), else the #284/#285 status cards 404.
+  image_tag = "133e7862a2d7dca7a8f1c7235411194f8a74fe9e"
 
-  # v3 cutover (ADR-067): flip the platform-projection catalog mode to v3 (Product=System, Environment=custom
-  # kind). Injected as an appConfig layer that overrides the image's default 'v2' — no new image needed (the
-  # L2c frontend already ships in image_tag above).
+  # platform-projection catalog mode = v3 (Product=System, Environment=custom kind). The v2 projection branch is
+  # inert (nothing reads it); removing it + this flag is a backstage-repo follow-up.
   projection_mode = "v3"
 
   # Split-horizon for OIDC: pin keycloak.aws.refplat.org to the gateway's ClusterIP so the backend hits the
