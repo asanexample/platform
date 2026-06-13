@@ -93,7 +93,7 @@ resource "aws_eks_addon" "this" {
 # scheduled (respects zone/topology). depends_on the EBS CSI addon so its
 # provisioner exists before anything binds a claim.
 
-resource "kubernetes_storage_class" "gp3" {
+resource "kubernetes_storage_class_v1" "gp3" {
   count = local.create && var.create_default_storageclass ? 1 : 0
 
   metadata {

@@ -11,7 +11,7 @@ locals {
 # View lacks, and deliberately grants no `create` and no other resource types —
 # resource authoring flows through GitOps (ArgoCD), emergencies via break-glass.
 # See ADR-040.
-resource "kubernetes_cluster_role" "platform_operator" {
+resource "kubernetes_cluster_role_v1" "platform_operator" {
   count = local.create ? 1 : 0
 
   metadata {
@@ -79,7 +79,7 @@ resource "kubernetes_cluster_role" "platform_operator" {
   }
 }
 
-resource "kubernetes_cluster_role_binding" "platform_operator" {
+resource "kubernetes_cluster_role_binding_v1" "platform_operator" {
   count = local.create ? 1 : 0
 
   metadata {
@@ -90,7 +90,7 @@ resource "kubernetes_cluster_role_binding" "platform_operator" {
   role_ref {
     api_group = "rbac.authorization.k8s.io"
     kind      = "ClusterRole"
-    name      = kubernetes_cluster_role.platform_operator[0].metadata[0].name
+    name      = kubernetes_cluster_role_v1.platform_operator[0].metadata[0].name
   }
 
   subject {

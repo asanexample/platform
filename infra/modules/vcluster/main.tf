@@ -68,7 +68,7 @@ locals {
 # Namespace
 # ---------------------------------------------------------------------------
 
-resource "kubernetes_namespace" "vcluster" {
+resource "kubernetes_namespace_v1" "vcluster" {
   count = var.create ? 1 : 0
 
   metadata {
@@ -108,5 +108,5 @@ resource "helm_release" "vcluster" {
     var.values != "" ? var.values : "{}",
   ]
 
-  depends_on = [kubernetes_namespace.vcluster]
+  depends_on = [kubernetes_namespace_v1.vcluster]
 }
