@@ -125,8 +125,17 @@ Do these / be aware of these before/at bootstrap; each cost a `--resume` cycle t
    `~/.aws/sso/cache` → `get_aws_account_id() ... failed to parse cached SSO token file`. Just
    **`aws sso login`** again and `--resume`. *(Durable fix TODO: platctl should pre-warm creds before the waves.)*
 4. **Backstage image must be re-pushed.** ECR is force-deleted on teardown, so the pinned Backstage image is gone.
-   After the early `ecr`/`github-oidc` waves recreate the repo + OIDC role, merge the Backstage build → it pushes
-   a fresh (arm64) image; bump `backstage` unit `image_tag` to that SHA.
+   The pinned commit (`backstage` unit `image_tag`) carries a `workflow_dispatch` trigger, so after the early
+   `ecr`/`github-oidc` waves recreate the repo + OIDC role, re-push the **same** tag — no new commit, no re-pin:
+
+   ```bash
+   gh workflow run build.yml --repo asanexample/backstage --ref main   # main HEAD == the pinned commit
+   gh run watch --repo asanexample/backstage $(gh run list --repo asanexample/backstage \
+     --workflow build.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+   ```
+
+   (Dispatching on `main` builds `:<github.sha>` = `main` HEAD; keep the `image_tag` pin == `main` HEAD so the
+   re-pushed tag matches. If `main` has advanced past the pin, pin to current `main` HEAD first.)
 5. **preprod `policy` ↔ `crossplane` circular dep — FIXED.** Two policies matched Crossplane CRDs (`XEnvironment`,
    `ProviderConfig`) that don't exist until crossplane deploys — but crossplane depends on policy. Kyverno churned
    its webhook config on the missing CRDs and the bulk policy install couldn't fully converge on the leaner preprod.
