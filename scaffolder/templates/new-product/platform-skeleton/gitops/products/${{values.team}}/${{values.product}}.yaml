@@ -2,7 +2,7 @@
 # entry — delivery (argocd-apps, github-oidc, policy) derives repo/domains from here; it is also projected as a
 # Product CR for admission (image-scope team-${{ values.team }}/${{ values.product }}-*, tenancy, owned domains).
 # One repo per product. Authored by the Backstage New Product template (ADR-062 self-service).
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: Product
 metadata:
   name: ${{ values.team }}-${{ values.product }}

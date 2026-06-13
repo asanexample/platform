@@ -1,10 +1,10 @@
 # okres within the team's locations; badloc claims eu (outside) → residency-within-envelope.
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata: { name: okres }
 spec: { team: rteam, product: app, stage: dev, tier: standard, residency: { allowedLocations: ["aws:us-east-1"] }, quota: { cpu: "4", memory: 8Gi, pods: 20 } }
 ---
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata: { name: badloc }
 spec: { team: rteam, product: app, stage: dev, tier: standard, residency: { allowedLocations: ["eu"] }, quota: { cpu: "4", memory: 8Gi, pods: 20 } }

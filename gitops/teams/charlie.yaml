@@ -2,7 +2,7 @@
 # The envelope is the bound on every Product/Environment this team may author; Kyverno reads the projected Team
 # CR during XEnvironment admission (restrict-environment-envelope, ADR-067). Platform-authored (admin-only);
 # developers author Products/Environments, not this. Source of truth for the team's identity (ssoGroup) + envelope.
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: Team
 metadata:
   name: charlie

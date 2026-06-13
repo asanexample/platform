@@ -12,15 +12,15 @@ the rebuild implements and that the access-model-as-code generators ([ADR-053](.
 > Tenant / Zone / Customer* contract — which retained the Team-envelope and per-app-identity design but whose
 > **`Tenant` / `Zone` vocabulary and per-team scoping are replaced here** (Tenant → Environment, Zone →
 > Isolation dial + Placement, app → Product/Service). This doc is the deployed contract; the live `xrd.yaml`
-> (`XEnvironment`, `v1alpha3`) implements it.
+> (`XEnvironment`, `v1beta1`) implements it.
 
 ## Conventions
 
 - **Vocabulary (ADR-067).** "Tenant" is **retired as a noun.** The namespace-level deployable is an
   **Environment**; the promotion rung (dev/test/staging/uat/prod) is a **Stage**; the consuming party (internal
   or external — the SaaS "tenant") is a **Customer**. "Multi-tenant" survives only as an adjective.
-- **API group / version.** Kubernetes-projected objects use `platform.refplat.org/v1alpha3`. The developer
-  claim bumps `XTenant` (`v1alpha2`) → **`XEnvironment` (`v1alpha3`)** (breaking; see
+- **API group / version.** Kubernetes-projected objects use `platform.refplat.org/v1beta1`. The developer
+  claim bumps `XTenant` (`v1alpha2`) → **`XEnvironment` (`v1beta1`)** (breaking; see
   [Migration](#migration-from-v1alpha2)).
 - **Cloud-neutrality is a hard rule for author-facing fields.** A developer-authored object (Environment, and
   the author-facing parts of Product/Service/Customer) **never** names a cloud, region, account, cluster, or
@@ -48,7 +48,7 @@ the rebuild implements and that the access-model-as-code generators ([ADR-053](.
   | **Team** | Platform team (a Team is granted) | Registry → Backstage `Group`; **projected as a `Team` CR** per cluster for admission |
   | **Product** | Team lead (self-service, "New Product") | Registry → Backstage `System`; **projected as a `Product` CR** for per-product policy (catalog mapping: [ADR-067 §10](../adrs/067-idp-domain-model.md)) |
   | **Service** | Developer (self-service, "New Service") | Repo-native `catalog-info.yaml` → Backstage `Component` (in the Product `System`; selectors span all envs) |
-  | **Environment** | Team lead / developer (self-service) | Crossplane `XEnvironment` XR (`v1alpha3`), GitOps-delivered → projected as a custom Backstage **`kind: Environment`** (ADR-067 §10) |
+  | **Environment** | Team lead / developer (self-service) | Crossplane `XEnvironment` XR (`v1beta1`), GitOps-delivered → projected as a custom Backstage **`kind: Environment`** (ADR-067 §10) |
   | **Customer** | Platform / sales ops | Registry → Backstage entity; referenced by per-customer Environments. **No projected CR in F1** — customer *existence* validation lands with P3; F1's projected-CRD set is **four**: the `XEnvironment` XRD + the `Team` / `Product` / `AccessGrant` CRDs. The `customer`-set-iff-per-customer-prod check is structural (reads the `Product` CR). |
   | **AccessGrant** | Owning team's `team-admin` (self-service) | `AccessGrant` CR in the owning team's git domain ([ADR-068](../adrs/068-product-scoped-and-cross-team-access-model.md)) |
 
@@ -130,7 +130,7 @@ Environment those Products realize. A Team has no namespace of itself.
 ### Projected `Team` CR
 
 ```yaml
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: Team
 metadata:
   name: alpha                          # = canonical Team.name
@@ -166,7 +166,7 @@ product-scoped, ADR-046/067) can read it.
 | `domains` | — | `[]object` | `[]` | The vanity hostnames this Product **owns** — the allowed set (`{ host, dns }`, ADR-061), validated against team ownership at admission. An Environment **binds** a subset via `Environment.domains` (a `[]string` of `host`s); the subset check is **by `host`** (`{e.host} ⊆ {p.host}`) — so a dev Environment cannot claim the prod vanity host. The generated canonical host is implicit and never declared — today's convention is `<product>-<team>-<stage>.<baseDomain>` (per-env `baseDomain`, e.g. `shop-alpha-dev.preprod.aws.refplat.org`). **⚠️ Open (see [Open questions](#open-questions--known-gaps)):** the generated host does **not** yet encode a *Service* (multi-service products) or a *Customer* (per-customer prod) — both must be added before P1's multi-service flow / P3's per-customer model. |
 
 ```yaml
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: Product
 metadata:
   name: shop
@@ -210,7 +210,7 @@ The **developer-authored contract** and the unit of deployment: a `(Product × S
 declares *what* it needs at a stage, never *where* it lands; Placement resolves the concrete coordinates to
 `status`.
 
-`apiVersion: platform.refplat.org/v1alpha3`, `kind: XEnvironment`, **cluster-scoped**. Logical identity =
+`apiVersion: platform.refplat.org/v1beta1`, `kind: XEnvironment`, **cluster-scoped**. Logical identity =
 `(team, product, stage, customer?)`. Because the XR is cluster-scoped, `metadata.name` MUST be globally unique
 and is therefore **team-prefixed**: `<team>-<product>-<stage>` (pooled) or `<team>-<product>-<customer>-<stage>`
 (per-customer) — a bare `<product>-<stage>` collides across teams that share a product name (e.g. two teams each
@@ -246,7 +246,7 @@ with a `demo` product). Namespace = the same `<team>-<product>-<stage>` (e.g. `a
 ### Canonical Environment claim
 
 ```yaml
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata:
   name: shop-bigbank-prod                       # logical identity = (product, stage, customer?)
@@ -525,7 +525,7 @@ should be resolved before P1 implementation starts.
 The v1alpha2 `XTenant` ([tenant-api-v2.md](tenant-api-v2.md), the ADR-049 contract) is the predecessor. v3 was
 a breaking cutover landed with the rebuild — no in-place migration. Object- and field-level delta:
 
-| v1alpha2 (ADR-049) | v1alpha3 (ADR-067) | Change |
+| v1alpha2 (ADR-049) | v1beta1 (ADR-067) | Change |
 | ------------------ | ------------------ | ------ |
 | `Tenant` (`XTenant`) | **`Environment` (`XEnvironment`)** | Renamed; re-scoped from `(team, name, environment)` to `(product, stage, customer?)`. |
 | `Tenant.environment` (`preprod`/`prod`) | **`Environment.stage`** (`dev`…`prod`) | Renamed; the rung ladder replaces the two-value env; **Stage ≠ Placement** split out. |
@@ -542,4 +542,4 @@ a breaking cutover landed with the rebuild — no in-place migration. Object- an
 | `status.placement { …, zone, namespace }` | `status.placement { cloud, region, account, cluster, namespace }` | `zone` dropped (retired); Stage may map to multiple placements. |
 
 The interim v2 model (`team == tenant`, the v1alpha2 `XTenant`) is retired: the rebuild replaced it with this
-v3 schema (`XEnvironment`, `v1alpha3`), which is now what's deployed.
+v3 schema (`XEnvironment`, `v1beta1`), which is now what's deployed.

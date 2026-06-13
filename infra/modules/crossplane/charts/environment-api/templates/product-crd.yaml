@@ -20,7 +20,7 @@ spec:
     categories:
       - environment-api
   versions:
-    - name: v1alpha3
+    - name: v1beta1
       served: true
       storage: true
       schema:

@@ -85,7 +85,7 @@ for tf in $TEAM_FILES; do
 
   # --- identity / kind ------------------------------------------------------------------------------
   [ "$(yq '.kind' "$f")" = "Team" ] || note "${tf}: kind must be Team"
-  [ "$(yq '.apiVersion' "$f")" = "platform.refplat.org/v1alpha3" ] || note "${tf}: apiVersion must be platform.refplat.org/v1alpha3"
+  [ "$(yq '.apiVersion' "$f")" = "platform.refplat.org/v1beta1" ] || note "${tf}: apiVersion must be platform.refplat.org/v1beta1"
   metaname="$(yq '.metadata.name' "$f")"
   [[ "$metaname" =~ $NAME_RE ]] || note "${tf}: metadata.name '${metaname}' must match ${NAME_RE}"
   [ "$metaname" = "$team" ] || note "${tf}: metadata.name '${metaname}' must equal the filename '${team}'"

@@ -32,7 +32,7 @@ spec:
         any:
           - resources:
               kinds:
-                - platform.refplat.org/v1alpha3/XEnvironment
+                - platform.refplat.org/v1beta1/XEnvironment
       {{- include "ktp.envContext" . | nindent 6 }}
       validate:
         failureAction: {{ .Values.envelopeFailureAction }}
@@ -52,7 +52,7 @@ spec:
         any:
           - resources:
               kinds:
-                - platform.refplat.org/v1alpha3/XEnvironment
+                - platform.refplat.org/v1beta1/XEnvironment
       {{- include "ktp.envContext" . | nindent 6 }}
       {{- include "ktp.productExistsPrecondition" . | nindent 6 }}
       validate:
@@ -73,7 +73,7 @@ spec:
         any:
           - resources:
               kinds:
-                - platform.refplat.org/v1alpha3/XEnvironment
+                - platform.refplat.org/v1beta1/XEnvironment
       {{- include "ktp.envContext" . | nindent 6 }}
       {{- include "ktp.teamExistsPrecondition" . | nindent 6 }}
       validate:
@@ -95,7 +95,7 @@ spec:
         any:
           - resources:
               kinds:
-                - platform.refplat.org/v1alpha3/XEnvironment
+                - platform.refplat.org/v1beta1/XEnvironment
       {{- include "ktp.envContext" . | nindent 6 }}
       {{- include "ktp.teamExistsPrecondition" . | nindent 6 }}
       validate:
@@ -117,7 +117,7 @@ spec:
         any:
           - resources:
               kinds:
-                - platform.refplat.org/v1alpha3/XEnvironment
+                - platform.refplat.org/v1beta1/XEnvironment
       {{- include "ktp.envContext" . | nindent 6 }}
       preconditions:
         all:
@@ -151,7 +151,7 @@ spec:
         any:
           - resources:
               kinds:
-                - platform.refplat.org/v1alpha3/XEnvironment
+                - platform.refplat.org/v1beta1/XEnvironment
       {{- include "ktp.envContext" . | nindent 6 }}
       {{- include "ktp.productExistsPrecondition" . | nindent 6 }}
       validate:
@@ -178,7 +178,7 @@ spec:
         any:
           - resources:
               kinds:
-                - platform.refplat.org/v1alpha3/XEnvironment
+                - platform.refplat.org/v1beta1/XEnvironment
       {{- include "ktp.envContext" . | nindent 6 }}
       {{- include "ktp.productExistsPrecondition" . | nindent 6 }}
       validate:
@@ -202,7 +202,7 @@ spec:
         any:
           - resources:
               kinds:
-                - platform.refplat.org/v1alpha3/XEnvironment
+                - platform.refplat.org/v1beta1/XEnvironment
       validate:
         failureAction: {{ .Values.envelopeFailureAction }}
         message: >-
@@ -227,7 +227,7 @@ spec:
         any:
           - resources:
               kinds:
-                - platform.refplat.org/v1alpha3/XEnvironment
+                - platform.refplat.org/v1beta1/XEnvironment
       {{- include "ktp.envContext" . | nindent 6 }}
       {{- include "ktp.teamExistsPrecondition" . | nindent 6 }}
       validate:

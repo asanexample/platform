@@ -16,7 +16,7 @@ metadata:
     crossplane.io/xrd: xenvironments.platform.refplat.org
 spec:
   compositeTypeRef:
-    apiVersion: platform.refplat.org/v1alpha3
+    apiVersion: platform.refplat.org/v1beta1
     kind: XEnvironment
   mode: Pipeline
   pipeline:
@@ -476,7 +476,7 @@ spec:
             {{- range $h := (keys $statusByHost | sortAlpha) }}{{- $statusDomains = append $statusDomains (index $statusByHost $h) }}{{- end }}
             {{- if $statusDomains }}
             ---
-            apiVersion: platform.refplat.org/v1alpha3
+            apiVersion: platform.refplat.org/v1beta1
             kind: XEnvironment
             metadata:
               name: {{ $xrName }}

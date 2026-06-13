@@ -84,7 +84,7 @@ Create `gitops/environments/<team>/<product>/<stage>[-<customer>].yaml` (a singl
 file **is** the claim:
 
 ```yaml
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata:
   # CLUSTER-scoped, so the name must be globally unique — team+product+stage prefixed, matching the namespace.

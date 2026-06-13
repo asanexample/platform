@@ -1,4 +1,4 @@
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: Team
 metadata: { name: alpha }
 spec:

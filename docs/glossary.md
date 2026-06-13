@@ -85,7 +85,7 @@ with `preview = true`, via the per-Product ApplicationSet PR generator + kustomi
 See [PR Preview Environments (ADR-032)](adrs/032-pr-preview-environments.md).
 
 **Product** — A deployable app/system owned by exactly one Team, declared at
-`gitops/products/<team>/<product>.yaml` (`kind: Product`, `v1alpha3`). Carries delivery identity (`repo`),
+`gitops/products/<team>/<product>.yaml` (`kind: Product`, `v1beta1`). Carries delivery identity (`repo`),
 tenancy (`pooled`/`per-customer`), default isolation, and the owned `domains` set. Surfaces as a Backstage
 `System`; images live at `team-<team>/<product>-*`; delivery is one ApplicationSet per Product (ADR-069).
 See [IDP Domain Model (ADR-067)](adrs/067-idp-domain-model.md).
@@ -133,7 +133,7 @@ what Environments its members may provision. See [IDP Domain Model (ADR-067)](ad
 Older ADRs use the original term; current code/docs say Environment.
 
 **Environment / XEnvironment** — A single declarative `XEnvironment` (cluster-scoped Crossplane XR,
-`platform.refplat.org/v1alpha3`) that provisions one Environment — a Product at a Stage (namespace, quota,
+`platform.refplat.org/v1beta1`) that provisions one Environment — a Product at a Stage (namespace, quota,
 network policy, Pod-Identity, GitOps delivery), bounded by the owning Team's envelope. The sole provisioning
 path. See [Crossplane Environment API](architecture/crossplane-environment-api.md).
 
@@ -146,7 +146,7 @@ caller of it. See [Shared build-sign Workflow (ADR-050)](adrs/050-shared-build-s
 See [Kyverno as Policy Engine (ADR-014)](adrs/014-kyverno-as-policy-engine.md).
 
 **XRD** — The `CompositeResourceDefinition` (`xenvironments.platform.refplat.org`) defining the cluster-scoped
-`XEnvironment` (`v1alpha3`) schema and its defaults (`quota`, `tier`, …). See [Crossplane Environment API](architecture/crossplane-environment-api.md#the-environment-claim-xtenant).
+`XEnvironment` (`v1beta1`) schema and its defaults (`quota`, `tier`, …). See [Crossplane Environment API](architecture/crossplane-environment-api.md#the-environment-claim-xtenant).
 
 **Zone** *(retired, v2)* — A platform-owned isolation/placement unit (account + cluster) in the ADR-049 v2
 model. Replaced under ADR-067 by the Isolation **dial** (`isolation.compute` rungs incl. `dedicated-cluster`/

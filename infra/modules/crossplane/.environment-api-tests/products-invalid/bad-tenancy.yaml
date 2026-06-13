@@ -1,5 +1,5 @@
 # MUST FAIL: tenancy outside the enum.
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: Product
 metadata: { name: bad-tenancy }
 spec: { team: alpha, repo: asanexample/x, tenancy: multi-tenant }

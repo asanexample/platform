@@ -28,7 +28,7 @@ configuration hierarchy that promotes consistency across environments.
 | [Identity & SSO](architecture/identity-and-sso.md) | How login works: Keycloak (IdP of record), oauth2-proxy, the access model, the pluggable seam |
 | [Gateway & Ingress](architecture/gateway-and-ingress.md) | Cilium Gateway → NLB → cert-manager → external-dns → Kyverno hostname guard (ADR-060/061) |
 | [Secrets & External Secrets](architecture/secrets-and-external-secrets.md) | Secrets Manager → ESO ClusterSecretStore → ExternalSecret → k8s Secret; platform vs environment |
-| [Platform Domain API](architecture/platform-domain-api.md) | **Normative schema** for the ADR-067 domain model — Team / Product / Service / Environment / Customer (v1alpha3; supersedes the ADR-049 tenant-api-v2) |
+| [Platform Domain API](architecture/platform-domain-api.md) | **Normative schema** for the ADR-067 domain model — Team / Product / Service / Environment / Customer (v1beta1; supersedes the ADR-049 tenant-api-v2) |
 | [Crossplane Composition Authoring](architecture/crossplane-composition-authoring.md) | The *how* behind the Environment API: XRD, Pipeline functions, the status-loop pattern |
 | [Supply-Chain Overview](architecture/supply-chain-overview.md) | Why + end-to-end flow: SBOM, cosign, SLSA provenance, Rekor, Kyverno, and the SLSA Build L3 matrix |
 | [Observability Current State](architecture/observability-current-state.md) | As-built P1 hub + P2 mimir: topology, multi-tenancy/security model, storage |

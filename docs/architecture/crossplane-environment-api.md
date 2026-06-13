@@ -1,7 +1,7 @@
 # Crossplane Environment API
 
 How environments are provisioned on this platform. An environment is a single declarative **`XEnvironment`
-claim** (`platform.refplat.org/v1alpha3`); a Crossplane **Composition** reconciles it into the complete
+claim** (`platform.refplat.org/v1beta1`); a Crossplane **Composition** reconciles it into the complete
 environment footprint — Kubernetes, AWS (workload account), and cross-account ECR. This is the **current, sole**
 provisioning path (ADR-067, the v3 Team → Product → Service → Environment model). The retired v2 path (the
 `XTenant` claim + `crossplane-tenant` chart, where `team == environment`) is gone.
@@ -34,7 +34,7 @@ delivered separately (below).
 
 ## The `XEnvironment` claim
 
-`apiVersion: platform.refplat.org/v1alpha3`, `kind: XEnvironment`, **cluster-scoped** (Crossplane v2 XR). The
+`apiVersion: platform.refplat.org/v1beta1`, `kind: XEnvironment`, **cluster-scoped** (Crossplane v2 XR). The
 spec is the environment-facing contract — no infra constants leak into it:
 
 | Field | Required | Purpose |

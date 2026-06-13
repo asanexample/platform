@@ -26,7 +26,7 @@ spec:
         any:
           - resources:
               kinds:
-                - platform.refplat.org/v1alpha3/XEnvironment
+                - platform.refplat.org/v1beta1/XEnvironment
                 - aws.upbound.io/v1beta1/ProviderConfig
                 - kubernetes.crossplane.io/v1alpha1/ProviderConfig
       {{- include "ktp.skipPlatformPrincipals" . | nindent 6 }}

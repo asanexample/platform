@@ -27,7 +27,7 @@ for rel in $PRODUCT_FILES; do
 
   # identity
   [ "$(yq '.kind' "$f")" = "Product" ] || note "${pf}: kind must be Product"
-  [ "$(yq '.apiVersion' "$f")" = "platform.refplat.org/v1alpha3" ] || note "${pf}: apiVersion must be platform.refplat.org/v1alpha3"
+  [ "$(yq '.apiVersion' "$f")" = "platform.refplat.org/v1beta1" ] || note "${pf}: apiVersion must be platform.refplat.org/v1beta1"
 
   team="$(yq '.spec.team // ""' "$f")"
   repo="$(yq '.spec.repo // ""' "$f")"

@@ -204,7 +204,7 @@ jobs:
   # The v3 app shift-left = the app-repo overlays-build guard + the platform v3 gitops Gate envelope check, #388.)
 
   # Offline schema validation of the Environment API XRD (ADR-067). Validates the example claims against the
-  # v1alpha3 OpenAPI schema + CEL rules with `crossplane beta validate` — no cluster. The CLI is installed at a
+  # v1beta1 OpenAPI schema + CEL rules with `crossplane beta validate` — no cluster. The CLI is installed at a
   # pinned version (download + SHA-256 verify, no `curl | sh`), matching the Trivy job's posture.
   environment-api-schema:
     name: Environment API Schema
