@@ -3,8 +3,8 @@
 > **Severity:** Medium (delivery stalled — app not converging)
 > **On-call scope:** Development Teams (app sync) / Platform Engineering (cluster reachability, RBAC)
 > **Related:** [Deploy App to Preprod](deploy-app-preprod.md), [ArgoCD SSO](argocd-sso.md),
-> [Crossplane Tenant API](../architecture/crossplane-tenant-api.md),
-> [Tenant Onboarding](tenant-onboarding.md)
+> [Crossplane Environment API](../architecture/crossplane-environment-api.md),
+> [Environment Onboarding](environment-onboarding.md)
 >
 > **Last reviewed:** 2026-06-08
 
@@ -81,7 +81,7 @@ kubectl logs -n argocd deploy/argocd-application-controller --tail=80 | grep -i 
 - **Stale preprod API ENI IPs after scale-to-zero/restore.** The most common one: the preprod EKS API ENI
   IPs changed and the `cross-vpc-dns` record went stale, so ArgoCD `i/o timeout`s. Re-apply
   `platform/.../cross-vpc-dns`, then `argocd app get <app> --hard-refresh`
-  (see [Tenant Onboarding](tenant-onboarding.md#troubleshooting)).
+  (see [Environment Onboarding](environment-onboarding.md#troubleshooting)).
 - **AssumeRole denied.** The application-controller's role can't assume the cluster `roleARN`, or that role
   lacks an EKS access entry. Re-apply `argocd-clusters`; verify the preprod access entry exists.
 - **Cluster secret missing.** `argocd-clusters` wasn't applied for that environment — re-apply it.
@@ -106,7 +106,7 @@ kubectl get appproject alpha -n argocd -o yaml
 **Causes and fixes:**
 
 - **Disallowed kind** (e.g. a `Role`, `LoadBalancer`-typed Service, a CRD). Remove it from the app manifests
-  — tenant manifests are limited to the whitelist (ingress is HTTPRoute on the shared Gateway, not a
+  — environment manifests are limited to the whitelist (ingress is HTTPRoute on the shared Gateway, not a
   Service of type LoadBalancer).
 - **Namespace mismatch.** The manifest's `namespace` must equal the project destination (`team-<team>`). A
   manifest in `default` or another team's namespace is denied.
@@ -156,9 +156,9 @@ App Applications sync with `automated { selfHeal = true, prune = true }` and `Cr
   [Deploy App to Preprod](deploy-app-preprod.md#deployment-rollout).)
 - **prune** deletes resources removed from Git. If a resource vanished unexpectedly, it was removed from the
   manifests — check the app repo history.
-- **CreateNamespace=false** — ArgoCD does **not** create namespaces; `team-<team>` is owned by the Tenant
+- **CreateNamespace=false** — ArgoCD does **not** create namespaces; `team-<team>` is owned by the Environment
   Composition. A `namespace not found` sync error means the `XTenant` isn't `READY`
-  (see [Tenant Onboarding](tenant-onboarding.md)).
+  (see [Environment Onboarding](environment-onboarding.md)).
 
 To pause self-heal for debugging:
 
@@ -171,7 +171,7 @@ argocd app sync alpha-demo                         # one-shot manual sync
 
 ## XTenant claims: ServerSideApply + ignoreDifferences
 
-The `tenant-claims-preprod` Application (project `platform-tenants`) syncs the cluster-scoped `XTenant`
+The `tenant-claims-preprod` Application (project `platform-environments`) syncs the cluster-scoped `XTenant`
 claim YAMLs from `gitops/tenant-claims/preprod/`. It has its own quirks:
 
 - It syncs with **`ServerSideApply=true`** + `selfHeal` + `prune`, so ArgoCD owns **only the fields it sets**
@@ -181,7 +181,7 @@ claim YAMLs from `gitops/tenant-claims/preprod/`. It has its own quirks:
   mutating the live object. If `tenant-claims-preprod` flaps `OutOfSync` on `spec.crossplane`/finalizers, the
   `ignoreDifferences` (or ServerSideApply) wasn't applied — re-apply the `argocd` unit.
 - ArgoCD applies as the assumed **`ArgoCD` IAM role**, the platform principal excluded from the S1
-  `restrict-tenant-control-plane` Kyverno backstop. An `XTenant` creation denied as a tenant principal means
+  `restrict-environment-control-plane` Kyverno backstop. An `XTenant` creation denied as an environment principal means
   the claim was applied by something other than this Application.
 
 ```bash
@@ -191,4 +191,4 @@ kubectl --context preprod get xtenant <team>                 # SYNCED / READY af
 ```
 
 To trace a claim end-to-end after it syncs, see
-[Crossplane Tenant API](../architecture/crossplane-tenant-api.md#claim-delivery--lifecycle).
+[Crossplane Environment API](../architecture/crossplane-environment-api.md#claim-delivery--lifecycle).

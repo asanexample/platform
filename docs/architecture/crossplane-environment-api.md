@@ -1,9 +1,9 @@
-# Crossplane Tenant API
+# Crossplane Environment API
 
-How tenants are provisioned on this platform. A team is a single declarative **`Tenant` claim**
-(`XTenant`); a Crossplane **Composition** reconciles it into the complete tenant footprint — Kubernetes,
+How environments are provisioned on this platform. A team is a single declarative **`Environment` claim**
+(`XTenant`); a Crossplane **Composition** reconciles it into the complete environment footprint — Kubernetes,
 AWS (workload account), and cross-account ECR. This is the **current, sole** provisioning path (BACK stack
-P3, [#174]). The previous Terragrunt path (`infra/modules/tenant` + the `tenants`/`pod-identity`/`s3-shared`
+P3, [#174]). The previous Terragrunt path (`infra/modules/environment` + the `environments`/`pod-identity`/`s3-shared`
 units) is **retired**.
 
 See also: [ADR-046](../adrs/046-back-stack-for-developer-self-service.md) (adopt the BACK stack),
@@ -13,8 +13,8 @@ See also: [ADR-046](../adrs/046-back-stack-for-developer-self-service.md) (adopt
 ## Federated topology
 
 Crossplane is **federated — one instance per cluster**, not a central hub reaching into every account. Each
-workload cluster runs its own Crossplane and provisions its **own** tenants locally, using its own EKS Pod
-Identity to authenticate the providers. The single cross-account hop is **ECR**: tenant image repos live in
+workload cluster runs its own Crossplane and provisions its **own** environments locally, using its own EKS Pod
+Identity to authenticate the providers. The single cross-account hop is **ECR**: environment image repos live in
 the platform account, so the provider-aws `ecr` provider assumes the platform `crossplane-ecr-provisioner`
 role (`assumeRoleChain`) for those resources only.
 
@@ -24,7 +24,7 @@ role (`assumeRoleChain`) for those resources only.
   │  crossplane-ecr-provisioner    │◀─────│ provider-aws-ecr  (assumeRoleChain, ECR only)   │
   │  ECR repos: team-*/*           │      │ provider-aws-iam/eks (Pod Identity, local)      │
   └───────────────────────────────┘      │ provider-kubernetes  (in-cluster)               │
-                                          │ Tenant XRD + Composition + functions            │
+                                          │ Environment XRD + Composition + functions            │
                                           └────────────────────────────────────────────────┘
 ```
 
@@ -32,23 +32,23 @@ The control plane (Crossplane core, providers, XRD/Composition) is installed by 
 [`crossplane`](../../infra/modules/crossplane/) Terragrunt module as a normal add-on unit. Claims are
 delivered separately (below).
 
-## The `Tenant` claim (`XTenant`)
+## The `Environment` claim (`XTenant`)
 
 `apiVersion: platform.refplat.org/v1alpha1`, `kind: XTenant`, **cluster-scoped** (Crossplane v2 XR). The
-spec is the tenant-facing contract — no infra constants leak into it:
+spec is the environment-facing contract — no infra constants leak into it:
 
 | Field | Required | Purpose |
 | ----- | -------- | ------- |
 | `team` | yes | Team key; drives the `team-<team>` namespace and every per-team resource name |
 | `domains` | — | Tier-1/2 vanity aliases (`[]` of `{ host, canonical?, dns? }`, ADR-061). Unioned with the implicit generated host into `restrict-route-hostnames`; the generated host is never declared |
 | `gatewayNamespace` | — (default `default`) | Namespace of the shared Gateway (ingress source) |
-| `resourceQuota` | — (defaults match the old tenant module) | `cpu`/`memory`/`pods`/`services`/`loadbalancers`/`pvcs`/`storage` |
+| `resourceQuota` | — (defaults match the old environment module) | `cpu`/`memory`/`pods`/`services`/`loadbalancers`/`pvcs`/`storage` |
 | `complianceTier` | — (default `standard`) | `standard`/`hipaa`/`pci` |
 | `apps` | — | Map `<app> → { repoPath, preview }`; each app gets an ECR repo `team-<team>/<app>` |
 | `aws` | — | `serviceAccount` (the named SA the Pod Identity association binds) + `policyStatements[]` (generic IAM granted to `Pod-team-<team>`, capped by the deny-escalation boundary) |
 | `developerAccess` | — (default `enabled: true`) | Provision `DeveloperAccess-<team>` + the EKS access entry |
 
-A minimal example lives in `infra/modules/crossplane/examples/tenant-gamma.yaml`; the live claims are YAML
+A minimal example lives in `infra/modules/crossplane/examples/environment-gamma.yaml`; the live claims are YAML
 files in `gitops/tenant-claims/<env>/` (one `XTenant` per file).
 
 ### `status.domains` — the ingress state machine (ADR-061 Phase 2)
@@ -56,7 +56,7 @@ files in `gitops/tenant-claims/<env>/` (one `XTenant` per file).
 The Composition writes `status.domains[]` (`{ host, state, mode, reason, message?, dnsTarget?,
 lastTransitionTime? }`) — one entry per generated canonical host + each `spec.domains` alias — and the
 `restrict-route-hostnames` allow-list admits a host **only while its entry is `Active`**. Verification is the
-security boundary: a tenant cannot route a domain whose state is not yet `Active`.
+security boundary: an environment cannot route a domain whose state is not yet `Active`.
 
 - **Generated host** (`<app>-<team>.<base>`) + tier-1/2 aliases (host under `.<baseDomain>`, our wildcard
   cert) → `Active` immediately (platform-owned).
@@ -67,14 +67,14 @@ security boundary: a tenant cannot route a domain whose state is not yet `Active
 
 ## What the Composition provisions
 
-The Composition (`infra/modules/crossplane/charts/tenant/files/composition.yaml`, mode `Pipeline`) renders,
+The Composition (`infra/modules/crossplane/charts/environment-api/files/composition.yaml`, mode `Pipeline`) renders,
 from one claim:
 
 **Kubernetes** (via `provider-kubernetes` `Object`s):
 
-- Namespace `team-<team>` (labeled `platform.refplat.org/tenant`), ResourceQuota, LimitRange
+- Namespace `team-<team>` (labeled `platform.refplat.org/environment`), ResourceQuota, LimitRange
 - default-deny + allow-DNS/allow-gateway NetworkPolicies, CiliumNetworkPolicies (gateway/Envoy + Pod-Identity egress)
-- `team-<team>:developers` RoleBinding (binds the `tenant-developers` ClusterRole — ADR-039)
+- `team-<team>:developers` RoleBinding (binds the `environment-developers` ClusterRole — ADR-039)
 - per-team Kyverno `restrict-images-team-<team>` + `restrict-route-hostnames-team-<team>` ClusterPolicies
 
 **AWS — workload account** (via `provider-aws` `iam`/`eks`, ProviderConfig `default` = Pod Identity):
@@ -91,7 +91,7 @@ from one claim:
   plus a cross-account RepositoryPolicy (pull for the preprod and prod account roots)
 
 **Not** provisioned by the claim — these stay platform-owned in the [`policy`](../../infra/modules/policy/)
-module for **all** teams (a tenant must not declare its own signature trust root): the cosign/SLSA
+module for **all** teams (an environment must not declare its own signature trust root): the cosign/SLSA
 `verify-images-team-<team>` + `verify-attestations-team-<team>` policies. The `policy` unit skips only the
 per-team `restrict-*` guardrails for migrated teams (`migrated_teams` input), since the Composition owns
 those. This **supply-chain split** — guardrails in the claim, trust roots in the platform — is deliberate
@@ -100,7 +100,7 @@ those. This **supply-chain split** — guardrails in the claim, trust roots in t
 ## Composition pipeline
 
 ```text
-load-environment   function-environment-configs   merges the tenant-cluster-config EnvironmentConfig
+load-environment   function-environment-configs   merges the platform-cluster-config EnvironmentConfig
        │                                           into the pipeline context (cluster constants)
 render-resources   function-go-templating          renders all of the above from spec + context
        │
@@ -109,19 +109,19 @@ ready              function-auto-ready              marks the XR Ready when its 
 
 **Cluster constants** (ECR registry, workload + management account IDs, cluster name, the permissions-boundary
 ARN, the cross-account pull accounts, the ECR ProviderConfig name) are **not** in the claim — they're injected
-via a Helm-templated **`EnvironmentConfig`** (`tenant-cluster-config`) read by the go-template as
+via a Helm-templated **`EnvironmentConfig`** (`platform-cluster-config`) read by the go-template as
 `index .context "apiextensions.crossplane.io/environment"`. This keeps the claim API clean and per-cluster
-config out of the tenant-facing spec. The Composition itself ships **raw** (`.Files.Get`) so Helm doesn't try
+config out of the environment-facing spec. The Composition itself ships **raw** (`.Files.Get`) so Helm doesn't try
 to process its inline go-template `{{ }}`.
 
 ## Claim delivery & lifecycle
 
 Claims are **GitOps-delivered**: each is a YAML file (`gitops/tenant-claims/<env>/<team>.yaml`, one
 `XTenant`) merged to the platform repo via a CODEOWNERS-gated PR. The `tenant-claims-preprod` ArgoCD
-Application (in a dedicated `platform-tenants` AppProject whose `clusterResourceWhitelist` admits only
+Application (in a dedicated `platform-environments` AppProject whose `clusterResourceWhitelist` admits only
 `XTenant`) syncs that directory to the cluster with `selfHeal` + `prune` + ServerSideApply. ArgoCD applies
 as the assumed **`ArgoCD` IAM role** — a platform principal excluded from the S1
-`restrict-tenant-control-plane` Kyverno backstop that denies `XTenant` creation by tenant principals. (When
+`restrict-environment-control-plane` Kyverno backstop that denies `XTenant` creation by environment principals. (When
 Backstage lands — BACK stack P5 — it will scaffold these same claim YAMLs via PR; the delivery mechanism is
 pluggable.)
 
@@ -147,11 +147,11 @@ model):
 | Catalog entity | From the claim | Notes |
 |---|---|---|
 | `Group <team>` | `spec.team` | `spec.type: team`; supersedes the seed Group |
-| `System <tenant>` | `metadata.name` | `owner: group:<team>`; carries **`zone`/`tier`** as first-class attributes (degenerate `default`/`standard` until the XRD gains them); `links` from `hostnames` |
-| `Resource`s | the Composition's footprint | a **curated** mirror — `team-<team>` namespace + quota, `ecr-team-<team>-<app>` per app, `Pod-team-<team>` + `DeveloperAccess-<team>` IAM roles, the `restrict-images`/`restrict-route-hostnames` Kyverno policies; each `owner: group:<team>`, `system: <tenant>` |
+| `System <environment>` | `metadata.name` | `owner: group:<team>`; carries **`zone`/`tier`** as first-class attributes (degenerate `default`/`standard` until the XRD gains them); `links` from `hostnames` |
+| `Resource`s | the Composition's footprint | a **curated** mirror — `team-<team>` namespace + quota, `ecr-team-<team>-<app>` per app, `Pod-team-<team>` + `DeveloperAccess-<team>` IAM roles, the `restrict-images`/`restrict-route-hostnames` Kyverno policies; each `owner: group:<team>`, `system: <environment>` |
 
 App `Component`s (discovered separately from the app repos' `catalog-info.yaml`) set `spec.system: <team>`, so
-each tenant System *contains* its app. The projection is **authoritative** for Groups/Systems/Resources; the
+each environment System *contains* its app. The projection is **authoritative** for Groups/Systems/Resources; the
 discovered Components only self-assert ownership (acceptable trust posture for an internal read-only portal).
 The Resource set is deterministic and curated — widen the mapping in `provider.ts` if a deeper audit lens is
 wanted. The projection emits entities directly (provider roots), so it bypasses `catalog.rules`; a trusted
@@ -159,13 +159,13 @@ wanted. The projection emits entities directly (provider roots), so it bypasses 
 
 ## Relationship to `teams.hcl`
 
-`teams.hcl` is **no longer the tenant-provisioning source of truth** — the `XTenant` claim is. It now only
+`teams.hcl` is **no longer the environment-provisioning source of truth** — the `XTenant` claim is. It now only
 feeds two non-provisioning concerns: **app delivery** (`argocd-apps` reads `apps`/`repo_url`) and the
 **platform-owned supply-chain policies** (`policy` reads it for `verify_subjects`). A team migrated to a claim
 carries `migrated = true`, which withdraws it from the (now-removed) Terragrunt infra loops and tells the
 `policy` unit to skip its `restrict-*` guardrails.
 
-To onboard or migrate a team, see the [tenant onboarding runbook](../runbooks/tenant-onboarding.md).
+To onboard or migrate a team, see the [environment onboarding runbook](../runbooks/environment-onboarding.md).
 
 ## Verification
 

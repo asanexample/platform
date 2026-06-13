@@ -1,10 +1,10 @@
-# Runbook: Tenant Team Onboarding (Preprod EKS)
+# Runbook: Environment Team Onboarding (Preprod EKS)
 
 > **On-call scope:** Platform Engineering
-> **Model:** Tenants are provisioned by the Crossplane **Tenant control plane** via an `XTenant` claim (BACK
+> **Model:** Environments are provisioned by the Crossplane **Environment control plane** via an `XTenant` claim (BACK
 > stack P3, [ADR-046](../adrs/046-back-stack-for-developer-self-service.md) /
-> [ADR-048](../adrs/048-federated-per-cluster-crossplane.md)). A single claim provisions the complete tenant.
-> The old Terragrunt path (`tenants`/`pod-identity`/`s3-shared` units, the `tenant` module) is **retired**.
+> [ADR-048](../adrs/048-federated-per-cluster-crossplane.md)). A single claim provisions the complete environment.
+> The old Terragrunt path (`environments`/`pod-identity`/`s3-shared` units, the `environment` module) is **retired**.
 > **Live configurations:**
 >
 > - `gitops/tenant-claims/preprod/<team>.yaml` — **the claim** (one `XTenant`, synced by ArgoCD — the SINGLE
@@ -15,7 +15,7 @@
 >
 > **Last reviewed:** 2026-06-03
 
-See [Crossplane Tenant API](../architecture/crossplane-tenant-api.md) for the XRD schema, what the
+See [Crossplane Environment API](../architecture/crossplane-environment-api.md) for the XRD schema, what the
 Composition provisions, and the claim lifecycle.
 
 ---
@@ -33,7 +33,7 @@ Composition provisions, and the claim lifecycle.
 
 ## What a claim provisions
 
-One `XTenant` claim → the Composition reconciles the **complete** tenant:
+One `XTenant` claim → the Composition reconciles the **complete** environment:
 
 - **Kubernetes:** namespace `team-<team>`, ResourceQuota, LimitRange, default-deny + allow NetworkPolicies,
   CiliumNetworkPolicies, the `team-<team>:developers` RoleBinding, and the per-team Kyverno
@@ -289,5 +289,5 @@ A compliant workload referencing `…/team-charlie/api:<tag>` should admit; a cr
 | `XTenant` SYNCED but `READY=False` | A managed resource isn't Ready yet (provider reconcile lag) or a K8s `Object` was rejected by Kyverno — check the Object's status. |
 | AWS MR 403 (e.g. `eks:TagResource`, `iam:ListInstanceProfilesForRole`) | The `crossplane-provisioner-<cluster>` role is missing a verb — add it in the `crossplane` module's provisioner policy and apply. |
 | Cross-account ECR MR `AccessDenied … sts:TagSession` | The platform `crossplane-ecr-provisioner` trust must allow `sts:TagSession` (not just `AssumeRole`); the preprod provisioner needs both too. |
-| Claim creation denied by `restrict-tenant-control-plane` | The claim must be applied by a **platform** principal — ArgoCD (the `platform-tenants` Application, assuming the `ArgoCD` IAM role) is that principal, excluded from the S1 backstop; a tenant principal is denied. |
+| Claim creation denied by `restrict-environment-control-plane` | The claim must be applied by a **platform** principal — ArgoCD (the `platform-environments` Application, assuming the `ArgoCD` IAM role) is that principal, excluded from the S1 backstop; an environment principal is denied. |
 | Per-team `restrict-images`/`restrict-route-hostnames` appear twice / `AlreadyExists` | A team is owned by both the Composition (claim) and the `policy` unit's non-migrated path. Every team with a claim is auto-migrated (`policy` derives `migrated_teams = keys(claims)`); confirm the team has a claim file under `gitops/tenant-claims/preprod/`. |

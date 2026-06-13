@@ -26,7 +26,7 @@
 
 | Cloud | Status | What's Deployed |
 |-------|--------|-----------------|
-| AWS | **Live** | **Platform** account: full EKS hub in us-east-1 (networking, IAM, EKS, Cilium, node groups, ArgoCD, cert-manager, external-dns/secrets, Kyverno, Tailscale, gateway ingress, **observability + Mimir**, Backstage, **self-hosted runners (ARC)** — ADR-065). **Preprod** account: a full tenant cluster (EKS, Cilium, Crossplane-Composition-provisioned tenants/Kyverno-Enforce, public gateway, **Falco**, Pod Identity — ADR-046/047/048). **Prod** account: networking + org scaffolding (no cluster yet). |
+| AWS | **Live** | **Platform** account: full EKS hub in us-east-1 (networking, IAM, EKS, Cilium, node groups, ArgoCD, cert-manager, external-dns/secrets, Kyverno, Tailscale, gateway ingress, **observability + mimir**, Backstage, **self-hosted runners (ARC)** — ADR-065). **Preprod** account: a full environment cluster (EKS, Cilium, Crossplane-Composition-provisioned environments/Kyverno-Enforce, public gateway, **Falco**, Pod Identity — ADR-046/047/048). **Prod** account: networking + org scaffolding (no cluster yet). |
 | Azure | **Planned** | No `live/azure` or `modules/azure` exists yet. The shared modules and config hierarchy are parameterized so Azure can be added without restructuring (ADR-001/008). |
 | GCP | **Planned** | Same as Azure — reserved in the CIDR plan (ADR-015), not yet present. |
 
@@ -177,7 +177,7 @@ graph LR
 | Kyverno | 3.8.1 | Policy engine — `validate` + `mutate` + cosign image/attestation verification (Enforce) above the PSA baseline floor |
 | Tailscale Operator | 1.96.5 | Mesh VPN subnet router for private cluster access |
 | kube-prometheus-stack | 86.1.0 | Observability hub: Prometheus + Grafana + Alertmanager (platform) |
-| Grafana Mimir | 6.0.6 | Durable, S3-backed, multi-tenant metrics store (platform) |
+| Grafana mimir | 6.0.6 | Durable, S3-backed, multi-tenant metrics store (platform) |
 | Falco | 9.0.0 | Runtime threat detection (preprod) |
 
 All Helm chart versions are pinned in `infra/live/aws/_versions.hcl`.

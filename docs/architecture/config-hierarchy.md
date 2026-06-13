@@ -133,7 +133,7 @@ The root configuration applies to every unit. It provides:
 The cloud-root `common.hcl` defines:
 
 - **Default workload name** (`platform`) and **org/resource name prefix** (`org_name`,
-  currently `asanexample`, used for globally-unique names like tenant S3 buckets).
+  currently `asanexample`, used for globally-unique names like environment S3 buckets).
 - **Base tags** shared across all environments.
 - **Secrets load + account-id safety map.** It reads the gitignored `secrets.hcl` and
   exposes `environment_account_map = local._secrets.locals.account_ids` — a lookup from

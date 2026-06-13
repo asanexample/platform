@@ -32,10 +32,10 @@ Azure/GCP deployment today.)
     plus a deny on secret/data exfil, and SSM-to-bastion only.
   - `PlatformDeployer` (platform, preprod, test) — the Terragrunt/IaC apply role.
   - `DeveloperAccess-<team>` (preprod) — per-team, namespace-scoped kubectl via group-mapped EKS
-    access entries + a `tenant-developer` RoleBinding.
+    access entries + a `environment-developer` RoleBinding.
   - `OrganizationAccountAccessRole` — break-glass only.
 - **Pod-level AWS identity**: **IRSA** for platform add-ons (ADR-018), **EKS Pod Identity** for
-  tenant workloads (ADR-041) — short-lived STS credentials, no static keys, no cross-team annotation
+  environment workloads (ADR-041) — short-lived STS credentials, no static keys, no cross-team annotation
   (Kyverno backstops `disallow-irsa-annotation-cross-team`).
 - **GitHub Actions OIDC** (ADR-036) — keyless CI; per-team `github-actions-ecr-push-<team>` roles
   scoped to that team's ECR repos.
@@ -44,7 +44,7 @@ Azure/GCP deployment today.)
 
 - **Private EKS API endpoints** (ADR-010) — both clusters are private-only; access via **Tailscale**
   subnet routers (ADR-011) or the **SSM bastion** (ADR-020). No SSH, no public API.
-- **Cilium NetworkPolicies** (ADR-008) — eBPF-enforced. Tenant namespaces are **default-deny ingress**
+- **Cilium NetworkPolicies** (ADR-008) — eBPF-enforced. Environment namespaces are **default-deny ingress**
   with explicit allows for the Gateway (`fromEntities: [ingress]`), DNS, and the Pod Identity agent;
   egress to IMDS is blocked (node enforces IMDSv2 hop-limit=1).
 - **Gateway API ingress** (ADR-017/029) — Cilium Gateway with TLS (Let's Encrypt DNS-01). Platform uses
@@ -55,8 +55,8 @@ Azure/GCP deployment today.)
 
 ## Data Protection
 
-- **Encryption at rest** — EKS secrets via **KMS** envelope encryption; CloudTrail S3 via KMS; tenant/
-  Mimir S3 via SSE-S3 (AES256); EBS encrypted by default (SCP-enforced).
+- **Encryption at rest** — EKS secrets via **KMS** envelope encryption; CloudTrail S3 via KMS; environment/
+  mimir S3 via SSE-S3 (AES256); EBS encrypted by default (SCP-enforced).
 - **Encryption in transit** — TLS everywhere (Gateway termination, Hubble TLS, service-to-service).
 - **Secrets** (ADR-019/024/025/026) — AWS Secrets Manager as the source of truth; **External Secrets
   Operator** (IRSA) syncs to Kubernetes; per-account isolation (no cross-account reads by default);
@@ -77,7 +77,7 @@ Azure/GCP deployment today.)
 - **Falco** (ADR-045) — runtime threat detection (modern eBPF) on preprod.
 - **GuardDuty / Config / Security Hub / Access Analyzer** — protected from tampering by the
   `protect-security-services` SCP.
-- **Observability** (ADR-043/044) — Prometheus + Grafana + durable Mimir + SNS alerting; **Hubble**
+- **Observability** (ADR-043/044) — Prometheus + Grafana + durable mimir + SNS alerting; **Hubble**
   for network flow visibility.
 
 ## Admission Policy (Kyverno)

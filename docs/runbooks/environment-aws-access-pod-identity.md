@@ -1,16 +1,16 @@
-# Runbook — Tenant AWS access via EKS Pod Identity
+# Runbook — Environment AWS access via EKS Pod Identity
 
-How a tenant team gets least-privilege AWS access via EKS Pod Identity, how the app consumes it, and how
+How an environment team gets least-privilege AWS access via EKS Pod Identity, how the app consumes it, and how
 the mechanism enforces isolation. Mechanism + rationale:
-[ADR-041](../adrs/041-pod-identity-for-tenant-workloads.md) /
+[ADR-041](../adrs/041-pod-identity-for-environment-workloads.md) /
 [ADR-047](../adrs/047-pod-identity-standard.md) (Pod Identity is the standard).
 
-> **Provisioning is now the `XTenant` claim.** Tenant AWS access is declared in the team's **`XTenant`
+> **Provisioning is now the `XTenant` claim.** Environment AWS access is declared in the team's **`XTenant`
 > claim** (`aws.serviceAccount` + `aws.policyStatements`) and provisioned by the Crossplane Composition —
 > not by editing `teams.hcl` and applying separate units. The previous `s3-shared` and `pod-identity`
 > Terragrunt units are **deleted**; the per-team role loops were removed from `iam-roles`. The Pod
-> Identity *mechanism* below is unchanged. See [Crossplane Tenant API](../architecture/crossplane-tenant-api.md)
-> and the [tenant onboarding runbook](tenant-onboarding.md).
+> Identity *mechanism* below is unchanged. See [Crossplane Environment API](../architecture/crossplane-environment-api.md)
+> and the [environment onboarding runbook](environment-onboarding.md).
 
 ---
 
@@ -77,7 +77,7 @@ kubectl exec deploy/<app> -n team-<team> -- aws sts get-caller-identity   # -> a
 A pod can only ever assume **its own** team's role: the Pod Identity association binds a specific
 `(cluster, namespace, serviceAccount)` triple to `Pod-team-<team>`, and `Pod-team-<team>` grants only the
 statements that team's own claim declares (capped by the deny-escalation boundary). A pod in `team-alpha`
-has no path to `Pod-team-bravo` — it can't change its association (an AWS API call tenants can't make) and
+has no path to `Pod-team-bravo` — it can't change its association (an AWS API call environments can't make) and
 the egress NetworkPolicy blocks IMDS, so it can't steal the node role either.
 
 Static confirmation (no cluster needed):
@@ -105,5 +105,5 @@ AWS_PROFILE=preprod aws eks list-pod-identity-associations --cluster-name prepro
   (`toEntities: ["host"]`, port 80) grants it. Confirm with `cilium monitor --type drop` on the node —
   a `…->host: …169.254.170.23:80 … Policy denied` means that CNP is missing/not applied. (IMDS stays
   blocked by the node's IMDSv2 hop-limit=1, not by this rule.)
-- **Tenant tried to set an `eks.amazonaws.com/role-arn` annotation** — denied by
-  `disallow-irsa-annotation-cross-team` (by design — tenants use Pod Identity, not IRSA).
+- **Environment tried to set an `eks.amazonaws.com/role-arn` annotation** — denied by
+  `disallow-irsa-annotation-cross-team` (by design — environments use Pod Identity, not IRSA).

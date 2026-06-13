@@ -157,7 +157,7 @@ kubectl get pods -n kube-system
 Access is provisioned when a team is onboarded — the per-team `DeveloperAccess-<team>`
 role, its group-mapped EKS access entry, and the namespace `RoleBinding` are all
 generated from `teams.hcl` (the SSO permission set/group are added in the
-identity-center unit). See the [Tenant Onboarding](tenant-onboarding.md) runbook.
+identity-center unit). See the [Environment Onboarding](environment-onboarding.md) runbook.
 
 If you cannot access your namespace, verify with the platform team that your team is
 listed in `teams.hcl` and that you are a member of the `Developers-<team>` Identity

@@ -17,7 +17,7 @@ infra/live/aws/<env>/                 env.hcl            # account ID, env tags
 infra/live/aws/<env>/<region>/        region.hcl         # region name + abbreviation
                                       network.hcl        # vpc_cidr, azs, subnet tiers, pod_cidr
 infra/live/aws/<env>/<region>/<workload>/  workload.hcl  # workload name, compliance_tier
-                                           teams.hcl     # (tenant clusters) team/app identity
+                                           teams.hcl     # (environment clusters) team/app identity
 infra/live/aws/<env>/<region>/<workload>/<module>/  terragrunt.hcl  # unit inputs + deps
 ```
 

@@ -10,7 +10,7 @@ reference see [`cmd/platctl/README.md`](../../cmd/platctl/README.md).
 > cluster. The rebuild is the first real apply. Under the current **AWS Identity Center** upstream, group claims
 > are empty (the membership gap), so SSO authenticates users but grants no group-based access yet — ArgoCD admin
 > is via its local break-glass account until a group-emitting upstream lands.
-
+>
 > **v3 cutover note (ADR-067):** the next rebuild is also the **v2→v3 cutover** (XTenant → XEnvironment; the
 > Team/Product/Service domain model). The cutover is a coordinated commit admin-merged *during* this teardown +
 > rebuild (teardown-before-merge). The full ordered procedure + the v3 deltas (the v3-only crossplane chart, the
@@ -130,8 +130,8 @@ Do these / be aware of these before/at bootstrap; each cost a `--resume` cycle t
 5. **preprod `policy` ↔ `crossplane` circular dep — FIXED.** Two policies matched Crossplane CRDs (`XEnvironment`,
    `ProviderConfig`) that don't exist until crossplane deploys — but crossplane depends on policy. Kyverno churned
    its webhook config on the missing CRDs and the bulk policy install couldn't fully converge on the leaner preprod.
-   `restrict-environment-envelope`/`restrict-tenant-control-plane` now live in the **crossplane** module
-   (`charts/tenant-policies`, a `helm_release` gated on `enable_tenant_api`, installed after `crossplane_tenant`), so
+   `restrict-environment-envelope`/`restrict-environment-control-plane` now live in the **crossplane** module
+   (`charts/environment-policies`, a `helm_release` gated on `enable_environment_api`, installed after `crossplane_environment_api`), so
    every CRD they match already exists at install time — no churn. The `policy` unit no longer ships them (and its
    `atomic = false` from the same incident stays, as defence-in-depth for the remaining bulk install).
 

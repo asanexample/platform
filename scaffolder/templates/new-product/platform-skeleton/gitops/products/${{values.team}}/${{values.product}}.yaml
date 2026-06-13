@@ -8,7 +8,7 @@ metadata:
   name: ${{ values.team }}-${{ values.product }}
   labels:
     app.kubernetes.io/managed-by: argocd
-    app.kubernetes.io/part-of: tenant-api
+    app.kubernetes.io/part-of: environment-api
 spec:
   team: ${{ values.team }}
   repo: asanexample/app-${{ values.team }}-${{ values.product }}

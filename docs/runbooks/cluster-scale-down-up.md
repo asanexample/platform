@@ -50,7 +50,7 @@ only reachable via Tailscale (or the SSM tunnel), which needs the subnet-router 
 - [ ] **`cross-vpc-dns` re-applied** — preprod's EKS ENI IPs can change on churn; the PHZ goes stale and ArgoCD
       (platform → preprod) fails `dial tcp <old-ENI>:443: i/o timeout`. Re-apply
       `infra/live/aws/platform/us-east-1/platform/cross-vpc-dns`, then hard-refresh the ArgoCD app. ([[project_cross_vpc_dns_dynamic]])
-- [ ] **Kyverno admission healthy** on both clusters (failure mode #2) — otherwise tenant pods can't be admitted.
+- [ ] **Kyverno admission healthy** on both clusters (failure mode #2) — otherwise environment pods can't be admitted.
 - [ ] **No stuck `Error` pods** in `team-*` (failure mode #3).
 - [ ] **Backstage `1/1`** (failure mode #6).
 
@@ -83,9 +83,9 @@ nslookup <platform-eks-host> 10.101.0.2              # preprod resolver → time
 
 **Always confirm it's REAL Tailscale, not the SSM bastion** (failure mode #5) before declaring it fixed.
 
-### 2. Kyverno admission-controller CrashLoopBackOff → blocks ALL tenant pod admission
+### 2. Kyverno admission-controller CrashLoopBackOff → blocks ALL environment pod admission
 
-**Symptom:** tenant pod create/delete fails `Internal error ... no endpoints available for service "kyverno-svc"`.
+**Symptom:** environment pod create/delete fails `Internal error ... no endpoints available for service "kyverno-svc"`.
 **Cause:** on hostNetwork the controller-runtime metrics server (`--controllerRuntimeMetricsAddress=:8080`) is a
 host port; on a rapid restart (informer-sync timeout during API turbulence) the prior `:8080` socket lingers →
 `bind: address already in use` → crashloop. The fail-closed webhook then rejects everything.

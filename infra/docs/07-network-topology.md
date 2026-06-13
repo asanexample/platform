@@ -73,7 +73,7 @@ Subnets are computed from `vpc_cidr` + `azs` using `cidrsubnet()` in each enviro
 |---------|-------------|----------|---------|
 | Management (<MGMT_ACCOUNT_ID>) | mgmt | None | Organizations, Identity Center, state backend |
 | Platform (<PLATFORM_ACCOUNT_ID>) | platform | `10.100.0.0/16` | Hub EKS cluster, shared services, observability, TGW hub |
-| Preprod (<PREPROD_ACCOUNT_ID>) | preprod | `10.101.0.0/16` | Full tenant cluster (EKS, tenants, Kyverno Enforce), TGW spoke |
+| Preprod (<PREPROD_ACCOUNT_ID>) | preprod | `10.101.0.0/16` | Full environment cluster (EKS, environments, Kyverno Enforce), TGW spoke |
 | Prod (<PROD_ACCOUNT_ID>) | prod | `10.102.0.0/16` | Networking + org scaffolding (no cluster yet) |
 
 ### Cross-Account Connectivity

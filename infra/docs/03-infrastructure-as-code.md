@@ -29,7 +29,7 @@ infra/
 │   ├── cert-manager/  external-dns/  external-secrets/  secret-stores/
 │   ├── tailscale/  tailscale-admin/  gateway-config/
 │   ├── policy/  observability/  observability-mimir/
-│   ├── tenant/  cluster-rbac/  eks-pod-identity/
+│   ├── environment/  cluster-rbac/  eks-pod-identity/
 │   └── vcluster/                   # deferred (ADR-033)
 ├── live/                           # Environment-specific configs
 │   └── aws/                        # only cloud deployed (live/azure, live/gcp are planned)

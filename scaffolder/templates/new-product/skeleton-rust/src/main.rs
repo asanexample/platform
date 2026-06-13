@@ -1,5 +1,5 @@
 //! Minimal Axum service for app-${{ values.team }}-${{ values.product }}. Exposes the liveness/readiness
-//! endpoint the platform manifests probe (/healthz) and a JSON root. No cloud/AWS deps — a tenant's AWS access
+//! endpoint the platform manifests probe (/healthz) and a JSON root. No cloud/AWS deps — an environment's AWS access
 //! (if any) is granted out-of-band via EKS Pod Identity to the named ServiceAccount.
 use axum::{http::HeaderMap, routing::get, Json, Router};
 use serde_json::{json, Value};

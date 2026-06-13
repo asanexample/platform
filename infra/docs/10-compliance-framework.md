@@ -20,7 +20,7 @@ The platform implements a tiered compliance model driven by the `compliance_tier
 
 ### Tier 1: Standard (SOC2)
 
-Applies to the current `platform` and tenant workloads (all `standard` today).
+Applies to the current `platform` and environment workloads (all `standard` today).
 
 | Control Area | Implementation |
 |-------------|----------------|
@@ -29,7 +29,7 @@ Applies to the current `platform` and tenant workloads (all `standard` today).
 | Identity | IAM Identity Center (SSO); purpose-built IAM roles; IRSA / EKS Pod Identity (no static keys) |
 | Encryption | KMS (EKS secrets, CloudTrail) + SSE-S3 (AES256); TLS 1.2+ in transit; EBS encrypted by SCP |
 | Endpoints | Private-only EKS API; SSM bastion; Tailscale VPN |
-| Logging | CloudTrail (per-account, 90-day) + VPC Flow Logs + observability (Prometheus/Mimir) |
+| Logging | CloudTrail (per-account, 90-day) + VPC Flow Logs + observability (Prometheus/mimir) |
 | Policy | Kyverno Enforce (image provenance + cosign verify, pod security, resource limits, RBAC hardening) above PSA baseline |
 
 ### Tier 2: HIPAA
@@ -63,7 +63,7 @@ Applies to: `pci` workload. Inherits all HIPAA controls, plus:
 
 - **Access control**: IAM (Identity Center + purpose-built roles), Kubernetes RBAC, and namespace-scoped RoleBindings; IRSA / Pod Identity
 - **Encryption**: SSE with platform-managed or customer-managed keys depending on tier; TLS everywhere
-- **Logging and monitoring**: Centralized CloudTrail + CloudWatch; Prometheus/Mimir/Grafana stack; retention scaled by tier
+- **Logging and monitoring**: Centralized CloudTrail + CloudWatch; Prometheus/mimir/Grafana stack; retention scaled by tier
 - **Network security**: security groups, private endpoints, Cilium NetworkPolicies; segmentation validated per tier
 - **Secure configuration**: Kyverno admission policies; AWS SCP guardrails; CIS benchmark scanning
 

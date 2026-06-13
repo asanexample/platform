@@ -19,12 +19,12 @@ emergency disable / the Audit↔Enforce flip.
 | **platform** | 829808296602 | v1.18.1 | **Enforce** | 3 (HA) | standard | 12 |
 | **prod** | 554518885123 | _not deployed_ | — | — | _TBD_ | — |
 
-- The **count differs** because several policy _families_ are generated one-per-tenant from
+- The **count differs** because several policy _families_ are generated one-per-environment from
   `teams.hcl` — `restrict-images-team-<team>`, `restrict-route-hostnames-team-<team>`,
-  `verify-images-team-<team>`, and `verify-attestations-team-<team>`. Preprod has tenants `alpha` +
+  `verify-images-team-<team>`, and `verify-attestations-team-<team>`. Preprod has environments `alpha` +
   `bravo`, so each family contributes two policies; the platform cluster hosts shared services only (no
-  tenants), so it carries just the common (non-per-team) policies. The counts above are an indicative
-  snapshot — read the exact live total with `kubectl get cpol` (it shifts as tenants/phases change).
+  environments), so it carries just the common (non-per-team) policies. The counts above are an indicative
+  snapshot — read the exact live total with `kubectl get cpol` (it shifts as environments/phases change).
 - **Mode** is controlled by the unit's `validation_failure_action` (`Audit` records PolicyReports and
   fails the webhook open; `Enforce` rejects at admission and fails the webhook closed). The flip is a
   one-line input change + apply.
@@ -33,32 +33,32 @@ emergency disable / the Audit↔Enforce flip.
 
 **Scope** column:
 
-- _tenant_ — matches only namespaces carrying the `platform.refplat.org/tenant` label (infra
-  namespaces excluded). Inert on clusters with no tenant namespaces (e.g. platform).
+- _tenant_ — matches only namespaces carrying the `platform.refplat.org/environment` label (infra
+  namespaces excluded). Inert on clusters with no environment namespaces (e.g. platform).
 - _cluster_ — evaluates cluster-wide at admission; skips the principals in `exclude_principals`
   (the IaC deployer, ArgoCD, and Kubernetes system controllers). These run `background: false`
   (Kyverno disallows `userInfo` in background scanning), so they only act on new `CREATE`/`UPDATE`.
 
 | Policy | Target kind(s) | Enforces | Scope | Tier | Clusters |
 | ------ | -------------- | -------- | ----- | ---- | -------- |
-| `restrict-image-registries` | Pod | Images only from approved registries (the platform ECR) | tenant | all | preprod, platform |
-| `restrict-images-team-<team>` | Pod | `team-<team>` namespace may only run `…/team-<team>/*` images (per-team, from `teams.hcl`) | tenant (per-team ns) | all | preprod (alpha, bravo) |
-| `disallow-latest-tag` | Pod | Explicit, non-`latest` image tag required | tenant | all | preprod, platform |
-| `require-requests-limits` | Pod | CPU + memory requests **and** limits on every container | tenant | all | preprod, platform |
-| `require-pod-probes` | Pod | Liveness + readiness probes on every container | tenant | all | preprod, platform |
-| `restrict-automount-sa-token` | Pod | `automountServiceAccountToken: false` | tenant | all | preprod, platform |
-| `require-workload-labels` | Pod | `app.kubernetes.io/name` + `team` labels | tenant | all | preprod, platform |
-| `block-public-loadbalancer` | Service | Deny `LoadBalancer` / `NodePort` (Gateway-only ingress) | tenant | all | preprod, platform |
-| `disallow-irsa-annotation-cross-team` | ServiceAccount | Deny `eks.amazonaws.com/role-arn` annotation (tenant AWS access is Pod Identity, not IRSA — ADR-041; backstop) | tenant | all | preprod, platform |
-| `require-tenant-namespace-naming` | Namespace | Tenant namespaces named `team-*` | tenant (labelled ns) | all | preprod, platform |
+| `restrict-image-registries` | Pod | Images only from approved registries (the platform ECR) | environment | all | preprod, platform |
+| `restrict-images-team-<team>` | Pod | `team-<team>` namespace may only run `…/team-<team>/*` images (per-team, from `teams.hcl`) | environment (per-team ns) | all | preprod (alpha, bravo) |
+| `disallow-latest-tag` | Pod | Explicit, non-`latest` image tag required | environment | all | preprod, platform |
+| `require-requests-limits` | Pod | CPU + memory requests **and** limits on every container | environment | all | preprod, platform |
+| `require-pod-probes` | Pod | Liveness + readiness probes on every container | environment | all | preprod, platform |
+| `restrict-automount-sa-token` | Pod | `automountServiceAccountToken: false` | environment | all | preprod, platform |
+| `require-workload-labels` | Pod | `app.kubernetes.io/name` + `team` labels | environment | all | preprod, platform |
+| `block-public-loadbalancer` | Service | Deny `LoadBalancer` / `NodePort` (Gateway-only ingress) | environment | all | preprod, platform |
+| `disallow-irsa-annotation-cross-team` | ServiceAccount | Deny `eks.amazonaws.com/role-arn` annotation (environment AWS access is Pod Identity, not IRSA — ADR-041; backstop) | environment | all | preprod, platform |
+| `require-environment-namespace-naming` | Namespace | Environment namespaces named `team-*` | environment (labelled ns) | all | preprod, platform |
 | `restrict-binding-clusteradmin` | RoleBinding, ClusterRoleBinding | Deny binding to `cluster-admin` | cluster | all | preprod, platform |
 | `restrict-wildcard-rbac` | Role, ClusterRole | Deny wildcard verbs / resources / apiGroups | cluster | all | preprod, platform |
 | `disallow-default-namespace` | Pod, Deployment, StatefulSet, DaemonSet, ReplicaSet, Job, CronJob | No workloads in `default` | cluster | all | preprod, platform |
-| `disallow-privilege-escalation` | Pod | Deny `securityContext.allowPrivilegeEscalation: true` (backstops the mutate default) | tenant | all | preprod, platform |
-| `require-seccomp` | Pod | Deny `seccompProfile.type: Unconfined` (backstops the mutate default) | tenant | all | preprod, platform |
-| `restrict-route-hostnames-team-<t>` | HTTPRoute, GRPCRoute, TLSRoute | Per-team route hostnames must be in the team's allow-list (from `teams.hcl`); deny cross-team/platform hostnames + empty hostname lists (anti-squatting, ADR-029) | tenant (per-team) | all | preprod |
-| `require-pod-security-restricted` | Pod | Full Restricted Pod Security Standard | tenant | **hipaa/pci only** | _(none yet — standard tier)_ |
-| `require-ro-rootfs` | Pod | `readOnlyRootFilesystem: true` | tenant | **hipaa/pci only** | _(none yet — standard tier)_ |
+| `disallow-privilege-escalation` | Pod | Deny `securityContext.allowPrivilegeEscalation: true` (backstops the mutate default) | environment | all | preprod, platform |
+| `require-seccomp` | Pod | Deny `seccompProfile.type: Unconfined` (backstops the mutate default) | environment | all | preprod, platform |
+| `restrict-route-hostnames-team-<t>` | HTTPRoute, GRPCRoute, TLSRoute | Per-team route hostnames must be in the team's allow-list (from `teams.hcl`); deny cross-team/platform hostnames + empty hostname lists (anti-squatting, ADR-029) | environment (per-team) | all | preprod |
+| `require-pod-security-restricted` | Pod | Full Restricted Pod Security Standard | environment | **hipaa/pci only** | _(none yet — standard tier)_ |
+| `require-ro-rootfs` | Pod | `readOnlyRootFilesystem: true` | environment | **hipaa/pci only** | _(none yet — standard tier)_ |
 
 The two tier-gated policies render only when a cluster's `compliance_tier` is `hipaa` or `pci`. Both
 current clusters are `standard`, so they are not deployed there yet; they will appear automatically on
@@ -66,7 +66,7 @@ any cluster set to a regulated tier (e.g. a future prod). See [ADR-013](../adrs/
 
 ## Mutate policies (Phase 2)
 
-`mutate` policies auto-inject safe defaults on tenant workloads at admission (add-if-absent — never
+`mutate` policies auto-inject safe defaults on environment workloads at admission (add-if-absent — never
 overrides an explicit app value), so apps need no security boilerplate and still satisfy the validate
 policies (Kyverno mutates before validating). Gated by `enable_mutate_defaults` (default true); the
 mutate webhooks **fail open** (a missed default must never block a pod). Their security values are
@@ -75,8 +75,8 @@ matching ArgoCD `ignoreDifferences` is safe.
 
 | Policy | Injects (when absent) | Scope |
 | ------ | --------------------- | ----- |
-| `mutate-pod-defaults` | container `securityContext` (`allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`, `seccompProfile.type: RuntimeDefault`; not `runAsNonRoot`) **and** pod `automountServiceAccountToken: false` — one patch so strategic-merge resolves under autogen | tenant |
-| `mutate-workload-labels` | `team` (tenant key from the `team-<k>[-env]` namespace name) | tenant |
+| `mutate-pod-defaults` | container `securityContext` (`allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`, `seccompProfile.type: RuntimeDefault`; not `runAsNonRoot`) **and** pod `automountServiceAccountToken: false` — one patch so strategic-merge resolves under autogen | environment |
+| `mutate-workload-labels` | `team` (environment key from the `team-<k>[-env]` namespace name) | environment |
 
 > `app.kubernetes.io/name` can't be auto-derived under autogen (pod templates have no name), so it is
 > **recommended but not required** — `require-workload-labels` requires only `team`, which is
@@ -99,13 +99,13 @@ supported fallback for bespoke-build apps.
 
 | Policy | Verifies | Scope |
 | ------ | -------- | ----- |
-| `verify-images-team-<team>` | Images under `…/team-<team>/*` are cosign-signed (`count: 1`) by the shared `trusted-ci/build-sign.yml` (`trusted_ci_build_subject_regexp`) gated per-team by the `githubWorkflowRepository` extension = `app-<team>` (`shared_signer_caller_repos`, ADR-050) **or**, as a fallback, by `app-<team>`'s own `deploy.yml@main` (pinned) / `preview.yml` (subjectRegExp — the PR OIDC ref varies); `mutateDigest` pins to digest | tenant (per-team) |
+| `verify-images-team-<team>` | Images under `…/team-<team>/*` are cosign-signed (`count: 1`) by the shared `trusted-ci/build-sign.yml` (`trusted_ci_build_subject_regexp`) gated per-team by the `githubWorkflowRepository` extension = `app-<team>` (`shared_signer_caller_repos`, ADR-050) **or**, as a fallback, by `app-<team>`'s own `deploy.yml@main` (pinned) / `preview.yml` (subjectRegExp — the PR OIDC ref varies); `mutateDigest` pins to digest | environment (per-team) |
 
 Per-team identity isolation: the shared signer's cert **subject** is the same for all teams, so isolation
 moves to the `githubWorkflowRepository` cert extension — Fulcio sets it from the _calling_ app repo's OIDC,
 so one team cannot forge another's. A signature whose caller repo (or, for the fallback, whose app
 workflow) is not the team's does **not** satisfy that team's policy — the supply-chain analog of per-team
-registry scoping. Deployed on **preprod** (where tenants run); the platform cluster has no tenant
+registry scoping. Deployed on **preprod** (where environments run); the platform cluster has no environment
 workloads. Verification depends on cluster egress to sigstore (Fulcio/Rekor) — see the break-glass runbook.
 
 ## Attestation verification (Phase 3 — SBOM + SLSA provenance)
@@ -119,7 +119,7 @@ signed by the shared `trusted-ci/build-sign.yml` workflow alongside the image si
 
 | Policy | Verifies | Scope |
 | ------ | -------- | ----- |
-| `verify-attestations-team-<team>` | `…/team-<team>/*` images carry a cosign-signed CycloneDX SBOM **and** a SLSA provenance attestation. The SBOM block accepts (`count: 1`) the shared `trusted-ci/build-sign.yml` (`trusted_ci_build_subject_regexp`) gated per-team by `githubWorkflowRepository` = `app-<team>` (`shared_signer_caller_repos`, ADR-050) **or**, as a fallback, the team's own workflow. For SLSA-L3-adopted teams (`attest_caller_repos`), the provenance must be signed by the isolated **`trusted-ci`** reusable workflow with the caller-repo = the team's own `app-<team>` (ADR-042); for others, by the team's own `deploy.yml`/`preview.yml`. | tenant (per-team) |
+| `verify-attestations-team-<team>` | `…/team-<team>/*` images carry a cosign-signed CycloneDX SBOM **and** a SLSA provenance attestation. The SBOM block accepts (`count: 1`) the shared `trusted-ci/build-sign.yml` (`trusted_ci_build_subject_regexp`) gated per-team by `githubWorkflowRepository` = `app-<team>` (`shared_signer_caller_repos`, ADR-050) **or**, as a fallback, the team's own workflow. For SLSA-L3-adopted teams (`attest_caller_repos`), the provenance must be signed by the isolated **`trusted-ci`** reusable workflow with the caller-repo = the team's own `app-<team>` (ADR-042); for others, by the team's own `deploy.yml`/`preview.yml`. | environment (per-team) |
 
 This is the admission-side counterpart to the image-signing/attestation chain in
 [`cosign-image-signing.md`](cosign-image-signing.md) §10b — the signature proves _who built_ the image;
@@ -128,7 +128,7 @@ these attestations prove the SBOM and _how_ it was built.
 ## Cleanup (Phase 5)
 
 `ClusterCleanupPolicy` `cleanup-finished-cronjob-jobs` (gated by `enable_cleanup`) reaps **finished
-CronJob-spawned Jobs** in tenant namespaces on an hourly schedule. Scoped to CronJob-owned Jobs so it
+CronJob-spawned Jobs** in environment namespaces on an hourly schedule. Scoped to CronJob-owned Jobs so it
 never deletes a Git-declared/ArgoCD-managed Job (selfHeal would recreate it). CleanupPolicies have no
 Audit mode — they delete on schedule.
 
@@ -136,7 +136,7 @@ Audit mode — they delete on schedule.
 
 Configured on the module and applied to every cluster:
 
-- **`exclude_namespaces`** (tenant policies skip these): `kube-system`, `kube-node-lease`,
+- **`exclude_namespaces`** (environment policies skip these): `kube-system`, `kube-node-lease`,
   `kube-public`, `kyverno`, `cert-manager`, `external-secrets`, `external-dns`, `argocd`, `tailscale`.
 - **`exclude_principals`** (cluster-scoped policies skip these usernames): the IaC deployer
   `arn:aws:sts::*:assumed-role/PlatformDeployer/*`, ArgoCD `system:serviceaccount:argocd:*`,

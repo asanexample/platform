@@ -15,7 +15,7 @@ merged through `_base.hcl`. The cost-relevant keys:
 | Tag | Use |
 |-----|-----|
 | `Environment` | Per-env spend (platform / preprod / prod) |
-| `Team` / `Workload` | Per-tenant / per-workload attribution (basis for showback) |
+| `Team` / `Workload` | Per-environment / per-workload attribution (basis for showback) |
 | `CostCenter` | Accounting group |
 | `ComplianceTier` | Spend by tier (regulated tiers cost more) |
 
@@ -34,7 +34,7 @@ management account to break them out in Cost Explorer.
 | **Small nodes** (`t3.large`) | node-group units | Right-sized for current load |
 | **gp3 EBS** | launch template + StorageClass | Cheaper/faster than gp2 |
 | **Custom PHZ cross-VPC DNS** | `dns_method` (not Resolver endpoints) | ~$365/mo avoided vs resolver endpoints |
-| **SSE-S3 (not KMS) on high-churn buckets** | Mimir/data buckets | No per-object KMS request cost |
+| **SSE-S3 (not KMS) on high-churn buckets** | mimir/data buckets | No per-object KMS request cost |
 | **Cilium overlay** | `cluster-pool` IPAM | Pods don't consume VPC IPs → no secondary-CIDR/larger-subnet cost |
 
 ## Major cost drivers (what to watch)
@@ -43,7 +43,7 @@ management account to break them out in Cost Explorer.
 - **EKS control plane** — ~$0.10/hr per cluster (platform + preprod).
 - **NAT gateways** — hourly + per-GB; single-NAT for non-prod, S3 endpoint offload.
 - **Transit Gateway** — per-attachment hourly + per-GB processed (hub + spokes).
-- **EBS + S3** — node volumes, Mimir/observability object storage, state bucket.
+- **EBS + S3** — node volumes, mimir/observability object storage, state bucket.
 - **Data transfer** — cross-AZ and egress; minimized by keeping traffic in-VPC/in-region.
 
 ## Environment-specific optimization
@@ -59,7 +59,7 @@ management account to break them out in Cost Explorer.
 - **AWS Budgets** + SNS alerts per account/tag — *not yet implemented* (no `aws_budgets`
   resources in the IaC).
 - **Cost Anomaly Detection** and scheduled **Cost Explorer** reports.
-- **Right-sizing** from observability (the Prometheus/Mimir stack already collects node/pod
+- **Right-sizing** from observability (the Prometheus/mimir stack already collects node/pod
   utilization — feed it into sizing decisions).
 - **Savings Plans / Reserved Instances** once steady-state usage is established (currently
   all On-Demand; note the account's low On-Demand vCPU quota also bounds scale — see #168).

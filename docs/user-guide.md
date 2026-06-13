@@ -298,7 +298,7 @@ Expected resources created:
 With the management account configured, deploy the full platform stack using
 **`platctl`** (the Go orchestration CLI, ADR-038). It auto-discovers all Terragrunt
 units (~30: networking, EKS, Cilium, node groups, eks-addons, Tailscale, ArgoCD,
-cert-manager, external-dns/secrets, policy/Kyverno, observability, Mimir, etc.) and
+cert-manager, external-dns/secrets, policy/Kyverno, observability, mimir, etc.) and
 applies them in dependency order with resumable state.
 
 ```bash
@@ -772,16 +772,16 @@ docker push <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/app
 ECR repos are defined in `infra/live/aws/platform/us-east-1/platform/ecr/terragrunt.hcl`.
 GitHub Actions pushes via OIDC federation — no static credentials needed.
 
-### Tenant Management
+### Environment Management
 
 Teams are defined in `infra/live/aws/preprod/us-east-1/platform/teams.hcl`.
 All teams use namespace isolation (`team-<name>`).
 
-> **Note:** A vCluster mode for stronger isolation exists in the tenant module
+> **Note:** A vCluster mode for stronger isolation exists in the environment module
 > but is currently deferred (ADR-033) due to HTTPRoute sync limitations in
 > the open-source vCluster chart.
 
-See [Tenant Onboarding](runbooks/tenant-onboarding.md) for the full
+See [Environment Onboarding](runbooks/environment-onboarding.md) for the full
 onboarding procedure.
 
 ### Developer Workflow

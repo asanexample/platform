@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
  * Minimal Spring Boot service for app-${{ values.team }}-${{ values.product }}. The HTTP routes live in
- * {@link HealthController}. No cloud/AWS deps — a tenant's AWS access (if any) is granted out-of-band via EKS
+ * {@link HealthController}. No cloud/AWS deps — an environment's AWS access (if any) is granted out-of-band via EKS
  * Pod Identity to the named ServiceAccount. (The package stays com.example.app — Java packages can't contain
  * hyphens; rename it for your real app.)
  */

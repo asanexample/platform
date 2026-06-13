@@ -30,7 +30,7 @@ abbreviations for future use.
 | Management  | mgmt         | Yes (Organizations, Identity Center, state) |
 | Platform    | platform     | Yes (hub cluster + shared services) |
 | Test        | test         | Yes (Terratest CI sandbox) |
-| Preprod     | preprod      | Yes (full tenant cluster) |
+| Preprod     | preprod      | Yes (full environment cluster) |
 | Production  | prod         | Yes (networking + org scaffolding) |
 | Development | dev          | Reserved |
 | Staging     | staging      | Reserved |

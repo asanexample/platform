@@ -44,7 +44,7 @@ to the module instead (see below).
 | **Tier-1 bundled** | kube-prometheus-stack | Compute Resources (cluster/namespace/pod), Node Exporter, Kubernetes/API-server, CoreDNS, Prometheus/Alertmanager overview |
 
 **Sources currently scraped** (so their panels have data): the cluster itself (kubelet/cAdvisor/node),
-**kube-state-metrics**, **Kyverno**, **cert-manager**, **ArgoCD**, **External-Secrets**, and **Mimir**'s own
+**kube-state-metrics**, **Kyverno**, **cert-manager**, **ArgoCD**, **External-Secrets**, and **mimir**'s own
 components. Dashboards for **Cilium agent/operator** are deferred (avoids a CNI re-apply; Hubble metrics are
 exposed but not yet scraped).
 
@@ -60,7 +60,7 @@ exposed but not yet scraped).
 
 ## 3. Query metrics
 
-Grafana's **default datasource is Mimir** (full history, tenant `platform`); **Prometheus** is selectable
+Grafana's **default datasource is mimir** (full history, environment `platform`); **Prometheus** is selectable
 for the last ~15 days / lowest-latency local queries. In Explore, pick the datasource and run PromQL, e.g.:
 
 ```promql
@@ -70,11 +70,11 @@ histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket[5m])
 sum(argocd_app_info{health_status="Healthy"})       # ArgoCD healthy apps (GitOps panel source)
 ```
 
-**Tenancy note:** Mimir requires `X-Scope-OrgID` — Grafana's Mimir datasource sets it (`platform`)
-automatically. Querying Mimir **directly** (bypassing Grafana) needs the header:
+**Tenancy note:** mimir requires `X-Scope-OrgID` — Grafana's mimir datasource sets it (`platform`)
+automatically. Querying mimir **directly** (bypassing Grafana) needs the header:
 
 ```bash
-# from inside the cluster only (Mimir is ClusterIP, NetworkPolicy-isolated to the observability ns)
+# from inside the cluster only (mimir is ClusterIP, NetworkPolicy-isolated to the observability ns)
 kubectl --context platform exec -n observability deploy/mimir-querier -- \
   wget -qO- --header 'X-Scope-OrgID: platform' \
   'http://mimir-gateway.observability.svc/prometheus/api/v1/query?query=up'
@@ -85,7 +85,7 @@ kubectl --context platform exec -n observability deploy/mimir-querier -- \
 Expose Prometheus metrics and add a **ServiceMonitor** (Prometheus scrapes ServiceMonitors cluster-wide —
 `serviceMonitorSelectorNilUsesHelmValues=false`). For platform add-ons this is typically a `metrics_enabled`
 toggle on the component's module/unit (as done for ArgoCD + External-Secrets). For team workloads, the
-self-service path (per-team ServiceMonitors + tenant routing) lands with **P10** — until then, coordinate
+self-service path (per-team ServiceMonitors + environment routing) lands with **P10** — until then, coordinate
 with the platform team.
 
 ---

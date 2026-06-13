@@ -33,7 +33,7 @@ Each environment gets a full /16, giving 32 regional /21 blocks — enough for a
 | Environment | VPC CIDR | Status |
 |-------------|----------|--------|
 | Platform | `10.100.0.0/16` | Deployed (hub cluster) |
-| Preprod | `10.101.0.0/16` | Deployed (full tenant cluster) |
+| Preprod | `10.101.0.0/16` | Deployed (full environment cluster) |
 | Prod | `10.102.0.0/16` | Deployed (networking + org) |
 | Reserved | `10.103.0.0/16` | — |
 

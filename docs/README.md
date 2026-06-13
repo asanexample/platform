@@ -18,7 +18,7 @@ configuration hierarchy that promotes consistency across environments.
 |----------|-------------|
 | [Onboarding Guide](onboarding.md) | New team member quickstart: prerequisites, first deploy, daily workflows |
 | [User Guide](user-guide.md) | Complete reference for module configuration, deployments, and day-2 operations |
-| [Glossary](glossary.md) | Platform-specific terms (tenant, the seam, generated host, Pod Identity, …) defined in one place |
+| [Glossary](glossary.md) | Platform-specific terms (environment, the seam, generated host, Pod Identity, …) defined in one place |
 
 ## How It Works
 
@@ -27,12 +27,12 @@ configuration hierarchy that promotes consistency across environments.
 | [Architecture](architecture/) | System design, network topology, and multi-cloud strategy |
 | [Identity & SSO](architecture/identity-and-sso.md) | How login works: Keycloak (IdP of record), oauth2-proxy, the access model, the pluggable seam |
 | [Gateway & Ingress](architecture/gateway-and-ingress.md) | Cilium Gateway → NLB → cert-manager → external-dns → Kyverno hostname guard (ADR-060/061) |
-| [Secrets & External Secrets](architecture/secrets-and-external-secrets.md) | Secrets Manager → ESO ClusterSecretStore → ExternalSecret → k8s Secret; platform vs tenant |
+| [Secrets & External Secrets](architecture/secrets-and-external-secrets.md) | Secrets Manager → ESO ClusterSecretStore → ExternalSecret → k8s Secret; platform vs environment |
 | [Platform Domain API](architecture/platform-domain-api.md) | **Normative schema** for the ADR-067 domain model — Team / Product / Service / Environment / Customer (v1alpha3; supersedes the ADR-049 tenant-api-v2) |
-| [Crossplane Composition Authoring](architecture/crossplane-composition-authoring.md) | The *how* behind the Tenant API: XRD, Pipeline functions, the status-loop pattern |
+| [Crossplane Composition Authoring](architecture/crossplane-composition-authoring.md) | The *how* behind the Environment API: XRD, Pipeline functions, the status-loop pattern |
 | [Supply-Chain Overview](architecture/supply-chain-overview.md) | Why + end-to-end flow: SBOM, cosign, SLSA provenance, Rekor, Kyverno, and the SLSA Build L3 matrix |
-| [Observability Current State](architecture/observability-current-state.md) | As-built P1 hub + P2 Mimir: topology, multi-tenancy/security model, storage |
-| [Preprod Tenant Model](architecture/preprod-tenant-model.md) | Namespace-based tenant isolation architecture |
+| [Observability Current State](architecture/observability-current-state.md) | As-built P1 hub + P2 mimir: topology, multi-tenancy/security model, storage |
+| [Preprod Environment Model](architecture/preprod-environment-model.md) | Namespace-based environment isolation architecture |
 | [Cosign Image Signing](architecture/cosign-image-signing.md) | From-scratch explainer: keyless signing, Fulcio/Rekor, per-team identity, Kyverno verify |
 | [Kyverno Policy Catalog](architecture/kyverno-policy-catalog.md) | Every admission policy enforced per cluster, scope, and mode |
 | [AWS Organizations](architecture/aws-organizations.md) | OU hierarchy, SCP catalog, exempt roles, blast-radius analysis |
@@ -46,11 +46,11 @@ configuration hierarchy that promotes consistency across environments.
 |----------|-------------|
 | [Runbooks](runbooks/) | Step-by-step operational procedures for common tasks |
 | [Deploy App to Preprod](runbooks/deploy-app-preprod.md) | Developer guide: repo structure, manifests, ECR push, ArgoCD sync |
-| [Tenant Onboarding](runbooks/tenant-onboarding.md) | Platform team: onboard/offboard teams, choose isolation mode |
+| [Environment Onboarding](runbooks/environment-onboarding.md) | Platform team: onboard/offboard teams, choose isolation mode |
 | [App Supply-Chain Onboarding](runbooks/app-supply-chain-onboarding.md) | App team: wire cosign signing + SBOM + SLSA provenance into CI |
 | [Supply-Chain Incidents](runbooks/supply-chain-incidents.md) | Verification failures, Sigstore outage, identity rotation, break-glass |
-| [Observability Access](runbooks/observability-access.md) | Access Grafana (Tailscale + creds), dashboards, query Mimir, alerting |
-| [Observability Troubleshooting](runbooks/observability-troubleshooting.md) | Grafana/Prometheus/Mimir/storage diagnostics + apply gotchas |
+| [Observability Access](runbooks/observability-access.md) | Access Grafana (Tailscale + creds), dashboards, query mimir, alerting |
+| [Observability Troubleshooting](runbooks/observability-troubleshooting.md) | Grafana/Prometheus/mimir/storage diagnostics + apply gotchas |
 | [EKS Cluster Access](runbooks/eks-cluster-access.md) | kubectl setup for platform engineers and developers |
 | [SSO Troubleshooting](runbooks/identity-sso-troubleshooting.md) | "Can't log in / no permissions" master triage across ArgoCD, Backstage, Keycloak |
 | [Debug Ingress & DNS](runbooks/debug-ingress-and-dns.md) | App unreachable / TLS fails / hostname rejected — external-dns, cert-manager, HTTPRoute, Kyverno |

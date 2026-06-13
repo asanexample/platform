@@ -16,7 +16,7 @@ Only **AWS** is deployed (5 accounts). Azure/GCP are planned (no `live/azure`, `
 | mgmt | <MGMT_ACCOUNT_ID> | Organizations, Identity Center, Terraform state, GitHub OIDC | Yes |
 | platform | <PLATFORM_ACCOUNT_ID> | EKS hub cluster + platform services + observability + IAM roles | Yes (full stack) |
 | test | <TEST_ACCOUNT_ID> | Terratest CI sandbox | Yes (GitHub OIDC + PlatformDeployer) |
-| preprod | <PREPROD_ACCOUNT_ID> | Pre-production tenant workloads | **Yes (full tenant cluster: EKS, Crossplane-Composition tenants, Kyverno Enforce, Falco, Pod Identity)** |
+| preprod | <PREPROD_ACCOUNT_ID> | Pre-production environment workloads | **Yes (full environment cluster: EKS, Crossplane-Composition environments, Kyverno Enforce, Falco, Pod Identity)** |
 | prod | <PROD_ACCOUNT_ID> | Production workloads | Networking + org scaffolding (no cluster yet) |
 
 ## Isolation Boundaries

@@ -58,8 +58,8 @@ upstream = {
 
 In Entra: register an **app**, add the broker endpoint as a redirect URI, and under **Token configuration** add
 the **groups claim**. Note Entra emits group **object-IDs** by default — so `ssoGroup` must be the group **OID**
-(or configure Entra to emit `sAMAccountName`/display names for on-prem-synced groups, and use that). `{tenant}`
-is the directory (tenant) ID.
+(or configure Entra to emit `sAMAccountName`/display names for on-prem-synced groups, and use that). `{environment}`
+is the directory (environment) ID.
 
 ```hcl
 upstream = {
@@ -68,10 +68,10 @@ upstream = {
   protocol    = "oidc"
   group_claim = "groups"
   oidc = {
-    authorization_url = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize"
-    token_url         = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
+    authorization_url = "https://login.microsoftonline.com/{environment}/oauth2/v2.0/authorize"
+    token_url         = "https://login.microsoftonline.com/{environment}/oauth2/v2.0/token"
     user_info_url     = "https://graph.microsoft.com/oidc/userinfo"
-    jwks_url          = "https://login.microsoftonline.com/{tenant}/discovery/v2.0/keys"
+    jwks_url          = "https://login.microsoftonline.com/{environment}/discovery/v2.0/keys"
     client_id         = "…"
   }
 }
