@@ -281,7 +281,7 @@ resource "helm_release" "mimir" {
 # Grafana datasource (sidecar-discovered ConfigMap in the observability namespace)
 # ---------------------------------------------------------------------------
 
-resource "kubernetes_config_map" "grafana_datasource" {
+resource "kubernetes_config_map_v1" "grafana_datasource" {
   count = local.create ? 1 : 0
 
   metadata {

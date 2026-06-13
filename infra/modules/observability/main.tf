@@ -191,7 +191,7 @@ locals {
 # Namespace (PSA `privileged` for node-exporter; created here, NOT by the chart,
 # so the label is set — and intentionally NO tenant label).
 # ---------------------------------------------------------------------------
-resource "kubernetes_namespace" "this" {
+resource "kubernetes_namespace_v1" "this" {
   count = local.create ? 1 : 0
 
   metadata {
@@ -228,7 +228,7 @@ resource "null_resource" "namespace_drain" {
     command = "bash ${self.triggers.script} --delete ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} ${self.triggers.namespace} ${self.triggers.refs}"
   }
 
-  depends_on = [kubernetes_namespace.this, helm_release.kube_prometheus_stack]
+  depends_on = [kubernetes_namespace_v1.this, helm_release.kube_prometheus_stack]
 }
 
 # ---------------------------------------------------------------------------
@@ -236,12 +236,12 @@ resource "null_resource" "namespace_drain" {
 # (gateway path). Egress left open (Prometheus scrapes cluster-wide). Full store-endpoint
 # isolation lands with the multi-tenant stores in P2.
 # ---------------------------------------------------------------------------
-resource "kubernetes_network_policy" "default_deny_ingress" {
+resource "kubernetes_network_policy_v1" "default_deny_ingress" {
   count = local.create ? 1 : 0
 
   metadata {
     name      = "default-deny-ingress"
-    namespace = kubernetes_namespace.this[0].metadata[0].name
+    namespace = kubernetes_namespace_v1.this[0].metadata[0].name
   }
   spec {
     pod_selector {}
@@ -249,12 +249,12 @@ resource "kubernetes_network_policy" "default_deny_ingress" {
   }
 }
 
-resource "kubernetes_network_policy" "allow_intra_namespace" {
+resource "kubernetes_network_policy_v1" "allow_intra_namespace" {
   count = local.create ? 1 : 0
 
   metadata {
     name      = "allow-intra-namespace"
-    namespace = kubernetes_namespace.this[0].metadata[0].name
+    namespace = kubernetes_namespace_v1.this[0].metadata[0].name
   }
   spec {
     pod_selector {}
@@ -281,7 +281,7 @@ resource "kubernetes_manifest" "allow_grafana_from_gateway" {
     kind       = "CiliumNetworkPolicy"
     metadata = {
       name      = "allow-grafana-from-gateway"
-      namespace = kubernetes_namespace.this[0].metadata[0].name
+      namespace = kubernetes_namespace_v1.this[0].metadata[0].name
     }
     spec = {
       endpointSelector = { matchLabels = { "app.kubernetes.io/name" = "grafana" } }
@@ -292,7 +292,7 @@ resource "kubernetes_manifest" "allow_grafana_from_gateway" {
     }
   }
 
-  depends_on = [kubernetes_namespace.this]
+  depends_on = [kubernetes_namespace_v1.this]
 }
 
 # ---------------------------------------------------------------------------
@@ -327,12 +327,12 @@ resource "aws_secretsmanager_secret_version" "grafana_admin" {
   })
 }
 
-resource "kubernetes_secret" "grafana_admin" {
+resource "kubernetes_secret_v1" "grafana_admin" {
   count = local.create ? 1 : 0
 
   metadata {
     name      = local.grafana_admin_secret
-    namespace = kubernetes_namespace.this[0].metadata[0].name
+    namespace = kubernetes_namespace_v1.this[0].metadata[0].name
     labels    = local.k8s_labels
   }
   data = {
@@ -347,12 +347,12 @@ resource "kubernetes_secret" "grafana_admin" {
 # Grafana sidecar (label grafana_dashboard=1). Tier-1 bundled dashboards ship with the chart;
 # these are the tier-3 custom (Platform Health) + tier-2 vendored ones.
 # ---------------------------------------------------------------------------
-resource "kubernetes_config_map" "dashboards" {
+resource "kubernetes_config_map_v1" "dashboards" {
   for_each = local.create ? fileset("${path.module}/dashboards", "*.json") : toset([])
 
   metadata {
     name        = "obs-dashboard-${trimsuffix(each.value, ".json")}"
-    namespace   = kubernetes_namespace.this[0].metadata[0].name
+    namespace   = kubernetes_namespace_v1.this[0].metadata[0].name
     labels      = merge(local.k8s_labels, { grafana_dashboard = "1" })
     annotations = { grafana_folder = "Platform" }
   }
@@ -437,7 +437,7 @@ resource "helm_release" "kube_prometheus_stack" {
   repository       = var.helm_repository
   chart            = var.helm_chart
   version          = var.helm_chart_version
-  namespace        = kubernetes_namespace.this[0].metadata[0].name
+  namespace        = kubernetes_namespace_v1.this[0].metadata[0].name
   create_namespace = false # created above with the PSA label
   timeout          = var.helm_timeout
   wait             = var.helm_wait
@@ -449,8 +449,8 @@ resource "helm_release" "kube_prometheus_stack" {
   ]
 
   depends_on = [
-    kubernetes_secret.grafana_admin,
-    kubernetes_network_policy.default_deny_ingress,
+    kubernetes_secret_v1.grafana_admin,
+    kubernetes_network_policy_v1.default_deny_ingress,
     aws_iam_role_policy.alertmanager_sns,
   ]
 }
