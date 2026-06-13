@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/gangster/platform/cmd/platctl/internal/config"
-	"github.com/gangster/platform/cmd/platctl/internal/validate"
+	"github.com/asanexample/platform/cmd/platctl/internal/config"
+	"github.com/asanexample/platform/cmd/platctl/internal/validate"
 )
 
 // NewValidateCmd creates the validate subcommand.

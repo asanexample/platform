@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gangster/platform/cmd/platctl/internal/cloud"
+	"github.com/asanexample/platform/cmd/platctl/internal/cloud"
 )
 
 // GatewayHealthCheck verifies the full gateway stack: GatewayClass, Gateway,

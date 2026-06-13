@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gangster/platform/cmd/platctl/internal/config"
-	"github.com/gangster/platform/cmd/platctl/internal/engine"
+	"github.com/asanexample/platform/cmd/platctl/internal/config"
+	"github.com/asanexample/platform/cmd/platctl/internal/engine"
 )
 
 // mockRunner returns a CommandRunner that matches commands and returns canned output.

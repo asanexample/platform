@@ -1,4 +1,4 @@
-module github.com/gangster/platform/infra/tests/aws
+module github.com/asanexample/platform/infra/tests/aws
 
 go 1.26.2
 

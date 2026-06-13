@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gangster/platform/cmd/platctl/internal/cloud"
-	"github.com/gangster/platform/cmd/platctl/internal/config"
-	"github.com/gangster/platform/cmd/platctl/internal/engine"
+	"github.com/asanexample/platform/cmd/platctl/internal/cloud"
+	"github.com/asanexample/platform/cmd/platctl/internal/config"
+	"github.com/asanexample/platform/cmd/platctl/internal/engine"
 )
 
 // ---------------------------------------------------------------------------
