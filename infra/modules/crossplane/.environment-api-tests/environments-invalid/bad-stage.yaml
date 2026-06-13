@@ -1,5 +1,5 @@
 # MUST FAIL: stage outside the enum (dev/test/uat/staging/prod).
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata: { name: bad-stage }
 spec: { team: alpha, product: demo, stage: production }

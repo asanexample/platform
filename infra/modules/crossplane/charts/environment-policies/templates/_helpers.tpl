@@ -67,11 +67,11 @@ Usage (under a rule):  {{- include "ktp.envContext" . | nindent 6 }}
 context:
   - name: team
     apiCall:
-      urlPath: "/apis/platform.refplat.org/v1alpha3/teams/{{`{{ request.object.spec.team }}`}}"
+      urlPath: "/apis/platform.refplat.org/v1beta1/teams/{{`{{ request.object.spec.team }}`}}"
       default: {}
   - name: product
     apiCall:
-      urlPath: "/apis/platform.refplat.org/v1alpha3/products/{{`{{ request.object.spec.team }}-{{ request.object.spec.product }}`}}"
+      urlPath: "/apis/platform.refplat.org/v1beta1/products/{{`{{ request.object.spec.team }}-{{ request.object.spec.product }}`}}"
       default: {}
 {{- end -}}
 

@@ -18,7 +18,7 @@ echo "Rendering environment-control-plane policy (template validity) ..."
 CPPOL="$DIR/rendered/environment-control-plane.yaml"
 helm template ktp "$CHART" --show-only templates/environment-control-plane.yaml >"$CPPOL"
 grep -q 'name: restrict-environment-control-plane' "$CPPOL" || { echo "FAIL: control-plane policy did not render"; exit 1; }
-grep -q 'platform.refplat.org/v1alpha3/XEnvironment' "$CPPOL" || { echo "FAIL: control-plane must match XEnvironment"; exit 1; }
+grep -q 'platform.refplat.org/v1beta1/XEnvironment' "$CPPOL" || { echo "FAIL: control-plane must match XEnvironment"; exit 1; }
 grep -q 'aws.upbound.io/v1beta1/ProviderConfig' "$CPPOL" || { echo "FAIL: control-plane must match the AWS ProviderConfig"; exit 1; }
 grep -q 'system:serviceaccount:crossplane-system:\*' "$CPPOL" || { echo "FAIL: control-plane must skip crossplane-system principals"; exit 1; }
 echo "environment-control-plane render-check passed."

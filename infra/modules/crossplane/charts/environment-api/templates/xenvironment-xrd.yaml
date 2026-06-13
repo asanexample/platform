@@ -27,7 +27,7 @@ spec:
     # isolation ≥ tier-floor, image registry ⊆ team-<team>/<product>, customer set iff per-customer prod) are
     # enforced by Kyverno against the projected Team + Product CRs (restrict-environment-envelope), not here.
     # ---------------------------------------------------------------------------
-    - name: v1alpha3
+    - name: v1beta1
       served: true
       referenceable: true
       storage: true

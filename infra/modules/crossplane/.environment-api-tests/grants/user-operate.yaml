@@ -1,4 +1,4 @@
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: AccessGrant
 metadata: { name: carol-on-alpha-shop }
 spec:

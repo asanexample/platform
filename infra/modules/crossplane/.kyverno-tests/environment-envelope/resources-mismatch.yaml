@@ -1,5 +1,5 @@
 # spec.team alpha but Product alpha-demo is owned by bravo → team-matches-product.
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata: { name: mismatchenv }
 spec: { team: alpha, product: demo, stage: dev, tier: standard, residency: { allowedLocations: ["*"] }, quota: { cpu: "4", memory: 8Gi, pods: 20 } }

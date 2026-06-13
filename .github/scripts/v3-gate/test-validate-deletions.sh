@@ -20,26 +20,26 @@ mkdir -p "${base}/gitops/products/alpha" \
          "${base}/gitops/environments/alpha/shop" "${base}/gitops/environments/alpha/done"
 for p in shop lonely done; do
   cat >"${base}/gitops/products/alpha/${p}.yaml" <<Y
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: Product
 metadata: { name: alpha-${p} }
 spec: { team: alpha, repo: asanexample/app-alpha-${p}, tenancy: pooled }
 Y
 done
 cat >"${base}/gitops/environments/alpha/shop/dev.yaml"  <<'Y'
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata: { name: alpha-shop-dev }
 spec: { team: alpha, product: shop, stage: dev }
 Y
 cat >"${base}/gitops/environments/alpha/shop/prod.yaml" <<'Y'
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata: { name: alpha-shop-prod }
 spec: { team: alpha, product: shop, stage: prod, lifecycle: { phase: decommissioning } }
 Y
 cat >"${base}/gitops/environments/alpha/done/staging.yaml" <<'Y'
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata: { name: alpha-done-staging }
 spec: { team: alpha, product: done, stage: staging, lifecycle: { phase: decommissioning } }

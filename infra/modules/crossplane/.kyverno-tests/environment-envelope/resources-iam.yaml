@@ -1,5 +1,5 @@
 # All within the alpha envelope (dev/standard/quota-ok) so ONLY policystatements-no-escalation can flag.
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata: { name: iamok }
 spec:
@@ -14,13 +14,13 @@ spec:
       serviceAccount: app-alpha
       permissions: { aws: { policyStatements: [{ actions: ["s3:GetObject"], resources: ["arn:aws:s3:::team-alpha-*/*"] }] } }
 ---
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata: { name: iamnoperm }
 spec: { team: alpha, product: demo, stage: dev, tier: standard, residency: { allowedLocations: ["*"] }, quota: { cpu: "4", memory: 8Gi, pods: 20 }, services: { web: { serviceAccount: app-alpha } } }
 ---
 # iam:CreateUser → flagged.
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata: { name: iambad }
 spec:
@@ -36,7 +36,7 @@ spec:
       permissions: { aws: { policyStatements: [{ actions: ["iam:CreateUser"], resources: ["*"] }] } }
 ---
 # sts:* subsumption → flagged.
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata: { name: iamsts }
 spec:
@@ -52,7 +52,7 @@ spec:
       permissions: { aws: { policyStatements: [{ actions: ["sts:AssumeRole"], resources: ["*"] }] } }
 ---
 # escalation hidden in a SECOND service → flagged (foreach flattens all services).
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata: { name: iammulti }
 spec:

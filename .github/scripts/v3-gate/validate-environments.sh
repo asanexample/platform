@@ -33,7 +33,7 @@ for rel in $ENVIRONMENT_FILES; do
 
   # identity + required
   [ "$(yq '.kind' "$f")" = "XEnvironment" ] || note "${pf}: kind must be XEnvironment"
-  [ "$(yq '.apiVersion' "$f")" = "platform.refplat.org/v1alpha3" ] || note "${pf}: apiVersion must be platform.refplat.org/v1alpha3"
+  [ "$(yq '.apiVersion' "$f")" = "platform.refplat.org/v1beta1" ] || note "${pf}: apiVersion must be platform.refplat.org/v1beta1"
   team="$(yq '.spec.team // ""' "$f")"
   product="$(yq '.spec.product // ""' "$f")"
   stage="$(yq '.spec.stage // ""' "$f")"
@@ -61,7 +61,7 @@ for rel in $ENVIRONMENT_FILES; do
   if [ -n "$team" ] && [ ! -f "$team_f" ]; then
     note "${pf}: spec.team '${team}' has no gitops/teams/${team}.yaml (envelope unknown)"
   elif [ -f "$team_f" ]; then
-    # allowedStages is the v1alpha3 field; allowedEnvironments is its v1alpha2 name (same concept, renamed at
+    # allowedStages is the v1beta1 field; allowedEnvironments/allowedStages were the v1alpha2/v1alpha3 names (same concept, renamed at
     # cutover). Read whichever is present so the gate is correct on both sides of the additive→v3 boundary.
     stages="$(yq '.spec.envelope.allowedStages[] // .spec.envelope.allowedEnvironments[]' "$team_f" 2>/dev/null | tr '\n' ' ')"
     [ -z "$stage" ] || [[ " $stages " == *" $stage "* ]] || note "${pf}: stage '${stage}' not in Team '${team}' allowedStages/allowedEnvironments ($stages)"

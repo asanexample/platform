@@ -1,7 +1,7 @@
 # Environment (bravo × demo × dev) — the developer-authored claim (ADR-067). Namespace bravo-demo-dev.
 # Synced by ArgoCD, reconciled by the Crossplane Environment Composition (v3). One claim per (product, stage[,
 # customer]); the image digest is promoted in by PR (promote-by-PR). See docs/architecture/platform-domain-api.md.
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata:
   # XEnvironment is CLUSTER-scoped, so the name must be globally unique — team-prefixed (matches the namespace

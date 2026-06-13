@@ -24,7 +24,7 @@
 > **Provisioning is Crossplane.** This document describes the environment
 > *isolation model* — what an environment looks like on the cluster (namespace mode,
 > NetworkPolicies, RBAC, quotas, Pod Identity). What provisions it is a single
-> declarative **`XEnvironment` claim** (`platform.refplat.org/v1alpha3`) reconciled by a
+> declarative **`XEnvironment` claim** (`platform.refplat.org/v1beta1`) reconciled by a
 > Crossplane **Environment Composition** (`environment-v3`). Both demo Environments
 > (alpha/demo, bravo/demo) are live on it. The v2-era Terragrunt path — the
 > `infra/modules/environment` module and the `environments`/`pod-identity` units — was

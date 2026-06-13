@@ -4,7 +4,7 @@
 # Environment Composition (v3). One claim per (product, stage[, customer]); the image digest is promoted in by
 # PR (promote-by-PR, #377). This file is the source of truth — change or remove it via PR. See
 # docs/architecture/platform-domain-api.md.
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata:
   # CLUSTER-scoped XR → name MUST be globally unique → team-prefixed <team>-<product>[-<customer>]-<stage>

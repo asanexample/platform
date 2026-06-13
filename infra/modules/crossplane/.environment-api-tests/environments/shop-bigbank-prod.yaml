@@ -1,5 +1,5 @@
 # Full per-customer regulated prod Environment (dialed-up isolation, residency, bound domain, AWS permissions).
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata: { name: shop-bigbank-prod }
 spec:

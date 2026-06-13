@@ -1,7 +1,7 @@
 # Product "demo" owned by Team alpha (ADR-067 / ADR-069). The git registry entry — delivery (argocd-apps,
 # github-oidc) derives repo/domains from here; it is also projected as a Product CR for admission (image-scope
 # team-alpha/demo-*, tenancy, owned domains). One repo per product. Team-authored (within-envelope self-service).
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: Product
 metadata:
   name: alpha-demo

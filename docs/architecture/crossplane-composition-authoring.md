@@ -20,9 +20,9 @@ The `CompositeResourceDefinition` is **Crossplane v2** (`apiextensions.crossplan
 means creating an `XEnvironment` needs cluster RBAC — developers can't self-provision, gate S1). One served
 version:
 
-- **`v1alpha3`** — `served: true`, **`referenceable: true`**, `storage: true` (the **storage/bound** version,
+- **`v1beta1`** — `served: true`, **`referenceable: true`**, `storage: true` (the **storage/bound** version,
   ADR-067). The live `environment-v3` Composition binds to it
-  (`compositeTypeRef.apiVersion: platform.refplat.org/v1alpha3`). `spec` is the Environment contract — a
+  (`compositeTypeRef.apiVersion: platform.refplat.org/v1beta1`). `spec` is the Environment contract — a
   Product at a Stage [for a Customer]: `team`, `product`, `stage`, optional `customer`, `tier`,
   `isolation.compute`, `residency`, `quota`, `domains`, `lifecycle.phase`, and `services.<svc>` (each with
   `serviceAccount`, `preview`, `image`, `permissions.aws.policyStatements`). `status` carries `namespace` + the
@@ -34,7 +34,7 @@ Product.team`, `tier ∈ Team.allowedTiers`, `stage ∈ Team.allowedStages`, `qu
 registry ⊆ `team-<team>/<product>`, etc. — are enforced by Kyverno against the projected `Team` + `Product`
 CRs (`restrict-environment-envelope`), not in the schema.
 
-When extending the **live** behaviour, edit **`v1alpha3`** `spec`/`status` and the Composition together: a
+When extending the **live** behaviour, edit **`v1beta1`** `spec`/`status` and the Composition together: a
 field the template reads must exist in the bound schema, and a `status` field the template writes must be
 declared or the apiserver drops it.
 
@@ -42,7 +42,7 @@ declared or the apiserver drops it.
 
 ```mermaid
 flowchart TD
-    XR["XEnvironment claim (v1alpha3)"] --> S1
+    XR["XEnvironment claim (v1beta1)"] --> S1
     subgraph Pipeline["Composition · mode Pipeline"]
         S1["load-environment<br/>function-environment-configs<br/>→ merges platform-cluster-config EnvironmentConfig into context"]
         S2["render-resources<br/>function-go-templating<br/>→ renders Objects + AWS MRs + writes XR status.domains"]
@@ -102,7 +102,7 @@ extra poller.
 > `{{- $observed := .observed.resources | default dict }}` *before* the range, then index `$observed`.
 
 **Writing composite status.** Emit a YAML doc whose `apiVersion`/`kind` are the **XR's own GVK**
-(`platform.refplat.org/v1alpha3` / `XEnvironment`) with `metadata.name: {{ $xrName }}` and **NO
+(`platform.refplat.org/v1beta1` / `XEnvironment`) with `metadata.name: {{ $xrName }}` and **NO
 `gotemplating.fn.crossplane.io/composition-resource-name` annotation**. Crossplane merges that into the
 composite's status. The live template does exactly this to publish `status.domains` (composition-v3.yaml around
 the `kind: XEnvironment` / `status: domains:` block):
@@ -156,7 +156,7 @@ other MR uses `default` (local Pod Identity). The chain hop needs `sts:AssumeRol
 
 When adding a resource or field:
 
-1. **Add the field** to `v1alpha3` `spec` (and a `status` field if the template writes one) in
+1. **Add the field** to `v1beta1` `spec` (and a `status` field if the template writes one) in
    `xenvironment-xrd.yaml`.
 2. **Render the resource** in the go-template with a unique
    `gotemplating.fn.crossplane.io/composition-resource-name`; gate optional resources with `{{- if ... }}`.

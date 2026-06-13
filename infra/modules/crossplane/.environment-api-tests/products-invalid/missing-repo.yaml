@@ -1,5 +1,5 @@
 # MUST FAIL: spec.repo is required.
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: Product
 metadata: { name: no-repo }
 spec: { team: alpha, tenancy: pooled }

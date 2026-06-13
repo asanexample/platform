@@ -1,5 +1,5 @@
 # MUST FAIL: spec.product is required.
-apiVersion: platform.refplat.org/v1alpha3
+apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata: { name: missing-product }
 spec: { team: alpha, stage: dev }
