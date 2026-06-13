@@ -5,13 +5,13 @@
 # RoleBinding) + per-SERVICE AWS identity (product-scoped ECR team-<team>/<product>-<service>, Pod-Identity)
 # + the per-namespace image-registry + route-hostname guards.
 #
-# ADDITIVE (ADR-067 cutover model): this binds the v3 XEnvironment XRD and coexists with the live v2 Composition
+# ADDITIVE (ADR-067 cutover model): this binds the XEnvironment XRD and coexists with the live v2 Composition
 # (tenant-v2, XTenant). Render-tested offline (crossplane render) by .environment-api-tests; it becomes active at the
 # rebuild cutover, when v2 is removed. Shipped raw (.Files.Get) so Helm leaves the go-template delimiters intact.
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
-  name: environment-v3
+  name: environment
   labels:
     crossplane.io/xrd: xenvironments.platform.refplat.org
 spec:

@@ -30,7 +30,7 @@ echo "environment-control-plane render-check passed."
 # assert the per-rule outcomes. Behavioral, cluster-free. The sibling v2 restrict-environment-envelope test retired
 # with the XTenant API.
 # ---------------------------------------------------------------------------
-echo "Testing environment-envelope policy (v3 envelope plane) ..."
+echo "Testing environment-envelope policy (envelope plane) ..."
 ENVPOL="$DIR/rendered/environment-envelope.yaml"
 helm template ktp "$CHART" --set enableEnvironmentEnvelope=true --show-only templates/environment-envelope.yaml >"$ENVPOL"
 ED="$DIR/environment-envelope"

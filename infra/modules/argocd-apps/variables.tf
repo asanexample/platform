@@ -51,7 +51,7 @@ variable "teams_repo_path" {
 }
 
 # ---------------------------------------------------------------------------
-# v3 delivery (ADR-069 / L2b #384) — per-Product ApplicationSets from the git registry
+# delivery (ADR-069 / L2b #384) — per-Product ApplicationSets from the git registry
 # ---------------------------------------------------------------------------
 variable "products" {
   description = "v3: per-Product delivery, keyed <team>-<product>. One ApplicationSet per product; its git-files generator fans out over gitops/environments/<team>/<product>/*.yaml → one Application per Environment (decision c)."
@@ -64,7 +64,7 @@ variable "products" {
 }
 
 variable "platform_repo_url" {
-  description = "v3: the platform GitOps repo the per-Product ApplicationSet git-files generator reads Environment claims from (gitops/environments/). Empty disables v3 delivery."
+  description = "v3: the platform GitOps repo the per-Product ApplicationSet git-files generator reads Environment claims from (gitops/environments/). Empty disables delivery."
   type        = string
   default     = ""
 }

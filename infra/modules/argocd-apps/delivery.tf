@@ -1,5 +1,5 @@
 # ===========================================================================================================
-# v3 delivery (ADR-069 / L2b #384) — one ApplicationSet per Product.
+# delivery (ADR-069 / L2b #384) — one ApplicationSet per Product.
 #
 # The git-files generator fans out over the product's Environment claims
 # (gitops/environments/<team>/<product>/*.yaml in the platform repo) → ONE Application per Environment
@@ -26,7 +26,7 @@ resource "kubernetes_manifest" "product_appproject" {
       namespace = var.argocd_namespace
     }
     spec = {
-      description = "v3 delivery for product ${each.value.team}/${each.value.product}"
+      description = "delivery for product ${each.value.team}/${each.value.product}"
       sourceRepos = compact([each.value.repo_url, var.platform_repo_url])
       destinations = [{
         server    = var.cluster_server
@@ -126,15 +126,15 @@ resource "kubernetes_manifest" "product_appset" {
 }
 
 # ===========================================================================================================
-# v3 registry-sync (ADR-069 §1 / #389) — project the git-native Product registry + Environment claims onto the
+# registry-sync (ADR-069 §1 / #389) — project the git-native Product registry + Environment claims onto the
 # cluster as CRs, so Kyverno admission (restrict-environment-envelope) and the Composition can read them. The
 # dual-representation contract: delivery derives from the git registry; the cluster reads the projected CRs.
-# Mirrors the v2 teams/tenant-claims sync apps. ADDITIVE + GATED on var.platform_repo_url (the v3 gate).
+# Mirrors the v2 teams/tenant-claims sync apps. ADDITIVE + GATED on var.platform_repo_url (the gate).
 # ===========================================================================================================
 locals {
-  gitops_v3 = var.create && var.platform_repo_url != "" ? { enabled = true } : {}
+  gitops_registry = var.create && var.platform_repo_url != "" ? { enabled = true } : {}
   # group/kind whitelists for each registry-sync project
-  v3_registry = {
+  registry_sync = {
     products = { wave = "-2", kinds = [{ group = "platform.refplat.org", kind = "Product" }], path = "gitops/products" }
     # XEnvironment claims (cluster-scoped Crossplane XR) — synced after Teams (-1) and Products (-2) so the
     # envelope/team-matches-product admission inputs land first.
@@ -142,8 +142,8 @@ locals {
   }
 }
 
-resource "kubernetes_manifest" "v3_registry_project" {
-  for_each = length(local.gitops_v3) > 0 ? local.v3_registry : {}
+resource "kubernetes_manifest" "registry_project" {
+  for_each = length(local.gitops_registry) > 0 ? local.registry_sync : {}
 
   manifest = {
     apiVersion = "argoproj.io/v1alpha1"
@@ -165,8 +165,8 @@ resource "kubernetes_manifest" "v3_registry_project" {
   }
 }
 
-resource "kubernetes_manifest" "v3_registry_app" {
-  for_each = length(local.gitops_v3) > 0 ? local.v3_registry : {}
+resource "kubernetes_manifest" "registry_app" {
+  for_each = length(local.gitops_registry) > 0 ? local.registry_sync : {}
 
   manifest = {
     apiVersion = "argoproj.io/v1alpha1"
@@ -202,5 +202,5 @@ resource "kubernetes_manifest" "v3_registry_app" {
     }
   }
 
-  depends_on = [kubernetes_manifest.v3_registry_project]
+  depends_on = [kubernetes_manifest.registry_project]
 }

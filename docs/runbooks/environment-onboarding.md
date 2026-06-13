@@ -130,7 +130,7 @@ delivery + supply-chain Terragrunt units (`argocd-apps`, `policy`, `github-oidc`
 `gitops/environments/`.
 
 Open a PR with the claim YAML (`gitops/environments/charlie/api/dev.yaml`) — the path is CODEOWNERS-gated and
-passes the **v3 gitops Gate** (envelope check: stage/tier/quota within the Team envelope). On merge, the
+passes the **gitops Gate** (envelope check: stage/tier/quota within the Team envelope). On merge, the
 per-Product ArgoCD ApplicationSet syncs the `XEnvironment` to the preprod cluster (`selfHeal` + `prune` +
 ServerSideApply) and the Composition reconciles it (~1–2 min). **No Terragrunt, no `terragrunt apply`** for the
 claim itself.

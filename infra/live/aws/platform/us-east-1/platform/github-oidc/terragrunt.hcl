@@ -26,27 +26,20 @@ dependency "ecr" {
 }
 
 locals {
-  # v3 (ADR-067/069 §5): image-build OIDC roles derive PER-PRODUCT from the Product registry
-  # (gitops/products/<team>/<product>.yaml — see product_roles below). The v2 per-team derivation from the
-  # XTenant claims was removed at the cutover.
-
   # ---------------------------------------------------------------------------
-  # v3 (ADR-069 §5) — one OIDC ECR-push role per PRODUCT, derived from the Product registry
-  # (gitops/products/<team>/<product>.yaml): trusts only the Product's repo, pushes only to its product-scoped
-  # ECR (team-<team>/<product>-*). ADDITIVE + GATED: `v3_delivery_enabled` stays false until the cutover, so the
-  # fileset is not even evaluated and no v3 roles are created on apply (it coexists with the v2 per-team roles).
-  # The v2->v3 cutover flips this true and removes the per-team derivation above.
+  # One OIDC ECR-push role per PRODUCT, derived from the Product registry
+  # (gitops/products/<team>/<product>.yaml — see product_roles below): each role trusts only the Product's repo
+  # and pushes only to its product-scoped ECR (team-<team>/<product>-*). ADR-069 §5.
   # ---------------------------------------------------------------------------
-  v3_delivery_enabled = true # v3 cutover: per-Product OIDC roles active (the per-team v2 derivation is removed in the v2-removal step)
-  products_dir        = "${get_repo_root()}/gitops/products"
-  products = local.v3_delivery_enabled ? {
+  products_dir = "${get_repo_root()}/gitops/products"
+  products = {
     for f in fileset(local.products_dir, "**/*.yaml") :
     yamldecode(file("${local.products_dir}/${f}")).metadata.name => {
       team    = yamldecode(file("${local.products_dir}/${f}")).spec.team
       product = trimsuffix(basename(f), ".yaml") # short name (the filename) = the gitops/.../<product>.yaml stem
       repo    = yamldecode(file("${local.products_dir}/${f}")).spec.repo
     }
-  } : {}
+  }
   product_roles = { for key, p in local.products :
     "github-actions-ecr-push-product-${key}" => {
       repos    = [split("/", p.repo)[1]] # the Product's repo (one repo : one product)
@@ -82,7 +75,7 @@ inputs = {
   create     = true
   github_org = "asanexample"
 
-  # Image-build OIDC ECR-push roles: the platform infra roles (Backstage, the ARC runner) + the v3 per-Product
+  # Image-build OIDC ECR-push roles: the platform infra roles (Backstage, the ARC runner) + the per-Product
   # roles (local.product_roles, ADR-069 §5 — one per Product, trusts only its repo, pushes only to
   # team-<team>/<product>-*). The v2 per-team roles were removed at the cutover (the per-Product roles replace
   # them; tenant ECR repos are Composition-owned, so nothing is read from the `ecr` unit).
@@ -156,7 +149,7 @@ inputs = {
         ]
       })
     }
-  }, local.product_roles) # v3 per-Product roles (ADR-069 §5) — empty until the cutover flips v3_delivery_enabled
+  }, local.product_roles) # per-Product roles (ADR-069 §5) — derived from the Product registry
 
   tags = include.base.locals.tags
 }

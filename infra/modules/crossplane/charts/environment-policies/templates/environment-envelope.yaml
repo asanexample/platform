@@ -19,7 +19,7 @@ metadata:
     policies.kyverno.io/severity: high
     policies.kyverno.io/subject: XEnvironment, Team, Product
     policies.kyverno.io/description: >-
-      The v3 envelope plane (ADR-067): an XEnvironment may only request what its Team envelope permits (tier /
+      The envelope plane (ADR-067): an XEnvironment may only request what its Team envelope permits (tier /
       stage / residency / quota) and must agree with its Product (team-ownership, per-customer tenancy). Reads
       the projected Team + Product CRs.
 spec:
@@ -89,7 +89,7 @@ spec:
                 operator: AnyNotIn
                 value: "{{`{{ team.spec.envelope.allowedTiers }}`}}"
 
-    # stage ∈ Team.envelope.allowedStages  (v3 rename of environment/allowedEnvironments)
+    # stage ∈ Team.envelope.allowedStages  (rename of environment/allowedEnvironments)
     - name: stage-within-envelope
       match:
         any:
@@ -196,7 +196,7 @@ spec:
                 operator: NotEquals
                 value: per-customer
 
-    # Self-service IAM deny-escalation (ADR-062 §4, #282) — v3 reads spec.services.<svc>.permissions (was apps).
+    # Self-service IAM deny-escalation (ADR-062 §4, #282) — reads spec.services.<svc>.permissions (was apps).
     - name: policystatements-no-escalation
       match:
         any:

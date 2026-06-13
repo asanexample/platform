@@ -12,7 +12,7 @@ terraform {
 }
 
 locals {
-  # v3 delivery (ADR-067/069 §1, L2b #384): per-Product delivery derives from the git-native Product registry
+  # delivery (ADR-067/069 §1, L2b #384): per-Product delivery derives from the git-native Product registry
   # (gitops/products/<team>/<product>.yaml) — the sole source replacing the retired v2 XTenant claims. One
   # ApplicationSet per product; the per-Environment fan-out reads gitops/environments/<team>/<product>/*.yaml.
   # metadata.name = <team>-<product> (e.g. alpha-demo); spec.{team,repo} drive the Application source.
@@ -82,7 +82,7 @@ generate "kubernetes_provider" {
 inputs = {
   create = true
 
-  # v3 per-Product delivery: one ApplicationSet per product, fanning out over the product's Environment claims
+  # per-Product delivery: one ApplicationSet per product, fanning out over the product's Environment claims
   # (gitops/environments/<team>/<product>/*.yaml) → one Application per Environment. Derived from gitops/products.
   # Replaces the retired v2 XTenant-claim delivery (the legacy `tenants` Applications were removed at the cutover).
   products       = local.products
@@ -103,7 +103,7 @@ inputs = {
   teams_repo_branch = "main"
   teams_repo_path   = "gitops/teams"
 
-  # v3 delivery surface, activated by platform_repo_url: the registry-sync apps (project gitops/products +
+  # delivery surface, activated by platform_repo_url: the registry-sync apps (project gitops/products +
   # gitops/environments → cluster CRs, sync-wave -2/0) AND the per-Product ApplicationSet (delivers each app's
   # k8s/overlays/<stage>, injecting ns + host). Teams still sync via enable_teams above.
   platform_repo_url    = "https://github.com/asanexample/platform"

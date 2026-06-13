@@ -22,7 +22,7 @@ regulated tiers add isolation, encryption, network, and retention requirements; 
 
 **Composition (Crossplane)** — The `Pipeline`-mode Composition that reconciles one `XEnvironment` into the
 full environment footprint (namespace + AWS + cross-account ECR). Lives in the `crossplane-environment-api`
-chart at `composition-v3.yaml`.
+chart at `composition.yaml`.
 See [Crossplane Environment API](architecture/crossplane-environment-api.md#what-the-composition-provisions).
 
 **cosign / keyless signing** — Images must be cosign-signed (keyless, via Fulcio/Rekor) to pass admission.
@@ -125,7 +125,7 @@ implicit generated host is never declared. The sole source of truth for hostname
 Composition; the platform-owned `verify-images`/`verify-attestations` trust roots stay in the `policy` module
 for all products. See [Cosign Image Signing](architecture/cosign-image-signing.md) and [ADR-046](adrs/046-back-stack-for-developer-self-service.md).
 
-**Team** — The owner/identity dimension: an SSO group + a git-native `Team` CR (ADR-063). The v3 model (ADR-067)
+**Team** — The owner/identity dimension: an SSO group + a git-native `Team` CR (ADR-063). The model (ADR-067)
 separates ownership (Team) from the deployment unit (Environment = Product × Stage). A Team's envelope bounds
 what Environments its members may provision. See [IDP Domain Model (ADR-067)](adrs/067-idp-domain-model.md).
 

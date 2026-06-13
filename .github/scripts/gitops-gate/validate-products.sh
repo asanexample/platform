@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# v3 Product gate (#388) — validate gitops/products/**/*.yaml (the Product registry) on a PR. Schema shape +
+# Product gate (#388) — validate gitops/products/**/*.yaml (the Product registry) on a PR. Schema shape +
 # enums + ownership (mirrors the CRD restrict it would hit at admission). Read strictly as YAML DATA (yq only;
 # never executed). Trusted inputs (the Team list, this script) come from the BASE checkout.
 #

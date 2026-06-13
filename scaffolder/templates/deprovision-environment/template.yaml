@@ -4,8 +4,8 @@
 # actually removing the claim — is a SEPARATE human PR (see docs/runbooks/environment-deprovisioning.md). This
 # template never deletes. Replaces the retired v2 "Deprovision Environment" (gitops/tenant-claims/preprod path).
 #
-# NB: the v3 gitops Gate does not yet arm automerge OR the decommission-first deletion guard (both deferred at
-# the cutover — see .github/workflows/v3-gitops-gate.yml) — so these PRs are reviewer-merged, and the purge PR
+# NB: the gitops Gate does not yet arm automerge OR the decommission-first deletion guard (both deferred at
+# the cutover — see .github/workflows/gitops-gate.yml) — so these PRs are reviewer-merged, and the purge PR
 # is not yet gate-enforced to be decommission-first. Until that lands, a reviewer enforces it.
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
@@ -109,12 +109,12 @@ spec:
 
           {% if parameters.action == 'decommission' %}
           This **reversibly suspends** the Environment: the Composition zeroes its ResourceQuota (workloads
-          drain; namespace, IAM, ECR all retained). **Merge it** to apply (the v3 gitops Gate validates; automerge
+          drain; namespace, IAM, ECR all retained). **Merge it** to apply (the gitops Gate validates; automerge
           is not yet armed). To restore, run this template again with action **reactivate**. To fully purge
-          (delete the namespace), open a separate PR removing the claim file — until the v3 gate's
+          (delete the namespace), open a separate PR removing the claim file — until the gate's
           decommission-first guard lands, a reviewer enforces decommission-first (`docs/runbooks/environment-deprovisioning.md`).
           {% else %}
-          This **restores** the Environment to active (quota reinstated). Merge it to apply (the v3 gitops Gate validates).
+          This **restores** the Environment to active (quota reinstated). Merge it to apply (the gitops Gate validates).
           {% endif %}
 
   output:

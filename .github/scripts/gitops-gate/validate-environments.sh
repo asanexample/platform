@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# v3 Environment gate (#388) — validate gitops/environments/**/*.yaml (XEnvironment claims) on a PR. Schema +
+# Environment gate (#388) — validate gitops/environments/**/*.yaml (XEnvironment claims) on a PR. Schema +
 # enums + the envelope SHIFT-LEFT (the same checks restrict-environment-envelope (#387) makes at admission, run
 # pre-merge against the projected Team + Product): stage/tier ∈ envelope, team == Product.team, customer-iff-
 # per-customer-prod, and the policyStatements IAM deny-set. Read strictly as YAML DATA (yq only). The Team list
@@ -62,7 +62,7 @@ for rel in $ENVIRONMENT_FILES; do
     note "${pf}: spec.team '${team}' has no gitops/teams/${team}.yaml (envelope unknown)"
   elif [ -f "$team_f" ]; then
     # allowedStages is the v1beta1 field; allowedEnvironments/allowedStages were the v1alpha2/v1alpha3 names (same concept, renamed at
-    # cutover). Read whichever is present so the gate is correct on both sides of the additive→v3 boundary.
+    # cutover). Read whichever is present so the gate is correct on both sides of the additive→boundary.
     stages="$(yq '.spec.envelope.allowedStages[] // .spec.envelope.allowedEnvironments[]' "$team_f" 2>/dev/null | tr '\n' ' ')"
     [ -z "$stage" ] || [[ " $stages " == *" $stage "* ]] || note "${pf}: stage '${stage}' not in Team '${team}' allowedStages/allowedEnvironments ($stages)"
     tiers="$(yq '.spec.envelope.allowedTiers[]' "$team_f" 2>/dev/null | tr '\n' ' ')"

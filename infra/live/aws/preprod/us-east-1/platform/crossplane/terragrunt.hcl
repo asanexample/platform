@@ -90,7 +90,7 @@ inputs = {
   # environment chart creates it (the Composition's per-environment RoleBindings bind to it).
   create_developer_cluster_role = true
 
-  # ArgoCD delivers the v3 XEnvironment claims (the `environments` registry-sync app, gitops/environments) from
+  # ArgoCD delivers the XEnvironment claims (the `environments` registry-sync app, gitops/environments) from
   # the platform cluster, authenticating to this remote cluster via the cross-account `ArgoCD` IAM role — so its
   # admission username is that role's
   # assumed-role ARN, not the in-cluster argocd SA. Allow it past restrict-environment-control-plane (ADR-046/048).
@@ -100,10 +100,10 @@ inputs = {
     # v3 cutover (ADR-067): activate restrict-environment-envelope (#387) — the XEnvironment envelope check
     # (team-matches-product, stage/tier/residency/quota within the Team envelope, policyStatements deny-set).
     enableEnvironmentEnvelope = true
-    # The v3 envelope soaked in Audit through the rebuild (one clean reconcile, the v2 A6 precedent) with ZERO
+    # The envelope soaked in Audit through the rebuild (one clean reconcile, the v2 A6 precedent) with ZERO
     # violations across both environments + their workloads, so it is now ENFORCE — out-of-envelope XEnvironment
     # claims (wrong team-for-product, out-of-ladder stage/tier, over-quota, escalating policyStatements) are
-    # rejected at admission, not just audited. envelopeFailureAction governs only the v3 envelope (the v2
+    # rejected at admission, not just audited. envelopeFailureAction governs only the envelope (the v2
     # restrict-environment-envelope was removed at the cutover).
     envelopeFailureAction = "Enforce"
   }

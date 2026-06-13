@@ -2,7 +2,7 @@
 # Offline schema-validation harness for the Environment API (ADR-067). Validates the example claims/records
 # against each XRD/CRD's OpenAPI v3 schema + CEL rules with `crossplane beta validate` — no cluster, no
 # Composition (that's render.sh). Driven in CI by the "Environment API Schema" job; runnable locally with the
-# crossplane CLI. v3-only since the cutover (the v1alpha2 XTenant surface was removed).
+# crossplane CLI. the sole API surface since the cutover (the v1alpha2 XTenant surface was removed).
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -44,11 +44,11 @@ validate_dir() {
 repo_root="$(cd "${here}/../../../.." && pwd)"
 
 # ===========================================================================================================
-# v3 API (ADR-067) — XEnvironment + Product + AccessGrant + the v1alpha3 Team envelope.
+# API (ADR-067) — XEnvironment + Product + AccessGrant + the v1alpha3 Team envelope.
 # ===========================================================================================================
 # Projected Team records (Team CRD, v1alpha3)
-validate_dir "$team_crd"    "valid Team records (v1alpha3)"   "${here}/teams-v3"              pass
-validate_dir "$team_crd"    "invalid Team records (v1alpha3)" "${here}/teams-v3-invalid"     reject
+validate_dir "$team_crd"    "valid Team records (v1alpha3)"   "${here}/teams"              pass
+validate_dir "$team_crd"    "invalid Team records (v1alpha3)" "${here}/teams-invalid"     reject
 # Live git-native Team objects (gitops/teams/ — what ArgoCD actually syncs). Gives Team-onboarding PRs a real
 # schema gate in CI, not just human review.
 validate_dir "$team_crd"    "live Team objects (gitops/teams)" "${repo_root}/gitops/teams"   pass
@@ -60,7 +60,7 @@ validate_dir "$product_crd" "invalid Product records (v3)"    "${here}/products-
 validate_dir "$grant_crd"   "valid AccessGrant records (v3)"  "${here}/grants"                pass
 validate_dir "$grant_crd"   "invalid AccessGrant records (v3)" "${here}/grants-invalid"       reject
 
-# Live v3 git-native objects (the new gitops layout). crossplane beta validate recurses the per-team subdirs.
+# Live git-native objects (the new gitops layout). crossplane beta validate recurses the per-team subdirs.
 validate_dir "$product_crd" "live Product objects (gitops/products)"          "${repo_root}/gitops/products"     pass
 validate_dir "$xenv_xrd"    "live Environment objects (gitops/environments)"  "${repo_root}/gitops/environments" pass
 

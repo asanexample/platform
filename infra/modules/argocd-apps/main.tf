@@ -16,7 +16,7 @@ locals {
     }
   }
 
-  # Fail-FAST retry for the per-Product ApplicationSet's generated Applications (v3-delivery). Their first
+  # Fail-FAST retry for the per-Product ApplicationSet's generated Applications (delivery). Their first
   # deploy is special: a brand-new Environment's app overlay carries `:placeholder` (no digest yet) until the
   # app's first CI build commits the signed-digest pin — a SEPARATE commit after the build-trigger push. ArgoCD
   # auto-syncs the pre-pin revision, Kyverno verify-images-product rejects the unpinned image, and the long

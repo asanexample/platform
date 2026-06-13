@@ -131,7 +131,7 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # This SHA (asanexample/backstage#37) completes the L2c v3 frontend: projection (#35) + #285 card re-point (#36)
+  # This SHA (asanexample/backstage#37) completes the L2c frontend: projection (#35) + #285 card re-point (#36)
   # + the kind:Environment relation processor (ownedBy/partOf) + team-tenants → Environments. BACKWARD-COMPATIBLE +
   # INERT: platformProjection.mode defaults to 'v2', so the live catalog behaves identically until the cutover sets
   # mode='v3' (a pure config flip — all L2c frontend code is now in this image). (Prior 15c5a0fc = #36; 81e4b544 = #35.)

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Unit test for validate-deletions.sh — both guards (Environment decommission-first + Product-deletion
 # completeness). Self-contained: builds throwaway BASE_DIR fixtures, runs the script with various DELETED_FILES,
-# and asserts the exit code. Run locally: bash .github/scripts/v3-gate/test-validate-deletions.sh
+# and asserts the exit code. Run locally: bash .github/scripts/gitops-gate/test-validate-deletions.sh
 set -uo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

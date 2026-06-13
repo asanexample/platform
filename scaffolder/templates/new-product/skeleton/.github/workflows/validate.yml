@@ -1,6 +1,6 @@
 name: Validate manifests
 
-# v3 manifest validation (ADR-067). The per-Product ApplicationSet syncs k8s/overlays/<stage> and injects the
+# manifest validation (ADR-067). The per-Product ApplicationSet syncs k8s/overlays/<stage> and injects the
 # namespace + host; admission (Kyverno) is the enforcement point. This job is the shift-left: it asserts every
 # stage overlay BUILDS and stays namespace-/host-agnostic + product-scoped, and runs the app's unit test.
 on:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   overlays-build:
-    name: v3 overlays build (ns-agnostic)
+    name: overlays build (ns-agnostic)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

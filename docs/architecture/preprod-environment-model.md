@@ -313,7 +313,7 @@ policy now **derive** from the `XEnvironment`/`Product` registries:
    ──────────────────────               |                   |
    Namespace, RBAC, quota,              v                   v
    NetworkPolicies, Kyverno          argocd-apps/        policy/
-   restrict-*, Pod Identity,         (v3-delivery)       terragrunt.hcl
+   restrict-*, Pod Identity,         (delivery)       terragrunt.hcl
    DeveloperAccess + access            |                   |
    entry, ECR repos                    v                   v
                                     ArgoCD Application   verify-images /

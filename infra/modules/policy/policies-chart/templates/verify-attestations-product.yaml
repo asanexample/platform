@@ -5,7 +5,7 @@ v3 (ADR-067/069 §6) per-PRODUCT attestation verification — the per-TEAM verif
 of the signature (verify-images-product), a team-<team>/<product>-* image in the product's environment namespaces
 must carry a cosign-signed SBOM (CycloneDX) AND a SLSA build provenance attestation. Both come from the SHARED
 asanexample/trusted-ci reusable workflows (build-sign.yml for the SBOM, slsa-provenance.yml for provenance, the
-ADR-050 backbone every v3 app calls) — same cert SUBJECT for all, gated to this product by the certificate's
+ADR-050 backbone every app calls) — same cert SUBJECT for all, gated to this product by the certificate's
 githubWorkflowRepository extension (= the Product repo, which Fulcio sets from the calling repo's OIDC, so another
 product cannot forge it). Optional per-product app-signed identities (appSubjects) cover bespoke-build products.
 ADDITIVE: renders only when verifySubjectsProduct is populated (the cutover); the v2 verify-attestations.yaml is
@@ -40,7 +40,7 @@ spec:
     - name: require-sbom-and-provenance
       match:
         any:
-          # The product's environment namespaces carry team + product labels (set by the v3 Composition).
+          # The product's environment namespaces carry team + product labels (set by the Composition).
           - resources:
               kinds:
                 - Pod
@@ -82,7 +82,7 @@ spec:
                           url: "{{ $.Values.rekorUrl }}"
                     {{- end }}
             # SLSA build provenance — signed by the isolated trusted-ci slsa-provenance workflow (SLSA Build L3,
-            # ADR-042), gated to this product. The app does not self-attest provenance under the v3 backbone.
+            # ADR-042), gated to this product. The app does not self-attest provenance under the backbone.
             - type: https://slsa.dev/provenance/v0.2
               attestors:
                 - count: 1
