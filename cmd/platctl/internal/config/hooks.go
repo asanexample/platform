@@ -8,8 +8,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/gangster/platform/cmd/platctl/internal/cloud"
-	"github.com/gangster/platform/cmd/platctl/internal/engine"
+	"github.com/asanexample/platform/cmd/platctl/internal/cloud"
+	"github.com/asanexample/platform/cmd/platctl/internal/engine"
 )
 
 // Hook defines a pre-apply or multi-stage operation for a unit.

@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/gangster/platform/cmd/platctl/internal/config"
+	"github.com/asanexample/platform/cmd/platctl/internal/config"
 )
 
 // NewKubeconfigCmd creates the kubeconfig subcommand.

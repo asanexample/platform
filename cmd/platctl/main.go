@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/gangster/platform/cmd/platctl/internal/cli"
+	"github.com/asanexample/platform/cmd/platctl/internal/cli"
 )
 
 func main() {

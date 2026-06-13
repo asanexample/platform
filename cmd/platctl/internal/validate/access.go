@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gangster/platform/cmd/platctl/internal/config"
+	"github.com/asanexample/platform/cmd/platctl/internal/config"
 )
 
 // IAMCheck verifies AWS SSO sessions, cross-account role assumptions,

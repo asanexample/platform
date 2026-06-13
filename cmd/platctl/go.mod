@@ -1,4 +1,4 @@
-module github.com/gangster/platform/cmd/platctl
+module github.com/asanexample/platform/cmd/platctl
 
 go 1.24.3
 

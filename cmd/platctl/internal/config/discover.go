@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 
-	"github.com/gangster/platform/cmd/platctl/internal/engine"
+	"github.com/asanexample/platform/cmd/platctl/internal/engine"
 )
 
 // Discover scans the configured environment directories for Terragrunt units,

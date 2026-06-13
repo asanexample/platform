@@ -11,8 +11,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/gangster/platform/cmd/platctl/internal/config"
-	"github.com/gangster/platform/cmd/platctl/internal/engine"
+	"github.com/asanexample/platform/cmd/platctl/internal/config"
+	"github.com/asanexample/platform/cmd/platctl/internal/engine"
 )
 
 // NewDownCmd parks an environment by scaling its managed node groups to zero. The EKS control plane and all EBS

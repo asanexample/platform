@@ -3,7 +3,7 @@ package cli
 import (
 	"testing"
 
-	"github.com/gangster/platform/cmd/platctl/internal/config"
+	"github.com/asanexample/platform/cmd/platctl/internal/config"
 )
 
 func TestKubeconfigForEnv(t *testing.T) {
