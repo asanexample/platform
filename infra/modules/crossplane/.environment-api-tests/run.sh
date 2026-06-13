@@ -7,7 +7,7 @@ set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 charts="${here}/../charts/environment-api/templates"
-team_crd="${charts}/team-crd.yaml"             # projected Team CRD (v1alpha3)
+team_crd="${charts}/team-crd.yaml"             # projected Team CRD (v1beta1)
 xenv_xrd="${charts}/xenvironment-xrd.yaml"     # XEnvironment XRD (v3, the Environment claim)
 product_crd="${charts}/product-crd.yaml"       # projected Product CRD (delivery identity)
 grant_crd="${charts}/access-grant-crd.yaml"    # projected AccessGrant CRD (ADR-068)
@@ -44,11 +44,11 @@ validate_dir() {
 repo_root="$(cd "${here}/../../../.." && pwd)"
 
 # ===========================================================================================================
-# API (ADR-067) — XEnvironment + Product + AccessGrant + the v1alpha3 Team envelope.
+# API (ADR-067) — XEnvironment + Product + AccessGrant + the v1beta1 Team envelope.
 # ===========================================================================================================
-# Projected Team records (Team CRD, v1alpha3)
-validate_dir "$team_crd"    "valid Team records (v1alpha3)"   "${here}/teams"              pass
-validate_dir "$team_crd"    "invalid Team records (v1alpha3)" "${here}/teams-invalid"     reject
+# Projected Team records (Team CRD, v1beta1)
+validate_dir "$team_crd"    "valid Team records (v1beta1)"   "${here}/teams"              pass
+validate_dir "$team_crd"    "invalid Team records (v1beta1)" "${here}/teams-invalid"     reject
 # Live git-native Team objects (gitops/teams/ — what ArgoCD actually syncs). Gives Team-onboarding PRs a real
 # schema gate in CI, not just human review.
 validate_dir "$team_crd"    "live Team objects (gitops/teams)" "${repo_root}/gitops/teams"   pass

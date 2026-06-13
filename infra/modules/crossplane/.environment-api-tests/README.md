@@ -22,7 +22,7 @@ environments/          valid XEnvironment claims that MUST pass (demo-dev first-
 environments-invalid/  XEnvironment claims that MUST be rejected (schema/enum/CEL)
 products/              valid Product records that MUST pass        ; products-invalid/  rejected
 grants/                valid AccessGrant records that MUST pass    ; grants-invalid/    rejected
-teams/              valid v1alpha3 Team records that MUST pass  ; teams-invalid/  rejected
+teams/              valid v1beta1 Team records that MUST pass  ; teams-invalid/  rejected
 ```
 
 `run.sh` also validates the LIVE git-native objects (`gitops/teams`, `gitops/products`, `gitops/environments`)

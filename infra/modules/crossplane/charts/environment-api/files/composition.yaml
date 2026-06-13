@@ -1,6 +1,6 @@
 # Environment Composition v3 (Crossplane v2, Pipeline mode) — ADR-067 / L2a (#383).
 #
-# Renders a v1alpha3 XEnvironment into its footprint: the Kubernetes footprint (namespace
+# Renders a v1beta1 XEnvironment into its footprint: the Kubernetes footprint (namespace
 # <team>-<product>-<stage>[-<customer>], quota, limits, NetworkPolicies, CiliumNetworkPolicies, developer
 # RoleBinding) + per-SERVICE AWS identity (product-scoped ECR team-<team>/<product>-<service>, Pod-Identity)
 # + the per-namespace image-registry + route-hostname guards.

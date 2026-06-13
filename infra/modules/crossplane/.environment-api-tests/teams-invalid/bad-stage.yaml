@@ -1,4 +1,4 @@
-# MUST FAIL: allowedStages value outside the enum (v1alpha3).
+# MUST FAIL: allowedStages value outside the enum (v1beta1).
 apiVersion: platform.refplat.org/v1beta1
 kind: Team
 metadata: { name: bad-stage }
