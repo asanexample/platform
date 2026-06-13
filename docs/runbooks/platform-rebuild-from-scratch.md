@@ -10,7 +10,7 @@ reference see [`cmd/platctl/README.md`](../../cmd/platctl/README.md).
 > cluster. The rebuild is the first real apply. Under the current **AWS Identity Center** upstream, group claims
 > are empty (the membership gap), so SSO authenticates users but grants no group-based access yet — ArgoCD admin
 > is via its local break-glass account until a group-emitting upstream lands.
-
+>
 > **v3 cutover note (ADR-067):** the next rebuild is also the **v2→v3 cutover** (XTenant → XEnvironment; the
 > Team/Product/Service domain model). The cutover is a coordinated commit admin-merged *during* this teardown +
 > rebuild (teardown-before-merge). The full ordered procedure + the v3 deltas (the v3-only crossplane chart, the
