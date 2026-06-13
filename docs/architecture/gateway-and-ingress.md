@@ -1,14 +1,14 @@
-# Gateway & Tenant Ingress
+# Gateway & Environment Ingress
 
-How an external request reaches a tenant pod end to end: a single shared **Cilium Gateway** (Gateway API)
+How an external request reaches an environment pod end to end: a single shared **Cilium Gateway** (Gateway API)
 fronted by an NLB, TLS terminated with a cert-manager-issued **wildcard** certificate, DNS synced by
-external-dns, and route hostnames bounded by a per-tenant Kyverno guard. Every piece is platform-owned
-substrate; tenants only ship `HTTPRoute`s whose hostnames their `XTenant` claim authorises.
+external-dns, and route hostnames bounded by a per-environment Kyverno guard. Every piece is platform-owned
+substrate; environments only ship `HTTPRoute`s whose hostnames their `XTenant` claim authorises.
 
 See also: [ADR-029](../adrs/029-preprod-public-ingress-gateway-api.md) (public ingress via Gateway API),
-[ADR-060](../adrs/060-tenant-app-hostname-convention.md) (generated hostname),
-[ADR-061](../adrs/061-tenant-ingress-and-custom-domain-strategy.md) (custom-domain strategy), and the
-[Crossplane Tenant API](crossplane-tenant-api.md) (`status.domains`).
+[ADR-060](../adrs/060-environment-app-hostname-convention.md) (generated hostname),
+[ADR-061](../adrs/061-environment-ingress-and-custom-domain-strategy.md) (custom-domain strategy), and the
+[Crossplane Environment API](crossplane-environment-api.md) (`status.domains`).
 
 ## The request path
 
@@ -19,7 +19,7 @@ flowchart LR
     NLB["AWS NLB<br/>(internal or internet-facing)"]
     Envoy["Cilium Envoy<br/>(ingress identity 8)<br/>TLS terminate :443"]
     Route["HTTPRoute<br/>(team-alpha ns)"]
-    Pod["Tenant Pod<br/>ClusterIP Service"]
+    Pod["Environment Pod<br/>ClusterIP Service"]
 
     Client -->|DNS| R53
     Client -->|TLS| NLB --> Envoy --> Route --> Pod
@@ -28,9 +28,9 @@ flowchart LR
 1. The client resolves the host via **Route53** (record written by external-dns) to the Gateway's NLB.
 2. The **NLB** forwards to Cilium's Envoy. Envoy presents the wildcard cert and terminates TLS at `:443`.
 3. Envoy matches the `Host` header to an attached **`HTTPRoute`** and forwards to the route's backend
-   (a tenant **ClusterIP** Service — `LoadBalancer`/`NodePort` are denied by Kyverno).
-4. Inside the cluster, Envoy traffic carries Cilium's reserved `ingress` identity (8), so tenant
-   `CiliumNetworkPolicy`s must allow `fromEntities: ["ingress"]` (the Tenant Composition does this).
+   (an environment **ClusterIP** Service — `LoadBalancer`/`NodePort` are denied by Kyverno).
+4. Inside the cluster, Envoy traffic carries Cilium's reserved `ingress` identity (8), so environment
+   `CiliumNetworkPolicy`s must allow `fromEntities: ["ingress"]` (the Environment Composition does this).
 
 ## The shared Cilium Gateway
 
@@ -46,7 +46,7 @@ The NLB is created by the AWS Load Balancer Controller from `spec.infrastructure
 by the Cilium Helm chart, not this module. The Gateway is a **foundational** unit with no app dependencies,
 so ingress is up before any app routes attach (ADR-059).
 
-This is the **single** ingress surface for tenant apps. Adding listeners to it is constrained (see
+This is the **single** ingress surface for environment apps. Adding listeners to it is constrained (see
 [Why custom domains are deferred](#why-external-custom-domains-are-deferred)).
 
 ## TLS — wildcard cert via cert-manager DNS-01
@@ -80,7 +80,7 @@ which hostnames a route may carry is enforced separately by Kyverno (below).
 
 ## Hostname authorisation — the claim is the source of truth
 
-A tenant must not be able to route an arbitrary or another team's hostname. Two mechanisms, one source:
+An environment must not be able to route an arbitrary or another team's hostname. Two mechanisms, one source:
 
 - **Generated host (ADR-060).** Every app has an implicit canonical host `<app>-<team>.<baseDomain>` (e.g.
   `demo-alpha.preprod.aws.refplat.org`). It is never declared; `argocd-apps` injects it (plus the `-pr-*`
@@ -88,11 +88,11 @@ A tenant must not be able to route an arbitrary or another team's hostname. Two 
   (see [kyverno-shift-left.md](kyverno-shift-left.md)).
 - **`spec.domains` aliases (ADR-061).** Additional vanity hosts a team declares on its `XTenant` claim.
 
-The Tenant Composition unions the generated host(s) with `spec.domains` into a per-team Kyverno
+The Environment Composition unions the generated host(s) with `spec.domains` into a per-team Kyverno
 `ClusterPolicy` **`restrict-route-hostnames-team-<team>`** that **denies** any `HTTPRoute`/`GRPCRoute`/
 `TLSRoute` hostname not in the allow-list (Enforce). The allow-list and the matching `status.domains` entries
 are both rendered from the same template pass in
-`infra/modules/crossplane/charts/tenant/files/composition.yaml` — see
+`infra/modules/crossplane/charts/environment-api/files/composition.yaml` — see
 [crossplane-composition-authoring.md](crossplane-composition-authoring.md) for the mechanism. There is **no
 second registry**: `teams.hcl` hostnames were retired (ADR-061 Phase 1).
 
@@ -100,7 +100,7 @@ second registry**: `teams.hcl` hostnames were retired (ADR-061 Phase 1).
 
 A host is admitted **only while its `status.domains[].state` is `Active`**. Hosts under the wildcard base
 domain (the generated host + tier-1/2 aliases) are platform-owned and marked `Active` immediately.
-Verification is the security boundary: a tenant cannot route a host whose state is not `Active`.
+Verification is the security boundary: an environment cannot route a host whose state is not `Active`.
 
 ## Why external custom domains are deferred
 
@@ -109,7 +109,7 @@ wildcard cert and would need its own listener/cert on the shared Gateway. On **C
 
 - [cilium #44123](https://github.com/cilium/cilium/issues/44123) — adding a specific-hostname HTTPS listener
   to a Gateway that **also** has a wildcard listener breaks the wildcard listener entirely (its
-  `CiliumEnvoyConfig` stops generating). That is exactly the shared Gateway → risk of dropping **all** tenant
+  `CiliumEnvoyConfig` stops generating). That is exactly the shared Gateway → risk of dropping **all** environment
   ingress.
 - [cilium #41228](https://github.com/cilium/cilium/issues/41228) — multiple `certificateRefs` on one listener
   fail Envoy config ("duplicate matcher"), ruling out single-listener multi-cert SNI.

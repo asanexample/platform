@@ -5,7 +5,7 @@
 deploy manifest to the signed digest — so Kyverno admits your pods on the platform/preprod clusters.
 
 > Why this matters: Kyverno runs `verify-images-team-<team>` and `verify-attestations-team-<team>` in
-> **Enforce** mode in tenant namespaces. A pod whose image isn't signed (and attested) for **your team** is
+> **Enforce** mode in environment namespaces. A pod whose image isn't signed (and attested) for **your team** is
 > **rejected at admission**. Background: [`../architecture/supply-chain-overview.md`](../architecture/supply-chain-overview.md).
 
 The supply-chain backbone is **not** copied into your repo. It lives in shared, app-team-**unwritable**
@@ -23,7 +23,7 @@ and swap team/app/hostname/Dockerfile. (ADR-050.)
 ## Prerequisites (platform side — done by the platform team)
 
 Before your CI can push or be trusted, your team must exist in the platform config. This is the
-[tenant-onboarding runbook](tenant-onboarding.md) — confirm it's done:
+[environment-onboarding runbook](environment-onboarding.md) — confirm it's done:
 
 1. **Team + app onboarded** — the `XTenant` claim defines the `team-<team>` namespace, the ECR repo
    `team-<team>/<app>`, and the route hostnames (`spec.domains` + the derived host); `teams.hcl` carries the
@@ -191,4 +191,4 @@ If a pod is **denied**, the message names the failing policy. See
 - Provenance design (L3): [ADR-042](../adrs/042-isolated-build-provenance-slsa-l3.md)
 - What's enforced where: [`../architecture/kyverno-policy-catalog.md`](../architecture/kyverno-policy-catalog.md)
 - Incident response: [`supply-chain-incidents.md`](supply-chain-incidents.md)
-- Tenant/infra onboarding: [`tenant-onboarding.md`](tenant-onboarding.md)
+- Environment/infra onboarding: [`environment-onboarding.md`](environment-onboarding.md)

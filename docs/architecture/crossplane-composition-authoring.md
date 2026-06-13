@@ -1,27 +1,27 @@
 # Crossplane Composition Authoring
 
-The **HOW** behind the tenant model — for someone who needs to **extend** the Composition. The contract (the
-`XTenant` claim, what gets provisioned, claim delivery) is [crossplane-tenant-api.md](crossplane-tenant-api.md);
+The **HOW** behind the environment model — for someone who needs to **extend** the Composition. The contract (the
+`XTenant` claim, what gets provisioned, claim delivery) is [crossplane-environment-api.md](crossplane-environment-api.md);
 this doc is the implementation: the XRD schema, the Pipeline + its three functions, the go-template that
 renders every managed resource **and** writes the XR status, providers + Pod Identity, and the hub/spoke ECR
 hop.
 
 Source of truth:
 
-- XRD — `infra/modules/crossplane/charts/tenant/templates/xrd.yaml`
-- Composition — `infra/modules/crossplane/charts/tenant/files/composition.yaml`
+- XRD — `infra/modules/crossplane/charts/environment-api/templates/xrd.yaml`
+- Composition — `infra/modules/crossplane/charts/environment-api/files/composition.yaml`
 - Control plane (core, providers, ProviderConfig, identity) — `infra/modules/crossplane/main.tf`
 - Status-loop proof — [ADR-061 Phase 2 spike](../spikes/adr-061-phase2-ingress-spike.md) (Q1)
 
 ## XRD design
 
 The `CompositeResourceDefinition` is **Crossplane v2** (`apiextensions.crossplane.io/v2`), `scope: Cluster`
-(a tenant provisions a namespace + cluster-scoped policies and composes across namespaces; cluster scope also
-means creating an `XTenant` needs cluster RBAC — tenants can't self-provision, gate S1). Two versions:
+(an environment provisions a namespace + cluster-scoped policies and composes across namespaces; cluster scope also
+means creating an `XTenant` needs cluster RBAC — environments can't self-provision, gate S1). Two versions:
 
 - **`v1alpha1`** — `served: true`, **`referenceable: true`** (the **storage/bound** version). The live
   Composition binds to it (`compositeTypeRef.apiVersion: platform.refplat.org/v1alpha1`). `spec` is the clean
-  tenant contract (`team`, `domains`, `resourceQuota`, `apps`, `aws`, `developerAccess`); `status` carries
+  environment contract (`team`, `domains`, `resourceQuota`, `apps`, `aws`, `developerAccess`); `status` carries
   `namespace` + the `domains[]` ingress state machine.
 - **`v1alpha2`** — `served: true`, **`referenceable: false`** (served-only). The richer target API
   (ADR-049: `name`/`environment`/`tier`/`tenancy`/`residency`/`placement` status, etc.). It does **not** bind
@@ -37,7 +37,7 @@ declared or the apiserver drops it. The v2 schema is forward-compat only — cha
 flowchart TD
     XR["XTenant claim (v1alpha1)"] --> S1
     subgraph Pipeline["Composition · mode Pipeline"]
-        S1["load-environment<br/>function-environment-configs<br/>→ merges tenant-cluster-config EnvironmentConfig into context"]
+        S1["load-environment<br/>function-environment-configs<br/>→ merges platform-cluster-config EnvironmentConfig into context"]
         S2["render-resources<br/>function-go-templating<br/>→ renders Objects + AWS MRs + writes XR status.domains"]
         S3["ready<br/>function-auto-ready<br/>→ marks XR Ready when composed resources are Ready"]
         S1 --> S2 --> S3
@@ -50,8 +50,8 @@ name. Each step's `input` is function-specific.
 
 ### Step 1 — `function-environment-configs` (cluster constants out of the claim)
 
-Per-cluster constants must **not** leak into the tenant-facing spec. The `crossplane_tenant` Helm release
-(`infra/modules/crossplane/main.tf`) templates an `EnvironmentConfig` named `tenant-cluster-config` carrying
+Per-cluster constants must **not** leak into the environment-facing spec. The `crossplane_environment_api` Helm release
+(`infra/modules/crossplane/main.tf`) templates an `EnvironmentConfig` named `platform-cluster-config` carrying
 `ecrRegistry`, `baseDomain`, `region`, `workloadAccountId`, `managementAccountId`, `clusterName`,
 `pullAccountIds`, `permissionsBoundaryArn`, `providerConfigEcr`, `podIdentityServiceAccnt`. Step 1 references
 it by name and merges it into the pipeline **context**, where the template reads it as
@@ -124,18 +124,18 @@ hosts are `Pending` (Phase 2b not built) and therefore **not** admitted. See
   `(namespace, provider ServiceAccount) → crossplane-provisioner-<cluster>`, and that association is the
   **only** thing crediting the provider pods (no SA annotation). `provider-kubernetes` uses
   `InjectedIdentity` (in-cluster, its own scoped ClusterRole).
-- **`crossplane-tenant`** — the XRD + Composition + the `tenant-cluster-config` EnvironmentConfig.
+- **`crossplane-environment-api`** — the XRD + Composition + the `platform-cluster-config` EnvironmentConfig.
 
-The provisioning IAM role (`crossplane-provisioner-<cluster>`) is deliberately scoped: on a tenant-provisioning
+The provisioning IAM role (`crossplane-provisioner-<cluster>`) is deliberately scoped: on an environment-provisioning
 (workload) cluster it may create `Pod-team-*`/`DeveloperAccess-*` roles **only with the deny-escalation
 permissions boundary attached** (and cannot strip it — no `Put/DeleteRolePermissionsBoundary`), `PassRole`
 those roles to `pods.eks.amazonaws.com` only, and manage EKS Pod Identity associations + access entries on its
-own cluster. Effective tenant-role perms = the role's declared policy **∩** the boundary, so even a
-compromised provisioner can't escalate a tenant role.
+own cluster. Effective environment-role perms = the role's declared policy **∩** the boundary, so even a
+compromised provisioner can't escalate an environment role.
 
 ## Hub / spoke — cross-account ECR
 
-Crossplane is **federated** (one per cluster); the only cross-account hop is ECR. Tenant image repos live in
+Crossplane is **federated** (one per cluster); the only cross-account hop is ECR. Environment image repos live in
 the **platform** account, but a workload cluster (e.g. preprod) runs its own Crossplane. So the ECR MRs use a
 **second** ProviderConfig — **`platform-ecr`** — that `assumeRoleChain`s the platform
 `crossplane-ecr-provisioner` role (`var.ecr_provisioner_role_arn`). The template selects it per-resource:

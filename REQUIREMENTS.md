@@ -102,7 +102,7 @@
 4. HTTP-to-HTTPS redirect via HTTPRoute filter with 301 permanent redirect on
    every hostname (ADR-017)
 5. Cilium Gateway Envoy proxy uses reserved `ingress` identity (identity 8) for
-   upstream connections — tenant CiliumNetworkPolicies must allow
+   upstream connections — environment CiliumNetworkPolicies must allow
    `fromEntities: ["ingress"]` (ADR-008)
 6. TLS secrets must be copied to `cilium-secrets` namespace as
    `<namespace>-<secret-name>` for Gateway TLS termination
@@ -132,11 +132,11 @@
 3. Hubble TLS uses `helm` auto-generation method on AWS to avoid post-install
    hook chicken-and-egg issues with BYOCNI (ADR-008)
 
-### 2.7 Tenant Isolation
+### 2.7 Environment Isolation
 
-1. Namespace-based tenant isolation with default-deny NetworkPolicies, resource
+1. Namespace-based environment isolation with default-deny NetworkPolicies, resource
    quotas, and limit ranges (ADR-027)
-2. Multi-app tenant model — teams declare apps in `teams.hcl`, each gets an
+2. Multi-app environment model — teams declare apps in `teams.hcl`, each gets an
    ArgoCD Application and optional PR preview ApplicationSet (ADR-031, ADR-032)
 3. Private EKS API endpoints with Tailscale VPN for developer access (ADR-010,
    ADR-011)
@@ -264,11 +264,11 @@
 
 ### 4.5 Network Security
 
-1. Default-deny ingress NetworkPolicies on all tenant namespaces with Cilium
+1. Default-deny ingress NetworkPolicies on all environment namespaces with Cilium
    enforcement at the eBPF level (ADR-027)
 2. CiliumNetworkPolicy per namespace allowing traffic from Gateway Envoy
    (`ingress` entity), remote nodes, and host network namespace (ADR-027)
-3. Standard Kubernetes NetworkPolicy stack per tenant: default-deny-ingress,
+3. Standard Kubernetes NetworkPolicy stack per environment: default-deny-ingress,
    allow-gateway-ingress (from gateway and kube-system namespaces),
    allow-dns-egress (UDP/TCP port 53), implicit allow all egress (ADR-027)
 
@@ -289,7 +289,7 @@
    plus required tags Environment, ManagedBy, Owner enforced by SCP
 4. SCP enforcement at the AWS API level — no opt-out possible (ADR-003)
 5. ResourceQuotas enforce resource limits at the scheduler level — default 4 CPU,
-   8Gi memory, 20 pods per tenant namespace (ADR-027)
+   8Gi memory, 20 pods per environment namespace (ADR-027)
 6. LimitRange defaults per container: 500m/512Mi limits, 100m/128Mi requests
    (ADR-027)
 7. NetworkPolicies enforce isolation at the kernel level (Cilium eBPF) (ADR-008)
@@ -354,7 +354,7 @@
 
 ## 8. Multitenancy
 
-1. Namespace isolation as the default tenant boundary — each team gets a
+1. Namespace isolation as the default environment boundary — each team gets a
    `team-<name>` namespace (ADR-027)
 2. Self-service via `teams.hcl` with nested `apps` map: each team declares
    multiple apps with `repo_url`, `repo_path`, `repo_branch`, and `preview`
@@ -414,7 +414,7 @@
 3. Terragrunt unit READMEs documenting module source, dependencies, key inputs,
    and apply commands with correct AWS_PROFILE
 4. Architecture Decision Records for every significant design choice (38 ADRs)
-5. Operational runbooks for common tasks (tenant onboarding, app deployment,
+5. Operational runbooks for common tasks (environment onboarding, app deployment,
    cluster access, ArgoCD SSO)
 6. Onboarding guide for new team members
 7. Compliance control mappings (SOC2, HIPAA, PCI-DSS)

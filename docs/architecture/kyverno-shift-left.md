@@ -1,6 +1,6 @@
 # Kyverno Shift-Left (Phase 4) — fail policy violations in app PR CI
 
-Kyverno admission is the **enforcement** point: non-compliant tenant workloads are rejected when they're
+Kyverno admission is the **enforcement** point: non-compliant environment workloads are rejected when they're
 applied to the cluster (see [ADR-014](../adrs/014-kyverno-as-policy-engine.md) and
 [the policy catalog](kyverno-policy-catalog.md)). The problem with enforcement-only is *timing*: an app
 team learns their manifest is non-compliant at **deploy** time (ArgoCD sync fails), long after the PR
@@ -18,7 +18,7 @@ A reusable composite action in the platform repo,
 [`.github/actions/kyverno-validate`](../../.github/actions/kyverno-validate/action.yml), does cluster-free
 what admission does in-cluster:
 
-1. **Render** the platform tenant policies for the team — `helm template` the same `policies-chart` the
+1. **Render** the platform environment policies for the team — `helm template` the same `policies-chart` the
    cluster runs, with `mutate` ON (so the auto-injected `securityContext`/labels are present, matching
    the cluster), `verifyImages` OFF (the image isn't built/signed at PR time), and `cleanup` OFF
    (runtime GC, not an admission check). The team's allowed route hostnames are DERIVED from its `XTenant`
@@ -27,7 +27,7 @@ what admission does in-cluster:
    host (`<app>-<team>.<base>` + any `spec.domains` aliases) into every Gateway-API route, the same as
    argocd-apps does at deploy, so the app repo ships a placeholder and the check sees what admission sees.
 3. **Apply** — `kyverno apply <policies> --resource <manifests> --values-file <ns-labels>`, telling the
-   CLI the `team-<team>` namespace carries the tenant label so the tenant-scoped policies match.
+   CLI the `team-<team>` namespace carries the environment label so the environment-scoped policies match.
 4. **Fail** the build if the parsed summary reports any `fail` or `error`.
 
 No cluster, no AWS credentials, no secrets — so it is safe to run on `pull_request`, including from forks.
@@ -78,7 +78,7 @@ host via its manifest — the guard is enforced against the injected, claim-deri
   (intent); it cannot read live `status.domains`, so it can't tell whether an external (tier-3) domain has
   reached `Active`. Admission is the authority — it admits a host only while Active. (Moot until Phase 2b
   introduces non-`Active` external domains; generated + tier-1/2 hosts are always Active.)
-- Anything depending on **live cluster state** (the namespace tenant label is *simulated* via a values
+- Anything depending on **live cluster state** (the namespace environment label is *simulated* via a values
   file).
 
 So a green shift-left check means "this will pass the validate policies"; admission remains the

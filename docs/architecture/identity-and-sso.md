@@ -52,7 +52,7 @@ flowchart TB
 - **keycloak-config** (`infra/modules/keycloak-config`) — **access-model-as-code.** A Terraform run (the
   Keycloak provider, over an in-cluster `kubectl` port-forward — `scripts/kc-portforward.sh`) that configures
   the *running* Keycloak: the realm, one **group per team** + platform groups (e.g. `platform-admins`), the
-  developer-access **roles** (`tenant-operate`, `tenant-view`), the per-app **OIDC clients**, the **claim
+  developer-access **roles** (`environment-operate`, `environment-view`), the per-app **OIDC clients**, the **claim
   mappers** that put group names into the `groups` claim, the optional **upstream broker**, and (in standalone
   mode) the **seed users**. All of it derived from `infra/live/aws/_teams.hcl`.
 - **ArgoCD** — consumes Keycloak OIDC **directly** (its own embedded Dex is off: `dex_enabled = false`).
@@ -114,18 +114,18 @@ _teams.hcl                         keycloak-config                 claims       
 ─────────────────────────────────  ──────────────────────────────  ───────────────   ────────────────────────
 team "alpha":                      group  "alpha"                   groups:           ArgoCD:
   envelope.allowedEnvironments       role-of-env(preprod)             ["alpha"]          g, alpha, role:team-alpha
-    = ["preprod"]                      = "tenant-operate"            roles:             → get/sync alpha/* apps
-  ssoGroup = "Dev-alpha"             group "alpha" → tenant-operate    ["tenant-operate"]
+    = ["preprod"]                      = "environment-operate"            roles:             → get/sync alpha/* apps
+  ssoGroup = "Dev-alpha"             group "alpha" → environment-operate    ["environment-operate"]
                                                                                        Kubernetes:
 platform group "platform-admins"   group "platform-admins"         groups:              team-alpha:developers
                                                                       ["platform-admins"]  (via EKS access entry)
 ```
 
 - **Team key = Keycloak group name** (`alpha` → group `/alpha`).
-- **Roles** are the *developer-access posture* by environment (ADR-049): `tenant-operate` for preprod,
-  `tenant-view` for prod. A team's group gets the roles implied by its `envelope.allowedEnvironments`.
+- **Roles** are the *developer-access posture* by environment (ADR-049): `environment-operate` for preprod,
+  `environment-view` for prod. A team's group gets the roles implied by its `envelope.allowedEnvironments`.
 - **`groups` claim** (names, not UUIDs) is what every app keys off. ArgoCD maps it to `role:team-<team>` /
-  `role:org-admin`; Kubernetes namespace access is granted separately by the Crossplane tenant Composition
+  `role:org-admin`; Kubernetes namespace access is granted separately by the Crossplane environment Composition
   (`team-<team>:developers`, ADR-039); **AWS** access is separate again (Identity Center permission sets).
 - **`ssoGroup`** matters **only when federating** — it's the *upstream* group name that maps into the Keycloak
   group (see below). In standalone mode it's unused.
@@ -188,5 +188,5 @@ standalone and adopt a corporate IdP later without touching the apps.
 - ADRs: [052 (Dex broker, superseded)](../adrs/052-centralized-dex-sso-broker.md) ·
   [053 (identity & cross-system authz)](../adrs/053-identity-and-cross-system-authorization-strategy.md) ·
   [059 (pluggable IdP seam)](../adrs/059-identity-topology-pluggable-idp-seam.md) ·
-  [049 (team/tenant model)](../adrs/049-tenant-model-team-tenant-zone.md)
+  [049 (team/environment model)](../adrs/049-tenant-model-team-tenant-zone.md)
 - The access-model source: `infra/live/aws/_teams.hcl`.

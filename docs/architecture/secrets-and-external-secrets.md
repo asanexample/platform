@@ -95,17 +95,17 @@ spec:
 ESO fetches on the `refreshInterval` cadence (so a freshly-rotated value in Secrets Manager appears after the
 next refresh, not instantly). `creationPolicy: Owner` ties the k8s Secret's lifecycle to the `ExternalSecret`.
 
-## Platform vs tenant secret boundaries
+## Platform vs environment secret boundaries
 
 Today **all** ESO secrets are **platform-scoped**. The `aws-secrets-manager` `ClusterSecretStore` runs on the
 platform and preprod clusters and reads `platform/<service>/<name>` from Secrets Manager via the single
 platform-scoped ESO IRSA role. Platform services — Keycloak, oauth2-proxy, Dex, Tailscale, ArgoCD SSO —
 consume their secrets this way.
 
-**Tenant workloads do not get AWS access through ESO.** Tenant access to AWS *resources* (S3, etc.) is **EKS
+**Environment workloads do not get AWS access through ESO.** Environment access to AWS *resources* (S3, etc.) is **EKS
 Pod Identity** (ADR-041/047): an association binds a named ServiceAccount to a `Pod-team-<team>` role, declared
-in the `XTenant` claim's `aws` block — see [crossplane-tenant-api.md](crossplane-tenant-api.md). The
-per-namespace, IRSA-scoped tenant *secret* path (a namespace-scoped `SecretStore` per team) is the documented
+in the `XTenant` claim's `aws` block — see [crossplane-environment-api.md](crossplane-environment-api.md). The
+per-namespace, IRSA-scoped environment *secret* path (a namespace-scoped `SecretStore` per team) is the documented
 **target** model but is **not yet deployed** (per the
 [secrets-management runbook](../runbooks/secrets-management.md), "Creating a New App Team Secret"). Do not
 describe it as live.
@@ -113,8 +113,8 @@ describe it as live.
 | Concern | Mechanism | Status |
 | --- | --- | --- |
 | Platform service secrets | ESO + `aws-secrets-manager` `ClusterSecretStore` (platform IRSA) | Live |
-| Tenant AWS *resource* access | EKS Pod Identity (`Pod-team-<team>`), declared in the claim | Live |
-| Tenant per-namespace *secrets* via ESO | namespace-scoped `SecretStore` + per-team IRSA | Target model, not deployed |
+| Environment AWS *resource* access | EKS Pod Identity (`Pod-team-<team>`), declared in the claim | Live |
+| Environment per-namespace *secrets* via ESO | namespace-scoped `SecretStore` + per-team IRSA | Target model, not deployed |
 
 ## Rotation
 

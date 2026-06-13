@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-08
 **Status:** Complete. Informs the Phase 2 build plan (no production code shipped by this spike).
-**Relates to:** [ADR-061](../adrs/061-tenant-ingress-and-custom-domain-strategy.md), builds on Phase 1 (PR #264).
+**Relates to:** [ADR-061](../adrs/061-environment-ingress-and-custom-domain-strategy.md), builds on Phase 1 (PR #264).
 
 ## Why
 
@@ -73,7 +73,7 @@ listener (or multiple cert refs) to the shared Gateway. **Open Cilium bugs make 
 - **[cilium #44123](https://github.com/cilium/cilium/issues/44123)** — adding specific-hostname HTTPS
   listeners to a Gateway that **also has a wildcard listener breaks the wildcard listener entirely** (its
   `CiliumEnvoyConfig` stops generating). This is *exactly* our shared Gateway → risk of taking down **all**
-  tenant ingress.
+  environment ingress.
 - **[cilium #41228](https://github.com/cilium/cilium/issues/41228)** — multiple `certificateRefs` on a single
   listener → Envoy config fails ("duplicate matcher"). Rules out single-listener-multi-cert SNI.
 - **[cilium #40966](https://github.com/cilium/cilium/issues/40966)** — Envoy doesn't fall back to a default
@@ -82,7 +82,7 @@ listener (or multiple cert refs) to the shared Gateway. **Open Cilium bugs make 
 **Verdict: do not add per-domain listeners to the shared Gateway.** Two viable paths for tier-3:
 
 1. **Edge offload (recommended)** — terminate the custom domain's TLS at **Cloudflare for SaaS** (Q5 confirms
-   the provider), origin = the tenant's wildcard host (`<app>-<team>.<base>`). The shared Cilium Gateway is
+   the provider), origin = the environment's wildcard host (`<app>-<team>.<base>`). The shared Cilium Gateway is
    untouched; Cilium's multi-cert limitations are sidestepped entirely. This is the ADR's documented edge lever
    — Q2 makes it the *default* for tier-3, not just the customer-managed fallback.
 2. **Isolated separate Gateway** per custom domain (own NLB) — avoids #44123 (wildcard untouched) but costs an
@@ -145,7 +145,7 @@ this makes edge offload the pragmatic primary for tier-3 external domains.
 
 **2b — tier-3 external domains.** Add `provider-aws-route53`; Composition composes the `Zone` (surface
 `status…nameServers` → `dnsTarget`/`DelegationRequired`) and drives the state machine. **Ingress edge decision
-(the crux, from Q2): default to Cloudflare-for-SaaS edge termination** (origin = the tenant's wildcard host)
+(the crux, from Q2): default to Cloudflare-for-SaaS edge termination** (origin = the environment's wildcard host)
 rather than per-domain Cilium listeners; gate the in-cluster alternative on the one remaining live #44123 test.
 Multi-zone cert-manager/external-dns IRSA only if the in-cluster path is chosen.
 

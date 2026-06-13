@@ -2,7 +2,7 @@
 //
 // It is deliberately minimal — a stdlib-only HTTP server exposing the liveness/readiness endpoint the
 // platform deployment manifests probe (/healthz) and a JSON root handler. There is NO cloud/AWS
-// dependency: a tenant's AWS access (if any) is granted out-of-band via EKS Pod Identity to the named
+// dependency: an environment's AWS access (if any) is granted out-of-band via EKS Pod Identity to the named
 // ServiceAccount (see k8s/preprod/serviceaccount.yaml) and declared in the Environment claim's `aws` block.
 // Add an SDK + the access only when an app actually needs it.
 //

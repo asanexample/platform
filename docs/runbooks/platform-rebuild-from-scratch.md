@@ -130,8 +130,8 @@ Do these / be aware of these before/at bootstrap; each cost a `--resume` cycle t
 5. **preprod `policy` ↔ `crossplane` circular dep — FIXED.** Two policies matched Crossplane CRDs (`XEnvironment`,
    `ProviderConfig`) that don't exist until crossplane deploys — but crossplane depends on policy. Kyverno churned
    its webhook config on the missing CRDs and the bulk policy install couldn't fully converge on the leaner preprod.
-   `restrict-environment-envelope`/`restrict-tenant-control-plane` now live in the **crossplane** module
-   (`charts/tenant-policies`, a `helm_release` gated on `enable_tenant_api`, installed after `crossplane_tenant`), so
+   `restrict-environment-envelope`/`restrict-environment-control-plane` now live in the **crossplane** module
+   (`charts/environment-policies`, a `helm_release` gated on `enable_environment_api`, installed after `crossplane_environment_api`), so
    every CRD they match already exists at install time — no churn. The `policy` unit no longer ships them (and its
    `atomic = false` from the same incident stays, as defence-in-depth for the remaining bulk install).
 

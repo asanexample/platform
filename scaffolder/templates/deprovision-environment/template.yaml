@@ -1,8 +1,8 @@
 # Deprovision Environment (ADR-062 v3): team-scoped, REVERSIBLE deprovisioning. "Decommission" suspends the
 # Environment (the Composition zeroes its ResourceQuota — workloads stop, everything else retained);
 # "Reactivate" restores it. Both are reversible claim EDITS to spec.lifecycle.phase. The irreversible step —
-# actually removing the claim — is a SEPARATE human PR (see docs/runbooks/tenant-deprovisioning.md). This
-# template never deletes. Replaces the retired v2 "Deprovision Tenant" (gitops/tenant-claims/preprod path).
+# actually removing the claim — is a SEPARATE human PR (see docs/runbooks/environment-deprovisioning.md). This
+# template never deletes. Replaces the retired v2 "Deprovision Environment" (gitops/tenant-claims/preprod path).
 #
 # NB: the v3 gitops Gate does not yet arm automerge OR the decommission-first deletion guard (both deferred at
 # the cutover — see .github/workflows/v3-gitops-gate.yml) — so these PRs are reviewer-merged, and the purge PR
@@ -112,7 +112,7 @@ spec:
           drain; namespace, IAM, ECR all retained). **Merge it** to apply (the v3 gitops Gate validates; automerge
           is not yet armed). To restore, run this template again with action **reactivate**. To fully purge
           (delete the namespace), open a separate PR removing the claim file — until the v3 gate's
-          decommission-first guard lands, a reviewer enforces decommission-first (`docs/runbooks/tenant-deprovisioning.md`).
+          decommission-first guard lands, a reviewer enforces decommission-first (`docs/runbooks/environment-deprovisioning.md`).
           {% else %}
           This **restores** the Environment to active (quota reinstated). Merge it to apply (the v3 gitops Gate validates).
           {% endif %}

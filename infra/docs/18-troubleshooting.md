@@ -15,8 +15,8 @@ symptoms, their usual cause on this platform, and where to go next.
 | Kyverno policy rejections | [kyverno-break-glass](../../docs/runbooks/kyverno-break-glass.md) |
 | Supply-chain (cosign / SLSA) rejections | [supply-chain-incidents](../../docs/runbooks/supply-chain-incidents.md), [app-supply-chain-onboarding](../../docs/runbooks/app-supply-chain-onboarding.md) |
 | Secrets (ESO / Secrets Manager) | [secrets-management](../../docs/runbooks/secrets-management.md), [secret-rotation](../../docs/runbooks/secret-rotation.md) |
-| Tenant AWS access (Pod Identity) | [tenant-aws-access-pod-identity](../../docs/runbooks/tenant-aws-access-pod-identity.md) |
-| Observability (Grafana / Mimir) | [observability-troubleshooting](../../docs/runbooks/observability-troubleshooting.md), [observability-access](../../docs/runbooks/observability-access.md) |
+| Environment AWS access (Pod Identity) | [environment-aws-access-pod-identity](../../docs/runbooks/environment-aws-access-pod-identity.md) |
+| Observability (Grafana / mimir) | [observability-troubleshooting](../../docs/runbooks/observability-troubleshooting.md), [observability-access](../../docs/runbooks/observability-access.md) |
 | Transit Gateway / cross-VPC | [transit-gateway-operations](../../docs/runbooks/transit-gateway-operations.md) |
 | Cluster/add-on upgrades | [upgrade-procedures](../../docs/runbooks/upgrade-procedures.md) |
 

@@ -9,23 +9,23 @@ General Kubernetes/AWS terms are omitted. Alphabetical.
 
 **App** — A deployable unit owned by a Team, declared as a key under `spec.apps.<app>` in the `XTenant`
 claim. Each app gets an ECR repo `team-<team>/<app>`, a derived hostname, and (optionally) PR previews.
-See [Multi-App Tenant Model (ADR-031)](adrs/031-multi-app-tenant-model.md).
+See [Multi-App Environment Model (ADR-031)](adrs/031-multi-app-environment-model.md).
 
 **ApplicationSet (PR preview generator)** — An ArgoCD `ApplicationSet` (one per preview-enabled app) whose
 `pullRequest`/GitHub generator polls the app repo every 60s and creates an ephemeral `Application` per open
 PR. See [PR Preview Environments (ADR-032)](adrs/032-pr-preview-environments.md).
 
 **BACK stack** — **B**ackstage + **A**rgoCD + **C**rossplane + **K**ubernetes: the chosen architecture for
-developer self-service. ArgoCD delivers, Crossplane provisions tenants, Backstage is the portal.
+developer self-service. ArgoCD delivers, Crossplane provisions environments, Backstage is the portal.
 See [Adopt the BACK Stack (ADR-046)](adrs/046-back-stack-for-developer-self-service.md).
 
-**Compliance tier** — `standard` / `hipaa` / `pci` posture on a tenant (`spec.complianceTier`, default
+**Compliance tier** — `standard` / `hipaa` / `pci` posture on an environment (`spec.complianceTier`, default
 `standard`). Regulated tiers add isolation, encryption, network, and retention requirements; on `standard`
 clusters only `standard` is in use. See [Compliance Tier Model (ADR-013)](adrs/013-compliance-tier-model.md).
 
 **Composition (Crossplane)** — The `Pipeline`-mode Composition that reconciles one `XTenant` into the full
-tenant footprint (namespace + AWS + cross-account ECR). Lives at `charts/tenant/files/composition.yaml`.
-See [Crossplane Tenant API](architecture/crossplane-tenant-api.md#what-the-composition-provisions).
+environment footprint (namespace + AWS + cross-account ECR). Lives at `charts/environment-api/files/composition.yaml`.
+See [Crossplane Environment API](architecture/crossplane-environment-api.md#what-the-composition-provisions).
 
 **cosign / keyless signing** — Images must be cosign-signed (keyless, via Fulcio/Rekor) to pass admission.
 Kyverno's `verify-images-team-<team>` admits the shared signer identity gated to the team's repo.
@@ -33,35 +33,35 @@ See [Cosign Image Signing](architecture/cosign-image-signing.md).
 
 **Domain tiers (1/2/3)** — Tier 1 = the generated canonical host; tier 2 = a platform-domain vanity alias
 (under `*.<baseDomain>`, free today); tier 3 = an external custom domain (e.g. `shop.acme.com`, deferred).
-See [Tenant Ingress & Custom Domain Strategy (ADR-061)](adrs/061-tenant-ingress-and-custom-domain-strategy.md).
+See [Environment Ingress & Custom Domain Strategy (ADR-061)](adrs/061-environment-ingress-and-custom-domain-strategy.md).
 
 **ECR team-scoping** — Container images live in the platform account at `team-<team>/<app>`; Kyverno denies
 cross-team image references and the preprod/prod accounts pull cross-account via a RepositoryPolicy.
 See [ECR Cross-Account Registry (ADR-028)](adrs/028-ecr-cross-account-container-registry.md).
 
-**EnvironmentConfig (`tenant-cluster-config`)** — A Helm-templated Crossplane `EnvironmentConfig` carrying
+**EnvironmentConfig (`platform-cluster-config`)** — A Helm-templated Crossplane `EnvironmentConfig` carrying
 per-cluster constants (ECR registry, account IDs, cluster name, `baseDomain`, boundary ARN) into the
-Composition, so they never leak into the claim. See [Crossplane Tenant API](architecture/crossplane-tenant-api.md#composition-pipeline).
+Composition, so they never leak into the claim. See [Crossplane Environment API](architecture/crossplane-environment-api.md#composition-pipeline).
 
 **federation (upstream IdP)** — Brokering authentication from an upstream identity provider (Okta / Entra /
 Google / AWS IdC) into Keycloak via a one-block `upstream` swap; nothing downstream of Keycloak moves.
 See [Pluggable IdP Seam (ADR-059)](adrs/059-identity-topology-pluggable-idp-seam.md).
 
-**function-go-templating** — The Crossplane composition function that renders all tenant resources (and, in
+**function-go-templating** — The Crossplane composition function that renders all environment resources (and, in
 ADR-061 Phase 2a, the `status.domains` state machine) from `spec` + context, with no separate controller.
-See [Crossplane Tenant API](architecture/crossplane-tenant-api.md#composition-pipeline).
+See [Crossplane Environment API](architecture/crossplane-environment-api.md#composition-pipeline).
 
 **Generated host** — The system-canonical hostname `<app>-<team>.<env-domain>` derived from `(app, team,
 env)` and injected into the app's HTTPRoute by argocd-apps — never hardcoded in the app repo. Previews use
-`<app>-<team>-pr-<n>`. See [Tenant App Hostname Convention (ADR-060)](adrs/060-tenant-app-hostname-convention.md).
+`<app>-<team>-pr-<n>`. See [Environment App Hostname Convention (ADR-060)](adrs/060-environment-app-hostname-convention.md).
 
 **IdP of record** — In the realized default (scenario B), Keycloak owns users and memberships in the
 `platform` realm (`upstream = null`); upstream federation is opt-in.
 See [Pluggable IdP Seam (ADR-059)](adrs/059-identity-topology-pluggable-idp-seam.md).
 
 **IRSA (IAM Roles for Service Accounts)** — OIDC-federated pod AWS credentials via an
-`eks.amazonaws.com/role-arn` SA annotation. Platform add-ons (cert-manager, external-dns, …) use it; tenant
-workloads must NOT (the annotation is denied for tenants). See [Pod Identity Standard (ADR-047)](adrs/047-pod-identity-as-aws-identity-standard.md).
+`eks.amazonaws.com/role-arn` SA annotation. Platform add-ons (cert-manager, external-dns, …) use it; environment
+workloads must NOT (the annotation is denied for environments). See [Pod Identity Standard (ADR-047)](adrs/047-pod-identity-as-aws-identity-standard.md).
 
 **Kyverno** — The admission policy engine (ADR-014), in Enforce mode on preprod and platform. Per-team
 `restrict-images`/`restrict-route-hostnames` (claim-owned) + platform `verify-images`/`verify-attestations`.
@@ -75,11 +75,11 @@ See [Pluggable IdP Seam (ADR-059)](adrs/059-identity-topology-pluggable-idp-seam
 **platctl** — The DAG-aware Go CLI (`./bin/platctl`, built via `make build-platctl`, not on PATH) for
 bootstrap, teardown, validate, and kubeconfig. See [platctl CLI (ADR-038)](adrs/038-platctl-cli-for-platform-operations.md).
 
-**Pod Identity** — The go-forward standard for tenant pod AWS access: an EKS Pod Identity association binds
+**Pod Identity** — The go-forward standard for environment pod AWS access: an EKS Pod Identity association binds
 a named ServiceAccount in `team-<team>` to `Pod-team-<team>` (capped by a deny-escalation boundary). No
 OIDC trust boilerplate; works with `automountServiceAccountToken: false`.
 See [Pod Identity Standard (ADR-047)](adrs/047-pod-identity-as-aws-identity-standard.md) and the
-[Pod Identity runbook](runbooks/tenant-aws-access-pod-identity.md).
+[Pod Identity runbook](runbooks/environment-aws-access-pod-identity.md).
 
 **PR preview** — An ephemeral per-PR deployment (`<app>-<team>-pr-<n>.<env-domain>`) created for apps with
 `preview = true`, via the ApplicationSet PR generator + kustomize overrides.
@@ -87,7 +87,7 @@ See [PR Preview Environments (ADR-032)](adrs/032-pr-preview-environments.md).
 
 **restrict-route-hostnames** — The per-team Kyverno ClusterPolicy that admits an HTTPRoute hostname only if
 it is in the team's allow-list (derived generated host ∪ `spec.domains`) **and** its `status.domains` entry
-is `Active`. See [Crossplane Tenant API](architecture/crossplane-tenant-api.md#statusdomains--the-ingress-state-machine-adr-061-phase-2).
+is `Active`. See [Crossplane Environment API](architecture/crossplane-environment-api.md#statusdomains--the-ingress-state-machine-adr-061-phase-2).
 
 **seam (invariant)** — A stable contract whose providers are swappable: the identity seam (Keycloak +
 `sso.aws.refplat.org`, ADR-059) and the ingress seam (`spec.domains`/`status.domains` + the shared Gateway,
@@ -101,38 +101,41 @@ See [Kyverno Shift-Left](architecture/kyverno-shift-left.md).
 `trusted-ci/slsa-provenance.yml`; Kyverno's `verify-attestations-team-<team>` enforces it (Enforce on
 preprod). See [Isolated Build Provenance (ADR-042)](adrs/042-isolated-build-provenance-slsa-l3.md).
 
-**`spec.domains`** — Structured tenant intent for vanity/custom hosts (`[]` of `{ host, canonical?, dns? }`)
+**`spec.domains`** — Structured environment intent for vanity/custom hosts (`[]` of `{ host, canonical?, dns? }`)
 on the `XTenant` claim; the implicit generated host is never declared. The sole source of truth for
-hostnames (replacing `teams.hcl`). See [ADR-061](adrs/061-tenant-ingress-and-custom-domain-strategy.md).
+hostnames (replacing `teams.hcl`). See [ADR-061](adrs/061-environment-ingress-and-custom-domain-strategy.md).
 
 **`status.domains`** — The ingress state machine the Composition writes (one entry per host with
 `state`/`mode`/`reason`). A host is admitted only while `Active`; verification is the security boundary
-(ADR-061 Phase 2a). See [Crossplane Tenant API](architecture/crossplane-tenant-api.md#statusdomains--the-ingress-state-machine-adr-061-phase-2).
+(ADR-061 Phase 2a). See [Crossplane Environment API](architecture/crossplane-environment-api.md#statusdomains--the-ingress-state-machine-adr-061-phase-2).
 
-**supply-chain split** — Per-team `restrict-*` guardrails live in the Tenant Composition (claim-owned); the
+**supply-chain split** — Per-team `restrict-*` guardrails live in the Environment Composition (claim-owned); the
 platform-owned `verify-images`/`verify-attestations` trust roots stay in the `policy` module for all teams.
 See [Cosign Image Signing](architecture/cosign-image-signing.md) and [ADR-046](adrs/046-back-stack-for-developer-self-service.md).
 
-**Team** — The owner/identity dimension: an SSO group + a `team-<team>` namespace. Today `team == tenant`;
-the v2 model separates ownership (Team) from isolation (Tenant). Feeds app delivery + supply-chain via
-`teams.hcl`. See [Tenant Model — Team/Tenant/Zone (ADR-049)](adrs/049-tenant-model-team-tenant-zone.md).
+**Team** — The owner/identity dimension: an SSO group + a git-native `Team` CR (ADR-063). The v3 model (ADR-067)
+separates ownership (Team) from the deployment unit (Environment = Product × Stage). A Team's envelope bounds
+what Environments its members may provision. See [IDP Domain Model (ADR-067)](adrs/067-idp-domain-model.md).
 
-**Tenant / XTenant claim** — A single declarative `XTenant` (cluster-scoped Crossplane XR,
-`platform.refplat.org/v1alpha1`) that provisions a complete tenant. The sole provisioning path; the old
-Terragrunt `tenants`/`pod-identity`/`s3-shared` units are retired.
-See [Crossplane Tenant API](architecture/crossplane-tenant-api.md).
+**Tenant** *(deprecated, pre-ADR-067)* — The historical noun for the provisioned unit, now the **Environment**.
+Older ADRs use the original term; current code/docs say Environment.
+
+**Environment / XEnvironment** — A single declarative `XEnvironment` (cluster-scoped Crossplane XR,
+`platform.refplat.org/v1alpha3`) that provisions one Environment — a Product at a Stage (namespace, quota,
+network policy, Pod-Identity, GitOps delivery), bounded by the owning Team's envelope. The sole provisioning
+path. See [Crossplane Environment API](architecture/crossplane-environment-api.md).
 
 **trusted-ci / build-sign** — The shared, app-team-unwritable reusable workflow
 (`asanexample/trusted-ci/build-sign.yml`) that builds → pushes → signs → SBOMs an image. App CI is a thin
 caller of it. See [Shared build-sign Workflow (ADR-050)](adrs/050-shared-build-sign-reusable-workflow.md).
 
 **`validation_failure_action`** — The Kyverno policy mode toggle: `Audit` (report-only) vs `Enforce`
-(reject at admission). Preprod and platform run Enforce for tenant policies.
+(reject at admission). Preprod and platform run Enforce for environment policies.
 See [Kyverno as Policy Engine (ADR-014)](adrs/014-kyverno-as-policy-engine.md).
 
 **XRD** — The `CompositeResourceDefinition` (`xtenants.platform.refplat.org`) defining the `XTenant` schema
-and its defaults (`resourceQuota`, `complianceTier`, …). See [Crossplane Tenant API](architecture/crossplane-tenant-api.md#the-tenant-claim-xtenant).
+and its defaults (`resourceQuota`, `complianceTier`, …). See [Crossplane Environment API](architecture/crossplane-environment-api.md#the-environment-claim-xtenant).
 
 **Zone** — A platform-owned isolation/placement unit (account + cluster keyed by environment, location,
-hardening, tenancy) in the v2 tenant model; not yet implemented (lands with the rebuild).
-See [Tenant Model — Team/Tenant/Zone (ADR-049)](adrs/049-tenant-model-team-tenant-zone.md).
+hardening, tenancy) in the v2 environment model; not yet implemented (lands with the rebuild).
+See [Environment Model — Team/Environment/Zone (ADR-049)](adrs/049-tenant-model-team-tenant-zone.md).

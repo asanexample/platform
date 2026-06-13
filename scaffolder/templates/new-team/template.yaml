@@ -1,6 +1,6 @@
 # New Team (#280, ADR-062 §1 + ADR-063): admin-only template that authors the git-native Team CR
 # (identity + envelope) as a PR to gitops/teams/ — HUMAN REVIEW, never automerge (a Team grants an
-# envelope; a privilege grant warrants review). Machine-enforced since #281: the Tenant Claims Gate FAILS
+# envelope; a privilege grant warrants review). Machine-enforced since #281: the Environment Claims Gate FAILS
 # scaffolder-authored PRs outside the claim paths until an admin approves the current head SHA, and the
 # verify step below restricts execution to platform admins server-side.
 apiVersion: scaffolder.backstage.io/v1beta3
@@ -10,7 +10,7 @@ metadata:
   title: New Team
   description: >-
     Onboard a team (platform admins only): authors the git-native Team object — identity (ssoGroup) +
-    envelope (the bound on every Tenant the team may author) — as a reviewed pull request. Nothing is
+    envelope (the bound on every Environment the team may author) — as a reviewed pull request. Nothing is
     provisioned until the PR is merged and the consumers converge.
   tags:
     - platform
@@ -29,7 +29,7 @@ spec:
           type: string
           description: >-
             Short lowercase identifier, letters/digits only (no hyphens — the team is parsed back out of
-            <team>-<tenant>-<env> namespace names, so a hyphen would make that split ambiguous).
+            <team>-<environment>-<env> namespace names, so a hyphen would make that split ambiguous).
           pattern: '^[a-z][a-z0-9]{1,15}$'
           maxLength: 16
         ssoGroup:
@@ -41,8 +41,8 @@ spec:
 
     - title: Envelope
       description: >-
-        The bound on every Tenant this team may author — Kyverno enforces it at claim admission
-        (restrict-tenant-envelope). Grant the minimum that serves the team; widening later is a
+        The bound on every Environment this team may author — Kyverno enforces it at claim admission
+        (restrict-environment-envelope). Grant the minimum that serves the team; widening later is a
         one-line reviewed PR.
       required:
         - allowedTiers
@@ -72,7 +72,7 @@ spec:
         cpu:
           title: CPU cap
           type: string
-          description: Per-tenant ceiling and (report-first) aggregate cap.
+          description: Per-environment ceiling and (report-first) aggregate cap.
           default: '8'
           pattern: '^[0-9]+m?$'
         memory:
@@ -88,7 +88,7 @@ spec:
 
   steps:
     # Server-side admin gate (#281): the permission policy now lets ANY team member create scaffolder
-    # tasks (New Tenant self-service), so the admin restriction for THIS template is enforced here —
+    # tasks (New Environment self-service), so the admin restriction for THIS template is enforced here —
     # template steps are server-stored, so the step can't be stripped by a client.
     - id: verify
       name: Verify platform-admin membership
@@ -134,9 +134,9 @@ spec:
           **Review checklist (this PR grants an envelope — never automerge, ADR-062 §1):**
           - [ ] Team name is right and unclaimed; ssoGroup matches the intended Keycloak group
           - [ ] Envelope is the minimum that serves the team (non-dev environments are gated on G1/G3)
-          - [ ] CI `Tenant API Schema` green (validates gitops/teams/ against the Team CRD)
+          - [ ] CI `Environment API Schema` green (validates gitops/teams/ against the Team CRD)
 
-          **After merge:** ArgoCD's `teams` app syncs the CR (Kyverno then accepts this team's Tenant
+          **After merge:** ArgoCD's `teams` app syncs the CR (Kyverno then accepts this team's Environment
           claims); apply `keycloak-config` (group + dev-access from the envelope) and `argocd`/`argocd-apps`
           (RBAC + delivery read the Team YAMLs) to converge the consumers.
 

@@ -46,12 +46,12 @@ flow through the whole v3 stack — which **surfaced real integration gaps** (th
 4. **Swap the CI gates:** `teams-gate` → v1alpha3 schema; retire `tenant-claims-gate` (the `v3 gitops Gate` —
    `product-gate` + `environment-gate`, #388 — is already live and required).
 5. **Remove v2** (in the same change): `xrd.yaml` (XTenant XRD), `composition-v2.yaml` (+ wrapper),
-   `tenant-envelope.yaml`, `verify-images.yaml` (per-team), the v2 `verifySubjects`/`tenantRegistryMap`
+   `environment-envelope.yaml`, `verify-images.yaml` (per-team), the v2 `verifySubjects`/`tenantRegistryMap`
    derivations, the per-team github-oidc roles.
 6. **Flip the Backstage projection to v3** — set `platformProjection.mode: 'v3'` (the L2c image is already
    rolled, inert, via #403; no new image needed). Land the L2c frontend follow-ups in the SAME backstage roll:
    the `kind:Environment` EntityPage + a catalog relation processor (ownedBy/partOf for the custom kind) +
-   re-point the #285 status card to the `cr-*` annotations + the team-tenants card → Environments.
+   re-point the #285 status card to the `cr-*` annotations + the team-environments card → Environments.
 7. **Run the rebuild** (the supervised op) — it deploys the above from scratch.
 
 ## Cutover commit — build status (`feat/v3-cutover` branch)
@@ -68,20 +68,20 @@ is **admin-merged during the rebuild** (teardown-before-merge). Validated **offl
 | 2 | Team CRD storage → v1alpha3 (Gap 1; v1alpha2 served:false) | ✅ done |
 | 3 | unit flips — github-oidc `v3_delivery_enabled=true`; argocd-apps retire `enable_tenant_claims` + set `platform_repo_url`; preprod crossplane `enableEnvironmentEnvelope=true` (envelope Audit-first soak) | ✅ done |
 | 3 | preprod policy v3 migration — `verify_subjects_product` derived from gitops/products; **NEW `verify-attestations-product.yaml`** (the missing SLSA-provenance analog — L2b had only `verify-images-product`, unwired); v2 per-team `verify_subjects`/`tenant_registry_map`/`tenant_hostname_patterns`/`attest_caller_repos` emptied. **helm-template green: 2 verify-images-product + 2 verify-attestations-product, 0 v2 per-team** | ✅ done |
-| 4 | `teams-gate` → v1alpha3 (`allowedStages`, `maxDedicatedIsolation.{cluster,account}`, env-deletion guard reads gitops/environments) + workflow env ; **retired `tenant-claims-gate.yml` + `.github/scripts/tenant-gate/`** (the `v3 gitops Gate` #388 replaces it) | ✅ done — gate green on migrated teams, rejects v1alpha2 |
+| 4 | `teams-gate` → v1alpha3 (`allowedStages`, `maxDedicatedIsolation.{cluster,account}`, env-deletion guard reads gitops/environments) + workflow env ; **retired `tenant-claims-gate.yml` + `.github/scripts/environment-gate/`** (the `v3 gitops Gate` #388 replaces it) | ✅ done — gate green on migrated teams, rejects v1alpha2 |
 | 5a | remove v2 supply-chain — per-team `verify-images.yaml` + `verify-attestations.yaml` (superseded by the product versions; render nothing now) | ✅ done — helm green |
-| 5b | remove v2 — XTenant `xrd.yaml` + `composition-v2.yaml`(+file), v1alpha2 Team version block (Team CRD now v1alpha3-only, storage), per-team `image-registries.yaml` per-team block (cluster floor kept) + `httproute-hostnames.yaml`, github-oidc per-team roles + claims locals, dead policy-unit locals, **the `.tenant-api-tests` harness → v3-only** (run.sh + render.sh, v2 fixtures deleted) | ✅ done — run.sh + render.sh green |
-| 5c | **fix `tenant-control-plane.yaml` → `v1alpha3/XEnvironment`** (was guarding the removed `v1alpha1/XTenant` → the v3 composite was unguarded; defense-in-depth, low exposure since the XRD is cluster-scoped) + the `.kyverno-tests` render assertion | ✅ done — kyverno-tests green |
-| 5e | removed `tenant-envelope.yaml` + added the v3 **environment-envelope kyverno behavioral test** (6 groups, Team+Product apiCall-mocked, all 8 rules). **Found + fixed 2 MORE admission gaps the bash shift-left masked:** (a) `customer-iff` used nested `all`-in-`any` `deny.conditions` → kyverno 1.18 **errors** (policy skipped) → split into two flat rules (`customer-required-per-customer-prod` + `customer-forbidden-on-pooled`); (b) `kyverno-read-platform-teams` granted only `teams` → the Product apiCall 403s → team-matches-product/customer rules **silently skip** → added `products`. tenant-policies chart 0.5.0 | ✅ done — full .kyverno-tests harness green |
-| 5d | removed the 7 dead policy module vars + plumbing; removed the crossplane `charts/teams` Helm projection (charts/teams + helm_release + var.teams + unit `teams={}`; depends_on re-pointed to crossplane_tenant); orphaned registry-values.yaml + v3 README | ✅ done — tofu validate clean both modules |
-| 5 | crossplane `tenant` (0.3.0) + policy `policies-chart` (0.2.0) Chart.yaml bumps | ✅ done |
-| 6a | #285 Tenant Status card re-pointed to the v3 Environment (backstage#36, backward-compatible: cr-* annotations w/ v2 xtenant fallback, kind-agnostic filter+links) — merged + image rolled | ✅ done |
-| 6b | L2c frontend part 2 (backstage#37): a catalog relation processor (ownedBy/partOf for kind:Environment) + the team-tenants card → Environments. kind:Environment uses the default entity page (cards attach by annotation filter, no dedicated EntityPage needed). Merged, image 4fbd38d3 | ✅ done |
+| 5b | remove v2 — XTenant `xrd.yaml` + `composition-v2.yaml`(+file), v1alpha2 Team version block (Team CRD now v1alpha3-only, storage), per-team `image-registries.yaml` per-team block (cluster floor kept) + `httproute-hostnames.yaml`, github-oidc per-team roles + claims locals, dead policy-unit locals, **the `.environment-api-tests` harness → v3-only** (run.sh + render.sh, v2 fixtures deleted) | ✅ done — run.sh + render.sh green |
+| 5c | **fix `environment-control-plane.yaml` → `v1alpha3/XEnvironment`** (was guarding the removed `v1alpha1/XTenant` → the v3 composite was unguarded; defense-in-depth, low exposure since the XRD is cluster-scoped) + the `.kyverno-tests` render assertion | ✅ done — kyverno-tests green |
+| 5e | removed `environment-envelope.yaml` + added the v3 **environment-envelope kyverno behavioral test** (6 groups, Team+Product apiCall-mocked, all 8 rules). **Found + fixed 2 MORE admission gaps the bash shift-left masked:** (a) `customer-iff` used nested `all`-in-`any` `deny.conditions` → kyverno 1.18 **errors** (policy skipped) → split into two flat rules (`customer-required-per-customer-prod` + `customer-forbidden-on-pooled`); (b) `kyverno-read-platform-teams` granted only `teams` → the Product apiCall 403s → team-matches-product/customer rules **silently skip** → added `products`. environment-policies chart 0.5.0 | ✅ done — full .kyverno-tests harness green |
+| 5d | removed the 7 dead policy module vars + plumbing; removed the crossplane `charts/teams` Helm projection (charts/teams + helm_release + var.teams + unit `teams={}`; depends_on re-pointed to crossplane_environment_api); orphaned registry-values.yaml + v3 README | ✅ done — tofu validate clean both modules |
+| 5 | crossplane `environment` (0.3.0) + policy `policies-chart` (0.2.0) Chart.yaml bumps | ✅ done |
+| 6a | #285 Environment Status card re-pointed to the v3 Environment (backstage#36, backward-compatible: cr-* annotations w/ v2 xtenant fallback, kind-agnostic filter+links) — merged + image rolled | ✅ done |
+| 6b | L2c frontend part 2 (backstage#37): a catalog relation processor (ownedBy/partOf for kind:Environment) + the team-environments card → Environments. kind:Environment uses the default entity page (cards attach by annotation filter, no dedicated EntityPage needed). Merged, image 4fbd38d3 | ✅ done |
 | 6c | the `platformProjection.mode: 'v3'` **activation flip** — all L2c frontend code is pre-positioned + deployed; the cutover sets `mode: 'v3'` in the backstage app-config (no new image needed) | ⛔ TODO (cutover step) |
 | 7 | app-repo `deploy.yml` rewire (build `team-<team>/demo-web`; pin the digest into `overlays/dev` via yq) + `preview.yml`/`validate.yml` v3 + delete `k8s/preprod/` — **PRs prepared** (app-bravo#10, app-alpha#35), MERGE-AT-CUTOVER (the product-scoped ECR doesn't exist until the rebuild, so the build checks are expected-red until then — mirrors the v2-rebuild A9 PRs) | ✅ prepared |
 | 8 | rebuild-runbook deltas — the "Rebuild-runbook deltas" section below is now a full ordered teardown→merge→bootstrap→Gap-4-image-prep→soak procedure; `platform-rebuild-from-scratch.md` updated (XTenant→XEnvironment refs fixed + a v3-cutover pointer) | ✅ done |
 
-**Naming locked by the migration:** Product = the v2 tenant `name` (`demo`); Service = `web` (single service;
+**Naming locked by the migration:** Product = the v2 environment `name` (`demo`); Service = `web` (single service;
 image `team-<team>/demo-web`, matching the F1 example + the Gap-2 app restructure); the named SA stays the app's
 `app-<team>` (the app deployment's `serviceAccountName`). v2 `developerAccess` drops — subsumed by the ADR-068
 access model (no per-Environment field).
@@ -159,7 +159,7 @@ In priority order (all cutover-blocking except L3a):
 
 1. ~~**#388** — `product-gate` + `environment-gate`~~ ✅ merged (#400). teams-gate v3 bump stays in the cutover commit (Gap 3).
 2. ~~**App-repo restructure / L3b**~~ ✅ done for the live apps — `app-alpha`, `app-bravo` on `k8s/base` + `overlays/<stage>` (Gap 2).
-3. ~~**L2c projection**~~ ✅ data layer done (backstage#35, mode-gated; inert image rolled #403). The frontend re-point (kind:Environment EntityPage + relation processor + #285/team-tenants cards) lands with the cutover's backstage roll (step 6).
+3. ~~**L2c projection**~~ ✅ data layer done (backstage#35, mode-gated; inert image rolled #403). The frontend re-point (kind:Environment EntityPage + relation processor + #285/team-environments cards) lands with the cutover's backstage roll (step 6).
 4. **The cutover commit itself** — flip Team CRD storage to v1alpha3 (Gap 1), migrate gitops, flip gates + projection mode, remove v2. ◀ the remaining cutover-blocking work.
 5. Rebuild-runbook deltas — image-prep ordering (Gap 4), the new gitops paths, the v3 unit inputs.
 
@@ -176,10 +176,10 @@ convert). The ordered procedure, with the v3 deltas:
    - set `platformProjection.mode: 'v3'` in the Backstage app-config (6c — a one-line flip; image 4fbd38d3 already
      carries all the L2c frontend, so NO new backstage image).
 3. **Bootstrap** (`platctl bootstrap`). v3 deltas the rebuild now deploys:
-   - **crossplane** unit deploys the **v3-only** tenant chart (XEnvironment XRD + composition-v3 + the Team /
+   - **crossplane** unit deploys the **v3-only** environment chart (XEnvironment XRD + composition-v3 + the Team /
      Product / AccessGrant CRDs; XTenant XRD + composition-v2 removed). Team CRD storage = **v1alpha3** (Gap 1).
-     `tenant_policy_values.enableEnvironmentEnvelope: true`, `envelopeFailureAction: Audit` (the v3 envelope's
-     first soak). `crossplane-tenant-policies` installs after `crossplane_tenant` (the `crossplane-teams` Helm
+     `environment_policy_values.enableEnvironmentEnvelope: true`, `envelopeFailureAction: Audit` (the v3 envelope's
+     first soak). `crossplane-environment-policies` installs after `crossplane_environment_api` (the `crossplane-teams` Helm
      projection is gone — Teams are git-native).
    - **argocd-apps** unit needs `platform_repo_url`/`platform_repo_branch`; it syncs `gitops/products` +
      `gitops/environments` (registry-sync) + the per-Product ApplicationSets — NOT `gitops/tenant-claims`.
@@ -197,4 +197,4 @@ convert). The ordered procedure, with the v3 deltas:
 5. **Validate + soak**, then flip the v3 envelope `envelopeFailureAction: Audit → Enforce` after one clean
    reconcile (matches the v2 A6 pattern). `platctl validate` covers the v3 footprint.
 
-**charlie** (the v2 throwaway tenant) is not migrated — re-provision it via the v3 self-service flow if needed.
+**charlie** (the v2 throwaway environment) is not migrated — re-provision it via the v3 self-service flow if needed.

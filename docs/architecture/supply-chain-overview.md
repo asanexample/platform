@@ -26,7 +26,7 @@ is not good enough. The supply chain answers four questions at **admission time*
 | Threat | Without controls | Control |
 |--------|------------------|---------|
 | **Tampered / unknown image** — an attacker pushes a malicious image (or swaps a digest) and it gets deployed | Any image in ECR runs | **cosign signature** — only images signed by a known CI identity are admitted |
-| **Cross-tenant image use** — team B runs team A's image (or pushes into A's repo) | Namespace isolation only; images are shared | **Per-team signing identity** — `verify-images-team-<team>` admits only images signed by the shared `trusted-ci/build-sign.yml` workflow whose `githubWorkflowRepository` cert extension is `app-<team>` (ADR-050); a bespoke-build app's own workflow is a supported fallback |
+| **Cross-environment image use** — team B runs team A's image (or pushes into A's repo) | Namespace isolation only; images are shared | **Per-team signing identity** — `verify-images-team-<team>` admits only images signed by the shared `trusted-ci/build-sign.yml` workflow whose `githubWorkflowRepository` cert extension is `app-<team>` (ADR-050); a bespoke-build app's own workflow is a supported fallback |
 | **No proof of origin** — "where did this image come from? what's in it?" is unanswerable | Opaque | **SLSA provenance + SBOM** attestations — signed statements of *how* it was built and *what's inside* |
 | **Forged image / provenance / SBOM** — a compromised app build signs its own malicious artifact and claims "I am a trusted build" | Self-signing/self-attestation proves nothing | **Isolated signer** (`trusted-ci`) — image + SBOM signing (`build-sign.yml`) and provenance (`slsa-provenance.yml`) run in a trust domain the app's own build cannot assume; per-team gating is the `githubWorkflowRepository` cert extension (ADR-042, ADR-050) |
 
@@ -152,7 +152,7 @@ inputs that admit the shared `build-sign.yml` signer (ADR-050). Each has its **o
 ## 5. SLSA compliance matrix
 
 We target **SLSA Build Level 3** (provenance exists, is authentic, and is produced by a build platform whose
-provenance the tenant cannot forge). Status against [SLSA v1.0 Build track](https://slsa.dev/spec/v1.0/levels):
+provenance the environment cannot forge). Status against [SLSA v1.0 Build track](https://slsa.dev/spec/v1.0/levels):
 
 | SLSA Build requirement | Status | How / why |
 |------------------------|:------:|-----------|
@@ -160,14 +160,14 @@ provenance the tenant cannot forge). Status against [SLSA v1.0 Build track](http
 | **L1 — Provenance distributed** | ✅ | Attached to the image in ECR; fetched by Kyverno at admission. |
 | **L2 — Provenance is authenticated** (signed) | ✅ | Keyless cosign signature, verifiable via Fulcio cert identity + Rekor — no shared key. |
 | **L2 — Hosted build platform** | ✅ | GitHub-hosted Actions runners (ephemeral, GitHub-managed). |
-| **L3 — Provenance is unforgeable** (build identity isolated from tenant) | ✅ | Provenance is signed by the **isolated `asanexample/trusted-ci`** reusable workflow, a Fulcio identity the app's own build job cannot assume; the app no longer self-attests provenance (ADR-042). The per-team gate is the `githubWorkflowRepository` cert extension, set by Fulcio from the caller's OIDC. |
+| **L3 — Provenance is unforgeable** (build identity isolated from environment) | ✅ | Provenance is signed by the **isolated `asanexample/trusted-ci`** reusable workflow, a Fulcio identity the app's own build job cannot assume; the app no longer self-attests provenance (ADR-042). The per-team gate is the `githubWorkflowRepository` cert extension, set by Fulcio from the caller's OIDC. |
 | **L3 — Isolated build environment** (secrets/runner isolation) | ⚠️ Partial | GitHub Actions provides per-job ephemeral runners + OIDC isolation; we do **not** run the dedicated SLSA `slsa-github-generator` (rejected for ECR credential-passing reasons — ADR-042 §"Why not off-the-shelf"). The isolation we rely on is the OIDC identity boundary, not a separate signing enclave. |
 
 **Beyond the Build track:** image **signatures** (integrity + per-team identity) and the **CycloneDX SBOM**
 are layered on top — these aren't SLSA *levels* but are part of the same admission gate. Both are now
 signed by the **same isolated `trusted-ci/build-sign.yml`** identity the app build cannot assume
 (per-team gating via the `githubWorkflowRepository` cert extension, ADR-050), so they inherit the same
-tenant-cannot-forge property as the L3 provenance rather than relying on the app's own self-signing.
+environment-cannot-forge property as the L3 provenance rather than relying on the app's own self-signing.
 Source-track and reproducible-build requirements are **out of scope** today.
 
 **Rollout state:** signatures (`verify-images`) are **Enforce** on preprod + platform. Attestations

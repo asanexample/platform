@@ -37,7 +37,7 @@ Only **AWS** is deployed. Azure and GCP are **planned** — no `modules/azure`,
 | IAM/Identity (IAM roles, IRSA, Pod Identity) | Done | Planned (managed identities / Workload Identity) |
 | Organizations / Accounts (SCPs, Identity Center) | Done | n/a (AWS-specific) |
 | ArgoCD, cert-manager, external-dns/secrets, Tailscale, gateway | Done | Planned (shared modules, reused) |
-| Kyverno policy, observability (Prometheus/Mimir/Grafana), Falco | Done | Planned (shared modules, reused) |
+| Kyverno policy, observability (Prometheus/mimir/Grafana), Falco | Done | Planned (shared modules, reused) |
 | vCluster | Deferred (ADR-033) | — |
 | Live deployments | 5 accounts (mgmt, platform, test, preprod, prod) | none |
 
@@ -59,7 +59,7 @@ infra/modules/
     ├── cert-manager/  external-dns/  external-secrets/  secret-stores/
     ├── tailscale/  tailscale-admin/  gateway-config/
     ├── policy/  observability/  observability-mimir/
-    ├── tenant/  cluster-rbac/  eks-pod-identity/
+    ├── environment/  cluster-rbac/  eks-pod-identity/
     └── vcluster/           # deferred (ADR-033)
 ```
 

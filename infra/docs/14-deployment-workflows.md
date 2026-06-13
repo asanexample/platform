@@ -84,7 +84,7 @@ role, ArgoCD, and the admission policy. The reference app is `app-alpha`.
 
 | Workflow | Purpose |
 |----------|---------|
-| `validate.yml` | **Kyverno shift-left** — calls the platform's `kyverno-validate` composite action (`asanexample/platform/.github/actions/kyverno-validate@main`) to render tenant policies and check `k8s/` manifests, failing the PR with the same checks admission enforces |
+| `validate.yml` | **Kyverno shift-left** — calls the platform's `kyverno-validate` composite action (`asanexample/platform/.github/actions/kyverno-validate@main`) to render environment policies and check `k8s/` manifests, failing the PR with the same checks admission enforces |
 | `security.yml` | Trivy (Go SCA + Dockerfile config) + Semgrep, pinned/verified, blocking on HIGH/CRITICAL |
 | `preview.yml` | On PR: builds + signs an image and drives an **ephemeral preview environment** (ArgoCD ApplicationSet PR generator; HTTPRoute hostnames patched per-PR) |
 

@@ -129,14 +129,14 @@ endpoint (IP-locked) is used since the Tailscale router is down with the nodes.
 ### Network Policies
 
 Cilium extends Kubernetes NetworkPolicy with `CiliumNetworkPolicy` (L7 HTTP/gRPC/DNS,
-FQDN egress, identity-aware rules). Tenant isolation is **identity-based**, not IP-based,
-so the overlay pod-IP scheme doesn't affect policy. Tenant namespaces are default-deny
+FQDN egress, identity-aware rules). Environment isolation is **identity-based**, not IP-based,
+so the overlay pod-IP scheme doesn't affect policy. Environment namespaces are default-deny
 ingress with explicit allows for the Gateway (`fromEntities: [ingress]`), DNS, and the
 Pod Identity agent.
 
 ### IMDS protection
 
-Tenant pods are blocked from stealing the node IAM role via IMDS (`169.254.169.254`) by
+Environment pods are blocked from stealing the node IAM role via IMDS (`169.254.169.254`) by
 **IMDSv2 hop-limit = 1** on the node (`HttpPutResponseHopLimit=1` in the launch template).
 This holds under overlay: link-local is not masqueraded, so a pod's IMDSv2 token request
 is >1 hop and the token response never reaches it. (Validated: a `team-*` pod gets a `401`
@@ -160,7 +160,7 @@ Cilium's **Hubble** provides per-pod flow logs, service maps, L7 metrics, and DN
 visibility. Because overlay traffic is VXLAN-encapsulated, **VPC Flow Logs see node IPs
 only** — pod-level network forensics rely on Hubble (durable export is a planned
 follow-up). Hubble UI/metrics are in-cluster; the platform observability hub
-(Prometheus + Mimir + Grafana) provides dashboards.
+(Prometheus + mimir + Grafana) provides dashboards.
 
 ## Next Steps
 

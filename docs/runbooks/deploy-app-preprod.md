@@ -383,7 +383,7 @@ ArgoCD Applications are configured with automated sync:
   ArgoCD reverts it to match the Git manifests
 - **Prune:** resources removed from Git are deleted from the cluster
 - **CreateNamespace=false:** ArgoCD does not create namespaces --
-  namespaces are managed by Terraform via the `tenant` module
+  namespaces are managed by Terraform via the `environment` module
 
 ArgoCD polls the repo every 3 minutes by default. After pushing
 manifest changes to `main`, expect the sync to begin within 3 minutes.
@@ -662,7 +662,7 @@ AWS_PROFILE=platform aws ecr describe-images \
 **Symptoms:** HTTPRoute is attached but requests return
 `upstream connect error or disconnect/reset before headers` or time out.
 
-**Cause:** Each tenant namespace has a default-deny ingress
+**Cause:** Each environment namespace has a default-deny ingress
 NetworkPolicy. Two policies must be present for gateway traffic to work:
 
 1. `allow-gateway-ingress` (Kubernetes NetworkPolicy) — allows traffic
@@ -692,7 +692,7 @@ kubectl get ciliumnetworkpolicy -n team-alpha
 #   allow-gateway-envoy       (allows ingress, remote-node, host entities)
 
 # If any are missing, contact the platform team.
-# These policies are managed by Terraform (tenant module), not application manifests.
+# These policies are managed by Terraform (environment module), not application manifests.
 ```
 
 **Debugging with Cilium (platform team):**
@@ -739,7 +739,7 @@ attached and DNS resolves correctly.
 Common reasons:
 
 1. **Missing CiliumNetworkPolicy** — the `allow-gateway-envoy` policy
-   is not present in the tenant namespace (see NetworkPolicy section above)
+   is not present in the environment namespace (see NetworkPolicy section above)
 2. **TLS secret not synced** — the Gateway TLS secret must exist in the
    `cilium-secrets` namespace as `<namespace>-<secret-name>` (e.g.,
    `cilium-secrets/default-preprod-gateway-tls`)
@@ -841,13 +841,13 @@ kubectl get challenges -A
 ### ResourceQuota Exceeded
 
 **Symptoms:** Pods stuck in `Pending`. Events show
-`exceeded quota: tenant-quota`.
+`exceeded quota: environment-quota`.
 
 **Fix:**
 
 ```bash
 # Check current quota usage
-kubectl describe resourcequota tenant-quota -n team-alpha
+kubectl describe resourcequota environment-quota -n team-alpha
 
 # Either reduce resource requests in your deployment or ask the
 # platform team to increase the quota in teams.hcl

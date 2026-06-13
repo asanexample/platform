@@ -132,7 +132,7 @@ aws --version     # Should print aws-cli/2.x
 │   │   │                              #   eks, eks-addons, ecr, cloudtrail, transit-gateway, s3, ...
 │   │   ├── argocd/ argocd-apps/       # Shared (cloud-agnostic) modules:
 │   │   ├── cilium/ cert-manager/      #   CNI, GitOps, TLS, DNS, secrets, gateway, policy (Kyverno),
-│   │   ├── external-dns/ external-secrets/  #   observability, observability-mimir, tenant, tailscale,
+│   │   ├── external-dns/ external-secrets/  #   observability, observability-mimir, environment, tailscale,
 │   │   ├── policy/ observability/     #   secret-stores, cluster-rbac, eks-pod-identity, vcluster (deferred)
 │   │   └── ...
 │   │
@@ -145,7 +145,7 @@ aws --version     # Should print aws-cli/2.x
 │   │       │   ├── env.hcl            # Environment-level config
 │   │       │   └── global/{state-bootstrap,organizations,identity-center}/
 │   │       ├── platform/  us-east-1/  # Platform account — the hub cluster + shared services
-│   │       ├── preprod/   us-east-1/  # Preprod account — tenant workloads
+│   │       ├── preprod/   us-east-1/  # Preprod account — environment workloads
 │   │       ├── prod/      us-east-1/  # Prod account
 │   │       └── test/      global/     # Terratest sandbox account
 │   │
@@ -444,7 +444,7 @@ enforced.
 For the full guide, see [Deploy App to Preprod](runbooks/deploy-app-preprod.md).
 
 For platform engineers onboarding new teams, see
-[Tenant Onboarding](runbooks/tenant-onboarding.md).
+[Environment Onboarding](runbooks/environment-onboarding.md).
 
 ---
 

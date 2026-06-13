@@ -76,7 +76,7 @@ kubectl get clusterpolicy -o wide                 # READY column should be true
 
 ## Notes
 
-- System/infra namespaces (`kube-system`, `argocd`, `tailscale`, …) are excluded from tenant
+- System/infra namespaces (`kube-system`, `argocd`, `tailscale`, …) are excluded from environment
   policies; cluster-scoped policies skip platform controllers via the `exclude_principals` list. If a
   platform addon install is blocked, that allow-list (module `exclude_principals`) is the place to fix
   it — verify in `Audit` before re-flipping to `Enforce`.

@@ -60,8 +60,8 @@ networking ─┘                        |
               gateway-config ────────┘ (eks, gateway, argocd) — per-app HTTPRoutes only (argocd/grafana/backstage); the Gateway moved to the `gateway` unit, keycloak self-routes
               cluster-rbac ──────────┤ (eks) — platform-operator ClusterRole (ADR-040)
               policy ────────────────┤ (eks, nodes) — Kyverno engine + ClusterPolicies (ADR-014), before crossplane
-              crossplane ────────────┤ (eks, nodes, policy) — federated tenant control plane (ADR-046/048); after policy (needs the crossplane-system Kyverno exclusion)
-              tenant-claims ─────────┤ (crossplane) — applies the XTenant claims; the Composition provisions each tenant (ADR-046/048)
+              crossplane ────────────┤ (eks, nodes, policy) — federated environment control plane (ADR-046/048); after policy (needs the crossplane-system Kyverno exclusion)
+              tenant-claims ─────────┤ (crossplane) — applies the XTenant claims; the Composition provisions each environment (ADR-046/048)
               cloudnative-pg ────────┤ (eks, nodes) — CNPG operator for the Backstage DB (ADR-051)
               keycloak ──────────────┤ (eks, nodes, ext-secrets, secret-stores, cnpg, gateway) — app-facing OIDC IdP, CNPG-backed (ADR-053, B1); self-owns its HTTPRoute on the shared Gateway (ADR-059) so its endpoint is up before keycloak-config
               keycloak-config ───────┤ (keycloak, eks) — realm + seeded realm users (Keycloak is the IdP of record by default; optional upstream federation, ADR-053/059) + OIDC clients (argocd, backstage) + team group/role taxonomy via the keycloak TF provider (B2); configures Keycloak over an in-cluster kubectl port-forward (scripts/kc-portforward.sh, ADR-059) so deploy needs cluster API access, NOT Tailscale; apply needs keycloak serving (helm_wait)
@@ -75,7 +75,7 @@ cloudflare-dns ──── (no deps)
 actions-runner-controller ─ (eks, nodes, ext-secrets, secret-stores; policy must carry the arc-systems/arc-runners excludes first) — self-hosted GitHub Actions runners (ARC) on the platform cluster for in-VPC CI (ADR-065 / #323). **Applied LOCALLY / via platctl (break-glass)** — it's what lets CI manage the cluster, so it can't bootstrap itself. Manual prereq: the GitHub App + its Secrets Manager secret (docs/runbooks/arc-github-app.md).
 ```
 
-Preprod is similar but adds the federated `crossplane` + `tenant-claims` units (the Tenant control plane, ADR-048 — alpha/bravo are provisioned by `Tenant` claims, not the retired `tenants`/`pod-identity` units) and `transit-gateway` as spoke.
+Preprod is similar but adds the federated `crossplane` + `tenant-claims` units (the Environment control plane, ADR-048 — alpha/bravo are provisioned by `Environment` claims, not the retired `environments`/`pod-identity` units) and `transit-gateway` as spoke.
 
 Cross-environment units (on platform cluster): route53-delegation, ecr, github-oidc, argocd-apps.
 
@@ -172,7 +172,7 @@ The **Test** account (`157263244316`, Terratest sandbox) is a standard `Platform
 |------|---------|---------|
 | **PlatformAdmin** | Platform, PreProd | kubectl operate/debug + SSM tunnel — least-privilege (read+operate, NOT author; cluster authoring via ArgoCD, AWS via PlatformDeployer, emergencies via break-glass — ADR-040) |
 | **PlatformDeployer** | Platform, PreProd | Terragrunt apply, Helm/K8s providers |
-| **DeveloperAccess-\<team\>** | PreProd | Per-team, namespace-scoped kubectl (one role per team, provisioned by the Crossplane Tenant Composition + an EKS access entry → `team-<team>:developers`; group-mapped RBAC — see ADR-039) |
+| **DeveloperAccess-\<team\>** | PreProd | Per-team, namespace-scoped kubectl (one role per team, provisioned by the Crossplane Environment Composition + an EKS access entry → `team-<team>:developers`; group-mapped RBAC — see ADR-039) |
 | **TerraformStateAccess** | Management | S3 state bucket + DynamoDB lock table |
 | **OrganizationAccountAccessRole** | All accounts | Break-glass only |
 
@@ -184,7 +184,7 @@ The **Test** account (`157263244316`, Terratest sandbox) is a standard `Platform
 ## Architecture Decisions
 
 - **Cilium as CNI** (1.19.4) — BYOCNI on EKS, `kubeProxyReplacement = true`. Shared module uses `cloud_provider` variable.
-- **Cilium Gateway API** — external Envoy uses reserved `ingress` identity (8), not `host`. Tenant CiliumNetworkPolicies must allow `fromEntities: ["ingress"]`. TLS secrets copied to `cilium-secrets` namespace.
+- **Cilium Gateway API** — external Envoy uses reserved `ingress` identity (8), not `host`. Environment CiliumNetworkPolicies must allow `fromEntities: ["ingress"]`. TLS secrets copied to `cilium-secrets` namespace.
 - **SSM Session Manager** for private cluster access (no VPN needed).
 - **Hubble TLS** uses `helm` method on AWS to avoid BYOCNI chicken-and-egg with post-install hooks.
 - **Node groups separated** from EKS module to enforce Cilium-first ordering.
@@ -194,16 +194,16 @@ The **Test** account (`157263244316`, Terratest sandbox) is a standard `Platform
 - **Cross-VPC DNS** — two modes via `dns_method`: custom PHZ (cheap, manual IP updates) or Route53 Resolver endpoints (robust, ~$365/mo). EKS-managed PHZs are inaccessible, so we maintain our own.
 - **Tailscale Operator** — subnet router advertising VPC CIDR to tailnet. Split DNS managed by `tailscale` K8s unit. OAuth from Secrets Manager.
 - **Internal Gateway NLB** — `internal` scheme, services only reachable through Tailscale. TLS via Let's Encrypt DNS-01.
-- **Multi-app tenant model** — team identity (isolation) decoupled from app identity (deployment). ECR: `team-<team>/<app>`. Namespace isolation only; vCluster deferred (ADR-033). Tenants are provisioned by the **Crossplane `Tenant` Composition** via an `XTenant` claim (the `tenant-claims` unit) — the sole provisioner since BACK stack P3 (#174); the old `tenant` module + `tenants`/`pod-identity`/`s3-shared` units are retired. **Claim-as-single-source (ADR-061):** the `XTenant` claim YAMLs (`gitops/tenant-claims/<env>/`) are the sole registry of team→app delivery — `argocd-apps`, `policy`, and `github-oidc` all derive (`fileset`+`yamldecode`) from `spec.apps.<app>.repo` (owner/repo) + `spec.domains`; the app-delivery `teams.hcl` is retired. Team identity/envelope is the git-native `Team` CR (`gitops/teams/`, ADR-063). **Deprovisioning (ADR-062 #283):** `spec.lifecycle.phase: decommissioning` is a reversible suspend (the Composition zeroes the ResourceQuota); the hard-delete (claim removal) is gated decommission-first + admin-reviewed, and ECR is retained (`deletionPolicy: Orphan`, team-scoped/shared). See `docs/runbooks/tenant-deprovisioning.md`. See `docs/architecture/crossplane-tenant-api.md`.
+- **Multi-app environment model** — team identity (isolation) decoupled from app identity (deployment). ECR: `team-<team>/<app>`. Namespace isolation only; vCluster deferred (ADR-033). Environments are provisioned by the **Crossplane `Environment` Composition** via an `XTenant` claim (the `tenant-claims` unit) — the sole provisioner since BACK stack P3 (#174); the old `environment` module + `environments`/`pod-identity`/`s3-shared` units are retired. **Claim-as-single-source (ADR-061):** the `XTenant` claim YAMLs (`gitops/tenant-claims/<env>/`) are the sole registry of team→app delivery — `argocd-apps`, `policy`, and `github-oidc` all derive (`fileset`+`yamldecode`) from `spec.apps.<app>.repo` (owner/repo) + `spec.domains`; the app-delivery `teams.hcl` is retired. Team identity/envelope is the git-native `Team` CR (`gitops/teams/`, ADR-063). **Deprovisioning (ADR-062 #283):** `spec.lifecycle.phase: decommissioning` is a reversible suspend (the Composition zeroes the ResourceQuota); the hard-delete (claim removal) is gated decommission-first + admin-reviewed, and ECR is retained (`deletionPolicy: Orphan`, team-scoped/shared). See `docs/runbooks/environment-deprovisioning.md`. See `docs/architecture/crossplane-environment-api.md`.
 - **PR preview environments** — ArgoCD ApplicationSet PR generator. Apps with `preview = true` get ephemeral deployments. Kustomize patches rewrite HTTPRoute hostnames.
-- **Kyverno policy engine** (3.8.1 / app v1.18.1, ADR-014) — `policy` module deploys the HA engine + a bundled local `policies-chart` of ClusterPolicies, layered above the PSA `baseline` floor. Per-tenant image-registry scoping + cross-team IRSA-annotation backstop (tenant AWS access is Pod Identity, ADR-041) + RBAC hardening. **Audit-first** (`validation_failure_action`) then flip to Enforce. No team data in the module (per-tenant maps derived from the `XTenant` claims at the unit — `verify_subjects`/`attest_caller_repos` from `spec.apps.<app>.repo`). **Supply-chain split (ADR-046)**: per-team `restrict-images`/`restrict-route-hostnames` are owned by the Crossplane Tenant Composition (the unit's `migrated_teams` input makes the `policy` module skip them); the platform-owned cosign/SLSA `verify-images`/`verify-attestations` stay here for all teams. Phased rollout (Phases 2–5: mutate/generate, cosign verifyImages, CLI shift-left, reporting/cleanup).
+- **Kyverno policy engine** (3.8.1 / app v1.18.1, ADR-014) — `policy` module deploys the HA engine + a bundled local `policies-chart` of ClusterPolicies, layered above the PSA `baseline` floor. Per-environment image-registry scoping + cross-team IRSA-annotation backstop (environment AWS access is Pod Identity, ADR-041) + RBAC hardening. **Audit-first** (`validation_failure_action`) then flip to Enforce. No team data in the module (per-environment maps derived from the `XTenant` claims at the unit — `verify_subjects`/`attest_caller_repos` from `spec.apps.<app>.repo`). **Supply-chain split (ADR-046)**: per-team `restrict-images`/`restrict-route-hostnames` are owned by the Crossplane Environment Composition (the unit's `migrated_teams` input makes the `policy` module skip them); the platform-owned cosign/SLSA `verify-images`/`verify-attestations` stay here for all teams. Phased rollout (Phases 2–5: mutate/generate, cosign verifyImages, CLI shift-left, reporting/cleanup).
 
 ## Authoring Policy-Compliant Workloads (Kyverno)
 
-Kyverno is in **Enforce** mode on **preprod and platform** — non-compliant resources in tenant
-namespaces (those labeled `platform.refplat.org/tenant`, named `<team>-<name>-<env>`, e.g. `alpha-demo-dev`)
+Kyverno is in **Enforce** mode on **preprod and platform** — non-compliant resources in environment
+namespaces (those labeled `platform.refplat.org/environment`, named `<team>-<name>-<env>`, e.g. `alpha-demo-dev`)
 are **rejected at admission**. Full per-cluster list: `docs/architecture/kyverno-policy-catalog.md`. When
-writing tenant manifests (app repos' `k8s/`, or anything applied to a tenant namespace):
+writing environment manifests (app repos' `k8s/`, or anything applied to an environment namespace):
 
 **Auto-injected by `mutate` — do NOT bother setting (Kyverno adds them when absent):**
 
@@ -218,10 +218,10 @@ writing tenant manifests (app repos' `k8s/`, or anything applied to a tenant nam
 - **Resource requests AND limits** (cpu + memory) on every container
 - **`livenessProbe` and `readinessProbe`** on every container
 - Services must be **`ClusterIP`** — `LoadBalancer`/`NodePort` are denied (ingress is via the shared Gateway / `HTTPRoute`)
-- **HTTPRoute/GRPCRoute/TLSRoute hostnames** must be in the team's allow-list (the `Tenant` claim's `hostnames`) — claiming another team's or a platform hostname (or omitting hostnames) is denied (ADR-029)
-- Workloads only in tenant namespaces (`<team>-<name>-<env>`, e.g. `alpha-demo-dev`) — **never `default`**
+- **HTTPRoute/GRPCRoute/TLSRoute hostnames** must be in the team's allow-list (the `Environment` claim's `hostnames`) — claiming another team's or a platform hostname (or omitting hostnames) is denied (ADR-029)
+- Workloads only in environment namespaces (`<team>-<name>-<env>`, e.g. `alpha-demo-dev`) — **never `default`**
 - **Do not** set `securityContext.allowPrivilegeEscalation: true` or `seccompProfile.type: Unconfined` (backstop policies deny them)
-- Tenant AWS access is via **platform-managed EKS Pod Identity** (association → named ServiceAccount; ADR-041/047): use a **named** ServiceAccount (never `default`) and set `serviceAccountName`; declare the access in the `Tenant` claim (`aws.serviceAccount` + `aws.policyStatements`), not `teams.hcl`. `policyStatements` are **deny-set-validated** (ADR-062 §4, #282) at CI + admission (`restrict-tenant-envelope/policystatements-no-escalation`): `iam`/`sts`/`organizations`/`account` actions + bare `*` wildcards are denied, and the minted role is boundary-capped at runtime (resource scoping like `s3:*` on `*` is allowed for now). ServiceAccounts must **not** carry an `eks.amazonaws.com/role-arn` annotation — IRSA is platform-only; a tenant annotation is denied (backstop `disallow-irsa-annotation-cross-team`)
+- Environment AWS access is via **platform-managed EKS Pod Identity** (association → named ServiceAccount; ADR-041/047): use a **named** ServiceAccount (never `default`) and set `serviceAccountName`; declare the access in the `Environment` claim (`aws.serviceAccount` + `aws.policyStatements`), not `teams.hcl`. `policyStatements` are **deny-set-validated** (ADR-062 §4, #282) at CI + admission (`restrict-environment-envelope/policystatements-no-escalation`): `iam`/`sts`/`organizations`/`account` actions + bare `*` wildcards are denied, and the minted role is boundary-capped at runtime (resource scoping like `s3:*` on `*` is allowed for now). ServiceAccounts must **not** carry an `eks.amazonaws.com/role-arn` annotation — IRSA is platform-only; an environment annotation is denied (backstop `disallow-irsa-annotation-cross-team`)
 - **Images must be cosign-signed** (keyless; Enforce on preprod). App CI is a **thin caller** of the shared, app-team-unwritable `asanexample/trusted-ci/build-sign.yml` reusable workflow (build → push → sign → SBOM) + `slsa-provenance.yml` (provenance) — the supply-chain backbone is NOT copied per app (ADR-050; `app-bravo` is the generic starter). Kyverno's `verify-images-team-<team>` admits images signed by the shared `build-sign.yml` identity **gated to the team** by the cert's `githubWorkflowRepository` extension (= the app repo); a per-team app-signed identity (`app-<team>`'s `deploy.yml`/`preview.yml`) is also accepted as a fallback for bespoke-build apps. Another team's image is rejected. Full explainer: `docs/architecture/cosign-image-signing.md`, `docs/runbooks/app-supply-chain-onboarding.md`.
 - **No** `cluster-admin` (Cluster)RoleBindings or wildcard (`*`) verbs/resources in Roles
 

@@ -16,7 +16,7 @@ consistent patterns for networking, security, Kubernetes, and operations.
 2. **Security by design** -- SCPs, private endpoints, RBAC,
    least-privilege IAM, encryption at rest and in transit.
 3. **Kubernetes-first** -- EKS clusters with Cilium CNI (BYOCNI) and ArgoCD
-   GitOps. Standard tenants use **namespace isolation** (vCluster deferred, ADR-033).
+   GitOps. Standard environments use **namespace isolation** (vCluster deferred, ADR-033).
 4. **Hierarchical configuration** -- a 6-layer Terragrunt hierarchy that
    composes tags, CIDRs, and module inputs from broad defaults to
    unit-specific overrides.
@@ -43,7 +43,7 @@ platform/
 │   │   ├── gateway-config/      # Shared: Gateway API ingress
 │   │   ├── policy/              # Shared: Kyverno
 │   │   ├── observability/       # Shared: kube-prometheus-stack (+ observability-mimir)
-│   │   ├── tenant/ cluster-rbac/ eks-pod-identity/   # Shared: multi-tenancy + RBAC + Pod Identity
+│   │   ├── environment/ cluster-rbac/ eks-pod-identity/   # Shared: multi-tenancy + RBAC + Pod Identity
 │   │   └── vcluster/            # Shared: virtual clusters (deferred, ADR-033)
 │   ├── live/                    # Environment-specific Terragrunt configs
 │   │   └── aws/                 # 5 accounts (mgmt, platform, test, preprod, prod)

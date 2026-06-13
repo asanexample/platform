@@ -1,10 +1,10 @@
-# Runbook: Debugging Tenant Ingress, DNS, and TLS
+# Runbook: Debugging Environment Ingress, DNS, and TLS
 
 > **Severity:** Medium (app unreachable / degraded ingress)
 > **On-call scope:** Development Teams (first pass) / Platform Engineering (Cilium, cert/DNS infra)
 > **Related:** [Deploy App to Preprod](deploy-app-preprod.md),
-> [Crossplane Tenant API](../architecture/crossplane-tenant-api.md),
-> [ADR-061: Tenant Ingress & Custom Domains](../adrs/061-tenant-ingress-and-custom-domain-strategy.md)
+> [Crossplane Environment API](../architecture/crossplane-environment-api.md),
+> [ADR-061: Environment Ingress & Custom Domains](../adrs/061-environment-ingress-and-custom-domain-strategy.md)
 >
 > **Last reviewed:** 2026-06-08
 
@@ -12,7 +12,7 @@
 
 "My app isn't reachable", "TLS fails", or "my hostname is rejected." Work the tree top to bottom — each
 layer assumes the ones above it pass. All examples use `team-alpha`, app `demo`, host
-`demo-alpha.preprod.aws.refplat.org` (the [generated host](../adrs/060-tenant-app-hostname-convention.md) —
+`demo-alpha.preprod.aws.refplat.org` (the [generated host](../adrs/060-environment-app-hostname-convention.md) —
 app repos do **not** hardcode it; argocd-apps injects it).
 
 The path a request takes:
@@ -83,7 +83,7 @@ kubectl get clusterpolicy restrict-route-hostnames-team-alpha -o yaml | less
   `gitops/tenant-claims/preprod/alpha.yaml` (PR). Tier-1/2 hosts under `*.preprod.aws.refplat.org` go
   `Active` immediately; tier-3 external domains stay `Pending` (Phase 2b deferred) and are **not** admitted.
 - **Host shows `Pending`/non-`Active`.** Expected for external domains — see
-  [ADR-061](../adrs/061-tenant-ingress-and-custom-domain-strategy.md). For a platform-domain host stuck
+  [ADR-061](../adrs/061-environment-ingress-and-custom-domain-strategy.md). For a platform-domain host stuck
   non-`Active`, inspect the `XTenant` status `reason`/`message` and the Composition.
 
 ---
@@ -166,7 +166,7 @@ kubectl logs -n cert-manager -l app.kubernetes.io/name=cert-manager --tail=80
   Give it a few minutes.
 - **Per-app cert expectation.** There is **no** per-app cert on the shared Gateway — every
   `*.<domain>` host rides the one wildcard. A "missing cert for my host" almost always means the host isn't
-  under the wildcard (an external domain) — see [ADR-061](../adrs/061-tenant-ingress-and-custom-domain-strategy.md).
+  under the wildcard (an external domain) — see [ADR-061](../adrs/061-environment-ingress-and-custom-domain-strategy.md).
 
 ---
 
@@ -176,8 +176,8 @@ kubectl logs -n cert-manager -l app.kubernetes.io/name=cert-manager --tail=80
 before headers` or times out.
 
 **Diagnosis.** Cilium's Gateway Envoy reaches backends using the reserved **`ingress` identity (8)** — not
-`host` — so a plain Kubernetes NetworkPolicy cannot authorize it. Each tenant namespace must carry the
-`allow-gateway-envoy` CiliumNetworkPolicy (provisioned by the Tenant Composition, not app manifests).
+`host` — so a plain Kubernetes NetworkPolicy cannot authorize it. Each environment namespace must carry the
+`allow-gateway-envoy` CiliumNetworkPolicy (provisioned by the Environment Composition, not app manifests).
 
 ```bash
 kubectl get networkpolicy -n team-alpha          # default-deny-ingress, allow-gateway-ingress, allow-dns-egress

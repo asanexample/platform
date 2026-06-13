@@ -37,9 +37,9 @@ Module sources are pinned via `_versions.hcl`, so a rebuild reproduces the exact
 
 ### Application workloads
 
-Standard-tier tenants are **stateless** containers pulled from ECR and reconciled by **ArgoCD** from
+Standard-tier environments are **stateless** containers pulled from ECR and reconciled by **ArgoCD** from
 Git — recovery is "point ArgoCD at the repo and sync." Container images live in per-team ECR repos
-(immutable tags, scan-on-push). There is **no tenant database tier** in the current `standard`
+(immutable tags, scan-on-push). There is **no environment database tier** in the current `standard`
 clusters, so there is no application data to back up yet.
 
 ### Secrets
@@ -61,7 +61,7 @@ These are **not** implemented today and are the roadmap for a formal DR program:
 |------------|--------|-------|
 | Cross-region state replication | Planned | S3 CRR of the state bucket to a second region |
 | Scheduled state backups | Partial | versioning covers rollback; no separate off-account copy yet |
-| Stateful-workload backup (Velero / EBS snapshots) | Planned | needed once a tenant data tier (RDS/PVC) lands |
+| Stateful-workload backup (Velero / EBS snapshots) | Planned | needed once an environment data tier (RDS/PVC) lands |
 | Multi-region / multi-AZ failover | Planned | clusters are single-region today |
 | RPO/RTO targets per tier | Planned | to be defined with the HIPAA/PCI tiers |
 | DR game-days / restore testing | Planned | teardown/bootstrap exercises rebuild, but not a formal drill |

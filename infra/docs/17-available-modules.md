@@ -31,9 +31,9 @@ catalog. Module source paths and Helm chart versions are pinned centrally in
 | `eks` | EKS control plane (BYOCNI, private endpoint, OIDC provider, KMS secrets encryption) (ADR-009/010/018) |
 | `eks-node-group` | EKS managed node groups (system/workload) with hardened launch templates (ADR-023) |
 | `eks-addons` | EKS managed add-ons (coredns) + gp3 default StorageClass + EBS CSI IRSA (ADR-009) |
-| `eks-pod-identity` | EKS Pod Identity associations for tenant AWS access (ADR-041) |
+| `eks-pod-identity` | EKS Pod Identity associations for environment AWS access (ADR-041) |
 | `ecr` | Centralized, per-team ECR repositories with cross-account pull + immutable tags (ADR-028) |
-| `s3` | Reusable private/encrypted S3 buckets (e.g. tenant data, Mimir blocks) |
+| `s3` | Reusable private/encrypted S3 buckets (e.g. environment data, mimir blocks) |
 | `ssm-bastion` | SSM Session Manager bastion (no SSH/inbound) for private cluster access (ADR-020) |
 | `cloudtrail` | Per-account CloudTrail trail (S3, KMS, CloudWatch, secrets alarms) (ADR-037) |
 | `sns-notifications` | SNS topic(s) for alerting (Alertmanager → email, Falco publisher) |
@@ -56,11 +56,11 @@ Deployed via Helm / the Kubernetes provider onto any cluster; reusable across cl
 | `tailscale` / `tailscale-admin` | Tailscale subnet-router operator + tailnet ACL/OAuth management (ADR-011) |
 | `actions-runner-controller` | Self-hosted GitHub Actions runners (ARC) on the platform cluster — in-VPC CI for cluster-facing applies; local/break-glass unit (ADR-065 / #323) |
 | `policy` | Kyverno engine + bundled ClusterPolicies (validate/mutate + cosign verify) (ADR-014) — see below |
-| `crossplane` | Crossplane v2 control plane — hub ECR provisioning + per-cluster `Tenant` XRD/Composition (ADR-046/048) |
+| `crossplane` | Crossplane v2 control plane — hub ECR provisioning + per-cluster `Environment` XRD/Composition (ADR-046/048) |
 | `tenant-claims` | Helm chart rendering `XTenant` claims, delivered by the `tenant-claims` unit (ADR-046/048) |
 | `cluster-rbac` | `platform-operator` ClusterRole for the operate-not-author access model (ADR-040) |
 | `observability` | kube-prometheus-stack hub: Prometheus + Grafana + Alertmanager (ADR-043) |
-| `observability-mimir` | Grafana Mimir — durable, S3-backed, multi-tenant metrics store (ADR-044) |
+| `observability-mimir` | Grafana mimir — durable, S3-backed, multi-tenant metrics store (ADR-044) |
 | `falco` | Runtime threat detection (modern eBPF) + falcosidekick (ADR-045) |
 | `cloudflare/dns_delegation` | NS records in the Cloudflare parent zone delegating to Route53 (ADR-022) |
 | `vcluster` | Virtual Kubernetes clusters — **deferred** (ADR-033) — see below |
@@ -72,7 +72,7 @@ Deployed via Helm / the Kubernetes provider onto any cluster; reusable across cl
 The Policy module installs the Kyverno policy engine (HA admission controller) via Helm and a bundled
 local chart of the platform's admission-control ClusterPolicies. It layers above the Pod Security
 Admission `baseline` floor (ADR-027/040) to express controls PSA cannot. The module holds **no
-team-specific data** — per-tenant values are supplied by the Terragrunt unit from `teams.hcl`.
+team-specific data** — per-environment values are supplied by the Terragrunt unit from `teams.hcl`.
 
 - Two Helm releases: the Kyverno engine + a local `policies-chart` (no `kubernetes_manifest`, so no
   plan-time CRD dependency)

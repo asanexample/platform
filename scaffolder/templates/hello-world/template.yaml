@@ -1,7 +1,7 @@
 # Smoke-test template (#279, ADR-062 foundation): proves the scaffolder pipeline end-to-end — template
 # discovery from this repo, the /create form, task execution, RBAC (execution is admin-only via the #197
 # permission policy) — without touching GitHub or AWS. The real provisioning templates (New Team #280,
-# New Tenant #281) replace this as the catalog grows; keep it as a cheap health probe.
+# New Environment #281) replace this as the catalog grows; keep it as a cheap health probe.
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:

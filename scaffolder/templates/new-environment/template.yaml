@@ -5,7 +5,7 @@
 # the permission policy lets team members run templates at all; platform:verify-team-membership (server-stored —
 # a client cannot strip it) binds the run to the requester's own team; the gate + admission bound the claim.
 #
-# Replaces the retired v2 "New Tenant" template (which emitted an XTenant into the removed
+# Replaces the retired v2 "New Environment" template (which emitted an XTenant into the removed
 # gitops/tenant-claims/preprod/ path). The repo is NO LONGER part of this claim — it lives in the Product
 # registry (gitops/products/<team>/<product>.yaml), which must already exist (one repo per Product).
 apiVersion: scaffolder.backstage.io/v1beta3

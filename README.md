@@ -27,14 +27,14 @@ The platform-engineering capabilities an enterprise IDP needs — each implement
 
 | Capability | How it shows up here |
 |------------|----------------------|
-| **Self-service via declarative claim** | A team is a single `Tenant` claim; a Crossplane Composition reconciles it into namespaces, RBAC, ECR repos, IAM/Pod Identity, developer access, and policy ([ADR-046](docs/adrs/046-back-stack-for-developer-self-service.md)/[048](docs/adrs/048-federated-per-cluster-crossplane.md)). *A Backstage portal front door is the remaining piece — see [Where this is heading](#where-this-is-heading--the-back-stack).* |
+| **Self-service via declarative claim** | A team is a single `Environment` claim; a Crossplane Composition reconciles it into namespaces, RBAC, ECR repos, IAM/Pod Identity, developer access, and policy ([ADR-046](docs/adrs/046-back-stack-for-developer-self-service.md)/[048](docs/adrs/048-federated-per-cluster-crossplane.md)). *A Backstage portal front door is the remaining piece — see [Where this is heading](#where-this-is-heading--the-back-stack).* |
 | **Golden paths / paved roads** | GitOps delivery (ArgoCD), signed-digest promotion, and per-PR preview environments are the supported, opinionated route to production ([ADR-021](docs/adrs/021-argocd-for-gitops.md)/[032](docs/adrs/032-pr-preview-environments.md)) |
 | **Guardrails, not gates** | Policy-as-code at every layer — org SCPs and Kyverno admission — lets teams move fast without breaking governance ([ADR-014](docs/adrs/014-kyverno-as-policy-engine.md)) |
-| **Multi-tenancy** | Team identity decoupled from app identity; namespace isolation with default-deny networking, quotas, and per-team EKS Pod Identity for AWS access ([ADR-027](docs/adrs/027-hybrid-tenant-isolation-model.md)/[041](docs/adrs/041-pod-identity-for-tenant-workloads.md)) |
+| **Multi-tenancy** | Team identity decoupled from app identity; namespace isolation with default-deny networking, quotas, and per-team EKS Pod Identity for AWS access ([ADR-027](docs/adrs/027-hybrid-environment-isolation-model.md)/[041](docs/adrs/041-pod-identity-for-environment-workloads.md)) |
 | **Defense in depth** | Layered controls — Organizations/SCPs → IAM (operate-not-author) → private networking → admission policy → runtime detection (Falco) — with **no static credentials** anywhere (IRSA / Pod Identity / OIDC) |
 | **Supply-chain integrity** | cosign keyless signing + CycloneDX SBOM + SLSA Build L3 provenance, **verified at admission** per team ([ADR-042](docs/adrs/042-isolated-build-provenance-slsa-l3.md)) |
 | **Compliance as a capability** | Workloads declare a `compliance_tier` (standard/HIPAA/PCI) that selects controls; SCPs mapped to SOC2/HIPAA/PCI/ISO/NIST/CIS ([ADR-013](docs/adrs/013-compliance-tier-model.md)) |
-| **Self-hosted observability** | Prometheus + Grafana + durable, multi-tenant Mimir — metrics you own, ready for spoke tenants ([ADR-043](docs/adrs/043-self-hosted-observability-stack.md)/[044](docs/adrs/044-mimir-durable-multi-tenant-metrics.md)) |
+| **Self-hosted observability** | Prometheus + Grafana + durable, multi-tenant mimir — metrics you own, ready for spoke environments ([ADR-043](docs/adrs/043-self-hosted-observability-stack.md)/[044](docs/adrs/044-mimir-durable-multi-tenant-metrics.md)) |
 | **Day-2 operability** | A purpose-built CLI (`platctl`) for DAG-aware bootstrap/teardown/validate; private cluster access via Tailscale or SSM ([ADR-038](docs/adrs/038-platctl-cli-for-platform-operations.md)) |
 
 ## Using this as a reference
@@ -48,21 +48,21 @@ The platform-engineering capabilities an enterprise IDP needs — each implement
 
 ## Where this is heading — the BACK stack
 
-Tenant provisioning runs on the **BACK stack**. A team is a single declarative **`Tenant` claim**
-(`XTenant`) that a Crossplane **Composition** reconciles into the complete tenant — namespace, RBAC, quotas,
+Environment provisioning runs on the **BACK stack**. A team is a single declarative **`Environment` claim**
+(`XTenant`) that a Crossplane **Composition** reconciles into the complete environment — namespace, RBAC, quotas,
 networking, per-team policy, IAM/Pod Identity, developer access, and cross-account ECR. The remaining piece
 is the **Backstage** front door:
 
 | | Role | Status |
 |---|------|--------|
-| **B — [Backstage](https://backstage.io/)** | Internal Developer Portal — service catalog + software templates; the self-service front door that creates the `Tenant` claim | Planned (P5) |
+| **B — [Backstage](https://backstage.io/)** | Internal Developer Portal — service catalog + software templates; the self-service front door that creates the `Environment` claim | Planned (P5) |
 | **A — ArgoCD** | GitOps reconciliation engine | **In place** |
-| **C — [Crossplane](https://www.crossplane.io/)** | Infrastructure control plane — tenant capabilities (namespaces, ECR, IAM, Pod Identity, policy, developer access) modeled as an XRD/Composition and **claimed through the Kubernetes API**, continuously reconciled. **The sole tenant provisioner** ([ADR-046](docs/adrs/046-back-stack-for-developer-self-service.md)/[048](docs/adrs/048-federated-per-cluster-crossplane.md)) | **Shipped (P1–P3)** — see [Crossplane Tenant API](docs/architecture/crossplane-tenant-api.md) |
+| **C — [Crossplane](https://www.crossplane.io/)** | Infrastructure control plane — environment capabilities (namespaces, ECR, IAM, Pod Identity, policy, developer access) modeled as an XRD/Composition and **claimed through the Kubernetes API**, continuously reconciled. **The sole environment provisioner** ([ADR-046](docs/adrs/046-back-stack-for-developer-self-service.md)/[048](docs/adrs/048-federated-per-cluster-crossplane.md)) | **Shipped (P1–P3)** — see [Crossplane Environment API](docs/architecture/crossplane-environment-api.md) |
 | **K — Kubernetes** | The universal control plane everything rides on | **In place** |
 
-`teams.hcl` is no longer the tenant-provisioning source of truth (the `XTenant` claim is); it now only feeds
+`teams.hcl` is no longer the environment-provisioning source of truth (the `XTenant` claim is); it now only feeds
 app delivery (ArgoCD) and the platform-owned supply-chain policies. The end state: a developer picks a
-Backstage template, which scaffolds a repo and a `Tenant` claim; ArgoCD applies it; Crossplane provisions the
+Backstage template, which scaffolds a repo and a `Environment` claim; ArgoCD applies it; Crossplane provisions the
 resources; Kubernetes runs them — portal-driven, GitOps-reconciled, self-served. The patterns in this repo
 (multi-tenancy, policy-as-code, signed supply chain, observability)
 are the substrate that stack composes onto. This work begins now that the foundation is established.
@@ -97,7 +97,7 @@ platform/
 ├── cmd/platctl/                 # Go CLI for platform operations (bootstrap, teardown, validate, kubeconfig)
 ├── docs/                        # User-facing documentation
 │   ├── adrs/                    # 48 architecture decision records
-│   ├── architecture/            # System design, supply chain, observability, tenant model, config hierarchy
+│   ├── architecture/            # System design, supply chain, observability, environment model, config hierarchy
 │   ├── compliance/              # SCP → control mapping
 │   ├── runbooks/                # Operational procedures
 │   └── troubleshooting/         # Known issues and solutions
@@ -105,7 +105,7 @@ platform/
 │   ├── live/aws/                # Terragrunt live configurations (AWS only)
 │   │   ├── mgmt/                # Management account (Organizations, SCPs, state, IAM Identity Center)
 │   │   ├── platform/            # Platform account (EKS, ArgoCD, Tailscale, TGW hub, observability, ECR)
-│   │   ├── preprod/             # Preprod account (EKS, tenants, ingress, TGW spoke)
+│   │   ├── preprod/             # Preprod account (EKS, environments, ingress, TGW spoke)
 │   │   ├── prod/                # Prod account (networking defined, not yet deployed)
 │   │   └── test/               # Test account (GitHub OIDC sandbox for Terratest CI)
 │   ├── modules/                 # Reusable OpenTofu modules
@@ -125,7 +125,7 @@ Real account IDs live in `infra/live/aws/secrets.hcl` (gitignored; see `secrets.
 |---------|---------|
 | **Management** | AWS Organizations, SCPs, IAM Identity Center (SSO), Terraform state (S3 + DynamoDB) |
 | **Platform** | Shared services: EKS, ArgoCD, Tailscale, TGW hub, ECR, observability hub |
-| **PreProd** | Workloads: EKS, tenant namespaces, public ingress, TGW spoke |
+| **PreProd** | Workloads: EKS, environment namespaces, public ingress, TGW spoke |
 | **Prod** | Production workloads (networking defined, not yet deployed) |
 | **Test** | GitHub OIDC sandbox for Terratest CI (`PlatformDeployer`-managed) |
 
@@ -141,7 +141,7 @@ and [ADR-040](docs/adrs/040-platform-engineer-access-model.md).
 - **EKS** (private API, BYOCNI) with **Cilium 1.19.4** (kube-proxy replacement, Gateway API, Hubble)
 - **ArgoCD** for GitOps delivery, with Dex → IAM Identity Center SAML SSO
 - **Observability hub** — kube-prometheus-stack (Prometheus + Grafana + Alertmanager), Grafana served
-  Tailscale-only, `critical` alerts → SNS → email; **Grafana Mimir** as the durable, multi-tenant, S3-backed
+  Tailscale-only, `critical` alerts → SNS → email; **Grafana mimir** as the durable, multi-tenant, S3-backed
   metrics store (Prometheus `remote_write`s to it)
 - **Kyverno** policy engine — admission guardrails (pod hardening, multi-tenancy isolation, supply-chain
   verification)
@@ -153,8 +153,8 @@ and [ADR-040](docs/adrs/040-platform-engineer-access-model.md).
 ### Preprod account — workload cluster
 
 - **EKS** with Cilium and Gateway API (public NLB)
-- **Tenant isolation** via namespaces with default-deny NetworkPolicies, resource quotas, and per-team
-  **EKS Pod Identity** for AWS access ([ADR-041](docs/adrs/041-pod-identity-for-tenant-workloads.md))
+- **Environment isolation** via namespaces with default-deny NetworkPolicies, resource quotas, and per-team
+  **EKS Pod Identity** for AWS access ([ADR-041](docs/adrs/041-pod-identity-for-environment-workloads.md))
 - **ArgoCD** Applications + per-team PR preview ApplicationSets
 - **Kyverno in Enforce** — pod hardening **and** supply-chain verification (signatures + attestations)
 - ECR cross-account image pull; GitHub OIDC for CI/CD
@@ -198,14 +198,14 @@ The full dependency DAG is documented in [CLAUDE.md](CLAUDE.md). The preferred d
 | [falco](infra/modules/falco/) | Runtime threat detection (eBPF) — deployed on preprod ([ADR-045](docs/adrs/045-falco-runtime-threat-detection.md)) |
 | [gateway-config](infra/modules/gateway-config/) | ClusterIssuer, Gateway, HTTPRoutes (TLS via cert-manager) |
 | [observability](infra/modules/observability/) | Observability hub — kube-prometheus-stack + SNS alerting |
-| [observability-mimir](infra/modules/observability-mimir/) | Durable, multi-tenant, S3-backed metrics store (Mimir) |
+| [observability-mimir](infra/modules/observability-mimir/) | Durable, multi-tenant, S3-backed metrics store (mimir) |
 | [policy](infra/modules/policy/) | Kyverno engine + ClusterPolicies — pod hardening, multi-tenancy, image verification (ADR-014) |
 | [secret-stores](infra/modules/secret-stores/) | ClusterSecretStore for AWS Secrets Manager and SSM |
 | [tailscale](infra/modules/tailscale/) | Tailscale Operator, subnet router, split DNS |
 | [tailscale-admin](infra/modules/tailscale-admin/) | Tailnet ACL and OAuth client management |
 | [actions-runner-controller](infra/modules/actions-runner-controller/) | Self-hosted GitHub Actions runners (ARC) on the platform cluster — in-VPC CI for cluster-facing applies (ADR-065) |
-| [crossplane](infra/modules/crossplane/) | Crossplane v2 control plane — hub (ECR provisioning) + per-cluster `Tenant` XRD/Composition; the tenant control plane (ADR-046/048) |
-| [tenant-claims](infra/modules/tenant-claims/) | Renders `XTenant` claims that the Composition reconciles into complete tenants (ADR-046/048) |
+| [crossplane](infra/modules/crossplane/) | Crossplane v2 control plane — hub (ECR provisioning) + per-cluster `Environment` XRD/Composition; the environment control plane (ADR-046/048) |
+| [tenant-claims](infra/modules/tenant-claims/) | Renders `XTenant` claims that the Composition reconciles into complete environments (ADR-046/048) |
 | [vcluster](infra/modules/vcluster/) | vCluster Helm (deferred — ADR-033) |
 
 ### AWS (19)
@@ -218,7 +218,7 @@ The full dependency DAG is documented in [CLAUDE.md](CLAUDE.md). The preferred d
 | [eks](infra/modules/aws/eks/) | EKS cluster with BYOCNI, KMS, OIDC, access entries |
 | [eks-addons](infra/modules/aws/eks-addons/) | EKS managed add-ons + gp3 default StorageClass |
 | [eks-node-group](infra/modules/aws/eks-node-group/) | EKS managed node groups |
-| [eks-pod-identity](infra/modules/aws/eks-pod-identity/) | EKS Pod Identity associations for tenant AWS access (ADR-041) |
+| [eks-pod-identity](infra/modules/aws/eks-pod-identity/) | EKS Pod Identity associations for environment AWS access (ADR-041) |
 | [github_oidc](infra/modules/aws/github_oidc/) | GitHub Actions OIDC federation (ADR-036) |
 | [iam_roles](infra/modules/aws/iam_roles/) | Purpose-built cross-account IAM roles |
 | [identity_center](infra/modules/aws/identity_center/) | IAM Identity Center permission sets |
@@ -247,23 +247,23 @@ Plus [cloudflare/dns_delegation](infra/modules/cloudflare/dns_delegation/) (DNS 
 | Kyverno as policy engine | [ADR-014](docs/adrs/014-kyverno-as-policy-engine.md) |
 | Gateway API over Ingress | [ADR-017](docs/adrs/017-gateway-api-over-ingress.md) |
 | ArgoCD for GitOps | [ADR-021](docs/adrs/021-argocd-for-gitops.md) |
-| Namespace tenant isolation | [ADR-027](docs/adrs/027-hybrid-tenant-isolation-model.md) |
+| Namespace environment isolation | [ADR-027](docs/adrs/027-hybrid-environment-isolation-model.md) |
 | Centralized cross-account ECR | [ADR-028](docs/adrs/028-ecr-cross-account-container-registry.md) |
-| Multi-app tenant model | [ADR-031](docs/adrs/031-multi-app-tenant-model.md) |
+| Multi-app environment model | [ADR-031](docs/adrs/031-multi-app-environment-model.md) |
 | PR preview environments | [ADR-032](docs/adrs/032-pr-preview-environments.md) |
 | Transit Gateway hub/spoke | [ADR-034](docs/adrs/034-transit-gateway-cross-account-connectivity.md) |
 | GitHub Actions OIDC federation | [ADR-036](docs/adrs/036-github-actions-oidc-federation.md) |
 | platctl CLI | [ADR-038](docs/adrs/038-platctl-cli-for-platform-operations.md) |
 | Platform-engineer access model | [ADR-040](docs/adrs/040-platform-engineer-access-model.md) |
-| Pod Identity for tenant workloads | [ADR-041](docs/adrs/041-pod-identity-for-tenant-workloads.md) |
+| Pod Identity for environment workloads | [ADR-041](docs/adrs/041-pod-identity-for-environment-workloads.md) |
 | Isolated build provenance (SLSA L3) | [ADR-042](docs/adrs/042-isolated-build-provenance-slsa-l3.md) |
 | Self-hosted observability stack | [ADR-043](docs/adrs/043-self-hosted-observability-stack.md) |
-| Mimir for durable multi-tenant metrics | [ADR-044](docs/adrs/044-mimir-durable-multi-tenant-metrics.md) |
+| mimir for durable multi-tenant metrics | [ADR-044](docs/adrs/044-mimir-durable-multi-tenant-metrics.md) |
 | Falco for runtime threat detection | [ADR-045](docs/adrs/045-falco-runtime-threat-detection.md) |
 | BACK stack for developer self-service | [ADR-046](docs/adrs/046-back-stack-for-developer-self-service.md) |
 | Pod Identity as the AWS-identity standard | [ADR-047](docs/adrs/047-pod-identity-as-aws-identity-standard.md) |
 | Federated per-cluster Crossplane | [ADR-048](docs/adrs/048-federated-per-cluster-crossplane.md) |
-| Multi-tenancy model (Team / Tenant / Zone) | [ADR-049](docs/adrs/049-tenant-model-team-tenant-zone.md) |
+| Multi-tenancy model (Team / Environment / Zone) | [ADR-049](docs/adrs/049-tenant-model-team-tenant-zone.md) |
 
 All 49 ADRs: [docs/adrs/](docs/adrs/)
 
@@ -287,9 +287,9 @@ scanning (Trivy IaC, Semgrep) — via OIDC federation, no stored credentials.
 | [Onboarding Guide](docs/onboarding.md) | New team member quickstart |
 | [User Guide](docs/user-guide.md) | Complete reference for deployments and day-2 ops |
 | [Supply-Chain Overview](docs/architecture/supply-chain-overview.md) | cosign + SBOM + SLSA L3 + Kyverno, end to end |
-| [Observability Current State](docs/architecture/observability-current-state.md) | As-built Prometheus/Grafana/Mimir hub |
+| [Observability Current State](docs/architecture/observability-current-state.md) | As-built Prometheus/Grafana/mimir hub |
 | [Deploy App to Preprod](docs/runbooks/deploy-app-preprod.md) | Developer guide: manifests, ECR, ArgoCD |
 | [App Supply-Chain Onboarding](docs/runbooks/app-supply-chain-onboarding.md) | Wire signing/SBOM/provenance into app CI |
-| [Tenant Onboarding](docs/runbooks/tenant-onboarding.md) | Add/remove teams via a Crossplane `Tenant` claim |
+| [Environment Onboarding](docs/runbooks/environment-onboarding.md) | Add/remove teams via a Crossplane `Environment` claim |
 | [EKS Cluster Access](docs/runbooks/eks-cluster-access.md) | kubectl setup for engineers |
 | [Architecture Decisions](docs/adrs/) | 48 ADRs documenting every significant choice |
