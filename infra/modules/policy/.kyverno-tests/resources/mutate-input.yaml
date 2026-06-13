@@ -1,4 +1,4 @@
-# A deliberately bare tenant Deployment (no securityContext/automount/labels) — used by run.sh to
+# A deliberately bare environment Deployment (no securityContext/automount/labels) — used by run.sh to
 # smoke-test that the mutate policies inject their defaults via Kyverno autogen WITHOUT error
 # (a bare Pod doesn't exercise the autogen path that real workloads hit).
 apiVersion: apps/v1

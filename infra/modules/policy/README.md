@@ -2,11 +2,11 @@
 
 Deploys the [Kyverno](https://kyverno.io/) policy engine and the platform's admission-control
 ClusterPolicies on a Kubernetes cluster (ADR-014). Kyverno layers above the Pod Security Admission
-`baseline` floor (ADR-027/040) to express controls PSA cannot: per-tenant image-registry scoping,
+`baseline` floor (ADR-027/040) to express controls PSA cannot: per-environment image-registry scoping,
 cross-team IRSA-annotation prevention, RBAC hardening, resource/label requirements, and tier-gated
 restricted Pod Security.
 
-The module is **cloud-agnostic and holds no team-specific data** — per-tenant values
+The module is **cloud-agnostic and holds no team-specific data** — per-environment values
 (`tenant_registry_map`, `allowed_registries`) are supplied by the Terragrunt unit from `teams.hcl`.
 
 ## Design
@@ -20,23 +20,23 @@ The module is **cloud-agnostic and holds no team-specific data** — per-tenant 
   without blocking admission, and the generated webhook is fail-open (`failurePolicy: Ignore`).
   Flipping to `"Enforce"` rejects violations and fails the webhook closed (`Fail`). The flip is a
   one-line input change + apply.
-- **Tenant scoping.** Tenant-targeted policies match the `platform.refplat.org/tenant` namespace
+- **Environment scoping.** Environment-targeted policies match the `platform.refplat.org/team` namespace
   label; infra namespaces are excluded. Cluster-scoped policies (RBAC, default-namespace) skip
   platform controllers via the `exclude_principals` allow-list.
-- **Split with the Crossplane Tenant Composition (BACK stack P3).** For tenants migrated to a `Tenant`
+- **Split with the Crossplane Environment Composition (BACK stack P3).** For environments migrated to a `Environment`
   claim (passed in `migrated_teams`), this module **skips** the per-team `restrict-images-team-<k>` and
   `restrict-route-hostnames-team-<k>` policies — the Composition provisions those (so the claim owns the
-  per-tenant guardrails). This module **keeps** owning the platform-wide floor and, for **all** teams
+  per-environment guardrails). This module **keeps** owning the platform-wide floor and, for **all** teams
   (migrated or not), the cosign/SLSA supply-chain policies `verify-images-team-<k>` /
   `verify-attestations-team-<k>` — signature/attestation trust roots are a platform security control, not a
-  per-tenant knob. `teams.hcl` (which feeds `tenant_registry_map`/`verify_subjects` here) is still the team
+  per-environment knob. `teams.hcl` (which feeds `tenant_registry_map`/`verify_subjects` here) is still the team
   registry for those.
 
 ## Phase 1 policy set
 
 | ClusterPolicy | Kind(s) | Purpose |
 | ------------- | ------- | ------- |
-| `restrict-image-registries` | Pod | Tenant images only from `allowed_registries` (ECR floor) |
+| `restrict-image-registries` | Pod | Environment images only from `allowed_registries` (ECR floor) |
 | `restrict-images-team-<k>` | Pod | `team-<k>` namespace may only run images under its own prefix |
 | `disallow-latest-tag` | Pod | Require an explicit, non-`latest` tag |
 | `require-requests-limits` | Pod | CPU/memory requests + limits on every container |
@@ -44,11 +44,11 @@ The module is **cloud-agnostic and holds no team-specific data** — per-tenant 
 | `restrict-automount-sa-token` | Pod | `automountServiceAccountToken: false` |
 | `require-workload-labels` | Pod | Identity + cost-allocation labels |
 | `block-public-loadbalancer` | Service | Deny `LoadBalancer`/`NodePort` (Gateway-only ingress) |
-| `disallow-irsa-annotation-cross-team` | ServiceAccount | Deny tenant IRSA annotations (until #64) |
+| `disallow-irsa-annotation-cross-team` | ServiceAccount | Deny environment IRSA annotations (until #64) |
 | `restrict-binding-clusteradmin` | (Cluster)RoleBinding | Deny binding to `cluster-admin` |
 | `restrict-wildcard-rbac` | Role, ClusterRole | Deny wildcard verbs/resources/apiGroups |
 | `disallow-default-namespace` | Workloads | No workloads in `default` |
-| `require-tenant-namespace-naming` | Namespace | Tenant namespaces named `team-*` |
+| `require-environment-namespace-naming` | Namespace | Environment namespaces named `team-*` |
 | `require-pod-security-restricted` | Pod | **hipaa/pci only** — full Restricted PSS |
 | `require-ro-rootfs` | Pod | **hipaa/pci only** — read-only root filesystem |
 | `disallow-privilege-escalation` | Pod | Deny `allowPrivilegeEscalation: true` (Phase 2 backstop) |
@@ -56,7 +56,7 @@ The module is **cloud-agnostic and holds no team-specific data** — per-tenant 
 
 ### Phase 2 mutate policies (`enable_mutate_defaults`, default true)
 
-Auto-inject safe defaults on tenant workloads (add-if-absent; webhooks fail open):
+Auto-inject safe defaults on environment workloads (add-if-absent; webhooks fail open):
 `mutate-pod-defaults` (allowPrivilegeEscalation=false, drop ALL caps, seccompProfile=RuntimeDefault,
 automountServiceAccountToken=false — one patch so it resolves under autogen) and
 `mutate-workload-labels` (`team`, derived from the namespace). Pair with ArgoCD `ignoreDifferences`
@@ -111,12 +111,12 @@ If a policy blocks legitimate admission, patch the generated webhook configurati
 | `create` | Whether to create resources | `bool` | `true` |
 | `validation_failure_action` | `Audit` or `Enforce` | `string` | `"Audit"` |
 | `compliance_tier` | `standard`/`hipaa`/`pci` | `string` | `"standard"` |
-| `allowed_registries` | Registry prefixes admitted in tenant namespaces | `list(string)` | `[]` |
-| `tenant_registry_map` | tenant key → allowed image prefix | `map(string)` | `{}` |
-| `migrated_teams` | Teams whose per-team `restrict-*` policies the Crossplane Tenant Composition owns (skipped here) | `list(string)` | `[]` |
+| `allowed_registries` | Registry prefixes admitted in environment namespaces | `list(string)` | `[]` |
+| `tenant_registry_map` | environment key → allowed image prefix | `map(string)` | `{}` |
+| `migrated_teams` | Teams whose per-team `restrict-*` policies the Crossplane Environment Composition owns (skipped here) | `list(string)` | `[]` |
 | `exclude_namespaces` | Infra namespaces excluded from policies | `list(string)` | (see variables.tf) |
 | `exclude_principals` | Principal wildcards skipped by cluster-scoped policies | `list(string)` | (see variables.tf) |
-| `tenant_namespace_label` | Namespace label marking tenants | `string` | `"platform.refplat.org/tenant"` |
+| `environment_namespace_label` | Namespace label marking environments | `string` | `"platform.refplat.org/team"` |
 | `required_workload_labels` | Labels every workload must carry | `list(string)` | `["app.kubernetes.io/name", "team"]` |
 | `replica_count` | Admission controller replicas (HA=3) | `number` | `3` |
 | `helm_chart_version` | Kyverno chart version | `string` | `"3.8.1"` |
@@ -138,4 +138,4 @@ If a policy blocks legitimate admission, patch the generated webhook configurati
   list of enforced policies (preprod / platform / prod) and their scope
 - ADR-014: Kyverno as Policy Engine
 - ADR-013: Compliance Tier Model
-- ADR-027 / ADR-039 / ADR-040: Tenant isolation, per-team RBAC, platform-engineer access
+- ADR-027 / ADR-039 / ADR-040: Environment isolation, per-team RBAC, platform-engineer access

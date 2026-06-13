@@ -10,7 +10,7 @@ metadata:
     policies.kyverno.io/severity: high
     policies.kyverno.io/subject: Service
     policies.kyverno.io/description: >-
-      Tenant Services must be ClusterIP. Ingress is only via the shared Gateway (ADR-029); direct
+      Environment Services must be ClusterIP. Ingress is only via the shared Gateway (ADR-029); direct
       LoadBalancer or NodePort exposure is denied (reinforces the loadbalancers=0 quota, #65).
 spec:
   background: true
@@ -22,7 +22,7 @@ spec:
           - resources:
               kinds:
                 - Service
-              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
       validate:
         failureAction: {{ .Values.validationFailureAction }}
         message: "Services must be ClusterIP; use the shared Gateway for ingress (LoadBalancer/NodePort are blocked)."

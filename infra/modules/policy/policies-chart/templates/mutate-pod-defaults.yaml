@@ -11,7 +11,7 @@ metadata:
     policies.kyverno.io/severity: medium
     policies.kyverno.io/subject: Pod
     policies.kyverno.io/description: >-
-      Adds safe defaults to tenant pods when not already set: a hardened container securityContext
+      Adds safe defaults to environment pods when not already set: a hardened container securityContext
       (allowPrivilegeEscalation=false, drop ALL capabilities, seccompProfile=RuntimeDefault) and
       automountServiceAccountToken=false. add-if-absent so it never overrides an explicit choice.
       runAsNonRoot is intentionally left to the workload (forcing it crashes root images) — enforced
@@ -28,7 +28,7 @@ spec:
           - resources:
               kinds:
                 - Pod
-              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
       mutate:
         patchStrategicMerge:
           spec:

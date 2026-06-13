@@ -6,12 +6,12 @@ metadata:
   labels:
     {{- include "kpp.labels" . | nindent 4 }}
   annotations:
-    policies.kyverno.io/title: Restrict Image Registries (tenant floor)
+    policies.kyverno.io/title: Restrict Image Registries (environment floor)
     policies.kyverno.io/category: Supply Chain, Multi-Tenancy
     policies.kyverno.io/severity: high
     policies.kyverno.io/subject: Pod
     policies.kyverno.io/description: >-
-      Tenant workloads may only run images from approved registries (the platform ECR). Closes the
+      Environment workloads may only run images from approved registries (the platform ECR). Closes the
       ADR-014 image-provenance gap and complements per-team ECR push isolation (#60).
 spec:
   background: true
@@ -23,11 +23,11 @@ spec:
           - resources:
               kinds:
                 - Pod
-              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
       validate:
         failureAction: {{ .Values.validationFailureAction }}
         message: >-
-          Image registry not allowed. Tenant images must come from one of:
+          Image registry not allowed. Environment images must come from one of:
           {{ join ", " .Values.allowedRegistries }}.
         foreach:
           - list: request.object.spec.containers

@@ -1,4 +1,4 @@
-# LoadBalancer Service in a tenant namespace — fails block-public-loadbalancer.
+# LoadBalancer Service in an environment namespace — fails block-public-loadbalancer.
 apiVersion: v1
 kind: Service
 metadata:

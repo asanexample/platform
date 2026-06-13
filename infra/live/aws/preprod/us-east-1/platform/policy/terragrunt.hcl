@@ -20,7 +20,7 @@ locals {
     yamldecode(file("${local.products_dir}/${f}")).metadata.name => yamldecode(file("${local.products_dir}/${f}"))
   }
 
-  # Tenant images live in the platform account's ECR (apps push there — see #60).
+  # Environment images live in the platform account's ECR (apps push there — see #60).
   ecr_registry = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com"
 
   # Per-PRODUCT cosign keyless verification (verify-images-product + verify-attestations-product): the shared
@@ -86,12 +86,12 @@ inputs = {
   # pod IPs, so the admission/cleanup webhook servers must run on hostNetwork (node VPC IP).
   webhook_host_network = true
 
-  # Cluster-wide tenant image floor. v3: restrict-images / restrict-route-hostnames are owned PER-ENVIRONMENT by
+  # Cluster-wide environment image floor. v3: restrict-images / restrict-route-hostnames are owned PER-ENVIRONMENT by
   # the Crossplane Composition (product-scoped), so the chart renders no per-team versions (the v2 per-team
   # tenant_registry_map / migrated_teams / tenant_hostname_patterns inputs were removed this cutover).
   allowed_registries = [local.ecr_registry]
 
-  # Crossplane (the federated tenant control plane, ADR-046/048) runs here. Its rbac-manager authors wildcard
+  # Crossplane (the federated environment control plane, ADR-046/048) runs here. Its rbac-manager authors wildcard
   # provider ClusterRoles at runtime as its own ServiceAccount (not the deployer), which the cluster-scoped
   # restrict-wildcard-rbac policy would otherwise deny in Enforce — blocking the install. Exclude the
   # crossplane-system control-plane principals (justified like kube-system/argocd) and the namespace. MUST be
@@ -105,7 +105,7 @@ inputs = {
   # Phase 3 — cosign keyless image verification (Audit-first, independent of the Enforce above).
   enable_image_verification = true
   verify_failure_action     = "Enforce"
-  # SBOM + SLSA provenance attestation requirement (#108/108d). Enforce: non-compliant tenant images are
+  # SBOM + SLSA provenance attestation requirement (#108/108d). Enforce: non-compliant environment images are
   # rejected at admission. For adopted teams the SLSA provenance must be trusted-ci-signed (see
   # attest_caller_repos below). Re-flipped to Enforce 2026-05-30 after the SLSA L3 single-provenance
   # cutover (#131): the new trusted-ci-provenance alpha image (sha256:d1e942d0) verified clean under Audit

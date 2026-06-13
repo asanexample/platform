@@ -31,13 +31,13 @@ variable "compliance_tier" {
 }
 
 variable "allowed_registries" {
-  description = "Container image registry prefixes admitted cluster-wide (e.g. the platform ECR host). The cluster-wide floor; per-tenant scoping is layered on top via tenant_registry_map."
+  description = "Container image registry prefixes admitted cluster-wide (e.g. the platform ECR host). The cluster-wide floor; per-environment scoping is layered on top via tenant_registry_map."
   type        = list(string)
   default     = []
 }
 
 variable "exclude_namespaces" {
-  description = "Infrastructure namespaces excluded from tenant-targeted and cluster-scoped policies so Kyverno never gates platform/system workloads."
+  description = "Infrastructure namespaces excluded from environment-targeted and cluster-scoped policies so Kyverno never gates platform/system workloads."
   type        = list(string)
   default = [
     "kube-system",
@@ -63,9 +63,9 @@ variable "exclude_principals" {
     # ARN; the wildcard covers every account + session name. PlatformAdmin is intentionally NOT here
     # (it is read+operate, not author — ADR-040).
     "arn:aws:sts::*:assumed-role/PlatformDeployer/*",
-    # ArgoCD delivers tenant claims via GitOps (BACK stack Phase 1). When it reconciles a managed (preprod)
+    # ArgoCD delivers environment claims via GitOps (BACK stack Phase 1). When it reconciles a managed (preprod)
     # cluster it assumes the ArgoCD IAM role, so EKS presents it as the assumed-role ARN — NOT the argocd pod
-    # SA below (which only covers ArgoCD running *in-cluster*). Without this, restrict-tenant-control-plane
+    # SA below (which only covers ArgoCD running *in-cluster*). Without this, restrict-environment-control-plane
     # would deny ArgoCD-applied XTenants. ArgoCD already holds cluster-admin on the managed cluster, so this
     # grants no new privilege; the trust boundary is git review + ArgoCD RBAC.
     "arn:aws:sts::*:assumed-role/ArgoCD/*",
@@ -74,7 +74,7 @@ variable "exclude_principals" {
     "system:nodes:*",
     "system:kube-controller-manager",
     # EKS installs managed add-ons (EBS CSI, etc.) as eks:addon-manager; their upstream RBAC uses
-    # wildcards. It is a platform/system installer, not a tenant, so exclude it like kube-system/argocd.
+    # wildcards. It is a platform/system installer, not an environment, so exclude it like kube-system/argocd.
     "eks:addon-manager",
   ]
 }
@@ -91,14 +91,14 @@ variable "extra_exclude_principals" {
   default     = []
 }
 
-variable "tenant_namespace_label" {
-  description = "Namespace label that marks tenant namespaces. Tenant-targeted policies match on its presence."
+variable "environment_namespace_label" {
+  description = "Namespace label that marks environment namespaces. Environment-targeted policies match on its presence."
   type        = string
-  default     = "platform.refplat.org/tenant"
+  default     = "platform.refplat.org/team"
 }
 
 variable "required_workload_labels" {
-  description = "Labels every tenant workload must carry (presence validated). Default is the team cost-allocation label, which the mutate-workload-labels policy auto-injects from the namespace — so apps need no label boilerplate. app.kubernetes.io/name can't be auto-derived under autogen, so it is recommended but not required."
+  description = "Labels every environment workload must carry (presence validated). Default is the team cost-allocation label, which the mutate-workload-labels policy auto-injects from the namespace — so apps need no label boilerplate. app.kubernetes.io/name can't be auto-derived under autogen, so it is recommended but not required."
   type        = list(string)
   default     = ["team"]
 }
@@ -150,7 +150,7 @@ variable "helm_wait" {
 }
 
 variable "enable_mutate_defaults" {
-  description = "Deploy the mutate policies that auto-inject safe defaults (hardened securityContext, automountServiceAccountToken=false, team/app labels) on tenant workloads. Mutate webhooks fail open. The validate backstops (disallow-privilege-escalation, require-seccomp) deploy regardless."
+  description = "Deploy the mutate policies that auto-inject safe defaults (hardened securityContext, automountServiceAccountToken=false, team/app labels) on environment workloads. Mutate webhooks fail open. The validate backstops (disallow-privilege-escalation, require-seccomp) deploy regardless."
   type        = bool
   default     = true
 }
@@ -260,7 +260,7 @@ variable "rekor_url" {
 # ---------------------------------------------------------------------------
 
 variable "enable_cleanup" {
-  description = "Deploy the ClusterCleanupPolicy that reaps finished CronJob-spawned Jobs in tenant namespaces."
+  description = "Deploy the ClusterCleanupPolicy that reaps finished CronJob-spawned Jobs in environment namespaces."
   type        = bool
   default     = true
 }

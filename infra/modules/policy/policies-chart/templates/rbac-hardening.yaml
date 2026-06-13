@@ -49,7 +49,7 @@ metadata:
     policies.kyverno.io/severity: high
     policies.kyverno.io/subject: Role, ClusterRole
     policies.kyverno.io/description: >-
-      Deny Roles/ClusterRoles that grant wildcard verbs, resources, or apiGroups — prevents a tenant
+      Deny Roles/ClusterRoles that grant wildcard verbs, resources, or apiGroups — prevents an environment
       (which holds 'edit', and so can create Roles in its namespace) from crafting an over-powered
       Role. Cluster-scoped; platform controllers skipped via the principal allow-list.
 spec:

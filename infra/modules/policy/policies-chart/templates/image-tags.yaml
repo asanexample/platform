@@ -22,7 +22,7 @@ spec:
           - resources:
               kinds:
                 - Pod
-              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
       validate:
         failureAction: {{ .Values.validationFailureAction }}
         message: "An explicit image tag is required (untagged images are not allowed)."
@@ -39,7 +39,7 @@ spec:
           - resources:
               kinds:
                 - Pod
-              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
       validate:
         failureAction: {{ .Values.validationFailureAction }}
         message: "Using the ':latest' tag is not allowed; pin an immutable version."

@@ -13,7 +13,7 @@ resources:
   - resources/httproutes.yaml
 variables: values.yaml
 results:
-  # --- compliant workload passes every tenant Pod policy ---
+  # --- compliant workload passes every environment Pod policy ---
   - policy: restrict-image-registries
     rule: validate-registry
     kind: Pod
@@ -99,4 +99,4 @@ results:
   # NB the per-team restrict-images-team-* and restrict-route-hostnames-team-* policies moved to the Crossplane
   # Composition (product-scoped, per-Environment) at the v3 cutover (ADR-067) — they no longer render from this
   # chart, so their assertions were removed here. That coverage now lives in the Composition render test
-  # (infra/modules/crossplane/.tenant-api-tests/render.sh: restrict-images team-alpha/demo-* + restrict-route-hostnames).
+  # (infra/modules/crossplane/.environment-api-tests/render.sh: restrict-images team-alpha/demo-* + restrict-route-hostnames).

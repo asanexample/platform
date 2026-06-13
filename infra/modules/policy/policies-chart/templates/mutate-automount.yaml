@@ -11,7 +11,7 @@ metadata:
     policies.kyverno.io/severity: medium
     policies.kyverno.io/subject: Pod
     policies.kyverno.io/description: >-
-      Sets automountServiceAccountToken=false on tenant pods when not specified (least privilege —
+      Sets automountServiceAccountToken=false on environment pods when not specified (least privilege —
       most workloads don't talk to the API server). add-if-absent: a workload that needs the token
       sets it true explicitly. Satisfies restrict-automount-sa-token automatically.
 spec:
@@ -23,7 +23,7 @@ spec:
           - resources:
               kinds:
                 - Pod
-              {{- include "kpp.tenantNamespaceSelector" . | nindent 14 }}
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
       mutate:
         patchStrategicMerge:
           spec:
