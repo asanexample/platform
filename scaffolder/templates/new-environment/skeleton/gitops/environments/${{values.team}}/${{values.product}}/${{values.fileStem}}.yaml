@@ -1,5 +1,5 @@
 # Environment (${{ values.team }} × ${{ values.product }} × ${{ values.stage }}${{ ' × ' + values.customer if values.customer }}) — developer-authored
-# claim (ADR-067, v1alpha3), via the Backstage **New Environment** template (ADR-062 self-service). Namespace
+# claim (ADR-067, v1beta1), via the Backstage **New Environment** template (ADR-062 self-service). Namespace
 # ${{ values.envName }}. Synced by ArgoCD (the `environments` registry-sync app) and reconciled by the Crossplane
 # Environment Composition (v3). One claim per (product, stage[, customer]); the image digest is promoted in by
 # PR (promote-by-PR, #377). This file is the source of truth — change or remove it via PR. See

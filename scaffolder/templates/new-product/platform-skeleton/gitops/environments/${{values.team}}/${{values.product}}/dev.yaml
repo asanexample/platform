@@ -1,5 +1,5 @@
 # Environment (${{ values.team }} × ${{ values.product }} × dev) — the first stage, authored by the Backstage
-# New Product template (ADR-067 v1alpha3). Namespace ${{ values.team }}-${{ values.product }}-dev. Synced by
+# New Product template (ADR-067 v1beta1). Namespace ${{ values.team }}-${{ values.product }}-dev. Synced by
 # ArgoCD (the `environments` registry-sync app) and reconciled by the Crossplane Environment Composition (v3).
 # The image is omitted until the new repo's first CI build pins a signed digest into k8s/overlays/dev.
 apiVersion: platform.refplat.org/v1beta1
