@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-08
 **Status:** Complete. Informs the Phase 2 build plan (no production code shipped by this spike).
-**Relates to:** [ADR-061](../adrs/061-environment-ingress-and-custom-domain-strategy.md), builds on Phase 1 (PR #264).
+**Relates to:** [ADR-061](../adrs/061-tenant-ingress-and-custom-domain-strategy.md), builds on Phase 1 (PR #264).
 
 ## Why
 
@@ -52,7 +52,7 @@ admitted **only** once its cert is Ready.
   `{{- $observed := .observed.resources | default dict }}` *before* the loop, or `.observed` is nil inside it.
 - **Write composite status:** emit an object with the **XR's apiVersion+kind and NO
   `gotemplating.fn.crossplane.io/composition-resource-name` annotation**. With the annotation it is treated as
-  a *composed* nested XTenant (shows up as an unready resource) instead of merging into the composite status.
+  a *composed* nested XEnvironment (shows up as an unready resource) instead of merging into the composite status.
 
 **Consequence:** the Phase 2 status loop + enforcement coupling is a **Composition-only** change
 (go-template + XRD status schema). No controller, no new function. This is the strongest possible result and
@@ -136,10 +136,10 @@ this makes edge offload the pragmatic primary for tier-3 external domains.
 
 **2a — status.domains state machine + Active-gating (next; low-risk, ~Phase-1-sized, NO new infra).**
 
-- Add `status.domains[]` to the v1alpha1 XRD (host, state, mode, dnsTarget, reason, message, lastTransitionTime).
+- Add `status.domains[]` to the `XEnvironment` XRD (host, state, mode, dnsTarget, reason, message, lastTransitionTime).
 - Composition (Q1 pattern): write `status.domains`; generated + tier-1/2 → `Active` immediately; tier-3 entries
   → `Pending` (no backing resources yet); build the allow-list = `{generated, tier-1/2} ∪ {Active}`.
-- ArgoCD `XTenant` `ignoreDifferences`: add `.status` so selfHeal doesn't fight Crossplane's status writes
+- ArgoCD `XEnvironment` `ignoreDifferences`: add `.status` so selfHeal doesn't fight Crossplane's status writes
   (`infra/live/aws/platform/.../argocd/terragrunt.hcl`).
 - Ships the security-boundary architecture + domain observability with no infra risk.
 

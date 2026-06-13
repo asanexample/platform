@@ -19,12 +19,14 @@ emergency disable / the Audit↔Enforce flip.
 | **platform** | 829808296602 | v1.18.1 | **Enforce** | 3 (HA) | standard | 12 |
 | **prod** | 554518885123 | _not deployed_ | — | — | _TBD_ | — |
 
-- The **count differs** because several policy _families_ are generated one-per-environment from
-  `teams.hcl` — `restrict-images-team-<team>`, `restrict-route-hostnames-team-<team>`,
-  `verify-images-team-<team>`, and `verify-attestations-team-<team>`. Preprod has environments `alpha` +
-  `bravo`, so each family contributes two policies; the platform cluster hosts shared services only (no
-  environments), so it carries just the common (non-per-team) policies. The counts above are an indicative
-  snapshot — read the exact live total with `kubectl get cpol` (it shifts as environments/phases change).
+- The **count differs** because several policy _families_ are generated one-per-product. The platform-owned
+  `verify-images-product-<team>-<product>` and `verify-attestations-product-<team>-<product>` render from the
+  `XEnvironment` claims in the `policy` unit; the per-product `restrict-images-product-<team>-<product>` and
+  `restrict-route-hostnames-product-<team>-<product>` are owned by the Crossplane Environment Composition.
+  Preprod runs the `alpha`/`demo` + `bravo`/`demo` products, so each family contributes two policies; the
+  platform cluster hosts shared services only (no environments), so it carries just the common (non-per-product)
+  policies. The counts above are an indicative snapshot — read the exact live total with `kubectl get cpol`
+  (it shifts as environments/phases change).
 - **Mode** is controlled by the unit's `validation_failure_action` (`Audit` records PolicyReports and
   fails the webhook open; `Enforce` rejects at admission and fails the webhook closed). The flip is a
   one-line input change + apply.
@@ -42,7 +44,7 @@ emergency disable / the Audit↔Enforce flip.
 | Policy | Target kind(s) | Enforces | Scope | Tier | Clusters |
 | ------ | -------------- | -------- | ----- | ---- | -------- |
 | `restrict-image-registries` | Pod | Images only from approved registries (the platform ECR) | environment | all | preprod, platform |
-| `restrict-images-team-<team>` | Pod | `team-<team>` namespace may only run `…/team-<team>/*` images (per-team, from `teams.hcl`) | environment (per-team ns) | all | preprod (alpha, bravo) |
+| `restrict-images-product-<team>-<product>` | Pod | A product's environment namespace may only run `…/team-<team>/<product>-*` images (per-product, owned by the Environment Composition) | environment (per-product ns) | all | preprod (alpha/demo, bravo/demo) |
 | `disallow-latest-tag` | Pod | Explicit, non-`latest` image tag required | environment | all | preprod, platform |
 | `require-requests-limits` | Pod | CPU + memory requests **and** limits on every container | environment | all | preprod, platform |
 | `require-pod-probes` | Pod | Liveness + readiness probes on every container | environment | all | preprod, platform |
@@ -50,13 +52,13 @@ emergency disable / the Audit↔Enforce flip.
 | `require-workload-labels` | Pod | `app.kubernetes.io/name` + `team` labels | environment | all | preprod, platform |
 | `block-public-loadbalancer` | Service | Deny `LoadBalancer` / `NodePort` (Gateway-only ingress) | environment | all | preprod, platform |
 | `disallow-irsa-annotation-cross-team` | ServiceAccount | Deny `eks.amazonaws.com/role-arn` annotation (environment AWS access is Pod Identity, not IRSA — ADR-041; backstop) | environment | all | preprod, platform |
-| `require-environment-namespace-naming` | Namespace | Environment namespaces named `team-*` | environment (labelled ns) | all | preprod, platform |
+| `require-environment-namespace-naming` | Namespace | Environment namespaces named `<team>-<product>-<stage>` | environment (labelled ns) | all | preprod, platform |
 | `restrict-binding-clusteradmin` | RoleBinding, ClusterRoleBinding | Deny binding to `cluster-admin` | cluster | all | preprod, platform |
 | `restrict-wildcard-rbac` | Role, ClusterRole | Deny wildcard verbs / resources / apiGroups | cluster | all | preprod, platform |
 | `disallow-default-namespace` | Pod, Deployment, StatefulSet, DaemonSet, ReplicaSet, Job, CronJob | No workloads in `default` | cluster | all | preprod, platform |
 | `disallow-privilege-escalation` | Pod | Deny `securityContext.allowPrivilegeEscalation: true` (backstops the mutate default) | environment | all | preprod, platform |
 | `require-seccomp` | Pod | Deny `seccompProfile.type: Unconfined` (backstops the mutate default) | environment | all | preprod, platform |
-| `restrict-route-hostnames-team-<t>` | HTTPRoute, GRPCRoute, TLSRoute | Per-team route hostnames must be in the team's allow-list (from `teams.hcl`); deny cross-team/platform hostnames + empty hostname lists (anti-squatting, ADR-029) | environment (per-team) | all | preprod |
+| `restrict-route-hostnames-product-<team>-<product>` | HTTPRoute, GRPCRoute, TLSRoute | Per-product route hostnames must be in the product's allow-list (from `spec.domains`, owned by the Environment Composition); deny cross-product/platform hostnames + empty hostname lists (anti-squatting, ADR-029) | environment (per-product) | all | preprod |
 | `require-pod-security-restricted` | Pod | Full Restricted Pod Security Standard | environment | **hipaa/pci only** | _(none yet — standard tier)_ |
 | `require-ro-rootfs` | Pod | `readOnlyRootFilesystem: true` | environment | **hipaa/pci only** | _(none yet — standard tier)_ |
 
@@ -76,7 +78,7 @@ matching ArgoCD `ignoreDifferences` is safe.
 | Policy | Injects (when absent) | Scope |
 | ------ | --------------------- | ----- |
 | `mutate-pod-defaults` | container `securityContext` (`allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`, `seccompProfile.type: RuntimeDefault`; not `runAsNonRoot`) **and** pod `automountServiceAccountToken: false` — one patch so strategic-merge resolves under autogen | environment |
-| `mutate-workload-labels` | `team` (environment key from the `team-<k>[-env]` namespace name) | environment |
+| `mutate-workload-labels` | `team` (derived from the `<team>-<product>-<stage>` namespace name) | environment |
 
 > `app.kubernetes.io/name` can't be auto-derived under autogen (pod templates have no name), so it is
 > **recommended but not required** — `require-workload-labels` requires only `team`, which is
@@ -92,21 +94,21 @@ Gated by `enable_image_verification`; rolls Audit→Enforce via its **own** `ver
 unwritable **`asanexample/trusted-ci/.github/workflows/build-sign.yml`** reusable workflow (cosign
 keyless, GitHub Actions OIDC → Fulcio/Rekor; ADR-050) — app `deploy.yml`/`preview.yml` are thin callers.
 Kyverno fetches the signature from ECR (via an IRSA role granting ECR read) and admits images signed by
-that shared workflow when the cert's `githubWorkflowRepository` extension is the team's own `app-<team>`
-caller repo. Two policy inputs drive this: `trusted_ci_build_subject_regexp` (the shared signer subject)
-and `shared_signer_caller_repos` (the per-team caller repos). A team's own app-signed identity remains a
-supported fallback for bespoke-build apps.
+that shared workflow when the cert's `githubWorkflowRepository` extension is the product's own
+`app-<team>-<product>` caller repo. Two policy inputs drive this: `trusted_ci_build_subject_regexp` (the
+shared signer subject) and `shared_signer_caller_repos` (the per-product caller repos). A product's own
+app-signed identity remains a supported fallback for bespoke-build apps.
 
 | Policy | Verifies | Scope |
 | ------ | -------- | ----- |
-| `verify-images-team-<team>` | Images under `…/team-<team>/*` are cosign-signed (`count: 1`) by the shared `trusted-ci/build-sign.yml` (`trusted_ci_build_subject_regexp`) gated per-team by the `githubWorkflowRepository` extension = `app-<team>` (`shared_signer_caller_repos`, ADR-050) **or**, as a fallback, by `app-<team>`'s own `deploy.yml@main` (pinned) / `preview.yml` (subjectRegExp — the PR OIDC ref varies); `mutateDigest` pins to digest | environment (per-team) |
+| `verify-images-product-<team>-<product>` | Images under `…/team-<team>/<product>-*` are cosign-signed (`count: 1`) by the shared `trusted-ci/build-sign.yml` (`trusted_ci_build_subject_regexp`) gated per-product by the `githubWorkflowRepository` extension = `app-<team>-<product>` (`shared_signer_caller_repos`, ADR-050) **or**, as a fallback, by `app-<team>-<product>`'s own `deploy.yml@main` (pinned) / `preview.yml` (subjectRegExp — the PR OIDC ref varies); `mutateDigest` pins to digest | environment (per-product) |
 
-Per-team identity isolation: the shared signer's cert **subject** is the same for all teams, so isolation
+Per-product identity isolation: the shared signer's cert **subject** is the same for all products, so isolation
 moves to the `githubWorkflowRepository` cert extension — Fulcio sets it from the _calling_ app repo's OIDC,
-so one team cannot forge another's. A signature whose caller repo (or, for the fallback, whose app
-workflow) is not the team's does **not** satisfy that team's policy — the supply-chain analog of per-team
-registry scoping. Deployed on **preprod** (where environments run); the platform cluster has no environment
-workloads. Verification depends on cluster egress to sigstore (Fulcio/Rekor) — see the break-glass runbook.
+so one product cannot forge another's. A signature whose caller repo (or, for the fallback, whose app
+workflow) is not the product's does **not** satisfy that product's policy — the supply-chain analog of
+per-product registry scoping. Deployed on **preprod** (where environments run); the platform cluster has no
+environment workloads. Verification depends on cluster egress to sigstore (Fulcio/Rekor) — see the break-glass runbook.
 
 ## Attestation verification (Phase 3 — SBOM + SLSA provenance)
 
@@ -119,7 +121,7 @@ signed by the shared `trusted-ci/build-sign.yml` workflow alongside the image si
 
 | Policy | Verifies | Scope |
 | ------ | -------- | ----- |
-| `verify-attestations-team-<team>` | `…/team-<team>/*` images carry a cosign-signed CycloneDX SBOM **and** a SLSA provenance attestation. The SBOM block accepts (`count: 1`) the shared `trusted-ci/build-sign.yml` (`trusted_ci_build_subject_regexp`) gated per-team by `githubWorkflowRepository` = `app-<team>` (`shared_signer_caller_repos`, ADR-050) **or**, as a fallback, the team's own workflow. For SLSA-L3-adopted teams (`attest_caller_repos`), the provenance must be signed by the isolated **`trusted-ci`** reusable workflow with the caller-repo = the team's own `app-<team>` (ADR-042); for others, by the team's own `deploy.yml`/`preview.yml`. | environment (per-team) |
+| `verify-attestations-product-<team>-<product>` | `…/team-<team>/<product>-*` images carry a cosign-signed CycloneDX SBOM **and** a SLSA provenance attestation. The SBOM block accepts (`count: 1`) the shared `trusted-ci/build-sign.yml` (`trusted_ci_build_subject_regexp`) gated per-product by `githubWorkflowRepository` = `app-<team>-<product>` (`shared_signer_caller_repos`, ADR-050) **or**, as a fallback, the product's own workflow. For SLSA-L3-adopted products (`attest_caller_repos`), the provenance must be signed by the isolated **`trusted-ci`** reusable workflow with the caller-repo = the product's own `app-<team>-<product>` (ADR-042); for others, by the product's own `deploy.yml`/`preview.yml`. | environment (per-product) |
 
 This is the admission-side counterpart to the image-signing/attestation chain in
 [`cosign-image-signing.md`](cosign-image-signing.md) §10b — the signature proves _who built_ the image;
@@ -146,8 +148,8 @@ Configured on the module and applied to every cluster:
 ## Adding a cluster (e.g. prod)
 
 1. Add a `policy/terragrunt.hcl` unit under the env mirroring the existing ones (eks + node-groups
-   deps, helm provider, `allowed_registries` from the platform ECR, `tenant_registry_map` from the
-   env's `teams.hcl` if any, `compliance_tier` from `workload.hcl`).
+   deps, helm provider, `allowed_registries` from the platform ECR, `product_registry_map` derived from the
+   env's `XEnvironment` claims if any, `compliance_tier` from `workload.hcl`).
 2. Apply in **Audit**; confirm PolicyReports are clean against real workloads
    (`kubectl get policyreport -A`).
 3. Flip `validation_failure_action` to **Enforce** and apply. For shared-services clusters, validate

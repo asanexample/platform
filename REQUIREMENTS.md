@@ -136,8 +136,9 @@
 
 1. Namespace-based environment isolation with default-deny NetworkPolicies, resource
    quotas, and limit ranges (ADR-027)
-2. Multi-app environment model — teams declare apps in `teams.hcl`, each gets an
-   ArgoCD Application and optional PR preview ApplicationSet (ADR-031, ADR-032)
+2. Team → Product → Service → Environment model — teams declare Products (with
+   their Services) in git-native `Product` CRs; each Product gets an ArgoCD
+   Application and optional PR preview ApplicationSet (ADR-031, ADR-032, ADR-067)
 3. Private EKS API endpoints with Tailscale VPN for developer access (ADR-010,
    ADR-011)
 4. Kyverno as the policy engine for admission control and compliance
@@ -354,23 +355,29 @@
 
 ## 8. Multitenancy
 
-1. Namespace isolation as the default environment boundary — each team gets a
-   `team-<name>` namespace (ADR-027)
-2. Self-service via `teams.hcl` with nested `apps` map: each team declares
-   multiple apps with `repo_url`, `repo_path`, `repo_branch`, and `preview`
-   flag (ADR-031)
-3. ECR naming convention: `team-<team>/<app>` (e.g., `team-alpha/demo`) —
-   supports monorepo and multi-repo teams (ADR-031)
-4. ArgoCD creates one Application per app entry and one ApplicationSet per
-   preview-enabled app (ADR-031, ADR-032)
-5. ResourceQuotas cap CPU (4), memory (8Gi), and pod count (20) per team
-   namespace — overridable via `resource_quota` in teams.hcl (ADR-027)
+1. Team → Product → Service → Environment domain model (ADR-067): a **Team**
+   owns identity, **Products** are its deployable apps, **Services** are the
+   components of a Product, and an **Environment** (a Product at a stage, the
+   provisioned unit) gets a `<team>-<product>-<stage>` namespace with default
+   namespace isolation (ADR-027)
+2. Git-native registries: `Team` CRs (`gitops/teams/`), `Product` CRs
+   (`gitops/products/<team>/<product>.yaml`), and `XEnvironment` CRs
+   (`gitops/environments/<team>/<product>/<stage>.yaml`) — provisioned by the
+   Crossplane Environment Composition, not `teams.hcl` (ADR-063/067/069)
+3. ECR naming convention: per-service `team-<team>/<product>-<svc>` (e.g.,
+   `team-alpha/demo-web`) — one repo per Service of a Product (ADR-028/067)
+4. ArgoCD delivers from the per-Product app repo (`app-<team>-<product>`), with
+   an optional PR-preview ApplicationSet for preview-enabled services
+   (ADR-031, ADR-032)
+5. ResourceQuotas cap CPU (4), memory (8Gi), and pod count (20) per Environment
+   namespace — sized by the Environment's `spec.quota`, capped by the Team
+   envelope `quotaCap` (ADR-027/067)
 6. LimitRange per namespace sets default container resource requests (100m CPU,
    128Mi memory) and limits (500m CPU, 512Mi memory) (ADR-027)
 7. AppProject sourceRepos whitelist restricts which Git repos each team can
    deploy from; deployable resource kinds are restricted (ADR-021)
-8. Teams own their app manifests in their own repos — the platform provides the
-   deployment pipeline via ArgoCD Applications pointing at team repos
+8. Teams own their Product manifests in their own repos — the platform provides
+   the deployment pipeline via ArgoCD Applications pointing at app repos
 9. vCluster support deferred — OSS cannot sync HTTPRoute CRDs to the host
    cluster's Gateway (ADR-033)
 

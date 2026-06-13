@@ -1,15 +1,15 @@
 # Crossplane Composition Authoring
 
 The **HOW** behind the environment model — for someone who needs to **extend** the Composition. The contract (the
-`XTenant` claim, what gets provisioned, claim delivery) is [crossplane-environment-api.md](crossplane-environment-api.md);
+`XEnvironment` claim, what gets provisioned, claim delivery) is [crossplane-environment-api.md](crossplane-environment-api.md);
 this doc is the implementation: the XRD schema, the Pipeline + its three functions, the go-template that
 renders every managed resource **and** writes the XR status, providers + Pod Identity, and the hub/spoke ECR
 hop.
 
 Source of truth:
 
-- XRD — `infra/modules/crossplane/charts/environment-api/templates/xrd.yaml`
-- Composition — `infra/modules/crossplane/charts/environment-api/files/composition.yaml`
+- XRD — `infra/modules/crossplane/charts/environment-api/templates/xenvironment-xrd.yaml`
+- Composition — `infra/modules/crossplane/charts/environment-api/files/composition-v3.yaml`
 - Control plane (core, providers, ProviderConfig, identity) — `infra/modules/crossplane/main.tf`
 - Status-loop proof — [ADR-061 Phase 2 spike](../spikes/adr-061-phase2-ingress-spike.md) (Q1)
 
@@ -17,25 +17,32 @@ Source of truth:
 
 The `CompositeResourceDefinition` is **Crossplane v2** (`apiextensions.crossplane.io/v2`), `scope: Cluster`
 (an environment provisions a namespace + cluster-scoped policies and composes across namespaces; cluster scope also
-means creating an `XTenant` needs cluster RBAC — environments can't self-provision, gate S1). Two versions:
+means creating an `XEnvironment` needs cluster RBAC — developers can't self-provision, gate S1). One served
+version:
 
-- **`v1alpha1`** — `served: true`, **`referenceable: true`** (the **storage/bound** version). The live
-  Composition binds to it (`compositeTypeRef.apiVersion: platform.refplat.org/v1alpha1`). `spec` is the clean
-  environment contract (`team`, `domains`, `resourceQuota`, `apps`, `aws`, `developerAccess`); `status` carries
-  `namespace` + the `domains[]` ingress state machine.
-- **`v1alpha2`** — `served: true`, **`referenceable: false`** (served-only). The richer target API
-  (ADR-049: `name`/`environment`/`tier`/`tenancy`/`residency`/`placement` status, etc.). It does **not** bind
-  a Composition yet — the storage flip + v2 Composition land at the rebuild cutover (delivery plan A6).
+- **`v1alpha3`** — `served: true`, **`referenceable: true`**, `storage: true` (the **storage/bound** version,
+  ADR-067). The live `environment-v3` Composition binds to it
+  (`compositeTypeRef.apiVersion: platform.refplat.org/v1alpha3`). `spec` is the Environment contract — a
+  Product at a Stage [for a Customer]: `team`, `product`, `stage`, optional `customer`, `tier`,
+  `isolation.compute`, `residency`, `quota`, `domains`, `lifecycle.phase`, and `services.<svc>` (each with
+  `serviceAccount`, `preview`, `image`, `permissions.aws.policyStatements`). `status` carries `namespace` + the
+  `domains[]` ingress state machine. This is a **greenfield rename** of the retired v2 `XTenant` — no stored v2
+  objects survive the from-scratch rebuild, so there is no served compatibility version.
 
-When extending the **live** behaviour, edit **`v1alpha1`** `spec`/`status` and the Composition together: a
+The XRD is **structural + self-contained validation only**. Cross-object envelope checks — `team ==
+Product.team`, `tier ∈ Team.allowedTiers`, `stage ∈ Team.allowedStages`, `quota ≤ Team.quotaCap`, image
+registry ⊆ `team-<team>/<product>`, etc. — are enforced by Kyverno against the projected `Team` + `Product`
+CRs (`restrict-environment-envelope`), not in the schema.
+
+When extending the **live** behaviour, edit **`v1alpha3`** `spec`/`status` and the Composition together: a
 field the template reads must exist in the bound schema, and a `status` field the template writes must be
-declared or the apiserver drops it. The v2 schema is forward-compat only — changing it does not affect runtime.
+declared or the apiserver drops it.
 
 ## The Composition pipeline (mode `Pipeline`)
 
 ```mermaid
 flowchart TD
-    XR["XTenant claim (v1alpha1)"] --> S1
+    XR["XEnvironment claim (v1alpha3)"] --> S1
     subgraph Pipeline["Composition · mode Pipeline"]
         S1["load-environment<br/>function-environment-configs<br/>→ merges platform-cluster-config EnvironmentConfig into context"]
         S2["render-resources<br/>function-go-templating<br/>→ renders Objects + AWS MRs + writes XR status.domains"]
@@ -69,12 +76,14 @@ One inline Go template renders **every** composed resource. Two output classes s
   `provider-kubernetes` `Object`s (`providerConfigRef.name: default`); AWS resources are provider-aws MRs
   (`iam.aws.upbound.io/Role`+`RolePolicy`, `eks.aws.upbound.io/PodIdentityAssociation`+`AccessEntry`,
   `ecr.aws.upbound.io/Repository`+`RepositoryPolicy`). External names are pinned with
-  `crossplane.io/external-name` where the AWS name must be deterministic (e.g. `Pod-team-<team>`).
+  `crossplane.io/external-name` where the AWS name must be deterministic (e.g.
+  `Pod-<team>-<product>-[<customer>-]<stage>-<svc>`). Per-service resources (ECR, the Pod-Identity role +
+  association) are rendered by ranging over `spec.services`.
 - **The composite's own status** — see the status loop below.
 
 ### Step 3 — `function-auto-ready`
 
-Marks the `XTenant` `Ready` once its composed resources report Ready. No input.
+Marks the `XEnvironment` `Ready` once its composed resources report Ready. No input.
 
 ## The status-loop pattern (read observed status, write composite status)
 
@@ -93,18 +102,18 @@ extra poller.
 > `{{- $observed := .observed.resources | default dict }}` *before* the range, then index `$observed`.
 
 **Writing composite status.** Emit a YAML doc whose `apiVersion`/`kind` are the **XR's own GVK**
-(`platform.refplat.org/v1alpha1` / `XTenant`) with `metadata.name: {{ $xrName }}` and **NO
+(`platform.refplat.org/v1alpha3` / `XEnvironment`) with `metadata.name: {{ $xrName }}` and **NO
 `gotemplating.fn.crossplane.io/composition-resource-name` annotation**. Crossplane merges that into the
-composite's status. The live template does exactly this to publish `status.domains` (composition.yaml around
-the `kind: XTenant` / `status: domains:` block):
+composite's status. The live template does exactly this to publish `status.domains` (composition-v3.yaml around
+the `kind: XEnvironment` / `status: domains:` block):
 
 > **Gotcha — omit the resource-name annotation.** With the annotation present, the emitted XR is treated as a
-> *composed nested `XTenant`* (it shows up as an unready resource and never merges into status). Without it,
+> *composed nested `XEnvironment`* (it shows up as an unready resource and never merges into status). Without it,
 > it merges into the composite status. This is the single most error-prone part of extending the status.
 
-The same template pass builds the `restrict-route-hostnames-team-<team>` Kyverno allow-list and the
-`status.domains[]` entries from one source: the generated host (`<app>-<team>.<baseDomain>` + the `-pr-*`
-preview wildcard) is always `Active`; `spec.domains` aliases under `.<baseDomain>` are `Active`; external
+The same template pass builds the `restrict-route-hostnames-<product>` Kyverno allow-list and the
+`status.domains[]` entries from one source: the generated host (`<product>-<team>-<stage>.<baseDomain>` + the
+`-pr-*` preview wildcard) is always `Active`; `spec.domains` aliases under `.<baseDomain>` are `Active`; external
 hosts are `Pending` (Phase 2b not built) and therefore **not** admitted. See
 [gateway-and-ingress.md](gateway-and-ingress.md) for how that allow-list enforces ingress.
 
@@ -127,7 +136,7 @@ hosts are `Pending` (Phase 2b not built) and therefore **not** admitted. See
 - **`crossplane-environment-api`** — the XRD + Composition + the `platform-cluster-config` EnvironmentConfig.
 
 The provisioning IAM role (`crossplane-provisioner-<cluster>`) is deliberately scoped: on an environment-provisioning
-(workload) cluster it may create `Pod-team-*`/`DeveloperAccess-*` roles **only with the deny-escalation
+(workload) cluster it may create `Pod-*`/`DeveloperAccess-*` roles **only with the deny-escalation
 permissions boundary attached** (and cannot strip it — no `Put/DeleteRolePermissionsBoundary`), `PassRole`
 those roles to `pods.eks.amazonaws.com` only, and manage EKS Pod Identity associations + access entries on its
 own cluster. Effective environment-role perms = the role's declared policy **∩** the boundary, so even a
@@ -147,7 +156,8 @@ other MR uses `default` (local Pod Identity). The chain hop needs `sts:AssumeRol
 
 When adding a resource or field:
 
-1. **Add the field** to `v1alpha1` `spec` (and a `status` field if the template writes one) in `xrd.yaml`.
+1. **Add the field** to `v1alpha3` `spec` (and a `status` field if the template writes one) in
+   `xenvironment-xrd.yaml`.
 2. **Render the resource** in the go-template with a unique
    `gotemplating.fn.crossplane.io/composition-resource-name`; gate optional resources with `{{- if ... }}`.
 3. **Cross-account?** Set `providerConfigRef.name: {{ $ecrCfg }}` (or add a new ProviderConfig in the config
@@ -157,13 +167,13 @@ When adding a resource or field:
 5. **Reading observed status?** Capture `$observed` before any `range`; gate on the observed condition.
 6. **Writing composite status?** Emit the XR's own GVK with **no** resource-name annotation.
 7. **Render-test offline** before applying:
-   `crossplane render xr.yaml composition.yaml functions.yaml [--observed-resources <dir>]`.
+   `crossplane render xr.yaml composition-v3.yaml functions.yaml [--observed-resources <dir>]`.
 
 ## Verification
 
 ```bash
-kubectl --context preprod get xtenant <team>                 # SYNCED=True READY=True
-kubectl --context preprod get managed | grep <team>          # all Object + aws.upbound.io MRs Ready
-kubectl --context preprod get xtenant <team> -o jsonpath='{.status.domains}' | jq
-kubectl --context preprod get providers.pkg.crossplane.io    # all HEALTHY
+kubectl --context preprod get xenvironment <ns>              # SYNCED=True READY=True (<ns> = <team>-<product>-<stage>)
+kubectl --context preprod get managed | grep <ns>           # all Object + aws.upbound.io MRs Ready
+kubectl --context preprod get xenvironment <ns> -o jsonpath='{.status.domains}' | jq
+kubectl --context preprod get providers.pkg.crossplane.io   # all HEALTHY
 ```

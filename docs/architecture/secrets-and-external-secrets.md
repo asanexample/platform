@@ -103,18 +103,20 @@ platform-scoped ESO IRSA role. Platform services — Keycloak, oauth2-proxy, Dex
 consume their secrets this way.
 
 **Environment workloads do not get AWS access through ESO.** Environment access to AWS *resources* (S3, etc.) is **EKS
-Pod Identity** (ADR-041/047): an association binds a named ServiceAccount to a `Pod-team-<team>` role, declared
-in the `XTenant` claim's `aws` block — see [crossplane-environment-api.md](crossplane-environment-api.md). The
-per-namespace, IRSA-scoped environment *secret* path (a namespace-scoped `SecretStore` per team) is the documented
-**target** model but is **not yet deployed** (per the
+Pod Identity** (ADR-041/047): an association binds a named ServiceAccount to a per-service
+`Pod-<team>-<product>-[<customer>-]<stage>-<svc>` role, declared in the `XEnvironment`'s
+`spec.services.<svc>.permissions.aws` block — see
+[crossplane-environment-api.md](crossplane-environment-api.md). The per-namespace, IRSA-scoped environment
+*secret* path (a namespace-scoped `SecretStore` per environment) is the documented **target** model but is
+**not yet deployed** (per the
 [secrets-management runbook](../runbooks/secrets-management.md), "Creating a New App Team Secret"). Do not
 describe it as live.
 
 | Concern | Mechanism | Status |
 | --- | --- | --- |
 | Platform service secrets | ESO + `aws-secrets-manager` `ClusterSecretStore` (platform IRSA) | Live |
-| Environment AWS *resource* access | EKS Pod Identity (`Pod-team-<team>`), declared in the claim | Live |
-| Environment per-namespace *secrets* via ESO | namespace-scoped `SecretStore` + per-team IRSA | Target model, not deployed |
+| Environment AWS *resource* access | EKS Pod Identity (`Pod-<team>-<product>-…-<svc>`), declared in the `XEnvironment` | Live |
+| Environment per-namespace *secrets* via ESO | namespace-scoped `SecretStore` + per-environment IRSA | Target model, not deployed |
 
 ## Rotation
 

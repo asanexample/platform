@@ -1,46 +1,50 @@
 # Preprod Environment Isolation Model
 
-> Related: [ADR-027 — Hybrid Environment Isolation](../adrs/027-hybrid-environment-isolation-model.md),
-> [ADR-033 — Defer vCluster Support](../adrs/033-defer-vcluster-environment-support.md),
-> [ADR-041 — Pod Identity for Environment Workloads](../adrs/041-pod-identity-for-environment-workloads.md),
+> Related: [ADR-027 — Hybrid Environment Isolation](../adrs/027-hybrid-tenant-isolation-model.md),
+> [ADR-033 — Defer vCluster Support](../adrs/033-defer-vcluster-tenant-support.md),
+> [ADR-041 — Pod Identity for Environment Workloads](../adrs/041-pod-identity-for-tenant-workloads.md),
 > [ADR-046 — BACK stack for developer self-service](../adrs/046-back-stack-for-developer-self-service.md),
-> [ADR-047 — Pod Identity standard](../adrs/047-pod-identity-standard.md),
-> [ADR-049 — Multi-tenancy model (Team / Environment / Zone)](../adrs/049-tenant-model-team-tenant-zone.md)
+> [ADR-047 — Pod Identity standard](../adrs/047-pod-identity-as-aws-identity-standard.md),
+> [ADR-067 — IDP domain model (Team / Product / Service / Environment)](../adrs/067-idp-domain-model.md)
 
 <!-- -->
 
-> **Current model is `team == environment`; the target model is ADR-049.** This document describes the **current**
-> preprod environment model, where one team is one environment is one namespace. The matured, scale/compliance/multi-cloud
-> model — **Team → Environment → Zone** (ownership decoupled from isolation; a compliance-driven isolation spectrum
-> up to dedicated cluster/account; cloud-neutral placement with data residency) — is
-> [ADR-049](../adrs/049-tenant-model-team-tenant-zone.md). ADR-049 is **design-stage** and lands with the
-> planned rebuild, so everything below still describes how preprod runs **today**.
+> **Domain model is Team → Product → Service → Environment (ADR-067).** An **Environment** —
+> a Product at a Stage [for a Customer] — is the provisioned unit on the cluster (the unit this
+> doc describes). Ownership is the git-native **`Team`** CR (an isolation/quota envelope), and a
+> Team's **Products** group the deployable systems; the namespace `<team>-<product>-<stage>` is
+> the deployment unit, NOT a degenerate `team == environment` namespace. The matured
+> scale/compliance/multi-cloud dimensions — a compliance-driven isolation spectrum up to dedicated
+> cluster/account, cloud-neutral placement with data residency — ride on the same
+> [ADR-067](../adrs/067-idp-domain-model.md) `Environment` (`tier`, `isolation.compute`, `residency`).
+> Everything below describes how preprod runs **today** on this model.
 
 <!-- -->
 
-> **Provisioning is now Crossplane.** This document describes the environment
+> **Provisioning is Crossplane.** This document describes the environment
 > *isolation model* — what an environment looks like on the cluster (namespace mode,
-> NetworkPolicies, RBAC, quotas, Pod Identity). That model is unchanged. What
-> changed is **how an environment is provisioned**: environments are now a single
-> declarative **`Environment` claim** (`XTenant`) reconciled by a Crossplane
-> **Composition** (BACK stack P3, #174). Both teams (alpha, bravo) are migrated.
-> The previous Terragrunt path — the `infra/modules/environment` module and the
-> `environments`/`pod-identity` units — is **retired and deleted**. For the claim API
-> (XRD schema, Composition pipeline, claim lifecycle, federated topology) see
+> NetworkPolicies, RBAC, quotas, Pod Identity). What provisions it is a single
+> declarative **`XEnvironment` claim** (`platform.refplat.org/v1alpha3`) reconciled by a
+> Crossplane **Environment Composition** (`environment-v3`). Both demo Environments
+> (alpha/demo, bravo/demo) are live on it. The v2-era Terragrunt path — the
+> `infra/modules/environment` module and the `environments`/`pod-identity` units — was
+> **retired and deleted** at the cutover. For the claim API (XRD schema, Composition
+> pipeline, claim lifecycle, federated topology) see
 > [Crossplane Environment API](crossplane-environment-api.md). Where this doc says "the
-> environment module creates …", read it as "the Composition provisions …" — the
-> resulting cluster footprint is the same.
+> Composition provisions …", read it as the `environment-v3` Composition rendering per
+> `XEnvironment` — the resulting cluster footprint is described below.
 
 ## Overview
 
 The preprod EKS cluster (`preprod-use1-eks`, account `<PREPROD_ACCOUNT_ID>`) uses
-**namespace-based environment isolation** on a shared cluster. Each team gets a
+**namespace-based environment isolation** on a shared cluster. Each Environment gets a
 dedicated namespace with ResourceQuotas, LimitRanges, and Cilium NetworkPolicies.
 
-Each team is one **`XTenant` claim**; a Crossplane Composition reconciles it into
-the namespace, RBAC, quotas, NetworkPolicies, per-team Kyverno guardrails, Pod
-Identity, and cross-account ECR. ArgoCD syncs the claim YAMLs from
-`gitops/tenant-claims/<env>/`. See [Crossplane Environment API](crossplane-environment-api.md).
+Each Environment is one **`XEnvironment` claim**; the Crossplane Environment Composition
+reconciles it into the namespace, RBAC, quotas, NetworkPolicies, per-product Kyverno
+guardrails, per-service Pod Identity, and cross-account ECR. ArgoCD syncs the claim YAMLs
+from `gitops/environments/<team>/<product>/`. See
+[Crossplane Environment API](crossplane-environment-api.md).
 
 > **Note:** The environment module also supports a vCluster mode for stronger isolation
 > (CRD independence, virtual control plane), but this is **deferred** (ADR-033).
@@ -50,7 +54,7 @@ Identity, and cross-account ECR. ArgoCD syncs the claim YAMLs from
 
 ## Architecture Diagram
 
-### Namespace mode (team-alpha)
+### Namespace mode (alpha-demo-dev)
 
 ```text
 Internet
@@ -61,38 +65,38 @@ Internet
 +------------------+
   |
   v
-+------------------------------------------+
-| Gateway: preprod-gateway  (ns: default)  |
-| GatewayClass: cilium                     |
-| Listeners: HTTPS :443, HTTP :80          |
-| allowedRoutes.namespaces.from: All       |
-+------------------------------------------+
++--------------------------------------------------+
+| Gateway: preprod-gateway  (ns: default)          |
+| GatewayClass: cilium                             |
+| Listeners: HTTPS :443, HTTP :80                  |
+| allowedRoutes.namespaces.from: All               |
++--------------------------------------------------+
   |
   v
-+------------------------------------------+
-| HTTPRoute        (ns: team-alpha)        |
-| parentRef: preprod-gateway/default       |
-| hostname: alpha.preprod.aws.refplat.org  |
-+------------------------------------------+
++--------------------------------------------------+
+| HTTPRoute         (ns: alpha-demo-dev)           |
+| parentRef: preprod-gateway/default               |
+| hostname: demo-alpha-dev.preprod.aws.refplat.org |
++--------------------------------------------------+
   |
   v
-+------------------------------------------+
-| Service          (ns: team-alpha)        |
-+------------------------------------------+
++--------------------------------------------------+
+| Service           (ns: alpha-demo-dev)           |
++--------------------------------------------------+
   |
   v
-+------------------------------------------+
-| Pod              (ns: team-alpha)        |
-| NetworkPolicy: default-deny-ingress     |
-|                + allow-gateway-ingress   |
-|                + allow-dns-egress        |
-| CiliumNetworkPolicy: allow-gateway-envoy|
-+------------------------------------------+
++--------------------------------------------------+
+| Pod               (ns: alpha-demo-dev)           |
+| NetworkPolicy: default-deny-ingress              |
+|                + allow-gateway-ingress           |
+|                + allow-dns-egress                |
+| CiliumNetworkPolicy: allow-gateway-envoy         |
++--------------------------------------------------+
 ```
 
-### Namespace mode (team-bravo)
+### Namespace mode (bravo-demo-dev)
 
-Same architecture as team-alpha. Both teams use namespace isolation.
+Same architecture as alpha-demo-dev. Both Environments use namespace isolation.
 
 > **vCluster mode** is supported by the environment module but currently deferred
 > (ADR-033) because HTTPRoute sync from virtual to host cluster requires the
@@ -100,12 +104,12 @@ Same architecture as team-alpha. Both teams use namespace isolation.
 
 ## Namespace Mode Detail
 
-The Crossplane Environment Composition provisions these resources for each team (the
-retired `environment` module created the same set for `mode = "namespace"`):
+The Crossplane Environment Composition provisions these resources for each Environment (the
+retired v2 `environment` module created the same set for `mode = "namespace"`):
 
 | Resource | Name | Purpose |
 |----------|------|---------|
-| `Namespace` | `team-<name>` | Workload boundary |
+| `Namespace` | `<team>-<product>-<stage>` | Workload boundary |
 | `ResourceQuota` | `environment-quota` | CPU, memory, pod, service/LB, PVC, and storage caps |
 | `LimitRange` | `environment-limits` | Default container requests/limits |
 | `NetworkPolicy` | `default-deny-ingress` | Block all inbound traffic by default |
@@ -114,7 +118,7 @@ retired `environment` module created the same set for `mode = "namespace"`):
 | `NetworkPolicy` | `allow-dns-egress` | Allow DNS (UDP/TCP 53) and internet egress, except the IMDS endpoint (169.254.169.254/32) |
 | `CiliumNetworkPolicy` | `allow-pod-identity-egress` | Permit egress to the EKS Pod Identity agent (`host` entity, `169.254.170.23:80`) so pods can fetch their workload AWS credentials (ADR-041) |
 | Namespace PSA labels | `enforce=baseline`, `warn`/`audit=restricted` | Block privileged/hostPath/hostNetwork pods (node-escape vectors) |
-| `RoleBinding` | `environment-developers` | Bind group `team-<name>:developers` to the `environment-developer` ClusterRole (ADR-039) |
+| `RoleBinding` | `environment-developers` | Bind group `<team>-<product>-<stage>:developers` to the `environment-developer` ClusterRole (ADR-039) |
 
 Pods are isolated by namespace. Cilium enforces NetworkPolicies at the eBPF
 level -- there is no iptables fallback. Cross-namespace traffic is blocked
@@ -262,122 +266,128 @@ on top. See ADR-033 for why vCluster mode is currently deferred.
 | Container default limit | 500m CPU, 512Mi memory |
 | Container default request | 100m CPU, 128Mi memory |
 
-### Per-team overrides
+### Per-environment overrides
 
-A team's `XTenant` claim accepts a per-team `resourceQuota` override (set in the
-team's `gitops/tenant-claims/<env>/<team>.yaml`); omitting it uses the defaults above:
+An `XEnvironment` claim accepts a per-environment `quota` override (set in the
+claim's `gitops/environments/<team>/<product>/<stage>[-<customer>].yaml`); omitting it uses
+the defaults above. The override is bounded by the owning Team's envelope `quotaCap`:
 
 ```yaml
 spec:
-  resourceQuota:
+  quota:
     cpu:    "8"
     memory: "16Gi"
     pods:   40
 ```
 
-Resource quotas apply at the team level (namespace-scoped), not per-app. All
-apps within a team share the same quota.
+Resource quotas apply at the Environment level (namespace-scoped), not per-service. All
+services within an Environment share the same quota.
 
 For vCluster environments (when enabled), resource limits are managed by vCluster's
 built-in policy enforcement settings. See ADR-033 for current status.
 
-## Sources of Truth: the `XTenant` claim and `teams.hcl`
+## Sources of Truth: the `XEnvironment` claim and the git-native registries
 
-The **`XTenant` claim is the environment source of truth** — it provisions the
-namespace, RBAC, quotas, NetworkPolicies, per-team Kyverno guardrails, the
-`Pod-team-<team>` role + Pod Identity association, the `DeveloperAccess-<team>`
-role + EKS access entry, and cross-account ECR. The Composition provisions all
-of it from that one CR. See [Crossplane Environment API](crossplane-environment-api.md).
+The **`XEnvironment` claim is the environment source of truth** — it provisions the
+namespace, RBAC, quotas, NetworkPolicies, per-product Kyverno guardrails, the per-service
+`Pod-<team>-<product>-[<customer>-]<stage>-<svc>` role + Pod Identity association, the
+`DeveloperAccess-<team>` role + EKS access entry, and cross-account ECR. The Composition
+provisions all of it from that one CR. See
+[Crossplane Environment API](crossplane-environment-api.md).
 
-`teams.hcl` is **no longer** the environment-provisioning source of truth. It now
-feeds only two **non-provisioning** concerns:
+The v2 `teams.hcl` app-delivery registry is **retired**. Team identity is the git-native
+**`Team`** CR (`gitops/teams/<team>.yaml`, ADR-063) and the deployable systems are
+**`Product`** CRs (`gitops/products/<team>/<product>.yaml`); app delivery and supply-chain
+policy now **derive** from the `XEnvironment`/`Product` registries:
 
 ```text
-+---------------------------+        +---------------------------+
-| gitops/tenant-claims/     |        |  teams.hcl                |
-|  XTenant per team (YAML)   |        |  alpha (migrated=true)    |
-|  alpha, bravo              |        |  bravo  (migrated=true)   |
-+-----------+---------------+         +-----------+---------------+
++-----------------------------+      +-----------------------------+
+| gitops/environments/        |      |  gitops/products/<team>/    |
+|  XEnvironment per env (YAML) |      |   Product per system (YAML) |
+|  alpha/demo/dev, bravo/...   |      |   alpha/demo, bravo/demo    |
++-----------+-----------------+       +-----------+-----------------+
             |                                     |
-            | ArgoCD sync (tenant-claims-preprod) | read_terragrunt_config()
+            | ArgoCD sync (per-product AppSet)    | fileset + yamldecode
             v                                     |
    Crossplane Composition               +---------+---------+
    ──────────────────────               |                   |
    Namespace, RBAC, quota,              v                   v
    NetworkPolicies, Kyverno          argocd-apps/        policy/
-   restrict-*, Pod Identity,         terragrunt.hcl      terragrunt.hcl
+   restrict-*, Pod Identity,         (v3-delivery)       terragrunt.hcl
    DeveloperAccess + access            |                   |
    entry, ECR repos                    v                   v
                                     ArgoCD Application   verify-images /
-                                    per app + preview    verify-attestations
-                                    ApplicationSets      (verify_subjects)
+                                    per Environment      verify-attestations
+                                    + preview            (verify_subjects)
 ```
 
-**EKS access entries** are now provisioned by the **Composition** (not `eks/`):
+**EKS access entries** are provisioned by the **Composition** (not `eks/`):
 each team's `DeveloperAccess-<team>` role gets a group-mapped access entry tying
-it to the Kubernetes group `team-<team>:developers`. Authorization is the
-namespace-scoped `environment-developers` RoleBinding the Composition provisions (not
-an AWS-managed policy). See ADR-039. The per-team role/access-entry loops were
-removed from the `eks`/`iam-roles` units.
+it to the per-namespace Kubernetes group `<team>-<product>-<stage>:developers`.
+Authorization is the namespace-scoped `environment-developers` RoleBinding the
+Composition provisions (not an AWS-managed policy). See ADR-039. The per-team
+role/access-entry loops were removed from the `eks`/`iam-roles` units.
 
-- All teams: principal `DeveloperAccess-<name>` → group `team-<name>:developers`
+- All teams: principal `DeveloperAccess-<team>` → group `<team>-<product>-<stage>:developers`
 
-**ArgoCD apps** (platform cluster, from `teams.hcl`): ArgoCD on the platform
-cluster creates Application resources targeting the preprod cluster. Each app's
-`repo_url` and `repo_path` from `teams.hcl` define the GitOps source; the
-destination namespace is derived from the team name. Apps with `preview = true`
+**ArgoCD apps** (platform cluster, ADR-069): `argocd-apps` runs **one
+ApplicationSet per Product**, a git-files generator over
+`gitops/environments/<team>/<product>/*.yaml` that emits one Application per
+`XEnvironment` targeting the preprod cluster. The GitOps source is the Product's
+app repo (`spec.repo`); the Application syncs `k8s/overlays/<stage>`, with the
+destination namespace + generated host injected. Services with `preview: true`
 get an additional ApplicationSet that creates ephemeral Applications for open
-pull requests (ADR-032). Migrated teams carry `migrated = true`, which withdraws
-them from the (now-removed) Terragrunt infra loops and tells the `policy` unit to
-skip the per-team `restrict-*` guardrails (the Composition owns those).
+pull requests (ADR-032).
 
-**Supply-chain policies** (`policy/`, from `teams.hcl`): the platform-owned
-`verify-images-team-<team>` / `verify-attestations-team-<team>` policies read
-each team's repo→identity mapping. These stay platform-owned for **all** teams
-(including migrated ones) — an environment must not own its own signature trust root,
-so they are deliberately not part of the claim/Composition.
+**Supply-chain policies** (`policy/`, derived from the `Product`/`XEnvironment`
+registries): the platform-owned `verify-images-<product>` /
+`verify-attestations-<product>` policies read each product's repo→identity
+mapping. These stay platform-owned for **all** products — an environment must not
+own its own signature trust root, so they are deliberately not part of the
+claim/Composition.
 
-### Adding a new team
+### Adding a new environment
 
-Onboarding a team is now an `XTenant` claim YAML in `gitops/tenant-claims/<env>/`
-(synced by ArgoCD), plus the `teams.hcl` entry for app delivery + supply-chain
-policies. Follow the
+Onboarding an environment is now an `XEnvironment` claim YAML in
+`gitops/environments/<team>/<product>/` (synced by ArgoCD), under an owning
+`Team` CR and `Product` CR. Follow the
 [environment onboarding runbook](../runbooks/environment-onboarding.md) — it walks the claim
-fields, the `migrated = true` flag, and verification. A minimal claim example
-lives at `infra/modules/crossplane/examples/environment-gamma.yaml`.
+fields (`team`/`product`/`stage`/`tier`/`services`) and verification. A minimal
+claim example lives at `infra/modules/crossplane/examples/environment-gamma.yaml`.
 
 ## Environment AWS Access (Pod Identity)
 
-Environments reach AWS resources via **platform-managed EKS Pod Identity** (ADR-041/047), not IRSA. A team
-declares its needs in its **`XTenant` claim** (`aws.serviceAccount` + `aws.policyStatements`); the
-Composition provisions a `Pod-team-<team>` role (trust `pods.eks.amazonaws.com` + an `aws:SourceAccount`
-condition, with a deny-escalation permissions boundary), its RolePolicy from the claim's
-`policyStatements`, and a `PodIdentityAssociation` binding `(cluster, team-<team>, <serviceAccount>) →
-role`. Pods running as that named SA receive credentials from the Pod Identity agent — no
-`eks.amazonaws.com/role-arn` annotation (which stays denied as a backstop).
+Environments reach AWS resources via **platform-managed EKS Pod Identity** (ADR-041/047), not IRSA. An
+Environment declares each service's needs in its **`XEnvironment` claim**
+(`services.<svc>.permissions.aws` — `serviceAccount` + `policyStatements`); the Composition provisions, per
+service, a `Pod-<team>-<product>-[<customer>-]<stage>-<svc>` role (trust `pods.eks.amazonaws.com` + an
+`aws:SourceAccount` condition, with a deny-escalation permissions boundary), its RolePolicy from the claim's
+`policyStatements`, and a `PodIdentityAssociation` binding `(cluster, <ns>, <serviceAccount>) → role`. Pods
+running as that named SA receive credentials from the Pod Identity agent — no `eks.amazonaws.com/role-arn`
+annotation (which stays denied as a backstop).
 
-**Generic AWS access, not S3 buckets.** Access to arbitrary AWS is via the claim's generic
-`aws.policyStatements` (IAM statements granted to the `Pod-team-<team>` role, capped by the
+**Generic AWS access, not S3 buckets.** Access to arbitrary AWS is via the claim's generic per-service
+`policyStatements` (IAM statements granted to the service's `Pod-…` role, capped by the
 deny-escalation boundary). The earlier per-team S3 buckets were a **demo** of the cross-account pattern
 and are **not** provisioned — there is no S3-shared unit.
 
-**Isolation is default-deny, by construction.** A team's `Pod-team-<team>` role is named from the team
-key and grants only what its own claim declares; the deny-escalation boundary prevents privilege growth.
-Environments cannot create Pod Identity associations or `XTenant` claims (the S1 `restrict-environment-control-plane`
-backstop denies environment principals), and the egress NetworkPolicy blocks IMDS so they cannot steal the
-node role. See the runbook
+**Isolation is default-deny, by construction.** A service's `Pod-…` role is named from the
+team/product/stage/service and grants only what its own claim declares; the deny-escalation boundary prevents
+privilege growth. Environments cannot create Pod Identity associations or `XEnvironment` claims (the S1
+`restrict-environment-control-plane` backstop denies environment principals), and the egress NetworkPolicy
+blocks IMDS so they cannot steal the node role. See the runbook
 [`environment-aws-access-pod-identity.md`](../runbooks/environment-aws-access-pod-identity.md) and the
 [Crossplane Environment API](crossplane-environment-api.md).
 
 ## PR Preview Environments
 
-Apps with `preview = true` in `teams.hcl` get ephemeral preview deployments
-for open pull requests. See [ADR-032](../adrs/032-pr-preview-environments.md)
+Services with `preview: true` on their `XEnvironment` claim get ephemeral preview
+deployments for open pull requests. See [ADR-032](../adrs/032-pr-preview-environments.md)
 for full design details.
 
 ```text
 Developer opens PR
-  -> GitHub Actions builds image (team-<team>/<app>:<head-sha>)
+  -> GitHub Actions builds image (team-<team>/<product>-<svc>:<head-sha>)
   -> ArgoCD ApplicationSet (PR generator) detects open PR
   -> Creates ephemeral Application with kustomize overrides:
      - namePrefix: pr-<N>-
@@ -385,7 +395,7 @@ Developer opens PR
      - images: ECR image with head SHA tag
      - patches: HTTPRoute hostname rewrite
      - nameReference: backendRef auto-update via app repo config
-  -> Preview at <app>-pr-<N>.preprod.aws.refplat.org
+  -> Preview at <product>-<team>-<stage>-pr-<N>.preprod.aws.refplat.org
   -> PR closes -> ArgoCD auto-deletes preview resources
 ```
 
@@ -399,13 +409,13 @@ uses `app.kubernetes.io/instance: stable`; each preview uses
 ### What namespace mode protects against
 
 - **Cross-environment network traffic** -- Default-deny ingress with Cilium
-  enforcement. Pods in `team-alpha` cannot receive traffic from `team-bravo`.
+  enforcement. Pods in `alpha-demo-dev` cannot receive traffic from `bravo-demo-dev`.
 - **Resource exhaustion** -- ResourceQuota caps CPU, memory, and pod count.
   LimitRange sets defaults so pods without explicit requests still get bounded.
 - **Unauthorized API access** -- each team's `DeveloperAccess-<team>` role is
-  group-mapped and bound (namespace-scoped) to the `environment-developer` role in its
-  own namespace only. A developer can edit only their own namespace and can assume
-  only their own team's role (ADR-039).
+  group-mapped and bound (namespace-scoped) to the `environment-developer` role in each
+  of its Environments' namespaces only. A developer can edit only their own team's
+  Environment namespaces and can assume only their own team's role (ADR-039).
 - **Node escape via pods** -- Pod Security Admission (`enforce=baseline`) blocks
   privileged, hostPath, and host-network/PID pods; the egress policy blocks the IMDS
   endpoint so pods cannot steal node-role credentials.

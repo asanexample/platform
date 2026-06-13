@@ -110,5 +110,5 @@ wiring does not.
 - IRSA and Pod Identity now coexist: IRSA for platform add-ons, Pod Identity for tenants. Documented so
   the two mechanisms aren't confused.
 
-See the runbook [`tenant-aws-access-pod-identity.md`](../runbooks/tenant-aws-access-pod-identity.md) for
+See the runbook [`tenant-aws-access-pod-identity.md`](../runbooks/environment-aws-access-pod-identity.md) for
 how a team requests access and the cross-team isolation test.

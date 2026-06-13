@@ -1,7 +1,7 @@
 # Runbook: Backstage Scaffolder GitHub App
 
 The **write-capable** GitHub App that the Backstage scaffolder uses to open environment-provisioning PRs against
-the platform repo ([ADR-062](../adrs/062-self-service-environment-provisioning.md) §5). It is **separate** from the
+the platform repo ([ADR-062](../adrs/062-self-service-tenant-provisioning.md) §5). It is **separate** from the
 read-only catalog-discovery App ([backstage-github-app.md](backstage-github-app.md)) — that one is read-only
 *forever*; never widen it.
 
@@ -18,7 +18,7 @@ A self-service PR-with-automerge flow is a privilege-delegation engine, so this 
   claim-only flows.)*
 - **PR-only** — `Contents: write` + `Pull requests: write`, nothing more. **No** Administration, Workflows,
   Actions, or Organization permissions. It *opens* PRs; it does not merge — automerge is GitHub's, gated by
-  required status checks ([ADR-062](../adrs/062-self-service-environment-provisioning.md) §3-4).
+  required status checks ([ADR-062](../adrs/062-self-service-tenant-provisioning.md) §3-4).
 - A GitHub App scopes by **repo, not path**, so it *can* technically edit any file in the platform repo. The
   compensating controls are the **automerge path/diff restriction** + **CI-gate integrity** (only claim-path
   diffs auto-merge; the gate workflow runs from the protected base branch) — see ADR-062 §4. Treat Backstage

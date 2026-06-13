@@ -65,10 +65,10 @@ Azure/GCP deployment today.)
 ## Supply-Chain Security
 
 - **Image signing** (ADR-014 Phase 3) — app CI **cosign-signs** images keyless (GitHub OIDC →
-  Fulcio/Rekor); Kyverno `verify-images-team-<team>` admits only images signed by that team's workflow.
+  Fulcio/Rekor); Kyverno `verify-images-<team>-<product>` admits only images signed by that product's workflow.
 - **SBOM + provenance** — CycloneDX SBOM + **SLSA Build L3** provenance (isolated `trusted-ci` signer,
-  ADR-042), required at admission by `verify-attestations-team-<team>` (Enforce on preprod).
-- **Per-team ECR scoping** (ADR-028) — `team-<team>/*` repos, immutable tags, scan-on-push.
+  ADR-042), required at admission by `verify-attestations-<team>-<product>` (Enforce on preprod).
+- **Per-product ECR scoping** (ADR-028) — `team-<team>/<product>-*` repos, immutable tags, scan-on-push.
 
 ## Detection & Monitoring
 
@@ -85,7 +85,7 @@ Azure/GCP deployment today.)
 [Kyverno](https://kyverno.io/) (ADR-014) runs in **Enforce** on preprod and platform, layered above the
 Pod Security Admission `baseline` floor:
 
-- **Image provenance** — approved-registry + per-team `team-<name>/*` scoping; cosign signature +
+- **Image provenance** — approved-registry + per-product `team-<team>/<product>-*` scoping; cosign signature +
   attestation verification.
 - **Pod hardening** — `mutate` injects `securityContext`/`automountServiceAccountToken: false`;
   backstops deny privilege-escalation and `seccompProfile: Unconfined`.
@@ -101,8 +101,9 @@ Security controls scale with the `compliance_tier` in each workload's `workload.
 
 ### Standard (SOC2)
 
-- Shared cluster with **namespace isolation** (vCluster deferred, ADR-033) — per-team namespace,
-  ResourceQuota, LimitRange, default-deny NetworkPolicies, namespace-scoped RBAC.
+- Shared cluster with **namespace isolation** (vCluster deferred, ADR-033) — per-Environment
+  (`<team>-<product>-<stage>`) namespace, ResourceQuota, LimitRange, default-deny NetworkPolicies,
+  namespace-scoped RBAC.
 - Private endpoints, audit logging, Kyverno Enforce.
 
 ### HIPAA

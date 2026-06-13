@@ -24,12 +24,12 @@ Key knobs (in the `policy` unit values, applied per cluster):
 
 ## 1. A pod is denied at admission
 
-**Symptom:** a Deployment in `team-<team>` won't roll out; ReplicaSet events show a Kyverno denial naming
-`verify-images-team-<team>` or `verify-attestations-team-<team>`.
+**Symptom:** a Deployment in `<team>-<product>-<stage>` won't roll out; ReplicaSet events show a Kyverno
+denial naming `verify-images-product-<team>-<product>` or `verify-attestations-product-<team>-<product>`.
 
 ```bash
-kubectl --context <cluster> -n team-<team> describe rs <rs>      # see the admission error
-kubectl --context <cluster> get clusterpolicy verify-images-team-<team> -o yaml | grep -iE "action|failurePolicy"
+kubectl --context <cluster> -n <team>-<product>-<stage> describe rs <rs>      # see the admission error
+kubectl --context <cluster> get clusterpolicy verify-images-product-<team>-<product> -o yaml | grep -iE "action|failurePolicy"
 ```
 
 Walk the chain (stop at the first failure):
@@ -39,20 +39,20 @@ Walk the chain (stop at the first failure):
    ```bash
    cosign verify "$IMAGE@$DIGEST" \
      --certificate-identity-regexp "^https://github.com/asanexample/trusted-ci/.github/workflows/build-sign.yml@" \
-     --certificate-github-workflow-repository asanexample/app-<team> \
+     --certificate-github-workflow-repository asanexample/app-<team>-<product> \
      --certificate-oidc-issuer https://token.actions.githubusercontent.com
    ```
 
    The cert **subject** is the shared `build-sign.yml` reusable workflow (signing is no longer per-app);
-   per-team isolation is the `githubWorkflowRepository` extension (= the caller app repo). Policy also
+   per-product isolation is the `githubWorkflowRepository` extension (= the caller app repo). Policy also
    admits an app-signed fallback for bespoke apps.
 
    - *No signature* → the app's thin CI didn't call the shared `build-sign` workflow (or signed the
      **tag**, not the digest). Fix the workflow ([onboarding runbook](app-supply-chain-onboarding.md))
      and rebuild.
    - *Signed by a different identity* → wrong caller repo (the `githubWorkflowRepository` extension), or
-     the team's `verifySubjects` in `teams.hcl` don't list this repo. Fix `teams.hcl` + re-apply the
-     `policy` unit.
+     the product's `verifySubjects` (derived from the `XEnvironment` claim's `spec.services.<svc>.repo`)
+     don't list this repo. Fix the claim + re-apply the `policy` unit.
 
 2. **Are the attestations present + the right predicate types?**
 
@@ -73,7 +73,7 @@ Walk the chain (stop at the first failure):
    the cluster can't reach `rekor.sigstore.dev` / `fulcio.sigstore.dev`, every verify times out
    (`webhookTimeoutSeconds: 30`). → go to §2.
 
-**Unblock fast (single team, low risk):** flip *attestations* (or *signatures*) to Audit for that rollout,
+**Unblock fast (single product, low risk):** flip *attestations* (or *signatures*) to Audit for that rollout,
 fix forward, then re-Enforce. Prefer narrowing to the failing policy over disabling globally.
 
 ---
@@ -113,7 +113,7 @@ If the GitHub **org** or a repo/workflow path changes, the OIDC `subject` on new
 existing `verifySubjects` won't match — new images get denied while old ones still verify.
 
 This is a **dual-subject transition** (worked example in
-[`cosign-image-signing.md`](cosign-image-signing.md) §"Org migration"):
+[`cosign-image-signing.md`](../architecture/cosign-image-signing.md) §"Org migration"):
 
 1. **Before** the cutover, add the **new** identity to the team's `verifySubjects` (and
    `trustedCiSubjectRegExp` / `attestCallerRepos` if the trusted-ci repo moved) **alongside** the old one —
@@ -122,19 +122,20 @@ This is a **dual-subject transition** (worked example in
 3. After all running images are rebuilt under the new identity, **remove** the old entry and re-apply.
 
 No keys to rotate — identities are short-lived Fulcio certs. "Rotation" here means updating *which OIDC
-identities the policy trusts*, always edited in `teams.hcl` → `policy` unit (never hand-edited on-cluster).
+identities the policy trusts*, always edited in the `XEnvironment` claim (`spec.services.<svc>.repo`) →
+`policy` unit (never hand-edited on-cluster).
 
 ---
 
 ## 4. Suspected compromise of a signing identity
 
-If a team's GitHub repo / OIDC is believed compromised (an attacker could mint valid signatures as that
-team):
+If a product's GitHub repo / OIDC is believed compromised (an attacker could mint valid signatures as that
+product):
 
-1. **Revoke trust immediately** — remove that team's entry from `verifySubjects` (and any caller repo from
+1. **Revoke trust immediately** — remove that product's entry from `verifySubjects` (and any caller repo from
    `attestCallerRepos`) and apply the `policy` unit. New pods using images "signed by" that identity are now
    denied everywhere.
-2. **Quarantine running workloads** — scale down / cordon the team's namespaces as warranted.
+2. **Quarantine running workloads** — scale down / cordon the product's environment namespaces as warranted.
 3. **Audit Rekor** — every signature is in the public transparency log; enumerate what was signed under the
    identity and when:
 
@@ -142,9 +143,10 @@ team):
    rekor-cli search --email <workflow-identity>            # or by image digest
    ```
 
-4. Rotate the GitHub repo/OIDC trust on the AWS side (the `github-actions-ecr-push-<team>` role's trust
-   policy — see [ADR-036](../adrs/036-github-actions-oidc-federation.md)) and re-onboard with a clean
-   identity (§3 dual-subject, but the old identity is *removed*, not retired gracefully).
+4. Rotate the GitHub repo/OIDC trust on the AWS side (the
+   `github-actions-ecr-push-product-<team>-<product>` role's trust policy — see
+   [ADR-036](../adrs/036-github-actions-oidc-federation.md)) and re-onboard with a clean identity (§3
+   dual-subject, but the old identity is *removed*, not retired gracefully).
 
 You **cannot** delete a Rekor entry (append-only by design) — that's the point: the tamper-evident record of
 what was signed survives the incident for forensics.
@@ -158,8 +160,8 @@ walked in time). Prefer the **smallest** scope:
 
 | Scope | Action | Reverts to |
 |-------|--------|-----------|
-| One team, attestations only | set `attestFailureAction: Audit` for that policy / team | re-apply Enforce |
-| One team, signatures too | `verifyFailureAction: Audit` | re-apply Enforce |
+| One product, attestations only | set `attestFailureAction: Audit` for that policy / product | re-apply Enforce |
+| One product, signatures too | `verifyFailureAction: Audit` | re-apply Enforce |
 | Whole cluster, verification | `enableImageVerification: false` (and/or `enableAttestationVerification: false`), apply | re-enable + apply |
 | Webhook down / can't apply | delete/patch the Kyverno webhook config — [`kyverno-break-glass.md`](kyverno-break-glass.md) | restore webhook |
 

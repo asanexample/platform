@@ -13,13 +13,13 @@ together. Reference material lives in
 
 ## 1. The problem: "is this container image the one we actually built?"
 
-A Kubernetes cluster pulls a container image (e.g. `…/team-alpha/demo@sha256:d60ea84…`) and runs it.
+A Kubernetes cluster pulls a container image (e.g. `…/team-alpha/demo-web@sha256:d60ea84…`) and runs it.
 By default the cluster trusts whatever is in the registry. That's a **supply-chain** gap:
 
 - If an attacker pushes a malicious image to your registry (stolen creds, a poisoned CI step, a typo'd
   tag), the cluster will happily run it.
-- If one team pushes an image into **another** team's repo path, nothing stops the other team from
-  running it.
+- If one product pushes an image into **another** product's repo path, nothing stops the other product
+  from running it.
 - You have no cryptographic proof that the image running in prod came from **your** build pipeline and
   not from someone's laptop.
 
@@ -50,7 +50,7 @@ leans on three pieces working together:
 
 The flow, in plain terms:
 
-1. The CI job asks GitHub for an **OIDC token** ("I'm `repo:asanexample/app-alpha`, workflow
+1. The CI job asks GitHub for an **OIDC token** ("I'm `repo:asanexample/app-alpha-demo`, workflow
    `deploy.yml`, branch `main`").
 2. cosign sends that token to **Fulcio**, which says "verified — here's a 10-minute certificate stamped
    with that exact identity."
@@ -68,8 +68,8 @@ has the record.
 > identity is a specific GitHub Actions workflow — the **shared** signing workflow
 > `https://github.com/asanexample/trusted-ci/.github/workflows/build-sign.yml@<sha>` — paired with the
 > certificate's `githubWorkflowRepository` extension naming the **caller** app repo (e.g.
-> `asanexample/app-alpha`). Fulcio sets that extension from the caller's *own* OIDC, so another team can't
-> forge it. The workflow path is the same for everyone; the per-team gate is which caller repo invoked it.
+> `asanexample/app-alpha-demo`). Fulcio sets that extension from the caller's *own* OIDC, so another product
+> can't forge it. The workflow path is the same for everyone; the per-product gate is which caller repo invoked it.
 > That's the whole security model. (See [ADR-050](../adrs/050-shared-build-sign-reusable-workflow.md) for
 > why image+SBOM signing moved to a shared, app-team-unwritable workflow — the same isolation pattern
 > provenance already used.)
@@ -118,15 +118,15 @@ keyless).
 
 The app repo no longer signs the image itself. Its `deploy.yml` / `preview.yml` are **thin callers**:
 sibling 1-level jobs that invoke the shared signer and the provenance signer, plus a `deploy` job that
-pins the resulting signed digest. The generic reference implementation is **`app-bravo`** (previously
-`app-alpha` carried inline build/sign — that's the legacy shape, still supported as a fallback, §8).
+pins the resulting signed digest. The generic reference implementation is **`app-bravo-demo`** (previously
+`app-alpha-demo` carried inline build/sign — that's the legacy shape, still supported as a fallback, §8).
 
-Here is the real caller shape from `app-bravo/.github/workflows/deploy.yml`:
+Here is the real caller shape from `app-bravo-demo/.github/workflows/deploy.yml`:
 
 ```yaml
 permissions:
   id-token: write        # ← REQUIRED: the *caller's* OIDC identity is what stamps the cert's
-                         #   githubWorkflowRepository extension (= asanexample/app-bravo)
+                         #   githubWorkflowRepository extension (= asanexample/app-bravo-demo)
   contents: write        # (used later to commit the pinned-digest manifest back)
 
 jobs:
@@ -151,13 +151,13 @@ Key points, decoded:
 - **The signing runs in `trusted-ci`, not the app.** `build-sign.yml` builds, pushes by digest, then
   `cosign sign`s **both the image and its SBOM attestation** keyless — under **trusted-ci's** OIDC
   identity. Because it's a **reusable** workflow, the Fulcio cert's *subject* is the **signer**
-  (`…/trusted-ci/.github/workflows/build-sign.yml@<sha>`), the **same for every team**. App teams can't
+  (`…/trusted-ci/.github/workflows/build-sign.yml@<sha>`), the **same for every product**. App teams can't
   edit `build-sign.yml` (CODEOWNERS / branch protection), so they can't change *how* signing happens.
   This is exactly the isolation provenance already used (§10b); ADR-050 extends it to image + SBOM.
 - **`id-token: write` on the caller** still matters — but now it stamps the cert's
-  **`githubWorkflowRepository`** extension with the **caller** repo (`asanexample/app-bravo`). Fulcio
-  sets that from the caller's own OIDC, so one team can't forge another's caller value. **That extension
-  is the per-team gate** (§6), replacing the old per-team *subject*.
+  **`githubWorkflowRepository`** extension with the **caller** repo (`asanexample/app-bravo-demo`). Fulcio
+  sets that from the caller's own OIDC, so one product can't forge another's caller value. **That extension
+  is the per-product gate** (§6), replacing the old per-product *subject*.
 - **Sign by `@digest`, not by `:tag`.** The build output is the immutable `sha256:…` content hash of
   the image. Tags can be moved; a digest can't. The signature is bound to the exact bytes. (Kyverno
   later re-checks by digest too.)
@@ -171,7 +171,7 @@ Key points, decoded:
 
 `preview.yml` is the same idea for pull requests: it calls the same `build-sign.yml`, tagging by
 `github.event.pull_request.head.sha`. Because the signer is shared, the cert **subject is identical** to
-deploy's; the caller-repo extension is likewise identical (`asanexample/app-bravo`) — what differs is the
+deploy's; the caller-repo extension is likewise identical (`asanexample/app-bravo-demo`) — what differs is the
 caller's *trigger* (`pull_request`), not the trust identity. (Under the legacy app-signed fallback, a
 preview's identity differed from deploy's because its *ref* was a PR ref — which is why the policy still
 also matches the legacy app subjects with a **regex**, see §6.)
@@ -182,44 +182,44 @@ Run this against our running image and you can read the identity straight out of
 
 ```bash
 cosign verify \
-  829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo@sha256:d60ea84… \
+  829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo-web@sha256:d60ea84… \
   --certificate-identity-regexp '^https://github\.com/asanexample/trusted-ci/\.github/workflows/build-sign\.yml@' \
-  --certificate-github-workflow-repository asanexample/app-alpha \
+  --certificate-github-workflow-repository asanexample/app-alpha-demo \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
 ```
 
 The output's certificate extensions spell out exactly who signed it — note the **subject is the shared
-signer** while the **repository extension is the caller team**:
+signer** while the **repository extension is the caller product**:
 
 ```text
 Issuer:  https://token.actions.githubusercontent.com
 Subject: https://github.com/asanexample/trusted-ci/.github/workflows/build-sign.yml@<sha>
-githubWorkflowRepository: asanexample/app-alpha
+githubWorkflowRepository: asanexample/app-alpha-demo
 githubWorkflowTrigger:    push
 …and "Existence of the claims in the transparency log was verified" (that's the Rekor check)
 ```
 
-The `Subject` is the **same for every team** (the shared signer); it's the `githubWorkflowRepository`
-extension — `asanexample/app-alpha` — that Kyverno keys on per team. (An image signed under the legacy
+The `Subject` is the **same for every product** (the shared signer); it's the `githubWorkflowRepository`
+extension — `asanexample/app-alpha-demo` — that Kyverno keys on per product. (An image signed under the legacy
 app-signed `deploy.yml`/`preview.yml` subject is still accepted as a fallback, §8.)
 
 ---
 
 ## 5. Half 2 — how the cluster verifies (Kyverno `verify-images`)
 
-On every cluster, Kyverno runs a per-team policy named `verify-images-team-<team>` (rendered from
-`infra/modules/policy/policies-chart/templates/verify-images.yaml`). It's an **admission** policy: it
+On every cluster, Kyverno runs a per-product policy named `verify-images-product-<team>-<product>` (rendered
+from `infra/modules/policy/policies-chart/templates/verify-images.yaml`). It's an **admission** policy: it
 runs when a Pod is *created*, before the Pod is allowed to start.
 
-What it does for a Pod in `team-alpha`:
+What it does for a Pod in an `alpha`/`demo` environment namespace:
 
-1. Look at each container image reference. If it matches `…/team-alpha/*`, the policy applies.
+1. Look at each container image reference. If it matches `…/team-alpha/demo-*`, the policy applies.
 2. Fetch that image's **signature** from ECR (this is why Kyverno needs ECR read — see §7).
 3. Check the signature's certificate. Either of two identities is acceptable (`count: 1`):
    - **Shared signer (primary):** **Subject** matches the shared
      `…/trusted-ci/.github/workflows/build-sign.yml@…` **and** the
-     **`githubWorkflowRepository`** extension equals the team's app repo (e.g. `asanexample/app-alpha`).
-   - **App-signed (fallback):** **Subject** = the team's own `deploy.yml@refs/heads/main` (or
+     **`githubWorkflowRepository`** extension equals the product's app repo (e.g. `asanexample/app-alpha-demo`).
+   - **App-signed (fallback):** **Subject** = the product's own `deploy.yml@refs/heads/main` (or
      `preview.yml` for PRs) — retained as the escape hatch for bespoke-build apps (§8).
    - In both cases: **Issuer** = `https://token.actions.githubusercontent.com` and **Rekor** inclusion
      (the signature is recorded in the transparency log).
@@ -230,30 +230,30 @@ The actual policy spec (simplified):
 
 ```yaml
 verifyImages:
-  - imageReferences: ["<team-ecr-prefix>/*"]
+  - imageReferences: ["<product-ecr-prefix>/*"]   # e.g. team-alpha/demo-*
     mutateDigest: true        # rewrite tag→digest on admit (see below)
     verifyDigest: true
     required: true            # an image with NO signature is denied, not skipped
     attestors:
       - count: 1              # ANY ONE of the entries below must verify
         entries:
-          - keyless:          # PRIMARY: shared trusted-ci signer, gated per-team by the caller-repo extension
+          - keyless:          # PRIMARY: shared trusted-ci signer, gated per-product by the caller-repo extension
               issuer: https://token.actions.githubusercontent.com
               subjectRegExp: "^https://github.com/asanexample/trusted-ci/.github/workflows/build-sign.yml@"
               additionalExtensions:
-                githubWorkflowRepository: "asanexample/app-alpha"   # the CALLER repo = the per-team gate
+                githubWorkflowRepository: "asanexample/app-alpha-demo"   # the CALLER repo = the per-product gate
               rekor: { url: https://rekor.sigstore.dev }
           - keyless:          # FALLBACK: legacy app-signed stable deploys (main branch)
               issuer: https://token.actions.githubusercontent.com
-              subject: "https://github.com/asanexample/app-alpha/.github/workflows/deploy.yml@refs/heads/main"
+              subject: "https://github.com/asanexample/app-alpha-demo/.github/workflows/deploy.yml@refs/heads/main"
               rekor: { url: https://rekor.sigstore.dev }
           - keyless:          # FALLBACK: legacy app-signed PR previews (ref varies per PR → regex)
               issuer: https://token.actions.githubusercontent.com
-              subjectRegExp: "https://github.com/asanexample/app-alpha/.github/workflows/preview.yml@refs/.*"
+              subjectRegExp: "https://github.com/asanexample/app-alpha-demo/.github/workflows/preview.yml@refs/.*"
               rekor: { url: https://rekor.sigstore.dev }
 ```
 
-The primary entry comes from the module's new `trusted_ci_build_subject_regexp` + the per-team caller
+The primary entry comes from the module's new `trusted_ci_build_subject_regexp` + the per-product caller
 from `shared_signer_caller_repos`; the two app-signed entries come from `verify_subjects` (retained as
 the bespoke-build fallback — the "heterogeneity model").
 
@@ -270,47 +270,48 @@ Three details that matter:
 
 ---
 
-## 6. Per-team identity: why `team-alpha` can't run `team-bravo`'s image
+## 6. Per-product identity: why `alpha`/`demo` can't run `bravo`/`demo`'s image
 
-Each team gets its **own** `verify-images-team-<team>` policy, and each policy only accepts **that
-team's** identity. The signer workflow (`build-sign.yml`) is now **shared**, so the per-team gate is the
-certificate's **`githubWorkflowRepository` extension** — the **caller** app repo. Fulcio stamps that
-from the caller's *own* OIDC token, so `app-bravo` cannot produce a signature whose extension reads
-`asanexample/app-alpha`; `verify-images-team-alpha` requires exactly that value. (The retained
-app-signed fallback gates the old way, on the per-team *subject*.) So even though all images live in one
-ECR registry and share one signer, a team can only run images its own pipeline triggered — the
-supply-chain analog of the per-team ECR-push and registry-scoping rules. This is the **same** mechanism
-provenance verification already used (§10b). The team data (which caller repo maps to which team) is
-**not** in the module; it comes from `teams.hcl` at the Terragrunt unit and is passed in via
+Each product gets its **own** `verify-images-product-<team>-<product>` policy, and each policy only accepts
+**that product's** identity. The signer workflow (`build-sign.yml`) is now **shared**, so the per-product
+gate is the certificate's **`githubWorkflowRepository` extension** — the **caller** app repo. Fulcio stamps
+that from the caller's *own* OIDC token, so `app-bravo-demo` cannot produce a signature whose extension reads
+`asanexample/app-alpha-demo`; `verify-images-product-alpha-demo` requires exactly that value. (The retained
+app-signed fallback gates the old way, on the per-product *subject*.) So even though all images live in one
+ECR registry and share one signer, a product can only run images its own pipeline triggered — the
+supply-chain analog of the per-product ECR-push and registry-scoping rules. This is the **same** mechanism
+provenance verification already used (§10b). The product data (which caller repo maps to which product) is
+**not** in the module; it comes from the `XEnvironment` claims at the Terragrunt unit and is passed in via
 `shared_signer_caller_repos` (the shared-signer gate) and `verify_subjects` (the app-signed fallback).
 
-> **These policies stay platform-owned — for *every* team.** `verify-images` (and `verify-attestations`,
-> §10b) live in the `policy` Terragrunt unit for **all** teams, including those migrated to a Crossplane
-> `XTenant` claim. They are **deliberately not** part of the Environment claim/Composition: an environment must not
-> own its own signature **trust root** (it could then trust its own forged identity). So while the claim
-> owns a migrated team's *guardrail* policies (`restrict-*`), the signature/attestation **trust** policies
-> remain platform-owned. `teams.hcl` still supplies the per-team repo→identity mapping
-> (`shared_signer_caller_repos` for the shared-signer gate, plus `verify_subjects` for the app-signed
-> fallback) for the `policy` unit — that mapping is read for migrated teams too. See
-> [Crossplane Environment API](crossplane-environment-api.md) ("supply-chain split") and ADR-014/046.
+> **These policies stay platform-owned — for *every* product.** `verify-images` (and `verify-attestations`,
+> §10b) live in the `policy` Terragrunt unit for **all** products, including those provisioned by a Crossplane
+> `XEnvironment` claim. They are **deliberately not** part of the Environment claim/Composition: an environment
+> must not own its own signature **trust root** (it could then trust its own forged identity). So while the
+> Composition owns a product's *guardrail* policies (`restrict-*`, scoped `team-<team>/<product>-*`), the
+> signature/attestation **trust** policies remain platform-owned. The `XEnvironment` claims still supply the
+> per-product repo→identity mapping (`shared_signer_caller_repos` for the shared-signer gate, plus
+> `verify_subjects` for the app-signed fallback) for the `policy` unit — that mapping is read for every
+> product. See [Crossplane Environment API](crossplane-environment-api.md) ("supply-chain split") and ADR-014/046.
 
 Where the identities come from (`infra/live/aws/preprod/us-east-1/platform/policy/terragrunt.hcl`):
 
 ```hcl
-# Shared signer (primary): one regexp for everyone, gated per-team by the caller repo.
+# Shared signer (primary): one regexp for everyone, gated per-product by the caller repo.
 trusted_ci_build_subject_regexp = "^https://github.com/asanexample/trusted-ci/.github/workflows/build-sign.yml@"
-shared_signer_caller_repos      = { for k, v in local.teams : k => v.repo }   # e.g. asanexample/app-alpha
+shared_signer_caller_repos      = { for k, v in local.products : k => v.repo }   # e.g. asanexample/app-alpha-demo
 
-# App-signed (fallback): the team's own deploy/preview subjects.
-verify_subjects = { for k, v in local.teams : k => [ {
+# App-signed (fallback): the product's own deploy/preview subjects.
+verify_subjects = { for k, v in local.products : k => [ {
   deploy_subject         = "${repo_url}/.github/workflows/deploy.yml@refs/heads/main"
   preview_subject_regexp = "${repo_url}/.github/workflows/preview.yml@refs/.*"
 } ] }
 ```
 
-`repo_url` is each team's app repo from `teams.hcl`. With the shared signer, the per-team org/repo name
-now appears as the **caller** in `shared_signer_caller_repos` (and still in the app-signed
-`verify_subjects` fallback) — which is why an org rename is a coordinated change (§8).
+`repo_url` is each product's app repo (`spec.services.<svc>.repo`) derived from its `XEnvironment` claim.
+With the shared signer, the per-product org/repo name now appears as the **caller** in
+`shared_signer_caller_repos` (and still in the app-signed `verify_subjects` fallback) — which is why an org
+rename is a coordinated change (§8).
 
 ---
 
@@ -399,15 +400,15 @@ aws ecr get-login-password --region us-east-1 --profile platform \
   | cosign login 829808296602.dkr.ecr.us-east-1.amazonaws.com --username AWS --password-stdin
 
 cosign verify \
-  829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo@sha256:<digest> \
+  829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo-web@sha256:<digest> \
   --certificate-identity-regexp '^https://github\.com/asanexample/trusted-ci/\.github/workflows/build-sign\.yml@' \
-  --certificate-github-workflow-repository asanexample/app-<team> \
+  --certificate-github-workflow-repository asanexample/app-<team>-<product> \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
 ```
 
 A clean exit (and a printed `Subject:`) = good signature. A non-zero exit = no/invalid signature for that
 identity. (For an image still on the legacy app-signed fallback, swap the identity regexp for
-`'https://github.com/asanexample/app-<team>/.github/workflows/(deploy|preview).yml@.*'` and drop the
+`'https://github.com/asanexample/app-<team>-<product>/.github/workflows/(deploy|preview).yml@.*'` and drop the
 `--certificate-github-workflow-repository` flag.)
 
 ### When a Pod is denied at admission
@@ -418,8 +419,8 @@ The deny message names the policy. Walk it back:
    (check the `build-sign` job actually ran — the caller invoked
    `asanexample/trusted-ci/.github/workflows/build-sign.yml` — and that the caller set `id-token: write`).
 2. **Right identity?** The signature's `Subject` must be the shared `build-sign.yml` signer **and** its
-   `githubWorkflowRepository` extension must equal the team's caller repo (`shared_signer_caller_repos`);
-   or, for the fallback, the `Subject` must match the team's app-signed `verify_subjects`. After a repo
+   `githubWorkflowRepository` extension must equal the product's caller repo (`shared_signer_caller_repos`);
+   or, for the fallback, the `Subject` must match the product's app-signed `verify_subjects`. After a repo
    move/rename, the caller-repo mismatch is the usual culprit — see §8.
 3. **Can Kyverno reach ECR?** If signatures exist but admission still fails with fetch errors, check the
    IRSA role (§7) is attached to the Kyverno controllers (`kubectl -n kyverno get sa
@@ -435,9 +436,9 @@ The deny message names the policy. Walk it back:
 To pass verification, an app's `deploy.yml`/`preview.yml` must be a **thin caller** of the shared signer:
 set `id-token: write`, then `uses: asanexample/trusted-ci/.github/workflows/build-sign.yml@<sha>` (image +
 SBOM signing) and `slsa-provenance.yml` (provenance), and pin the resulting `@digest`. The shared workflow
-does the build/push/sign; the app holds no keys or secrets. `app-bravo` is the reference implementation,
-and the platform side (trusting that identity) is wired from `teams.hcl`. (A bespoke-build app may still
-self-sign under the app-signed fallback — §8 — but the shared caller is the default.)
+does the build/push/sign; the app holds no keys or secrets. `app-bravo-demo` is the reference implementation,
+and the platform side (trusting that identity) is wired from the `XEnvironment` claims. (A bespoke-build app
+may still self-sign under the app-signed fallback — §8 — but the shared caller is the default.)
 
 ---
 
@@ -455,10 +456,11 @@ app's own build job, which a compromised build could forge (Build L1+):
 - Because it is a **reusable** workflow, the Fulcio cert's **subject is the signer workflow, not the
   caller** — so the app build can't forge provenance attributed to trusted-ci. That isolation is the
   SLSA **Build L3** lever. The cert's `GitHub Workflow Repository` extension still records the caller
-  (`app-<team>`), which per-team verification keys on.
-- It mints its own ECR token by assuming the **caller team's `github-actions-ecr-push-<team>` role**
-  (AWS doesn't honor the `job_workflow_ref` claim in trust policies — only `sub`/`aud`), then
-  `cosign attest --type slsaprovenance` (legacy `.att`, same format this doc's verification uses).
+  (`app-<team>-<product>`), which per-product verification keys on.
+- It mints its own ECR token by assuming the **caller product's
+  `github-actions-ecr-push-product-<team>-<product>` role** (AWS doesn't honor the `job_workflow_ref` claim
+  in trust policies — only `sub`/`aud`), then `cosign attest --type slsaprovenance` (legacy `.att`, same
+  format this doc's verification uses).
 
 Verify the isolated provenance by hand:
 
@@ -466,21 +468,21 @@ Verify the isolated provenance by hand:
 cosign verify-attestation --type slsaprovenance \
   --certificate-identity-regexp 'https://github.com/asanexample/trusted-ci/.github/workflows/slsa-provenance.yml@.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-github-workflow-repository asanexample/app-<team> \
-  <registry>/team-<team>/<app>@<digest>
+  --certificate-github-workflow-repository asanexample/app-<team>-<product> \
+  <registry>/team-<team>/<product>-<svc>@<digest>
 ```
 
 The rollout was dual-provenance first (old hand-authored + new isolated attestation both present) so
 admission never broke; **preprod has since dropped the hand-authored step**, and Kyverno's
 `verify-attestations` is in **Enforce** requiring the trusted-ci identity — **Build L3 on preprod**.
 Replicating to the **platform** cluster is the remaining step (ADR-042 P4). The image **signature**
-policy (sections 4–6) remains the primary per-team gate.
+policy (sections 4–6) remains the primary per-product gate.
 
 > **SBOM attestations follow the same shared-signer model (ADR-050).** The image's **SBOM** attestation
 > is signed by the same shared `build-sign.yml` (not the provenance workflow, not the app), so
 > `verify-attestations`' SBOM block was widened to accept the shared `build-sign.yml` identity
 > (`subjectRegExp` + the `githubWorkflowRepository` caller extension) as an additional `count: 1`
-> alternative **alongside** the team's existing app-signed identity (`verify_subjects`) — the same
+> alternative **alongside** the product's existing app-signed identity (`verify_subjects`) — the same
 > primary-plus-fallback shape as §5. Provenance verification (above) is unchanged: it always keyed on the
 > caller-repo extension, which is precisely the pattern image+SBOM signing now adopt.
 
@@ -496,8 +498,8 @@ policy (sections 4–6) remains the primary per-team gate.
 | **OIDC token** | Short-lived proof of identity GitHub issues to a workflow run (needs `id-token: write`). |
 | **Fulcio** | Sigstore CA; exchanges an OIDC token for a ~10-min signing certificate stamped with the identity. |
 | **Rekor** | Sigstore's public, append-only transparency log of signatures. The tamper-evident ledger. |
-| **Certificate identity / Subject** | The **signer** workflow baked into the signing cert. Primary: the shared `…/asanexample/trusted-ci/.github/workflows/build-sign.yml@<sha>` (same for every team); app-signed fallback: `…/asanexample/app-alpha/.github/workflows/deploy.yml@refs/heads/main`. |
-| **`githubWorkflowRepository`** | Cert extension naming the **caller** repo (e.g. `asanexample/app-alpha`), set by Fulcio from the caller's own OIDC. With the shared signer this is the **per-team gate** — unforgeable across teams. |
+| **Certificate identity / Subject** | The **signer** workflow baked into the signing cert. Primary: the shared `…/asanexample/trusted-ci/.github/workflows/build-sign.yml@<sha>` (same for every product); app-signed fallback: `…/asanexample/app-alpha-demo/.github/workflows/deploy.yml@refs/heads/main`. |
+| **`githubWorkflowRepository`** | Cert extension naming the **caller** repo (e.g. `asanexample/app-alpha-demo`), set by Fulcio from the caller's own OIDC. With the shared signer this is the **per-product gate** — unforgeable across products. |
 | **Digest** | The immutable `sha256:…` content hash of an image. Signatures bind to it. |
 | **Attestor / `count`** | The set of acceptable signing identities for a policy rule; `count: 1` = any one suffices. |
 | **`mutateDigest`** | Kyverno rewriting an admitted Pod's image tag to the verified digest. |
@@ -511,7 +513,7 @@ policy (sections 4–6) remains the primary per-team gate.
 - [ADR-014 — Kyverno as policy engine](../adrs/014-kyverno-as-policy-engine.md) (the broader decision +
   phased rollout; image verification is Phase 3)
 - [ADR-050 — shared `build-sign.yml` reusable workflow](../adrs/050-shared-build-sign-reusable-workflow.md)
-  (image + SBOM signing moved to a shared, app-team-unwritable signer; per-team gate via the caller-repo
+  (image + SBOM signing moved to a shared, app-team-unwritable signer; per-product gate via the caller-repo
   cert extension)
 - [ADR-042 — isolated build provenance (SLSA L3)](../adrs/042-isolated-build-provenance-slsa-l3.md) (the
   same isolation pattern, already in place for provenance)

@@ -18,23 +18,23 @@ A reusable composite action in the platform repo,
 [`.github/actions/kyverno-validate`](../../.github/actions/kyverno-validate/action.yml), does cluster-free
 what admission does in-cluster:
 
-1. **Render** the platform environment policies for the team — `helm template` the same `policies-chart` the
+1. **Render** the platform environment policies for the product — `helm template` the same `policies-chart` the
    cluster runs, with `mutate` ON (so the auto-injected `securityContext`/labels are present, matching
    the cluster), `verifyImages` OFF (the image isn't built/signed at PR time), and `cleanup` OFF
-   (runtime GC, not an admission check). The team's allowed route hostnames are DERIVED from its `XTenant`
-   claim (`gitops/tenant-claims/<env>/<team>.yaml`, via `yq`) — the single source of truth (ADR-060/061).
+   (runtime GC, not an admission check). The product's allowed route hostnames are DERIVED from its `XEnvironment`
+   claim (`gitops/environments/<team>/<product>/<stage>.yaml`, via `yq`) — the single source of truth (ADR-060/061).
 2. **Render the app manifests** — `kubectl kustomize <manifests-path>` — then **inject** the derived route
-   host (`<app>-<team>.<base>` + any `spec.domains` aliases) into every Gateway-API route, the same as
+   host (`<product>-<team>.<base>` + any `spec.domains` aliases) into every Gateway-API route, the same as
    argocd-apps does at deploy, so the app repo ships a placeholder and the check sees what admission sees.
 3. **Apply** — `kyverno apply <policies> --resource <manifests> --values-file <ns-labels>`, telling the
-   CLI the `team-<team>` namespace carries the environment label so the environment-scoped policies match.
+   CLI the `<team>-<product>-<stage>` namespace carries the environment label so the environment-scoped policies match.
 4. **Fail** the build if the parsed summary reports any `fail` or `error`.
 
 No cluster, no AWS credentials, no secrets — so it is safe to run on `pull_request`, including from forks.
 
 ## Using it in an app repo
 
-Add a `validate.yml` to the app repo (`<org>/app-<team>`). It calls the platform action by ref; nothing
+Add a `validate.yml` to the app repo (`<org>/app-<team>-<product>`). It calls the platform action by ref; nothing
 else is needed.
 
 ```yaml
@@ -50,10 +50,10 @@ jobs:
       - name: Kyverno shift-left validation
         uses: asanexample/platform/.github/actions/kyverno-validate@main
         with:
-          team: alpha                 # this app's team
-          app: demo                   # this app's key (the route host is <app>-<team>.<base>)
+          team: alpha                 # this product's owning team
+          product: demo               # this product's key (the route host is <product>-<team>.<base>)
           manifests-path: k8s/preprod # the kustomize dir to check
-          # env: preprod              # (default) which env's XTenant claim supplies the team's hostnames
+          # env: preprod              # (default) which env's XEnvironment claim supplies the product's hostnames
 ```
 
 Cross-repo private action use requires the org setting **Settings → Actions → General → Access →
@@ -63,7 +63,7 @@ surfaces across all apps immediately.
 
 ## What it catches (and what it doesn't)
 
-**Catches** (same as admission): wrong/cross-team image registry, mutable/`:latest` tag, missing
+**Catches** (same as admission): wrong/cross-product image registry, mutable/`:latest` tag, missing
 resource requests/limits, missing liveness/readiness probes, `LoadBalancer`/`NodePort` services. Route
 hostnames are **injected** from the claim before validation (as in production), so an app cannot squat a
 host via its manifest — the guard is enforced against the injected, claim-derived host.
@@ -90,9 +90,9 @@ The platform CI job **`Kyverno Shift-Left (dogfood)`** (in `.github/workflows/ci
 against two committed sample apps in `infra/modules/policy/.kyverno-tests/sample-app/`:
 
 - `compliant/` — ships a `placeholder.invalid` host and must **pass** after the claim-derived host is
-  injected (the run asserts the `XTenant` claim hostname derivation resolved).
+  injected (the run asserts the `XEnvironment` claim hostname derivation resolved).
 - `broken/` — must **fail** (it trips the registry, `:latest`, probes, limits, `LoadBalancer`, and
-  cross-team-image policies; the route host is injected, so squatting is not the failure here).
+  cross-product-image policies; the route host is injected, so squatting is not the failure here).
 
 This proves the action end-to-end without needing the app repos, and guards against policy/template
 drift breaking the gate.

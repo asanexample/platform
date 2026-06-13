@@ -5,7 +5,7 @@
 > **Related:** [EKS Cluster Access](eks-cluster-access.md),
 > [ArgoCD SSO](argocd-sso.md), [Tailscale VPN](tailscale-vpn.md)
 >
-> **Last reviewed:** 2026-05-27
+> **Last reviewed:** 2026-06-12
 
 ---
 
@@ -31,14 +31,15 @@ delivery flow:
 ```text
 Developer pushes code
   -> GitHub Actions builds image -> pushes to ECR (platform account)
-  -> Developer updates manifests in k8s/preprod/
-  -> ArgoCD auto-syncs manifests to preprod cluster
+  -> CI promotes the digest into k8s/overlays/<stage>
+  -> ArgoCD (per-Product ApplicationSet) auto-syncs the overlay to the preprod cluster
   -> Cilium Gateway API routes traffic via HTTPRoute
   -> cert-manager provisions TLS, external-dns creates DNS records
 ```
 
-Teams are assigned a namespace (`team-<name>`) in
-`infra/live/aws/preprod/us-east-1/platform/teams.hcl`.
+Each environment (a Product at a Stage) is assigned a namespace `<team>-<product>-<stage>` (e.g.
+`alpha-demo-dev`), owned by the Crossplane Environment Composition. The environment is declared by an
+`XEnvironment` claim at `gitops/environments/<team>/<product>/<stage>.yaml` (ADR-067/069).
 
 ---
 
@@ -84,10 +85,10 @@ AWS_PROFILE=preprod-dev aws eks update-kubeconfig \
   --role-arn arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/DeveloperAccess
 ```
 
-Verify access to your team namespace:
+Verify access to your environment namespace:
 
 ```bash
-kubectl get pods -n team-alpha
+kubectl get pods -n alpha-demo-dev
 ```
 
 ### 3. Tailscale VPN (for ArgoCD UI)
@@ -108,24 +109,28 @@ argocd login argocd.aws.refplat.org --sso
 
 ## Repository Structure
 
-ArgoCD watches each app's repo at the path configured in `teams.hcl`.
-The default convention is `k8s/preprod/`:
+The per-Product ApplicationSet (ADR-069) syncs each environment's Application against the app repo's
+`k8s/overlays/<stage>` (e.g. `k8s/overlays/dev`), which references a shared `k8s/base`. The convention:
 
 ```text
 your-app-repo/
   k8s/
-    preprod/
-      kustomization.yaml    # required for PR previews
+    base/
+      kustomization.yaml
       deployment.yaml
       service.yaml
       httproute.yaml
-      configmap.yaml        # optional
-      external-secret.yaml  # optional (for secrets from AWS SM)
+      serviceaccount.yaml
+    overlays/
+      dev/
+        kustomization.yaml    # required; references ../../base + the digest-pinned image
+        configmap.yaml        # optional
+        external-secret.yaml  # optional (for secrets from AWS SM)
 ```
 
-ArgoCD syncs all YAML files in this directory. Do not use
-subdirectories -- the ArgoCD Application is configured with a flat path,
-not recursive.
+ArgoCD renders the overlay with kustomize. The namespace and the generated HTTPRoute host
+(`<product>-<team>-<stage>.<baseDomain>`) are injected by the ApplicationSet — app repos do **not** hardcode
+them (ADR-060/069).
 
 ### kustomization.yaml (Required)
 
@@ -175,7 +180,7 @@ regression, platform #155). Add it to the app's `validate.yml`:
       - uses: actions/checkout@v4
       - uses: asanexample/platform/.github/actions/preview-routing-check@main
         with:
-          manifests-path: k8s/preprod
+          manifests-path: k8s/overlays/dev
 ```
 
 **Allowed resource kinds** (enforced by ArgoCD AppProject):
@@ -191,18 +196,19 @@ Other resource kinds will be rejected by the AppProject whitelist.
 
 ## Sample Manifests
 
-The examples below deploy a web application in the `team-alpha`
-namespace with HTTPS ingress at `myapp.preprod.aws.refplat.org`.
+The examples below deploy the `demo` product's `web` service in the `alpha-demo-dev`
+environment namespace. Ingress is at the generated host `demo-alpha-dev.preprod.aws.refplat.org` —
+injected by the ApplicationSet, **not** hardcoded (ADR-060). The `namespace:` is likewise injected; it is
+shown here only for illustration.
 
 ### Deployment
 
 ```yaml
-# k8s/preprod/deployment.yaml
+# k8s/base/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: myapp
-  namespace: team-alpha
   labels:
     app: myapp
 spec:
@@ -217,7 +223,7 @@ spec:
     spec:
       containers:
         - name: myapp
-          image: <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:v1.0.0
+          image: <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo-web:v1.0.0
           ports:
             - containerPort: 8080
           resources:
@@ -250,12 +256,11 @@ spec:
 ### Service
 
 ```yaml
-# k8s/preprod/service.yaml
+# k8s/base/service.yaml
 apiVersion: v1
 kind: Service
 metadata:
   name: myapp
-  namespace: team-alpha
 spec:
   type: ClusterIP
   selector:
@@ -269,19 +274,21 @@ spec:
 ### HTTPRoute
 
 ```yaml
-# k8s/preprod/httproute.yaml
+# k8s/base/httproute.yaml
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: myapp
-  namespace: team-alpha
 spec:
   parentRefs:
     - name: preprod-gateway
       namespace: default
       sectionName: https
+  # hostnames is a placeholder — the ApplicationSet overwrites it with the generated host
+  # demo-alpha-dev.preprod.aws.refplat.org (ADR-060). Do NOT hardcode a real host (Kyverno
+  # restrict-route-hostnames-alpha-demo would reject one outside the env's allow-list).
   hostnames:
-    - myapp.preprod.aws.refplat.org
+    - placeholder.preprod.aws.refplat.org
   rules:
     - backendRefs:
         - name: myapp
@@ -328,7 +335,7 @@ permissions:
 
 env:
   ECR_REGISTRY: <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
-  ECR_REPO: team-alpha/demo
+  ECR_REPO: team-alpha/demo-web
 
 jobs:
   build:
@@ -367,8 +374,8 @@ AWS_PROFILE=platform aws ecr get-login-password --region us-east-1 \
   | docker login --username AWS --password-stdin <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
 
 # Tag and push
-docker build -t <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:v1.0.0 .
-docker push <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:v1.0.0
+docker build -t <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo-web:v1.0.0 .
+docker push <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo-web:v1.0.0
 ```
 
 ---
@@ -383,7 +390,7 @@ ArgoCD Applications are configured with automated sync:
   ArgoCD reverts it to match the Git manifests
 - **Prune:** resources removed from Git are deleted from the cluster
 - **CreateNamespace=false:** ArgoCD does not create namespaces --
-  namespaces are managed by Terraform via the `environment` module
+  namespaces are owned by the Crossplane Environment Composition
 
 ArgoCD polls the repo every 3 minutes by default. After pushing
 manifest changes to `main`, expect the sync to begin within 3 minutes.
@@ -426,7 +433,7 @@ argocd app diff alpha-demo
 
 ## PR Preview Environments
 
-Apps with `preview = true` in `teams.hcl` get automatic preview
+Services with `preview: true` on their `XEnvironment` claim get automatic preview
 deployments for every open pull request. See
 [ADR-032](../adrs/032-pr-preview-environments.md) for the full design.
 
@@ -440,7 +447,7 @@ deployments for every open pull request. See
 4. Kustomize overrides rename resources (`namePrefix`), isolate label
    selectors (`commonLabels`), rewrite the HTTPRoute hostname (patch),
    and update backendRefs automatically (`nameReference`)
-5. Preview is live at `<app>-pr-<N>.preprod.aws.refplat.org`
+5. Preview is live at `<product>-<team>-pr-<N>.preprod.aws.refplat.org`
 6. When the PR is closed or merged, ArgoCD auto-deletes the preview
 
 ### PR Preview Workflow
@@ -460,7 +467,7 @@ permissions:
 
 env:
   ECR_REGISTRY: <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
-  ECR_REPO: team-alpha/demo
+  ECR_REPO: team-alpha/demo-web
 
 jobs:
   build:
@@ -499,7 +506,7 @@ argocd app list | grep preview
 argocd app get alpha-demo-pr-42
 
 # View preview pods
-kubectl get pods -n team-alpha -l app.kubernetes.io/instance=pr-42
+kubectl get pods -n alpha-demo-dev -l app.kubernetes.io/instance=pr-42
 ```
 
 ### Private Repos
@@ -533,35 +540,35 @@ team that the GitHub token is configured for your repo's organization.
 
 ```bash
 # Check pod status
-kubectl get pods -n team-alpha
+kubectl get pods -n alpha-demo-dev
 
 # Describe a failing pod (shows events, scheduling failures)
-kubectl describe pod -n team-alpha <pod-name>
+kubectl describe pod -n alpha-demo-dev <pod-name>
 
 # View logs
-kubectl logs -n team-alpha <pod-name>
+kubectl logs -n alpha-demo-dev <pod-name>
 
 # Follow logs in real time
-kubectl logs -n team-alpha <pod-name> -f
+kubectl logs -n alpha-demo-dev <pod-name> -f
 
 # View logs from a previous crash
-kubectl logs -n team-alpha <pod-name> --previous
+kubectl logs -n alpha-demo-dev <pod-name> --previous
 
 # Exec into a running container
-kubectl exec -it -n team-alpha <pod-name> -- /bin/sh
+kubectl exec -it -n alpha-demo-dev <pod-name> -- /bin/sh
 ```
 
 ### Deployment Rollout
 
 ```bash
 # Check rollout status
-kubectl rollout status deployment/myapp -n team-alpha
+kubectl rollout status deployment/myapp -n alpha-demo-dev
 
 # View rollout history
-kubectl rollout history deployment/myapp -n team-alpha
+kubectl rollout history deployment/myapp -n alpha-demo-dev
 
 # Roll back (ArgoCD will detect drift and may re-sync)
-kubectl rollout undo deployment/myapp -n team-alpha
+kubectl rollout undo deployment/myapp -n alpha-demo-dev
 ```
 
 > **Note:** Manual rollbacks are overridden by ArgoCD self-heal. To
@@ -571,10 +578,10 @@ kubectl rollout undo deployment/myapp -n team-alpha
 
 ```bash
 # Namespace events (sorted by time)
-kubectl get events -n team-alpha --sort-by=.lastTimestamp
+kubectl get events -n alpha-demo-dev --sort-by=.lastTimestamp
 
 # Filter for warnings only
-kubectl get events -n team-alpha --field-selector type=Warning
+kubectl get events -n alpha-demo-dev --field-selector type=Warning
 ```
 
 ### ArgoCD Application Debugging
@@ -594,16 +601,16 @@ argocd app get alpha-demo --refresh
 
 ```bash
 # Verify the HTTPRoute is attached to the gateway
-kubectl get httproute -n team-alpha
+kubectl get httproute -n alpha-demo-dev
 
 # Check gateway status
 kubectl get gateway preprod-gateway -n default
 
 # Verify the service has endpoints
-kubectl get endpoints myapp -n team-alpha
+kubectl get endpoints myapp -n alpha-demo-dev
 
 # Test connectivity from within the cluster
-kubectl run -n team-alpha debug --rm -it --image=busybox -- wget -qO- http://myapp.team-alpha.svc.cluster.local
+kubectl run -n alpha-demo-dev debug --rm -it --image=busybox -- wget -qO- http://myapp.alpha-demo-dev.svc.cluster.local
 ```
 
 ### DNS and TLS
@@ -637,7 +644,7 @@ cross-account pull from `<PREPROD_ACCOUNT_ID>`.
 ```bash
 # Verify the ECR repo policy allows cross-account access
 AWS_PROFILE=platform aws ecr get-repository-policy \
-  --repository-name team-alpha/demo \
+  --repository-name team-alpha/demo-web \
   --region us-east-1
 
 # The policy must include a statement allowing ecr:GetDownloadUrlForLayer,
@@ -652,7 +659,7 @@ Also verify the image tag exists:
 
 ```bash
 AWS_PROFILE=platform aws ecr describe-images \
-  --repository-name team-alpha/demo \
+  --repository-name team-alpha/demo-web \
   --region us-east-1 \
   --query 'imageDetails[*].imageTags' --output table
 ```
@@ -680,8 +687,8 @@ standard Kubernetes NetworkPolicy cannot authorize its traffic.
 
 ```bash
 # List both Kubernetes NetworkPolicies and CiliumNetworkPolicies
-kubectl get networkpolicy -n team-alpha
-kubectl get ciliumnetworkpolicy -n team-alpha
+kubectl get networkpolicy -n alpha-demo-dev
+kubectl get ciliumnetworkpolicy -n alpha-demo-dev
 
 # Expected K8s NetworkPolicies:
 #   default-deny-ingress      (blocks all ingress by default)
@@ -692,7 +699,7 @@ kubectl get ciliumnetworkpolicy -n team-alpha
 #   allow-gateway-envoy       (allows ingress, remote-node, host entities)
 
 # If any are missing, contact the platform team.
-# These policies are managed by Terraform (environment module), not application manifests.
+# These policies are owned by the Crossplane Environment Composition, not application manifests.
 ```
 
 **Debugging with Cilium (platform team):**
@@ -720,7 +727,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-intra-namespace
-  namespace: team-alpha
+  namespace: alpha-demo-dev
 spec:
   podSelector: {}
   policyTypes: [Ingress]
@@ -752,7 +759,7 @@ Common reasons:
 CILIUM_POD=$(kubectl get pods -n kube-system -l k8s-app=cilium \
   -o jsonpath='{.items[0].metadata.name}')
 kubectl exec -n kube-system $CILIUM_POD -- \
-  cilium-dbg envoy admin clusters | grep -A 5 team-alpha
+  cilium-dbg envoy admin clusters | grep -A 5 alpha-demo-dev
 
 # Check for cx_connect_fail > 0 — means TCP connections to backends are failing
 
@@ -779,7 +786,7 @@ does not reach the service.
 
 ```bash
 # Check HTTPRoute status
-kubectl describe httproute myapp -n team-alpha
+kubectl describe httproute myapp -n alpha-demo-dev
 
 # Verify parentRef values match exactly:
 #   name: preprod-gateway
@@ -847,10 +854,10 @@ kubectl get challenges -A
 
 ```bash
 # Check current quota usage
-kubectl describe resourcequota environment-quota -n team-alpha
+kubectl describe resourcequota environment-quota -n alpha-demo-dev
 
 # Either reduce resource requests in your deployment or ask the
-# platform team to increase the quota in teams.hcl
+# platform team to raise the quota in the `XEnvironment` claim (within the Team envelope's quotaCap)
 ```
 
 ### ArgoCD Sync Failed
@@ -874,5 +881,5 @@ argocd app get alpha-demo -o yaml | grep -A 10 operationState
 # - RBAC: ArgoCD service account lacks permission for the resource type
 ```
 
-Verify your manifest namespace matches the team namespace convention:
-`team-<name>` (e.g., `team-alpha`)
+The destination namespace is injected by the ApplicationSet and follows the environment convention
+`<team>-<product>-<stage>` (e.g., `alpha-demo-dev`); do not hardcode a different one in your manifests.

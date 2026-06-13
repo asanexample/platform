@@ -100,8 +100,8 @@ role, ArgoCD, and the admission policy. The reference app is `app-alpha`.
 5. **Pin & commit**: the `deploy` job (gated on *both* build and provenance) rewrites
    `k8s/preprod/deployment.yaml` to the signed digest and commits to `main`.
 6. **ArgoCD syncs** the cluster to the new commit. At admission, Kyverno (Enforce) verifies the
-   image signature (`verify-images-team-<team>`) and the SBOM + provenance attestations
-   (`verify-attestations-team-<team>`) — see [Security Architecture](09-security-architecture.md).
+   image signature (`verify-images-<team>-<product>`) and the SBOM + provenance attestations
+   (`verify-attestations-<team>-<product>`) — see [Security Architecture](09-security-architecture.md).
 
 Gating the commit on provenance is deliberate: it guarantees ArgoCD never sees a digest whose
 attestation does not yet exist (which Enforce would reject).

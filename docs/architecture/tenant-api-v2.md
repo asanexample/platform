@@ -17,7 +17,7 @@ read from.
 
 > **Status: design-stage, normative-on-paper.** These schemas land with the **planned rebuild**, not as an
 > in-place migration (ADR-049). They supersede the v1alpha1 `XTenant` schema documented in
-> [crossplane-tenant-api.md](crossplane-tenant-api.md) (the current, interim contract). Where this doc and the
+> [crossplane-environment-api.md](crossplane-environment-api.md) (the current, interim contract). Where this doc and the
 > live `xrd.yaml` disagree, the live file is what's deployed today and this doc is the target.
 
 Finalizing these schemas is the first implementation step of the rebuild: the Keycloak group taxonomy, the
@@ -170,7 +170,7 @@ one requires cluster RBAC, the S1 self-provisioning gate). Logical identity = `(
 | `developerAccess` | — | object | `{ enabled: true }` | `enabled: bool`; `group: string` (override the Team `developerGroup`). The override is **required** for regulated (`pci`/`hipaa`) prod. Names only *who* — the *posture* is derived (see [Developer access](#developer-access-posture)). |
 | `dataServices` | — | map | `{}` | 🔒 **Reserved.** `<name> → DataServiceSpec` — cloud-neutral stateful dependencies (DB / cache / object store / stream). Realized data **inherits the Tenant's `residency`** — placement validates the data's location ⊆ `allowedLocations`, closing the *compute-residency-without-data-residency* gap — and the tier's recovery posture. Provisioning lands with the data paved-road (#106/#107). |
 | `encryption` | — | object | derived from `tier` | `keyCustody: platform-managed \| customer-managed \| customer-hosted`. Defaults `platform-managed`; regulated / dedicated may default to `customer-managed` (a dedicated CMK). 🔒 BYOK/HYOK realization deferred; the field reserves the contract. |
-| `lifecycle` | — | object | `{ phase: active }` | `phase: active \| suspended \| decommissioning`. **Wired (ADR-062 #283):** `suspended`/`decommissioning` is a **reversible suspend** — the Composition zeroes the ResourceQuota (no pod runs; everything retained), undone by flipping back to `active`. Hard-delete (claim removal) is gated decommission-first + reviewed; ECR is retained (`deletionPolicy: Orphan`). See [tenant-deprovisioning.md](../runbooks/tenant-deprovisioning.md). Ordered data-destruction / retention-hold / exit-attestation (the `status` fields) remain a future hook. |
+| `lifecycle` | — | object | `{ phase: active }` | `phase: active \| suspended \| decommissioning`. **Wired (ADR-062 #283):** `suspended`/`decommissioning` is a **reversible suspend** — the Composition zeroes the ResourceQuota (no pod runs; everything retained), undone by flipping back to `active`. Hard-delete (claim removal) is gated decommission-first + reviewed; ECR is retained (`deletionPolicy: Orphan`). See [environment-deprovisioning.md](../runbooks/environment-deprovisioning.md). Ordered data-destruction / retention-hold / exit-attestation (the `status` fields) remain a future hook. |
 
 `apps.<app>` (AppSpec):
 
@@ -369,7 +369,7 @@ projected `Team` CR:
 
 ## Migration from v1alpha1
 
-The v1alpha1 `XTenant` ([crossplane-tenant-api.md](crossplane-tenant-api.md)) is the **interim** contract. v2
+The v1alpha1 `XTenant` ([crossplane-environment-api.md](crossplane-environment-api.md)) is the **interim** contract. v2
 is breaking and lands with the rebuild — no in-place migration. Field-level delta:
 
 | v1alpha1 | v1alpha2 | Change |
