@@ -1,0 +1,13 @@
+# Cross-team AccessGrant (ADR-068): Team bravo's members get VIEW on Team alpha's "demo" product. Authored in
+# the owning team's (alpha) domain — the owner grants access. Projected to the cluster (the `grants` registry-sync
+# app) for admission + Backstage soft-scoping (read-only catalog/ArgoCD visibility of alpha/demo for team-bravo).
+apiVersion: platform.refplat.org/v1beta1
+kind: AccessGrant
+metadata:
+  name: bravo-view-alpha-demo
+spec:
+  target:
+    team: alpha
+    product: demo
+  subject: group:team-bravo
+  posture: view

@@ -139,6 +139,9 @@ locals {
     # XEnvironment claims (cluster-scoped Crossplane XR) — synced after Teams (-1) and Products (-2) so the
     # envelope/team-matches-product admission inputs land first.
     environments = { wave = "0", kinds = [{ group = "platform.refplat.org", kind = "XEnvironment" }], path = "gitops/environments" }
+    # AccessGrant records (cross-team access, ADR-068) — projected for admission + Backstage soft-scoping. Synced
+    # after Products so the target Product/Environment exist.
+    grants = { wave = "0", kinds = [{ group = "platform.refplat.org", kind = "AccessGrant" }], path = "gitops/grants" }
   }
 }
 
