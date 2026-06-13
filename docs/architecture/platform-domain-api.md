@@ -7,18 +7,18 @@ document is the *contract* — the concrete field names, types, defaults, enums,
 the rebuild implements and that the access-model-as-code generators ([ADR-053](../adrs/053-identity-and-cross-system-authorization-strategy.md)
 / [ADR-068](../adrs/068-product-scoped-and-cross-team-access-model.md)) read from.
 
-> **Status: design-stage, normative-on-paper.** These schemas land with the **planned rebuild**, not as an
-> in-place migration (ADR-067 Consequences). They **supersede** [tenant-api-v2.md](tenant-api-v2.md) — the
-> ADR-049 *Team / Environment / Zone / Customer* contract — which retains the Team-envelope and per-app-identity
-> design but whose **`Environment` / `Zone` vocabulary and per-team scoping are replaced here** (Environment → Environment,
-> Zone → Isolation dial + Placement, app → Product/Service). Where this doc and the live `xrd.yaml` disagree, the
-> live file is what's deployed today and this doc is the target.
+> **Status: normative and LIVE.** These schemas landed with the rebuild (the v3 cutover, ADR-067 Consequences)
+> — not an in-place migration. They **supersede** [tenant-api-v2.md](tenant-api-v2.md) — the ADR-049 *Team /
+> Tenant / Zone / Customer* contract — which retained the Team-envelope and per-app-identity design but whose
+> **`Tenant` / `Zone` vocabulary and per-team scoping are replaced here** (Tenant → Environment, Zone →
+> Isolation dial + Placement, app → Product/Service). This doc is the deployed contract; the live `xrd.yaml`
+> (`XEnvironment`, `v1alpha3`) implements it.
 
 ## Conventions
 
-- **Vocabulary (ADR-067).** "Environment" is **retired as a noun.** The namespace-level deployable is an
+- **Vocabulary (ADR-067).** "Tenant" is **retired as a noun.** The namespace-level deployable is an
   **Environment**; the promotion rung (dev/test/staging/uat/prod) is a **Stage**; the consuming party (internal
-  or external — the SaaS "environment") is a **Customer**. "Multi-tenant" survives only as an adjective.
+  or external — the SaaS "tenant") is a **Customer**. "Multi-tenant" survives only as an adjective.
 - **API group / version.** Kubernetes-projected objects use `platform.refplat.org/v1alpha3`. The developer
   claim bumps `XTenant` (`v1alpha2`) → **`XEnvironment` (`v1alpha3`)** (breaking; see
   [Migration](#migration-from-v1alpha2)).
@@ -27,7 +27,7 @@ the rebuild implements and that the access-model-as-code generators ([ADR-053](.
   namespace. Those are *derived by placement* and written to `status`. The single deliberate exception is
   `Service.permissions`, which is **explicitly cloud-keyed** (`permissions.aws.…`) while the identity binding it
   attaches to (`serviceAccount`) stays neutral. *How* a neutral claim is realized on more than one cloud — a
-  shared XRD with one Composition per cloud — is [ADR-058](../adrs/058-per-cloud-environment-composition-strategy.md).
+  shared XRD with one Composition per cloud — is [ADR-058](../adrs/058-per-cloud-tenant-composition-strategy.md).
 - **Stage is not a place** (ADR-067 §4). A **Stage** is a logical promotion rung a developer reasons about; a
   **Placement** is the concrete cloud/region/account/cluster it lands in. They are independent: one Stage can
   have several Placements (HA/DR). Author-facing fields name a Stage; Placement is derived to `status`.
@@ -206,7 +206,7 @@ Environment claim (below) per stage.
 ## Object 4 — Environment
 
 The **developer-authored contract** and the unit of deployment: a `(Product × Stage[, × Customer])` instance =
-**one namespace** = a Backstage `System`. Replaces the ADR-049 `Environment`. Pure **intent + constraints** — it
+**one namespace** = a Backstage `System`. Replaces the ADR-049 `Tenant`. Pure **intent + constraints** — it
 declares *what* it needs at a stage, never *where* it lands; Placement resolves the concrete coordinates to
 `status`.
 
@@ -230,7 +230,7 @@ with a `demo` product). Namespace = the same `<team>-<product>-<stage>` (e.g. `a
 | `residency` | — | object | `{ allowedLocations: ["*"] }` | **Hard, attested** placement constraint (jurisdiction or `cloud:region`). Must be ⊆ the Team's `allowedLocations`. Placement fails (never silently relaxes) if no placement satisfies it. |
 | `quota` | — | object | tier profile default | `cpu`/`memory`/`pods` (+ optional `services`/`loadbalancers`/`pvcs`/`storage`). Validated ≤ the Team's `quotaCap`. |
 | `domains` | — | `[]string` | `[]` | The vanity hosts **bound** in *this* Environment — a subset of `Product.domains` (the owned set). `Environment.domains ⊆ Product.domains` is enforced at admission (ADR-069 §2), so e.g. only the prod Environment binds `shop.example.com`. Unioned with the generated host into the Kyverno `restrict-route-hostnames` allow-list + `status.domains`. |
-| `services` | — | map | `{}` | `<service> → ServiceDeploySpec`. Per-stage **realization** of each deployed Service: `{ image?, repoPath?, preview?, serviceAccount?, permissions? }`. `image` is the immutable `…@sha256:` digest promoted into this stage ([Promotion](#promotion)) — **optional**: an entry with **no `image`** is *declared but not yet deployed* (the New-Product first-deploy state). The Environment still provisions namespace/quota/identity; the per-Product ApplicationSet **skips (Environment × Service) pairs with no digest**, and the first auto digest-bump generates the workload. `serviceAccount`/`permissions` **override** the `Service` defaults (effective = override else default). Also 🔒 **reserved** ([ADR-070](../adrs/070-environment-app-config-and-secrets.md)): `config` (per-stage non-secret env → a ConfigMap, in git) and `secrets` (the bound secret keys; **values never in git** — written via the portal/platctl to Secrets Manager, synced by an ESO `ExternalSecret`). |
+| `services` | — | map | `{}` | `<service> → ServiceDeploySpec`. Per-stage **realization** of each deployed Service: `{ image?, repoPath?, preview?, serviceAccount?, permissions? }`. `image` is the immutable `…@sha256:` digest promoted into this stage ([Promotion](#promotion)) — **optional**: an entry with **no `image`** is *declared but not yet deployed* (the New-Product first-deploy state). The Environment still provisions namespace/quota/identity; the per-Product ApplicationSet **skips (Environment × Service) pairs with no digest**, and the first auto digest-bump generates the workload. `serviceAccount`/`permissions` **override** the `Service` defaults (effective = override else default). Also 🔒 **reserved** ([ADR-070](../adrs/070-tenant-app-config-and-secrets.md)): `config` (per-stage non-secret env → a ConfigMap, in git) and `secrets` (the bound secret keys; **values never in git** — written via the portal/platctl to Secrets Manager, synced by an ESO `ExternalSecret`). |
 | `lifecycle` | — | object | `{ phase: active }` | `phase: active \| suspended \| decommissioning`. Reversible suspend zeroes the ResourceQuota (ADR-062 #283); hard-delete is gated decommission-first + reviewed; ECR retained (`Orphan`). |
 
 ### status (derived — never authored)
@@ -440,7 +440,7 @@ arrived), reading the projected `Team` / `Product` CRs:
 ## Open questions & known gaps
 
 This schema is internally consistent but **not yet complete** — splitting `app → Product/Service` and
-`Environment → Environment` opens structural questions the v1alpha2 model never had to answer. Each below needs a
+`Tenant → Environment` opens structural questions the v1alpha2 model never had to answer. Each below needs a
 decision (most a small design pass / ADR) **before its phase ships**; the two marked ⛔ are **foundational** and
 should be resolved before P1 implementation starts.
 
@@ -512,7 +512,7 @@ should be resolved before P1 implementation starts.
     `sha256("<team>/<product>/<stage>/<customer?>/<service?>")`**. Friendly names in the common (short) case;
     always-valid in the edge case. Apply uniformly in the Composition (L2a).
 
-11. **✅ App-level config & secrets — DESIGNED: [ADR-070](../adrs/070-environment-app-config-and-secrets.md).**
+11. **✅ App-level config & secrets — DESIGNED: [ADR-070](../adrs/070-tenant-app-config-and-secrets.md).**
     Portal-first (Backstage form / `platctl`, Backstage the sole broker, write-through) → cloud-native store
     brokered by ESO (**Secrets Manager today**, per-cloud via the seam; **Vault parked behind a trigger**).
     **Config-in-git** (`services.<svc>.config` → ConfigMap) vs **secrets-in-store** (never git → `ExternalSecret`);
@@ -522,14 +522,14 @@ should be resolved before P1 implementation starts.
 
 ## Migration from v1alpha2
 
-The v1alpha2 `XTenant` ([tenant-api-v2.md](tenant-api-v2.md), the ADR-049 contract) is the predecessor. v3 is
-breaking and lands with the rebuild — no in-place migration. Object- and field-level delta:
+The v1alpha2 `XTenant` ([tenant-api-v2.md](tenant-api-v2.md), the ADR-049 contract) is the predecessor. v3 was
+a breaking cutover landed with the rebuild — no in-place migration. Object- and field-level delta:
 
 | v1alpha2 (ADR-049) | v1alpha3 (ADR-067) | Change |
 | ------------------ | ------------------ | ------ |
-| `Environment` (`XTenant`) | **`Environment` (`XEnvironment`)** | Renamed; re-scoped from `(team, name, environment)` to `(product, stage, customer?)`. |
-| `Environment.environment` (`preprod`/`prod`) | **`Environment.stage`** (`dev`…`prod`) | Renamed; the rung ladder replaces the two-value env; **Stage ≠ Placement** split out. |
-| `apps.<app>` (on the Environment) | **`Product` + `Service`** (first-class) | App split into an owned Product (Domain) and its Services (Components); Repo 1:N Service. |
+| `Tenant` (`XTenant`) | **`Environment` (`XEnvironment`)** | Renamed; re-scoped from `(team, name, environment)` to `(product, stage, customer?)`. |
+| `Tenant.environment` (`preprod`/`prod`) | **`Environment.stage`** (`dev`…`prod`) | Renamed; the rung ladder replaces the two-value env; **Stage ≠ Placement** split out. |
+| `apps.<app>` (on the Tenant) | **`Product` + `Service`** (first-class) | App split into an owned Product (Domain) and its Services (Components); Repo 1:N Service. |
 | image `team-<team>/<app>` | `team-<team>/<product>-<service>` | **Product-scoped** image identity (ADR-067 §7). |
 | `Zone` (platform-owned account+cluster) | **retired** → `Environment.isolation` (dial) + `status.placement` | Hard isolation becomes the dial's `cluster`/`account` rungs; coordinates become derived Placement. |
 | `Customer` (lightweight placement attribute) | **`Customer`** (first-class consumer) | Promoted; `defaultIsolation` + internal/external; the *default* source of per-customer isolation. |
@@ -537,9 +537,9 @@ breaking and lands with the rebuild — no in-place migration. Object- and field
 | `tier` = fixed hardening level | `tier` = **floor**; `Environment.isolation` dials up | `effective = max(tier-floor, chosen)` (ADR-067 §5). |
 | `Team.allowedEnvironments` | `Team.allowedStages` | Renamed to the stage ladder. |
 | `Team.maxDedicatedZones` | `Team.maxDedicatedIsolation { cluster, account }` | Zone retired → caps on the expensive isolation rungs. |
-| `dataServices` (on Environment) | `Service.resources` + `Resource.isolation` | Moved onto the Service→Resource graph; carries the data-isolation axis. |
+| `dataServices` (on Tenant) | `Service.resources` + `Resource.isolation` | Moved onto the Service→Resource graph; carries the data-isolation axis. |
 | `developerAccess { enabled, group }` | **`AccessGrant`** + `Team.roles` | Team-scoped access replaced by the product-scoped grant model (ADR-068); `team-admin`/`release-approver` roles added. |
 | `status.placement { …, zone, namespace }` | `status.placement { cloud, region, account, cluster, namespace }` | `zone` dropped (retired); Stage may map to multiple placements. |
 
-The interim model (`team == environment`, the v1alpha2 `XTenant`) stands until the rebuild; this schema does not
-change it.
+The interim v2 model (`team == tenant`, the v1alpha2 `XTenant`) is retired: the rebuild replaced it with this
+v3 schema (`XEnvironment`, `v1alpha3`), which is now what's deployed.

@@ -1,65 +1,71 @@
 # Runbook — Environment AWS access via EKS Pod Identity
 
-How an environment team gets least-privilege AWS access via EKS Pod Identity, how the app consumes it, and how
-the mechanism enforces isolation. Mechanism + rationale:
-[ADR-041](../adrs/041-pod-identity-for-environment-workloads.md) /
-[ADR-047](../adrs/047-pod-identity-standard.md) (Pod Identity is the standard).
+How an environment's Service gets least-privilege AWS access via EKS Pod Identity, how the app consumes it, and
+how the mechanism enforces isolation. Mechanism + rationale:
+[ADR-041](../adrs/041-pod-identity-for-tenant-workloads.md) /
+[ADR-047](../adrs/047-pod-identity-as-aws-identity-standard.md) (Pod Identity is the standard).
 
-> **Provisioning is now the `XTenant` claim.** Environment AWS access is declared in the team's **`XTenant`
-> claim** (`aws.serviceAccount` + `aws.policyStatements`) and provisioned by the Crossplane Composition —
-> not by editing `teams.hcl` and applying separate units. The previous `s3-shared` and `pod-identity`
-> Terragrunt units are **deleted**; the per-team role loops were removed from `iam-roles`. The Pod
-> Identity *mechanism* below is unchanged. See [Crossplane Environment API](../architecture/crossplane-environment-api.md)
-> and the [environment onboarding runbook](environment-onboarding.md).
+> **Provisioning is now the `XEnvironment` claim.** AWS access is declared **per Service** on the
+> `XEnvironment` claim (`services.<svc>.serviceAccount` + `services.<svc>.permissions.aws.policyStatements`) and
+> provisioned by the Crossplane Composition — not by editing `teams.hcl` and applying separate units. The
+> previous `s3-shared` and `pod-identity` Terragrunt units are **deleted**; the per-team role loops were removed
+> from `iam-roles`. The Pod Identity *mechanism* below is unchanged. See
+> [Crossplane Environment API](../architecture/crossplane-environment-api.md) and the
+> [environment onboarding runbook](environment-onboarding.md).
 
 ---
 
 ## Model in one picture
 
 ```text
-XTenant claim (aws.serviceAccount + aws.policyStatements)
+XEnvironment claim (services.<svc>.serviceAccount + .permissions.aws.policyStatements)
         │
         │  Crossplane Composition (provider-aws iam/eks, ProviderConfig = Pod Identity)
         │
-        ├─ Pod-team-<team>  IAM role  (trust pods.eks.amazonaws.com + aws:SourceAccount;
-        │                              deny-escalation permissions boundary)
-        ├─ RolePolicy        the claim's aws.policyStatements (generic, least-privilege)
-        └─ PodIdentityAssociation (cluster, team-<team>, <serviceAccount>) → Pod-team-<team>
+        ├─ Pod-<team>-<product>-[<customer>-]<stage>-<svc>  IAM role  (trust pods.eks.amazonaws.com +
+        │                              aws:SourceAccount; environment-permissions-boundary)
+        ├─ RolePolicy        the Service's permissions.aws.policyStatements (generic, least-privilege)
+        └─ PodIdentityAssociation (cluster, <team>-<product>-<stage> ns, <serviceAccount>) → that role
                                           │
             app pod (named SA) ───────────┘  EKS Pod Identity agent injects creds (no annotation)
 ```
 
-Default-deny, by construction: the `Pod-team-<team>` role is named from the team key, grants only what
-its own claim declares, and the deny-escalation boundary prevents privilege growth — a team can never
-mint or assume another team's role. See ADR-047 "Isolation model".
+Default-deny, by construction: the role is named from the (team, product, stage, service) tuple, grants only what
+that Service's claim declares, and the permissions boundary prevents privilege growth — a Service can never
+mint or assume another environment's role. See ADR-047 "Isolation model".
 
-> **No per-team S3 buckets.** Access to arbitrary AWS is via the claim's generic `aws.policyStatements`.
+> **No per-team S3 buckets.** Access to arbitrary AWS is via the Service's generic `permissions.aws.policyStatements`.
 > The earlier per-team S3 buckets (in the platform account, via the now-deleted `s3-shared` unit) were a
-> **demo** of the cross-account bucket-policy pattern and are no longer provisioned. If a team needs a
+> **demo** of the cross-account bucket-policy pattern and are no longer provisioned. If a Service needs a
 > bucket, grant it through `policyStatements` against a bucket provisioned separately.
 
-## Granting a team AWS access (platform engineer)
+## Granting a Service AWS access (platform engineer)
 
-1. **Declare it in the team's `XTenant` claim** (in the `tenant-claims` unit's inputs), under `aws`:
+1. **Declare it on the `XEnvironment` claim** (in `gitops/environments/<team>/<product>/<stage>.yaml`), under the
+   Service's `permissions.aws`:
 
    ```yaml
    spec:
-     aws:
-       serviceAccount: app-foo            # the named SA the app's pods run as
-       policyStatements:                  # generic least-privilege IAM, capped by the deny boundary
-         - sid: ReadData
-           effect: Allow
-           actions: ["s3:GetObject"]
-           resources: ["arn:aws:s3:::some-bucket/*"]
+     services:
+       web:
+         serviceAccount: app-foo            # the named SA the app's pods run as
+         permissions:
+           aws:
+             policyStatements:              # generic least-privilege IAM, capped by the boundary
+               - sid: ReadData
+                 effect: Allow
+                 actions: ["s3:GetObject"]
+                 resources: ["arn:aws:s3:::some-bucket/*"]
    ```
 
-   The Composition grants exactly these statements to `Pod-team-<team>`. A team may only ever grant its
-   own role; it cannot name another team's role (the team key is structurally prepended).
+   The Composition grants exactly these statements to that Service's `Pod-<team>-<product>-[<customer>-]<stage>-<svc>`
+   role. A claim may only ever grant its own Services' roles; it cannot name another environment's role (the
+   tuple is structurally prepended).
 
-2. **Apply the `tenant-claims` unit** (`terragrunt apply`). The Composition reconciles the
-   `Pod-team-<team>` role, its RolePolicy, and the Pod Identity association in one pass. (The
-   `eks-pod-identity-agent` add-on is installed once cluster-wide by `eks-addons` — not per team.)
-   Verify with `kubectl get xtenant <team>` (SYNCED / READY).
+2. **Sync the claim** (open a PR; ArgoCD's per-Product ApplicationSet syncs it). The Composition reconciles the
+   `Pod-…-<svc>` role, its RolePolicy, and the Pod Identity association in one pass. (The
+   `eks-pod-identity-agent` add-on is installed once cluster-wide by `eks-addons` — not per environment.)
+   Verify with `kubectl get xenvironment <name>` (SYNCED / READY).
 
 3. The app sets `spec.serviceAccountName` to the declared SA and reads via the AWS SDK (creds arrive
    automatically — no annotation, no static keys). See `app-alpha` for a worked example.
@@ -67,43 +73,45 @@ mint or assume another team's role. See ADR-047 "Isolation model".
 ## Verifying it works (positive)
 
 ```bash
+NS=<team>-<product>-<stage>
 # creds are injected (and the default K8s SA token is NOT — automountServiceAccountToken: false holds):
-kubectl exec deploy/<app> -n team-<team> -- env | grep AWS_CONTAINER_CREDENTIALS_FULL_URI
-kubectl exec deploy/<app> -n team-<team> -- aws sts get-caller-identity   # -> assumed-role/Pod-team-<team>/...
+kubectl exec deploy/<app> -n $NS -- env | grep AWS_CONTAINER_CREDENTIALS_FULL_URI
+kubectl exec deploy/<app> -n $NS -- aws sts get-caller-identity   # -> assumed-role/Pod-<team>-<product>-<stage>-<svc>/...
 ```
 
-## Cross-team isolation
+## Cross-environment isolation
 
-A pod can only ever assume **its own** team's role: the Pod Identity association binds a specific
-`(cluster, namespace, serviceAccount)` triple to `Pod-team-<team>`, and `Pod-team-<team>` grants only the
-statements that team's own claim declares (capped by the deny-escalation boundary). A pod in `team-alpha`
-has no path to `Pod-team-bravo` — it can't change its association (an AWS API call environments can't make) and
-the egress NetworkPolicy blocks IMDS, so it can't steal the node role either.
+A pod can only ever assume **its own** Service's role: the Pod Identity association binds a specific
+`(cluster, namespace, serviceAccount)` triple to `Pod-<team>-<product>-[<customer>-]<stage>-<svc>`, and that role
+grants only the statements that Service's own claim declares (capped by the permissions boundary). A pod in
+`alpha-demo-dev` has no path to a `bravo-*` role — it can't change its association (an AWS API call environment
+workloads can't make) and the egress NetworkPolicy blocks IMDS, so it can't steal the node role either.
 
 Static confirmation (no cluster needed):
 
 ```bash
-# each team's role grants only what its own claim declared:
-AWS_PROFILE=preprod aws iam get-role-policy --role-name Pod-team-alpha --policy-name <policy>
-# the association binds only that team's namespace + SA:
+# each Service's role grants only what its own claim declared:
+AWS_PROFILE=preprod aws iam get-role-policy --role-name Pod-alpha-demo-dev-web --policy-name <policy>
+# the association binds only that environment's namespace + SA:
 AWS_PROFILE=preprod aws eks list-pod-identity-associations --cluster-name preprod-use1-eks \
-  --namespace team-alpha
+  --namespace alpha-demo-dev
 ```
 
 ## Troubleshooting
 
 - **No creds in the pod** — confirm `eks-pod-identity-agent` DaemonSet is Running; confirm the pod's
-  `serviceAccountName` matches the claim's `aws.serviceAccount`; confirm an association exists
+  `serviceAccountName` matches the Service's `serviceAccount`; confirm an association exists
   (`aws eks list-pod-identity-associations --cluster-name preprod-use1-eks`). If missing, check the
-  `XTenant` is READY (`kubectl get xtenant <team>`) — the Composition provisions the association.
-- **AccessDenied on an action the team should have** — confirm the claim's `aws.policyStatements` actually
-  grant it (the deny-escalation boundary also caps what can be granted), re-apply the `tenant-claims`
-  unit, and confirm the `Pod-team-<team>` RolePolicy reconciled (`kubectl get managed | grep <team>`).
+  `XEnvironment` is READY (`kubectl get xenvironment <name>`) — the Composition provisions the association.
+- **AccessDenied on an action the Service should have** — confirm the Service's `permissions.aws.policyStatements`
+  actually grant it (the permissions boundary also caps what can be granted), re-sync the claim, and confirm the
+  `Pod-…-<svc>` RolePolicy reconciled (`kubectl get managed | grep <name>`).
 - **Pod gets no AWS creds / SDK hangs then DNS-fails** — the SDK can't reach the Pod Identity agent.
   Cilium classifies the agent (`169.254.170.23:80`) as the **`host`** entity, which CIDR egress rules
   don't match; the Composition's `allow-pod-identity-egress` CiliumNetworkPolicy
   (`toEntities: ["host"]`, port 80) grants it. Confirm with `cilium monitor --type drop` on the node —
   a `…->host: …169.254.170.23:80 … Policy denied` means that CNP is missing/not applied. (IMDS stays
   blocked by the node's IMDSv2 hop-limit=1, not by this rule.)
-- **Environment tried to set an `eks.amazonaws.com/role-arn` annotation** — denied by
-  `disallow-irsa-annotation-cross-team` (by design — environments use Pod Identity, not IRSA).
+- **Environment workload tried to set an `eks.amazonaws.com/role-arn` annotation** — denied by
+  `disallow-irsa-annotation-cross-team` (by design — environment workloads use Pod Identity, not IRSA;
+  IRSA is platform-only).

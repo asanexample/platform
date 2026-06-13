@@ -250,7 +250,7 @@ is operate/debug, never authoring:
   running its own Crossplane + Composition; placement routes a claim to the right one.
 - Until the rebuild, the **interim** model stands: `team == tenant`, `teams.hcl` for delivery + supply-chain,
   the `tenant-claims` Terragrunt unit for delivery, and the manual Identity Center steps
-  (see [tenant-onboarding](../runbooks/tenant-onboarding.md)).
+  (see [tenant-onboarding](../runbooks/environment-onboarding.md)).
 - Open, explicitly deferred — **reserved in the v2 schema** ([tenant-api-v2.md](../architecture/tenant-api-v2.md#reserved-dimensions-modeled-now-realized-post-rebuild)),
   realized post-rebuild so the API needn't break to gain them: the **dedicated-zone vending mechanism** (behind
   a cloud-neutral interface), the **aggregate-quota controller** (report-first), the **data-services paved

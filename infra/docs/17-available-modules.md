@@ -22,7 +22,7 @@ catalog. Module source paths and Helm chart versions are pinned centrally in
 | `organizations` | AWS Organizations: OUs, member accounts, Service Control Policies, Identity Center scaffolding (ADR-003/004/005) |
 | `identity_center` | IAM Identity Center permission sets, groups, and account assignments |
 | `state_bootstrap` | S3 bucket + DynamoDB lock table for the Terraform remote state backend (ADR-006) |
-| `iam_roles` | Purpose-built IAM roles (PlatformAdmin, PlatformDeployer, per-team DeveloperAccess, Pod-team-*) (ADR-007/039/040/041) |
+| `iam_roles` | Purpose-built IAM roles (PlatformAdmin, PlatformDeployer, per-team DeveloperAccess, per-service Pod-<team>-<product>-…-<svc>) (ADR-007/039/040/041) |
 | `github_oidc` | GitHub Actions OIDC provider + per-team/role trust for keyless CI (ADR-036) |
 | `networking` | VPC, multi-tier subnets, IGW, NAT, route tables, EKS networking, S3 gateway endpoint, flow logs (ADR-015) |
 | `transit-gateway` | Hub-and-spoke Transit Gateway for cross-account VPC connectivity, shared via RAM (ADR-034) |
@@ -56,8 +56,7 @@ Deployed via Helm / the Kubernetes provider onto any cluster; reusable across cl
 | `tailscale` / `tailscale-admin` | Tailscale subnet-router operator + tailnet ACL/OAuth management (ADR-011) |
 | `actions-runner-controller` | Self-hosted GitHub Actions runners (ARC) on the platform cluster — in-VPC CI for cluster-facing applies; local/break-glass unit (ADR-065 / #323) |
 | `policy` | Kyverno engine + bundled ClusterPolicies (validate/mutate + cosign verify) (ADR-014) — see below |
-| `crossplane` | Crossplane v2 control plane — hub ECR provisioning + per-cluster `Environment` XRD/Composition (ADR-046/048) |
-| `tenant-claims` | Helm chart rendering `XTenant` claims, delivered by the `tenant-claims` unit (ADR-046/048) |
+| `crossplane` | Crossplane v2 control plane — hub ECR provisioning + the per-cluster `XEnvironment` XRD/Composition, shipping the `crossplane-environment-api` + `environment-policies` charts (ADR-046/048/067) |
 | `cluster-rbac` | `platform-operator` ClusterRole for the operate-not-author access model (ADR-040) |
 | `observability` | kube-prometheus-stack hub: Prometheus + Grafana + Alertmanager (ADR-043) |
 | `observability-mimir` | Grafana mimir — durable, S3-backed, multi-tenant metrics store (ADR-044) |
@@ -72,13 +71,14 @@ Deployed via Helm / the Kubernetes provider onto any cluster; reusable across cl
 The Policy module installs the Kyverno policy engine (HA admission controller) via Helm and a bundled
 local chart of the platform's admission-control ClusterPolicies. It layers above the Pod Security
 Admission `baseline` floor (ADR-027/040) to express controls PSA cannot. The module holds **no
-team-specific data** — per-environment values are supplied by the Terragrunt unit from `teams.hcl`.
+team-specific data** — per-cluster values are supplied by the Terragrunt unit, derived from the
+`XEnvironment` registry (`gitops/environments/`) and the git-native `Product` CRs (ADR-067/069).
 
 - Two Helm releases: the Kyverno engine + a local `policies-chart` (no `kubernetes_manifest`, so no
   plan-time CRD dependency)
 - **Audit-first rollout**: `validation_failure_action` toggles `Audit` (record PolicyReports, webhook
   fail-open) ↔ `Enforce` (reject at admission, webhook fail-closed) in one input change
-- Validate policies: per-team image-registry scoping, cross-team IRSA-annotation guard, RBAC hardening
+- Validate policies: per-product image-registry scoping, cross-team IRSA-annotation guard, RBAC hardening
   (`restrict-binding-clusteradmin`, `restrict-wildcard-rbac`), `require-requests-limits`,
   `require-workload-labels`, `disallow-latest-tag`, `block-public-loadbalancer`, `require-pod-probes`,
   `disallow-default-namespace`, route-hostname allow-lists; tier-gated restricted PSS + read-only rootfs
@@ -90,8 +90,8 @@ team-specific data** — per-environment values are supplied by the Terragrunt u
 
 **Key Variables**: `validation_failure_action`, `verify_failure_action`,
 `verify_attestations_failure_action`, `compliance_tier`, `allowed_registries`, `tenant_registry_map`,
-`verify_subjects`, `attest_caller_repos`, `replica_count`, `helm_chart_version`, `additional_policies`,
-`tags`. Full reference: the module's `README.md` and the
+`verify_subjects`, `verify_subjects_product`, `attest_caller_repos`, `replica_count`, `helm_chart_version`,
+`additional_policies`, `tags`. Full reference: the module's `README.md` and the
 [Kyverno policy catalog](../../docs/architecture/kyverno-policy-catalog.md).
 
 ## vCluster Module — detail (deferred)

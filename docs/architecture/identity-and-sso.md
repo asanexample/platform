@@ -15,9 +15,9 @@ runbooks linked at the end.
 There is **one issuer the apps trust — Keycloak** (`https://keycloak.aws.refplat.org/realms/platform`). Keycloak
 owns the users (or brokers them from a corporate IdP, if you wire one up), owns the **groups** that represent
 teams, and mints the OIDC tokens the apps consume. Each app maps the token's **`groups` claim** to its own
-permissions. The team→group→role mapping is **generated from one file** (`infra/live/aws/_teams.hcl`) by the
-`keycloak-config` unit. AWS account access is a **separate** system (AWS Identity Center), deliberately
-decoupled from app login.
+permissions. The team→group→role mapping is **generated from the git-native `Team` CRs** (`gitops/teams/`,
+ADR-063) by the `keycloak-config` unit. AWS account access is a **separate** system (AWS Identity Center),
+deliberately decoupled from app login.
 
 ## Components
 
@@ -32,7 +32,7 @@ flowchart TB
         REALM["realm: platform<br/>users · groups (1/team) · roles<br/>OIDC clients · claim mappers"]
     end
 
-    CFG["keycloak-config (IaC)<br/>reads _teams.hcl →<br/>groups, roles, clients, mappers"]
+    CFG["keycloak-config (IaC)<br/>reads gitops/teams/ →<br/>groups, roles, clients, mappers"]
 
     subgraph apps["Apps (downstream — consume Keycloak OIDC directly)"]
         ARGO["ArgoCD"]
@@ -54,7 +54,7 @@ flowchart TB
   the *running* Keycloak: the realm, one **group per team** + platform groups (e.g. `platform-admins`), the
   developer-access **roles** (`environment-operate`, `environment-view`), the per-app **OIDC clients**, the **claim
   mappers** that put group names into the `groups` claim, the optional **upstream broker**, and (in standalone
-  mode) the **seed users**. All of it derived from `infra/live/aws/_teams.hcl`.
+  mode) the **seed users**. All of it derived from the git-native `Team` CRs (`gitops/teams/`, ADR-063).
 - **ArgoCD** — consumes Keycloak OIDC **directly** (its own embedded Dex is off: `dex_enabled = false`).
 - **Backstage** — consumes Keycloak OIDC **directly** (the `oidc` sign-in provider; the `backstage` confidential
   client). It is reached directly through the gateway and authenticates each request itself.
@@ -75,7 +75,7 @@ flowchart TB
    `["alpha"]` or `["platform-admins"]`).
 4. ArgoCD exchanges the code (confidential client; secret synced from Secrets Manager via an ExternalSecret)
    and reads the **`groups` claim** for RBAC (`rbac_scopes = [groups]`, default policy = **deny**).
-5. ArgoCD's RBAC (generated from `_teams.hcl`) maps the group to a role:
+5. ArgoCD's RBAC (generated from the `Team` CRs) maps the group to a role:
    - `g, platform-admins, role:org-admin` → full access.
    - `g, alpha, role:team-alpha` → `get`/`sync`/`logs` on `alpha/*` apps only.
 6. Logout is **RP-initiated** — ArgoCD redirects to Keycloak's end-session endpoint, ending the SSO session
@@ -106,27 +106,28 @@ both Dex and oauth2-proxy were **retired**.
 
 ## Where permissions come from — the access model
 
-The single source of truth is **`infra/live/aws/_teams.hcl`**. `keycloak-config` turns it into Keycloak
-objects; the apps read the resulting claims.
+The single source of truth is the git-native **`Team` CRs** (`gitops/teams/`, ADR-063). `keycloak-config`
+turns them into Keycloak objects; the apps read the resulting claims.
 
 ```text
-_teams.hcl                         keycloak-config                 claims            app RBAC
+gitops/teams/alpha.yaml            keycloak-config                 claims            app RBAC
 ─────────────────────────────────  ──────────────────────────────  ───────────────   ────────────────────────
-team "alpha":                      group  "alpha"                   groups:           ArgoCD:
-  envelope.allowedEnvironments       role-of-env(preprod)             ["alpha"]          g, alpha, role:team-alpha
-    = ["preprod"]                      = "environment-operate"            roles:             → get/sync alpha/* apps
+Team "alpha":                      group  "alpha"                   groups:           ArgoCD:
+  envelope.allowedStages             role-of-stage(test)              ["alpha"]          g, alpha, role:team-alpha
+    = [dev, test, …]                   = "environment-operate"            roles:             → get/sync alpha/* apps
   ssoGroup = "Dev-alpha"             group "alpha" → environment-operate    ["environment-operate"]
                                                                                        Kubernetes:
-platform group "platform-admins"   group "platform-admins"         groups:              team-alpha:developers
+platform group "platform-admins"   group "platform-admins"         groups:              alpha-demo-test:developers
                                                                       ["platform-admins"]  (via EKS access entry)
 ```
 
 - **Team key = Keycloak group name** (`alpha` → group `/alpha`).
-- **Roles** are the *developer-access posture* by environment (ADR-049): `environment-operate` for preprod,
-  `environment-view` for prod. A team's group gets the roles implied by its `envelope.allowedEnvironments`.
+- **Roles** are the *developer-access posture* by stage (ADR-049): `environment-operate` for non-prod,
+  `environment-view` for prod. A team's group gets the roles implied by its `envelope.allowedStages`.
 - **`groups` claim** (names, not UUIDs) is what every app keys off. ArgoCD maps it to `role:team-<team>` /
-  `role:org-admin`; Kubernetes namespace access is granted separately by the Crossplane environment Composition
-  (`team-<team>:developers`, ADR-039); **AWS** access is separate again (Identity Center permission sets).
+  `role:org-admin`; Kubernetes namespace access is granted separately, per **Environment**, by the Crossplane
+  Environment Composition (a `<team>-<product>-<stage>:developers` RoleBinding → ClusterRole
+  `environment-developer`, ADR-039); **AWS** access is separate again (Identity Center permission sets).
 - **`ssoGroup`** matters **only when federating** — it's the *upstream* group name that maps into the Keycloak
   group (see below). In standalone mode it's unused.
 
@@ -175,7 +176,7 @@ standalone and adopt a corporate IdP later without touching the apps.
 - **Claim** — a field in the OIDC id token (`email`, `groups`, `roles`). The **`groups` claim** carries group
   *names* and is what app RBAC keys off.
 - **Membership** — which Keycloak groups a user belongs to (set by seed/UI, or an upstream group mapper).
-- **`ssoGroup`** — a team's *upstream* group name in `_teams.hcl`; used only to map a federated upstream group
+- **`ssoGroup`** — a team's *upstream* group name in its `Team` CR; used only to map a federated upstream group
   into the Keycloak group. Unused in standalone mode.
 - **The seam** — the invariant contract (Keycloak issuer + `groups` claim) that keeps the upstream IdP
   swappable without changing the apps (ADR-059).
@@ -189,4 +190,4 @@ standalone and adopt a corporate IdP later without touching the apps.
   [053 (identity & cross-system authz)](../adrs/053-identity-and-cross-system-authorization-strategy.md) ·
   [059 (pluggable IdP seam)](../adrs/059-identity-topology-pluggable-idp-seam.md) ·
   [049 (team/environment model)](../adrs/049-tenant-model-team-tenant-zone.md)
-- The access-model source: `infra/live/aws/_teams.hcl`.
+- The access-model source: the git-native `Team` CRs (`gitops/teams/`, ADR-063).

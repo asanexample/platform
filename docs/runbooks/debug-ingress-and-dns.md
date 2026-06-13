@@ -4,16 +4,17 @@
 > **On-call scope:** Development Teams (first pass) / Platform Engineering (Cilium, cert/DNS infra)
 > **Related:** [Deploy App to Preprod](deploy-app-preprod.md),
 > [Crossplane Environment API](../architecture/crossplane-environment-api.md),
-> [ADR-061: Environment Ingress & Custom Domains](../adrs/061-environment-ingress-and-custom-domain-strategy.md)
+> [ADR-061: Tenant/Environment Ingress & Custom Domains](../adrs/061-tenant-ingress-and-custom-domain-strategy.md)
 >
-> **Last reviewed:** 2026-06-08
+> **Last reviewed:** 2026-06-12
 
 ---
 
 "My app isn't reachable", "TLS fails", or "my hostname is rejected." Work the tree top to bottom — each
-layer assumes the ones above it pass. All examples use `team-alpha`, app `demo`, host
-`demo-alpha.preprod.aws.refplat.org` (the [generated host](../adrs/060-environment-app-hostname-convention.md) —
-app repos do **not** hardcode it; argocd-apps injects it).
+layer assumes the ones above it pass. All examples use team `alpha`, product `demo`, stage `dev` — namespace
+`alpha-demo-dev`, host `demo-alpha-dev.preprod.aws.refplat.org` (the
+[generated host](../adrs/060-tenant-app-hostname-convention.md) — app repos do **not** hardcode it; the
+per-Product ApplicationSet injects it).
 
 The path a request takes:
 
@@ -38,9 +39,9 @@ client ─DNS─▶ Route53 record (external-dns) ─▶ Gateway NLB ─▶ Cili
 ## Quick triage
 
 ```bash
-kubectl get httproute demo -n team-alpha                     # is it Accepted by a parent?
-dig +short demo-alpha.preprod.aws.refplat.org                # does DNS resolve?
-curl -sv https://demo-alpha.preprod.aws.refplat.org 2>&1 | head -30   # TLS + response
+kubectl get httproute demo -n alpha-demo-dev                     # is it Accepted by a parent?
+dig +short demo-alpha-dev.preprod.aws.refplat.org                # does DNS resolve?
+curl -sv https://demo-alpha-dev.preprod.aws.refplat.org 2>&1 | head -30   # TLS + response
 ```
 
 - **Route rejected at apply / not created** → [Kyverno](#kyverno-rejected-the-httproute-hostname).
@@ -54,25 +55,25 @@ curl -sv https://demo-alpha.preprod.aws.refplat.org 2>&1 | head -30   # TLS + re
 
 ## Kyverno rejected the HTTPRoute hostname
 
-**Symptom:** ArgoCD sync fails or `kubectl apply` is rejected with a `restrict-route-hostnames-team-alpha`
+**Symptom:** ArgoCD sync fails or `kubectl apply` is rejected with a `restrict-route-hostnames-alpha-demo`
 admission error.
 
-**Diagnosis.** The per-team `restrict-route-hostnames` ClusterPolicy admits a hostname only when **both**
+**Diagnosis.** The per-product `restrict-route-hostnames` ClusterPolicy admits a hostname only when **both**
 hold (ADR-061 Phase 2a):
 
-1. the host is in the team's allow-list — the **derived generated host** (`demo-alpha.…` + the
-   `demo-alpha-pr-*` preview wildcard) **unioned with** `spec.domains` from the `XTenant` claim; and
+1. the host is in the environment's allow-list — the **derived generated host** (`demo-alpha-dev.…` + the
+   `demo-alpha-dev-pr-*` preview wildcard) **unioned with** `spec.domains` from the `XEnvironment` claim; and
 2. that host's `status.domains` entry is **`Active`**.
 
 ```bash
 # The claim's declared aliases (generated host is implicit, never declared)
-kubectl get xtenant alpha -o jsonpath='{.spec.domains}' | jq .
+kubectl get xenvironment alpha-demo-dev -o jsonpath='{.spec.domains}' | jq .
 
 # The state machine — a host must be Active to be admitted
-kubectl get xtenant alpha -o jsonpath='{.status.domains}' | jq .
+kubectl get xenvironment alpha-demo-dev -o jsonpath='{.status.domains}' | jq .
 
 # What the policy actually permits
-kubectl get clusterpolicy restrict-route-hostnames-team-alpha -o yaml | less
+kubectl get clusterpolicy restrict-route-hostnames-alpha-demo -o yaml | less
 ```
 
 **Fixes:**
@@ -80,11 +81,11 @@ kubectl get clusterpolicy restrict-route-hostnames-team-alpha -o yaml | less
 - **Hardcoded host in the app repo.** Don't. The app's `httproute.yaml` carries a placeholder; argocd-apps
   overwrites `spec.hostnames` with the generated host ∪ aliases. Remove the literal and let injection win.
 - **Want a vanity host** (`demo.refplat.org`). Add it under `spec.domains` in
-  `gitops/tenant-claims/preprod/alpha.yaml` (PR). Tier-1/2 hosts under `*.preprod.aws.refplat.org` go
+  `gitops/environments/alpha/demo/dev.yaml` (PR). Tier-1/2 hosts under `*.preprod.aws.refplat.org` go
   `Active` immediately; tier-3 external domains stay `Pending` (Phase 2b deferred) and are **not** admitted.
 - **Host shows `Pending`/non-`Active`.** Expected for external domains — see
-  [ADR-061](../adrs/061-environment-ingress-and-custom-domain-strategy.md). For a platform-domain host stuck
-  non-`Active`, inspect the `XTenant` status `reason`/`message` and the Composition.
+  [ADR-061](../adrs/061-tenant-ingress-and-custom-domain-strategy.md). For a platform-domain host stuck
+  non-`Active`, inspect the `XEnvironment` status `reason`/`message` and the Composition.
 
 ---
 
@@ -93,7 +94,7 @@ kubectl get clusterpolicy restrict-route-hostnames-team-alpha -o yaml | less
 **Symptom:** `kubectl get httproute` shows no parent / `PARENTS` blank; traffic never reaches the service.
 
 ```bash
-kubectl describe httproute demo -n team-alpha    # look at Status > Parents > conditions
+kubectl describe httproute demo -n alpha-demo-dev    # look at Status > Parents > conditions
 kubectl get gateway -n default                    # the shared Gateway, GatewayClass cilium
 kubectl describe gateway -n default <gateway-name>
 ```
@@ -112,7 +113,7 @@ kubectl describe gateway -n default <gateway-name>
 
 ## DNS does not resolve
 
-**Symptom:** HTTPRoute is attached but `dig demo-alpha.preprod.aws.refplat.org` returns NXDOMAIN.
+**Symptom:** HTTPRoute is attached but `dig demo-alpha-dev.preprod.aws.refplat.org` returns NXDOMAIN.
 
 **Diagnosis.** `external-dns` (sourcing from `gateway-httproute`/`service`) writes Route53 records from
 HTTPRoute hostnames. Propagation can take a few minutes.
@@ -122,7 +123,7 @@ kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=80
 
 # The record's TXT owner ID must match this cluster (external-dns won't touch records it doesn't own)
 AWS_PROFILE=preprod aws route53 list-resource-record-sets \
-  --hosted-zone-id <ZONE_ID> --query "ResourceRecordSets[?contains(Name, 'demo-alpha')]"
+  --hosted-zone-id <ZONE_ID> --query "ResourceRecordSets[?contains(Name, 'demo-alpha-dev')]"
 ```
 
 **Causes and fixes:**
@@ -166,7 +167,7 @@ kubectl logs -n cert-manager -l app.kubernetes.io/name=cert-manager --tail=80
   Give it a few minutes.
 - **Per-app cert expectation.** There is **no** per-app cert on the shared Gateway — every
   `*.<domain>` host rides the one wildcard. A "missing cert for my host" almost always means the host isn't
-  under the wildcard (an external domain) — see [ADR-061](../adrs/061-environment-ingress-and-custom-domain-strategy.md).
+  under the wildcard (an external domain) — see [ADR-061](../adrs/061-tenant-ingress-and-custom-domain-strategy.md).
 
 ---
 
@@ -180,9 +181,9 @@ before headers` or times out.
 `allow-gateway-envoy` CiliumNetworkPolicy (provisioned by the Environment Composition, not app manifests).
 
 ```bash
-kubectl get networkpolicy -n team-alpha          # default-deny-ingress, allow-gateway-ingress, allow-dns-egress
-kubectl get ciliumnetworkpolicy -n team-alpha    # allow-gateway-envoy (must be present)
-kubectl get endpoints demo -n team-alpha         # backend pods actually Ready?
+kubectl get networkpolicy -n alpha-demo-dev          # default-deny-ingress, allow-gateway-ingress, allow-dns-egress
+kubectl get ciliumnetworkpolicy -n alpha-demo-dev    # allow-gateway-envoy (must be present)
+kubectl get endpoints demo -n alpha-demo-dev         # backend pods actually Ready?
 ```
 
 Platform-side drop trace (always start with drops, not flow traces):
@@ -196,7 +197,7 @@ kubectl exec -n kube-system "$CILIUM_POD" -- \
 
 **Causes and fixes:**
 
-- **Missing `allow-gateway-envoy`.** Re-check the `XTenant` is `READY` (the Composition owns the
+- **Missing `allow-gateway-envoy`.** Re-check the `XEnvironment` is `READY` (the Composition owns the
   CiliumNetworkPolicy); if the policy is absent, reconcile the claim. Escalate to platform if it won't apply.
 - **TLS secret not synced to `cilium-secrets`.** The Gateway TLS secret must exist in `cilium-secrets` as
   `<namespace>-<secret-name>` (e.g. `default-<gateway-name>-tls`). `kubectl get secret -n cilium-secrets`.

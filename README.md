@@ -4,8 +4,9 @@ A **reference architecture and pattern library for platform engineering** — a 
 **Internal Developer Platform (IDP)** an enterprise platform team builds so product teams get a Vercel-like
 "push to ship" experience on top of governed, secure, compliant cloud.
 
-It treats the **platform as a product**, not a pile of Terraform. Product teams self-serve through a
-declarative contract ([`teams.hcl`](infra/live/aws/preprod/us-east-1/platform/teams.hcl)), ship along
+It treats the **platform as a product**, not a pile of Terraform. Product teams self-serve through
+declarative, git-native contracts (the [`Team`](gitops/teams/) / [`Product`](gitops/products/) /
+[`Environment`](gitops/environments/) registries, ADR-067), ship along
 **paved roads** (GitOps delivery + a signed software supply chain + per-PR preview environments), and move
 fast inside **guardrails** — policy-as-code enforced at admission — instead of waiting on tickets. The
 platform absorbs the cognitive load of cloud, networking, security, and compliance so developers focus on
@@ -30,7 +31,7 @@ The platform-engineering capabilities an enterprise IDP needs — each implement
 | **Self-service via declarative claim** | A team is a single `Environment` claim; a Crossplane Composition reconciles it into namespaces, RBAC, ECR repos, IAM/Pod Identity, developer access, and policy ([ADR-046](docs/adrs/046-back-stack-for-developer-self-service.md)/[048](docs/adrs/048-federated-per-cluster-crossplane.md)). *A Backstage portal front door is the remaining piece — see [Where this is heading](#where-this-is-heading--the-back-stack).* |
 | **Golden paths / paved roads** | GitOps delivery (ArgoCD), signed-digest promotion, and per-PR preview environments are the supported, opinionated route to production ([ADR-021](docs/adrs/021-argocd-for-gitops.md)/[032](docs/adrs/032-pr-preview-environments.md)) |
 | **Guardrails, not gates** | Policy-as-code at every layer — org SCPs and Kyverno admission — lets teams move fast without breaking governance ([ADR-014](docs/adrs/014-kyverno-as-policy-engine.md)) |
-| **Multi-tenancy** | Team identity decoupled from app identity; namespace isolation with default-deny networking, quotas, and per-team EKS Pod Identity for AWS access ([ADR-027](docs/adrs/027-hybrid-environment-isolation-model.md)/[041](docs/adrs/041-pod-identity-for-environment-workloads.md)) |
+| **Multi-tenancy** | Team identity decoupled from app identity; namespace isolation with default-deny networking, quotas, and per-team EKS Pod Identity for AWS access ([ADR-027](docs/adrs/027-hybrid-tenant-isolation-model.md)/[041](docs/adrs/041-pod-identity-for-tenant-workloads.md)) |
 | **Defense in depth** | Layered controls — Organizations/SCPs → IAM (operate-not-author) → private networking → admission policy → runtime detection (Falco) — with **no static credentials** anywhere (IRSA / Pod Identity / OIDC) |
 | **Supply-chain integrity** | cosign keyless signing + CycloneDX SBOM + SLSA Build L3 provenance, **verified at admission** per team ([ADR-042](docs/adrs/042-isolated-build-provenance-slsa-l3.md)) |
 | **Compliance as a capability** | Workloads declare a `compliance_tier` (standard/HIPAA/PCI) that selects controls; SCPs mapped to SOC2/HIPAA/PCI/ISO/NIST/CIS ([ADR-013](docs/adrs/013-compliance-tier-model.md)) |
@@ -48,20 +49,21 @@ The platform-engineering capabilities an enterprise IDP needs — each implement
 
 ## Where this is heading — the BACK stack
 
-Environment provisioning runs on the **BACK stack**. A team is a single declarative **`Environment` claim**
-(`XTenant`) that a Crossplane **Composition** reconciles into the complete environment — namespace, RBAC, quotas,
-networking, per-team policy, IAM/Pod Identity, developer access, and cross-account ECR. The remaining piece
-is the **Backstage** front door:
+Environment provisioning runs on the **BACK stack**. Each Environment is a single declarative **`XEnvironment`
+claim** (a Product at a Stage) that a Crossplane **Composition** reconciles into the complete footprint —
+namespace, RBAC, quotas, networking, per-product policy, IAM/Pod Identity, developer access, and cross-account
+ECR. The remaining piece is the **Backstage** front door:
 
 | | Role | Status |
 |---|------|--------|
-| **B — [Backstage](https://backstage.io/)** | Internal Developer Portal — service catalog + software templates; the self-service front door that creates the `Environment` claim | Planned (P5) |
+| **B — [Backstage](https://backstage.io/)** | Internal Developer Portal — service catalog + software templates; the self-service front door that creates the `XEnvironment` claim | Planned (P5) |
 | **A — ArgoCD** | GitOps reconciliation engine | **In place** |
 | **C — [Crossplane](https://www.crossplane.io/)** | Infrastructure control plane — environment capabilities (namespaces, ECR, IAM, Pod Identity, policy, developer access) modeled as an XRD/Composition and **claimed through the Kubernetes API**, continuously reconciled. **The sole environment provisioner** ([ADR-046](docs/adrs/046-back-stack-for-developer-self-service.md)/[048](docs/adrs/048-federated-per-cluster-crossplane.md)) | **Shipped (P1–P3)** — see [Crossplane Environment API](docs/architecture/crossplane-environment-api.md) |
 | **K — Kubernetes** | The universal control plane everything rides on | **In place** |
 
-`teams.hcl` is no longer the environment-provisioning source of truth (the `XTenant` claim is); it now only feeds
-app delivery (ArgoCD) and the platform-owned supply-chain policies. The end state: a developer picks a
+The git-native `Team`/`Product`/`Environment` registries (`gitops/`) are the source of truth — the retired
+`teams.hcl` is gone; `argocd-apps`, `policy`, and `github-oidc` derive delivery + supply-chain policy from the
+Product registry. The end state: a developer picks a
 Backstage template, which scaffolds a repo and a `Environment` claim; ArgoCD applies it; Crossplane provisions the
 resources; Kubernetes runs them — portal-driven, GitOps-reconciled, self-served. The patterns in this repo
 (multi-tenancy, policy-as-code, signed supply chain, observability)
@@ -154,7 +156,7 @@ and [ADR-040](docs/adrs/040-platform-engineer-access-model.md).
 
 - **EKS** with Cilium and Gateway API (public NLB)
 - **Environment isolation** via namespaces with default-deny NetworkPolicies, resource quotas, and per-team
-  **EKS Pod Identity** for AWS access ([ADR-041](docs/adrs/041-pod-identity-for-environment-workloads.md))
+  **EKS Pod Identity** for AWS access ([ADR-041](docs/adrs/041-pod-identity-for-tenant-workloads.md))
 - **ArgoCD** Applications + per-team PR preview ApplicationSets
 - **Kyverno in Enforce** — pod hardening **and** supply-chain verification (signatures + attestations)
 - ECR cross-account image pull; GitHub OIDC for CI/CD
@@ -204,8 +206,7 @@ The full dependency DAG is documented in [CLAUDE.md](CLAUDE.md). The preferred d
 | [tailscale](infra/modules/tailscale/) | Tailscale Operator, subnet router, split DNS |
 | [tailscale-admin](infra/modules/tailscale-admin/) | Tailnet ACL and OAuth client management |
 | [actions-runner-controller](infra/modules/actions-runner-controller/) | Self-hosted GitHub Actions runners (ARC) on the platform cluster — in-VPC CI for cluster-facing applies (ADR-065) |
-| [crossplane](infra/modules/crossplane/) | Crossplane v2 control plane — hub (ECR provisioning) + per-cluster `Environment` XRD/Composition; the environment control plane (ADR-046/048) |
-| [tenant-claims](infra/modules/tenant-claims/) | Renders `XTenant` claims that the Composition reconciles into complete environments (ADR-046/048) |
+| [crossplane](infra/modules/crossplane/) | Crossplane v2 control plane — hub (ECR provisioning) + the per-cluster `XEnvironment` XRD/Composition (the `environment-api` + `environment-policies` charts); the environment control plane (ADR-046/048/067) |
 | [vcluster](infra/modules/vcluster/) | vCluster Helm (deferred — ADR-033) |
 
 ### AWS (19)
@@ -247,15 +248,15 @@ Plus [cloudflare/dns_delegation](infra/modules/cloudflare/dns_delegation/) (DNS 
 | Kyverno as policy engine | [ADR-014](docs/adrs/014-kyverno-as-policy-engine.md) |
 | Gateway API over Ingress | [ADR-017](docs/adrs/017-gateway-api-over-ingress.md) |
 | ArgoCD for GitOps | [ADR-021](docs/adrs/021-argocd-for-gitops.md) |
-| Namespace environment isolation | [ADR-027](docs/adrs/027-hybrid-environment-isolation-model.md) |
+| Namespace environment isolation | [ADR-027](docs/adrs/027-hybrid-tenant-isolation-model.md) |
 | Centralized cross-account ECR | [ADR-028](docs/adrs/028-ecr-cross-account-container-registry.md) |
-| Multi-app environment model | [ADR-031](docs/adrs/031-multi-app-environment-model.md) |
+| Multi-app environment model | [ADR-031](docs/adrs/031-multi-app-tenant-model.md) |
 | PR preview environments | [ADR-032](docs/adrs/032-pr-preview-environments.md) |
 | Transit Gateway hub/spoke | [ADR-034](docs/adrs/034-transit-gateway-cross-account-connectivity.md) |
 | GitHub Actions OIDC federation | [ADR-036](docs/adrs/036-github-actions-oidc-federation.md) |
 | platctl CLI | [ADR-038](docs/adrs/038-platctl-cli-for-platform-operations.md) |
 | Platform-engineer access model | [ADR-040](docs/adrs/040-platform-engineer-access-model.md) |
-| Pod Identity for environment workloads | [ADR-041](docs/adrs/041-pod-identity-for-environment-workloads.md) |
+| Pod Identity for environment workloads | [ADR-041](docs/adrs/041-pod-identity-for-tenant-workloads.md) |
 | Isolated build provenance (SLSA L3) | [ADR-042](docs/adrs/042-isolated-build-provenance-slsa-l3.md) |
 | Self-hosted observability stack | [ADR-043](docs/adrs/043-self-hosted-observability-stack.md) |
 | mimir for durable multi-tenant metrics | [ADR-044](docs/adrs/044-mimir-durable-multi-tenant-metrics.md) |

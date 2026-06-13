@@ -5,7 +5,7 @@ access, the access-as-code generators — is invariant, and only the **upstream 
 `keycloak-config` module's `var.upstream` selects that upstream. This runbook holds copy-paste presets.
 
 The key payoff is **membership**: when the upstream emits a group claim, the per-team membership mappers bind
-each team's `ssoGroup` (from `infra/live/aws/_teams.hcl`) to the Keycloak group `/<team>`, so a brokered user
+each team's `ssoGroup` (from the git-native `Team` CRs, `gitops/teams/`) to the Keycloak group `/<team>`, so a brokered user
 joins the group at login and inherits its roles — populating the `groups` and `roles` claims apps consume. Set
 `upstream.group_claim` to enable this; leave it `""` to keep the mappers inert.
 
@@ -34,8 +34,8 @@ upstream = {
 
 In Okta: create an **OIDC web app**, set the redirect URI to the broker endpoint
 (`https://keycloak.aws.refplat.org/realms/platform/broker/okta/endpoint`), and add a **Groups claim** to the
-ID token (name `groups`, filter `Matches regex .*`) plus the `groups` scope. `ssoGroup` in `_teams.hcl` is the
-Okta **group name**.
+ID token (name `groups`, filter `Matches regex .*`) plus the `groups` scope. `ssoGroup` in the team's `Team`
+CR is the Okta **group name**.
 
 ```hcl
 upstream = {
@@ -58,8 +58,8 @@ upstream = {
 
 In Entra: register an **app**, add the broker endpoint as a redirect URI, and under **Token configuration** add
 the **groups claim**. Note Entra emits group **object-IDs** by default — so `ssoGroup` must be the group **OID**
-(or configure Entra to emit `sAMAccountName`/display names for on-prem-synced groups, and use that). `{environment}`
-is the directory (environment) ID.
+(or configure Entra to emit `sAMAccountName`/display names for on-prem-synced groups, and use that). `{tenant}`
+is the directory (tenant) ID.
 
 ```hcl
 upstream = {
@@ -68,10 +68,10 @@ upstream = {
   protocol    = "oidc"
   group_claim = "groups"
   oidc = {
-    authorization_url = "https://login.microsoftonline.com/{environment}/oauth2/v2.0/authorize"
-    token_url         = "https://login.microsoftonline.com/{environment}/oauth2/v2.0/token"
+    authorization_url = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize"
+    token_url         = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
     user_info_url     = "https://graph.microsoft.com/oidc/userinfo"
-    jwks_url          = "https://login.microsoftonline.com/{environment}/discovery/v2.0/keys"
+    jwks_url          = "https://login.microsoftonline.com/{tenant}/discovery/v2.0/keys"
     client_id         = "…"
   }
 }

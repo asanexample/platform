@@ -2,23 +2,23 @@
 
 How an external request reaches an environment pod end to end: a single shared **Cilium Gateway** (Gateway API)
 fronted by an NLB, TLS terminated with a cert-manager-issued **wildcard** certificate, DNS synced by
-external-dns, and route hostnames bounded by a per-environment Kyverno guard. Every piece is platform-owned
-substrate; environments only ship `HTTPRoute`s whose hostnames their `XTenant` claim authorises.
+external-dns, and route hostnames bounded by a per-product Kyverno guard. Every piece is platform-owned
+substrate; environments only ship `HTTPRoute`s whose hostnames their `XEnvironment` claim authorises.
 
 See also: [ADR-029](../adrs/029-preprod-public-ingress-gateway-api.md) (public ingress via Gateway API),
-[ADR-060](../adrs/060-environment-app-hostname-convention.md) (generated hostname),
-[ADR-061](../adrs/061-environment-ingress-and-custom-domain-strategy.md) (custom-domain strategy), and the
+[ADR-060](../adrs/060-tenant-app-hostname-convention.md) (generated hostname),
+[ADR-061](../adrs/061-tenant-ingress-and-custom-domain-strategy.md) (custom-domain strategy), and the
 [Crossplane Environment API](crossplane-environment-api.md) (`status.domains`).
 
 ## The request path
 
 ```mermaid
 flowchart LR
-    Client["Client<br/>https://demo-alpha.preprod.aws.refplat.org"]
+    Client["Client<br/>https://demo-alpha-dev.preprod.aws.refplat.org"]
     R53["Route53<br/>A/ALIAS → NLB"]
     NLB["AWS NLB<br/>(internal or internet-facing)"]
     Envoy["Cilium Envoy<br/>(ingress identity 8)<br/>TLS terminate :443"]
-    Route["HTTPRoute<br/>(team-alpha ns)"]
+    Route["HTTPRoute<br/>(alpha-demo-dev ns)"]
     Pod["Environment Pod<br/>ClusterIP Service"]
 
     Client -->|DNS| R53
@@ -82,19 +82,19 @@ which hostnames a route may carry is enforced separately by Kyverno (below).
 
 An environment must not be able to route an arbitrary or another team's hostname. Two mechanisms, one source:
 
-- **Generated host (ADR-060).** Every app has an implicit canonical host `<app>-<team>.<baseDomain>` (e.g.
-  `demo-alpha.preprod.aws.refplat.org`). It is never declared; `argocd-apps` injects it (plus the `-pr-*`
-  preview wildcard) into the app's `HTTPRoute` at deploy, and the shift-left CI injects the same at PR time
-  (see [kyverno-shift-left.md](kyverno-shift-left.md)).
-- **`spec.domains` aliases (ADR-061).** Additional vanity hosts a team declares on its `XTenant` claim.
+- **Generated host (ADR-060).** Every Environment has an implicit canonical host
+  `<product>-<team>-<stage>.<baseDomain>` (e.g. `demo-alpha-dev.preprod.aws.refplat.org`). It is never
+  declared; `argocd-apps` injects it (plus the `-pr-*` preview wildcard) into the app's `HTTPRoute` at deploy,
+  and the shift-left CI injects the same at PR time (see [kyverno-shift-left.md](kyverno-shift-left.md)).
+- **`spec.domains` aliases (ADR-061).** Additional vanity hosts declared on the `XEnvironment` claim.
 
-The Environment Composition unions the generated host(s) with `spec.domains` into a per-team Kyverno
-`ClusterPolicy` **`restrict-route-hostnames-team-<team>`** that **denies** any `HTTPRoute`/`GRPCRoute`/
+The Environment Composition unions the generated host(s) with `spec.domains` into a per-product Kyverno
+`ClusterPolicy` **`restrict-route-hostnames-<product>`** that **denies** any `HTTPRoute`/`GRPCRoute`/
 `TLSRoute` hostname not in the allow-list (Enforce). The allow-list and the matching `status.domains` entries
 are both rendered from the same template pass in
-`infra/modules/crossplane/charts/environment-api/files/composition.yaml` — see
+`infra/modules/crossplane/charts/environment-api/files/composition-v3.yaml` — see
 [crossplane-composition-authoring.md](crossplane-composition-authoring.md) for the mechanism. There is **no
-second registry**: `teams.hcl` hostnames were retired (ADR-061 Phase 1).
+second registry**: the v2 `teams.hcl` hostnames were retired (ADR-061 Phase 1).
 
 ### `status.domains` gating (ADR-061 Phase 2a — shipped)
 
@@ -126,7 +126,7 @@ existing wildcard (`*.preprod.aws.refplat.org`), declared in `spec.domains` and 
 kubectl --context preprod get gateway -A
 kubectl --context preprod get httproute -A
 kubectl --context preprod get certificate -A                       # <gateway>-tls Ready=True
-kubectl --context preprod get xtenant <team> -o jsonpath='{.status.domains}' | jq
+kubectl --context preprod get xenvironment <ns> -o jsonpath='{.status.domains}' | jq
 aws route53 list-resource-record-sets --hosted-zone-id <zone> --profile preprod \
-  --query "ResourceRecordSets[?contains(Name, '<team>')]"
+  --query "ResourceRecordSets[?contains(Name, '<product>-<team>')]"
 ```

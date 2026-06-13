@@ -137,7 +137,7 @@ kubectl apply -f external-secret.yaml
 > which is **not yet deployed** (ADR-024 Implementation Status). Today, ESO secrets are platform-scoped
 > (the `aws-secrets-manager` ClusterSecretStore runs on both platform and preprod). Environment access to
 > AWS *resources* (S3, etc.) is already live but uses **EKS Pod Identity**, not ESO — see
-> [ADR-041](../adrs/041-pod-identity-for-environment-workloads.md) and the
+> [ADR-041](../adrs/041-pod-identity-for-tenant-workloads.md) and the
 > [environment AWS access runbook](environment-aws-access-pod-identity.md).
 
 App team secrets use the naming convention `{namespace}/{service}/{secret-name}`,

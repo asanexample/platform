@@ -6,7 +6,7 @@
 > PR that removes the claim. ECR images survive a purge (retained), so there is no *accidental* one-shot
 > destroy path.
 >
-> **Last reviewed:** 2026-06-09
+> **Last reviewed:** 2026-06-12
 
 ---
 
@@ -16,9 +16,9 @@
 |------|------|-------------|-----|
 | **Decommission** | `spec.lifecycle.phase: decommissioning` → the Composition zeroes the ResourceQuota (pods + cpu/memory → 0). No new/rescheduled pod can run; workloads drain on the next reconcile. Namespace, IAM, ECR, policies all **retained**. | **Yes** — flip phase back to `active` and the quota is restored. | Backstage **Deprovision Environment** template (action: decommission), or edit the claim. Automerges (reversible). |
 | **Grace** | The environment sits suspended. Back up any app data now (see below). | — | A separate PR / time; not CI-time-gated. |
-| **Purge** | Remove the claim file → ArgoCD prune deletes the XTenant → Crossplane deletes the namespace. **ECR is orphaned (images kept).** | Largely — re-add the claim to recreate the namespace/IAM; ECR repo + images are reused. | A **human-authored, reviewed** PR (the gate requires it). |
+| **Purge** | Remove the claim file → ArgoCD prune deletes the XEnvironment → Crossplane deletes the namespace. **ECR is orphaned (images kept).** | Largely — re-add the claim to recreate the namespace/IAM; ECR repo + images are reused. | A **human-authored, reviewed** PR (the gate requires it). |
 
-## What the gate enforces (`Environment Claims Gate`)
+## What the gate enforces (`v3 gitops Gate`)
 
 - A claim may be **deleted only if it is `decommissioning` on the base branch** — you cannot one-shot delete an
   active environment (the decommission must merge first, in its own PR → a real reversible window).
@@ -30,10 +30,10 @@
 
 ## Data safety — read this
 
-- **ECR images are retained.** The repo is `team-<team>/<app>` (team-scoped, shared across the team's
-  environments/stages); it carries `deletionPolicy: Orphan`, so a purge never destroys images another environment might
-  use. The **only** way to delete images is a deliberate manual purge (`aws ecr delete-repository`) or the
-  cluster-teardown ECR orphan sweep.
+- **ECR images are retained.** The repo is `team-<team>/<product>-<svc>` (Product/Service-scoped, shared across
+  the product's environments/stages); it carries `deletionPolicy: Orphan`, so a purge never destroys images
+  another environment might use. The **only** way to delete images is a deliberate manual purge
+  (`aws ecr delete-repository`) or the cluster-teardown ECR orphan sweep.
 - **In-namespace data is NOT.** A purge deletes the namespace, which cascades to anything inside it —
   including **PVCs/PVs (and their EBS volumes)** an app created. The platform cannot retain resources it does
   not own. The grace window is your chance to **back up app data before purging**; a *deliberate* purge can
@@ -45,12 +45,12 @@
 
 ### 1. Decommission (reversible)
 
-Portal → **Create** → **Deprovision Environment** → pick the team + environment + environment, action **decommission**,
+Portal → **Create** → **Deprovision Environment** → pick the team + product + stage, action **decommission**,
 type the environment name to confirm. It opens a PR setting `spec.lifecycle.phase: decommissioning` +
 `platform.refplat.org/decommissioned-at`. The PR automerges (reversible); ArgoCD syncs → the environment's quota
 zeroes → the app drains.
 
-(Or by hand: edit `gitops/tenant-claims/preprod/<team>-<name>-<env>.yaml`, add `spec.lifecycle.phase:
+(Or by hand: edit `gitops/environments/<team>/<product>/<stage>[-<customer>].yaml`, add `spec.lifecycle.phase:
 decommissioning`, open a PR.)
 
 **To reverse:** run the template with action **reactivate** (or set the phase back to `active`); the quota is
@@ -59,37 +59,38 @@ restored and workloads schedule again.
 ### 2. Purge (after the grace window, reviewed)
 
 Open a PR that **removes** the claim file. Verify any app data is backed up first. The gate validates that the
-environment is `decommissioning` and requires an admin review. On merge, ArgoCD prunes the XTenant; the namespace is
-deleted; **the ECR repo + images remain** in AWS.
+environment is `decommissioning` and requires an admin review. On merge, ArgoCD prunes the XEnvironment; the
+namespace is deleted; **the ECR repo + images remain** in AWS.
 
 ```bash
-git rm gitops/tenant-claims/preprod/<team>-<name>-<env>.yaml
+git rm gitops/environments/<team>/<product>/<stage>[-<customer>].yaml
 # PR → admin review → merge
 ```
 
 ### 3. (Optional) delete the ECR images
 
-Only if you truly want the images gone and no other environment/stage of that app needs them:
+Only if you truly want the images gone and no other environment/stage of that product needs them:
 
 ```bash
-aws ecr delete-repository --repository-name team-<team>/<app> --force --region us-east-1 --profile platform
+aws ecr delete-repository --repository-name team-<team>/<product>-<svc> --force --region us-east-1 --profile platform
 ```
 
 ## Verification
 
 ```bash
+NS=<team>-<product>-<stage>
 # After decommission:
-kubectl --context preprod get resourcequota -n <team>-<name>-<env> environment-quota -o jsonpath='{.spec.hard.pods}'  # "0"
-kubectl --context preprod get ns <team>-<name>-<env>   # still Active (retained)
+kubectl --context preprod get resourcequota -n $NS environment-quota -o jsonpath='{.spec.hard.pods}'  # "0"
+kubectl --context preprod get ns $NS   # still Active (retained)
 # After purge:
-kubectl --context preprod get ns <team>-<name>-<env>   # NotFound
-aws ecr describe-repositories --repository-names team-<team>/<app> --region us-east-1 --profile platform  # still there
+kubectl --context preprod get ns $NS   # NotFound
+aws ecr describe-repositories --repository-names team-<team>/<product>-<svc> --region us-east-1 --profile platform  # still there
 ```
 
 ## Residual / out of scope
 
-- **Direct `kubectl delete xtenant` by a platform principal** bypasses the gate (it's the git-path control). No
-  admission delete-guard is installed because it would break `platctl teardown` + ArgoCD prune. Platform
+- **Direct `kubectl delete xenvironment` by a platform principal** bypasses the gate (it's the git-path control).
+  No admission delete-guard is installed because it would break `platctl teardown` + ArgoCD prune. Platform
   principals are trusted/break-glass.
 - **Hard retention duration** (e.g. "must wait 24h") is not CI-enforced (clock flakiness + would block
   legitimate teardown). `status.lifecycle.retentionUntil` + a reaper is the future path.

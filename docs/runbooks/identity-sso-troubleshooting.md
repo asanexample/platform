@@ -33,13 +33,13 @@ them nothing. This is the **most common** issue.
   Groups → Join → `alpha` / `platform-admins` / etc. Seed users (`admin`, `dev-alpha`, `dev-bravo`) are
   pre-placed; a brand-new user is in **no** group until you add them.
 - **Federated, group-emitting upstream (Okta/Entra):** the upstream group name must match the team's
-  `ssoGroup` in `_teams.hcl`, and the advanced-group mapper must exist. Verify the upstream actually emits the
-  `groups` claim and that `keycloak-config` ran after the team was added.
+  `ssoGroup` in its `Team` CR (`gitops/teams/`), and the advanced-group mapper must exist. Verify the upstream
+  actually emits the `groups` claim and that `keycloak-config` ran after the team was added.
 - **Federated AWS Identity Center:** IdC emits **no groups** — membership must be assigned manually in Keycloak
   (the documented gap). Same fix as standalone.
-- **ArgoCD specifically:** confirm the group→role line exists — RBAC is generated from `_teams.hcl`
-  (`g, <team>, role:team-<team>`; `g, platform-admins, role:org-admin`). A team added to `_teams.hcl` needs the
-  `argocd` unit re-applied to pick up the new RBAC row.
+- **ArgoCD specifically:** confirm the group→role line exists — RBAC is generated from the `Team` CRs
+  (`g, <team>, role:team-<team>`; `g, platform-admins, role:org-admin`). A team added under `gitops/teams/`
+  needs the `argocd` unit re-applied to pick up the new RBAC row.
 
 ## 2. Redirect loop / invalid redirect_uri
 
