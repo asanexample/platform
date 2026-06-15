@@ -1,0 +1,9 @@
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata:
+  name: alpha-payments-dev
+spec:
+  environmentRef: alpha-payments-dev
+  services:
+    web:
+      digest: sha256:8aa73f8aee5bc0e17117034b52c2e5fda101cda731da2cfb04006ef56b887894
