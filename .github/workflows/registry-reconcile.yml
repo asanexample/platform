@@ -11,10 +11,16 @@ name: Registry reconcile — apply on merge
 # only these three Terragrunt units need the apply.
 
 on:
+  # push fires only on a HUMAN merge — the gitops Gate auto-merges Product PRs with GITHUB_TOKEN, and GitHub
+  # deliberately does NOT trigger push workflows from GITHUB_TOKEN. So `schedule` is the reliable trigger for the
+  # self-service path (a new Product reconciles within the interval); `push` keeps human merges immediate.
   push:
     branches: [main]
     paths:
       - gitops/products/**
+  schedule:
+    - cron: "*/10 * * * *" # every 10 min — the safety net for GITHUB_TOKEN-auto-merged Product PRs
+  workflow_dispatch: {}
 
 permissions:
   contents: read
