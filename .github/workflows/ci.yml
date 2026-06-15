@@ -36,7 +36,7 @@ jobs:
     needs: versions
     steps:
       - uses: actions/checkout@v4
-      - uses: opentofu/setup-opentofu@v1
+      - uses: opentofu/setup-opentofu@v2
         with:
           tofu_version: ${{ needs.versions.outputs.opentofu }}
       - name: Check formatting
@@ -51,7 +51,7 @@ jobs:
       TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.tofu-plugin-cache
     steps:
       - uses: actions/checkout@v4
-      - uses: opentofu/setup-opentofu@v1
+      - uses: opentofu/setup-opentofu@v2
         with:
           tofu_version: ${{ needs.versions.outputs.opentofu }}
 
