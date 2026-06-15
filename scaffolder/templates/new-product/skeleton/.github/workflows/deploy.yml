@@ -1,14 +1,14 @@
 name: Deploy
 
-# Thin caller (v3 / ADR-067). The supply-chain backbone lives in the app-team-unwritable asanexample/trusted-ci
-# repo:
-#   build  -> build-sign.yml     builds from the Dockerfile, pushes to the PRODUCT-scoped repo team-${{ values.team }}/${{ values.product }}-${{ values.service }},
-#                                cosign-signs the image + attaches a CycloneDX SBOM (under trusted-ci's identity).
+# Thin caller (ADR-067 / ADR-071). The supply-chain backbone lives in the app-team-unwritable
+# asanexample/trusted-ci repo:
+#   build      -> build-sign.yml       builds from the Dockerfile, pushes to team-${{ values.team }}/${{ values.product }}-${{ values.service }},
+#                                       cosign-signs the image + attaches a CycloneDX SBOM (trusted-ci's identity).
 #   provenance -> slsa-provenance.yml   attaches the SLSA build provenance (SLSA L3, isolated signer).
-#   deploy -> pins the signed digest into the dev overlay (k8s/overlays/dev) and commits — the GitOps source the
-#             per-Product ApplicationSet syncs. Promotion to test/uat/staging/prod is by PR (promote-by-PR, #377).
-# Pins are by SHA so the OIDC cert identities are the per-product ones Kyverno verify-images-product /
-# verify-attestations-product expect.
+#   promote    -> promote.yml           records the deployed digest in the PLATFORM control-plane repo (a gated PR
+#                                        bumping gitops/releases/${{ values.team }}/${{ values.product }}/dev.yaml).
+#                                        The per-Product ApplicationSet injects it. THIS repo's main is NEVER
+#                                        written by CI — no contents:write — so it stays fully protected (ADR-071).
 
 on:
   push:
@@ -16,18 +16,16 @@ on:
 
 permissions:
   id-token: write
-  contents: write
+  contents: read
 
 jobs:
   build:
-    # Don't re-trigger on the deploy job's own manifest commit.
-    if: "!startsWith(github.event.head_commit.message, 'deploy:')"
     permissions:
       id-token: write # OIDC: AWS (ECR push) + cosign keyless signing
       contents: read
     uses: asanexample/trusted-ci/.github/workflows/build-sign.yml@1fbb75f51a76aa85f9d753b6d56f1da297991d4f
     with:
-      app: ${{ values.product }}-${{ values.service }} # product-scoped image: team-${{ values.team }}/${{ values.product }}-${{ values.service }} (Product "demo", Service "web")
+      app: ${{ values.product }}-${{ values.service }} # product-scoped image: team-${{ values.team }}/${{ values.product }}-${{ values.service }}
       product: ${{ values.product }} # selects the per-Product OIDC role github-actions-ecr-push-product-${{ values.team }}-${{ values.product }} (ADR-069)
       tag: {% raw %}${{ github.sha }}{% endraw %}
 
@@ -42,37 +40,17 @@ jobs:
       digest: {% raw %}${{ needs.build.outputs.digest }}{% endraw %}
       product: ${{ values.product }} # selects the per-Product OIDC role github-actions-ecr-push-product-${{ values.team }}-${{ values.product }} (ADR-069)
 
-  # Gated on BOTH build and provenance so the digest the ApplicationSet picks up already carries its signature,
-  # SBOM AND provenance — no window where Kyverno's Enforce verify-*-product would reject it.
-  deploy:
+  # Gated on BOTH build and provenance so the promoted digest already carries its signature, SBOM AND provenance
+  # — no window where Kyverno's Enforce verify-*-product would reject it. promote opens a gated PR in the platform
+  # repo (as the asanexample-promote App); the gitops Gate auto-merges it; the ApplicationSet injects the digest.
+  promote:
     needs: [build, provenance]
-    runs-on: ubuntu-latest
     permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install yq
-        run: |
-          sudo curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
-          sudo chmod +x /usr/local/bin/yq
-
-      - name: Pin the dev overlay to the signed digest
-        env:
-          IMAGE: {% raw %}${{ needs.build.outputs.image }}{% endraw %}
-          DIGEST: {% raw %}${{ needs.build.outputs.digest }}{% endraw %}
-        run: |
-          set -euo pipefail
-          # Replace the kustomize images entry's newTag with the immutable digest (kustomize pins by digest).
-          IMAGE="$IMAGE" DIGEST="$DIGEST" yq -i '
-            (.images[] | select(.name == strenv(IMAGE)))
-              |= (.digest = strenv(DIGEST) | del(.newTag))
-          ' k8s/overlays/dev/kustomization.yaml
-
-      - name: Commit and push manifest update
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add k8s/overlays/dev/kustomization.yaml
-          git diff --cached --quiet || git commit -m "deploy: pin dev to {% raw %}${{ github.sha }}{% endraw %}"
-          git push
+      id-token: write # OIDC -> per-Product role -> read the promote App key (NO contents write on this repo)
+      contents: read
+    uses: asanexample/trusted-ci/.github/workflows/promote.yml@d2b823fb6fe87f05ed46820cb9de09ced2eba582
+    with:
+      product: ${{ values.product }}
+      service: ${{ values.service }}
+      stage: dev
+      digest: {% raw %}${{ needs.build.outputs.digest }}{% endraw %}
