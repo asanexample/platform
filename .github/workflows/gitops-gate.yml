@@ -56,6 +56,10 @@ jobs:
       IAM_SENSITIVE: "iam sts organizations account"
       CROSSPLANE_VERSION: "v2.2.1" # crank CLI (built from the Go module proxy — see install step)
       SCAFFOLDER_APP_LOGIN: "asanexample-backstage-scaffolder[bot]"
+      # The promote App (ADR-071) authors release digest-bump PRs (gitops/releases/**) from app CI; it is
+      # least-privilege (contents+pull_requests write on THIS repo only — no repo-create). Its release-only,
+      # non-deletion PRs auto-merge on the same path as the scaffolder. See docs/runbooks/promote-github-app.md.
+      PROMOTE_APP_LOGIN: "asanexample-promote[bot]"
     steps:
       # Trusted: the gate scripts + the Team/Product registries (envelope + ownership authority) all come from
       # BASE. Always runs (classify needs the script).
@@ -158,9 +162,10 @@ jobs:
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
           bot=false
-          # The write App only ever pushes branches in this repo; require same-repo (a fork claiming the name
-          # would be a different login anyway — belt and braces).
-          if [ "$AUTHOR" = "$SCAFFOLDER_APP_LOGIN" ] && [ "$HEAD_REPO" = "$GITHUB_REPOSITORY" ]; then
+          # The write Apps (scaffolder: onboarding PRs; promote: ADR-071 release digest bumps) only ever push
+          # branches in this repo; require same-repo (a fork claiming the name would be a different login anyway
+          # — belt and braces). Both author registry-only, non-deletion PRs that auto-merge on the same path.
+          if { [ "$AUTHOR" = "$SCAFFOLDER_APP_LOGIN" ] || [ "$AUTHOR" = "$PROMOTE_APP_LOGIN" ]; } && [ "$HEAD_REPO" = "$GITHUB_REPOSITORY" ]; then
             bot=true
           fi
           echo "bot=$bot" >>"$GITHUB_OUTPUT"
