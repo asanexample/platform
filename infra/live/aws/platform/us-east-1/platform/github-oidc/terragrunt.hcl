@@ -61,6 +61,10 @@ locals {
               "ecr:InitiateLayerUpload",
               "ecr:UploadLayerPart",
               "ecr:CompleteLayerUpload",
+              # The shared build-sign workflow polls describe-repositories to confirm the Composition-created ECR
+              # repo exists before building (ADR-071 "wait for delivery infra"); without it the first deploy of a
+              # new Product loops until timeout even though it can push.
+              "ecr:DescribeRepositories",
             ]
             # Only this product's repos (team-<team>/<product>-*), Composition-created. Wildcard by construction.
             Resource = ["arn:aws:ecr:${include.base.locals.region}:${include.base.locals.account_id}:repository/team-${p.team}/${p.product}-*"]
