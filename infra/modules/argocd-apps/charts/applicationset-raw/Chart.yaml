@@ -1,0 +1,10 @@
+apiVersion: v2
+name: applicationset-raw
+description: >-
+  Passthrough chart (ADR-071) that applies a pre-rendered ArgoCD ApplicationSet manifest. Terraform's
+  kubernetes_manifest cannot represent ArgoCD's recursive merge/matrix generator schema; Helm applies the YAML
+  verbatim with no type validation, and emits .Values.manifest as-is so ArgoCD's own {{ }} templating passes
+  through untouched (Helm does not re-evaluate substituted values).
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

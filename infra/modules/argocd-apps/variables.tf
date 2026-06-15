@@ -74,3 +74,9 @@ variable "platform_repo_branch" {
   type        = string
   default     = "main"
 }
+
+variable "ecr_registry" {
+  description = "ECR registry host for the per-Product image (ADR-071). The ApplicationSet injects the Release digest as a kustomize image override whose name must match the app overlay's image — <ecr_registry>/team-<team>/<product>-<service>."
+  type        = string
+  default     = ""
+}

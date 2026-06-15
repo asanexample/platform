@@ -48,10 +48,19 @@ resource "kubernetes_manifest" "product_appproject" {
   }
 }
 
-resource "kubernetes_manifest" "product_appset" {
+resource "helm_release" "product_appset" {
   for_each = local.products
 
-  manifest = {
+  name             = "product-${each.key}"
+  namespace        = var.argocd_namespace
+  chart            = "${path.module}/charts/applicationset-raw"
+  create_namespace = false
+
+  # ADR-071 (B-via-Helm): the ApplicationSet uses a recursive `merge` generator, which Terraform's
+  # kubernetes_manifest provider cannot represent (it crashes resolving the self-referential generators schema).
+  # Build the manifest as data and apply it via the passthrough chart — Helm emits it verbatim (no recursive type
+  # validation; ArgoCD's {{ }} survive because Helm does not re-parse substituted values).
+  values = [yamlencode({ manifest = yamlencode({
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "ApplicationSet"
     metadata = {
@@ -65,12 +74,31 @@ resource "kubernetes_manifest" "product_appset" {
     spec = {
       goTemplate        = true
       goTemplateOptions = ["missingkey=error"]
-      # Fan out over the product's Environment claims in the platform repo → one param-set per env file.
+      # Fan out over the product's Environment claims, MERGED with the matching Release record (ADR-071) so each
+      # param-set carries both the Environment (stage/host/ns inputs) AND the deployed digest. Merge key =
+      # path.basenameNormalized: gitops/environments/<t>/<p>/<stage>.yaml and gitops/releases/<t>/<p>/<stage>.yaml
+      # share a basename → joined 1:1. A first-deploy Environment with no Release yet passes through unchanged
+      # (no digest → the templatePatch injects nothing → the overlay's own image governs). The deep-merge unions
+      # the two `.spec`s (env: stage/team/services-keys; release: services.<svc>.digest).
       generators = [{
-        git = {
-          repoURL  = var.platform_repo_url
-          revision = "HEAD"
-          files    = [{ path = "gitops/environments/${each.value.team}/${each.value.product}/*.yaml" }]
+        merge = {
+          mergeKeys = ["path.basenameNormalized"]
+          generators = [
+            {
+              git = {
+                repoURL  = var.platform_repo_url
+                revision = "HEAD"
+                files    = [{ path = "gitops/environments/${each.value.team}/${each.value.product}/*.yaml" }]
+              }
+            },
+            {
+              git = {
+                repoURL  = var.platform_repo_url
+                revision = "HEAD"
+                files    = [{ path = "gitops/releases/${each.value.team}/${each.value.product}/*.yaml" }]
+              }
+            },
+          ]
         }
       }]
       template = {
@@ -89,8 +117,8 @@ resource "kubernetes_manifest" "product_appset" {
             targetRevision = "HEAD"
             path           = "k8s/overlays/{{ .spec.stage }}"
             kustomize = {
-              # Inject the generated host (static per env). The digest is NOT injected — it lives in the synced
-              # overlay (k8s/overlays/<stage>/kustomization.yaml images), promotion mechanism = P2 (#377).
+              # Inject the generated host (static per env). The per-Service digest is injected by templatePatch
+              # below (ADR-071) from the merged Release record — the overlay ships `:placeholder`.
               patches = var.preview_domain != "" ? [{
                 target = { kind = "HTTPRoute" }
                 patch = yamlencode([{
@@ -119,8 +147,30 @@ resource "kubernetes_manifest" "product_appset" {
           }
         }
       }
+      # ADR-071: inject the Release digest as a kustomize image override for every Service that has one — the
+      # image name MUST match the app overlay's image (<ecr_registry>/team-<team>/<product>-<svc>). Rendered
+      # per generated Application (YAML, merged onto it). An Environment with no Release, or a Service with no
+      # digest, injects nothing → the overlay's own image governs (safe for first-deploy). The `{{- }}` trims
+      # keep the rendered YAML well-indented; `${...}` is Terraform, `{{...}}` is ArgoCD goTemplate.
+      templatePatch = <<-EOT
+        {{- if hasKey .spec "services" }}
+        {{- $any := false }}
+        {{- range $svc, $cfg := .spec.services }}{{- if hasKey $cfg "digest" }}{{- $any = true }}{{- end }}{{- end }}
+        {{- if $any }}
+        spec:
+          source:
+            kustomize:
+              images:
+              {{- range $svc, $cfg := .spec.services }}
+              {{- if hasKey $cfg "digest" }}
+                - "${var.ecr_registry}/team-${each.value.team}/${each.value.product}-{{ $svc }}@{{ $cfg.digest }}"
+              {{- end }}
+              {{- end }}
+        {{- end }}
+        {{- end }}
+      EOT
     }
-  }
+  }) })]
 
   depends_on = [kubernetes_manifest.product_appproject]
 }

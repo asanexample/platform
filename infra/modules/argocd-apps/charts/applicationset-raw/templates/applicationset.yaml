@@ -1,0 +1,6 @@
+{{- /*
+  Emit the pre-rendered ApplicationSet verbatim. .Values.manifest is built (and yamlencoded) in Terraform with
+  ArgoCD's {{ }} as literal data; Helm substitutes the string once and does NOT re-parse it, so ArgoCD's
+  generator templating survives. No Helm logic here by design.
+*/ -}}
+{{- .Values.manifest }}

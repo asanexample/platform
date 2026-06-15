@@ -79,6 +79,26 @@ generate "kubernetes_provider" {
   EOF
 }
 
+# ADR-071: the per-Product ApplicationSet (recursive merge generator) is delivered via a passthrough Helm chart.
+generate "helm_provider" {
+  path      = "helm-provider.tf"
+  if_exists = "overwrite_terragrunt"
+  contents  = <<-EOF
+    provider "helm" {
+      kubernetes = {
+        host                   = "${dependency.eks.outputs.cluster_endpoint}"
+        cluster_ca_certificate = base64decode("${dependency.eks.outputs.cluster_certificate_authority}")
+
+        exec = {
+          api_version = "client.authentication.k8s.io/v1beta1"
+          command     = "aws"
+          args        = ["eks", "get-token", "--cluster-name", "${dependency.eks.outputs.cluster_id}", "--region", "${include.base.locals.region}", "--role-arn", "${include.base.locals.deployer_role_arn}"]
+        }
+      }
+    }
+  EOF
+}
+
 inputs = {
   create = true
 
@@ -87,6 +107,9 @@ inputs = {
   # Replaces the retired v2 XTenant-claim delivery (the legacy `tenants` Applications were removed at the cutover).
   products       = local.products
   preview_domain = "preprod.aws.refplat.org"
+  # ADR-071: the platform-account ECR host — the ApplicationSet injects the Release digest as a kustomize image
+  # override (<ecr_registry>/team-<team>/<product>-<svc>), matching the app overlay's image name.
+  ecr_registry = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com"
 
   # Target cluster name in ArgoCD — the preprod cluster that ArgoCD manages,
   # not the platform cluster where ArgoCD runs
