@@ -37,6 +37,8 @@ inputs = {
 
   # The ARC runner (platform account) reads config in CI — decrypt only, CROSS-account. The key policy admits
   # it here; the runner role's IAM also grants kms:Decrypt (cross-account KMS needs both — actions-runner-controller).
+  # Granted by ARN (account-root + aws:PrincipalArn condition in the module), so a rebuild that recreates the
+  # runner role (new unique-id, same ARN) keeps decrypting WITHOUT a sops-kms re-apply — durable across rebuilds.
   decrypt_principal_arns = [
     "arn:aws:iam::${include.base.locals.account_ids["platform"]}:role/platform-use1-eks-arc-runner",
   ]

@@ -115,6 +115,12 @@ variable "deployer_role_arn" {
   type        = string
 }
 
+variable "additional_deployer_role_arns" {
+  description = "Extra PlatformDeployer role ARNs the runner may assume (AssumeRole + TagSession) — the CROSS-account deployers for units that target other accounts (e.g. preprod's PlatformDeployer, which registry-reconcile assumes to apply preprod/policy). Each target's trust must also admit the runner (its iam-roles extra_trust_statements). Stable across rebuilds: granted by ARN."
+  type        = list(string)
+  default     = []
+}
+
 variable "state_role_arn" {
   description = "TerraformStateAccess role ARN (in the management account) the runner assumes for the S3/DynamoDB backend. Terragrunt assumes this SEPARATELY from PlatformDeployer (root.hcl remote_state.role_arn), so a CI apply needs both."
   type        = string

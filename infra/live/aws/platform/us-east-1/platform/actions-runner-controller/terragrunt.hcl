@@ -100,7 +100,7 @@ inputs = {
 
   # The custom toolchain image built by gha-runner-image.yml (platform/gha-runner). Bump this SHA + re-apply
   # to roll a new runner build (a /.tool-versions bump triggers the rebuild → new SHA here).
-  runner_image = "829808296602.dkr.ecr.us-east-1.amazonaws.com/platform/gha-runner:9304c681c44b0c5c318c5072fe6bf3a313e99889"
+  runner_image = "829808296602.dkr.ecr.us-east-1.amazonaws.com/platform/gha-runner:45bbcc5ce11b52f62480f3baa4ef2dc336b79c68"
 
   # GitHub App creds in Secrets Manager (JSON: appId, installationId, privateKey). Created out-of-band —
   # see docs/runbooks/arc-github-app.md.
@@ -110,6 +110,13 @@ inputs = {
   # The runner role is granted permission to assume PlatformDeployer here, but the access stays INERT until
   # PlatformDeployer's trust admits the role (a separate, isolated change — the actual privilege grant).
   deployer_role_arn = include.base.locals.deployer_role_arn
+
+  # CROSS-account deployers the runner also assumes: registry-reconcile applies preprod/policy, which targets the
+  # preprod account, so terragrunt assumes preprod's PlatformDeployer. Its trust admits this runner via an
+  # extra_trust_statement (preprod/iam-roles). Granted by ARN → durable across rebuilds.
+  additional_deployer_role_arns = [
+    "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:role/PlatformDeployer",
+  ]
 
   # Terragrunt assumes the state-backend role (root.hcl remote_state.role_arn) SEPARATELY from PlatformDeployer,
   # so a CI apply on the runner needs to assume it too. It lives in the management account and already trusts
