@@ -1,0 +1,57 @@
+# The projected Release CR (ADR-071, docs/architecture/platform-domain-api.md — the control-plane digest record).
+#
+# A plain, cluster-scoped, data-only CRD (not a Crossplane composite). Records the DEPLOYED image digest per
+# Service for one Environment — the desired-deployed-state that ADR-069 §2 names an Environment-owned fact.
+# Authored by CI (the promote workflow opens a gated PR bumping gitops/releases/<team>/<product>/<stage>.yaml);
+# the per-Product ApplicationSet reads it and injects the digest as a kustomize image override (ADR-071 §3), so
+# the app repo's overlay stays `:placeholder` and its `main` is never written by CI. Named identically to its
+# XEnvironment (<team>-<product>-<stage>[-<customer>]) so the join to the claim is 1:1.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: releases.platform.refplat.org
+spec:
+  group: platform.refplat.org
+  scope: Cluster
+  names:
+    kind: Release
+    plural: releases
+    singular: release
+    categories:
+      - environment-api
+  versions:
+    - name: v1beta1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - environmentRef
+                - services
+              properties:
+                environmentRef:
+                  type: string
+                  description: The XEnvironment this Release targets (its metadata.name, <team>-<product>-<stage>[-<customer>]).
+                services:
+                  type: object
+                  description: Deployed image digest per Service. Each key is a Service of the Product; CI bumps the digest on promote.
+                  minProperties: 1
+                  additionalProperties:
+                    type: object
+                    required:
+                      - digest
+                    properties:
+                      digest:
+                        type: string
+                        pattern: '^sha256:[a-f0-9]{64}$'
+                        description: The cosign-signed image MANIFEST digest deployed for this Service (sha256:<64 hex>).
+      additionalPrinterColumns:
+        - name: Environment
+          type: string
+          jsonPath: .spec.environmentRef

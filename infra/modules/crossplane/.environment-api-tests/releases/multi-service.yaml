@@ -1,0 +1,9 @@
+# A multi-service Release (a Product with > 1 Service deployed in one Environment).
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata: { name: alpha-shop-acme-prod }
+spec:
+  environmentRef: alpha-shop-acme-prod
+  services:
+    web: { digest: "sha256:0000000000000000000000000000000000000000000000000000000000000001" }
+    api: { digest: "sha256:0000000000000000000000000000000000000000000000000000000000000002" }

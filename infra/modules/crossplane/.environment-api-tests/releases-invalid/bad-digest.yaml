@@ -1,0 +1,8 @@
+# MUST FAIL: digest is not a sha256:<64 hex> manifest digest (a mutable tag is not a digest).
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata: { name: bad-digest }
+spec:
+  environmentRef: alpha-shop-dev
+  services:
+    web: { digest: "v1.2.3" }

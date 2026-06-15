@@ -11,6 +11,7 @@ team_crd="${charts}/team-crd.yaml"             # projected Team CRD (v1beta1)
 xenv_xrd="${charts}/xenvironment-xrd.yaml"     # XEnvironment XRD (v3, the Environment claim)
 product_crd="${charts}/product-crd.yaml"       # projected Product CRD (delivery identity)
 grant_crd="${charts}/access-grant-crd.yaml"    # projected AccessGrant CRD (ADR-068)
+release_crd="${charts}/release-crd.yaml"       # projected Release CRD (ADR-071, control-plane digest record)
 
 command -v crossplane >/dev/null 2>&1 || { echo "::error::crossplane CLI not found on PATH"; exit 1; }
 
@@ -59,6 +60,9 @@ validate_dir "$product_crd" "valid Product records (v3)"      "${here}/products"
 validate_dir "$product_crd" "invalid Product records (v3)"    "${here}/products-invalid"      reject
 validate_dir "$grant_crd"   "valid AccessGrant records (v3)"  "${here}/grants"                pass
 validate_dir "$grant_crd"   "invalid AccessGrant records (v3)" "${here}/grants-invalid"       reject
+# Release records (ADR-071 — the control-plane deployed-digest record; CI-owned via the promote gated PR)
+validate_dir "$release_crd" "valid Release records"           "${here}/releases"              pass
+validate_dir "$release_crd" "invalid Release records"         "${here}/releases-invalid"      reject
 
 # Live git-native objects (the new gitops layout). crossplane beta validate recurses the per-team subdirs.
 validate_dir "$product_crd" "live Product objects (gitops/products)"          "${repo_root}/gitops/products"     pass

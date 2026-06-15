@@ -1,0 +1,7 @@
+# MUST FAIL: spec.services must have at least one Service (a Release with nothing deployed is meaningless).
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata: { name: empty-services }
+spec:
+  environmentRef: alpha-shop-dev
+  services: {}
