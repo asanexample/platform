@@ -96,6 +96,7 @@ jobs:
           sparse-checkout: |
             gitops/products
             gitops/environments
+            gitops/releases
           sparse-checkout-cone-mode: true
           persist-credentials: false
 
