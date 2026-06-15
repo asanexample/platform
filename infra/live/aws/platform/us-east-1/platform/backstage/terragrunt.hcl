@@ -131,13 +131,11 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # This SHA (asanexample/backstage#37) completes the L2c frontend: projection (#35) + #285 card re-point (#36)
-  # + the kind:Environment relation processor (ownedBy/partOf) + team-tenants → Environments. ad2721f7
-  # (backstage#38 v1beta1 live-CR pointer + #39 workflow_dispatch) queries XEnvironment at v1beta1 — required
-  # after the API graduation (v1alpha3 → v1beta1), else the #284/#285 status cards 404. This commit carries the
-  # workflow_dispatch trigger, so the rebuild can re-push THIS exact tag (ECR is force-deleted on teardown)
-  # without a dummy commit — keeping this pin stable across rebuilds.
-  image_tag = "ad2721f7b6f2878246ee49c64082c4e0f9b873d7"
+  # f502c5ff (backstage#40) adds the ProductPicker scaffolder field — the New Environment form's Product
+  # input is now a Team-scoped dropdown (catalog Systems owned by the selected Team) instead of free text.
+  # Carries forward the v1beta1 projection (#38) + workflow_dispatch trigger, so the rebuild can re-push THIS
+  # exact tag (ECR is force-deleted on teardown) without a dummy commit — keeping this pin stable across rebuilds.
+  image_tag = "f502c5ffb65d3937576d8b79b4d0dfe498863b56"
 
   # platform-projection catalog mode = v3 (Product=System, Environment=custom kind). The v2 projection branch is
   # inert (nothing reads it); removing it + this flag is a backstage-repo follow-up.
