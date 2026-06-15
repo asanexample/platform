@@ -16,15 +16,15 @@ write App on the platform:
 
 - **One repo only** — installed on `asanexample/platform`, nothing else. It never touches an app repo.
 - **PR-only** — `Contents: write` + `Pull requests: write`, nothing more. **No** Administration, Workflows,
-  Actions, or Organization permissions. It *opens* PRs; it does **not** merge — auto-merge is GitHub's, gated by
+  Actions, or Organization permissions. It _opens_ PRs; it does **not** merge — auto-merge is GitHub's, gated by
   the required gitops-Gate checks (ADR-062 §3-4, the same path the scaffolder uses).
 - **Strictly narrower than the scaffolder App** — no repo-create, no org scope. Where the scaffolder App is
   elevated for New Product (repo-on-demand), this App is **never** elevated.
-- A GitHub App scopes by **repo, not path**, so it *can* technically edit any file in the platform repo. The
+- A GitHub App scopes by **repo, not path**, so it _can_ technically edit any file in the platform repo. The
   compensating controls are the gate's **auto-merge path/diff restriction** (only `gitops/releases/**`,
   non-deletion, validated, promote-App-authored PRs auto-merge — see `validate-releases.sh` + `classify-diff.sh`)
-  + **CI-gate integrity** (the gate runs from the protected base branch). A malformed or off-path PR is validated
-  and left for human review, never auto-merged.
+  and **CI-gate integrity** (the gate runs from the protected base branch). A malformed or off-path PR is
+  validated and left for human review, never auto-merged.
 
 ## Create the App (org admin, ~5 min)
 
