@@ -120,6 +120,14 @@ jobs:
           ENVIRONMENT_FILES: ${{ steps.classify.outputs.environment_files }}
         run: bash base/.github/scripts/gitops-gate/validate-environments.sh
 
+      - name: Validate Releases (ADR-071 digest records)
+        if: steps.classify.outputs.any == 'true' && steps.classify.outputs.release_files != ''
+        env:
+          BASE_DIR: ${{ github.workspace }}/base
+          HEAD_DIR: ${{ github.workspace }}/head
+          RELEASE_FILES: ${{ steps.classify.outputs.release_files }}
+        run: bash base/.github/scripts/gitops-gate/validate-releases.sh
+
       # --- composition render: prove each Environment claim BUILDS against the Composition (the
       # Environment+Product join), catching schema/envelope-valid-but-render-breaking claims. Only when there
       # are Environment files. Docker is preinstalled on ubuntu-latest; crank is built from the Go module proxy
