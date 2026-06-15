@@ -3,8 +3,8 @@
 # Seeded with the showcase's current digest at the ADR-071 cutover.
 apiVersion: platform.refplat.org/v1beta1
 kind: Release
-metadata: { name: alpha-shop-dev }
+metadata: {name: alpha-shop-dev}
 spec:
   environmentRef: alpha-shop-dev
   services:
-    web: { digest: "sha256:69ff1ab2abeb52b7fde3fec3b75e548116a7d33a27816bf2afd36df1f93527a7" }
+    web: {digest: "sha256:0de25d8ae1e7e1c0b5b9b1158e932fedb1121fa736dc693ba3230004cb55c475"}
