@@ -2,7 +2,14 @@
 
 **Date:** 2026-06-14
 
-**Status:** Proposed — **resolves the P2/[#377](069-delivery-source-of-truth-product-environment.md) decision
+**Status:** Accepted + **IMPLEMENTED & PROVEN LIVE** (2026-06-15) — the full chain works end-to-end on
+`app-alpha-shop`: app deploy → build-sign → `promote.yml` (as the `asanexample-promote` App) opens a gated
+Release PR on the platform repo → the gitops Gate auto-merges it → the per-Product ApplicationSet injects the
+digest → the pod rolls, **with the app repo's `main` receiving zero CI commits** (now re-protected). Delivered via
+`charts/applicationset-raw` (B-via-Helm — `kubernetes_manifest` cannot represent ArgoCD's recursive `merge`
+generator). PRs: Release schema/gate (#445/#446), promote App + recognition (#447, trusted-ci#12/#13),
+registry-reconcile (#448), ApplicationSet injection (#451), scaffolder starter (#453). **Resolves the
+P2/[#377](069-delivery-source-of-truth-product-environment.md) decision
 deferred by [ADR-069](069-delivery-source-of-truth-product-environment.md) §4** ("where the digest lives and how
 it is promoted should not be locked in by the delivery layer"). ADR-069 already names the deployed **digest** an
 **Environment-owned fact** (§2, *one home per fact*); this ADR decides its *home* and *promotion mechanism*. Also
