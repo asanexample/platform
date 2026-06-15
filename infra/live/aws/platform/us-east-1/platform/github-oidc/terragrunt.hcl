@@ -65,6 +65,15 @@ locals {
             # Only this product's repos (team-<team>/<product>-*), Composition-created. Wildcard by construction.
             Resource = ["arn:aws:ecr:${include.base.locals.region}:${include.base.locals.account_id}:repository/team-${p.team}/${p.product}-*"]
           },
+          {
+            # Read the promote App's key (ADR-071) so trusted-ci/promote.yml can mint an installation token and
+            # open the release digest-bump PR — the per-Product role is the only identity that reads it (no GitHub
+            # org secret, no key in the app repo). docs/runbooks/promote-github-app.md.
+            Sid      = "PromoteAppSecret"
+            Effect   = "Allow"
+            Action   = ["secretsmanager:GetSecretValue"]
+            Resource = ["arn:aws:secretsmanager:${include.base.locals.region}:${include.base.locals.account_id}:secret:platform/promote/github-app-*"]
+          },
         ]
       })
     }
