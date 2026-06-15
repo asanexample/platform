@@ -16,8 +16,8 @@ set -uo pipefail
 : "${BASE_DIR:?}" "${HEAD_DIR:?}"
 ENVIRONMENT_FILES="${ENVIRONMENT_FILES:-}"
 
-COMPOSITION="${BASE_DIR}/infra/modules/crossplane/charts/tenant/files/composition.yaml"
-FIXTURES="${BASE_DIR}/infra/modules/crossplane/.tenant-api-tests/render"
+COMPOSITION="${BASE_DIR}/infra/modules/crossplane/charts/environment-api/files/composition.yaml"
+FIXTURES="${BASE_DIR}/infra/modules/crossplane/.environment-api-tests/render"
 FNS="${FIXTURES}/functions.yaml"
 ENVCFG="${FIXTURES}/environmentconfig.yaml"
 
