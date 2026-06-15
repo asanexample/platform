@@ -7,8 +7,8 @@ calls the shared `trusted-ci/promote.yml` workflow, which (as this App) opens a 
 `gitops/releases/<team>/<product>/<stage>.yaml`. The gitops Gate validates + auto-merges it.
 
 > **Live instance:** App ID **4060090** (`asanexample-promote`), created 2026-06-15. Secret:
-> `platform/promote/github-app` (platform account, stored). ⚠️ Must be **installed on `asanexample/platform`**
-> for `promote.yml` to mint an installation token (created ≠ installed — install via the App's _Install App_ tab).
+> `platform/promote/github-app` (platform account, stored). Installed on **`asanexample/platform`**
+> (installation `140462682`). Fully provisioned — ready for `promote.yml`.
 
 ## Security posture (why it's shaped this way)
 
