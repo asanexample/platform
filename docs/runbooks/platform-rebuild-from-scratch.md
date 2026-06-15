@@ -103,7 +103,7 @@ and prompts if missing; the rest you must ensure yourself. For a from-scratch re
 | *(Phase 3)* **Backstage Scaffolder GitHub App** (write) → `platform/backstage/scaffolder-github-app` | Secrets Manager | [backstage-scaffolder-github-app.md](backstage-scaffolder-github-app.md) |
 | **ARC runner GitHub App** (self-hosted runners) → `platform/gha-runner-controller/github-app` | Secrets Manager | [arc-github-app.md](arc-github-app.md) |
 | **ECR images** — only the `ecr`-unit repos (`platform/backstage`, `platform/gha-runner`) are force-deleted on teardown and need re-push at the pinned SHA. The Composition-managed per-product repos (`team-<team>/<product>-*`) are `deletionPolicy: Orphan` → they **survive teardown with their signed images**, so the demo/app workloads deploy immediately (re-running an app `deploy.yml` just fails harmlessly on ECR's immutable-tag guard). | ECR | Backstage `build.yml` / `gha-runner-image.yml` |
-| **ArgoCD `backstage` token** → `platform/argocd/backstage-token` | Secrets Manager | [backstage-argocd.md](backstage-argocd.md) — **minted after ArgoCD is up** (post-bootstrap or a resume pass) |
+| **ArgoCD `backstage` token** → `platform/argocd/backstage-token` | Secrets Manager | [backstage-argocd.md](backstage-argocd.md) — **auto-minted by `platctl bootstrap`** (the `argocd_account_token` hook, post-`argocd`-apply / idempotent); manual mint is the fallback |
 
 > **Gap to close:** `.platctl.yaml.example` only has `manual_steps` for cloudflare/tailscale. Adding entries for
 > the (optional) Keycloak upstream SAML values (`file_contains` on secrets.hcl) and the Backstage GitHub App(s)

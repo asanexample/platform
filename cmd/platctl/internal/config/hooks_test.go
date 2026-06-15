@@ -413,3 +413,90 @@ func TestResolveHook_Unknown(t *testing.T) {
 		t.Fatal("expected nil hook for unknown type")
 	}
 }
+
+func TestParseTokenJSON(t *testing.T) {
+	cases := []struct {
+		name, in, key, want string
+	}{
+		{"normal", `{"token":"eyJabc"}`, "token", "eyJabc"},
+		{"whitespace", "  {\"token\":\"x\"}\n", "token", "x"},
+		{"missing key", `{"other":"x"}`, "token", ""},
+		{"not json", "eyJrawtoken", "token", ""},
+		{"empty", "", "token", ""},
+		{"custom key", `{"argocdToken":"y"}`, "argocdToken", "y"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := parseTokenJSON(c.in, c.key); got != c.want {
+				t.Errorf("parseTokenJSON(%q,%q) = %q, want %q", c.in, c.key, got, c.want)
+			}
+		})
+	}
+}
+
+func TestUserInfoLoggedIn(t *testing.T) {
+	cases := []struct {
+		name, in string
+		want     bool
+	}{
+		{"valid", "Logged In: true\nUsername: backstage\nIssuer: argocd\n", true},
+		{"invalid", "Logged In: false\n", false},
+		{"indented", "  Logged In: true  \n", true},
+		{"empty", "", false},
+		{"error text", "FATA[0000] rpc error: unauthenticated", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := userInfoLoggedIn(c.in); got != c.want {
+				t.Errorf("userInfoLoggedIn(%q) = %v, want %v", c.in, got, c.want)
+			}
+		})
+	}
+}
+
+func TestIsSafeAccountName(t *testing.T) {
+	safe := []string{"backstage", "ci-bot", "team_alpha", "abc123"}
+	unsafe := []string{"", "back stage", "a;b", "x'y", "$(whoami)", "a&b"}
+	for _, s := range safe {
+		if !isSafeAccountName(s) {
+			t.Errorf("isSafeAccountName(%q) = false, want true", s)
+		}
+	}
+	for _, s := range unsafe {
+		if isSafeAccountName(s) {
+			t.Errorf("isSafeAccountName(%q) = true, want false", s)
+		}
+	}
+}
+
+func TestResolveArgoTokenHook(t *testing.T) {
+	h := ResolveHook(UnitOverride{
+		Hook: "argocd_account_token",
+		HookConfig: map[string]string{
+			"cluster": "platform-use1-eks", "region": "us-east-1", "profile": "platform",
+			"role_arn": "arn:aws:iam::1:role/PlatformAdmin", "account": "backstage",
+			"secret_id": "platform/argocd/backstage-token",
+		},
+	}, nil, false)
+	ah, ok := h.(*ArgoTokenHook)
+	if !ok {
+		t.Fatalf("expected *ArgoTokenHook, got %T", h)
+	}
+	if ah.Cluster != "platform-use1-eks" || ah.SecretID != "platform/argocd/backstage-token" {
+		t.Errorf("hook fields not wired: %+v", ah)
+	}
+	// defaults applied via accessors
+	if ah.account() != "backstage" || ah.namespace() != "argocd" || ah.serverDeploy() != "argocd-server" || ah.secretKey() != "token" {
+		t.Errorf("defaults wrong: account=%s ns=%s deploy=%s key=%s", ah.account(), ah.namespace(), ah.serverDeploy(), ah.secretKey())
+	}
+	if ah.smProfile() != "platform" || ah.smRegion() != "us-east-1" {
+		t.Errorf("sm fallbacks wrong: profile=%s region=%s", ah.smProfile(), ah.smRegion())
+	}
+}
+
+func TestArgoTokenReconcileMisconfigured(t *testing.T) {
+	h := &ArgoTokenHook{} // no secret_id/cluster
+	if err := h.reconcile(context.Background()); err == nil {
+		t.Error("expected error for misconfigured hook")
+	}
+}

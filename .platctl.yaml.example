@@ -39,6 +39,26 @@ overrides:
       profile: platform
       secrets: "platform/tailscale/oauth@platform,preprod/tailscale/oauth@preprod,preprod/tailscale/api-key@preprod"
 
+  platform/argocd:
+    # Post-apply: re-mint the read-only ArgoCD token that Backstage's ArgoCD plugin authenticates with. A
+    # from-scratch rebuild regenerates the ArgoCD server signing key, which silently invalidates the token in
+    # Secrets Manager (minted out-of-band) and blanks every Backstage ArgoCD card. argocd is an early wave, so
+    # minting here lands a valid token in SM before backstage's ExternalSecret first syncs — no restart or ESO
+    # force-refresh needed (which the operate-only PlatformAdmin can't do anyway). Idempotent (re-mints only when
+    # the current token fails validation, so applies don't accumulate dead tokens); best-effort (warns on
+    # failure, never fails bootstrap). See docs/runbooks/backstage-argocd.md.
+    hook: argocd_account_token
+    hook_config:
+      cluster: platform-use1-eks
+      region: us-east-1
+      profile: platform # AWS profile for cluster access + the SM write
+      role_arn: arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/PlatformAdmin
+      account: backstage # the read-only ArgoCD local account
+      namespace: argocd
+      server_deploy: argocd-server
+      secret_id: platform/argocd/backstage-token
+      secret_key: token
+
   platform/eks:
     bootstrap_args: ["-var", "endpoint_public_access=true"]
 
