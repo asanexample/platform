@@ -48,7 +48,7 @@ jobs:
     permissions:
       id-token: write # OIDC -> per-Product role -> read the promote App key (NO contents write on this repo)
       contents: read
-    uses: asanexample/trusted-ci/.github/workflows/promote.yml@d2b823fb6fe87f05ed46820cb9de09ced2eba582
+    uses: asanexample/trusted-ci/.github/workflows/promote.yml@699ab5de5ded7c19581e17e12fcb65c535928abb
     with:
       product: ${{ values.product }}
       service: ${{ values.service }}
