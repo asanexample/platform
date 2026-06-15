@@ -204,9 +204,20 @@ jobs:
         run: |
           if [ -n "$(gh pr view "$PR_NUMBER" --repo "$REPO" --json autoMergeRequest --jq '.autoMergeRequest // empty')" ]; then
             echo "auto-merge already armed"
-          else
-            gh pr merge "$PR_NUMBER" --repo "$REPO" --auto --squash
+          elif gh pr merge "$PR_NUMBER" --repo "$REPO" --auto --squash 2>/tmp/merge_err; then
             echo "auto-merge armed (squash) — merges when all required checks pass"
+          else
+            # GitHub REFUSES to arm auto-merge once the PR is already mergeable (mergeStateStatus CLEAN/UNSTABLE —
+            # all REQUIRED checks have passed; only non-required ones are pending, e.g. the reconcile-on-product-merge
+            # dispatcher, which sits IN_PROGRESS for ~15 min). There's then nothing to wait for, so merge directly —
+            # a squash still honours branch protection's required checks, so this can't merge an unvalidated PR.
+            # Without this, a fast-passing PR (or any pending non-required check) would silently never merge.
+            if grep -qiE 'unstable status|clean status|not in the correct state|not mergeable' /tmp/merge_err; then
+              echo "auto-merge not applicable (PR already mergeable) — merging directly"
+              gh pr merge "$PR_NUMBER" --repo "$REPO" --squash
+            else
+              echo "::error::failed to arm auto-merge"; cat /tmp/merge_err >&2; exit 1
+            fi
           fi
 
       # The deletion admin-approval requirement is published HERE as a commit status — NOT a job failure — so it
