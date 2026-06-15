@@ -39,6 +39,10 @@ inputs = {
   create       = true
   cluster_name = "${include.base.locals.env}-${include.base.locals.region_abbv}-eks"
 
+  # Control-plane logging is OFF in dev (vended audit/api logs ran ~$700/mo across the dev clusters). Re-enable
+  # per-env via control_plane_log_types in env.hcl (see _base.hcl). Empty = no vended logs.
+  enabled_cluster_log_types = include.base.locals.control_plane_log_types
+
   subnet_ids = [
     for name, id in dependency.networking.outputs.subnet_ids :
     id if can(regex("kubernetes$", name))
