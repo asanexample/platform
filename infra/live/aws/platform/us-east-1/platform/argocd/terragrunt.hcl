@@ -31,10 +31,13 @@ locals {
     "p, role:org-admin, exec, create, */*, allow",
     "g, platform-admins, role:org-admin",
     ], flatten([
+      # v3 (ADR-067/069): a team's apps live in the per-Product AppProjects `product-<team>-<product>` (the
+      # ApplicationSets create them), NOT a single team-named project — so scope to `product-${t}-*/*`. The glob
+      # separator is `/`, so `product-${t}-*` matches every product of team `t` and `/*` matches its apps.
       for t, _cfg in local.teams : [
-        "p, role:team-${t}, applications, get, ${t}/*, allow",
-        "p, role:team-${t}, applications, sync, ${t}/*, allow",
-        "p, role:team-${t}, logs, get, ${t}/*, allow",
+        "p, role:team-${t}, applications, get, product-${t}-*/*, allow",
+        "p, role:team-${t}, applications, sync, product-${t}-*/*, allow",
+        "p, role:team-${t}, logs, get, product-${t}-*/*, allow",
         "g, ${t}, role:team-${t}",
       ]
     ]), [
