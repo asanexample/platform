@@ -102,7 +102,7 @@ and prompts if missing; the rest you must ensure yourself. For a from-scratch re
 | **Backstage GitHub App** (read-only discovery) → `platform/backstage/github-app` | Secrets Manager | [backstage-github-app.md](backstage-github-app.md) |
 | *(Phase 3)* **Backstage Scaffolder GitHub App** (write) → `platform/backstage/scaffolder-github-app` | Secrets Manager | [backstage-scaffolder-github-app.md](backstage-scaffolder-github-app.md) |
 | **ARC runner GitHub App** (self-hosted runners) → `platform/gha-runner-controller/github-app` | Secrets Manager | [arc-github-app.md](arc-github-app.md) |
-| **ECR images** (Backstage + the `platform/gha-runner` runner image at the pinned SHA; app images) pushed | ECR | app CI / `gha-runner-image.yml` |
+| **ECR images** — only the `ecr`-unit repos (`platform/backstage`, `platform/gha-runner`) are force-deleted on teardown and need re-push at the pinned SHA. The Composition-managed per-product repos (`team-<team>/<product>-*`) are `deletionPolicy: Orphan` → they **survive teardown with their signed images**, so the demo/app workloads deploy immediately (re-running an app `deploy.yml` just fails harmlessly on ECR's immutable-tag guard). | ECR | Backstage `build.yml` / `gha-runner-image.yml` |
 | **ArgoCD `backstage` token** → `platform/argocd/backstage-token` | Secrets Manager | [backstage-argocd.md](backstage-argocd.md) — **minted after ArgoCD is up** (post-bootstrap or a resume pass) |
 
 > **Gap to close:** `.platctl.yaml.example` only has `manual_steps` for cloudflare/tailscale. Adding entries for
