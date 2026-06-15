@@ -21,7 +21,7 @@ freshly-scaffolded repo and exposed the flaw. Backstage's `publish:github` prote
 (`protectDefaultBranch: true`, `enforce_admins: true`), so the `deploy.yml` digest-pin push to `main` was
 rejected:
 
-```
+```text
 remote: error: GH006: Protected branch update failed for refs/heads/main
 ```
 
@@ -55,19 +55,20 @@ principle — *the platform repo is the delivery control plane* — and should b
 is application source only — fully protected, human-PR-only, never written by CI. Promotion is a gated PR to the
 control plane, merged by the existing gitops-Gate auto-merge.**
 
-### 1. Digest home — a per-Environment deployment manifest, separate from the claim
+### 1. Digest home — a per-Environment `Release` record, separate from the claim
 
-The digest lives in a dedicated control-plane file, **not** in the human-owned `XEnvironment` claim:
+The digest lives in a dedicated control-plane file (`kind: Release`), **not** in the human-owned `XEnvironment`
+claim:
 
-```
-gitops/deployments/<team>/<product>/<stage>[-<customer>].yaml   # CI-owned, digest-per-service
+```text
+gitops/releases/<team>/<product>/<stage>[-<customer>].yaml      # CI-owned, digest-per-service
 gitops/environments/<team>/<product>/<stage>[-<customer>].yaml  # human-owned XEnvironment claim (unchanged)
 ```
 
 ```yaml
-# gitops/deployments/alpha/shop/dev.yaml  — owned by CI, one line per service
+# gitops/releases/alpha/shop/dev.yaml  — owned by CI, one digest per service
 apiVersion: platform.refplat.org/v1beta1
-kind: Deployment            # control-plane record, NOT a k8s Deployment
+kind: Release
 metadata: { name: alpha-shop-dev }
 spec:
   environmentRef: alpha-shop-dev
@@ -83,7 +84,7 @@ gate to re-run for a one-line image bump. Separate homes keep each object's gate
 ### 2. Promotion = a gated PR to the control plane (reuses existing machinery)
 
 The app CI stops pushing to its own `main`. Instead, after build+sign+push, it opens a PR against the **platform
-repo** bumping `gitops/deployments/<…>.yaml`. This is **not new machinery** — it is the same path that merged the
+repo** bumping `gitops/releases/<…>.yaml`. This is **not new machinery** — it is the same path that merged the
 showcase's onboarding PR:
 
 - The **gitops Gate** ([ADR-069 §3](069-delivery-source-of-truth-product-environment.md) / #388) validates the
@@ -97,7 +98,7 @@ showcase's onboarding PR:
 ### 3. The ApplicationSet injects the digest; the app overlay stays a placeholder
 
 The per-Product ApplicationSet (ADR-069 §3) already injects per-Environment namespace + host via a kustomize
-patch. It additionally **reads the digest from `gitops/deployments/…` (its git generator already walks the
+patch. It additionally **reads the digest from `gitops/releases/…` (its git generator already walks the
 platform repo) and injects it as a kustomize image override.** The app overlay keeps `:placeholder` — **CI never
 pins it**, so the app repo's `k8s/` is pure, environment-agnostic source. *Whatever digest the control plane
 records deploys* — the same contract as ADR-069 §4, with the home corrected from app-overlay to control-plane.
@@ -110,7 +111,7 @@ main" problem is dissolved rather than carved around.
 
 ## Consequences
 
-**Positive**
+### Positive
 
 - **App-repo `main` is fully protected, human-PR-only, with zero CI write access** — no bypass actor, no
   enforce-admins hole. The trust surface shrinks: a compromised app-CI token cannot rewrite app source.
@@ -124,11 +125,11 @@ main" problem is dissolved rather than carved around.
 - **Auditable + reversible** — every promotion and rollback is a control-plane PR with the signed-image attestation
   in scope; rollback = revert the digest line.
 
-**Negative / costs**
+### Negative / costs
 
 - **Largest change of the three options.** Touches: the New Product scaffolder, the shared `trusted-ci` deploy
   flow (emit digest + open promote-PR instead of self-push), the per-Product ApplicationSet (inject digest), the
-  gitops Gate (a `Deployment` record validator), and the `platform-domain-api` schema (the `Deployment` kind).
+  gitops Gate (a `Release` record validator), and the `platform-domain-api` schema (the `Release` kind).
 - **A promotion is now two repos** (image pushed to ECR by the app; digest recorded in the platform repo). Mildly
   less local for app developers, but it is the correct boundary.
 - **Migration:** `app-alpha`/`app-bravo` move off self-overlay-pinning to control-plane promotion;

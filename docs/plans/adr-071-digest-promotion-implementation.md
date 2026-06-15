@@ -6,22 +6,22 @@ showcase (alpha/shop, 2026-06-14) — see [the showcase findings](../adrs/071-di
 lives in the control plane and promotes via the existing gitops-Gate auto-merge. Bundles the showcase's second
 finding (Gap #2: per-Product delivery plumbing needs a privileged `terragrunt apply`).
 
-## Two open decisions (resolve before/at PR 1)
+## Open decisions
 
-1. **Record kind name.** ADR-071 wrote `kind: Deployment` but flagged "NOT a k8s Deployment." That collision is
-   confusing in a K8s repo. **Recommend `kind: Release`** (a released digest-set per Environment). Affects the
-   schema + projected CRD name. *(Decision needed.)*
-2. **Gap #2 mechanism.** (a) a **registry-reconcile CI job** that `terragrunt apply`s the 3 derived units on
-   `gitops/products` changes (reuses existing units + the in-VPC ARC runners — pragmatic, ships fast), vs (b)
-   **move the per-Product OIDC role + ApplicationSet + `verify-images-product` into the Crossplane Composition**
-   (everything per-Product becomes auto-provisioned like ns/ECR/PodIdentity — cleaner, bigger). **Recommend (a)
-   now, (b) as a later convergence.** *(Decision needed — Workstream 2.)*
+1. **Record kind name — RESOLVED: `kind: Release`** (Josh, 2026-06-14). Avoids the apps/v1 `Deployment` collision;
+   a "released digest-set per Environment." The ADR + schema + CRD are written to `Release`.
+2. **Gap #2 mechanism — defaulting to (a), open to override.** (a) a **registry-reconcile CI job** that
+   `terragrunt apply`s the 3 derived units on `gitops/products` changes (reuses existing units + the in-VPC ARC
+   runners — pragmatic, ships fast), vs (b) **move the per-Product OIDC role + ApplicationSet +
+   `verify-images-product` into the Crossplane Composition** (everything per-Product becomes auto-provisioned like
+   ns/ECR/PodIdentity — cleaner, bigger). **Proceeding with (a) now, (b) as a later convergence** (Workstream 2).
 
 ---
 
 ## Workstream 1 — Control-plane digest promotion
 
 ### PR 1 — Schema: the per-Environment `Release` record
+
 - **Add** the control-plane record shape to `docs/architecture/platform-domain-api.md` and a projected CRD in
   `infra/modules/crossplane/charts/environment-api/` (`release-crd.yaml`, `platform.refplat.org/v1beta1`,
   cluster-scoped, named `<team>-<product>-<stage>[-<customer>]`). Shape: `spec.environmentRef` +
@@ -34,6 +34,7 @@ finding (Gap #2: per-Product delivery plumbing needs a privileged `terragrunt ap
   `.environment-api-tests/**`. *No cluster.*
 
 ### PR 2 — gitops Gate validator for `Release`
+
 - **`validate-releases.sh`**: each changed `gitops/releases/**` file is digest-only vs base, references an
   existing `Environment`+`Service` (join against `gitops/environments` + the Product's `services`), the digest's
   image is in the Product's ECR scope (`team-<team>/<product>-<svc>`), and (stretch) a cosign attestation exists.
@@ -43,6 +44,7 @@ finding (Gap #2: per-Product delivery plumbing needs a privileged `terragrunt ap
 - *Files:* `.github/scripts/gitops-gate/{validate-releases.sh,classify-diff.sh}`, `gitops-gate.yml`.
 
 ### PR 3 — The `promote` reusable workflow + a promote GitHub App
+
 - **`asanexample/trusted-ci/.github/workflows/promote.yml`** (app-team-unwritable, like `build-sign.yml`):
   inputs `team/product/stage/customer?/service/digest` → checks out the platform repo → bumps
   `gitops/releases/<…>.yaml` → opens a gated PR (auto-merged by PR 2's path). Authenticated as a **promote
@@ -52,6 +54,7 @@ finding (Gap #2: per-Product delivery plumbing needs a privileged `terragrunt ap
 - *Files:* `trusted-ci` repo workflow; `docs/runbooks/promote-github-app.md`; the App's Secrets-Manager secret.
 
 ### PR 4 — ApplicationSet injects the digest
+
 - The per-Product ApplicationSet (`infra/modules/argocd-apps/delivery.tf`) gains a **merge generator**
   (environments × releases over the platform repo) and a **kustomize image override** patch that sets the
   service image to the `Release` digest — alongside today's ns + host patch. The app overlay stays
@@ -61,6 +64,7 @@ finding (Gap #2: per-Product delivery plumbing needs a privileged `terragrunt ap
   lands).*
 
 ### PR 5 — Starters + app CI switch to promote; migrate the live apps
+
 - **Scaffolder starters** (`scaffolder/templates/new-product/skeleton-*/.github/workflows/deploy.yml` + each
   `k8s/overlays/*`): the deploy job **calls `promote.yml`** instead of self-pinning; overlays ship
   `:placeholder`.
@@ -69,6 +73,7 @@ finding (Gap #2: per-Product delivery plumbing needs a privileged `terragrunt ap
 - *Files:* scaffolder skeletons; the 3 app repos.
 
 ### PR 6 — Flip ADR-071 → Accepted; remove the interim mechanism
+
 - ADR-071 status → Accepted; update `platform-domain-api.md` (drop the "digest in app overlay" interim note);
   retire the self-overlay-pin guidance.
 
@@ -81,12 +86,14 @@ Today a new Product's per-Product **OIDC ECR-push role** (`github-oidc`), **Appl
 until a privileged `terragrunt apply`. The showcase needed all three applied by hand.
 
 ### Option (a) — registry-reconcile CI job (recommended first step)
+
 - **PR 7a:** a workflow that, on merge to `main` touching `gitops/products/**`, runs `terragrunt apply` on
   `github-oidc` + `argocd-apps` + `policy` on the **in-VPC ARC self-hosted runners** (they already hold cluster +
   PlatformDeployer access). Sequential, gated, idempotent. Closes the seam with no model change.
 - *Files:* `.github/workflows/registry-reconcile.yml`; ARC runner perms.
 
 ### Option (b) — move per-Product plumbing into the Composition (later convergence)
+
 - **PR 7b–9b:** add the per-Product OIDC role (provider-aws IAM), the ApplicationSet (provider-kubernetes), and
   `verify-images-product` (provider-kubernetes ClusterPolicy) to the Crossplane Environment/Product Composition,
   so they auto-provision like the rest of the footprint. Eliminates Terragrunt-derived per-Product resources.
