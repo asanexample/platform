@@ -6,8 +6,9 @@ The **write-capable** GitHub App that app CI uses to open **release digest-bump 
 calls the shared `trusted-ci/promote.yml` workflow, which (as this App) opens a gated PR bumping
 `gitops/releases/<team>/<product>/<stage>.yaml`. The gitops Gate validates + auto-merges it.
 
-> **Live instance:** _(fill in once created)_ App ID **«APP_ID»** (`asanexample-promote`). Secret:
-> `platform/promote/github-app` (platform account). Installed on **`asanexample/platform` only**.
+> **Live instance:** App ID **4060090** (`asanexample-promote`), created 2026-06-15. Secret:
+> `platform/promote/github-app` (platform account, stored). ⚠️ Must be **installed on `asanexample/platform`**
+> for `promote.yml` to mint an installation token (created ≠ installed — install via the App's _Install App_ tab).
 
 ## Security posture (why it's shaped this way)
 
