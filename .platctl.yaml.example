@@ -160,6 +160,18 @@ kubeconfig:
     kubectl_role_arn: arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/PlatformAdmin
 
 lockdown:
+  # Tailscale split-DNS MUST run BEFORE the EKS endpoint-disable below. These units carry kubernetes_manifest
+  # resources (proxy_class/connector) whose GroupVersionResource discovery hits the LIVE cluster API at PLAN
+  # time — even though the only thing changing is the Tailscale-API split_dns resource. Once the public
+  # endpoint is disabled the API is private-only and that plan-time discovery times out (the apply host isn't
+  # on the tailnet — and configuring Tailscale is precisely what would put it there: a chicken-and-egg). The
+  # split_dns value is the static VPC resolver (10.100.0.2), independent of the endpoint toggle, so enabling it
+  # while the endpoint is still public is safe. No later lockdown step touches the cluster K8s API (eks +
+  # cross-vpc-dns are AWS-provider ops), so split-DNS being live can't affect them.
+  - unit: platform/tailscale
+    description: Enable split DNS for private EKS resolution
+  - unit: preprod/tailscale
+    description: Enable split DNS for preprod.aws.refplat.org resolution
   - unit: platform/eks
     description: Disable public EKS endpoint
   - unit: preprod/eks
@@ -169,10 +181,6 @@ lockdown:
   # preprod-targeting Application degrades to Unknown/SyncFailed. Re-applying refreshes the dynamic ENI lookup.
   - unit: platform/cross-vpc-dns
     description: Refresh preprod EKS API PHZ records (ENIs churn on endpoint toggle)
-  - unit: platform/tailscale
-    description: Enable split DNS for private EKS resolution
-  - unit: preprod/tailscale
-    description: Enable split DNS for preprod.aws.refplat.org resolution
 
 validate:
   # NS / TGW-id / EKS-endpoint values CHURN on every rebuild, so validate DISCOVERS them (Route53 delegation
