@@ -419,9 +419,39 @@ The **posture** is derived from `stage × tier` under ADR-040 (kubectl is operat
 ## Promotion
 
 The same **signed artifact (by digest)** moves up the Stage ladder (ADR-067 §8): **auto-promote ≤ staging**,
-**gated review for prod** (separation of duties — the `release-approver` gate above). Promotion is a digest-bump
-to the next stage's `Environment.spec.services.<svc>` source, not a rebuild — the identical image promotes.
-Detailed mechanism is ADR-067 P2 (#377), sharing the `release-approver` projection with ADR-068 P4.5 (#366).
+**gated review for prod** (separation of duties — the `release-approver` gate above). Promotion is a digest-bump,
+not a rebuild — the identical image promotes.
+
+**The deployed digest lives in a control-plane `Release` record, not the `Environment` claim** ([ADR-071](../adrs/071-digest-promotion-via-control-plane.md)).
+The digest is *desired-deployed-state* (CI-owned, changes every build), so storing it in the app repo's source —
+or churning the human-owned `XEnvironment` claim on every deploy — is the wrong home. Instead CI's `promote`
+workflow opens a **gated PR** (the gitops-Gate auto-merge path, ADR-062/#417) bumping
+`gitops/releases/<team>/<product>/<stage>[-<customer>].yaml` (the `Release` record below); the per-Product
+ApplicationSet reads it and injects the digest as a kustomize image override, so the **app repo's `main` is never
+written by CI** and stays fully protected. This realizes the mechanism ADR-067 P2 (#377) deferred, sharing the
+`release-approver` projection with ADR-068 P4.5 (#366).
+
+### `Release` record (control-plane deployed-digest)
+
+`apiVersion: platform.refplat.org/v1beta1`, `kind: Release`, **cluster-scoped**, named identically to its
+`XEnvironment` (`<team>-<product>-<stage>[-<customer>]`) so the join is 1:1. CI-authored (one home per fact — the
+digest is the *only* thing here, kept out of the human-owned claim; the claim's `services.<svc>.image` field is
+retired in favor of this record once ADR-071 is Accepted).
+
+| field | req | type | notes |
+| --- | --- | --- | --- |
+| `environmentRef` | yes | string | the `XEnvironment` `metadata.name` this Release targets |
+| `services.<svc>.digest` | yes | string | the cosign-signed image **manifest** digest deployed for that Service (`^sha256:[a-f0-9]{64}$`); ≥1 service |
+
+```yaml
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata: { name: alpha-shop-dev }
+spec:
+  environmentRef: alpha-shop-dev
+  services:
+    web: { digest: "sha256:69ff1ab2…" }
+```
 
 ## Envelope enforcement (the admission plane)
 

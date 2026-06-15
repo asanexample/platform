@@ -1,0 +1,7 @@
+# MUST FAIL: spec.environmentRef is required (the Release must name the Environment it targets).
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata: { name: no-envref }
+spec:
+  services:
+    web: { digest: "sha256:69ff1ab2abeb52b7fde3fec3b75e548116a7d33a27816bf2afd36df1f93527a7" }
