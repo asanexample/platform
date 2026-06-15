@@ -103,20 +103,23 @@ until a privileged `terragrunt apply`. The showcase needed all three applied by 
 
 ## Sequencing & dependencies
 
-```
+```text
 PR1 (schema) → PR2 (gate) → PR3 (promote wf) → PR4 (appset inject) → PR5 (starters+migrate) → PR6 (accept)
                                    └ Gap#2 PR7a (reconcile) can land in parallel after PR4 (unblocks auto-apply)
 ```
+
 PR 1–2 are pure additions (no behavior change). PR 4 is the first cluster-affecting change. PR 5 is the cutover
 (apps stop self-pinning). PR 7a removes the manual `terragrunt apply` the showcase needed.
 
 ## Migration / rollback
+
 - Until PR 5, apps keep self-pinning (the interim mechanism still works on unprotected mains). PR 4's injection is
   additive — if no `Release` exists, the overlay `:placeholder` simply doesn't resolve (App OutOfSync, harmless),
   so PR 4 before PR 5 is safe.
 - Rollback of a bad deploy = revert the `Release` digest line (a control-plane PR), not an app-repo change.
 
 ## Validation gates
+
 - PR 1/2: schema + gate test harnesses (offline). PR 3: dry-run promote PR. PR 4/5: live on preprod via alpha-shop
   (pod runs the injected digest; app `main` receives zero CI commits; re-protected). PR 7a: a `gitops/products`
   PR triggers the reconcile → the new Product's role/AppSet/policy appear with no human apply.
