@@ -1,0 +1,44 @@
+name: Registry reconcile — apply on merge
+
+# Converge the per-Product Terragrunt-derived units (github-oidc -> preprod/policy -> argocd-apps) after a
+# `gitops/products/**` change merges to main (ADR-071 Gap #2). These units derive their per-Product resources
+# (the OIDC ECR-push role, the verify-images-product cosign gate, the delivery ApplicationSet) from the Product
+# registry via fileset — so a NEW Product has none of them until applied, and its first build/deploy fails. This
+# is the apply half of New Product: the gated registry PR merges -> the per-Product plumbing converges with zero
+# operator action, always from the merged SHA. Sibling of teams-apply.yml (the New Team equivalent).
+#
+# The GitOps/Crossplane half (namespace, ECR, Pod Identity) already auto-provisions via ArgoCD + the Composition;
+# only these three Terragrunt units need the apply.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - gitops/products/**
+
+permissions:
+  contents: read
+
+concurrency:
+  # Serialize all Terragrunt applies (shared group with teams-apply.yml; belt-and-suspenders with the DynamoDB
+  # state lock). Never cancel a running apply mid-flight (a partial apply could leave the lock held).
+  group: terragrunt-apply
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    # In-VPC self-hosted runner. Toolchain baked into the image; AWS via Pod Identity -> terragrunt force-assumes
+    # PlatformDeployer (TG_FORCE_DEPLOYER, runner is in-account) + TerraformStateAccess.
+    runs-on: platform-infra
+    env:
+      TG_FORCE_DEPLOYER: "1"
+      AWS_REGION: us-east-1
+      # Read dependency outputs straight from S3 state — the cold runner checkout doesn't init each dependency's
+      # cache, so `tofu output` fails "Backend initialization required"; the deps are already deployed. (#305)
+      TG_DEPENDENCY_FETCH_OUTPUT_FROM_STATE: "true"
+    steps:
+      - name: Checkout the merged commit (trusted)
+        uses: actions/checkout@v4
+
+      - name: Terragrunt reconcile the per-Product units
+        run: bash .github/scripts/registry/apply.sh
