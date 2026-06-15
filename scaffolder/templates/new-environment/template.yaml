@@ -51,7 +51,10 @@ spec:
           description: >-
             An EXISTING Product owned by your team (its repo, tenancy, and owned domains come from
             gitops/products/<team>/<product>.yaml). The gate + admission reject a product whose team ≠ yours,
-            or one that doesn't exist. To create a Product, add its registry entry first.
+            or one that doesn't exist. To create a Product, use New Product first.
+          # Team-scoped dropdown: ProductPicker (custom field, asanexample/backstage) auto-populates with only
+          # the Systems the selected Team owns. allowArbitraryValues isn't needed — the gate enforces existence.
+          ui:field: ProductPicker
           pattern: '^[a-z][a-z0-9-]{0,30}$'
           maxLength: 31
         stage:
