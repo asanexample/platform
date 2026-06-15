@@ -19,7 +19,18 @@ Backstage backend (backstage ns)
 - The **token** is minted out-of-band (ArgoCD mints it; there is no ArgoCD Terraform provider in this repo —
   same pattern as the GitHub App / repo-creds PAT) and stored in Secrets Manager.
 
-## One-time setup — mint the token
+## Automated by `platctl bootstrap` (the normal path)
+
+`platctl bootstrap` re-mints this token automatically via the `argocd_account_token` hook on the `platform/argocd`
+unit (`.platctl.yaml`). The hook runs right after ArgoCD applies — an **early** wave, before `backstage` — so a
+valid token is in Secrets Manager before backstage's ExternalSecret first syncs (no restart / ESO force-refresh,
+which the operate-only PlatformAdmin can't do). It is **idempotent**: it validates the current token first
+(`argocd account get-user-info`) and re-mints only when the token is missing or invalid, so a rebuild heals the
+stale-signing-key problem while incremental applies are no-ops. Failures warn but never fail the bootstrap.
+
+The manual steps below are the **fallback** — for a live fix outside a bootstrap, or if the hook is disabled.
+
+## Manual mint (fallback)
 
 Prereq: the argocd unit has been applied with the `backstage` account + RBAC (above). Do this over the tailnet.
 
