@@ -125,6 +125,26 @@ inputs = {
         },
       ]
 
+      # ARC self-hosted runners (ADR-065 / #323): the platform-cluster runner pool's Pod Identity role assumes
+      # this preprod PlatformDeployer to apply the preprod per-Product units (registry-reconcile → preprod/policy)
+      # from in-VPC CI — CROSS-account (the runner lives in the platform account). Separate statement (the SSO
+      # ArnLike above can't be appended to). Account-root principal + ArnLike on the runner ARN, with sts:TagSession
+      # (terragrunt tags every assume-role session). Matches by ARN, so a rebuild that recreates the runner role
+      # keeps working without re-applying this trust — durable. Mirror of the platform PlatformDeployer grant.
+      extra_trust_statements = [
+        {
+          actions    = ["sts:AssumeRole", "sts:TagSession"]
+          principals = { aws = ["arn:aws:iam::${include.base.locals.account_ids["platform"]}:root"] }
+          conditions = [
+            {
+              test     = "ArnLike"
+              variable = "aws:PrincipalArn"
+              values   = ["arn:aws:iam::${include.base.locals.account_ids["platform"]}:role/platform-use1-eks-arc-runner"]
+            },
+          ]
+        },
+      ]
+
       managed_policies = ["arn:aws:iam::aws:policy/AdministratorAccess"]
     }
 

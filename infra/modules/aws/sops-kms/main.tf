@@ -4,6 +4,19 @@
 
 data "aws_caller_identity" "current" {}
 
+locals {
+  # Account roots the decrypt-only principals authenticate from, derived from their role ARNs. The DecryptOnly
+  # statement grants the ACCOUNT ROOT (delegating to that account's IAM) and narrows back to the exact role via
+  # an aws:PrincipalArn condition — NOT the role ARN as a direct principal. Why: KMS resolves a role-ARN
+  # principal to the role's immutable unique-id at write time, so a teardown/rebuild that recreates the role
+  # (new unique-id, same ARN) silently orphans the grant and breaks every CI config-decrypt until a manual
+  # re-apply. The account-root + ArnLike-condition form matches by ARN, which is stable across recreation, so
+  # the grant survives rebuilds with no re-apply (ADR-066). Same posture as OperatorsEncryptDecrypt below.
+  decrypt_account_roots = distinct([
+    for arn in var.decrypt_principal_arns : "arn:aws:iam::${split(":", arn)[4]}:root"
+  ])
+}
+
 data "aws_iam_policy_document" "key" {
   count = var.create ? 1 : 0
 
@@ -38,7 +51,9 @@ data "aws_iam_policy_document" "key" {
     }
   }
 
-  # Decrypt-only principals (the ARC runner role) — reads config in CI, never edits it.
+  # Decrypt-only principals (the ARC runner role) — reads config in CI, never edits it. Granted via account-root
+  # + aws:PrincipalArn condition (ARN-stable across role recreation) rather than a direct role-ARN principal
+  # (unique-id-pinned, breaks on rebuild) — see locals.decrypt_account_roots.
   dynamic "statement" {
     for_each = length(var.decrypt_principal_arns) > 0 ? [1] : []
     content {
@@ -48,7 +63,12 @@ data "aws_iam_policy_document" "key" {
       resources = ["*"]
       principals {
         type        = "AWS"
-        identifiers = var.decrypt_principal_arns
+        identifiers = local.decrypt_account_roots
+      }
+      condition {
+        test     = "ArnLike"
+        variable = "aws:PrincipalArn"
+        values   = var.decrypt_principal_arns
       }
     }
   }

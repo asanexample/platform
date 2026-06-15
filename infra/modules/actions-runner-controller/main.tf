@@ -104,11 +104,13 @@ resource "aws_iam_role_policy" "runner_assume_deployer" {
     Version = "2012-10-17"
     Statement = concat([
       {
-        # Providers, secrets, and the keycloak port-forward run as PlatformDeployer.
+        # Providers, secrets, and the keycloak port-forward run as PlatformDeployer. additional_deployer_role_arns
+        # are the cross-account deployers (e.g. preprod) for units that target another account — registry-reconcile
+        # assumes preprod's PlatformDeployer to apply preprod/policy.
         Sid      = "AssumePlatformDeployer"
         Effect   = "Allow"
         Action   = ["sts:AssumeRole", "sts:TagSession"]
-        Resource = [var.deployer_role_arn]
+        Resource = concat([var.deployer_role_arn], var.additional_deployer_role_arns)
       },
       {
         # Terragrunt assumes the state role SEPARATELY for the S3/DynamoDB backend (root.hcl remote_state) — in
