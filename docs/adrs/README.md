@@ -103,6 +103,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-042: Isolated Build Provenance for SLSA Build L3](042-isolated-build-provenance-slsa-l3.md) | Accepted |
 | [ADR-050: Shared `build-sign` Reusable Workflow + Shared-Signer Policy Model](050-shared-build-sign-reusable-workflow.md) | Accepted |
 | [ADR-056: Progressive Delivery & Safe Rollback](056-progressive-delivery-and-safe-rollback.md) | Proposed |
+| [ADR-071: Image-Digest Promotion via the Control Plane (Protected-Main Delivery)](071-digest-promotion-via-control-plane.md) | Proposed |
 
 ## Developer Portal & Experience
 
