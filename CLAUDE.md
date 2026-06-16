@@ -91,11 +91,15 @@ terragrunt run --all apply
 
 # Destroy (reverse DAG)
 terragrunt run --all destroy --filter-allow-destroy -- -auto-approve
-
-# If EKS API is private-only, enable public endpoint first:
-aws eks update-cluster-config --name platform-use1-eks --region us-east-1 \
-  --resources-vpc-config endpointPublicAccess=true --profile platform
 ```
+
+The EKS API is **private-only by design** (ADR-010). For routine apply/maintenance, reach it over
+**Tailscale** — the `*-eks-subnet-router` advertises the VPC CIDR and split-DNS resolves the private
+endpoint to its VPC ENI IPs, so `terragrunt apply`, `kubectl`, etc. work directly once you're on the
+tailnet (`tailscale status` should list the subnet routers). **Do NOT enable the public endpoint** for
+ordinary operations. The only exception is a full from-scratch teardown/rebuild, where Tailscale itself
+is destroyed — `platctl` handles that bootstrap escape (its unlock/lockdown phases toggle the endpoint
+and re-disable it automatically; see `docs/runbooks/platform-rebuild-from-scratch.md`).
 
 All dependency blocks have `mock_outputs` so destroy works even if upstream dependencies are already gone.
 
