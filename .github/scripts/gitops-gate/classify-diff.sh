@@ -43,7 +43,9 @@ add() {
     environment) environment_files+=("$2") ;;
     release)
       release_files+=("$2")
-      [[ "$2" =~ $PROD_RELEASE_RE ]] && prod_release_files+=("$2")
+      # `if`, NOT `&&` — a non-matching [[ ]] returns non-zero, which under `set -e` would make add() (and the
+      # whole classify step) exit 1 for every non-prod release PR.
+      if [[ "$2" =~ $PROD_RELEASE_RE ]]; then prod_release_files+=("$2"); fi
       ;;
   esac
 }
