@@ -76,6 +76,11 @@ run ok   "purge: NON-prod env → only generic admin"       DELETIONS=true DELET
 run ok   "purge: prod product file delete → no env gate"  DELETIONS=true DELETED_FILES=gitops/products/alpha/web.yaml AUTHOR=dev VERDICT_TEST_APPROVERS="dave" VERDICT_TEST_PERMS="dave=admin"
 run ok   "roles-change (product): admin approver"         PRODUCT_ROLES_CHANGES=true AUTHOR=dev VERDICT_TEST_APPROVERS="alice" VERDICT_TEST_PERMS="alice=admin"
 run deny "roles-change (team): no admin approval"         TEAM_ROLES_CHANGES=true AUTHOR=dev VERDICT_TEST_APPROVERS="alice" VERDICT_TEST_PERMS="alice=write"
+# Environment decommission — ANY one approving review ≠ author (no permission tier).
+run deny "decommission: no approval yet"                  LIFECYCLE_DECOMMISSION=true AUTHOR=scaffolderbot VERDICT_TEST_APPROVERS=""
+run ok   "decommission: a human approved (no tier)"       LIFECYCLE_DECOMMISSION=true AUTHOR=scaffolderbot VERDICT_TEST_APPROVERS="gangster"
+run deny "decommission: only the author approved"         LIFECYCLE_DECOMMISSION=true AUTHOR=gangster VERDICT_TEST_APPROVERS="gangster"
+run ok   "decommission: write-level approver is fine"     LIFECYCLE_DECOMMISSION=true AUTHOR=bot VERDICT_TEST_APPROVERS="dev" VERDICT_TEST_PERMS="dev=write"
 run ok   "no reasons → success"                           AUTHOR=dev VERDICT_TEST_APPROVERS=""
 
 echo "publish-verdict: ${pass} passed, ${failc} failed"
