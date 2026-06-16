@@ -11,11 +11,6 @@ metadata:
     app.kubernetes.io/part-of: tenant-api
 spec:
   ssoGroup: Dev-alpha
-  # Governance role holders (ADR-068 §7, #501) — GitHub logins. releaseApprover is the team-wide default set that
-  # gates prod promotion: a prod Release PR needs an APPROVED review (≠ author) from this set. A Product may
-  # override it; editing this list itself requires a second-person approval (the Teams Gate roles-change guard).
-  roles:
-    releaseApprover: ["gangster"]
   envelope:
     allowedTiers: ["standard"]
     allowedStages: ["dev", "test", "uat", "staging", "prod"]
