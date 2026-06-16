@@ -131,11 +131,10 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # f502c5ff (backstage#40) adds the ProductPicker scaffolder field — the New Environment form's Product
-  # input is now a Team-scoped dropdown (catalog Systems owned by the selected Team) instead of free text.
-  # Carries forward the v1beta1 projection (#38) + workflow_dispatch trigger, so the rebuild can re-push THIS
-  # exact tag (ECR is force-deleted on teardown) without a dummy commit — keeping this pin stable across rebuilds.
-  image_tag = "f502c5ffb65d3937576d8b79b4d0dfe498863b56"
+  # 754254ba (backstage#41) adds the `platform:resolve-release-digest` scaffolder action — backing the new
+  # Request Promotion template (#377 Phase 3b). Carries forward f502c5ff (ProductPicker, #40) + the v1beta1
+  # projection (#38) + workflow_dispatch trigger.
+  image_tag = "754254ba5798c91967c1e0e06a72405e80ced964"
 
   # platform-projection catalog mode = v3 (Product=System, Environment=custom kind). The v2 projection branch is
   # inert (nothing reads it); removing it + this flag is a backstage-repo follow-up.
