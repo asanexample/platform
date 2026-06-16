@@ -1,0 +1,67 @@
+# Minimal Kyverno-compliant Deployment for an environment namespace (preprod/platform, ADR-014).
+# The canonical concrete example for CLAUDE.md's "Authoring Policy-Compliant Workloads" section — preserved here
+# (it formerly lived in the retired seed app `app-alpha`). Adapt the team/product/service/image to yours; the
+# New Product scaffolder emits the same shape automatically (scaffolder/templates/new-product/skeleton/k8s/).
+#
+# Illustrative names: team `acme`, product `store`, service `web` → namespace acme-store-dev, repo app-acme-store.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-acme-store
+  labels:
+    app: app-acme-store
+    app.kubernetes.io/name: app-acme-store
+    team: acme
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: app-acme-store
+  template:
+    metadata:
+      labels:
+        app: app-acme-store
+        app.kubernetes.io/name: app-acme-store
+        team: acme
+    spec:
+      # Named SA (never `default`) — Pod Identity binds AWS creds here IF the Environment claim declares any
+      # (services.<svc>.permissions.aws, ADR-041). NEVER an `eks.amazonaws.com/role-arn` IRSA annotation here
+      # (platform-only; a cross-team annotation is denied by disallow-irsa-annotation-cross-team).
+      serviceAccountName: app-acme
+      # App does not talk to the Kubernetes API — drop the SA token (least privilege). Pod Identity injects its
+      # OWN projected token, so this does not affect AWS access. (Kyverno auto-injects this if omitted.)
+      automountServiceAccountToken: false
+      containers:
+        - name: web
+          # Product-scoped ECR image (v3: team-<team>/<product>-<service>), with an EXPLICIT immutable tag/digest
+          # — never :latest, never untagged. Cross-team images are denied (restrict-images). The :placeholder tag
+          # is the pre-first-deploy seed; each overlay's `images:` pins the signed digest CI promotes per stage
+          # (promote-by-PR, #377). The image must be cosign-signed (verify-images-product, Enforce on preprod).
+          image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-acme/store-web:placeholder
+          ports:
+            - containerPort: 8080
+          # Resource requests AND limits (cpu + memory) are REQUIRED on every container.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          # livenessProbe AND readinessProbe are REQUIRED on every container.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+# Auto-injected by Kyverno mutate when omitted (do not bother setting): the container securityContext
+# (allowPrivilegeEscalation: false, capabilities.drop: [ALL], seccompProfile.type: RuntimeDefault) and the
+# `team` label. Services must be ClusterIP; HTTPRoute hostnames must be in the Environment's allow-list.
+# Regulated tiers (hipaa/pci) additionally REQUIRE runAsNonRoot: true + readOnlyRootFilesystem: true.
