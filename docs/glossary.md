@@ -7,9 +7,12 @@ General Kubernetes/AWS terms are omitted. Alphabetical.
 
 ---
 
-**ApplicationSet (PR preview generator)** — An ArgoCD `ApplicationSet` (one per Product, ADR-069) whose
-`pullRequest`/GitHub generator polls the Product repo every 60s and creates an ephemeral `Application` per
-open PR into the `dev` Environment's namespace. See [PR Preview Environments (ADR-032)](adrs/032-pr-preview-environments.md).
+**ApplicationSet (per-Product delivery)** — The ArgoCD `ApplicationSet` (one per Product, ADR-069/#377) whose
+git generator fans out over the Product's **Release records** (`gitops/releases/<team>/<product>/*.yaml`),
+creating **one `Application` per Release** and injecting the signed digest as a kustomize image override. This
+**release-keyed** form replaced an earlier `pullRequest`/merge generator (which collided on a null merge key).
+See [Promotion & Release](architecture/promotion-and-release.md). *(PR-preview **delivery** — an ephemeral
+`Application` per open PR, [ADR-032](adrs/032-pr-preview-environments.md) — is **not yet wired** in v3.)*
 
 **BACK stack** — **B**ackstage + **A**rgoCD + **C**rossplane + **K**ubernetes: the chosen architecture for
 developer self-service. ArgoCD delivers, Crossplane provisions environments, Backstage is the portal.
@@ -80,15 +83,34 @@ boilerplate; works with `automountServiceAccountToken: false`.
 See [Pod Identity for Tenant Workloads (ADR-041)](adrs/041-pod-identity-for-tenant-workloads.md) and the
 [Pod Identity runbook](runbooks/environment-aws-access-pod-identity.md).
 
-**PR preview** — An ephemeral per-PR deployment (`<product>-<team>-pr-<n>.<baseDomain>`) created for Services
-with `preview = true`, via the per-Product ApplicationSet PR generator + kustomize overrides.
-See [PR Preview Environments (ADR-032)](adrs/032-pr-preview-environments.md).
+**PR preview** — The intended ephemeral per-PR deployment (`<product>-<team>-pr-<n>.<baseDomain>`) for Services
+with `preview = true`. **Status (v3): partial** — the app skeleton's `preview.yml` builds + signs a PR image, but
+preview *delivery* (the ephemeral `Application`) is **not yet wired** (the delivery ApplicationSet is
+release-keyed). See [PR Preview Environments (ADR-032)](adrs/032-pr-preview-environments.md) and the
+[Delivery Pipeline](architecture/delivery-pipeline.md) cross-cutting note.
 
 **Product** — A deployable app/system owned by exactly one Team, declared at
 `gitops/products/<team>/<product>.yaml` (`kind: Product`, `v1beta1`). Carries delivery identity (`repo`),
 tenancy (`pooled`/`per-customer`), default isolation, and the owned `domains` set. Surfaces as a Backstage
 `System`; images live at `team-<team>/<product>-*`; delivery is one ApplicationSet per Product (ADR-069).
 See [IDP Domain Model (ADR-067)](adrs/067-idp-domain-model.md).
+
+**promote-by-digest** — Promotion moves the **same signed image digest** up the stage ladder by writing it into
+the next stage's Release record — never a rebuild, so the artifact tested below is byte-identical above.
+See [Promotion & Release](architecture/promotion-and-release.md) ([ADR-067 §8](adrs/067-idp-domain-model.md),
+[ADR-071](adrs/071-digest-promotion-via-control-plane.md)).
+
+**promotion ladder** — The ordered stages `dev → test → uat → staging → prod`. A digest is promoted **one rung at
+a time**; ≤ staging is automatic (health-gated), prod is gated by a release-approver.
+See [Promotion & Release](architecture/promotion-and-release.md) (#377).
+
+**release-approver** — The GitHub logins authorized to approve a **gated prod** promotion, declared at
+`spec.roles.releaseApprover` on the `Team` (default) or `Product` (override). Read from the base branch, author
+excluded, fail-closed when empty, ≥2 for `pci`/`hipaa`. See [Promotion & Release](architecture/promotion-and-release.md) (#501).
+
+**Release record** — A git record (`gitops/releases/<team>/<product>/<stage>.yaml`, `kind: Release`, in the
+**platform** repo) naming the digest deployed at one stage (`spec.environmentRef` + per-Service `digest`). The
+delivery ApplicationSet reads it; promotion writes it. See [Promotion & Release](architecture/promotion-and-release.md).
 
 **restrict-route-hostnames** — The per-namespace (per-Product) Kyverno policy that admits an HTTPRoute
 hostname only if it is in the Environment's allow-list (derived generated host ∪ bound `domains`) **and** its

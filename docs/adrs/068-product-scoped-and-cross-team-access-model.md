@@ -97,6 +97,10 @@ This collapses the awkward IAM-federation path into the same OIDC plane ArgoCD a
 
 ### 7. Release-approver — gated prod, separation of duties
 
+> **Implemented** (#501) — `spec.roles.releaseApprover` on the `Team`/`Product` records, enforced by the gitops/Teams
+> Gate verdict (read from base, author-excluded, fail-closed, ≥2 for pci/hipaa). Realized via a required
+> commit-status check rather than CODEOWNERS. Mechanics: [Promotion & Release](../architecture/promotion-and-release.md).
+
 Promotion to prod is a GitOps operation (a **digest-bump PR**). Separation of duties is enforced by making the **access model the source** and **GitHub the enforcement**:
 
 - `release-approver:<team>/<product>` is a **generator-managed role** (git/Keycloak = source of truth), **projected into CODEOWNERS / a required-reviewer set** on the prod path. "Cannot approve your own PR" gives separation of duties for free, reusing the New-Team/tenant-gate machinery.

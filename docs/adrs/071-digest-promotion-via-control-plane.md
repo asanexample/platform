@@ -16,6 +16,9 @@ it is promoted should not be locked in by the delivery layer"). ADR-069 already 
 refines the self-service flow of [ADR-062](062-self-service-tenant-provisioning.md). Implementable incrementally
 (not rebuild-gated).
 
+> **Architecture doc:** [Promotion & Release](../architecture/promotion-and-release.md) — the as-built ladder,
+> release-keyed delivery, and gated-prod approver (this ADR + #377/#501).
+
 ## Context
 
 The interim delivery mechanism (ADR-069 §4) is: *"whatever digest is committed in the app overlay deploys — apps

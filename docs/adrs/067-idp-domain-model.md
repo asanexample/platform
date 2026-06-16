@@ -154,6 +154,9 @@ rebuilt per stage). **Promotion to lower stages (≤ staging) auto-merges** with
 `prod`** (and regulated stages) requires an **approving review** — separation of duties (deployer ≠ approver,
 ADR-040), like the New-Team gate.
 
+> **Implemented** (#377/#501) — the release-keyed ApplicationSet, auto ≤ staging reconciler, and gated-prod
+> release-approver are live. Mechanics: [Promotion & Release](../architecture/promotion-and-release.md).
+
 ### 9. Platform-injection (manifests are placement-agnostic)
 
 A service's manifests are **namespace- and host-agnostic**. The platform injects what varies per environment —
