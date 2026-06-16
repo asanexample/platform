@@ -9,4 +9,4 @@ spec:
   environmentRef: alpha-checkout-test
   services:
     web:
-      digest: sha256:20c7787344f633224c7bcd6346da18609e772f6ee84e8e0efdd9739f5017615b
+      digest: sha256:1fa5a03110fe8a9711617769d3b4d545d36e8dac6364f29bdc3eed13e6007add
