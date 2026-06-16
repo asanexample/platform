@@ -1,0 +1,20 @@
+# Environment (alpha × checkout × staging) — provisioned to exercise the #377 Phase 2 auto-promotion ladder
+# (the digest bakes dev→test→uat→staging one healthy rung per reconcile). Namespace alpha-checkout-staging.
+# Synced by ArgoCD (the `environments` registry-sync app) and reconciled by the Crossplane Environment
+# Composition (v3). The image digest is promoted in by PR (#377); the auto-promoter advances it once the lower
+# stage is Synced+Healthy.
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata:
+  name: alpha-checkout-staging
+  annotations:
+    platform.refplat.org/requested-by: user:default/dev-alpha
+spec:
+  team: alpha
+  product: checkout
+  stage: staging # in alpha's allowedStages (dev/test/uat/staging/prod)
+  tier: standard
+  services:
+    web:
+      serviceAccount: app-alpha
+      preview: false
