@@ -73,18 +73,19 @@ within the VPC. For Tailscale users, split DNS in the Tailscale admin console ro
 to the VPC DNS resolver (`10.100.0.2`). For SSM tunnel users, the tunnel script handles DNS
 resolution locally.
 
-### Destroy Workflow
+### Apply / Destroy Workflow
 
-Because the EKS API is private-only, Terragrunt's Helm and Kubernetes providers cannot reach the
-cluster from outside the VPC. Before destroying Kubernetes-resident resources (Cilium, ArgoCD,
-etc.), the public endpoint must be temporarily re-enabled:
+Because the EKS API is private-only, Terragrunt's Helm and Kubernetes providers reach the cluster over
+**Tailscale** — the `*-eks-subnet-router` advertises the VPC CIDR and split DNS resolves the private
+endpoint to its VPC ENI IPs, so ordinary `apply`/`destroy` of Kubernetes-resident resources (Cilium,
+ArgoCD, Backstage, etc.) works directly once you're on the tailnet. **Do NOT enable the public endpoint
+for routine operations.**
 
-```bash
-aws eks update-cluster-config --name platform-use1-eks --region us-east-1 \
-  --resources-vpc-config endpointPublicAccess=true --profile platform
-```
-
-This is documented in CLAUDE.md's destroy order section.
+The single exception is a **full from-scratch teardown/rebuild**, where Tailscale itself (the subnet
+router) is among the resources being destroyed — there is then no in-VPC path, so the public endpoint is
+a temporary bootstrap escape. `platctl` handles this automatically (its unlock phase re-enables the
+endpoint to destroy K8s resources, and its lockdown phase re-disables it), so it should not be toggled by
+hand. See `docs/runbooks/platform-rebuild-from-scratch.md`.
 
 ## Consequences
 
@@ -102,7 +103,9 @@ This is documented in CLAUDE.md's destroy order section.
   "just configure kubeconfig and go" experience
 - CI/CD pipelines need VPC connectivity to deploy to the cluster (currently Terragrunt runs from
   a developer machine with Tailscale; future: self-hosted runners on EKS)
-- Destroy workflow requires temporarily enabling the public endpoint, adding operational complexity
+- A full from-scratch teardown (which destroys Tailscale itself) requires temporarily enabling the public
+  endpoint as a bootstrap escape, adding operational complexity — but `platctl` automates it (re-disabling
+  on lockdown); routine apply/destroy needs no such toggle (it goes over Tailscale)
 - Debugging access during incidents requires either working Tailscale or a functioning SSM bastion,
   adding a dependency that may itself be affected by the incident
 
