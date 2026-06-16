@@ -7,9 +7,10 @@
 # ApplicationSet → no delivery; no verify-images-product → unsigned). This closes the seam: on every
 # gitops/products merge, converge them with zero operator action, always from the merged SHA.
 #
-#   platform/github-oidc  per-Product ECR-push role (+ the promote-secret read, ADR-071 PR3)
-#   preprod/policy        per-Product verify-images-product cosign gate (ADR-046)
-#   platform/argocd-apps  per-Product ApplicationSet (ADR-069 delivery)
+#   platform/github-oidc   per-Product ECR-push role (+ the promote-secret read, ADR-071 PR3)
+#   preprod/policy         per-Product verify-images-product cosign gate (ADR-046)
+#   platform/argocd-apps   per-Product ApplicationSet (ADR-069 delivery)
+#   platform/github-teams  per-Product org-Team `push` grant on the <team>-<product> repo (ADR-072 ownership)
 #
 # Each is conditional (plan -detailed-exitcode → apply only on a diff) + idempotent. The GitOps/Crossplane half
 # (namespace/ECR/Pod-Identity from the Composition) already auto-provisions via ArgoCD — only these Terragrunt
@@ -57,4 +58,8 @@ run() {
 run "${PLATFORM}/github-oidc" || { echo "::error::github-oidc reconcile failed — stopping"; exit 1; }
 run "${PREPROD}/policy"       || { echo "::error::preprod/policy reconcile failed — stopping"; exit 1; }
 run "${PLATFORM}/argocd-apps" || { echo "::error::argocd-apps reconcile failed — stopping"; exit 1; }
+# github-teams grants the owning team `push` on the new <team>-<product> repo (ADR-072 ownership layer). The
+# team itself is created by teams-apply (on the Team CR); this is the per-Product repo grant. Conditional +
+# idempotent across both workflows.
+run "${PLATFORM}/github-teams" || { echo "::error::github-teams reconcile failed — stopping"; exit 1; }
 echo "per-Product units converged"

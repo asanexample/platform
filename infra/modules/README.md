@@ -29,6 +29,7 @@ modules/
 | [external-secrets](external-secrets/) | External Secrets Operator Helm with IRSA |
 | [falco](falco/) | Runtime threat detection (eBPF) — module available, not yet deployed |
 | [gateway-config](gateway-config/) | ClusterIssuer, Cilium Gateway, HTTPRoutes, HTTP-to-HTTPS redirect |
+| [github-teams](github-teams/) | GitHub org-Team ownership of app repos, registry-derived (ADR-072) |
 | [observability](observability/) | Observability hub — kube-prometheus-stack (Prometheus/Grafana/Alertmanager) + SNS alerting |
 | [observability-mimir](observability-mimir/) | Durable, multi-tenant, S3-backed metrics store (Grafana Mimir) |
 | [policy](policy/) | Kyverno engine + ClusterPolicies — pod hardening, multi-tenancy, image signature/attestation verification (ADR-014) |

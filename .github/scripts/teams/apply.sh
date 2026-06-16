@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
-# Apply the access-model units on merge (#305 Phase 1). keycloak-config + argocd always apply; argocd-apps
-# applies only if it has a diff (a no-op until the team has tenant claims). Fail-fast in dependency order
-# (argocd reads keycloak-config's outputs; argocd-apps reads argocd's). Output -> the job summary.
+# Apply the access-model units on merge (#305 Phase 1). keycloak-config + argocd always apply; argocd-apps and
+# github-teams apply only if they have a diff (no-ops until the team has tenant claims / a Team-CR change).
+# Fail-fast in dependency order (argocd reads keycloak-config's outputs; argocd-apps reads argocd's;
+# github-teams is independent — the org-Team ownership layer, ADR-072). Output -> the job summary.
 #
 # Env: BASE (the platform unit parent dir). GITHUB_STEP_SUMMARY is provided by Actions.
 set -uo pipefail
@@ -45,4 +46,8 @@ run() {
 run keycloak-config apply || { echo "::error::keycloak-config apply failed — stopping"; exit 1; }
 run argocd apply || { echo "::error::argocd apply failed — stopping"; exit 1; }
 run argocd-apps conditional || { echo "::error::argocd-apps failed — stopping"; exit 1; }
+# github-teams materialises the org Team for the Team CR (ADR-072) — the GitHub half of "create a Team → it
+# appears in every external system", alongside the Keycloak group above. Conditional (no-op until a diff); also
+# applied by registry-reconcile (for the per-Product repo grants), idempotent across both.
+run github-teams conditional || { echo "::error::github-teams apply failed — stopping"; exit 1; }
 echo "access-model units converged"

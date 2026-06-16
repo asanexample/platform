@@ -1,7 +1,8 @@
 name: Teams — apply on merge
 
-# Converge the access-model units (keycloak-config -> argocd -> argocd-apps) after a `gitops/teams/**` change
-# merges to main (#305 Phase 1, ADR-053). Runs on the in-VPC `platform-infra` ARC runner. Inherently
+# Converge the access-model units (keycloak-config -> argocd -> argocd-apps -> github-teams) after a
+# `gitops/teams/**` change merges to main (#305 Phase 1, ADR-053; github-teams = ADR-072 org-Team ownership).
+# Runs on the in-VPC `platform-infra` ARC runner. Inherently
 # merge-commit-only (push:main). This is the apply half of the New Team flow: a human-reviewed PR (carrying the
 # `teams-plan` comment) merges -> Keycloak groups/roles + ArgoCD RBAC converge with zero operator action,
 # always from the merged SHA (no more stale-local-checkout no-ops).

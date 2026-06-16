@@ -53,6 +53,7 @@ Deployed via Helm / the Kubernetes provider onto any cluster; reusable across cl
 | `external-secrets` | External Secrets Operator (IRSA → Secrets Manager / SSM) (ADR-019) |
 | `secret-stores` | ClusterSecretStore (Secrets Manager + SSM backends) (ADR-024) |
 | `gateway-config` | Cilium Gateway API: Gateway, HTTPRoutes, ClusterIssuer (internal/public NLB) (ADR-017/029) |
+| `github-teams` | GitHub org-Team ownership of app repos, derived from the Team/Product registries (ADR-072) |
 | `tailscale` / `tailscale-admin` | Tailscale subnet-router operator + tailnet ACL/OAuth management (ADR-011) |
 | `actions-runner-controller` | Self-hosted GitHub Actions runners (ARC) on the platform cluster — in-VPC CI for cluster-facing applies; local/break-glass unit (ADR-065 / #323) |
 | `policy` | Kyverno engine + bundled ClusterPolicies (validate/mutate + cosign verify) (ADR-014) — see below |
