@@ -1,11 +1,12 @@
 # ===========================================================================================================
-# delivery (ADR-069 / L2b #384) — one ApplicationSet per Product.
+# delivery (ADR-069 / L2b #384; release-keyed #377) — one ApplicationSet per Product.
 #
-# The git-files generator fans out over the product's Environment claims
-# (gitops/environments/<team>/<product>/*.yaml in the platform repo) → ONE Application per Environment
-# (decision c: per-Environment App; per-service digests live in the app overlay). The Application syncs the app
-# repo's per-stage overlay (<repo>/k8s/overlays/<stage>) and injects ONLY namespace + host (static per env) —
-# no image injection (the digest is whatever the overlay carries; the promotion/digest mechanism is P2, #377).
+# The git-files generator fans out over the product's Release records (gitops/releases/<team>/<product>/*.yaml
+# in the platform repo) → ONE Application per Release (= per Environment that has a deployed digest). The
+# Application syncs the app repo's per-stage overlay (<repo>/k8s/overlays/<stage>) and injects namespace + host
+# (derived from the Release's spec.environmentRef) plus the per-Service signed digest as a kustomize image
+# override (ADR-071). Keying on the Release — not the Environment — is what lets a Product deliver to MORE THAN
+# ONE stage; the old per-Environment merge generator collided on a null merge key (#377).
 #
 # ADDITIVE: coexists with the v2 `tenants` Applications above; enabled only when var.platform_repo_url is set.
 # NOTE: ArgoCD ApplicationSet generators have NO offline test (they evaluate only inside a running ArgoCD), so
@@ -74,37 +75,28 @@ resource "helm_release" "product_appset" {
     spec = {
       goTemplate        = true
       goTemplateOptions = ["missingkey=error"]
-      # Fan out over the product's Environment claims, MERGED with the matching Release record (ADR-071) so each
-      # param-set carries both the Environment (stage/host/ns inputs) AND the deployed digest. Merge key =
-      # path.basenameNormalized: gitops/environments/<t>/<p>/<stage>.yaml and gitops/releases/<t>/<p>/<stage>.yaml
-      # share a basename → joined 1:1. A first-deploy Environment with no Release yet passes through unchanged
-      # (no digest → the templatePatch injects nothing → the overlay's own image governs). The deep-merge unions
-      # the two `.spec`s (env: stage/team/services-keys; release: services.<svc>.digest).
+      # Fan out over the product's Release records (ADR-071, #377) — ONE Application per Release. Each
+      # gitops/releases/<t>/<p>/<stage>[-<customer>].yaml carries the deployed digest(s) for one Environment; the
+      # template derives stage (and optional customer) from spec.environmentRef (= <team>-<product>[-<customer>]-
+      # <stage>, the sibling Environment's name) and team/product come from the Terraform loop. A SINGLE git-files
+      # generator — the prior `merge` keyed on `path.basenameNormalized`, which is null under goTemplate (every
+      # field nests), so a 2nd Environment for the same Product collided on the {null} key and broke the WHOLE
+      # ApplicationSet (#377 — no Product could deliver to >1 stage). Release-keyed has no merge key to collide.
+      # An Environment with no Release yet generates NO Application (no doomed :placeholder sync); its first
+      # promote writes the Release and the App appears.
       generators = [{
-        merge = {
-          mergeKeys = ["path.basenameNormalized"]
-          generators = [
-            {
-              git = {
-                repoURL  = var.platform_repo_url
-                revision = "HEAD"
-                files    = [{ path = "gitops/environments/${each.value.team}/${each.value.product}/*.yaml" }]
-              }
-            },
-            {
-              git = {
-                repoURL  = var.platform_repo_url
-                revision = "HEAD"
-                files    = [{ path = "gitops/releases/${each.value.team}/${each.value.product}/*.yaml" }]
-              }
-            },
-          ]
+        git = {
+          repoURL  = var.platform_repo_url
+          revision = "HEAD"
+          files    = [{ path = "gitops/releases/${each.value.team}/${each.value.product}/*.yaml" }]
         }
       }]
       template = {
         metadata = {
-          # <team>-<product>-<stage> (customer envs disambiguated by the namespace below)
-          name = "${each.value.team}-${each.value.product}-{{.spec.stage}}{{- if hasKey .spec \"customer\" }}-{{ .spec.customer }}{{- end }}"
+          # <team>-<product>-<stage>[-<customer>], derived from the Release's spec.environmentRef
+          # (= <team>-<product>[-<customer>]-<stage>). stage is the FINAL dash-segment — allowedStages is a
+          # closed CRD enum (dev/test/uat/staging/prod), none with a dash — and customer is whatever precedes it.
+          name = "${each.value.team}-${each.value.product}-{{- $rest := trimPrefix \"${each.value.team}-${each.value.product}-\" .spec.environmentRef }}{{- $parts := splitList \"-\" $rest }}{{ last $parts }}{{- if gt (len $parts) 1 }}-{{ join \"-\" (initial $parts) }}{{- end }}"
           labels = {
             "platform.refplat.org/team"    = each.value.team
             "platform.refplat.org/product" = each.value.product
@@ -115,26 +107,27 @@ resource "helm_release" "product_appset" {
           source = {
             repoURL        = each.value.repo_url
             targetRevision = "HEAD"
-            path           = "k8s/overlays/{{ .spec.stage }}"
+            path           = "k8s/overlays/{{ trimPrefix \"${each.value.team}-${each.value.product}-\" .spec.environmentRef | splitList \"-\" | last }}"
             kustomize = {
               # Inject the generated host (static per env). The per-Service digest is injected by templatePatch
-              # below (ADR-071) from the merged Release record — the overlay ships `:placeholder`.
+              # below (ADR-071) from this Release record — the overlay ships `:placeholder`.
               patches = var.preview_domain != "" ? [{
                 target = { kind = "HTTPRoute" }
                 patch = yamlencode([{
                   op    = "replace"
                   path  = "/spec/hostnames/0"
-                  value = "{{ .spec.product }}-{{ .spec.team }}-{{ .spec.stage }}.${var.preview_domain}"
+                  value = "${each.value.product}-${each.value.team}-{{ trimPrefix \"${each.value.team}-${each.value.product}-\" .spec.environmentRef | splitList \"-\" | last }}.${var.preview_domain}"
                 }])
               }] : []
             }
           }
           destination = {
             server = var.cluster_server
-            # Must EXACTLY match the Composition's namespace: <team>-<product>[-<customer>]-<stage>, with the
-            # same truncate-and-hash on the 63-char limit (sha256 6-hex suffix), else the App targets a namespace
-            # the Composition never created.
-            namespace = "{{- $c := \"\" }}{{- if hasKey .spec \"customer\" }}{{ $c = printf \"-%s\" .spec.customer }}{{- end }}{{- $nsRaw := printf \"%s-%s%s-%s\" .spec.team .spec.product $c .spec.stage }}{{- if gt (len $nsRaw) 63 }}{{ printf \"%s-%s\" (substr 0 56 $nsRaw) (substr 0 6 (sha256sum $nsRaw)) }}{{- else }}{{ $nsRaw }}{{- end }}"
+            # Must EXACTLY match the Composition's namespace: <team>-<product>[-<customer>]-<stage>. That string
+            # IS the Release's spec.environmentRef (the Environment's metadata.name), so use it verbatim with the
+            # same truncate-and-hash on the 63-char limit (sha256 6-hex suffix) the Composition applies, else the
+            # App targets a namespace the Composition never created.
+            namespace = "{{- $nsRaw := .spec.environmentRef }}{{- if gt (len $nsRaw) 63 }}{{ printf \"%s-%s\" (substr 0 56 $nsRaw) (substr 0 6 (sha256sum $nsRaw)) }}{{- else }}{{ $nsRaw }}{{- end }}"
           }
           syncPolicy = {
             automated   = { selfHeal = true, prune = true }
@@ -149,9 +142,9 @@ resource "helm_release" "product_appset" {
       }
       # ADR-071: inject the Release digest as a kustomize image override for every Service that has one — the
       # image name MUST match the app overlay's image (<ecr_registry>/team-<team>/<product>-<svc>). Rendered
-      # per generated Application (YAML, merged onto it). An Environment with no Release, or a Service with no
-      # digest, injects nothing → the overlay's own image governs (safe for first-deploy). The `{{- }}` trims
-      # keep the rendered YAML well-indented; `${...}` is Terraform, `{{...}}` is ArgoCD goTemplate.
+      # per generated Application (YAML, merged onto it). A Service declared without a digest injects nothing →
+      # the overlay's own image governs. The `{{- }}` trims keep the rendered YAML well-indented; `${...}` is
+      # Terraform, `{{...}}` is ArgoCD goTemplate.
       templatePatch = <<-EOT
         {{- if hasKey .spec "services" }}
         {{- $any := false }}
