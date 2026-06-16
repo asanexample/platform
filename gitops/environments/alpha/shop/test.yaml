@@ -1,0 +1,18 @@
+# Environment (alpha × shop × test) — provisioned to close the #377 loop: deliver the Request Promotion form's
+# shop dev→test Release (PR #492). Namespace alpha-shop-test. Synced by ArgoCD (the `environments` registry-sync
+# app) and reconciled by the Crossplane Environment Composition (v3). The digest is promoted in by PR (#377).
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata:
+  name: alpha-shop-test
+  annotations:
+    platform.refplat.org/requested-by: user:default/dev-alpha
+spec:
+  team: alpha
+  product: shop
+  stage: test
+  tier: standard
+  services:
+    web:
+      serviceAccount: app-alpha
+      preview: false
