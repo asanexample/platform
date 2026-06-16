@@ -38,17 +38,17 @@ jobs:
           done < .tool-versions
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::829808296602:role/github-actions-ecr-push-gha-runner
           aws-region: us-east-1
 
       - uses: aws-actions/amazon-ecr-login@v2
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build and push image
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: docker/gha-runner
           file: docker/gha-runner/Dockerfile

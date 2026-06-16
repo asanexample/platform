@@ -69,7 +69,7 @@ jobs:
 
       - name: Mint promote App token (scoped to the platform repo)
         id: token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ steps.appcred.outputs.app_id }}
           private-key: ${{ steps.appcred.outputs.pem }}
