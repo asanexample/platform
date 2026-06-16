@@ -205,6 +205,29 @@ jobs:
             echo "No changed markdown files to lint."
           fi
 
+  gate-scripts:
+    # Run the gitops/teams gate-script unit tests (verdict, validators) — these guard security-critical merge
+    # gating (release-approver #501, prod #377, deletions #283). Previously local-only, which let a classify-diff
+    # `set -e` regression slip through; now CI-enforced.
+    name: Gate Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install yq (mikefarah)
+        run: |
+          sudo curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+      - name: Run gate unit tests
+        run: |
+          rc=0
+          for t in .github/scripts/gitops-gate/test-*.sh .github/scripts/teams/test-*.sh; do
+            [ -f "$t" ] || continue
+            echo "::group::$t"
+            bash "$t" || rc=1
+            echo "::endgroup::"
+          done
+          exit "$rc"
+
   kyverno-policy-test:
     name: Kyverno Policy Test
     runs-on: ubuntu-latest

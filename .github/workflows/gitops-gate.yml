@@ -13,24 +13,22 @@ name: gitops — gate on PR
 # the cutover (docs/runbooks/v3-cutover.md), so today this is inert; it activates the moment the first
 # gitops/products or gitops/environments file lands.
 #
-# AUTO-MERGE + DELETION GUARD + GATED PROD (ADR-062 §3-4, ADR-067 §8 / #377). Decision table:
+# AUTO-MERGE + DELETION GUARD + GATED PROD (ADR-062 §3-4, ADR-067 §8 / #377, ADR-068 §7 / #501). Decision table:
 #   author          diff                                outcome
 #   promote/scaff   ⊆ gitops/{products,environments,    gate green + auto-merge armed (merges when ALL
 #    App            releases ≤ staging}, no deletions    required checks pass) — auto ≤ staging
-#   promote/scaff   a PROD release (…/prod.yaml)         NOT auto-armed + a current-SHA admin/maintainer
-#    App                                                 approval (≠ author) on the "gitops Approval" check —
-#                                                        gated prod (#377); a human approves, then merges
+#   promote/scaff   a PROD release (…/prod.yaml)         NOT auto-armed + an approval (≠ author) from the
+#    App                                                 release-approver set (Product/Team spec.roles, #501) on
+#                                                        the "gitops Approval" check; pci/hipaa ⇒ ≥2 — gated prod
+#   any             a Product spec.roles edit            an admin/maintainer approval (≠ author) — can't add an
+#                                                        approver then self-approve (#501 two-step guard)
 #   scaffolder App  ⊆ those paths, validation fails      gate red, no merge
 #   scaffolder App  a claim DELETION                     rejected (the bot never deletes — #283)
-#   human           a claim deletion                     decommission-first guard (Environment must be on
-#                                                        spec.lifecycle.phase: decommissioning at base) + a
-#                                                        current-SHA admin/maintainer approval (the "gitops
-#                                                        Approval" commit status); never auto-armed
-#   human           a PROD release                       current-SHA admin/maintainer approval (≠ author) on
-#                                                        the "gitops Approval" check; never auto-armed (#377)
+#   human           a claim deletion                     decommission-first guard + an admin/maintainer approval
+#                                                        (≠ author) on the "gitops Approval" check; never auto-armed
 #   human           adds/edits, no deletion              validated, never auto-armed
-# "gitops Approval" must be a REQUIRED status check on main (it gates deletions + prod). See
-# docs/runbooks/tenant-claims-automerge.md for the full model (shared with the Teams/v2 gates).
+# "gitops Approval" must be a REQUIRED status check on main (gates deletions, prod, Product roles edits). Team
+# roles edits are gated by the SEPARATE Teams Gate ("Teams Approval"). docs/runbooks/tenant-claims-automerge.md.
 #
 # CI-GATE INTEGRITY: `pull_request_target` means THIS definition and every script it calls run from the
 # PROTECTED BASE BRANCH — a PR cannot edit the gate that judges it. The PR's registry files are checked out
@@ -232,6 +230,28 @@ jobs:
       # (sha, context): the post-approval run overwrites the pre-approval failure, unblocking WITHOUT a manual
       # re-run). Default success; required only for claim deletions. Make "gitops Approval" the
       # branch-protection required check for the deletion-approval gate.
+      # A Product `spec.roles` edit (the approver list itself) is a privileged surface — gate it like a deletion
+      # so you can't quietly add yourself as a release-approver then approve a prod promotion (#501 two-step guard).
+      # base-vs-head subtree diff so a NEW product or any non-roles edit does NOT trip it (self-service auto-merge
+      # is preserved). Teams are gated by the Teams Gate (separate workflow).
+      - name: Detect Product roles edits
+        id: roles
+        if: steps.classify.outputs.any == 'true' && steps.classify.outputs.product_files != ''
+        env:
+          PRODUCT_FILES: ${{ steps.classify.outputs.product_files }}
+        run: |
+          set -euo pipefail
+          changed=false
+          for f in $PRODUCT_FILES; do
+            b="$(yq -o=json -I=0 '.spec.roles // {}' "base/$f" 2>/dev/null || echo '{}')"
+            h="$(yq -o=json -I=0 '.spec.roles // {}' "head/$f" 2>/dev/null || echo '{}')"
+            [ "$b" != "$h" ] && { changed=true; break; }
+          done
+          echo "product_roles_changes=${changed}" >> "$GITHUB_OUTPUT"
+
+      # The single approval verdict (shared with the Teams Gate) → the `gitops Approval` required check. Gates
+      # registry deletions (#283), prod promotions (#377, via the per-(team,product) release-approver set #501),
+      # and Product approver-list edits (#501). Reads approver sets ONLY from the trusted base/ checkout.
       - name: Publish approval verdict (commit status)
         if: always()
         env:
@@ -239,36 +259,11 @@ jobs:
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE_DIR: ${{ github.workspace }}/base
+          STATUS_CONTEXT: gitops Approval
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DELETIONS: ${{ steps.classify.outputs.deletions }}
           PROD_RELEASES: ${{ steps.classify.outputs.prod_release_files }}
-          AUTHOR: ${{ github.event.pull_request.user.login }}
-        run: |
-          set -euo pipefail
-          state=success
-          desc="no admin-approval requirement for this PR"
-          # Two paths need a machine-enforced human review of the CURRENT commit: a registry deletion
-          # (ADR-062 #283) and a PROD promotion (#377 — gated prod, author ≠ approver). Both publish to the same
-          # "gitops Approval" required check; neither is auto-armed (see the arm step), so the merge waits here.
-          reason=""
-          [ "$DELETIONS" = "true" ] && reason="registry deletion (ADR-062 #283)"
-          [ -n "$PROD_RELEASES" ] && reason="prod promotion (#377 — author ≠ approver)"
-          if [ -n "$reason" ]; then
-            approver=""
-            for login in $(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" --paginate \
-                  --jq 'group_by(.user.login) | map(max_by(.submitted_at))
-                        | .[] | select(.state == "APPROVED" and .commit_id == env.HEAD_SHA) | .user.login'); do
-              [ "$login" = "$AUTHOR" ] && continue # author ≠ approver (a self-approval never satisfies the gate)
-              perm=$(gh api "repos/${REPO}/collaborators/${login}/permission" --jq .permission)
-              if [ "$perm" = "admin" ] || [ "$perm" = "maintain" ]; then approver="$login"; break; fi
-            done
-            if [ -n "$approver" ]; then
-              state=success; desc="approved by ${approver} at ${HEAD_SHA:0:7} — ${reason}"
-            else
-              state=failure; desc="awaiting an admin/maintainer approval (≠ author) of the current commit (${HEAD_SHA:0:7}) — ${reason}"
-            fi
-          fi
-          gh api --method POST "repos/${REPO}/statuses/${HEAD_SHA}" \
-            -f state="$state" -f context="gitops Approval" \
-            -f description="$desc" -f target_url="$RUN_URL" >/dev/null
-          echo "gitops Approval = ${state} — ${desc}"
+          PRODUCT_ROLES_CHANGES: ${{ steps.roles.outputs.product_roles_changes }}
+        run: bash base/.github/scripts/gitops-gate/publish-verdict.sh

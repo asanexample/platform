@@ -92,8 +92,18 @@ for tf in $TEAM_FILES; do
 
   # --- no unknown keys (the CRD prunes them silently at admission) -----------------------------------
   for k in $(yq '.spec | keys | .[]' "$f" 2>/dev/null); do
-    case "$k" in ssoGroup | envelope) ;; *) note "${tf}: unknown spec key '${k}' (typo? it would be silently dropped)";; esac
+    case "$k" in ssoGroup | envelope | roles) ;; *) note "${tf}: unknown spec key '${k}' (typo? it would be silently dropped)";; esac
   done
+
+  # --- release-approver set (ADR-068 §7, #501): if present, a non-empty list of valid GitHub logins. This is the
+  # team-wide default prod approver set; editing it requires a second-person approval (the Teams Approval gate). --
+  if [ "$(yq '(.spec.roles | has("releaseApprover")) // false' "$f" 2>/dev/null)" = "true" ]; then
+    [ "$(yq '.spec.roles.releaseApprover | length' "$f" 2>/dev/null || echo 0)" -ge 1 ] || note "${tf}: spec.roles.releaseApprover is empty — omit it, or list ≥1 GitHub login"
+    while IFS= read -r login; do
+      [ -z "$login" ] && continue
+      [[ "$login" =~ ^[A-Za-z0-9-]{1,39}$ ]] || note "${tf}: release-approver '${login}' is not a valid GitHub login"
+    done < <(yq -r '(.spec.roles.releaseApprover // [])[]' "$f" 2>/dev/null)
+  fi
   for k in $(yq '.spec.envelope | keys | .[]' "$f" 2>/dev/null); do
     case "$k" in allowedTiers | allowedStages | allowedLocations | quotaCap | maxDedicatedIsolation | maxCrossTeamGrantsPerProduct) ;; *) note "${tf}: unknown spec.envelope key '${k}'";; esac
   done
