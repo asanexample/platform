@@ -1,0 +1,143 @@
+# Request Promotion (#377 / ADR-067 §8) — the portal front door for moving a Product's signed, deployed image
+# UP the stage ladder. It resolves the digest the Service is ALREADY running at the source stage and opens a
+# control-plane Release PR (gitops/releases/<team>/<product>/<to-stem>.yaml) for the target stage — the SAME
+# signed artifact moves up. The gitops Gate then governs it: dev→staging auto-merges (the digest is already
+# staged + signed), but PROD requires a release-approver review (a current-SHA admin/maintainer approval ≠
+# author — gated prod). Team membership is verified server-side (ADR-062 §1).
+#
+# Single-Service v1: the rendered Release carries the chosen Service's digest. A multi-Service Product's other
+# Services are promoted by separate runs (the per-Service Release files accumulate on merge).
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: request-promotion
+  title: Request Promotion
+  description: >-
+    Promote a Product's deployed image up the stage ladder (dev→test→uat→staging→prod). Resolves the digest
+    running at the source stage and opens a Release PR for the target stage — the same signed artifact moves up.
+    dev→staging auto-merges; prod needs a release-approver review.
+  tags:
+    - self-service
+    - promotion
+    - release
+spec:
+  owner: group:default/platform
+  type: release
+
+  parameters:
+    - title: Promotion
+      required:
+        - team
+        - product
+        - service
+        - fromStage
+        - toStage
+      properties:
+        team:
+          title: Team
+          type: string
+          description: Your team — membership is verified server-side.
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+              spec.type: team
+            defaultKind: Group
+            allowArbitraryValues: true
+        product:
+          title: Product
+          type: string
+          pattern: '^[a-z][a-z0-9-]{0,30}$'
+          description: The Product to promote (locates gitops/releases/<team>/<product>/).
+        service:
+          title: Service
+          type: string
+          pattern: '^[a-z][a-z0-9-]{0,30}$'
+          default: web
+          description: The Service within the Product whose deployed digest to promote.
+        fromStage:
+          title: From stage (source — copy the digest running here)
+          type: string
+          enum: ['dev', 'test', 'uat', 'staging']
+          default: staging
+        toStage:
+          title: To stage (target — must already have an Environment)
+          type: string
+          enum: ['test', 'uat', 'staging', 'prod']
+          default: prod
+          description: prod is GATED — the PR needs a release-approver review before it can merge.
+        customer:
+          title: Customer (per-customer Environments only)
+          type: string
+          description: Leave blank for pooled Environments.
+
+  steps:
+    - id: verify
+      name: Verify team membership
+      action: platform:verify-team-membership
+      input:
+        team: ${{ parameters.team }}
+
+    # Pull the SOURCE stage's Release into a scratch dir (NOT under out/, so it never lands in the PR).
+    - id: fetch
+      name: Fetch the source-stage Release
+      action: fetch:plain:file
+      input:
+        url: https://github.com/asanexample/platform/blob/main/gitops/releases/${{ parameters.team | replace('group:default/', '') }}/${{ parameters.product }}/${{ parameters.customer + "-" if parameters.customer }}${{ parameters.fromStage }}.yaml
+        targetPath: _src/source-release.yaml
+
+    - id: resolve
+      name: Resolve the deployed digest
+      action: platform:resolve-release-digest
+      input:
+        releasePath: _src/source-release.yaml
+        service: ${{ parameters.service }}
+
+    # Render the TARGET stage's Release with that digest, under out/ (the only thing published).
+    - id: render
+      name: Render the target Release
+      action: fetch:template
+      input:
+        url: ./skeleton
+        targetPath: out
+        values:
+          team: ${{ parameters.team | replace('group:default/', '') }}
+          product: ${{ parameters.product }}
+          service: ${{ parameters.service }}
+          toStage: ${{ parameters.toStage }}
+          fromStage: ${{ parameters.fromStage }}
+          customer: ${{ parameters.customer }}
+          # <team>-<product>[-<customer>]-<to_stage>, matching the Environment's name + namespace.
+          envName: ${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}${{ "-" + parameters.customer if parameters.customer }}-${{ parameters.toStage }}
+          toStem: ${{ parameters.customer + "-" if parameters.customer }}${{ parameters.toStage }}
+          digest: ${{ steps.resolve.output.digest }}
+          requestedBy: ${{ user.ref | default('unknown', true) }}
+
+    - id: pr
+      name: Open the promotion PR (governed by the gitops Gate)
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?owner=asanexample&repo=platform
+        sourcePath: out
+        branchName: promote/${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}${{ "-" + parameters.customer if parameters.customer }}-${{ parameters.toStage }}-${{ parameters.service }}
+        targetBranchName: main
+        title: "promote: ${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}${{ '-' + parameters.customer if parameters.customer }}-${{ parameters.toStage }} ${{ parameters.service }} (${{ parameters.fromStage }}→${{ parameters.toStage }})"
+        commitMessage: |
+          promote: ${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}${{ '-' + parameters.customer if parameters.customer }}-${{ parameters.toStage }} ${{ parameters.service }} -> ${{ steps.resolve.output.digest }}
+
+          Requested-by: ${{ user.ref | default('unknown', true) }}
+        description: |
+          Promote **${{ parameters.service }}** ${{ parameters.fromStage }}→**${{ parameters.toStage }}** for `${{ parameters.team | replace('group:default/', '') }}/${{ parameters.product }}` — the same signed digest `${{ steps.resolve.output.digest }}` already running at `${{ parameters.fromStage }}`.
+
+          Requested via the Backstage **Request Promotion** template by `${{ user.ref | default('unknown', true) }}` — team membership verified server-side.
+
+          {% if parameters.toStage == 'prod' %}
+          ⛔ **Gated prod (#377):** this PR will **not** auto-merge — it needs a **release-approver** review (a current-SHA admin/maintainer approval, **author ≠ approver**) on the "gitops Approval" check. prod's standing posture is view; it only mutates through this gated PR (ADR-040).
+          {% else %}
+          The gitops Gate validates the Release and **auto-merges** it (≤ staging); the per-Product ApplicationSet then injects the digest and ArgoCD delivers it.
+          {% endif %}
+
+  output:
+    links:
+      - title: Promotion pull request (governed by the gitops Gate)
+        url: ${{ steps.pr.output.remoteUrl }}
