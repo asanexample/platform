@@ -19,10 +19,13 @@ on:
   pull_request_target:
     branches: [main]
     types: [opened, synchronize, reopened]
+  pull_request_review:
+    types: [submitted, dismissed] # re-evaluate the "Teams Approval" gate when a roles-edit is approved (#501)
 
 permissions:
   contents: read
   pull-requests: write # post/update the sticky gate comment
+  statuses: write # publish the "Teams Approval" commit status (#501 — last-write-wins)
 
 concurrency:
   group: teams-gate-${{ github.event.pull_request.number }}
@@ -94,6 +97,40 @@ jobs:
           set +e
           bash base/.github/scripts/teams/gate.sh
           echo "rc=$?" >> "$GITHUB_OUTPUT"
+
+      # A Team spec.roles edit (the approver list itself) is a privileged surface — gate it so you can't add
+      # yourself as a release-approver then approve a prod promotion (#501 two-step guard). base-vs-head subtree
+      # diff so a non-roles envelope edit does NOT require approval (no behaviour change for those).
+      - name: Detect Team roles edits
+        id: roles
+        if: steps.classify.outputs.has_teams == 'true'
+        env:
+          TEAM_FILES: ${{ steps.classify.outputs.team_files }}
+        run: |
+          set -euo pipefail
+          changed=false
+          for f in $TEAM_FILES; do
+            b="$(yq -o=json -I=0 '.spec.roles // {}' "base/$f" 2>/dev/null || echo '{}')"
+            h="$(yq -o=json -I=0 '.spec.roles // {}' "head/$f" 2>/dev/null || echo '{}')"
+            [ "$b" != "$h" ] && { changed=true; break; }
+          done
+          echo "team_roles_changes=${changed}" >> "$GITHUB_OUTPUT"
+
+      # The "Teams Approval" required check — shares publish-verdict.sh with the gitops Gate. A Team approver-list
+      # edit needs a current-SHA admin/maintainer approval (≠ author); every other PR is success.
+      - name: Publish approval verdict (commit status)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE_DIR: ${{ github.workspace }}/base
+          STATUS_CONTEXT: Teams Approval
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TEAM_ROLES_CHANGES: ${{ steps.roles.outputs.team_roles_changes }}
+        run: bash base/.github/scripts/gitops-gate/publish-verdict.sh
 
       - name: Post sticky gate comment
         if: always() && steps.classify.outputs.has_teams == 'true'

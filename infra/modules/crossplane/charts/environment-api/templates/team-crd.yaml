@@ -84,6 +84,19 @@ spec:
                       description: Cap on active inbound AccessGrants per Product (ADR-068 §9 sprawl backstop).
                       default: 10
                       minimum: 0
+                roles:
+                  type: object
+                  description: >-
+                    Governance role holders (ADR-068 §7/§8) — GitHub logins, default the team lead. teamAdmin
+                    governs membership/grants; releaseApprover is the team-wide default approver set for gated prod
+                    promotion (#501), overridable per Product.
+                  properties:
+                    teamAdmin:
+                      type: array
+                      items: { type: string }
+                    releaseApprover:
+                      type: array
+                      items: { type: string }
             status:
               type: object
               properties:

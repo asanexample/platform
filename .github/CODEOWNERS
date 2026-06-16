@@ -22,8 +22,9 @@
 # gate that evaluates it).
 /.github/                @gangster
 
-# Gated prod (#377 / ADR-067 §8): a prod release digest bump is the one promotion that requires human
-# review — request a release-approver. The HARD gate is the gitops Gate's "gitops Approval" required check
-# (a current-SHA admin/maintainer approval ≠ author); this entry is the review-request signal on the prod path.
+# Gated prod (#377 / ADR-067 §8 / ADR-068 §7): a prod release digest bump is the one promotion that requires
+# human review. The HARD gate is the gitops Gate's "gitops Approval" required check — an APPROVED review (≠ author)
+# from the registry-sourced release-approver set (Product.spec.roles.releaseApprover else Team's; #501). This
+# entry is the review-request signal; the authoritative approver list lives in gitops/teams + gitops/products.
 /gitops/releases/**/prod.yaml      @gangster
 /gitops/releases/**/*-prod.yaml    @gangster

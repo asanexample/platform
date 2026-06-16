@@ -72,6 +72,18 @@ spec:
                         type: string
                         enum: ["managed", "external"]
                         default: managed
+                roles:
+                  type: object
+                  description: >-
+                    Per-Product governance role override (ADR-068 §7/§8) — GitHub logins. releaseApprover, when
+                    set, overrides the Team default for gated prod promotion of THIS Product (#501).
+                  properties:
+                    teamAdmin:
+                      type: array
+                      items: { type: string }
+                    releaseApprover:
+                      type: array
+                      items: { type: string }
       additionalPrinterColumns:
         - name: Team
           type: string

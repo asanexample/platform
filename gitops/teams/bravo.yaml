@@ -8,6 +8,8 @@ metadata:
     app.kubernetes.io/part-of: tenant-api
 spec:
   ssoGroup: Dev-bravo
+  roles:
+    releaseApprover: ["gangster"] # team-wide default prod release-approver set (ADR-068 §7, #501)
   envelope:
     allowedTiers: ["standard"]
     allowedStages: ["dev", "test", "uat", "staging", "prod"]
