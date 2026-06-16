@@ -107,17 +107,20 @@ resource "helm_release" "product_appset" {
           source = {
             repoURL        = each.value.repo_url
             targetRevision = "HEAD"
-            path           = "k8s/overlays/{{ trimPrefix \"${each.value.team}-${each.value.product}-\" .spec.environmentRef | splitList \"-\" | last }}"
+            path           = "k8s/overlays/{{ splitList \"-\" .spec.environmentRef | last }}"
             kustomize = {
               # Inject the generated host (static per env). The per-Service digest is injected by templatePatch
-              # below (ADR-071) from this Release record — the overlay ships `:placeholder`.
+              # below (ADR-071) from this Release record — the overlay ships `:placeholder`. stage = the final
+              # dash-segment of spec.environmentRef (allowedStages is a closed CRD enum, no dashes). The patch is
+              # a HEREDOC (not yamlencode) so the `splitList "-"` quotes survive as a literal block scalar — a
+              # yamlencoded patch escapes them to `\"`, which ArgoCD's goTemplate cannot parse.
               patches = var.preview_domain != "" ? [{
                 target = { kind = "HTTPRoute" }
-                patch = yamlencode([{
-                  op    = "replace"
-                  path  = "/spec/hostnames/0"
-                  value = "${each.value.product}-${each.value.team}-{{ trimPrefix \"${each.value.team}-${each.value.product}-\" .spec.environmentRef | splitList \"-\" | last }}.${var.preview_domain}"
-                }])
+                patch  = <<-EOT
+                  - op: replace
+                    path: /spec/hostnames/0
+                    value: ${each.value.product}-${each.value.team}-{{ splitList "-" .spec.environmentRef | last }}.${var.preview_domain}
+                EOT
               }] : []
             }
           }
