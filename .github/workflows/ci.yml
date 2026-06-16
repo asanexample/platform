@@ -75,7 +75,7 @@ jobs:
       # Persist the provider plugins across runs; restore-keys give a partial hit when versions change.
       - name: Cache provider plugins
         if: steps.scope.outputs.run == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.TF_PLUGIN_CACHE_DIR }}
           key: tofu-plugins-${{ runner.os }}-${{ hashFiles('infra/modules/**/versions.tf', '.github/workflows/ci.yml') }}
@@ -315,7 +315,7 @@ jobs:
           dep() { trivy fs infra/tests/aws --scanners vuln --severity HIGH,CRITICAL "$@"; }
           dep --format sarif --output trivy-deps.sarif --exit-code 0
           echo "::group::Trivy dependency findings"; dep --format table --exit-code 1; echo "::endgroup::"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: trivy-sarif
@@ -326,7 +326,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Install Semgrep (pinned)
@@ -343,7 +343,7 @@ jobs:
           echo "::group::Semgrep findings"
           semgrep scan $rulesets --exclude '*.sarif' --metrics off --error
           echo "::endgroup::"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: semgrep-sarif
