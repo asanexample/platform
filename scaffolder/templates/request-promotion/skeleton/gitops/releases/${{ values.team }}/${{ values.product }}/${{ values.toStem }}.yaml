@@ -1,0 +1,14 @@
+# Control-plane Release (ADR-071) — the deployed image digest for ${{ values.team }}/${{ values.product }} at the
+# ${{ values.toStage }} stage. Opened by the Backstage Request Promotion template (#377): the SAME signed digest
+# running at ${{ values.fromStage }} is promoted up. The gitops Gate governs the merge — dev→staging auto-merges,
+# prod needs a release-approver review. CI never writes the app repo's main; the per-Product ApplicationSet
+# injects this digest. Requested-by: ${{ values.requestedBy }}.
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata:
+  name: ${{ values.envName }}
+spec:
+  environmentRef: ${{ values.envName }}
+  services:
+    ${{ values.service }}:
+      digest: ${{ values.digest }}
