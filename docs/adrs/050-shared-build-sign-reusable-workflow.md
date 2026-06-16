@@ -43,7 +43,10 @@ and passed via `env:` (never inlined into `run:`) to close the shell-injection c
 that pins the signed digest into `k8s/preprod` and commits. The two reusable workflows are invoked as
 **sibling 1-level calls — never nested** — so the OIDC `job_workflow_ref` (→ cosign cert subject) and
 `repository` (→ `githubWorkflowRepository`) claims are the well-understood single-level values, not the
-2-level-nesting behavior GitHub's docs leave unspecified. **`app-bravo` is the generic starter** teams copy.
+2-level-nesting behavior GitHub's docs leave unspecified. ~~`app-bravo` is the generic starter teams copy.~~
+**Update (2026-06-16):** the seed apps `app-bravo`/`app-alpha` were retired — the **New Product scaffolder
+skeleton** (`scaffolder/templates/new-product/skeleton/`, ADR-062) is now the starter, emitting the thin
+build-sign caller by construction; no repo to copy.
 
 **3. Per-team isolation moves to the certificate extension.** Because the shared workflow signs everything,
 the cosign cert **subject** is the same for all teams (`…/trusted-ci/build-sign.yml@<sha>`); the per-team gate
