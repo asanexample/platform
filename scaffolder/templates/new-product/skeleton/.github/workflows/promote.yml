@@ -1,0 +1,53 @@
+name: Promote
+
+# On-demand promotion UP the stage ladder (#377 / ADR-067 §8). Moves the SAME signed digest already deployed in a
+# lower stage up into the target stage, by opening a gated Release PR via the app-team-unwritable shared
+# asanexample/trusted-ci promote.yml (the supply-chain backbone). THIS repo's main is NEVER written (no
+# contents:write) — exactly like deploy.yml's dev auto-promote, just triggered by hand for higher stages.
+#
+# The target Environment must already exist (gitops/environments/${{ values.team }}/${{ values.product }}/<to_stage>.yaml) —
+# the gitops Gate rejects a Release for a stage with no Environment claim. `prod` is intentionally absent: the
+# gated-prod path (approver != author) lands in #377 Phase 3; until then on-demand promotions go up to staging.
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service within the product to promote (image team-${{ values.team }}/${{ values.product }}-<service>)."
+        required: true
+        default: ${{ values.service }}
+        type: string
+      from_stage:
+        description: "Source stage to copy the deployed digest FROM (the same signed artifact moves up)."
+        required: true
+        default: dev
+        type: choice
+        options: [dev, test, uat, staging]
+      to_stage:
+        description: "Target stage to promote INTO (must already have an Environment)."
+        required: true
+        default: test
+        type: choice
+        options: [test, uat, staging]
+      customer:
+        description: "Optional customer (per-customer environments). Empty for pooled."
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  promote:
+    permissions:
+      id-token: write # OIDC -> per-Product role -> read the promote App key (NO contents write on this repo)
+      contents: read
+    uses: asanexample/trusted-ci/.github/workflows/promote.yml@f9a77cd1ad3bc0166ec8f6c8912a46641179a94a
+    with:
+      product: ${{ values.product }}
+      service: {% raw %}${{ inputs.service }}{% endraw %}
+      stage: {% raw %}${{ inputs.to_stage }}{% endraw %}
+      from_stage: {% raw %}${{ inputs.from_stage }}{% endraw %}
+      customer: {% raw %}${{ inputs.customer }}{% endraw %}
