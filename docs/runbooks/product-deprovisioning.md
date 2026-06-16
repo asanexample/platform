@@ -41,7 +41,7 @@ The symmetric inverse of **New Product**. For a single environment, use *Deprovi
      --force --region us-east-1 --profile platform
    ```
 
-4. **(Optional) delete the app repo** — archived by default (reversible). To hard-delete: `gh repo delete asanexample/app-<team>-<product> --yes` (irreversible).
+4. **(Optional) delete the app repo** — archived by default (reversible). To hard-delete: `gh repo delete asanexample/<team>-<product> --yes` (irreversible).
 
 ## What the gate enforces (`gitops Gate`)
 
@@ -63,6 +63,6 @@ kubectl get resourcequota -n <team>-<product>-<stage> environment-quota -o jsonp
 # After purge:
 kubectl get ns -l platform.refplat.org/environment | grep <team>-<product>   # gone
 aws ecr describe-repositories --repository-names team-<team>/<product>-<svc> --profile platform  # still there
-gh repo view asanexample/app-<team>-<product> --json isArchived --jq .isArchived                 # true
+gh repo view asanexample/<team>-<product> --json isArchived --jq .isArchived                 # true
 # The per-Product Terragrunt units converge via registry-reconcile (github-oidc / preprod-policy / argocd-apps).
 ```

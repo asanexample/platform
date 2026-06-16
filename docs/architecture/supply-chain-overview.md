@@ -26,7 +26,7 @@ is not good enough. The supply chain answers four questions at **admission time*
 | Threat | Without controls | Control |
 |--------|------------------|---------|
 | **Tampered / unknown image** — an attacker pushes a malicious image (or swaps a digest) and it gets deployed | Any image in ECR runs | **cosign signature** — only images signed by a known CI identity are admitted |
-| **Cross-product image use** — product B runs product A's image (or pushes into A's repo) | Namespace isolation only; images are shared | **Per-product signing identity** — `verify-images-product-<team>-<product>` admits only images signed by the shared `trusted-ci/build-sign.yml` workflow whose `githubWorkflowRepository` cert extension is `app-<team>-<product>` (ADR-050); a bespoke-build app's own workflow is a supported fallback |
+| **Cross-product image use** — product B runs product A's image (or pushes into A's repo) | Namespace isolation only; images are shared | **Per-product signing identity** — `verify-images-product-<team>-<product>` admits only images signed by the shared `trusted-ci/build-sign.yml` workflow whose `githubWorkflowRepository` cert extension is `<team>-<product>` (ADR-050); a bespoke-build app's own workflow is a supported fallback |
 | **No proof of origin** — "where did this image come from? what's in it?" is unanswerable | Opaque | **SLSA provenance + SBOM** attestations — signed statements of *how* it was built and *what's inside* |
 | **Forged image / provenance / SBOM** — a compromised app build signs its own malicious artifact and claims "I am a trusted build" | Self-signing/self-attestation proves nothing | **Isolated signer** (`trusted-ci`) — image + SBOM signing (`build-sign.yml`) and provenance (`slsa-provenance.yml`) run in a trust domain the app's own build cannot assume; per-product gating is the `githubWorkflowRepository` cert extension (ADR-042, ADR-050) |
 
@@ -44,7 +44,7 @@ One commit to an app repo's `main` produces a signed, attested, provenance-beari
 admits — with **no window** where ArgoCD could deploy an image whose attestations don't yet exist.
 
 ```text
- DEVELOPER                 APP CI — app-<team>-<product> repo's deploy.yml/preview.yml is a THIN CALLER (ADR-050)
+ DEVELOPER                 APP CI — <team>-<product> repo's deploy.yml/preview.yml is a THIN CALLER (ADR-050)
  ─────────                 ───────────────────────────────────────────────────────────────
  git push main  ─────────▶ build-sign job  (uses asanexample/trusted-ci/...build-sign.yml@<pinned-sha>)
                              1. assume role github-actions-ecr-push-product-<team>-<product>  (OIDC → AWS, ADR-036)
@@ -53,7 +53,7 @@ admits — with **no window** where ArgoCD could deploy an image whose attestati
                              4. syft → CycloneDX SBOM
                                 cosign attest --type cyclonedx          (keyless, same workflow)
                                 ↳ signed by the ISOLATED trusted-ci build-sign.yml identity the app
-                                  cannot assume; per-product gate = githubWorkflowRepository = app-<team>-<product> (ADR-050)
+                                  cannot assume; per-product gate = githubWorkflowRepository = <team>-<product> (ADR-050)
                            provenance job  (uses asanexample/trusted-ci/...slsa-provenance.yml@<pinned-sha>)
                              5. → SLSA provenance (slsa.dev/provenance/v0.2), signed by the same
                                   ISOLATED trusted-ci trust domain the app build cannot forge (ADR-042)
@@ -68,7 +68,7 @@ admits — with **no window** where ArgoCD could deploy an image whose attestati
                                                                           ▼
  KYVERNO admission (platform + preprod clusters)   ◀── Pod create in <team>-<product>-<stage> namespace
    verify-images-product-<team>-<product>       : image signed by trusted-ci build-sign.yml,  (Enforce)
-                                                  githubWorkflowRepository = app-<team>-<product>? (or app fallback)
+                                                  githubWorkflowRepository = <team>-<product>? (or app fallback)
    verify-attestations-product-<team>-<product> : CycloneDX SBOM present + signed by build-sign.yml? (audit→Enforce)
                                                   SLSA provenance present + signed by trusted-ci? (per ADR-042/050)
    → admit (mutate image to digest) ──▶ Pod runs        |        → deny ──▶ Pod rejected at admission

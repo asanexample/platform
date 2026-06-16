@@ -39,7 +39,7 @@ Walk the chain (stop at the first failure):
    ```bash
    cosign verify "$IMAGE@$DIGEST" \
      --certificate-identity-regexp "^https://github.com/asanexample/trusted-ci/.github/workflows/build-sign.yml@" \
-     --certificate-github-workflow-repository asanexample/app-<team>-<product> \
+     --certificate-github-workflow-repository asanexample/<team>-<product> \
      --certificate-oidc-issuer https://token.actions.githubusercontent.com
    ```
 

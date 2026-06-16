@@ -95,13 +95,13 @@ unwritable **`asanexample/trusted-ci/.github/workflows/build-sign.yml`** reusabl
 keyless, GitHub Actions OIDC → Fulcio/Rekor; ADR-050) — app `deploy.yml`/`preview.yml` are thin callers.
 Kyverno fetches the signature from ECR (via an IRSA role granting ECR read) and admits images signed by
 that shared workflow when the cert's `githubWorkflowRepository` extension is the product's own
-`app-<team>-<product>` caller repo. Two policy inputs drive this: `trusted_ci_build_subject_regexp` (the
+`<team>-<product>` caller repo. Two policy inputs drive this: `trusted_ci_build_subject_regexp` (the
 shared signer subject) and `shared_signer_caller_repos` (the per-product caller repos). A product's own
 app-signed identity remains a supported fallback for bespoke-build apps.
 
 | Policy | Verifies | Scope |
 | ------ | -------- | ----- |
-| `verify-images-product-<team>-<product>` | Images under `…/team-<team>/<product>-*` are cosign-signed (`count: 1`) by the shared `trusted-ci/build-sign.yml` (`trusted_ci_build_subject_regexp`) gated per-product by the `githubWorkflowRepository` extension = `app-<team>-<product>` (`shared_signer_caller_repos`, ADR-050) **or**, as a fallback, by `app-<team>-<product>`'s own `deploy.yml@main` (pinned) / `preview.yml` (subjectRegExp — the PR OIDC ref varies); `mutateDigest` pins to digest | environment (per-product) |
+| `verify-images-product-<team>-<product>` | Images under `…/team-<team>/<product>-*` are cosign-signed (`count: 1`) by the shared `trusted-ci/build-sign.yml` (`trusted_ci_build_subject_regexp`) gated per-product by the `githubWorkflowRepository` extension = `<team>-<product>` (`shared_signer_caller_repos`, ADR-050) **or**, as a fallback, by `<team>-<product>`'s own `deploy.yml@main` (pinned) / `preview.yml` (subjectRegExp — the PR OIDC ref varies); `mutateDigest` pins to digest | environment (per-product) |
 
 Per-product identity isolation: the shared signer's cert **subject** is the same for all products, so isolation
 moves to the `githubWorkflowRepository` cert extension — Fulcio sets it from the _calling_ app repo's OIDC,
@@ -121,7 +121,7 @@ signed by the shared `trusted-ci/build-sign.yml` workflow alongside the image si
 
 | Policy | Verifies | Scope |
 | ------ | -------- | ----- |
-| `verify-attestations-product-<team>-<product>` | `…/team-<team>/<product>-*` images carry a cosign-signed CycloneDX SBOM **and** a SLSA provenance attestation. The SBOM block accepts (`count: 1`) the shared `trusted-ci/build-sign.yml` (`trusted_ci_build_subject_regexp`) gated per-product by `githubWorkflowRepository` = `app-<team>-<product>` (`shared_signer_caller_repos`, ADR-050) **or**, as a fallback, the product's own workflow. For SLSA-L3-adopted products (`attest_caller_repos`), the provenance must be signed by the isolated **`trusted-ci`** reusable workflow with the caller-repo = the product's own `app-<team>-<product>` (ADR-042); for others, by the product's own `deploy.yml`/`preview.yml`. | environment (per-product) |
+| `verify-attestations-product-<team>-<product>` | `…/team-<team>/<product>-*` images carry a cosign-signed CycloneDX SBOM **and** a SLSA provenance attestation. The SBOM block accepts (`count: 1`) the shared `trusted-ci/build-sign.yml` (`trusted_ci_build_subject_regexp`) gated per-product by `githubWorkflowRepository` = `<team>-<product>` (`shared_signer_caller_repos`, ADR-050) **or**, as a fallback, the product's own workflow. For SLSA-L3-adopted products (`attest_caller_repos`), the provenance must be signed by the isolated **`trusted-ci`** reusable workflow with the caller-repo = the product's own `<team>-<product>` (ADR-042); for others, by the product's own `deploy.yml`/`preview.yml`. | environment (per-product) |
 
 This is the admission-side counterpart to the image-signing/attestation chain in
 [`cosign-image-signing.md`](cosign-image-signing.md) §10b — the signature proves _who built_ the image;

@@ -19,7 +19,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    uses: asanexample/trusted-ci/.github/workflows/build-sign.yml@f2cf5504bd6f010c73cb118adfb9874d33b36c68
+    uses: asanexample/trusted-ci/.github/workflows/build-sign.yml@28dbe1b66c2be6b05801575617d307cafd4a67e7
     with:
       app: ${{ values.product }}-${{ values.service }} # product-scoped image team-${{ values.team }}/${{ values.product }}-${{ values.service }} (v3); PR-preview delivery is a separate enhancement
       tag: {% raw %}${{ github.event.pull_request.head.sha }}{% endraw %}
@@ -29,7 +29,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    uses: asanexample/trusted-ci/.github/workflows/slsa-provenance.yml@f2cf5504bd6f010c73cb118adfb9874d33b36c68
+    uses: asanexample/trusted-ci/.github/workflows/slsa-provenance.yml@28dbe1b66c2be6b05801575617d307cafd4a67e7
     with:
       image: {% raw %}${{ needs.build.outputs.image }}{% endraw %}
       digest: {% raw %}${{ needs.build.outputs.digest }}{% endraw %}

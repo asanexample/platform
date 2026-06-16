@@ -25,7 +25,7 @@ without touching Terragrunt, ArgoCD, or AWS directly.
 
 **You:** open Backstage → **New Product**, pick your team, name the product and its first service.
 
-**The platform:** opens a PR that creates your **app repository** (`app-<team>-<product>`, seeded with thin-caller
+**The platform:** opens a PR that creates your **app repository** (`<team>-<product>`, seeded with thin-caller
 CI and `k8s/` overlays), a **Product registry entry**, and a **dev Environment**. The gitops Gate validates and
 **auto-merges** it; Crossplane provisions the dev namespace, quota, scoped ECR, and AWS access.
 

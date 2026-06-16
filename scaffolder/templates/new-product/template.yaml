@@ -1,6 +1,6 @@
 # New Product (ADR-067 v3 §"New Product lifecycle" / ADR-062): TEAM-SCOPED self-service repo-on-demand. A team
-# member creates a Product — a new app repo (app-<team>-<product>) seeded from the platform's golden starter +
-# the registry entry + the first `dev` Environment. Two publishes: (1) the new app repo, (2) a platform-repo PR
+# member creates a Product — a new app repo (<team>-<product>, ADR-072) seeded from the platform's golden starter
+# + the registry entry + the first `dev` Environment. Two publishes: (1) the new app repo, (2) a platform-repo PR
 # adding gitops/products/<team>/<product>.yaml + gitops/environments/<team>/<product>/dev.yaml. The first CI
 # build on the new repo pins the first signed digest → first deploy to dev.
 #
@@ -8,8 +8,8 @@
 #   - The Backstage scaffolder GitHub App must be able to CREATE repos in the asanexample org (org-wide install +
 #     "Administration: write" / repo-creation). It is currently installed on asanexample/platform only — the
 #     publish:github step below needs it broadened, else repo creation 403s. See backstage-scaffolder-github-app.md.
-#   - The new repo derives its team from the app- prefix's FIRST segment (trusted-ci build-sign first-segment
-#     change) — so app-<team>-<product> resolves team=<team>; the deploy.yml pins that trusted-ci SHA.
+#   - The new repo derives its team from the repo name's FIRST segment (trusted-ci build-sign, ADR-072) — so
+#     <team>-<product> resolves team=<team>; the deploy.yml pins that trusted-ci SHA.
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
@@ -48,7 +48,7 @@ spec:
           title: Product name
           type: string
           description: >-
-            Short lowercase identifier (the repo becomes app-<team>-<product>, the namespace
+            Short lowercase identifier (the repo becomes <team>-<product>, the namespace
             <team>-<product>-<stage>, the image team-<team>/<product>-<service>). Unique within your team.
           pattern: '^[a-z][a-z0-9-]{1,30}$'
           maxLength: 31
@@ -114,10 +114,10 @@ spec:
           service: ${{ parameters.service }}
 
     - id: publish-app
-      name: Create the app repo (app-<team>-<product>)
+      name: Create the app repo (<team>-<product>)
       action: publish:github
       input:
-        repoUrl: github.com?owner=asanexample&repo=app-${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}
+        repoUrl: github.com?owner=asanexample&repo=${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}
         sourcePath: ./app
         defaultBranch: main
         repoVisibility: public
@@ -154,7 +154,7 @@ spec:
           | team | `${{ parameters.team | replace('group:default/', '') }}` |
           | product | `${{ parameters.product }}` |
           | first service | `${{ parameters.service }}` |
-          | repo | [`asanexample/app-${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}`](https://github.com/asanexample/app-${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}) (created) |
+          | repo | [`asanexample/${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}`](https://github.com/asanexample/${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}) (created) |
 
           Adds `gitops/products/<team>/<product>.yaml` (the registry entry, repo → the new app repo) + the `dev`
           `XEnvironment` claim (image initially empty). The **gitops Gate** validates schema + envelope shift-left

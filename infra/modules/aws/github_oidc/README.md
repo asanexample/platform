@@ -13,7 +13,7 @@ module "github_oidc" {
   roles = {
     # One role per repo/team, each scoped to its own repo(s) and permissions.
     "github-actions-ecr-push-alpha" = {
-      repos    = ["app-alpha"]
+      repos    = ["alpha-shop"]
       branches = ["main"]
       events   = ["pull_request"]
       inline_policy = jsonencode({

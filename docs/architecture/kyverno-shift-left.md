@@ -34,7 +34,7 @@ No cluster, no AWS credentials, no secrets — so it is safe to run on `pull_req
 
 ## Using it in an app repo
 
-Add a `validate.yml` to the app repo (`<org>/app-<team>-<product>`). It calls the platform action by ref; nothing
+Add a `validate.yml` to the app repo (`<org>/<team>-<product>`). It calls the platform action by ref; nothing
 else is needed.
 
 ```yaml

@@ -1,4 +1,4 @@
-# app-${{ values.team }}-${{ values.product }}
+# ${{ values.team }}-${{ values.product }}
 
 Team `${{ values.team }}`'s **${{ values.product }}** product — scaffolded by the platform's **New Product** template
 (ADR-067 v3), language **`${{ values.language }}`**. A minimal containerized HTTP service (`${{ values.service }}`)

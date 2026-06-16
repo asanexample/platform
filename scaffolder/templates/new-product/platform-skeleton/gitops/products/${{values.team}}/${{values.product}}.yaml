@@ -11,7 +11,7 @@ metadata:
     app.kubernetes.io/part-of: environment-api
 spec:
   team: ${{ values.team }}
-  repo: asanexample/app-${{ values.team }}-${{ values.product }}
+  repo: asanexample/${{ values.team }}-${{ values.product }}
   tenancy: pooled
   defaultIsolation: { compute: dedicated-namespace }
   domains: []
