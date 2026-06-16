@@ -13,6 +13,10 @@
 #   PROD_RELEASES="<files...>"  prod promotion             → an approval from the (team,product) RELEASE-APPROVER
 #                               set: Product.spec.roles.releaseApprover else Team.spec.roles.releaseApprover, ≠
 #                               author. pci/hipaa env tier → ≥2 DISTINCT approvers. Empty set → FAIL CLOSED.
+#   DELETED_FILES="<paths...>"  (Deprovision Product purge) any deleted gitops/environments/** whose BASE file
+#                               is a PROD env → the SAME release-approver requirement as a prod release (tearing
+#                               down prod is as sensitive as shipping to it), ON TOP OF the generic admin
+#                               deletion approval. Empty approver set → FAIL CLOSED.
 #
 # Env: GH_TOKEN REPO PR_NUMBER HEAD_SHA AUTHOR BASE_DIR STATUS_CONTEXT RUN_URL + the reason flags above.
 # Test seam (bypasses the two gh api calls + the status POST):
@@ -26,6 +30,7 @@ AUTHOR="$(printf '%s' "${AUTHOR:-}" | tr '[:upper:]' '[:lower:]')"
 BASE="${BASE_DIR:-base}"
 DELETIONS="${DELETIONS:-false}"
 PROD_RELEASES="${PROD_RELEASES:-}"
+DELETED_FILES="${DELETED_FILES:-}"
 PRODUCT_ROLES_CHANGES="${PRODUCT_ROLES_CHANGES:-false}"
 TEAM_ROLES_CHANGES="${TEAM_ROLES_CHANGES:-false}"
 
@@ -52,6 +57,38 @@ collab_perm() {
   else
     gh api "repos/${REPO}/collaborators/${1}/permission" --jq .permission 2>/dev/null || echo none
   fi
+}
+
+# Require an approval from the (team,product) release-approver set — Product.spec.roles.releaseApprover else
+# the Team default, read from BASE, author excluded; pci/hipaa tier ⇒ ≥2 distinct. Empty set FAILS CLOSED.
+# On any shortfall sets the globals ok=false/state=failure/desc and returns 1; on success sets desc, returns 0.
+# Args: <team> <product> <tier> <label>. Shared by prod promotion and prod-env teardown (Deprovision Product).
+require_release_approver() {
+  local team="$1" product="$2" tier="$3" label="$4"
+  local pfile="${BASE}/gitops/products/${team}/${product}.yaml"
+  local tfile="${BASE}/gitops/teams/${team}.yaml"
+  local set_logins=""
+  [ -f "$pfile" ] && set_logins="$(yq -r '(.spec.roles.releaseApprover // [])[]' "$pfile" 2>/dev/null)"
+  if [ -z "$set_logins" ] && [ -f "$tfile" ]; then
+    set_logins="$(yq -r '(.spec.roles.releaseApprover // [])[]' "$tfile" 2>/dev/null)"
+  fi
+  set_logins="$(printf '%s\n' "$set_logins" | tr '[:upper:]' '[:lower:]' | sed '/^$/d' | sort -u)"
+  if [ -z "$set_logins" ]; then
+    ok=false; state=failure
+    desc="no release-approver configured for ${team}/${product} — ${label} blocked (fail-closed, #501)"; return 1
+  fi
+  local need=1
+  case "$tier" in pci | hipaa) need=2 ;; esac
+  local matched=0 a
+  for a in "${APPROVERS[@]:-}"; do
+    [ -z "$a" ] && continue
+    printf '%s\n' "$set_logins" | grep -qx "$a" && matched=$((matched + 1))
+  done
+  if [ "$matched" -lt "$need" ]; then
+    ok=false; state=failure
+    desc="${label} ${team}/${product} needs ${need} release-approver approval(s) ≠ author of ${HEAD_SHA:0:7}; have ${matched}"; return 1
+  fi
+  desc="${label} ${team}/${product} approved (${matched}/${need}) at ${HEAD_SHA:0:7}"; return 0
 }
 
 # Portable (bash 3.2+) — no mapfile.
@@ -87,31 +124,26 @@ if [ "$ok" = true ] && [ -n "$PROD_RELEASES" ]; then
     team="$(basename "$(dirname "$(dirname "$rel")")")"
     product="$(basename "$(dirname "$rel")")"
     fname="$(basename "$rel")"
-    pfile="${BASE}/gitops/products/${team}/${product}.yaml"
-    tfile="${BASE}/gitops/teams/${team}.yaml"
-    set_logins=""
-    [ -f "$pfile" ] && set_logins="$(yq -r '(.spec.roles.releaseApprover // [])[]' "$pfile" 2>/dev/null)"
-    if [ -z "$set_logins" ] && [ -f "$tfile" ]; then
-      set_logins="$(yq -r '(.spec.roles.releaseApprover // [])[]' "$tfile" 2>/dev/null)"
-    fi
-    set_logins="$(printf '%s\n' "$set_logins" | tr '[:upper:]' '[:lower:]' | sed '/^$/d' | sort -u)"
-    if [ -z "$set_logins" ]; then
-      ok=false; state=failure
-      desc="no release-approver configured for ${team}/${product} — prod blocked (fail-closed, #501)"; break
-    fi
-    need=1
+    tier=standard
     efile="${BASE}/gitops/environments/${team}/${product}/${fname}"
-    [ -f "$efile" ] && case "$(yq -r '.spec.tier // "standard"' "$efile" 2>/dev/null)" in pci | hipaa) need=2 ;; esac
-    matched=0
-    for a in "${APPROVERS[@]:-}"; do
-      [ -z "$a" ] && continue
-      printf '%s\n' "$set_logins" | grep -qx "$a" && matched=$((matched + 1))
-    done
-    if [ "$matched" -lt "$need" ]; then
-      ok=false; state=failure
-      desc="prod ${team}/${product} needs ${need} release-approver approval(s) ≠ author of ${HEAD_SHA:0:7}; have ${matched}"; break
-    fi
-    desc="prod ${team}/${product} approved (${matched}/${need}) at ${HEAD_SHA:0:7}"
+    [ -f "$efile" ] && tier="$(yq -r '.spec.tier // "standard"' "$efile" 2>/dev/null)"
+    require_release_approver "$team" "$product" "$tier" "prod" || break
+  done
+fi
+
+# Prod-environment DELETIONS (Deprovision Product purge): destroying a prod Environment is as sensitive as a
+# prod release, so it needs the (team,product) release-approver approval too — not just the generic admin
+# deletion approval above. The deleted file is gone on head but present on BASE (read stage/tier there).
+if [ "$ok" = true ] && [ -n "$DELETED_FILES" ]; then
+  for f in $DELETED_FILES; do
+    case "$f" in gitops/environments/*) ;; *) continue ;; esac
+    bfile="${BASE}/${f}"
+    [ -f "$bfile" ] || continue
+    [ "$(yq -r '.spec.stage // ""' "$bfile" 2>/dev/null)" = "prod" ] || continue
+    team="$(basename "$(dirname "$(dirname "$f")")")"
+    product="$(basename "$(dirname "$f")")"
+    tier="$(yq -r '.spec.tier // "standard"' "$bfile" 2>/dev/null)"
+    require_release_approver "$team" "$product" "$tier" "prod env teardown" || break
   done
 fi
 

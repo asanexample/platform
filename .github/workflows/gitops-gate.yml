@@ -23,7 +23,14 @@ name: gitops — gate on PR
 #   any             a Product spec.roles edit            an admin/maintainer approval (≠ author) — can't add an
 #                                                        approver then self-approve (#501 two-step guard)
 #   scaffolder App  ⊆ those paths, validation fails      gate red, no merge
-#   scaffolder App  a claim DELETION                     rejected (the bot never deletes — #283)
+#   scaffolder App  a claim DELETION on a purge branch   permitted (Deprovision Product/Environment): decommission-
+#                   (product/purge-* | environment/      first + completeness guards + an admin/maintainer approval
+#                    purge-*)                             (≠ author), + the release-approver if a PROD env is in the
+#                                                        bundle (#501); never auto-armed (ADR-062 #283)
+#   scaffolder App  a claim DELETION off a purge branch  rejected (deletions only via the Deprovision purge path)
+#   promote App     a claim DELETION                     rejected (the promote App only bumps digests — never deletes)
+#   any             an Environment DECOMMISSION          validated; NOT auto-armed — draining a Product/env (incl.
+#                   (spec.lifecycle.phase → suspend)      prod) is reviewer-merged even though reversible
 #   human           a claim deletion                     decommission-first guard + an admin/maintainer approval
 #                                                        (≠ author) on the "gitops Approval" check; never auto-armed
 #   human           adds/edits, no deletion              validated, never auto-armed
@@ -113,6 +120,17 @@ jobs:
           sudo chmod +x /usr/local/bin/yq
           yq --version
 
+      # A Product/Environment DECOMMISSION (spec.lifecycle.phase → decommissioning/suspended) drains workloads
+      # (incl. prod), so it is reviewer-merged, NOT self-service auto-merged — even though it's reversible and
+      # non-deletion. Detect it from HEAD so the Arm auto-merge step can exclude it (Deprovision Product, ADR-062).
+      - name: Detect lifecycle decommission (exclude from auto-merge)
+        id: lifecycle
+        if: steps.classify.outputs.environment_files != ''
+        env:
+          HEAD_DIR: ${{ github.workspace }}/head
+          ENVIRONMENT_FILES: ${{ steps.classify.outputs.environment_files }}
+        run: bash base/.github/scripts/gitops-gate/detect-lifecycle-decommission.sh
+
       - name: Validate Products
         if: steps.classify.outputs.any == 'true' && steps.classify.outputs.product_files != ''
         env:
@@ -175,14 +193,32 @@ jobs:
           fi
           echo "bot=$bot" >>"$GITHUB_OUTPUT"
 
-      - name: Reject scaffolder-authored claim deletions
+      # Bot-authored deletions are PERMITTED for the scaffolder, but ONLY on a sanctioned Deprovision purge
+      # branch — a guardrail against an accidental/buggy mass-delete (the real control is the admin (+ release-
+      # approver) approval on "gitops Approval" + the decommission-first/completeness guards below; ADR-062 #283).
+      # The promote App only ever bumps release digests, so it must never author a deletion. Human deletions skip
+      # this step (bot==false) and are caught by the same downstream guards + approval.
+      - name: Guard bot-authored deletions (scaffolder purge-branch only; promote never deletes)
         if: steps.author.outputs.bot == 'true' && steps.classify.outputs.deletions == 'true'
+        env:
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
-          echo "::error::the scaffolder never deletes registry files — the hard-delete is a human, reviewed PR (ADR-062 #283). Use the Deprovision template to decommission, then open a deletion PR."
-          exit 1
+          if [ "$AUTHOR" = "$PROMOTE_APP_LOGIN" ]; then
+            echo "::error::the promote App only bumps release digests (ADR-071) — it never deletes registry files. Deletion PRs come from the Deprovision templates."
+            exit 1
+          fi
+          case "$HEAD_REF" in
+            product/purge-* | environment/purge-*)
+              echo "scaffolder deletion on a sanctioned purge branch ($HEAD_REF) — decommission-first/completeness guards + approval apply" ;;
+            *)
+              echo "::error::scaffolder deletions are only permitted on a Deprovision purge branch (product/purge-* or environment/purge-*); got '$HEAD_REF'. Use the Deprovision Product/Environment template."
+              exit 1 ;;
+          esac
 
       # Decommission-first guard (deterministic per-SHA, a hard gate) for ANY claim deletion (bot deletions are
-      # already rejected above). yq is installed below when there's anything to read.
+      # now permitted via the scoped guard above, then judged here just like human deletions). yq is installed
+      # below when there's anything to read.
       - name: Guard claim deletions (decommission-first)
         if: steps.classify.outputs.deletions == 'true'
         env:
@@ -200,6 +236,7 @@ jobs:
           steps.classify.outputs.non_registry_changes == 'false' &&
           steps.classify.outputs.deletions == 'false' &&
           steps.classify.outputs.prod_release_files == '' &&
+          steps.lifecycle.outputs.decommission != 'true' &&
           steps.classify.outputs.any == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -251,7 +288,8 @@ jobs:
 
       # The single approval verdict (shared with the Teams Gate) → the `gitops Approval` required check. Gates
       # registry deletions (#283), prod promotions (#377, via the per-(team,product) release-approver set #501),
-      # and Product approver-list edits (#501). Reads approver sets ONLY from the trusted base/ checkout.
+      # prod-ENV teardown (a Deprovision Product purge deleting a prod env → the same release-approver set), and
+      # Product approver-list edits (#501). Reads approver sets ONLY from the trusted base/ checkout.
       - name: Publish approval verdict (commit status)
         if: always()
         env:
@@ -264,6 +302,7 @@ jobs:
           STATUS_CONTEXT: gitops Approval
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DELETIONS: ${{ steps.classify.outputs.deletions }}
+          DELETED_FILES: ${{ steps.classify.outputs.deleted_files }}
           PROD_RELEASES: ${{ steps.classify.outputs.prod_release_files }}
           PRODUCT_ROLES_CHANGES: ${{ steps.roles.outputs.product_roles_changes }}
         run: bash base/.github/scripts/gitops-gate/publish-verdict.sh

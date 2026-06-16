@@ -14,7 +14,7 @@
 
 | Step | What | Reversible? | How |
 |------|------|-------------|-----|
-| **Decommission** | `spec.lifecycle.phase: decommissioning` → the Composition zeroes the ResourceQuota (pods + cpu/memory → 0). No new/rescheduled pod can run; workloads drain on the next reconcile. Namespace, IAM, ECR, policies all **retained**. | **Yes** — flip phase back to `active` and the quota is restored. | Backstage **Deprovision Environment** template (action: decommission), or edit the claim. Automerges (reversible). |
+| **Decommission** | `spec.lifecycle.phase: decommissioning` → the Composition zeroes the ResourceQuota (pods + cpu/memory → 0). No new/rescheduled pod can run; workloads drain on the next reconcile. Namespace, IAM, ECR, policies all **retained**. | **Yes** — flip phase back to `active` and the quota is restored. | Backstage **Deprovision Environment** template (action: decommission), or edit the claim. **Reviewer-merged** — the gate excludes any decommission from auto-merge (draining workloads, incl. prod, warrants a human merge even though it's reversible). |
 | **Grace** | The environment sits suspended. Back up any app data now (see below). | — | A separate PR / time; not CI-time-gated. |
 | **Purge** | Remove the claim file → ArgoCD prune deletes the XEnvironment → Crossplane deletes the namespace. **ECR is orphaned (images kept).** | Largely — re-add the claim to recreate the namespace/IAM; ECR repo + images are reused. | A **human-authored, reviewed** PR (the gate requires it). |
 
@@ -24,8 +24,12 @@
   active environment (the decommission must merge first, in its own PR → a real reversible window).
 - A deletion PR requires a **current-SHA admin/maintainer approving review** (main has no required-review rule,
   so this machine-enforces "deletes are reviewed"; GitHub blocks self-approval → a platform reviewer must sign
-  off the destroy).
-- The scaffolder write App **never** authors a delete — the purge is always a human PR.
+  off the destroy). Deleting a **prod** environment additionally requires the **release-approver** (the same set
+  that gates prod releases) — tearing down prod is as sensitive as shipping to it.
+- **Deletion authorship:** the *Deprovision Environment* purge is still a **human PR** (this template never
+  deletes). The *Deprovision Product* template, however, authors its purge PR via the scaffolder App on a
+  sanctioned `product/purge-*` branch — the gate permits that because the control is the **human approval**, not
+  the authorship (ADR-062 #283). The promote App may never author a deletion.
 - A decommissioning environment is **excluded from the team's aggregate quota** (it's winding down).
 
 ## Data safety — read this

@@ -15,4 +15,5 @@ spec:
     - ./new-product/template.yaml
     - ./new-environment/template.yaml
     - ./deprovision-environment/template.yaml
+    - ./deprovision-product/template.yaml
     - ./request-promotion/template.yaml

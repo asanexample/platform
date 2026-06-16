@@ -4,9 +4,11 @@
 # actually removing the claim — is a SEPARATE human PR (see docs/runbooks/environment-deprovisioning.md). This
 # template never deletes. Replaces the retired v2 "Deprovision Environment" (gitops/tenant-claims/preprod path).
 #
-# NB: the gitops Gate does not yet arm automerge OR the decommission-first deletion guard (both deferred at
-# the cutover — see .github/workflows/gitops-gate.yml) — so these PRs are reviewer-merged, and the purge PR
-# is not yet gate-enforced to be decommission-first. Until that lands, a reviewer enforces it.
+# NB: a decommission/reactivate is REVIEWER-MERGED, not auto-merged — the gitops Gate excludes any Environment
+# decommission (spec.lifecycle.phase → suspend) from auto-merge, since draining workloads (incl. prod) warrants
+# a human merge even though it's reversible. The purge (claim deletion) is a separate human PR, gate-enforced
+# decommission-first (validate-deletions.sh) + admin-approved (publish-verdict.sh). For a whole Product, the
+# Deprovision Product template fans this out over every Environment and can author the purge PR itself.
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:

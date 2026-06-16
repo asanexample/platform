@@ -1,0 +1,95 @@
+# Deprovision Product (ADR-062): team-scoped, portal-driven teardown of a Product AND all its Environments.
+# A Product owns no running resources itself, so this acts on every Environment of the Product at once:
+#   - decommission / reactivate: a REVERSIBLE edit setting spec.lifecycle.phase on every env claim (the
+#     Composition zeroes / restores each ResourceQuota). Bot-authored, but the gitops Gate does NOT auto-merge
+#     it — draining a Product (incl. prod) is reviewer-merged — and `reactivate` undoes it.
+#   - purge: the IRREVERSIBLE step — one PR deleting the Product registry file + all its env claims + all its
+#     release records together. On merge, registry-reconcile tears down the per-Product OIDC role / ApplicationSet
+#     / Kyverno policy and ArgoCD prunes the Environments (namespaces deleted); ECR images are retained (orphan)
+#     and the app repo is archived. The Gate requires an admin/maintainer approval (+ the release-approver if a
+#     prod env is in the bundle) and never auto-merges it. See docs/runbooks/product-deprovisioning.md.
+#
+# Unlike Deprovision Environment (whose purge is a hand-authored PR), this template's `platform:deprovision-product`
+# action opens the deletion PR itself via the GitHub App — on the sanctioned `product/purge-*` branch the Gate
+# permits for scaffolder deletions (the control is the human approval, not the authorship; ADR-062 #283).
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: deprovision-product
+  title: Deprovision Product
+  description: >-
+    Wind a whole Product down (or back up): decommission reversibly suspends every Environment of the Product;
+    reactivate restores them; purge removes the Product and all its Environments + Releases (a reviewed,
+    irreversible PR). ECR images are retained; the app repo is archived on purge.
+  tags:
+    - self-service
+    - product
+    - lifecycle
+spec:
+  owner: group:default/platform
+  type: product
+
+  parameters:
+    - title: Product
+      required:
+        - team
+        - product
+        - action
+        - confirm
+      properties:
+        team:
+          title: Team
+          type: string
+          description: Your team — membership is verified server-side.
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+              spec.type: team
+            defaultKind: Group
+            allowArbitraryValues: true
+        product:
+          title: Product
+          type: string
+          pattern: '^[a-z][a-z0-9-]{0,30}$'
+          description: The Product to act on (locates gitops/products/<team>/<product>.yaml + its environments/releases).
+        action:
+          title: Action
+          type: string
+          enum: ['decommission', 'reactivate', 'purge']
+          default: decommission
+          description: >-
+            decommission = reversibly suspend every Environment (quota → 0); reactivate = restore them; purge =
+            irreversibly delete the Product + all its Environments + Releases (requires decommission first).
+        archiveRepo:
+          title: Archive the app repo (purge only)
+          type: boolean
+          default: true
+          description: On purge, archive app-<team>-<product> (reversible). Uncheck to leave it active.
+        confirm:
+          title: Confirm product name
+          type: string
+          description: Type the full Product name (<team>-<product>) to confirm — checked server-side.
+
+  steps:
+    - id: verify
+      name: Verify team membership
+      action: platform:verify-team-membership
+      input:
+        team: ${{ parameters.team }}
+
+    - id: deprovision
+      name: Open the deprovisioning PR
+      action: platform:deprovision-product
+      input:
+        team: ${{ parameters.team }}
+        product: ${{ parameters.product }}
+        mode: ${{ parameters.action }}
+        archiveRepo: ${{ parameters.archiveRepo }}
+        confirm: ${{ parameters.confirm }}
+        requestedBy: ${{ user.ref | default('unknown', true) }}
+
+  output:
+    links:
+      - title: Deprovisioning pull request
+        url: ${{ steps.deprovision.output.remoteUrl }}

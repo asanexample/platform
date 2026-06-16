@@ -32,6 +32,17 @@ cat >"$base/gitops/environments/alpha/reg/prod.yaml" <<'Y'
 kind: XEnvironment
 spec: { team: alpha, product: reg, stage: prod, tier: pci }
 Y
+# Prod-env teardown fixtures (Deprovision Product purge): a standard prod env + a dev env under alpha/web
+# (web has no Product override → team default approvers alice+bob).
+mkdir -p "$base/gitops/environments/alpha/web"
+cat >"$base/gitops/environments/alpha/web/prod.yaml" <<'Y'
+kind: XEnvironment
+spec: { team: alpha, product: web, stage: prod, tier: standard }
+Y
+cat >"$base/gitops/environments/alpha/web/dev.yaml" <<'Y'
+kind: XEnvironment
+spec: { team: alpha, product: web, stage: dev, tier: standard }
+Y
 
 pass=0; failc=0
 run() { # <expect ok|deny> <name> <VAR=VAL ...>
@@ -55,6 +66,14 @@ run ok   "prod: pci tier needs 2 (have 2)"                PROD_RELEASES=$P/reg/p
 run deny "prod: pci 2 but one is the author"              PROD_RELEASES=$P/reg/prod.yaml AUTHOR=bob VERDICT_TEST_APPROVERS="alice bob"
 run ok   "deletion: admin approver"                       DELETIONS=true AUTHOR=dev VERDICT_TEST_APPROVERS="alice" VERDICT_TEST_PERMS="alice=admin"
 run deny "deletion: write-only approver"                  DELETIONS=true AUTHOR=dev VERDICT_TEST_APPROVERS="alice" VERDICT_TEST_PERMS="alice=write"
+# Prod-env teardown (Deprovision Product purge) — needs the release-approver ON TOP OF the generic admin deletion.
+E=gitops/environments/alpha
+run ok   "purge: prod env, admin+release-approver (alice)" DELETIONS=true DELETED_FILES=$E/web/prod.yaml AUTHOR=dev VERDICT_TEST_APPROVERS="alice" VERDICT_TEST_PERMS="alice=admin"
+run deny "purge: prod env, admin but NOT release-approver" DELETIONS=true DELETED_FILES=$E/web/prod.yaml AUTHOR=dev VERDICT_TEST_APPROVERS="dave" VERDICT_TEST_PERMS="dave=admin"
+run deny "purge: prod env pci needs 2 (have 1)"           DELETIONS=true DELETED_FILES=$E/reg/prod.yaml AUTHOR=dev VERDICT_TEST_APPROVERS="alice" VERDICT_TEST_PERMS="alice=admin"
+run ok   "purge: prod env pci needs 2 (have 2)"           DELETIONS=true DELETED_FILES=$E/reg/prod.yaml AUTHOR=dev VERDICT_TEST_APPROVERS="alice bob" VERDICT_TEST_PERMS="alice=admin bob=admin"
+run ok   "purge: NON-prod env → only generic admin"       DELETIONS=true DELETED_FILES=$E/web/dev.yaml AUTHOR=dev VERDICT_TEST_APPROVERS="dave" VERDICT_TEST_PERMS="dave=admin"
+run ok   "purge: prod product file delete → no env gate"  DELETIONS=true DELETED_FILES=gitops/products/alpha/web.yaml AUTHOR=dev VERDICT_TEST_APPROVERS="dave" VERDICT_TEST_PERMS="dave=admin"
 run ok   "roles-change (product): admin approver"         PRODUCT_ROLES_CHANGES=true AUTHOR=dev VERDICT_TEST_APPROVERS="alice" VERDICT_TEST_PERMS="alice=admin"
 run deny "roles-change (team): no admin approval"         TEAM_ROLES_CHANGES=true AUTHOR=dev VERDICT_TEST_APPROVERS="alice" VERDICT_TEST_PERMS="alice=write"
 run ok   "no reasons → success"                           AUTHOR=dev VERDICT_TEST_APPROVERS=""
