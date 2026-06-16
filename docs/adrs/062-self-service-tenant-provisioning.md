@@ -114,9 +114,21 @@ Kyverno-in-CI — which we already run — is itself evidence the existing stack
   envelope authoring and the guardrails — the intended IDP shape.
 - The security surface is real and concentrated in the write App + automerge gate; the controls above are
   mandatory before any write-enabled code ships.
-- **Deferred / separate:** the safe **deprovisioning** (tenant delete) flow; **cost guardrails** (the upcoming
-  cost-management effort — this work leaves the `quotaCap`/aggregate seam); opening `New Tenant` to non-admins
-  is the *intended* model but is gated on the rebuild implementing the Team/Tenant split and the RBAC scoping.
+- **Deprovisioning (built, #283 + Deprovision Product):** the safe teardown flow is a **two-step, reversible-
+  until-the-last-step** model — *decommission* (a reversible `spec.lifecycle.phase` suspend) then, after a grace
+  window, *purge* (delete the claim). It exists per-Environment (*Deprovision Environment*) and per-Product
+  (*Deprovision Product*, which fans out over every Environment). Runbooks:
+  `environment-deprovisioning.md`, `product-deprovisioning.md`.
+  - **Deletion-authorship evolution:** the original #283 rule was "the scaffolder never authors a deletion — the
+    hard-delete is a human PR." We've since relocated the control from **authorship** to **approval**: the
+    scaffolder may author a deletion PR, but only on a sanctioned `product/purge-*` / `environment/purge-*`
+    branch, and the gitops Gate still requires a current-SHA **admin/maintainer approval (≠ author)** — plus the
+    **release-approver** if a **prod** environment is in the bundle — and **never auto-merges** it. This is
+    strictly safer per UX (no hand-run `git rm`) and equally safe per control (a bot can't self-approve; the
+    decommission-first + completeness guards are author-agnostic). The **promote** App may never author a deletion.
+- **Deferred / separate:** **cost guardrails** (the upcoming cost-management effort — this work leaves the
+  `quotaCap`/aggregate seam); opening `New Tenant` to non-admins is the *intended* model but is gated on the
+  rebuild implementing the Team/Tenant split and the RBAC scoping.
 
 ## Relationships
 
