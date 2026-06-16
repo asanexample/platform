@@ -31,6 +31,9 @@ kc() {
   if [ -n "${KCTX:-}" ]; then kubectl --context "$KCTX" "$@"; else kubectl "$@"; fi
 }
 
+# GitHub REST API as the promote App — the platform-infra runner image has no `gh` CLI, but curl + jq are present.
+api() { curl -fsS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "$@"; }
+
 # The auto ladder — ADJACENT pairs (dev→test, test→uat, uat→staging). prod is NOT here (gated, Phase 3).
 LADDER=(dev test uat staging)
 
@@ -102,7 +105,7 @@ for prod_file in gitops/products/*/*.yaml; do
       fi
 
       # Don't reopen a promotion already in flight (a prior run's PR not yet merged).
-      if [ -n "$(gh pr list --repo "$REPO" --head "$branch" --state open --json number --jq '.[0].number // empty' 2>/dev/null)" ]; then
+      if [ -n "$(api "https://api.github.com/repos/${REPO}/pulls?head=${REPO%%/*}:${branch}&state=open" 2>/dev/null | jq -r '.[0].number // empty' 2>/dev/null)" ]; then
         echo "open  ${team}/${product} ${svc} ${lower}→${upper}: PR already open for ${branch}"
         continue
       fi
@@ -126,9 +129,10 @@ for prod_file in gitops/products/*/*.yaml; do
       git checkout -q -b "$branch"
       git commit -q -m "promote: ${env_name} ${svc} -> sha256:${short}"
       git push -q -u origin "$branch"
-      gh pr create --repo "$REPO" --base main --head "$branch" \
-        --title "promote: ${env_name} ${svc} -> ${short:0:12} (auto ${lower}→${upper})" \
-        --body "Auto-promotion (#377 Phase 2): \`${lower}\` is Synced+Healthy on \`${lower_digest}\`, advancing the same signed digest to \`${upper}\`. The gitops Gate validates + auto-merges; the per-Product ApplicationSet injects it. The app repo's main is untouched."
+      pr_title="promote: ${env_name} ${svc} -> ${short:0:12} (auto ${lower}→${upper})"
+      pr_body="Auto-promotion (#377 Phase 2): \`${lower}\` is Synced+Healthy on \`${lower_digest}\`, advancing the same signed digest to \`${upper}\`. The gitops Gate validates + auto-merges; the per-Product ApplicationSet injects it. The app repo's main is untouched."
+      api -X POST "https://api.github.com/repos/${REPO}/pulls" \
+        -d "$(jq -n --arg t "$pr_title" --arg h "$branch" --arg b "$pr_body" '{title: $t, head: $h, base: "main", body: $b}')" >/dev/null
       git checkout -q main
       git branch -q -D "$branch" 2>/dev/null || true
       echo "PROMOTE ${team}/${product} ${svc} ${lower}→${upper} @ ${lower_digest}"
