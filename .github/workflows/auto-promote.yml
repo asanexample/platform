@@ -60,9 +60,7 @@ jobs:
         id: appcred
         run: |
           set -euo pipefail
-          creds=$(aws sts assume-role --role-arn "$DEPLOYER_ARN" --role-session-name auto-promote-secret --query Credentials --output json)
-          akid="$(jq -r .AccessKeyId <<<"$creds")"; asak="$(jq -r .SecretAccessKey <<<"$creds")"; asst="$(jq -r .SessionToken <<<"$creds")"
-          export AWS_ACCESS_KEY_ID="$akid" AWS_SECRET_ACCESS_KEY="$asak" AWS_SESSION_TOKEN="$asst"
+          creds_env="$(.github/scripts/auto-promote/assume-role-env.sh "$DEPLOYER_ARN" auto-promote-secret)"; eval "$creds_env"
           secret="$(aws secretsmanager get-secret-value --secret-id "$PROMOTE_SECRET" --query SecretString --output text)"
           echo "app_id=$(jq -r '.app_id' <<<"$secret")" >> "$GITHUB_OUTPUT"
           pem="$(jq -r '.private_key' <<<"$secret")"
@@ -87,8 +85,6 @@ jobs:
           set -euo pipefail
           # Re-assume PR-D for the ArgoCD health reads (kubectl exec auth runs as the ambient creds; PR-D holds
           # the EKS access entry — update-kubeconfig's own DescribeCluster also needs PR-D, so assume up-front).
-          creds=$(aws sts assume-role --role-arn "$DEPLOYER_ARN" --role-session-name auto-promote-kubectl --query Credentials --output json)
-          akid="$(jq -r .AccessKeyId <<<"$creds")"; asak="$(jq -r .SecretAccessKey <<<"$creds")"; asst="$(jq -r .SessionToken <<<"$creds")"
-          export AWS_ACCESS_KEY_ID="$akid" AWS_SECRET_ACCESS_KEY="$asak" AWS_SESSION_TOKEN="$asst"
+          creds_env="$(.github/scripts/auto-promote/assume-role-env.sh "$DEPLOYER_ARN" auto-promote-kubectl)"; eval "$creds_env"
           aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_REGION"
           bash .github/scripts/auto-promote/reconcile.sh
