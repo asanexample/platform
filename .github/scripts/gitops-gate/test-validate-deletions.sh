@@ -23,7 +23,7 @@ for p in shop lonely done; do
 apiVersion: platform.refplat.org/v1beta1
 kind: Product
 metadata: { name: alpha-${p} }
-spec: { team: alpha, repo: asanexample/app-alpha-${p}, tenancy: pooled }
+spec: { team: alpha, repo: asanexample/alpha-${p}, tenancy: pooled }
 Y
 done
 cat >"${base}/gitops/environments/alpha/shop/dev.yaml"  <<'Y'

@@ -46,11 +46,11 @@ echo "Rendering per-product verify-images/attestations (template validity) ..."
 VP="$(helm template kpp "$CHART" \
   --set enableImageVerification=true \
   --set enableAttestationVerification=true \
-  --set-json 'verifySubjectsProduct={"alpha-demo":{"team":"alpha","product":"demo","repo":"asanexample/app-alpha","registryPrefix":"829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo"}}')"
+  --set-json 'verifySubjectsProduct={"alpha-demo":{"team":"alpha","product":"demo","repo":"asanexample/alpha-demo","registryPrefix":"829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo"}}')"
 grep -q 'name: verify-images-product-alpha-demo' <<<"$VP" || { echo "FAIL: verify-images-product-alpha-demo did not render"; exit 1; }
 grep -q 'name: verify-attestations-product-alpha-demo' <<<"$VP" || { echo "FAIL: verify-attestations-product-alpha-demo did not render"; exit 1; }
 grep -q 'asanexample/trusted-ci' <<<"$VP" || { echo "FAIL: per-product verification must use the trusted-ci subject"; exit 1; }
-grep -q 'githubWorkflowRepository: "asanexample/app-alpha"' <<<"$VP" || { echo "FAIL: per-product caller extension (= the Product repo) missing"; exit 1; }
+grep -q 'githubWorkflowRepository: "asanexample/alpha-demo"' <<<"$VP" || { echo "FAIL: per-product caller extension (= the Product repo) missing"; exit 1; }
 grep -q 'team-alpha/demo-\*' <<<"$VP" || { echo "FAIL: per-product image scope team-alpha/demo-* missing"; exit 1; }
 echo "per-product verify-images/attestations render-check passed."
 

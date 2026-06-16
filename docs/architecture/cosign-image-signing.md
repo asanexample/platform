@@ -402,13 +402,13 @@ aws ecr get-login-password --region us-east-1 --profile platform \
 cosign verify \
   829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo-web@sha256:<digest> \
   --certificate-identity-regexp '^https://github\.com/asanexample/trusted-ci/\.github/workflows/build-sign\.yml@' \
-  --certificate-github-workflow-repository asanexample/app-<team>-<product> \
+  --certificate-github-workflow-repository asanexample/<team>-<product> \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
 ```
 
 A clean exit (and a printed `Subject:`) = good signature. A non-zero exit = no/invalid signature for that
 identity. (For an image still on the legacy app-signed fallback, swap the identity regexp for
-`'https://github.com/asanexample/app-<team>-<product>/.github/workflows/(deploy|preview).yml@.*'` and drop the
+`'https://github.com/asanexample/<team>-<product>/.github/workflows/(deploy|preview).yml@.*'` and drop the
 `--certificate-github-workflow-repository` flag.)
 
 ### When a Pod is denied at admission
@@ -456,7 +456,7 @@ app's own build job, which a compromised build could forge (Build L1+):
 - Because it is a **reusable** workflow, the Fulcio cert's **subject is the signer workflow, not the
   caller** — so the app build can't forge provenance attributed to trusted-ci. That isolation is the
   SLSA **Build L3** lever. The cert's `GitHub Workflow Repository` extension still records the caller
-  (`app-<team>-<product>`), which per-product verification keys on.
+  (`<team>-<product>`), which per-product verification keys on.
 - It mints its own ECR token by assuming the **caller product's
   `github-actions-ecr-push-product-<team>-<product>` role** (AWS doesn't honor the `job_workflow_ref` claim
   in trust policies — only `sub`/`aud`), then `cosign attest --type slsaprovenance` (legacy `.att`, same
@@ -468,7 +468,7 @@ Verify the isolated provenance by hand:
 cosign verify-attestation --type slsaprovenance \
   --certificate-identity-regexp 'https://github.com/asanexample/trusted-ci/.github/workflows/slsa-provenance.yml@.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-github-workflow-repository asanexample/app-<team>-<product> \
+  --certificate-github-workflow-repository asanexample/<team>-<product> \
   <registry>/team-<team>/<product>-<svc>@<digest>
 ```
 

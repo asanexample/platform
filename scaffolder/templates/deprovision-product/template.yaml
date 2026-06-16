@@ -71,7 +71,7 @@ spec:
             - 'Keep — leave it active'
           default: archive
           description: >-
-            What to do with the app repo (app-<team>-<product>) when PURGING. Ignored for
+            What to do with the app repo (<team>-<product>) when PURGING. Ignored for
             decommission/reactivate.
         confirm:
           title: Confirm product name

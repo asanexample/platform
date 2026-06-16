@@ -33,7 +33,7 @@ Before your CI can push or be trusted, your product's environment must exist in 
 2. **ECR push role** — `arn:aws:iam::829808296602:role/github-actions-ecr-push-product-<team>-<product>`,
    trusting your repo's GitHub OIDC (see [ADR-036](../adrs/036-github-actions-oidc-federation.md)).
    `build-sign.yml` assumes this; it is scoped to `team-<team>/<product>-*`.
-3. **Trust your product's shared-signer identity** — your repo (`asanexample/app-<team>-<product>`) listed in
+3. **Trust your product's shared-signer identity** — your repo (`asanexample/<team>-<product>`) listed in
    the policy unit's `shared_signer_products` (→ `shared_signer_caller_repos`) **and**
    `isolated_provenance_products`. That makes `verify-images` + the SBOM/provenance checks accept the shared
    `build-sign.yml` / `slsa-provenance.yml` identities **gated to your repo** by the cert's
@@ -71,7 +71,7 @@ jobs:
       contents: read
     uses: asanexample/trusted-ci/.github/workflows/build-sign.yml@<PINNED_SHA>
     with:
-      service: <svc>   # image is team-<team>/<product>-<svc>; <team>/<product> derived from your app-<team>-<product> repo name
+      service: <svc>   # image is team-<team>/<product>-<svc>; <team>/<product> derived from your <team>-<product> repo name
 
   provenance:
     needs: build
@@ -127,7 +127,7 @@ The Dockerfile is the **only** language/framework-specific surface you own; `bui
 - [ ] `permissions.id-token: write` on the `build` and `provenance` caller jobs (passed through to the reusable
       workflow for OIDC); `contents: write` on the `deploy` job.
 - [ ] `with.service` is exactly `<svc>` from the `XEnvironment` claim's `spec.services` (the image becomes
-      `team-<team>/<product>-<svc>`; the team/product are derived from your `app-<team>-<product>` repo name, so
+      `team-<team>/<product>-<svc>`; the team/product are derived from your `<team>-<product>` repo name, so
       cross-product pushes are structurally impossible).
 - [ ] `deploy` job `needs: [build, provenance]` (the barrier — ArgoCD never sees an unprovenanced digest).
 - [ ] A **Dockerfile** at the repo root (or pass `dockerfile:`); the image runs as non-root on a slim base.
@@ -151,19 +151,19 @@ ISSUER=https://token.actions.githubusercontent.com
 cosign verify "$IMAGE@$DIGEST" \
   --certificate-identity-regexp '^https://github\.com/asanexample/trusted-ci/\.github/workflows/build-sign\.yml@' \
   --certificate-oidc-issuer "$ISSUER" \
-  --certificate-github-workflow-repository asanexample/app-<team>-<product>
+  --certificate-github-workflow-repository asanexample/<team>-<product>
 
 # SBOM — same shared build-sign.yml identity.
 cosign verify-attestation "$IMAGE@$DIGEST" --type cyclonedx \
   --certificate-identity-regexp '^https://github\.com/asanexample/trusted-ci/\.github/workflows/build-sign\.yml@' \
   --certificate-oidc-issuer "$ISSUER" \
-  --certificate-github-workflow-repository asanexample/app-<team>-<product>
+  --certificate-github-workflow-repository asanexample/<team>-<product>
 
 # Provenance — shared slsa-provenance.yml identity, same extension.
 cosign verify-attestation "$IMAGE@$DIGEST" --type slsaprovenance \
   --certificate-identity-regexp '^https://github\.com/asanexample/trusted-ci/\.github/workflows/slsa-provenance\.yml@' \
   --certificate-oidc-issuer "$ISSUER" \
-  --certificate-github-workflow-repository asanexample/app-<team>-<product>
+  --certificate-github-workflow-repository asanexample/<team>-<product>
 
 # On-cluster: did the pod get admitted?
 kubectl --context preprod -n <team>-<product>-<stage> get pods

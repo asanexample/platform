@@ -56,7 +56,7 @@ ApplicationSet) reconciles it into running infrastructure or a running pod. Noth
 
 A developer opens the **New Product** template in Backstage. It produces three things in one shot:
 
-- an **app repository** (`app-<team>-<product>`) seeded from the generic starter — `k8s/` overlays plus a
+- an **app repository** (`<team>-<product>`) seeded from the generic starter — `k8s/` overlays plus a
   **thin-caller** CI that calls the shared supply-chain workflows (it never owns the build/sign logic, ADR-050);
 - a **Product registry entry** at `gitops/products/<team>/<product>.yaml` (repo, tenancy, owned domains);
 - a **dev Environment claim** at `gitops/environments/<team>/<product>/dev.yaml`.

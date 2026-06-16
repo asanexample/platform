@@ -48,7 +48,7 @@ A self-service PR-with-automerge flow is a privilege-delegation engine, so this 
 ## Elevating the App for New Product (repo-on-demand)
 
 The **New Product** scaffolder template (`scaffolder/templates/new-product/`, ADR-067 §"New Product lifecycle")
-**creates a new app repo** (`app-<team>-<product>`) via `publish:github` — and that repo ships its own CI
+**creates a new app repo** (`<team>-<product>`) via `publish:github` — and that repo ships its own CI
 workflows. Creating org repos and pushing workflow files are privileges the claim-writing flows don't have, so
 New Product requires elevating this App. **This is a deliberate, material privilege increase** — the App goes
 from "PR-only on one repo" to "can create repos and push CI across the org" — so only do it if you're running
@@ -84,7 +84,7 @@ App normally creates fine, but a locked-down org policy can still gate it.
 **No secret/redeploy needed:** `platform/backstage/scaffolder-github-app` (appId/privateKey) is unchanged — the
 scaffolder requests fresh installation tokens with the broader scope once the request is approved. (A Backstage
 pod restart isn't required but is harmless.) Verify by running **New Product** for a throwaway product and
-confirming the `app-<team>-<product>` repo is created.
+confirming the `<team>-<product>` repo is created.
 
 ## Store the private key in Secrets Manager (platform account)
 

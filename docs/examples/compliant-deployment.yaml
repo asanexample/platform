@@ -3,7 +3,7 @@
 # (it formerly lived in the retired seed app `app-alpha`). Adapt the team/product/service/image to yours; the
 # New Product scaffolder emits the same shape automatically (scaffolder/templates/new-product/skeleton/k8s/).
 #
-# Illustrative names: team `acme`, product `store`, service `web` → namespace acme-store-dev, repo app-acme-store.
+# Illustrative names: team `acme`, product `store`, service `web` → namespace acme-store-dev, repo acme-store.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
