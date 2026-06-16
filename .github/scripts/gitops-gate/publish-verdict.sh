@@ -17,6 +17,9 @@
 #                               is a PROD env → the SAME release-approver requirement as a prod release (tearing
 #                               down prod is as sensitive as shipping to it), ON TOP OF the generic admin
 #                               deletion approval. Empty approver set → FAIL CLOSED.
+#   LIFECYCLE_DECOMMISSION=true  an Environment decommission (spec.lifecycle.phase → suspend) → require ANY one
+#                               approving review ≠ author (no permission tier). Reversible, but draining workloads
+#                               (incl. prod) gets an explicit human sign-off before merge — never auto-merged.
 #
 # Env: GH_TOKEN REPO PR_NUMBER HEAD_SHA AUTHOR BASE_DIR STATUS_CONTEXT RUN_URL + the reason flags above.
 # Test seam (bypasses the two gh api calls + the status POST):
@@ -33,6 +36,7 @@ PROD_RELEASES="${PROD_RELEASES:-}"
 DELETED_FILES="${DELETED_FILES:-}"
 PRODUCT_ROLES_CHANGES="${PRODUCT_ROLES_CHANGES:-false}"
 TEAM_ROLES_CHANGES="${TEAM_ROLES_CHANGES:-false}"
+LIFECYCLE_DECOMMISSION="${LIFECYCLE_DECOMMISSION:-false}"
 
 # Lowercased, deduped logins that APPROVED the current HEAD, with the PR author excluded.
 head_approvers() {
@@ -145,6 +149,19 @@ if [ "$ok" = true ] && [ -n "$DELETED_FILES" ]; then
     tier="$(yq -r '.spec.tier // "standard"' "$bfile" 2>/dev/null)"
     require_release_approver "$team" "$product" "$tier" "prod env teardown" || break
   done
+fi
+
+# Environment decommission (Deprovision Product/Environment): reversible, but draining workloads (incl. prod)
+# gets an explicit human sign-off — require ANY one approving review ≠ author (no permission tier). The PR author
+# is the scaffolder bot, so a single human reviewer (≠ the bot) unlocks merge. Never auto-merged (gate).
+if [ "$ok" = true ] && [ "$LIFECYCLE_DECOMMISSION" = "true" ]; then
+  approver="${APPROVERS[0]:-}"
+  if [ -n "$approver" ]; then
+    desc="approved by ${approver} at ${HEAD_SHA:0:7} — environment decommission"
+  else
+    ok=false; state=failure
+    desc="awaiting an approval (≠ author) of ${HEAD_SHA:0:7} — environment decommission"
+  fi
 fi
 
 desc="${desc:0:140}" # GitHub commit-status description limit

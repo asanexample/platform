@@ -29,8 +29,10 @@ name: gitops — gate on PR
 #                                                        bundle (#501); never auto-armed (ADR-062 #283)
 #   scaffolder App  a claim DELETION off a purge branch  rejected (deletions only via the Deprovision purge path)
 #   promote App     a claim DELETION                     rejected (the promote App only bumps digests — never deletes)
-#   any             an Environment DECOMMISSION          validated; NOT auto-armed — draining a Product/env (incl.
-#                   (spec.lifecycle.phase → suspend)      prod) is reviewer-merged even though reversible
+#   any             an Environment DECOMMISSION          validated; NOT auto-armed AND requires ANY one approving
+#                   (spec.lifecycle.phase → suspend)      review ≠ author on "gitops Approval" — draining a
+#                                                        Product/env (incl. prod) needs an explicit human sign-off
+#                                                        even though reversible
 #   human           a claim deletion                     decommission-first guard + an admin/maintainer approval
 #                                                        (≠ author) on the "gitops Approval" check; never auto-armed
 #   human           adds/edits, no deletion              validated, never auto-armed
@@ -305,4 +307,5 @@ jobs:
           DELETED_FILES: ${{ steps.classify.outputs.deleted_files }}
           PROD_RELEASES: ${{ steps.classify.outputs.prod_release_files }}
           PRODUCT_ROLES_CHANGES: ${{ steps.roles.outputs.product_roles_changes }}
+          LIFECYCLE_DECOMMISSION: ${{ steps.lifecycle.outputs.decommission }}
         run: bash base/.github/scripts/gitops-gate/publish-verdict.sh

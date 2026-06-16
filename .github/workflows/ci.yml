@@ -197,14 +197,35 @@ jobs:
       CROSSPLANE_VERSION: "v2.2.1" # crank CLI version (built from source — see install step)
     steps:
       - uses: actions/checkout@v6
+      # Scope: this validates the crossplane module's OWN example fixtures (.environment-api-tests) against the
+      # XRD — a PR that changes no infra/modules/crossplane/** can't affect it. Short-circuit to green (the job
+      # still runs + reports, so it stays a valid required check), skipping the ~2-min crank build. Registry PRs
+      # (gitops/**, e.g. a decommission) have their actual claims validated by the gitops Gate, not here.
+      - name: Scope to crossplane changes
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"; echo "non-PR event → full validate"; exit 0
+          fi
+          if gh api "repos/${{ github.repository }}/pulls/${{ github.event.number }}/files" --paginate \
+               --jq '.[].filename' | grep -qE '^infra/modules/crossplane/'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"; echo "crossplane module changed → validating"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"; echo "no crossplane module change → skipping (gitops claims are validated by the gitops Gate)"
+          fi
       - uses: azure/setup-helm@v5 # the harness renders the crossplane-teams chart (registry → projection)
+        if: steps.scope.outputs.run == 'true'
         with:
           # Canonical Helm pin from /.tool-versions — keep CLI rendering on the 3.x line (not floating to v4).
           version: v${{ needs.versions.outputs.helm }}
       - uses: actions/setup-go@v6
+        if: steps.scope.outputs.run == 'true'
         with:
           go-version: stable
       - name: Install Crossplane CLI (build crank from the Go module proxy)
+        if: steps.scope.outputs.run == 'true'
         run: |
           # The crank CLI is only published on releases.crossplane.io, which intermittently 403s GitHub runner
           # IPs. Build it from the Go module proxy instead — checksum-verified via go.sum/sum.golang.org and
@@ -214,6 +235,7 @@ jobs:
           sudo install -m 0755 "$(go env GOPATH)/bin/crank" /usr/local/bin/crossplane
           crossplane version --client || true
       - name: Validate Environment API example claims against the XRD
+        if: steps.scope.outputs.run == 'true'
         run: infra/modules/crossplane/.environment-api-tests/run.sh
 
   # Offline `crossplane render` of the Environment Composition (delivery-plan A3). Runs the Pipeline functions
@@ -226,10 +248,30 @@ jobs:
       CROSSPLANE_VERSION: "v2.2.1" # crank CLI version (built from source — see install step)
     steps:
       - uses: actions/checkout@v6
+      # Scope: this renders the crossplane module's OWN Composition + example fixtures — a PR that changes no
+      # infra/modules/crossplane/** can't affect it. Short-circuit to green (skip the ~2.5-min crank build +
+      # function-image pulls), staying a valid required check. Registry PRs (gitops/**, e.g. a decommission) have
+      # their actual claims rendered by the gitops Gate's render-environments step, not here.
+      - name: Scope to crossplane changes
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"; echo "non-PR event → full render"; exit 0
+          fi
+          if gh api "repos/${{ github.repository }}/pulls/${{ github.event.number }}/files" --paginate \
+               --jq '.[].filename' | grep -qE '^infra/modules/crossplane/'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"; echo "crossplane module changed → rendering"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"; echo "no crossplane module change → skipping (gitops claims are rendered by the gitops Gate)"
+          fi
       - uses: actions/setup-go@v6
+        if: steps.scope.outputs.run == 'true'
         with:
           go-version: stable
       - name: Install Crossplane CLI (build crank from the Go module proxy)
+        if: steps.scope.outputs.run == 'true'
         run: |
           # The crank CLI is only published on releases.crossplane.io, which intermittently 403s GitHub runner
           # IPs. Build it from the Go module proxy instead — checksum-verified via go.sum/sum.golang.org and
@@ -239,6 +281,7 @@ jobs:
           sudo install -m 0755 "$(go env GOPATH)/bin/crank" /usr/local/bin/crossplane
           crossplane version --client || true
       - name: Render the Composition and assert the environment footprint
+        if: steps.scope.outputs.run == 'true'
         run: infra/modules/crossplane/.environment-api-tests/render.sh
 
   tflint:
