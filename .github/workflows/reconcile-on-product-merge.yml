@@ -32,12 +32,17 @@ jobs:
   dispatch:
     name: Reconcile on merge
     runs-on: ubuntu-latest
-    # Only the scaffolder's own Product PRs (the New Product path). Same-repo head — a fork can't impersonate the
-    # login anyway, but belt-and-braces (mirrors the Gate's author check). Human Product PRs already fire the
-    # push trigger on merge (a human push is not GITHUB_TOKEN), so they need no dispatch.
+    # Only the scaffolder's own Product PRs (the New Product ADD path). Same-repo head — a fork can't impersonate
+    # the login anyway, but belt-and-braces (mirrors the Gate's author check). This dispatcher exists ONLY because
+    # GITHUB_TOKEN auto-merges (New Product) don't fire registry-reconcile's `push` trigger. A DEPROVISION purge
+    # (branch product/purge-*) is a deletion → never auto-merged → a HUMAN merges it → that push DOES fire
+    # registry-reconcile directly, so the dispatcher is redundant. Skip purges so the job doesn't sit in_progress
+    # for ~15 min on every teardown looking stuck. (Decommission PRs touch gitops/environments, not the
+    # gitops/products path filter above, so they never reach here.)
     if: >
       github.event.pull_request.user.login == 'asanexample-backstage-scaffolder[bot]' &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !startsWith(github.event.pull_request.head.ref, 'product/purge-')
     steps:
       # Need the script on disk. pull_request_target → checkout defaults to the trusted BASE (main), and the
       # script only calls `gh` (no PR input is read/executed), so this is safe. (#506 extracted this from an
