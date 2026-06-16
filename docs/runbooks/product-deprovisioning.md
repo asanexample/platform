@@ -35,6 +35,7 @@ The symmetric inverse of **New Product**. For a single environment, use *Deprovi
    - The approver merges in the GitHub UI (a human merge fires the `registry-reconcile` apply). The app repo is archived on PR open.
 
 3. **(Optional) delete ECR images** — retained by design. Only if you truly want them gone:
+
    ```bash
    aws ecr delete-repository --repository-name team-<team>/<product>-<svc> \
      --force --region us-east-1 --profile platform
