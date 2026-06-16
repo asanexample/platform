@@ -7,11 +7,16 @@ metadata:
   # XEnvironment is CLUSTER-scoped, so the name must be globally unique — team-prefixed (matches the namespace
   # <team>-<product>-<stage> + the v2 XTenant naming). Bare <product>-<stage> collides across teams (same product).
   name: bravo-demo-dev
+  annotations:
+    platform.refplat.org/decommissioned-at: "2026-06-16T16:40:00Z"
+    platform.refplat.org/requested-by: user:default/josh
 spec:
   team: bravo
   product: demo
   stage: dev
   tier: standard
+  lifecycle:
+    phase: decommissioning
   services:
     web:
       serviceAccount: app-bravo # matches app-bravo's k8s/base/serviceaccount.yaml (Pod Identity binds it)
