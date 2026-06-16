@@ -1,9 +1,0 @@
-apiVersion: platform.refplat.org/v1beta1
-kind: Release
-metadata:
-  name: alpha-orders-dev
-spec:
-  environmentRef: alpha-orders-dev
-  services:
-    web:
-      digest: sha256:213e7aa6c7a075001e4b6ede36ff3908da25afe53d4a1f914c4c840318acf687
