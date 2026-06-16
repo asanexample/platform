@@ -69,12 +69,14 @@ no encoded metadata) but is gated on two prerequisites that are decisions, not j
 
 ## Consequences
 
-**Positive**
+### Positive
+
 - Cleaner repo names (`alpha-shop` not `app-alpha-shop`); native GitHub team ownership/write-access.
 - The supply-chain trust model is unchanged by Flavor A; the IAM role + cosign + Kyverno still anchor on the repo.
 - Flavor B's path is written down with its real blockers, so it's a deliberate future step, not a vague wish.
 
-**Negative / costs**
+### Negative / costs
+
 - The `app-` prefix's value as a visual/CI marker is replaced by the `<team>-` shape + the registry allowlist.
 - Org Teams add a new surface to manage (the scaffolder App needs `Members: write`; team creation must stay
   platform-controlled or the ownership signal is spoofable).
