@@ -1,0 +1,14 @@
+# Control-plane Release (ADR-071) — the deployed image digest for alpha/shop at the
+# test stage. Opened by the Backstage Request Promotion template (#377): the SAME signed digest
+# running at dev is promoted up. The gitops Gate governs the merge — dev→staging auto-merges,
+# prod needs a release-approver review. CI never writes the app repo's main; the per-Product ApplicationSet
+# injects this digest. Requested-by: user:default/dev-alpha.
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata:
+  name: alpha-shop-test
+spec:
+  environmentRef: alpha-shop-test
+  services:
+    web:
+      digest: sha256:0de25d8ae1e7e1c0b5b9b1158e932fedb1121fa736dc693ba3230004cb55c475
