@@ -11,7 +11,7 @@ jobs:
     name: overlays build (ns-agnostic)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build each stage overlay
         run: |
           set -euo pipefail
@@ -34,14 +34,14 @@ jobs:
     name: ${{ values.language }} unit test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       {%- if values.language == 'go' %}
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: stable
       - run: go test ./...
       {%- elif values.language == 'nodejs' %}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
       - run: npm ci
@@ -53,7 +53,7 @@ jobs:
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - run: python -m pytest -q
       {%- elif values.language == 'java' %}
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"

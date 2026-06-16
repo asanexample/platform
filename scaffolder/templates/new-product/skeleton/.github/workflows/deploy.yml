@@ -23,7 +23,7 @@ jobs:
     permissions:
       id-token: write # OIDC: AWS (ECR push) + cosign keyless signing
       contents: read
-    uses: asanexample/trusted-ci/.github/workflows/build-sign.yml@f9a77cd1ad3bc0166ec8f6c8912a46641179a94a
+    uses: asanexample/trusted-ci/.github/workflows/build-sign.yml@f2cf5504bd6f010c73cb118adfb9874d33b36c68
     with:
       app: ${{ values.product }}-${{ values.service }} # product-scoped image: team-${{ values.team }}/${{ values.product }}-${{ values.service }}
       product: ${{ values.product }} # selects the per-Product OIDC role github-actions-ecr-push-product-${{ values.team }}-${{ values.product }} (ADR-069)
@@ -34,7 +34,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    uses: asanexample/trusted-ci/.github/workflows/slsa-provenance.yml@f9a77cd1ad3bc0166ec8f6c8912a46641179a94a
+    uses: asanexample/trusted-ci/.github/workflows/slsa-provenance.yml@f2cf5504bd6f010c73cb118adfb9874d33b36c68
     with:
       image: {% raw %}${{ needs.build.outputs.image }}{% endraw %}
       digest: {% raw %}${{ needs.build.outputs.digest }}{% endraw %}
@@ -48,7 +48,7 @@ jobs:
     permissions:
       id-token: write # OIDC -> per-Product role -> read the promote App key (NO contents write on this repo)
       contents: read
-    uses: asanexample/trusted-ci/.github/workflows/promote.yml@f9a77cd1ad3bc0166ec8f6c8912a46641179a94a
+    uses: asanexample/trusted-ci/.github/workflows/promote.yml@f2cf5504bd6f010c73cb118adfb9874d33b36c68
     with:
       product: ${{ values.product }}
       service: ${{ values.service }}

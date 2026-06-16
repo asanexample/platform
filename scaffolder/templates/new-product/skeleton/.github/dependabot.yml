@@ -8,6 +8,10 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
     labels: ["dependencies", "${{ values.language }}"]
+    # One batched PR/week instead of one-per-dependency (less noise; a single CI run).
+    groups:
+      app-dependencies:
+        patterns: ["*"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -15,6 +19,9 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
     labels: ["dependencies", "ci"]
+    groups:
+      github-actions:
+        patterns: ["*"]
 
   - package-ecosystem: "docker"
     directory: "/"
@@ -22,3 +29,6 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
     labels: ["dependencies", "docker"]
+    groups:
+      docker:
+        patterns: ["*"]
