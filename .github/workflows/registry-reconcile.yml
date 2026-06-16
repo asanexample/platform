@@ -1,14 +1,15 @@
 name: Registry reconcile — apply on merge
 
-# Converge the per-Product Terragrunt-derived units (github-oidc -> preprod/policy -> argocd-apps) after a
-# `gitops/products/**` change merges to main (ADR-071 Gap #2). These units derive their per-Product resources
-# (the OIDC ECR-push role, the verify-images-product cosign gate, the delivery ApplicationSet) from the Product
-# registry via fileset — so a NEW Product has none of them until applied, and its first build/deploy fails. This
-# is the apply half of New Product: the gated registry PR merges -> the per-Product plumbing converges with zero
-# operator action, always from the merged SHA. Sibling of teams-apply.yml (the New Team equivalent).
+# Converge the per-Product Terragrunt-derived units (github-oidc -> preprod/policy -> argocd-apps -> github-teams)
+# after a `gitops/products/**` change merges to main (ADR-071 Gap #2). These units derive their per-Product
+# resources (the OIDC ECR-push role, the verify-images-product cosign gate, the delivery ApplicationSet, and the
+# org-Team repo `push` grant — ADR-072) from the Product registry via fileset — so a NEW Product has none of them
+# until applied, and its first build/deploy fails. This is the apply half of New Product: the gated registry PR
+# merges -> the per-Product plumbing converges with zero operator action, always from the merged SHA. Sibling of
+# teams-apply.yml (the New Team equivalent).
 #
 # The GitOps/Crossplane half (namespace, ECR, Pod Identity) already auto-provisions via ArgoCD + the Composition;
-# only these three Terragrunt units need the apply.
+# only these Terragrunt units need the apply.
 
 on:
   # Three triggers, layered:

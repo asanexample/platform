@@ -4,7 +4,7 @@
 
 Multi-cloud IaC platform using OpenTofu (v1.12.1) + Terragrunt (v1.0.7). Currently targets AWS only (Azure/GCP removed). CLI tool versions (tofu, terragrunt, kubectl, helm, awscli) are pinned canonically in `/.tool-versions` — the single source of truth read by local dev (mise/asdf), CI, and the self-hosted runner image.
 
-- **Shared modules** (`infra/modules/`): actions-runner-controller, argocd, argocd-apps, argocd-clusters, cert-manager, cilium, cloudflare/dns_delegation, cluster-rbac, crossplane, external-dns, external-secrets, gateway-config, policy, secret-stores, tailscale, tailscale-admin, tenant-claims, vcluster
+- **Shared modules** (`infra/modules/`): actions-runner-controller, argocd, argocd-apps, argocd-clusters, cert-manager, cilium, cloudflare/dns_delegation, cluster-rbac, crossplane, external-dns, external-secrets, gateway-config, github-teams, policy, secret-stores, tailscale, tailscale-admin, tenant-claims, vcluster
 - **AWS modules** (`infra/modules/aws/`): cloudtrail, cross-vpc-dns, ecr, eks, eks-addons, eks-node-group, github_oidc, iam_roles, identity_center, networking, organizations, route53, route53_delegation, ssm-bastion, state_bootstrap, transit-gateway
 - **Live configs**: `infra/live/aws/` -- environment-specific Terragrunt units
 
@@ -76,7 +76,7 @@ actions-runner-controller ─ (eks, nodes, ext-secrets, secret-stores; policy mu
 
 Preprod is similar but adds the federated `crossplane` + `tenant-claims` units (the Environment control plane, ADR-048 — alpha/bravo are provisioned by `Environment` claims, not the retired `environments`/`pod-identity` units) and `transit-gateway` as spoke.
 
-Cross-environment units (on platform cluster): route53-delegation, ecr, github-oidc, argocd-apps.
+Cross-environment units (on platform cluster): route53-delegation, ecr, github-oidc, argocd-apps, github-teams (org-Team ownership of app repos, registry-derived — ADR-072).
 
 EKS uses BYOCNI (`bootstrap_self_managed_addons = false`), so Cilium must be deployed before node groups join. EKS managed add-ons (coredns) are in a separate `eks-addons` unit since addon pods need the CNI to schedule.
 

@@ -45,9 +45,17 @@ nicer repo names and (b) GitHub-native team ownership of app repos.
 2. **`build-sign` parses `<team>-<product>`** (team = first segment) instead of `app-<team>-<product>`. No change
    to the trust model — team is still recovered from a platform-controlled name and backstopped by the IAM role.
    The `app-*` guard becomes a `<team>-*` shape check (the Product registry remains the real allowlist).
-3. **GitHub org Teams own the app repos.** New Team creates a GitHub org team; New Product assigns the new repo
-   to it with `push` access. This is the genuinely new capability — native, auditable team write-access — layered
-   *beside* (not replacing) the supply-chain identity.
+3. **GitHub org Teams own the app repos.** A team's org team and its repo `push` grants are **derived from the
+   git registries** (`gitops/teams/` → `github_team`; `gitops/products/` → `github_team_repository`) by a
+   Terragrunt unit (`github-teams`, `infra/modules/github-teams`), applied on merge — the **same convergence
+   pattern** as the team's Keycloak group (`keycloak-config`) and its per-Product OIDC role (`github-oidc`). So
+   "create a Team → it appears in every external system" stays uniform (Keycloak **and** GitHub materialise at
+   Team-CR convergence), rather than the scaffolder creating the team imperatively at form-submit time — before
+   the Team PR is even reviewed. This is the genuinely new capability — native, auditable team write-access —
+   layered *beside* (not replacing) the supply-chain identity. The unit authenticates as a dedicated GitHub App
+   (`Members: write` + `Administration: write`, org-wide; creds in Secrets Manager) —
+   `docs/runbooks/github-ownership-app.md`. Team/repo management stays platform-controlled (IaC-only), so the
+   ownership signal is unspoofable.
 4. The Product registry `spec.repo`, the per-Product OIDC role, and Kyverno all key off `spec.repo` already, so
    they follow the new name with no logic change — only the registry value changes.
 
@@ -78,8 +86,9 @@ no encoded metadata) but is gated on two prerequisites that are decisions, not j
 ### Negative / costs
 
 - The `app-` prefix's value as a visual/CI marker is replaced by the `<team>-` shape + the registry allowlist.
-- Org Teams add a new surface to manage (the scaffolder App needs `Members: write`; team creation must stay
-  platform-controlled or the ownership signal is spoofable).
+- Org Teams add a new surface to manage: a dedicated GitHub App (`Members: write` + `Administration: write`) and
+  the `github` Terraform provider. Team/repo management is IaC-only (registry-derived), so the ownership signal
+  stays platform-controlled and unspoofable.
 - Two naming conventions exist transiently in docs/history until references are swept.
 
 ## Alternatives considered

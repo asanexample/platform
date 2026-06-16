@@ -199,6 +199,7 @@ The full dependency DAG is documented in [CLAUDE.md](CLAUDE.md). The preferred d
 | [external-secrets](infra/modules/external-secrets/) | External Secrets Operator Helm with IRSA |
 | [falco](infra/modules/falco/) | Runtime threat detection (eBPF) — deployed on preprod ([ADR-045](docs/adrs/045-falco-runtime-threat-detection.md)) |
 | [gateway-config](infra/modules/gateway-config/) | ClusterIssuer, Gateway, HTTPRoutes (TLS via cert-manager) |
+| [github-teams](infra/modules/github-teams/) | GitHub org-Team ownership of app repos, registry-derived (ADR-072) |
 | [observability](infra/modules/observability/) | Observability hub — kube-prometheus-stack + SNS alerting |
 | [observability-mimir](infra/modules/observability-mimir/) | Durable, multi-tenant, S3-backed metrics store (mimir) |
 | [policy](infra/modules/policy/) | Kyverno engine + ClusterPolicies — pod hardening, multi-tenancy, image verification (ADR-014) |
