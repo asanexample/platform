@@ -6,8 +6,9 @@ name: Promote
 # contents:write) — exactly like deploy.yml's dev auto-promote, just triggered by hand for higher stages.
 #
 # The target Environment must already exist (gitops/environments/${{ values.team }}/${{ values.product }}/<to_stage>.yaml) —
-# the gitops Gate rejects a Release for a stage with no Environment claim. `prod` is intentionally absent: the
-# gated-prod path (approver != author) lands in #377 Phase 3; until then on-demand promotions go up to staging.
+# the gitops Gate rejects a Release for a stage with no Environment claim. `prod` is GATED (#377 Phase 3): a prod
+# promotion opens the Release PR like any other, but the gitops Gate does NOT auto-merge it — it requires a
+# release-approver's review (a current-SHA admin/maintainer approval ≠ author) before it can merge.
 
 on:
   workflow_dispatch:
@@ -24,11 +25,11 @@ on:
         type: choice
         options: [dev, test, uat, staging]
       to_stage:
-        description: "Target stage to promote INTO (must already have an Environment)."
+        description: "Target stage to promote INTO (must already have an Environment). prod is GATED — needs a release-approver review."
         required: true
         default: test
         type: choice
-        options: [test, uat, staging]
+        options: [test, uat, staging, prod]
       customer:
         description: "Optional customer (per-customer environments). Empty for pooled."
         required: false

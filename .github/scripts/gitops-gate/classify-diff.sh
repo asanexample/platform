@@ -10,6 +10,8 @@
 #            product_files      space-separated added/modified gitops/products/**/*.yaml
 #            environment_files  space-separated added/modified gitops/environments/**/*.yaml
 #            release_files      space-separated added/modified gitops/releases/**/*.yaml (ADR-071 digest bumps)
+#            prod_release_files space-separated added/modified releases targeting the PROD stage
+#                               (<stem> = prod or <customer>-prod) — the gated-prod subset (#377 Phase 3)
 #            deletions          "true" if any registry file was removed or renamed-away
 #            deleted_files      space-separated registry paths removed/renamed-away (read from BASE for the
 #                               decommission-first guard); environments and products both included
@@ -22,17 +24,29 @@ set -euo pipefail
 PRODUCT_RE='^gitops/products/[a-z0-9-]+/[a-z0-9.-]+\.ya?ml$'
 ENVIRON_RE='^gitops/environments/[a-z0-9-]+/[a-z0-9-]+/[a-z0-9.-]+\.ya?ml$'
 RELEASE_RE='^gitops/releases/[a-z0-9-]+/[a-z0-9-]+/[a-z0-9.-]+\.ya?ml$'
+# A prod-stage release: stem is `prod` (pooled) or `<customer>-prod` (per-customer). The gated subset (#377 P3).
+PROD_RELEASE_RE='^gitops/releases/[a-z0-9-]+/[a-z0-9-]+/(prod|[a-z0-9-]+-prod)\.ya?ml$'
 
 files_json="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate --jq '[.[] | {filename, status, previous_filename}]')"
 
 product_files=()
 environment_files=()
 release_files=()
+prod_release_files=()
 deleted_files=()
 deletions=false
 non_registry_changes=false
 
-add() { case "$1" in product) product_files+=("$2");; environment) environment_files+=("$2");; release) release_files+=("$2");; esac; }
+add() {
+  case "$1" in
+    product) product_files+=("$2") ;;
+    environment) environment_files+=("$2") ;;
+    release)
+      release_files+=("$2")
+      [[ "$2" =~ $PROD_RELEASE_RE ]] && prod_release_files+=("$2")
+      ;;
+  esac
+}
 match() { [[ "$1" =~ $PRODUCT_RE ]] && { echo product; return; }; [[ "$1" =~ $ENVIRON_RE ]] && { echo environment; return; }; [[ "$1" =~ $RELEASE_RE ]] && { echo release; return; }; echo ""; }
 
 while IFS=$'\t' read -r filename status previous; do
@@ -62,6 +76,7 @@ out="${GITHUB_OUTPUT:-/dev/stdout}"
   echo "product_files=${product_files[*]:-}"
   echo "environment_files=${environment_files[*]:-}"
   echo "release_files=${release_files[*]:-}"
+  echo "prod_release_files=${prod_release_files[*]:-}"
   echo "deletions=${deletions}"
   echo "deleted_files=${deleted_files[*]:-}"
   echo "non_registry_changes=${non_registry_changes}"

@@ -13,18 +13,24 @@ name: gitops — gate on PR
 # the cutover (docs/runbooks/v3-cutover.md), so today this is inert; it activates the moment the first
 # gitops/products or gitops/environments file lands.
 #
-# AUTO-MERGE + DELETION GUARD (ADR-062 §3-4, the successor to the Tenant Claims Gate). Decision table:
+# AUTO-MERGE + DELETION GUARD + GATED PROD (ADR-062 §3-4, ADR-067 §8 / #377). Decision table:
 #   author          diff                                outcome
-#   scaffolder App  ⊆ gitops/{products,environments},   gate green + auto-merge armed (merges when ALL
-#                   no deletions, validation passes      required checks pass)
+#   promote/scaff   ⊆ gitops/{products,environments,    gate green + auto-merge armed (merges when ALL
+#    App            releases ≤ staging}, no deletions    required checks pass) — auto ≤ staging
+#   promote/scaff   a PROD release (…/prod.yaml)         NOT auto-armed + a current-SHA admin/maintainer
+#    App                                                 approval (≠ author) on the "gitops Approval" check —
+#                                                        gated prod (#377); a human approves, then merges
 #   scaffolder App  ⊆ those paths, validation fails      gate red, no merge
 #   scaffolder App  a claim DELETION                     rejected (the bot never deletes — #283)
 #   human           a claim deletion                     decommission-first guard (Environment must be on
 #                                                        spec.lifecycle.phase: decommissioning at base) + a
 #                                                        current-SHA admin/maintainer approval (the "gitops
 #                                                        Approval" commit status); never auto-armed
+#   human           a PROD release                       current-SHA admin/maintainer approval (≠ author) on
+#                                                        the "gitops Approval" check; never auto-armed (#377)
 #   human           adds/edits, no deletion              validated, never auto-armed
-# See docs/runbooks/tenant-claims-automerge.md for the full model (shared with the Teams/v2 gates).
+# "gitops Approval" must be a REQUIRED status check on main (it gates deletions + prod). See
+# docs/runbooks/tenant-claims-automerge.md for the full model (shared with the Teams/v2 gates).
 #
 # CI-GATE INTEGRITY: `pull_request_target` means THIS definition and every script it calls run from the
 # PROTECTED BASE BRANCH — a PR cannot edit the gate that judges it. The PR's registry files are checked out
@@ -195,6 +201,7 @@ jobs:
           steps.author.outputs.bot == 'true' &&
           steps.classify.outputs.non_registry_changes == 'false' &&
           steps.classify.outputs.deletions == 'false' &&
+          steps.classify.outputs.prod_release_files == '' &&
           steps.classify.outputs.any == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -234,22 +241,31 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DELETIONS: ${{ steps.classify.outputs.deletions }}
+          PROD_RELEASES: ${{ steps.classify.outputs.prod_release_files }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           set -euo pipefail
           state=success
           desc="no admin-approval requirement for this PR"
-          if [ "$DELETIONS" = "true" ]; then
+          # Two paths need a machine-enforced human review of the CURRENT commit: a registry deletion
+          # (ADR-062 #283) and a PROD promotion (#377 — gated prod, author ≠ approver). Both publish to the same
+          # "gitops Approval" required check; neither is auto-armed (see the arm step), so the merge waits here.
+          reason=""
+          [ "$DELETIONS" = "true" ] && reason="registry deletion (ADR-062 #283)"
+          [ -n "$PROD_RELEASES" ] && reason="prod promotion (#377 — author ≠ approver)"
+          if [ -n "$reason" ]; then
             approver=""
             for login in $(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" --paginate \
                   --jq 'group_by(.user.login) | map(max_by(.submitted_at))
                         | .[] | select(.state == "APPROVED" and .commit_id == env.HEAD_SHA) | .user.login'); do
+              [ "$login" = "$AUTHOR" ] && continue # author ≠ approver (a self-approval never satisfies the gate)
               perm=$(gh api "repos/${REPO}/collaborators/${login}/permission" --jq .permission)
               if [ "$perm" = "admin" ] || [ "$perm" = "maintain" ]; then approver="$login"; break; fi
             done
             if [ -n "$approver" ]; then
-              state=success; desc="deletion approved by ${approver} at ${HEAD_SHA:0:7}"
+              state=success; desc="approved by ${approver} at ${HEAD_SHA:0:7} — ${reason}"
             else
-              state=failure; desc="awaiting an admin/maintainer approval of the current commit (${HEAD_SHA:0:7}) — registry deletion (ADR-062 #283)"
+              state=failure; desc="awaiting an admin/maintainer approval (≠ author) of the current commit (${HEAD_SHA:0:7}) — ${reason}"
             fi
           fi
           gh api --method POST "repos/${REPO}/statuses/${HEAD_SHA}" \
