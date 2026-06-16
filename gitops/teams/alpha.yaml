@@ -11,6 +11,8 @@ metadata:
     app.kubernetes.io/part-of: tenant-api
 spec:
   ssoGroup: Dev-alpha
+  roles:
+    releaseApprover: ["gangster"] # prod release-approver default (ADR-068 §7, #501)
   envelope:
     allowedTiers: ["standard"]
     allowedStages: ["dev", "test", "uat", "staging", "prod"]
