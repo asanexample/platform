@@ -4,7 +4,7 @@ metadata:
   name: alpha-payments-dev
   annotations:
     platform.refplat.org/requested-by: user:default/dev-alpha
-    platform.refplat.org/decommissioned-at: 2026-06-16T17:51:46.588Z
+    platform.refplat.org/decommissioned-at: 2026-06-16T19:21:59.491Z
 spec:
   team: alpha
   product: payments
