@@ -21,7 +21,7 @@ jobs:
       terragrunt: ${{ steps.read.outputs.terragrunt }}
       helm: ${{ steps.read.outputs.helm }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - id: read
         name: Read /.tool-versions
         run: |
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: versions
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: opentofu/setup-opentofu@v1
         with:
           tofu_version: ${{ needs.versions.outputs.opentofu }}
@@ -50,7 +50,7 @@ jobs:
       # Provider plugin cache — without it every module's `tofu init` re-downloads aws/helm/kubernetes (~30×).
       TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.tofu-plugin-cache
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: opentofu/setup-opentofu@v1
         with:
           tofu_version: ${{ needs.versions.outputs.opentofu }}
@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: versions
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install Terragrunt
         env:
           # Version from /.tool-versions (the `versions` job); the release tag is v-prefixed.
@@ -111,7 +111,7 @@ jobs:
     name: Markdown Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Lint changed markdown files
@@ -139,7 +139,7 @@ jobs:
     name: Gate Scripts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install yq (mikefarah)
         run: |
           sudo curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
@@ -163,7 +163,7 @@ jobs:
       # Pin to the chart's appVersion (helm_versions.kyverno = 3.8.1) so test semantics match.
       KYVERNO_VERSION: "1.18.1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: azure/setup-helm@v4
         with:
           # Canonical Helm pin from /.tool-versions — keep CLI rendering on the 3.x line (not floating to v4).
@@ -196,7 +196,7 @@ jobs:
     env:
       CROSSPLANE_VERSION: "v2.2.1" # crank CLI version (built from source — see install step)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: azure/setup-helm@v4 # the harness renders the crossplane-teams chart (registry → projection)
         with:
           # Canonical Helm pin from /.tool-versions — keep CLI rendering on the 3.x line (not floating to v4).
@@ -225,7 +225,7 @@ jobs:
     env:
       CROSSPLANE_VERSION: "v2.2.1" # crank CLI version (built from source — see install step)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-go@v5
         with:
           go-version: stable
@@ -245,7 +245,7 @@ jobs:
     name: TFLint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: terraform-linters/setup-tflint@v4
       - name: Lint all modules
         run: |
@@ -284,7 +284,7 @@ jobs:
     env:
       TRIVY_VERSION: "0.70.0" # pinned clean release; v0.69.4 was the malicious one
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install Trivy CLI (download release binary + verify SHA-256)
         run: |
           base="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
@@ -325,7 +325,7 @@ jobs:
     name: Semgrep (SAST)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
