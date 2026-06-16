@@ -110,6 +110,14 @@ platform repo) and injects it as a kustomize image override.** The app overlay k
 pins it**, so the app repo's `k8s/` is pure, environment-agnostic source. *Whatever digest the control plane
 records deploys* — the same contract as ADR-069 §4, with the home corrected from app-overlay to control-plane.
 
+> **Correction (#377): the generator is release-keyed.** The first implementation joined the Environment claim
+> to its Release with a `merge` generator keyed on `path.basenameNormalized`. Under `goTemplate` every manifest
+> field nests, so that dotted key resolved to `null`; a second Environment for the same Product collided on the
+> `{null}` key and broke the *whole* ApplicationSet — no Product could deliver to more than one stage. The
+> generator now fans out over the **Releases** alone (one Application per `gitops/releases/<t>/<p>/*.yaml`),
+> deriving stage/customer from `spec.environmentRef` and team/product from the Terraform loop. No merge key, no
+> collision. An Environment with no Release simply generates no Application (its first promote creates one).
+
 ### 4. App-repo `main` is protected by default
 
 The New Product scaffolder keeps `publish:github`'s default-branch protection (require PR + review). Because CI
