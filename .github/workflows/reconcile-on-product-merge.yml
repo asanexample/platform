@@ -39,6 +39,10 @@ jobs:
       github.event.pull_request.user.login == 'asanexample-backstage-scaffolder[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository
     steps:
+      # Need the script on disk. pull_request_target → checkout defaults to the trusted BASE (main), and the
+      # script only calls `gh` (no PR input is read/executed), so this is safe. (#506 extracted this from an
+      # inline run: block but didn't add the checkout — the script then 127'd; this restores it.)
+      - uses: actions/checkout@v6
       - name: Wait for the Product PR to merge, then dispatch reconcile
         env:
           GH_TOKEN: ${{ github.token }}
