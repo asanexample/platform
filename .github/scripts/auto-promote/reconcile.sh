@@ -37,6 +37,15 @@ LADDER=(dev test uat staging)
 git config user.name "asanexample-promote[bot]"
 git config user.email "asanexample-promote[bot]@users.noreply.github.com"
 
+# Push + open the Release PR AS the promote App — its token (GH_TOKEN) has contents+pull_requests write on the
+# platform repo, and the gate only auto-merges asanexample-promote[bot] PRs. actions/checkout left a read-only
+# default-GITHUB_TOKEN Authorization header (the workflow is contents:read), so repoint origin at the token URL
+# and drop that header. (Skipped in DRY_RUN — and harmless where there is no origin, e.g. local tests.)
+if [ "$DRY_RUN" != "true" ]; then
+  git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+  git config --unset-all "http.https://github.com/.extraheader" 2>/dev/null || true
+fi
+
 # Read a service's digest from a Release file (empty if the file/service/digest is absent).
 rel_digest() { # <release-file> <service>
   [ -f "$1" ] || { echo ""; return; }
