@@ -21,7 +21,7 @@ jobs:
     env:
       TRIVY_VERSION: "0.70.0" # pinned clean release; v0.69.4 was the malicious one
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install Trivy CLI (download release binary + verify SHA-256)
         run: |
           base="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
@@ -46,7 +46,7 @@ jobs:
           cfg() { trivy config . --skip-dirs k8s --severity HIGH,CRITICAL "$@"; }
           cfg --format sarif --output trivy-config.sarif --exit-code 0
           echo "::group::Trivy config findings"; cfg --format table --exit-code 1; echo "::endgroup::"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: trivy-sarif
@@ -56,7 +56,7 @@ jobs:
     name: Semgrep (SAST)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -70,7 +70,7 @@ jobs:
           echo "::group::Semgrep findings"
           semgrep scan $rulesets --exclude '*.sarif' --metrics off --error
           echo "::endgroup::"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: semgrep-sarif

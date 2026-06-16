@@ -141,7 +141,7 @@ jobs:
       # Environment+Product join), catching schema/envelope-valid-but-render-breaking claims. Only when there
       # are Environment files. Docker is preinstalled on ubuntu-latest; crank is built from the Go module proxy
       # (releases.crossplane.io intermittently 403s runner IPs — same install as the Tenant Claims Gate).
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         if: steps.classify.outputs.any == 'true' && steps.classify.outputs.environment_files != ''
         with:
           go-version: stable

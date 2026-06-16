@@ -36,7 +36,7 @@ jobs:
     needs: versions
     steps:
       - uses: actions/checkout@v6
-      - uses: opentofu/setup-opentofu@v1
+      - uses: opentofu/setup-opentofu@v2
         with:
           tofu_version: ${{ needs.versions.outputs.opentofu }}
       - name: Check formatting
@@ -51,7 +51,7 @@ jobs:
       TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.tofu-plugin-cache
     steps:
       - uses: actions/checkout@v6
-      - uses: opentofu/setup-opentofu@v1
+      - uses: opentofu/setup-opentofu@v2
         with:
           tofu_version: ${{ needs.versions.outputs.opentofu }}
 
@@ -164,7 +164,7 @@ jobs:
       KYVERNO_VERSION: "1.18.1"
     steps:
       - uses: actions/checkout@v6
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           # Canonical Helm pin from /.tool-versions — keep CLI rendering on the 3.x line (not floating to v4).
           version: v${{ needs.versions.outputs.helm }}
@@ -197,11 +197,11 @@ jobs:
       CROSSPLANE_VERSION: "v2.2.1" # crank CLI version (built from source — see install step)
     steps:
       - uses: actions/checkout@v6
-      - uses: azure/setup-helm@v4 # the harness renders the crossplane-teams chart (registry → projection)
+      - uses: azure/setup-helm@v5 # the harness renders the crossplane-teams chart (registry → projection)
         with:
           # Canonical Helm pin from /.tool-versions — keep CLI rendering on the 3.x line (not floating to v4).
           version: v${{ needs.versions.outputs.helm }}
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: stable
       - name: Install Crossplane CLI (build crank from the Go module proxy)
@@ -226,7 +226,7 @@ jobs:
       CROSSPLANE_VERSION: "v2.2.1" # crank CLI version (built from source — see install step)
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: stable
       - name: Install Crossplane CLI (build crank from the Go module proxy)
@@ -246,7 +246,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: terraform-linters/setup-tflint@v4
+      - uses: terraform-linters/setup-tflint@v6
       - name: Lint all modules
         run: |
           FAILED=0
