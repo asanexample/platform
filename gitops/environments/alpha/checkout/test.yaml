@@ -1,27 +1,18 @@
-# Environment (alpha × checkout × test) — developer-authored
-# claim (ADR-067, v1beta1), via the Backstage **New Environment** template (ADR-062 self-service). Namespace
-# alpha-checkout-test. Synced by ArgoCD (the `environments` registry-sync app) and reconciled by the Crossplane
-# Environment Composition (v3). One claim per (product, stage[, customer]); the image digest is promoted in by
-# PR (promote-by-PR, #377). This file is the source of truth — change or remove it via PR. See
-# docs/architecture/platform-domain-api.md.
 apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata:
-  # CLUSTER-scoped XR → name MUST be globally unique → team-prefixed <team>-<product>[-<customer>]-<stage>
-  # (ADR-067; a bare <product>-<stage> collides across teams, and a per-customer Environment without the
-  # customer collides across customers of one Product). Computed in the template (values.envName).
   name: alpha-checkout-test
   annotations:
     platform.refplat.org/requested-by: user:default/dev-alpha
+    platform.refplat.org/decommissioned-at: 2026-06-16T17:49:27.017Z
 spec:
-  team: alpha # validated == Product.team at the gate + admission (team-matches-product)
-  product: checkout # must reference an existing Product (gitops/products/alpha/checkout.yaml)
-  stage: test # must be in the Team's allowedStages (envelope: stage-within-envelope)
+  team: alpha
+  product: checkout
+  stage: test
   tier: standard
   services:
     web:
-      serviceAccount: app-alpha # Pod Identity binds this named SA
+      serviceAccount: app-alpha
       preview: false
-      # image omitted — declared but NOT yet deployed (the first-deploy state). The Environment still
-      # provisions namespace/quota/identity; the per-Product ApplicationSet SKIPS this (Environment × Service)
-      # pair until the first CI build promotes an immutable …@sha256: digest into <app-repo>/k8s/overlays/test.
+  lifecycle:
+    phase: decommissioning
