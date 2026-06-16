@@ -1,0 +1,88 @@
+name: Auto-promote (≤ staging)
+
+# Auto-promotion reconciler (#377 Phase 2 — auto ≤ staging). Climbs each Product's deployed digest UP one rung of
+# the ladder (dev → test → uat → staging) wherever the lower stage is Synced+Healthy and the upper stage is
+# behind — the same signed artifact moves up, no operator action. prod is EXCLUDED (its promotion is gated,
+# approver != author — #377 Phase 3). The reconciler opens a `asanexample-promote[bot]` Release PR per advanced
+# rung; the gitops Gate validates + auto-merges it and the per-Product ApplicationSet injects the digest — the
+# automated sibling of the app-repo on-demand Promote workflow.
+#
+# Runs on the in-VPC self-hosted runner (ADR-065): it assumes PlatformDeployer to read the promote App key from
+# Secrets Manager (mint the bot token) AND to reach the PRIVATE EKS API for the ArgoCD health gate. One rung is
+# advanced per run; the digest bakes at each stage until the next reconcile sees it healthy.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *" # every 30 min — advances one healthy rung per run
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Log what would be promoted without opening PRs."
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  # Never run two reconcilers at once (cron racing a manual dispatch) — one could open a duplicate Release PR.
+  group: auto-promote
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  CLUSTER_NAME: platform-use1-eks
+  DEPLOYER_ARN: arn:aws:iam::829808296602:role/PlatformDeployer
+  PROMOTE_SECRET: platform/promote/github-app
+
+jobs:
+  reconcile:
+    # The ARC scale set (runnerScaleSetName=platform-infra) — AWS via Pod Identity, private EKS API reach.
+    runs-on: platform-infra
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yq (mikefarah)
+        run: |
+          sudo curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      # Assume PlatformDeployer (the runner role can't read the secret or reach the cluster by itself) and read
+      # the promote App credential — the same key trusted-ci/promote.yml uses, here read by PR-D not a product role.
+      - name: Read the promote App credential
+        id: appcred
+        run: |
+          set -euo pipefail
+          creds=$(aws sts assume-role --role-arn "$DEPLOYER_ARN" --role-session-name auto-promote-secret --query Credentials --output json)
+          akid="$(jq -r .AccessKeyId <<<"$creds")"; asak="$(jq -r .SecretAccessKey <<<"$creds")"; asst="$(jq -r .SessionToken <<<"$creds")"
+          export AWS_ACCESS_KEY_ID="$akid" AWS_SECRET_ACCESS_KEY="$asak" AWS_SESSION_TOKEN="$asst"
+          secret="$(aws secretsmanager get-secret-value --secret-id "$PROMOTE_SECRET" --query SecretString --output text)"
+          echo "app_id=$(jq -r '.app_id' <<<"$secret")" >> "$GITHUB_OUTPUT"
+          pem="$(jq -r '.private_key' <<<"$secret")"
+          echo "::add-mask::${pem}"
+          { echo "pem<<PROMOTE_PEM_EOF"; printf '%s\n' "$pem"; echo "PROMOTE_PEM_EOF"; } >> "$GITHUB_OUTPUT"
+
+      - name: Mint promote App token (scoped to the platform repo)
+        id: token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ steps.appcred.outputs.app_id }}
+          private-key: ${{ steps.appcred.outputs.pem }}
+          owner: ${{ github.repository_owner }}
+          repositories: platform
+
+      - name: Reconcile the ladder
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          PLATFORM_REPO: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+          # Re-assume PR-D for the ArgoCD health reads (kubectl exec auth runs as the ambient creds; PR-D holds
+          # the EKS access entry — update-kubeconfig's own DescribeCluster also needs PR-D, so assume up-front).
+          creds=$(aws sts assume-role --role-arn "$DEPLOYER_ARN" --role-session-name auto-promote-kubectl --query Credentials --output json)
+          akid="$(jq -r .AccessKeyId <<<"$creds")"; asak="$(jq -r .SecretAccessKey <<<"$creds")"; asst="$(jq -r .SessionToken <<<"$creds")"
+          export AWS_ACCESS_KEY_ID="$akid" AWS_SECRET_ACCESS_KEY="$asak" AWS_SESSION_TOKEN="$asst"
+          aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_REGION"
+          bash .github/scripts/auto-promote/reconcile.sh
