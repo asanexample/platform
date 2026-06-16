@@ -131,10 +131,10 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # d7abb78a (backstage#42) adds the `platform:deprovision-product` scaffolder action — backing the new
-  # Deprovision Product template (ADR-062). Carries forward 754254ba (resolve-release-digest, #41) +
-  # f502c5ff (ProductPicker, #40) + the v1beta1 projection (#38).
-  image_tag = "d7abb78a358d7cb5cefb8beb4b920abbeca14801"
+  # 16ce1f23 (backstage#43) replaces the deprovision-product `archiveRepo` checkbox with a `repoAction`
+  # enum (delete | archive | keep). Carries forward d7abb78a (deprovision-product action, #42) +
+  # 754254ba (resolve-release-digest, #41) + f502c5ff (ProductPicker, #40) + the v1beta1 projection (#38).
+  image_tag = "16ce1f23371de7e16c5ccf1889069055bf80739a"
 
   # platform-projection catalog mode = v3 (Product=System, Environment=custom kind). The v2 projection branch is
   # inert (nothing reads it); removing it + this flag is a backstage-repo follow-up.

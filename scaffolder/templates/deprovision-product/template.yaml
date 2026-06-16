@@ -61,11 +61,18 @@ spec:
           description: >-
             decommission = reversibly suspend every Environment (quota → 0); reactivate = restore them; purge =
             irreversibly delete the Product + all its Environments + Releases (requires decommission first).
-        archiveRepo:
-          title: Archive the app repo (purge only)
-          type: boolean
-          default: true
-          description: On purge, archive app-<team>-<product> (reversible). Uncheck to leave it active.
+        repoAction:
+          title: App repo on purge
+          type: string
+          enum: ['archive', 'delete', 'keep']
+          enumNames:
+            - 'Archive — read-only, reversible'
+            - 'Delete — permanent (irreversible)'
+            - 'Keep — leave it active'
+          default: archive
+          description: >-
+            What to do with the app repo (app-<team>-<product>) when PURGING. Ignored for
+            decommission/reactivate.
         confirm:
           title: Confirm product name
           type: string
@@ -85,7 +92,7 @@ spec:
         team: ${{ parameters.team }}
         product: ${{ parameters.product }}
         mode: ${{ parameters.action }}
-        archiveRepo: ${{ parameters.archiveRepo }}
+        repoAction: ${{ parameters.repoAction }}
         confirm: ${{ parameters.confirm }}
         requestedBy: ${{ user.ref | default('unknown', true) }}
 
