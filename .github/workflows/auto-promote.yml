@@ -44,7 +44,13 @@ jobs:
 
       - name: Install yq (mikefarah)
         run: |
-          sudo curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          set -euo pipefail
+          case "$(uname -m)" in
+            x86_64) arch=amd64 ;;
+            aarch64 | arm64) arch=arm64 ;; # the platform-infra ARC runners are Graviton/arm64
+            *) echo "::error::unsupported arch $(uname -m)"; exit 1 ;;
+          esac
+          sudo curl -fsSL -o /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_${arch}"
           sudo chmod +x /usr/local/bin/yq
           yq --version
 
