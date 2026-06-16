@@ -12,7 +12,7 @@ a team is materialised in GitHub on Team-CR convergence — the same apply-on-me
 
 - **Ownership only, never a security anchor.** Org-team membership is **not** in the Actions OIDC token, so this
   App's teams can never carry the cosign / Kyverno team identity — that stays the repo name (`<team>-<product>`)
-  + the per-Product IAM OIDC role. This App grants human write-access; it does **not** affect the supply chain.
+  plus the per-Product IAM OIDC role. This App grants human write-access; it does **not** affect the supply chain.
 - **Org-scoped + repo-admin, by necessity.** Managing org teams needs `Organization → Members: write`; granting a
   team `push` on a repo needs `Repository → Administration: write`. That is broader than the promote App (PR-only)
   — comparable to the scaffolder App. The compensating control is that it is driven **only** by the git registries
