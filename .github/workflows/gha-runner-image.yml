@@ -27,7 +27,7 @@ jobs:
     # Native arm64 runner: the platform is all-Graviton, so the image must be arm64.
     runs-on: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Read toolchain versions from /.tool-versions
         id: tools

@@ -47,7 +47,7 @@ jobs:
       TG_DEPENDENCY_FETCH_OUTPUT_FROM_STATE: "true"
     steps:
       - name: Checkout the merged commit (trusted)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Terragrunt reconcile the per-Product units
         run: bash .github/scripts/registry/apply.sh
