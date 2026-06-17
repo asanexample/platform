@@ -72,7 +72,7 @@ printf '%s' "$OUT" | grep -q 'arn:aws:sqs:us-east-1:[0-9]*:refplat-alpha-shop-de
 printf '%s' "$OUT" | grep -q 'JOBS_QUEUE_URL:'                               || { echo "::error::JOBS_QUEUE_URL output key missing from ConfigMap"; exit 1; }
 # SNS (ADR-073 A.1): a Topic, SSE (AWS-managed key), deny-non-TLS, derived publish IAM + kms-via-service, ARN output.
 printf '%s' "$OUT" | grep -q 'kind: Topic'                                   || { echo "::error::SNS Topic MR not rendered"; printf '%s\n' "$OUT"; exit 1; }
-printf '%s' "$OUT" | grep -q 'name: refplat-alpha-shop-dev-notify-'          || { echo "::error::deterministic topic name not rendered"; exit 1; }
+printf '%s' "$OUT" | grep -q 'external-name: refplat-alpha-shop-dev-notify-' || { echo "::error::deterministic topic name (external-name) not rendered"; exit 1; }
 printf '%s' "$OUT" | grep -q 'kmsMasterKeyId: alias/aws/sns'                  || { echo "::error::SNS topic must be SSE (alias/aws/sns)"; exit 1; }
 printf '%s' "$OUT" | grep -q 'sns:Publish'                                   || { echo "::error::readwrite topic must derive sns:Publish"; exit 1; }
 printf '%s' "$OUT" | grep -q 'kms:GenerateDataKey'                           || { echo "::error::SSE publish must derive kms:GenerateDataKey (via-service scoped)"; exit 1; }
