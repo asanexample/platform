@@ -41,3 +41,23 @@ admission. Nothing per-app to maintain — it lives in `trusted-ci`.
 
 The team and product were registered in the platform repo — the `gitops/products/${{ values.team }}/${{ values.product }}.yaml`
 registry entry and the `dev` Environment claim — by the same New Product run. See `docs/runbooks/app-supply-chain-onboarding.md`.
+
+## Self-service cloud resources (ADR-073)
+
+Need an S3 bucket (more engines coming)? Declare it on the Service in your Environment claim
+(`gitops/environments/${{ values.team }}/${{ values.product }}/<stage>.yaml`) — no Crossplane/AWS to write:
+
+```yaml
+spec:
+  services:
+    ${{ values.service }}:
+      serviceAccount: app-${{ values.team }}
+      resources:
+        uploads: { kind: objectstore, engine: s3, access: readwrite }  # access: read | readwrite
+```
+
+The platform provisions the bucket safe-by-construction (encrypted, private, versioned, TLS-only), derives
+least-privilege IAM scoped to **that bucket only** onto the Service's Pod-Identity role, and publishes the
+name into a `${{ values.service }}-resources` ConfigMap. `base/deployment.yaml` already `envFrom`s it
+(`optional: true`), so `UPLOADS_BUCKET` appears as an env var after the next rollout. Your Team must allow the
+engine in its envelope (platform-team-owned); the gate validates the request on the PR.
