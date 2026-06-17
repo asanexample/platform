@@ -22,3 +22,8 @@ spec:
       memory: 16Gi
       pods: 40
     maxDedicatedIsolation: { cluster: 0, account: 0 }
+    # Self-service cloud resources (ADR-073). Opted in to S3; up to 10 per Environment, pooled isolation.
+    resources:
+      allowedEngines: ["s3"]
+      maxPerEnvironment: 10
+      isolationFloor: shared

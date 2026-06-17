@@ -44,6 +44,12 @@ rules:
   - apiGroups: ["kyverno.io"]
     resources: ["clusterpolicies"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Per-Service resource-output ConfigMaps (ADR-073): the Composition writes <svc>-resources into the
+  # Environment namespace (bucket names, etc.) via a provider-kubernetes Object; the workload consumes it via
+  # envFrom. Namespaced, non-secret outputs only (credentialed engines use a Secret/ESO path, not this).
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

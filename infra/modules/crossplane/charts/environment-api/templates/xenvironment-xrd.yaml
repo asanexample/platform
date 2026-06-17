@@ -202,8 +202,10 @@ spec:
                       resources:
                         type: object
                         description: >-
-                          Reserved (ADR-067 §7): cloud-neutral Service→Resource deps (DB/cache/objectstore/stream)
-                          carrying the data-isolation axis. Inert until the data paved-road ships.
+                          Cloud-neutral Service→Resource deps (ADR-067 §7, activated by ADR-073). The dev declares
+                          intent (kind/engine/access); the Composition provisions the AWS resource safe-by-
+                          construction with a platform-controlled name and derives least-privilege IAM onto the
+                          service's Pod-Identity role. Phase A: objectstore/s3.
                         additionalProperties:
                           type: object
                           required:
@@ -219,6 +221,20 @@ spec:
                             isolation:
                               type: string
                               enum: ["shared", "dedicated"]
+                            access:
+                              type: string
+                              description: >-
+                                Intent the Composition derives least-privilege IAM from. read = read-only
+                                (S3: Get/List); readwrite = read + write (S3: +Put/Delete). Default read.
+                              enum: ["read", "readwrite"]
+                              default: read
+                            params:
+                              type: object
+                              description: >-
+                                Free-form, engine-specific config (dev-authored). Treated as benign config data
+                                ONLY — NEVER interpolated into resource names, ARNs, IAM, or security config
+                                (those are 100% platform-derived). Per-engine validated at the gate/Kyverno.
+                              additionalProperties: true
                 lifecycle:
                   type: object
                   description: Environment lifecycle; the exit counterpart to onboarding (ADR-062).

@@ -1,0 +1,23 @@
+# Team alpha with the ADR-073 resources envelope (allowedEngines [s3], cap 2) + pooled Product alpha-demo.
+# Mirrors the API-server-defaulted projection the envContext apiCall would return.
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Values
+metadata: { name: values }
+globalValues:
+  team:
+    metadata: { name: alpha }
+    spec:
+      envelope:
+        allowedTiers: ["standard"]
+        allowedStages: ["dev", "prod"]
+        allowedLocations: ["*"]
+        quotaCap: { cpu: "8", memory: "16Gi", pods: 40 }
+        resources:
+          allowedEngines: ["s3"]
+          maxPerEnvironment: 2
+          isolationFloor: shared
+  product:
+    metadata: { name: alpha-demo }
+    spec:
+      team: alpha
+      tenancy: pooled

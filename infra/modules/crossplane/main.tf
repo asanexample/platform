@@ -187,6 +187,7 @@ resource "helm_release" "crossplane_environment_api" {
       managementAccountId     = var.management_account_id
       clusterName             = var.cluster_name
       pullAccountIds          = var.environment_pull_account_ids
+      resourcePrefix          = var.environment_resource_prefix
       permissionsBoundaryArn  = local.enable_environment_provisioning ? aws_iam_policy.environment_boundary[0].arn : ""
       providerConfigEcr       = var.ecr_provisioner_role_arn != "" ? "platform-ecr" : var.providerconfig_name
       podIdentityServiceAccnt = var.provider_service_account
@@ -550,6 +551,40 @@ data "aws_iam_policy_document" "provisioner" {
       # alongside sts:AssumeRole (the target role's trust policy must allow sts:TagSession too).
       actions   = ["sts:AssumeRole", "sts:TagSession"]
       resources = [var.ecr_provisioner_role_arn]
+    }
+  }
+
+  # Self-service S3 buckets (ADR-073, the resource paved road). Bucket lifecycle + the safe-by-construction
+  # config the Composition's MRs set. Scoped to `${var.environment_resource_prefix}*` bucket names (the
+  # platform-controlled refplat-<team>-<product>-<stage>-<name> convention; cross-team isolation is enforced at
+  # the WORKLOAD role, which gets per-bucket object access — this provisioner is shared platform infra) and
+  # pinned to this cluster's region. Object-level access is intentionally NOT here (provisioning is config-only;
+  # the workload role gets the per-bucket Get/Put/etc). Added only when the s3 provider is installed.
+  dynamic "statement" {
+    for_each = local.enable_environment_provisioning && contains(var.provider_services, "s3") ? [1] : []
+    content {
+      sid    = "EnvironmentS3Buckets"
+      effect = "Allow"
+      actions = [
+        "s3:CreateBucket", "s3:DeleteBucket",
+        "s3:PutBucketTagging", "s3:GetBucketTagging",
+        "s3:PutBucketPublicAccessBlock", "s3:GetBucketPublicAccessBlock",
+        "s3:PutEncryptionConfiguration", "s3:GetEncryptionConfiguration",
+        "s3:PutBucketVersioning", "s3:GetBucketVersioning",
+        "s3:PutBucketOwnershipControls", "s3:GetBucketOwnershipControls",
+        "s3:PutBucketPolicy", "s3:GetBucketPolicy", "s3:DeleteBucketPolicy",
+        # Observe-only reads provider-upjet-aws issues when reconciling a Bucket and its sub-resources.
+        "s3:GetBucketAcl", "s3:GetBucketLocation", "s3:GetAccelerateConfiguration",
+        "s3:GetBucketObjectLockConfiguration", "s3:GetBucketRequestPayment", "s3:GetBucketLogging",
+        "s3:GetLifecycleConfiguration", "s3:GetReplicationConfiguration", "s3:GetBucketWebsite",
+        "s3:GetBucketCORS", "s3:ListBucket",
+      ]
+      resources = ["arn:aws:s3:::${var.environment_resource_prefix}*"]
+      condition {
+        test     = "StringEquals"
+        variable = "aws:RequestedRegion"
+        values   = [var.region]
+      }
     }
   }
 }

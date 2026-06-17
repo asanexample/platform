@@ -1,0 +1,70 @@
+# ADR-073 self-service resource envelope, tested against the alpha Team with envelope.resources
+# {allowedEngines: [s3], maxPerEnvironment: 2} (values-resources-s3.yaml) + pooled Product alpha-demo.
+# Each case isolates ONE resource rule (everything else within-envelope).
+---
+# 2 s3 resources, both engines allowed, within cap → ADMIT.
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata: { name: okrsrc }
+spec:
+  team: alpha
+  product: demo
+  stage: dev
+  tier: standard
+  residency: { allowedLocations: ["*"] }
+  quota: { cpu: "4", memory: 8Gi, pods: 20 }
+  services:
+    web:
+      resources:
+        uploads: { kind: objectstore, engine: s3, access: readwrite }
+        assets: { kind: objectstore, engine: s3, access: read }
+---
+# No resources at all → resource rules are a no-op → ADMIT (regression safety).
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata: { name: norsrc }
+spec:
+  team: alpha
+  product: demo
+  stage: dev
+  tier: standard
+  residency: { allowedLocations: ["*"] }
+  quota: { cpu: "4", memory: 8Gi, pods: 20 }
+  services:
+    web: { serviceAccount: demo-web }
+---
+# engine sqs ∉ allowedEngines [s3] → resources-engine-within-envelope.
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata: { name: badengine }
+spec:
+  team: alpha
+  product: demo
+  stage: dev
+  tier: standard
+  residency: { allowedLocations: ["*"] }
+  quota: { cpu: "4", memory: 8Gi, pods: 20 }
+  services:
+    web:
+      resources:
+        q: { kind: stream, engine: sqs, access: readwrite }
+---
+# 3 resources > cap 2 → resources-count-within-cap.
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata: { name: overcount }
+spec:
+  team: alpha
+  product: demo
+  stage: dev
+  tier: standard
+  residency: { allowedLocations: ["*"] }
+  quota: { cpu: "4", memory: 8Gi, pods: 20 }
+  services:
+    web:
+      resources:
+        a: { kind: objectstore, engine: s3, access: read }
+        b: { kind: objectstore, engine: s3, access: read }
+    api:
+      resources:
+        c: { kind: objectstore, engine: s3, access: read }

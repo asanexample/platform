@@ -46,6 +46,13 @@ spec:
           image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-${{ values.team }}/${{ values.product }}-${{ values.service }}:placeholder
           ports:
             - containerPort: 8080
+          # Self-service resource outputs (ADR-073): the Environment Composition publishes a
+          # ${{ values.service }}-resources ConfigMap (e.g. UPLOADS_BUCKET) when this Service declares
+          # `resources:` in its Environment claim. optional: true → a no-op until then, so the starter runs as-is.
+          envFrom:
+            - configMapRef:
+                name: ${{ values.service }}-resources
+                optional: true
           env:
             - name: NAMESPACE
               valueFrom:
