@@ -4,5 +4,7 @@ description: >-
   Crossplane AWS ProviderConfig (EKS Pod Identity credential source). Applied as a separate release so the
   runtime chart's Healthy-gate Job guarantees the aws.upbound.io ProviderConfig CRD exists first.
 type: application
-version: 0.1.1
+# 0.1.2 (ADR-073): provisioner ClusterRole gains `configmaps` so the Composition can write the
+# <svc>-resources output ConfigMap. The bump forces the helm release to re-render this template-only change.
+version: 0.1.2
 appVersion: "2.5.0"
