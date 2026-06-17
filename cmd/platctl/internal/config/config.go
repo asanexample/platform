@@ -99,6 +99,35 @@ type EnvConfig struct {
 	Path     string            `yaml:"path"`     // Relative path from repo root to unit directory
 	Provider string            `yaml:"provider"` // Cloud provider: "aws", "azure", etc.
 	Auth     map[string]string `yaml:"auth"`     // Provider-specific credentials
+	// Reconnect lists steps run after `platctl up` restores THIS environment, to repair the cross-environment
+	// path a park/restore (or an EKS API control-plane ENI rotation) can leave stale. Without it, restoring a
+	// workload cluster can leave the platform cluster's cross-VPC DNS pointing at dead API ENIs, so the platform
+	// ArgoCD controller + CI runner can't reach it. Steps are idempotent + best-effort. See
+	// reference_preprod_scaleup_recovery.
+	Reconnect *Reconnect `yaml:"reconnect,omitempty"`
+}
+
+// Reconnect declares the post-`up` repair steps for an environment.
+type Reconnect struct {
+	// Units are Terragrunt units (in any environment) to re-apply idempotently — e.g. platform/cross-vpc-dns,
+	// which re-looks-up the restored cluster's API ENIs and rewrites the private hosted-zone records.
+	Units []ReconnectUnit `yaml:"units,omitempty"`
+	// Restarts are kubectl rollout restarts that clear stale cross-cluster connections — e.g. the platform
+	// ArgoCD application-controller, which caches a dead connection to the parked cluster's API.
+	Restarts []ReconnectRestart `yaml:"restarts,omitempty"`
+}
+
+// ReconnectUnit identifies a Terragrunt unit to re-apply during reconnect (owning env + unit name).
+type ReconnectUnit struct {
+	Env  string `yaml:"env"`  // environment that owns the unit (e.g. "platform")
+	Unit string `yaml:"unit"` // unit directory name (e.g. "cross-vpc-dns")
+}
+
+// ReconnectRestart identifies a workload to kubectl-rollout-restart on an environment's cluster.
+type ReconnectRestart struct {
+	Env       string `yaml:"env"`       // environment whose cluster hosts the workload (resolved via kubeconfig)
+	Namespace string `yaml:"namespace"` // workload namespace (e.g. "argocd")
+	Target    string `yaml:"target"`    // rollout target, e.g. "statefulset/argocd-application-controller"
 }
 
 // UnitOverride provides per-unit configuration that can't be auto-discovered.
@@ -172,6 +201,18 @@ func (c *Config) validate() error {
 		}
 		if env.Provider == "" {
 			return fmt.Errorf("environment %q: provider is required", name)
+		}
+		if env.Reconnect != nil {
+			for _, ru := range env.Reconnect.Units {
+				if ru.Env == "" || ru.Unit == "" {
+					return fmt.Errorf("environment %q: reconnect.units entries need both env and unit", name)
+				}
+			}
+			for _, rr := range env.Reconnect.Restarts {
+				if rr.Env == "" || rr.Target == "" {
+					return fmt.Errorf("environment %q: reconnect.restarts entries need both env and target", name)
+				}
+			}
 		}
 	}
 	for name, override := range c.Overrides {

@@ -93,12 +93,112 @@ from the HCL — the inverse of 'platctl down'. Takes ~1-2 minutes.`,
 			runner := &engine.TerragruntRunner{
 				LogWriter: func(_ string, data []byte) { fmt.Print(string(data)) },
 			}
-			return runner.Run(context.Background(), unit, engine.Apply)
+			ctx := context.Background()
+			if err := runner.Run(ctx, unit, engine.Apply); err != nil {
+				return err
+			}
+			// Repair the cross-environment path a park/restore can leave stale (e.g. platform→preprod cross-VPC
+			// DNS + the ArgoCD controller's cached connection). Idempotent; no-op when not configured.
+			if env.Reconnect != nil {
+				return runReconnect(ctx, cfg, repoRoot, envName, env.Reconnect, runner)
+			}
+			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&envName, "env", "", "Environment to restore (required)")
 	return cmd
+}
+
+// runReconnect runs the post-restore repair steps for an environment (see config.EnvConfig.Reconnect):
+// re-apply idempotent units (e.g. platform/cross-vpc-dns — refreshes the private hosted zone to the restored
+// cluster's current API ENIs) and bounce stale cross-cluster connections (e.g. the platform ArgoCD controller).
+// Best-effort: it attempts every step, then returns a combined error so a partial reconnect still repairs what
+// it can and the operator sees what's left.
+func runReconnect(ctx context.Context, cfg *config.Config, repoRoot, restoredEnv string, rc *config.Reconnect, runner engine.Runner) error {
+	fmt.Printf("Reconnecting after restoring %s (refresh cross-VPC DNS + bounce dependents)...\n", restoredEnv)
+	var issues []string
+
+	for _, ru := range rc.Units {
+		owner, ok := cfg.Environments[ru.Env]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("unit %s/%s: environment %q not defined in config", ru.Env, ru.Unit, ru.Env))
+			continue
+		}
+		u := &engine.Unit{
+			Name:     ru.Env + "/" + ru.Unit,
+			Path:     filepath.Join(repoRoot, owner.Path, ru.Unit),
+			Provider: owner.Provider,
+			Auth:     cfg.AuthForUnit(ru.Env, ru.Unit),
+		}
+		fmt.Printf("  re-applying %s (idempotent)...\n", u.Name)
+		if err := runner.Run(ctx, u, engine.Apply); err != nil {
+			issues = append(issues, fmt.Sprintf("re-applying %s: %v", u.Name, err))
+		}
+	}
+
+	for _, rr := range rc.Restarts {
+		fmt.Printf("  restarting %s in %s/%s ...\n", rr.Target, rr.Env, rr.Namespace)
+		if err := rolloutRestart(ctx, cfg, rr); err != nil {
+			issues = append(issues, fmt.Sprintf("restart %s (%s): %v", rr.Target, rr.Env, err))
+		}
+	}
+
+	if len(issues) > 0 {
+		for _, msg := range issues {
+			fmt.Printf("  warning: %s\n", msg)
+		}
+		return fmt.Errorf("reconnect completed with %d issue(s); platform→%s may need manual repair "+
+			"(re-apply cross-vpc-dns + restart the argocd controller — see reference_preprod_scaleup_recovery)",
+			len(issues), restoredEnv)
+	}
+	fmt.Printf("Reconnect complete — platform can reach the restored %s cluster.\n", restoredEnv)
+	return nil
+}
+
+// rolloutRestart resolves the target environment's cluster and bounces a workload. Indirected through
+// rolloutRestartFn so tests can stub the kubectl boundary.
+func rolloutRestart(ctx context.Context, cfg *config.Config, rr config.ReconnectRestart) error {
+	kc, err := kubeconfigForEnv(cfg, rr.Env)
+	if err != nil {
+		return err
+	}
+	return rolloutRestartFn(ctx, kc, rr.Namespace, rr.Target)
+}
+
+var rolloutRestartFn = doRolloutRestart
+
+// doRolloutRestart builds a throwaway kubeconfig for the cluster (so it doesn't depend on the operator's local
+// contexts, matching the bootstrap hooks) and runs `kubectl rollout restart`.
+func doRolloutRestart(ctx context.Context, kc config.KubeconfigEntry, namespace, target string) error {
+	tmp, err := os.CreateTemp("", "platctl-reconnect-kubeconfig-*.yaml")
+	if err != nil {
+		return err
+	}
+	path := tmp.Name()
+	_ = tmp.Close()
+	defer func() { _ = os.Remove(path) }()
+
+	kcArgs := []string{"eks", "update-kubeconfig", "--name", kc.Cluster, "--region", kc.Region,
+		"--kubeconfig", path, "--alias", "platctl-reconnect"}
+	if kc.KubectlRoleARN != "" {
+		kcArgs = append(kcArgs, "--role-arn", kc.KubectlRoleARN)
+	}
+	if kc.Profile != "" {
+		kcArgs = append(kcArgs, "--profile", kc.Profile)
+	}
+	if out, err := exec.CommandContext(ctx, "aws", kcArgs...).CombinedOutput(); err != nil {
+		return fmt.Errorf("update-kubeconfig: %v: %s", err, strings.TrimSpace(string(out)))
+	}
+
+	rsArgs := []string{"--kubeconfig", path, "rollout", "restart", target}
+	if namespace != "" {
+		rsArgs = append(rsArgs, "-n", namespace)
+	}
+	if out, err := exec.CommandContext(ctx, "kubectl", rsArgs...).CombinedOutput(); err != nil {
+		return fmt.Errorf("kubectl rollout restart: %v: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 // kubeconfigForEnv finds the kubeconfig entry (cluster/region/profile) for an environment, keyed by its alias.
