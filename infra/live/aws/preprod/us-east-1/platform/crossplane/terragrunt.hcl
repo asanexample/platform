@@ -70,9 +70,9 @@ inputs = {
 
   # Federated environment control plane (ADR-048). P2b: the full environment footprint — K8s (provider-kubernetes) +
   # AWS (provider-aws iam/eks locally; ecr cross-account into the platform account via assumeRoleChain).
-  # ADR-073 Phase A: provider-aws-s3 + provider-aws-sqs for the self-service resource paved road (S3, then SQS
-  # in A.1). The module loop spins up each provider-aws-<svc> from the registry; SNS/DynamoDB follow.
-  provider_services = ["ecr", "iam", "eks", "s3", "sqs"]
+  # ADR-073 Phase A: the self-service resource paved road — provider-aws-{s3,sqs,sns,dynamodb}. The module loop
+  # spins up each provider-aws-<svc> from the registry (RDS / stateful engines are a later, separate ADR).
+  provider_services = ["ecr", "iam", "eks", "s3", "sqs", "sns", "dynamodb"]
 
   enable_kubernetes_provider = true
   # provider-kubernetes stays hostNetwork + list index 0 (its P2a config) so it does NOT churn when the aws

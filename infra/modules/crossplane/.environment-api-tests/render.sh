@@ -70,6 +70,24 @@ printf '%s' "$OUT" | grep -q 'sqs:SendMessage'                               || 
 printf '%s' "$OUT" | grep -q 'sqs:ReceiveMessage'                            || { echo "::error::queue must derive sqs:ReceiveMessage"; exit 1; }
 printf '%s' "$OUT" | grep -q 'arn:aws:sqs:us-east-1:[0-9]*:refplat-alpha-shop-dev-jobs-' || { echo "::error::derived IAM must be scoped to the queue ARN"; exit 1; }
 printf '%s' "$OUT" | grep -q 'JOBS_QUEUE_URL:'                               || { echo "::error::JOBS_QUEUE_URL output key missing from ConfigMap"; exit 1; }
-echo "  ✓ resources-s3-dev OK (S3: encrypted/private/versioned/TLS-only + bucket-scoped IAM read≠write; SQS: SSE+TLS-only queue + queue-scoped IAM; web-resources ConfigMap)"
+# SNS (ADR-073 A.1): a Topic, SSE (AWS-managed key), deny-non-TLS, derived publish IAM + kms-via-service, ARN output.
+printf '%s' "$OUT" | grep -q 'kind: Topic'                                   || { echo "::error::SNS Topic MR not rendered"; printf '%s\n' "$OUT"; exit 1; }
+printf '%s' "$OUT" | grep -q 'name: refplat-alpha-shop-dev-notify-'          || { echo "::error::deterministic topic name not rendered"; exit 1; }
+printf '%s' "$OUT" | grep -q 'kmsMasterKeyId: alias/aws/sns'                  || { echo "::error::SNS topic must be SSE (alias/aws/sns)"; exit 1; }
+printf '%s' "$OUT" | grep -q 'sns:Publish'                                   || { echo "::error::readwrite topic must derive sns:Publish"; exit 1; }
+printf '%s' "$OUT" | grep -q 'kms:GenerateDataKey'                           || { echo "::error::SSE publish must derive kms:GenerateDataKey (via-service scoped)"; exit 1; }
+printf '%s' "$OUT" | grep -q 'sns.us-east-1.amazonaws.com'                    || { echo "::error::kms perms must be scoped to the SNS service via kms:ViaService"; exit 1; }
+printf '%s' "$OUT" | grep -q 'NOTIFY_TOPIC_ARN:'                             || { echo "::error::NOTIFY_TOPIC_ARN output key missing"; exit 1; }
+# DynamoDB (ADR-073 A.1): a Table, on-demand, default id key, SSE + PITR, derived item IAM, table-scoped, TABLE output.
+printf '%s' "$OUT" | grep -q 'kind: Table'                                   || { echo "::error::DynamoDB Table MR not rendered"; printf '%s\n' "$OUT"; exit 1; }
+printf '%s' "$OUT" | grep -q 'external-name: refplat-alpha-shop-dev-sessions-' || { echo "::error::deterministic table name not rendered"; exit 1; }
+printf '%s' "$OUT" | grep -q 'billingMode: PAY_PER_REQUEST'                  || { echo "::error::DynamoDB must be on-demand (PAY_PER_REQUEST)"; exit 1; }
+printf '%s' "$OUT" | grep -q 'hashKey: id'                                   || { echo "::error::DynamoDB default hashKey id not rendered"; exit 1; }
+printf '%s' "$OUT" | grep -A2 'serverSideEncryption:' | grep -q 'enabled: true' || { echo "::error::DynamoDB must enable SSE"; exit 1; }
+printf '%s' "$OUT" | grep -A2 'pointInTimeRecovery:' | grep -q 'enabled: true' || { echo "::error::DynamoDB must enable PITR"; exit 1; }
+printf '%s' "$OUT" | grep -q 'dynamodb:PutItem'                              || { echo "::error::readwrite table must derive dynamodb:PutItem"; exit 1; }
+printf '%s' "$OUT" | grep -q 'arn:aws:dynamodb:us-east-1:[0-9]*:table/refplat-alpha-shop-dev-sessions-' || { echo "::error::derived IAM must be scoped to the table ARN"; exit 1; }
+printf '%s' "$OUT" | grep -q 'SESSIONS_TABLE:'                              || { echo "::error::SESSIONS_TABLE output key missing"; exit 1; }
+echo "  ✓ resources-s3-dev OK (S3 + SQS + SNS topic (SSE/TLS-only/publish+kms) + DynamoDB table (on-demand/SSE/PITR/item IAM); all engine-scoped IAM; web-resources ConfigMap)"
 
-echo "Environment Composition render checks passed (L2a — product-scoped footprint + identity; ADR-073 — S3 + SQS resources)."
+echo "Environment Composition render checks passed (L2a — product-scoped footprint + identity; ADR-073 — S3/SQS/SNS/DynamoDB resources)."

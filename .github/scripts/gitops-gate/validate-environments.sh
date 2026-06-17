@@ -122,7 +122,7 @@ for rel in $ENVIRONMENT_FILES; do
       raccess="$(yq -r "${base}.access // \"read\"" "$f" 2>/dev/null)"
       riso="$(yq -r "${base}.isolation // \"shared\"" "$f" 2>/dev/null)"
       printf '%s' "$rname" | grep -Eq '^[a-z][a-z0-9-]{0,30}$' || note "${pf}: resource name '${rname}' (service ${rsvc}) must match ^[a-z][a-z0-9-]{0,30}$"
-      case "$rkind" in relational|cache|objectstore|stream) ;; *) note "${pf}: resource '${rname}' kind '${rkind}' invalid (relational|cache|objectstore|stream)";; esac
+      case "$rkind" in relational|cache|objectstore|stream|keyvalue) ;; *) note "${pf}: resource '${rname}' kind '${rkind}' invalid (relational|cache|objectstore|stream|keyvalue)";; esac
       case "$raccess" in read|readwrite) ;; *) note "${pf}: resource '${rname}' access '${raccess}' not in {read,readwrite}";; esac
       in_set "$rengine" " $allowed_engines " || note "${pf}: resource '${rname}' engine '${rengine:-<unset>}' not in Team '${team}' envelope.resources.allowedEngines (${allowed_engines:-<none>})"
       [ "$iso_floor" = "dedicated" ] && [ "${riso:-shared}" = "shared" ] && note "${pf}: resource '${rname}' isolation 'shared' is below Team '${team}' isolationFloor 'dedicated'"
