@@ -19,7 +19,3 @@ spec:
       serviceAccount: app-alpha # Pod Identity binds this named SA; the app repo's serviceaccount.yaml creates it
       # image omitted — declared but NOT yet deployed (the first-deploy state). The per-Product ApplicationSet
       # skips this (Environment × Service) pair until the first CI build promotes a digest into k8s/overlays/dev.
-      # Self-service S3 bucket (ADR-073 Phase A): the Composition provisions it safe-by-construction and derives
-      # bucket-scoped read+write IAM onto this service's Pod-Identity role; the name lands in the web-resources CM.
-      resources:
-        uploads: { kind: objectstore, engine: s3, access: readwrite }
