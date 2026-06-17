@@ -94,11 +94,11 @@ spec:
                       properties:
                         allowedEngines:
                           type: array
-                          description: Engines the Team may declare (e.g. s3). Empty/absent = none allowed.
+                          description: Engines the Team may declare (e.g. s3, sqs). Empty/absent = none allowed.
                           default: []
                           items:
                             type: string
-                            enum: ["s3"]
+                            enum: ["s3", "sqs"]
                         maxPerEnvironment:
                           type: integer
                           description: Max self-service resources per Environment (count cap; cost backstop).

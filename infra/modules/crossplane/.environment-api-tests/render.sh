@@ -62,6 +62,14 @@ printf '%s' "$OUT" | grep -q 'arn:aws:s3:::refplat-alpha-shop-dev-uploads-'  || 
 printf '%s' "$OUT" | grep -q 'name: web-resources'                           || { echo "::error::web-resources ConfigMap not rendered"; exit 1; }
 printf '%s' "$OUT" | grep -q 'UPLOADS_BUCKET:'                               || { echo "::error::UPLOADS_BUCKET output key missing from ConfigMap"; exit 1; }
 printf '%s' "$OUT" | grep -q 'ASSETS_BUCKET:'                                || { echo "::error::ASSETS_BUCKET output key missing from ConfigMap"; exit 1; }
-echo "  ✓ resources-s3-dev OK (encrypted/private/versioned/TLS-only buckets, derived bucket-scoped IAM, read≠write, web-resources ConfigMap)"
+# SQS (ADR-073 A.1): a Queue, SSE-SQS on, deny-non-TLS policy, derived queue-scoped IAM, QUEUE_URL output.
+printf '%s' "$OUT" | grep -q 'kind: Queue'                                   || { echo "::error::SQS Queue MR not rendered"; printf '%s\n' "$OUT"; exit 1; }
+printf '%s' "$OUT" | grep -q 'name: refplat-alpha-shop-dev-jobs-'            || { echo "::error::deterministic queue name refplat-alpha-shop-dev-jobs-<hash> not rendered"; exit 1; }
+printf '%s' "$OUT" | grep -q 'sqsManagedSseEnabled: true'                    || { echo "::error::SQS queue must be SSE-SQS encrypted"; exit 1; }
+printf '%s' "$OUT" | grep -q 'sqs:SendMessage'                               || { echo "::error::readwrite queue must derive sqs:SendMessage"; exit 1; }
+printf '%s' "$OUT" | grep -q 'sqs:ReceiveMessage'                            || { echo "::error::queue must derive sqs:ReceiveMessage"; exit 1; }
+printf '%s' "$OUT" | grep -q 'arn:aws:sqs:us-east-1:[0-9]*:refplat-alpha-shop-dev-jobs-' || { echo "::error::derived IAM must be scoped to the queue ARN"; exit 1; }
+printf '%s' "$OUT" | grep -q 'JOBS_QUEUE_URL:'                               || { echo "::error::JOBS_QUEUE_URL output key missing from ConfigMap"; exit 1; }
+echo "  ✓ resources-s3-dev OK (S3: encrypted/private/versioned/TLS-only + bucket-scoped IAM read≠write; SQS: SSE+TLS-only queue + queue-scoped IAM; web-resources ConfigMap)"
 
-echo "Environment Composition render checks passed (L2a — product-scoped footprint + identity; ADR-073 — S3 resources)."
+echo "Environment Composition render checks passed (L2a — product-scoped footprint + identity; ADR-073 — S3 + SQS resources)."

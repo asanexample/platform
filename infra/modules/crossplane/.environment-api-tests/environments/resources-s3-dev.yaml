@@ -1,6 +1,6 @@
-# Self-service cloud resources (ADR-073, Phase A): a dev declares an S3 objectstore on a service. The
-# Composition must render the safe-by-construction Bucket + sub-MRs, DERIVE scoped IAM onto the service's
-# Pod-Identity role, and publish the bucket name into the <svc>-resources ConfigMap.
+# Self-service cloud resources (ADR-073, Phase A): a dev declares S3 objectstores AND an SQS queue on a service.
+# The Composition must render the safe-by-construction MRs per engine, DERIVE scoped IAM onto the service's
+# Pod-Identity role, and publish the names/URLs into the <svc>-resources ConfigMap.
 apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata: { name: shop-dev }
@@ -15,3 +15,4 @@ spec:
       resources:
         uploads: { kind: objectstore, engine: s3, access: readwrite }
         assets: { kind: objectstore, engine: s3, access: read }
+        jobs: { kind: stream, engine: sqs, access: readwrite }

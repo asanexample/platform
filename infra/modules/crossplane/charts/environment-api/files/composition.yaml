@@ -513,6 +513,47 @@ spec:
             {{- $stmts = append $stmts (dict "Effect" "Allow" "Action" $objActions "Resource" (list (printf "%s/*" $bktArn))) }}
             {{- $resOutputs = set $resOutputs (printf "%s_BUCKET" (upper (replace "-" "_" $resName))) $bucket }}
             {{- end }}
+            {{- if eq ($rescfg.engine | default "") "sqs" }}
+            {{- /* Self-service SQS queue (ADR-073 Phase A.1). Deterministic name; region+account+name are all
+                   known, so the ARN + URL are constructed (no post-create lookup needed for outputs/IAM). SQS
+                   queue names allow up to 80 chars. */}}
+            {{- $qFriendly := printf "%s%s-%s-%s-%s" $cfg.resourcePrefix $team $product $stage $resName }}
+            {{- $qHash := substr 0 8 (sha256sum (printf "%s:%s:%s:%s:%s:%s" $cfg.workloadAccountId $team $product $stage $svc $resName)) }}
+            {{- $queue := printf "%s-%s" $qFriendly $qHash }}
+            {{- if gt (len $queue) 80 }}{{- $queue = printf "%s-%s" (substr 0 71 $qFriendly) $qHash }}{{- end }}
+            {{- $qArn := printf "arn:aws:sqs:%s:%s:%s" $cfg.region $cfg.workloadAccountId $queue }}
+            {{- $qUrl := printf "https://sqs.%s.amazonaws.com/%s/%s" $cfg.region $cfg.workloadAccountId $queue }}
+            ---
+            apiVersion: sqs.aws.upbound.io/v1beta1
+            kind: Queue
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: sqs-{{ $svc }}-{{ $resName }}
+            spec:
+              deletionPolicy: Orphan
+              providerConfigRef:
+                name: default
+              forProvider:
+                region: {{ $cfg.region }}
+                name: {{ $queue }}
+                # SSE-SQS (AWS-managed key) — encrypted at rest by default, no workload kms:Decrypt needed (the
+                # standard-tier analog of S3 SSE-S3; per-team CMK is the regulated-tier path, deferred).
+                sqsManagedSseEnabled: true
+                # Deny any non-TLS access to the queue (transport security by construction). Identity-based IAM
+                # on the Pod role grants same-account access; this policy only adds the TLS deny.
+                policy: {{ (dict "Version" "2012-10-17" "Statement" (list (dict "Sid" "DenyInsecureTransport" "Effect" "Deny" "Principal" "*" "Action" "sqs:*" "Resource" $qArn "Condition" (dict "Bool" (dict "aws:SecureTransport" "false"))))) | toJson | quote }}
+                tags:
+                  Team: {{ $team }}
+                  Product: {{ $product }}
+                  Stage: {{ $stage }}
+                  Service: {{ $svc }}
+                  Resource: {{ $resName }}
+            {{- /* DERIVED least-privilege IAM for THIS queue only. read = consume; readwrite = + produce. */}}
+            {{- $qActions := list "sqs:ReceiveMessage" "sqs:DeleteMessage" "sqs:ChangeMessageVisibility" "sqs:GetQueueAttributes" "sqs:GetQueueUrl" }}
+            {{- if eq ($rescfg.access | default "read") "readwrite" }}{{- $qActions = append $qActions "sqs:SendMessage" }}{{- end }}
+            {{- $stmts = append $stmts (dict "Effect" "Allow" "Action" $qActions "Resource" (list $qArn)) }}
+            {{- $resOutputs = set $resOutputs (printf "%s_QUEUE_URL" (upper (replace "-" "_" $resName))) $qUrl }}
+            {{- end }}
             {{- end }}
             {{- if $stmts }}
             ---
