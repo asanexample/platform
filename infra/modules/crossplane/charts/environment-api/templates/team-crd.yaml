@@ -84,6 +84,31 @@ spec:
                       description: Cap on active inbound AccessGrants per Product (ADR-068 §9 sprawl backstop).
                       default: 10
                       minimum: 0
+                    resources:
+                      type: object
+                      description: >-
+                        Self-service cloud-resource bound (ADR-073). DEFAULT-DENY — a Team with no resources
+                        envelope (or an empty allowedEngines) may provision NOTHING; only listed engines, up to
+                        maxPerEnvironment per Environment, at or above the isolationFloor.
+                      default: { allowedEngines: [], maxPerEnvironment: 0, isolationFloor: shared }
+                      properties:
+                        allowedEngines:
+                          type: array
+                          description: Engines the Team may declare (e.g. s3). Empty/absent = none allowed.
+                          default: []
+                          items:
+                            type: string
+                            enum: ["s3"]
+                        maxPerEnvironment:
+                          type: integer
+                          description: Max self-service resources per Environment (count cap; cost backstop).
+                          default: 0
+                          minimum: 0
+                        isolationFloor:
+                          type: string
+                          description: Lowest data-isolation rung the Team may request for a resource.
+                          enum: ["shared", "dedicated"]
+                          default: shared
                 roles:
                   type: object
                   description: >-

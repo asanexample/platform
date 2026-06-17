@@ -249,4 +249,52 @@ spec:
               - key: "{{`{{ request.object.spec.quota.pods }}`}}"
                 operator: GreaterThan
                 value: "{{`{{ team.spec.envelope.quotaCap.pods || '1000000' }}`}}"
+
+    # Self-service cloud resources (ADR-073): every declared resource's engine ∈ Team.envelope.resources.
+    # allowedEngines. DEFAULT-DENY — the Team CRD defaults allowedEngines to [], so a Team that never opted in
+    # admits no engine (AnyNotIn [] ⇒ every engine is "not in" ⇒ deny). Resource-less Environments are a no-op
+    # (the engine list is empty), so this is regression-safe for existing claims.
+    - name: resources-engine-within-envelope
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1beta1/XEnvironment
+      {{- include "ktp.envContext" . | nindent 6 }}
+      {{- include "ktp.teamExistsPrecondition" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: >-
+          a self-service resource requests an engine not in Team
+          '{{`{{ request.object.spec.team }}`}}' envelope.resources.allowedEngines
+          {{`{{ team.spec.envelope.resources.allowedEngines }}`}} (default-deny when unset).
+        deny:
+          conditions:
+            any:
+              - key: "{{`{{ values(request.object.spec.services)[].resources.*.engine[] }}`}}"
+                operator: AnyNotIn
+                value: "{{`{{ team.spec.envelope.resources.allowedEngines }}`}}"
+
+    # total self-service resources across all Services ≤ Team.envelope.resources.maxPerEnvironment (cost
+    # backstop; the CRD defaults it to 0). Resource-less Environments count 0 ≤ cap, so this is a no-op for them.
+    - name: resources-count-within-cap
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1beta1/XEnvironment
+      {{- include "ktp.envContext" . | nindent 6 }}
+      {{- include "ktp.teamExistsPrecondition" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: >-
+          the Environment declares more self-service resources than Team
+          '{{`{{ request.object.spec.team }}`}}' envelope.resources.maxPerEnvironment
+          ({{`{{ team.spec.envelope.resources.maxPerEnvironment }}`}}).
+        deny:
+          conditions:
+            any:
+              - key: "{{`{{ length(values(request.object.spec.services)[].resources.*[]) }}`}}"
+                operator: GreaterThan
+                value: "{{`{{ team.spec.envelope.resources.maxPerEnvironment }}`}}"
 {{- end }}

@@ -96,6 +96,41 @@ for rel in $ENVIRONMENT_FILES; do
     [ "$svc" = "*" ] && note "${pf}: a Service requests a bare '*' IAM action (denied)"
   done < <(yq -r '.spec.services.*.permissions.aws.policyStatements[].actions[] // ""' "$f" 2>/dev/null)
 
+  # --- self-service cloud resources (ADR-073) shift-left: engine ∈ Team allowedEngines (DEFAULT-DENY — empty/
+  #     absent ⇒ nothing), count ≤ maxPerEnvironment, valid name/kind/access, isolation ≥ isolationFloor. Mirrors
+  #     the Kyverno resources-engine-within-envelope / resources-count-within-cap rules (#387). ---
+  allowed_engines=""
+  max_per_env=0
+  iso_floor="shared"
+  if [ -f "$team_f" ]; then
+    allowed_engines="$(yq '.spec.envelope.resources.allowedEngines[] // ""' "$team_f" 2>/dev/null | tr '\n' ' ')"
+    max_per_env="$(yq '.spec.envelope.resources.maxPerEnvironment // 0' "$team_f" 2>/dev/null)"
+    iso_floor="$(yq '.spec.envelope.resources.isolationFloor // "shared"' "$team_f" 2>/dev/null)"
+  fi
+  res_count=0
+  # Index by strenv() (NOT string interpolation) so dev-authored service/resource keys can never alter the query.
+  while IFS= read -r rsvc; do
+    [ -z "$rsvc" ] && continue
+    export _RSVC="$rsvc"
+    while IFS= read -r rname; do
+      [ -z "$rname" ] && continue
+      export _RNAME="$rname"
+      res_count=$((res_count + 1))
+      base='.spec.services[strenv(_RSVC)].resources[strenv(_RNAME)]'
+      rkind="$(yq -r "${base}.kind // \"\"" "$f" 2>/dev/null)"
+      rengine="$(yq -r "${base}.engine // \"\"" "$f" 2>/dev/null)"
+      raccess="$(yq -r "${base}.access // \"read\"" "$f" 2>/dev/null)"
+      riso="$(yq -r "${base}.isolation // \"shared\"" "$f" 2>/dev/null)"
+      printf '%s' "$rname" | grep -Eq '^[a-z][a-z0-9-]{0,30}$' || note "${pf}: resource name '${rname}' (service ${rsvc}) must match ^[a-z][a-z0-9-]{0,30}$"
+      case "$rkind" in relational|cache|objectstore|stream) ;; *) note "${pf}: resource '${rname}' kind '${rkind}' invalid (relational|cache|objectstore|stream)";; esac
+      case "$raccess" in read|readwrite) ;; *) note "${pf}: resource '${rname}' access '${raccess}' not in {read,readwrite}";; esac
+      in_set "$rengine" " $allowed_engines " || note "${pf}: resource '${rname}' engine '${rengine:-<unset>}' not in Team '${team}' envelope.resources.allowedEngines (${allowed_engines:-<none>})"
+      [ "$iso_floor" = "dedicated" ] && [ "${riso:-shared}" = "shared" ] && note "${pf}: resource '${rname}' isolation 'shared' is below Team '${team}' isolationFloor 'dedicated'"
+    done < <(yq -r '.spec.services[strenv(_RSVC)].resources // {} | keys | .[]' "$f" 2>/dev/null)
+  done < <(yq -r '.spec.services // {} | keys | .[]' "$f" 2>/dev/null)
+  unset _RSVC _RNAME
+  [ "$res_count" -le "$max_per_env" ] || note "${pf}: ${res_count} self-service resources exceed Team '${team}' envelope.resources.maxPerEnvironment (${max_per_env})"
+
   echo "   ${pf}: checked"
 done
 

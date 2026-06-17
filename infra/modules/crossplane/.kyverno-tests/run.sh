@@ -78,4 +78,18 @@ must_flag  "$OUT" iambad   "policystatements-no-escalation"  # iam:CreateUser
 must_flag  "$OUT" iamsts   "policystatements-no-escalation"  # sts:AssumeRole (service-prefix subsumption)
 must_flag  "$OUT" iammulti "policystatements-no-escalation"  # escalation hidden in a 2nd service
 
-echo "environment-envelope policy checks passed (tier/stage/residency/quota/team-existence/team-product/customer/iam)."
+# Self-service cloud resources (ADR-073) — engine ∈ allowedEngines + count ≤ maxPerEnvironment. Team alpha opted
+# in to s3, cap 2.
+OUT="$(run_env resources-s3.yaml values-resources-s3.yaml)"
+must_admit "$OUT" okrsrc                                         # 2 s3, both allowed, within cap
+must_admit "$OUT" norsrc                                         # no resources → no-op (regression safety)
+must_flag  "$OUT" badengine "resources-engine-within-envelope"  # engine sqs ∉ [s3]
+must_flag  "$OUT" overcount "resources-count-within-cap"         # 3 > cap 2
+# DEFAULT-DENY: the same resource-bearing claims against a Team with an EMPTY resources envelope (the CRD-
+# defaulted state) must be rejected — engine ∉ [] and count > 0.
+OUT="$(run_env resources-s3.yaml values-resources-noenv.yaml)"
+must_flag  "$OUT" okrsrc "resources-engine-within-envelope"     # s3 ∉ [] (default-deny)
+must_flag  "$OUT" badengine "resources-count-within-cap"        # any count > 0
+must_admit "$OUT" norsrc                                         # still a no-op with no resources
+
+echo "environment-envelope policy checks passed (tier/stage/residency/quota/team-existence/team-product/customer/iam/resources)."

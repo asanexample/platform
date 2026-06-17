@@ -1,0 +1,23 @@
+# Team alpha as the API server defaults it when no resources envelope was authored (allowedEngines [],
+# maxPerEnvironment 0) — the DEFAULT-DENY baseline: any declared resource must be rejected.
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Values
+metadata: { name: values }
+globalValues:
+  team:
+    metadata: { name: alpha }
+    spec:
+      envelope:
+        allowedTiers: ["standard"]
+        allowedStages: ["dev", "prod"]
+        allowedLocations: ["*"]
+        quotaCap: { cpu: "8", memory: "16Gi", pods: 40 }
+        resources:
+          allowedEngines: []
+          maxPerEnvironment: 0
+          isolationFloor: shared
+  product:
+    metadata: { name: alpha-demo }
+    spec:
+      team: alpha
+      tenancy: pooled
