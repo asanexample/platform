@@ -643,6 +643,66 @@ data "aws_iam_policy_document" "provisioner" {
       }
     }
   }
+
+  # Self-service SNS topics (ADR-073 A.1). Topic lifecycle + the safe-config the Composition sets (SSE key,
+  # deny-non-TLS policy, tags). Scoped to refplat-* topic names in-region; the WORKLOAD role gets publish/
+  # subscribe. Added only when the sns provider is installed.
+  dynamic "statement" {
+    for_each = local.enable_environment_provisioning && contains(var.provider_services, "sns") ? [1] : []
+    content {
+      sid    = "EnvironmentSnsTopics"
+      effect = "Allow"
+      actions = [
+        "sns:CreateTopic", "sns:DeleteTopic",
+        "sns:GetTopicAttributes", "sns:SetTopicAttributes",
+        "sns:TagResource", "sns:UntagResource", "sns:ListTagsForResource",
+      ]
+      resources = ["arn:aws:sns:${var.region}:${var.account_id}:${var.environment_resource_prefix}*"]
+      condition {
+        test     = "StringEquals"
+        variable = "aws:RequestedRegion"
+        values   = [var.region]
+      }
+    }
+  }
+
+  # Self-service DynamoDB tables (ADR-073 A.1). Table lifecycle + the safe-config (SSE, PITR, tags). Scoped to
+  # refplat-* table names in-region; the WORKLOAD role gets the item ops. Added only when the dynamodb provider
+  # is installed. ListTables has no resource scope (account-wide); the provider may call it on observe.
+  dynamic "statement" {
+    for_each = local.enable_environment_provisioning && contains(var.provider_services, "dynamodb") ? [1] : []
+    content {
+      sid    = "EnvironmentDynamoDbTables"
+      effect = "Allow"
+      actions = [
+        "dynamodb:CreateTable", "dynamodb:DeleteTable", "dynamodb:DescribeTable", "dynamodb:UpdateTable",
+        "dynamodb:TagResource", "dynamodb:UntagResource", "dynamodb:ListTagsOfResource",
+        # Observe the safe-config the Composition sets.
+        "dynamodb:DescribeContinuousBackups", "dynamodb:UpdateContinuousBackups",
+        "dynamodb:DescribeTimeToLive",
+      ]
+      resources = ["arn:aws:dynamodb:${var.region}:${var.account_id}:table/${var.environment_resource_prefix}*"]
+      condition {
+        test     = "StringEquals"
+        variable = "aws:RequestedRegion"
+        values   = [var.region]
+      }
+    }
+  }
+  dynamic "statement" {
+    for_each = local.enable_environment_provisioning && contains(var.provider_services, "dynamodb") ? [1] : []
+    content {
+      sid       = "EnvironmentDynamoDbList"
+      effect    = "Allow"
+      actions   = ["dynamodb:ListTables"]
+      resources = ["*"]
+      condition {
+        test     = "StringEquals"
+        variable = "aws:RequestedRegion"
+        values   = [var.region]
+      }
+    }
+  }
 }
 
 resource "aws_iam_role_policy" "provisioner" {

@@ -16,3 +16,5 @@ spec:
         uploads: { kind: objectstore, engine: s3, access: readwrite }
         assets: { kind: objectstore, engine: s3, access: read }
         jobs: { kind: stream, engine: sqs, access: readwrite }
+        notify: { kind: stream, engine: sns, access: readwrite }
+        sessions: { kind: keyvalue, engine: dynamodb, access: readwrite }

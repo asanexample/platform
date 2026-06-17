@@ -554,6 +554,91 @@ spec:
             {{- $stmts = append $stmts (dict "Effect" "Allow" "Action" $qActions "Resource" (list $qArn)) }}
             {{- $resOutputs = set $resOutputs (printf "%s_QUEUE_URL" (upper (replace "-" "_" $resName))) $qUrl }}
             {{- end }}
+            {{- if eq ($rescfg.engine | default "") "sns" }}
+            {{- /* Self-service SNS topic (ADR-073 A.1). Deterministic name; ARN constructed from region+account. */}}
+            {{- $tFriendly := printf "%s%s-%s-%s-%s" $cfg.resourcePrefix $team $product $stage $resName }}
+            {{- $tHash := substr 0 8 (sha256sum (printf "%s:%s:%s:%s:%s:%s" $cfg.workloadAccountId $team $product $stage $svc $resName)) }}
+            {{- $topic := printf "%s-%s" $tFriendly $tHash }}
+            {{- if gt (len $topic) 256 }}{{- $topic = printf "%s-%s" (substr 0 247 $tFriendly) $tHash }}{{- end }}
+            {{- $tArn := printf "arn:aws:sns:%s:%s:%s" $cfg.region $cfg.workloadAccountId $topic }}
+            ---
+            apiVersion: sns.aws.upbound.io/v1beta1
+            kind: Topic
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: sns-{{ $svc }}-{{ $resName }}
+            spec:
+              deletionPolicy: Orphan
+              providerConfigRef:
+                name: default
+              forProvider:
+                region: {{ $cfg.region }}
+                name: {{ $topic }}
+                # SSE with the AWS-managed SNS key (standard tier; per-team CMK is the regulated path, deferred).
+                kmsMasterKeyId: alias/aws/sns
+                # Deny any non-TLS access to the topic.
+                policy: {{ (dict "Version" "2012-10-17" "Statement" (list (dict "Sid" "DenyInsecureTransport" "Effect" "Deny" "Principal" "*" "Action" "sns:*" "Resource" $tArn "Condition" (dict "Bool" (dict "aws:SecureTransport" "false"))))) | toJson | quote }}
+                tags:
+                  Team: {{ $team }}
+                  Product: {{ $product }}
+                  Stage: {{ $stage }}
+                  Service: {{ $svc }}
+                  Resource: {{ $resName }}
+            {{- /* DERIVED IAM. read = inspect/subscribe; readwrite = + publish. Publishing to an SSE topic also
+                   needs KMS on the AWS-managed key, scoped to the SNS service via kms:ViaService. */}}
+            {{- $snsActions := list "sns:GetTopicAttributes" "sns:Subscribe" "sns:ListSubscriptionsByTopic" }}
+            {{- if eq ($rescfg.access | default "read") "readwrite" }}{{- $snsActions = append $snsActions "sns:Publish" }}{{- end }}
+            {{- $stmts = append $stmts (dict "Effect" "Allow" "Action" $snsActions "Resource" (list $tArn)) }}
+            {{- if eq ($rescfg.access | default "read") "readwrite" }}
+            {{- $stmts = append $stmts (dict "Effect" "Allow" "Action" (list "kms:GenerateDataKey" "kms:Decrypt") "Resource" (list "*") "Condition" (dict "StringEquals" (dict "kms:ViaService" (printf "sns.%s.amazonaws.com" $cfg.region)))) }}
+            {{- end }}
+            {{- $resOutputs = set $resOutputs (printf "%s_TOPIC_ARN" (upper (replace "-" "_" $resName))) $tArn }}
+            {{- end }}
+            {{- if eq ($rescfg.engine | default "") "dynamodb" }}
+            {{- /* Self-service DynamoDB table (ADR-073 A.1). Deterministic name (external-name pinned, re-adopts). */}}
+            {{- $tblFriendly := printf "%s%s-%s-%s-%s" $cfg.resourcePrefix $team $product $stage $resName }}
+            {{- $tblHash := substr 0 8 (sha256sum (printf "%s:%s:%s:%s:%s:%s" $cfg.workloadAccountId $team $product $stage $svc $resName)) }}
+            {{- $table := printf "%s-%s" $tblFriendly $tblHash }}
+            {{- if gt (len $table) 255 }}{{- $table = printf "%s-%s" (substr 0 246 $tblFriendly) $tblHash }}{{- end }}
+            {{- $tblArn := printf "arn:aws:dynamodb:%s:%s:table/%s" $cfg.region $cfg.workloadAccountId $table }}
+            ---
+            apiVersion: dynamodb.aws.upbound.io/v1beta1
+            kind: Table
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: dynamodb-{{ $svc }}-{{ $resName }}
+                crossplane.io/external-name: {{ $table }}
+            spec:
+              deletionPolicy: Orphan
+              providerConfigRef:
+                name: default
+              forProvider:
+                region: {{ $cfg.region }}
+                # On-demand billing (no capacity planning; cost-safe default). Paved-road default schema: a single
+                # "id" (String) hash key — richer schemas are a future params extension.
+                billingMode: PAY_PER_REQUEST
+                hashKey: id
+                attribute:
+                  - name: id
+                    type: S
+                # Encrypted at rest with the AWS-managed key (transparent — no workload kms perms) + PITR (the
+                # recovery analog of S3 versioning).
+                serverSideEncryption:
+                  - enabled: true
+                pointInTimeRecovery:
+                  - enabled: true
+                tags:
+                  Team: {{ $team }}
+                  Product: {{ $product }}
+                  Stage: {{ $stage }}
+                  Service: {{ $svc }}
+                  Resource: {{ $resName }}
+            {{- /* DERIVED IAM scoped to the table + its indexes. read = read ops; readwrite = + write ops. */}}
+            {{- $ddbActions := list "dynamodb:GetItem" "dynamodb:BatchGetItem" "dynamodb:Query" "dynamodb:Scan" "dynamodb:DescribeTable" "dynamodb:ConditionCheckItem" }}
+            {{- if eq ($rescfg.access | default "read") "readwrite" }}{{- $ddbActions = concat $ddbActions (list "dynamodb:PutItem" "dynamodb:UpdateItem" "dynamodb:DeleteItem" "dynamodb:BatchWriteItem") }}{{- end }}
+            {{- $stmts = append $stmts (dict "Effect" "Allow" "Action" $ddbActions "Resource" (list $tblArn (printf "%s/index/*" $tblArn))) }}
+            {{- $resOutputs = set $resOutputs (printf "%s_TABLE" (upper (replace "-" "_" $resName))) $table }}
+            {{- end }}
             {{- end }}
             {{- if $stmts }}
             ---

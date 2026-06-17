@@ -213,7 +213,7 @@ spec:
                           properties:
                             kind:
                               type: string
-                              enum: ["relational", "cache", "objectstore", "stream"]
+                              enum: ["relational", "cache", "objectstore", "stream", "keyvalue"]
                             engine:
                               type: string
                             class:
