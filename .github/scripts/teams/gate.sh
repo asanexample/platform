@@ -22,6 +22,7 @@
 #   MAX_QUOTA_MEMORY          per-tenant memory ceiling                       (default 256Gi)
 #   MAX_QUOTA_PODS            per-tenant pods ceiling                         (default 500)
 #   MAX_DEDICATED_ISOLATION   envelope.maxDedicatedIsolation.{cluster,account} ceiling (default 0 — pooled only)
+#   MAX_RESOURCES_PER_ENV     envelope.resources.maxPerEnvironment ceiling (ADR-073; default 25)
 #   DENIED_SSO_GROUPS         space/comma-separated privileged groups a team may NOT map to (default platform-admins)
 # Requires: yq (mikefarah), python3.
 set -uo pipefail
@@ -33,11 +34,13 @@ MAX_QUOTA_CPU="${MAX_QUOTA_CPU:-64}"
 MAX_QUOTA_MEMORY="${MAX_QUOTA_MEMORY:-256Gi}"
 MAX_QUOTA_PODS="${MAX_QUOTA_PODS:-500}"
 MAX_DEDICATED_ISOLATION="${MAX_DEDICATED_ISOLATION:-0}"
+MAX_RESOURCES_PER_ENV="${MAX_RESOURCES_PER_ENV:-25}"
 DENIED_SSO_GROUPS="${DENIED_SSO_GROUPS:-platform-admins}"
 
 NAME_RE='^[a-z][a-z0-9-]{1,30}$'
 VALID_TIERS=" standard elevated pci hipaa "
 VALID_STAGES=" dev test uat staging prod "
+VALID_ENGINES=" s3 "
 ENVIRONMENTS_DIR="${BASE_DIR}/gitops/environments"
 
 overall_rc=0
@@ -105,7 +108,7 @@ for tf in $TEAM_FILES; do
     done < <(yq -r '(.spec.roles.releaseApprover // [])[]' "$f" 2>/dev/null)
   fi
   for k in $(yq '.spec.envelope | keys | .[]' "$f" 2>/dev/null); do
-    case "$k" in allowedTiers | allowedStages | allowedLocations | quotaCap | maxDedicatedIsolation | maxCrossTeamGrantsPerProduct) ;; *) note "${tf}: unknown spec.envelope key '${k}'";; esac
+    case "$k" in allowedTiers | allowedStages | allowedLocations | quotaCap | maxDedicatedIsolation | maxCrossTeamGrantsPerProduct | resources) ;; *) note "${tf}: unknown spec.envelope key '${k}'";; esac
   done
 
   # --- required fields ------------------------------------------------------------------------------
@@ -141,6 +144,17 @@ for tf in $TEAM_FILES; do
   mda="$(yq '.spec.envelope.maxDedicatedIsolation.account // 0' "$f")"
   qty_le "$mdc" "$MAX_DEDICATED_ISOLATION" int || note "${tf}: maxDedicatedIsolation.cluster '${mdc}' exceeds the allowed max ${MAX_DEDICATED_ISOLATION} (dedicated isolation is platform-gated)"
   qty_le "$mda" "$MAX_DEDICATED_ISOLATION" int || note "${tf}: maxDedicatedIsolation.account '${mda}' exceeds the allowed max ${MAX_DEDICATED_ISOLATION} (dedicated isolation is platform-gated)"
+  # self-service resources envelope (ADR-073): the CRD enums allowedEngines + isolationFloor but does NOT bound
+  # maxPerEnvironment — cap it (cost backstop). allowedEngines must be platform-known engines.
+  if [ "$(yq '.spec.envelope | has("resources")' "$f")" = "true" ]; then
+    for eng in $(yq '.spec.envelope.resources.allowedEngines[]' "$f" 2>/dev/null); do
+      [[ "$VALID_ENGINES" == *" $eng "* ]] || note "${tf}: envelope.resources.allowedEngines '${eng}' not in {${VALID_ENGINES# }}"
+    done
+    rmax="$(yq '.spec.envelope.resources.maxPerEnvironment // 0' "$f")"
+    qty_le "$rmax" "$MAX_RESOURCES_PER_ENV" int || note "${tf}: envelope.resources.maxPerEnvironment '${rmax}' exceeds the platform max ${MAX_RESOURCES_PER_ENV}"
+    rfloor="$(yq '.spec.envelope.resources.isolationFloor // "shared"' "$f")"
+    case "$rfloor" in shared | dedicated) ;; *) note "${tf}: envelope.resources.isolationFloor '${rfloor}' not in {shared,dedicated}";; esac
+  fi
 
   echo "   ${tf}: checked"
 done
@@ -187,7 +201,7 @@ done
   fi
   echo
   echo "---"
-  echo "_Deny-set: quotaCap ≤ cpu \`${MAX_QUOTA_CPU}\` / mem \`${MAX_QUOTA_MEMORY}\` / pods \`${MAX_QUOTA_PODS}\`, maxDedicatedIsolation ≤ \`${MAX_DEDICATED_ISOLATION}\`, ssoGroup ∉ {\`${DENIED_SSO_GROUPS}\`}._"
+  echo "_Deny-set: quotaCap ≤ cpu \`${MAX_QUOTA_CPU}\` / mem \`${MAX_QUOTA_MEMORY}\` / pods \`${MAX_QUOTA_PODS}\`, maxDedicatedIsolation ≤ \`${MAX_DEDICATED_ISOLATION}\`, resources.maxPerEnvironment ≤ \`${MAX_RESOURCES_PER_ENV}\` (engines ⊆ {\`${VALID_ENGINES# }\`}), ssoGroup ∉ {\`${DENIED_SSO_GROUPS}\`}._"
 } >"$REPORT_MD"
 
 if [ "$overall_rc" -ne 0 ]; then
