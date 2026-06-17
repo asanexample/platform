@@ -577,8 +577,9 @@ spec:
                 region: {{ $cfg.region }}
                 # SSE with the AWS-managed SNS key (standard tier; per-team CMK is the regulated path, deferred).
                 kmsMasterKeyId: alias/aws/sns
-                # Deny any non-TLS access to the topic.
-                policy: {{ (dict "Version" "2012-10-17" "Statement" (list (dict "Sid" "DenyInsecureTransport" "Effect" "Deny" "Principal" "*" "Action" "sns:*" "Resource" $tArn "Condition" (dict "Bool" (dict "aws:SecureTransport" "false"))))) | toJson | quote }}
+                # Deny any non-TLS access to the topic. SNS topic policies reject a bare sns:* (it spans
+                # non-topic-scoped actions — "action out of service scope"), so enumerate the topic actions.
+                policy: {{ (dict "Version" "2012-10-17" "Statement" (list (dict "Sid" "DenyInsecureTransport" "Effect" "Deny" "Principal" "*" "Action" (list "sns:Publish" "sns:Subscribe" "sns:GetTopicAttributes" "sns:SetTopicAttributes" "sns:AddPermission" "sns:RemovePermission" "sns:DeleteTopic" "sns:ListSubscriptionsByTopic") "Resource" $tArn "Condition" (dict "Bool" (dict "aws:SecureTransport" "false"))))) | toJson | quote }}
                 tags:
                   Team: {{ $team }}
                   Product: {{ $product }}
