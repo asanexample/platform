@@ -1,0 +1,17 @@
+# Product "checkout" owned by Team alpha (ADR-067 / ADR-069). The git-native registry
+# entry — delivery (argocd-apps, github-oidc, policy) derives repo/domains from here; it is also projected as a
+# Product CR for admission (image-scope team-alpha/checkout-*, tenancy, owned domains).
+# One repo per product. Authored by the Backstage New Product template (ADR-062 self-service).
+apiVersion: platform.refplat.org/v1beta1
+kind: Product
+metadata:
+  name: alpha-checkout
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/part-of: environment-api
+spec:
+  team: alpha
+  repo: asanexample/alpha-checkout
+  tenancy: pooled
+  defaultIsolation: { compute: dedicated-namespace }
+  domains: []
