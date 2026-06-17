@@ -567,13 +567,14 @@ spec:
             metadata:
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: sns-{{ $svc }}-{{ $resName }}
+                # SNS Topic has no forProvider.name — the topic name IS the external-name (like S3/DynamoDB).
+                crossplane.io/external-name: {{ $topic }}
             spec:
               deletionPolicy: Orphan
               providerConfigRef:
                 name: default
               forProvider:
                 region: {{ $cfg.region }}
-                name: {{ $topic }}
                 # SSE with the AWS-managed SNS key (standard tier; per-team CMK is the regulated path, deferred).
                 kmsMasterKeyId: alias/aws/sns
                 # Deny any non-TLS access to the topic.
