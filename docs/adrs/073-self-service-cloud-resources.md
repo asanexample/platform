@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-17
 
-**Status:** Proposed (draft for review — not yet accepted)
+**Status:** Accepted (2026-06-17)
 
 ## Context
 
@@ -131,6 +131,12 @@ All three produce the *same* governed claim and pass the *same* validation:
    blast-radius, the developer confirms, and it opens the **gated PR**. It is the platform team's expertise made
    always-available and self-service. A **sibling ADR will detail the agent when it is built**; this ADR names it,
    reserves the seam, and fixes its safety boundary (below).
+
+The front-door set is **open-ended** — the governed claim is the only contract, so any channel that produces it
+inherits the entire safety floor. A natural future addition (especially for the Phase-B agent) is a **Slack/chat
+surface**, letting a developer describe a need in Slack and the agent co-author the claim → gated PR there. It is
+a *future consideration* — no Slack workspace exists yet — and it changes nothing below the claim; it is simply
+another producer of the same IR.
 
 ## Security & safety
 
