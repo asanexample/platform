@@ -1,0 +1,9 @@
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata:
+  name: alpha-checkout-dev
+spec:
+  environmentRef: alpha-checkout-dev
+  services:
+    web:
+      digest: sha256:df9add9959bc5fd50735b87b72fc0768e34dfeefe0f87e039958408cf0c312d8
