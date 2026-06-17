@@ -66,6 +66,17 @@ locals {
     local.enable_aws ? ["providerconfigs.aws.upbound.io"] : [],
     var.enable_kubernetes_provider ? ["providerconfigs.kubernetes.crossplane.io"] : [],
   )
+
+  # Content checksum per LOCAL chart, carried as a release value so the helm provider re-renders when any chart
+  # file changes. A template/raw-file-only change (e.g. the Composition in files/, a CRD template, the provider
+  # RBAC) does NOT alter the release's other values, so the provider would otherwise skip the upgrade — the
+  # gotcha that silently dropped the config-chart RBAC and the env_api Composition until a value happened to
+  # change. Hash every file in the chart dir; the value is inert (charts don't read it) but its change forces
+  # the in-place upgrade.
+  chart_checksum = {
+    for c in ["runtime", "config", "environment-api"] :
+    c => sha256(join(",", [for f in sort(tolist(fileset("${path.module}/charts/${c}", "**"))) : filesha256("${path.module}/charts/${c}/${f}")]))
+  }
 }
 
 # ---------------------------------------------------------------------------
@@ -114,11 +125,12 @@ resource "helm_release" "crossplane_runtime" {
   atomic    = var.helm_wait
 
   values = [yamlencode({
-    namespace   = var.namespace
-    waitImage   = var.wait_image
-    providers   = local.providers
-    functions   = var.functions
-    waitForCrds = local.wait_for_crds
+    namespace     = var.namespace
+    waitImage     = var.wait_image
+    providers     = local.providers
+    functions     = var.functions
+    waitForCrds   = local.wait_for_crds
+    chartChecksum = local.chart_checksum["runtime"]
   })]
 
   depends_on = [helm_release.crossplane]
@@ -151,6 +163,7 @@ resource "helm_release" "crossplane_config" {
     enableAws             = local.enable_aws
     enableKubernetes      = var.enable_kubernetes_provider
     ecrProvisionerRoleArn = var.ecr_provisioner_role_arn # platform-ecr ProviderConfig (assumeRoleChain)
+    chartChecksum         = local.chart_checksum["config"]
   })]
 
   depends_on = [helm_release.crossplane_runtime]
@@ -175,6 +188,7 @@ resource "helm_release" "crossplane_environment_api" {
 
   values = [yamlencode({
     providerConfigName = var.providerconfig_name
+    chartChecksum      = local.chart_checksum["environment-api"]
     # The shared environment-developer ClusterRole the Composition's per-environment RoleBindings reference. The retired v1
     # `environment` module used to own it (coexistence → default false); on a fresh v2 build the environment chart creates it.
     createDeveloperClusterRole = var.create_developer_cluster_role
