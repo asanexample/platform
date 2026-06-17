@@ -9,6 +9,16 @@ environments:
     provider: aws
     auth:
       profile: management
+    # After `platctl up --env preprod` restores the workload cluster, repair the platform→preprod path that a
+    # park/restore (or an EKS control-plane ENI rotation) can leave stale: re-apply the platform cross-vpc-dns
+    # unit (re-looks-up preprod's API ENIs → rewrites the PHZ; no-op if already correct) and bounce the platform
+    # ArgoCD controller (clears its cached dead connection to the parked API). Makes the manual scale-up recovery
+    # automatic — see reference_preprod_scaleup_recovery / docs/runbooks.
+    reconnect:
+      units:
+        - { env: platform, unit: cross-vpc-dns }
+      restarts:
+        - { env: platform, namespace: argocd, target: statefulset/argocd-application-controller }
   # prod:
   #   path: infra/live/aws/prod/us-east-1/platform
   #   provider: aws
