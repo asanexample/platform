@@ -23,3 +23,5 @@ spec:
       # derives queue-scoped send/receive IAM onto this service's Pod-Identity role; the URL lands in web-resources.
       resources:
         jobs: { kind: stream, engine: sqs, access: readwrite }
+        events: { kind: stream, engine: sns, access: readwrite }
+        sessions: { kind: keyvalue, engine: dynamodb, access: readwrite }
