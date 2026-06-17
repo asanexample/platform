@@ -40,4 +40,28 @@ printf '%s' "$OUT" | grep -q 'host: shop.example.com'                || { echo "
 printf '%s' "$OUT" | grep -q 'reason: BoundDomain'                   || { echo "::error::bound domain should be reason BoundDomain"; exit 1; }
 echo "  ✓ shop-bigbank-prod OK (customer-ns, ECR team-alpha/shop-api, role Pod-alpha-shop-bigbank-prod-api + Customer tag + RolePolicy + boundary, bound domain Active)"
 
-echo "Environment Composition render checks passed (L2a — product-scoped footprint + identity)."
+echo "== render resources-s3-dev (ADR-073: S3 objectstore on a service) → safe MRs + derived IAM + ConfigMap =="
+OUT="$(render "${here}/environments/resources-s3-dev.yaml")"
+# Bucket name is deterministic <prefix><team>-<product>-<stage>-<name>-<hash>; assert the friendly stem (the
+# 8-char hash suffix varies but the stem is stable).
+printf '%s' "$OUT" | grep -q 'kind: Bucket'                                  || { echo "::error::S3 Bucket MR not rendered"; printf '%s\n' "$OUT"; exit 1; }
+printf '%s' "$OUT" | grep -q 'external-name: refplat-alpha-shop-dev-uploads-' || { echo "::error::deterministic bucket name refplat-alpha-shop-dev-uploads-<hash> not rendered"; exit 1; }
+printf '%s' "$OUT" | grep -q 'kind: BucketPublicAccessBlock'                 || { echo "::error::BucketPublicAccessBlock not rendered (public-access not blocked)"; exit 1; }
+printf '%s' "$OUT" | grep -q 'restrictPublicBuckets: true'                   || { echo "::error::restrictPublicBuckets must be true"; exit 1; }
+printf '%s' "$OUT" | grep -q 'kind: BucketServerSideEncryptionConfiguration' || { echo "::error::SSE config not rendered (bucket unencrypted)"; exit 1; }
+printf '%s' "$OUT" | grep -q 'sseAlgorithm: AES256'                          || { echo "::error::standard tier must be SSE-S3 (AES256)"; exit 1; }
+printf '%s' "$OUT" | grep -q 'kind: BucketVersioning'                        || { echo "::error::BucketVersioning not rendered"; exit 1; }
+printf '%s' "$OUT" | grep -q 'objectOwnership: BucketOwnerEnforced'          || { echo "::error::BucketOwnershipControls BucketOwnerEnforced not rendered"; exit 1; }
+printf '%s' "$OUT" | grep -q 'DenyInsecureTransport'                         || { echo "::error::BucketPolicy must deny non-TLS"; exit 1; }
+# Derived least-privilege IAM: readwrite bucket gets PutObject; the ARN is scoped to the bucket (never *).
+printf '%s' "$OUT" | grep -q 's3:PutObject'                                  || { echo "::error::readwrite resource must derive s3:PutObject"; exit 1; }
+printf '%s' "$OUT" | grep -q 'arn:aws:s3:::refplat-alpha-shop-dev-uploads-'  || { echo "::error::derived IAM must be scoped to the bucket ARN"; exit 1; }
+# read-only resource must NOT be able to write its bucket — there should be exactly one PutObject (uploads).
+[ "$(printf '%s' "$OUT" | grep -c 's3:PutObject')" -eq 1 ]                    || { echo "::error::read-only 'assets' bucket must NOT derive PutObject (only readwrite 'uploads')"; exit 1; }
+# Outputs ConfigMap web-resources carries both bucket names for envFrom consumption.
+printf '%s' "$OUT" | grep -q 'name: web-resources'                           || { echo "::error::web-resources ConfigMap not rendered"; exit 1; }
+printf '%s' "$OUT" | grep -q 'UPLOADS_BUCKET:'                               || { echo "::error::UPLOADS_BUCKET output key missing from ConfigMap"; exit 1; }
+printf '%s' "$OUT" | grep -q 'ASSETS_BUCKET:'                                || { echo "::error::ASSETS_BUCKET output key missing from ConfigMap"; exit 1; }
+echo "  ✓ resources-s3-dev OK (encrypted/private/versioned/TLS-only buckets, derived bucket-scoped IAM, read≠write, web-resources ConfigMap)"
+
+echo "Environment Composition render checks passed (L2a — product-scoped footprint + identity; ADR-073 — S3 resources)."

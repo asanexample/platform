@@ -15,6 +15,7 @@ data:
   workloadAccountId: {{ .Values.environment.workloadAccountId | quote }}
   managementAccountId: {{ .Values.environment.managementAccountId | default "" | quote }}
   clusterName: {{ .Values.environment.clusterName | quote }}
+  resourcePrefix: {{ .Values.environment.resourcePrefix | default "refplat-" | quote }}
   permissionsBoundaryArn: {{ .Values.environment.permissionsBoundaryArn | quote }}
   providerConfigEcr: {{ .Values.environment.providerConfigEcr | quote }}
   pullAccountIds: {{ .Values.environment.pullAccountIds | toJson | quote }}

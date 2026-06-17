@@ -386,14 +386,135 @@ spec:
                 namespace: {{ $ns }}
                 serviceAccount: {{ $svccfg.serviceAccount }}
                 roleArn: arn:aws:iam::{{ $cfg.workloadAccountId }}:role/{{ $role }}
-            {{- $awsPerms := (($svccfg.permissions | default dict).aws | default dict) }}
-            {{- if $awsPerms.policyStatements }}
+            {{- /* IAM for the service Pod-Identity role (ADR-041/047 + ADR-073): explicit policyStatements
+                   (deny-set validated upstream) FIRST, then platform-DERIVED least-privilege for each declared
+                   cloud resource. Resource ARNs + actions are 100% platform-computed — never author-supplied. */}}
             {{- $stmts := list }}
-            {{- range $s := $awsPerms.policyStatements }}
+            {{- $awsPerms := (($svccfg.permissions | default dict).aws | default dict) }}
+            {{- range $s := ($awsPerms.policyStatements | default list) }}
             {{- $st := dict "Effect" ($s.effect | default "Allow") "Action" $s.actions "Resource" $s.resources }}
             {{- if $s.sid }}{{- $st = merge $st (dict "Sid" $s.sid) }}{{- end }}
             {{- $stmts = append $stmts $st }}
             {{- end }}
+            {{- /* Self-service cloud resources (ADR-073). Per declared resource: render the safe-by-construction
+                   MRs, DERIVE scoped IAM into $stmts, and collect the output env var for the <svc>-resources
+                   ConfigMap. Guarded so a resource-less service renders byte-identically to pre-ADR-073. */}}
+            {{- $resOutputs := dict }}
+            {{- range $resName, $rescfg := ($svccfg.resources | default dict) }}
+            {{- if and (eq $rescfg.kind "objectstore") (eq ($rescfg.engine | default "s3") "s3") }}
+            {{- /* Deterministic, platform-controlled name <prefix><team>-<product>-<stage>-<name>-<hash>. The hash
+                   (account + service identity) keeps it globally unique; truncate the friendly part so the whole
+                   name stays <=63. Computed ONCE and reused for external-name + IAM ARN + ConfigMap. */}}
+            {{- $bktFriendly := printf "%s%s-%s-%s-%s" $cfg.resourcePrefix $team $product $stage $resName }}
+            {{- $bktHash := substr 0 8 (sha256sum (printf "%s:%s:%s:%s:%s:%s" $cfg.workloadAccountId $team $product $stage $svc $resName)) }}
+            {{- $bucket := printf "%s-%s" $bktFriendly $bktHash }}
+            {{- if gt (len $bucket) 63 }}{{- $bucket = printf "%s-%s" (substr 0 54 $bktFriendly) $bktHash }}{{- end }}
+            {{- $bktArn := printf "arn:aws:s3:::%s" $bucket }}
+            ---
+            apiVersion: s3.aws.upbound.io/v1beta1
+            kind: Bucket
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: s3-{{ $svc }}-{{ $resName }}
+                crossplane.io/external-name: {{ $bucket }}
+            spec:
+              deletionPolicy: Orphan
+              providerConfigRef:
+                name: default
+              forProvider:
+                region: {{ $cfg.region }}
+                tags:
+                  Team: {{ $team }}
+                  Product: {{ $product }}
+                  Stage: {{ $stage }}
+                  Service: {{ $svc }}
+                  Resource: {{ $resName }}
+            ---
+            apiVersion: s3.aws.upbound.io/v1beta1
+            kind: BucketPublicAccessBlock
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: s3-pab-{{ $svc }}-{{ $resName }}
+            spec:
+              deletionPolicy: Orphan
+              providerConfigRef:
+                name: default
+              forProvider:
+                region: {{ $cfg.region }}
+                bucket: {{ $bucket }}
+                blockPublicAcls: true
+                blockPublicPolicy: true
+                ignorePublicAcls: true
+                restrictPublicBuckets: true
+            ---
+            apiVersion: s3.aws.upbound.io/v1beta1
+            kind: BucketServerSideEncryptionConfiguration
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: s3-sse-{{ $svc }}-{{ $resName }}
+            spec:
+              deletionPolicy: Orphan
+              providerConfigRef:
+                name: default
+              forProvider:
+                region: {{ $cfg.region }}
+                bucket: {{ $bucket }}
+                rule:
+                  - applyServerSideEncryptionByDefault:
+                      - sseAlgorithm: AES256
+            ---
+            apiVersion: s3.aws.upbound.io/v1beta1
+            kind: BucketVersioning
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: s3-ver-{{ $svc }}-{{ $resName }}
+            spec:
+              deletionPolicy: Orphan
+              providerConfigRef:
+                name: default
+              forProvider:
+                region: {{ $cfg.region }}
+                bucket: {{ $bucket }}
+                versioningConfiguration:
+                  - status: Enabled
+            ---
+            apiVersion: s3.aws.upbound.io/v1beta1
+            kind: BucketOwnershipControls
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: s3-own-{{ $svc }}-{{ $resName }}
+            spec:
+              deletionPolicy: Orphan
+              providerConfigRef:
+                name: default
+              forProvider:
+                region: {{ $cfg.region }}
+                bucket: {{ $bucket }}
+                rule:
+                  - objectOwnership: BucketOwnerEnforced
+            ---
+            apiVersion: s3.aws.upbound.io/v1beta1
+            kind: BucketPolicy
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: s3-pol-{{ $svc }}-{{ $resName }}
+            spec:
+              deletionPolicy: Orphan
+              providerConfigRef:
+                name: default
+              forProvider:
+                region: {{ $cfg.region }}
+                bucket: {{ $bucket }}
+                policy: {{ (dict "Version" "2012-10-17" "Statement" (list (dict "Sid" "DenyInsecureTransport" "Effect" "Deny" "Principal" "*" "Action" "s3:*" "Resource" (list $bktArn (printf "%s/*" $bktArn)) "Condition" (dict "Bool" (dict "aws:SecureTransport" "false"))))) | toJson | quote }}
+            {{- /* DERIVED least-privilege IAM for THIS bucket only — tenancy isolation lives here. */}}
+            {{- $objActions := list "s3:GetObject" }}
+            {{- if eq ($rescfg.access | default "read") "readwrite" }}{{- $objActions = list "s3:GetObject" "s3:PutObject" "s3:DeleteObject" "s3:AbortMultipartUpload" }}{{- end }}
+            {{- $stmts = append $stmts (dict "Effect" "Allow" "Action" (list "s3:ListBucket" "s3:GetBucketLocation") "Resource" (list $bktArn)) }}
+            {{- $stmts = append $stmts (dict "Effect" "Allow" "Action" $objActions "Resource" (list (printf "%s/*" $bktArn))) }}
+            {{- $resOutputs = set $resOutputs (printf "%s_BUCKET" (upper (replace "-" "_" $resName))) $bucket }}
+            {{- end }}
+            {{- end }}
+            {{- if $stmts }}
             ---
             apiVersion: iam.aws.upbound.io/v1beta1
             kind: RolePolicy
@@ -406,6 +527,31 @@ spec:
               forProvider:
                 role: {{ $role }}
                 policy: {{ (dict "Version" "2012-10-17" "Statement" $stmts) | toJson | quote }}
+            {{- end }}
+            {{- if $resOutputs }}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: resources-configmap-{{ $svc }}
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: ConfigMap
+                  metadata:
+                    name: {{ $svc }}-resources
+                    namespace: {{ $ns }}
+                    labels:
+                      app.kubernetes.io/managed-by: crossplane
+                      platform.refplat.org/team: {{ $team }}
+                  data:
+                    {{- range $k, $v := $resOutputs }}
+                    {{ $k }}: {{ $v | quote }}
+                    {{- end }}
             {{- end }}
             {{- end }}
             {{- end }}

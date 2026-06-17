@@ -179,6 +179,12 @@ variable "environment_repo_prefix" {
   default     = "team-"
 }
 
+variable "environment_resource_prefix" {
+  description = "Name prefix for self-service cloud resources the Composition provisions (ADR-073). S3 buckets are named '<prefix><team>-<product>-<stage>-<name>-<hash>'; the provisioner role's S3 actions are scoped to '<prefix>*'. The same prefix is passed to the Composition's EnvironmentConfig so the rendered names always fall inside the role's grant."
+  type        = string
+  default     = "refplat-"
+}
+
 # ---------------------------------------------------------------------------
 # Environment provisioning (P2b) — the privileged identity that creates environment AWS resources
 # ---------------------------------------------------------------------------
