@@ -40,7 +40,7 @@ DENIED_SSO_GROUPS="${DENIED_SSO_GROUPS:-platform-admins}"
 NAME_RE='^[a-z][a-z0-9-]{1,30}$'
 VALID_TIERS=" standard elevated pci hipaa "
 VALID_STAGES=" dev test uat staging prod "
-VALID_ENGINES=" s3 "
+VALID_ENGINES=" s3 sqs "
 ENVIRONMENTS_DIR="${BASE_DIR}/gitops/environments"
 
 overall_rc=0

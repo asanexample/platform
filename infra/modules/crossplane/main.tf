@@ -587,6 +587,48 @@ data "aws_iam_policy_document" "provisioner" {
       }
     }
   }
+
+  # Self-service SQS queues (ADR-073 Phase A.1). Queue lifecycle + the safe-config the Composition sets (SSE,
+  # deny-non-TLS policy, tags). Scoped to `${var.environment_resource_prefix}*` queue names in this region/
+  # account; the WORKLOAD role gets the per-queue send/receive. Added only when the sqs provider is installed.
+  dynamic "statement" {
+    for_each = local.enable_environment_provisioning && contains(var.provider_services, "sqs") ? [1] : []
+    content {
+      sid    = "EnvironmentSqsQueues"
+      effect = "Allow"
+      actions = [
+        "sqs:CreateQueue", "sqs:DeleteQueue",
+        "sqs:GetQueueAttributes", "sqs:SetQueueAttributes", "sqs:GetQueueUrl",
+        "sqs:TagQueue", "sqs:UntagQueue", "sqs:ListQueueTags",
+        # Manage the queue access policy (the deny-non-TLS statement).
+        "sqs:AddPermission", "sqs:RemovePermission",
+        # Observe: the provider lists a queue's DLQ source relationships on reconcile.
+        "sqs:ListDeadLetterSourceQueues",
+      ]
+      resources = ["arn:aws:sqs:${var.region}:${var.account_id}:${var.environment_resource_prefix}*"]
+      condition {
+        test     = "StringEquals"
+        variable = "aws:RequestedRegion"
+        values   = [var.region]
+      }
+    }
+  }
+  # sqs:ListQueues has no resource-level scope (account-wide enumeration); the provider may call it on observe.
+  # Read-only, pinned to this region. Separate statement so the CRUD actions above stay scoped to refplat-*.
+  dynamic "statement" {
+    for_each = local.enable_environment_provisioning && contains(var.provider_services, "sqs") ? [1] : []
+    content {
+      sid       = "EnvironmentSqsList"
+      effect    = "Allow"
+      actions   = ["sqs:ListQueues"]
+      resources = ["*"]
+      condition {
+        test     = "StringEquals"
+        variable = "aws:RequestedRegion"
+        values   = [var.region]
+      }
+    }
+  }
 }
 
 resource "aws_iam_role_policy" "provisioner" {
