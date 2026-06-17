@@ -97,8 +97,14 @@ inputs = {
   # admission username is that role's
   # assumed-role ARN, not the in-cluster argocd SA. Allow it past restrict-environment-control-plane (ADR-046/048).
   # Scoped to THIS (preprod) account; the `ArgoCD` role + EKS access entry are platform-owned.
+  # PlatformDeployer is the IaC principal that OWNS the control-plane resources (it creates the ProviderConfigs
+  # via this very unit) — exclude it too, or any re-apply that re-patches a ProviderConfig is denied at admission
+  # (the initial create slipped in before this policy existed). Same convention as the policy module's deny-set.
   environment_policy_values = {
-    extraExcludePrincipals = ["arn:aws:sts::${include.base.locals.account_ids["preprod"]}:assumed-role/ArgoCD/*"]
+    extraExcludePrincipals = [
+      "arn:aws:sts::${include.base.locals.account_ids["preprod"]}:assumed-role/ArgoCD/*",
+      "arn:aws:sts::${include.base.locals.account_ids["preprod"]}:assumed-role/PlatformDeployer/*",
+    ]
     # v3 cutover (ADR-067): activate restrict-environment-envelope (#387) — the XEnvironment envelope check
     # (team-matches-product, stage/tier/residency/quota within the Team envelope, policyStatements deny-set).
     enableEnvironmentEnvelope = true
