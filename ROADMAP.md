@@ -61,7 +61,7 @@ _Actively in flight or next-up._
 
 **Developer Portal**
 
-- [#554](https://github.com/asanexample/platform/issues/554) ADR-073 Phase B: conversational resource agent
+- [#554](https://github.com/asanexample/platform/issues/554) Epic: conversational resource agent (ADR-073 Phase B)
 
 ### Next
 
@@ -74,13 +74,11 @@ _Queued — the near-term build order._
 - [#363](https://github.com/asanexample/platform/issues/363) P4.2 (ADR-068): Access-model-as-code — Product roles in Keycloak
 - [#364](https://github.com/asanexample/platform/issues/364) P4.3 (ADR-068): OIDC-native developer cluster auth (EKS OIDC IdP)
 - [#365](https://github.com/asanexample/platform/issues/365) P4.4 (ADR-068): Fan-out — ArgoCD RBAC + Backstage permissions from product roles
-- [#366](https://github.com/asanexample/platform/issues/366) P4.5 (ADR-068): release-approver + gated prod promotion
 - [#367](https://github.com/asanexample/platform/issues/367) P4.6 (ADR-068): team-admin governance + grant lifecycle (request/TTL/re-attest)
 - [#368](https://github.com/asanexample/platform/issues/368) P4.7 (ADR-068): Two-plane grant enforcement (access-grant-gate CI + Kyverno)
 
 **GitOps & Delivery**
 
-- [#377](https://github.com/asanexample/platform/issues/377) P2 (ADR-067): Promotion — promote-by-digest, auto ≤ staging, gated prod
 - [#500](https://github.com/asanexample/platform/issues/500) P2.4 (ADR-056): progressive delivery for prod — Argo Rollouts
 - [#502](https://github.com/asanexample/platform/issues/502) P2.6: multi-service Request Promotion template
 - **Immutable release + environment-binding promotion** — Net-new delta. Builds ON the shipped Release-CRD digest promotion (ADR-071) + release-keyed ApplicationSet (#495, done) + promotion ladder (#377). New = an immutable release as the artifact and a binding as the promotion/rollback primitive (rollback = re-point the binding).
@@ -89,17 +87,10 @@ _Queued — the near-term build order._
 
 - [#285](https://github.com/asanexample/platform/issues/285) BACK P5: provisioning visibility — polished experience (ADR-064)
 - [#356](https://github.com/asanexample/platform/issues/356) Backstage: unified "in-flight" view of teams/tenants (open requests + provisioning-not-Ready)
-- [#178](https://github.com/asanexample/platform/issues/178) Epic: Developer self-service via the BACK stack (ADR-046)
-- [#370](https://github.com/asanexample/platform/issues/370) P1 (ADR-067): New Service + multi-env starter + Product-as-System + product-scoped identity
-- [#386](https://github.com/asanexample/platform/issues/386) P1 prereq: create asanexample/golden-path-starters + scaffolder read access
-- [#372](https://github.com/asanexample/platform/issues/372) P1.2/L3a (ADR-067): New Product scaffolder template (repo-on-demand, language picker)
-- [#375](https://github.com/asanexample/platform/issues/375) P1.5 (ADR-067): Platform-injection of namespace + hostname (ns-agnostic manifests)
-- [#376](https://github.com/asanexample/platform/issues/376) P1.6 (ADR-067): Multi-env starter (base/overlays + stage-picker; fix app-bravo hardcoded namespace)
 - **Golden paths as first-class API objects** — Net-new delta. Today paved roads are scaffolder cookiecutter templates (shipped, ADR-062). New = model golden paths as queryable, composable platform API objects the platform reasons about. Relates #358 (add service to existing repo).
 
 **Environment & Resource Control Plane**
 
-- [#555](https://github.com/asanexample/platform/issues/555) Epic: self-service cloud resources — the resource paved road (ADR-073)
 - [#391](https://github.com/asanexample/platform/issues/391) Secrets paved-road: tenant app config & secrets (ADR-070)
 
 **Cost & FinOps**
