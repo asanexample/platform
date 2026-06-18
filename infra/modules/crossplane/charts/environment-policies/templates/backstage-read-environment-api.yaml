@@ -16,6 +16,22 @@ rules:
   - apiGroups: ["platform.refplat.org"]
     resources: ["xenvironments", "products", "teams"]
     verbs: ["get", "list", "watch"]
+  # Self-service resource MRs (ADR-073/#574): the catalog Kubernetes tab reads the live status of an Environment's
+  # cloud resources. They're provisioned as the namespaced (aws.m.upbound.io) MR family in the env namespace; grant
+  # the Backstage reader the same read on the four developer-facing kinds the K8s plugin is configured to fetch
+  # (backstage/main.tf customResources). Sub-MRs/RolePolicy aren't surfaced, so they're not granted here.
+  - apiGroups: ["s3.aws.m.upbound.io"]
+    resources: ["buckets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["sqs.aws.m.upbound.io"]
+    resources: ["queues"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["sns.aws.m.upbound.io"]
+    resources: ["topics"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["dynamodb.aws.m.upbound.io"]
+    resources: ["tables"]
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

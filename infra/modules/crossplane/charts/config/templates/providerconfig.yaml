@@ -8,6 +8,19 @@ metadata:
 spec:
   credentials:
     source: PodIdentity
+---
+# Same Pod Identity creds for the Crossplane v2 *namespaced* provider family (aws.m.upbound.io). The
+# tenant resource plane (per-env S3/SQS/SNS/DynamoDB MRs) is composed as namespaced MRs that live in the
+# environment namespace (ADR-073) so the catalog/Backstage K8s plugin can read their live status; namespaced
+# MRs resolve credentials from a config in the .m. family, not the legacy ProviderConfig above. Cluster-scoped
+# (one object, mirrors the legacy ProviderConfig) — referenced as `providerConfigRef.kind: ClusterProviderConfig`.
+apiVersion: aws.m.upbound.io/v1beta1
+kind: ClusterProviderConfig
+metadata:
+  name: {{ .Values.providerConfigName }}
+spec:
+  credentials:
+    source: PodIdentity
 {{- if .Values.ecrProvisionerRoleArn }}
 ---
 # Cross-account ECR: Pod Identity base creds (the preprod provisioning role) chained into the platform

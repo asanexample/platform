@@ -74,7 +74,7 @@ locals {
   # change. Hash every file in the chart dir; the value is inert (charts don't read it) but its change forces
   # the in-place upgrade.
   chart_checksum = {
-    for c in ["runtime", "config", "environment-api"] :
+    for c in ["runtime", "config", "environment-api", "environment-policies"] :
     c => sha256(join(",", [for f in sort(tolist(fileset("${path.module}/charts/${c}", "**"))) : filesha256("${path.module}/charts/${c}/${f}")]))
   }
 }
@@ -243,7 +243,12 @@ resource "helm_release" "crossplane_environment_policies" {
   # Defaults (chart values.yaml) reproduce what the policy unit passed for these two policies pre-move:
   # control-plane Enforce, envelope Audit-first, failurePolicy Fail, crossplane-system in the skip list. The
   # unit can override (e.g. enableEnvironmentEnvelope=true at the cutover) via var.environment_policy_values.
-  values = [yamlencode(var.environment_policy_values)]
+  # chartChecksum (inert key) forces a helm upgrade when any chart template changes — same mechanism as the
+  # config/environment-api releases. Without it, edits to this chart's templates (e.g. the backstage-read RBAC,
+  # #574) don't re-apply on terragrunt apply because helm_release tracks values, not chart-dir content.
+  values = [yamlencode(merge(var.environment_policy_values, {
+    chartChecksum = local.chart_checksum["environment-policies"]
+  }))]
 
   depends_on = [helm_release.crossplane_environment_api]
 }

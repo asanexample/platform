@@ -93,7 +93,24 @@ locals {
           # lookup 403s and shows a spurious "problem retrieving objects" warning. Skip it (workloads/health
           # still render). Grant metrics RBAC + flip this off later if CPU/memory usage is wanted.
           skipMetricsLookup = true
-        }, try(c.assume_role, null) != null && try(c.assume_role, "") != "" ? { assumeRole = c.assume_role } : {})]
+          },
+          try(c.assume_role, null) != null && try(c.assume_role, "") != "" ? { assumeRole = c.assume_role } : {},
+          # Crossplane self-service resource MRs (ADR-073/#574): surface live provisioning status (Ready/Syncing) of
+          # an Environment's cloud resources on its catalog Kubernetes tab. The plugin only fetches *namespaced*
+          # objects, so the Composition provisions these as the namespaced (aws.m.upbound.io) MR family in the env
+          # namespace; the Environment entity's kubernetes-namespace + label-selector annotations (from
+          # platform-projection) scope the query. Only the four primary resource kinds are surfaced (S3
+          # sub-MRs/RolePolicy aren't developer-facing). Scoped PER-CLUSTER to the cross-account WORKLOAD clusters
+          # (assume_role set) — the local platform/management cluster doesn't run the environment-api, so these CRDs
+          # don't exist there and a global customResources would 403 on it (authz denies the unserved group before
+          # the 404). New workload clusters inherit this automatically.
+          try(c.assume_role, null) != null && try(c.assume_role, "") != "" ? { customResources = [
+            { group = "s3.aws.m.upbound.io", apiVersion = "v1beta1", plural = "buckets" },
+            { group = "sqs.aws.m.upbound.io", apiVersion = "v1beta1", plural = "queues" },
+            { group = "sns.aws.m.upbound.io", apiVersion = "v1beta1", plural = "topics" },
+            { group = "dynamodb.aws.m.upbound.io", apiVersion = "v1beta1", plural = "tables" },
+          ] } : {},
+        )]
       }]
     }
   } : {}
