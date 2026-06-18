@@ -19,3 +19,11 @@ spec:
       serviceAccount: app-alpha # Pod Identity binds this named SA; the app repo's serviceaccount.yaml creates it
       # image omitted — declared but NOT yet deployed (the first-deploy state). The per-Product ApplicationSet
       # skips this (Environment × Service) pair until the first CI build promotes a digest into k8s/overlays/dev.
+      # ADR-073 conformance harness: declare one of every engine so the app's /selftest can exercise the full
+      # paved road at runtime (Pod Identity → derived IAM → S3/SQS/SNS/DynamoDB). Names map to the
+      # web-resources ConfigMap keys the app reads (BLOB_BUCKET / JOBS_QUEUE_URL / EVENTS_TOPIC_ARN / SESSIONS_TABLE).
+      resources:
+        blob: { kind: objectstore, engine: s3, access: readwrite }
+        jobs: { kind: stream, engine: sqs, access: readwrite }
+        events: { kind: stream, engine: sns, access: readwrite }
+        sessions: { kind: keyvalue, engine: dynamodb, access: readwrite }
