@@ -131,10 +131,10 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # 8c029ab1 (backstage#46) surfaces self-service cloud resources (ADR-073) in the catalog: the v3 projection
-  # emits a kind:Resource per declared services.<svc>.resources.<name>, dependencyOf its Service Component.
-  # Carries forward 16ce1f23 (deprovision repoAction, #43) + d7abb78a (#42) + 754254ba (#41) + the projection (#38).
-  image_tag = "8c029ab17f32e97f22589d4a54aa6c5ffa1a4833"
+  # dd4bad6d (backstage#47) adds the platform:add-service-resource action that backs the New Resource template
+  # (ADR-073 #553 self-service write path). Carries forward 8c029ab1 (the resource catalog projection, #46) +
+  # 16ce1f23 (#43) + d7abb78a (#42) + 754254ba (#41) + the v1beta1 projection (#38).
+  image_tag = "dd4bad6dac498b107cd021c53e3f473784de7a73"
 
   # platform-projection catalog mode = v3 (Product=System, Environment=custom kind). The v2 projection branch is
   # inert (nothing reads it); removing it + this flag is a backstage-repo follow-up.
