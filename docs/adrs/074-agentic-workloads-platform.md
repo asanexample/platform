@@ -41,8 +41,9 @@ makes every agent — in-house or third-party — safe by construction:
 
 1. Agents are **constrained, grounded, propose-only** assistants (LLM-guided slot-filling toward a fixed governed
    artifact), **never autonomous actors with infrastructure privilege.**
-2. An **`Agent` is a first-class CRD** — a declarative, Kyverno-governed, catalog-projected, git-native spec that the
-   substrate reconciles into a running workload, exactly as `XEnvironment` is reconciled today.
+2. An agent is a **declarative, Kyverno-governed, git-native spec**, delivered and gated like our other workloads.
+   *Whether that spec is a first-class `Agent` CRD (reconciled as `XEnvironment` is) or starts as a plain service is a
+   hypothesis tier-0 validates* — we do not commit to the CRD shape before a single agent exists.
 3. The substrate supplies the cross-cutting concerns once — **identity & authority, disposition (the gate), the LLM
    data boundary, risk-tiering, evaluation, lifecycle, cost, and observability** — and every agent inherits them.
 4. The whole design is **cross-walked to the IMDA MGF**, and **safety invariants are not configurable.**
@@ -50,6 +51,12 @@ makes every agent — in-house or third-party — safe by construction:
 The resource agent (ADR-075) is **tier-0: the first reference tenant and deliberate low-stakes proving ground** — not
 the killer app. It exercises every substrate primitive end-to-end at minimal risk; the high-value agents come once the
 substrate is proven.
+
+**What this ADR commits to vs. records as direction.** *Firm — accept now (the tier-0 spine):* propose-only,
+zero-infrastructure-privilege, gate-first disposition, tier-0 as a low-stakes proving ground, and the build-vs-adopt
+stance. *Directional — designed-for so we don't paint ourselves into a corner, but re-decided before each is built:*
+the `Agent` CRD shape, autonomous agent-to-agent, eval-as-a-service beyond the oracle-able case, the model gateway, and
+the configurability framework. Accepting this ADR commits us to the spine, not to the far-future specifics.
 
 ## The design
 
@@ -94,7 +101,9 @@ This is what permits eventual *autonomous* agent-to-agent chains to run without 
 ### The LLM data boundary
 
 The **context window is an authz boundary** — assembled strictly within the caller's team scope (reusing the
-permission model), so cross-tenant context is structurally impossible. A **tier-keyed data-classification gate** governs
+permission model), so cross-tenant context is never *assembled*. (This bounds what an agent can be *given*, not what an
+injection can steer it to *propose* — that is caught downstream by the gate, which is the real protection; Spike 2
+confirmed it held 140/140.) A **tier-keyed data-classification gate** governs
 what data classes may enter context; **secrets never enter context** (invariant). Model API use is under
 **zero-retention / no-training** terms. Egress is **per-cluster / per-compliance-tier**: in a regulated (PCI/HIPAA)
 cluster an agent egresses only to a **compliant model endpoint** or **not at all** (Cilium egress control).
@@ -134,6 +143,11 @@ The **model gateway** is the enforcement point — metering, per-tenant/agent bu
 (runaway guard, which also ties to the kill-switch). Agent inference cost is a new **cost source that folds into the
 broader (greenfield) platform FinOps effort** — not a parallel system.
 
+*Reconciled with the component spike (Spike 3):* a dedicated model gateway is **deferred** — at tier-0 the metering
+seam is **Anthropic Workspaces + the Usage/Cost API + per-workspace rate limits** (no new infra; the rate cap is the
+runaway guard), adopting a gateway (e.g. a hardened LiteLLM) only when multi-agent, multi-provider, or in-line
+request-time cutoffs actually demand it.
+
 ### Multi-agent & autonomous agent-to-agent (A2A)
 
 Cascading failure is **prevented by construction**: propose-don't-act + no-bypass mean one agent's bad output can't
@@ -154,8 +168,8 @@ no-bypass, and zero-privilege-by-default are never knobs.
 
 **Reuse** the platform (runtime, identity, delivery, policy, observability). **Adopt** commodity plumbing — the
 **AI/model gateway**, **MCP**, Claude **structured outputs / tool use**, **guardrail libraries**, an **eval harness**,
-and **OpenTelemetry GenAI** tracing. **Build** the governed integration that ties them to our substrate — **that is the
-moat.** **Do not adopt a wholesale agent platform**: it would bring its own runtime/identity/governance that conflicts
+and **OpenTelemetry GenAI** tracing (the agent-observability design is **ADR-076**). **Build** the governed
+integration that ties them to our substrate — **that is the moat.** **Do not adopt a wholesale agent platform**: it would bring its own runtime/identity/governance that conflicts
 with the governed-infra substrate that is our entire differentiator. Specific tool selections are a de-risking spike.
 
 ### User experience
@@ -196,6 +210,34 @@ model, the form as oracle and fallback — to prove the substrate end-to-end bef
 **Prerequisite:** the unified access model (AccessGrant, ADR-068) is today a CRD shell with no enforcement and is
 rebuild-gated; it is a prerequisite for the *broader* substrate (autonomous/cross-team agents), **not** for tier-0
 (which rides the existing Keycloak model). The agent initiative is the concrete forcing function to prioritize it.
+
+## Honest limits & open gaps
+
+Stated plainly so they aren't mistaken for solved:
+
+- **The reuse is the easy part; the safety machinery is net-new.** The existing substrate governs the *container*, not
+  the *model's behavior*. Eval-as-a-service, the data boundary, the kill-switch, prompt-as-artifact, and the metering
+  seam are all new — that is where the real work and risk live. "Not greenfield" is true of the plumbing, not of agent
+  safety.
+- **The "many agents" thesis is a bet.** If few materialize, the substrate is over-investment. Substrate primitives
+  must be **pulled by the second and third real agent**, not built ahead on faith; the post-tier-0 decision gate is
+  where that bet is re-evaluated.
+- **The unified access model is aspirational.** The three-identity / intersection / attenuating-delegation design
+  rides AccessGrant (ADR-068), which is a CRD shell with no enforcement and is rebuild-gated. Until P4 is real, tier-0
+  uses the existing Keycloak model — so "one access model" is the target, not the interim reality.
+- **The `auto-policy-gate` is the autonomy seam and is under-specified here.** It is precisely where "propose-don't-act"
+  can become "act if policy allows." What counts as low-risk/reversible, and who classifies it, needs its own rigorous
+  design before any autonomous use — not a sub-bullet.
+- **Evaluation generalizes only to the oracle-able case.** Tier-0 works because the claim is machine-checkable and the
+  form is a deterministic oracle. The high-value agents have no oracle; their eval degrades to LLM-judge + human, which
+  is itself unreliable (judge bias/calibration — Spike 3). Eval-as-a-service is a solved primitive *only for the easy
+  case*; the hard case is open.
+- **Third-party agents are a claimed driver with no design yet.** What running a third-party agent means (a container,
+  an MCP server, a called SaaS) and how trust is established beyond cosign/SLSA is an open follow-up, not a decided
+  model.
+- **"Safety invariants are not configurable" needs an enforcement mechanism.** The invariants (propose-only, no-bypass,
+  zero-privilege, intersection/attenuation) must be expressible as admission policy that makes a violating agent
+  *un-admittable*; that Kyverno surface is to be designed, or the invariants are only an intention.
 
 ## Consequences
 

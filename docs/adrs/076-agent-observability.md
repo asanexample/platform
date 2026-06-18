@@ -56,7 +56,8 @@ simultaneously:
 - the **debug record** (the causal chain when something goes wrong).
 
 Instrumenting this once, with stable span/attribute names, is the load-bearing decision — it is why the metering,
-eval, and AgentOps efforts do not each build a parallel telemetry path.
+eval, and AgentOps efforts do not each build a parallel telemetry path. The full span tree is the **designed-for end
+state**; **tier-0 emits only a minimal subset** (proposal accepted/abandoned + token/cost) — see D6.
 
 ### D3 — Content capture is governed by the ADR-074 data boundary
 
@@ -70,8 +71,10 @@ those rules verbatim:
   collector-side redaction the #102 plan already specifies), and is **stored in-cluster only — never shipped to a
   SaaS observability backend.**
 - **Secrets in telemetry is a hard never** (an invariant, not a tier knob), mirroring secrets-never-in-context.
-- **Regulated tiers (ADR-013 hipaa/pci) may be metadata-only** — content capture off entirely where the tier
-  demands it.
+- **Regulated tiers (ADR-013 hipaa/pci) default to metadata-only** — content capture off, because reliable secret/PII
+  redaction of free-form prompts/responses is itself an *unsolved, best-effort* problem (the same class as
+  prompt-injection detection); we do not rely on redaction as a guarantee. Content-with-redaction is opt-in and
+  best-effort, in non-regulated tiers only.
 
 This per-tier content rule is what makes this an *agent* observability decision rather than a generic one.
 

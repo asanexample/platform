@@ -13,15 +13,18 @@ Be clear-eyed about its value. The deterministic New Resource form already serve
 need* (it's a tiny 4-field domain). The resource agent's real value is the **uncertain** developer — "I need somewhere
 to put uploaded files" — whom it helps via elicitation and cost/tradeoff explanation. Its **primary job, though, is to
 prove the substrate end-to-end at minimal risk**, because its artifact (the claim) is uniquely *machine-checkable* (the
-existing gate) and has a *deterministic oracle* (the form). It is not the killer app; it is the safe pipe-cleaner.
+existing gate) and has a *deterministic oracle* (the form). It is not the killer app; it is the safe pipe-cleaner — and accordingly a **time-boxed prototype with an explicit kill
+criterion** (does it prove the substrate is safe and worth building on?), not a product line. If the post-tier-0
+substrate decision gate (ADR-074) says no, tier-0 is retired, not maintained.
 
 ## Decision
 
 Build the resource agent as a **channel-agnostic, envelope-grounded, slot-filling conversational assistant** that
 elicits intent, **co-authors the governed claim by driving the existing `platform:add-service-resource` scaffolder
 action**, confirms on the **concrete claim diff**, and opens the **existing gated PR** — holding **zero infrastructure
-privilege.** It is **the first `Agent` CR** (ADR-074), at the lowest risk tier, with a **Backstage channel adapter only**
-for the first release.
+privilege.** It is the **first agent on the substrate** (ADR-074), at the lowest risk tier, with a **Backstage channel
+adapter only** for the first release. Per ADR-074, whether it is a first-class `Agent` CRD or simply a Backstage
+backend service is the **shape question tier-0 answers** — it most likely starts as a service.
 
 ## Design
 
@@ -42,8 +45,10 @@ for the first release.
   no agent change, only its catalog metadata + eval scenarios (ADR-073 extensibility, ADR-074 §catalog).
 - **Evaluation.** Reuse-based: **code grader** = the gitops gate + Kyverno envelope; **oracle** = the form's
   deterministic output for the same captured intent; **pass^k** consistency gate; **outcome signals** in prod (PR
-  merged-vs-abandoned, turns-to-completion, abandonment) as cheap online eval + conversation-quality measure. No
-  LLM-judge needed at tier-0 (we have an oracle).
+  merged-vs-abandoned, turns-to-completion, abandonment) as cheap online eval. No LLM-judge needed at tier-0 (we have
+  an oracle). **Known gap:** the oracle grades the *claim*, not the *elicitation* — tier-0's actual value-add (helping
+  the uncertain dev) is only *proxied* by those online signals, never directly measured; semantic conversation-quality
+  eval is deferred.
 - **Lifecycle & safety.** Composite versioned release `{image, prompt@v, model@v pinned, tools@v}`; the **kill-switch**
   → **falls back to the form**; prompt + tool-set baked into the **signed release** with elevated review; a model
   **metering seam + runaway guard**; a **cost-appropriate model** (cheap — it's simple slot-filling).
@@ -56,8 +61,10 @@ for the first release.
   AgentOps, data-boundary, cost guard).
 - **Safe** — zero out-of-policy claims reach merge, zero data-boundary violations, the agent never *acts* (only
   proposes), pass^k ≥ the tier-0 threshold.
-- **At-least-as-good-as-the-form for the uncertain user** — produces a correct, accepted, in-policy claim; headline
-  metric = **PR merged vs abandoned.**
+- **At-least-as-good-as-the-form for the uncertain user** — produces a correct, accepted, in-policy claim. Note the
+  agent emits the *same artifact* the form does, so the value is the elicitation conversation, **not** a better
+  outcome; the headline signal **PR merged vs abandoned** is **qualitative for now** (we lack a form-usage baseline),
+  not a hard numeric bar.
 
 The initiative's north-star (deflection of platform-team requests, time-to-resolution) is measured across *future*
 high-value agents, **not** judged on this one.
@@ -65,8 +72,8 @@ high-value agents, **not** judged on this one.
 ## Scope
 
 **In (tier-0):** channel-agnostic core + Backstage adapter; envelope-grounded slot-filling; cost explanation; the
-claim-diff confirm; reuse of `add-service-resource` → gated PR; the first `Agent` CR (a thin reconciler is acceptable);
-the reuse-based eval; kill-switch + form fallback; metering seam + runaway guard; live-catalog grounding.
+claim-diff confirm; reuse of `add-service-resource` → gated PR; the agent runtime (a **Backstage backend service**; a first-class `Agent` CRD only if tier-0 shows the shape earns its
+place); the reuse-based eval; kill-switch + form fallback; metering seam + runaway guard; live-catalog grounding.
 
 **Deferred:** Slack/Discord adapters; a unified multi-agent assistant surface; multi-resource conversations; richer RAG;
 cross-session memory; AccessGrant-based authz; LLM-judge / semantic conversation-quality eval. (Tracked in ADR-074's
