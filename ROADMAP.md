@@ -60,9 +60,10 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 
 *Actively in flight or next-up.*
 
-#### Developer Portal
+#### Agentic Workloads
 
-- [#554](https://github.com/asanexample/platform/issues/554) Epic: conversational resource agent (ADR-073 Phase B)
+- Design-of-record landed: ADR-074 (governed platform for running AI agents) + ADR-075 (resource agent = tier-0 proving ground) + ADR-076 (agent/GenAI observability). De-risking spikes 1–3 **done, all GO** — structured-output conformance (no auto-repair loop needed), untrusted-context/IPI, and component build-vs-adopt (adopt nothing new at tier-0).
+- [#554](https://github.com/asanexample/platform/issues/554) Epic (re-scoped): **tier-0 resource agent** — the first agent on the substrate (ADR-075). Build gated on ADR acceptance; rides the existing Keycloak access model.
 
 ### Next
 
@@ -125,6 +126,12 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 - [#200](https://github.com/asanexample/platform/issues/200) Represent the Terraform/Terragrunt platform infra in the Backstage catalog
 - **Higher-altitude developer abstraction** — Net-new. Developers declare intent (e.g. an internal HTTP endpoint); the platform synthesizes HTTPRoute + NetworkPolicy + policy-compliant wiring, vs near-raw manifests. Relates #375 (platform-injection).
 
+#### Agentic Workloads
+
+- **Substrate primitives** — Agent CRD + three-identity authority (intersection + attenuating delegation) + tiered disposition + LLM data-boundary + model-gateway metering seam + eval-as-a-service + kill-switch (ADR-074). Built after tier-0 + a decision gate.
+- **Autonomous / multi-agent (A2A)** — autonomous agents + agent-to-agent, behind a mature safety substrate (eval-as-a-service + kill-switch live). Depends on the **AccessGrant/P4** model (see Identity & Access, #361–#368) for cross-team/autonomous authority — the agent initiative is the forcing function to prioritize P4.
+- **Deferred component picks (Spike 3)** — CaMeL/dual-LLM IPI defense + a classifier guardrail (PromptGuard/AlignmentCheck) only when an agent can *act*; Inspect + self-hosted Langfuse when the oracle disappears (multi-agent eval); a larger guardrail FP corpus. Tier-0 adopts none of these.
+
 #### Environment & Resource Control Plane
 
 - [#105](https://github.com/asanexample/platform/issues/105) Developer environments (ephemeral dev sandboxes / devcontainers)
@@ -135,6 +142,7 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 #### Observability
 
 - [#102](https://github.com/asanexample/platform/issues/102) Observability stack (epic) — metrics, logs, traces, profiles, cost
+- Agent / GenAI observability layer (ADR-076) rides the #102 backbone — OTel-GenAI conventions, per-invocation agent traces, data-boundary content rules.
 
 #### Platform Tooling & Ops
 
