@@ -29,7 +29,3 @@ spec:
           kind: keyvalue
           engine: dynamodb
           access: readwrite
-        scratch:
-          kind: objectstore
-          engine: s3
-          access: readwrite

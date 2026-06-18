@@ -19,9 +19,3 @@ spec:
       serviceAccount: app-alpha # Pod Identity binds this named SA; the app repo's serviceaccount.yaml creates it
       # image omitted — declared but NOT yet deployed (the first-deploy state). The per-Product ApplicationSet
       # skips this (Environment × Service) pair until the first CI build promotes a digest into k8s/overlays/dev.
-      # Self-service SQS queue (ADR-073 A.1, #552 e2e): the Composition provisions an SSE+TLS-only queue and
-      # derives queue-scoped send/receive IAM onto this service's Pod-Identity role; the URL lands in web-resources.
-      resources:
-        jobs: { kind: stream, engine: sqs, access: readwrite }
-        events: { kind: stream, engine: sns, access: readwrite }
-        sessions: { kind: keyvalue, engine: dynamodb, access: readwrite }
