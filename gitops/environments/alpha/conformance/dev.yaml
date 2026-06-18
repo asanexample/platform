@@ -1,29 +1,35 @@
-# Environment (alpha × conformance × dev) — the first stage, authored by the Backstage
-# New Product template (ADR-067 v1beta1). Namespace alpha-conformance-dev. Synced by
-# ArgoCD (the `environments` registry-sync app) and reconciled by the Crossplane Environment Composition (v3).
-# The image is omitted until the new repo's first CI build pins a signed digest into k8s/overlays/dev.
 apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata:
-  # CLUSTER-scoped XR → team-prefixed, globally unique (ADR-067).
   name: alpha-conformance-dev
   annotations:
     platform.refplat.org/requested-by: user:default/dev-alpha
 spec:
-  team: alpha # validated == Product.team at the gate + admission
+  team: alpha
   product: conformance
   stage: dev
   tier: standard
   services:
     web:
-      serviceAccount: app-alpha # Pod Identity binds this named SA; the app repo's serviceaccount.yaml creates it
-      # image omitted — declared but NOT yet deployed (the first-deploy state). The per-Product ApplicationSet
-      # skips this (Environment × Service) pair until the first CI build promotes a digest into k8s/overlays/dev.
-      # ADR-073 conformance harness: declare one of every engine so the app's /selftest can exercise the full
-      # paved road at runtime (Pod Identity → derived IAM → S3/SQS/SNS/DynamoDB). Names map to the
-      # web-resources ConfigMap keys the app reads (BLOB_BUCKET / JOBS_QUEUE_URL / EVENTS_TOPIC_ARN / SESSIONS_TABLE).
+      serviceAccount: app-alpha
       resources:
-        blob: { kind: objectstore, engine: s3, access: readwrite }
-        jobs: { kind: stream, engine: sqs, access: readwrite }
-        events: { kind: stream, engine: sns, access: readwrite }
-        sessions: { kind: keyvalue, engine: dynamodb, access: readwrite }
+        blob:
+          kind: objectstore
+          engine: s3
+          access: readwrite
+        jobs:
+          kind: stream
+          engine: sqs
+          access: readwrite
+        events:
+          kind: stream
+          engine: sns
+          access: readwrite
+        sessions:
+          kind: keyvalue
+          engine: dynamodb
+          access: readwrite
+        scratch:
+          kind: objectstore
+          engine: s3
+          access: readwrite
