@@ -112,6 +112,14 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-051: Backstage as the Developer Portal](051-backstage-developer-portal.md) | Accepted |
 | [ADR-064: Backstage Provisioning Visibility & Developer Experience](064-backstage-provisioning-visibility.md) | Proposed |
 
+## Self-Service Resources & Agentic Workloads
+
+| ADR | Status |
+|-----|--------|
+| [ADR-073: Self-Service Cloud Resources (the resource paved road)](073-self-service-cloud-resources.md) | Accepted |
+| [ADR-074: Agentic Workloads — a Governed Platform for Running AI Agents](074-agentic-workloads-platform.md) | Proposed |
+| [ADR-075: The Resource Agent — Conversational Self-Service (ADR-073 Phase B)](075-resource-agent.md) | Proposed |
+
 ## Observability, Resilience & Compliance Assurance
 
 | ADR | Status |
