@@ -411,15 +411,22 @@ spec:
             {{- if gt (len $bucket) 63 }}{{- $bucket = printf "%s-%s" (substr 0 54 $bktFriendly) $bktHash }}{{- end }}
             {{- $bktArn := printf "arn:aws:s3:::%s" $bucket }}
             ---
-            apiVersion: s3.aws.upbound.io/v1beta1
+            apiVersion: s3.aws.m.upbound.io/v1beta1
             kind: Bucket
             metadata:
+              namespace: {{ $ns }}
+              labels:
+                platform.refplat.org/team: {{ $team }}
+                platform.refplat.org/product: {{ $product }}
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: s3-{{ $svc }}-{{ $resName }}
                 crossplane.io/external-name: {{ $bucket }}
             spec:
-              deletionPolicy: Orphan
+              # v2 namespaced MRs have no spec.deletionPolicy; managementPolicies w/o "Delete" == Orphan (retain
+              # the AWS resource on delete/deprovision, adopt the existing one via external-name). ADR-073/#574.
+              managementPolicies: ["Observe", "Create", "Update", "LateInitialize"]
               providerConfigRef:
+                kind: ClusterProviderConfig
                 name: default
               forProvider:
                 region: {{ $cfg.region }}
@@ -430,14 +437,21 @@ spec:
                   Service: {{ $svc }}
                   Resource: {{ $resName }}
             ---
-            apiVersion: s3.aws.upbound.io/v1beta1
+            apiVersion: s3.aws.m.upbound.io/v1beta1
             kind: BucketPublicAccessBlock
             metadata:
+              namespace: {{ $ns }}
+              labels:
+                platform.refplat.org/team: {{ $team }}
+                platform.refplat.org/product: {{ $product }}
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: s3-pab-{{ $svc }}-{{ $resName }}
             spec:
-              deletionPolicy: Orphan
+              # v2 namespaced MRs have no spec.deletionPolicy; managementPolicies w/o "Delete" == Orphan (retain
+              # the AWS resource on delete/deprovision, adopt the existing one via external-name). ADR-073/#574.
+              managementPolicies: ["Observe", "Create", "Update", "LateInitialize"]
               providerConfigRef:
+                kind: ClusterProviderConfig
                 name: default
               forProvider:
                 region: {{ $cfg.region }}
@@ -447,60 +461,92 @@ spec:
                 ignorePublicAcls: true
                 restrictPublicBuckets: true
             ---
-            apiVersion: s3.aws.upbound.io/v1beta1
+            apiVersion: s3.aws.m.upbound.io/v1beta1
             kind: BucketServerSideEncryptionConfiguration
             metadata:
+              namespace: {{ $ns }}
+              labels:
+                platform.refplat.org/team: {{ $team }}
+                platform.refplat.org/product: {{ $product }}
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: s3-sse-{{ $svc }}-{{ $resName }}
             spec:
-              deletionPolicy: Orphan
+              # v2 namespaced MRs have no spec.deletionPolicy; managementPolicies w/o "Delete" == Orphan (retain
+              # the AWS resource on delete/deprovision, adopt the existing one via external-name). ADR-073/#574.
+              managementPolicies: ["Observe", "Create", "Update", "LateInitialize"]
               providerConfigRef:
+                kind: ClusterProviderConfig
                 name: default
               forProvider:
                 region: {{ $cfg.region }}
                 bucket: {{ $bucket }}
+                # Namespaced (s3.aws.m.upbound.io) schema collapsed the MaxItems=1
+                # applyServerSideEncryptionByDefault block to an object (rule stays a list). ADR-073/#574.
                 rule:
                   - applyServerSideEncryptionByDefault:
-                      - sseAlgorithm: AES256
+                      sseAlgorithm: AES256
             ---
-            apiVersion: s3.aws.upbound.io/v1beta1
+            apiVersion: s3.aws.m.upbound.io/v1beta1
             kind: BucketVersioning
             metadata:
+              namespace: {{ $ns }}
+              labels:
+                platform.refplat.org/team: {{ $team }}
+                platform.refplat.org/product: {{ $product }}
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: s3-ver-{{ $svc }}-{{ $resName }}
             spec:
-              deletionPolicy: Orphan
+              # v2 namespaced MRs have no spec.deletionPolicy; managementPolicies w/o "Delete" == Orphan (retain
+              # the AWS resource on delete/deprovision, adopt the existing one via external-name). ADR-073/#574.
+              managementPolicies: ["Observe", "Create", "Update", "LateInitialize"]
               providerConfigRef:
+                kind: ClusterProviderConfig
                 name: default
               forProvider:
                 region: {{ $cfg.region }}
                 bucket: {{ $bucket }}
+                # Namespaced schema: versioningConfiguration is an object (was a MaxItems=1 list). ADR-073/#574.
                 versioningConfiguration:
-                  - status: Enabled
+                  status: Enabled
             ---
-            apiVersion: s3.aws.upbound.io/v1beta1
+            apiVersion: s3.aws.m.upbound.io/v1beta1
             kind: BucketOwnershipControls
             metadata:
+              namespace: {{ $ns }}
+              labels:
+                platform.refplat.org/team: {{ $team }}
+                platform.refplat.org/product: {{ $product }}
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: s3-own-{{ $svc }}-{{ $resName }}
             spec:
-              deletionPolicy: Orphan
+              # v2 namespaced MRs have no spec.deletionPolicy; managementPolicies w/o "Delete" == Orphan (retain
+              # the AWS resource on delete/deprovision, adopt the existing one via external-name). ADR-073/#574.
+              managementPolicies: ["Observe", "Create", "Update", "LateInitialize"]
               providerConfigRef:
+                kind: ClusterProviderConfig
                 name: default
               forProvider:
                 region: {{ $cfg.region }}
                 bucket: {{ $bucket }}
+                # Namespaced schema: rule is an object (was a MaxItems=1 list). ADR-073/#574.
                 rule:
-                  - objectOwnership: BucketOwnerEnforced
+                  objectOwnership: BucketOwnerEnforced
             ---
-            apiVersion: s3.aws.upbound.io/v1beta1
+            apiVersion: s3.aws.m.upbound.io/v1beta1
             kind: BucketPolicy
             metadata:
+              namespace: {{ $ns }}
+              labels:
+                platform.refplat.org/team: {{ $team }}
+                platform.refplat.org/product: {{ $product }}
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: s3-pol-{{ $svc }}-{{ $resName }}
             spec:
-              deletionPolicy: Orphan
+              # v2 namespaced MRs have no spec.deletionPolicy; managementPolicies w/o "Delete" == Orphan (retain
+              # the AWS resource on delete/deprovision, adopt the existing one via external-name). ADR-073/#574.
+              managementPolicies: ["Observe", "Create", "Update", "LateInitialize"]
               providerConfigRef:
+                kind: ClusterProviderConfig
                 name: default
               forProvider:
                 region: {{ $cfg.region }}
@@ -524,14 +570,25 @@ spec:
             {{- $qArn := printf "arn:aws:sqs:%s:%s:%s" $cfg.region $cfg.workloadAccountId $queue }}
             {{- $qUrl := printf "https://sqs.%s.amazonaws.com/%s/%s" $cfg.region $cfg.workloadAccountId $queue }}
             ---
-            apiVersion: sqs.aws.upbound.io/v1beta1
+            apiVersion: sqs.aws.m.upbound.io/v1beta1
             kind: Queue
             metadata:
+              namespace: {{ $ns }}
+              labels:
+                platform.refplat.org/team: {{ $team }}
+                platform.refplat.org/product: {{ $product }}
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: sqs-{{ $svc }}-{{ $resName }}
+                # SQS external-name is the queue URL. Pin it (deterministic from region/account/name) so the MR
+                # ADOPTS an existing queue via Observe instead of calling CreateQueue (which fails QueueAlreadyExists
+                # on a tag mismatch). Matches the Bucket/Topic/Table adoption pattern. ADR-073/#574.
+                crossplane.io/external-name: {{ $qUrl }}
             spec:
-              deletionPolicy: Orphan
+              # v2 namespaced MRs have no spec.deletionPolicy; managementPolicies w/o "Delete" == Orphan (retain
+              # the AWS resource on delete/deprovision, adopt the existing one via external-name). ADR-073/#574.
+              managementPolicies: ["Observe", "Create", "Update", "LateInitialize"]
               providerConfigRef:
+                kind: ClusterProviderConfig
                 name: default
               forProvider:
                 region: {{ $cfg.region }}
@@ -562,16 +619,23 @@ spec:
             {{- if gt (len $topic) 256 }}{{- $topic = printf "%s-%s" (substr 0 247 $tFriendly) $tHash }}{{- end }}
             {{- $tArn := printf "arn:aws:sns:%s:%s:%s" $cfg.region $cfg.workloadAccountId $topic }}
             ---
-            apiVersion: sns.aws.upbound.io/v1beta1
+            apiVersion: sns.aws.m.upbound.io/v1beta1
             kind: Topic
             metadata:
+              namespace: {{ $ns }}
+              labels:
+                platform.refplat.org/team: {{ $team }}
+                platform.refplat.org/product: {{ $product }}
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: sns-{{ $svc }}-{{ $resName }}
                 # SNS Topic has no forProvider.name — the topic name IS the external-name (like S3/DynamoDB).
                 crossplane.io/external-name: {{ $topic }}
             spec:
-              deletionPolicy: Orphan
+              # v2 namespaced MRs have no spec.deletionPolicy; managementPolicies w/o "Delete" == Orphan (retain
+              # the AWS resource on delete/deprovision, adopt the existing one via external-name). ADR-073/#574.
+              managementPolicies: ["Observe", "Create", "Update", "LateInitialize"]
               providerConfigRef:
+                kind: ClusterProviderConfig
                 name: default
               forProvider:
                 region: {{ $cfg.region }}
@@ -604,15 +668,22 @@ spec:
             {{- if gt (len $table) 255 }}{{- $table = printf "%s-%s" (substr 0 246 $tblFriendly) $tblHash }}{{- end }}
             {{- $tblArn := printf "arn:aws:dynamodb:%s:%s:table/%s" $cfg.region $cfg.workloadAccountId $table }}
             ---
-            apiVersion: dynamodb.aws.upbound.io/v1beta1
+            apiVersion: dynamodb.aws.m.upbound.io/v1beta1
             kind: Table
             metadata:
+              namespace: {{ $ns }}
+              labels:
+                platform.refplat.org/team: {{ $team }}
+                platform.refplat.org/product: {{ $product }}
               annotations:
                 gotemplating.fn.crossplane.io/composition-resource-name: dynamodb-{{ $svc }}-{{ $resName }}
                 crossplane.io/external-name: {{ $table }}
             spec:
-              deletionPolicy: Orphan
+              # v2 namespaced MRs have no spec.deletionPolicy; managementPolicies w/o "Delete" == Orphan (retain
+              # the AWS resource on delete/deprovision, adopt the existing one via external-name). ADR-073/#574.
+              managementPolicies: ["Observe", "Create", "Update", "LateInitialize"]
               providerConfigRef:
+                kind: ClusterProviderConfig
                 name: default
               forProvider:
                 region: {{ $cfg.region }}
@@ -625,10 +696,11 @@ spec:
                     type: S
                 # Encrypted at rest with the AWS-managed key (transparent — no workload kms perms) + PITR (the
                 # recovery analog of S3 versioning).
+                # Namespaced schema: these MaxItems=1 blocks are objects (attribute stays a list). ADR-073/#574.
                 serverSideEncryption:
-                  - enabled: true
+                  enabled: true
                 pointInTimeRecovery:
-                  - enabled: true
+                  enabled: true
                 tags:
                   Team: {{ $team }}
                   Product: {{ $product }}
