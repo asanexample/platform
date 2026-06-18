@@ -127,6 +127,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-043: Self-Hosted Prometheus/Grafana Observability Stack](043-self-hosted-observability-stack.md) | Accepted |
 | [ADR-044: Grafana Mimir for Durable, Multi-Tenant Metrics Storage](044-mimir-durable-multi-tenant-metrics.md) | Accepted |
 | [ADR-045: Falco for Runtime Threat Detection](045-falco-runtime-threat-detection.md) | Accepted |
+| [ADR-076: Agent / GenAI Observability](076-agent-observability.md) | Proposed |
 | [ADR-054: Platform Resilience & Business Continuity](054-platform-resilience-and-business-continuity.md) | Proposed |
 | [ADR-055: Compliance Assurance & Continuous Control Evidence](055-compliance-assurance-and-continuous-control-evidence.md) | Proposed |
 | [ADR-057: Service Identity & East-West Zero Trust (mTLS)](057-service-identity-and-east-west-zero-trust.md) | Proposed |
