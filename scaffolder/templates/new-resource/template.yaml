@@ -1,0 +1,141 @@
+# New Resource (ADR-073 §self-service resources, #553): team-scoped, self-service declaration of a cloud
+# resource (S3/SQS/SNS/DynamoDB) on an existing Service. It fetches the Service's Environment claim, adds
+# spec.services.<svc>.resources.<name> = {kind, engine, access} (kind derived from engine by the action), and
+# opens a gated PR. The platform provisions it safe-by-construction + derives least-privilege IAM onto the
+# Service's Pod-Identity role + publishes the coordinates into the <svc>-resources ConfigMap. The gitops Gate
+# validates the request against the Team envelope (allowedEngines / per-env count) and auto-merges non-prod
+# bot PRs (prod → release-approver). This is the portal write-path counterpart of editing the claim by hand.
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: new-resource
+  title: New Resource
+  description: >-
+    Declare a cloud resource (S3 bucket, SQS queue, SNS topic, or DynamoDB table) on one of your Services.
+    The platform provisions it safe-by-construction and grants your Service least-privilege access — no
+    Crossplane/AWS to write. Opens a gated PR against the Environment claim.
+  tags:
+    - self-service
+    - resource
+    - adr-073
+spec:
+  owner: group:default/platform
+  type: resource
+
+  parameters:
+    - title: Resource
+      required:
+        - team
+        - product
+        - stage
+        - service
+        - resourceName
+        - engine
+        - access
+      properties:
+        team:
+          title: Team
+          type: string
+          description: Your team — membership is verified server-side.
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+              spec.type: team
+            defaultKind: Group
+            allowArbitraryValues: true
+        product:
+          title: Product
+          type: string
+          pattern: '^[a-z][a-z0-9-]{0,30}$'
+          description: The Product (locates gitops/environments/<team>/<product>/<stage>.yaml).
+        stage:
+          title: Stage
+          type: string
+          enum: ['dev', 'test', 'uat', 'staging', 'prod']
+          default: dev
+          description: Which Environment to add the resource to. One stage per run.
+        service:
+          title: Service
+          type: string
+          pattern: '^[a-z][a-z0-9-]{0,30}$'
+          description: The Service to attach the resource to (must already be declared on the Environment).
+        resourceName:
+          title: Resource name
+          type: string
+          pattern: '^[a-z][a-z0-9-]{0,30}$'
+          description: >-
+            A short logical name (e.g. "uploads", "jobs"). Becomes the env var prefix in the
+            <service>-resources ConfigMap (e.g. UPLOADS_BUCKET / JOBS_QUEUE_URL).
+        engine:
+          title: Engine
+          type: string
+          enum: ['s3', 'sqs', 'sns', 'dynamodb']
+          enumNames: ['S3 bucket', 'SQS queue', 'SNS topic', 'DynamoDB table']
+          description: Your Team must allow the engine in its envelope (the gate validates).
+        access:
+          title: Access
+          type: string
+          enum: ['read', 'readwrite']
+          default: readwrite
+          description: Least-privilege intent the platform derives IAM from (read = consume; readwrite = + produce/write).
+
+  steps:
+    - id: verify
+      name: Verify team membership
+      action: platform:verify-team-membership
+      input:
+        team: ${{ parameters.team }}
+
+    - id: fetch
+      name: Fetch the Environment claim
+      action: fetch:plain:file
+      input:
+        url: https://github.com/asanexample/platform/blob/main/gitops/environments/${{ parameters.team | replace('group:default/', '') }}/${{ parameters.product }}/${{ parameters.stage }}.yaml
+        targetPath: gitops/environments/${{ parameters.team | replace('group:default/', '') }}/${{ parameters.product }}/${{ parameters.stage }}.yaml
+
+    - id: patch
+      name: Add the resource to the claim
+      action: platform:add-service-resource
+      input:
+        claimPath: gitops/environments/${{ parameters.team | replace('group:default/', '') }}/${{ parameters.product }}/${{ parameters.stage }}.yaml
+        service: ${{ parameters.service }}
+        resourceName: ${{ parameters.resourceName }}
+        engine: ${{ parameters.engine }}
+        access: ${{ parameters.access }}
+        requestedBy: ${{ user.ref | default('unknown', true) }}
+
+    - id: pr
+      name: Open the resource PR
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?owner=asanexample&repo=platform
+        branchName: resource/add-${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}-${{ parameters.stage }}-${{ parameters.service }}-${{ parameters.resourceName }}
+        targetBranchName: main
+        title: "feat(resources): add ${{ parameters.service }}/${{ parameters.resourceName }} (${{ parameters.engine }}) to ${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}-${{ parameters.stage }}"
+        commitMessage: |
+          feat(resources): add ${{ parameters.service }}/${{ parameters.resourceName }} (${{ parameters.engine }})
+
+          Requested-by: ${{ user.ref | default('unknown', true) }}
+        description: |
+          Adds a **${{ parameters.engine }}** resource `${{ parameters.resourceName }}` (access `${{ parameters.access }}`) to
+          Service `${{ parameters.service }}` of Environment
+          `${{ parameters.team | replace('group:default/', '') }}-${{ parameters.product }}-${{ parameters.stage }}` (ADR-073).
+
+          Requested via the Backstage **New Resource** template by `${{ user.ref | default('unknown', true) }}`.
+
+          On merge the Composition provisions the resource safe-by-construction, derives least-privilege IAM onto
+          the Service's Pod-Identity role, and publishes its coordinate into the `${{ parameters.service }}-resources`
+          ConfigMap. **After it provisions, redeploy/restart your Service** so it picks up the new env var
+          (`envFrom` is read at container start). The gitops Gate validates the request against your Team
+          envelope; non-prod requests auto-merge, prod requires a release-approver.
+
+  output:
+    links:
+      - title: Resource pull request
+        url: ${{ steps.pr.output.remoteUrl }}
+    text:
+      - title: Next step
+        content: |
+          After the PR merges and the resource provisions, **restart your Service**
+          (`kubectl rollout restart deploy/...`) so it mounts the new `${{ parameters.service }}-resources` key.
