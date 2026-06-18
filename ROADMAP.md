@@ -1,3 +1,10 @@
+# Platform Roadmap
+
+The single forward-looking map of the platform: **everything shipped and everything planned**, organized by
+**functional area** (the *what*) and **horizon** (the *when*). This is the navigable narrative;
+[GitHub Issues](https://github.com/asanexample/platform/issues) remains the system of record for live status and
+detail. "Complete picture" means every capability and area is represented — not every ticket.
+
 ## Revision History
 
 | Date       | Version | Author    | Notes                                                                  |
@@ -5,13 +12,6 @@
 | 2025-04-08 | 0.1     | J. Deeden | Initial draft of roadmap                                               |
 | 2025-05-15 | 0.2     | J. Deeden | Updated for AWS Organizations, SCPs, and state management             |
 | 2026-06-18 | 1.0     | J. Deeden | Consolidated to a capability map (Area × Horizon); backfilled shipped work, reframed to the current AWS IDP, retired stale multi-cloud status tables |
-
-# Platform Roadmap
-
-The single forward-looking map of the platform: **everything shipped and everything planned**, organized by
-**functional area** (the *what*) and **horizon** (the *when*). This is the navigable narrative;
-[GitHub Issues](https://github.com/asanexample/platform/issues) remains the system of record for live status and
-detail. "Complete picture" means every capability and area is represented — not every ticket.
 
 ## Executive Summary
 
@@ -24,6 +24,7 @@ than in scope today.
 ### Vision
 
 A platform that:
+
 - Gives developers a **simple, self-service experience** — provision products, environments, and cloud resources
   through a portal or git, without touching the underlying infrastructure.
 - Provides **enterprise-grade security, compliance, and governance by default** — least-privilege identity,
@@ -45,7 +46,7 @@ Kyverno) — the substrate, not just the surface.
   per commit), fine for **Now/Next** (real, linked issues we steer by), coarse again for **Later** (themes and
   per-area backlogs, intentionally not over-specified).
 - **Source-of-truth split.** This document is the narrative map; **GitHub Issues** is live status/detail. They are
-  kept in step (see _Maintenance_).
+  kept in step (see *Maintenance*).
 - **Roadmap-driven.** New work is picked from **Now / Next**; when a capability ships it moves to **Shipped** and
   its issue closes.
 
@@ -57,48 +58,48 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 
 ### Now
 
-_Actively in flight or next-up._
+*Actively in flight or next-up.*
 
-**Developer Portal**
+#### Developer Portal
 
 - [#554](https://github.com/asanexample/platform/issues/554) Epic: conversational resource agent (ADR-073 Phase B)
 
 ### Next
 
-_Queued and build-now — near-term build order._
+*Queued and build-now — near-term build order.*
 
-**GitOps & Delivery**
+#### GitOps & Delivery
 
 - [#502](https://github.com/asanexample/platform/issues/502) P2.6: multi-service Request Promotion template
 - **Immutable release + environment-binding promotion** — Net-new delta. Builds ON the shipped Release-CRD digest promotion (ADR-071) + release-keyed ApplicationSet (#495, done) + promotion ladder (#377). New = an immutable release as the artifact and a binding as the promotion/rollback primitive (rollback = re-point the binding).
 
-**Developer Portal**
+#### Developer Portal
 
 - [#285](https://github.com/asanexample/platform/issues/285) BACK P5: provisioning visibility — polished experience (ADR-064)
 - [#356](https://github.com/asanexample/platform/issues/356) Backstage: unified "in-flight" view of teams/tenants (open requests + provisioning-not-Ready)
 - **Golden paths as first-class API objects** — Net-new delta. Today paved roads are scaffolder cookiecutter templates (shipped, ADR-062). New = model golden paths as queryable, composable platform API objects the platform reasons about. Relates #358 (add service to existing repo).
 
-**Environment & Resource Control Plane**
+#### Environment & Resource Control Plane
 
 - [#391](https://github.com/asanexample/platform/issues/391) Secrets paved-road: tenant app config & secrets (ADR-070)
 
-**Cost & FinOps**
+#### Cost & FinOps
 
 - **Cost guardrails — aggregate budgets + FinOps visibility** — Forward half of Cost & FinOps. Aggregate per-team budgets/caps (the quota-cap dial seam left by Phase 3), cost dashboards/FinOps visibility, anomaly alerts.
 
 ### Later
 
-_On the map; not yet scheduled or blocked on a dependency (e.g. the planned rebuild)._
+*On the map; not yet scheduled or blocked on a dependency (e.g. the planned rebuild).*
 
-**Network & Connectivity**
+#### Network & Connectivity
 
 - **Network hardening backlog** — Rollup -> filter label:area/network. Includes #162 WireGuard pod encryption, #163 node subnet sizing, #166 Kyverno HA hostNetwork, #206 subnet-router after scale-up.
 
-**Kubernetes & Ingress**
+#### Kubernetes & Ingress
 
 - **Autoscaling** — Workload + cluster autoscaling as a paved-road capability (HPA/VPA/Karpenter-class), governed and surfaced through the platform abstractions.
 
-**Identity & Access**
+#### Identity & Access
 
 - [#361](https://github.com/asanexample/platform/issues/361) P4 (ADR-068): Product-scoped & cross-team access model
 - [#362](https://github.com/asanexample/platform/issues/362) P4.1 (ADR-068): AccessGrant CRD + cluster projection
@@ -109,33 +110,33 @@ _On the map; not yet scheduled or blocked on a dependency (e.g. the planned rebu
 - [#368](https://github.com/asanexample/platform/issues/368) P4.7 (ADR-068): Two-plane grant enforcement (access-grant-gate CI + Kyverno)
 - **East-west zero-trust mTLS / service identity** — Decided (ADR-057), not yet built. Service identity + east-west mTLS zero-trust between workloads.
 
-**Governance & Supply-chain**
+#### Governance & Supply-chain
 
 - **Kyverno policy backlog** — Rollup -> filter label:area/policy. Includes #77 CEL ValidatingPolicy, #78 PolicyException governance, #79 HIPAA/PCI packs, #80 kyverno-json, #81 multi-cluster distribution, #82 nodeSelector validation, #93 PolicyReport observability.
 - **Security & hardening backlog** — Rollup -> filter label:security. Includes #59 _v1 rename, #70 prod least-privilege, #111 ArgoCD GitHub App, #118 customer KMS CMKs, #129 SCA/AppSec, #132 CSPM, #149 Falco, #152 state-bootstrap S3, #196 Backstage ns hardening, #213 token rotation, #242 EBS orphans, #243 chart-repo resilience, #273 CoreDNS.
 
-**GitOps & Delivery**
+#### GitOps & Delivery
 
 - [#500](https://github.com/asanexample/platform/issues/500) P2.4 (ADR-056): progressive delivery for prod — Argo Rollouts
 
-**Developer Portal**
+#### Developer Portal
 
 - [#177](https://github.com/asanexample/platform/issues/177) BACK stack P6: Backstage plugins (ArgoCD, Crossplane, Kyverno, Grafana)
 - [#200](https://github.com/asanexample/platform/issues/200) Represent the Terraform/Terragrunt platform infra in the Backstage catalog
 - **Higher-altitude developer abstraction** — Net-new. Developers declare intent (e.g. an internal HTTP endpoint); the platform synthesizes HTTPRoute + NetworkPolicy + policy-compliant wiring, vs near-raw manifests. Relates #375 (platform-injection).
 
-**Environment & Resource Control Plane**
+#### Environment & Resource Control Plane
 
 - [#105](https://github.com/asanexample/platform/issues/105) Developer environments (ephemeral dev sandboxes / devcontainers)
 - [#378](https://github.com/asanexample/platform/issues/378) P3 (ADR-067): Customers + graduated isolation
 - [#379](https://github.com/asanexample/platform/issues/379) P5 (ADR-067): Placement / multi-cluster (HA/DR) + Service→Resource dependencies
 - **Multi-cloud** — Extend the cloud-resource control plane + governance beyond AWS (Azure/GCP) behind the same governed-claim + derived-IAM model. Currently AWS-only.
 
-**Observability**
+#### Observability
 
 - [#102](https://github.com/asanexample/platform/issues/102) Observability stack (epic) — metrics, logs, traces, profiles, cost
 
-**Platform Tooling & Ops**
+#### Platform Tooling & Ops
 
 - **Resilience & BC / DR posture** — Decided (ADR-054), partial. Teardown→rebuild validated (done); broader DR/business-continuity posture outstanding. Overlaps #379 placement.
 - **platctl & CI backlog** — Rollup. Includes #299 platctl CI+coverage, #305 Terragrunt post-merge converge, #346 teams CI TG_DEPENDENCY_FETCH, #348 teams CI sts:TagSession.
@@ -144,7 +145,7 @@ _On the map; not yet scheduled or blocked on a dependency (e.g. the planned rebu
 
 ## Shipped capabilities
 
-_The capability map of what the platform does today. Each bullet ≈ one ADR cluster or epic — capability granularity, not per-commit._
+*The capability map of what the platform does today. Each bullet ≈ one ADR cluster or epic — capability granularity, not per-commit.*
 
 ### Cloud Foundation
 
@@ -219,6 +220,7 @@ _The capability map of what the platform does today. Each bullet ≈ one ADR clu
 
 - **Validated teardown→rebuild-from-scratch** — Shipped. Repeatable full teardown+rebuild (58/58) validated; runbook + platctl automation.
 - **platctl CLI — bootstrap/teardown/validate** — Shipped. platctl: bootstrap, teardown, lockdown/unlock, validate, kubeconfig; DAG-aware. ADR-038.
+
 ---
 
 ## Success Metrics & KPIs
@@ -226,6 +228,7 @@ _The capability map of what the platform does today. Each bullet ≈ one ADR clu
 Aspirational targets the platform is steered toward (not all instrumented yet).
 
 ### Operational
+
 | Metric | Target | Description |
 |---|---|---|
 | Deployment Time | < 2 hours | Time to deploy a complete environment from scratch |
@@ -235,6 +238,7 @@ Aspirational targets the platform is steered toward (not all instrumented yet).
 | Security Findings | 0 critical/high | Open critical/high security findings |
 
 ### Platform Reliability
+
 | Metric | Target | Description |
 |---|---|---|
 | Service Availability (SLA) | > 99.95% | Uptime for production services |
@@ -242,6 +246,7 @@ Aspirational targets the platform is steered toward (not all instrumented yet).
 | Recovery Success Rate | > 99% | Recovery procedures executed successfully |
 
 ### Performance
+
 | Metric | Target | Description |
 |---|---|---|
 | Cluster Resource Saturation | < 80% | CPU/memory headroom across clusters |
@@ -249,6 +254,7 @@ Aspirational targets the platform is steered toward (not all instrumented yet).
 | CI/CD Pipeline Execution Time | < 30 min | Commit to deployed |
 
 ### Operational Efficiency
+
 | Metric | Target | Description |
 |---|---|---|
 | Mean Time to Detect (MTTD) | < 5 min | Time to detect infrastructure issues |
@@ -256,6 +262,7 @@ Aspirational targets the platform is steered toward (not all instrumented yet).
 | Toil Reduction | > 30% quarterly | Hours saved through automation vs baseline |
 
 ### Security & Compliance
+
 | Metric | Target | Description |
 |---|---|---|
 | Time to Patch Critical Vulns | < 24 hours | Patch time for critical vulnerabilities |
@@ -263,6 +270,7 @@ Aspirational targets the platform is steered toward (not all instrumented yet).
 | Compliance Controls Coverage | 100% | Required compliance controls implemented |
 
 ### Resource Optimization
+
 | Metric | Target | Description |
 |---|---|---|
 | Resource Utilization | > 65% | Actual usage vs allocated |
@@ -270,6 +278,7 @@ Aspirational targets the platform is steered toward (not all instrumented yet).
 | Cloud Spend Visibility | 100% | Resources with cost-allocation tags |
 
 ### Developer Experience
+
 | Metric | Target | Description |
 |---|---|---|
 | Self-Service Success Rate | > 95% | Successful self-service ops vs attempts |
@@ -282,6 +291,7 @@ Aspirational targets the platform is steered toward (not all instrumented yet).
 ## Prioritization Framework
 
 ### Priority Categories
+
 | Priority | Description | Criteria |
 |---|---|---|
 | P0: Critical | Must-have for security, compliance, or core functionality | Security vulns • regulatory requirements • core infra dependencies |
@@ -290,6 +300,7 @@ Aspirational targets the platform is steered toward (not all instrumented yet).
 | P3: Low | Nice-to-have features or enhancements | Additional features • further automation • optional integrations |
 
 ### Impact vs. Effort
+
 - **High Impact / Low Effort** → implement immediately
 - **High Impact / High Effort** → schedule for focused work
 - **Low Impact / Low Effort** → as resources allow
@@ -305,8 +316,8 @@ Aspirational targets the platform is steered toward (not all instrumented yet).
 | Security & Compliance | Josh Deeden | Security requirements, compliance validation |
 | Platform Consumer / Requirements | Josh Deeden | Requirements input, acceptance |
 
-_Team of one for now — Josh Deeden is the sole stakeholder across all roles. Roles are listed so responsibilities
-stay explicit and can be delegated as the team grows._
+*Team of one for now — Josh Deeden is the sole stakeholder across all roles. Roles are listed so responsibilities
+stay explicit and can be delegated as the team grows.*
 
 **Decision making:** strategic and technical decisions are made by the Platform Lead; security/compliance changes
 are self-reviewed against the policy-as-code guardrails (Kyverno, supply-chain) that enforce them in CI and at
