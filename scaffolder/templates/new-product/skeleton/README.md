@@ -44,7 +44,7 @@ registry entry and the `dev` Environment claim — by the same New Product run. 
 
 ## Self-service cloud resources (ADR-073)
 
-Need an S3 bucket (more engines coming)? Declare it on the Service in your Environment claim
+Need a bucket, queue, topic, or table? Declare it on the Service in your Environment claim
 (`gitops/environments/${{ values.team }}/${{ values.product }}/<stage>.yaml`) — no Crossplane/AWS to write:
 
 ```yaml
@@ -52,12 +52,26 @@ spec:
   services:
     ${{ values.service }}:
       serviceAccount: app-${{ values.team }}
-      resources:
-        uploads: { kind: objectstore, engine: s3, access: readwrite }  # access: read | readwrite
+      resources:                                                       # access: read | readwrite
+        uploads: { kind: objectstore, engine: s3,       access: readwrite }
+        jobs:    { kind: stream,      engine: sqs,      access: readwrite }
+        events:  { kind: stream,      engine: sns,      access: readwrite }
+        sessions:{ kind: keyvalue,    engine: dynamodb, access: readwrite }
 ```
 
-The platform provisions the bucket safe-by-construction (encrypted, private, versioned, TLS-only), derives
-least-privilege IAM scoped to **that bucket only** onto the Service's Pod-Identity role, and publishes the
-name into a `${{ values.service }}-resources` ConfigMap. `base/deployment.yaml` already `envFrom`s it
-(`optional: true`), so `UPLOADS_BUCKET` appears as an env var after the next rollout. Your Team must allow the
+The platform provisions each resource safe-by-construction (encrypted, private/TLS-only; S3 also versioned,
+DynamoDB also PITR), derives least-privilege IAM scoped to **that resource only** onto the Service's
+Pod-Identity role, and publishes the coordinates into a `${{ values.service }}-resources` ConfigMap.
+`base/deployment.yaml` already `envFrom`s it (`optional: true`), so the keys appear as env vars after the next
+rollout: `UPLOADS_BUCKET`, `JOBS_QUEUE_URL`, `EVENTS_TOPIC_ARN`, `SESSIONS_TABLE`. Your Team must allow the
 engine in its envelope (platform-team-owned); the gate validates the request on the PR.
+
+**Using the resources from your app** — credentials come from EKS Pod Identity (ambient; just use the AWS SDK's
+default config). Two gotchas the platform enforces:
+
+- **Set an explicit region** (`AWS_REGION`) — IMDS is egress-blocked in environment namespaces, so the SDK
+  can't auto-discover it. `base/deployment.yaml` sets `AWS_REGION` already.
+- **S3 uploads MUST set server-side encryption on the request.** The org SCP `enforce-encryption` denies any
+  `PutObject` that omits the `x-amz-server-side-encryption` header — even though the bucket defaults to SSE-S3.
+  In the Go SDK: `s3.PutObjectInput{..., ServerSideEncryption: s3types.ServerSideEncryptionAes256}`. (Other
+  engines need no special header.) The `alpha/conformance` app is a worked reference for all four engines.
