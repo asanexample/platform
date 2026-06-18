@@ -65,21 +65,10 @@ _Actively in flight or next-up._
 
 ### Next
 
-_Queued — the near-term build order._
-
-**Identity & Access**
-
-- [#361](https://github.com/asanexample/platform/issues/361) P4 (ADR-068): Product-scoped & cross-team access model
-- [#362](https://github.com/asanexample/platform/issues/362) P4.1 (ADR-068): AccessGrant CRD + cluster projection
-- [#363](https://github.com/asanexample/platform/issues/363) P4.2 (ADR-068): Access-model-as-code — Product roles in Keycloak
-- [#364](https://github.com/asanexample/platform/issues/364) P4.3 (ADR-068): OIDC-native developer cluster auth (EKS OIDC IdP)
-- [#365](https://github.com/asanexample/platform/issues/365) P4.4 (ADR-068): Fan-out — ArgoCD RBAC + Backstage permissions from product roles
-- [#367](https://github.com/asanexample/platform/issues/367) P4.6 (ADR-068): team-admin governance + grant lifecycle (request/TTL/re-attest)
-- [#368](https://github.com/asanexample/platform/issues/368) P4.7 (ADR-068): Two-plane grant enforcement (access-grant-gate CI + Kyverno)
+_Queued and build-now — near-term build order._
 
 **GitOps & Delivery**
 
-- [#500](https://github.com/asanexample/platform/issues/500) P2.4 (ADR-056): progressive delivery for prod — Argo Rollouts
 - [#502](https://github.com/asanexample/platform/issues/502) P2.6: multi-service Request Promotion template
 - **Immutable release + environment-binding promotion** — Net-new delta. Builds ON the shipped Release-CRD digest promotion (ADR-071) + release-keyed ApplicationSet (#495, done) + promotion ladder (#377). New = an immutable release as the artifact and a binding as the promotion/rollback primitive (rollback = re-point the binding).
 
@@ -99,7 +88,7 @@ _Queued — the near-term build order._
 
 ### Later
 
-_On the map, not yet scheduled (incl. per-area backlogs)._
+_On the map; not yet scheduled or blocked on a dependency (e.g. the planned rebuild)._
 
 **Network & Connectivity**
 
@@ -111,12 +100,23 @@ _On the map, not yet scheduled (incl. per-area backlogs)._
 
 **Identity & Access**
 
+- [#361](https://github.com/asanexample/platform/issues/361) P4 (ADR-068): Product-scoped & cross-team access model
+- [#362](https://github.com/asanexample/platform/issues/362) P4.1 (ADR-068): AccessGrant CRD + cluster projection
+- [#363](https://github.com/asanexample/platform/issues/363) P4.2 (ADR-068): Access-model-as-code — Product roles in Keycloak
+- [#364](https://github.com/asanexample/platform/issues/364) P4.3 (ADR-068): OIDC-native developer cluster auth (EKS OIDC IdP)
+- [#365](https://github.com/asanexample/platform/issues/365) P4.4 (ADR-068): Fan-out — ArgoCD RBAC + Backstage permissions from product roles
+- [#367](https://github.com/asanexample/platform/issues/367) P4.6 (ADR-068): team-admin governance + grant lifecycle (request/TTL/re-attest)
+- [#368](https://github.com/asanexample/platform/issues/368) P4.7 (ADR-068): Two-plane grant enforcement (access-grant-gate CI + Kyverno)
 - **East-west zero-trust mTLS / service identity** — Decided (ADR-057), not yet built. Service identity + east-west mTLS zero-trust between workloads.
 
 **Governance & Supply-chain**
 
 - **Kyverno policy backlog** — Rollup -> filter label:area/policy. Includes #77 CEL ValidatingPolicy, #78 PolicyException governance, #79 HIPAA/PCI packs, #80 kyverno-json, #81 multi-cluster distribution, #82 nodeSelector validation, #93 PolicyReport observability.
 - **Security & hardening backlog** — Rollup -> filter label:security. Includes #59 _v1 rename, #70 prod least-privilege, #111 ArgoCD GitHub App, #118 customer KMS CMKs, #129 SCA/AppSec, #132 CSPM, #149 Falco, #152 state-bootstrap S3, #196 Backstage ns hardening, #213 token rotation, #242 EBS orphans, #243 chart-repo resilience, #273 CoreDNS.
+
+**GitOps & Delivery**
+
+- [#500](https://github.com/asanexample/platform/issues/500) P2.4 (ADR-056): progressive delivery for prod — Argo Rollouts
 
 **Developer Portal**
 
