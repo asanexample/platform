@@ -51,6 +51,7 @@ for the first release.
   peer/fallback; channel-agnostic core so Slack/Discord are later adapters, not rewrites.
 
 ## Success criteria (the proving-ground bar — NOT "beat the form")
+
 - **Substrate proven** — every ADR-074 primitive exercised E2E (Agent CR, identity, gate, pass^k eval, kill-switch,
   AgentOps, data-boundary, cost guard).
 - **Safe** — zero out-of-policy claims reach merge, zero data-boundary violations, the agent never *acts* (only
@@ -62,6 +63,7 @@ The initiative's north-star (deflection of platform-team requests, time-to-resol
 high-value agents, **not** judged on this one.
 
 ## Scope
+
 **In (tier-0):** channel-agnostic core + Backstage adapter; envelope-grounded slot-filling; cost explanation; the
 claim-diff confirm; reuse of `add-service-resource` → gated PR; the first `Agent` CR (a thin reconciler is acceptable);
 the reuse-based eval; kill-switch + form fallback; metering seam + runaway guard; live-catalog grounding.
@@ -71,21 +73,25 @@ cross-session memory; AccessGrant-based authz; LLM-judge / semantic conversation
 follow-ups.)
 
 ## Dependencies
+
 Gated on the **de-risking spikes** (ADR-074): structured-output **conformance + policy-validity on the real claim
 schema** (does it need an auto-repair/conftest loop?), and **untrusted-context/IPI** handling for slot pre-fill. Builds
 on the substrate primitives defined in ADR-074.
 
 ## Consequences
+
 - The substrate gets validated against an oracle-able, low-risk first case before any higher-stakes agent.
 - The form remains and is the fallback; nothing is taken away from developers who prefer it.
 - Modest standalone value is *expected and acceptable* — the deliverable is a proven substrate, not a beloved resource chatbot.
 
 ## Alternatives considered
+
 - **Form only (no agent)** — leaves the uncertain developer unserved and, more importantly, never builds the substrate
   the high-value agents need.
 - **A fuller assistant first** (multi-resource + RAG + rich cost modeling) — larger surface, higher eval burden, slower
   to a safe first proof; deferred to follow-ons.
 
 ## Related
+
 **ADR-074** (the substrate — parent) · ADR-073 (self-service resources — the domain) · ADR-067/068 (domain + access
 model) · ADR-062 (gated provisioning) · ADR-051/064 (Backstage). Tracking epic: #554.

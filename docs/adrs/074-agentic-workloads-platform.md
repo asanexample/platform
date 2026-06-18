@@ -54,6 +54,7 @@ substrate is proven.
 ## The design
 
 ### Spectrum position & the hard boundary
+
 A **hybrid LLM-guided slot-filling** agent toward a *fixed* schema (the slots **are** the target artifact's fields) —
 **not** an open autonomous agent. It is RAG-grounded on the live catalog/policy so it proposes only **in-policy**
 options, emits via **structured outputs / strict tool use** (constrained decoding → a structurally-valid artifact), holds
@@ -61,12 +62,14 @@ options, emits via **structured outputs / strict tool use** (constrained decodin
 validity ≠ policy validity, so **the gate remains load-bearing** — the agent can never replace it.
 
 ### `Agent` as a governed workload (CRD)
+
 `Agent` joins `Team`/`Product`/`XEnvironment`/`AccessGrant` as a git-native kind: spec in git → **Kyverno-validated
 against platform bounds** → **gated-PR reviewed** → **Backstage-catalog projected** → reconciled into a running workload
 (mechanism — a Crossplane `XAgent` composite vs an operator-reconciled CRD — is an implementation choice; the composite
 shape is favored for consistency with `XEnvironment`). Agents are **federated per-cluster like Crossplane** (ADR-048).
 
 ### Identity & authority
+
 Three identities, kept **separate**: (1) the agent's own workload identity (least-privilege, often near-zero —
 Pod Identity), (2) its **tool/model grant** (scoped by tier), (3) **on-behalf-of-user delegation.** The governing rule:
 **effective authority = intersection(the agent's grant, the calling human's scope)** — enforced by **trusted code at the
@@ -76,9 +79,11 @@ agents are subjects in the **AccessGrant model (ADR-068), extended**; delegation
 agent has a **named, accountable human sponsor** plus an owning team.
 
 ### Disposition — the gate, generalized
+
 **Propose-don't-act** with a **universal no-bypass invariant** (no agent ever gets a direct-action path around the gate).
 "The gate" is **tiered disposition**, keyed to risk × reversibility (MGF-aligned, which prescribes human approval at
 *significant/irreversible* checkpoints — explicitly *not* every checkpoint):
+
 - **auto-policy-gate** — low-risk, reversible actions (deterministic checks, no human);
 - **human gate** — significant/irreversible;
 - **multi-human gate** — high-stakes/regulated.
@@ -87,6 +92,7 @@ This is what permits eventual *autonomous* agent-to-agent chains to run without 
 "propose, don't act."
 
 ### The LLM data boundary
+
 The **context window is an authz boundary** — assembled strictly within the caller's team scope (reusing the
 permission model), so cross-tenant context is structurally impossible. A **tier-keyed data-classification gate** governs
 what data classes may enter context; **secrets never enter context** (invariant). Model API use is under
@@ -94,16 +100,19 @@ what data classes may enter context; **secrets never enter context** (invariant)
 cluster an agent egresses only to a **compliant model endpoint** or **not at all** (Cilium egress control).
 
 ### Risk-tiering
+
 Per MGF "bound risk upfront": an agent's controls scale with **autonomy × reversibility × data sensitivity × cluster
 compliance tier.** The resource agent is the lowest tier. Tiers are governed configuration, not code.
 
 ### Evaluation as a substrate service
+
 The **CI gate for agents.** Grade the **artifact, not the path**; gate releases on **pass^k consistency** (threshold by
 tier); combine code + LLM-judge + human graders plus a static scan; run **continuous/regression** eval (drift) and
 **online outcome signals** (e.g. proposal accepted vs abandoned). Eval-as-a-service (with lifecycle, below) is the
 explicit **prerequisite for autonomous agents**, which lack a per-action human check.
 
 ### Lifecycle, versioning & the kill-switch
+
 An agent's **version is composite**: `{image, prompt@v, model@v (PINNED — never floating), tool-set@v, eval-result}`.
 A prompt/model/tool change is a new release that re-runs eval and promotes through the existing ladder (canary,
 rollback). **Pinning the model** prevents silent behavioral drift. The one new primitive is a **kill-switch** — a
@@ -112,6 +121,7 @@ sponsor + platform on-call, audited; a disabled/failed agent **falls back to the
 (by team/scope) and incident response (sponsor paged; failing case → eval set) are required.
 
 ### Prompt & config as a governed artifact
+
 An agent's behavior *is* configuration (system prompt + tool/MCP set + model + params). It gets **image-grade
 supply-chain rigor**: baked into the **signed release**, changed only via **elevated review** (security-reviewer,
 author ≠ approver — the prompt is partly a *control surface*), with the **tool/MCP allow-list governed** alongside it,
@@ -119,11 +129,13 @@ and **provenance separation at runtime** (the system prompt comes only from the 
 untrusted data, never merged into system-prompt trust — the core prompt-injection defense).
 
 ### Cost / FinOps
+
 The **model gateway** is the enforcement point — metering, per-tenant/agent budgets, rate limits, a circuit-breaker
 (runaway guard, which also ties to the kill-switch). Agent inference cost is a new **cost source that folds into the
 broader (greenfield) platform FinOps effort** — not a parallel system.
 
 ### Multi-agent & autonomous agent-to-agent (A2A)
+
 Cascading failure is **prevented by construction**: propose-don't-act + no-bypass mean one agent's bad output can't
 become another's unmediated input — it hits the gate first. **A2A is a governed tool** (it rides the same identity,
 intersection/attenuation, allow-list, and gate; no separate channel). Conflicts on shared artifacts ride gitops;
@@ -131,6 +143,7 @@ tracing is **causality-aware.** Autonomous A2A is **designed-for** (tiered dispo
 chain budgets and depth bounds) but **built only behind a mature safety substrate** (eval-as-a-service + kill-switch).
 
 ### Configurability
+
 An agent is a **declarative `Agent` spec.** Configuration is **two-level and bounded**: the platform sets bounds as
 **policy-as-config** (the tier→controls mapping, the model and tool/MCP catalogs, eval thresholds, budgets, disposition
 rules, data-classification rules); a sponsor configures their agent **within** those bounds. The bright line:
@@ -138,6 +151,7 @@ rules, data-classification rules); a sponsor configures their agent **within** t
 no-bypass, and zero-privilege-by-default are never knobs.
 
 ### Build vs adopt
+
 **Reuse** the platform (runtime, identity, delivery, policy, observability). **Adopt** commodity plumbing — the
 **AI/model gateway**, **MCP**, Claude **structured outputs / tool use**, **guardrail libraries**, an **eval harness**,
 and **OpenTelemetry GenAI** tracing. **Build** the governed integration that ties them to our substrate — **that is the
@@ -145,6 +159,7 @@ moat.** **Do not adopt a wholesale agent platform**: it would bring its own runt
 with the governed-infra substrate that is our entire differentiator. Specific tool selections are a de-risking spike.
 
 ### User experience
+
 A **channel-agnostic agent core** plus thin **channel adapters** — Backstage first; Slack/Discord later (with identity
 mapping, channel risk-tier, and per-channel confirm rendering as the named hard parts). Agents are surfaced
 **embedded at the point of need** with the deterministic form as a visible **peer and fallback**, and every proposal is
@@ -152,6 +167,7 @@ confirmed on the **concrete artifact** (review the diff, not prose). Scope is bo
 end-user responsibility).
 
 ### Governance backbone (cross-walk)
+
 We **anchor on the IMDA MGF + CSA**, use **OWASP Agentic/LLM Top 10 + MITRE ATLAS** as the threat/controls checklist,
 and treat **NIST AI RMF / ISO 42001 / EU AI Act as deferred cross-walks** (design-for, don't certify pre-driver). The
 substrate maps each control to an MGF pillar:
@@ -164,10 +180,12 @@ substrate maps each control to an MGF pillar:
 | End-user responsibility | UX transparency · the artifact-confirm step |
 
 ## Tier-0: the first reference agent
+
 The resource agent (**ADR-075**) is built on this substrate at the lowest tier — zero privilege, the existing access
 model, the form as oracle and fallback — to prove the substrate end-to-end before any higher-value or autonomous agent.
 
 ## Phasing & sequencing
+
 1. This ADR + the sibling ADR-075 (design of record).
 2. **De-risking spikes** (structured-output conformance/policy-validity on the real claim schema; untrusted-context/IPI
    handling; component evaluation). Code is gated on these.
@@ -180,6 +198,7 @@ rebuild-gated; it is a prerequisite for the *broader* substrate (autonomous/cros
 (which rides the existing Keycloak model). The agent initiative is the concrete forcing function to prioritize it.
 
 ## Consequences
+
 - A new, durable platform capability with its own pillar on the roadmap; agents become as governed as any workload.
 - Strong positioning: a governed agent platform *on a real governed-infra substrate*, architected to a recognized
   agentic-AI governance framework — credible and compliance-aware.
@@ -188,6 +207,7 @@ rebuild-gated; it is a prerequisite for the *broader* substrate (autonomous/cros
   behind explicit gates, not assumed.
 
 ## Alternatives considered
+
 - **An open, tool-using autonomous agent** — rejected for tier-0: highest capability but highest eval burden,
   autonomy-regret exposure, injection surface, and tool-bloat failure modes; not how you prove a new capability safely.
 - **A deterministic dynamic form only** — already exists; gives no elicitation help to the developer who doesn't know
@@ -198,6 +218,7 @@ rebuild-gated; it is a prerequisite for the *broader* substrate (autonomous/cros
   the moat.
 
 ## Related
+
 ADR-073 (self-service cloud resources — the agent's domain) · ADR-067/068 (domain model + access model) · ADR-048
 (federated per-cluster Crossplane) · ADR-041/047 (Pod Identity) · ADR-014 (Kyverno) · ADR-042/050 (supply chain) ·
 ADR-053/059 (identity/Keycloak) · ADR-062 (gated provisioning) · ADR-051/064 (Backstage). Sibling: **ADR-075** (the
