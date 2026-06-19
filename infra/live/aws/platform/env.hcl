@@ -8,6 +8,10 @@ locals {
   account_alias = "platform-aws"
   account_id    = local._secrets.account_ids["platform"]
 
+  # Cost-profile override: run Loki (logs — #102 P3a) on the platform dev cluster in cost-effective
+  # single-binary mode, even though cost_profile=dev defaults durable stores off. (preprod stays off.)
+  enable_loki = true
+
   tags = {
     Environment        = local.environment
     ManagedBy          = "Terragrunt"
