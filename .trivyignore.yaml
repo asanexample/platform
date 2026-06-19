@@ -55,6 +55,16 @@ misconfigurations:
       SSE-KMS bucket would require kms:GenerateDataKey*/Decrypt or writes fail). It
       is Grafana's documented default. CMK is the regulated-tier upgrade (#118).
 
+  - id: AWS-0132
+    paths:
+      - "observability-loki/main.tf"
+    statement: >-
+      The Loki chunks bucket uses SSE-S3 (AES256), not a CMK — same rationale as the
+      Mimir blocks bucket (AWS-0132 above): AES256 fits a high-churn log store (no
+      per-object KMS GenerateDataKey cost/throttle) and keeps the Loki Pod Identity
+      role free of kms perms (an SSE-KMS bucket would require
+      kms:GenerateDataKey*/Decrypt or writes fail). CMK is the regulated-tier upgrade (#118).
+
   - id: AWS-0136
     paths:
       - "aws/sns-notifications/main.tf"
