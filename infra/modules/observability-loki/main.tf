@@ -59,7 +59,13 @@ locals {
           admin  = local.chunks_bucket
         }
         # No static creds — Pod Identity injects via the AWS SDK credential chain.
-        s3 = { region = var.aws_region }
+        # SSE: the org SCP "enforce-encryption" (DenyUnencryptedS3Uploads) denies any PutObject whose
+        # request omits the x-amz-server-side-encryption header — the bucket's *default* encryption does
+        # not add that header. So the client must send it. SSE-S3 (AES256) matches the bucket.
+        s3 = {
+          region = var.aws_region
+          sse    = { type = "SSE-S3" }
+        }
       }
 
       # Per-tenant limits double as the noisy-neighbor security control.
