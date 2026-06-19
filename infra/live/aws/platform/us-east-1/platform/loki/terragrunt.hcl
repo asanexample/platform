@@ -93,8 +93,8 @@ inputs = {
   helm_chart_version = include.base.locals.helm_versions.loki
   helm_wait          = true
 
-  # Reference cluster — single-binary minimal sizing.
-  high_availability = false
+  # Sizing follows cost_profile (dev = single-binary minimal; prod = SimpleScalable RF3).
+  high_availability = include.base.locals.high_availability
   storage_class     = "gp3"
 
   tags = include.base.locals.tags

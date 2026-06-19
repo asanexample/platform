@@ -84,8 +84,8 @@ inputs = {
   helm_chart_version = include.base.locals.helm_versions.kube_prometheus_stack
   helm_wait          = true
 
-  # Reference cluster — single-replica. Flip to true for prod / capacity-rich clusters (needs >=3 nodes / 2-3 AZs).
-  high_availability = false
+  # Sizing follows cost_profile (dev = single-replica; prod = HA, needs >=3 nodes / 2-3 AZs).
+  high_availability = include.base.locals.high_availability
   # Prometheus + Alertmanager on durable gp3 PVCs (the eks-addons gp3 default StorageClass, #102 P2).
   use_persistent_storage = true
   storage_class          = "gp3"

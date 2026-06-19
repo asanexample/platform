@@ -55,8 +55,6 @@ locals {
   # Overridable per-env in env.hcl (the env layer wins in _base.hcl's all_vars merge).
   # See docs/plans/cost-optimized-dev-rebuild.md.
   # ---------------------------------------------------------------------------
-  single_az_nodes = true    # true: node groups in ONE AZ (cheapest, no AZ resilience). false: spread all AZs.
-  node_arch       = "arm64" # "arm64" = Graviton (t4g, ~20% cheaper). "amd64" = t3 / x86.
-  enable_mimir    = false   # false: Prometheus-only (no durable long-range store). true: deploy Mimir.
-  enable_loki     = false   # false: no log store. true: deploy Loki (P3a logs; ADR-047 Pod Identity).
+  cost_profile = "dev"   # ONE SWITCH. "dev" = cost-optimized (single-AZ, single-replica, durable stores off); "prod" = HA (RF3, multi-AZ, stores on). Per-knob overrides (high_availability / single_az_nodes / enable_mimir / enable_loki) win over the preset — set them here or in env.hcl.
+  node_arch    = "arm64" # Graviton (cheaper, prod-grade); independent of cost_profile. "amd64" = t3 / x86.
 }

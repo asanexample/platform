@@ -159,7 +159,7 @@ inputs = {
   helm_chart_version = include.base.locals.helm_versions.argocd
   helm_wait          = false # ArgoCD CRDs need time to register; sync-wave handles ordering
 
-  high_availability = false # Single instance — sufficient for non-production platform cluster
+  high_availability = include.base.locals.high_availability # dev = single instance; prod = HA (cost_profile)
 
   # Prometheus metrics + ServiceMonitors for the observability hub dashboards (#102 P1).
   metrics_enabled = true

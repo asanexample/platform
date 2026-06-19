@@ -93,8 +93,8 @@ inputs = {
   helm_chart_version = include.base.locals.helm_versions.mimir
   helm_wait          = true
 
-  # Reference cluster — single-replica minimal sizing.
-  high_availability = false
+  # Sizing follows cost_profile (dev = single-replica minimal; prod = RF3 + zone-aware).
+  high_availability = include.base.locals.high_availability
   storage_class     = "gp3"
 
   # Mimir is Grafana's default datasource (durable, full-range); the observability change sets the bundled
