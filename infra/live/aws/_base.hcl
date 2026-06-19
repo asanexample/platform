@@ -59,6 +59,7 @@ locals {
   single_az_nodes = try(local.all_vars.single_az_nodes, true)
   node_arch       = try(local.all_vars.node_arch, "arm64")
   enable_mimir    = try(local.all_vars.enable_mimir, false)
+  enable_loki     = try(local.all_vars.enable_loki, false)
 
   # EKS control-plane log types vended to CloudWatch. Defaults to [] (OFF) — the `audit`/`api` streams are billed
   # at the vended-logs ingestion rate and, driven by the GitOps controllers' constant apiserver traffic, ran
