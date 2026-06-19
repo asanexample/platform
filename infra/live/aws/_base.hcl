@@ -56,10 +56,19 @@ locals {
   # Cost / environment-profile toggles (defaults in common.hcl; env.hcl may override).
   # See docs/plans/cost-optimized-dev-rebuild.md.
   # ---------------------------------------------------------------------------
-  single_az_nodes = try(local.all_vars.single_az_nodes, true)
-  node_arch       = try(local.all_vars.node_arch, "arm64")
-  enable_mimir    = try(local.all_vars.enable_mimir, false)
-  enable_loki     = try(local.all_vars.enable_loki, false)
+  # One switch (cost_profile) sets the bundle; an explicit per-knob override wins over the preset.
+  cost_profile = try(local.all_vars.cost_profile, "dev")
+  _cost_profiles = {
+    dev  = { high_availability = false, single_az_nodes = true, enable_mimir = false, enable_loki = false }
+    prod = { high_availability = true, single_az_nodes = false, enable_mimir = true, enable_loki = true }
+  }
+  _profile = local._cost_profiles[local.cost_profile]
+
+  high_availability = try(local.all_vars.high_availability, local._profile.high_availability)
+  single_az_nodes   = try(local.all_vars.single_az_nodes, local._profile.single_az_nodes)
+  enable_mimir      = try(local.all_vars.enable_mimir, local._profile.enable_mimir)
+  enable_loki       = try(local.all_vars.enable_loki, local._profile.enable_loki)
+  node_arch         = try(local.all_vars.node_arch, "arm64")
 
   # EKS control-plane log types vended to CloudWatch. Defaults to [] (OFF) — the `audit`/`api` streams are billed
   # at the vended-logs ingestion rate and, driven by the GitOps controllers' constant apiserver traffic, ran
