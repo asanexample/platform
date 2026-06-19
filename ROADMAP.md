@@ -60,10 +60,10 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 
 *Actively in flight or next-up.*
 
-#### Agentic Workloads
+#### Observability
 
-- Design-of-record landed: ADR-074 (governed platform for running AI agents) + ADR-075 (resource agent = tier-0 proving ground) + ADR-076 (agent/GenAI observability). De-risking spikes 1–3 **done, all GO** — structured-output conformance (no auto-repair loop needed), untrusted-context/IPI, and component build-vs-adopt (adopt nothing new at tier-0).
-- [#554](https://github.com/asanexample/platform/issues/554) Epic (re-scoped): **tier-0 resource agent** — the first agent on the substrate (ADR-075). Build gated on ADR acceptance; rides the existing Keycloak access model.
+- [#102](https://github.com/asanexample/platform/issues/102) Observability stack (epic) — metrics, logs, traces, profiles, cost. **2/14 phases live** (P1 metrics+dashboards, P2 Mimir); the remaining 12 are tracked as sub-issues. **Next up: P3 — Loki + Tempo ([#582](https://github.com/asanexample/platform/issues/582), `priority: top`).**
+- Agent / GenAI observability layer (ADR-076) rides the #102 backbone — OTel-GenAI conventions, per-invocation agent traces, data-boundary content rules.
 
 ### Next
 
@@ -128,6 +128,7 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 
 #### Agentic Workloads
 
+- **Status: design-of-record landed, at rest.** ADR-074/075/076 (Proposed) + de-risking spikes 1–3 done (all GO); [#554](https://github.com/asanexample/platform/issues/554) tier-0 resource agent epic is build-gated. **Resume trigger:** a concrete, wanted *second* agent → run the eval-feasibility probe. Substrate pulled by demand, not pushed.
 - **Substrate primitives** — Agent CRD + three-identity authority (intersection + attenuating delegation) + tiered disposition + LLM data-boundary + model-gateway metering seam + eval-as-a-service + kill-switch (ADR-074). Built after tier-0 + a decision gate.
 - **Autonomous / multi-agent (A2A)** — autonomous agents + agent-to-agent, behind a mature safety substrate (eval-as-a-service + kill-switch live). Depends on the **AccessGrant/P4** model (see Identity & Access, #361–#368) for cross-team/autonomous authority — the agent initiative is the forcing function to prioritize P4.
 - **Deferred component picks (Spike 3)** — CaMeL/dual-LLM IPI defense + a classifier guardrail (PromptGuard/AlignmentCheck) only when an agent can *act*; Inspect + self-hosted Langfuse when the oracle disappears (multi-agent eval); a larger guardrail FP corpus. Tier-0 adopts none of these.
@@ -138,11 +139,6 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 - [#378](https://github.com/asanexample/platform/issues/378) P3 (ADR-067): Customers + graduated isolation
 - [#379](https://github.com/asanexample/platform/issues/379) P5 (ADR-067): Placement / multi-cluster (HA/DR) + Service→Resource dependencies
 - **Multi-cloud** — Extend the cloud-resource control plane + governance beyond AWS (Azure/GCP) behind the same governed-claim + derived-IAM model. Currently AWS-only.
-
-#### Observability
-
-- [#102](https://github.com/asanexample/platform/issues/102) Observability stack (epic) — metrics, logs, traces, profiles, cost
-- Agent / GenAI observability layer (ADR-076) rides the #102 backbone — OTel-GenAI conventions, per-invocation agent traces, data-boundary content rules.
 
 #### Platform Tooling & Ops
 
