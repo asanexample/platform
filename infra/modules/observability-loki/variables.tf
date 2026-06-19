@@ -1,0 +1,124 @@
+variable "create" {
+  description = "Controls whether resources are created."
+  type        = bool
+  default     = true
+}
+
+variable "cluster_name" {
+  description = "EKS cluster name (used for S3 bucket + IAM role naming + the Pod Identity association)."
+  type        = string
+}
+
+variable "aws_region" {
+  description = "AWS region (S3 bucket region)."
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "namespace" {
+  description = "Namespace to deploy Loki into. Defaults to the observability hub namespace so it shares Grafana's datasource sidecar and the existing default-deny NetworkPolicy isolation. Must already exist (created by the observability module)."
+  type        = string
+  default     = "observability"
+}
+
+# ---------------------------------------------------------------------------
+# S3 (chunks storage)
+# ---------------------------------------------------------------------------
+
+variable "force_destroy" {
+  description = "Allow Terraform to delete the (non-empty) Loki chunks bucket on destroy. true suits the rebuild-safe reference platform; set false to protect long-term logs."
+  type        = bool
+  default     = true
+}
+
+variable "retention_period" {
+  description = "Loki per-tenant log retention (limits_config.retention_period), enforced by the compactor. Default 14d (336h)."
+  type        = string
+  default     = "336h"
+}
+
+# ---------------------------------------------------------------------------
+# Helm
+# ---------------------------------------------------------------------------
+
+variable "helm_release_name" {
+  description = "Helm release name. Also used as fullnameOverride + the ServiceAccount name, so Service names are deterministic (e.g. <name>-gateway)."
+  type        = string
+  default     = "loki"
+}
+
+variable "helm_repository" {
+  description = "Helm repository URL."
+  type        = string
+  default     = "https://grafana.github.io/helm-charts"
+}
+
+variable "helm_chart" {
+  description = "Helm chart name."
+  type        = string
+  default     = "loki"
+}
+
+variable "helm_chart_version" {
+  description = "grafana/loki chart version (pinned in _versions.hcl; resolved latest stable at authoring)."
+  type        = string
+  default     = "7.0.0"
+}
+
+variable "helm_timeout" {
+  description = "Helm operation timeout (seconds). Generous: the StatefulSet binds a WaitForFirstConsumer PVC on first schedule."
+  type        = number
+  default     = 1200
+}
+
+variable "helm_wait" {
+  description = "Wait for the release to become ready."
+  type        = bool
+  default     = true
+}
+
+variable "high_availability" {
+  description = "HA sizing: SimpleScalable (read/write/backend RF3) instead of the single-binary reference deployment, multi-replica gateway, memcached caches. false = single-binary minimal (reference cluster)."
+  type        = bool
+  default     = false
+}
+
+variable "storage_class" {
+  description = "StorageClass for the Loki PVC (WAL / local index scratch)."
+  type        = string
+  default     = "gp3"
+}
+
+# ---------------------------------------------------------------------------
+# Tenancy / limits (per-tenant limits double as the noisy-neighbor security control)
+# ---------------------------------------------------------------------------
+
+variable "default_tenant_id" {
+  description = "Tenant ID (X-Scope-OrgID) the Grafana datasource queries with — the hub's own logs live here."
+  type        = string
+  default     = "platform"
+}
+
+variable "max_global_streams_per_user" {
+  description = "Per-tenant active streams cap (cardinality / memory / cost control)."
+  type        = number
+  default     = 5000
+}
+
+variable "ingestion_rate_mb" {
+  description = "Per-tenant sustained ingestion limit (MB/sec)."
+  type        = number
+  default     = 4
+}
+
+variable "ingestion_burst_size_mb" {
+  description = "Per-tenant ingestion burst size (MB)."
+  type        = number
+  default     = 6
+}
+
+variable "tags" {
+  description = "Tags applied to AWS resources (and sanitized into K8s labels)."
+  type        = map(string)
+  default     = {}
+}

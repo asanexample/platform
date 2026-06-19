@@ -66,6 +66,7 @@ locals {
     falco               = "${local.source_base}/falco"
     observability       = "${local.source_base}/observability"
     observability_mimir = "${local.source_base}/observability-mimir"
+    observability_loki  = "${local.source_base}/observability-loki"
     crossplane          = "${local.source_base}/crossplane"
     cloudnative_pg      = "${local.source_base}/cloudnative-pg"
     backstage           = "${local.source_base}/backstage"
@@ -88,6 +89,7 @@ locals {
     falco                 = "9.0.0"
     kube_prometheus_stack = "86.1.0"
     mimir                 = "6.0.6"
+    loki                  = "7.0.0"  # grafana/loki — P3a logs store (latest stable, resolved 2026-06-19)
     crossplane            = "2.3.1"  # Crossplane v2 (ADR-046)
     cloudnative_pg        = "0.28.2" # CNPG operator chart (app v1.29.1) — Backstage DB (ADR-051)
     backstage             = "2.8.1"  # official backstage Helm chart (points at our platform/backstage image)

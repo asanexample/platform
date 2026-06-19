@@ -58,4 +58,5 @@ locals {
   single_az_nodes = true    # true: node groups in ONE AZ (cheapest, no AZ resilience). false: spread all AZs.
   node_arch       = "arm64" # "arm64" = Graviton (t4g, ~20% cheaper). "amd64" = t3 / x86.
   enable_mimir    = false   # false: Prometheus-only (no durable long-range store). true: deploy Mimir.
+  enable_loki     = false   # false: no log store. true: deploy Loki (P3a logs; ADR-047 Pod Identity).
 }
