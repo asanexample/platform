@@ -21,7 +21,7 @@ jobs:
     # The ARC runner scale set (gha-runner-scale-set, runnerScaleSetName=platform-infra).
     runs-on: platform-infra
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Toolchain is baked in
         run: |
