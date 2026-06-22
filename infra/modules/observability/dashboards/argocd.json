@@ -9,6 +9,20 @@
     "iconColor": "rgba(0, 211, 255, 1)",
     "name": "Annotations & Alerts",
     "type": "dashboard"
+   },
+   {
+    "datasource": {
+     "type": "prometheus",
+     "uid": "prometheus"
+    },
+    "enable": true,
+    "expr": "changes(kube_deployment_metadata_generation[2m]) > 0",
+    "iconColor": "blue",
+    "name": "Deploys",
+    "step": "1m",
+    "tagKeys": "namespace,deployment",
+    "textFormat": "{{namespace}}/{{deployment}}",
+    "titleFormat": "Deploy"
    }
   ]
  },
