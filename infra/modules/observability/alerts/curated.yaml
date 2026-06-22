@@ -1,0 +1,141 @@
+# Curated platform-specific alert rules (P4 Tier 2). Loaded into kube-prometheus-stack via
+# additionalPrometheusRulesMap (yamldecode in main.tf). Every alert carries severity (routed by the
+# Alertmanager severity tree) + a runbook_url. Exprs are grounded in metrics verified present in the
+# live Prometheus (cert-manager / kyverno / argocd ServiceMonitors). Cilium / ESO / the LGTM stores
+# are added once their metrics are scraped (a follow-up that enables metrics per component).
+groups:
+  # ---------------------------------------------------------------------------
+  - name: cert-manager.rules
+    rules:
+      - alert: CertManagerDown
+        expr: up{job="cert-manager"} == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: cert-manager controller is down
+          description: "cert-manager (job cert-manager) has been unreachable for 10m — certificate issuance and renewal are stalled (Gateway TLS / Let's Encrypt)."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cert-manager"
+      - alert: CertManagerCertExpiringCritical
+        expr: (certmanager_certificate_expiration_timestamp_seconds - time()) < 604800
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in < 7d"
+          description: "Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in under 7 days and has not renewed."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cert-manager"
+      - alert: CertManagerCertExpiringSoon
+        expr: ((certmanager_certificate_expiration_timestamp_seconds - time()) < 1814400) and ((certmanager_certificate_expiration_timestamp_seconds - time()) >= 604800)
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in < 21d"
+          description: "Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in under 21 days; renewal should occur automatically — investigate if it doesn't."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cert-manager"
+      - alert: CertManagerCertNotReady
+        expr: certmanager_certificate_ready_status{condition="True"} == 0
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} not Ready"
+          description: "Certificate {{ $labels.namespace }}/{{ $labels.name }} has not been Ready for 1h (issuance/renewal failing)."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cert-manager"
+      - alert: CertManagerSyncErrors
+        expr: increase(certmanager_controller_sync_error_count[15m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cert-manager sync errors ({{ $labels.controller }})"
+          description: "cert-manager controller {{ $labels.controller }} is logging sync errors over the last 15m."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cert-manager"
+  # ---------------------------------------------------------------------------
+  - name: kyverno.rules
+    rules:
+      - alert: KyvernoAdmissionControllerDown
+        expr: up{job="kyverno-svc-metrics"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Kyverno admission controller is down
+          description: "The Kyverno admission controller (job kyverno-svc-metrics) has been down for 5m — admission webhooks may be failing or blocking deploys cluster-wide."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#kyverno"
+      - alert: KyvernoReportsControllerDown
+        expr: up{job="kyverno-reports-controller-metrics"} == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Kyverno reports controller is down
+          description: "The Kyverno reports controller has been down for 15m — policy reports will be stale."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#kyverno"
+      - alert: KyvernoBackgroundControllerDown
+        expr: up{job="kyverno-background-controller-metrics"} == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Kyverno background controller is down
+          description: "The Kyverno background controller has been down for 15m — generate/mutate-existing rules won't reconcile."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#kyverno"
+      - alert: KyvernoPolicyExecutionErrors
+        expr: increase(kyverno_policy_results_total{rule_result="error"}[15m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kyverno policy execution errors ({{ $labels.policy_name }})"
+          description: "Kyverno policy {{ $labels.policy_name }} is producing rule-execution errors over the last 15m."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#kyverno"
+      - alert: KyvernoCircuitBreakerTripping
+        expr: increase(kyverno_breaker_drops_total[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kyverno circuit breaker dropping ({{ $labels.circuit_name }})"
+          description: "Kyverno's circuit breaker is dropping work — the controller is overloaded or degraded."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#kyverno"
+  # ---------------------------------------------------------------------------
+  - name: argocd.rules
+    rules:
+      - alert: ArgoCDComponentDown
+        expr: up{job=~"argocd-.*-metrics"} == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ArgoCD component down ({{ $labels.job }})"
+          description: "An ArgoCD component ({{ $labels.job }}) has been unreachable for 10m — GitOps reconciliation/UI may be impaired."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#argocd"
+      - alert: ArgoCDAppDegraded
+        expr: argocd_app_info{health_status="Degraded"} > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ArgoCD app {{ $labels.name }} Degraded"
+          description: "ArgoCD application {{ $labels.name }} (project {{ $labels.project }}) has been Degraded for 15m."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#argocd"
+      - alert: ArgoCDAppOutOfSync
+        expr: argocd_app_info{sync_status="OutOfSync"} > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ArgoCD app {{ $labels.name }} OutOfSync"
+          description: "ArgoCD application {{ $labels.name }} has been OutOfSync for 15m — a manual change or a failing auto-sync."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#argocd"
+      - alert: ArgoCDRepoServerGitErrors
+        expr: increase(argocd_git_lsremote_fail_total[15m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ArgoCD git ls-remote failures ({{ $labels.repo }})"
+          description: "ArgoCD repo-server is failing git ls-remote against {{ $labels.repo }} — repo connectivity/credentials issue."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#argocd"
