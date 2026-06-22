@@ -93,6 +93,19 @@ Namespace `kube-system`. The CNI / network plane — start with `cilium status` 
   excluded as expected). Start with `cilium monitor --type drop` to see drop reasons/identities, then chase
   the datapath/connectivity cause. Threshold is tunable in `curated.yaml` if it's noisy on a busier cluster.
 
+## Cloud resources
+
+AWS-resource metrics via **YACE** (the `cloudwatch-exporter` Deployment in `observability`; CloudWatch →
+Prometheus, the P5b slice of epic 102). Metric names are `aws_<namespace>_<metric>_<stat>`. Broad ad-hoc
+coverage is also available query-time via the Grafana **CloudWatch datasource** (P5a).
+
+- **CloudNLBUnhealthyHosts** — an NLB target group (`{{ $labels.dimension_TargetGroup }}`) has unhealthy
+  hosts for 15m; the gateway/LB backend is degraded. Check target-group health in the EC2 console and the
+  backing Cilium gateway pods / nodes (these target groups are `k8s-default-ciliumga-*`).
+- **CloudNATGatewayPortAllocationErrors** — a NAT gateway can't allocate SNAT source ports (port
+  exhaustion); outbound VPC connections are being dropped. Usually too many concurrent connections to a
+  single destination IP:port — spread destinations or add NAT gateways.
+
 ## Notification channels & secret rotation
 
 How alerts leave the cluster, and the recurring operational tasks. Routing (set in the `observability`
