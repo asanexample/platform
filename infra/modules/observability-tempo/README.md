@@ -1,15 +1,17 @@
 # observability-tempo
 
-Observability **P3b (traces store)** — **Grafana Tempo** (single-binary monolith) backed by **S3**, the trace
+Observability **P3b (traces store)** — **Grafana Tempo** (`tempo-distributed`) backed by **S3**, the trace
 counterpart of `observability-loki` (`docs/plans/102-observability-stack.md`). The trace **collector** (OTel) is a
 separate module; apps/collector push **OTLP** here and traces are queried in Grafana.
 
 ## Key decisions
 
-- **Monolith from `grafana-community/helm-charts`.** Grafana moved the Tempo Helm charts to the community repo
-  (`https://grafana-community.github.io/helm-charts`) as of Jan 2026 — the copies in `grafana/helm-charts` are frozen.
-  This is a repo move, **not** an operator pivot, and the community chart is newer (app **v2.10.7**). The **monolith**
-  (one pod) fits the cost-effective cluster; **HA/prod = the `tempo-distributed` chart** (a future path).
+- **One chart sized by `high_availability`** (same spirit as Loki's SingleBinary↔SimpleScalable toggle): dev runs
+  every component at 1 replica / RF1 / caches off (~5 small pods), so **dev exercises the real prod architecture
+  scaled down**; HA flips to RF3 + zone-aware + multi-replica + caches. The single-binary monolith can't do HA, so
+  using the distributed chart for both keeps the `cost_profile` switch coherent for Tempo.
+- **From `grafana-community/helm-charts`.** Grafana moved the Tempo Helm charts there (Jan 2026) and froze the
+  `grafana/helm-charts` copies — a repo move, **not** an operator pivot; the community chart is newer (app **v2.10.7**).
 - **S3 + EKS Pod Identity (ADR-047)** — same shape as Loki: SSE-S3 bucket, a role trusting `pods.eks.amazonaws.com`
   bound to the Tempo ServiceAccount; **no IRSA annotation**. The S3 client sends `x-amz-server-side-encryption`
   (`storage.trace.s3.sse=SSE-S3`) to satisfy the org `enforce-encryption` SCP (the same fix Loki needed).

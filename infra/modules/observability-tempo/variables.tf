@@ -56,15 +56,21 @@ variable "helm_repository" {
 }
 
 variable "helm_chart" {
-  description = "Helm chart name — tempo (single-binary monolith)."
+  description = "Helm chart name — tempo-distributed (one chart, sized by high_availability)."
   type        = string
-  default     = "tempo"
+  default     = "tempo-distributed"
 }
 
 variable "helm_chart_version" {
-  description = "grafana-community/tempo chart version (pinned in _versions.hcl; latest stable at authoring — app v2.10.7)."
+  description = "grafana-community/tempo-distributed chart version (pinned in _versions.hcl; latest stable at authoring — app v2.10.7)."
   type        = string
-  default     = "2.2.3"
+  default     = "2.25.5"
+}
+
+variable "high_availability" {
+  description = "Sizing toggle (cost_profile). false = single replica per component, RF1, caches off (dev). true = RF3, zone-aware, multi-replica, caches on (prod HA)."
+  type        = bool
+  default     = false
 }
 
 variable "helm_timeout" {

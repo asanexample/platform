@@ -9,11 +9,11 @@ output "tempo_role_arn" {
 }
 
 output "otlp_grpc_endpoint" {
-  description = "OTLP/gRPC endpoint trace producers (the OTel collector) push to."
-  value       = "http://${var.helm_release_name}.${var.namespace}.svc:4317"
+  description = "OTLP/gRPC endpoint trace producers (the OTel collector) push to — the distributor service."
+  value       = "http://${var.helm_release_name}-distributor.${var.namespace}.svc:4317"
 }
 
 output "query_endpoint" {
-  description = "Tempo query API (the Grafana Tempo datasource)."
-  value       = "http://${var.helm_release_name}.${var.namespace}.svc:3200"
+  description = "Tempo query API (the Grafana Tempo datasource) — the query-frontend service."
+  value       = "http://${var.helm_release_name}-query-frontend.${var.namespace}.svc:3200"
 }

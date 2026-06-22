@@ -11,11 +11,12 @@ locals {
 
   traces_bucket = try(aws_s3_bucket.traces[0].bucket, "")
 
-  # ---- Tempo helm values (grafana-community/tempo — single-binary monolith) ----
-  # One pod (lands on a node with room) fits the cost-effective cluster — mirrors Loki's single-binary
-  # choice. The chart moved to grafana-community/helm-charts (Jan 2026); it is NOT an operator pivot.
-  # OTLP receivers ingest on 4317/4318; the query API serves on 3200. HA/prod = the tempo-distributed
-  # chart (a future path).
+  # ---- Tempo helm values (grafana-community/tempo-distributed) ----
+  # ONE chart, sized by high_availability — same spirit as Loki's SingleBinary<->SimpleScalable toggle:
+  # dev runs every component at 1 replica (RF1, caches off) so dev exercises the real prod architecture
+  # scaled down; HA flips to RF3 + zone-aware + multi-replica + caches. Chart sourced from
+  # grafana-community/helm-charts (the standalone Tempo charts moved there Jan 2026 — a repo move, NOT an
+  # operator pivot; app v2.10.7). OTLP ingests on the distributor (4317/4318); query API on 3200.
   helm_values = {
     fullnameOverride = var.helm_release_name
 
@@ -26,50 +27,56 @@ locals {
       annotations = {}
     }
 
-    tempo = {
-      reportingEnabled = false # no usage phone-home
-      retention        = var.retention_period
+    reportingEnabled = false # no usage phone-home
 
-      # S3 trace backend. The client sends x-amz-server-side-encryption (sse=SSE-S3) to satisfy the org
-      # "enforce-encryption" SCP — bucket default encryption alone doesn't add the header (same as Loki).
-      storage = {
-        trace = {
-          backend = "s3"
-          s3 = {
-            bucket   = local.traces_bucket
-            endpoint = "s3.${var.aws_region}.amazonaws.com"
-            region   = var.aws_region
-            sse      = { type = "SSE-S3" }
-          }
-          wal = { path = "/var/tempo/wal" }
+    # S3 trace backend. The client sends x-amz-server-side-encryption (sse=SSE-S3) to satisfy the org
+    # "enforce-encryption" SCP — bucket default encryption alone doesn't add the header (same as Loki).
+    storage = {
+      trace = {
+        backend = "s3"
+        s3 = {
+          bucket   = local.traces_bucket
+          endpoint = "s3.${var.aws_region}.amazonaws.com"
+          region   = var.aws_region
+          sse      = { type = "SSE-S3" }
         }
-      }
-
-      # OTLP only (the OTel collector speaks OTLP); drop the jaeger/opencensus receivers + ports.
-      receivers = {
-        otlp = {
-          protocols = {
-            grpc = { endpoint = "0.0.0.0:4317" }
-            http = { endpoint = "0.0.0.0:4318" }
-          }
-        }
-      }
-
-      resources = {
-        requests = { cpu = "100m", memory = "256Mi" }
-        limits   = { memory = "768Mi" }
       }
     }
 
-    # WAL + local blocks before flush to S3 — a small PVC for the reference cluster.
-    persistence = {
-      enabled      = true
-      storageClass = var.storage_class
-      size         = "5Gi"
+    # Enable OTLP receivers (chart default is OFF) — the OTel collector pushes OTLP to the distributor.
+    traces = {
+      otlp = {
+        grpc = { enabled = true }
+        http = { enabled = true }
+      }
     }
 
-    # The metrics-generator (service graphs / span metrics) needs Prometheus remote-write; defer (Mimir).
+    # Sizing follows cost_profile via high_availability.
+    ingester = {
+      replicas             = var.high_availability ? 3 : 1
+      config               = { replication_factor = var.high_availability ? 3 : 1 }
+      zoneAwareReplication = { enabled = var.high_availability } # needs 3 zones
+      persistence          = { enabled = true, storageClass = var.storage_class, size = "5Gi" }
+    }
+    distributor   = { replicas = var.high_availability ? 2 : 1 }
+    querier       = { replicas = var.high_availability ? 2 : 1 }
+    queryFrontend = { replicas = var.high_availability ? 2 : 1 }
+    compactor = {
+      replicas = 1
+      config   = { compaction = { block_retention = var.retention_period } }
+    }
+
+    # Off in dev; the HA profile turns the cache on for query performance. metrics-generator stays off
+    # (service graphs / span metrics need Prometheus remote-write; defer with Mimir).
     metricsGenerator = { enabled = false }
+    memcached        = { enabled = var.high_availability }
+    cache = var.high_availability ? {
+      caches = [{
+        memcached = { host = "${var.helm_release_name}-memcached", service = "memcached-client", consistent_hash = true, timeout = "500ms" }
+        roles     = ["parquet-footer", "bloom", "frontend-search"]
+      }]
+    } : { caches = [] }
+    gateway = { enabled = false }
   }
 
   # ---- Grafana datasource (auto-loaded by the observability Grafana sidecar) ----
@@ -80,7 +87,7 @@ locals {
       type   = "tempo"
       uid    = "tempo"
       access = "proxy"
-      url    = "http://${var.helm_release_name}.${var.namespace}.svc:3200"
+      url    = "http://${var.helm_release_name}-query-frontend.${var.namespace}.svc:3200"
       jsonData = {
         # Trace -> logs: jump from a span to its pod's logs in Loki (pairs with the Loki datasource's
         # derivedField trace_id -> tempo, giving bidirectional correlation).
@@ -218,7 +225,7 @@ resource "aws_eks_pod_identity_association" "tempo" {
 }
 
 # ---------------------------------------------------------------------------
-# Helm release — grafana-community/tempo
+# Helm release — grafana-community/tempo-distributed
 # ---------------------------------------------------------------------------
 
 resource "helm_release" "tempo" {

@@ -93,5 +93,8 @@ inputs = {
   helm_wait          = true
   storage_class      = "gp3"
 
+  # Sizing follows cost_profile (dev = 1 replica/component RF1; prod = RF3 + zone-aware + caches).
+  high_availability = include.base.locals.high_availability
+
   tags = include.base.locals.tags
 }

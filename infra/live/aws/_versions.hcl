@@ -93,7 +93,7 @@ locals {
     mimir                 = "6.0.6"
     loki                  = "7.0.0"  # grafana/loki — P3a logs store (latest stable, resolved 2026-06-19)
     alloy                 = "1.10.0" # grafana/alloy — P3a log-collector DaemonSet
-    tempo                 = "2.2.3"  # grafana-community/tempo — P3b traces store (single-binary monolith, app v2.10.7)
+    tempo                 = "2.25.5" # grafana-community/tempo-distributed — P3b traces store (sized by cost_profile; app v2.10.7)
     crossplane            = "2.3.1"  # Crossplane v2 (ADR-046)
     cloudnative_pg        = "0.28.2" # CNPG operator chart (app v1.29.1) — Backstage DB (ADR-051)
     backstage             = "2.8.1"  # official backstage Helm chart (points at our platform/backstage image)
