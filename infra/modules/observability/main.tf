@@ -41,8 +41,20 @@ locals {
     headers = { "X-Scope-OrgID" = var.mimir_tenant_id }
   }] : []
 
-  # Alertmanager routing: critical → SNS, Watchdog → null (external heartbeat is a P4 follow-up),
-  # everything else → null. Only wired when an SNS topic + IRSA are present.
+  # SNS receiver config (severity is in the subject) — shared by the critical + warning receivers.
+  sns_config = {
+    topic_arn     = var.alerts_topic_arn
+    sigv4         = { region = var.aws_region }
+    subject       = "[{{ .CommonLabels.severity }}] {{ .CommonLabels.alertname }}"
+    message       = "{{ range .Alerts }}{{ .Annotations.description }}{{ \"\\n\" }}{{ end }}"
+    send_resolved = true
+  }
+
+  # Alertmanager routing (P4): critical + warning → SNS (P1 dropped warning to null); info/others →
+  # dashboard-only (null); Watchdog → null (external heartbeat is a follow-up). A critical inhibits a
+  # matching warning (same namespace+alertname) so one incident doesn't double-notify. The SNS
+  # receivers are only wired when an SNS topic + IRSA are present; routing/inhibition are harmless
+  # without them (everything lands on null). Slack/PagerDuty (oncall_provider) are a later add.
   alertmanager_config = {
     global = { resolve_timeout = "5m" }
     route = {
@@ -53,21 +65,23 @@ locals {
       receiver        = "null"
       routes = concat(
         [{ receiver = "null", matchers = ["alertname = \"Watchdog\""] }],
-        local.create_irsa ? [{ receiver = "critical-sns", matchers = ["severity = \"critical\""], continue = false }] : [],
+        local.create_irsa ? [
+          { receiver = "critical-sns", matchers = ["severity = \"critical\""], continue = false },
+          { receiver = "warning-sns", matchers = ["severity = \"warning\""], continue = false },
+        ] : [],
       )
     }
+    inhibit_rules = [{
+      source_matchers = ["severity = \"critical\""]
+      target_matchers = ["severity = \"warning\""]
+      equal           = ["namespace", "alertname"]
+    }]
     receivers = concat(
       [{ name = "null" }],
-      local.create_irsa ? [{
-        name = "critical-sns"
-        sns_configs = [{
-          topic_arn     = var.alerts_topic_arn
-          sigv4         = { region = var.aws_region }
-          subject       = "[{{ .CommonLabels.severity }}] {{ .CommonLabels.alertname }}"
-          message       = "{{ range .Alerts }}{{ .Annotations.description }}{{ \"\\n\" }}{{ end }}"
-          send_resolved = true
-        }]
-      }] : [],
+      local.create_irsa ? [
+        { name = "critical-sns", sns_configs = [local.sns_config] },
+        { name = "warning-sns", sns_configs = [local.sns_config] },
+      ] : [],
     )
   }
 
