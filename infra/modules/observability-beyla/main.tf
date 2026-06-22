@@ -43,8 +43,10 @@ locals {
     }
 
     resources = {
-      requests = { cpu = "50m", memory = "128Mi" }
-      limits   = { memory = "512Mi" }
+      # Beyla instruments ~20 processes (eBPF maps + per-process tracers); 512Mi OOMed (exit 137). Nodes
+      # have memory headroom (MemoryPressure=False), so this is a container-limit raise, not a node-size issue.
+      requests = { cpu = "50m", memory = "256Mi" }
+      limits   = { memory = "1Gi" }
     }
   }
 }
