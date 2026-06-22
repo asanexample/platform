@@ -59,18 +59,19 @@ locals {
   # One switch (cost_profile) sets the bundle; an explicit per-knob override wins over the preset.
   cost_profile = try(local.all_vars.cost_profile, "dev")
   _cost_profiles = {
-    dev  = { high_availability = false, single_az_nodes = true, enable_mimir = false, enable_loki = false, enable_log_pipeline = false, enable_tempo = false }
-    prod = { high_availability = true, single_az_nodes = false, enable_mimir = true, enable_loki = true, enable_log_pipeline = true, enable_tempo = true }
+    dev  = { high_availability = false, single_az_nodes = true, enable_mimir = false, enable_loki = false, enable_log_pipeline = false, enable_tempo = false, enable_trace_pipeline = false }
+    prod = { high_availability = true, single_az_nodes = false, enable_mimir = true, enable_loki = true, enable_log_pipeline = true, enable_tempo = true, enable_trace_pipeline = true }
   }
   _profile = local._cost_profiles[local.cost_profile]
 
-  high_availability   = try(local.all_vars.high_availability, local._profile.high_availability)
-  single_az_nodes     = try(local.all_vars.single_az_nodes, local._profile.single_az_nodes)
-  enable_mimir        = try(local.all_vars.enable_mimir, local._profile.enable_mimir)
-  enable_loki         = try(local.all_vars.enable_loki, local._profile.enable_loki)
-  enable_log_pipeline = try(local.all_vars.enable_log_pipeline, local._profile.enable_log_pipeline)
-  enable_tempo        = try(local.all_vars.enable_tempo, local._profile.enable_tempo)
-  node_arch           = try(local.all_vars.node_arch, "arm64")
+  high_availability     = try(local.all_vars.high_availability, local._profile.high_availability)
+  single_az_nodes       = try(local.all_vars.single_az_nodes, local._profile.single_az_nodes)
+  enable_mimir          = try(local.all_vars.enable_mimir, local._profile.enable_mimir)
+  enable_loki           = try(local.all_vars.enable_loki, local._profile.enable_loki)
+  enable_log_pipeline   = try(local.all_vars.enable_log_pipeline, local._profile.enable_log_pipeline)
+  enable_tempo          = try(local.all_vars.enable_tempo, local._profile.enable_tempo)
+  enable_trace_pipeline = try(local.all_vars.enable_trace_pipeline, local._profile.enable_trace_pipeline)
+  node_arch             = try(local.all_vars.node_arch, "arm64")
 
   # EKS control-plane log types vended to CloudWatch. Defaults to [] (OFF) — the `audit`/`api` streams are billed
   # at the vended-logs ingestion rate and, driven by the GitOps controllers' constant apiserver traffic, ran

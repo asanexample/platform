@@ -10,9 +10,10 @@ locals {
 
   # Cost-profile override: run Loki (logs — #102 P3a) on the platform dev cluster in cost-effective
   # single-binary mode, even though cost_profile=dev defaults durable stores off. (preprod stays off.)
-  enable_loki         = true
-  enable_log_pipeline = true # Alloy DaemonSet → Loki (P3a). Pairs with enable_loki on the dev cluster.
-  enable_tempo        = true # Tempo traces store (P3b). OTel collector (trace pipeline) lands next.
+  enable_loki           = true
+  enable_log_pipeline   = true # Alloy DaemonSet → Loki (P3a). Pairs with enable_loki on the dev cluster.
+  enable_tempo          = true # Tempo traces store (P3b).
+  enable_trace_pipeline = true # OTel collector gateway → Tempo (P3b). Pairs with enable_tempo.
 
   tags = {
     Environment        = local.environment
