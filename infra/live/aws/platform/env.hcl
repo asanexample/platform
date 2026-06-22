@@ -15,6 +15,7 @@ locals {
   enable_tempo          = true # Tempo traces store (P3b).
   enable_trace_pipeline = true # OTel collector gateway → Tempo (P3b). Pairs with enable_tempo.
   enable_cloud_metrics  = true # YACE → Prometheus for AWS-resource metrics (P5b).
+  enable_cost_metrics   = true # OpenCost → per-namespace/workload cost in Grafana (P11).
 
   tags = {
     Environment        = local.environment
