@@ -106,6 +106,10 @@ inputs = {
   # PagerDuty: critical alerts page via Events API v2; routing key synced from SM via External Secrets.
   pagerduty_routing_key_secret_name = "platform/observability/pagerduty-routing-key"
 
+  # P5a — cloud-resource metrics: Grafana CloudWatch datasource (query-time, zero storage). Grafana's SA
+  # gets CloudWatch read via Pod Identity. Broad AWS-resource coverage (NLB/S3/TGW/NAT/Route53/EKS).
+  cloudwatch_enabled = true
+
   # Grafana served Tailscale-only via the platform internal Gateway (gateway-config adds the HTTPRoute).
   grafana_hostname = "grafana.aws.refplat.org"
 

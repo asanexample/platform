@@ -212,3 +212,13 @@ variable "secret_store_name" {
   type        = string
   default     = "aws-secrets-manager"
 }
+
+# ---------------------------------------------------------------------------
+# P5a — Cloud-resource metrics: Grafana CloudWatch datasource
+# ---------------------------------------------------------------------------
+
+variable "cloudwatch_enabled" {
+  description = "Add a Grafana CloudWatch datasource (query-time, zero-storage AWS-resource metrics) + grant the Grafana ServiceAccount CloudWatch read via EKS Pod Identity. Covers NLB/S3/TGW/NAT/Route53/EKS etc. with no exporter. #102 P5a."
+  type        = bool
+  default     = false
+}
