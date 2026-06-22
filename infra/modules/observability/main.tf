@@ -41,7 +41,10 @@ locals {
     headers = { "X-Scope-OrgID" = var.mimir_tenant_id }
   }] : []
 
-  # SNS receiver config (severity is in the subject) — shared by the critical + warning receivers.
+  # Slack receiver wired when a webhook secret name is provided (synced via External Secrets).
+  slack_enabled = var.slack_webhook_secret_name != ""
+
+  # SNS receiver config (severity is in the subject) — shared across receivers.
   sns_config = {
     topic_arn     = var.alerts_topic_arn
     sigv4         = { region = var.aws_region }
@@ -50,11 +53,19 @@ locals {
     send_resolved = true
   }
 
-  # Alertmanager routing (P4): critical + warning → SNS (P1 dropped warning to null); info/others →
-  # dashboard-only (null); Watchdog → null (external heartbeat is a follow-up). A critical inhibits a
-  # matching warning (same namespace+alertname) so one incident doesn't double-notify. The SNS
-  # receivers are only wired when an SNS topic + IRSA are present; routing/inhibition are harmless
-  # without them (everything lands on null). Slack/PagerDuty (oncall_provider) are a later add.
+  # Slack receiver config. api_url_file reads the webhook from the mounted ES-synced secret, so the URL
+  # never enters Terraform state or the helm values. The incoming webhook is bound to its own channel.
+  slack_config = {
+    api_url_file  = "/etc/alertmanager/secrets/alertmanager-slack-webhook/url"
+    channel       = var.slack_channel
+    send_resolved = true
+  }
+
+  # Alertmanager routing (P4): critical → SNS + Slack, warning → Slack (SNS fallback when Slack is off);
+  # info/others → dashboard-only (null); Watchdog → null (external heartbeat is a follow-up). A critical
+  # inhibits a matching warning (same namespace+alertname) so one incident doesn't double-notify. Each
+  # receiver carries only the channels actually wired (SNS needs the topic+IRSA; Slack needs the secret);
+  # with neither, the receivers are no-ops (== null).
   alertmanager_config = {
     global = { resolve_timeout = "5m" }
     route = {
@@ -63,25 +74,34 @@ locals {
       group_interval  = "5m"
       repeat_interval = "4h"
       receiver        = "null"
-      routes = concat(
-        [{ receiver = "null", matchers = ["alertname = \"Watchdog\""] }],
-        local.create_irsa ? [
-          { receiver = "critical-sns", matchers = ["severity = \"critical\""], continue = false },
-          { receiver = "warning-sns", matchers = ["severity = \"warning\""], continue = false },
-        ] : [],
-      )
+      routes = [
+        { receiver = "null", matchers = ["alertname = \"Watchdog\""] },
+        { receiver = "critical", matchers = ["severity = \"critical\""], continue = false },
+        { receiver = "warning", matchers = ["severity = \"warning\""], continue = false },
+      ]
     }
     inhibit_rules = [{
       source_matchers = ["severity = \"critical\""]
       target_matchers = ["severity = \"warning\""]
       equal           = ["namespace", "alertname"]
     }]
+    # critical → SNS (if IRSA) + Slack (if enabled); warning → Slack (if enabled), else SNS fallback.
+    # Config keys are always present as lists (empty = that channel off) so critical/warning share one
+    # object type; concat keeps the differently-shaped "null" receiver separate.
     receivers = concat(
       [{ name = "null" }],
-      local.create_irsa ? [
-        { name = "critical-sns", sns_configs = [local.sns_config] },
-        { name = "warning-sns", sns_configs = [local.sns_config] },
-      ] : [],
+      [
+        {
+          name          = "critical"
+          sns_configs   = local.create_irsa ? [local.sns_config] : []
+          slack_configs = local.slack_enabled ? [local.slack_config] : []
+        },
+        {
+          name          = "warning"
+          sns_configs   = (!local.slack_enabled && local.create_irsa) ? [local.sns_config] : []
+          slack_configs = local.slack_enabled ? [local.slack_config] : []
+        },
+      ],
     )
   }
 
@@ -197,6 +217,9 @@ locals {
           limits   = { memory = "256Mi" }
         }
         storage = local.alertmanager_storage_spec
+        # Mount the ES-synced Slack webhook at /etc/alertmanager/secrets/<name>/url (referenced by the
+        # Slack receiver's api_url_file). The K8s secret is created by the ExternalSecret below.
+        secrets = local.slack_enabled ? ["alertmanager-slack-webhook"] : []
       }
       serviceAccount = {
         annotations = local.create_irsa ? {
@@ -508,5 +531,37 @@ resource "helm_release" "kube_prometheus_stack" {
     kubernetes_secret_v1.grafana_admin,
     kubernetes_network_policy_v1.default_deny_ingress,
     aws_iam_role_policy.alertmanager_sns,
+    kubernetes_manifest.alertmanager_slack_webhook,
   ]
+}
+
+# ---------------------------------------------------------------------------
+# Slack webhook for Alertmanager — External Secret synced from AWS Secrets Manager.
+# Mounted into Alertmanager via alertmanagerSpec.secrets; the Slack receiver reads it through
+# api_url_file, so the webhook URL never enters Terraform state or the helm values. The SM secret is
+# created manually (the URL is generated in Slack), JSON property "url".
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_manifest" "alertmanager_slack_webhook" {
+  count = local.slack_enabled ? 1 : 0
+
+  manifest = {
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = "alertmanager-slack-webhook"
+      namespace = var.namespace
+    }
+    spec = {
+      refreshInterval = "1h"
+      secretStoreRef  = { name = var.secret_store_name, kind = "ClusterSecretStore" }
+      target          = { name = "alertmanager-slack-webhook", creationPolicy = "Owner" }
+      data = [{
+        secretKey = "url"
+        remoteRef = { key = var.slack_webhook_secret_name, property = "url" }
+      }]
+    }
+  }
+
+  depends_on = [kubernetes_namespace_v1.this]
 }
