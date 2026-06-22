@@ -103,6 +103,15 @@ locals {
     resultsCache = { enabled = var.high_availability }
     lokiCanary   = { enabled = false }
     test         = { enabled = false }
+
+    # Self-monitoring: scrape Loki's own metrics into Prometheus (P4 store alerts). ServiceMonitor only —
+    # not the chart's bundled rules/dashboards/agent (we author curated rules + manage dashboards).
+    monitoring = {
+      serviceMonitor = { enabled = true }
+      selfMonitoring = { enabled = false }
+      rules          = { enabled = false }
+      dashboards     = { enabled = false }
+    }
   }
 
   # ---- Grafana datasource (auto-loaded by the observability Grafana sidecar) ----

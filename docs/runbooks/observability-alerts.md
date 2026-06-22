@@ -47,3 +47,19 @@ Namespace `argocd`. GitOps reconciliation.
 - **ArgoCDAppOutOfSync** — an app has drifted `OutOfSync` for 15m (manual change or a failing auto-sync).
 - **ArgoCDRepoServerGitErrors** — repo-server can't `git ls-remote` (`{{ $labels.repo }}`); a repo
   connectivity or credentials problem.
+
+## Loki & Tempo stores
+
+Namespace `observability`. The log (Loki) and trace (Tempo) stores monitoring themselves. Both write to
+S3 via Pod Identity — flush failures usually mean an S3/IAM/SCP problem (see the SSE requirement in the
+module READMEs).
+
+- **LokiDown** / **TempoComponentDown** (critical) — the store (or a Tempo component `{{ $labels.job }}`)
+  is unreachable; log/trace ingestion or queries are impaired. Check `kubectl -n observability get pods`
+  and the pod logs.
+- **LokiRequestErrors** — >5% of Loki requests are 5xx; check Loki logs and S3 reachability.
+- **LokiChunkFlushFailures** / **TempoIngesterFlushFailures** — ingesters can't flush chunks/traces to
+  S3 (risk of data loss / WAL backpressure). Check the pod logs for `AccessDenied` (the `enforce-encryption`
+  SCP needs client-side SSE) or other S3 errors.
+- **TempoBackendFlushFailures** — Tempo's backend scheduler is failing compaction flushes; same S3 triage.
+- **LokiPanics** — Loki logged panics; capture logs and check for a bad query/config.
