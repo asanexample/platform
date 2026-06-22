@@ -14,6 +14,7 @@ locals {
   enable_log_pipeline   = true # Alloy DaemonSet → Loki (P3a). Pairs with enable_loki on the dev cluster.
   enable_tempo          = true # Tempo traces store (P3b).
   enable_trace_pipeline = true # OTel collector gateway → Tempo (P3b). Pairs with enable_tempo.
+  enable_cloud_metrics  = true # YACE → Prometheus for AWS-resource metrics (P5b).
 
   tags = {
     Environment        = local.environment

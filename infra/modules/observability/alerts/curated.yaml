@@ -288,3 +288,26 @@ groups:
           summary: High Cilium packet drop rate (non-policy)
           description: "Cilium is dropping >10 packets/s for non-policy reasons over 15m — a datapath/connectivity problem (policy-denied drops are excluded as expected). Start with `cilium monitor --type drop`."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cilium"
+
+  # Cloud-resource alerts (#102 P5b) — metrics from YACE (CloudWatch → Prometheus). Names are
+  # aws_<namespace>_<metric>_<stat> (live-verified).
+  - name: cloudwatch.rules
+    rules:
+      - alert: CloudNLBUnhealthyHosts
+        expr: max by (dimension_LoadBalancer, dimension_TargetGroup) (aws_networkelb_un_healthy_host_count_maximum) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "NLB target group has unhealthy hosts ({{ $labels.dimension_TargetGroup }})"
+          description: "An AWS NLB target group has reported unhealthy hosts for 15m — the gateway/load-balancer backend is degraded. Check target-group health and the backing pods/nodes."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cloud-resources"
+      - alert: CloudNATGatewayPortAllocationErrors
+        expr: sum by (dimension_NatGatewayId) (rate(aws_natgateway_error_port_allocation_sum[10m])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "NAT gateway SNAT port-allocation errors ({{ $labels.dimension_NatGatewayId }})"
+          description: "A NAT gateway is failing to allocate SNAT source ports for 15m — outbound connections from the VPC are being dropped (port exhaustion). Reduce concurrent connections to a single destination, or add NAT gateways."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cloud-resources"
