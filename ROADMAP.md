@@ -62,7 +62,7 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 
 #### Observability
 
-- [#102](https://github.com/asanexample/platform/issues/102) Observability stack (epic) — metrics, logs, traces, profiles, cost. **2/14 phases live** (P1 metrics+dashboards, P2 Mimir); the remaining 12 are tracked as sub-issues. **Next up: P3 — Loki + Tempo ([#582](https://github.com/asanexample/platform/issues/582), `priority: top`).**
+- [#102](https://github.com/asanexample/platform/issues/102) Observability stack (epic) — metrics, logs, traces, profiles, cost. **~6/14 phases live: the full standing-state foundation** — P1 metrics+dashboards, P3 logs+traces ([#582](https://github.com/asanexample/platform/issues/582)), P4 alerting + Slack/PagerDuty ([#583](https://github.com/asanexample/platform/issues/583)), P5 cloud-resource metrics ([#584](https://github.com/asanexample/platform/issues/584)), P11 in-cluster cost (OpenCost + dashboard). P2 Mimir is code-complete but off in the dev cost_profile (Prometheus-only). **Next up: P7 — instrumentation on-ramp ([#586](https://github.com/asanexample/platform/issues/586))** — Beyla eBPF zero-code baseline + platform-injected OTLP + opt-in SDK enrichment ([ADR-077](docs/adrs/077-application-instrumentation-strategy.md)); it's the unlock for the activity-dependent phases (P6 APM, P9 SLOs, P13 isolation) which are deferred until real telemetry/traffic flows.
 - Agent / GenAI observability layer (ADR-076) rides the #102 backbone — OTel-GenAI conventions, per-invocation agent traces, data-boundary content rules.
 
 ### Next
