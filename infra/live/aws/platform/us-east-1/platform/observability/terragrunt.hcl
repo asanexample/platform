@@ -103,6 +103,8 @@ inputs = {
   # Slack alerting: Alertmanager Slack receiver, webhook synced from Secrets Manager via External Secrets
   # (manually created — see docs/runbooks/observability-alerts.md). warning → Slack, critical → Slack + SNS.
   slack_webhook_secret_name = "platform/observability/slack-webhook"
+  # PagerDuty: critical alerts page via Events API v2; routing key synced from SM via External Secrets.
+  pagerduty_routing_key_secret_name = "platform/observability/pagerduty-routing-key"
 
   # Grafana served Tailscale-only via the platform internal Gateway (gateway-config adds the HTTPRoute).
   grafana_hostname = "grafana.aws.refplat.org"

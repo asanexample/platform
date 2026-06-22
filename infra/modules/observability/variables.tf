@@ -201,6 +201,12 @@ variable "slack_channel" {
   default     = "#platform-alerts"
 }
 
+variable "pagerduty_routing_key_secret_name" {
+  description = "AWS Secrets Manager secret name holding the PagerDuty Events API v2 routing/integration key (JSON property 'routingKey'). Empty disables the PagerDuty receiver. Synced to Alertmanager via External Secrets — never enters Terraform state or helm values. Critical alerts page PagerDuty."
+  type        = string
+  default     = ""
+}
+
 variable "secret_store_name" {
   description = "Name of the External Secrets ClusterSecretStore (AWS Secrets Manager)."
   type        = string

@@ -41,8 +41,9 @@ locals {
     headers = { "X-Scope-OrgID" = var.mimir_tenant_id }
   }] : []
 
-  # Slack receiver wired when a webhook secret name is provided (synced via External Secrets).
-  slack_enabled = var.slack_webhook_secret_name != ""
+  # Slack/PagerDuty receivers wired when their secret names are provided (synced via External Secrets).
+  slack_enabled     = var.slack_webhook_secret_name != ""
+  pagerduty_enabled = var.pagerduty_routing_key_secret_name != ""
 
   # SNS receiver config (severity is in the subject) — shared across receivers.
   sns_config = {
@@ -59,6 +60,15 @@ locals {
     api_url_file  = "/etc/alertmanager/secrets/alertmanager-slack-webhook/url"
     channel       = var.slack_channel
     send_resolved = true
+  }
+
+  # PagerDuty receiver config (Events API v2). routing_key_file reads the integration key from the mounted
+  # ES-synced secret (URL/key never enters state or helm values). Only critical alerts page.
+  pagerduty_config = {
+    routing_key_file = "/etc/alertmanager/secrets/alertmanager-pagerduty/routingKey"
+    severity         = "critical"
+    description      = "{{ .CommonLabels.alertname }} ({{ .CommonLabels.namespace }})"
+    send_resolved    = true
   }
 
   # Alertmanager routing (P4): critical → SNS + Slack, warning → Slack (SNS fallback when Slack is off);
@@ -92,14 +102,16 @@ locals {
       [{ name = "null" }],
       [
         {
-          name          = "critical"
-          sns_configs   = local.create_irsa ? [local.sns_config] : []
-          slack_configs = local.slack_enabled ? [local.slack_config] : []
+          name              = "critical"
+          sns_configs       = local.create_irsa ? [local.sns_config] : []
+          slack_configs     = local.slack_enabled ? [local.slack_config] : []
+          pagerduty_configs = local.pagerduty_enabled ? [local.pagerduty_config] : []
         },
         {
-          name          = "warning"
-          sns_configs   = (!local.slack_enabled && local.create_irsa) ? [local.sns_config] : []
-          slack_configs = local.slack_enabled ? [local.slack_config] : []
+          name              = "warning"
+          sns_configs       = (!local.slack_enabled && local.create_irsa) ? [local.sns_config] : []
+          slack_configs     = local.slack_enabled ? [local.slack_config] : []
+          pagerduty_configs = [] # warnings notify Slack/SNS, they don't page
         },
       ],
     )
@@ -219,7 +231,10 @@ locals {
         storage = local.alertmanager_storage_spec
         # Mount the ES-synced Slack webhook at /etc/alertmanager/secrets/<name>/url (referenced by the
         # Slack receiver's api_url_file). The K8s secret is created by the ExternalSecret below.
-        secrets = local.slack_enabled ? ["alertmanager-slack-webhook"] : []
+        secrets = concat(
+          local.slack_enabled ? ["alertmanager-slack-webhook"] : [],
+          local.pagerduty_enabled ? ["alertmanager-pagerduty"] : [],
+        )
       }
       serviceAccount = {
         annotations = local.create_irsa ? {
@@ -532,6 +547,7 @@ resource "helm_release" "kube_prometheus_stack" {
     kubernetes_network_policy_v1.default_deny_ingress,
     aws_iam_role_policy.alertmanager_sns,
     kubernetes_manifest.alertmanager_slack_webhook,
+    kubernetes_manifest.alertmanager_pagerduty,
   ]
 }
 
@@ -559,6 +575,36 @@ resource "kubernetes_manifest" "alertmanager_slack_webhook" {
       data = [{
         secretKey = "url"
         remoteRef = { key = var.slack_webhook_secret_name, property = "url" }
+      }]
+    }
+  }
+
+  depends_on = [kubernetes_namespace_v1.this]
+}
+
+# ---------------------------------------------------------------------------
+# PagerDuty routing key for Alertmanager — External Secret synced from AWS Secrets Manager.
+# Mounted via alertmanagerSpec.secrets; the PagerDuty receiver reads it through routing_key_file. The SM
+# secret is created manually (the key is generated in PagerDuty), JSON property "routingKey".
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_manifest" "alertmanager_pagerduty" {
+  count = local.pagerduty_enabled ? 1 : 0
+
+  manifest = {
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = "alertmanager-pagerduty"
+      namespace = var.namespace
+    }
+    spec = {
+      refreshInterval = "1h"
+      secretStoreRef  = { name = var.secret_store_name, kind = "ClusterSecretStore" }
+      target          = { name = "alertmanager-pagerduty", creationPolicy = "Owner" }
+      data = [{
+        secretKey = "routingKey"
+        remoteRef = { key = var.pagerduty_routing_key_secret_name, property = "routingKey" }
       }]
     }
   }
