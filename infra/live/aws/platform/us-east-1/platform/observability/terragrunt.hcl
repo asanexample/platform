@@ -100,6 +100,10 @@ inputs = {
   oidc_provider_url = dependency.eks.outputs.oidc_provider_url
   alerts_topic_arn  = dependency.sns_notifications.outputs.topic_arn
 
+  # Slack alerting: Alertmanager Slack receiver, webhook synced from Secrets Manager via External Secrets
+  # (manually created — see docs/runbooks/observability-alerts.md). warning → Slack, critical → Slack + SNS.
+  slack_webhook_secret_name = "observability/alertmanager/slack-webhook"
+
   # Grafana served Tailscale-only via the platform internal Gateway (gateway-config adds the HTTPRoute).
   grafana_hostname = "grafana.aws.refplat.org"
 

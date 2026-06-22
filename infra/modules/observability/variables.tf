@@ -184,3 +184,25 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# ---------------------------------------------------------------------------
+# Slack alerting (Alertmanager Slack receiver via an External-Secrets-synced webhook)
+# ---------------------------------------------------------------------------
+
+variable "slack_webhook_secret_name" {
+  description = "AWS Secrets Manager secret name holding the Slack incoming-webhook URL (JSON property 'url'). Empty disables the Slack receiver (SNS-only). Synced to Alertmanager via External Secrets — never enters Terraform state or helm values."
+  type        = string
+  default     = ""
+}
+
+variable "slack_channel" {
+  description = "Slack channel for alerts (the incoming webhook is bound to its own channel; this is informational/override)."
+  type        = string
+  default     = "#platform-alerts"
+}
+
+variable "secret_store_name" {
+  description = "Name of the External Secrets ClusterSecretStore (AWS Secrets Manager)."
+  type        = string
+  default     = "aws-secrets-manager"
+}
