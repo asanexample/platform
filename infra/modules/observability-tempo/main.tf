@@ -77,6 +77,12 @@ locals {
       }]
     } : { caches = [] }
     gateway = { enabled = false }
+
+    # Self-monitoring: ServiceMonitors for the Tempo components so Prometheus scrapes their metrics
+    # (P4 store alerts). Just the ServiceMonitors — no bundled rules/agent.
+    metaMonitoring = {
+      serviceMonitor = { enabled = true }
+    }
   }
 
   # ---- Grafana datasource (auto-loaded by the observability Grafana sidecar) ----

@@ -139,3 +139,72 @@ groups:
           summary: "ArgoCD git ls-remote failures ({{ $labels.repo }})"
           description: "ArgoCD repo-server is failing git ls-remote against {{ $labels.repo }} — repo connectivity/credentials issue."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#argocd"
+  # ---------------------------------------------------------------------------
+  - name: loki.rules
+    rules:
+      - alert: LokiDown
+        expr: up{job=~".*loki.*"} == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: Loki is down
+          description: "Loki (the log store) has been unreachable for 10m — log ingestion and queries are unavailable."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#loki--tempo-stores"
+      - alert: LokiRequestErrors
+        expr: (sum(rate(loki_request_duration_seconds_count{status_code=~"5.."}[5m])) / sum(rate(loki_request_duration_seconds_count[5m]))) > 0.05
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Loki 5xx error ratio > 5%
+          description: "More than 5% of Loki requests have returned 5xx over the last 15m."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#loki--tempo-stores"
+      - alert: LokiChunkFlushFailures
+        expr: increase(loki_ingester_chunks_flush_failures_total[15m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Loki chunk flushes to object storage are failing
+          description: "Loki ingester chunk flushes to S3 have failed over the last 15m — risk of log loss / WAL backpressure."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#loki--tempo-stores"
+      - alert: LokiPanics
+        expr: increase(loki_panic_total[10m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Loki is panicking
+          description: "Loki has logged panics over the last 10m."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#loki--tempo-stores"
+  # ---------------------------------------------------------------------------
+  - name: tempo.rules
+    rules:
+      - alert: TempoComponentDown
+        expr: up{job=~"observability/(distributor|ingester|querier|query-frontend|compactor)"} == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Tempo component down ({{ $labels.job }})"
+          description: "A Tempo component ({{ $labels.job }}) has been unreachable for 10m — trace ingestion or queries may be impaired."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#loki--tempo-stores"
+      - alert: TempoIngesterFlushFailures
+        expr: increase(tempo_ingester_failed_flushes_total[15m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Tempo ingester flushes to object storage are failing
+          description: "Tempo ingester flushes to S3 have failed over the last 15m — risk of trace loss / WAL backpressure."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#loki--tempo-stores"
+      - alert: TempoBackendFlushFailures
+        expr: increase(tempo_backend_scheduler_work_flushes_failed_total[15m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Tempo backend compaction flushes are failing
+          description: "Tempo's backend scheduler has failed work flushes over the last 15m — compaction/backend write issues."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#loki--tempo-stores"
