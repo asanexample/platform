@@ -73,6 +73,7 @@ locals {
     observability_events         = "${local.source_base}/observability-events"
     observability_cw_exporter    = "${local.source_base}/observability-cloudwatch-exporter"
     observability_opencost       = "${local.source_base}/observability-opencost"
+    observability_beyla          = "${local.source_base}/observability-beyla"
     crossplane                   = "${local.source_base}/crossplane"
     cloudnative_pg               = "${local.source_base}/cloudnative-pg"
     backstage                    = "${local.source_base}/backstage"
@@ -101,6 +102,7 @@ locals {
     otel_collector        = "0.158.2" # open-telemetry/opentelemetry-collector — P3b trace gateway (app v0.153.0)
     cloudwatch_exporter   = "0.46.0"  # prometheus-community/prometheus-yet-another-cloudwatch-exporter — P5b cloud-resource metrics (app v0.65.0)
     opencost              = "2.5.23"  # opencost/opencost — P11 in-cluster cost allocation (app 1.120.3)
+    beyla                 = "1.16.8"  # grafana/beyla — P7a zero-code eBPF instrumentation (app 3.20.0)
     crossplane            = "2.3.1"   # Crossplane v2 (ADR-046)
     cloudnative_pg        = "0.28.2"  # CNPG operator chart (app v1.29.1) — Backstage DB (ADR-051)
     backstage             = "2.8.1"   # official backstage Helm chart (points at our platform/backstage image)
