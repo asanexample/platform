@@ -1,6 +1,9 @@
 locals {
   create      = var.create
   create_irsa = local.create && var.alerts_topic_arn != "" && var.oidc_provider_arn != ""
+  # P5a — Grafana CloudWatch datasource (zero-storage, query-time AWS-resource metrics). Grafana's SA gets
+  # CloudWatch read via Pod Identity (ADR-047 — no IRSA annotation needed); the datasource uses the pod creds.
+  cloudwatch_enabled = local.create && var.cloudwatch_enabled
 
   # Sanitize tags for K8s label compliance (RFC-1123), mirroring the policy module.
   k8s_labels = {
@@ -261,6 +264,17 @@ locals {
         datasources = { enabled = true, defaultDatasourceEnabled = var.mimir_remote_write_url == "" }
       }
       service = { port = 80 }
+      # P5a — CloudWatch datasource (query-time, no storage). authType "default" picks up the Grafana SA's
+      # Pod-Identity creds (CloudWatch read). Covers NLB/S3/TGW/NAT/Route53/EKS metrics with no exporter.
+      additionalDataSources = local.cloudwatch_enabled ? [{
+        name = "CloudWatch"
+        type = "cloudwatch"
+        uid  = "cloudwatch"
+        jsonData = {
+          authType      = "default"
+          defaultRegion = var.aws_region
+        }
+      }] : []
       "grafana.ini" = {
         server           = { root_url = "https://${var.grafana_hostname}", enforce_domain = false }
         "auth.anonymous" = { enabled = false }
@@ -522,6 +536,92 @@ resource "aws_iam_role_policy" "alertmanager_sns" {
 }
 
 # ---------------------------------------------------------------------------
+# P5a — Grafana CloudWatch read (Pod Identity; ADR-047 — trust pods.eks.amazonaws.com, no IRSA).
+# Read-only CloudWatch + CloudWatch-Logs + tag/EC2 describe (the standard Grafana CloudWatch-datasource
+# permission set; GetMetricData/ListMetrics don't support resource scoping, so Resource = "*").
+# ---------------------------------------------------------------------------
+data "aws_iam_policy_document" "grafana_cloudwatch_trust" {
+  count = local.cloudwatch_enabled ? 1 : 0
+
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole", "sts:TagSession"]
+    principals {
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "grafana_cloudwatch" {
+  count = local.cloudwatch_enabled ? 1 : 0
+
+  name_prefix        = "${var.cluster_name}-graf-cw-"
+  assume_role_policy = data.aws_iam_policy_document.grafana_cloudwatch_trust[0].json
+  tags               = var.tags
+}
+
+resource "aws_iam_role_policy" "grafana_cloudwatch" {
+  count = local.cloudwatch_enabled ? 1 : 0
+
+  name = "cloudwatch-read"
+  role = aws_iam_role.grafana_cloudwatch[0].id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "CloudWatchRead"
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:DescribeAlarmsForMetric",
+          "cloudwatch:DescribeAlarmHistory",
+          "cloudwatch:DescribeAlarms",
+          "cloudwatch:ListMetrics",
+          "cloudwatch:GetMetricData",
+          "cloudwatch:GetMetricStatistics",
+          "cloudwatch:GetInsightRuleReport",
+        ]
+        Resource = ["*"]
+      },
+      {
+        Sid    = "CloudWatchLogsRead"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups",
+          "logs:GetLogGroupFields",
+          "logs:StartQuery",
+          "logs:StopQuery",
+          "logs:GetQueryResults",
+          "logs:GetLogEvents",
+        ]
+        Resource = ["*"]
+      },
+      {
+        Sid    = "ResourceTagAndEC2Describe"
+        Effect = "Allow"
+        Action = [
+          "tag:GetResources",
+          "ec2:DescribeTags",
+          "ec2:DescribeInstances",
+          "ec2:DescribeRegions",
+        ]
+        Resource = ["*"]
+      },
+    ]
+  })
+}
+
+resource "aws_eks_pod_identity_association" "grafana_cloudwatch" {
+  count = local.cloudwatch_enabled ? 1 : 0
+
+  cluster_name    = var.cluster_name
+  namespace       = var.namespace
+  service_account = local.grafana_service # chart names the SA <release>-grafana
+  role_arn        = aws_iam_role.grafana_cloudwatch[0].arn
+  tags            = var.tags
+}
+
+# ---------------------------------------------------------------------------
 # kube-prometheus-stack
 # ---------------------------------------------------------------------------
 resource "helm_release" "kube_prometheus_stack" {
@@ -548,6 +648,7 @@ resource "helm_release" "kube_prometheus_stack" {
     aws_iam_role_policy.alertmanager_sns,
     kubernetes_manifest.alertmanager_slack_webhook,
     kubernetes_manifest.alertmanager_pagerduty,
+    aws_eks_pod_identity_association.grafana_cloudwatch,
   ]
 }
 
