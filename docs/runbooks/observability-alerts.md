@@ -89,3 +89,67 @@ Namespace `kube-system`. The CNI / network plane — start with `cilium status` 
   and the underlying VPC/security-group/route path.
 - **HubbleDown** — flow observability is degraded; networking itself is unaffected. Check the Hubble
   metrics endpoint on the agent.
+
+## Notification channels & secret rotation
+
+How alerts leave the cluster, and the recurring operational tasks. Routing (set in the `observability`
+module's Alertmanager config):
+
+| severity | destinations |
+|----------|-------------|
+| `critical` | SNS (`platform-alerts` → email) + Slack (`#platform-alerts`) + PagerDuty (page) |
+| `warning` | Slack |
+| `info` / `Watchdog` / else | dashboard-only |
+
+A `critical` inhibits a matching `warning` (same `namespace`+`alertname`) so one incident doesn't
+double-notify. SNS auth is IRSA + sigv4. The **Slack webhook** and **PagerDuty routing key** are pulled from
+Secrets Manager by **External Secrets**, mounted into Alertmanager (`alertmanagerSpec.secrets`), and read via
+`api_url_file` / `routing_key_file` — so the secret values never enter Terraform state or helm values.
+
+### ⚠️ Secrets must live under the `platform/` prefix
+
+ESO's IRSA is scoped to `secret:platform/*` (the `external-secrets` unit sets `secret_path_prefix=platform`).
+**Any Secrets-Manager secret ESO syncs must be named `platform/…`** or the ExternalSecret fails with
+`AccessDenied` and the Alertmanager pod gets stuck mounting the missing K8s secret. Current secrets:
+
+- Slack webhook → `platform/observability/slack-webhook` (JSON property `url`)
+- PagerDuty routing key → `platform/observability/pagerduty-routing-key` (JSON property `routingKey`)
+
+### Rotate / set a webhook or key
+
+```bash
+# Slack: api.slack.com/apps → your app → Incoming Webhooks → (re)generate the URL, then:
+AWS_PROFILE=platform aws secretsmanager put-secret-value \
+  --secret-id platform/observability/slack-webhook \
+  --secret-string '{"url":"<new-webhook-url>"}' --region us-east-1
+
+# PagerDuty: Service → Events API v2 integration → copy the integration key, then:
+AWS_PROFILE=platform aws secretsmanager put-secret-value \
+  --secret-id platform/observability/pagerduty-routing-key \
+  --secret-string '{"routingKey":"<new-key>"}' --region us-east-1
+```
+
+ESO re-syncs within `refreshInterval` (1h); to apply immediately, `kubectl -n observability annotate
+externalsecret <name> force-sync=$(date +%s) --overwrite` (or delete the ESO pod). No Terraform apply needed
+for a rotation — only the SM value changes.
+
+### Onboard a new channel / service
+
+Add the secret under `platform/…`, then add an Alertmanager receiver in the `observability` module
+(`slack_configs` / `pagerduty_configs` with `*_file`) + mount it via `alertmanagerSpec.secrets`, and route a
+severity to it. Mirror the existing Slack/PagerDuty wiring in `infra/modules/observability/main.tf`.
+
+### Test the path end-to-end
+
+Port-forward Alertmanager and post a synthetic alert (severity picks the channel; `endsAt` auto-resolves):
+
+```bash
+kubectl -n observability port-forward svc/kube-prometheus-stack-alertmanager 9093:9093 &
+start=$(date -u +%Y-%m-%dT%H:%M:%SZ); end=$(date -u -d '+10 minutes' +%Y-%m-%dT%H:%M:%SZ)
+curl -s -X POST http://localhost:9093/api/v2/alerts -H 'Content-Type: application/json' \
+  -d "[{\"labels\":{\"alertname\":\"NotifyTest\",\"severity\":\"critical\",\"namespace\":\"observability\"},
+       \"annotations\":{\"description\":\"test\"},\"startsAt\":\"$start\",\"endsAt\":\"$end\"}]"
+```
+
+`severity=warning` → Slack only; `severity=critical` → SNS + Slack + PagerDuty (page). Alertmanager logs
+**only failed** notifications — silence after the POST means it sent. Confirm receipt in the channel.

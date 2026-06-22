@@ -1,12 +1,14 @@
 # #102 — Observability stack (metrics, logs, traces, profiles, cost, cloud resources) — hub-and-spoke, phased
 
-> **Status:** **P1 (kube-prometheus-stack hub: Grafana + metrics + dashboards + SNS alerting) and P2
-> (Grafana Mimir — durable, S3-backed, multi-tenant metrics) are DONE and live on the platform hub**
-> (ADR-043, ADR-044; merged through PR #147). As-built reference:
-> [observability-current-state.md](../architecture/observability-current-state.md). Remaining phases
-> (P3 logs/traces via Loki/Tempo, P4 curated alerts, P5 cloud-resource metrics, P10 spoke onboarding,
-> cost, and the Grafana SSO fast-follow) are below. Tracking issue:
-> [#102](https://github.com/asanexample/platform/issues/102).
+> **Status:** **P1–P4 are DONE and live on the platform hub.** P1 (kube-prometheus-stack: Grafana +
+> metrics + dashboards) + P2 (Grafana Mimir, ADR-043/044, PR #147 — code-complete but **off in the dev
+> cost_profile**, so metrics are Prometheus-only in dev); **P3 logs+traces** (Loki + Alloy + K8s-events;
+> Tempo + OTel collector, with trace↔logs correlation; PRs #596–#603); **P4 alerting + notifications**
+> (severity routing + inhibition + 28 curated `PrometheusRule`s across 7 components + store self-monitoring;
+> SNS / Slack / PagerDuty receivers; deploy/change dashboard annotations; PRs #604–#612). As-built reference:
+> [observability-current-state.md](../architecture/observability-current-state.md). **Remaining:** P5
+> cloud-resource metrics, P10 preprod spoke onboarding, cost (P11), Grafana SSO (deferred hardening), and
+> the smaller phases below. Tracking issue: [#102](https://github.com/asanexample/platform/issues/102).
 
 ## Context
 
