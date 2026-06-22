@@ -77,6 +77,10 @@ locals {
 
     crds = { create = false } # we deploy a plain log-collector DaemonSet; the chart CRDs (monitors) aren't used.
 
+    # Drop the config-reloader sidecar: the River config is static (managed via Terragrunt/helm, which
+    # rolls the DaemonSet on change). Removes a container + its CPU request so the pod fits packed nodes.
+    configReloader = { enabled = false }
+
     serviceAccount = { create = true, name = local.sa_name }
     rbac           = { create = true } # ClusterRole: list/watch pods for discovery.kubernetes.
 
@@ -102,8 +106,10 @@ locals {
         }
       }]
 
+      # Minimal CPU request — a log collector idles low, and the cost-effective nodes run packed
+      # (one sits ~98% CPU-requested). No CPU limit, so it can still burst. Memory limit only.
       resources = {
-        requests = { cpu = "50m", memory = "128Mi" }
+        requests = { cpu = "20m", memory = "128Mi" }
         limits   = { memory = "256Mi" }
       }
     }

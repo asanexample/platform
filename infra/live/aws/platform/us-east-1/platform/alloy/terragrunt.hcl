@@ -77,7 +77,10 @@ inputs = {
   loki_push_url = dependency.loki.outputs.push_endpoint
 
   helm_chart_version = include.base.locals.helm_versions.alloy
-  helm_wait          = true
+  # DaemonSet on a capacity-tight cost-effective cluster: a node can be too packed to fit one pod,
+  # which would (with atomic) roll back the whole release. Don't gate the apply on full scheduling —
+  # verify readiness out-of-band (kubectl). atomic follows helm_wait in the module.
+  helm_wait = false
 
   tags = include.base.locals.tags
 }
