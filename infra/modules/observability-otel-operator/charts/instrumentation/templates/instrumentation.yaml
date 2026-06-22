@@ -1,0 +1,18 @@
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: {{ .Values.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  # Platform-injected OTLP endpoint — opted-in pods get OTEL_EXPORTER_OTLP_ENDPOINT from here, never
+  # hardcoded in the app (ADR-077 D2). Points at the OpenTelemetry Collector gateway (#102 P3b) → Tempo.
+  exporter:
+    endpoint: {{ .Values.endpoint | quote }}
+  propagators:
+    - tracecontext
+    - baggage
+  sampler:
+    type: {{ .Values.sampler.type }}
+    argument: {{ .Values.sampler.argument | quote }}
+  resource:
+    addK8sUIDAttributes: true

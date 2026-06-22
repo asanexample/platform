@@ -1,0 +1,5 @@
+apiVersion: v2
+name: instrumentation
+description: Platform OpenTelemetry Instrumentation CR — platform-injected OTLP endpoint + SDK config for opt-in auto-instrumentation (ADR-077 D2/D3). Delivered as a local chart (not kubernetes_manifest) so the CR can reference the operator's CRD installed in the same apply.
+type: application
+version: 0.1.0
