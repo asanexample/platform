@@ -208,3 +208,24 @@ groups:
           summary: Tempo backend compaction flushes are failing
           description: "Tempo's backend scheduler has failed work flushes over the last 15m — compaction/backend write issues."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#loki--tempo-stores"
+  # ---------------------------------------------------------------------------
+  - name: external-secrets.rules
+    rules:
+      - alert: ExternalSecretNotReady
+        expr: externalsecret_status_condition{condition="Ready",status="False"} == 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ExternalSecret {{ $labels.namespace }}/{{ $labels.name }} not Ready"
+          description: "ExternalSecret {{ $labels.namespace }}/{{ $labels.name }} has been Ready=False for 15m — the Secrets Manager → K8s sync is failing (downstream secrets go stale)."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#external-secrets"
+      - alert: ClusterSecretStoreNotReady
+        expr: clustersecretstore_status_condition{condition="Ready",status="False"} == 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ClusterSecretStore {{ $labels.name }} not Ready"
+          description: "ClusterSecretStore {{ $labels.name }} has been Ready=False for 15m — everything that syncs secrets through it is affected."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#external-secrets"

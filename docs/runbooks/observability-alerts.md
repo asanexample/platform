@@ -63,3 +63,14 @@ module READMEs).
   SCP needs client-side SSE) or other S3 errors.
 - **TempoBackendFlushFailures** — Tempo's backend scheduler is failing compaction flushes; same S3 triage.
 - **LokiPanics** — Loki logged panics; capture logs and check for a bad query/config.
+
+## External Secrets
+
+Namespace `external-secrets`. The Secrets-Manager → Kubernetes sync path that most workloads depend on.
+
+- **ExternalSecretNotReady** — an `ExternalSecret` has been `Ready=False` for 15m; the synced `Secret` is
+  stale. `kubectl get externalsecret -A`, then `kubectl describe externalsecret <ns>/<name>` for the
+  `SecretSyncError` reason (missing SM key, IAM/Pod-Identity perms, store unreachable).
+- **ClusterSecretStoreNotReady** — the `ClusterSecretStore` is `Ready=False`; the AWS provider can't auth
+  or reach Secrets Manager. Check the store's status and the ESO controller's AWS credentials
+  (Pod Identity / IRSA).

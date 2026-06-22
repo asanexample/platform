@@ -149,6 +149,15 @@ locals {
           selector          = { matchLabels = { "app.kubernetes.io/name" = "cert-manager" } }
           endpoints         = [{ port = "tcp-prometheus-servicemonitor", interval = "30s" }]
         },
+        {
+          # ESO exposes a metrics Service (metrics_enabled in the external-secrets unit), but the chart's
+          # own ServiceMonitor is capability-gated and didn't render via the helm provider — define it
+          # here instead (the "metrics" port; the webhook service lacks it and is skipped).
+          name              = "external-secrets"
+          namespaceSelector = { matchNames = ["external-secrets"] }
+          selector          = { matchLabels = { "app.kubernetes.io/name" = "external-secrets" } }
+          endpoints         = [{ port = "metrics", interval = "30s" }]
+        },
       ]
     }
 
