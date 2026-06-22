@@ -70,6 +70,7 @@ locals {
     observability_alloy          = "${local.source_base}/observability-alloy"
     observability_tempo          = "${local.source_base}/observability-tempo"
     observability_otel_collector = "${local.source_base}/observability-otel-collector"
+    observability_events         = "${local.source_base}/observability-events"
     crossplane                   = "${local.source_base}/crossplane"
     cloudnative_pg               = "${local.source_base}/cloudnative-pg"
     backstage                    = "${local.source_base}/backstage"
