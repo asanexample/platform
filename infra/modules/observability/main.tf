@@ -104,6 +104,13 @@ locals {
       }
     }
 
+    # Curated platform-specific alert rules (P4 Tier 2) — one group per component, PromQL grounded in
+    # metrics verified present in Prometheus. Severity labels route via the Alertmanager tree; each
+    # alert carries a runbook_url. Cilium/ESO/stores join once their metrics are scraped (follow-up).
+    additionalPrometheusRulesMap = {
+      "platform-curated" = yamldecode(file("${path.module}/alerts/curated.yaml"))
+    }
+
     # --- Prometheus ---
     prometheus = {
       prometheusSpec = {
