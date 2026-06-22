@@ -277,3 +277,14 @@ groups:
           summary: "Hubble metrics down ({{ $labels.pod }})"
           description: "Hubble metrics ({{ $labels.pod }}) have been unreachable for 15m — network flow observability is degraded (networking itself is unaffected)."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cilium"
+      - alert: CiliumHighDropRate
+        # Excludes "Policy denied" (intended by network policy). Threshold sits well above the steady-state
+        # noise (~0.03/s "Unsupported L3 protocol"); >10/s sustained = a real datapath/connectivity problem.
+        expr: sum(rate(cilium_drop_count_total{reason!="Policy denied"}[5m])) > 10
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: High Cilium packet drop rate (non-policy)
+          description: "Cilium is dropping >10 packets/s for non-policy reasons over 15m — a datapath/connectivity problem (policy-denied drops are excluded as expected). Start with `cilium monitor --type drop`."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cilium"
