@@ -9,7 +9,10 @@ locals {
     privileged = true
 
     # Expose Beyla's RED + service-graph metrics for Prometheus to scrape (no metrics-generator needed —
-    # ADR-077 D5). serviceMonitorSelectorNilUsesHelmValues=false on the platform Prometheus → it's scraped.
+    # ADR-077 D5). The ServiceMonitor targets this metrics Service (chart wires its port/path from
+    # prometheus_export), so BOTH must be enabled. serviceMonitorSelectorNilUsesHelmValues=false on the
+    # platform Prometheus → it's scraped.
+    service        = { enabled = true }
     serviceMonitor = { enabled = true }
 
     config = {

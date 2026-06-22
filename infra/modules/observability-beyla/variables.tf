@@ -11,9 +11,9 @@ variable "namespace" {
 }
 
 variable "instrument_namespaces" {
-  description = "Regex of Kubernetes namespaces whose workloads Beyla instruments (eBPF discovery). The platform-cluster dogfood targets the human-facing HTTP services."
+  description = "Glob of Kubernetes namespaces whose workloads Beyla instruments (eBPF discovery; `k8s_namespace` is a glob, not a regex). The platform-cluster dogfood targets the human-facing HTTP services."
   type        = string
-  default     = "backstage|keycloak|argocd|observability"
+  default     = "{backstage,keycloak,argocd,observability}"
 }
 
 variable "otel_traces_endpoint" {
