@@ -74,3 +74,18 @@ Namespace `external-secrets`. The Secrets-Manager → Kubernetes sync path that 
 - **ClusterSecretStoreNotReady** — the `ClusterSecretStore` is `Ready=False`; the AWS provider can't auth
   or reach Secrets Manager. Check the store's status and the ESO controller's AWS credentials
   (Pod Identity / IRSA).
+
+## Cilium
+
+Namespace `kube-system`. The CNI / network plane — start with `cilium status` and
+`docs/runbooks` Cilium debug notes (begin with `cilium monitor --type drop`).
+
+- **CiliumAgentDown** (critical) — an agent (`{{ $labels.pod }}`) is unreachable; pods on that node lose
+  networking + policy enforcement. Check the agent pod/logs on that node; eBPF datapath usually survives
+  an agent restart, so a brief blip is expected during rollouts.
+- **CiliumOperatorDown** (critical) — no operator is up; IPAM, identity GC, and CRD reconciliation stall.
+- **CiliumUnreachableNodes** / **CiliumUnreachableHealthEndpoints** — an agent can't reach peer nodes /
+  health endpoints (node-to-node or pod-to-pod connectivity degradation). Check the cilium-health status
+  and the underlying VPC/security-group/route path.
+- **HubbleDown** — flow observability is degraded; networking itself is unaffected. Check the Hubble
+  metrics endpoint on the agent.

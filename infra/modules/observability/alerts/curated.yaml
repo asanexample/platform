@@ -229,3 +229,51 @@ groups:
           summary: "ClusterSecretStore {{ $labels.name }} not Ready"
           description: "ClusterSecretStore {{ $labels.name }} has been Ready=False for 15m — everything that syncs secrets through it is affected."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#external-secrets"
+  # ---------------------------------------------------------------------------
+  - name: cilium.rules
+    rules:
+      - alert: CiliumAgentDown
+        expr: up{job="observability/cilium-agent"} == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cilium agent down ({{ $labels.pod }})"
+          description: "A Cilium agent ({{ $labels.pod }}) has been unreachable for 10m — pods on that node lose networking/policy enforcement."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cilium"
+      - alert: CiliumOperatorDown
+        expr: sum(up{job="observability/cilium-operator"}) == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: Cilium operator is down
+          description: "No Cilium operator has been up for 10m — IPAM, identity GC, and CRD reconciliation are stalled."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cilium"
+      - alert: CiliumUnreachableNodes
+        expr: cilium_unreachable_nodes > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cilium reports unreachable nodes ({{ $labels.pod }})"
+          description: "A Cilium agent ({{ $labels.pod }}) reports unreachable peer nodes for 10m — node-to-node connectivity problem."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cilium"
+      - alert: CiliumUnreachableHealthEndpoints
+        expr: cilium_unreachable_health_endpoints > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cilium reports unreachable health endpoints ({{ $labels.pod }})"
+          description: "A Cilium agent ({{ $labels.pod }}) reports unreachable health endpoints for 10m — pod-to-pod connectivity degradation."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cilium"
+      - alert: HubbleDown
+        expr: up{job="hubble-metrics"} == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Hubble metrics down ({{ $labels.pod }})"
+          description: "Hubble metrics ({{ $labels.pod }}) have been unreachable for 15m — network flow observability is degraded (networking itself is unaffected)."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cilium"

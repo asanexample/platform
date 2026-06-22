@@ -158,6 +158,32 @@ locals {
           selector          = { matchLabels = { "app.kubernetes.io/name" = "external-secrets" } }
           endpoints         = [{ port = "metrics", interval = "30s" }]
         },
+        {
+          # Hubble metrics Service (Cilium flow observability). Agent/operator metrics have no Service —
+          # they're scraped via additionalPodMonitors below.
+          name              = "hubble"
+          namespaceSelector = { matchNames = ["kube-system"] }
+          selector          = { matchLabels = { "k8s-app" = "hubble" } }
+          endpoints         = [{ port = "hubble-metrics", interval = "30s" }]
+        },
+      ]
+
+      # Cilium agent + operator expose Prometheus metrics on the pods (prometheus.enabled is on), but the
+      # cilium chart's ServiceMonitors are intentionally off (Cilium installs before the Prometheus-operator
+      # CRDs in the DAG). Scrape the pods directly here, where the CRDs exist — no CNI change needed.
+      additionalPodMonitors = [
+        {
+          name                = "cilium-agent"
+          namespaceSelector   = { matchNames = ["kube-system"] }
+          selector            = { matchLabels = { "k8s-app" = "cilium" } }
+          podMetricsEndpoints = [{ port = "prometheus", interval = "30s" }]
+        },
+        {
+          name                = "cilium-operator"
+          namespaceSelector   = { matchNames = ["kube-system"] }
+          selector            = { matchLabels = { "io.cilium/app" = "operator" } }
+          podMetricsEndpoints = [{ port = "prometheus", interval = "30s" }]
+        },
       ]
     }
 
