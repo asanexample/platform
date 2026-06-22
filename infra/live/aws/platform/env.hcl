@@ -12,6 +12,7 @@ locals {
   # single-binary mode, even though cost_profile=dev defaults durable stores off. (preprod stays off.)
   enable_loki         = true
   enable_log_pipeline = true # Alloy DaemonSet → Loki (P3a). Pairs with enable_loki on the dev cluster.
+  enable_tempo        = true # Tempo traces store (P3b). OTel collector (trace pipeline) lands next.
 
   tags = {
     Environment        = local.environment
