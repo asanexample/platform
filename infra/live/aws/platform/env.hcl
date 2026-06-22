@@ -10,7 +10,8 @@ locals {
 
   # Cost-profile override: run Loki (logs — #102 P3a) on the platform dev cluster in cost-effective
   # single-binary mode, even though cost_profile=dev defaults durable stores off. (preprod stays off.)
-  enable_loki = true
+  enable_loki         = true
+  enable_log_pipeline = true # Alloy DaemonSet → Loki (P3a). Pairs with enable_loki on the dev cluster.
 
   tags = {
     Environment        = local.environment
