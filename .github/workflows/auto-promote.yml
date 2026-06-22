@@ -40,7 +40,7 @@ jobs:
     # The ARC scale set (runnerScaleSetName=platform-infra) — AWS via Pod Identity, private EKS API reach.
     runs-on: platform-infra
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install yq (mikefarah)
         run: |

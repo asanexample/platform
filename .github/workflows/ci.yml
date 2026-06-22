@@ -21,7 +21,7 @@ jobs:
       terragrunt: ${{ steps.read.outputs.terragrunt }}
       helm: ${{ steps.read.outputs.helm }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - id: read
         name: Read /.tool-versions
         run: |
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: versions
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: opentofu/setup-opentofu@v2
         with:
           tofu_version: ${{ needs.versions.outputs.opentofu }}
@@ -50,7 +50,7 @@ jobs:
       # Provider plugin cache — without it every module's `tofu init` re-downloads aws/helm/kubernetes (~30×).
       TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.tofu-plugin-cache
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: opentofu/setup-opentofu@v2
         with:
           tofu_version: ${{ needs.versions.outputs.opentofu }}
@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: versions
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install Terragrunt
         env:
           # Version from /.tool-versions (the `versions` job); the release tag is v-prefixed.
@@ -111,7 +111,7 @@ jobs:
     name: Markdown Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Lint changed markdown files
@@ -139,7 +139,7 @@ jobs:
     name: Gate Scripts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install yq (mikefarah)
         run: |
           sudo curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
@@ -163,7 +163,7 @@ jobs:
       # Pin to the chart's appVersion (helm_versions.kyverno = 3.8.1) so test semantics match.
       KYVERNO_VERSION: "1.18.1"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: azure/setup-helm@v5
         with:
           # Canonical Helm pin from /.tool-versions — keep CLI rendering on the 3.x line (not floating to v4).
@@ -196,7 +196,7 @@ jobs:
     env:
       CROSSPLANE_VERSION: "v2.2.1" # crank CLI version (built from source — see install step)
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       # Scope: this validates the crossplane module's OWN example fixtures (.environment-api-tests) against the
       # XRD — a PR that changes no infra/modules/crossplane/** can't affect it. Short-circuit to green (the job
       # still runs + reports, so it stays a valid required check), skipping the ~2-min crank build. Registry PRs
@@ -247,7 +247,7 @@ jobs:
     env:
       CROSSPLANE_VERSION: "v2.2.1" # crank CLI version (built from source — see install step)
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       # Scope: this renders the crossplane module's OWN Composition + example fixtures — a PR that changes no
       # infra/modules/crossplane/** can't affect it. Short-circuit to green (skip the ~2.5-min crank build +
       # function-image pulls), staying a valid required check. Registry PRs (gitops/**, e.g. a decommission) have
@@ -288,7 +288,7 @@ jobs:
     name: TFLint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: terraform-linters/setup-tflint@v6
       - name: Lint all modules
         run: |
@@ -327,7 +327,7 @@ jobs:
     env:
       TRIVY_VERSION: "0.70.0" # pinned clean release; v0.69.4 was the malicious one
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install Trivy CLI (download release binary + verify SHA-256)
         run: |
           base="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
@@ -368,7 +368,7 @@ jobs:
     name: Semgrep (SAST)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
