@@ -71,7 +71,9 @@ inputs = {
   # Shares the P7 instrumentation toggle with Beyla: off in dev by default, on for platform (env.hcl).
   create = include.base.locals.enable_instrumentation
 
-  namespace = dependency.observability.outputs.namespace
+  # Operator runs in its OWN namespace (module default opentelemetry-operator-system) — NOT observability,
+  # whose default-deny-ingress would block the kube-apiserver → webhook call. The OTLP endpoint still
+  # targets the otel-collector in observability (cross-namespace).
 
   helm_chart_version = include.base.locals.helm_versions.otel_operator
 

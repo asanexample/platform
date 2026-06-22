@@ -9,11 +9,12 @@ locals {
 resource "helm_release" "operator" {
   count = local.create ? 1 : 0
 
-  name       = "opentelemetry-operator"
-  repository = var.helm_repository
-  chart      = var.helm_chart
-  version    = var.helm_chart_version
-  namespace  = var.namespace
+  name             = "opentelemetry-operator"
+  repository       = var.helm_repository
+  chart            = var.helm_chart
+  version          = var.helm_chart_version
+  namespace        = var.namespace
+  create_namespace = true # its own namespace (no default-deny that would block the webhook)
 
   timeout = var.helm_timeout
   wait    = true
@@ -37,28 +38,10 @@ resource "helm_release" "operator" {
   })]
 }
 
-# ---------------------------------------------------------------------------
-# Platform Instrumentation CR — the platform-injected OTLP endpoint + SDK config (ADR-077 D2).
-# Delivered as a local Helm chart (not kubernetes_manifest) so it can reference the operator's CRD
-# installed in the same apply — the crossplane-module convention. Waits for the operator (its webhook
-# validates the CR).
-# ---------------------------------------------------------------------------
-resource "helm_release" "instrumentation" {
-  count = local.create ? 1 : 0
-
-  name      = "platform-instrumentation"
-  chart     = "${path.module}/charts/instrumentation"
-  namespace = var.namespace
-
-  timeout = var.helm_timeout
-  wait    = true
-
-  values = [yamlencode({
-    name      = var.instrumentation_name
-    namespace = var.namespace
-    endpoint  = var.otlp_endpoint
-    sampler   = var.sampler
-  })]
-
-  depends_on = [helm_release.operator]
-}
+# NOTE: the `Instrumentation` CR (the platform-injected OTLP endpoint + SDK config, ADR-077 D2) is
+# **namespace-scoped** — a workload references one in (or cross-ns from) its own namespace. So rather than a
+# single central CR here, it is created **per environment namespace by the golden path (P14)** / the
+# Crossplane Environment Composition, pointing at the OTel Collector. The reusable CR template lives in
+# `charts/instrumentation/` for P14 to deploy. This module delivers the cluster-wide operator (the
+# mechanism); P14 delivers the per-namespace endpoint. Apps opt in via
+# `instrumentation.opentelemetry.io/inject-<lang>: "<their-namespace>/<name>"`.

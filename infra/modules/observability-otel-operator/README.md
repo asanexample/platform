@@ -10,11 +10,12 @@ The [OpenTelemetry Operator](https://github.com/open-telemetry/opentelemetry-ope
   (Java / Python / Node.js / .NET / Go) as an init container into pods carrying the inject annotation. The
   webhook serving cert comes from **cert-manager**. Installs the `Instrumentation` (and
   `OpenTelemetryCollector`) CRDs.
-- **Platform `Instrumentation` CR** (`<namespace>/<instrumentation_name>`, default `observability/platform`):
-  holds the **platform-injected OTLP endpoint** (→ the OpenTelemetry Collector gateway, P3b) + propagators +
-  sampler. Apps never hardcode the endpoint (ADR-077 D2). Delivered as a **local Helm chart** (not
-  `kubernetes_manifest`) so the CR can reference the operator's CRD from the same apply — the crossplane-module
-  convention.
+- **The `Instrumentation` CR** (the **platform-injected OTLP endpoint** + SDK config, ADR-077 D2) is
+  **namespace-scoped** — a workload references one in (or cross-ns from) its own namespace. So it is created
+  **per environment namespace by the golden path (P14)** / the Crossplane Environment Composition, not as a
+  single central CR here. The reusable CR template lives in `charts/instrumentation/` for P14 to deploy
+  (pointing at the OTel Collector). This module delivers the cluster-wide **operator** (the mechanism); P14
+  delivers the per-namespace endpoint.
 
 ## How apps opt in
 

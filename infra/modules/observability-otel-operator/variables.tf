@@ -5,9 +5,9 @@ variable "create" {
 }
 
 variable "namespace" {
-  description = "Namespace for the operator + the platform Instrumentation CR (the shared observability namespace)."
+  description = "Namespace for the operator + the platform Instrumentation CR. Its OWN namespace, NOT observability: observability's default-deny-ingress NetworkPolicy blocks the kube-apiserver from reaching the operator's mutating webhook (the API server isn't intra-namespace), which fails Instrumentation CR admission."
   type        = string
-  default     = "observability"
+  default     = "opentelemetry-operator-system"
 }
 
 variable "instrumentation_name" {
