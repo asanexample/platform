@@ -17,7 +17,22 @@
     "list": []
   },
   "annotations": {
-    "list": []
+    "list": [
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "enable": true,
+        "expr": "changes(kube_deployment_metadata_generation[2m]) > 0",
+        "iconColor": "blue",
+        "name": "Deploys",
+        "step": "1m",
+        "tagKeys": "namespace,deployment",
+        "textFormat": "{{namespace}}/{{deployment}}",
+        "titleFormat": "Deploy"
+      }
+    ]
   },
   "panels": [
     {
