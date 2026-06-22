@@ -49,32 +49,33 @@ locals {
     state_bootstrap = "${local.source_base}/aws//state_bootstrap"
 
     # Cloud-agnostic (Kubernetes add-ons)
-    cilium              = "${local.source_base}/cilium"
-    argocd              = "${local.source_base}/argocd"
-    argocd_clusters     = "${local.source_base}/argocd-clusters"
-    argocd_apps         = "${local.source_base}/argocd-apps"
-    cert_manager        = "${local.source_base}/cert-manager"
-    external_dns        = "${local.source_base}/external-dns"
-    external_secrets    = "${local.source_base}/external-secrets"
-    secret_stores       = "${local.source_base}/secret-stores"
-    gateway             = "${local.source_base}/gateway"
-    gateway_config      = "${local.source_base}/gateway-config"
-    cluster_rbac        = "${local.source_base}//cluster-rbac"
-    policy              = "${local.source_base}//policy"
-    tailscale           = "${local.source_base}/tailscale"
-    tailscale_admin     = "${local.source_base}/tailscale-admin"
-    falco               = "${local.source_base}/falco"
-    observability       = "${local.source_base}/observability"
-    observability_mimir = "${local.source_base}/observability-mimir"
-    observability_loki  = "${local.source_base}/observability-loki"
-    observability_alloy = "${local.source_base}/observability-alloy"
-    observability_tempo = "${local.source_base}/observability-tempo"
-    crossplane          = "${local.source_base}/crossplane"
-    cloudnative_pg      = "${local.source_base}/cloudnative-pg"
-    backstage           = "${local.source_base}/backstage"
-    keycloak            = "${local.source_base}/keycloak"
-    keycloak_config     = "${local.source_base}/keycloak-config"
-    github_teams        = "${local.source_base}/github-teams"
+    cilium                       = "${local.source_base}/cilium"
+    argocd                       = "${local.source_base}/argocd"
+    argocd_clusters              = "${local.source_base}/argocd-clusters"
+    argocd_apps                  = "${local.source_base}/argocd-apps"
+    cert_manager                 = "${local.source_base}/cert-manager"
+    external_dns                 = "${local.source_base}/external-dns"
+    external_secrets             = "${local.source_base}/external-secrets"
+    secret_stores                = "${local.source_base}/secret-stores"
+    gateway                      = "${local.source_base}/gateway"
+    gateway_config               = "${local.source_base}/gateway-config"
+    cluster_rbac                 = "${local.source_base}//cluster-rbac"
+    policy                       = "${local.source_base}//policy"
+    tailscale                    = "${local.source_base}/tailscale"
+    tailscale_admin              = "${local.source_base}/tailscale-admin"
+    falco                        = "${local.source_base}/falco"
+    observability                = "${local.source_base}/observability"
+    observability_mimir          = "${local.source_base}/observability-mimir"
+    observability_loki           = "${local.source_base}/observability-loki"
+    observability_alloy          = "${local.source_base}/observability-alloy"
+    observability_tempo          = "${local.source_base}/observability-tempo"
+    observability_otel_collector = "${local.source_base}/observability-otel-collector"
+    crossplane                   = "${local.source_base}/crossplane"
+    cloudnative_pg               = "${local.source_base}/cloudnative-pg"
+    backstage                    = "${local.source_base}/backstage"
+    keycloak                     = "${local.source_base}/keycloak"
+    keycloak_config              = "${local.source_base}/keycloak-config"
+    github_teams                 = "${local.source_base}/github-teams"
 
     actions_runner_controller = "${local.source_base}/actions-runner-controller"
   }
@@ -91,14 +92,15 @@ locals {
     falco                 = "9.0.0"
     kube_prometheus_stack = "86.1.0"
     mimir                 = "6.0.6"
-    loki                  = "7.0.0"  # grafana/loki — P3a logs store (latest stable, resolved 2026-06-19)
-    alloy                 = "1.10.0" # grafana/alloy — P3a log-collector DaemonSet
-    tempo                 = "2.25.5" # grafana-community/tempo-distributed — P3b traces store (sized by cost_profile; app v2.10.7)
-    crossplane            = "2.3.1"  # Crossplane v2 (ADR-046)
-    cloudnative_pg        = "0.28.2" # CNPG operator chart (app v1.29.1) — Backstage DB (ADR-051)
-    backstage             = "2.8.1"  # official backstage Helm chart (points at our platform/backstage image)
-    keycloak              = "7.2.0"  # codecentric/keycloakx chart; Keycloak 26.6.3 via image-tag override — app IdP (ADR-053, B1)
-    arc_controller        = "0.14.2" # gha-runner-scale-set-controller (ADR-065 / #323)
-    arc_runner_set        = "0.14.2" # gha-runner-scale-set — pinned in lockstep with the controller
+    loki                  = "7.0.0"   # grafana/loki — P3a logs store (latest stable, resolved 2026-06-19)
+    alloy                 = "1.10.0"  # grafana/alloy — P3a log-collector DaemonSet
+    tempo                 = "2.25.5"  # grafana-community/tempo-distributed — P3b traces store (sized by cost_profile; app v2.10.7)
+    otel_collector        = "0.158.2" # open-telemetry/opentelemetry-collector — P3b trace gateway (app v0.153.0)
+    crossplane            = "2.3.1"   # Crossplane v2 (ADR-046)
+    cloudnative_pg        = "0.28.2"  # CNPG operator chart (app v1.29.1) — Backstage DB (ADR-051)
+    backstage             = "2.8.1"   # official backstage Helm chart (points at our platform/backstage image)
+    keycloak              = "7.2.0"   # codecentric/keycloakx chart; Keycloak 26.6.3 via image-tag override — app IdP (ADR-053, B1)
+    arc_controller        = "0.14.2"  # gha-runner-scale-set-controller (ADR-065 / #323)
+    arc_runner_set        = "0.14.2"  # gha-runner-scale-set — pinned in lockstep with the controller
   }
 }
