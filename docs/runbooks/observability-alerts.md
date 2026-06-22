@@ -89,6 +89,9 @@ Namespace `kube-system`. The CNI / network plane — start with `cilium status` 
   and the underlying VPC/security-group/route path.
 - **HubbleDown** — flow observability is degraded; networking itself is unaffected. Check the Hubble
   metrics endpoint on the agent.
+- **CiliumHighDropRate** — sustained non-policy packet drops (>10/s for 15m; policy-denied drops are
+  excluded as expected). Start with `cilium monitor --type drop` to see drop reasons/identities, then chase
+  the datapath/connectivity cause. Threshold is tunable in `curated.yaml` if it's noisy on a busier cluster.
 
 ## Notification channels & secret rotation
 
