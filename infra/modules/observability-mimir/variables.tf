@@ -182,6 +182,12 @@ variable "ingestion_burst_size" {
   default     = 200000
 }
 
+variable "max_label_names_per_series" {
+  description = "Per-tenant cap on label names per series (Mimir default 30). Raised to admit Beyla's label-rich auto-instrumentation series (P7) — it stamps ~35+ k8s attributes, so the default silently discards its RED metrics."
+  type        = number
+  default     = 50
+}
+
 variable "tags" {
   description = "Tags applied to AWS resources (and sanitized into K8s labels)."
   type        = map(string)
