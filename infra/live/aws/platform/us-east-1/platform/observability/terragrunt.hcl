@@ -81,6 +81,10 @@ inputs = {
   cluster_name = dependency.eks.outputs.cluster_id
   aws_region   = include.base.locals.region
 
+  # Multi-cluster dimension: stamp the clean env name (`platform`) as the `cluster` label, not the raw EKS
+  # cluster ID — so the single pane reads `platform`/`preprod` (== tenant == env), consistently (#630).
+  cluster_label = include.base.locals.env
+
   helm_chart_version = include.base.locals.helm_versions.kube_prometheus_stack
   helm_wait          = true
 

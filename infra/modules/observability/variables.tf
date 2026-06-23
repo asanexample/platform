@@ -9,6 +9,12 @@ variable "cluster_name" {
   type        = string
 }
 
+variable "cluster_label" {
+  description = "Value of the `cluster` external label stamped on every metric — the multi-cluster dimension. Use a clean, consistent name matching the tenant/env (e.g. `platform`), so the single pane reads `platform`/`preprod`, not the raw EKS cluster IDs. Empty falls back to cluster_name (the EKS cluster ID)."
+  type        = string
+  default     = ""
+}
+
 variable "aws_region" {
   description = "AWS region (for the Alertmanager → SNS sigv4 signer)."
   type        = string

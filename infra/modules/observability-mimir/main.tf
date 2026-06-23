@@ -28,8 +28,11 @@ locals {
     minio = { enabled = false }
 
     # Let the hub Prometheus scrape Mimir's own metrics (health + remote-write lag + object store).
+    # clusterLabel overrides the chart's default `cluster` label (which is the Mimir release name, "mimir",
+    # and pollutes the real cluster dimension — #630) with the actual cluster, matching Prometheus
+    # externalLabels.cluster so Mimir's self-metrics are attributed to the cluster they run on.
     metaMonitoring = {
-      serviceMonitor = { enabled = true }
+      serviceMonitor = { enabled = true, clusterLabel = var.cluster_label != "" ? var.cluster_label : var.cluster_name }
     }
 
     mimir = {
@@ -133,14 +136,21 @@ locals {
   # All query the same in-cluster gateway; only the X-Scope-OrgID header differs.
   all_tenants = concat([var.default_tenant_id], var.extra_tenant_datasources)
 
+  # The default datasource keeps its stable uid "mimir" (referenced by dashboards) but its DISPLAY name is
+  # suffixed with the tenant — so the picker reads `Mimir (platform)` / `Mimir (preprod)` / `Mimir (all
+  # clusters)` consistently, instead of a bare `Mimir` for the hub.
   datasource_tenants = concat(
-    [{ name = "Mimir", uid = "mimir", tenant = var.default_tenant_id, is_default = var.datasource_is_default }],
+    [{ name = "Mimir (${var.default_tenant_id})", uid = "mimir", tenant = var.default_tenant_id, is_default = var.datasource_is_default }],
     [for t in var.extra_tenant_datasources : { name = "Mimir (${t})", uid = "mimir-${t}", tenant = t, is_default = false }],
     var.enable_federated_datasource ? [{ name = "Mimir (all clusters)", uid = "mimir-all", tenant = join("|", local.all_tenants), is_default = false }] : [],
   )
 
   grafana_datasource = {
     apiVersion = 1
+    # Rename migration: the default datasource was bare "Mimir"; it's now "Mimir (platform)" (same uid). Grafana
+    # provisioning keys on name, so without deleting the old name first the new one collides on uid and 500s
+    # the whole reload. Idempotent — a no-op once the old name is gone.
+    deleteDatasources = [{ name = "Mimir", orgId = 1 }]
     datasources = [for ds in local.datasource_tenants : {
       name           = ds.name
       type           = "prometheus"
