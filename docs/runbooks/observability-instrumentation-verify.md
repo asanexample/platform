@@ -35,12 +35,14 @@ kubectl --context <platform|preprod> -n observability get pods -l app.kubernetes
 - **Grafana → Explore → `Tempo (preprod)`** (or `Tempo (all clusters)`) → search. Spans appear with
   `service.name` from the instrumented workloads and `cluster=preprod`.
 - Or query the store directly:
+
   ```bash
   # hub Tempo, tenant preprod — any trace in the last 15m
   kubectl --context platform -n observability port-forward svc/tempo-query-frontend 3200:3200 &
   curl -s -H "X-Scope-OrgID: preprod" \
     "http://localhost:3200/api/search?q=%7B%20resource.cluster%3D%22preprod%22%20%7D&limit=5"
   ```
+
 - **Trace ↔ logs**: a span's `service.name` links to its pod's logs (the Tempo datasource `tracesToLogsV2` →
   Loki), and a `trace_id` in a log line links back (the Loki `derivedField`).
 
