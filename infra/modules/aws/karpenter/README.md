@@ -27,5 +27,6 @@ replacing the static spot workload node group. Cluster-agnostic + parameterized 
 
 ## Inputs of note
 
-`node_role_arn` (the node-groups unit's output — Karpenter nodes assume the same role), `cluster_security_group_id`
-+ `subnet_ids` (the eks/networking units), `node_arch`, and the per-cluster NodePool knobs above.
+`node_role_arn` (the node-groups unit's output — Karpenter nodes assume the same role), plus
+`cluster_security_group_id` and `subnet_ids` (the eks/networking units), `node_arch`, and the per-cluster
+NodePool knobs above.
