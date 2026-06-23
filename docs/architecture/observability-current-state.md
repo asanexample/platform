@@ -118,7 +118,8 @@ The Tempo **metrics-generator** is **on** — it derives **RED span-metrics** (`
 Grafana renders the **node graph** (e.g. `user → app-alpha-shop`). **Exemplars** close the loop: Mimir stores
 them (`max_global_exemplars_per_user`), span-metrics carry the `traceID`, and the Mimir datasource's
 `exemplarTraceIdDestinations` link a latency spike → the **trace** → (tracesToLogs) → **logs** — the full
-**metrics ↔ traces ↔ logs** triangle.
+**metrics ↔ traces ↔ logs** triangle. The generator also runs the **`local-blocks`** processor, which powers
+Grafana's **Traces Drilldown** (TraceQL *metrics* queries — `rate()`/`quantile_over_time()` over spans).
 
 ### Multi-cluster view — federated datasource (#626)
 

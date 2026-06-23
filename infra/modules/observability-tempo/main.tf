@@ -80,13 +80,20 @@ locals {
           remote_write = [{ url = var.mimir_remote_write_url }]
         }
         registry = { external_labels = { source = "tempo" } }
+        # local-blocks keeps recent traces in the generator so TraceQL *metrics* queries (rate/quantile over
+        # spans) work — this is what powers Grafana's Traces Drilldown. flush_to_storage makes them queryable
+        # over longer ranges from S3 too.
+        processor = {
+          local_blocks = { flush_to_storage = true }
+        }
       }
     }
 
-    # Enable the generator's processors for all tenants (empty = generate nothing when disabled).
+    # Enable the generator's processors for all tenants (empty = generate nothing when disabled). local-blocks
+    # is required by Grafana Traces Drilldown (TraceQL metrics); service-graphs/span-metrics feed Mimir.
     overrides = {
       defaults = {
-        metrics_generator = { processors = var.enable_metrics_generator ? ["service-graphs", "span-metrics"] : [] }
+        metrics_generator = { processors = var.enable_metrics_generator ? ["service-graphs", "span-metrics", "local-blocks"] : [] }
       }
     }
     memcached = { enabled = var.high_availability }
