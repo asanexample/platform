@@ -14,7 +14,45 @@
     "to": "now"
   },
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "label": "Datasource",
+        "query": "prometheus",
+        "regex": "/Mimir.*/",
+        "refresh": 1,
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "current": {
+          "text": "Mimir (all clusters)",
+          "value": "mimir-all",
+          "selected": true
+        }
+      },
+      {
+        "name": "cluster",
+        "type": "query",
+        "label": "Cluster",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "label_values(up, cluster)",
+        "definition": "label_values(up, cluster)",
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all",
+          "selected": true
+        }
+      }
+    ]
   },
   "annotations": {
     "list": [
@@ -41,7 +79,7 @@
       "title": "Nodes Ready",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 4,
@@ -80,7 +118,11 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"})"
+          "expr": "sum by (cluster) (kube_node_status_condition{condition=\"Ready\",status=\"true\",cluster=~\"$cluster\"})",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ]
     },
@@ -90,7 +132,7 @@
       "title": "Pods Pending/Failed",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 4,
@@ -133,7 +175,11 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(kube_pod_status_phase{phase=~\"Pending|Failed|Unknown\"})"
+          "expr": "sum(kube_pod_status_phase{phase=~\"Pending|Failed|Unknown\",cluster=~\"$cluster\"}) or vector(0)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ]
     },
@@ -143,7 +189,7 @@
       "title": "CrashLoopBackOff",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 4,
@@ -182,7 +228,11 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(kube_pod_container_status_waiting_reason{reason=\"CrashLoopBackOff\"}) or vector(0)"
+          "expr": "sum(kube_pod_container_status_waiting_reason{reason=\"CrashLoopBackOff\",cluster=~\"$cluster\"}) or vector(0)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ]
     },
@@ -192,7 +242,7 @@
       "title": "API Server Availability (5m)",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 4,
@@ -237,7 +287,11 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "1 - (sum(rate(apiserver_request_total{code=~\"5..\"}[5m])) / sum(rate(apiserver_request_total[5m])))"
+          "expr": "1 - (sum by (cluster) (rate(apiserver_request_total{code=~\"5..\",cluster=~\"$cluster\"}[5m])) / sum by (cluster) (rate(apiserver_request_total{cluster=~\"$cluster\"}[5m])))",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ]
     },
@@ -247,7 +301,7 @@
       "title": "Soonest Cert Expiry (days)",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 4,
@@ -290,7 +344,11 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "min(certmanager_certificate_expiration_timestamp_seconds - time()) / 86400"
+          "expr": "min by (cluster) (certmanager_certificate_expiration_timestamp_seconds{cluster=~\"$cluster\"} - time()) / 86400",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ]
     },
@@ -300,7 +358,7 @@
       "title": "API Server Request Latency (p99)",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 8,
@@ -330,8 +388,12 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{verb!~\"WATCH|CONNECT\"}[5m])) by (le, verb))",
-          "legendFormat": "{{verb}}"
+          "expr": "histogram_quantile(0.99, sum by (le, verb, cluster) (rate(apiserver_request_duration_seconds_bucket{verb!~\"WATCH|CONNECT\",cluster=~\"$cluster\"}[5m])))",
+          "legendFormat": "{{verb}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ]
     },
@@ -341,7 +403,7 @@
       "title": "Kyverno Admission Requests/s (by result)",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 8,
@@ -374,8 +436,12 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(kyverno_admission_requests_total[5m])) by (resource_request_operation)",
-          "legendFormat": "{{resource_request_operation}}"
+          "expr": "sum by (resource_request_operation, cluster) (rate(kyverno_admission_requests_total{cluster=~\"$cluster\"}[5m]))",
+          "legendFormat": "{{resource_request_operation}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ]
     },
@@ -385,7 +451,7 @@
       "title": "Cluster CPU Requests vs Allocatable",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 8,
@@ -429,7 +495,11 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(kube_pod_container_resource_requests{resource=\"cpu\"}) / sum(kube_node_status_allocatable{resource=\"cpu\"})"
+          "expr": "sum by (cluster) (kube_pod_container_resource_requests{resource=\"cpu\",cluster=~\"$cluster\"}) / sum by (cluster) (kube_node_status_allocatable{resource=\"cpu\",cluster=~\"$cluster\"})",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ]
     },
@@ -439,7 +509,7 @@
       "title": "Cluster Memory Requests vs Allocatable",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 8,
@@ -483,7 +553,11 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(kube_pod_container_resource_requests{resource=\"memory\"}) / sum(kube_node_status_allocatable{resource=\"memory\"})"
+          "expr": "sum by (cluster) (kube_pod_container_resource_requests{resource=\"memory\",cluster=~\"$cluster\"}) / sum by (cluster) (kube_node_status_allocatable{resource=\"memory\",cluster=~\"$cluster\"})",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ]
     },
@@ -493,7 +567,7 @@
       "title": "ArgoCD Apps Healthy",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 4,
@@ -532,7 +606,11 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(argocd_app_info{health_status=\"Healthy\"})"
+          "expr": "sum by (cluster) (argocd_app_info{health_status=\"Healthy\",cluster=~\"$cluster\"})",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ]
     },
@@ -542,7 +620,7 @@
       "title": "ArgoCD Apps OutOfSync",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 4,
@@ -581,7 +659,11 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(argocd_app_info{sync_status=\"OutOfSync\"}) or vector(0)"
+          "expr": "sum(argocd_app_info{sync_status=\"OutOfSync\",cluster=~\"$cluster\"}) or vector(0)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ]
     }

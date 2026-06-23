@@ -124,5 +124,9 @@ inputs = {
   }
   extra_tenant_datasources = ["preprod"]
 
+  # Multi-cluster single pane (#626): enable read-path tenant federation + a `Mimir (all clusters)`
+  # datasource spanning platform|preprod. Platform-admin overview lane (per-team scoping = P13).
+  enable_federated_datasource = true
+
   tags = include.base.locals.tags
 }

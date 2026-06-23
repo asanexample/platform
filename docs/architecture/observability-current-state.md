@@ -109,6 +109,20 @@ Apps send **OTLP** to a deployment-mode **OpenTelemetry Collector** (`otelcol-k8
 off; `prod` scales it via `high_availability`); durable blocks on **S3 via Pod Identity**. The Grafana
 **Tempo** datasource links **traces↔logs** (`tracesToLogsV2` → Loki; Loki's `trace_id` derivedField → Tempo).
 
+### Multi-cluster view — federated datasource (#626)
+
+Each cluster is a separate Mimir tenant (`platform`, `preprod`), so by default one datasource = one cluster
+(strong read-isolation). For a **platform-admin overview across clusters**, Mimir **tenant federation** is
+enabled (`tenant_federation.enabled`) and a **`Mimir (all clusters)`** Grafana datasource queries every tenant
+at once (`X-Scope-OrgID: platform|preprod`). Write-isolation is unaffected — the Gateway edge still
+force-stamps a single tenant per spoke. The **Platform Health** dashboard defaults to this datasource and has
+a `cluster` multi-select, so panels break out per cluster. Per-team scoping of the federated lane is **P13**
+(#590); cross-cluster **logs/traces** federation follows their spokes (#627/#628). Umbrella: #629.
+
+> **Known wrinkle:** the Loki/Mimir charts stamp their own `cluster` label on self-metrics, so the dashboard's
+> `cluster` dropdown shows a couple of spurious entries (`loki`, `mimir`) alongside the real clusters. The
+> KSM/node panels are clean. Relabeling those self-metrics is a tracked follow-up.
+
 ### Multi-tenancy & the security boundary (read this)
 
 Mimir runs with `multitenancy_enabled: true`. The tenant is the **`X-Scope-OrgID`** header; the hub's own

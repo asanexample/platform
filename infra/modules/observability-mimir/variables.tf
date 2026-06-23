@@ -127,6 +127,12 @@ variable "extra_tenant_datasources" {
   default     = []
 }
 
+variable "enable_federated_datasource" {
+  description = "Enable Mimir read-path tenant federation (#626) and provision a single `Mimir (all clusters)` datasource that queries ALL tenants at once (`X-Scope-OrgID: <default>|<extras…>`), so one panel can span clusters. Write-isolation is unaffected (each spoke still writes only its own tenant at the Gateway edge). This is the PLATFORM-ADMIN overview lane — per-team scoping is P13 (#590). Off by default."
+  type        = bool
+  default     = false
+}
+
 # ---------------------------------------------------------------------------
 # Cross-cluster spoke ingest (P10) — Gateway-API-native, no proxy
 # ---------------------------------------------------------------------------

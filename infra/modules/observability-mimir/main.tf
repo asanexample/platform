@@ -38,6 +38,11 @@ locals {
         # isolation rests on the observability ns default-deny NetworkPolicy (tenant pods can't reach us).
         multitenancy_enabled = true
 
+        # Read-path tenant federation (#626): a query with `X-Scope-OrgID: a|b` spans both tenants, which is
+        # what lets one Grafana panel cover multiple clusters. Write isolation is unaffected (the Gateway edge
+        # still force-stamps a single tenant per spoke). Only enabled alongside the federated datasource.
+        tenant_federation = { enabled = var.enable_federated_datasource }
+
         common = {
           storage = {
             backend = "s3"
@@ -120,10 +125,14 @@ locals {
 
   # ---- Grafana datasources (auto-loaded by the observability Grafana sidecar) ----
   # One per tenant: the hub's own `default_tenant_id` (optionally default) + one read-only `Mimir (<tenant>)`
-  # per spoke tenant (P10). All query the same in-cluster gateway; only the X-Scope-OrgID header differs.
+  # per spoke tenant (P10) + (optionally) a federated `Mimir (all clusters)` spanning every tenant (#626).
+  # All query the same in-cluster gateway; only the X-Scope-OrgID header differs.
+  all_tenants = concat([var.default_tenant_id], var.extra_tenant_datasources)
+
   datasource_tenants = concat(
     [{ name = "Mimir", uid = "mimir", tenant = var.default_tenant_id, is_default = var.datasource_is_default }],
     [for t in var.extra_tenant_datasources : { name = "Mimir (${t})", uid = "mimir-${t}", tenant = t, is_default = false }],
+    var.enable_federated_datasource ? [{ name = "Mimir (all clusters)", uid = "mimir-all", tenant = join("|", local.all_tenants), is_default = false }] : [],
   )
 
   grafana_datasource = {
