@@ -48,6 +48,35 @@ locals {
   slack_enabled     = var.slack_webhook_secret_name != ""
   pagerduty_enabled = var.pagerduty_routing_key_secret_name != ""
 
+  # Grafana SSO via Keycloak OIDC (#592). On when an issuer is provided; the client secret syncs via ESO and
+  # is injected as the GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET env (so it never enters grafana.ini / state).
+  grafana_oidc_enabled  = local.create && var.grafana_oidc_issuer != "" && var.grafana_oidc_secret_manager_key != ""
+  grafana_oidc_secret   = "grafana-oidc"
+  grafana_oidc_alias_on = local.grafana_oidc_enabled && var.oidc_gateway_alias_host != ""
+
+  # Split-horizon host-alias: pin the issuer host to the gateway Envoy ClusterIP (looked up below, never
+  # hardcoded) so Grafana's backend OIDC calls bypass the internal-NLB hairpin. Mirrors Backstage.
+  grafana_host_aliases = local.grafana_oidc_alias_on ? [{
+    ip        = data.kubernetes_service_v1.gateway[0].spec[0].cluster_ip
+    hostnames = [var.oidc_gateway_alias_host]
+  }] : []
+
+  grafana_oauth_ini = local.grafana_oidc_enabled ? {
+    "auth.generic_oauth" = {
+      enabled = true
+      name    = "Keycloak"
+      # client_secret comes from the GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET env (envValueFrom below).
+      client_id           = var.grafana_oidc_client_id
+      scopes              = "openid profile email groups"
+      auth_url            = "${var.grafana_oidc_issuer}/protocol/openid-connect/auth"
+      token_url           = "${var.grafana_oidc_issuer}/protocol/openid-connect/token"
+      api_url             = "${var.grafana_oidc_issuer}/protocol/openid-connect/userinfo"
+      role_attribute_path = var.grafana_oidc_role_attribute_path
+      allow_sign_up       = true
+      use_pkce            = true
+    }
+  } : {}
+
   # SNS receiver config (severity is in the subject) — shared across receivers.
   sns_config = {
     topic_arn     = var.alerts_topic_arn
@@ -276,14 +305,26 @@ locals {
           defaultRegion = var.aws_region
         }
       }] : []
-      "grafana.ini" = {
+      # grafana.ini: base hardening + (when SSO is on) the Keycloak generic_oauth block merged in.
+      "grafana.ini" = merge({
         server           = { root_url = "https://${var.grafana_hostname}", enforce_domain = false }
         "auth.anonymous" = { enabled = false }
         users            = { viewers_can_edit = false, allow_sign_up = false, allow_org_create = false, default_theme = "dark" }
         security         = { cookie_secure = true, cookie_samesite = "strict", content_security_policy = true, disable_gravatar = true }
         plugins          = { allow_loading_unsigned_plugins = "" }
         analytics        = { reporting_enabled = false, check_for_updates = false }
-      }
+      }, local.grafana_oauth_ini)
+
+      # Inject the OIDC client secret from the ESO-synced K8s secret (never in grafana.ini / state).
+      envValueFrom = local.grafana_oidc_enabled ? {
+        GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET = {
+          secretKeyRef = { name = local.grafana_oidc_secret, key = "client-secret" }
+        }
+      } : {}
+
+      # Pin the issuer host to the gateway Envoy ClusterIP so backend OIDC calls dodge the internal-NLB hairpin.
+      hostAliases = local.grafana_host_aliases
+
       resources = {
         requests = { cpu = "100m", memory = "256Mi" }
         limits   = { memory = "512Mi" }
@@ -649,6 +690,7 @@ resource "helm_release" "kube_prometheus_stack" {
     aws_iam_role_policy.alertmanager_sns,
     kubernetes_manifest.alertmanager_slack_webhook,
     kubernetes_manifest.alertmanager_pagerduty,
+    kubernetes_manifest.grafana_oidc_secret,
     aws_eks_pod_identity_association.grafana_cloudwatch,
   ]
 }
@@ -712,4 +754,45 @@ resource "kubernetes_manifest" "alertmanager_pagerduty" {
   }
 
   depends_on = [kubernetes_namespace_v1.this]
+}
+
+# ---------------------------------------------------------------------------
+# Grafana SSO (#592) — Keycloak OIDC client secret synced from AWS Secrets Manager, plus the gateway-ClusterIP
+# lookup backing the split-horizon host-alias. The secret (keycloak-config writes platform/keycloak/grafana-oidc)
+# syncs to the `grafana-oidc` K8s secret, injected as GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET. Mirrors ArgoCD/Backstage.
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_manifest" "grafana_oidc_secret" {
+  count = local.grafana_oidc_enabled ? 1 : 0
+
+  manifest = {
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = local.grafana_oidc_secret
+      namespace = var.namespace
+    }
+    spec = {
+      refreshInterval = "1h"
+      secretStoreRef  = { name = var.secret_store_name, kind = "ClusterSecretStore" }
+      target          = { name = local.grafana_oidc_secret, creationPolicy = "Owner" }
+      data = [{
+        secretKey = "client-secret"
+        remoteRef = { key = var.grafana_oidc_secret_manager_key, property = "client-secret" }
+      }]
+    }
+  }
+
+  depends_on = [kubernetes_namespace_v1.this]
+}
+
+# Current ClusterIP of the shared Cilium gateway Service — backs the OIDC issuer host-alias (never hardcoded;
+# self-corrects on apply if the gateway Service is recreated). Mirrors the Backstage module.
+data "kubernetes_service_v1" "gateway" {
+  count = local.grafana_oidc_alias_on ? 1 : 0
+
+  metadata {
+    name      = var.gateway_service_name
+    namespace = var.gateway_service_namespace
+  }
 }

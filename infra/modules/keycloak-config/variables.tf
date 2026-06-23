@@ -140,6 +140,13 @@ variable "clients" {
       # session). Mirrors argocd above. See packages/app/src/modules/auth in the asanexample/backstage repo.
       post_logout_redirect_uris = ["https://backstage.aws.refplat.org/*"]
     }
+    grafana = {
+      name = "Grafana"
+      # Grafana's generic_oauth callback. The `groups` claim drives Grafana's role mapping (#592).
+      redirect_uris = ["https://grafana.aws.refplat.org/login/generic_oauth"]
+      # RP-initiated logout: signing out of Grafana also ends the Keycloak SSO session. Mirrors argocd/backstage.
+      post_logout_redirect_uris = ["https://grafana.aws.refplat.org/*"]
+    }
   }
 }
 
