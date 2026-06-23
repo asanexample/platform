@@ -85,6 +85,9 @@ locals {
           # ~35+, over Mimir's default of 30, so its RED metrics get discarded (max_label_names_per_series).
           # Raise it to admit label-rich auto-instrumentation series. Bounded, so cardinality stays sane.
           max_label_names_per_series = var.max_label_names_per_series
+          # Store exemplars (default 0 = off) so span-metric/RED samples keep their trace_id — the APM
+          # metric→trace link (P6).
+          max_global_exemplars_per_user = var.max_global_exemplars_per_user
         }
       }
     }
@@ -152,13 +155,22 @@ locals {
     # the whole reload. Idempotent — a no-op once the old name is gone.
     deleteDatasources = [{ name = "Mimir", orgId = 1 }]
     datasources = [for ds in local.datasource_tenants : {
-      name           = ds.name
-      type           = "prometheus"
-      uid            = ds.uid
-      access         = "proxy"
-      url            = "http://${var.helm_release_name}-gateway.${var.namespace}.svc/prometheus"
-      isDefault      = ds.is_default
-      jsonData       = { httpHeaderName1 = "X-Scope-OrgID", timeInterval = "30s" }
+      name      = ds.name
+      type      = "prometheus"
+      uid       = ds.uid
+      access    = "proxy"
+      url       = "http://${var.helm_release_name}-gateway.${var.namespace}.svc/prometheus"
+      isDefault = ds.is_default
+      # exemplarTraceIdDestinations links an exemplar's trace_id to the matching Tempo tenant datasource
+      # (mimir->tempo, mimir-preprod->tempo-preprod, …) — click a latency spike → open the trace (P6).
+      jsonData = {
+        httpHeaderName1 = "X-Scope-OrgID"
+        timeInterval    = "30s"
+        exemplarTraceIdDestinations = [{
+          name          = "traceID" # the exemplar label the Tempo metrics-generator emits (camelCase)
+          datasourceUid = replace(ds.uid, "mimir", "tempo")
+        }]
+      }
       secureJsonData = { httpHeaderValue1 = ds.tenant }
     }]
   }

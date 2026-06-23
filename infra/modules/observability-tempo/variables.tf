@@ -49,6 +49,18 @@ variable "default_tenant_id" {
   default     = "platform"
 }
 
+variable "enable_metrics_generator" {
+  description = "Enable the Tempo metrics-generator (P6 / APM): derives RED span-metrics + a service graph from traces and remote_writes them to Mimir, per-tenant (X-Scope-OrgID preserved). Needs Mimir on. Off = no APM metrics."
+  type        = bool
+  default     = false
+}
+
+variable "mimir_remote_write_url" {
+  description = "Mimir push endpoint the metrics-generator remote_writes RED/service-graph metrics to (in-cluster gateway). Per-tenant via remote_write_add_org_id_header."
+  type        = string
+  default     = "http://mimir-gateway.observability.svc/api/v1/push"
+}
+
 variable "extra_tenant_datasources" {
   description = "Additional X-Scope-OrgID tenants to provision as Grafana datasources — e.g. [\"preprod\"] for the preprod traces spoke (#628). Each renders a `Tempo (<tenant>)` datasource."
   type        = list(string)

@@ -70,10 +70,33 @@ locals {
       config   = { compaction = { block_retention = var.retention_period } }
     }
 
-    # Off in dev; the HA profile turns the cache on for query performance. metrics-generator stays off
-    # (service graphs / span metrics need Prometheus remote-write; defer with Mimir).
-    metricsGenerator = { enabled = false }
-    memcached        = { enabled = var.high_availability }
+    # Metrics-generator (P6 / APM): derive RED span-metrics + a service graph from traces and remote_write
+    # them to Mimir per-tenant (X-Scope-OrgID preserved via remote_write_add_org_id_header, default true).
+    # Deployment + emptyDir WAL in dev (a restart loses a few min of un-flushed metrics — fine for reference).
+    metricsGenerator = {
+      enabled = var.enable_metrics_generator
+      config = {
+        storage = {
+          remote_write = [{ url = var.mimir_remote_write_url }]
+        }
+        registry = { external_labels = { source = "tempo" } }
+        # local-blocks keeps recent traces in the generator so TraceQL *metrics* queries (rate/quantile over
+        # spans) work — this is what powers Grafana's Traces Drilldown. flush_to_storage makes them queryable
+        # over longer ranges from S3 too.
+        processor = {
+          local_blocks = { flush_to_storage = true }
+        }
+      }
+    }
+
+    # Enable the generator's processors for all tenants (empty = generate nothing when disabled). local-blocks
+    # is required by Grafana Traces Drilldown (TraceQL metrics); service-graphs/span-metrics feed Mimir.
+    overrides = {
+      defaults = {
+        metrics_generator = { processors = var.enable_metrics_generator ? ["service-graphs", "span-metrics", "local-blocks"] : [] }
+      }
+    }
+    memcached = { enabled = var.high_availability }
     cache = var.high_availability ? {
       caches = [{
         memcached = { host = "${var.helm_release_name}-memcached", service = "memcached-client", consistent_hash = true, timeout = "500ms" }
@@ -116,12 +139,18 @@ locals {
     # doesn't collide on uid and 500 the reload. Idempotent. See the mimir module for the full rationale.
     deleteDatasources = [{ name = "Tempo", orgId = 1 }]
     datasources = [for ds in local.datasource_tenants : {
-      name           = ds.name
-      type           = "tempo"
-      uid            = ds.uid
-      access         = "proxy"
-      url            = "http://${var.helm_release_name}-query-frontend.${var.namespace}.svc:3200"
-      jsonData       = { httpHeaderName1 = "X-Scope-OrgID", tracesToLogsV2 = local.tempo_traces_to_logs }
+      name   = ds.name
+      type   = "tempo"
+      uid    = ds.uid
+      access = "proxy"
+      url    = "http://${var.helm_release_name}-query-frontend.${var.namespace}.svc:3200"
+      # serviceMap points at the matching Mimir tenant datasource so Grafana renders the node graph from the
+      # generator's `traces_service_graph_*` metrics (tempo->mimir, tempo-preprod->mimir-preprod, …).
+      jsonData = {
+        httpHeaderName1 = "X-Scope-OrgID"
+        tracesToLogsV2  = local.tempo_traces_to_logs
+        serviceMap      = { datasourceUid = replace(ds.uid, "tempo", "mimir") }
+      }
       secureJsonData = { httpHeaderValue1 = ds.tenant }
     }]
   }

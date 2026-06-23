@@ -106,9 +106,20 @@ single-binary; durable chunks live on **S3 via Pod Identity** (ADR-047 — no IR
 
 Apps send **OTLP** to a deployment-mode **OpenTelemetry Collector** (`otelcol-k8s`;
 `otlp → memory_limiter → batch → otlp/tempo`), which forwards to **Tempo**'s distributor. Tempo uses the
-`tempo-distributed` chart **minimized for dev** (each component 1 replica, RF1, caches/gateway/metrics-gen
-off; `prod` scales it via `high_availability`); durable blocks on **S3 via Pod Identity**. The Grafana
+`tempo-distributed` chart **minimized for dev** (each component 1 replica, RF1, caches/gateway off;
+`prod` scales it via `high_availability`); durable blocks on **S3 via Pod Identity**. The Grafana
 **Tempo** datasource links **traces↔logs** (`tracesToLogsV2` → Loki; Loki's `trace_id` derivedField → Tempo).
+
+### APM correlation: metrics-generator + exemplars (P6)
+
+The Tempo **metrics-generator** is **on** — it derives **RED span-metrics** (`traces_spanmetrics_*`) and a
+**service graph** (`traces_service_graph_*`) from traces and `remote_write`s them to **Mimir per-tenant**
+(X-Scope-OrgID preserved). The Tempo datasource's `serviceMap` points at the matching Mimir datasource so
+Grafana renders the **node graph** (e.g. `user → app-alpha-shop`). **Exemplars** close the loop: Mimir stores
+them (`max_global_exemplars_per_user`), span-metrics carry the `traceID`, and the Mimir datasource's
+`exemplarTraceIdDestinations` link a latency spike → the **trace** → (tracesToLogs) → **logs** — the full
+**metrics ↔ traces ↔ logs** triangle. The generator also runs the **`local-blocks`** processor, which powers
+Grafana's **Traces Drilldown** (TraceQL *metrics* queries — `rate()`/`quantile_over_time()` over spans).
 
 ### Multi-cluster view — federated datasource (#626)
 
