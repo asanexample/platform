@@ -71,7 +71,11 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 
 #### Observability
 
-- [#626](https://github.com/asanexample/platform/issues/626) Federated multi-cluster Grafana view — Mimir tenant federation (read-path) + a platform-admin federated datasource (`platform|preprod`) + multi-cluster-aware overview dashboards. Surfaced by P10: today each cluster is a separate tenant/datasource (strong read-isolation) but no single panel spans clusters. Coordinates with P13 isolation ([#590](https://github.com/asanexample/platform/issues/590)) — the federated lane must stay platform-admin-gated.
+- [#629](https://github.com/asanexample/platform/issues/629) **Epic: single pane of glass — multi-cluster, all signals.** Threads the cross-cluster collection + read-federation work surfaced by P10 into one place. Architecture is proven (P10's Gateway-native spoke edge + the per-tenant model); remaining = replicate the edge per store, federate the read path, enforce a uniform `cluster` label, make dashboards cluster-aware — gated behind P13. Threads:
+  - [#626](https://github.com/asanexample/platform/issues/626) Mimir federation + multi-cluster overview dashboards (fastest win — metrics already flow from platform + preprod)
+  - [#627](https://github.com/asanexample/platform/issues/627) Logs spoke (Loki edge + Alloy on preprod) + `cluster` label
+  - [#628](https://github.com/asanexample/platform/issues/628) Traces spoke (Tempo edge + OTel on preprod) — pairs with P7 ([#586](https://github.com/asanexample/platform/issues/586))
+  - Access gating + scoped per-team views = P13 ([#590](https://github.com/asanexample/platform/issues/590)); profiles later via P8 ([#587](https://github.com/asanexample/platform/issues/587))
 
 #### GitOps & Delivery
 
