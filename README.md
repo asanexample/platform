@@ -1,73 +1,157 @@
 # Reference Platform
 
-A **reference architecture and pattern library for platform engineering** — a blueprint for the kind of
-**Internal Developer Platform (IDP)** an enterprise platform team builds so product teams get a Vercel-like
-"push to ship" experience on top of governed, secure, compliant cloud.
+**Ship to your own governed cloud as fast as you'd ship to Vercel.**
 
-It treats the **platform as a product**, not a pile of Terraform. Product teams self-serve through
-declarative, git-native contracts (the [`Team`](gitops/teams/) / [`Product`](gitops/products/) /
-[`Environment`](gitops/environments/) registries, ADR-067), ship along
-**paved roads** (GitOps delivery + a signed software supply chain + per-PR preview environments), and move
-fast inside **guardrails** — policy-as-code enforced at admission — instead of waiting on tickets. The
-platform absorbs the cognitive load of cloud, networking, security, and compliance so developers focus on
-their apps, while governance stays invariant by construction.
+Enterprises usually pick one or the other: let product teams move fast and lose the plot on security and
+compliance, or keep control and bury everyone in tickets. This is a working reference platform that refuses the
+trade. Developers self-serve through declarative, git-native contracts and ship along **paved roads** — while
+governance holds **invariant by construction**, enforced at admission, not by review.
 
-The running infrastructure — multi-account AWS, private EKS, GitOps, a self-hosted observability stack, a
-signed supply chain — is real and production-shaped, but it is the **means, not the end**. The deliverable
-is the set of **patterns, contracts, and decisions**: 48 [architecture decision records](docs/adrs/) and a
-full [design-doc set](infra/docs/) you can study, adapt, or lift wholesale.
+A developer's entire interaction is one declarative claim. From it, the platform reconciles the whole
+footprint — namespace, RBAC, quotas, network policy, an ECR repo, scoped IAM, developer access, per-product
+policy — and hands every app a **signed software supply chain**, **per-PR preview environments**, and **full
+observability**, without them touching any of it. The platform absorbs the cognitive load of cloud,
+networking, security, and compliance so developers think about their apps; governance stays out of their way
+*and* never bends.
+
+It treats the **platform as a product**, not a pile of Terraform. The running infrastructure — multi-account
+AWS, private EKS, GitOps, a self-hosted LGTM+profiles observability stack, a signed supply chain — is real and
+production-shaped. But the deliverable is the set of **patterns, contracts, and decisions**: **77
+[architecture decision records](docs/adrs/)** and a full [design-doc set](infra/docs/) you can study, adapt, or
+lift wholesale.
 
 > **Cloud scope — multi-cloud by design, AWS-first in practice.** A cloud-agnostic Kubernetes/platform layer
-> (`infra/modules/`) sits over per-cloud foundations (`infra/modules/aws/`). AWS is the only cloud
-> implemented today; Azure/GCP are **deferred until the AWS reference is mature**, and the shared modules are
-> written to be portable for that future.
+> (`infra/modules/`) sits over per-cloud foundations (`infra/modules/aws/`). AWS is the only cloud implemented
+> today; Azure/GCP are **deferred until the AWS reference is mature**, and the shared modules are written to be
+> portable for that future.
 
-## What it demonstrates
+## What shipping actually looks like
 
-The platform-engineering capabilities an enterprise IDP needs — each implemented end-to-end and documented:
+The whole point is the experience. When a developer ships a new service, here's what *they* do — and what the
+platform does for them, invisibly:
 
-| Capability | How it shows up here |
-|------------|----------------------|
-| **Self-service via declarative claim** | A team is a single `Environment` claim; a Crossplane Composition reconciles it into namespaces, RBAC, ECR repos, IAM/Pod Identity, developer access, and policy ([ADR-046](docs/adrs/046-back-stack-for-developer-self-service.md)/[048](docs/adrs/048-federated-per-cluster-crossplane.md)). *A Backstage portal front door is the remaining piece — see [Where this is heading](#where-this-is-heading--the-back-stack).* |
-| **Golden paths / paved roads** | GitOps delivery (ArgoCD), signed-digest promotion, and per-PR preview environments are the supported, opinionated route to production ([ADR-021](docs/adrs/021-argocd-for-gitops.md)/[032](docs/adrs/032-pr-preview-environments.md)) |
-| **Guardrails, not gates** | Policy-as-code at every layer — org SCPs and Kyverno admission — lets teams move fast without breaking governance ([ADR-014](docs/adrs/014-kyverno-as-policy-engine.md)) |
-| **Multi-tenancy** | Team identity decoupled from app identity; namespace isolation with default-deny networking, quotas, and per-team EKS Pod Identity for AWS access ([ADR-027](docs/adrs/027-hybrid-tenant-isolation-model.md)/[041](docs/adrs/041-pod-identity-for-tenant-workloads.md)) |
-| **Defense in depth** | Layered controls — Organizations/SCPs → IAM (operate-not-author) → private networking → admission policy → runtime detection (Falco) — with **no static credentials** anywhere (IRSA / Pod Identity / OIDC) |
-| **Supply-chain integrity** | cosign keyless signing + CycloneDX SBOM + SLSA Build L3 provenance, **verified at admission** per team ([ADR-042](docs/adrs/042-isolated-build-provenance-slsa-l3.md)) |
-| **Compliance as a capability** | Workloads declare a `compliance_tier` (standard/HIPAA/PCI) that selects controls; SCPs mapped to SOC2/HIPAA/PCI/ISO/NIST/CIS ([ADR-013](docs/adrs/013-compliance-tier-model.md)) |
-| **Self-hosted observability** | Prometheus + Grafana + durable, multi-tenant mimir — metrics you own, ready for spoke environments ([ADR-043](docs/adrs/043-self-hosted-observability-stack.md)/[044](docs/adrs/044-mimir-durable-multi-tenant-metrics.md)) |
-| **Day-2 operability** | A purpose-built CLI (`platctl`) for DAG-aware bootstrap/teardown/validate; private cluster access via Tailscale or SSM ([ADR-038](docs/adrs/038-platctl-cli-for-platform-operations.md)) |
+1. **One form.** In the [Backstage](https://backstage.io/) portal, they pick the *New Product* template and fill
+   in a team, product, and stage. The scaffolder opens a **gated pull request** that adds a `Product` registry
+   entry and an `XEnvironment` claim (and, for a new service, a repo from the golden-path skeleton).
+2. **Merge provisions everything.** ArgoCD applies the claim; a **Crossplane Composition** reconciles it into the
+   complete environment footprint — namespace, RBAC, `ResourceQuota`, default-deny `NetworkPolicy`, an **ECR
+   repo**, **scoped IAM via EKS Pod Identity** (no static keys), per-team `kubectl` access, and per-product
+   admission policy. No tickets, no platform-team hand-offs.
+3. **CI signs the artifact.** The app's CI is a *thin caller* of shared, app-team-unwritable `trusted-ci`
+   workflows: build → **cosign keyless-sign** → **CycloneDX SBOM** → **SLSA Build L3 provenance** → pin the
+   deploy manifest to the signed digest.
+4. **The cluster enforces the rules.** **Kyverno** verifies all of it at admission — signature, SBOM, provenance,
+   team-scoped image registry, an immutable tag, resource limits, probes, pod hardening, hostname allow-lists.
+   Non-compliant workloads are *rejected*, not flagged.
+5. **It runs, observed and previewed.** The service comes up behind the Cilium Gateway, gets **per-PR preview
+   environments** automatically, and is **fully instrumented with zero code** — RED metrics, logs, distributed
+   traces, and CPU profiles, with SLOs and a single Grafana pane spanning every cluster.
+
+The result a developer feels is "I pushed and it shipped." Everything between steps 1 and 5 — the governance
+that makes it safe — is the platform's job, done by construction.
+
+## Governance by construction
+
+What makes that speed *safe* is that the guardrails aren't optional and aren't manual. Delivery, policy, and
+IAM are **derived** from the git-native `Team`/`Product`/`Environment`/`Release` registries (`gitops/`) — the
+single source of truth; change the registry and the platform reconciles the consequences. And the rules are
+**enforced at admission**, not in review: a workload missing a signature, an SBOM, resource limits, or a
+team-scoped image registry is *rejected by the cluster*, not flagged in a PR. Governance is a property of the
+system, not a step in a process.
+
+## Capability matrix
+
+The platform-engineering capabilities an enterprise IDP needs — each implemented end-to-end, with honest
+status. **✅ Live** · **◐ Partial / modeled** · **○ Designed / deferred**.
+
+| Capability | Status | How it works |
+|---|:---:|---|
+| **Self-service provisioning** | ✅ | One `XEnvironment` claim → a Crossplane Composition is its **sole provisioner** (namespace, RBAC, quotas, network policy, ECR, IAM, dev access, policy) ([ADR-046](docs/adrs/046-back-stack-for-developer-self-service.md)/[048](docs/adrs/048-federated-per-cluster-crossplane.md)/[067](docs/adrs/067-idp-domain-model.md)) |
+| **GitOps delivery** | ✅ | ArgoCD + per-team AppProjects/RBAC; registries derive the Applications ([ADR-021](docs/adrs/021-argocd-for-gitops.md)) |
+| **Golden paths & scaffolding** | ✅ | Backstage software templates; signed-digest promotion up a dev→test→staging→prod ladder, gated prod + SoD ([ADR-051](docs/adrs/051-backstage-developer-portal.md)/[071](docs/adrs/071-digest-promotion-via-control-plane.md)) |
+| **PR preview environments** | ✅ | ArgoCD ApplicationSet PR generator — ephemeral envs per PR ([ADR-032](docs/adrs/032-pr-preview-environments.md)) |
+| **Policy as code** | ✅ Enforce | Kyverno admission (pod hardening, isolation, supply-chain) **+** org SCPs; Enforce on platform + preprod ([ADR-014](docs/adrs/014-kyverno-as-policy-engine.md)) |
+| **Software supply chain** | ✅ | cosign keyless + CycloneDX SBOM + SLSA Build L3, **verified at admission per team** ([ADR-042](docs/adrs/042-isolated-build-provenance-slsa-l3.md)/[050](docs/adrs/050-shared-build-sign-reusable-workflow.md)) |
+| **Multi-tenancy & isolation** | ✅ | Ownership decoupled from the deployment unit; namespace + default-deny networking + quotas + per-team Pod Identity ([ADR-027](docs/adrs/027-hybrid-tenant-isolation-model.md)/[067](docs/adrs/067-idp-domain-model.md)) |
+| **Identity & SSO** | ✅ | Keycloak OIDC across ArgoCD, Backstage, and Grafana; pluggable-IdP seam ([ADR-053](docs/adrs/053-identity-and-cross-system-authorization-strategy.md)/[059](docs/adrs/059-identity-topology-pluggable-idp-seam.md)) |
+| **Secrets — zero static creds** | ✅ | External Secrets ↔ Secrets Manager; AWS access via Pod Identity / OIDC only ([ADR-047](docs/adrs/047-pod-identity-as-aws-identity-standard.md)) |
+| **Networking** | ✅ | Cilium (kube-proxy-replacement, Gateway API, Hubble), private EKS, TGW hub/spoke, Tailscale ([ADR-008](docs/adrs/008-cilium-as-cross-cloud-cni.md)/[010](docs/adrs/010-private-eks-api-endpoint.md)/[017](docs/adrs/017-gateway-api-over-ingress.md)/[034](docs/adrs/034-transit-gateway-cross-account-connectivity.md)) |
+| **Observability** | ✅ | Full LGTM+profiles, multi-cluster, federated, zero-code (Beyla/Pyroscope), APM correlation, SLOs, synthetics, cost ([ADR-043](docs/adrs/043-self-hosted-observability-stack.md)/[077](docs/adrs/077-application-instrumentation-strategy.md)) |
+| **Runtime threat detection** | ✅ preprod | Falco (eBPF) on the workload cluster ([ADR-045](docs/adrs/045-falco-runtime-threat-detection.md)) |
+| **Cost visibility** | ✅ / ◐ | OpenCost in-cluster allocation + Grafana dashboard live; AWS CUR→Athena (true cloud spend by team) planned |
+| **Day-2 operability** | ✅ | `platctl` — DAG-aware bootstrap / teardown / validate ([ADR-038](docs/adrs/038-platctl-cli-for-platform-operations.md)) |
+| **Compliance tiers** | ◐ modeled | `compliance_tier` selects controls; SCPs mapped to SOC2/HIPAA/PCI/ISO/NIST/CIS. Clusters run `standard`; HIPAA/PCI selectable, not yet exercised ([ADR-013](docs/adrs/013-compliance-tier-model.md)) |
+| **Per-team observability isolation** | ○ designed | Re-tenant every signal by team so devs see only their own telemetry ([#590](https://github.com/asanexample/platform/issues/590)) |
+| **Self-service cloud resources** | ○ designed | S3/SQS/SNS/DynamoDB as governed Crossplane claims with derived least-privilege IAM ([ADR-073](docs/adrs/073-self-service-cloud-resources.md)) |
+| **Agentic workloads** | ○ designed | Run/govern/secure AI agents as a first-class, safety-paramount capability ([ADR-074](docs/adrs/074-agentic-workloads-platform.md)/[075](docs/adrs/075-resource-agent.md)/[076](docs/adrs/076-agent-observability.md)) |
+| **Multi-cloud** | ○ deferred | Cloud-agnostic layer ready; Azure/GCP after the AWS reference matures |
+
+## Observability you'd actually want to operate
+
+Self-hosted, multi-tenant, multi-cluster — the full **LGTM+profiles** stack, not just metrics
+([ADR-043](docs/adrs/043-self-hosted-observability-stack.md)/[044](docs/adrs/044-mimir-durable-multi-tenant-metrics.md)/[077](docs/adrs/077-application-instrumentation-strategy.md)):
+
+- **Every signal, every cluster, one pane.** Metrics (**Mimir**), logs (**Loki**), traces (**Tempo**), and
+  continuous **CPU profiles** (**Pyroscope**) — all S3-backed, multi-tenant by `X-Scope-OrgID`, federated so a
+  single Grafana spans the platform + preprod clusters, broken out by `cluster`.
+- **Zero-code instrumentation.** **Beyla** (eBPF) gives RED metrics + distributed traces for every workload with
+  no app changes; an Alloy eBPF agent profiles every process. New apps are observed the moment they run.
+- **APM correlation.** Service graph + exemplars + Traces Drilldown, with one-click hops **trace → logs → flame
+  graph** across the stack.
+- **The measurement layer.** Error-budget **SLOs** (Sloth burn-rate alerts), **synthetics** (blackbox probes +
+  k6 scripted checks), **cost visibility** (OpenCost), and curated alerting → Slack / PagerDuty / SNS.
+- **Gated by SSO.** Grafana authenticates against **Keycloak** (OIDC), the platform's identity provider of record.
+
+## What's actually running
+
+Real, multi-account AWS infrastructure — production-shaped, deployed and operated via a purpose-built CLI.
+
+**Platform account — shared-services cluster.** Private-API EKS (BYOCNI) with **Cilium 1.19.4**
+(kube-proxy-replacement, Gateway API, Hubble); **ArgoCD** GitOps with **Keycloak OIDC** SSO + team-scoped RBAC;
+**Backstage** developer portal ([ADR-051](docs/adrs/051-backstage-developer-portal.md)) on a CloudNative-PG
+database; **Keycloak** as the app-facing IdP ([ADR-053](docs/adrs/053-identity-and-cross-system-authorization-strategy.md)/[059](docs/adrs/059-identity-topology-pluggable-idp-seam.md));
+**Crossplane** environment control plane; **Kyverno** policy engine; the **observability hub**; **Transit
+Gateway hub** + cross-VPC DNS; **Tailscale** for private access; self-hosted **GitHub Actions runners** (ARC)
+for in-VPC CI.
+
+**Preprod account — workload cluster.** EKS + Cilium + Gateway API; **environment isolation** via namespaces
+(default-deny NetworkPolicies, quotas, per-team **Pod Identity**); ArgoCD Applications + per-team PR-preview
+ApplicationSets; **Kyverno in Enforce** (pod hardening **and** supply-chain verification); **Falco** runtime
+threat detection; cross-account ECR pull; Beyla instrumentation of the live workloads.
+
+**Management account.** AWS Organizations + SCPs, IAM Identity Center (SSO), Terraform state (S3 + DynamoDB).
+**Prod & Test accounts** round out the org (prod networking defined; test is the Terratest OIDC sandbox).
+
+> **Day-2 first.** Everything is driven by **`platctl`**, a Go CLI that resolves the dependency DAG for
+> bootstrap / teardown / validate ([ADR-038](docs/adrs/038-platctl-cli-for-platform-operations.md)). Private
+> clusters are reached over Tailscale (split-DNS subnet routers) or SSM — the EKS API is private by design
+> ([ADR-010](docs/adrs/010-private-eks-api-endpoint.md)).
 
 ## Using this as a reference
 
+The infrastructure is the means; the **patterns, contracts, and decisions** are the deliverable.
+
 - **Platform / DevEx engineers** adopting patterns — start with the [design docs](infra/docs/) (architecture,
-  multi-tenancy, security, supply chain) and compose the [reusable modules](infra/modules/); `infra/live/`
-  shows one opinionated composition.
-- **Architects** evaluating an approach — the [48 ADRs](docs/adrs/) record *why* each choice was made, and
+  multi-tenancy, security, supply chain) and compose the [reusable modules](infra/modules/); `infra/live/` shows
+  one opinionated composition.
+- **Architects** evaluating an approach — the **77 [ADRs](docs/adrs/)** record *why* each choice was made, and
   what was rejected.
 - **New team members** — the [Onboarding Guide](docs/onboarding.md) and the [Quick Start](#quick-start) below.
 
-## Where this is heading — the BACK stack
+## The control plane: B·A·C·K on Kubernetes
 
-Environment provisioning runs on the **BACK stack**. Each Environment is a single declarative **`XEnvironment`
-claim** (a Product at a Stage) that a Crossplane **Composition** reconciles into the complete footprint —
-namespace, RBAC, quotas, networking, per-product policy, IAM/Pod Identity, developer access, and cross-account
-ECR. The remaining piece is the **Backstage** front door:
+Self-service runs on four planes, all reconciled continuously through the Kubernetes API:
 
 | | Role | Status |
 |---|------|--------|
-| **B — [Backstage](https://backstage.io/)** | Internal Developer Portal — service catalog + software templates; the self-service front door that creates the `XEnvironment` claim | Planned (P5) |
-| **A — ArgoCD** | GitOps reconciliation engine | **In place** |
-| **C — [Crossplane](https://www.crossplane.io/)** | Infrastructure control plane — environment capabilities (namespaces, ECR, IAM, Pod Identity, policy, developer access) modeled as an XRD/Composition and **claimed through the Kubernetes API**, continuously reconciled. **The sole environment provisioner** ([ADR-046](docs/adrs/046-back-stack-for-developer-self-service.md)/[048](docs/adrs/048-federated-per-cluster-crossplane.md)) | **Shipped (P1–P3)** — see [Crossplane Environment API](docs/architecture/crossplane-environment-api.md) |
-| **K — Kubernetes** | The universal control plane everything rides on | **In place** |
+| **B — [Backstage](https://backstage.io/)** | Developer portal — service catalog + software templates; the self-service front door that opens the gated PR creating the `XEnvironment` claim | **Live** ([ADR-051](docs/adrs/051-backstage-developer-portal.md)/[064](docs/adrs/064-backstage-provisioning-visibility.md)) |
+| **A — ArgoCD** | GitOps reconciliation engine + per-team AppProjects/RBAC | **Live** ([ADR-021](docs/adrs/021-argocd-for-gitops.md)) |
+| **C — [Crossplane](https://www.crossplane.io/)** | Infrastructure control plane — the environment footprint modeled as an XRD/Composition, **claimed through the K8s API** and continuously reconciled. The sole environment provisioner | **Live** ([ADR-046](docs/adrs/046-back-stack-for-developer-self-service.md)/[048](docs/adrs/048-federated-per-cluster-crossplane.md)) |
+| **K — Kubernetes** | The universal control plane everything rides on | **Live** |
 
-The git-native `Team`/`Product`/`Environment` registries (`gitops/`) are the source of truth — the retired
-`teams.hcl` is gone; `argocd-apps`, `policy`, and `github-oidc` derive delivery + supply-chain policy from the
-Product registry. The end state: a developer picks a
-Backstage template, which scaffolds a repo and a `Environment` claim; ArgoCD applies it; Crossplane provisions the
-resources; Kubernetes runs them — portal-driven, GitOps-reconciled, self-served. The patterns in this repo
-(multi-tenancy, policy-as-code, signed supply chain, observability)
-are the substrate that stack composes onto. This work begins now that the foundation is established.
+A developer picks a template → it scaffolds a repo and an `XEnvironment` claim → ArgoCD applies it → Crossplane
+provisions the resources → Kubernetes runs them. Portal-driven, GitOps-reconciled, self-served, governed by
+construction.
 
 ## Quick Start
 
@@ -85,201 +169,94 @@ platctl bootstrap
 cd infra/live/aws/platform/us-east-1/platform/eks
 AWS_PROFILE=management terragrunt apply
 
-# Validate deployed infrastructure
+# Validate deployed infrastructure, then configure kubectl contexts
 platctl validate
-
-# Configure kubectl contexts
 platctl kubeconfig
 ```
 
-## Repository Layout
+## Repository layout
 
 ```text
 platform/
-├── cmd/platctl/                 # Go CLI for platform operations (bootstrap, teardown, validate, kubeconfig)
-├── docs/                        # User-facing documentation
-│   ├── adrs/                    # 48 architecture decision records
-│   ├── architecture/            # System design, supply chain, observability, environment model, config hierarchy
-│   ├── compliance/              # SCP → control mapping
+├── cmd/platctl/                 # Go CLI: DAG-aware bootstrap / teardown / validate / kubeconfig
+├── gitops/                      # The source of truth: Team / Product / Environment / Release registries
+├── docs/
+│   ├── adrs/                    # 77 architecture decision records
+│   ├── architecture/            # System design, supply chain, observability, environment model
+│   ├── compliance/              # SCP → control mapping (SOC2/HIPAA/PCI/ISO/NIST/CIS)
 │   ├── runbooks/                # Operational procedures
 │   └── troubleshooting/         # Known issues and solutions
 ├── infra/
-│   ├── live/aws/                # Terragrunt live configurations (AWS only)
-│   │   ├── mgmt/                # Management account (Organizations, SCPs, state, IAM Identity Center)
-│   │   ├── platform/            # Platform account (EKS, ArgoCD, Tailscale, TGW hub, observability, ECR)
-│   │   ├── preprod/             # Preprod account (EKS, environments, ingress, TGW spoke)
-│   │   ├── prod/                # Prod account (networking defined, not yet deployed)
-│   │   └── test/               # Test account (GitHub OIDC sandbox for Terratest CI)
-│   ├── modules/                 # Reusable OpenTofu modules
-│   │   ├── aws/                 # 19 AWS modules
-│   │   ├── cloudflare/          # 1 Cloudflare module (dns_delegation)
-│   │   └── (shared)             # cloud-agnostic modules (cilium, argocd, policy, crossplane, tenant-claims, observability, …)
+│   ├── live/aws/                # Terragrunt live configs — mgmt / platform / preprod / prod / test accounts
+│   ├── modules/                 # ~60 reusable OpenTofu modules (cloud-agnostic + aws/ + cloudflare/)
 │   ├── tests/                   # Terratest integration tests (Go)
-│   └── root.hcl                 # Root Terragrunt config (S3 state, providers, terraform_binary)
-└── scripts/                     # Helper scripts (eks-tunnel, bootstrap, teardown)
+│   └── root.hcl                 # Root Terragrunt config (S3 state, providers)
+└── scripts/                     # Helper scripts (eks-tunnel, port-forwards, finalizer-clear)
 ```
 
-## AWS Accounts
+## Modules
+
+~60 reusable OpenTofu modules — a cloud-agnostic platform layer over per-cloud foundations. By domain:
+
+- **Delivery & portal** — `argocd`, `argocd-apps`, `argocd-clusters`, `backstage`, `github-teams`
+- **Environment control plane** — `crossplane` (the `XEnvironment` XRD/Composition), `policy` (Kyverno),
+  `cluster-rbac`, `gateway`, `gateway-config`
+- **Identity & secrets** — `keycloak`, `keycloak-config`, `external-secrets`, `secret-stores`,
+  `cloudnative-pg`
+- **Networking & access** — `cilium`, `cert-manager`, `external-dns`, `tailscale`, `tailscale-admin`
+- **Security** — `policy` (Kyverno), `falco`, plus the SCP/IAM/supply-chain layers
+- **Observability (17 modules)** — `observability` (kube-prometheus-stack) + the durable stores
+  (`observability-mimir`/`-loki`/`-tempo`/`-pyroscope`), collectors (`-alloy`/`-beyla`/`-otel-collector`/
+  `-otel-operator`/`-prometheus-agent`/`-pyroscope-ebpf`/`-events`), and the measurement layer
+  (`-slo`/`-blackbox`/`-k6`/`-opencost`/`-cloudwatch-exporter`)
+- **AWS foundation (20 modules)** — `organizations`, `networking`, `eks` (+ `eks-addons`/`-node-group`/
+  `-pod-identity`), `transit-gateway`, `cross-vpc-dns`, `route53` (+ `-delegation`), `ecr`, `iam_roles`,
+  `identity_center`, `github_oidc`, `cloudtrail`, `s3`, `sops-kms`, `ssm-bastion`, `sns-notifications`,
+  `state_bootstrap`
+- **Deferred** — `vcluster` (hard multi-tenancy, [ADR-033](docs/adrs/033-defer-vcluster-tenant-support.md))
+
+Full catalog: [infra/modules/README.md](infra/modules/README.md).
+
+## AWS accounts
 
 Real account IDs live in `infra/live/aws/secrets.hcl` (gitignored; see `secrets.hcl.example`).
 
 | Account | Purpose |
 |---------|---------|
 | **Management** | AWS Organizations, SCPs, IAM Identity Center (SSO), Terraform state (S3 + DynamoDB) |
-| **Platform** | Shared services: EKS, ArgoCD, Tailscale, TGW hub, ECR, observability hub |
-| **PreProd** | Workloads: EKS, environment namespaces, public ingress, TGW spoke |
+| **Platform** | Shared services: EKS, ArgoCD, Backstage, Keycloak, Crossplane, TGW hub, ECR, the observability hub |
+| **PreProd** | Workloads: EKS, environment namespaces, public ingress, Falco, TGW spoke |
 | **Prod** | Production workloads (networking defined, not yet deployed) |
 | **Test** | GitHub OIDC sandbox for Terratest CI (`PlatformDeployer`-managed) |
 
-Cross-account access uses purpose-built IAM roles (**PlatformAdmin** for operate/debug, **PlatformDeployer**
-for Terragrunt apply, **DeveloperAccess-\<team\>** for namespace-scoped kubectl, **TerraformStateAccess** for
-the state backend). `OrganizationAccountAccessRole` is retained as break-glass only. See [CLAUDE.md](CLAUDE.md)
-and [ADR-040](docs/adrs/040-platform-engineer-access-model.md).
+Cross-account access uses purpose-built IAM roles — **PlatformAdmin** (operate/debug, *not* author),
+**PlatformDeployer** (Terragrunt apply), **DeveloperAccess-\<team\>** (namespace-scoped kubectl), and
+**TerraformStateAccess**. `OrganizationAccountAccessRole` is break-glass only ([ADR-040](docs/adrs/040-platform-engineer-access-model.md)).
 
-## Platform Stack
+## Testing & CI
 
-### Platform account — shared services cluster
-
-- **EKS** (private API, BYOCNI) with **Cilium 1.19.4** (kube-proxy replacement, Gateway API, Hubble)
-- **ArgoCD** for GitOps delivery, with Dex → IAM Identity Center SAML SSO
-- **Observability hub** — kube-prometheus-stack (Prometheus + Grafana + Alertmanager), Grafana served
-  Tailscale-only, `critical` alerts → SNS → email; **Grafana mimir** as the durable, multi-tenant, S3-backed
-  metrics store (Prometheus `remote_write`s to it)
-- **Kyverno** policy engine — admission guardrails (pod hardening, multi-tenancy isolation, supply-chain
-  verification)
-- **Tailscale Operator** for VPN access to the private clusters
-- **Transit Gateway hub** + cross-VPC DNS for private cross-account EKS connectivity
-- **Gateway API** (internal NLB) for platform service ingress; cert-manager, ExternalDNS, External Secrets
-  Operator
-
-### Preprod account — workload cluster
-
-- **EKS** with Cilium and Gateway API (public NLB)
-- **Environment isolation** via namespaces with default-deny NetworkPolicies, resource quotas, and per-team
-  **EKS Pod Identity** for AWS access ([ADR-041](docs/adrs/041-pod-identity-for-tenant-workloads.md))
-- **ArgoCD** Applications + per-team PR preview ApplicationSets
-- **Kyverno in Enforce** — pod hardening **and** supply-chain verification (signatures + attestations)
-- ECR cross-account image pull; GitHub OIDC for CI/CD
-
-### Software supply chain (cross-cutting)
-
-App CI (a **thin caller** in each app repo) invokes the shared `trusted-ci` reusable workflows: `build-sign.yml`
-builds the image, **cosign keyless-signs** it, and attaches a **CycloneDX SBOM**, while `slsa-provenance.yml`
-issues the **SLSA Build L3** provenance attestation — both under an isolated `trusted-ci` identity, with
-per-team isolation carried by the cosign cert's `githubWorkflowRepository` extension (the caller app repo). CI
-then pins the deploy manifest to the signed digest. **Kyverno verifies all of it at admission**, per team —
-only images signed by the shared signer for that team's repo (plus an app-signed fallback for bespoke apps),
-carrying a valid SBOM + provenance, are admitted ([ADR-050](docs/adrs/050-shared-build-sign-reusable-workflow.md)).
-See [Supply-Chain Overview](docs/architecture/supply-chain-overview.md).
-
-### Compliance tiers
-
-Workloads declare a `compliance_tier` (`standard` / `hipaa` / `pci`); the tier selects which Kyverno policies
-and platform controls apply ([ADR-013](docs/adrs/013-compliance-tier-model.md)). Current clusters run the
-`standard` tier.
-
-### Deployment order
-
-The full dependency DAG is documented in [CLAUDE.md](CLAUDE.md). The preferred deployment method is
-`platctl bootstrap`, which resolves the DAG automatically.
-
-## Modules
-
-### Shared — cloud-agnostic (19)
-
-| Module | Description |
-|--------|-------------|
-| [argocd](infra/modules/argocd/) | ArgoCD Helm deployment with RBAC, Dex SAML SSO, optional HA |
-| [argocd-apps](infra/modules/argocd-apps/) | Multi-tenant AppProjects, Applications, PR preview ApplicationSets |
-| [argocd-clusters](infra/modules/argocd-clusters/) | Remote cluster registration (hub → spokes) |
-| [cert-manager](infra/modules/cert-manager/) | cert-manager Helm with IRSA for DNS-01 challenges |
-| [cilium](infra/modules/cilium/) | Cilium CNI — BYOCNI, kube-proxy replacement, Gateway API, Hubble |
-| [cluster-rbac](infra/modules/cluster-rbac/) | platform-operator ClusterRole — least-privilege kubectl (ADR-040) |
-| [external-dns](infra/modules/external-dns/) | ExternalDNS Helm with IRSA |
-| [external-secrets](infra/modules/external-secrets/) | External Secrets Operator Helm with IRSA |
-| [falco](infra/modules/falco/) | Runtime threat detection (eBPF) — deployed on preprod ([ADR-045](docs/adrs/045-falco-runtime-threat-detection.md)) |
-| [gateway-config](infra/modules/gateway-config/) | ClusterIssuer, Gateway, HTTPRoutes (TLS via cert-manager) |
-| [github-teams](infra/modules/github-teams/) | GitHub org-Team ownership of app repos, registry-derived (ADR-072) |
-| [observability](infra/modules/observability/) | Observability hub — kube-prometheus-stack + SNS alerting |
-| [observability-mimir](infra/modules/observability-mimir/) | Durable, multi-tenant, S3-backed metrics store (mimir) |
-| [policy](infra/modules/policy/) | Kyverno engine + ClusterPolicies — pod hardening, multi-tenancy, image verification (ADR-014) |
-| [secret-stores](infra/modules/secret-stores/) | ClusterSecretStore for AWS Secrets Manager and SSM |
-| [tailscale](infra/modules/tailscale/) | Tailscale Operator, subnet router, split DNS |
-| [tailscale-admin](infra/modules/tailscale-admin/) | Tailnet ACL and OAuth client management |
-| [actions-runner-controller](infra/modules/actions-runner-controller/) | Self-hosted GitHub Actions runners (ARC) on the platform cluster — in-VPC CI for cluster-facing applies (ADR-065) |
-| [crossplane](infra/modules/crossplane/) | Crossplane v2 control plane — hub (ECR provisioning) + the per-cluster `XEnvironment` XRD/Composition (the `environment-api` + `environment-policies` charts); the environment control plane (ADR-046/048/067) |
-| [vcluster](infra/modules/vcluster/) | vCluster Helm (deferred — ADR-033) |
-
-### AWS (19)
-
-| Module | Description |
-|--------|-------------|
-| [cloudtrail](infra/modules/aws/cloudtrail/) | Audit logging with S3, KMS, secrets alarms |
-| [cross-vpc-dns](infra/modules/aws/cross-vpc-dns/) | Cross-VPC DNS for private EKS endpoints |
-| [ecr](infra/modules/aws/ecr/) | ECR with lifecycle policies and cross-account access |
-| [eks](infra/modules/aws/eks/) | EKS cluster with BYOCNI, KMS, OIDC, access entries |
-| [eks-addons](infra/modules/aws/eks-addons/) | EKS managed add-ons + gp3 default StorageClass |
-| [eks-node-group](infra/modules/aws/eks-node-group/) | EKS managed node groups |
-| [eks-pod-identity](infra/modules/aws/eks-pod-identity/) | EKS Pod Identity associations for environment AWS access (ADR-041) |
-| [github_oidc](infra/modules/aws/github_oidc/) | GitHub Actions OIDC federation (ADR-036) |
-| [iam_roles](infra/modules/aws/iam_roles/) | Purpose-built cross-account IAM roles |
-| [identity_center](infra/modules/aws/identity_center/) | IAM Identity Center permission sets |
-| [networking](infra/modules/aws/networking/) | VPC, subnets, NAT, flow logs (3 topology modes) |
-| [organizations](infra/modules/aws/organizations/) | AWS Organizations with OUs and SCPs |
-| [route53](infra/modules/aws/route53/) | Route53 hosted zones |
-| [route53_delegation](infra/modules/aws/route53_delegation/) | NS record delegation between zones |
-| [s3](infra/modules/aws/s3/) | General-purpose S3 buckets (SSE, public-access-blocked) |
-| [sns-notifications](infra/modules/aws/sns-notifications/) | SNS alert topic (Alertmanager → email) |
-| [ssm-bastion](infra/modules/aws/ssm-bastion/) | SSM bastion for private cluster access |
-| [state_bootstrap](infra/modules/aws/state_bootstrap/) | S3 + DynamoDB for Terraform state |
-| [transit-gateway](infra/modules/aws/transit-gateway/) | TGW hub/spoke for cross-VPC connectivity |
-
-Plus [cloudflare/dns_delegation](infra/modules/cloudflare/dns_delegation/) (DNS delegation). Full catalog:
-[infra/modules/README.md](infra/modules/README.md).
-
-## Key Design Decisions
-
-| Decision | ADR |
-|----------|-----|
-| Cilium as CNI (BYOCNI) | [ADR-008](docs/adrs/008-cilium-as-cross-cloud-cni.md) |
-| EKS component separation (BYOCNI ordering) | [ADR-009](docs/adrs/009-eks-component-separation.md) |
-| Private EKS API endpoint | [ADR-010](docs/adrs/010-private-eks-api-endpoint.md) |
-| Tailscale for VPN access | [ADR-011](docs/adrs/011-tailscale-for-private-cluster-access.md) |
-| Compliance-tier model | [ADR-013](docs/adrs/013-compliance-tier-model.md) |
-| Kyverno as policy engine | [ADR-014](docs/adrs/014-kyverno-as-policy-engine.md) |
-| Gateway API over Ingress | [ADR-017](docs/adrs/017-gateway-api-over-ingress.md) |
-| ArgoCD for GitOps | [ADR-021](docs/adrs/021-argocd-for-gitops.md) |
-| Namespace environment isolation | [ADR-027](docs/adrs/027-hybrid-tenant-isolation-model.md) |
-| Centralized cross-account ECR | [ADR-028](docs/adrs/028-ecr-cross-account-container-registry.md) |
-| Multi-app environment model | [ADR-031](docs/adrs/031-multi-app-tenant-model.md) |
-| PR preview environments | [ADR-032](docs/adrs/032-pr-preview-environments.md) |
-| Transit Gateway hub/spoke | [ADR-034](docs/adrs/034-transit-gateway-cross-account-connectivity.md) |
-| GitHub Actions OIDC federation | [ADR-036](docs/adrs/036-github-actions-oidc-federation.md) |
-| platctl CLI | [ADR-038](docs/adrs/038-platctl-cli-for-platform-operations.md) |
-| Platform-engineer access model | [ADR-040](docs/adrs/040-platform-engineer-access-model.md) |
-| Pod Identity for environment workloads | [ADR-041](docs/adrs/041-pod-identity-for-tenant-workloads.md) |
-| Isolated build provenance (SLSA L3) | [ADR-042](docs/adrs/042-isolated-build-provenance-slsa-l3.md) |
-| Self-hosted observability stack | [ADR-043](docs/adrs/043-self-hosted-observability-stack.md) |
-| mimir for durable multi-tenant metrics | [ADR-044](docs/adrs/044-mimir-durable-multi-tenant-metrics.md) |
-| Falco for runtime threat detection | [ADR-045](docs/adrs/045-falco-runtime-threat-detection.md) |
-| BACK stack for developer self-service | [ADR-046](docs/adrs/046-back-stack-for-developer-self-service.md) |
-| Pod Identity as the AWS-identity standard | [ADR-047](docs/adrs/047-pod-identity-as-aws-identity-standard.md) |
-| Federated per-cluster Crossplane | [ADR-048](docs/adrs/048-federated-per-cluster-crossplane.md) |
-| Multi-tenancy model (Team / Environment / Zone) | [ADR-049](docs/adrs/049-tenant-model-team-tenant-zone.md) |
-
-All 49 ADRs: [docs/adrs/](docs/adrs/)
-
-## Testing
-
-Tests use **Terratest (Go)** and live in `infra/tests/aws/<module>/`. Plan-only tests cover modules that
-can't be safely apply/destroyed in CI; tests must use the OpenTofu binary (`TerraformBinary: "tofu"`).
+Tests use **Terratest (Go)** in `infra/tests/aws/<module>/` (plan-only where apply/destroy isn't CI-safe; the
+OpenTofu binary is required — `TerraformBinary: "tofu"`).
 
 ```bash
 cd infra/tests/aws/networking && go test -v -timeout 30m
 ```
 
-CI (GitHub Actions) runs OpenTofu/Terragrunt format, validate, TFLint, Kyverno policy tests, and security
-scanning (Trivy IaC, Semgrep) — via OIDC federation, no stored credentials.
+CI (GitHub Actions, via OIDC — no stored credentials) runs OpenTofu/Terragrunt fmt + validate, TFLint, Kyverno
+policy tests, and security scanning (Trivy IaC, Semgrep). Cluster-facing applies run on the in-VPC self-hosted
+runners (ARC, [ADR-065](docs/adrs/065-self-hosted-github-actions-runners-arc.md)).
+
+## Where it's heading
+
+The foundation is established; the active frontiers:
+
+- **Per-team observability isolation** — the single pane's access half: re-tenant every signal by team so
+  developers see only their own telemetry across clusters ([#590](https://github.com/asanexample/platform/issues/590)).
+- **Self-service cloud resources** — S3/SQS/SNS/DynamoDB as governed Crossplane claims with derived
+  least-privilege IAM ([ADR-073](docs/adrs/073-self-service-cloud-resources.md)).
+- **Agentic workloads** — running and governing AI agents as a first-class, safety-paramount platform capability
+  ([ADR-074](docs/adrs/074-agentic-workloads-platform.md)/[075](docs/adrs/075-resource-agent.md)/[076](docs/adrs/076-agent-observability.md)).
+- **Multi-cloud** — Azure/GCP foundations under the existing cloud-agnostic layer, once the AWS reference is mature.
 
 ## Documentation
 
@@ -287,11 +264,8 @@ scanning (Trivy IaC, Semgrep) — via OIDC federation, no stored credentials.
 |----------|-------------|
 | [Documentation Index](docs/README.md) | Full doc map — start here |
 | [Onboarding Guide](docs/onboarding.md) | New team member quickstart |
-| [User Guide](docs/user-guide.md) | Complete reference for deployments and day-2 ops |
+| [Crossplane Environment API](docs/architecture/crossplane-environment-api.md) | The `XEnvironment` claim → Composition model |
 | [Supply-Chain Overview](docs/architecture/supply-chain-overview.md) | cosign + SBOM + SLSA L3 + Kyverno, end to end |
-| [Observability Current State](docs/architecture/observability-current-state.md) | As-built Prometheus/Grafana/mimir hub |
-| [Deploy App to Preprod](docs/runbooks/deploy-app-preprod.md) | Developer guide: manifests, ECR, ArgoCD |
-| [App Supply-Chain Onboarding](docs/runbooks/app-supply-chain-onboarding.md) | Wire signing/SBOM/provenance into app CI |
-| [Environment Onboarding](docs/runbooks/environment-onboarding.md) | Add/remove teams via a Crossplane `Environment` claim |
-| [EKS Cluster Access](docs/runbooks/eks-cluster-access.md) | kubectl setup for engineers |
-| [Architecture Decisions](docs/adrs/) | 48 ADRs documenting every significant choice |
+| [Observability Current State](docs/architecture/observability-current-state.md) | As-built LGTM+profiles, multi-cluster |
+| [New Product / Deploy runbooks](docs/runbooks/) | The developer paved road, end to end |
+| [Architecture Decisions](docs/adrs/) | **77 ADRs** documenting every significant choice |
