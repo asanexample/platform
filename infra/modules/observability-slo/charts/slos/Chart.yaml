@@ -1,0 +1,6 @@
+apiVersion: v2
+name: slos
+description: Sloth PrometheusServiceLevel SLO definitions (rendered from values). Deployed via helm so the CRs
+  don't need the CRD present at plan time (unlike kubernetes_manifest).
+type: application
+version: 0.1.0

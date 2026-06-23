@@ -121,6 +121,17 @@ them (`max_global_exemplars_per_user`), span-metrics carry the `traceID`, and th
 **metrics ↔ traces ↔ logs** triangle. The generator also runs the **`local-blocks`** processor, which powers
 Grafana's **Traces Drilldown** (TraceQL *metrics* queries — `rate()`/`quantile_over_time()` over spans).
 
+### SLOs & error budgets (P9)
+
+**Sloth** turns abstract SLO definitions (`{ objective, error/total query }`, the `observability-slo` module's
+`slos` input) into **SLI recording rules** + **multi-window burn-rate alert rules**. Its controller watches
+`PrometheusServiceLevel` CRs and emits `PrometheusRule`s, which the hub Prometheus discovers + evaluates;
+the SLO metrics (`slo:sli_error:*`, `slo:current_burn_rate:ratio`, …) remote-write to Mimir, and burn-rate
+**alerts route via the P4 Alertmanager** by severity (`pageAlert`=critical, `ticketAlert`=warning). First SLO:
+**API server request availability** (99.9%). The grafana.com **"High level Sloth SLOs"** dashboard (14643) is
+provisioned as code. `slo_engine` is the seam for a future Pyrra/Grafana-SLO swap. (Synthetics —
+blackbox/k6 — are P9b.)
+
 ### Multi-cluster view — federated datasource (#626)
 
 Each cluster is a separate Mimir tenant (`platform`, `preprod`), so by default one datasource = one cluster
