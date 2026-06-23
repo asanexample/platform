@@ -97,6 +97,10 @@ inputs = {
   cluster_name = dependency.eks.outputs.cluster_id
   aws_region   = include.base.locals.region
 
+  # Clean `cluster` label on Mimir's own self-metrics (#630) — the env name, matching the hub's
+  # Prometheus externalLabels.cluster, not the chart default (release name "mimir").
+  cluster_label = include.base.locals.env
+
   namespace = dependency.observability.outputs.namespace
 
   oidc_provider_arn = dependency.eks.outputs.oidc_provider_arn

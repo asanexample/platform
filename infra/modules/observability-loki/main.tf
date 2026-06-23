@@ -107,7 +107,13 @@ locals {
     # Self-monitoring: scrape Loki's own metrics into Prometheus (P4 store alerts). ServiceMonitor only —
     # not the chart's bundled rules/dashboards/agent (we author curated rules + manage dashboards).
     monitoring = {
-      serviceMonitor = { enabled = true }
+      # The chart hardcodes a relabeling that sets `cluster=loki` on Loki's self-metrics, polluting the real
+      # cluster dimension (#630). Loki has no clusterLabel knob, so drop the label post-scrape — Prometheus
+      # externalLabels.cluster then attributes them to the actual cluster.
+      serviceMonitor = {
+        enabled           = true
+        metricRelabelings = [{ action = "labeldrop", regex = "cluster" }]
+      }
       selfMonitoring = { enabled = false }
       rules          = { enabled = false }
       dashboards     = { enabled = false }
@@ -120,7 +126,7 @@ locals {
   all_tenants = concat([var.default_tenant_id], var.extra_tenant_datasources)
 
   datasource_tenants = concat(
-    [{ name = "Loki", uid = "loki", tenant = var.default_tenant_id }],
+    [{ name = "Loki (${var.default_tenant_id})", uid = "loki", tenant = var.default_tenant_id }],
     [for t in var.extra_tenant_datasources : { name = "Loki (${t})", uid = "loki-${t}", tenant = t }],
     var.enable_federated_datasource ? [{ name = "Loki (all clusters)", uid = "loki-all", tenant = join("|", local.all_tenants) }] : [],
   )
@@ -135,6 +141,9 @@ locals {
 
   grafana_datasource = {
     apiVersion = 1
+    # Rename migration (bare "Loki" -> "Loki (platform)", same uid): delete the old name first so provisioning
+    # doesn't collide on uid and 500 the reload. Idempotent. See the mimir module for the full rationale.
+    deleteDatasources = [{ name = "Loki", orgId = 1 }]
     datasources = [for ds in local.datasource_tenants : {
       name           = ds.name
       type           = "loki"

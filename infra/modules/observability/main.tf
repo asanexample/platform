@@ -151,8 +151,9 @@ locals {
       prometheusSpec = {
         replicas  = var.high_availability ? 2 : 1
         retention = var.prometheus_retention
-        # Tag every series with the source cluster (needed once spokes remote_write to the same Mimir).
-        externalLabels = { cluster = var.cluster_name }
+        # Tag every series with the source cluster (the multi-cluster dimension). Clean name (e.g. `platform`)
+        # matching the tenant/env, not the raw EKS cluster ID; falls back to cluster_name if unset.
+        externalLabels = { cluster = var.cluster_label != "" ? var.cluster_label : var.cluster_name }
         # Ship to Mimir for durable, long-range storage (empty when no Mimir url is set).
         remoteWrite = local.prometheus_remote_write
         # Pick up ServiceMonitors / PodMonitors / Rules cluster-wide, not just chart-labelled ones

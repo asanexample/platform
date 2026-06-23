@@ -95,7 +95,7 @@ locals {
   all_tenants = concat([var.default_tenant_id], var.extra_tenant_datasources)
 
   datasource_tenants = concat(
-    [{ name = "Tempo", uid = "tempo", tenant = var.default_tenant_id }],
+    [{ name = "Tempo (${var.default_tenant_id})", uid = "tempo", tenant = var.default_tenant_id }],
     [for t in var.extra_tenant_datasources : { name = "Tempo (${t})", uid = "tempo-${t}", tenant = t }],
     var.enable_federated_datasource ? [{ name = "Tempo (all clusters)", uid = "tempo-all", tenant = join("|", local.all_tenants) }] : [],
   )
@@ -112,6 +112,9 @@ locals {
 
   grafana_datasource = {
     apiVersion = 1
+    # Rename migration (bare "Tempo" -> "Tempo (platform)", same uid): delete the old name first so provisioning
+    # doesn't collide on uid and 500 the reload. Idempotent. See the mimir module for the full rationale.
+    deleteDatasources = [{ name = "Tempo", orgId = 1 }]
     datasources = [for ds in local.datasource_tenants : {
       name           = ds.name
       type           = "tempo"

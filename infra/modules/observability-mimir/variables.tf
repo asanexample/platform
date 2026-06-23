@@ -15,6 +15,12 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "cluster_label" {
+  description = "Clean `cluster` label for Mimir's own self-metrics (#630) — matches the hub's Prometheus externalLabels.cluster (e.g. `platform`) so they're attributed to the cluster they run on, not the chart's default (the release name `mimir`). Empty falls back to cluster_name."
+  type        = string
+  default     = ""
+}
+
 variable "namespace" {
   description = "Namespace to deploy Mimir into. Defaults to the observability hub namespace so Mimir shares Grafana's datasource sidecar and the existing default-deny NetworkPolicy isolation. The namespace must already exist (created by the observability module)."
   type        = string
