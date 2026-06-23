@@ -194,6 +194,12 @@ variable "max_label_names_per_series" {
   default     = 50
 }
 
+variable "max_global_exemplars_per_user" {
+  description = "Per-tenant in-memory exemplar storage (Mimir default 0 = OFF, exemplars discarded). >0 enables it so the Tempo metrics-generator's span-metrics exemplars (and Prometheus exemplars) are stored — the metric→trace link for APM (P6)."
+  type        = number
+  default     = 100000
+}
+
 variable "tags" {
   description = "Tags applied to AWS resources (and sanitized into K8s labels)."
   type        = map(string)

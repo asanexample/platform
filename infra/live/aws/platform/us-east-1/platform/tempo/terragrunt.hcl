@@ -118,5 +118,8 @@ inputs = {
   extra_tenant_datasources    = ["preprod"]
   enable_federated_datasource = true
 
+  # APM (P6): metrics-generator derives a service graph + RED span-metrics from traces into Mimir, per-tenant.
+  enable_metrics_generator = true
+
   tags = include.base.locals.tags
 }
