@@ -25,15 +25,16 @@ On the **platform** cluster, in the **`observability`** namespace:
 | **Curated alerts** | 28 `PrometheusRule`s across 7 components (+ bundled mixins) | — | P4 |
 | **Notifications** | `warning`→Slack · `critical`→SNS+Slack+PagerDuty · inhibition | — | P4; secrets via ESO |
 | **gp3 StorageClass** | cluster-default EBS storage (EBS CSI) | — | in the `eks-addons` unit |
-| **Grafana Mimir** | Durable, multi-tenant, S3-backed metrics store | chart `mimir-distributed 6.0.6` | P2 — **code-complete but OFF in the dev cost_profile** (`enable_mimir=false`); **Prometheus-only metrics today** |
+| **Grafana Mimir** | Durable, multi-tenant, S3-backed metrics store | chart `mimir-distributed 6.0.6` | P2 — **ON** on the platform hub (`enable_mimir=true`); Prometheus `remote_write`s here; the hub-and-spoke store |
+| **Prometheus agent (preprod spoke)** | kube-prometheus-stack agent mode (+ KSM + node-exporter) on **preprod**, `remote_write`s to the hub Mimir under tenant `preprod` | chart `kube-prometheus-stack 86.1.0` | P10 — `infra/modules/observability-prometheus-agent` |
 
 > **cost_profile (`common.hcl`/`_base.hcl`):** `dev` (default) = single-replica + durable stores **off**. The
-> platform cluster overrides `enable_loki` / `enable_log_pipeline` / `enable_tempo` / `enable_trace_pipeline`
-> **on** (so logs + traces run), but **`enable_mimir` stays off** — so metrics are Prometheus-only in dev, no
-> remote-write. `cost_profile=prod` flips the whole bundle to HA (RF3, multi-replica, Mimir on).
+> platform cluster overrides `enable_mimir` / `enable_loki` / `enable_log_pipeline` / `enable_tempo` /
+> `enable_trace_pipeline` **on** in its `env.hcl` (so the full LGTM bundle runs single-replica), while other
+> clusters stay dev/off. `cost_profile=prod` flips the bundle to HA (RF3, multi-replica).
 
-**Not yet deployed:** cloud-resource metrics (P5), preprod spoke onboarding (P10), Grafana SSO (deferred
-hardening — admin login for now). Mimir is code-complete but off in dev (see above). Full roadmap in the plan.
+**Not yet deployed:** cross-cluster **logs/traces** spokes (P10 shipped metrics first), Grafana SSO (deferred
+hardening — admin login for now). Full roadmap in the plan.
 
 ---
 
@@ -42,9 +43,21 @@ hardening — admin login for now). Mimir is code-complete but off in dev (see a
 ### Hub-and-spoke (single hub today)
 
 The design is **hub-and-spoke**: one central hub (the **platform** cluster) runs Grafana + the durable
-stores; spoke clusters (preprod, prod) will run collectors that `remote_write` to the hub over Tailscale/TGW.
-**Today only the hub exists**, and it monitors itself — the platform cluster's own Prometheus scrapes the
-platform cluster and ships to the platform-hosted Mimir. Adding preprod as a spoke is **P10**.
+stores; spoke clusters run lightweight collectors that `remote_write` to the hub over the Transit Gateway.
+The hub monitors itself (its own Prometheus → the hub Mimir, tenant `platform`), and **preprod** is the first
+**metrics spoke** (P10): a kube-prometheus-stack agent on preprod ships to the hub Mimir under tenant
+`preprod`. Logs/traces spokes are the next step.
+
+**Cross-cluster ingest edge (Gateway-API-native, no proxy).** The hub Mimir is `ClusterIP`-only; spokes reach
+it through a write-only **HTTPRoute** on the shared Cilium Gateway (`<spoke>-mimir.aws.refplat.org`,
+self-routed by the `observability-mimir` module's `spoke_ingest` input). The HTTPRoute does two
+security-critical jobs declaratively: a `RequestHeaderModifier` **force-sets `X-Scope-OrgID`** to the spoke's
+tenant — overwriting any client value, so a spoke can't spoof another tenant (the ADR-044 guard) — and a path
+match on `/api/v1/push` keeps it **write-only** (no query path is exposed cross-cluster). A
+`CiliumNetworkPolicy` (`fromEntities: ["ingress"]`) admits the Gateway Envoy to the Mimir gateway past the
+`observability` default-deny. **Auth = network isolation** (the internal NLB reachable only over the VPC/TGW);
+mTLS is the planned P10.x hardening. The spoke sends **no** tenant header (the edge sets it) and **no**
+credential. Onboarding the next spoke: [`observability-spoke-onboarding.md`](../runbooks/observability-spoke-onboarding.md).
 
 ```text
               ┌─────────────────────────  observability namespace (platform cluster)  ──────────────────────┐
@@ -196,10 +209,12 @@ gp3 is the cluster-**default** StorageClass (encrypted, expandable, WaitForFirst
 | Logs — store / collector | `infra/modules/observability-loki/` · `infra/modules/observability-alloy/` |
 | Events → Loki | `infra/modules/observability-events/` |
 | Traces — store / collector | `infra/modules/observability-tempo/` · `infra/modules/observability-otel-collector/` |
-| Metrics durable store (off in dev) | `infra/modules/observability-mimir/` |
+| Metrics durable store (+ cross-cluster `spoke_ingest` edge) | `infra/modules/observability-mimir/` |
+| Metrics spoke collector (preprod) | `infra/modules/observability-prometheus-agent/` · runbook `docs/runbooks/observability-spoke-onboarding.md` |
 | SNS topic | `infra/modules/aws/sns-notifications/` |
 | gp3 StorageClass | `infra/modules/aws/eks-addons/` (`create_default_storageclass`) |
 | Live units (platform) | `infra/live/aws/platform/us-east-1/platform/{observability,loki,alloy,events,tempo,otel-collector,mimir,sns-notifications,eks-addons,gateway-config}/` |
+| Live units (preprod spoke) | `infra/live/aws/preprod/us-east-1/platform/observability-spoke/` |
 | Dashboards (as code) | `infra/modules/observability/dashboards/*.json` |
 | cost_profile toggle | `infra/live/aws/common.hcl` + `_base.hcl`; per-cluster overrides in `…/platform/env.hcl` |
 | Versions | `infra/live/aws/_versions.hcl` (`helm_versions.{kube_prometheus_stack,mimir,loki,alloy,tempo,otel_collector}`) |

@@ -306,12 +306,14 @@ independently-verifiable sub-issue + unit(s); do not batch.
 
 ### Track F — Multi-cluster reach & economics
 
-- **P10 — Onboard preprod spoke (all signals).** Preprod foundations (Kyverno exclude + tenant
-  `allow-metrics-scrape` + `observability` ns) + **authenticated** cross-cluster ingest (Tailscale/TGW,
-  per security #1) + agent buffering. Preprod collectors stamp `X-Scope-OrgID=<team>` + `cluster=preprod`;
-  instrument app-alpha — now largely **free via P7 auto-instrumentation** (metrics + traces) plus structured
-  logs. **Verify:** central Grafana shows preprod `team-alpha` metrics/logs/traces/profiles under tenant
-  `alpha`.
+- **P10 — Onboard preprod spoke.** **Metrics shipped** (issue #150): a kube-prometheus-stack **agent** on
+  preprod (`observability-prometheus-agent`) `remote_write`s to the hub Mimir under tenant `preprod` over the
+  Transit Gateway, through a **Gateway-API-native** write-only HTTPRoute that force-overwrites `X-Scope-OrgID`
+  (no proxy, no shared secret; auth = network isolation, mTLS deferred to P10.x). Grafana gets a
+  `Mimir (preprod)` datasource. **Logs/traces spokes** + per-team `X-Scope-OrgID` (vs the single `preprod`
+  tenant) + scraping app-alpha's environment namespaces (needs `allow-metrics-scrape` on the Crossplane
+  Environment Composition, constraint #2) are follow-ons. **Verified:** central Grafana shows preprod
+  cluster/node/KSM metrics under tenant `preprod`; a forged `platform` header is overwritten to `preprod`.
 - **P11 — Cost (in-cluster + cloud).** **OpenCost** per cluster → cost metrics into Mimir
   (per-team/namespace/cluster + cross-cluster-transfer dashboards); plus **AWS CUR → Athena → Grafana**
   (Athena datasource) for true cloud spend beyond the cluster, attributed by the `Team` tag. **Verify:**

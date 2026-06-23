@@ -75,6 +75,7 @@ locals {
     observability_opencost       = "${local.source_base}/observability-opencost"
     observability_beyla          = "${local.source_base}/observability-beyla"
     observability_otel_operator  = "${local.source_base}/observability-otel-operator"
+    observability_prom_agent     = "${local.source_base}/observability-prometheus-agent"
     crossplane                   = "${local.source_base}/crossplane"
     cloudnative_pg               = "${local.source_base}/cloudnative-pg"
     backstage                    = "${local.source_base}/backstage"
