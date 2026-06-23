@@ -89,6 +89,11 @@ locals {
       secureJsonData = { httpHeaderValue1 = ds.tenant }
     }]
   }
+
+  spoke_ingest_create = local.create && length(var.spoke_ingest.tenants) > 0
+
+  # Pyroscope's push endpoint (the Connect PusherService the Alloy `pyroscope.write` client posts to).
+  pyroscope_push_path = "/push.v1.PusherService"
 }
 
 # ---------------------------------------------------------------------------
@@ -253,5 +258,67 @@ resource "kubernetes_config_map_v1" "grafana_datasource" {
 
   data = {
     "pyroscope-datasource.yaml" = yamlencode(local.grafana_datasource)
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Cross-cluster spoke PROFILE ingest edge (#629) — Gateway-API-native, no proxy. Mirrors the Loki/Tempo/Mimir
+# edges: a write-only HTTPRoute on the shared Cilium Gateway that FORCE-SETS X-Scope-OrgID to the mapped tenant
+# (so a spoke can't spoof another tenant) and routes only the Pyroscope push path. Auth = network isolation.
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_manifest" "spoke_ingest_route" {
+  for_each = local.spoke_ingest_create ? var.spoke_ingest.tenants : {}
+
+  manifest = {
+    apiVersion = "gateway.networking.k8s.io/v1"
+    kind       = "HTTPRoute"
+    metadata = {
+      name      = "${var.helm_release_name}-spoke-${each.key}"
+      namespace = var.namespace
+    }
+    spec = {
+      parentRefs = [{
+        name        = var.spoke_ingest.gateway_name
+        namespace   = var.spoke_ingest.gateway_namespace
+        sectionName = "https"
+      }]
+      hostnames = ["${each.key}-profiles.${var.spoke_ingest.domain}"]
+      rules = [{
+        # Write-only: only the Pyroscope push path is routed; query APIs are never exposed.
+        matches = [{ path = { type = "PathPrefix", value = local.pyroscope_push_path } }]
+        filters = [{
+          type                  = "RequestHeaderModifier"
+          requestHeaderModifier = { set = [{ name = "X-Scope-OrgID", value = each.value }] }
+        }]
+        backendRefs = [{
+          name = var.helm_release_name
+          port = 4040
+        }]
+      }]
+    }
+  }
+}
+
+# Admit the Cilium Gateway Envoy (reserved `ingress` identity) to Pyroscope past the observability ns
+# default-deny — a standard NetworkPolicy `from:` can't match that identity (the documented gotcha).
+resource "kubernetes_manifest" "spoke_ingest_from_gateway" {
+  count = local.spoke_ingest_create ? 1 : 0
+
+  manifest = {
+    apiVersion = "cilium.io/v2"
+    kind       = "CiliumNetworkPolicy"
+    metadata = {
+      name      = "${var.helm_release_name}-spoke-ingest-from-gateway"
+      namespace = var.namespace
+    }
+    spec = {
+      endpointSelector = {
+        matchLabels = {
+          "app.kubernetes.io/name" = var.helm_release_name
+        }
+      }
+      ingress = [{ fromEntities = ["ingress"] }]
+    }
   }
 }

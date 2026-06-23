@@ -140,11 +140,14 @@ datasource. Mirrors the Loki/Tempo/Mimir store pattern. **Config note:** Pyrosco
 Grafana/dskit-lineage (`bucket_name` + `sse.type` + an explicit `endpoint`), *not* Thanos-style.
 
 **Collection** is zero-code: a privileged **Alloy** eBPF DaemonSet (`observability-pyroscope-ebpf` —
-`pyroscope.ebpf` → `pyroscope.write`, like the Beyla agent) CPU-profiles every process on each node and
-labels each by `service_name = <ns>/<pod>` — dogfooding all ~50 platform components. The Tempo datasource's
-`tracesToProfilesV2` links a span → its CPU flame graph (matching span `service.name` → profile
-`service_name`); the end-to-end trace→flame-graph jump fully lights up once a service has *both* signals in
-one tenant (the preprod profiling spoke — profiling the traced alpha apps — is the follow-up).
+`pyroscope.ebpf` → `pyroscope.write`, like the Beyla agent) CPU-profiles every process on each node, labelling
+each by `service_name` = the `app.kubernetes.io/name` label (falling back to namespace) so it **matches
+Beyla's trace `service.name`**. It runs on **both clusters**: the platform profiler writes locally; the
+**preprod profiler** writes to the hub via the same write-only, tenant-overwriting Gateway edge as the other
+spokes (`preprod-profiles.aws.refplat.org`), landing under the `preprod` tenant. The Tempo datasource's
+`tracesToProfilesV2` links a span → its CPU flame graph in the matching Pyroscope tenant (`tempo`→`pyroscope`,
+`tempo-preprod`→`pyroscope-preprod`). The trace→flame-graph jump resolves for any CPU-using traced service
+(the trivial echo demo apps don't burn enough CPU to flame-graph under load).
 
 **Synthetics (P9b)** — the **blackbox-exporter** (`observability-blackbox`) probes the platform HTTPRoute
 endpoints (grafana/argocd/backstage/keycloak) over HTTP/TLS via a `Probe` CR → `probe_success`,

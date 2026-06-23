@@ -99,6 +99,28 @@ variable "extra_tenant_datasources" {
   default     = []
 }
 
+variable "spoke_ingest" {
+  description = <<-EOT
+    Cross-cluster spoke PROFILE ingest via the shared Cilium Gateway (hub-and-spoke, #629). When `tenants` is
+    non-empty this self-routes — per spoke — a write-only HTTPRoute at `<prefix>-profiles.<domain>` that
+    force-SETS `X-Scope-OrgID` to the mapped tenant (overwriting any client value — the cross-tenant spoofing
+    guard) and matches only the Pyroscope push path, plus a CiliumNetworkPolicy admitting the Gateway Envoy's
+    `ingress` identity to Pyroscope. Empty `tenants` disables it. Auth = network isolation.
+  EOT
+  type = object({
+    domain            = string
+    gateway_name      = string
+    gateway_namespace = string
+    tenants           = map(string) # hostname-prefix => X-Scope-OrgID tenant
+  })
+  default = {
+    domain            = ""
+    gateway_name      = ""
+    gateway_namespace = ""
+    tenants           = {}
+  }
+}
+
 variable "tags" {
   description = "AWS tags + sanitized into K8s labels on the datasource ConfigMap."
   type        = map(string)

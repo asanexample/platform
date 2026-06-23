@@ -40,6 +40,17 @@ dependency "observability" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+# Shared Cilium Gateway — Pyroscope self-routes its cross-cluster spoke-ingest HTTPRoute onto it (#629).
+dependency "gateway" {
+  config_path = "../gateway"
+
+  mock_outputs = {
+    gateway_name      = "platform-gateway"
+    gateway_namespace = "default"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
 generate "helm_provider" {
   path      = "helm-provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -91,9 +102,17 @@ inputs = {
   helm_wait          = true
   storage_class      = "gp3"
 
-  # This cluster's tenant. A preprod profiling spoke (extra_tenant_datasources + a write-only Gateway edge)
-  # is a follow-up, mirroring the Loki/Tempo/Mimir spokes.
   default_tenant_id = include.base.locals.env
+
+  # Cross-cluster profile spoke ingest (#629): self-route a write-only, tenant-overwriting HTTPRoute per spoke
+  # + surface each spoke's tenant as a Grafana datasource (mirrors the Loki/Tempo/Mimir spokes).
+  spoke_ingest = {
+    domain            = "aws.refplat.org"
+    gateway_name      = dependency.gateway.outputs.gateway_name
+    gateway_namespace = dependency.gateway.outputs.gateway_namespace
+    tenants           = { preprod = "preprod" }
+  }
+  extra_tenant_datasources = ["preprod"]
 
   tags = include.base.locals.tags
 }
