@@ -20,6 +20,10 @@ locals {
   helm_values = {
     fullnameOverride = var.helm_release_name
 
+    # Multi-tenant (#628): each cluster is a tenant via X-Scope-OrgID, like Loki/Mimir. The hub OTel collector
+    # stamps `default_tenant_id`; spokes are stamped at the Gateway edge. Required on read+write once on.
+    multitenancyEnabled = true
+
     serviceAccount = {
       create = true
       name   = local.sa_name
@@ -85,28 +89,41 @@ locals {
     }
   }
 
-  # ---- Grafana datasource (auto-loaded by the observability Grafana sidecar) ----
+  # ---- Grafana datasources (auto-loaded by the observability Grafana sidecar) ----
+  # The hub's own `default_tenant_id` + one `Tempo (<tenant>)` per spoke (#628) + (optionally) a federated
+  # `Tempo (all clusters)` spanning every tenant. All query the same frontend; only the X-Scope-OrgID differs.
+  all_tenants = concat([var.default_tenant_id], var.extra_tenant_datasources)
+
+  datasource_tenants = concat(
+    [{ name = "Tempo", uid = "tempo", tenant = var.default_tenant_id }],
+    [for t in var.extra_tenant_datasources : { name = "Tempo (${t})", uid = "tempo-${t}", tenant = t }],
+    var.enable_federated_datasource ? [{ name = "Tempo (all clusters)", uid = "tempo-all", tenant = join("|", local.all_tenants) }] : [],
+  )
+
+  # Trace -> logs: jump from a span to its pod's logs in Loki (pairs with the Loki derivedField trace_id ->
+  # tempo). Applied on every Tempo datasource.
+  tempo_traces_to_logs = {
+    datasourceUid      = var.loki_datasource_uid
+    spanStartTimeShift = "-1h"
+    spanEndTimeShift   = "1h"
+    filterByTraceID    = true
+    tags               = [{ key = "service.name", value = "service_name" }]
+  }
+
   grafana_datasource = {
     apiVersion = 1
-    datasources = [{
-      name   = "Tempo"
-      type   = "tempo"
-      uid    = "tempo"
-      access = "proxy"
-      url    = "http://${var.helm_release_name}-query-frontend.${var.namespace}.svc:3200"
-      jsonData = {
-        # Trace -> logs: jump from a span to its pod's logs in Loki (pairs with the Loki datasource's
-        # derivedField trace_id -> tempo, giving bidirectional correlation).
-        tracesToLogsV2 = {
-          datasourceUid      = var.loki_datasource_uid
-          spanStartTimeShift = "-1h"
-          spanEndTimeShift   = "1h"
-          filterByTraceID    = true
-          tags               = [{ key = "service.name", value = "service_name" }]
-        }
-      }
+    datasources = [for ds in local.datasource_tenants : {
+      name           = ds.name
+      type           = "tempo"
+      uid            = ds.uid
+      access         = "proxy"
+      url            = "http://${var.helm_release_name}-query-frontend.${var.namespace}.svc:3200"
+      jsonData       = { httpHeaderName1 = "X-Scope-OrgID", tracesToLogsV2 = local.tempo_traces_to_logs }
+      secureJsonData = { httpHeaderValue1 = ds.tenant }
     }]
   }
+
+  spoke_ingest_create = local.create && length(var.spoke_ingest.tenants) > 0
 }
 
 # ---------------------------------------------------------------------------
@@ -271,5 +288,68 @@ resource "kubernetes_config_map_v1" "grafana_datasource" {
 
   data = {
     "tempo-datasource.yaml" = yamlencode(local.grafana_datasource)
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Cross-cluster spoke TRACE ingest edge (#628) — Gateway-API-native, no proxy. Mirrors the Loki/Mimir edges:
+# a write-only HTTPRoute on the shared Cilium Gateway that FORCE-SETS X-Scope-OrgID to the mapped tenant and
+# routes only the OTLP/HTTP trace path to the Tempo distributor. Auth = network isolation.
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_manifest" "spoke_ingest_route" {
+  for_each = local.spoke_ingest_create ? var.spoke_ingest.tenants : {}
+
+  manifest = {
+    apiVersion = "gateway.networking.k8s.io/v1"
+    kind       = "HTTPRoute"
+    metadata = {
+      name      = "${var.helm_release_name}-spoke-${each.key}"
+      namespace = var.namespace
+    }
+    spec = {
+      parentRefs = [{
+        name        = var.spoke_ingest.gateway_name
+        namespace   = var.spoke_ingest.gateway_namespace
+        sectionName = "https"
+      }]
+      hostnames = ["${each.key}-traces.${var.spoke_ingest.domain}"]
+      rules = [{
+        # Write-only: only the OTLP/HTTP trace push path is routed; query APIs are not exposed cross-cluster.
+        matches = [{ path = { type = "PathPrefix", value = "/v1/traces" } }]
+        filters = [{
+          type                  = "RequestHeaderModifier"
+          requestHeaderModifier = { set = [{ name = "X-Scope-OrgID", value = each.value }] }
+        }]
+        backendRefs = [{
+          name = "${var.helm_release_name}-distributor"
+          port = 4318 # OTLP/HTTP on the Tempo distributor
+        }]
+      }]
+    }
+  }
+}
+
+# Admit the Cilium Gateway Envoy (reserved `ingress` identity) to the Tempo distributor past the
+# observability ns default-deny (the documented gotcha — a standard NetworkPolicy `from:` can't match it).
+resource "kubernetes_manifest" "spoke_ingest_from_gateway" {
+  count = local.spoke_ingest_create ? 1 : 0
+
+  manifest = {
+    apiVersion = "cilium.io/v2"
+    kind       = "CiliumNetworkPolicy"
+    metadata = {
+      name      = "${var.helm_release_name}-spoke-ingest-from-gateway"
+      namespace = var.namespace
+    }
+    spec = {
+      endpointSelector = {
+        matchLabels = {
+          "app.kubernetes.io/name"      = var.helm_release_name
+          "app.kubernetes.io/component" = "distributor"
+        }
+      }
+      ingress = [{ fromEntities = ["ingress"] }]
+    }
   }
 }

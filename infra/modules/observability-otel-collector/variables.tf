@@ -11,9 +11,33 @@ variable "namespace" {
 }
 
 variable "tempo_otlp_endpoint" {
-  description = "Tempo OTLP/gRPC endpoint (host:port, no scheme) the collector exports traces to — the Tempo distributor."
+  description = "Where the collector exports traces. HUB (gRPC): the in-cluster Tempo distributor `host:port` (no scheme). SPOKE (HTTP): the hub Tempo edge base URL `https://<spoke>-traces.<domain>` (the otlphttp exporter appends /v1/traces). Driven by exporter_use_http."
   type        = string
   default     = "tempo-distributor.observability.svc:4317"
+}
+
+variable "tenant_id" {
+  description = "Tenant (X-Scope-OrgID) stamped on the exported traces (Tempo multitenancy, #628). Hub = `platform`. For a spoke it's belt-and-suspenders — the hub Gateway edge force-overwrites it per-hostname."
+  type        = string
+  default     = "platform"
+}
+
+variable "exporter_use_http" {
+  description = "false = OTLP/gRPC exporter to an in-cluster Tempo distributor (hub). true = OTLP/HTTP exporter to the hub Tempo edge over the Gateway (spoke), since the HTTPRoute terminates HTTP."
+  type        = bool
+  default     = false
+}
+
+variable "exporter_tls_insecure" {
+  description = "TLS for the trace exporter. true = plaintext (in-cluster hub→Tempo). false = verify TLS (spoke→edge, public Let's Encrypt cert)."
+  type        = bool
+  default     = true
+}
+
+variable "resource_attributes" {
+  description = "Resource attributes upserted on every span via a `resource` processor — e.g. { cluster = \"preprod\" } on a spoke so the hub can isolate/break-out traces by cluster (#628). Empty = no resource processor."
+  type        = map(string)
+  default     = {}
 }
 
 variable "high_availability" {

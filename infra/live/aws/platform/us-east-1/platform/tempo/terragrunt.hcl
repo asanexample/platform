@@ -42,6 +42,17 @@ dependency "observability" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+# Shared Cilium Gateway — Tempo self-routes its cross-cluster spoke-ingest HTTPRoute onto it (#628).
+dependency "gateway" {
+  config_path = "../gateway"
+
+  mock_outputs = {
+    gateway_name      = "platform-gateway"
+    gateway_namespace = "default"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
 generate "helm_provider" {
   path      = "helm-provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -95,6 +106,17 @@ inputs = {
 
   # Sizing follows cost_profile (dev = 1 replica/component RF1; prod = RF3 + zone-aware + caches).
   high_availability = include.base.locals.high_availability
+
+  # Cross-cluster trace spoke ingest (#628): self-route a write-only, tenant-overwriting OTLP/HTTP HTTPRoute
+  # per spoke + surface each spoke's tenant (and a federated all-clusters view) as Grafana datasources.
+  spoke_ingest = {
+    domain            = "aws.refplat.org"
+    gateway_name      = dependency.gateway.outputs.gateway_name
+    gateway_namespace = dependency.gateway.outputs.gateway_namespace
+    tenants           = { preprod = "preprod" }
+  }
+  extra_tenant_datasources    = ["preprod"]
+  enable_federated_datasource = true
 
   tags = include.base.locals.tags
 }
