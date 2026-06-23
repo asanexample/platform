@@ -78,6 +78,7 @@ locals {
     observability_prom_agent     = "${local.source_base}/observability-prometheus-agent"
     observability_slo            = "${local.source_base}/observability-slo"
     observability_blackbox       = "${local.source_base}/observability-blackbox"
+    observability_k6             = "${local.source_base}/observability-k6"
     crossplane                   = "${local.source_base}/crossplane"
     cloudnative_pg               = "${local.source_base}/cloudnative-pg"
     backstage                    = "${local.source_base}/backstage"
