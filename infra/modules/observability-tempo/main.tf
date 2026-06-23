@@ -146,11 +146,19 @@ locals {
       url    = "http://${var.helm_release_name}-query-frontend.${var.namespace}.svc:3200"
       # serviceMap points at the matching Mimir tenant datasource so Grafana renders the node graph from the
       # generator's `traces_service_graph_*` metrics (tempo->mimir, tempo-preprod->mimir-preprod, …).
-      jsonData = {
+      # tracesToProfilesV2 (P8b) links a span -> its CPU flame graph in the matching Pyroscope tenant datasource
+      # (tempo->pyroscope), matching the span's service.name to the profile's service_name label.
+      jsonData = merge({
         httpHeaderName1 = "X-Scope-OrgID"
         tracesToLogsV2  = local.tempo_traces_to_logs
         serviceMap      = { datasourceUid = replace(ds.uid, "tempo", "mimir") }
-      }
+        }, var.enable_traces_to_profiles ? {
+        tracesToProfilesV2 = {
+          datasourceUid = replace(ds.uid, "tempo", "pyroscope")
+          profileTypeId = "process_cpu:cpu:nanoseconds:cpu:nanoseconds"
+          tags          = [{ key = "service.name", value = "service_name" }]
+        }
+      } : {})
       secureJsonData = { httpHeaderValue1 = ds.tenant }
     }]
   }

@@ -118,6 +118,9 @@ inputs = {
   extra_tenant_datasources    = ["preprod"]
   enable_federated_datasource = true
 
+  # Trace -> profile link (P8b): a span jumps to its CPU flame graph in Pyroscope. On when the profiles store is.
+  enable_traces_to_profiles = include.base.locals.enable_pyroscope
+
   # APM (P6): metrics-generator derives a service graph + RED span-metrics from traces into Mimir, per-tenant.
   enable_metrics_generator = true
 

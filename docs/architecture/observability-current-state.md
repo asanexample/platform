@@ -137,9 +137,14 @@ provisioned as code. `slo_engine` is the seam for a future Pyrra/Grafana-SLO swa
 single-binary StatefulSet (metastore + segment-writer embedded), S3-backed (SSE-S3 + EKS Pod Identity, no
 static keys), multi-tenant by `X-Scope-OrgID` (each cluster a tenant), with a `Pyroscope (<tenant>)` Grafana
 datasource. Mirrors the Loki/Tempo/Mimir store pattern. **Config note:** Pyroscope's S3 config is
-Grafana/dskit-lineage (`bucket_name` + `sse.type` + an explicit `endpoint`), *not* Thanos-style. Profile
-collection (Alloy eBPF) + the Tempo `tracesToProfilesV2` span→flame-graph link, and a preprod profiling spoke,
-are follow-ups.
+Grafana/dskit-lineage (`bucket_name` + `sse.type` + an explicit `endpoint`), *not* Thanos-style.
+
+**Collection** is zero-code: a privileged **Alloy** eBPF DaemonSet (`observability-pyroscope-ebpf` —
+`pyroscope.ebpf` → `pyroscope.write`, like the Beyla agent) CPU-profiles every process on each node and
+labels each by `service_name = <ns>/<pod>` — dogfooding all ~50 platform components. The Tempo datasource's
+`tracesToProfilesV2` links a span → its CPU flame graph (matching span `service.name` → profile
+`service_name`); the end-to-end trace→flame-graph jump fully lights up once a service has *both* signals in
+one tenant (the preprod profiling spoke — profiling the traced alpha apps — is the follow-up).
 
 **Synthetics (P9b)** — the **blackbox-exporter** (`observability-blackbox`) probes the platform HTTPRoute
 endpoints (grafana/argocd/backstage/keycloak) over HTTP/TLS via a `Probe` CR → `probe_success`,

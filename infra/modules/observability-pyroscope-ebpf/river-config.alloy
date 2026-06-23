@@ -1,0 +1,37 @@
+// Zero-code continuous profiling (#102 P8b). A privileged Alloy DaemonSet attaches eBPF on each node and
+// CPU-profiles the running processes, grouping samples by the discovered pod (service_name = ns/pod) and
+// pushing to Pyroscope. No app changes — dogfoods every platform component.
+
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+discovery.kubernetes "pods" {
+  role = "pod"
+}
+
+// Label each profile with service_name = <namespace>/<pod> so flame graphs are grouped sensibly in Grafana.
+discovery.relabel "profiles" {
+  targets = discovery.kubernetes.pods.targets
+
+  rule {
+    source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
+    separator     = "/"
+    target_label  = "service_name"
+  }
+}
+
+pyroscope.ebpf "platform" {
+  forward_to = [pyroscope.write.default.receiver]
+  targets    = discovery.relabel.profiles.output
+}
+
+pyroscope.write "default" {
+  endpoint {
+    url = "${pyroscope_url}"
+    headers = {
+      "X-Scope-OrgID" = "${tenant_id}",
+    }
+  }
+}
