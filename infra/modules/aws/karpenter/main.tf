@@ -381,10 +381,11 @@ resource "helm_release" "nodepool" {
     # BYOCNI: pods must not land before Cilium is ready; Cilium removes this taint (D5).
     startupTaintKey = "node.cilium.io/agent-not-ready"
     maxPods         = 110
-    # Drop `Team` — the org `DenyTeamTagTampering` SCP forbids non-exempt roles (Karpenter included) from
-    # setting it on ec2:CreateTags, and Karpenter's nodes are shared infra, not team-scoped resources. (The
-    # alternative is exempting the Karpenter role in the SCP — an org/mgmt change; deliberately avoided here.)
-    tags = { for k, v in var.tags : k => v if k != "Team" }
+    # Full governance tags on provisioned nodes. The Karpenter controller role is exempt from the org tagging
+    # SCPs (DenyTeamTagTampering on ec2:CreateTags + require-tagging on ec2:RunInstances) — added to
+    # `exempt_roles` alongside the crossplane provisioners, since like them Karpenter is a trusted, platform-
+    # managed provisioner that tags resources via the launch template, not the RunInstances request.
+    tags = var.tags
   })]
 
   depends_on = [helm_release.controller]

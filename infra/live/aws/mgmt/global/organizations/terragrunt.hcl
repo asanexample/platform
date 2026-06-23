@@ -20,7 +20,10 @@ inputs = {
   # crossplane-ecr-provisioner (platform) Team-tags tenant ECR repos; crossplane-provisioner-* (per workload
   # cluster) Team-tags the Pod-team IAM roles it creates — both need the DenyTeamTagTampering exemption (BACK
   # stack P2b / ADR-048). A wildcard covers preprod now + prod later.
-  exempt_roles = ["OrganizationAccountAccessRole", "github-actions-terratest", "PlatformDeployer", "crossplane-ecr-provisioner", "crossplane-provisioner-*"]
+  # `*-karpenter-*`: the Karpenter node-provisioner controller (ADR-078). Like the EKS/ASG service roles and the
+  # crossplane provisioners, it must set governance tags on the resources it creates (and tags via the launch
+  # template, not the RunInstances request) — so it's exempt from DenyTeamTagTampering + require-tagging.
+  exempt_roles = ["OrganizationAccountAccessRole", "github-actions-terratest", "PlatformDeployer", "crossplane-ecr-provisioner", "crossplane-provisioner-*", "*-karpenter-*"]
 
   organizational_units = {
     "Platform"            = { parent = null }
