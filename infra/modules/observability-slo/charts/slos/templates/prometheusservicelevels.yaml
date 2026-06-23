@@ -1,0 +1,40 @@
+{{- /*
+One Sloth PrometheusServiceLevel per SLO in .Values.slos. Sloth's controller watches these and generates
+the SLI recording rules + multi-window burn-rate alert rules as PrometheusRule objects, which the hub
+Prometheus discovers (ruleSelectorNilUsesHelmValues=false) and evaluates; alerts route via the P4
+Alertmanager by their severity label (pageAlert=critical, ticketAlert=warning).
+*/ -}}
+{{- range .Values.slos }}
+---
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Values.namespace }}
+spec:
+  service: {{ .service }}
+  {{- with .labels }}
+  labels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  slos:
+    - name: {{ .slo_name }}
+      objective: {{ .objective }}
+      description: {{ .description | quote }}
+      sli:
+        events:
+          errorQuery: {{ .error_query | quote }}
+          totalQuery: {{ .total_query | quote }}
+      alerting:
+        name: {{ .alert_name }}
+        {{- with .alert_labels }}
+        labels:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        pageAlert:
+          labels:
+            severity: {{ .page_severity | default "critical" }}
+        ticketAlert:
+          labels:
+            severity: {{ .ticket_severity | default "warning" }}
+{{- end }}
