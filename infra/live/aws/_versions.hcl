@@ -19,6 +19,7 @@ locals {
     eks            = "${local.source_base}/aws//eks"
     eks_addons     = "${local.source_base}/aws//eks-addons"
     eks_node_group = "${local.source_base}/aws//eks-node-group"
+    karpenter      = "${local.source_base}/aws//karpenter"
     ssm_bastion    = "${local.source_base}/aws//ssm-bastion"
 
     # IAM
@@ -114,6 +115,7 @@ locals {
     sloth                 = "0.16.0"  # slok/sloth — P9 SLO engine (burn-rate rules from PrometheusServiceLevel)
     blackbox_exporter     = "11.13.0" # prometheus-community/prometheus-blackbox-exporter — P9b synthetics (app v0.28.0)
     pyroscope             = "2.1.0"   # grafana/pyroscope — P8 continuous profiling store (LGTM+P)
+    karpenter             = "1.13.0"  # Karpenter node autoscaling (ADR-078) — chart + karpenter-crd, OCI public.ecr.aws
     crossplane            = "2.3.1"   # Crossplane v2 (ADR-046)
     cloudnative_pg        = "0.28.2"  # CNPG operator chart (app v1.29.1) — Backstage DB (ADR-051)
     backstage             = "2.8.1"   # official backstage Helm chart (points at our platform/backstage image)
