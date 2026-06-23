@@ -45,8 +45,8 @@ hardening — admin login for now). Full roadmap in the plan.
 The design is **hub-and-spoke**: one central hub (the **platform** cluster) runs Grafana + the durable
 stores; spoke clusters run lightweight collectors that `remote_write` to the hub over the Transit Gateway.
 The hub monitors itself (its own Prometheus → the hub Mimir, tenant `platform`), and **preprod** is the first
-**metrics spoke** (P10): a kube-prometheus-stack agent on preprod ships to the hub Mimir under tenant
-`preprod`. Logs/traces spokes are the next step.
+spoke for **metrics** (P10 — a kube-prometheus-stack agent → hub Mimir, tenant `preprod`) and **logs** (#627 —
+an Alloy DaemonSet → hub Loki, tenant `preprod`, stamped `cluster=preprod`). Traces are the next spoke.
 
 **Cross-cluster ingest edge (Gateway-API-native, no proxy).** The hub Mimir is `ClusterIP`-only; spokes reach
 it through a write-only **HTTPRoute** on the shared Cilium Gateway (`<spoke>-mimir.aws.refplat.org`,
@@ -114,8 +114,9 @@ off; `prod` scales it via `high_availability`); durable blocks on **S3 via Pod I
 Each cluster is a separate Mimir tenant (`platform`, `preprod`), so by default one datasource = one cluster
 (strong read-isolation). For a **platform-admin overview across clusters**, Mimir **tenant federation** is
 enabled (`tenant_federation.enabled`) and a **`Mimir (all clusters)`** Grafana datasource queries every tenant
-at once (`X-Scope-OrgID: platform|preprod`). Write-isolation is unaffected — the Gateway edge still
-force-stamps a single tenant per spoke. The **Platform Health** dashboard defaults to this datasource and has
+at once (`X-Scope-OrgID: platform|preprod`). The same applies to logs: a **`Loki (all clusters)`** datasource
+federates across tenants (Loki does multi-tenant queries via the pipe-separated header natively — no server
+flag). Write-isolation is unaffected — each store's Gateway edge still force-stamps a single tenant per spoke. The **Platform Health** dashboard defaults to this datasource and has
 a `cluster` multi-select, so panels break out per cluster. Per-team scoping of the federated lane is **P13**
 (#590); cross-cluster **logs/traces** federation follows their spokes (#627/#628). Umbrella: #629.
 

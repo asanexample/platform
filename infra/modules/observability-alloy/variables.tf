@@ -22,6 +22,12 @@ variable "tenant_id" {
   default     = "platform"
 }
 
+variable "external_labels" {
+  description = "Static labels stamped on every log stream (Alloy loki.write external_labels). For a spoke, set `{ cluster = \"preprod\" }` so the hub can isolate/break-out logs by cluster (#627), matching the metrics `externalLabels.cluster`. Empty = none."
+  type        = map(string)
+  default     = {}
+}
+
 # ---------------------------------------------------------------------------
 # Helm
 # ---------------------------------------------------------------------------

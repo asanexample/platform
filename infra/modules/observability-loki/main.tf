@@ -114,28 +114,39 @@ locals {
     }
   }
 
-  # ---- Grafana datasource (auto-loaded by the observability Grafana sidecar) ----
+  # ---- Grafana datasources (auto-loaded by the observability Grafana sidecar) ----
+  # The hub's own `default_tenant_id` + one `Loki (<tenant>)` per spoke (#627) + (optionally) a federated
+  # `Loki (all clusters)` spanning every tenant (#626/#629). All query the same gateway; only the header differs.
+  all_tenants = concat([var.default_tenant_id], var.extra_tenant_datasources)
+
+  datasource_tenants = concat(
+    [{ name = "Loki", uid = "loki", tenant = var.default_tenant_id }],
+    [for t in var.extra_tenant_datasources : { name = "Loki (${t})", uid = "loki-${t}", tenant = t }],
+    var.enable_federated_datasource ? [{ name = "Loki (all clusters)", uid = "loki-all", tenant = join("|", local.all_tenants) }] : [],
+  )
+
+  # A trace_id in a log line links straight to the Tempo trace (trace→logs↔logs→trace) — on every datasource.
+  loki_derived_fields = [{
+    name          = "trace_id"
+    matcherRegex  = "trace_?[iI][dD]\"?[:=]\\s*\"?([0-9a-fA-F]+)"
+    url           = "$${__value.raw}"
+    datasourceUid = "tempo"
+  }]
+
   grafana_datasource = {
     apiVersion = 1
-    datasources = [{
-      name   = "Loki"
-      type   = "loki"
-      uid    = "loki"
-      access = "proxy"
-      url    = "http://${var.helm_release_name}-gateway.${var.namespace}.svc"
-      jsonData = {
-        httpHeaderName1 = "X-Scope-OrgID"
-        # A trace_id in a log line links straight to the Tempo trace (trace→logs↔logs→trace).
-        derivedFields = [{
-          name          = "trace_id"
-          matcherRegex  = "trace_?[iI][dD]\"?[:=]\\s*\"?([0-9a-fA-F]+)"
-          url           = "$${__value.raw}"
-          datasourceUid = "tempo"
-        }]
-      }
-      secureJsonData = { httpHeaderValue1 = var.default_tenant_id }
+    datasources = [for ds in local.datasource_tenants : {
+      name           = ds.name
+      type           = "loki"
+      uid            = ds.uid
+      access         = "proxy"
+      url            = "http://${var.helm_release_name}-gateway.${var.namespace}.svc"
+      jsonData       = { httpHeaderName1 = "X-Scope-OrgID", derivedFields = local.loki_derived_fields }
+      secureJsonData = { httpHeaderValue1 = ds.tenant }
     }]
   }
+
+  spoke_ingest_create = local.create && length(var.spoke_ingest.tenants) > 0
 }
 
 # ---------------------------------------------------------------------------
@@ -300,5 +311,68 @@ resource "kubernetes_config_map_v1" "grafana_datasource" {
 
   data = {
     "loki-datasource.yaml" = yamlencode(local.grafana_datasource)
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Cross-cluster spoke LOG ingest edge (#627) — Gateway-API-native, no proxy. Mirrors the Mimir edge: a
+# write-only HTTPRoute on the shared Cilium Gateway that FORCE-SETS X-Scope-OrgID to the mapped tenant
+# (so a spoke can't spoof another tenant) and routes only the Loki push path. Auth = network isolation.
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_manifest" "spoke_ingest_route" {
+  for_each = local.spoke_ingest_create ? var.spoke_ingest.tenants : {}
+
+  manifest = {
+    apiVersion = "gateway.networking.k8s.io/v1"
+    kind       = "HTTPRoute"
+    metadata = {
+      name      = "${var.helm_release_name}-spoke-${each.key}"
+      namespace = var.namespace
+    }
+    spec = {
+      parentRefs = [{
+        name        = var.spoke_ingest.gateway_name
+        namespace   = var.spoke_ingest.gateway_namespace
+        sectionName = "https"
+      }]
+      hostnames = ["${each.key}-logs.${var.spoke_ingest.domain}"]
+      rules = [{
+        # Write-only: only the Loki push path is routed; everything else (incl. query APIs) 404s.
+        matches = [{ path = { type = "PathPrefix", value = "/loki/api/v1/push" } }]
+        filters = [{
+          type                  = "RequestHeaderModifier"
+          requestHeaderModifier = { set = [{ name = "X-Scope-OrgID", value = each.value }] }
+        }]
+        backendRefs = [{
+          name = "${var.helm_release_name}-gateway"
+          port = 80
+        }]
+      }]
+    }
+  }
+}
+
+# Admit the Cilium Gateway Envoy (reserved `ingress` identity) to the Loki gateway past the observability
+# ns default-deny — a standard NetworkPolicy `from:` can't match that identity (the documented gotcha).
+resource "kubernetes_manifest" "spoke_ingest_from_gateway" {
+  count = local.spoke_ingest_create ? 1 : 0
+
+  manifest = {
+    apiVersion = "cilium.io/v2"
+    kind       = "CiliumNetworkPolicy"
+    metadata = {
+      name      = "${var.helm_release_name}-spoke-ingest-from-gateway"
+      namespace = var.namespace
+    }
+    spec = {
+      endpointSelector = {
+        matchLabels = {
+          "app.kubernetes.io/name"      = var.helm_release_name
+          "app.kubernetes.io/component" = "gateway"
+        }
+      }
+      ingress = [{ fromEntities = ["ingress"] }]
+    }
   }
 }
