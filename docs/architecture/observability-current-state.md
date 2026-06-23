@@ -131,6 +131,16 @@ the SLO metrics (`slo:sli_error:*`, `slo:current_burn_rate:ratio`, …) remote-w
 **API server request availability** (99.9%). The grafana.com **"High level Sloth SLOs"** dashboard (14643) is
 provisioned as code. `slo_engine` is the seam for a future Pyrra/Grafana-SLO swap.
 
+### Continuous profiling (P8)
+
+**Pyroscope** (`observability-pyroscope`) is the profiles store — the **P** in LGTM+P. Monolithic
+single-binary StatefulSet (metastore + segment-writer embedded), S3-backed (SSE-S3 + EKS Pod Identity, no
+static keys), multi-tenant by `X-Scope-OrgID` (each cluster a tenant), with a `Pyroscope (<tenant>)` Grafana
+datasource. Mirrors the Loki/Tempo/Mimir store pattern. **Config note:** Pyroscope's S3 config is
+Grafana/dskit-lineage (`bucket_name` + `sse.type` + an explicit `endpoint`), *not* Thanos-style. Profile
+collection (Alloy eBPF) + the Tempo `tracesToProfilesV2` span→flame-graph link, and a preprod profiling spoke,
+are follow-ups.
+
 **Synthetics (P9b)** — the **blackbox-exporter** (`observability-blackbox`) probes the platform HTTPRoute
 endpoints (grafana/argocd/backstage/keycloak) over HTTP/TLS via a `Probe` CR → `probe_success`,
 `probe_ssl_earliest_cert_expiry`, latency in Mimir. To dodge the internal-NLB hairpin (a pod can't reliably
