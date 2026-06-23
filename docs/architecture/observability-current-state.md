@@ -131,6 +131,24 @@ the SLO metrics (`slo:sli_error:*`, `slo:current_burn_rate:ratio`, …) remote-w
 **API server request availability** (99.9%). The grafana.com **"High level Sloth SLOs"** dashboard (14643) is
 provisioned as code. `slo_engine` is the seam for a future Pyrra/Grafana-SLO swap.
 
+### Continuous profiling (P8)
+
+**Pyroscope** (`observability-pyroscope`) is the profiles store — the **P** in LGTM+P. Monolithic
+single-binary StatefulSet (metastore + segment-writer embedded), S3-backed (SSE-S3 + EKS Pod Identity, no
+static keys), multi-tenant by `X-Scope-OrgID` (each cluster a tenant), with a `Pyroscope (<tenant>)` Grafana
+datasource. Mirrors the Loki/Tempo/Mimir store pattern. **Config note:** Pyroscope's S3 config is
+Grafana/dskit-lineage (`bucket_name` + `sse.type` + an explicit `endpoint`), *not* Thanos-style.
+
+**Collection** is zero-code: a privileged **Alloy** eBPF DaemonSet (`observability-pyroscope-ebpf` —
+`pyroscope.ebpf` → `pyroscope.write`, like the Beyla agent) CPU-profiles every process on each node, labelling
+each by `service_name` = the `app.kubernetes.io/name` label (falling back to namespace) so it **matches
+Beyla's trace `service.name`**. It runs on **both clusters**: the platform profiler writes locally; the
+**preprod profiler** writes to the hub via the same write-only, tenant-overwriting Gateway edge as the other
+spokes (`preprod-profiles.aws.refplat.org`), landing under the `preprod` tenant. The Tempo datasource's
+`tracesToProfilesV2` links a span → its CPU flame graph in the matching Pyroscope tenant (`tempo`→`pyroscope`,
+`tempo-preprod`→`pyroscope-preprod`). The trace→flame-graph jump resolves for any CPU-using traced service
+(the trivial echo demo apps don't burn enough CPU to flame-graph under load).
+
 **Synthetics (P9b)** — the **blackbox-exporter** (`observability-blackbox`) probes the platform HTTPRoute
 endpoints (grafana/argocd/backstage/keycloak) over HTTP/TLS via a `Probe` CR → `probe_success`,
 `probe_ssl_earliest_cert_expiry`, latency in Mimir. To dodge the internal-NLB hairpin (a pod can't reliably

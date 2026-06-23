@@ -74,6 +74,15 @@ misconfigurations:
       the Tempo Pod Identity role free of kms perms (an SSE-KMS bucket would require
       kms:GenerateDataKey*/Decrypt or writes fail). CMK is the regulated-tier upgrade (#118).
 
+  - id: AWS-0132
+    paths:
+      - "observability-pyroscope/main.tf"
+    statement: >-
+      The Pyroscope profiles bucket uses SSE-S3 (AES256), not a CMK — same rationale as the
+      Loki/Mimir/Tempo buckets (AWS-0132 above): AES256 fits a high-churn profile store and keeps
+      the Pyroscope Pod Identity role free of kms perms (an SSE-KMS bucket would require
+      kms:GenerateDataKey*/Decrypt or writes fail). CMK is the regulated-tier upgrade (#118).
+
   - id: AWS-0136
     paths:
       - "aws/sns-notifications/main.tf"

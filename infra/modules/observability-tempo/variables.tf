@@ -73,6 +73,12 @@ variable "enable_federated_datasource" {
   default     = false
 }
 
+variable "enable_traces_to_profiles" {
+  description = "Add the `tracesToProfilesV2` link to each Tempo datasource (P8b) — a span jumps to its CPU flame graph in the matching Pyroscope tenant datasource (`tempo`->`pyroscope`). Set when Pyroscope (the profiles store) is deployed."
+  type        = bool
+  default     = false
+}
+
 variable "spoke_ingest" {
   description = <<-EOT
     Cross-cluster spoke TRACE ingest via the shared Cilium Gateway (#628). When `tenants` is non-empty this

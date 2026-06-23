@@ -8,7 +8,7 @@ include "root" {
 }
 
 terraform {
-  source = include.base.locals.module_source.observability_tempo
+  source = include.base.locals.module_source.observability_pyroscope
 }
 
 dependency "eks" {
@@ -18,8 +18,6 @@ dependency "eks" {
     cluster_id                    = "mock-cluster"
     cluster_endpoint              = "https://mock-endpoint"
     cluster_certificate_authority = "bW9jaw=="
-    oidc_provider_arn             = "arn:aws:iam::000000000000:oidc-provider/mock"
-    oidc_provider_url             = "oidc.eks.mock.amazonaws.com/id/mock"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
@@ -31,7 +29,7 @@ dependency "node_groups" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-# Tempo deploys into the observability namespace (shares Grafana's datasource sidecar + the
+# Pyroscope deploys into the observability namespace (shares Grafana's datasource sidecar + the
 # default-deny NetworkPolicy isolation). Depend on observability so the namespace exists first.
 dependency "observability" {
   config_path = "../observability"
@@ -42,7 +40,7 @@ dependency "observability" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-# Shared Cilium Gateway — Tempo self-routes its cross-cluster spoke-ingest HTTPRoute onto it (#628).
+# Shared Cilium Gateway — Pyroscope self-routes its cross-cluster spoke-ingest HTTPRoute onto it (#629).
 dependency "gateway" {
   config_path = "../gateway"
 
@@ -90,39 +88,31 @@ generate "kubernetes_provider" {
 }
 
 inputs = {
-  # Per-signal cost toggle (flip enable_tempo). create=false applies as a no-op.
-  create       = include.base.locals.enable_tempo
+  # Cost-profile toggle: off in dev. enable_pyroscope=true on platform (env.hcl). create=false applies as a no-op.
+  create       = include.base.locals.enable_pyroscope
   cluster_name = dependency.eks.outputs.cluster_id
   aws_region   = include.base.locals.region
 
   namespace = dependency.observability.outputs.namespace
 
-  # Identity = EKS Pod Identity (ADR-047): module creates the role + association from cluster_name +
-  # namespace + the chart SA. trace->logs link targets the Loki datasource (uid "loki").
+  # Identity = EKS Pod Identity (ADR-047): the module creates the role + association from cluster_name +
+  # namespace + the chart SA.
 
-  helm_chart_version = include.base.locals.helm_versions.tempo
+  helm_chart_version = include.base.locals.helm_versions.pyroscope
   helm_wait          = true
   storage_class      = "gp3"
 
-  # Sizing follows cost_profile (dev = 1 replica/component RF1; prod = RF3 + zone-aware + caches).
-  high_availability = include.base.locals.high_availability
+  default_tenant_id = include.base.locals.env
 
-  # Cross-cluster trace spoke ingest (#628): self-route a write-only, tenant-overwriting OTLP/HTTP HTTPRoute
-  # per spoke + surface each spoke's tenant (and a federated all-clusters view) as Grafana datasources.
+  # Cross-cluster profile spoke ingest (#629): self-route a write-only, tenant-overwriting HTTPRoute per spoke
+  # + surface each spoke's tenant as a Grafana datasource (mirrors the Loki/Tempo/Mimir spokes).
   spoke_ingest = {
     domain            = "aws.refplat.org"
     gateway_name      = dependency.gateway.outputs.gateway_name
     gateway_namespace = dependency.gateway.outputs.gateway_namespace
     tenants           = { preprod = "preprod" }
   }
-  extra_tenant_datasources    = ["preprod"]
-  enable_federated_datasource = true
-
-  # Trace -> profile link (P8b): a span jumps to its CPU flame graph in Pyroscope. On when the profiles store is.
-  enable_traces_to_profiles = include.base.locals.enable_pyroscope
-
-  # APM (P6): metrics-generator derives a service graph + RED span-metrics from traces into Mimir, per-tenant.
-  enable_metrics_generator = true
+  extra_tenant_datasources = ["preprod"]
 
   tags = include.base.locals.tags
 }
