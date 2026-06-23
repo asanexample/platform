@@ -9,6 +9,9 @@ locals {
     if length(replace(lower(k), "/[^a-z0-9_.-]/", "_")) <= 63 && length(replace(lower(v), "/[^a-z0-9_.-]/", "_")) <= 63
   }
 
+  # Render external_labels into River syntax (a block-level arg on loki.write). Empty => omitted entirely.
+  external_labels_block = length(var.external_labels) > 0 ? "external_labels = { ${join(", ", [for k, v in var.external_labels : "\"${k}\" = \"${v}\""])} }" : ""
+
   # ---- Alloy River config: tail this node's pod logs -> Loki (tenant _platform) ----
   # DaemonSet + file-tailing is the node-local pattern (each Alloy reads only its own node's
   # /var/log/pods, so no duplicate ingestion). discovery.kubernetes provides pod metadata only
@@ -62,12 +65,13 @@ locals {
       forward_to = [loki.write.platform.receiver]
     }
 
-    // Tenant stamped here = _platform's hub logs. Per-team derivation from the namespace is P10.
+    // Tenant stamped here (overwritten at the hub edge for spokes). external_labels stamp e.g. cluster=<spoke>.
     loki.write "platform" {
       endpoint {
         url       = "${var.loki_push_url}"
         tenant_id = "${var.tenant_id}"
       }
+      ${local.external_labels_block}
     }
   RIVER
 

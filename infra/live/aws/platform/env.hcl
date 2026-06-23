@@ -10,6 +10,7 @@ locals {
 
   # Cost-profile override: run Loki (logs — #102 P3a) on the platform dev cluster in cost-effective
   # single-binary mode, even though cost_profile=dev defaults durable stores off. (preprod stays off.)
+  enable_mimir           = true # Durable multi-tenant metrics store (P2). The hub-and-spoke store: preprod remote_writes here (P10).
   enable_loki            = true
   enable_log_pipeline    = true # Alloy DaemonSet → Loki (P3a). Pairs with enable_loki on the dev cluster.
   enable_tempo           = true # Tempo traces store (P3b).

@@ -8,7 +8,7 @@ include "root" {
 }
 
 terraform {
-  source = include.base.locals.module_source.observability_tempo
+  source = include.base.locals.module_source.observability_prom_agent
 }
 
 dependency "eks" {
@@ -18,8 +18,6 @@ dependency "eks" {
     cluster_id                    = "mock-cluster"
     cluster_endpoint              = "https://mock-endpoint"
     cluster_certificate_authority = "bW9jaw=="
-    oidc_provider_arn             = "arn:aws:iam::000000000000:oidc-provider/mock"
-    oidc_provider_url             = "oidc.eks.mock.amazonaws.com/id/mock"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
@@ -31,25 +29,12 @@ dependency "node_groups" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-# Tempo deploys into the observability namespace (shares Grafana's datasource sidecar + the
-# default-deny NetworkPolicy isolation). Depend on observability so the namespace exists first.
-dependency "observability" {
-  config_path = "../observability"
+# The agent ships over Transit Gateway to the platform hub (private). Order after the TGW spoke attachment
+# so the cross-VPC route to the hub VPC exists before remote_write starts.
+dependency "transit_gateway" {
+  config_path = "../transit-gateway"
 
-  mock_outputs = {
-    namespace = "observability"
-  }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
-}
-
-# Shared Cilium Gateway — Tempo self-routes its cross-cluster spoke-ingest HTTPRoute onto it (#628).
-dependency "gateway" {
-  config_path = "../gateway"
-
-  mock_outputs = {
-    gateway_name      = "platform-gateway"
-    gateway_namespace = "default"
-  }
+  mock_outputs                            = {}
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
@@ -90,33 +75,24 @@ generate "kubernetes_provider" {
 }
 
 inputs = {
-  # Per-signal cost toggle (flip enable_tempo). create=false applies as a no-op.
-  create       = include.base.locals.enable_tempo
+  create       = true
   cluster_name = dependency.eks.outputs.cluster_id
   aws_region   = include.base.locals.region
 
-  namespace = dependency.observability.outputs.namespace
+  # Stamped on every series so the hub isolates preprod under its tenant (`up{cluster="preprod"}`).
+  cluster_label = "preprod"
 
-  # Identity = EKS Pod Identity (ADR-047): module creates the role + association from cluster_name +
-  # namespace + the chart SA. trace->logs link targets the Loki datasource (uid "loki").
+  # Ship to the platform hub's Mimir spoke-ingest edge. The hub Gateway force-sets X-Scope-OrgID=preprod
+  # per-hostname (write-only), so no tenant header is sent from here. Reached privately over the TGW.
+  remote_write_url = "https://preprod-mimir.aws.refplat.org/api/v1/push"
 
-  helm_chart_version = include.base.locals.helm_versions.tempo
+  helm_chart_version = include.base.locals.helm_versions.kube_prometheus_stack
   helm_wait          = true
-  storage_class      = "gp3"
 
-  # Sizing follows cost_profile (dev = 1 replica/component RF1; prod = RF3 + zone-aware + caches).
+  # Sizing follows cost_profile (dev = single replica; prod = HA).
   high_availability = include.base.locals.high_availability
-
-  # Cross-cluster trace spoke ingest (#628): self-route a write-only, tenant-overwriting OTLP/HTTP HTTPRoute
-  # per spoke + surface each spoke's tenant (and a federated all-clusters view) as Grafana datasources.
-  spoke_ingest = {
-    domain            = "aws.refplat.org"
-    gateway_name      = dependency.gateway.outputs.gateway_name
-    gateway_namespace = dependency.gateway.outputs.gateway_namespace
-    tenants           = { preprod = "preprod" }
-  }
-  extra_tenant_datasources    = ["preprod"]
-  enable_federated_datasource = true
+  # WAL on emptyDir (module default): preprod has no gp3 StorageClass, and an ephemeral WAL is fine for a
+  # lightweight spoke (the agent re-scrapes on restart). Set to an existing class for a durable WAL.
 
   tags = include.base.locals.tags
 }

@@ -121,6 +121,49 @@ variable "datasource_is_default" {
   default     = false
 }
 
+variable "extra_tenant_datasources" {
+  description = "Additional X-Scope-OrgID tenants to provision as Grafana datasources beyond default_tenant_id — e.g. [\"preprod\"] for the preprod spoke (P10). Each renders a `Mimir (<tenant>)` datasource querying the in-cluster gateway with that tenant header. Read path only (Grafana is in-cluster); never the default."
+  type        = list(string)
+  default     = []
+}
+
+variable "enable_federated_datasource" {
+  description = "Enable Mimir read-path tenant federation (#626) and provision a single `Mimir (all clusters)` datasource that queries ALL tenants at once (`X-Scope-OrgID: <default>|<extras…>`), so one panel can span clusters. Write-isolation is unaffected (each spoke still writes only its own tenant at the Gateway edge). This is the PLATFORM-ADMIN overview lane — per-team scoping is P13 (#590). Off by default."
+  type        = bool
+  default     = false
+}
+
+# ---------------------------------------------------------------------------
+# Cross-cluster spoke ingest (P10) — Gateway-API-native, no proxy
+# ---------------------------------------------------------------------------
+
+variable "spoke_ingest" {
+  description = <<-EOT
+    Cross-cluster spoke metrics ingest via the shared Cilium Gateway (hub-and-spoke, ADR-044 / #102 P10).
+    When `tenants` is non-empty this self-routes — for each spoke — a write-only HTTPRoute on the shared
+    Gateway at `<prefix>-mimir.<domain>` that:
+      • force-SETS `X-Scope-OrgID` to the mapped tenant, overwriting any client value (the cross-tenant
+        spoofing guard — a spoke physically cannot write to another tenant), and
+      • matches only `/api/v1/push` (write-only: no query path is exposed cross-cluster),
+    plus a CiliumNetworkPolicy admitting the Gateway Envoy's reserved `ingress` identity to the Mimir gateway
+    (the observability ns is default-deny). `domain`/`gateway_name`/`gateway_namespace` identify the shared
+    Gateway. Empty `tenants` disables the edge. Auth = network isolation (internal NLB + TGW); mTLS is the
+    documented P10.x hardening follow-up.
+  EOT
+  type = object({
+    domain            = string
+    gateway_name      = string
+    gateway_namespace = string
+    tenants           = map(string) # hostname-prefix => X-Scope-OrgID tenant
+  })
+  default = {
+    domain            = ""
+    gateway_name      = ""
+    gateway_namespace = ""
+    tenants           = {}
+  }
+}
+
 variable "max_global_series_per_user" {
   description = "Per-tenant active series cap (cardinality / memory / cost control)."
   type        = number

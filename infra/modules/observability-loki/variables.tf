@@ -99,6 +99,40 @@ variable "default_tenant_id" {
   default     = "platform"
 }
 
+variable "extra_tenant_datasources" {
+  description = "Additional X-Scope-OrgID tenants to provision as Grafana datasources beyond default_tenant_id — e.g. [\"preprod\"] for the preprod logs spoke (#627). Each renders a `Loki (<tenant>)` datasource."
+  type        = list(string)
+  default     = []
+}
+
+variable "enable_federated_datasource" {
+  description = "Provision a `Loki (all clusters)` datasource that queries ALL tenants at once (`X-Scope-OrgID: <default>|<extras…>`). Loki supports multi-tenant queries via the pipe-separated header natively — no server flag needed (unlike Mimir). Platform-admin overview lane (#626/#629). Off by default."
+  type        = bool
+  default     = false
+}
+
+variable "spoke_ingest" {
+  description = <<-EOT
+    Cross-cluster spoke LOG ingest via the shared Cilium Gateway (hub-and-spoke, #627). When `tenants` is
+    non-empty this self-routes — per spoke — a write-only HTTPRoute at `<prefix>-logs.<domain>` that force-SETS
+    `X-Scope-OrgID` to the mapped tenant (overwriting any client value — the cross-tenant spoofing guard) and
+    matches only the Loki push path (`/loki/api/v1/push`), plus a CiliumNetworkPolicy admitting the Gateway
+    Envoy's `ingress` identity to the Loki gateway. Empty `tenants` disables it. Auth = network isolation.
+  EOT
+  type = object({
+    domain            = string
+    gateway_name      = string
+    gateway_namespace = string
+    tenants           = map(string) # hostname-prefix => X-Scope-OrgID tenant
+  })
+  default = {
+    domain            = ""
+    gateway_name      = ""
+    gateway_namespace = ""
+    tenants           = {}
+  }
+}
+
 variable "max_global_streams_per_user" {
   description = "Per-tenant active streams cap (cardinality / memory / cost control)."
   type        = number

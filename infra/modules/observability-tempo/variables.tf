@@ -40,6 +40,50 @@ variable "loki_datasource_uid" {
 }
 
 # ---------------------------------------------------------------------------
+# Tenancy (multi-cluster — #628). Tempo multitenancy is ON so each cluster is a tenant, like Loki/Mimir.
+# ---------------------------------------------------------------------------
+
+variable "default_tenant_id" {
+  description = "Tenant (X-Scope-OrgID) the default Tempo datasource queries with, and that the hub's own traces are written under."
+  type        = string
+  default     = "platform"
+}
+
+variable "extra_tenant_datasources" {
+  description = "Additional X-Scope-OrgID tenants to provision as Grafana datasources — e.g. [\"preprod\"] for the preprod traces spoke (#628). Each renders a `Tempo (<tenant>)` datasource."
+  type        = list(string)
+  default     = []
+}
+
+variable "enable_federated_datasource" {
+  description = "Provision a `Tempo (all clusters)` datasource querying ALL tenants at once (`X-Scope-OrgID: <default>|<extras…>`). Tempo supports multi-tenant queries via the pipe-separated header. Platform-admin overview lane (#629). Off by default."
+  type        = bool
+  default     = false
+}
+
+variable "spoke_ingest" {
+  description = <<-EOT
+    Cross-cluster spoke TRACE ingest via the shared Cilium Gateway (#628). When `tenants` is non-empty this
+    self-routes — per spoke — a write-only HTTPRoute at `<prefix>-traces.<domain>` that force-SETS
+    `X-Scope-OrgID` to the mapped tenant (overwriting any client value) and matches only the OTLP/HTTP trace
+    path (`/v1/traces`), plus a CiliumNetworkPolicy admitting the Gateway Envoy's `ingress` identity to the
+    Tempo distributor. Empty `tenants` disables it. Auth = network isolation.
+  EOT
+  type = object({
+    domain            = string
+    gateway_name      = string
+    gateway_namespace = string
+    tenants           = map(string) # hostname-prefix => X-Scope-OrgID tenant
+  })
+  default = {
+    domain            = ""
+    gateway_name      = ""
+    gateway_namespace = ""
+    tenants           = {}
+  }
+}
+
+# ---------------------------------------------------------------------------
 # Helm
 # ---------------------------------------------------------------------------
 

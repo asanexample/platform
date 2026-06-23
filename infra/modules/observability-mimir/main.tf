@@ -38,6 +38,11 @@ locals {
         # isolation rests on the observability ns default-deny NetworkPolicy (tenant pods can't reach us).
         multitenancy_enabled = true
 
+        # Read-path tenant federation (#626): a query with `X-Scope-OrgID: a|b` spans both tenants, which is
+        # what lets one Grafana panel cover multiple clusters. Write isolation is unaffected (the Gateway edge
+        # still force-stamps a single tenant per spoke). Only enabled alongside the federated datasource.
+        tenant_federation = { enabled = var.enable_federated_datasource }
+
         common = {
           storage = {
             backend = "s3"
@@ -45,6 +50,9 @@ locals {
               region   = var.aws_region
               endpoint = "s3.${var.aws_region}.amazonaws.com"
               # IRSA: access_key_id/secret_access_key intentionally omitted -> AWS SDK web-identity chain.
+              # The org `enforce-encryption` SCP denies s3:PutObject without an explicit SSE header — bucket
+              # default encryption alone isn't enough. Send SSE-S3 on every write (mirrors Loki/Tempo).
+              sse = { type = "SSE-S3" }
             }
           }
         }
@@ -115,20 +123,34 @@ locals {
     "results-cache"    = { enabled = var.high_availability }
   }
 
-  # ---- Grafana datasource (auto-loaded by the observability Grafana sidecar) ----
+  # ---- Grafana datasources (auto-loaded by the observability Grafana sidecar) ----
+  # One per tenant: the hub's own `default_tenant_id` (optionally default) + one read-only `Mimir (<tenant>)`
+  # per spoke tenant (P10) + (optionally) a federated `Mimir (all clusters)` spanning every tenant (#626).
+  # All query the same in-cluster gateway; only the X-Scope-OrgID header differs.
+  all_tenants = concat([var.default_tenant_id], var.extra_tenant_datasources)
+
+  datasource_tenants = concat(
+    [{ name = "Mimir", uid = "mimir", tenant = var.default_tenant_id, is_default = var.datasource_is_default }],
+    [for t in var.extra_tenant_datasources : { name = "Mimir (${t})", uid = "mimir-${t}", tenant = t, is_default = false }],
+    var.enable_federated_datasource ? [{ name = "Mimir (all clusters)", uid = "mimir-all", tenant = join("|", local.all_tenants), is_default = false }] : [],
+  )
+
   grafana_datasource = {
     apiVersion = 1
-    datasources = [{
-      name           = "Mimir"
+    datasources = [for ds in local.datasource_tenants : {
+      name           = ds.name
       type           = "prometheus"
-      uid            = "mimir"
+      uid            = ds.uid
       access         = "proxy"
       url            = "http://${var.helm_release_name}-gateway.${var.namespace}.svc/prometheus"
-      isDefault      = var.datasource_is_default
+      isDefault      = ds.is_default
       jsonData       = { httpHeaderName1 = "X-Scope-OrgID", timeInterval = "30s" }
-      secureJsonData = { httpHeaderValue1 = var.default_tenant_id }
+      secureJsonData = { httpHeaderValue1 = ds.tenant }
     }]
   }
+
+  # Spoke ingest edge is created only when tenants are declared (and the store itself is enabled).
+  spoke_ingest_create = local.create && length(var.spoke_ingest.tenants) > 0
 }
 
 # ---------------------------------------------------------------------------
@@ -292,5 +314,77 @@ resource "kubernetes_config_map_v1" "grafana_datasource" {
 
   data = {
     "mimir-datasource.yaml" = yamlencode(local.grafana_datasource)
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Cross-cluster spoke ingest edge (P10) — Gateway-API-native, no proxy.
+# Per spoke: a write-only HTTPRoute on the shared Cilium Gateway that FORCE-SETS X-Scope-OrgID to the
+# mapped tenant (overwriting any client value — so a spoke can't spoof another tenant, the ADR-044 guard)
+# and routes only /api/v1/push (no query path is exposed cross-cluster). The header-overwrite + path-match
+# are native Gateway API filters — same idiom the repo already uses for HTTP→HTTPS redirects. Auth is
+# network isolation (the internal NLB reachable only over the VPC/TGW); mTLS is the P10.x hardening follow-up.
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_manifest" "spoke_ingest_route" {
+  for_each = local.spoke_ingest_create ? var.spoke_ingest.tenants : {}
+
+  manifest = {
+    apiVersion = "gateway.networking.k8s.io/v1"
+    kind       = "HTTPRoute"
+    metadata = {
+      name      = "${var.helm_release_name}-spoke-${each.key}"
+      namespace = var.namespace
+    }
+    spec = {
+      parentRefs = [{
+        name        = var.spoke_ingest.gateway_name
+        namespace   = var.spoke_ingest.gateway_namespace
+        sectionName = "https"
+      }]
+      hostnames = ["${each.key}-mimir.${var.spoke_ingest.domain}"]
+      rules = [{
+        # Write-only: only the remote_write push path is routed; everything else (incl. /prometheus) 404s.
+        matches = [{ path = { type = "PathPrefix", value = "/api/v1/push" } }]
+        # Overwrite the tenant from the authenticated route (the hostname), ignoring any client header.
+        filters = [{
+          type = "RequestHeaderModifier"
+          requestHeaderModifier = {
+            set = [{ name = "X-Scope-OrgID", value = each.value }]
+          }
+        }]
+        backendRefs = [{
+          name = "${var.helm_release_name}-gateway"
+          port = 80
+        }]
+      }]
+    }
+  }
+}
+
+# The Gateway's Envoy connects with the reserved Cilium `ingress` identity (8), which a STANDARD k8s
+# NetworkPolicy `from:` can't match — so admit it to the Mimir gateway via a CiliumNetworkPolicy
+# (the repo's documented Gateway gotcha; mirrors `allow-grafana-from-gateway` in the observability module).
+# Ports omitted: the gateway pod's nginx targetPort isn't worth hardcoding — the `ingress` entity is the
+# trusted Envoy, and the default-deny + this single allow already scope who reaches the gateway pods.
+resource "kubernetes_manifest" "spoke_ingest_from_gateway" {
+  count = local.spoke_ingest_create ? 1 : 0
+
+  manifest = {
+    apiVersion = "cilium.io/v2"
+    kind       = "CiliumNetworkPolicy"
+    metadata = {
+      name      = "${var.helm_release_name}-spoke-ingest-from-gateway"
+      namespace = var.namespace
+    }
+    spec = {
+      endpointSelector = {
+        matchLabels = {
+          "app.kubernetes.io/name"      = var.helm_release_name
+          "app.kubernetes.io/component" = "gateway"
+        }
+      }
+      ingress = [{ fromEntities = ["ingress"] }]
+    }
   }
 }

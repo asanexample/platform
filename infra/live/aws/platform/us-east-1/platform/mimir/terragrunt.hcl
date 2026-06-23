@@ -42,6 +42,18 @@ dependency "observability" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+# Shared Cilium Gateway — Mimir self-routes its cross-cluster spoke-ingest HTTPRoute onto it (P10),
+# the same self-routing pattern keycloak uses (ADR-059). Gateway is EARLY in the DAG (no app deps).
+dependency "gateway" {
+  config_path = "../gateway"
+
+  mock_outputs = {
+    gateway_name      = "platform-gateway"
+    gateway_namespace = "default"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
 generate "helm_provider" {
   path      = "helm-provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -100,6 +112,21 @@ inputs = {
   # Mimir is Grafana's default datasource (durable, full-range); the observability change sets the bundled
   # Prometheus datasource non-default so there's exactly one default.
   datasource_is_default = true
+
+  # Cross-cluster spoke ingest (P10): self-route a write-only, tenant-overwriting HTTPRoute per spoke onto
+  # the shared Gateway, and surface each spoke's tenant as its own Grafana datasource. preprod is the first
+  # spoke; add a `<prefix> = <tenant>` entry (and the matching datasource) to onboard the next one.
+  spoke_ingest = {
+    domain            = "aws.refplat.org"
+    gateway_name      = dependency.gateway.outputs.gateway_name
+    gateway_namespace = dependency.gateway.outputs.gateway_namespace
+    tenants           = { preprod = "preprod" }
+  }
+  extra_tenant_datasources = ["preprod"]
+
+  # Multi-cluster single pane (#626): enable read-path tenant federation + a `Mimir (all clusters)`
+  # datasource spanning platform|preprod. Platform-admin overview lane (per-team scoping = P13).
+  enable_federated_datasource = true
 
   tags = include.base.locals.tags
 }

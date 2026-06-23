@@ -18,8 +18,6 @@ dependency "eks" {
     cluster_id                    = "mock-cluster"
     cluster_endpoint              = "https://mock-endpoint"
     cluster_certificate_authority = "bW9jaw=="
-    oidc_provider_arn             = "arn:aws:iam::000000000000:oidc-provider/mock"
-    oidc_provider_url             = "oidc.eks.mock.amazonaws.com/id/mock"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
@@ -31,8 +29,9 @@ dependency "node_groups" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-dependency "observability" {
-  config_path = "../observability"
+# The metrics spoke owns the preprod `observability` namespace. Order after it so the namespace exists.
+dependency "observability_spoke" {
+  config_path = "../observability-spoke"
 
   mock_outputs = {
     namespace = "observability"
@@ -40,13 +39,11 @@ dependency "observability" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-# The collector exports OTLP to Tempo's distributor — pull the endpoint from the tempo unit.
-dependency "tempo" {
-  config_path = "../tempo"
+# Traces ship over the Transit Gateway to the platform hub. Order after the TGW spoke attachment.
+dependency "transit_gateway" {
+  config_path = "../transit-gateway"
 
-  mock_outputs = {
-    otlp_grpc_endpoint = "http://tempo-distributor.observability.svc:4317"
-  }
+  mock_outputs                            = {}
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
@@ -70,22 +67,20 @@ generate "helm_provider" {
 }
 
 inputs = {
-  # Per-signal cost toggle (flip enable_trace_pipeline). create=false applies as a no-op.
-  create    = include.base.locals.enable_trace_pipeline
-  namespace = dependency.observability.outputs.namespace
+  create    = true
+  namespace = dependency.observability_spoke.outputs.namespace
 
-  # OTLP/gRPC exporter wants host:port (no scheme) — strip http:// from the tempo output.
-  tempo_otlp_endpoint = replace(dependency.tempo.outputs.otlp_grpc_endpoint, "http://", "")
-
-  # Tempo is multi-tenant (#628): stamp the hub's own traces (Beyla et al.) as tenant `platform`. Set this
-  # BEFORE Tempo flips multitenancyEnabled so there's no rejection window (a single-tenant Tempo ignores it).
-  tenant_id = "platform"
+  # Spoke collector: preprod workloads send OTLP here (once instrumented — P7); it forwards over the TGW to
+  # the platform hub's Tempo spoke-ingest edge via OTLP/HTTP. The hub Gateway force-sets X-Scope-OrgID=preprod
+  # (write-only); the resource processor stamps cluster=preprod so the hub isolates/breaks out by cluster.
+  tempo_otlp_endpoint   = "https://preprod-traces.aws.refplat.org"
+  exporter_use_http     = true
+  exporter_tls_insecure = false
+  tenant_id             = "preprod" # belt-and-suspenders; the edge overwrites it
+  resource_attributes   = { cluster = "preprod" }
 
   helm_chart_version = include.base.locals.helm_versions.otel_collector
   helm_wait          = true
-
-  # Sizing follows cost_profile (dev = 1 replica; prod = 2).
-  high_availability = include.base.locals.high_availability
 
   tags = include.base.locals.tags
 }
