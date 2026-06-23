@@ -39,8 +39,8 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "query": "label_values(up, cluster)",
-        "definition": "label_values(up, cluster)",
+        "query": "label_values(kube_node_info, cluster)",
+        "definition": "label_values(kube_node_info, cluster)",
         "refresh": 2,
         "sort": 1,
         "includeAll": true,

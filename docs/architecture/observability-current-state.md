@@ -119,9 +119,10 @@ force-stamps a single tenant per spoke. The **Platform Health** dashboard defaul
 a `cluster` multi-select, so panels break out per cluster. Per-team scoping of the federated lane is **P13**
 (#590); cross-cluster **logs/traces** federation follows their spokes (#627/#628). Umbrella: #629.
 
-> **Known wrinkle:** the Loki/Mimir charts stamp their own `cluster` label on self-metrics, so the dashboard's
-> `cluster` dropdown shows a couple of spurious entries (`loki`, `mimir`) alongside the real clusters. The
-> KSM/node panels are clean. Relabeling those self-metrics is a tracked follow-up.
+> **Known wrinkle (data layer only):** the Loki/Mimir charts stamp their own `cluster` label on self-metrics
+> (`cluster=loki`/`cluster=mimir`), polluting the raw `cluster` dimension. The dashboard's `cluster` dropdown
+> sidesteps this by deriving values from `kube_node_info` (KSM — real clusters only), so the UI is clean;
+> relabeling the self-metrics so `externalLabels.cluster` is authoritative is tracked in #630.
 
 ### Multi-tenancy & the security boundary (read this)
 
