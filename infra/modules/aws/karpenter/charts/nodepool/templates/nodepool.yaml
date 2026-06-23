@@ -1,0 +1,42 @@
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: default
+spec:
+  template:
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: [{{ .Values.arch | quote }}]
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values:
+            {{- range .Values.capacityTypes }}
+            - {{ . | quote }}
+            {{- end }}
+        - key: karpenter.k8s.aws/instance-family
+          operator: In
+          values:
+            {{- range .Values.instanceFamilies }}
+            - {{ . | quote }}
+            {{- end }}
+      # BYOCNI: block pods until Cilium is ready on the node; Cilium removes this taint (D5).
+      startupTaints:
+        - key: {{ .Values.startupTaintKey }}
+          effect: NoSchedule
+  disruption:
+    # WhenEmpty (platform, stateful-safe — only reclaims empty nodes) or WhenEmptyOrUnderutilized (preprod).
+    consolidationPolicy: {{ .Values.consolidationPolicy }}
+    consolidateAfter: {{ .Values.consolidateAfter }}
+  # Cost guardrail — Karpenter never provisions past these totals.
+  limits:
+    cpu: {{ .Values.cpuLimit | quote }}
+    memory: {{ .Values.memoryLimit | quote }}

@@ -44,7 +44,8 @@ include.base.locals.account_emails["preprod"]  # per-account email
 ```text
 iam-roles ──┐
              ├─> eks -> cilium -> node-groups -> ssm-bastion
-networking ─┘                        |
+networking ─┘                        ├─> karpenter (eks, cilium, node-groups, eks-addons) — node autoscaling (ADR-078); runs on the system group, provisions/consolidates workload nodes. Cilium-first via the node.cilium.io/agent-not-ready startup taint.
+                                     |
               route53 ───────────────┤
               eks-addons ────────────┤ (eks, cilium, nodes)
               cert-manager ──────────┤ (eks, nodes, r53)

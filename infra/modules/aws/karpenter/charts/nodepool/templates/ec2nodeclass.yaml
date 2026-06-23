@@ -1,0 +1,32 @@
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: default
+spec:
+  # AL2023 latest for the cluster's K8s version (Karpenter resolves via SSM). arch follows the NodePool.
+  amiSelectorTerms:
+    - alias: al2023@latest
+  # Karpenter-provisioned nodes assume the SAME role the managed node groups use (worker/ECR/SSM/CNI policies).
+  role: {{ .Values.nodeRole }}
+  subnetSelectorTerms:
+    {{- range .Values.subnetIds }}
+    - id: {{ . }}
+    {{- end }}
+  securityGroupSelectorTerms:
+    - id: {{ .Values.securityGroupId }}
+  metadataOptions:
+    httpEndpoint: enabled
+    httpTokens: required
+    httpPutResponseHopLimit: 1
+  # BYOCNI/Cilium overlay decouples pods from ENI IPs — lift the kubelet cap off the ENI default.
+  kubelet:
+    maxPods: {{ .Values.maxPods }}
+  # NB: do NOT set kubernetes.io/cluster/<name> or karpenter.* keys here — Karpenter manages (and auto-applies)
+  # them on provisioned resources, which is what satisfies the controller IAM tag conditions. Setting them in
+  # spec.tags is rejected as invalid. Only user tags here.
+  {{- if .Values.tags }}
+  tags:
+    {{- range $k, $v := .Values.tags }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- end }}
