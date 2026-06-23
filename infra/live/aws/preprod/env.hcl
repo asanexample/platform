@@ -8,6 +8,11 @@ locals {
   account_alias = "preprod-aws"
   account_id    = local._secrets.account_ids["preprod"]
 
+  # Zero-code instrumentation (P7 / #586): run Beyla on preprod so its workloads emit RED metrics + traces
+  # with no app changes. Traces -> the preprod traces-spoke collector -> hub Tempo (tenant preprod); RED
+  # metrics -> Beyla's ServiceMonitor -> the preprod metrics agent -> hub Mimir (tenant preprod).
+  enable_instrumentation = true
+
   tags = {
     Environment        = local.environment
     ManagedBy          = "Terragrunt"

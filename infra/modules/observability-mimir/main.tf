@@ -78,6 +78,10 @@ locals {
           ingestion_rate                    = var.ingestion_rate
           ingestion_burst_size              = var.ingestion_burst_size
           compactor_blocks_retention_period = var.blocks_retention
+          # Beyla (P7) stamps a rich set of k8s attributes (namespace/deployment/pod/service/…) per series —
+          # ~35+, over Mimir's default of 30, so its RED metrics get discarded (max_label_names_per_series).
+          # Raise it to admit label-rich auto-instrumentation series. Bounded, so cardinality stays sane.
+          max_label_names_per_series = var.max_label_names_per_series
         }
       }
     }
