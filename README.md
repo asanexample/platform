@@ -269,4 +269,3 @@ The foundation is established; the active frontiers:
 | [Observability Current State](docs/architecture/observability-current-state.md) | As-built LGTM+profiles, multi-cluster |
 | [New Product / Deploy runbooks](docs/runbooks/) | The developer paved road, end to end |
 | [Architecture Decisions](docs/adrs/) | **77 ADRs** documenting every significant choice |
-```
