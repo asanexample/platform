@@ -33,8 +33,11 @@ On the **platform** cluster, in the **`observability`** namespace:
 > `enable_trace_pipeline` **on** in its `env.hcl` (so the full LGTM bundle runs single-replica), while other
 > clusters stay dev/off. `cost_profile=prod` flips the bundle to HA (RF3, multi-replica).
 
-**Not yet deployed:** cross-cluster **logs/traces** spokes (P10 shipped metrics first), Grafana SSO (deferred
-hardening — admin login for now). Full roadmap in the plan.
+**Grafana SSO (#592):** Grafana authenticates against **Keycloak** (OIDC `generic_oauth`, the `grafana` client
+from keycloak-config — same pattern as ArgoCD/Backstage). Group→role: `platform-admins` → **Admin**, any other
+authenticated user → **Viewer** (per-team Editor scoping is P13/#590). The client secret syncs from Secrets
+Manager via ESO; the backend OIDC calls reach Keycloak through the gateway Envoy (a host-alias to its ClusterIP)
+to dodge the internal-NLB hairpin. The local admin login remains as break-glass.
 
 ---
 

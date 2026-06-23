@@ -228,3 +228,49 @@ variable "cloudwatch_enabled" {
   type        = bool
   default     = false
 }
+
+# ---------------------------------------------------------------------------
+# Grafana SSO via Keycloak OIDC (#592, ADR-053/059 — same pattern as ArgoCD/Backstage)
+# ---------------------------------------------------------------------------
+
+variable "grafana_oidc_issuer" {
+  description = "Keycloak OIDC issuer URL (e.g. https://keycloak.aws.refplat.org/realms/platform). Empty disables Grafana SSO (admin-password only)."
+  type        = string
+  default     = ""
+}
+
+variable "grafana_oidc_client_id" {
+  description = "Grafana OIDC client_id in Keycloak."
+  type        = string
+  default     = "grafana"
+}
+
+variable "grafana_oidc_secret_manager_key" {
+  description = "AWS Secrets Manager key holding the Grafana OIDC client secret (keycloak-config writes platform/keycloak/grafana-oidc, JSON property `client-secret`). Synced to a K8s secret via ExternalSecret, injected as GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET."
+  type        = string
+  default     = ""
+}
+
+variable "grafana_oidc_role_attribute_path" {
+  description = "Grafana role mapping (JMESPath over the token's `groups` claim). Default: platform-admins → Admin, any other authenticated user → Viewer. Per-team Editor scoping is P13 (#590)."
+  type        = string
+  default     = "contains(groups[*], 'platform-admins') && 'Admin' || 'Viewer'"
+}
+
+variable "oidc_gateway_alias_host" {
+  description = "Split-horizon host-alias: the OIDC issuer hostname (keycloak.aws.refplat.org) pinned to the Cilium Gateway Envoy ClusterIP, so Grafana's backend token/userinfo calls reach Keycloak via the gateway directly — NOT the internal NLB (which a pod can't reliably hairpin to). Mirrors Backstage. Empty disables the alias."
+  type        = string
+  default     = ""
+}
+
+variable "gateway_service_name" {
+  description = "Cilium gateway LoadBalancer Service whose ClusterIP backs oidc_gateway_alias_host."
+  type        = string
+  default     = "cilium-gateway-platform-gateway"
+}
+
+variable "gateway_service_namespace" {
+  description = "Namespace of the Cilium gateway Service."
+  type        = string
+  default     = "default"
+}

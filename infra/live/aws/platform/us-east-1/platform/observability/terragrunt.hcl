@@ -40,6 +40,19 @@ dependency "sns_notifications" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+# Grafana SSO (#592): the OIDC client + its secret (platform/keycloak/grafana-oidc) are provisioned by
+# keycloak-config, so Grafana's SSO applies after it (same ordering as ArgoCD/Backstage). The grafana-oidc
+# ExternalSecret needs the SM secret to already exist for ESO to sync it before the Grafana pod starts.
+dependency "keycloak_config" {
+  config_path = "../keycloak-config"
+
+  mock_outputs = {
+    issuer              = "https://keycloak.aws.refplat.org/realms/platform"
+    client_secret_names = { grafana = "platform/keycloak/grafana-oidc" }
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
 generate "helm_provider" {
   path      = "helm-provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -116,6 +129,13 @@ inputs = {
 
   # Grafana served Tailscale-only via the platform internal Gateway (gateway-config adds the HTTPRoute).
   grafana_hostname = "grafana.aws.refplat.org"
+
+  # Grafana SSO via Keycloak OIDC (#592). Group→role: platform-admins → Admin, any other authenticated user →
+  # Viewer (per-team Editor scoping is P13/#590). The client secret syncs from SM via ESO. The backend OIDC
+  # calls reach Keycloak via the gateway Envoy (oidc_gateway_alias_host) to dodge the internal-NLB hairpin.
+  grafana_oidc_issuer             = dependency.keycloak_config.outputs.issuer
+  grafana_oidc_secret_manager_key = dependency.keycloak_config.outputs.client_secret_names["grafana"]
+  oidc_gateway_alias_host         = "keycloak.aws.refplat.org"
 
   # Destroy-time namespace drain auth (scripts/k8s-finalizer-clear.sh) — see the module's namespace_drain.
   deployer_role_arn      = include.base.locals.deployer_role_arn
