@@ -129,8 +129,14 @@ Grafana's **Traces Drilldown** (TraceQL *metrics* queries — `rate()`/`quantile
 the SLO metrics (`slo:sli_error:*`, `slo:current_burn_rate:ratio`, …) remote-write to Mimir, and burn-rate
 **alerts route via the P4 Alertmanager** by severity (`pageAlert`=critical, `ticketAlert`=warning). First SLO:
 **API server request availability** (99.9%). The grafana.com **"High level Sloth SLOs"** dashboard (14643) is
-provisioned as code. `slo_engine` is the seam for a future Pyrra/Grafana-SLO swap. (Synthetics —
-blackbox/k6 — are P9b.)
+provisioned as code. `slo_engine` is the seam for a future Pyrra/Grafana-SLO swap.
+
+**Synthetics (P9b)** — the **blackbox-exporter** (`observability-blackbox`) probes the platform HTTPRoute
+endpoints (grafana/argocd/backstage/keycloak) over HTTP/TLS via a `Probe` CR → `probe_success`,
+`probe_ssl_earliest_cert_expiry`, latency in Mimir. To dodge the internal-NLB hairpin (a pod can't reliably
+reach an internal NLB that targets its own cluster), the exporter `hostAlias`es the probe hostnames to the
+Cilium Gateway Envoy **ClusterIP** — testing Gateway routing + TLS directly (keeping the real SNI/Host). k6
+scripted checks are the remaining synthetics follow-up.
 
 ### Multi-cluster view — federated datasource (#626)
 

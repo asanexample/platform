@@ -77,6 +77,7 @@ locals {
     observability_otel_operator  = "${local.source_base}/observability-otel-operator"
     observability_prom_agent     = "${local.source_base}/observability-prometheus-agent"
     observability_slo            = "${local.source_base}/observability-slo"
+    observability_blackbox       = "${local.source_base}/observability-blackbox"
     crossplane                   = "${local.source_base}/crossplane"
     cloudnative_pg               = "${local.source_base}/cloudnative-pg"
     backstage                    = "${local.source_base}/backstage"
@@ -108,6 +109,7 @@ locals {
     beyla                 = "1.16.8"  # grafana/beyla — P7a zero-code eBPF instrumentation (app 3.20.0)
     otel_operator         = "0.116.0" # open-telemetry/opentelemetry-operator — P7b SDK auto-inject (app 0.153.0)
     sloth                 = "0.16.0"  # slok/sloth — P9 SLO engine (burn-rate rules from PrometheusServiceLevel)
+    blackbox_exporter     = "11.13.0" # prometheus-community/prometheus-blackbox-exporter — P9b synthetics (app v0.28.0)
     crossplane            = "2.3.1"   # Crossplane v2 (ADR-046)
     cloudnative_pg        = "0.28.2"  # CNPG operator chart (app v1.29.1) — Backstage DB (ADR-051)
     backstage             = "2.8.1"   # official backstage Helm chart (points at our platform/backstage image)
