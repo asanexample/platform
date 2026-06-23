@@ -62,12 +62,16 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 
 #### Observability
 
-- [#102](https://github.com/asanexample/platform/issues/102) Observability stack (epic) — metrics, logs, traces, profiles, cost. **~6/14 phases live: the full standing-state foundation** — P1 metrics+dashboards, P3 logs+traces ([#582](https://github.com/asanexample/platform/issues/582)), P4 alerting + Slack/PagerDuty ([#583](https://github.com/asanexample/platform/issues/583)), P5 cloud-resource metrics ([#584](https://github.com/asanexample/platform/issues/584)), P11 in-cluster cost (OpenCost + dashboard). P2 Mimir is code-complete but off in the dev cost_profile (Prometheus-only). **Next up: P7 — instrumentation on-ramp ([#586](https://github.com/asanexample/platform/issues/586))** — Beyla eBPF zero-code baseline + platform-injected OTLP + opt-in SDK enrichment ([ADR-077](docs/adrs/077-application-instrumentation-strategy.md)); it's the unlock for the activity-dependent phases (P6 APM, P9 SLOs, P13 isolation) which are deferred until real telemetry/traffic flows.
+- [#102](https://github.com/asanexample/platform/issues/102) Observability stack (epic) — metrics, logs, traces, profiles, cost. **~7/14 phases live: the full standing-state foundation + the first cross-cluster spoke** — P1 metrics+dashboards, P3 logs+traces ([#582](https://github.com/asanexample/platform/issues/582)), P4 alerting + Slack/PagerDuty ([#583](https://github.com/asanexample/platform/issues/583)), P5 cloud-resource metrics ([#584](https://github.com/asanexample/platform/issues/584)), P11 in-cluster cost (OpenCost + dashboard). **P2 Mimir durable store now on at the hub**, and **P10 preprod metrics spoke live** ([#150](https://github.com/asanexample/platform/issues/150) / [#625](https://github.com/asanexample/platform/pull/625)) — Gateway-API-native, write-only, tenant-overwriting cross-cluster `remote_write` into Mimir under per-cluster tenants. **Next up: P7 — instrumentation on-ramp ([#586](https://github.com/asanexample/platform/issues/586))** — Beyla eBPF zero-code baseline + platform-injected OTLP + opt-in SDK enrichment ([ADR-077](docs/adrs/077-application-instrumentation-strategy.md)); it's the unlock for the activity-dependent phases (P6 APM, P9 SLOs, P13 isolation) which are deferred until real telemetry/traffic flows.
 - Agent / GenAI observability layer (ADR-076) rides the #102 backbone — OTel-GenAI conventions, per-invocation agent traces, data-boundary content rules.
 
 ### Next
 
 *Queued and build-now — near-term build order.*
+
+#### Observability
+
+- [#626](https://github.com/asanexample/platform/issues/626) Federated multi-cluster Grafana view — Mimir tenant federation (read-path) + a platform-admin federated datasource (`platform|preprod`) + multi-cluster-aware overview dashboards. Surfaced by P10: today each cluster is a separate tenant/datasource (strong read-isolation) but no single panel spans clusters. Coordinates with P13 isolation ([#590](https://github.com/asanexample/platform/issues/590)) — the federated lane must stay platform-admin-gated.
 
 #### GitOps & Delivery
 
