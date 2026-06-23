@@ -16,7 +16,7 @@ networking, security, and compliance so developers think about their apps; gover
 
 It treats the **platform as a product**, not a pile of Terraform. The running infrastructure — multi-account
 AWS, private EKS, GitOps, a self-hosted LGTM+profiles observability stack, a signed supply chain — is real and
-production-shaped. But the deliverable is the set of **patterns, contracts, and decisions**: **77
+production-shaped. But the deliverable is the set of **patterns, contracts, and decisions**: **78
 [architecture decision records](docs/adrs/)** and a full [design-doc set](infra/docs/) you can study, adapt, or
 lift wholesale.
 
@@ -134,7 +134,7 @@ The infrastructure is the means; the **patterns, contracts, and decisions** are 
 - **Platform / DevEx engineers** adopting patterns — start with the [design docs](infra/docs/) (architecture,
   multi-tenancy, security, supply chain) and compose the [reusable modules](infra/modules/); `infra/live/` shows
   one opinionated composition.
-- **Architects** evaluating an approach — the **77 [ADRs](docs/adrs/)** record *why* each choice was made, and
+- **Architects** evaluating an approach — the **78 [ADRs](docs/adrs/)** record *why* each choice was made, and
   what was rejected.
 - **New team members** — the [Onboarding Guide](docs/onboarding.md) and the [Quick Start](#quick-start) below.
 
@@ -181,7 +181,7 @@ platform/
 ├── cmd/platctl/                 # Go CLI: DAG-aware bootstrap / teardown / validate / kubeconfig
 ├── gitops/                      # The source of truth: Team / Product / Environment / Release registries
 ├── docs/
-│   ├── adrs/                    # 77 architecture decision records
+│   ├── adrs/                    # 78 architecture decision records
 │   ├── architecture/            # System design, supply chain, observability, environment model
 │   ├── compliance/              # SCP → control mapping (SOC2/HIPAA/PCI/ISO/NIST/CIS)
 │   ├── runbooks/                # Operational procedures
@@ -268,4 +268,4 @@ The foundation is established; the active frontiers:
 | [Supply-Chain Overview](docs/architecture/supply-chain-overview.md) | cosign + SBOM + SLSA L3 + Kyverno, end to end |
 | [Observability Current State](docs/architecture/observability-current-state.md) | As-built LGTM+profiles, multi-cluster |
 | [New Product / Deploy runbooks](docs/runbooks/) | The developer paved road, end to end |
-| [Architecture Decisions](docs/adrs/) | **77 ADRs** documenting every significant choice |
+| [Architecture Decisions](docs/adrs/) | **78 ADRs** documenting every significant choice |

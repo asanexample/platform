@@ -227,7 +227,7 @@ summarized in [CLAUDE.md](../CLAUDE.md#authoring-policy-compliant-workloads-kyve
 | I want to… | Go to… |
 |---|---|
 | The big picture | [README](../README.md) |
-| Understand **why** a decision was made | [`docs/adrs/`](adrs/) — 77 ADRs |
+| Understand **why** a decision was made | [`docs/adrs/`](adrs/) — 78 ADRs |
 | Understand **how** the system is designed | [`docs/architecture/`](architecture/) + [`infra/docs/`](../infra/docs/) |
 | Follow a **procedure** | [`docs/runbooks/`](runbooks/) |
 | Configure/deploy a **module** | [User Guide](user-guide.md) + module READMEs |
