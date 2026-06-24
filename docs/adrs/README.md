@@ -130,6 +130,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-076: Agent / GenAI Observability](076-agent-observability.md) | Proposed |
 | [ADR-077: Application Instrumentation Strategy](077-application-instrumentation-strategy.md) | Accepted |
 | [ADR-078: Cluster Elasticity — Karpenter + Workload Autoscaling](078-cluster-elasticity-karpenter.md) | Accepted |
+| [ADR-079: Cloud-Resource Monitoring Scope — Query-Time-First in Grafana](079-cloud-resource-monitoring-scope.md) | Accepted |
 | [ADR-054: Platform Resilience & Business Continuity](054-platform-resilience-and-business-continuity.md) | Proposed |
 | [ADR-055: Compliance Assurance & Continuous Control Evidence](055-compliance-assurance-and-continuous-control-evidence.md) | Proposed |
 | [ADR-057: Service Identity & East-West Zero Trust (mTLS)](057-service-identity-and-east-west-zero-trust.md) | Proposed |

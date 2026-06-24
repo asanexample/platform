@@ -6,8 +6,10 @@
 > Tempo + OTel collector, with trace↔logs correlation; PRs #596–#603); **P4 alerting + notifications**
 > (severity routing + inhibition + 28 curated `PrometheusRule`s across 7 components + store self-monitoring;
 > SNS / Slack / PagerDuty receivers; deploy/change dashboard annotations; PRs #604–#612). As-built reference:
-> [observability-current-state.md](../architecture/observability-current-state.md). **Remaining:** P5
-> cloud-resource metrics, P10 preprod spoke onboarding, cost (P11), Grafana SSO (deferred hardening), and
+> [observability-current-state.md](../architecture/observability-current-state.md). **P5 cloud-resource
+> observability** is scoped + mostly live (ADR-079: P5a CloudWatch metrics+logs datasource and P5b YACE→Mimir
+> built; P5c Loki ingestion descoped; GuardDuty/Config punted). **Remaining:** P5 curated AWS dashboards +
+> one alert, P10 preprod spoke onboarding, cost (P11 incl. CUR→Athena), Grafana SSO (deferred hardening), and
 > the smaller phases below. Tracking issue: [#102](https://github.com/asanexample/platform/issues/102).
 
 ## Context
@@ -271,13 +273,20 @@ independently-verifiable sub-issue + unit(s); do not batch.
 ### Track C — Cloud-resource observability (AWS)
 
 - **P5 — Cloud-resource observability.** The "cloud resource" half of the goal — visibility *beyond* the
-  cluster. **(a)** Grafana **CloudWatch datasource** (zero-storage, query-time) for broad coverage of RDS /
-  ALB·NLB / SQS·SNS / Transit Gateway / Route53 / ACM / NAT / EKS control plane; **(b)** **YACE /
-  cloudwatch-exporter → Mimir** (IRSA) for the subset we alert + dashboard on in PromQL; **(c)** **CloudWatch
-  Logs → Loki** (Firehose / Alloy `loki.source.awsfirehose`) for RDS / ALB / VPC-flow logs + the existing
-  **CloudTrail**. Dashboards for the AWS resources backing platform + tenants. **Verify:** RDS/ALB metrics +
-  a VPC-flow/CloudTrail query in Grafana; one cloud-resource alert (e.g. RDS free-storage low) fires. (Cloud
-  *cost* lands in P11.)
+  cluster. Scope + cost model decided in [ADR-079](../adrs/079-cloud-resource-monitoring-scope.md)
+  (**query-time-first**: query CloudWatch live for breadth, store only what backs an alert). **(a) DONE +
+  live** — Grafana **CloudWatch datasource** (zero-storage, query-time) covering metrics *and* CloudWatch
+  **Logs Insights** (RDS / ELB·NLB / SQS·SNS / Transit Gateway / Route53 / ACM / NAT / EKS + the VPC-flow-log
+  & CloudTrail groups), via the Grafana SA's Pod-Identity read role; `cloudwatch_enabled = true` on the hub.
+  **(b) DONE + live** — **YACE / cloudwatch-exporter → Mimir** (Pod Identity) for the curated alert/dashboard
+  subset (`AWS/NetworkELB` / `AWS/NATGateway` / `AWS/TransitGateway`). **(c) DESCOPED** — **CloudWatch Logs →
+  Loki** (Firehose / Alloy) is *not* built as general scope; the query-time Logs datasource (a) already
+  surfaces flow-log/CloudTrail in Grafana, so a group is shipped to Loki only against a named alert/retention
+  need (VPC flow logs explicitly excluded). **Footprint note:** 0 RDS (CNPG), 0 ALB (the 2 LBs are NLBs,
+  already in (b)) — no new stored namespaces warranted today. **Remaining:** curated AWS dashboards + one
+  cloud-resource alert (the verify bar below). **Verify:** an NLB/NAT/TGW metric + a VPC-flow/CloudTrail query
+  in Grafana; one cloud-resource alert fires. (Cloud *cost* lands in P11; AWS-native security services
+  GuardDuty/Config are punted — ADR-079 D6.)
 
 ### Track D — Developer experience / APM
 
@@ -316,7 +325,8 @@ independently-verifiable sub-issue + unit(s); do not batch.
   cluster/node/KSM metrics under tenant `preprod`; a forged `platform` header is overwritten to `preprod`.
 - **P11 — Cost (in-cluster + cloud).** **OpenCost** per cluster → cost metrics into Mimir
   (per-team/namespace/cluster + cross-cluster-transfer dashboards); plus **AWS CUR → Athena → Grafana**
-  (Athena datasource) for true cloud spend beyond the cluster, attributed by the `Team` tag. **Verify:**
+  (Athena datasource) for true cloud spend beyond the cluster, attributed by the `Team` tag (the cloud-cost
+  build of [ADR-079](../adrs/079-cloud-resource-monitoring-scope.md) D4). **Verify:**
   per-namespace cost across clusters AND cloud-resource cost by team in one pane. Feeds the
   self-hosted-vs-managed call.
 - **P12 — Policy reporting (closes #93).** `policy-reporter` on each Kyverno cluster, metrics into Mimir;
