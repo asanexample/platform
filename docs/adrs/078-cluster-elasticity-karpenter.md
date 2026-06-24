@@ -151,7 +151,13 @@ Things the design didn't anticipate, learned applying it live (module `infra/mod
   are actually gone** — `kubectl delete nodepool` cascades to NodeClaim deletion in the *background* and returns
   early, so without the wait the controller (on the system group) is scaled to zero mid-termination and orphans
   the EC2 instances. The original "the NodePool finalizer blocks until drained" assumption was wrong on both
-  counts. `up` re-applies the karpenter unit and the workloads' pod templates re-add the annotation.
+  counts. Then (3) the managed-group scale-to-zero itself drains each node via an EKS lifecycle hook that
+  **respects PodDisruptionBudgets**, so the stateful pods that rescheduled onto the system nodes stall it in
+  `Terminating:Wait` for the ~15 min hook timeout — `down` gives the graceful drain a short window then
+  **force-terminates the stragglers** (a park is a full shutdown; EBS data persists). And on the way back, `up`
+  must **wait for the cluster API** (restored nodes + Tailscale router) before applying the karpenter unit, else
+  the apply fails and orphans its helm releases from TF state. `up` also re-applies the karpenter unit and the
+  workloads' pod templates re-add the annotation.
 - **System-node sizing is its own decision.** Node-pinned DaemonSet pods can't be served by Karpenter, so the
   fixed system group must itself be large enough to hold the DaemonSet slab + standing load — the platform system
   group went `t4g.large → t4g.xlarge`. Changing a managed group's `instance_types` is **ForceNew**
