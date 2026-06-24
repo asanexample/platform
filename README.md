@@ -210,10 +210,10 @@ platform/
   (`observability-mimir`/`-loki`/`-tempo`/`-pyroscope`), collectors (`-alloy`/`-beyla`/`-otel-collector`/
   `-otel-operator`/`-prometheus-agent`/`-pyroscope-ebpf`/`-events`), and the measurement layer
   (`-slo`/`-blackbox`/`-k6`/`-opencost`/`-cloudwatch-exporter`)
-- **AWS foundation (20 modules)** — `organizations`, `networking`, `eks` (+ `eks-addons`/`-node-group`/
-  `-pod-identity`), `transit-gateway`, `cross-vpc-dns`, `route53` (+ `-delegation`), `ecr`, `iam_roles`,
-  `identity_center`, `github_oidc`, `cloudtrail`, `s3`, `sops-kms`, `ssm-bastion`, `sns-notifications`,
-  `state_bootstrap`
+- **AWS foundation (21 modules)** — `organizations`, `networking`, `eks` (+ `eks-addons`/`-node-group`/
+  `-pod-identity`), `karpenter` (node autoscaling, ADR-078), `transit-gateway`, `cross-vpc-dns`,
+  `route53` (+ `-delegation`), `ecr`, `iam_roles`, `identity_center`, `github_oidc`, `cloudtrail`, `s3`,
+  `sops-kms`, `ssm-bastion`, `sns-notifications`, `state_bootstrap`
 - **Deferred** — `vcluster` (hard multi-tenancy, [ADR-033](docs/adrs/033-defer-vcluster-tenant-support.md))
 
 Full catalog: [infra/modules/README.md](infra/modules/README.md).

@@ -1,5 +1,13 @@
 # Platform Requirements
 
+> **⚠️ Legacy spec — predates the current architecture.** This document captures the *original* requirements and
+> no longer reflects what was built. Notably it still references multi-cloud (Azure/GCP were **removed** — AWS-only),
+> Dex/SAML→Identity-Center SSO (**retired** → Keycloak OIDC, ADR-053/059), IRSA as the workload-identity standard
+> (**superseded** by EKS Pod Identity, ADR-047), and the "Tenant" model (**superseded** by Team→Product→Service→
+> Environment, ADR-067). For current-state truth see [`README.md`](README.md), [`docs/onboarding.md`](docs/onboarding.md),
+> [`CLAUDE.md`](CLAUDE.md), the [ADRs](docs/adrs/), and [`docs/architecture/`](docs/architecture/). Kept for historical
+> reference; treat specific claims below as aspirational-at-time-of-writing, not as-built.
+
 ## 1. Architecture
 
 1. Use OpenTofu with Terragrunt for infrastructure management across AWS, Azure,

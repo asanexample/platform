@@ -297,9 +297,9 @@ Expected resources created:
 
 With the management account configured, deploy the full platform stack using
 **`platctl`** (the Go orchestration CLI, ADR-038). It auto-discovers all Terragrunt
-units (~30: networking, EKS, Cilium, node groups, eks-addons, Tailscale, ArgoCD,
-cert-manager, external-dns/secrets, policy/Kyverno, observability, mimir, etc.) and
-applies them in dependency order with resumable state.
+units (~90: networking, EKS, Cilium, node groups, eks-addons, karpenter, Tailscale, ArgoCD,
+cert-manager, external-dns/secrets, policy/Kyverno, keycloak, crossplane, backstage,
+observability, etc.) and applies them in dependency order with resumable state.
 
 ```bash
 # Prerequisites:
@@ -314,9 +314,11 @@ The flow includes two manual steps:
 
 1. **Tailscale account setup** (after node groups are deployed) -- create an
    account, generate an API key, store it in Secrets Manager
-2. **ArgoCD SAML app** (after Tailscale is deployed) -- create a SAML app in
-   Identity Center. SSO URL and CA cert are pre-configured in
-   `infra/live/aws/common.hcl`
+
+ArgoCD SSO needs **no** manual step: it authenticates against **Keycloak OIDC**
+(the IdP of record), and the `keycloak-config` unit provisions the realm + the
+`argocd` OIDC client automatically. (The old Dex/SAML→Identity-Center bridge is
+retired — ADR-053/059.)
 
 `platctl` is resumable — `--resume` skips already-applied units, and a re-run
 re-applies cleanly (no-op for converged units).
@@ -774,10 +776,12 @@ GitHub Actions pushes via OIDC federation — no static credentials needed.
 
 ### Environment Management
 
-Teams are defined in `infra/live/aws/preprod/us-east-1/platform/teams.hcl`.
-All teams use namespace isolation (`team-<name>`).
+Teams, Products, and Environments are defined as git-native registries under `gitops/`
+(`gitops/teams/`, `gitops/products/`, `gitops/environments/`) — the source of truth since
+ADR-067/072 (the old `teams.hcl` is retired). Environments use namespace isolation; each
+environment namespace is `<team>-<product>-<stage>` (e.g. `alpha-shop-dev`).
 
-> **Note:** A vCluster mode for stronger isolation exists in the environment module
+> **Note:** A vCluster mode for stronger isolation exists as a standalone `vcluster` module
 > but is currently deferred (ADR-033) due to HTTPRoute sync limitations in
 > the open-source vCluster chart.
 
