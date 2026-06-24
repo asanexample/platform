@@ -15,7 +15,7 @@ agent runtime is written.
 - **Build the corpus forward by fault injection** (fault-injection-first; postmortems + production-shadow come later).
 - **Freeze fixtures** — snapshot the telemetry at injection time and replay the snapshot; do **not** keep backends hot.
 - **Structured-taxonomy grading** — label and agent output fill the same form, so scoring is set-membership, not judgment.
-- **Walled-off preprod** — inject in a dedicated throwaway namespace on the preprod cluster (rides the #590/P10 spoke work).
+- **Walled-off preprod** — inject in a dedicated throwaway namespace on the preprod cluster (rides the P10 preprod-spoke work, #150).
 - **Scripted faults, no chaos framework** — kubectl/helm + k6 + Cilium/ESO toggles (consistent with the Spike-3 "adopt nothing new at tier-0" stance).
 
 ## GO / NO-GO
@@ -63,7 +63,7 @@ Scenario 10 is the deliberate test of the "injected faults are too clean" gap.
 
 ## Sequence
 
-- **Phase 0 — venue.** Scale up preprod; create the throwaway eval namespace; deploy the test app; confirm the **preprod observability spoke (#590/P10)** captures the app's metrics/logs/traces. *(Hard dependency: this spike needs P10 far enough along that preprod telemetry is queryable.)*
+- **Phase 0 — venue.** Scale up preprod; create the throwaway eval namespace; deploy the test app; confirm the **preprod observability spoke (P10, #150)** captures the app's metrics **and logs/traces**. *(Hard dependency: P10 metrics are live, but the **logs/traces spokes are a P10 follow-on not yet built** — and the agent reads Loki/Tempo, so this must be finished first. Also needs `allow-metrics-scrape` on the test app's Environment namespace.)*
 - **Phase 1 — freeze first, no agent.** Build C + D + E. Prove you can take a faithful "photograph" of a window and read it back.
 - **Phase 2 — three easy faults.** Build B for scenarios 1, 5, 6 (cleanest) → produce 3 fixtures.
 - **Phase 3 — first graded run.** Build F + G; run over the 3 fixtures; confirm you get *a* graded score at all.
@@ -82,7 +82,7 @@ uncertainty, surfaces). This spike builds **only** the answer-key machinery.
 - **Faults too clean** — real incidents are noisy/cascading. *Mitigation:* scenario #10 (compound under load); calibrate difficulty against the few real postmortems later.
 - **Taxonomy doesn't fit a real fault** — *Mitigation:* the `other/unknown` escape hatch + a flag to grow the enum; a high `other` rate is itself a finding.
 - **Preprod entanglement** — demolition disturbs other staging work. *Mitigation:* a dedicated eval namespace/test-product; faults scoped to it.
-- **P10 not ready** — no preprod telemetry to capture. *Mitigation:* Phase 0 gates on it; if P10 slips, the fallback is a small dedicated cluster in the test account (higher build cost — see ADR-080 venue discussion).
+- **Preprod logs/traces not flowing** — P10 (#150) shipped *metrics* only; the logs/traces spokes are an unbuilt follow-on, and the agent reads Loki/Tempo. *Mitigation:* Phase 0 gates on finishing them; if that slips, the fallback is a small dedicated cluster in the test account (higher build cost — see ADR-080 venue discussion).
 
 ## Artifacts
 
