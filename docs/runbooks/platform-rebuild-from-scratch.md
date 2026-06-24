@@ -234,6 +234,13 @@ down tailscale) and configures kubeconfig. Logs stream to `.platctl-logs/latest/
 (self-owns its browser HTTPRoute on the gateway) → `keycloak-config`; separately `argocd → keycloak-config`;
 `gateway-config` carries the remaining app routes.
 
+**Karpenter ordering (ADR-078):** `karpenter` runs on the system group after `eks`/`cilium`/`node-groups`/
+`eks-addons`. It has **no terragrunt dependency on the management-account `organizations` unit**, but it needs
+the `*-karpenter-*` **SCP exemption** (in `exempt_roles`) to be live first — without it, the controller can't
+tag launch templates or call `ec2:RunInstances` (`DenyTeamTagTampering` + `require-tagging` → 403, nodes never
+launch). `organizations` is a foundational management unit applied early in the bootstrap, so this holds in a
+normal run; just don't apply `karpenter` against a cluster whose org SCPs predate the exemption.
+
 ### keycloak-config readiness (automatic, in-cluster — no Tailscale, no `--resume`)
 
 `keycloak-config` configures Keycloak **in-cluster** via a kubectl **port-forward to the ClusterIP** — not the
