@@ -1,6 +1,6 @@
 # External Secrets Operator
 
-Deploys the External Secrets Operator (ESO) via Helm with optional IRSA for reading secrets from AWS Secrets Manager and SSM Parameter Store. When IRSA is enabled, creates an IAM role scoped to configurable path prefixes for both Secrets Manager and SSM, with optional KMS decrypt permissions. The module installs CRDs automatically. ClusterSecretStore resources are created separately via the `secret-stores` module.
+Deploys the External Secrets Operator (ESO) via Helm for reading secrets from AWS Secrets Manager and SSM Parameter Store, with AWS identity via **EKS Pod Identity** (ADR-047). Creates an IAM role scoped to configurable path prefixes for both Secrets Manager and SSM (with optional KMS decrypt), and a Pod Identity association binding it to the `external-secrets` controller ServiceAccount. The module installs CRDs automatically. ClusterSecretStore resources are created separately via the `secret-stores` module — they authenticate as this controller identity (no per-store `serviceAccountRef`).
 
 ## Usage
 
@@ -8,10 +8,8 @@ Deploys the External Secrets Operator (ESO) via Helm with optional IRSA for read
 module "external_secrets" {
   source = "../../modules/external-secrets"
 
-  cluster_name      = "platform-use1-eks"
-  aws_account_id    = "<PLATFORM_ACCOUNT_ID>"
-  oidc_provider_arn = "arn:aws:iam::<PLATFORM_ACCOUNT_ID>:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE"
-  oidc_provider_url = "oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE"
+  cluster_name   = "platform-use1-eks"
+  aws_account_id = "<PLATFORM_ACCOUNT_ID>"
 
   secret_path_prefix = "platform"
   ssm_path_prefix    = "/platform"
@@ -33,17 +31,6 @@ module "external_secrets" {
   source = "../../modules/external-secrets"
 
   create         = false
-  cluster_name   = "platform-use1-eks"
-  aws_account_id = "<PLATFORM_ACCOUNT_ID>"
-}
-```
-
-### Minimal (No IRSA)
-
-```hcl
-module "external_secrets" {
-  source = "../../modules/external-secrets"
-
   cluster_name   = "platform-use1-eks"
   aws_account_id = "<PLATFORM_ACCOUNT_ID>"
 }
@@ -73,6 +60,7 @@ No modules.
 
 | Name | Type |
 | ---- | ---- |
+| [aws_eks_pod_identity_association.external_secrets](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eks_pod_identity_association) | resource |
 | [aws_iam_role.external_secrets](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role_policy.external_secrets](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [helm_release.external_secrets](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
@@ -94,10 +82,8 @@ No modules.
 | <a name="input_helm_wait"></a> [helm\_wait](#input\_helm\_wait) | Whether to wait for Helm release to complete | `bool` | `true` | no |
 | <a name="input_kms_key_arns"></a> [kms\_key\_arns](#input\_kms\_key\_arns) | KMS key ARNs that external-secrets is allowed to decrypt | `list(string)` | `[]` | no |
 | <a name="input_namespace"></a> [namespace](#input\_namespace) | Kubernetes namespace to install external-secrets into | `string` | `"external-secrets"` | no |
-| <a name="input_oidc_provider_arn"></a> [oidc\_provider\_arn](#input\_oidc\_provider\_arn) | ARN of the EKS OIDC provider for IRSA. Empty string disables IRSA. | `string` | `""` | no |
-| <a name="input_oidc_provider_url"></a> [oidc\_provider\_url](#input\_oidc\_provider\_url) | OIDC provider URL (without https:// prefix) for IRSA trust policy | `string` | `""` | no |
-| <a name="input_secret_path_prefix"></a> [secret\_path\_prefix](#input\_secret\_path\_prefix) | Secrets Manager path prefix for scoping IRSA access (e.g., 'platform') | `string` | `"*"` | no |
-| <a name="input_ssm_path_prefix"></a> [ssm\_path\_prefix](#input\_ssm\_path\_prefix) | SSM Parameter Store path prefix for scoping IRSA access (e.g., '/platform') | `string` | `"/*"` | no |
+| <a name="input_secret_path_prefix"></a> [secret\_path\_prefix](#input\_secret\_path\_prefix) | Secrets Manager path prefix for scoping access (e.g., 'platform') | `string` | `"*"` | no |
+| <a name="input_ssm_path_prefix"></a> [ssm\_path\_prefix](#input\_ssm\_path\_prefix) | SSM Parameter Store path prefix for scoping access (e.g., '/platform') | `string` | `"/*"` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to all resources | `map(string)` | `{}` | no |
 
 ## Outputs
@@ -105,7 +91,7 @@ No modules.
 | Name | Description |
 | ---- | ----------- |
 | <a name="output_helm_release_status"></a> [helm\_release\_status](#output\_helm\_release\_status) | Status of the external-secrets Helm release |
-| <a name="output_irsa_role_arn"></a> [irsa\_role\_arn](#output\_irsa\_role\_arn) | ARN of the IRSA IAM role for external-secrets |
+| <a name="output_role_arn"></a> [role\_arn](#output\_role\_arn) | ARN of the external-secrets IAM role (bound to the controller SA via EKS Pod Identity) |
 | <a name="output_namespace"></a> [namespace](#output\_namespace) | Kubernetes namespace where external-secrets is installed |
 <!-- END_TF_DOCS -->
 
@@ -118,4 +104,4 @@ No modules.
 ## Related ADRs
 
 - ADR-019: External Secrets Operator for Secrets Management
-- ADR-018: IRSA for Pod-Level AWS Identity
+- ADR-047: EKS Pod Identity as the Standard for Pod AWS Identity

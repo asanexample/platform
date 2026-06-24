@@ -8,7 +8,7 @@ output "namespace" {
   value       = local.create ? helm_release.external_secrets[0].namespace : var.namespace
 }
 
-output "irsa_role_arn" {
-  description = "ARN of the IRSA IAM role for external-secrets"
-  value       = local.create_irsa ? aws_iam_role.external_secrets[0].arn : null
+output "role_arn" {
+  description = "ARN of the external-secrets IAM role (bound to the controller SA via EKS Pod Identity)"
+  value       = local.create ? aws_iam_role.external_secrets[0].arn : null
 }

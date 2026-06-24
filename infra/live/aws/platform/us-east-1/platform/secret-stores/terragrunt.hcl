@@ -59,7 +59,8 @@ inputs = {
   create = true
   region = include.base.locals.region
 
-  service_account_namespace = dependency.external_secrets.outputs.namespace
+  # ESO auth is the controller's EKS Pod Identity (ADR-047, #594) — no serviceAccountRef needed. The
+  # external_secrets dependency below is kept for ordering (ESO + CRDs must exist before the stores).
 
   tags = include.base.locals.tags
 }
