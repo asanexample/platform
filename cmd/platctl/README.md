@@ -88,7 +88,10 @@ teardown.
   (recreating the NodePool `down` deleted, so node autoscaling returns). The readiness gate is essential: the
   karpenter apply needs the helm/kubernetes providers, so applying before the API is up fails *and* orphans
   karpenter's helm releases from TF state (a manual-import trap). On timeout it skips karpenter (node groups are
-  already restored) and asks you to re-run.
+  already restored) and asks you to re-run. Finally, if any workload is left with **zero pods** (the fail-closed
+  Kyverno image-verification webhook can cache a failed sigstore TUF init while the network settles, denying every
+  policed pod), it **restarts the Kyverno admission controller** and re-rolls the blocked Deployments so they
+  recover promptly instead of waiting out the ReplicaSet backoff.
 
 ```bash
 platctl down --env preprod    # park overnight (~5-min resume, data intact)
