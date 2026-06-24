@@ -1,6 +1,5 @@
 locals {
-  create      = var.create
-  create_irsa = local.create && var.oidc_provider_arn != ""
+  create = var.create
 
   k8s_labels = {
     for k, v in var.tags :
@@ -19,11 +18,8 @@ locals {
       podLabels = local.k8s_labels
     }
 
-    serviceAccount = {
-      annotations = local.create_irsa ? {
-        "eks.amazonaws.com/role-arn" = aws_iam_role.cert_manager[0].arn
-      } : {}
-    }
+    # AWS identity via EKS Pod Identity (ADR-047): the cert-manager SA is matched by the
+    # pod-identity association below — no IRSA `eks.amazonaws.com/role-arn` annotation needed.
 
     securityContext = {
       fsGroup = 1001 # cert-manager runs as non-root uid 1001; fsGroup ensures volume mounts are writable
@@ -40,37 +36,25 @@ locals {
 }
 
 # ---------------------------------------------------------------------------
-# IRSA — IAM Role for cert-manager (DNS01 challenge via Route53)
+# IAM — cert-manager role (DNS-01 via Route53); AWS identity via EKS Pod Identity (ADR-047)
 # ---------------------------------------------------------------------------
 
 data "aws_iam_policy_document" "cert_manager_trust" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create ? 1 : 0
 
   statement {
     effect  = "Allow"
-    actions = ["sts:AssumeRoleWithWebIdentity"]
+    actions = ["sts:AssumeRole", "sts:TagSession"]
 
     principals {
-      type        = "Federated"
-      identifiers = [var.oidc_provider_arn]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "${var.oidc_provider_url}:aud"
-      values   = ["sts.amazonaws.com"]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "${var.oidc_provider_url}:sub"
-      values   = ["system:serviceaccount:${var.namespace}:cert-manager"]
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
     }
   }
 }
 
 resource "aws_iam_role" "cert_manager" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create ? 1 : 0
 
   name_prefix        = "${var.cluster_name}-cert-mgr-"
   assume_role_policy = data.aws_iam_policy_document.cert_manager_trust[0].json
@@ -79,7 +63,7 @@ resource "aws_iam_role" "cert_manager" {
 }
 
 data "aws_iam_policy_document" "cert_manager_route53" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create ? 1 : 0
 
   statement {
     effect = "Allow"
@@ -111,11 +95,23 @@ data "aws_iam_policy_document" "cert_manager_route53" {
 }
 
 resource "aws_iam_role_policy" "cert_manager_route53" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create ? 1 : 0
 
   name   = "route53-dns01"
   role   = aws_iam_role.cert_manager[0].id
   policy = data.aws_iam_policy_document.cert_manager_route53[0].json
+}
+
+# Pod Identity association: binds the role to the `cert-manager` controller SA (the DNS-01 solver).
+# The webhook/cainjector SAs need no AWS access, so only this SA is associated.
+resource "aws_eks_pod_identity_association" "cert_manager" {
+  count = local.create ? 1 : 0
+
+  cluster_name    = var.cluster_name
+  namespace       = var.namespace
+  service_account = "cert-manager"
+  role_arn        = aws_iam_role.cert_manager[0].arn
+  tags            = var.tags
 }
 
 # ---------------------------------------------------------------------------
@@ -140,5 +136,6 @@ resource "helm_release" "cert_manager" {
     yamlencode(local.cert_manager_values),
   ]
 
-  depends_on = [aws_iam_role.cert_manager]
+  # The association must exist before the SA/pod rolls so the new pod gets Pod-Identity creds immediately.
+  depends_on = [aws_eks_pod_identity_association.cert_manager]
 }

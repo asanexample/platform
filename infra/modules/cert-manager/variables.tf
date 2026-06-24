@@ -16,20 +16,8 @@ variable "tags" {
 }
 
 # ---------------------------------------------------------------------------
-# IRSA
+# IAM (EKS Pod Identity — ADR-047)
 # ---------------------------------------------------------------------------
-
-variable "oidc_provider_arn" {
-  description = "ARN of the EKS OIDC provider for IRSA. Empty string disables IRSA."
-  type        = string
-  default     = ""
-}
-
-variable "oidc_provider_url" {
-  description = "OIDC provider URL (without https:// prefix) for IRSA trust policy"
-  type        = string
-  default     = ""
-}
 
 variable "route53_hosted_zone_arn" {
   description = "ARN of the Route53 hosted zone for DNS01 challenge solving"

@@ -8,7 +8,7 @@ output "namespace" {
   value       = local.create ? helm_release.cert_manager[0].namespace : var.namespace
 }
 
-output "irsa_role_arn" {
-  description = "ARN of the IRSA IAM role for cert-manager"
-  value       = local.create_irsa ? aws_iam_role.cert_manager[0].arn : null
+output "role_arn" {
+  description = "ARN of the cert-manager IAM role (bound to the SA via EKS Pod Identity)"
+  value       = local.create ? aws_iam_role.cert_manager[0].arn : null
 }
