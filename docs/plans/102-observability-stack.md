@@ -7,10 +7,13 @@
 > (severity routing + inhibition + 28 curated `PrometheusRule`s across 7 components + store self-monitoring;
 > SNS / Slack / PagerDuty receivers; deploy/change dashboard annotations; PRs #604–#612). As-built reference:
 > [observability-current-state.md](../architecture/observability-current-state.md). **P5 cloud-resource
-> observability** is scoped + mostly live (ADR-079: P5a CloudWatch metrics+logs datasource and P5b YACE→Mimir
-> built; P5c Loki ingestion descoped; GuardDuty/Config punted). **Remaining:** P5 curated AWS dashboards +
-> one alert, P10 preprod spoke onboarding, cost (P11 incl. CUR→Athena), Grafana SSO (deferred hardening), and
-> the smaller phases below. Tracking issue: [#102](https://github.com/asanexample/platform/issues/102).
+> observability is live** (ADR-079: P5a CloudWatch metrics+logs datasource + P5b YACE→Mimir + the AWS Cloud
+> Resources dashboard and NLB/NAT/TGW alerts, #584/#670/#671; P5c Loki ingestion descoped, GuardDuty/Config
+> punted). **P10** (preprod spoke) and **Grafana SSO** (#592/#638) are also live. **Remaining:** **P11-cost**
+> CUR→Athena (#668 — cost-allocation-tag prereq applied #673), **P12** policy-reporter (#93), **P13** per-team
+> isolation (#590, designed + paused), **P14** golden path (#591), and small chores (#595 chart bump, #151
+> dashboard cluster/env filters — blocked on cluster-label normalization, #161 Hubble export). Tracking issue:
+> [#102](https://github.com/asanexample/platform/issues/102).
 
 ## Context
 
