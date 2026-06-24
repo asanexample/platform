@@ -46,7 +46,7 @@
       "fieldConfig": { "defaults": { "unit": "short", "decimals": 2, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.001 }] } }, "overrides": [] },
       "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "targets": [
-        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(aws_transitgateway_packet_drop_count_blackhole_sum[5m]))" }
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(aws_transitgateway_packet_drop_count_blackhole_sum[10m]))" }
       ]
     },
     {
@@ -94,7 +94,7 @@
       "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "targets": [
-        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_LoadBalancer) (rate(aws_networkelb_processed_bytes_sum[5m]))", "legendFormat": "{{dimension_LoadBalancer}}" }
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_LoadBalancer) (rate(aws_networkelb_processed_bytes_sum[15m]))", "legendFormat": "{{dimension_LoadBalancer}}" }
       ]
     },
     {
@@ -107,7 +107,7 @@
       "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "targets": [
-        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_LoadBalancer) (rate(aws_networkelb_tcp_target_reset_count_sum[5m]))", "legendFormat": "{{dimension_LoadBalancer}}" }
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_LoadBalancer) (rate(aws_networkelb_tcp_target_reset_count_sum[15m]))", "legendFormat": "{{dimension_LoadBalancer}}" }
       ]
     },
     {
@@ -128,7 +128,7 @@
       "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "targets": [
-        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_NatGatewayId) (rate(aws_natgateway_bytes_out_to_destination_sum[5m]))", "legendFormat": "{{dimension_NatGatewayId}}" }
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_NatGatewayId) (rate(aws_natgateway_bytes_out_to_destination_sum[15m]))", "legendFormat": "{{dimension_NatGatewayId}}" }
       ]
     },
     {
@@ -141,7 +141,7 @@
       "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "targets": [
-        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_NatGatewayId) (rate(aws_natgateway_packets_drop_count_sum[5m]))", "legendFormat": "{{dimension_NatGatewayId}}" }
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_NatGatewayId) (rate(aws_natgateway_packets_drop_count_sum[15m]))", "legendFormat": "{{dimension_NatGatewayId}}" }
       ]
     },
     {
@@ -162,8 +162,8 @@
       "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
       "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] }, "tooltip": { "mode": "multi" } },
       "targets": [
-        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_TransitGateway) (rate(aws_transitgateway_bytes_in_sum[5m]))", "legendFormat": "in — {{dimension_TransitGateway}}" },
-        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_TransitGateway) (rate(aws_transitgateway_bytes_out_sum[5m]))", "legendFormat": "out — {{dimension_TransitGateway}}" }
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_TransitGateway) (rate(aws_transitgateway_bytes_in_sum[15m]))", "legendFormat": "in — {{dimension_TransitGateway}}" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_TransitGateway) (rate(aws_transitgateway_bytes_out_sum[15m]))", "legendFormat": "out — {{dimension_TransitGateway}}" }
       ]
     },
     {
@@ -176,7 +176,7 @@
       "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "targets": [
-        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_TransitGateway) (rate(aws_transitgateway_packet_drop_count_blackhole_sum[5m]))", "legendFormat": "{{dimension_TransitGateway}}" }
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_TransitGateway) (rate(aws_transitgateway_packet_drop_count_blackhole_sum[15m]))", "legendFormat": "{{dimension_TransitGateway}}" }
       ]
     }
   ]
