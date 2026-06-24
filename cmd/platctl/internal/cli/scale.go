@@ -128,7 +128,12 @@ from the HCL — the inverse of 'platctl down'. Takes ~1-2 minutes.`,
 					Auth:     cfg.AuthForUnit(envName, "karpenter"),
 				}
 				fmt.Printf("Restoring %s Karpenter NodePool (terragrunt apply)...\n", envName)
-				if err := runner.Run(ctx, kpUnit, engine.Apply); err != nil {
+				// 'down' deletes the NodePool CR via kubectl to drain Karpenter's nodes, but leaves the helm
+				// release that renders it untouched in TF state — so a plain apply sees no release change and does
+				// NOT recreate the deleted NodePool (an apply reports "0 changed" and the cluster comes back with
+				// no autoscaling). Force-replace the nodepool release so the NodePool always returns. The address
+				// is the karpenter module's resource (count-indexed); keep in sync if the module is restructured.
+				if err := runner.Run(ctx, kpUnit, engine.Apply, "-replace=helm_release.nodepool[0]"); err != nil {
 					return err
 				}
 			}
