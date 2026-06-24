@@ -108,6 +108,19 @@ from the HCL — the inverse of 'platctl down'. Takes ~1-2 minutes.`,
 			// cluster regains node autoscaling). No-op if this env has no karpenter unit.
 			kpPath := filepath.Join(repoRoot, env.Path, "karpenter")
 			if _, statErr := os.Stat(kpPath); statErr == nil {
+				// The karpenter apply uses the helm/kubernetes providers, so it needs the cluster API — which,
+				// for a private cluster, is fronted by the in-cluster Tailscale subnet router that only comes
+				// back once the restored system nodes are Ready. Applying before then fails AND leaves karpenter's
+				// helm releases orphaned from TF state (a "cannot re-use a name" trap needing manual import, #660).
+				// Gate the apply on API readiness; on timeout we skip it (node groups are already restored) and
+				// tell the operator to re-run, rather than apply into an unreachable API and corrupt state.
+				kc, kcErr := kubeconfigForEnv(cfg, envName)
+				if kcErr != nil {
+					return fmt.Errorf("restoring karpenter: %w", kcErr)
+				}
+				if err := waitForClusterAPI(ctx, kc); err != nil {
+					return err
+				}
 				kpUnit := &engine.Unit{
 					Name:     envName + "/karpenter",
 					Path:     kpPath,
@@ -130,6 +143,39 @@ from the HCL — the inverse of 'platctl down'. Takes ~1-2 minutes.`,
 
 	cmd.Flags().StringVar(&envName, "env", "", "Environment to restore (required)")
 	return cmd
+}
+
+// waitForClusterAPI polls the cluster API until it answers, so 'up' doesn't apply the API-dependent karpenter
+// unit before the restored nodes (and the in-cluster Tailscale subnet router fronting the private endpoint) are
+// back — which fails the apply and orphans karpenter's helm releases from TF state (#660). Returns an error on
+// timeout so the caller skips the karpenter apply rather than applying into an unreachable API and corrupting
+// state. Indirected through waitForClusterAPIFn so tests can stub the kubectl boundary.
+var waitForClusterAPIFn = doWaitForClusterAPI
+
+func waitForClusterAPI(ctx context.Context, kc config.KubeconfigEntry) error {
+	return waitForClusterAPIFn(ctx, kc)
+}
+
+func doWaitForClusterAPI(ctx context.Context, kc config.KubeconfigEntry) error {
+	path, cleanup, err := tempKubeconfig(ctx, kc, "platctl-ready")
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	fmt.Println("  waiting for the cluster API to become reachable (restored nodes + Tailscale router)...")
+	for i := 0; i < 90; i++ { // up to ~15 min — exits as soon as the API answers
+		out, qErr := exec.CommandContext(ctx, "kubectl", "--kubeconfig", path,
+			"get", "ns", "--request-timeout=10s", "-o", "name").CombinedOutput()
+		if qErr == nil && strings.Contains(string(out), "namespace/") {
+			fmt.Println("  cluster API reachable.")
+			return nil
+		}
+		time.Sleep(10 * time.Second)
+	}
+	return fmt.Errorf("cluster API for %s not reachable after ~15m; node groups are restored but the karpenter "+
+		"apply was skipped to avoid orphaning its helm releases — re-run 'platctl up' once nodes/Tailscale are up",
+		kc.Cluster)
 }
 
 // runReconnect runs the post-restore repair steps for an environment (see config.EnvConfig.Reconnect):

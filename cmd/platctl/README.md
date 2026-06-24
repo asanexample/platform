@@ -82,8 +82,13 @@ teardown.
   controller runs on the system group, so scaling the managed groups first would kill it mid-park and leave its
   EC2 instances orphaned (ADR-078). No-op on clusters without Karpenter. The **control plane and all EBS volumes
   survive** (e.g. CNPG databases), so it is non-destructive; `--yes` skips the confirmation.
-- `platctl up --env <env>` re-applies the env's `node-groups` unit (restoring the configured sizes from the HCL)
-  **and the `karpenter` unit** (recreating the NodePool `down` deleted, so node autoscaling returns).
+- `platctl up --env <env>` re-applies the env's `node-groups` unit (restoring the configured sizes from the HCL),
+  then **waits for the cluster API to become reachable** (the restored nodes + the in-cluster Tailscale router
+  that fronts the private endpoint take a few minutes to come back), then re-applies the **`karpenter` unit**
+  (recreating the NodePool `down` deleted, so node autoscaling returns). The readiness gate is essential: the
+  karpenter apply needs the helm/kubernetes providers, so applying before the API is up fails *and* orphans
+  karpenter's helm releases from TF state (a manual-import trap). On timeout it skips karpenter (node groups are
+  already restored) and asks you to re-run.
 
 ```bash
 platctl down --env preprod    # park overnight (~5-min resume, data intact)
