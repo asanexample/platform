@@ -40,8 +40,12 @@ locals {
   # Graviton (arm64/t4g) vs x86 (t3), driven by include.base.locals.node_arch. (Subnet/single-AZ selection
   # can't live here — terragrunt locals can't read dependency outputs — so it's passed to the module as
   # single_az + the full kubernetes subnet list; the module restricts to one AZ when single_az = true.)
-  _arm         = include.base.locals.node_arch == "arm64"
-  sys_instance = local._arm ? "t4g.large" : "t3.large"
+  _arm = include.base.locals.node_arch == "arm64"
+  # t4g.xlarge (4 vCPU / 16 GiB). The per-node DaemonSet slab (Cilium, Beyla, Alloy, node-exporter, otel) plus
+  # the heavy standing load (Keycloak/ArgoCD/Crossplane/Prometheus/Grafana) saturated the old 2-vCPU t4g.large
+  # at ~100% CPU — node-pinned DaemonSet pods (alloy-profiles) couldn't even fit. The xlarge gives per-node
+  # headroom; Karpenter handles bursts above this floor.
+  sys_instance = local._arm ? "t4g.xlarge" : "t3.xlarge"
   ami_type     = local._arm ? "AL2023_ARM_64_STANDARD" : "AL2023_x86_64_STANDARD"
 }
 
@@ -57,7 +61,7 @@ inputs = {
     # System nodes run platform components (Cilium, ArgoCD, cert-manager, Keycloak, Crossplane, etc.)
     system = {
       subnet_ids     = [for name, id in dependency.networking.outputs.subnet_ids : id if can(regex("kubernetes$", name))]
-      instance_types = [local.sys_instance] # 2 vCPU / 8 GiB (t4g.large Graviton in the dev profile)
+      instance_types = [local.sys_instance] # 4 vCPU / 16 GiB (t4g.xlarge Graviton in the dev profile)
       ami_type       = local.ami_type
       # Dev profile: 2 nodes. With Mimir off and single-AZ placement, the old "cover all 3 AZs for the
       # AZ-pinned observability StatefulSets" reason is gone — count is now RAM/CPU-bound. The stack is
