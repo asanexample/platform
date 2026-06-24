@@ -43,7 +43,6 @@ locals {
   _arm         = include.base.locals.node_arch == "arm64"
   sys_instance = local._arm ? "t4g.large" : "t3.large"
   ami_type     = local._arm ? "AL2023_ARM_64_STANDARD" : "AL2023_x86_64_STANDARD"
-  spot_pool    = local._arm ? ["t4g.large", "t4g.xlarge", "m6g.large", "m7g.large"] : ["t3.large", "t3a.large", "m5.large", "m6i.large"]
 }
 
 inputs = {
@@ -71,19 +70,9 @@ inputs = {
       # Kubernetes default so density is bound by CPU/mem, not IPs.
       max_pods = 110
     }
-    # Workload nodes run ArgoCD-managed application pods — Spot in the dev profile (stateless; ArgoCD
-    # reschedules on interruption). Diversified instance pool for better Spot availability.
-    workload = {
-      subnet_ids     = [for name, id in dependency.networking.outputs.subnet_ids : id if can(regex("kubernetes$", name))]
-      instance_types = local.spot_pool
-      ami_type       = local.ami_type
-      capacity_type  = "SPOT"
-      desired_size   = 1
-      max_size       = 6
-      min_size       = 1
-      labels         = { "node-role" = "workload" }
-      max_pods       = 110 # overlay: lift the ENI-based cap (see system node group)
-    }
+    # Workload capacity is now Karpenter's (ADR-078) — the static Spot workload group is retired. Karpenter
+    # provisions right-sized on-demand nodes just-in-time for overflow and consolidates them when idle (the
+    # `karpenter` unit). The system group stays a fixed on-demand floor for the controller + standing components.
   }
 
   tags = include.base.locals.tags

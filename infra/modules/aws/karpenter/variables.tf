@@ -62,6 +62,12 @@ variable "instance_families" {
   default     = []
 }
 
+variable "min_instance_memory_mib" {
+  description = "Exclude instance types smaller than this (MiB). Heavy per-node DaemonSets (Cilium, Beyla, Alloy, node-exporter) consume a fixed slab of every node's memory; too-small nodes exhaust it and the kubelet goes NotReady. 0 = no floor. Set ~6144 to require 8 GiB+ (t4g.large), matching the system node size."
+  type        = number
+  default     = 0
+}
+
 variable "capacity_types" {
   description = "Allowed capacity types — e.g. [\"on-demand\"] (platform, stateful-safe) or [\"spot\",\"on-demand\"] (preprod, cheap/ephemeral)."
   type        = list(string)

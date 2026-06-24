@@ -117,6 +117,20 @@ resource "aws_iam_role_policy" "controller" {
         }
       },
       {
+        # Standalone re-tagging of running instances (the nodeclaim.tagging controller sets Name +
+        # karpenter.sh/nodeclaim + eks:eks-cluster-name AFTER launch — not covered by the CreateAction-scoped
+        # statement above). ForAllValues caps it to exactly those keys.
+        Sid      = "AllowScopedResourceTagging"
+        Effect   = "Allow"
+        Action   = ["ec2:CreateTags"]
+        Resource = "arn:${local.partition}:ec2:${var.aws_region}:*:instance/*"
+        Condition = {
+          StringEquals                = { "aws:ResourceTag/${local.cluster_tag}" = "owned" }
+          StringLike                  = { "aws:ResourceTag/karpenter.sh/nodepool" = "*" }
+          "ForAllValues:StringEquals" = { "aws:TagKeys" = ["eks:eks-cluster-name", "karpenter.sh/nodeclaim", "Name"] }
+        }
+      },
+      {
         Sid    = "AllowScopedDeletion"
         Effect = "Allow"
         Action = ["ec2:TerminateInstances", "ec2:DeleteLaunchTemplate"]
@@ -367,17 +381,18 @@ resource "helm_release" "nodepool" {
   wait             = false
 
   values = [yamlencode({
-    clusterName         = var.cluster_name
-    nodeRole            = local.node_role_name
-    subnetIds           = local.selected_subnets
-    securityGroupId     = var.cluster_security_group_id
-    arch                = local.k8s_arch
-    instanceFamilies    = local.instance_families
-    capacityTypes       = var.capacity_types
-    consolidationPolicy = var.consolidation_policy
-    consolidateAfter    = var.consolidate_after
-    cpuLimit            = var.cpu_limit
-    memoryLimit         = var.memory_limit
+    clusterName          = var.cluster_name
+    nodeRole             = local.node_role_name
+    subnetIds            = local.selected_subnets
+    securityGroupId      = var.cluster_security_group_id
+    arch                 = local.k8s_arch
+    instanceFamilies     = local.instance_families
+    minInstanceMemoryMib = var.min_instance_memory_mib
+    capacityTypes        = var.capacity_types
+    consolidationPolicy  = var.consolidation_policy
+    consolidateAfter     = var.consolidate_after
+    cpuLimit             = var.cpu_limit
+    memoryLimit          = var.memory_limit
     # BYOCNI: pods must not land before Cilium is ready; Cilium removes this taint (D5).
     startupTaintKey = "node.cilium.io/agent-not-ready"
     maxPods         = 110
