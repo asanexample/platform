@@ -16,7 +16,7 @@
 1. [Cloudflare API Token Rotation](#1-cloudflare-api-token-rotation)
 2. [Tailscale API Key Rotation](#2-tailscale-api-key-rotation)
 3. [Tailscale OAuth Client Rotation](#3-tailscale-oauth-client-rotation)
-4. [ArgoCD SSO CA Certificate Renewal](#4-argocd-sso-ca-certificate-renewal)
+4. [ArgoCD OIDC Client Secret Rotation](#4-argocd-oidc-client-secret-rotation)
 5. [Emergency: Compromised Secret Response](#5-emergency-compromised-secret-response)
 6. [Proactive: Tracking Secret Expiry](#6-proactive-tracking-secret-expiry)
 
@@ -152,42 +152,43 @@ to manage devices is temporarily affected.
 
 ---
 
-## 4. ArgoCD SSO CA Certificate Renewal
+## 4. ArgoCD OIDC Client Secret Rotation
 
-The SAML signing certificate from AWS Identity Center validates SSO login
-responses. When Identity Center rotates the certificate, ArgoCD must be
-updated or SSO login will fail with a certificate verification error.
+ArgoCD signs in directly against **Keycloak via OIDC** (ADR-053/059;
+embedded Dex is off, `dex_enabled = false`). The `argocd` OIDC client is
+owned by the `keycloak-config` module, which generates the client secret
+and stores it in Secrets Manager at `platform/keycloak/argocd-oidc`. The
+`argocd` unit syncs that secret into the `argocd` namespace via an
+ExternalSecret (`argocd-keycloak-oidc`), and `argocd-cm` references it as
+`$argocd-keycloak-oidc:client-secret`. Rotate when the secret is
+compromised, or as part of a routine credential refresh.
 
 ### Procedure
 
-1. **Export the new certificate** from the Identity Center SAML
-   application:
-
-   - Open the [IAM Identity Center console](https://console.aws.amazon.com/singlesignon)
-     in the management account (<MGMT_ACCOUNT_ID>)
-   - Navigate to **Applications** > **ArgoCD** > application details
-   - Download the **SAML metadata XML**
-
-2. **Extract and encode the certificate** from the metadata XML:
+1. **Re-apply `keycloak-config`** to mint a new client secret for the
+   `argocd` client (the deployer must be on Tailscale to reach
+   `keycloak.aws.refplat.org`):
 
    ```bash
-   xmllint --xpath '//*[local-name()="X509Certificate"]/text()' metadata.xml \
-     | fold -w 64 \
-     | { echo "-----BEGIN CERTIFICATE-----"; cat; echo "-----END CERTIFICATE-----"; } \
-     > signing-cert.pem
-
-   base64 -i signing-cert.pem | tr -d '\n'
+   cd infra/live/aws/platform/us-east-1/platform/keycloak-config
+   terragrunt apply
    ```
 
-   > **Warning:** Do NOT use the certificate downloaded from the Identity
-   > Center console ("Download certificate" button). Always extract the
-   > certificate from the SAML metadata XML -- it contains the exact
-   > certificate used to sign SAML responses.
+   This rotates the `argocd` `keycloak_openid_client` secret in Keycloak
+   and updates the Secrets Manager secret at
+   `platform/keycloak/argocd-oidc`.
 
-3. **Update** `argocd_sso_ca_data` in `infra/live/aws/common.hcl` with
-   the base64-encoded certificate from step 2.
+2. **Force the ExternalSecret to re-sync** so the new value lands in the
+   `argocd` namespace (External Secrets refreshes on its own interval; a
+   manual nudge propagates it immediately):
 
-4. **Apply:**
+   ```bash
+   kubectl -n argocd annotate externalsecret argocd-keycloak-oidc \
+     force-sync="$(date +%s)" --overwrite
+   ```
+
+3. **Re-apply `argocd`** (or restart the server) so it picks up the
+   refreshed `argocd-cm` reference:
 
    ```bash
    cd infra/live/aws/platform/us-east-1/platform/argocd
@@ -195,12 +196,13 @@ updated or SSO login will fail with a certificate verification error.
    ```
 
    The `configHash` annotation in the Helm release triggers an automatic
-   pod restart.
+   pod restart; alternatively
+   `kubectl -n argocd rollout restart deployment argocd-server`.
 
-5. **Verify** SSO login:
+4. **Verify** OIDC login:
    - Connect to Tailscale VPN, then access the ArgoCD UI at `https://argocd.aws.refplat.org`
-   - Click "Log in via SSO"
-   - Complete authentication through Identity Center
+   - Click "Log in via Keycloak"
+   - Complete authentication through Keycloak
    - Confirm group-based RBAC permissions are working (admin users can
      see all applications, developers can sync)
 
@@ -229,7 +231,7 @@ Use the relevant section above to rotate the secret:
 | Cloudflare API token | [Section 1](#1-cloudflare-api-token-rotation) |
 | Tailscale API key | [Section 2](#2-tailscale-api-key-rotation) |
 | Tailscale OAuth client | [Section 3](#3-tailscale-oauth-client-rotation) |
-| ArgoCD SSO CA cert | [Section 4](#4-argocd-sso-ca-certificate-renewal) |
+| ArgoCD OIDC client secret | [Section 4](#4-argocd-oidc-client-secret-rotation) |
 
 **Revoke the old credential immediately** -- do not wait for verification
 of the new credential.
@@ -273,7 +275,7 @@ Determine if the compromised credential was used to access other systems:
   created (Tailscale admin > Settings > Keys).
 - **Cloudflare API token:** Check DNS records for unauthorized
   modifications (`cloudflare-dns` unit, Cloudflare dashboard audit log).
-- **ArgoCD SSO cert:** Check ArgoCD audit logs for unauthorized logins:
+- **ArgoCD OIDC client secret:** Check ArgoCD audit logs for unauthorized logins:
 
   ```bash
   kubectl logs -n argocd -l app.kubernetes.io/name=argocd-server \
@@ -334,7 +336,7 @@ Within 48 hours of the incident:
 | Tailscale API key | `platform/tailscale/api-key` (Secrets Manager) | 90 days | Calendar reminder |
 | Tailscale OAuth client | `platform/tailscale/oauth` (Secrets Manager) | No expiry | Compromise only |
 | Cloudflare API token | `platform/cloudflare/api-token` (Secrets Manager) | No expiry | Compromise or policy |
-| ArgoCD SSO CA cert | `argocd_sso_ca_data` in `common.hcl` | Varies (IdC rotation) | Identity Center notification |
+| ArgoCD OIDC client secret | `platform/keycloak/argocd-oidc` (Secrets Manager) | No expiry | Compromise or routine refresh |
 
 ### Checking Current Key Age
 

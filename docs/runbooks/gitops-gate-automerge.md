@@ -1,8 +1,8 @@
 # Runbook: Environment-Claims PR Automerge (the Environment Claims Gate)
 
 > **Purpose:** how self-service environment provisioning merges without a human (ADR-062 §2–4, #281): the
-> Backstage **New Environment** template opens a PR via the scaffolder write App; the **Environment Claims Gate**
-> (`.github/workflows/tenant-claims-gate.yml`) validates it deterministically and arms GitHub auto-merge;
+> Backstage **New Environment** template opens a PR via the scaffolder write App; the **gitops Gate**
+> (`.github/workflows/gitops-gate.yml`) validates it deterministically and arms GitHub auto-merge;
 > GitHub merges when every required check passes; ArgoCD syncs the claim; Crossplane provisions; Kyverno
 > envelope enforcement at admission is the runtime backstop.
 >
@@ -43,7 +43,7 @@ The rest of this runbook (CI-gate integrity, threat model, repo settings rationa
 
 | PR author | Diff | Outcome |
 |---|---|---|
-| scaffolder App | only `gitops/tenant-claims/preprod/*.yaml` adds/modifies, all checks pass | gate green, **auto-merge armed** |
+| scaffolder App | only `gitops/environments/**` (+ `gitops/products/**`, `gitops/releases/**`) adds/modifies, all checks pass | gate green, **auto-merge armed** |
 | scaffolder App | same, any check fails | gate red, no merge |
 | scaffolder App | anything else (New Team PRs, or a compromised key straying) | gate red until an **admin approves the current head SHA**; never auto-armed |
 | scaffolder App | deletes/renames a claim | gate red (the hard-delete is a human, reviewed PR — ADR-062 #283; use the Deprovision template to decommission first) |
@@ -83,9 +83,9 @@ The rest of this runbook (CI-gate integrity, threat model, repo settings rationa
 ## CI-gate integrity (why a PR can't cheat)
 
 - The workflow triggers on `pull_request_target` + `pull_request_review`, so the gate definition and all
-  scripts under `.github/scripts/environment-gate/` run from the **protected base branch** — a PR editing the
+  scripts under `.github/scripts/gitops-gate/` run from the **protected base branch** — a PR editing the
   gate is judged by the *current* gate, not its own copy.
-- The PR's content is checked out sparse (`gitops/tenant-claims` only), credential-free, and treated as
+- The PR's content is checked out sparse (`gitops/` registries only), credential-free, and treated as
   data: nothing from the head checkout is ever executed or templated.
 - **Stale approvals don't count**: for App-authored non-claim PRs, only an admin/maintainer approval whose
   `commit_id` equals the current head SHA passes the gate — an approve-then-push sequence goes red again
@@ -151,14 +151,15 @@ A new claim **provisions the environment** (namespace, quota, policies, Pod Iden
 Crossplane with zero further action. But a claim introducing a **new app/repo** still needs the delivery
 consumers applied (they derive from the claims): `policy` (preprod), `argocd-apps`, `github-oidc` —
 see `environment-onboarding.md`. Candidate for the #305 terragrunt-in-CI converge job (phase 1.5: trigger on
-`gitops/tenant-claims/**`).
+`gitops/environments/**`).
 
 ## Local testing
 
 ```bash
 # All gate scripts run locally (yq v4, helm, kyverno 1.18, crossplane CLI; docker for the render check):
 BASE_DIR=$PWD HEAD_DIR=/tmp/fake-head \
-  CLAIM_FILES="gitops/tenant-claims/preprod/charlie-web-dev.yaml" CLAIM_FILES_ADDED="..." \
-  BOT_AUTHOR=true RENDER_CHECK=false .github/scripts/environment-gate/validate-claims.sh
-BASE_DIR=$PWD HEAD_DIR=/tmp/fake-head CLAIM_FILES="..." .github/scripts/environment-gate/aggregate-quota.sh
+  CHANGED_FILES="gitops/environments/alpha/shop/dev.yaml" \
+  BOT_AUTHOR=true RENDER_CHECK=false .github/scripts/gitops-gate/validate-environments.sh
+# Other validators: validate-products.sh, validate-releases.sh, validate-deletions.sh
+#   (+ classify-diff.sh / render-environments.sh / publish-verdict.sh — see .github/scripts/gitops-gate/)
 ```

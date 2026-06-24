@@ -162,10 +162,13 @@ list without modifying the SCP logic.
    ```hcl
    inputs = {
      exempt_roles = [
-       # Keep the three live roles — do NOT drop these:
+       # Keep ALL six live entries — do NOT drop these:
        "OrganizationAccountAccessRole",
-       "PlatformDeployer",
        "github-actions-terratest",
+       "PlatformDeployer",
+       "crossplane-ecr-provisioner",     # environment ECR provisioning
+       "crossplane-provisioner-*",       # environment IAM/EKS provisioning
+       "*-karpenter-*",                  # Karpenter node provisioning (ADR-078)
        "TemporaryExempt-INCIDENT-1234",  # <-- add with incident ticket reference
      ]
    }

@@ -157,10 +157,9 @@ resource "keycloak_attribute_importer_identity_provider_mapper" "email" {
 }
 
 # ---------------------------------------------------------------------------
-# Per-app OIDC clients — each app's registration in the realm (ADR-053).
-# Confidential clients with a generated secret (stored in Secrets Manager, Keycloak-specific path so it does
-# NOT collide with Dex's platform/<id>/oidc during coexistence) + a `groups` claim mapper. Apps repoint to
-# these at the B3/B4 cutover; nothing consumes them yet.
+# Per-app OIDC clients — each app's registration in the realm (ADR-053/059).
+# Confidential clients with a generated secret (stored in Secrets Manager at platform/keycloak/<id>-oidc) +
+# a `groups` claim mapper. Each app (ArgoCD, Backstage, Grafana) consumes its secret via an ExternalSecret.
 # ---------------------------------------------------------------------------
 
 resource "random_password" "client" {

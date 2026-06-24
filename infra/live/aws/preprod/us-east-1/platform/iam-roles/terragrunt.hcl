@@ -14,9 +14,10 @@ terraform {
 inputs = {
   create = true
 
-  # Per-team developer + Pod Identity workload roles (DeveloperAccess-<team>, Pod-team-<team>) are now
-  # provisioned by the Tenant Composition (iam.aws.upbound.io), not here — all teams migrated (BACK stack P3,
-  # #174). This unit retains only the static platform roles below.
+  # Per-team Pod Identity workload roles (Pod-team-<team>) are provisioned by the Environment Composition
+  # (iam.aws.upbound.io), not here. NOTE: DeveloperAccess-<team> was meant to migrate too (BACK stack P3, #174)
+  # but the v3 Composition does NOT yet emit it (regression tracked in #647) — no DeveloperAccess role is live.
+  # This unit retains only the static platform roles below.
   roles = {
     PlatformAdmin = {
       description          = "Platform team cluster access"

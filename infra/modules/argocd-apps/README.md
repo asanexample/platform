@@ -126,11 +126,12 @@ No modules.
 - Preview ApplicationSets use Kustomize `namePrefix` (`pr-<number>-`) and `commonLabels` (`app.kubernetes.io/instance: pr-<number>`) to isolate preview pods from stable deployments.
 - Preview hostname rewriting patches `HTTPRoute` hostnames to `<app>-pr-<number>.<preview_domain>`.
 - The `github_org` variable must be set for PR preview generators to be created; if empty, preview ApplicationSets are skipped.
-- `enable_teams` adds a `platform-teams` AppProject + `teams` Application that syncs the git-native `Team` CRs (`teams_repo_path`, e.g. `gitops/teams`) to the target cluster — replacing the `crossplane-teams` Helm projection (ADR-063). The Team CRs are Kyverno admission inputs (envelope / team-must-exist), so the app carries a `sync-wave: "-1"` ahead of the tenant-claims app; selfHeal converges a claim transiently rejected before its Team lands.
-- `enable_tenant_claims` adds a `platform-tenants` AppProject + `tenant-claims-<env>` Application that syncs the cluster-scoped `XTenant` claim YAMLs (`tenant_claims_repo_path`) from git.
+- `enable_teams` adds a `platform-teams` AppProject + `teams` Application that syncs the git-native `Team` CRs (`teams_repo_path`, e.g. `gitops/teams`) to the target cluster — replacing the `crossplane-teams` Helm projection (ADR-063). The Team CRs are Kyverno admission inputs (envelope / team-must-exist), so the app carries a `sync-wave: "-1"` ahead of the environments registry-sync app; selfHeal converges a claim transiently rejected before its Team lands.
+- Setting `platform_repo_url` enables the **registry-sync** apps (ADR-069 §1): per registry kind, a `platform-<kind>` AppProject + an Application that projects the git-native registries onto the cluster as CRs — `products` (`gitops/products`, `Product` CRs, wave `-2`), `environments` (`gitops/environments`, the cluster-scoped `XEnvironment` claims, wave `0`), and `grants` (`gitops/grants`, `AccessGrant` CRs). The `XEnvironment` claims are thus delivered by the `environments` Application under the `platform-environments` AppProject — the retired `enable_tenant_claims`/`platform-tenants`/`tenant-claims-<env>`/`XTenant`/`tenant_claims_repo_path` wiring is replaced by this.
+- Per-Product **delivery** (`products` variable, gated on `platform_repo_url`): one `product-<team>-<product>` AppProject + ApplicationSet whose git-files generator fans out over the product's Release records to one Application per Environment.
 
 ## Related ADRs
 
-- ADR-031: Multi-App Tenant Model
+- ADR-067: Team→Product→Service→Environment Model
 - ADR-032: PR Preview Environments
 - ADR-063: Git-Native Team Object

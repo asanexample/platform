@@ -18,13 +18,13 @@ modules/
 
 | Module | Description |
 |--------|-------------|
-| [argocd](argocd/) | ArgoCD Helm deployment with RBAC, Dex SAML SSO, optional HA |
+| [argocd](argocd/) | ArgoCD Helm deployment with RBAC, Keycloak OIDC SSO, optional HA |
 | [argocd-apps](argocd-apps/) | Multi-tenant AppProjects, Applications, PR preview ApplicationSets |
 | [argocd-clusters](argocd-clusters/) | Remote cluster registration via labeled K8s Secrets |
 | [cert-manager](cert-manager/) | cert-manager Helm with IRSA for DNS-01 challenges |
 | [cilium](cilium/) | Cilium CNI — BYOCNI, kube-proxy replacement, Gateway API, Hubble |
 | [cluster-rbac](cluster-rbac/) | platform-operator ClusterRole — least-privilege kubectl (ADR-040) |
-| [crossplane](crossplane/) | Crossplane v2 control plane — hub ECR provisioning + per-cluster Tenant XRD/Composition (ADR-046/048) |
+| [crossplane](crossplane/) | Crossplane v2 control plane — hub ECR provisioning + per-cluster Environment XRD/Composition (ADR-046/048/067) |
 | [external-dns](external-dns/) | ExternalDNS Helm with IRSA, Gateway API source support |
 | [external-secrets](external-secrets/) | External Secrets Operator Helm with IRSA |
 | [falco](falco/) | Runtime threat detection (eBPF) — module available, not yet deployed |
@@ -37,7 +37,6 @@ modules/
 | [tailscale](tailscale/) | Tailscale Operator, subnet router, split DNS |
 | [tailscale-admin](tailscale-admin/) | Tailnet ACL management, OAuth client provisioning |
 | [actions-runner-controller](actions-runner-controller/) | Self-hosted GitHub Actions runners (ARC) — in-VPC CI for cluster-facing applies (ADR-065) |
-| [tenant-claims](tenant-claims/) | Helm chart rendering XTenant claims, delivered by the `tenant-claims` unit (ADR-046/048) |
 | [vcluster](vcluster/) | vCluster Helm deployment (deferred -- see ADR-033) |
 
 ## AWS Modules

@@ -54,7 +54,7 @@ output "public_client_ids" {
 }
 
 output "client_secret_names" {
-  description = "Secrets Manager secret names holding each client's secret (key: client-secret). Apps consume these at the B3/B4 cutover."
+  description = "Secrets Manager secret names holding each client's secret (key: client-secret). Each app consumes its secret via an ExternalSecret."
   value       = { for k, v in aws_secretsmanager_secret.client : k => v.name }
 }
 

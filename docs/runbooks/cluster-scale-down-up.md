@@ -10,33 +10,54 @@ every failure mode we've hit (incident 2026-06-04) and how to prevent/fix each.
 
 ## Scale DOWN
 
-Set every managed node group to `minSize=0, desiredSize=0` (keep `maxSize`). AWS CLI is fine (it drifts from
-the `node-groups` units' `desired_size`; the restore re-aligns). Requires SSO login (`aws sso login --profile
-platform` / `--profile preprod`).
+The supported path is **`platctl down --env <env>`** — it **drains Karpenter** (deletes the NodePool; its
+finalizer waits for the nodes Karpenter manages to terminate) *before* scaling the managed node groups to zero,
+so the controller (which runs on the `system` group) doesn't die mid-park and **orphan EC2 instances** (ADR-078).
+PVCs, S3, and all control-plane CRs persist.
 
 ```bash
-for c in platform preprod; do for ng in system workload; do
-  AWS_PROFILE=$c aws eks update-nodegroup-config --cluster-name ${c}-use1-eks --nodegroup-name $ng \
-    --scaling-config minSize=0,desiredSize=0 --region us-east-1; done; done
+./bin/platctl down --env platform
+./bin/platctl down --env preprod
+```
+
+**Break-glass (manual)** — only if platctl is unavailable. Only the `system` group exists now (workload capacity
+is Karpenter's); you MUST delete the NodePool first, or Karpenter's nodes are orphaned:
+
+```bash
+for c in platform preprod; do
+  kubectl --context $c delete nodepool --all                    # drain Karpenter FIRST
+  AWS_PROFILE=$c aws eks update-nodegroup-config --cluster-name ${c}-use1-eks --nodegroup-name system \
+    --scaling-config minSize=0,desiredSize=0 --region us-east-1
+done
 ```
 
 Pods go `Pending`; that's expected. Nothing else to do.
 
 ## Scale UP (restore)
 
-**1. Restore the node groups** to their normal sizes (AWS CLI, or `terragrunt apply` the four `node-groups`
-units which also clears the CLI drift):
-
-| Cluster | `system` | `workload` |
-|---|---|---|
-| platform-use1-eks | desired **3** (max 4) | desired **1** (max 6) |
-| preprod-use1-eks | desired **2** (max 4) | desired **1** (max 6) |
+**1. Restore capacity.** The supported path is **`platctl up --env <env>`** — it re-applies the `node-groups`
+unit (restoring the `system` group) **and the `karpenter` unit** (recreating the NodePool that `down` deleted,
+so node autoscaling returns), then runs the reconnect steps (re-applies `cross-vpc-dns` + restarts the platform
+ArgoCD controller). ~3–5 min.
 
 ```bash
-AWS_PROFILE=platform aws eks update-nodegroup-config --cluster-name platform-use1-eks --nodegroup-name system   --scaling-config minSize=3,maxSize=4,desiredSize=3 --region us-east-1
-AWS_PROFILE=platform aws eks update-nodegroup-config --cluster-name platform-use1-eks --nodegroup-name workload --scaling-config minSize=1,maxSize=6,desiredSize=1 --region us-east-1
-AWS_PROFILE=preprod  aws eks update-nodegroup-config --cluster-name preprod-use1-eks  --nodegroup-name system   --scaling-config minSize=2,maxSize=4,desiredSize=2 --region us-east-1
-AWS_PROFILE=preprod  aws eks update-nodegroup-config --cluster-name preprod-use1-eks  --nodegroup-name workload --scaling-config minSize=1,maxSize=6,desiredSize=1 --region us-east-1
+./bin/platctl up --env platform
+./bin/platctl up --env preprod
+```
+
+**Break-glass (manual)** — restore the `system` group, then re-apply the `karpenter` unit:
+
+| Cluster | `system` group |
+|---|---|
+| platform-use1-eks | desired **2** / min 2 / max 3 (t4g.xlarge) |
+| preprod-use1-eks | desired **1** / min 1 / max 2 (t4g.large) |
+
+```bash
+AWS_PROFILE=platform aws eks update-nodegroup-config --cluster-name platform-use1-eks --nodegroup-name system --scaling-config minSize=2,maxSize=3,desiredSize=2 --region us-east-1
+AWS_PROFILE=preprod  aws eks update-nodegroup-config --cluster-name preprod-use1-eks  --nodegroup-name system --scaling-config minSize=1,maxSize=2,desiredSize=1 --region us-east-1
+# recreate the Karpenter NodePool (deleted on scale-down) so autoscaling returns:
+(cd infra/live/aws/platform/us-east-1/platform/karpenter && terragrunt apply)
+(cd infra/live/aws/preprod/us-east-1/platform/karpenter && terragrunt apply)
 ```
 
 **2. Wait for nodes.** Check via the **AWS API first** (kubectl won't work until the in-cluster Tailscale
@@ -51,7 +72,7 @@ only reachable via Tailscale (or the SSM tunnel), which needs the subnet-router 
       (platform → preprod) fails `dial tcp <old-ENI>:443: i/o timeout`. Re-apply
       `infra/live/aws/platform/us-east-1/platform/cross-vpc-dns`, then hard-refresh the ArgoCD app. ([[project_cross_vpc_dns_dynamic]])
 - [ ] **Kyverno admission healthy** on both clusters (failure mode #2) — otherwise environment pods can't be admitted.
-- [ ] **No stuck `Error` pods** in `team-*` (failure mode #3).
+- [ ] **No stuck `Error` pods** in environment namespaces (`<team>-<product>-<stage>`, e.g. `alpha-shop-dev`) (failure mode #3).
 - [ ] **Backstage `1/1`** (failure mode #6).
 
 ## Known failure modes (and fixes)

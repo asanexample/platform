@@ -26,10 +26,10 @@ clients**, the **Team group/role taxonomy**, and — only when federating — th
   Plus a `keycloak_attribute_importer_identity_provider_mapper` that imports the upstream email (SAML
   `attribute_name` / OIDC `claim_name`) onto the Keycloak user. The `alias` is the stable downstream-facing seam;
   only this block changes per environment. **Presets:** [docs/runbooks/keycloak-upstream-idp.md](../../../docs/runbooks/keycloak-upstream-idp.md).
-- **Per-app OIDC clients** (`var.clients`: ArgoCD, Backstage, oauth2-proxy) — each a confidential
+- **Per-app OIDC clients** (`var.clients`: ArgoCD, Backstage, Grafana) — each a confidential
   `keycloak_openid_client` with a `groups` claim mapper and a `roles` claim mapper, plus a generated secret
-  stored in Secrets Manager at `platform/keycloak/<id>-oidc` (a Keycloak-specific path — no collision with Dex's
-  `platform/<id>/oidc` during coexistence). Apps repoint at the B3/B4 cutover.
+  stored in Secrets Manager at `platform/keycloak/<id>-oidc`. Each app consumes its client secret via an
+  ExternalSecret.
 - **Public clients** (`var.public_clients`, e.g. `argocd-cli`) — PUBLIC `keycloak_openid_client` with PKCE S256,
   **no** secret / no Secrets Manager entry (for CLIs that can't safely hold a confidential secret), with the same
   `groups`/`roles` claim mappers.
@@ -117,9 +117,7 @@ three sources depending on mode:
 ## Not here (→ later)
 
 Outbound **SCIM** (Keycloak→AWS in standalone mode, external SaaS — ADR-059 item 4); wiring a **live** upstream
-tenant; the ArgoCD OIDC cutover (B3) + Backstage RBAC (#197, B4) that consume the claims; wiring the app
-ExternalSecrets (the client secrets sit in Secrets Manager, unread); per-environment registry filtering; full
-`teams.hcl` consolidation; the Dex→Keycloak issuer cutover.
+tenant; per-environment registry filtering; full `teams.hcl` consolidation.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
@@ -160,8 +158,10 @@ No modules.
 | [keycloak_oidc_identity_provider.upstream](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs/resources/oidc_identity_provider) | resource |
 | [keycloak_openid_client.public](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs/resources/openid_client) | resource |
 | [keycloak_openid_client.this](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs/resources/openid_client) | resource |
+| [keycloak_openid_client_default_scopes.confidential](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs/resources/openid_client_default_scopes) | resource |
+| [keycloak_openid_client_default_scopes.public](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs/resources/openid_client_default_scopes) | resource |
+| [keycloak_openid_client_scope.groups](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs/resources/openid_client_scope) | resource |
 | [keycloak_openid_group_membership_protocol_mapper.groups](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs/resources/openid_group_membership_protocol_mapper) | resource |
-| [keycloak_openid_group_membership_protocol_mapper.public_groups](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs/resources/openid_group_membership_protocol_mapper) | resource |
 | [keycloak_openid_user_realm_role_protocol_mapper.public_roles](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs/resources/openid_user_realm_role_protocol_mapper) | resource |
 | [keycloak_openid_user_realm_role_protocol_mapper.roles](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs/resources/openid_user_realm_role_protocol_mapper) | resource |
 | [keycloak_realm.this](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs/resources/realm) | resource |
@@ -177,7 +177,7 @@ No modules.
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_keycloak_url"></a> [keycloak\_url](#input\_keycloak\_url) | Base URL of the running Keycloak (e.g. https://keycloak.aws.refplat.org). Used to derive the realm issuer + the SP entity id. | `string` | n/a | yes |
-| <a name="input_clients"></a> [clients](#input\_clients) | OIDC clients to register in the realm. Each gets a confidential client + a `groups` claim mapper + a<br/>generated secret stored in Secrets Manager at platform/keycloak/<id>-oidc (a Keycloak-specific path, so it<br/>does NOT collide with Dex's platform/<id>/oidc during coexistence). Apps repoint to these at the B3/B4<br/>cutover. Add a client here to onboard another app. | <pre>map(object({<br/>    name          = string<br/>    redirect_uris = list(string)<br/>  }))</pre> | <pre>{<br/>  "argocd": {<br/>    "name": "ArgoCD",<br/>    "redirect_uris": [<br/>      "https://argocd.aws.refplat.org/auth/callback"<br/>    ]<br/>  },<br/>  "backstage": {<br/>    "name": "Backstage",<br/>    "redirect_uris": [<br/>      "https://backstage.aws.refplat.org/api/auth/oidc/handler/frame"<br/>    ]<br/>  },<br/>  "oauth2-proxy": {<br/>    "name": "OAuth2 Proxy (Backstage)",<br/>    "redirect_uris": [<br/>      "https://backstage.aws.refplat.org/oauth2/callback"<br/>    ]<br/>  }<br/>}</pre> | no |
+| <a name="input_clients"></a> [clients](#input\_clients) | OIDC clients to register in the realm. Each gets a confidential client + a `groups` claim mapper + a<br/>generated secret stored in Secrets Manager at platform/keycloak/<id>-oidc. Each app consumes its client<br/>secret via an ExternalSecret. Add a client here to onboard another app. | <pre>map(object({<br/>    name          = string<br/>    redirect_uris = list(string)<br/>    # Allowed post-logout redirect URIs (RP-initiated OIDC logout). Empty -> "+" (inherit redirect_uris).<br/>    post_logout_redirect_uris = optional(list(string), [])<br/>  }))</pre> | <pre>{<br/>  "argocd": {<br/>    "name": "ArgoCD",<br/>    "post_logout_redirect_uris": [<br/>      "https://argocd.aws.refplat.org/*"<br/>    ],<br/>    "redirect_uris": [<br/>      "https://argocd.aws.refplat.org/auth/callback"<br/>    ]<br/>  },<br/>  "backstage": {<br/>    "name": "Backstage",<br/>    "post_logout_redirect_uris": [<br/>      "https://backstage.aws.refplat.org/*"<br/>    ],<br/>    "redirect_uris": [<br/>      "https://backstage.aws.refplat.org/api/auth/oidc/handler/frame"<br/>    ]<br/>  },<br/>  "grafana": {<br/>    "name": "Grafana",<br/>    "post_logout_redirect_uris": [<br/>      "https://grafana.aws.refplat.org/*"<br/>    ],<br/>    "redirect_uris": [<br/>      "https://grafana.aws.refplat.org/login/generic_oauth"<br/>    ]<br/>  }<br/>}</pre> | no |
 | <a name="input_create"></a> [create](#input\_create) | Whether to configure the realm + broker | `bool` | `true` | no |
 | <a name="input_platform_groups"></a> [platform\_groups](#input\_platform\_groups) | Non-team platform realm groups (e.g. platform-admins, ADR-059), separate from teams: each gets a Keycloak<br/>group (emitted in the `groups` claim) and — when it carries an `ssoGroup` and the upstream emits groups — an<br/>advanced-group membership mapper. No tenant envelope/roles (apps match the group name directly). Empty<br/>ssoGroup leaves membership to a group-emitting upstream / manual assignment (claims stay empty under AWS IdC). | `map(object({ ssoGroup = optional(string, "") }))` | <pre>{<br/>  "platform-admins": {}<br/>}</pre> | no |
 | <a name="input_public_clients"></a> [public\_clients](#input\_public\_clients) | PUBLIC OIDC clients (PKCE S256, NO client secret, no Secrets Manager entry) — for CLIs that can't safely hold<br/>a confidential secret (e.g. the ArgoCD CLI). Each gets the same `groups`/`roles` claim mappers as the<br/>confidential clients so CLI tokens carry the access-model claims. See ADR-059. | <pre>map(object({<br/>    name          = string<br/>    redirect_uris = list(string)<br/>  }))</pre> | `{}` | no |
@@ -198,7 +198,7 @@ No modules.
 | <a name="output_broker_endpoint"></a> [broker\_endpoint](#output\_broker\_endpoint) | Broker callback endpoint — the upstream app's ACS (SAML) / redirect URI (OIDC) target. Null when standalone. |
 | <a name="output_broker_protocol"></a> [broker\_protocol](#output\_broker\_protocol) | Protocol of the upstream broker (saml \| oidc), or null when standalone. |
 | <a name="output_client_ids"></a> [client\_ids](#output\_client\_ids) | Registered confidential OIDC client IDs. |
-| <a name="output_client_secret_names"></a> [client\_secret\_names](#output\_client\_secret\_names) | Secrets Manager secret names holding each client's secret (key: client-secret). Apps consume these at the B3/B4 cutover. |
+| <a name="output_client_secret_names"></a> [client\_secret\_names](#output\_client\_secret\_names) | Secrets Manager secret names holding each client's secret (key: client-secret). Each app consumes its secret via an ExternalSecret. |
 | <a name="output_group_membership_mappers"></a> [group\_membership\_mappers](#output\_group\_membership\_mappers) | Teams whose upstream group is mapped to a Keycloak group (empty when the upstream emits no groups). |
 | <a name="output_group_names"></a> [group\_names](#output\_group\_names) | Keycloak groups created from the Team registry (one per Team). |
 | <a name="output_identity_source"></a> [identity\_source](#output\_identity\_source) | Where identity comes from: "keycloak" (IdP of record, standalone) or the federated broker protocol ("saml" \| "oidc"). |

@@ -77,7 +77,7 @@ variable "image_tag" {
 # ---------------------------------------------------------------------------
 
 variable "hostname_url" {
-  description = "Public base URL Keycloak serves on (KC_HOSTNAME). Behind the gateway at keycloak.aws.refplat.org for now; becomes sso.aws.refplat.org at the Dex cutover."
+  description = "Public base URL Keycloak serves on (KC_HOSTNAME). Behind the shared gateway at keycloak.aws.refplat.org."
   type        = string
   default     = "https://keycloak.aws.refplat.org"
 }
