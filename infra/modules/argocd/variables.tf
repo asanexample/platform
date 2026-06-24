@@ -16,23 +16,11 @@ variable "tags" {
 }
 
 # ---------------------------------------------------------------------------
-# IRSA
+# IAM (EKS Pod Identity — ADR-047)
 # ---------------------------------------------------------------------------
 
-variable "oidc_provider_arn" {
-  description = "ARN of the EKS OIDC provider for IRSA. Empty string disables IRSA."
-  type        = string
-  default     = ""
-}
-
-variable "oidc_provider_url" {
-  description = "OIDC provider URL (without https:// prefix) for IRSA trust policy"
-  type        = string
-  default     = ""
-}
-
 variable "extra_iam_policy_arns" {
-  description = "Additional IAM policy ARNs to attach to the ArgoCD IRSA role"
+  description = "Additional IAM policy ARNs to attach to the ArgoCD role"
   type        = list(string)
   default     = []
 }

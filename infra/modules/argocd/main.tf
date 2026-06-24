@@ -1,6 +1,5 @@
 locals {
-  create      = var.create
-  create_irsa = local.create && var.oidc_provider_arn != ""
+  create = var.create
 
   # Sanitize tags for K8s label compliance (RFC 1123): lowercase, valid chars, max 63 chars
   k8s_labels = {
@@ -9,9 +8,13 @@ locals {
     if length(replace(lower(k), "/[^a-z0-9_.-]/", "_")) <= 63 && length(replace(lower(v), "/[^a-z0-9_.-]/", "_")) <= 63
   }
 
-  irsa_annotations = local.create_irsa ? {
-    "eks.amazonaws.com/role-arn" = aws_iam_role.argocd[0].arn
-  } : {}
+  # AWS identity via EKS Pod Identity (ADR-047): the controller/server/repo-server SAs are matched by
+  # the pod-identity associations below — no IRSA `eks.amazonaws.com/role-arn` annotations needed.
+  argocd_aws_service_accounts = toset([
+    "argocd-application-controller",
+    "argocd-server",
+    "argocd-repo-server",
+  ])
 
   # Per-component metrics: enabling creates the metrics Service AND a ServiceMonitor (the
   # Prometheus-operator CRD is present once the observability hub is installed, #102 P1).
@@ -51,10 +54,7 @@ locals {
     }
 
     controller = {
-      replicas = var.high_availability ? 2 : 1
-      serviceAccount = {
-        annotations = local.irsa_annotations
-      }
+      replicas  = var.high_availability ? 2 : 1
       metrics   = local.metrics
       resources = try(var.component_resources["controller"], {})
     }
@@ -64,18 +64,12 @@ locals {
       service = {
         type = var.server_service_type
       }
-      serviceAccount = {
-        annotations = local.irsa_annotations
-      }
       metrics   = local.metrics
       resources = try(var.component_resources["server"], {})
     }
 
     repoServer = {
-      replicas = var.high_availability ? 2 : 1
-      serviceAccount = {
-        annotations = local.irsa_annotations
-      }
+      replicas  = var.high_availability ? 2 : 1
       metrics   = local.metrics
       resources = try(var.component_resources["repoServer"], {})
     }
@@ -102,41 +96,25 @@ locals {
 }
 
 # ---------------------------------------------------------------------------
-# IRSA — IAM Role for ArgoCD service accounts
+# IAM — shared role for ArgoCD SAs; AWS identity via EKS Pod Identity (ADR-047)
 # ---------------------------------------------------------------------------
 
 data "aws_iam_policy_document" "argocd_trust" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create ? 1 : 0
 
   statement {
     effect  = "Allow"
-    actions = ["sts:AssumeRoleWithWebIdentity"]
+    actions = ["sts:AssumeRole", "sts:TagSession"]
 
     principals {
-      type        = "Federated"
-      identifiers = [var.oidc_provider_arn]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "${var.oidc_provider_url}:aud"
-      values   = ["sts.amazonaws.com"]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "${var.oidc_provider_url}:sub"
-      values = [
-        "system:serviceaccount:${var.namespace}:argocd-server",
-        "system:serviceaccount:${var.namespace}:argocd-repo-server",
-        "system:serviceaccount:${var.namespace}:argocd-application-controller",
-      ]
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
     }
   }
 }
 
 resource "aws_iam_role" "argocd" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create ? 1 : 0
 
   name_prefix        = "${var.cluster_name}-argocd-"
   assume_role_policy = data.aws_iam_policy_document.argocd_trust[0].json
@@ -144,8 +122,19 @@ resource "aws_iam_role" "argocd" {
   tags = var.tags
 }
 
+# One association per AWS-using SA (controller/server/repo-server), all bound to the shared role.
+resource "aws_eks_pod_identity_association" "argocd" {
+  for_each = local.create ? local.argocd_aws_service_accounts : toset([])
+
+  cluster_name    = var.cluster_name
+  namespace       = var.namespace
+  service_account = each.value
+  role_arn        = aws_iam_role.argocd[0].arn
+  tags            = var.tags
+}
+
 resource "aws_iam_role_policy_attachment" "ecr_read" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create ? 1 : 0
 
   role = aws_iam_role.argocd[0].name
   # Allows ArgoCD to pull Helm charts and container images from ECR
@@ -153,7 +142,7 @@ resource "aws_iam_role_policy_attachment" "ecr_read" {
 }
 
 resource "aws_iam_role_policy_attachment" "extra" {
-  for_each = local.create_irsa ? toset(var.extra_iam_policy_arns) : toset([])
+  for_each = local.create ? toset(var.extra_iam_policy_arns) : toset([])
 
   role       = aws_iam_role.argocd[0].name
   policy_arn = each.value
@@ -161,7 +150,7 @@ resource "aws_iam_role_policy_attachment" "extra" {
 
 # Allows ArgoCD to assume cross-account roles for managing remote EKS clusters
 resource "aws_iam_role_policy" "remote_clusters" {
-  count = local.create_irsa && length(var.remote_cluster_role_arns) > 0 ? 1 : 0
+  count = local.create && length(var.remote_cluster_role_arns) > 0 ? 1 : 0
 
   name = "remote-cluster-access"
   role = aws_iam_role.argocd[0].name
@@ -206,7 +195,8 @@ resource "helm_release" "argocd" {
     },
   ]
 
-  depends_on = [aws_iam_role.argocd]
+  # Associations must exist before the SAs/pods roll so the new pods get Pod-Identity creds immediately.
+  depends_on = [aws_eks_pod_identity_association.argocd]
 }
 
 # ---------------------------------------------------------------------------
