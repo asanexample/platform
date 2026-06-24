@@ -31,7 +31,6 @@ module "cert_manager" {
 }
 ```
 
-
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
