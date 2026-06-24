@@ -1,7 +1,7 @@
 # Runbook: EKS Cluster Access
 
 > **Roles:** PlatformAdmin, PlatformDeployer, DeveloperAccess-\<team\>
-> **Related ADR:** [007-iam-role-model](../adrs/007-iam-role-model.md), [039-per-team-developer-rbac](../adrs/039-per-team-developer-rbac.md)
+> **Related ADR:** [007-iam-role-model](../adrs/007-iam-role-model.md), [039-per-team-developer-rbac](../adrs/039-per-team-developer-rbac.md), [040-platform-engineer-access-model](../adrs/040-platform-engineer-access-model.md)
 > **See also:** [ArgoCD SSO](argocd-sso.md) for web UI access
 >
 > **Last reviewed:** 2026-05-28
@@ -144,24 +144,32 @@ AWS_PROFILE=preprod-dev aws eks update-kubeconfig \
   --region us-east-1 \
   --role-arn arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/DeveloperAccess-<your-team>
 
-# 3. Access your namespace
-kubectl get pods -n team-<your-team>
+# 3. Access your environment namespace (<team>-<product>-<stage>, e.g. alpha-shop-dev)
+kubectl get pods -n alpha-shop-dev
 
 # These will be denied (other namespace / cluster-scoped):
-kubectl get pods -n team-<other-team>
+kubectl get pods -n bravo-shop-dev
 kubectl get pods -n kube-system
 ```
 
 ### Requesting Namespace Access
 
-Access is provisioned when a team is onboarded — the per-team `DeveloperAccess-<team>`
-role, its group-mapped EKS access entry, and the namespace `RoleBinding` are all
-generated from `teams.hcl` (the SSO permission set/group are added in the
-identity-center unit). See the [Environment Onboarding](environment-onboarding.md) runbook.
+Access is provisioned when a team's environment is onboarded — the namespace
+`RoleBinding` (→ ClusterRole `environment-developer`), and (when emitted) the per-team
+`DeveloperAccess-<team>` role + its group-mapped EKS access entry, come from the
+**Crossplane Environment Composition** driven by the `gitops/` registries
+(`gitops/teams/`, `gitops/products/`, `gitops/environments/`) — `teams.hcl` is retired.
+The SSO permission set/group are added in the `identity-center` unit. See the
+[Environment Onboarding](environment-onboarding.md) runbook.
 
-If you cannot access your namespace, verify with the platform team that your team is
-listed in `teams.hcl` and that you are a member of the `Developers-<team>` Identity
-Center group for the preprod account (<PREPROD_ACCOUNT_ID>).
+> **Note (#647):** the per-team `DeveloperAccess-<team>` IAM role and its EKS access
+> entry are **not yet emitted** by the Composition. Until then the namespace
+> `RoleBinding` exists but there is no team-scoped IAM role to assume into it.
+
+If you cannot access your namespace, verify with the platform team that your team's
+registry entries (`gitops/teams/<team>.yaml` + an `XEnvironment` claim under
+`gitops/environments/`) exist and that you are a member of the `Developers-<team>`
+Identity Center group for the preprod account (<PREPROD_ACCOUNT_ID>).
 
 ---
 

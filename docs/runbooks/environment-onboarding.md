@@ -157,7 +157,7 @@ get namespace-scoped kubectl. This wiring is **hand-maintained** in the `identit
 account) and has a few genuinely manual, console-only steps. Skip this step for a team with no human
 developers yet (e.g. a workload-only team).
 
-#### 4a. Add the team to the `identity-center` unit (HCL)
+#### 3a. Add the team to the `identity-center` unit (HCL)
 
 Edit `infra/live/aws/mgmt/global/identity-center/terragrunt.hcl` — add three things, mirroring the existing
 `alpha`/`bravo` entries:
@@ -199,7 +199,7 @@ Edit `infra/live/aws/mgmt/global/identity-center/terragrunt.hcl` — add three t
 { account_id = dependency.organizations.outputs.account_ids["Preprod"], permission_set = "Dev-charlie", group = "Developers-charlie" },
 ```
 
-Then add the developers (see 4b for which path applies):
+Then add the developers (see 3b for which path applies):
 
 ```hcl
 # users — only when AWS Identity Center is the identity source (NOT when syncing from an external IdP)
@@ -221,11 +221,11 @@ AWS_PROFILE=management terragrunt apply
 This creates the permission set, group, group memberships, and the account assignment via the AWS APIs — no
 console clicks for those.
 
-#### 4b. Provision the actual people — the manual part
+#### 3b. Provision the actual people — the manual part
 
 Which path applies depends on your **identity source** (IAM Identity Center → Settings → Identity source):
 
-- **AWS Identity Center is the identity source** (this repo's default — `users` are managed in HCL as in 4a).
+- **AWS Identity Center is the identity source** (this repo's default — `users` are managed in HCL as in 3a).
   Terraform creates each user, but AWS then requires **per-user, manual, browser steps**:
   1. The user receives an **"Invitation to join IAM Identity Center"** email. (If it didn't arrive, an admin
      can resend: IAM Identity Center console → **Users** → select the user → **Send email verification
@@ -239,13 +239,13 @@ Which path applies depends on your **identity source** (IAM Identity Center → 
   1. In the IdP, create/assign the user to a group that SCIM-provisions into Identity Center as
      `Developers-charlie` (the group name must match the HCL `groups` + `account_assignments` entry).
   2. Confirm the synced group appears: IAM Identity Center console → **Groups**.
-  3. The permission set + assignment from 4a still come from HCL; only users/groups live in the IdP.
+  3. The permission set + assignment from 3a still come from HCL; only users/groups live in the IdP.
 
 > One-time, **not per team:** ArgoCD SSO uses a SAML app created by hand in the Identity Center console (see
 > [onboarding.md](../onboarding.md)). New teams get ArgoCD access through their group → ArgoCD RBAC, so you
 > do **not** create a new SAML app per team.
 
-#### 4c. How the developer then gets access (hand this to them)
+#### 3c. How the developer then gets access (hand this to them)
 
 ```bash
 # One-time: configure an SSO profile (uses the AWS access portal / start URL)
@@ -284,7 +284,7 @@ aws ecr describe-repositories --repository-names team-charlie/api-web --profile 
 ```
 
 A compliant workload referencing `…/team-charlie/api-web:<tag>` should admit; a cross-product image is denied by
-`restrict-images-charlie-api`.
+`restrict-images-charlie-api-dev` (the per-environment policy is named `restrict-images-<team>-<product>-<stage>`).
 
 ---
 
@@ -321,4 +321,4 @@ teardown is:
 | Cross-account ECR MR `AccessDenied … sts:TagSession` | The platform `crossplane-ecr-provisioner` trust must allow `sts:TagSession` (not just `AssumeRole`); the preprod provisioner needs both too. |
 | Claim creation denied by `restrict-environment-control-plane` | The claim must be applied by a **platform** principal — ArgoCD (the per-Product ApplicationSet, assuming the `ArgoCD` IAM role) is that principal, excluded from the S1 backstop; an environment principal is denied. |
 | Claim rejected by `restrict-environment-envelope` | The claim's `stage`/`tier`/`quota` is outside the Team envelope (`gitops/teams/<team>.yaml`) — widen the envelope (admin PR) or fix the claim. |
-| Per-product `restrict-images`/`restrict-route-hostnames` appear twice / `AlreadyExists` | A Product is owned by both the Composition (claim) and the `policy` unit's non-migrated path. Every Product with an environment claim is auto-migrated (`policy` derives `migrated_products` from the registries); confirm the Product has entries under `gitops/products/` + `gitops/environments/`. |
+| Per-product `restrict-images`/`restrict-route-hostnames` missing for an environment | These policies are owned **solely** by the Crossplane Composition (named `restrict-images-<team>-<product>-<stage>`), per-environment — the old `policy`-unit dual-ownership / auto-migration path was removed at the v3 cutover. If a policy is absent, check the `XEnvironment` is `READY` (the Composition renders it); the `policy` unit no longer emits per-product `restrict-images`. |

@@ -38,7 +38,7 @@ Layer 1 (broadest)    infra/root.hcl
     |                     Remote state (S3 + DynamoDB), AWS provider, terraform_binary, cloud detection
     |
 Layer 2               infra/live/aws/common.hcl
-    |                     Cloud-wide defaults: base tags, loads secrets.hcl, account-id safety map
+    |                     Cloud-wide defaults: base tags, loads secrets.enc.yaml, account-id safety map
     |
 Layer 3               infra/live/aws/{env}/env.hcl
     |                     Account ID (from secrets), environment name, env-specific tags
@@ -70,7 +70,7 @@ infra/
       common.hcl                          <-- Layer 2: cloud-wide
       _versions.hcl                       <-- supporting: version/source pins
       _base.hcl                           <-- supporting: composer (reads layers 2-5)
-      secrets.hcl                         <-- gitignored: account IDs, state bucket, emails
+      secrets.enc.yaml                    <-- committed, SOPS-encrypted: account IDs, state bucket, emails
       mgmt/
         env.hcl                           <-- Layer 3: environment (mgmt)
         global/
@@ -111,7 +111,8 @@ The root configuration applies to every unit. It provides:
   (`terraform_binary = "tofu"`).
 - **Remote state.** An S3 backend with DynamoDB locking (see
   [Remote State Routing](#remote-state-routing)). The bucket, lock table, and access
-  role come from the gitignored `secrets.hcl`.
+  role come from the SOPS-encrypted `secrets.enc.yaml` (see
+  [Config Secrets](#config-secrets-sops)).
 - **Provider generation.** Generates `provider_aws.tf` (the only cloud provider
   generated today; Azure/GCP provider generation would be added when those clouds land).
 - **Version constraints.** Generates `versions.tf` pinning the AWS provider to
@@ -135,11 +136,12 @@ The cloud-root `common.hcl` defines:
 - **Default workload name** (`platform`) and **org/resource name prefix** (`org_name`,
   currently `asanexample`, used for globally-unique names like environment S3 buckets).
 - **Base tags** shared across all environments.
-- **Secrets load + account-id safety map.** It reads the gitignored `secrets.hcl` and
-  exposes `environment_account_map = local._secrets.locals.account_ids` — a lookup from
-  environment name to expected AWS account ID, used by `_base.hcl` safety assertions to
-  prevent cross-account deployment mistakes. (Sensitive values live in `secrets.hcl`, not
-  in the repo — see `secrets.hcl.example` for the structure.)
+- **Secrets load + account-id safety map.** It loads config secrets (account IDs, emails,
+  SSO config) and exposes `environment_account_map = local._secrets.account_ids` — a lookup
+  from environment name to expected AWS account ID, used by `_base.hcl` safety assertions to
+  prevent cross-account deployment mistakes. (Secrets handling is detailed under
+  [Remote State Routing → Config Secrets](#config-secrets-sops) — they are SOPS-encrypted and
+  committed, not gitignored plaintext.)
 
 ### Layer 3: Environment (`infra/live/aws/{env}/env.hcl`)
 
@@ -147,7 +149,7 @@ Each environment directory contains an `env.hcl` defining:
 
 - **Environment name** (`env` / `environment`). The deployed environments are
   `mgmt`, `platform`, `preprod`, `prod`, and `test`.
-- **Account ID** for the target environment (sourced from `secrets.hcl`).
+- **Account ID** for the target environment (sourced from `secrets.enc.yaml`).
 - **Environment-specific tags** (`env_tags`) including data classification.
 
 ### Layer 4: Region (`region.hcl` + `network.hcl`)
@@ -244,16 +246,18 @@ declared in `env.hcl`.
 
 ```hcl
 _assert_account = (
+  local._expected_account == null ||
   local._expected_account == local.env_vars.locals.account_id
   ? true
   : tobool("SAFETY: env '${local.env}' expects account '${local._expected_account}' but env.hcl has '${local.env_vars.locals.account_id}'")
 )
 ```
 
-`_expected_account` is looked up from `environment_account_map` (from `secrets.hcl`). If
-the map has an entry for the current environment and it does not match what `env.hcl`
-declares, the plan fails — preventing, e.g., deploying preprod infrastructure into the
-prod account.
+`_expected_account` is looked up from `environment_account_map` (from the config secrets),
+defaulting to `null` when the map has no entry for the current environment. The `== null ||`
+guard makes the assertion a no-op for environments not in the map; when the map *does* have
+an entry and it does not match what `env.hcl` declares, the plan fails — preventing, e.g.,
+deploying preprod infrastructure into the prod account.
 
 ### Flat Merge for Ad-Hoc Lookups
 
@@ -290,11 +294,11 @@ module_source = {
   organizations = "${local.source_base}/aws//organizations"
   networking    = "${local.source_base}/aws//networking"
   eks           = "${local.source_base}/aws//eks"
-  # ... ~37 modules total (shared modules + aws/ modules)
+  # ... ~61 modules total (shared modules + aws/ modules)
 }
 ```
 
-The `//` is OpenTofu's module-subdirectory separator. There are roughly **37** module
+The `//` is OpenTofu's module-subdirectory separator. There are roughly **61** module
 sources registered (the shared cloud-agnostic modules plus the `aws/` modules).
 
 ### Why get_repo_root()
@@ -309,7 +313,7 @@ Using `get_repo_root()` instead of relative paths provides:
 
 ### Helm Chart Version Pins
 
-`_versions.hcl` also pins Helm chart versions in a `helm_versions` map (~10 charts),
+`_versions.hcl` also pins Helm chart versions in a `helm_versions` map (~28 charts),
 so chart upgrades are a one-line change reviewed in one place. Current pins include:
 
 ```hcl
@@ -399,19 +403,41 @@ gets a unique state file mirroring the tree.
 remote_state {
   backend = "s3"
   config = {
-    bucket         = local._secrets.locals.state_bucket        # from secrets.hcl
+    bucket         = local._secrets.state_bucket               # from secrets.enc.yaml
     key            = "${path_relative_to_include()}/terraform.tfstate"
     region         = "us-east-1"
-    dynamodb_table = "terraform-locks"
-    role_arn       = local._secrets.locals.state_role_arn      # TerraformStateAccess
     encrypt        = true
+    dynamodb_table = "terraform-locks"
+    role_arn       = local._secrets.state_role_arn             # TerraformStateAccess
   }
 }
 ```
 
-The bucket and the state-access role ARN come from `secrets.hcl` (the bucket is created
-once by the `state_bootstrap` module — ADR-006). The `_cloud` detection seam exists for
-future multi-cloud backend routing, but today the backend is unconditionally S3.
+The secrets decode to a **flat** map, so the accessors are `local._secrets.<key>` (e.g.
+`local._secrets.state_bucket`, `local._secrets.state_role_arn`) — not a nested
+`.locals.*`. The bucket and the state-access role ARN come from the config secrets (the
+bucket is created once by the `state_bootstrap` module — ADR-006). The `_cloud` detection
+seam exists for future multi-cloud backend routing, but today the backend is
+unconditionally S3.
+
+### Config Secrets (SOPS) {#config-secrets-sops}
+
+Sensitive values (account IDs, emails, SSO URLs, the state bucket + state-access role ARN)
+live in `infra/live/aws/secrets.enc.yaml` — **committed to the repo but SOPS-encrypted**
+(ADR-066). Both `root.hcl` and `common.hcl` decrypt it inline at config-load time:
+
+```hcl
+_secrets = get_env("TG_SOPS_BOOTSTRAP", "") == "1"
+  ? read_terragrunt_config("${get_repo_root()}/infra/live/aws/secrets.hcl").locals
+  : yamldecode(sops_decrypt_file("${get_repo_root()}/infra/live/aws/secrets.enc.yaml"))
+```
+
+The normal path decrypts `secrets.enc.yaml` via the management `platform-sops` KMS key.
+Plaintext `secrets.hcl` is **only** a greenfield bootstrap fallback, gated behind
+`TG_SOPS_BOOTSTRAP=1` — needed solely on a true from-zero bootstrap before the
+`platform-sops` key exists (the `state-bootstrap` and KMS-key units include `root.hcl`, so
+they cannot decrypt what has not been created yet). Both branches yield the same flat map,
+so `local._secrets.<key>` accessors are identical regardless of which path is taken.
 
 State key example:
 
@@ -449,8 +475,9 @@ Until then, treat the structure as AWS-only.
 
 1. Create `infra/live/aws/{env}/`.
 2. Create `env.hcl` with the environment name, account ID, and environment tags.
-3. Add the environment → account-ID entry to `account_ids` in `secrets.hcl` (surfaced as
-   `environment_account_map`), so the account safety assertion can validate it.
+3. Add the environment → account-ID entry to `account_ids` in `secrets.enc.yaml` (edit via
+   `sops`; surfaced as `environment_account_map`), so the account safety assertion can
+   validate it.
 4. Create region subdirectories as needed.
 
 ### Adding a New Region

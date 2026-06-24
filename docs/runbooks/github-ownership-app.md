@@ -5,8 +5,10 @@ of app repos ([ADR-072](../adrs/072-app-repo-naming-and-team-ownership.md) Flavo
 the **Team registry** (`gitops/teams/`) and `push` grants from the **Product registry** (`gitops/products/`), so
 a team is materialised in GitHub on Team-CR convergence — the same apply-on-merge moment as its Keycloak group.
 
-> **Live instance:** _not yet created_ — fill in App ID + installation once provisioned. Secret:
-> `platform/github-ownership/app` (platform account). Install **org-wide** (`asanexample`).
+> **Live instance:** provisioned — the `github-teams` unit
+> (`infra/live/aws/platform/us-east-1/platform/github-teams/`) is applied and live (PR #533; alpha/bravo org
+> teams created). Creds in Secrets Manager at `platform/github-ownership/app` (platform account). Installed
+> **org-wide** (`asanexample`).
 
 ## Security posture (why it's shaped this way)
 

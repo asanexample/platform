@@ -457,13 +457,16 @@ condition {
 ```
 
 The exempt roles are driven by `var.exempt_roles`. The live management unit
-(`infra/live/aws/mgmt/global/organizations/terragrunt.hcl`) sets **three**:
+(`infra/live/aws/mgmt/global/organizations/terragrunt.hcl`) sets **six**:
 
 | Role | Why it's exempt |
 |------|-----------------|
 | `OrganizationAccountAccessRole` | AWS-created in every member account, assumable from the management account — the break-glass administrative path (ADR-007). |
 | `PlatformDeployer` | The Terragrunt/IaC apply role (ADR-007). IaC must perform the administrative operations the Deny statements otherwise block (manage encryption defaults, tag resources, etc.). |
 | `github-actions-terratest` | The CI integration-test role in the Test sandbox account; Terratest creates and destroys real resources, so it needs the same administrative latitude. |
+| `crossplane-ecr-provisioner` | The platform Crossplane provisioner that `Team`-tags tenant ECR repositories — needs the `DenyTeamTagTampering` exemption (ADR-048). |
+| `crossplane-provisioner-*` | The per-workload-cluster Crossplane provisioners that `Team`-tag the per-team Pod-identity IAM roles they create — same `DenyTeamTagTampering` exemption (the wildcard covers preprod now + prod later, ADR-048). |
+| `*-karpenter-*` | The Karpenter node-provisioner controller (ADR-078); like the EKS/ASG service roles it must set governance tags on the nodes it provisions (via the launch template), so it is exempt from `DenyTeamTagTampering` + `require-tagging`. |
 
 Each role name becomes an `arn:aws:iam::*:role/<name>` pattern in `local.exempt_role_arns`.
 

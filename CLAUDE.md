@@ -12,7 +12,7 @@ Multi-cloud IaC platform using OpenTofu (v1.12.1) + Terragrunt (v1.0.7). Current
 
 ```text
 root.hcl              Remote state (S3), providers, terraform_binary
-  └─ common.hcl       Cloud-wide defaults, loads secrets.hcl, tags
+  └─ common.hcl       Cloud-wide defaults, loads secrets (SOPS secrets.enc.yaml), tags
       └─ env.hcl      Account ID (from secrets), env tags
           └─ region.hcl / network.hcl    Region, CIDRs
               └─ workload.hcl            Workload name, compliance tier
@@ -30,7 +30,7 @@ include "base" {
 
 ### Secrets
 
-Sensitive values (account IDs, emails, SSO URLs) live in `infra/live/aws/secrets.hcl` (gitignored). See `secrets.hcl.example` for the structure. Loaded via `read_terragrunt_config("${get_repo_root()}/infra/live/aws/secrets.hcl")` in common.hcl, then exposed through `_base.hcl`:
+Sensitive values (account IDs, emails, SSO URLs) live in `infra/live/aws/secrets.enc.yaml` — **SOPS-encrypted and committed** to git, decrypted at plan/apply via the management `platform-sops` KMS key (ADR-066). `root.hcl`/`common.hcl` set `_secrets = sops_decrypt_file(...secrets.enc.yaml)`; `TG_SOPS_BOOTSTRAP=1` is the greenfield escape that falls back to a local plaintext `infra/live/aws/secrets.hcl` (gitignored) — needed only on a true from-zero bootstrap before the KMS key exists. `_secrets` is then exposed through `_base.hcl`:
 
 ```hcl
 include.base.locals.account_ids["platform"]   # AWS account ID
@@ -75,7 +75,7 @@ cloudflare-dns ──── (no deps)
 actions-runner-controller ─ (eks, nodes, ext-secrets, secret-stores; policy must carry the arc-systems/arc-runners excludes first) — self-hosted GitHub Actions runners (ARC) on the platform cluster for in-VPC CI (ADR-065 / #323). **Applied LOCALLY / via platctl (break-glass)** — it's what lets CI manage the cluster, so it can't bootstrap itself. Manual prereq: the GitHub App + its Secrets Manager secret (docs/runbooks/arc-github-app.md).
 ```
 
-Preprod is similar but adds the federated `crossplane` + `tenant-claims` units (the Environment control plane, ADR-048 — alpha/bravo are provisioned by `Environment` claims, not the retired `environments`/`pod-identity` units) and `transit-gateway` as spoke.
+Preprod is similar but adds the federated `crossplane` unit (the Environment control plane, ADR-048/067 — alpha/bravo are provisioned by `XEnvironment` claims delivered via argocd-apps' `gitops/environments` registry-sync, not the retired `tenant-claims`/`environments`/`pod-identity` units) and `transit-gateway` as spoke.
 
 Cross-environment units (on platform cluster): route53-delegation, ecr, github-oidc, argocd-apps, github-teams (org-Team ownership of app repos, registry-derived — ADR-072).
 
@@ -164,7 +164,7 @@ Group related resources under a header (e.g. "IAM", "KMS", "EKS Cluster"). No he
 
 ## AWS Accounts
 
-Real account IDs are in `infra/live/aws/secrets.hcl` (gitignored). See `infra/live/aws/secrets.hcl.example` for the structure.
+Real account IDs are in the SOPS-encrypted `infra/live/aws/secrets.enc.yaml` (committed; KMS-decrypted, ADR-066). See `infra/live/aws/secrets.hcl.example` for the structure.
 
 Cross-account access uses purpose-built IAM roles (see IAM Roles below). `OrganizationAccountAccessRole` retained as break-glass only.
 

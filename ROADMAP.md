@@ -12,6 +12,7 @@ detail. "Complete picture" means every capability and area is represented — no
 | 2025-04-08 | 0.1     | J. Deeden | Initial draft of roadmap                                               |
 | 2025-05-15 | 0.2     | J. Deeden | Updated for AWS Organizations, SCPs, and state management             |
 | 2026-06-18 | 1.0     | J. Deeden | Consolidated to a capability map (Area × Horizon); backfilled shipped work, reframed to the current AWS IDP, retired stale multi-cloud status tables |
+| 2026-06-23 | 1.1     | J. Deeden | Added Compute & Elasticity (Karpenter, ADR-078, #643); observability data plane marked complete |
 
 ## Executive Summary
 

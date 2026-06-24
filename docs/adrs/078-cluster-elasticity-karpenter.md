@@ -1,7 +1,8 @@
 # ADR-078: Cluster Elasticity — Karpenter + Workload Autoscaling
 
 **Status:** Accepted — Phase 1 (Karpenter) implemented + live on both clusters, 2026-06-23 (#643). Phase 2
-(HPA/KEDA on the paved road) outstanding.
+(HPA/KEDA on the paved road) outstanding. Refines [ADR-023](023-managed-node-groups.md) (managed node groups
+now bootstrap only the `system` floor; Karpenter owns workload capacity).
 
 ## Context
 

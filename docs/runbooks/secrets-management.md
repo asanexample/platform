@@ -141,7 +141,7 @@ kubectl apply -f external-secret.yaml
 > [environment AWS access runbook](environment-aws-access-pod-identity.md).
 
 App team secrets use the naming convention `{namespace}/{service}/{secret-name}`,
-where the namespace maps to the team's Kubernetes namespace.
+where the namespace maps to the environment's Kubernetes namespace (`<team>-<product>-<stage>`).
 
 ### Prerequisites
 
