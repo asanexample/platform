@@ -236,10 +236,19 @@ func doRolloutRestart(ctx context.Context, kc config.KubeconfigEntry, namespace,
 // drainKarpenterNodesFn is indirected so tests can stub the kubectl boundary.
 var drainKarpenterNodesFn = doDrainKarpenterNodes
 
-// doDrainKarpenterNodes deletes the Karpenter NodePool(s) so Karpenter drains and terminates the nodes it
-// manages before the managed node groups (incl. the system group the controller runs on) scale to zero. The
-// NodePool finalizer blocks the delete until the owned NodeClaims are drained, so this also waits for the
-// graceful teardown. 'platctl up' re-applies the karpenter unit to recreate the NodePool. No-op on clusters
+// doDrainKarpenterNodes drains and terminates the Karpenter-managed nodes before the managed node groups
+// (incl. the system group the controller runs on) scale to zero, so the controller doesn't die mid-park and
+// orphan EC2 instances.
+//
+// It FIRST clears the `karpenter.sh/do-not-disrupt` annotation from any pods carrying it. That annotation
+// protects stateful pods (the CNPG DBs, the observability stores) from Karpenter's *voluntary* disruption
+// (consolidation/drift/expiry) in steady state — but it ALSO blocks the termination drain, so without this the
+// NodePool delete would HANG on those pods and the park would leave orphaned nodes. A park is an intentional
+// full shutdown, so overriding the steady-state protection is correct; the drain stays graceful (we clear the
+// annotation, we don't force-kill). 'platctl up' re-applies the karpenter unit and the workloads' pod templates
+// re-add the annotation, restoring the protection.
+//
+// Then it deletes the NodePool(s); the finalizer blocks until the owned NodeClaims drain. No-op on clusters
 // without Karpenter (the CRD is absent).
 func doDrainKarpenterNodes(ctx context.Context, kc config.KubeconfigEntry) error {
 	path, cleanup, err := tempKubeconfig(ctx, kc, "platctl-drain")
@@ -247,6 +256,18 @@ func doDrainKarpenterNodes(ctx context.Context, kc config.KubeconfigEntry) error
 		return err
 	}
 	defer cleanup()
+
+	// Clear do-not-disrupt from the pods that carry it (best-effort; targeted so the drain stays graceful).
+	findOut, _ := exec.CommandContext(ctx, "kubectl", "--kubeconfig", path, "get", "pods", "--all-namespaces",
+		"-o", `jsonpath={range .items[?(@.metadata.annotations.karpenter\.sh/do-not-disrupt=="true")]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}`).CombinedOutput()
+	for _, line := range strings.Split(strings.TrimSpace(string(findOut)), "\n") {
+		ns, name, ok := strings.Cut(line, "/")
+		if !ok {
+			continue
+		}
+		_ = exec.CommandContext(ctx, "kubectl", "--kubeconfig", path, "annotate", "pod",
+			"-n", ns, name, "karpenter.sh/do-not-disrupt-").Run()
+	}
 
 	out, err := exec.CommandContext(ctx, "kubectl", "--kubeconfig", path,
 		"delete", "nodepool", "--all", "--ignore-not-found", "--timeout=5m").CombinedOutput()
