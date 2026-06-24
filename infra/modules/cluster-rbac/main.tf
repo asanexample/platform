@@ -61,6 +61,29 @@ resource "kubernetes_cluster_role_v1" "platform_operator" {
     verbs      = ["patch"]
   }
 
+  # Operate: CR-level recovery on this CRD-heavy platform — delete a stuck Karpenter NodeClaim,
+  # patch off a wedged finalizer on a Crossplane managed resource / XEnvironment during teardown,
+  # bounce a wedged CNPG Cluster. These are the COMMON operator recoveries; without them, CR-level
+  # recovery has no path here and forces a jump to PlatformDeployer (full cluster-admin), defeating
+  # the least-privilege intent. Bounded mutate (patch/update/delete) on a NAMED allow-list of
+  # operational CR groups ONLY — no `create` (authoring stays in GitOps, ADR-040), and not arbitrary
+  # CRDs. Read is already covered by the */* get,list,watch rule below. (Note: cleaning up a wedged
+  # *Helm release* still needs PlatformDeployer — its release Secrets can't be RBAC-scoped by the
+  # owner=helm label, and cluster-wide Secret delete is too broad for this role.)
+  rule {
+    api_groups = [
+      "karpenter.sh", "karpenter.k8s.aws",                # Karpenter NodeClaim/NodePool/EC2NodeClass
+      "platform.refplat.org",                             # XEnvironment XR
+      "apiextensions.crossplane.io", "pkg.crossplane.io", # Crossplane composites/usages, providers
+      "kubernetes.crossplane.io",                         # provider-kubernetes Objects
+      "aws.upbound.io", "aws.m.upbound.io",               # Crossplane AWS managed resources
+      "ecr.aws.upbound.io", "ecr.aws.m.upbound.io",
+      "postgresql.cnpg.io", # CNPG Cluster
+    ]
+    resources = ["*"]
+    verbs     = ["patch", "update", "delete"]
+  }
+
   # Debug: cluster-wide READ on EVERYTHING, including custom resources. The
   # AmazonEKSViewPolicy access entry only reads the fixed built-in resource set
   # (like the `view` role), so it can't read CRDs — crossplane (XTenant,
