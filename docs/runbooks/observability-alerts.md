@@ -97,7 +97,8 @@ Namespace `kube-system`. The CNI / network plane — start with `cilium status` 
 
 AWS-resource metrics via **YACE** (the `cloudwatch-exporter` Deployment in `observability`; CloudWatch →
 Prometheus, the P5b slice of epic 102). Metric names are `aws_<namespace>_<metric>_<stat>`. Broad ad-hoc
-coverage is also available query-time via the Grafana **CloudWatch datasource** (P5a).
+coverage is also available query-time via the Grafana **CloudWatch datasource** (P5a). At-a-glance state for
+all three resources is on the **AWS Cloud Resources** dashboard (Platform folder); scope per ADR-079.
 
 - **CloudNLBUnhealthyHosts** — an NLB target group (`{{ $labels.dimension_TargetGroup }}`) has unhealthy
   hosts for 15m; the gateway/LB backend is degraded. Check target-group health in the EC2 console and the
@@ -105,6 +106,9 @@ coverage is also available query-time via the Grafana **CloudWatch datasource** 
 - **CloudNATGatewayPortAllocationErrors** — a NAT gateway can't allocate SNAT source ports (port
   exhaustion); outbound VPC connections are being dropped. Usually too many concurrent connections to a
   single destination IP:port — spread destinations or add NAT gateways.
+- **CloudTransitGatewayBlackholeDrops** — a Transit Gateway is dropping packets to a blackhole route for
+  15m; cross-account traffic (platform hub ↔ preprod spoke) is hitting a missing/misconfigured route. Check
+  the TGW route tables and VPC attachments (the `transit-gateway` units).
 
 ## Notification channels & secret rotation
 
