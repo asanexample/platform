@@ -137,6 +137,15 @@ from the HCL — the inverse of 'platctl down'. Takes ~1-2 minutes.`,
 					return err
 				}
 			}
+			// Post-unpark workload recovery: the fail-closed Kyverno image-verification webhook can cache a
+			// failed sigstore TUF init while the network is still settling, blocking every policed workload pod
+			// (0 pods created) until Kyverno is restarted (#665). Best-effort — workloads otherwise recover only
+			// after the ReplicaSet backoff.
+			if kcK, kcErr := kubeconfigForEnv(cfg, envName); kcErr == nil {
+				if err := recoverKyverno(ctx, kcK); err != nil {
+					fmt.Printf("  warning: post-unpark Kyverno recovery: %v\n", err)
+				}
+			}
 			// Repair the cross-environment path a park/restore can leave stale (e.g. platform→preprod cross-VPC
 			// DNS + the ArgoCD controller's cached connection). Idempotent; no-op when not configured.
 			if env.Reconnect != nil {
@@ -181,6 +190,66 @@ func doWaitForClusterAPI(ctx context.Context, kc config.KubeconfigEntry) error {
 	return fmt.Errorf("cluster API for %s not reachable after ~15m; node groups are restored but the karpenter "+
 		"apply was skipped to avoid orphaning its helm releases — re-run 'platctl up' once nodes/Tailscale are up",
 		kc.Cluster)
+}
+
+// recoverKyverno repairs the post-unpark Kyverno/sigstore trap (#665). Kyverno's cosign image-verification
+// policies need outbound DNS+internet to sigstore's TUF CDN; right after an unpark the network is still settling,
+// so the admission controller's TUF init fails AND caches the failure — fail-closed, it then denies EVERY policed
+// workload pod (the Deployments sit at zero pods) until it is restarted. So: if any Deployment wants pods but has
+// none, wait for CoreDNS, restart the Kyverno admission controller (fresh TUF init), then re-roll the blocked
+// Deployments so they recreate now instead of waiting out the ReplicaSet backoff. Best-effort; no-op when nothing
+// is blocked or Kyverno is absent. Runs as the env's kubectl (PlatformAdmin: get/patch deployments).
+func recoverKyverno(ctx context.Context, kc config.KubeconfigEntry) error {
+	path, cleanup, err := tempKubeconfig(ctx, kc, "platctl-kyverno")
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	k := func(args ...string) ([]byte, error) {
+		return exec.CommandContext(ctx, "kubectl", append([]string{"--kubeconfig", path}, args...)...).CombinedOutput()
+	}
+
+	// Symptom: Deployments that want pods (spec.replicas>0) but have none (status.replicas absent/0).
+	out, err := k("get", "deploy", "--all-namespaces",
+		"-o", `jsonpath={range .items[*]}{.metadata.namespace}{" "}{.metadata.name}{" "}{.spec.replicas}{" "}{.status.replicas}{"\n"}{end}`)
+	if err != nil {
+		return fmt.Errorf("listing deployments: %s", strings.TrimSpace(string(out)))
+	}
+	var blocked [][2]string
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		f := strings.Fields(line)
+		if len(f) < 3 { // ns name spec [status]
+			continue
+		}
+		status := "0"
+		if len(f) >= 4 {
+			status = f[3]
+		}
+		if f[2] != "0" && f[2] != "" && status == "0" {
+			blocked = append(blocked, [2]string{f[0], f[1]})
+		}
+	}
+	if len(blocked) == 0 {
+		return nil // healthy unpark — nothing blocked
+	}
+
+	// Workloads are blocked. If Kyverno is present, its cached sigstore TUF init likely failed during the network
+	// settle — let CoreDNS come up, then restart it to force a fresh init.
+	if _, kErr := k("get", "deploy", "kyverno-admission-controller", "-n", "kyverno"); kErr == nil {
+		fmt.Printf("  %d workload(s) have no pods post-unpark — refreshing Kyverno (sigstore trust roots)...\n", len(blocked))
+		_, _ = k("rollout", "status", "deploy/coredns", "-n", "kube-system", "--timeout=3m") // let DNS settle first
+		if rOut, rErr := k("rollout", "restart", "deploy/kyverno-admission-controller", "-n", "kyverno"); rErr != nil {
+			return fmt.Errorf("restarting kyverno: %s", strings.TrimSpace(string(rOut)))
+		}
+		_, _ = k("rollout", "status", "deploy/kyverno-admission-controller", "-n", "kyverno", "--timeout=2m")
+	}
+
+	// Re-roll the blocked Deployments so they recreate immediately rather than waiting out the backoff.
+	for _, b := range blocked {
+		_, _ = k("rollout", "restart", "deploy/"+b[1], "-n", b[0])
+	}
+	fmt.Printf("  re-rolled %d blocked workload(s).\n", len(blocked))
+	return nil
 }
 
 // runReconnect runs the post-restore repair steps for an environment (see config.EnvConfig.Reconnect):
