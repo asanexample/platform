@@ -113,9 +113,8 @@ inputs = {
   mimir_remote_write_url = include.base.locals.enable_mimir ? "http://mimir-gateway.observability.svc/api/v1/push" : ""
 
   # Alertmanager → SNS (critical alerts → email)
-  oidc_provider_arn = dependency.eks.outputs.oidc_provider_arn
-  oidc_provider_url = dependency.eks.outputs.oidc_provider_url
-  alerts_topic_arn  = dependency.sns_notifications.outputs.topic_arn
+  # Alertmanager SNS publish uses EKS Pod Identity (ADR-047, #594) — no OIDC/IRSA inputs needed.
+  alerts_topic_arn = dependency.sns_notifications.outputs.topic_arn
 
   # Slack alerting: Alertmanager Slack receiver, webhook synced from Secrets Manager via External Secrets
   # (manually created — see docs/runbooks/observability-alerts.md). warning → Slack, critical → Slack + SNS.

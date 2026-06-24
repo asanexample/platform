@@ -132,23 +132,12 @@ variable "mimir_tenant_id" {
 }
 
 # ---------------------------------------------------------------------------
-# IRSA (P1: Alertmanager → SNS publish only)
+# IAM (P1: Alertmanager → SNS publish via EKS Pod Identity, ADR-047)
 # ---------------------------------------------------------------------------
 
-variable "oidc_provider_arn" {
-  description = "EKS OIDC provider ARN, for the Alertmanager IRSA trust policy."
-  type        = string
-  default     = ""
-}
-
-variable "oidc_provider_url" {
-  description = "EKS OIDC provider URL (no https:// prefix)."
-  type        = string
-  default     = ""
-}
 
 variable "alerts_topic_arn" {
-  description = "SNS topic ARN for critical alerts. When set (with OIDC), the Alertmanager SA gets an IRSA role with sns:Publish on it and the Alertmanager config gains an sns_configs receiver."
+  description = "SNS topic ARN for critical alerts. When set, the Alertmanager SA gets a role with sns:Publish (bound via EKS Pod Identity) and the Alertmanager config gains an sns_configs receiver."
   type        = string
   default     = ""
 }

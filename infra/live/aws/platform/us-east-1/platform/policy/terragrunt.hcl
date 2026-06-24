@@ -55,7 +55,8 @@ generate "helm_provider" {
 }
 
 inputs = {
-  create = true
+  cluster_name = dependency.eks.outputs.cluster_id
+  create       = true
 
   # Enforce: webhook fails closed. Flipped after preprod was proven in Enforce and the cluster-scoped
   # RBAC policies were hardened to exempt the IaC deployer (validated on preprod: PlatformDeployer

@@ -1,6 +1,6 @@
 locals {
-  create      = var.create
-  create_irsa = local.create && var.alerts_topic_arn != "" && var.oidc_provider_arn != ""
+  create     = var.create
+  create_sns = local.create && var.alerts_topic_arn != "" # SNS-publish role for Alertmanager (Pod Identity)
   # P5a — Grafana CloudWatch datasource (zero-storage, query-time AWS-resource metrics). Grafana's SA gets
   # CloudWatch read via Pod Identity (ADR-047 — no IRSA annotation needed); the datasource uses the pod creds.
   cloudwatch_enabled = local.create && var.cloudwatch_enabled
@@ -135,13 +135,13 @@ locals {
       [
         {
           name              = "critical"
-          sns_configs       = local.create_irsa ? [local.sns_config] : []
+          sns_configs       = local.create_sns ? [local.sns_config] : []
           slack_configs     = local.slack_enabled ? [local.slack_config] : []
           pagerduty_configs = local.pagerduty_enabled ? [local.pagerduty_config] : []
         },
         {
           name              = "warning"
-          sns_configs       = (!local.slack_enabled && local.create_irsa) ? [local.sns_config] : []
+          sns_configs       = (!local.slack_enabled && local.create_sns) ? [local.sns_config] : []
           slack_configs     = local.slack_enabled ? [local.slack_config] : []
           pagerduty_configs = [] # warnings notify Slack/SNS, they don't page
         },
@@ -278,9 +278,8 @@ locals {
         )
       }
       serviceAccount = {
-        annotations = local.create_irsa ? {
-          "eks.amazonaws.com/role-arn" = aws_iam_role.alertmanager[0].arn
-        } : {}
+        # Pod Identity (ADR-047) — no IRSA annotation; the association binds this SA -> the SNS-publish role.
+        annotations = {}
       }
       config = local.alertmanager_config
     }
@@ -520,34 +519,23 @@ resource "kubernetes_config_map_v1" "dashboards" {
 }
 
 # ---------------------------------------------------------------------------
-# IRSA — Alertmanager → SNS publish (the only AWS access in P1)
+# Alertmanager → SNS publish; AWS identity via EKS Pod Identity (ADR-047)
 # ---------------------------------------------------------------------------
 data "aws_iam_policy_document" "alertmanager_trust" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create_sns ? 1 : 0
 
   statement {
     effect  = "Allow"
-    actions = ["sts:AssumeRoleWithWebIdentity"]
-
+    actions = ["sts:AssumeRole", "sts:TagSession"]
     principals {
-      type        = "Federated"
-      identifiers = [var.oidc_provider_arn]
-    }
-    condition {
-      test     = "StringEquals"
-      variable = "${var.oidc_provider_url}:aud"
-      values   = ["sts.amazonaws.com"]
-    }
-    condition {
-      test     = "StringEquals"
-      variable = "${var.oidc_provider_url}:sub"
-      values   = ["system:serviceaccount:${var.namespace}:${local.alertmanager_sa}"]
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
     }
   }
 }
 
 resource "aws_iam_role" "alertmanager" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create_sns ? 1 : 0
 
   name_prefix        = "${var.cluster_name}-am-sns-"
   assume_role_policy = data.aws_iam_policy_document.alertmanager_trust[0].json
@@ -555,7 +543,7 @@ resource "aws_iam_role" "alertmanager" {
 }
 
 resource "aws_iam_role_policy" "alertmanager_sns" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create_sns ? 1 : 0
 
   name = "sns-publish"
   role = aws_iam_role.alertmanager[0].id
@@ -583,6 +571,16 @@ resource "aws_iam_role_policy" "alertmanager_sns" {
       },
     ]
   })
+}
+
+resource "aws_eks_pod_identity_association" "alertmanager" {
+  count = local.create_sns ? 1 : 0
+
+  cluster_name    = var.cluster_name
+  namespace       = var.namespace
+  service_account = local.alertmanager_sa
+  role_arn        = aws_iam_role.alertmanager[0].arn
+  tags            = var.tags
 }
 
 # ---------------------------------------------------------------------------
@@ -700,6 +698,7 @@ resource "helm_release" "kube_prometheus_stack" {
     kubernetes_manifest.alertmanager_pagerduty,
     kubernetes_manifest.grafana_oidc_secret,
     aws_eks_pod_identity_association.grafana_cloudwatch,
+    aws_eks_pod_identity_association.alertmanager,
   ]
 }
 

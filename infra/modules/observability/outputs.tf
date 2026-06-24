@@ -14,6 +14,6 @@ output "grafana_admin_secret_arn" {
 }
 
 output "alertmanager_role_arn" {
-  description = "IRSA role ARN the Alertmanager SA assumes to publish to SNS (empty when no alerts topic)."
+  description = "IAM role ARN bound to the Alertmanager SA via EKS Pod Identity for SNS publish (empty when no alerts topic)."
   value       = try(aws_iam_role.alertmanager[0].arn, "")
 }

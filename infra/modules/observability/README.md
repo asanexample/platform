@@ -3,7 +3,7 @@
 Deploys the central observability hub on a cluster: **kube-prometheus-stack** (Prometheus + Grafana +
 Alertmanager + node-exporter + kube-state-metrics + prometheus-operator) in a dedicated `observability`
 namespace. Grafana is hardened and served via the cluster's internal Gateway (Tailscale-only); Alertmanager
-routes `critical` alerts to SNS via IRSA; Prometheus optionally `remote_write`s to **Mimir** (the durable
+routes `critical` alerts to SNS via EKS Pod Identity; Prometheus optionally `remote_write`s to **Mimir** (the durable
 store — see the [`observability-mimir`](../observability-mimir/README.md) module) and points Grafana's
 default datasource at it. EKS-inaccurate scrape jobs and alert rule groups (scheduler/controller-manager/
 etcd/kube-proxy) are disabled. This is **P1+** of the observability stack (#102).
@@ -28,9 +28,7 @@ module "observability" {
   use_persistent_storage = true
   storage_class          = "gp3"
 
-  # Alertmanager -> SNS (critical alerts -> email). IRSA is created only when both are set.
-  oidc_provider_arn = "arn:aws:iam::...:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/..."
-  oidc_provider_url = "oidc.eks.us-east-1.amazonaws.com/id/..."
+  # Alertmanager -> SNS (critical alerts -> email). The SNS-publish role (Pod Identity) is created when alerts_topic_arn is set.
   alerts_topic_arn  = "arn:aws:sns:us-east-1:829808296602:platform-alerts"
 
   # Ship to Mimir for durable, long-range storage (empty = local Prometheus only).
@@ -50,7 +48,7 @@ module "observability" {
 | `high_availability` | `false` | Prom×2 / AM×3 / Grafana×2 + anti-affinity + PDBs. Needs ≥3 nodes / 2–3 AZs. |
 | `use_persistent_storage` / `storage_class` | `false` / `""` | Back Prometheus + Alertmanager with PVCs. `false` = emptyDir (interim). |
 | `prometheus_retention` | `"15d"` | Local retention — short by design (Mimir is the durable store). |
-| `oidc_provider_arn`/`_url` + `alerts_topic_arn` | `""` | All three present ⇒ Alertmanager IRSA + `sns_configs` receiver (incl. `kms:GenerateDataKey*` for the SSE-KMS topic). |
+| `alerts_topic_arn` | `""` | Set ⇒ Alertmanager SNS-publish role via EKS Pod Identity + `sns_configs` receiver (incl. `kms:GenerateDataKey*` for the SSE-KMS topic). |
 | `mimir_remote_write_url` / `mimir_tenant_id` | `""` / `"platform"` | When set: Prometheus `remoteWrite` + `externalLabels{cluster}`, and the bundled Prometheus datasource is no longer Grafana's default. |
 | `grafana_hostname` | `grafana.aws.refplat.org` | `root_url` + cookie domain; the gateway HTTPRoute backend is `<release>-grafana`. |
 | `secret_path_prefix` | `"platform"` | Grafana admin credential at `<prefix>/observability/grafana-admin` (Secrets Manager). |

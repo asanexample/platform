@@ -4,7 +4,7 @@ output "blocks_bucket_name" {
 }
 
 output "mimir_role_arn" {
-  description = "IRSA role ARN the Mimir ServiceAccount assumes for S3 access (empty when IRSA disabled)."
+  description = "IAM role ARN bound to the Mimir ServiceAccount via EKS Pod Identity (empty when disabled)."
   value       = try(aws_iam_role.mimir[0].arn, "")
 }
 

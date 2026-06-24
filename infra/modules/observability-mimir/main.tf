@@ -1,7 +1,6 @@
 locals {
-  create      = var.create
-  create_irsa = local.create && var.oidc_provider_arn != ""
-  sa_name     = var.helm_release_name
+  create  = var.create
+  sa_name = var.helm_release_name
 
   # Sanitize tags for K8s label compliance (RFC 1123), matching the observability module.
   k8s_labels = {
@@ -19,9 +18,8 @@ locals {
     serviceAccount = {
       create = true
       name   = local.sa_name
-      annotations = local.create_irsa ? {
-        "eks.amazonaws.com/role-arn" = aws_iam_role.mimir[0].arn
-      } : {}
+      # Pod Identity (ADR-047) — no IRSA annotation; the association below binds (ns, SA) -> role.
+      annotations = {}
     }
 
     # We use S3 — do NOT deploy the chart's bundled demo MinIO.
@@ -52,7 +50,7 @@ locals {
             s3 = {
               region   = var.aws_region
               endpoint = "s3.${var.aws_region}.amazonaws.com"
-              # IRSA: access_key_id/secret_access_key intentionally omitted -> AWS SDK web-identity chain.
+              # Pod Identity: access_key_id/secret_access_key intentionally omitted -> AWS SDK container-credentials chain.
               # The org `enforce-encryption` SCP denies s3:PutObject without an explicit SSE header — bucket
               # default encryption alone isn't enough. Send SSE-S3 on every write (mirrors Loki/Tempo).
               sse = { type = "SSE-S3" }
@@ -247,35 +245,24 @@ resource "aws_s3_bucket_lifecycle_configuration" "blocks" {
 }
 
 # ---------------------------------------------------------------------------
-# IRSA — IAM role for the Mimir ServiceAccount (S3 blocks access)
+# IAM role for the Mimir ServiceAccount (S3 blocks access); AWS identity via EKS Pod Identity (ADR-047)
 # ---------------------------------------------------------------------------
 
 data "aws_iam_policy_document" "mimir_trust" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create ? 1 : 0
 
   statement {
     effect  = "Allow"
-    actions = ["sts:AssumeRoleWithWebIdentity"]
-
+    actions = ["sts:AssumeRole", "sts:TagSession"]
     principals {
-      type        = "Federated"
-      identifiers = [var.oidc_provider_arn]
-    }
-    condition {
-      test     = "StringEquals"
-      variable = "${var.oidc_provider_url}:aud"
-      values   = ["sts.amazonaws.com"]
-    }
-    condition {
-      test     = "StringEquals"
-      variable = "${var.oidc_provider_url}:sub"
-      values   = ["system:serviceaccount:${var.namespace}:${local.sa_name}"]
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
     }
   }
 }
 
 resource "aws_iam_role" "mimir" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create ? 1 : 0
 
   name_prefix        = "${var.cluster_name}-mimir-"
   assume_role_policy = data.aws_iam_policy_document.mimir_trust[0].json
@@ -285,7 +272,7 @@ resource "aws_iam_role" "mimir" {
 # AES256 bucket => no KMS statement needed (unlike an SSE-KMS bucket, which would require
 # kms:GenerateDataKey*/Decrypt or writes fail with AccessDenied). Scoped to the blocks bucket only.
 resource "aws_iam_role_policy" "mimir_s3" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create ? 1 : 0
 
   name = "blocks-storage"
   role = aws_iam_role.mimir[0].id
@@ -308,6 +295,16 @@ resource "aws_iam_role_policy" "mimir_s3" {
   })
 }
 
+resource "aws_eks_pod_identity_association" "mimir" {
+  count = local.create ? 1 : 0
+
+  cluster_name    = var.cluster_name
+  namespace       = var.namespace
+  service_account = local.sa_name
+  role_arn        = aws_iam_role.mimir[0].arn
+  tags            = var.tags
+}
+
 # ---------------------------------------------------------------------------
 # Helm release — mimir-distributed
 # ---------------------------------------------------------------------------
@@ -328,7 +325,7 @@ resource "helm_release" "mimir" {
 
   values = [yamlencode(local.helm_values)]
 
-  depends_on = [aws_iam_role_policy.mimir_s3]
+  depends_on = [aws_eks_pod_identity_association.mimir]
 }
 
 # ---------------------------------------------------------------------------
