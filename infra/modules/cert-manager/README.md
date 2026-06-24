@@ -1,6 +1,6 @@
 # cert-manager
 
-Deploys cert-manager via Helm with Gateway API support enabled and optional IRSA for DNS-01 challenge solving against AWS Route53. When IRSA is enabled, creates an IAM role with permissions to manage Route53 record sets for ACME DNS-01 validation. The Helm chart installs CRDs automatically. The service account is annotated with the IRSA role ARN for transparent credential injection.
+Deploys cert-manager via Helm with Gateway API support enabled, using AWS Route53 for ACME DNS-01 challenge solving. AWS identity is via **EKS Pod Identity** (ADR-047): an IAM role with Route53 DNS-01 permissions is created and bound to the `cert-manager` controller ServiceAccount through a Pod Identity association. The Helm chart installs CRDs automatically.
 
 ## Usage
 
@@ -8,9 +8,7 @@ Deploys cert-manager via Helm with Gateway API support enabled and optional IRSA
 module "cert_manager" {
   source = "../../modules/cert-manager"
 
-  cluster_name           = "platform-use1-eks"
-  oidc_provider_arn      = "arn:aws:iam::<PLATFORM_ACCOUNT_ID>:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE"
-  oidc_provider_url      = "oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE"
+  cluster_name            = "platform-use1-eks"
   route53_hosted_zone_arn = "arn:aws:route53:::hostedzone/Z1234567890"
 
   tags = {
@@ -29,16 +27,6 @@ module "cert_manager" {
   source = "../../modules/cert-manager"
 
   create       = false
-  cluster_name = "platform-use1-eks"
-}
-```
-
-### Without IRSA
-
-```hcl
-module "cert_manager" {
-  source = "../../modules/cert-manager"
-
   cluster_name = "platform-use1-eks"
 }
 ```
@@ -67,6 +55,7 @@ No modules.
 
 | Name | Type |
 | ---- | ---- |
+| [aws_eks_pod_identity_association.cert_manager](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eks_pod_identity_association) | resource |
 | [aws_iam_role.cert_manager](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role_policy.cert_manager_route53](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [helm_release.cert_manager](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
@@ -86,8 +75,6 @@ No modules.
 | <a name="input_helm_timeout"></a> [helm\_timeout](#input\_helm\_timeout) | Timeout for Helm operations in seconds | `number` | `600` | no |
 | <a name="input_helm_wait"></a> [helm\_wait](#input\_helm\_wait) | Whether to wait for Helm release to complete | `bool` | `true` | no |
 | <a name="input_namespace"></a> [namespace](#input\_namespace) | Kubernetes namespace to install cert-manager into | `string` | `"cert-manager"` | no |
-| <a name="input_oidc_provider_arn"></a> [oidc\_provider\_arn](#input\_oidc\_provider\_arn) | ARN of the EKS OIDC provider for IRSA. Empty string disables IRSA. | `string` | `""` | no |
-| <a name="input_oidc_provider_url"></a> [oidc\_provider\_url](#input\_oidc\_provider\_url) | OIDC provider URL (without https:// prefix) for IRSA trust policy | `string` | `""` | no |
 | <a name="input_route53_hosted_zone_arn"></a> [route53\_hosted\_zone\_arn](#input\_route53\_hosted\_zone\_arn) | ARN of the Route53 hosted zone for DNS01 challenge solving | `string` | `""` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to all resources | `map(string)` | `{}` | no |
 
@@ -96,17 +83,17 @@ No modules.
 | Name | Description |
 | ---- | ----------- |
 | <a name="output_helm_release_status"></a> [helm\_release\_status](#output\_helm\_release\_status) | Status of the cert-manager Helm release |
-| <a name="output_irsa_role_arn"></a> [irsa\_role\_arn](#output\_irsa\_role\_arn) | ARN of the IRSA IAM role for cert-manager |
+| <a name="output_role_arn"></a> [role\_arn](#output\_role\_arn) | ARN of the cert-manager IAM role (bound to the SA via EKS Pod Identity) |
 | <a name="output_namespace"></a> [namespace](#output\_namespace) | Kubernetes namespace where cert-manager is installed |
 <!-- END_TF_DOCS -->
 
 ## Notes
 
-- IRSA is automatically enabled when `oidc_provider_arn` is non-empty. The IAM policy grants `route53:ChangeResourceRecordSets` on the specified hosted zone and `route53:ListHostedZones` globally.
+- AWS identity is via **EKS Pod Identity** (ADR-047): the IAM role trusts `pods.eks.amazonaws.com` and a `aws_eks_pod_identity_association` binds it to the `cert-manager` controller SA — no `eks.amazonaws.com/role-arn` annotation and no OIDC provider. The IAM policy grants `route53:GetChange`, `route53:ChangeResourceRecordSets`/`ListResourceRecordSets` on the specified hosted zone, and `route53:ListHostedZones*` globally (DNS-01).
 - Gateway API integration is enabled by default (`enableGatewayAPI = true`), so cert-manager watches Gateway and HTTPRoute resources for TLS certificate requests.
 - The `fsGroup: 1001` security context is set to avoid permission issues with cert-manager's key storage.
 - The Helm release uses `replace = true`, so failed installs are replaced rather than upgraded.
 
 ## Related ADRs
 
-- ADR-018: IRSA for Pod-Level AWS Identity
+- ADR-047: EKS Pod Identity as the Standard for Pod AWS Identity
