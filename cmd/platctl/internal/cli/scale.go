@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -248,8 +249,10 @@ var drainKarpenterNodesFn = doDrainKarpenterNodes
 // annotation, we don't force-kill). 'platctl up' re-applies the karpenter unit and the workloads' pod templates
 // re-add the annotation, restoring the protection.
 //
-// Then it deletes the NodePool(s); the finalizer blocks until the owned NodeClaims drain. No-op on clusters
-// without Karpenter (the CRD is absent).
+// Then it deletes the NodePool(s) and POLLS until the NodeClaims are actually gone — `kubectl delete nodepool`
+// cascades to NodeClaim deletion in the background and returns early, so without the explicit wait the caller
+// would scale the controller's node group to zero mid-termination and orphan the instances (verified live).
+// No-op on clusters without Karpenter (the CRD is absent).
 func doDrainKarpenterNodes(ctx context.Context, kc config.KubeconfigEntry) error {
 	path, cleanup, err := tempKubeconfig(ctx, kc, "platctl-drain")
 	if err != nil {
@@ -270,7 +273,7 @@ func doDrainKarpenterNodes(ctx context.Context, kc config.KubeconfigEntry) error
 	}
 
 	out, err := exec.CommandContext(ctx, "kubectl", "--kubeconfig", path,
-		"delete", "nodepool", "--all", "--ignore-not-found", "--timeout=5m").CombinedOutput()
+		"delete", "nodepool", "--all", "--ignore-not-found", "--wait=false").CombinedOutput()
 	if err != nil {
 		// No Karpenter CRD on this cluster → nothing to drain.
 		if strings.Contains(string(out), "the server doesn't have a resource type") {
@@ -278,9 +281,20 @@ func doDrainKarpenterNodes(ctx context.Context, kc config.KubeconfigEntry) error
 		}
 		return fmt.Errorf("kubectl delete nodepool: %v: %s", err, strings.TrimSpace(string(out)))
 	}
-	if s := strings.TrimSpace(string(out)); s != "" {
-		fmt.Printf("  %s\n", s)
+
+	// Deleting the NodePool cascades to NodeClaim deletion in the BACKGROUND — `kubectl delete nodepool` returns
+	// before the instances actually terminate. We MUST wait for the NodeClaims to be gone (the controller drains
+	// and terminates them) before returning, because the caller next scales the system group — where the
+	// controller runs — to zero; returning early kills the controller mid-termination and orphans the instances.
+	for i := 0; i < 36; i++ { // up to ~6 min
+		nc, _ := exec.CommandContext(ctx, "kubectl", "--kubeconfig", path, "get", "nodeclaims", "-o", "name").CombinedOutput()
+		if strings.TrimSpace(string(nc)) == "" {
+			fmt.Println("  Karpenter nodes drained and terminated.")
+			return nil
+		}
+		time.Sleep(10 * time.Second)
 	}
+	fmt.Println("  warning: Karpenter NodeClaims still present after 6m — check for orphaned instances before scaling the system group")
 	return nil
 }
 
