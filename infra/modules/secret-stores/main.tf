@@ -3,7 +3,7 @@ locals {
 }
 
 # ---------------------------------------------------------------------------
-# ClusterSecretStore — AWS Secrets Manager (IRSA auth)
+# ClusterSecretStore — AWS Secrets Manager (EKS Pod Identity auth)
 # ---------------------------------------------------------------------------
 
 resource "kubernetes_manifest" "cluster_secret_store" {
@@ -20,15 +20,8 @@ resource "kubernetes_manifest" "cluster_secret_store" {
         aws = {
           service = "SecretsManager"
           region  = var.region
-          # JWT auth: ESO exchanges its K8s service account token for AWS credentials via IRSA
-          auth = {
-            jwt = {
-              serviceAccountRef = {
-                name      = var.service_account_name
-                namespace = var.service_account_namespace
-              }
-            }
-          }
+          # No `auth` block: ESO authenticates as the controller pod's own identity — the external-secrets
+          # SA bound to its IAM role via EKS Pod Identity (ADR-047, #594). Replaces the IRSA jwt.serviceAccountRef.
         }
       }
     }
@@ -36,7 +29,7 @@ resource "kubernetes_manifest" "cluster_secret_store" {
 }
 
 # ---------------------------------------------------------------------------
-# ClusterSecretStore — AWS SSM Parameter Store (IRSA auth)
+# ClusterSecretStore — AWS SSM Parameter Store (EKS Pod Identity auth)
 # ---------------------------------------------------------------------------
 
 resource "kubernetes_manifest" "cluster_secret_store_ssm" {
@@ -53,15 +46,8 @@ resource "kubernetes_manifest" "cluster_secret_store_ssm" {
         aws = {
           service = "ParameterStore"
           region  = var.region
-          # JWT auth: ESO exchanges its K8s service account token for AWS credentials via IRSA
-          auth = {
-            jwt = {
-              serviceAccountRef = {
-                name      = var.service_account_name
-                namespace = var.service_account_namespace
-              }
-            }
-          }
+          # No `auth` block: ESO authenticates as the controller pod's own identity (EKS Pod Identity,
+          # ADR-047, #594). Replaces the IRSA jwt.serviceAccountRef.
         }
       }
     }

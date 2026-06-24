@@ -1,6 +1,5 @@
 locals {
-  create      = var.create
-  create_irsa = local.create && var.oidc_provider_arn != ""
+  create = var.create
 
   # Sanitize tags for K8s label compliance (RFC 1123): lowercase, valid chars, max 63 chars
   k8s_labels = {
@@ -14,11 +13,9 @@ locals {
 
     podLabels = local.k8s_labels
 
-    serviceAccount = {
-      annotations = local.create_irsa ? {
-        "eks.amazonaws.com/role-arn" = aws_iam_role.external_secrets[0].arn
-      } : {}
-    }
+    # AWS identity via EKS Pod Identity (ADR-047): the external-secrets controller SA is matched by the
+    # pod-identity association below. The ClusterSecretStores (secret-stores module) drop their
+    # `auth.jwt.serviceAccountRef` and use this controller identity — no IRSA annotation, no OIDC.
 
     # Prometheus metrics: expose the controller metrics Service + a ServiceMonitor (needs the
     # Prometheus-operator CRDs from the observability hub, #102). Off by default.
@@ -48,37 +45,25 @@ locals {
 }
 
 # ---------------------------------------------------------------------------
-# IRSA — IAM Role for external-secrets (AWS Secrets Manager + SSM)
+# IAM — external-secrets role (Secrets Manager + SSM); AWS identity via EKS Pod Identity (ADR-047)
 # ---------------------------------------------------------------------------
 
 data "aws_iam_policy_document" "external_secrets_trust" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create ? 1 : 0
 
   statement {
     effect  = "Allow"
-    actions = ["sts:AssumeRoleWithWebIdentity"]
+    actions = ["sts:AssumeRole", "sts:TagSession"]
 
     principals {
-      type        = "Federated"
-      identifiers = [var.oidc_provider_arn]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "${var.oidc_provider_url}:aud"
-      values   = ["sts.amazonaws.com"]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "${var.oidc_provider_url}:sub"
-      values   = ["system:serviceaccount:${var.namespace}:external-secrets"]
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
     }
   }
 }
 
 resource "aws_iam_role" "external_secrets" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create ? 1 : 0
 
   name_prefix        = "${var.cluster_name}-ext-sec-"
   assume_role_policy = data.aws_iam_policy_document.external_secrets_trust[0].json
@@ -87,7 +72,7 @@ resource "aws_iam_role" "external_secrets" {
 }
 
 data "aws_iam_policy_document" "external_secrets" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create ? 1 : 0
 
   statement {
     effect = "Allow"
@@ -124,11 +109,23 @@ data "aws_iam_policy_document" "external_secrets" {
 }
 
 resource "aws_iam_role_policy" "external_secrets" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create ? 1 : 0
 
   name   = "secrets-access"
   role   = aws_iam_role.external_secrets[0].id
   policy = data.aws_iam_policy_document.external_secrets[0].json
+}
+
+# Pod Identity association: binds the role to the `external-secrets` controller SA. ESO's
+# ClusterSecretStores authenticate as this controller identity (no per-store serviceAccountRef).
+resource "aws_eks_pod_identity_association" "external_secrets" {
+  count = local.create ? 1 : 0
+
+  cluster_name    = var.cluster_name
+  namespace       = var.namespace
+  service_account = "external-secrets"
+  role_arn        = aws_iam_role.external_secrets[0].arn
+  tags            = var.tags
 }
 
 # ---------------------------------------------------------------------------
@@ -153,5 +150,6 @@ resource "helm_release" "external_secrets" {
     yamlencode(local.external_secrets_values),
   ]
 
-  depends_on = [aws_iam_role.external_secrets]
+  # The association must exist before the SA/pod rolls so the new pod gets Pod-Identity creds immediately.
+  depends_on = [aws_eks_pod_identity_association.external_secrets]
 }

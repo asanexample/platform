@@ -27,20 +27,8 @@ variable "tags" {
 }
 
 # ---------------------------------------------------------------------------
-# IRSA
+# IAM (EKS Pod Identity — ADR-047)
 # ---------------------------------------------------------------------------
-
-variable "oidc_provider_arn" {
-  description = "ARN of the EKS OIDC provider for IRSA. Empty string disables IRSA."
-  type        = string
-  default     = ""
-}
-
-variable "oidc_provider_url" {
-  description = "OIDC provider URL (without https:// prefix) for IRSA trust policy"
-  type        = string
-  default     = ""
-}
 
 variable "kms_key_arns" {
   description = "KMS key ARNs that external-secrets is allowed to decrypt"
@@ -49,13 +37,13 @@ variable "kms_key_arns" {
 }
 
 variable "secret_path_prefix" {
-  description = "Secrets Manager path prefix for scoping IRSA access (e.g., 'platform')"
+  description = "Secrets Manager path prefix for scoping access (e.g., 'platform')"
   type        = string
   default     = "*"
 }
 
 variable "ssm_path_prefix" {
-  description = "SSM Parameter Store path prefix for scoping IRSA access (e.g., '/platform')"
+  description = "SSM Parameter Store path prefix for scoping access (e.g., '/platform')"
   type        = string
   default     = "/*"
 }
