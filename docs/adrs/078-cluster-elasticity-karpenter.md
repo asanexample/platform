@@ -144,8 +144,14 @@ Things the design didn't anticipate, learned applying it live (module `infra/mod
 - **Minimum node size matters (D5 corollary).** The per-node DaemonSet slab (Cilium, Beyla, Alloy, node-exporter,
   otel) is ~3.2 GiB; a 4 GiB node exhausts memory and the kubelet flaps `NotReady`, churning. The NodePool sets a
   `karpenter.k8s.aws/instance-memory` floor (`min_instance_memory_mib = 6144` → 8 GiB+, matching the system group).
-- **Park integration.** `platctl down` deletes the NodePool (its finalizer drains the nodes) *before* scaling the
-  managed groups to zero, else the controller dies mid-park and orphans EC2; `up` re-applies the karpenter unit.
+- **Park integration (subtler than it looks — verified live).** `platctl down` must, *before* scaling the
+  managed groups to zero: (1) **clear `karpenter.sh/do-not-disrupt`** from the stateful pods — that annotation
+  (steady-state protection against voluntary disruption) ALSO blocks Karpenter's termination drain, so the
+  NodePool delete would otherwise hang on them; and (2) after deleting the NodePool, **poll until the NodeClaims
+  are actually gone** — `kubectl delete nodepool` cascades to NodeClaim deletion in the *background* and returns
+  early, so without the wait the controller (on the system group) is scaled to zero mid-termination and orphans
+  the EC2 instances. The original "the NodePool finalizer blocks until drained" assumption was wrong on both
+  counts. `up` re-applies the karpenter unit and the workloads' pod templates re-add the annotation.
 - **System-node sizing is its own decision.** Node-pinned DaemonSet pods can't be served by Karpenter, so the
   fixed system group must itself be large enough to hold the DaemonSet slab + standing load — the platform system
   group went `t4g.large → t4g.xlarge`. Changing a managed group's `instance_types` is **ForceNew**

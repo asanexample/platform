@@ -75,8 +75,10 @@ teardown.
 - `platctl down --env <env>` first **drains Karpenter** — it clears the `karpenter.sh/do-not-disrupt`
   annotation from the pods that carry it (the stateful pods protect themselves from *voluntary* disruption in
   steady state, but that annotation also blocks the termination drain, so a park would otherwise hang on them),
-  then deletes the NodePool (its finalizer blocks until the nodes it manages drain and terminate) — *then* scales
-  every managed node group to `desiredSize=0, minSize=0` via the EKS API. The Karpenter step is essential: the
+  then deletes the NodePool and **polls until its NodeClaims are actually gone** (the delete cascades to NodeClaim
+  deletion in the background and returns early — it does *not* block until the instances terminate) — *then*
+  scales every managed node group to `desiredSize=0, minSize=0` via the EKS API. The Karpenter step is essential:
+  the
   controller runs on the system group, so scaling the managed groups first would kill it mid-park and leave its
   EC2 instances orphaned (ADR-078). No-op on clusters without Karpenter. The **control plane and all EBS volumes
   survive** (e.g. CNPG databases), so it is non-destructive; `--yes` skips the confirmation.
