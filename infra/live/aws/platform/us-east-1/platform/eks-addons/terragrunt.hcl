@@ -60,7 +60,8 @@ inputs = {
   create       = true
   cluster_name = dependency.eks.outputs.cluster_id
 
-  # AWS identity via EKS Pod Identity (ADR-047, #594) — no OIDC/IRSA inputs needed.
+  oidc_provider_arn = dependency.eks.outputs.oidc_provider_arn
+  oidc_provider_url = dependency.eks.outputs.oidc_provider_url
 
   addons = {
     coredns = {}
