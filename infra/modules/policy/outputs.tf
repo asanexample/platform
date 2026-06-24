@@ -19,6 +19,6 @@ output "validation_failure_action" {
 }
 
 output "kyverno_ecr_role_arn" {
-  description = "ARN of the Kyverno IRSA role for ECR signature reads (null when image verification is disabled)"
-  value       = local.create_irsa ? aws_iam_role.kyverno_ecr[0].arn : null
+  description = "ARN of the Kyverno ECR-read role (bound to the controller SAs via EKS Pod Identity; null when image verification is disabled)"
+  value       = try(aws_iam_role.kyverno_ecr[0].arn, null)
 }

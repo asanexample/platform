@@ -28,20 +28,8 @@ variable "namespace" {
 }
 
 # ---------------------------------------------------------------------------
-# IRSA
+# IAM (EKS Pod Identity — ADR-047)
 # ---------------------------------------------------------------------------
-
-variable "oidc_provider_arn" {
-  description = "EKS OIDC provider ARN for the Mimir IRSA trust policy. Empty string disables IRSA (the chart would then need static creds — not supported here)."
-  type        = string
-  default     = ""
-}
-
-variable "oidc_provider_url" {
-  description = "EKS OIDC provider URL (no https:// prefix) for the IRSA trust policy."
-  type        = string
-  default     = ""
-}
 
 # ---------------------------------------------------------------------------
 # S3 (blocks storage)

@@ -73,7 +73,8 @@ generate "helm_provider" {
 }
 
 inputs = {
-  create = true
+  cluster_name = dependency.eks.outputs.cluster_id
+  create       = true
 
   # Enforce: reject violations at admission (webhook fails closed). Flipped after the Audit phase
   # confirmed PolicyReports clean against the live alpha workload (ADR-014 rollout).
@@ -112,9 +113,8 @@ inputs = {
   # (PolicyReport verifiedCount:1, pods rolled out) so Enforce no longer risks blocking the live workload.
   enable_attestation_verification = true
   attest_failure_action           = "Enforce"
-  oidc_provider_arn               = dependency.eks.outputs.oidc_provider_arn
-  oidc_provider_url               = dependency.eks.outputs.oidc_provider_url
-  ecr_account_id                  = include.base.locals.account_ids["platform"]
+  # AWS identity via EKS Pod Identity (ADR-047, #594) — no OIDC/IRSA inputs needed.
+  ecr_account_id = include.base.locals.account_ids["platform"]
 
   # v3 (ADR-067/069 §6): per-PRODUCT cosign keyless verification (verify-images-product +
   # verify-attestations-product), derived from the Product registry above. Every product uses the SHARED

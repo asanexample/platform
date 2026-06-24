@@ -119,6 +119,12 @@ variable "helm_repository" {
   default     = "https://kyverno.github.io/kyverno/"
 }
 
+variable "cluster_name" {
+  description = "EKS cluster name (for the Kyverno ECR-read Pod Identity association)."
+  type        = string
+  default     = ""
+}
+
 variable "namespace" {
   description = "Dedicated namespace for the Kyverno engine (must not be co-located with other apps)"
   type        = string
@@ -209,17 +215,6 @@ variable "trusted_ci_build_subject_regexp" {
   default     = "^https://github\\.com/asanexample/trusted-ci/\\.github/workflows/build-sign\\.yml@.+$"
 }
 
-variable "oidc_provider_arn" {
-  description = "EKS OIDC provider ARN, for the Kyverno IRSA trust policy. Required when enable_image_verification = true."
-  type        = string
-  default     = ""
-}
-
-variable "oidc_provider_url" {
-  description = "EKS OIDC provider URL (no https:// prefix), for the Kyverno IRSA trust policy."
-  type        = string
-  default     = ""
-}
 
 variable "ecr_account_id" {
   description = "AWS account ID hosting the ECR repos Kyverno reads signatures from (the platform account). Cross-account from preprod is permitted by the ECR repo policy."

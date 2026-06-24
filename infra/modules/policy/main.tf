@@ -17,10 +17,8 @@ locals {
   cleanup_server_port   = var.webhook_host_network ? 9444 : 9443
 
   # Kyverno needs ECR read (IRSA) to fetch cosign signatures for verifyImages (Phase 3).
-  create_irsa = local.create && var.enable_image_verification && var.oidc_provider_arn != ""
-  irsa_sa_annotations = local.create_irsa ? {
-    "eks.amazonaws.com/role-arn" = aws_iam_role.kyverno_ecr[0].arn
-  } : {}
+  create_image_role            = local.create && var.enable_image_verification # Kyverno ECR read (Pod Identity)
+  kyverno_ecr_service_accounts = toset(["kyverno-admission-controller", "kyverno-reports-controller"])
 
   # Sanitize tags for K8s label compliance (RFC 1123): lowercase, valid chars, max 63 chars
   k8s_labels = {
@@ -56,7 +54,7 @@ locals {
       # IRSA: lets the admission controller pull cosign signatures from ECR (the EKS pod-identity
       # webhook injects AWS_REGION/creds from this annotation). Empty when verification is off.
       # The chart nests the SA under rbac.serviceAccount.
-      rbac = { serviceAccount = { annotations = local.irsa_sa_annotations } }
+      rbac = { serviceAccount = { annotations = {} } } # SA bound to the ECR role via Pod Identity (ADR-047)
       # Webhook server port off 9443 on hostNetwork (see local.admission_server_port) so it never collides
       # with provider-kubernetes' hardcoded :9443. The service's targetPort follows webhookServer.port, and
       # autoUpdateWebhooks repoints the webhook configs — so the API-server path (kyverno-svc:443) is unchanged.
@@ -94,7 +92,7 @@ locals {
     backgroundController = { replicas = 1 }
     reportsController = {
       replicas = 1
-      rbac     = { serviceAccount = { annotations = local.irsa_sa_annotations } }
+      rbac     = { serviceAccount = { annotations = {} } } # SA bound to the ECR role via Pod Identity (ADR-047)
     }
     # The cleanup controller also serves an API-server-called webhook → same hostNetwork need.
     # On hostNetwork its server (9443) + metrics (8000) become host ports that collide with the
@@ -172,41 +170,24 @@ locals {
 }
 
 # ---------------------------------------------------------------------------
-# IRSA — Kyverno ECR read (for verifyImages signature fetch)
+# Kyverno ECR read (verifyImages signature fetch); AWS identity via EKS Pod Identity (ADR-047)
 # ---------------------------------------------------------------------------
 
 data "aws_iam_policy_document" "kyverno_trust" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create_image_role ? 1 : 0
 
   statement {
     effect  = "Allow"
-    actions = ["sts:AssumeRoleWithWebIdentity"]
-
+    actions = ["sts:AssumeRole", "sts:TagSession"]
     principals {
-      type        = "Federated"
-      identifiers = [var.oidc_provider_arn]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "${var.oidc_provider_url}:aud"
-      values   = ["sts.amazonaws.com"]
-    }
-
-    # Admission controller verifies at admission; reports controller for background image scans.
-    condition {
-      test     = "StringEquals"
-      variable = "${var.oidc_provider_url}:sub"
-      values = [
-        "system:serviceaccount:${var.namespace}:kyverno-admission-controller",
-        "system:serviceaccount:${var.namespace}:kyverno-reports-controller",
-      ]
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
     }
   }
 }
 
 resource "aws_iam_role" "kyverno_ecr" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create_image_role ? 1 : 0
 
   name_prefix        = "kyverno-ecr-"
   assume_role_policy = data.aws_iam_policy_document.kyverno_trust[0].json
@@ -215,7 +196,7 @@ resource "aws_iam_role" "kyverno_ecr" {
 }
 
 data "aws_iam_policy_document" "kyverno_ecr" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create_image_role ? 1 : 0
 
   statement {
     sid       = "EcrAuth"
@@ -239,11 +220,22 @@ data "aws_iam_policy_document" "kyverno_ecr" {
 }
 
 resource "aws_iam_role_policy" "kyverno_ecr" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create_image_role ? 1 : 0
 
   name   = "ecr-read"
   role   = aws_iam_role.kyverno_ecr[0].id
   policy = data.aws_iam_policy_document.kyverno_ecr[0].json
+}
+
+# One association per Kyverno controller SA (admission + reports) -> the shared ECR-read role.
+resource "aws_eks_pod_identity_association" "kyverno_ecr" {
+  for_each = local.create_image_role ? local.kyverno_ecr_service_accounts : toset([])
+
+  cluster_name    = var.cluster_name
+  namespace       = var.namespace
+  service_account = each.value
+  role_arn        = aws_iam_role.kyverno_ecr[0].arn
+  tags            = var.tags
 }
 
 # ---------------------------------------------------------------------------

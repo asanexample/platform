@@ -4,7 +4,7 @@ Deploys **Grafana Mimir** (`mimir-distributed` chart) as the hub's durable, mult
 long-range metrics store, into the existing `observability` namespace (so it shares Grafana's datasource
 sidecar and the namespace's default-deny NetworkPolicy isolation). The hub Prometheus `remote_write`s to it;
 Grafana queries it as the default datasource. Includes the **S3 blocks bucket** (SSE-S3/AES256) and an
-**IRSA** role for Mimir's ServiceAccount. This is **P2** of the observability stack (#102).
+An IAM role for Mimir's ServiceAccount, bound via **EKS Pod Identity** (ADR-047). This is **P2** of the observability stack (#102).
 
 Runs in **classic architecture** (distributor → ingester gRPC, RF1) at minimal single-replica sizing — not
 the chart's default Kafka ingest-storage. `multitenancy_enabled` is on; the hub's own metrics use tenant
@@ -23,9 +23,6 @@ module "mimir" {
   cluster_name = "platform-use1-eks"
   aws_region   = "us-east-1"
   namespace    = "observability" # must exist (created by the observability module)
-
-  oidc_provider_arn = "arn:aws:iam::...:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/..."
-  oidc_provider_url = "oidc.eks.us-east-1.amazonaws.com/id/..."
 
   helm_chart_version = "6.0.6"
   high_availability  = false  # single-replica; true => RF3 + zone-aware + caches + query-scheduler x2
@@ -66,7 +63,7 @@ module "mimir" {
 - **query-scheduler is required** — the chart wires querier/query-frontend to it and has no scheduler-less
   mode; disabling it breaks the read path (DNS failures). Kept on (single replica when not HA).
 - **RF1 with one ingester** — `ingester.ring.replication_factor` must be 1 or writes are rejected.
-- **AES256 (SSE-S3) bucket on purpose** — keeps the Mimir IRSA free of KMS perms (an SSE-KMS bucket needs
+- **AES256 (SSE-S3) bucket on purpose** — keeps the Mimir role free of KMS perms (an SSE-KMS bucket needs
   `kms:GenerateDataKey*`/`Decrypt` or writes fail) and avoids per-object KMS cost. `AWS-0132` is accepted in
   `.trivyignore.yaml` (CMK is the regulated-tier upgrade). `fullnameOverride=mimir` makes service names
   deterministic (`mimir-gateway`, …); `minio.enabled=false` (we use S3); `metaMonitoring.serviceMonitor`
