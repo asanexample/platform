@@ -2,7 +2,7 @@
 
 Creates EKS managed node groups with a shared IAM node role. The node role includes the standard EKS worker, ECR read-only, SSM managed instance, and CNI policies. Each node group is independently configurable for instance types, scaling parameters, capacity type (on-demand vs spot), AMI type, and Kubernetes labels. Node groups are separated from the EKS module to enforce deployment ordering -- Cilium must be deployed before nodes can join the cluster.
 
-Each node group is backed by a minimal launch template that enforces IMDSv2 (`http_tokens = required`) and a metadata hop limit of 1, so pods cannot reach the instance metadata endpoint and assume the node IAM role's credentials (pods use IRSA instead). The launch template sets no `image_id`, so EKS still injects the EKS-optimized AMI and bootstrap. **Changing these node groups triggers a rolling instance replacement.**
+Each node group is backed by a minimal launch template that enforces IMDSv2 (`http_tokens = required`) and a metadata hop limit of 1, so pods cannot reach the instance metadata endpoint and assume the node IAM role's credentials (pods use EKS Pod Identity, ADR-047). The launch template sets no `image_id`, so EKS still injects the EKS-optimized AMI and bootstrap. **Changing these node groups triggers a rolling instance replacement.**
 
 ## Usage
 
@@ -46,6 +46,11 @@ module "node_groups" {
 ```
 
 ### Mixed On-Demand and Spot Groups
+
+> **Note:** the static SPOT `workloads` node group below is **illustrative only** — workload-tier nodes are now
+> provisioned/consolidated by **Karpenter** (ADR-078), which runs on the `system` group. A static workload node
+> group is no longer the deployed shape; the example shows the module's `capacity_type`/sizing knobs, not the
+> current topology.
 
 ```hcl
 module "node_groups" {
@@ -134,4 +139,4 @@ No modules.
 ## Related ADRs
 
 - ADR-009: EKS Component Separation
-- ADR-023: EKS Managed Node Groups over Self-Managed or Karpenter
+- ADR-023: EKS Managed Node Groups over Self-Managed or Karpenter (refined by ADR-078, which adopts Karpenter for workload nodes)

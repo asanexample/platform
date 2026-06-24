@@ -16,7 +16,7 @@ reusable workflows in **`asanexample/trusted-ci`** (public, but only the platfor
   cosign-keyless-sign the image → attach a CycloneDX SBOM. All under `trusted-ci`'s own OIDC identity.
 - **`slsa-provenance.yml`** — attach the SLSA build provenance (SLSA L3 isolated signer, ADR-042).
 
-Your repo just **calls** them. The reference implementation is **`app-bravo-demo`** — the generic starter; copy it
+Your repo just **calls** them. The reference implementation is **`alpha-shop`** — the generic starter; copy it
 and swap team/product/service/hostname/Dockerfile. (ADR-050.)
 
 ---
@@ -26,23 +26,25 @@ and swap team/product/service/hostname/Dockerfile. (ADR-050.)
 Before your CI can push or be trusted, your product's environment must exist in the platform config. This is the
 [environment-onboarding runbook](environment-onboarding.md) — confirm it's done:
 
-1. **Product + service onboarded** — the `XEnvironment` claim defines the `<team>-<product>-<stage>`
+1. **Product + service onboarded** — the **Product registry** entry (`gitops/products/<team>/<product>.yaml`)
+   sets `spec.repo` (your app repo), and the `XEnvironment` claim defines the `<team>-<product>-<stage>`
    namespace, the ECR repo `team-<team>/<product>-<svc>` (per `spec.services.<svc>`), and the route hostnames
-   (`spec.domains` + the derived host); the claim also carries the per-product **signing identities**
-   (`spec.services.<svc>.repo`) the policy will trust.
+   (`spec.domains` + the derived host).
 2. **ECR push role** — `arn:aws:iam::829808296602:role/github-actions-ecr-push-product-<team>-<product>`,
    trusting your repo's GitHub OIDC (see [ADR-036](../adrs/036-github-actions-oidc-federation.md)).
    `build-sign.yml` assumes this; it is scoped to `team-<team>/<product>-*`.
-3. **Trust your product's shared-signer identity** — your repo (`asanexample/<team>-<product>`) listed in
-   the policy unit's `shared_signer_products` (→ `shared_signer_caller_repos`) **and**
-   `isolated_provenance_products`. That makes `verify-images` + the SBOM/provenance checks accept the shared
+3. **Shared-signer trust is registry-derived — nothing to hand-maintain.** The `policy` unit builds its
+   `verify_subjects_product` map **automatically** from the Product registry: your repo from `spec.repo`
+   becomes the per-product caller-repo gate. So once your `gitops/products/<team>/<product>.yaml` entry exists
+   (step 1) and `policy` is applied, `verify-images` + the SBOM/provenance checks accept the shared
    `build-sign.yml` / `slsa-provenance.yml` identities **gated to your repo** by the cert's
-   `githubWorkflowRepository` extension.
+   `githubWorkflowRepository` extension. There is no separate allow-list to be added to.
 
 > **Bespoke builds (escape hatch):** if your build genuinely can't use `build-sign.yml` (exotic toolchain,
-> multi-image, non-Docker), run your own build+sign job and ask the platform team to keep you on the
-> **app-signed** path (`verify_subjects`, the `deploy.yml`/`preview.yml` identity) instead of the shared signer.
-> The policy accepts whichever your product is wired for. This runbook covers the **shared (default)** path.
+> multi-image, non-Docker), run your own build+sign job and ask the platform team to add your repo's
+> `deploy.yml`/`preview.yml` identity to your product's **`appSubjects`** (the app-signed fallback inside
+> `verify_subjects_product`) instead of relying solely on the shared signer. The policy accepts either. This
+> runbook covers the **shared (default)** path.
 
 You **do not** create or manage any keys — signing is keyless (GitHub OIDC → Fulcio → Rekor).
 
@@ -111,7 +113,7 @@ jobs:
 ```
 
 **PR previews:** a near-identical `preview.yml` triggered on `pull_request` — the same `build` + `provenance`
-jobs, no `deploy` job, tagging with `github.event.pull_request.head.sha`. (Reference: `app-bravo-demo/preview.yml`.)
+jobs, no `deploy` job, tagging with `github.event.pull_request.head.sha`. (Reference: `alpha-shop/preview.yml`.)
 Fork PRs receive no OIDC token, so they fail closed (cannot push) — by design.
 
 The Dockerfile is the **only** language/framework-specific surface you own; `build-sign.yml` exposes
@@ -134,7 +136,8 @@ The Dockerfile is the **only** language/framework-specific surface you own; `bui
 - [ ] Your manifests live under `k8s/` and are policy-compliant — see the CLAUDE.md "Authoring Policy-Compliant
       Workloads" checklist (resource limits, probes, ClusterIP, named ServiceAccount, allow-listed hostnames,
       no `:latest`).
-- [ ] Platform team has added your repo to `shared_signer_products` + `isolated_provenance_products` (prereq 3).
+- [ ] Your Product registry entry (`gitops/products/<team>/<product>.yaml`) sets `spec.repo` to your app repo,
+      and the `policy` unit has been applied — trust is then derived automatically (prereq 3, no allow-list).
 
 ---
 
@@ -181,7 +184,7 @@ If a pod is **denied**, the message names the failing policy. See
 | Reusable workflow pinned to an unreachable/typo'd SHA or repo | `error parsing called workflow … : workflow was not found` at startup (0 jobs) |
 | Missing `id-token: write` on the caller job | inside `build-sign.yml`: cosign `no identity token` / AWS `Not authorized to perform sts:AssumeRoleWithWebIdentity` |
 | `with.service` ≠ claim `spec.services` svc / wrong product repo name | `build-sign.yml` guard refuses (image not in `team-<team>/<product>-*`); or `image-registries` denies the pod |
-| Platform hasn't added you to `shared_signer_products` | signature is valid but **no product policy trusts the shared identity for you** → pod denied |
+| Product registry entry missing `spec.repo` (or `policy` not yet applied) | signature is valid but **no product policy trusts the shared identity for you** (`verify_subjects_product` didn't derive your caller repo) → pod denied |
 | Copied the *old* per-app build+sign steps AND call the shared signer | two image-signature identities; prefer the thin caller (delete the inline build/sign) |
 | Build job self-attests `slsaprovenance` (legacy) | two provenance identities → Kyverno single-identity match fails (`verifiedCount: 0`) — provenance is `slsa-provenance.yml`'s job only |
 | Sigstore egress blocked in the runner | cosign `sign`/`attest` hangs/fails reaching `fulcio.sigstore.dev` / `rekor.sigstore.dev` |

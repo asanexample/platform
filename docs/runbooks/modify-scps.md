@@ -95,16 +95,20 @@ interpolation, automatic JSON formatting).
 ### Modifying Exempt Roles
 
 To change which roles are exempt from SCP deny statements, modify `var.exempt_roles`
-in `terragrunt.hcl`. **The current live value has three roles — keep them and append**;
-dropping `PlatformDeployer` or `github-actions-terratest` will break Terragrunt apply and
-the Terratest CI respectively:
+in `terragrunt.hcl`. **The current live value has SIX entries — keep them ALL and append**;
+dropping `PlatformDeployer`/`github-actions-terratest` breaks Terragrunt apply / Terratest CI,
+dropping the `crossplane-*` entries breaks environment ECR/IAM provisioning, and dropping
+`*-karpenter-*` breaks Karpenter node provisioning org-wide (ADR-078):
 
 ```hcl
 inputs = {
   exempt_roles = [
     "OrganizationAccountAccessRole", # break-glass (AWS-created per account)
-    "PlatformDeployer",              # IaC apply role — DO NOT REMOVE
     "github-actions-terratest",      # CI integration tests — DO NOT REMOVE
+    "PlatformDeployer",              # IaC apply role — DO NOT REMOVE
+    "crossplane-ecr-provisioner",    # environment ECR provisioning — DO NOT REMOVE
+    "crossplane-provisioner-*",      # environment IAM/EKS provisioning — DO NOT REMOVE
+    "*-karpenter-*",                 # Karpenter node provisioning (ADR-078) — DO NOT REMOVE
     "EmergencyBreakGlassRole",       # <-- new role being added
   ]
 }
@@ -422,14 +426,17 @@ dynamic "statement" {
 
 ### Add an Emergency Exempt Role
 
-In `terragrunt.hcl` — **append to the existing three roles, do not replace them**:
+In `terragrunt.hcl` — **append to the existing six entries, do not replace them**:
 
 ```hcl
 inputs = {
   exempt_roles = [
     "OrganizationAccountAccessRole",
-    "PlatformDeployer",         # keep — IaC apply
     "github-actions-terratest", # keep — CI tests
+    "PlatformDeployer",         # keep — IaC apply
+    "crossplane-ecr-provisioner",  # keep — environment ECR provisioning
+    "crossplane-provisioner-*",    # keep — environment IAM/EKS provisioning
+    "*-karpenter-*",               # keep — Karpenter node provisioning (ADR-078)
     "BreakGlassRole",           # <-- emergency role being added
   ]
 }

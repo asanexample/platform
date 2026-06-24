@@ -47,8 +47,7 @@ Each environment (a Product at a Stage) is assigned a namespace `<team>-<product
 
 ### 1. AWS SSO Access
 
-You need an SSO profile for the preprod account with the
-`DeveloperAccess` role. Add to `~/.aws/config`:
+You need an SSO profile for the preprod account. Add to `~/.aws/config`:
 
 ```ini
 [profile preprod-dev]
@@ -70,20 +69,18 @@ aws sso login --profile preprod-dev
 
 ### 2. kubectl Access
 
-Configure kubeconfig for the preprod cluster:
+Configure kubeconfig for the preprod cluster (the recommended path):
 
 ```bash
 platctl kubeconfig --env preprod
 ```
 
-Or manually:
-
-```bash
-AWS_PROFILE=preprod-dev aws eks update-kubeconfig \
-  --name preprod-use1-eks \
-  --region us-east-1 \
-  --role-arn arn:aws:iam::<PREPROD_ACCOUNT_ID>:role/DeveloperAccess
-```
+> **Note:** Per-team, namespace-scoped `DeveloperAccess-<team>` roles
+> (ADR-039) are **not yet provisioned** — see
+> [#647](https://github.com/asanexample/platform/issues/647). Until they
+> land, use `platctl kubeconfig` (which configures the cluster context
+> against the available role); there is no per-team scoped kubectl access
+> to assume.
 
 Verify access to your environment namespace:
 
@@ -399,7 +396,7 @@ manifest changes to `main`, expect the sync to begin within 3 minutes.
 
 1. Connect to Tailscale VPN
 2. Open `https://argocd.aws.refplat.org`
-3. Log in via SSO (Identity Center)
+3. Log in via Keycloak OIDC
 4. Find your application (e.g. `alpha-demo`)
 5. Click **Sync** > **Synchronize**
 

@@ -288,8 +288,10 @@ ArgoCD runs on the platform cluster and manages deployments to preprod.
 
 ### Constraints
 
-- ArgoCD SSO uses Dex + SAML. Dex is bundled in the Helm chart -- major
-  ArgoCD upgrades may change Dex configuration format.
+- ArgoCD SSO uses **Keycloak OIDC** (ADR-053/059; embedded Dex is off,
+  `dex_enabled = false`). The OIDC config is injected via `argocd-cm`
+  (`oidc.config`), so an ArgoCD upgrade should not disturb it -- but
+  verify the login still works after the upgrade.
 - ArgoCD cluster secrets (preprod connection) must remain valid after
   upgrade.
 - CRDs (Application, AppProject, ApplicationSet) may change between
@@ -329,7 +331,7 @@ kubectl -n argocd get secret argocd-secret -o yaml > /tmp/argocd-secret-backup.y
    kubectl -n argocd get pods
 
    # SSO login works
-   # Open https://argocd.aws.refplat.org and test SAML login
+   # Open https://argocd.aws.refplat.org and verify OIDC login via Keycloak
 
    # Cluster connections healthy
    argocd cluster list
@@ -411,10 +413,10 @@ kubectl -n argocd get secret argocd-secret -o yaml > /tmp/argocd-secret-backup.y
 
    ```bash
    # Operator pod running
-   kubectl -n tailscale get pods
+   kubectl -n tailscale-system get pods
 
-   # Subnet router advertising routes
-   kubectl -n tailscale get connector -o yaml
+   # Subnet router advertising routes (Connector is cluster-scoped)
+   kubectl get connector -o yaml
 
    # VPN connectivity
    tailscale status
@@ -424,12 +426,16 @@ kubectl -n argocd get secret argocd-secret -o yaml > /tmp/argocd-secret-backup.y
 
 ## Upgrading OpenTofu / Terragrunt
 
-These are local CLI tools, not deployed infrastructure.
+These are local CLI tools, not deployed infrastructure. The canonical
+versions of all CLI tools (`tofu`, `terragrunt`, `kubectl`, `helm`,
+`awscli`) are pinned in **`/.tool-versions`** — the single source of
+truth read by local dev (mise/asdf), CI, and the self-hosted runner
+image. Bump the version there so every consumer stays in lock-step.
 
 ### OpenTofu
 
 1. Check the [OpenTofu changelog](https://github.com/opentofu/opentofu/releases).
-2. Update the version constraint in `infra/live/aws/root.hcl` if needed.
+2. Update the version constraint in `infra/root.hcl` if needed.
 3. Install the new version locally.
 4. Run `tofu fmt -check -recursive infra/modules/` to catch syntax changes.
 5. Test with `terragrunt plan` on a non-critical unit before applying widely.

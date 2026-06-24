@@ -23,14 +23,14 @@ The module is **cloud-agnostic and holds no team-specific data** — per-environ
 - **Environment scoping.** Environment-targeted policies match the `platform.refplat.org/team` namespace
   label; infra namespaces are excluded. Cluster-scoped policies (RBAC, default-namespace) skip
   platform controllers via the `exclude_principals` allow-list.
-- **Split with the Crossplane Environment Composition (BACK stack P3).** For environments migrated to a `Environment`
-  claim (passed in `migrated_teams`), this module **skips** the per-team `restrict-images-team-<k>` and
-  `restrict-route-hostnames-team-<k>` policies — the Composition provisions those (so the claim owns the
-  per-environment guardrails). This module **keeps** owning the platform-wide floor and, for **all** teams
-  (migrated or not), the cosign/SLSA supply-chain policies `verify-images-team-<k>` /
-  `verify-attestations-team-<k>` — signature/attestation trust roots are a platform security control, not a
-  per-environment knob. `teams.hcl` (which feeds `tenant_registry_map`/`verify_subjects` here) is still the team
-  registry for those.
+- **Split with the Crossplane Environment Composition (ADR-046).** The **per-environment** image/hostname
+  guardrails `restrict-images-<team>-<product>-<stage>` and `restrict-route-hostnames-<team>-<product>-<stage>`
+  are provisioned by the Composition (one set per `XEnvironment` namespace, so the claim owns them). This module
+  **keeps** owning the platform-wide floor and the per-**product** cosign/SLSA supply-chain policies
+  `verify-images-product-<team>-<product>` / `verify-attestations-product-<team>-<product>` — signature/attestation
+  trust roots are a platform security control, not a per-environment knob. Those derive from the **Product
+  registry** (`gitops/products/`) via `verify_subjects_product` (the old `teams.hcl` / `verify_subjects` v2 inputs
+  are retired).
 
 ## Phase 1 policy set
 
@@ -48,7 +48,7 @@ The module is **cloud-agnostic and holds no team-specific data** — per-environ
 | `restrict-binding-clusteradmin` | (Cluster)RoleBinding | Deny binding to `cluster-admin` |
 | `restrict-wildcard-rbac` | Role, ClusterRole | Deny wildcard verbs/resources/apiGroups |
 | `disallow-default-namespace` | Workloads | No workloads in `default` |
-| `require-environment-namespace-naming` | Namespace | Environment namespaces named `team-*` |
+| `require-environment-namespace-naming` | Namespace | Environment namespaces named `<team>-<product>-<stage>` |
 | `require-pod-security-restricted` | Pod | **hipaa/pci only** — full Restricted PSS |
 | `require-ro-rootfs` | Pod | **hipaa/pci only** — read-only root filesystem |
 | `disallow-privilege-escalation` | Pod | Deny `allowPrivilegeEscalation: true` (Phase 2 backstop) |

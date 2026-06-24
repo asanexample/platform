@@ -113,9 +113,8 @@ variable "users" {
 variable "clients" {
   description = <<-DESC
     OIDC clients to register in the realm. Each gets a confidential client + a `groups` claim mapper + a
-    generated secret stored in Secrets Manager at platform/keycloak/<id>-oidc (a Keycloak-specific path, so it
-    does NOT collide with Dex's platform/<id>/oidc during coexistence). Apps repoint to these at the B3/B4
-    cutover. Add a client here to onboard another app.
+    generated secret stored in Secrets Manager at platform/keycloak/<id>-oidc. Each app consumes its client
+    secret via an ExternalSecret. Add a client here to onboard another app.
   DESC
   type = map(object({
     name          = string

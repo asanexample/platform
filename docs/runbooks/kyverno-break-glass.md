@@ -86,7 +86,7 @@ kubectl get clusterpolicy -o wide                 # READY column should be true
   break-glass by setting `verify_failure_action = "Audit"` on the `policy` unit and applying (or
   fail-open the verify webhook as above). The verify policies roll Audit→Enforce independently of the
   other policies via `verify_failure_action`.
-- **Attestation verification** (SBOM + SLSA provenance, `verify-attestations-team-<team>`) has its own
-  **separate** knob, `verify_attestations_failure_action`, independent of both `validation_failure_action`
+- **Attestation verification** (SBOM + SLSA provenance, `verify-attestations-product-<team>-<product>`) has its own
+  **separate** knob, `attest_failure_action`, independent of both `validation_failure_action`
   and `verify_failure_action` — so the SBOM/provenance requirement (incl. the trusted-ci L3 provenance,
   ADR-042) can be flipped to `Audit` for break-glass without weakening the image-signature gate.

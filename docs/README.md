@@ -8,9 +8,9 @@ is parameterized for Azure/GCP, but those are **designed-for, not built** (no
 defined declaratively, version-controlled, and deployed through a layered
 configuration hierarchy that promotes consistency across environments.
 
-> **Current identity state:** **Keycloak** is the app-facing IdP of record (ArgoCD
-> direct; Backstage via oauth2-proxy). Dex is legacy. See
-> [Identity & SSO](architecture/identity-and-sso.md).
+> **Current identity state:** **Keycloak** is the app-facing IdP of record — ArgoCD,
+> Backstage, and Grafana all sign in directly via Keycloak OIDC. Dex and oauth2-proxy are
+> retired. See [Identity & SSO](architecture/identity-and-sso.md).
 
 ## Start Here
 
@@ -28,7 +28,7 @@ configuration hierarchy that promotes consistency across environments.
 | [Architecture](architecture/) | System design, network topology, and multi-cloud strategy |
 | [Delivery Pipeline](architecture/delivery-pipeline.md) | **End-to-end spine**: scaffold → registry/Composition → supply chain → delivery → promotion → gated prod, with the gates as control plane |
 | [Promotion & Release](architecture/promotion-and-release.md) | Promote-by-digest, the release-keyed ApplicationSet, auto ≤ staging, and the gated-prod release-approver (#377/#501) |
-| [Identity & SSO](architecture/identity-and-sso.md) | How login works: Keycloak (IdP of record), oauth2-proxy, the access model, the pluggable seam |
+| [Identity & SSO](architecture/identity-and-sso.md) | How login works: Keycloak (IdP of record) OIDC for ArgoCD/Backstage/Grafana, the access model, the pluggable seam |
 | [Gateway & Ingress](architecture/gateway-and-ingress.md) | Cilium Gateway → NLB → cert-manager → external-dns → Kyverno hostname guard (ADR-060/061) |
 | [Secrets & External Secrets](architecture/secrets-and-external-secrets.md) | Secrets Manager → ESO ClusterSecretStore → ExternalSecret → k8s Secret; platform vs environment |
 | [Platform Domain API](architecture/platform-domain-api.md) | **Normative schema** for the ADR-067 domain model — Team / Product / Service / Environment / Customer (v1beta1; supersedes the ADR-049 tenant-api-v2) |

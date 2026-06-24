@@ -63,9 +63,11 @@ SCPs that apply depend on the OU. Root-level SCPs (`baseline-guardrails`,
 regardless of OU placement. OU-specific SCPs are documented in
 `docs/compliance/scp-control-mapping.md`.
 
-Three roles are exempt from SCP deny statements: `OrganizationAccountAccessRole`
-(break-glass), `PlatformDeployer` (Terragrunt apply), and `github-actions-terratest`
-(CI test runner). See `docs/runbooks/modify-scps.md` for details on exempt roles.
+Six entries are exempt from SCP deny statements: `OrganizationAccountAccessRole`
+(break-glass), `PlatformDeployer` (Terragrunt apply), `github-actions-terratest`
+(CI test runner), `crossplane-ecr-provisioner` + `crossplane-provisioner-*` (environment
+provisioning), and `*-karpenter-*` (Karpenter node provisioning, ADR-078). See
+`docs/runbooks/modify-scps.md` for details on exempt roles.
 
 ---
 

@@ -1,6 +1,6 @@
 # ArgoCD
 
-Deploys ArgoCD via Helm with optional IRSA (IAM Roles for Service Accounts) on AWS EKS. Creates the ArgoCD Helm release with configurable HA replicas, RBAC policies, SSO (embedded Dex, or an external OIDC IdP such as Keycloak via an optional client-secret ExternalSecret), ApplicationSet controller, and notifications. When IRSA is enabled, provisions an IAM role with ECR read-only access and optional cross-account `sts:AssumeRole` permissions for managing remote clusters. The IRSA role is annotated on the controller, server, and repo-server service accounts. Tags are converted to Kubernetes-safe pod labels. CiliumIdentity resources are excluded from ArgoCD management by default.
+Deploys ArgoCD via Helm with optional IRSA (IAM Roles for Service Accounts) on AWS EKS. Creates the ArgoCD Helm release with configurable HA replicas, RBAC policies, SSO, ApplicationSet controller, and notifications. **SSO is Keycloak OIDC** (ADR-053/059, the live path): the client secret is synced from Secrets Manager into a `part-of:argocd` Secret and referenced from `argocd-cm`. The embedded **Dex** server remains available as a dormant legacy toggle (`dex_enabled`, default `false`) but is off in this deployment. When IRSA is enabled, provisions an IAM role with ECR read-only access and optional cross-account `sts:AssumeRole` permissions for managing remote clusters. The IRSA role is annotated on the controller, server, and repo-server service accounts. Tags are converted to Kubernetes-safe pod labels. CiliumIdentity resources are excluded from ArgoCD management by default.
 
 ## Usage
 
@@ -154,7 +154,7 @@ No modules.
 
 - IRSA is enabled automatically when `oidc_provider_arn` is non-empty. Setting it to `""` disables IAM role creation.
 - The module uses `replace = true` on the Helm release, so failed installs are replaced rather than upgraded in-place.
-- SSO configuration (Dex/SAML, or external OIDC) is injected via `argocd_cm_extra` to keep the module cloud-agnostic.
+- SSO configuration is injected via `argocd_cm_extra` to keep the module cloud-agnostic — the live path is external OIDC (Keycloak); the embedded Dex/SAML config is the dormant legacy path (`dex_enabled = false`).
 - For external OIDC (Keycloak — ADR-053/059), set `oidc_external_secret_enabled = true`: the module syncs the client secret from Secrets Manager into a Secret **labeled `app.kubernetes.io/part-of: argocd`** (required for ArgoCD to resolve a `$<name>:<key>` reference in `argocd-cm`). Requires External Secrets + a ClusterSecretStore. The CLI should use a separate **public** PKCE client via `oidc.config.cliClientID` (never the confidential secret).
 - A `configHash` value forces Helm to detect config drift even when values don't change structurally.
 

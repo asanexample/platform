@@ -145,7 +145,12 @@ cd ../github-oidc && AWS_PROFILE=management terragrunt apply                    
 
 ### Step 3 — Grant developer access (AWS Identity Center)
 
-The claim provisions the `DeveloperAccess-<team>` IAM role + the EKS access entry, but **a human reaches it
+> **⚠️ Not yet functional (#647).** The steps below describe the intended design, but the v3 Composition does
+> **not** currently emit the `DeveloperAccess-<team>` IAM role or its EKS access entry (only the in-cluster
+> `:developers` RoleBinding) — so this flow can't be completed until #647 is built. Until then, developers reach
+> preprod via `platctl kubeconfig`/PlatformAdmin.
+
+The claim is *designed to* provision the `DeveloperAccess-<team>` IAM role + the EKS access entry, with **a human reaching it
 through AWS Identity Center**: they sign in to the AWS access portal, select the `Dev-<team>` permission set
 on the preprod account (account-wide read + permission to assume `DeveloperAccess-<team>`), and from there
 get namespace-scoped kubectl. This wiring is **hand-maintained** in the `identity-center` unit (mgmt

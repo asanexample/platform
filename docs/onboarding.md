@@ -91,7 +91,7 @@ kubectl --context platform -n argocd get secret argocd-initial-admin-secret \
 ├── docs/                         # User-facing docs (you are here) — adrs/ architecture/ runbooks/ …
 ├── infra/
 │   ├── root.hcl                  # Root Terragrunt config: remote state (S3), providers, role assumption
-│   ├── live/aws/                 # Terragrunt live configs (171 units; AWS is the only cloud today)
+│   ├── live/aws/                 # Terragrunt live configs (~90 units; AWS is the only cloud today)
 │   │   ├── _base.hcl             # Composer: loads the config layers + safety assertions
 │   │   ├── _versions.hcl         # Module source paths + Helm version pins
 │   │   ├── common.hcl            # Cloud-wide defaults; loads secrets.hcl (gitignored)
@@ -135,7 +135,7 @@ live in `infra/live/aws/secrets.hcl` (gitignored — see `secrets.hcl.example`).
 
 ## Deploying the stack
 
-**The preferred path is `platctl bootstrap`** — it auto-discovers all 171 units, applies them in dependency
+**The preferred path is `platctl bootstrap`** — it auto-discovers all units (~90), applies them in dependency
 order with parallelism, handles the private-endpoint bootstrap problem (temporarily enables public API access,
 locks it down once Tailscale is up), runs post-apply hooks, and is **resumable**. The canonical from-scratch
 procedure (including the recovery escape hatches) is

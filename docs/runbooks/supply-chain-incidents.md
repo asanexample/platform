@@ -51,8 +51,9 @@ Walk the chain (stop at the first failure):
      **tag**, not the digest). Fix the workflow ([onboarding runbook](app-supply-chain-onboarding.md))
      and rebuild.
    - *Signed by a different identity* → wrong caller repo (the `githubWorkflowRepository` extension), or
-     the product's `verifySubjects` (derived from the `XEnvironment` claim's `spec.services.<svc>.repo`)
-     don't list this repo. Fix the claim + re-apply the `policy` unit.
+     the product's `verify_subjects_product` entry (derived from the Product registry
+     `gitops/products/<team>/<product>.yaml` `spec.repo`) doesn't list this repo. Fix the registry entry +
+     re-apply the `policy` unit.
 
 2. **Are the attestations present + the right predicate types?**
 
@@ -109,21 +110,23 @@ Check the [Sigstore status page](https://status.sigstore.dev/).
 
 ## 3. Signing-identity / org rename
 
-If the GitHub **org** or a repo/workflow path changes, the OIDC `subject` on new signatures changes, and the
-existing `verifySubjects` won't match — new images get denied while old ones still verify.
+If the GitHub **org** or a repo/workflow path changes, the OIDC `subject` (or caller-repo extension) on new
+signatures changes, and the existing `verify_subjects_product` entry won't match — new images get denied
+while old ones still verify.
 
 This is a **dual-subject transition** (worked example in
 [`cosign-image-signing.md`](../architecture/cosign-image-signing.md) §"Org migration"):
 
-1. **Before** the cutover, add the **new** identity to the team's `verifySubjects` (and
-   `trustedCiSubjectRegExp` / `attestCallerRepos` if the trusted-ci repo moved) **alongside** the old one —
-   the policy lists alternatives (`count: 1` matches any). Apply the `policy` unit.
+1. **Before** the cutover, add the **new** identity to the product's `verify_subjects_product` entry — its
+   `appSubjects` list (and the cluster-wide `trusted_ci_subject_regexp` if the trusted-ci repo moved) —
+   **alongside** the old one; the policy lists alternatives (`count: 1` matches any). Apply the `policy` unit.
 2. Cut over CI to the new identity; new images now match the new entry, old images still match the old.
 3. After all running images are rebuilt under the new identity, **remove** the old entry and re-apply.
 
 No keys to rotate — identities are short-lived Fulcio certs. "Rotation" here means updating *which OIDC
-identities the policy trusts*, always edited in the `XEnvironment` claim (`spec.services.<svc>.repo`) →
-`policy` unit (never hand-edited on-cluster).
+identities the policy trusts*. The per-product caller repo (`verify_subjects_product[*].repo`) is derived
+from the Product registry (`gitops/products/<team>/<product>.yaml` `spec.repo`) → `policy` unit (never
+hand-edited on-cluster).
 
 ---
 
@@ -132,9 +135,9 @@ identities the policy trusts*, always edited in the `XEnvironment` claim (`spec.
 If a product's GitHub repo / OIDC is believed compromised (an attacker could mint valid signatures as that
 product):
 
-1. **Revoke trust immediately** — remove that product's entry from `verifySubjects` (and any caller repo from
-   `attestCallerRepos`) and apply the `policy` unit. New pods using images "signed by" that identity are now
-   denied everywhere.
+1. **Revoke trust immediately** — remove that product's repo from the Product registry (or clear its
+   `spec.repo`) so `verify_subjects_product` no longer derives the compromised caller-repo gate, and apply the
+   `policy` unit. New pods using images "signed by" that identity are now denied everywhere.
 2. **Quarantine running workloads** — scale down / cordon the product's environment namespaces as warranted.
 3. **Audit Rekor** — every signature is in the public transparency log; enumerate what was signed under the
    identity and when:

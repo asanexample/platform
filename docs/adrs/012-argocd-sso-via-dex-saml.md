@@ -2,7 +2,11 @@
 
 **Date:** 2026-05-23
 
-**Status:** Accepted
+**Status:** Superseded by ADR-053 / ADR-059 (Keycloak OIDC is the ArgoCD IdP)
+
+> **Note:** This ADR is retained as history. ArgoCD SSO no longer uses Dex + SAML —
+> it signs in directly against Keycloak via OIDC (embedded Dex is off, `dex_enabled = false`).
+> See ADR-053 / ADR-059.
 
 ## Context
 

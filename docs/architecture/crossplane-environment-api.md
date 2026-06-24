@@ -99,7 +99,7 @@ renders, from one claim:
 
 **Not** provisioned by the claim — these stay platform-owned in the [`policy`](../../infra/modules/policy/)
 module for **all** products (an environment must not declare its own signature trust root): the cosign/SLSA
-`verify-images-team-<team>` + `verify-attestations-team-<team>` policies. The `policy` unit skips only the
+`verify-images-product-<team>-<product>` + `verify-attestations-product-<team>-<product>` policies. The `policy` unit skips only the
 per-product `restrict-*` guardrails for migrated teams (`migrated_teams` input), since the Composition owns
 those. This **supply-chain split** — guardrails in the claim, trust roots in the platform — is deliberate
 (ADR-014/046).

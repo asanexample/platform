@@ -80,5 +80,3 @@ SAML email.
 - **Cert format** is the #1 failure mode — a base64-of-PEM (Dex-style) value makes Keycloak reject the IdP
   signature silently. Use the bare body.
 - **Audience mismatch** — the IdC SAML audience must exactly equal `https://keycloak.aws.refplat.org/realms/platform`.
-- Keycloak runs **alongside Dex** during this phase; Dex still owns `sso.aws.refplat.org`. The Dex→Keycloak
-  issuer cutover happens at the rebuild.

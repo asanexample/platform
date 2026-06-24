@@ -4,8 +4,8 @@
 
 Multi-cloud IaC platform using OpenTofu (v1.12.1) + Terragrunt (v1.0.7). Currently targets AWS only (Azure/GCP removed). CLI tool versions (tofu, terragrunt, kubectl, helm, awscli) are pinned canonically in `/.tool-versions` — the single source of truth read by local dev (mise/asdf), CI, and the self-hosted runner image.
 
-- **Shared modules** (`infra/modules/`): actions-runner-controller, argocd, argocd-apps, argocd-clusters, cert-manager, cilium, cloudflare/dns_delegation, cluster-rbac, crossplane, external-dns, external-secrets, gateway-config, github-teams, policy, secret-stores, tailscale, tailscale-admin, tenant-claims, vcluster
-- **AWS modules** (`infra/modules/aws/`): cloudtrail, cross-vpc-dns, ecr, eks, eks-addons, eks-node-group, github_oidc, iam_roles, identity_center, networking, organizations, route53, route53_delegation, ssm-bastion, state_bootstrap, transit-gateway
+- **Shared modules** (`infra/modules/`): actions-runner-controller, argocd, argocd-apps, argocd-clusters, backstage, cert-manager, cilium, cloudflare/dns_delegation, cloudnative-pg, cluster-rbac, crossplane, external-dns, external-secrets, falco, gateway, gateway-config, github-teams, keycloak, keycloak-config, policy, secret-stores, tailscale, tailscale-admin, vcluster, plus `observability` and 16× `observability-*` (the LGTM+P stack: alloy, beyla, blackbox, cloudwatch-exporter, events, k6, loki, mimir, opencost, otel-collector, otel-operator, prometheus-agent, pyroscope, pyroscope-ebpf, slo, tempo)
+- **AWS modules** (`infra/modules/aws/`): cloudtrail, cross-vpc-dns, ecr, eks, eks-addons, eks-node-group, eks-pod-identity, github_oidc, iam_roles, identity_center, karpenter, networking, organizations, route53, route53_delegation, s3, sns-notifications, sops-kms, ssm-bastion, state_bootstrap, transit-gateway
 - **Live configs**: `infra/live/aws/` -- environment-specific Terragrunt units
 
 ## Terragrunt Config Hierarchy
@@ -176,7 +176,7 @@ The **Test** account (`157263244316`, Terratest sandbox) is a standard `Platform
 |------|---------|---------|
 | **PlatformAdmin** | Platform, PreProd | kubectl operate/debug + SSM tunnel — least-privilege (read+operate, NOT author; cluster authoring via ArgoCD, AWS via PlatformDeployer, emergencies via break-glass — ADR-040) |
 | **PlatformDeployer** | Platform, PreProd | Terragrunt apply, Helm/K8s providers |
-| **DeveloperAccess-\<team\>** | PreProd | Per-team, namespace-scoped kubectl (one role per team, provisioned by the Crossplane Environment Composition + an EKS access entry → the team's per-Environment `<team>-<product>-<stage>:developers` groups bound to the `environment-developer` ClusterRole; group-mapped RBAC — see ADR-039) |
+| **DeveloperAccess-\<team\>** | PreProd | Per-team, namespace-scoped kubectl (design: one role per team + an EKS access entry → the team's per-Environment `<team>-<product>-<stage>:developers` group bound to the `environment-developer` ClusterRole; group-mapped RBAC — ADR-039). **⚠️ NOT currently provisioned** — the v3 Composition emits only the in-cluster RoleBinding, not the IAM role/access entry (regression tracked in #647); use `platctl kubeconfig`/PlatformAdmin until built |
 | **TerraformStateAccess** | Management | S3 state bucket + DynamoDB lock table |
 | **OrganizationAccountAccessRole** | All accounts | Break-glass only |
 
@@ -205,7 +205,7 @@ The **Test** account (`157263244316`, Terratest sandbox) is a standard `Platform
 ## Authoring Policy-Compliant Workloads (Kyverno)
 
 Kyverno is in **Enforce** mode on **preprod and platform** — non-compliant resources in environment
-namespaces (those labeled `platform.refplat.org/environment`, named `<team>-<name>-<env>`, e.g. `alpha-demo-dev`)
+namespaces (those labeled `platform.refplat.org/team`, named `<team>-<product>-<stage>`, e.g. `alpha-demo-dev`)
 are **rejected at admission**. Full per-cluster list: `docs/architecture/kyverno-policy-catalog.md`. When
 writing environment manifests (app repos' `k8s/`, or anything applied to an environment namespace):
 

@@ -84,7 +84,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 
 | ADR | Status |
 |-----|--------|
-| [ADR-012: ArgoCD SSO via Dex and SAML](012-argocd-sso-via-dex-saml.md) | Accepted |
+| [ADR-012: ArgoCD SSO via Dex and SAML](012-argocd-sso-via-dex-saml.md) | Superseded by ADR-053/059 |
 | [ADR-018: IRSA for Pod-Level AWS Identity](018-irsa-for-pod-identity.md) | Superseded by ADR-047 |
 | [ADR-039: Per-Team Developer RBAC](039-per-team-developer-rbac.md) | Accepted |
 | [ADR-040: Platform Engineer Access Model](040-platform-engineer-access-model.md) | Accepted |
@@ -128,8 +128,8 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-044: Grafana Mimir for Durable, Multi-Tenant Metrics Storage](044-mimir-durable-multi-tenant-metrics.md) | Accepted |
 | [ADR-045: Falco for Runtime Threat Detection](045-falco-runtime-threat-detection.md) | Accepted |
 | [ADR-076: Agent / GenAI Observability](076-agent-observability.md) | Proposed |
-| [ADR-077: Application Instrumentation Strategy](077-application-instrumentation-strategy.md) | Proposed |
-| [ADR-078: Cluster Elasticity — Karpenter + Workload Autoscaling](078-cluster-elasticity-karpenter.md) | Proposed |
+| [ADR-077: Application Instrumentation Strategy](077-application-instrumentation-strategy.md) | Accepted |
+| [ADR-078: Cluster Elasticity — Karpenter + Workload Autoscaling](078-cluster-elasticity-karpenter.md) | Accepted |
 | [ADR-054: Platform Resilience & Business Continuity](054-platform-resilience-and-business-continuity.md) | Proposed |
 | [ADR-055: Compliance Assurance & Continuous Control Evidence](055-compliance-assurance-and-continuous-control-evidence.md) | Proposed |
 | [ADR-057: Service Identity & East-West Zero Trust (mTLS)](057-service-identity-and-east-west-zero-trust.md) | Proposed |

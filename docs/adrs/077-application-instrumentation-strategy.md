@@ -1,6 +1,6 @@
 # ADR-077: Application Instrumentation Strategy
 
-**Status:** Proposed (2026-06-22)
+**Status:** Accepted — Beyla eBPF baseline (P7a) + OTel Operator auto-inject (P7b) implemented + live; SDK / golden-path templates (P14) outstanding (2026-06-22)
 
 ## Context
 

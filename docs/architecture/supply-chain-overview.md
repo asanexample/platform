@@ -100,8 +100,8 @@ identity** (`issuer: https://token.actions.githubusercontent.com`, `subject: <wo
 entry is in **Rekor**. Since the image + SBOM are now signed by the shared
 `trusted-ci/build-sign.yml` reusable workflow (ADR-050), the cert **subject** is the same for every
 product; **per-product isolation moves to the `githubWorkflowRepository` cert extension**, which Fulcio sets
-from the *calling* app repo's OIDC and which one product cannot forge for another. So `app-alpha-demo`'s images
-carry `githubWorkflowRepository: …/app-alpha-demo`, which `app-bravo-demo`'s policy does not list. (App-signed
+from the *calling* app repo's OIDC and which one product cannot forge for another. So `alpha-shop`'s images
+carry `githubWorkflowRepository: …/alpha-shop`, which `alpha-checkout`'s policy does not list. (App-signed
 identities remain a supported fallback for bespoke-build apps.) See
 [`cosign-image-signing.md`](cosign-image-signing.md) for the full keyless mechanics.
 
@@ -116,37 +116,38 @@ v2.5.2** for the legacy `.att` format (see the onboarding runbook).
 
 ## 4. The two verification policies (what Kyverno actually checks)
 
-Both are generated per product from the `XEnvironment` claims (`verifySubjects`, `productRegistryMap`,
-`attestCallerRepos` derived from `spec.services.<svc>.repo`) by the `policy` module, plus the module-level
-`trusted_ci_build_subject_regexp` + `shared_signer_caller_repos` inputs that admit the shared
+Both are generated per product from the single `verify_subjects_product` input — derived at the `policy`
+unit from the **Product registry** (`gitops/products/<team>/<product>.yaml`, `spec.repo`), keyed
+`<team>-<product>` and carrying `repo` (the caller-repo gate), `registryPrefix`, and optional `appSubjects` —
+plus the cluster-wide `trusted_ci_build_subject_regexp` input that admits the shared
 `build-sign.yml` signer (ADR-050). Each has its **own**
 `validationFailureAction`/`failurePolicy` so signatures can be **Enforce** while attestations roll out
 **Audit-first**. `webhookTimeoutSeconds: 30` covers the signature fetch + Rekor lookup.
 
-**`verify-images-product-<team>-<product>`** (signatures) — `infra/modules/policy/policies-chart/templates/verify-images.yaml`
+**`verify-images-product-<team>-<product>`** (signatures) — `infra/modules/policy/policies-chart/templates/verify-images-product.yaml`
 
 - Scope: Pods in the product's environment namespaces using images under the product's ECR prefix
-  (`productRegistryMap[<team>-<product>]/*`, i.e. `team-<team>/<product>-*`).
+  (`verify_subjects_product[<team>-<product>].registryPrefix-*`, i.e. `team-<team>/<product>-*`).
 - Admits an image signed (keyless) by **any one** (`count: 1`) of these alternatives: the shared
   **`trusted-ci/build-sign.yml`** signer (`trusted_ci_build_subject_regexp`) gated per-product by the cert's
-  **`githubWorkflowRepository`** extension = the product's caller repo (`shared_signer_caller_repos`, ADR-050)
+  **`githubWorkflowRepository`** extension = the product's caller repo (`verify_subjects_product[*].repo`, ADR-050)
   — **or**, as a bespoke-build fallback, the app's own identity: the stable `deploy_subject`
   (main-branch workflow) **or** the `preview_subject_regexp` (PR previews — the OIDC ref varies per PR, so
   it's matched by regex).
 - On **Enforce**, `mutateDigest: true` pins the admitted image to its digest (Kyverno forbids mutation in
   Audit, so pinning only happens once enforcing).
 
-**`verify-attestations-product-<team>-<product>`** (SBOM + provenance) — `.../verify-attestations.yaml`
+**`verify-attestations-product-<team>-<product>`** (SBOM + provenance) — `.../verify-attestations-product.yaml`
 
 - Requires two attestations on the image:
   - **SBOM** (`https://cyclonedx.org/bom`). Accepts (`count: 1`) the shared **`trusted-ci/build-sign.yml`**
     signer (`trusted_ci_build_subject_regexp`, gated per-product by the **`githubWorkflowRepository`**
     extension = the product's caller repo, ADR-050) — **or**, as a fallback, the app's own workflow identity.
   - **SLSA provenance** (`https://slsa.dev/provenance/v0.2`). For products that have adopted the isolated
-    signer (those in `attestCallerRepos`), it must be signed by the **`trusted-ci`** reusable workflow
-    (`trustedCiSubjectRegExp`), gated per-product by the cert's **`githubWorkflowRepository`** extension = the
-    product's caller repo. A different product can't forge that extension — Fulcio sets it from the *calling*
-    repo's OIDC. Products not yet adopted keep app-signed provenance.
+    signer, it must be signed by the **`trusted-ci`** reusable workflow
+    (`trusted_ci_subject_regexp`), gated per-product by the cert's **`githubWorkflowRepository`** extension = the
+    product's caller repo (`verify_subjects_product[*].repo`). A different product can't forge that extension —
+    Fulcio sets it from the *calling* repo's OIDC. Products not yet adopted keep app-signed provenance.
 - Does **not** mutate (`mutateDigest: false`) — `verify-images` already pins the digest.
 
 ---
@@ -176,8 +177,8 @@ Source-track and reproducible-build requirements are **out of scope** today.
 (`verify-attestations`, incl. the L3 trusted-ci provenance) are **Enforce on preprod**; consult
 [`kyverno-policy-catalog.md`](kyverno-policy-catalog.md) for the authoritative per-cluster status. The
 shared `trusted-ci/build-sign.yml` image + SBOM signer (ADR-050) went **live on preprod (Enforce) on
-2026-06-03**, with the `alpha`/`demo` and `bravo`/`demo` products migrated to thin-caller
-`deploy.yml`/`preview.yml` (`app-bravo-demo` is the generic reference).
+2026-06-03**, with the `alpha-shop` and `alpha-checkout` products migrated to thin-caller
+`deploy.yml`/`preview.yml` (`alpha-shop` is the generic reference).
 
 ---
 

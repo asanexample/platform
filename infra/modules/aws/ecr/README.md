@@ -79,7 +79,7 @@ No modules.
 
 ## Notes
 
-- Repository names follow the `team-<team>/<app>` convention established by the multi-app tenant model.
+- Repository names follow the `team-<team>/<product>-<svc>` convention (Team→Product→Service, ADR-067/072).
 - Image tag immutability defaults to `IMMUTABLE`; override per repository by setting `tag_mutability = "MUTABLE"` in the repository map value.
 - Cross-account pull policies are applied only when `pull_account_ids` is non-empty.
 - Set `force_delete = true` to allow deletion of repositories that still contain images (useful for teardowns).

@@ -14,11 +14,14 @@ Two roles, selected by inputs:
   (`charts/environment-api`). A single `Environment` claim provisions a **complete** environment: the Kubernetes side
   (namespace, ResourceQuota/LimitRange, NetworkPolicies, CiliumNetworkPolicies, developer RoleBinding,
   per-team Kyverno `restrict-images`/`restrict-route-hostnames`) **and** the AWS side (`Pod-team-<team>` IAM
-  role + EKS Pod Identity association, `DeveloperAccess-<team>` IAM role + EKS access entry, cross-account
-  ECR repo). This is the **sole** environment provisioner — the old `infra/modules/tenant` module and the
+  role + EKS Pod Identity association, cross-account ECR repo). *(The `DeveloperAccess-<team>` IAM role + EKS
+  access entry are part of the design but **not yet emitted** by the v3 Composition — a regression tracked in
+  [#647]; the IAM scoping for it already exists on the provisioning role.)* This is the **sole** environment
+  provisioner — the old `infra/modules/tenant` module and the
   `environments`/`pod-identity`/`s3-shared` Terragrunt units are **retired** (BACK stack P3, #174).
 
-Claims are delivered by the `tenant-claims` Terragrunt unit (see [`infra/modules/tenant-claims`](../tenant-claims/)).
+Claims are delivered by the `argocd-apps` registry-sync of `gitops/environments/` (one Application per `XEnvironment`
+claim), **not** a Terragrunt unit — the old `tenant-claims` unit is retired.
 The cosign/SLSA supply-chain policies (`verify-images`/`verify-attestations`) are **not** in the claim — they
 stay platform-owned in the `policy` module (applied to all teams, including migrated ones via its
 `migrated_teams` input).
@@ -26,12 +29,12 @@ stay platform-owned in the `policy` module (applied to all teams, including migr
 The two Kyverno policies that govern the environment **control plane** itself — `restrict-environment-envelope`
 ([ADR-049](../../../docs/adrs/049-tenant-model-team-tenant-zone.md)) and `restrict-environment-control-plane` (ADR-046/048) — **do**
 live here (`charts/environment-policies`, a `helm_release` gated on `enable_environment_api`, installed after the Team
-projection). They match Crossplane CRDs (`XTenant`, the projected `Team`, the provider `ProviderConfig`s), so
+projection). They match Crossplane CRDs (`XEnvironment`, the projected `Team`, the provider `ProviderConfig`s), so
 they must install *after* those CRDs exist. They were deliberately moved out of the `policy` module, which
 deploys *before* Crossplane (to pre-create the `crossplane-system` exclusion) — shipping them there made Kyverno
 churn its webhook config on the not-yet-existing kinds and stalled the policy install. Tests:
 `.kyverno-tests/run.sh` (run by the same CI job as the policy module's). Foundational/platform infra stays on Terragrunt. See
-[`docs/architecture/crossplane-environment-api-api.md`](../../../docs/architecture/crossplane-environment-api-api.md) for the
+[`docs/architecture/crossplane-environment-api.md`](../../../docs/architecture/crossplane-environment-api.md) for the
 XRD schema, Composition pipeline, and claim lifecycle.
 
 ## Usage

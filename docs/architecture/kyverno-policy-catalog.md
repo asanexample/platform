@@ -21,9 +21,9 @@ emergency disable / the Audit↔Enforce flip.
 
 - The **count differs** because several policy _families_ are generated one-per-product. The platform-owned
   `verify-images-product-<team>-<product>` and `verify-attestations-product-<team>-<product>` render from the
-  `XEnvironment` claims in the `policy` unit; the per-product `restrict-images-product-<team>-<product>` and
-  `restrict-route-hostnames-product-<team>-<product>` are owned by the Crossplane Environment Composition.
-  Preprod runs the `alpha`/`demo` + `bravo`/`demo` products, so each family contributes two policies; the
+  **Product registry** (`gitops/products/`) in the `policy` unit; the per-environment `restrict-images-<team>-<product>-<stage>` and
+  `restrict-route-hostnames-<team>-<product>-<stage>` are owned by the Crossplane Environment Composition (one per environment namespace).
+  Preprod runs the `alpha-shop` + `alpha-checkout` products, so each family contributes two policies; the
   platform cluster hosts shared services only (no environments), so it carries just the common (non-per-product)
   policies. The counts above are an indicative snapshot — read the exact live total with `kubectl get cpol`
   (it shifts as environments/phases change).
@@ -44,7 +44,7 @@ emergency disable / the Audit↔Enforce flip.
 | Policy | Target kind(s) | Enforces | Scope | Tier | Clusters |
 | ------ | -------------- | -------- | ----- | ---- | -------- |
 | `restrict-image-registries` | Pod | Images only from approved registries (the platform ECR) | environment | all | preprod, platform |
-| `restrict-images-product-<team>-<product>` | Pod | A product's environment namespace may only run `…/team-<team>/<product>-*` images (per-product, owned by the Environment Composition) | environment (per-product ns) | all | preprod (alpha/demo, bravo/demo) |
+| `restrict-images-<team>-<product>-<stage>` | Pod | A product's environment namespace may only run `…/team-<team>/<product>-*` images (one per environment namespace, owned by the Environment Composition) | environment (per-namespace) | all | preprod (alpha-shop, alpha-checkout) |
 | `disallow-latest-tag` | Pod | Explicit, non-`latest` image tag required | environment | all | preprod, platform |
 | `require-requests-limits` | Pod | CPU + memory requests **and** limits on every container | environment | all | preprod, platform |
 | `require-pod-probes` | Pod | Liveness + readiness probes on every container | environment | all | preprod, platform |
@@ -58,7 +58,7 @@ emergency disable / the Audit↔Enforce flip.
 | `disallow-default-namespace` | Pod, Deployment, StatefulSet, DaemonSet, ReplicaSet, Job, CronJob | No workloads in `default` | cluster | all | preprod, platform |
 | `disallow-privilege-escalation` | Pod | Deny `securityContext.allowPrivilegeEscalation: true` (backstops the mutate default) | environment | all | preprod, platform |
 | `require-seccomp` | Pod | Deny `seccompProfile.type: Unconfined` (backstops the mutate default) | environment | all | preprod, platform |
-| `restrict-route-hostnames-product-<team>-<product>` | HTTPRoute, GRPCRoute, TLSRoute | Per-product route hostnames must be in the product's allow-list (from `spec.domains`, owned by the Environment Composition); deny cross-product/platform hostnames + empty hostname lists (anti-squatting, ADR-029) | environment (per-product) | all | preprod |
+| `restrict-route-hostnames-<team>-<product>-<stage>` | HTTPRoute, GRPCRoute, TLSRoute | Per-environment route hostnames must be in the product's allow-list (from `spec.domains`, owned by the Environment Composition, one per environment namespace); deny cross-product/platform hostnames + empty hostname lists (anti-squatting, ADR-029) | environment (per-namespace) | all | preprod |
 | `require-pod-security-restricted` | Pod | Full Restricted Pod Security Standard | environment | **hipaa/pci only** | _(none yet — standard tier)_ |
 | `require-ro-rootfs` | Pod | `readOnlyRootFilesystem: true` | environment | **hipaa/pci only** | _(none yet — standard tier)_ |
 
@@ -78,6 +78,7 @@ matching ArgoCD `ignoreDifferences` is safe.
 | Policy | Injects (when absent) | Scope |
 | ------ | --------------------- | ----- |
 | `mutate-pod-defaults` | container `securityContext` (`allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`, `seccompProfile.type: RuntimeDefault`; not `runAsNonRoot`) **and** pod `automountServiceAccountToken: false` — one patch so strategic-merge resolves under autogen | environment |
+| `mutate-automount` | pod `automountServiceAccountToken: false` when unset (least-privilege default; satisfies `restrict-automount-sa-token`) | environment |
 | `mutate-workload-labels` | `team` (derived from the `<team>-<product>-<stage>` namespace name) | environment |
 
 > `app.kubernetes.io/name` can't be auto-derived under autogen (pod templates have no name), so it is
@@ -95,13 +96,15 @@ unwritable **`asanexample/trusted-ci/.github/workflows/build-sign.yml`** reusabl
 keyless, GitHub Actions OIDC → Fulcio/Rekor; ADR-050) — app `deploy.yml`/`preview.yml` are thin callers.
 Kyverno fetches the signature from ECR (via an IRSA role granting ECR read) and admits images signed by
 that shared workflow when the cert's `githubWorkflowRepository` extension is the product's own
-`<team>-<product>` caller repo. Two policy inputs drive this: `trusted_ci_build_subject_regexp` (the
-shared signer subject) and `shared_signer_caller_repos` (the per-product caller repos). A product's own
-app-signed identity remains a supported fallback for bespoke-build apps.
+`<team>-<product>` caller repo. Two policy inputs drive this: the cluster-wide
+`trusted_ci_build_subject_regexp` (the shared signer subject) and the per-product `verify_subjects_product`
+map — derived from the **Product registry** (`gitops/products/<team>/<product>.yaml`, `spec.repo`), whose
+`repo` field is the caller-repo gate. A product's own app-signed identity (`verify_subjects_product`'s
+optional `appSubjects`) remains a supported fallback for bespoke-build apps.
 
 | Policy | Verifies | Scope |
 | ------ | -------- | ----- |
-| `verify-images-product-<team>-<product>` | Images under `…/team-<team>/<product>-*` are cosign-signed (`count: 1`) by the shared `trusted-ci/build-sign.yml` (`trusted_ci_build_subject_regexp`) gated per-product by the `githubWorkflowRepository` extension = `<team>-<product>` (`shared_signer_caller_repos`, ADR-050) **or**, as a fallback, by `<team>-<product>`'s own `deploy.yml@main` (pinned) / `preview.yml` (subjectRegExp — the PR OIDC ref varies); `mutateDigest` pins to digest | environment (per-product) |
+| `verify-images-product-<team>-<product>` | Images under `…/team-<team>/<product>-*` are cosign-signed (`count: 1`) by the shared `trusted-ci/build-sign.yml` (`trusted_ci_build_subject_regexp`) gated per-product by the `githubWorkflowRepository` extension = `<team>-<product>` (`verify_subjects_product[*].repo`, ADR-050) **or**, as a fallback, by `<team>-<product>`'s own `deploy.yml@main` (pinned) / `preview.yml` (subjectRegExp — the PR OIDC ref varies); `mutateDigest` pins to digest | environment (per-product) |
 
 Per-product identity isolation: the shared signer's cert **subject** is the same for all products, so isolation
 moves to the `githubWorkflowRepository` cert extension — Fulcio sets it from the _calling_ app repo's OIDC,
@@ -121,7 +124,7 @@ signed by the shared `trusted-ci/build-sign.yml` workflow alongside the image si
 
 | Policy | Verifies | Scope |
 | ------ | -------- | ----- |
-| `verify-attestations-product-<team>-<product>` | `…/team-<team>/<product>-*` images carry a cosign-signed CycloneDX SBOM **and** a SLSA provenance attestation. The SBOM block accepts (`count: 1`) the shared `trusted-ci/build-sign.yml` (`trusted_ci_build_subject_regexp`) gated per-product by `githubWorkflowRepository` = `<team>-<product>` (`shared_signer_caller_repos`, ADR-050) **or**, as a fallback, the product's own workflow. For SLSA-L3-adopted products (`attest_caller_repos`), the provenance must be signed by the isolated **`trusted-ci`** reusable workflow with the caller-repo = the product's own `<team>-<product>` (ADR-042); for others, by the product's own `deploy.yml`/`preview.yml`. | environment (per-product) |
+| `verify-attestations-product-<team>-<product>` | `…/team-<team>/<product>-*` images carry a cosign-signed CycloneDX SBOM **and** a SLSA provenance attestation. The SBOM block accepts (`count: 1`) the shared `trusted-ci/build-sign.yml` (`trusted_ci_build_subject_regexp`) gated per-product by `githubWorkflowRepository` = `<team>-<product>` (`verify_subjects_product[*].repo`, ADR-050) **or**, as a fallback, the product's own workflow. For SLSA-L3-adopted products, the provenance must be signed by the isolated **`trusted-ci`** reusable workflow with the caller-repo = the product's own `<team>-<product>` (ADR-042); for others, by the product's own `deploy.yml`/`preview.yml`. Break-glass: `attest_failure_action`. | environment (per-product) |
 
 This is the admission-side counterpart to the image-signing/attestation chain in
 [`cosign-image-signing.md`](cosign-image-signing.md) §10b — the signature proves _who built_ the image;
@@ -148,8 +151,8 @@ Configured on the module and applied to every cluster:
 ## Adding a cluster (e.g. prod)
 
 1. Add a `policy/terragrunt.hcl` unit under the env mirroring the existing ones (eks + node-groups
-   deps, helm provider, `allowed_registries` from the platform ECR, `product_registry_map` derived from the
-   env's `XEnvironment` claims if any, `compliance_tier` from `workload.hcl`).
+   deps, helm provider, `allowed_registries` from the platform ECR, `verify_subjects_product` derived from the
+   Product registry (`gitops/products/`) if any, `compliance_tier` from `workload.hcl`).
 2. Apply in **Audit**; confirm PolicyReports are clean against real workloads
    (`kubectl get policyreport -A`).
 3. Flip `validation_failure_action` to **Enforce** and apply. For shared-services clusters, validate
