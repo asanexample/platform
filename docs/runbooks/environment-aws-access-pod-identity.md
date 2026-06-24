@@ -68,7 +68,7 @@ mint or assume another environment's role. See ADR-047 "Isolation model".
    Verify with `kubectl get xenvironment <name>` (SYNCED / READY).
 
 3. The app sets `spec.serviceAccountName` to the declared SA and reads via the AWS SDK (creds arrive
-   automatically — no annotation, no static keys). See `app-alpha` for a worked example.
+   automatically — no annotation, no static keys). See the `alpha-shop` app repo for a worked example.
 
 ## Verifying it works (positive)
 
@@ -84,17 +84,17 @@ kubectl exec deploy/<app> -n $NS -- aws sts get-caller-identity   # -> assumed-r
 A pod can only ever assume **its own** Service's role: the Pod Identity association binds a specific
 `(cluster, namespace, serviceAccount)` triple to `Pod-<team>-<product>-[<customer>-]<stage>-<svc>`, and that role
 grants only the statements that Service's own claim declares (capped by the permissions boundary). A pod in
-`alpha-demo-dev` has no path to a `bravo-*` role — it can't change its association (an AWS API call environment
+`alpha-shop-dev` has no path to a `bravo-*` role — it can't change its association (an AWS API call environment
 workloads can't make) and the egress NetworkPolicy blocks IMDS, so it can't steal the node role either.
 
 Static confirmation (no cluster needed):
 
 ```bash
 # each Service's role grants only what its own claim declared:
-AWS_PROFILE=preprod aws iam get-role-policy --role-name Pod-alpha-demo-dev-web --policy-name <policy>
+AWS_PROFILE=preprod aws iam get-role-policy --role-name Pod-alpha-shop-dev-web --policy-name <policy>
 # the association binds only that environment's namespace + SA:
 AWS_PROFILE=preprod aws eks list-pod-identity-associations --cluster-name preprod-use1-eks \
-  --namespace alpha-demo-dev
+  --namespace alpha-shop-dev
 ```
 
 ## Troubleshooting

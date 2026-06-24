@@ -2,7 +2,10 @@
 
 **Date:** 2026-06-05
 
-**Status:** Proposed — **strategy/direction.** Records *how* the cloud-neutral Tenant API
+**Status:** Proposed — **strategy/direction** (not implemented). **Vocabulary superseded by
+[ADR-067](067-idp-domain-model.md):** the `Tenant`/`XTenant` claim is now `Environment`/`XEnvironment`. **Scope
+note:** multi-cloud is deferred — the platform is AWS-only today (Azure/GCP removed), so the per-cloud
+Compositions here are forward-looking only. Records *how* the cloud-neutral Tenant API
 ([ADR-049](049-tenant-model-team-tenant-zone.md), [schema](../architecture/tenant-api-v2.md)) is realized on
 more than one cloud. Builds on [ADR-048](048-federated-per-cluster-crossplane.md) (federated per-cluster
 Crossplane) and [ADR-047](047-pod-identity-as-aws-identity-standard.md) (Pod Identity = the AWS instance of a

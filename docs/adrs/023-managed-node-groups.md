@@ -2,7 +2,9 @@
 
 **Date:** 2026-05-23
 
-**Status:** Accepted
+**Status:** Accepted — **partly superseded by [ADR-078](078-cluster-elasticity-karpenter.md)**: Karpenter now
+provisions and consolidates *workload* nodes; managed node groups are retained only for the fixed `system`
+(controller/bootstrap) floor.
 
 ## Context
 

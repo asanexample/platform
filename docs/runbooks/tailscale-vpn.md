@@ -434,7 +434,8 @@ deployment creates devices with a `-1` suffix.
 | Secrets Manager key | `platform/tailscale/oauth` (us-east-1) |
 | Subnet route | `10.100.0.0/16` |
 | VPC DNS resolver | `10.100.0.2` |
-| Split DNS domain | `us-east-1.eks.amazonaws.com` |
+| Split DNS domain | `us-east-1.eks.amazonaws.com` (private EKS API) |
+| Split DNS domain | `aws.refplat.org` (platform service hostnames) |
 | Operator namespace | `tailscale-system` |
 | Helm chart version | `1.96.5` |
 | Module path | `infra/modules/tailscale/` |

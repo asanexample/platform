@@ -127,7 +127,8 @@ Two consequences:
    Because repo-scoped lookups take the *first covering* App, that installation **shadows the write App** —
    the scaffolder would get a read-only token and PR creation 403s. One-time migration, **after** the portal
    runs an image with both Apps in config and **before** any PR-opening template ships (#280/#281): read App →
-   Install App → Configure → remove `platform` (keep `app-alpha`, `app-bravo`, `backstage`). Platform-repo
+   Install App → Configure → remove `platform` (keep the app repos `<team>-<product>`, e.g. `alpha-shop`,
+   `alpha-checkout`, plus `backstage`). Platform-repo
    *reads* (the projection, the template location) then resolve to the write App — fine, its Contents scope
    includes read.
 

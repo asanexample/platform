@@ -50,7 +50,7 @@ kubectl --context <platform|preprod> -n observability get pods -l app.kubernetes
 
 - **No spans / no RED for a service:** Beyla only emits for **observed HTTP/gRPC traffic** — an idle service
   produces nothing. Generate traffic. Confirm the service's namespace matches the Beyla `instrument_namespaces`
-  glob (`kubectl -n observability get cm beyla -o yaml | grep -A3 discovery`).
+  glob (`kubectl -n observability get cm beyla-config -o yaml | grep -A3 discovery`).
 - **Beyla pod CrashLoop / permission errors:** eBPF needs the **privileged** PSA namespace + host access — the
   `observability` namespace is created privileged by the metrics module; confirm the label is set.
 - **Traces missing on preprod but present on hub:** check the preprod traces-spoke collector is Running and
