@@ -44,10 +44,11 @@ locals {
     github_oidc = "${local.source_base}/aws//github_oidc"
 
     # Governance & compliance
-    organizations   = "${local.source_base}/aws//organizations"
-    identity_center = "${local.source_base}/aws//identity_center"
-    cloudtrail      = "${local.source_base}/aws//cloudtrail"
-    state_bootstrap = "${local.source_base}/aws//state_bootstrap"
+    organizations        = "${local.source_base}/aws//organizations"
+    identity_center      = "${local.source_base}/aws//identity_center"
+    cloudtrail           = "${local.source_base}/aws//cloudtrail"
+    state_bootstrap      = "${local.source_base}/aws//state_bootstrap"
+    cost_allocation_tags = "${local.source_base}/aws//cost-allocation-tags" # billing tag activation (#668, P11 pt2)
 
     # Cloud-agnostic (Kubernetes add-ons)
     cilium                       = "${local.source_base}/cilium"
