@@ -1,0 +1,183 @@
+{
+  "uid": "aws-cloud-resources",
+  "title": "AWS Cloud Resources",
+  "tags": ["platform", "aws", "cloudwatch", "yace"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "editable": true,
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "5m",
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "NLB unhealthy hosts (max)",
+      "description": "AWS/NetworkELB UnHealthyHostCount via YACE. >0 means the gateway NLB has degraded target-group backends (alert: CloudNLBUnhealthyHosts).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(aws_networkelb_un_healthy_host_count_maximum)" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "NAT port-allocation errors (rate)",
+      "description": "AWS/NATGateway ErrorPortAllocation rate. >0 means SNAT source-port exhaustion — outbound connections dropped (alert: CloudNATGatewayPortAllocationErrors).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 2, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.001 }] } }, "overrides": [] },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(aws_natgateway_error_port_allocation_sum[10m]))" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Transit Gateway blackhole drops (rate)",
+      "description": "AWS/TransitGateway PacketDropCountBlackhole rate. >0 means packets hit a blackhole route — a missing/misconfigured TGW route (alert: CloudTransitGatewayBlackholeDrops).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 2, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.001 }] } }, "overrides": [] },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(aws_transitgateway_packet_drop_count_blackhole_sum[5m]))" }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "Network Load Balancer (gateway)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 4 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Target host health",
+      "description": "Healthy vs unhealthy targets per target group (AWS/NetworkELB HealthyHostCount avg / UnHealthyHostCount max).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_TargetGroup) (aws_networkelb_healthy_host_count_average)", "legendFormat": "healthy — {{dimension_TargetGroup}}" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_TargetGroup) (aws_networkelb_un_healthy_host_count_maximum)", "legendFormat": "unhealthy — {{dimension_TargetGroup}}" }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Active flows",
+      "description": "AWS/NetworkELB ActiveFlowCount (average) — concurrent TCP/UDP flows through the NLB.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_LoadBalancer) (aws_networkelb_active_flow_count_average)", "legendFormat": "{{dimension_LoadBalancer}}" }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Throughput",
+      "description": "AWS/NetworkELB ProcessedBytes rate (bytes/sec).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+      "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_LoadBalancer) (rate(aws_networkelb_processed_bytes_sum[5m]))", "legendFormat": "{{dimension_LoadBalancer}}" }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "TCP target resets",
+      "description": "AWS/NetworkELB TCP_Target_Reset_Count rate — RSTs sent by targets, an indicator of backend connection churn/errors.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_LoadBalancer) (rate(aws_networkelb_tcp_target_reset_count_sum[5m]))", "legendFormat": "{{dimension_LoadBalancer}}" }
+      ]
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "NAT Gateway",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Egress to destination",
+      "description": "AWS/NATGateway BytesOutToDestination rate (bytes/sec) — outbound VPC traffic. Cross-references the OpenCost NAT-egress cost panel on the Platform Cost dashboard.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+      "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_NatGatewayId) (rate(aws_natgateway_bytes_out_to_destination_sum[5m]))", "legendFormat": "{{dimension_NatGatewayId}}" }
+      ]
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Packets dropped",
+      "description": "AWS/NATGateway PacketsDropCount rate — sustained drops can indicate NAT gateway stress.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_NatGatewayId) (rate(aws_natgateway_packets_drop_count_sum[5m]))", "legendFormat": "{{dimension_NatGatewayId}}" }
+      ]
+    },
+    {
+      "id": 30,
+      "type": "row",
+      "title": "Transit Gateway",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "Throughput in / out",
+      "description": "AWS/TransitGateway BytesIn / BytesOut rate (bytes/sec) — cross-account (platform hub ↔ preprod spoke) traffic.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 },
+      "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_TransitGateway) (rate(aws_transitgateway_bytes_in_sum[5m]))", "legendFormat": "in — {{dimension_TransitGateway}}" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_TransitGateway) (rate(aws_transitgateway_bytes_out_sum[5m]))", "legendFormat": "out — {{dimension_TransitGateway}}" }
+      ]
+    },
+    {
+      "id": 32,
+      "type": "timeseries",
+      "title": "Blackhole packet drops",
+      "description": "AWS/TransitGateway PacketDropCountBlackhole rate — packets dropped to a blackhole route (missing/misconfigured TGW route).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (dimension_TransitGateway) (rate(aws_transitgateway_packet_drop_count_blackhole_sum[5m]))", "legendFormat": "{{dimension_TransitGateway}}" }
+      ]
+    }
+  ]
+}
