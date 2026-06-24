@@ -31,11 +31,13 @@ resource "kubernetes_cluster_role_v1" "platform_operator" {
     verbs      = ["create"]
   }
 
-  # Operate: delete a stuck pod; evict pods when draining a node.
+  # Operate: delete a stuck pod; evict pods when draining a node; patch pod metadata — e.g. clear the
+  # karpenter.sh/do-not-disrupt annotation during `platctl down` so the park drain isn't blocked by stateful
+  # pods (a pod's spec is immutable, so patch can't escalate; it only touches metadata/tolerations).
   rule {
     api_groups = [""]
     resources  = ["pods"]
-    verbs      = ["delete"]
+    verbs      = ["delete", "patch"]
   }
   rule {
     # Eviction subresource is registered under both core and policy groups
