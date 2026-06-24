@@ -107,19 +107,25 @@ locals {
     # it breaks the read path (DNS failures). Keep it on (single replica when not HA).
     query_scheduler = { enabled = true, replicas = var.high_availability ? 2 : 1 }
 
+    # Karpenter must not voluntarily disrupt (consolidate/drift/expire) the nodes Mimir's PVC-backed
+    # StatefulSets (ingester / store-gateway / compactor) run on. The chart renders <component>.podAnnotations
+    # onto each component's StatefulSet pod template (covers all zone-aware replicas when HA).
     ingester = {
       replicas             = var.high_availability ? 3 : 1
       zoneAwareReplication = { enabled = var.high_availability }
       persistentVolume     = { enabled = true, storageClass = var.storage_class, size = "10Gi" }
+      podAnnotations       = { "karpenter.sh/do-not-disrupt" = "true" }
     }
     store_gateway = {
       replicas             = var.high_availability ? 3 : 1
       zoneAwareReplication = { enabled = var.high_availability }
       persistentVolume     = { enabled = true, storageClass = var.storage_class, size = "10Gi" }
+      podAnnotations       = { "karpenter.sh/do-not-disrupt" = "true" }
     }
     compactor = {
       replicas         = 1
       persistentVolume = { enabled = true, storageClass = var.storage_class, size = "20Gi" }
+      podAnnotations   = { "karpenter.sh/do-not-disrupt" = "true" }
     }
 
     # --- Disabled in P2 (ruler/alertmanager -> P4; the rest are HA-only) ---

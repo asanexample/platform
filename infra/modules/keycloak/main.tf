@@ -141,8 +141,16 @@ resource "kubernetes_manifest" "db" {
       namespace = var.namespace
     }
     spec = {
-      instances             = var.database.instances
-      storage               = { size = var.database.storage_size }
+      instances = var.database.instances
+      storage   = { size = var.database.storage_size }
+
+      # Propagate the Karpenter do-not-disrupt annotation to the CNPG-managed instance Pods so Karpenter
+      # won't voluntarily disrupt (consolidate/drift/expire) the node a Postgres primary/replica runs on.
+      # inheritedMetadata is applied by CNPG to all Cluster-owned objects, the instance Pods included.
+      inheritedMetadata = {
+        annotations = { "karpenter.sh/do-not-disrupt" = "true" }
+      }
+
       bootstrap             = { initdb = { database = "keycloak", owner = "keycloak" } }
       enableSuperuserAccess = false
     }

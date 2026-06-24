@@ -61,6 +61,10 @@ locals {
       config               = { replication_factor = var.high_availability ? 3 : 1 }
       zoneAwareReplication = { enabled = var.high_availability } # needs 3 zones
       persistence          = { enabled = true, storageClass = var.storage_class, size = "5Gi" }
+      # Karpenter must not voluntarily disrupt (consolidate/drift/expire) the node the ingester runs on —
+      # it's the only PVC-backed StatefulSet in tempo-distributed (holds un-flushed trace blocks). The chart
+      # renders ingester.podAnnotations onto the ingester StatefulSet's pod template.
+      podAnnotations = { "karpenter.sh/do-not-disrupt" = "true" }
     }
     distributor   = { replicas = var.high_availability ? 2 : 1 }
     querier       = { replicas = var.high_availability ? 2 : 1 }

@@ -180,6 +180,10 @@ locals {
       prometheusSpec = {
         replicas  = var.high_availability ? 2 : 1
         retention = var.prometheus_retention
+        # Karpenter must not voluntarily disrupt (consolidate/drift/expire) the node a Prometheus pod runs on
+        # (PVC-backed TSDB). The prometheus-operator propagates prometheusSpec.podMetadata.annotations onto
+        # the StatefulSet pods it generates from this Prometheus CR.
+        podMetadata = { annotations = { "karpenter.sh/do-not-disrupt" = "true" } }
         # Tag every series with the source cluster (the multi-cluster dimension). Clean name (e.g. `platform`)
         # matching the tenant/env, not the raw EKS cluster ID; falls back to cluster_name if unset.
         externalLabels = { cluster = var.cluster_label != "" ? var.cluster_label : var.cluster_name }
@@ -257,6 +261,10 @@ locals {
       alertmanagerSpec = {
         replicas        = var.high_availability ? 3 : 1
         podAntiAffinity = var.high_availability ? "hard" : "soft"
+        # Karpenter must not voluntarily disrupt (consolidate/drift/expire) the node an Alertmanager pod runs
+        # on (PVC-backed silence/notification state). The prometheus-operator propagates
+        # alertmanagerSpec.podMetadata.annotations onto the StatefulSet pods it generates from the Alertmanager CR.
+        podMetadata = { annotations = { "karpenter.sh/do-not-disrupt" = "true" } }
         resources = {
           requests = { cpu = "50m", memory = "128Mi" }
           limits   = { memory = "256Mi" }

@@ -84,16 +84,23 @@ locals {
       }
     }
 
+    # Karpenter must not voluntarily disrupt (consolidate/drift/expire) the nodes Loki's stateful pods run
+    # on (PVC-backed local index/WAL). The chart renders <component>.podAnnotations onto each component's
+    # StatefulSet pod template. SingleBinary (dev) is one StatefulSet; SimpleScalable (HA) makes write +
+    # backend StatefulSets (read is a stateless Deployment) — annotate all the stateful tiers so the right
+    # object is covered in either deployment mode.
+
     # SingleBinary path (reference): one replica with a PVC. Zeroed when HA.
     singleBinary = {
-      replicas    = var.high_availability ? 0 : 1
-      persistence = { enabled = true, storageClass = var.storage_class, size = "10Gi" }
+      replicas       = var.high_availability ? 0 : 1
+      persistence    = { enabled = true, storageClass = var.storage_class, size = "10Gi" }
+      podAnnotations = { "karpenter.sh/do-not-disrupt" = "true" }
     }
 
     # SimpleScalable path (HA only): read/write/backend tiers, zeroed in single-binary mode.
     read    = { replicas = var.high_availability ? 3 : 0 }
-    write   = { replicas = var.high_availability ? 3 : 0 }
-    backend = { replicas = var.high_availability ? 3 : 0 }
+    write   = { replicas = var.high_availability ? 3 : 0, podAnnotations = { "karpenter.sh/do-not-disrupt" = "true" } }
+    backend = { replicas = var.high_availability ? 3 : 0, podAnnotations = { "karpenter.sh/do-not-disrupt" = "true" } }
 
     # Single push/query entry point (nginx gateway).
     gateway = { enabled = true, replicas = var.high_availability ? 2 : 1 }

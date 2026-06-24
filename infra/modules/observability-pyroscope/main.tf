@@ -27,6 +27,13 @@ locals {
     pyroscope = {
       replicaCount = 1
 
+      # Karpenter must not voluntarily disrupt (consolidate/drift/expire) the node this single-binary
+      # StatefulSet runs on — it holds the local WAL + the v2 metastore RAFT state on a PVC. The chart
+      # renders pyroscope.podAnnotations onto the StatefulSet's pod template.
+      podAnnotations = {
+        "karpenter.sh/do-not-disrupt" = "true"
+      }
+
       serviceAccount = {
         create = true
         name   = local.sa_name
