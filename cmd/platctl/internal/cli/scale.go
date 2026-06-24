@@ -452,7 +452,61 @@ func scaleNodeGroupsToZero(kc config.KubeconfigEntry) error {
 			return fmt.Errorf("scaling node group %s: %s\n%s", ng, err, out)
 		}
 	}
-	fmt.Printf("Parked %s. Nodes drain over a few minutes; control plane + EBS data are preserved. Restore with 'platctl up --env %s'.\n", kc.Cluster, kc.Alias)
+	// A managed group's scale-to-zero drains each node via an EKS lifecycle hook that respects PodDisruption
+	// Budgets — so the stateful pods that landed on the system nodes during the Karpenter drain can stall the
+	// node in Terminating:Wait until the hook times out (~15m), needlessly burning money. Reap them.
+	if err := reapStuckNodeGroupInstances(kc); err != nil {
+		fmt.Printf("  warning: %v (nodes will still terminate at the lifecycle-hook timeout)\n", err)
+	}
+	fmt.Printf("Parked %s. Control plane + EBS data are preserved. Restore with 'platctl up --env %s'.\n", kc.Cluster, kc.Alias)
+	return nil
+}
+
+// reapStuckNodeGroupInstances is the managed-node-group analogue of the Karpenter do-not-disrupt fix: after a
+// group scales to zero, give the graceful (PDB-respecting) lifecycle-hook drain a short window, then
+// force-terminate any of the cluster's instances still running. A park is a full shutdown and EBS data persists
+// (Postgres is crash-safe), so a PDB-blocked drain must not be allowed to keep nodes alive for the ~15m hook
+// timeout (#661). Best-effort and ctx-free, matching scaleNodeGroupsToZero. By this point the Karpenter nodes are
+// already gone (doDrainKarpenterNodes waited for them), so the only instances left are this group's.
+func reapStuckNodeGroupInstances(kc config.KubeconfigEntry) error {
+	alive := func() ([]string, error) {
+		out, err := exec.Command("aws", "ec2", "describe-instances",
+			"--region", kc.Region, "--profile", kc.Profile,
+			"--filters", "Name=tag:kubernetes.io/cluster/"+kc.Cluster+",Values=owned",
+			"Name=instance-state-name,Values=running,pending",
+			"--query", "Reservations[].Instances[].InstanceId", "--output", "text").CombinedOutput()
+		if err != nil {
+			return nil, fmt.Errorf("describe-instances: %s\n%s", err, strings.TrimSpace(string(out)))
+		}
+		return strings.Fields(string(out)), nil
+	}
+
+	// Graceful window: a node with no PDB-blocked pods drains in ~1-2 min.
+	for i := 0; i < 12; i++ {
+		ids, err := alive()
+		if err != nil {
+			return err
+		}
+		if len(ids) == 0 {
+			return nil // drained gracefully — nothing to reap
+		}
+		time.Sleep(10 * time.Second)
+	}
+
+	ids, err := alive()
+	if err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	fmt.Printf("  %d node(s) still draining after 2m (PDB-blocked lifecycle hook); force-terminating "+
+		"(park is a full shutdown — EBS data preserved)...\n", len(ids))
+	args := append([]string{"ec2", "terminate-instances", "--region", kc.Region, "--profile", kc.Profile,
+		"--instance-ids"}, ids...)
+	if out, err := exec.Command("aws", args...).CombinedOutput(); err != nil {
+		return fmt.Errorf("force-terminating stuck nodes %v: %s\n%s", ids, err, strings.TrimSpace(string(out)))
+	}
 	return nil
 }
 

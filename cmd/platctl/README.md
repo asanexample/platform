@@ -78,10 +78,13 @@ teardown.
   then deletes the NodePool and **polls until its NodeClaims are actually gone** (the delete cascades to NodeClaim
   deletion in the background and returns early — it does *not* block until the instances terminate) — *then*
   scales every managed node group to `desiredSize=0, minSize=0` via the EKS API. The Karpenter step is essential:
-  the
-  controller runs on the system group, so scaling the managed groups first would kill it mid-park and leave its
-  EC2 instances orphaned (ADR-078). No-op on clusters without Karpenter. The **control plane and all EBS volumes
-  survive** (e.g. CNPG databases), so it is non-destructive; `--yes` skips the confirmation.
+  the controller runs on the system group, so scaling the managed groups first would kill it mid-park and leave
+  its EC2 instances orphaned (ADR-078). Finally, because the managed-group scale-down drains each node via an EKS
+  lifecycle hook that **respects PodDisruptionBudgets**, the stateful pods that land on the system nodes can stall
+  it in `Terminating:Wait` for ~15 min — so `down` gives the graceful drain a ~2-minute window, then
+  **force-terminates any node still running** (safe: a park is a full shutdown and EBS data is preserved). No-op
+  on clusters without Karpenter. The **control plane and all EBS volumes survive** (e.g. CNPG databases), so it is
+  non-destructive; `--yes` skips the confirmation.
 - `platctl up --env <env>` re-applies the env's `node-groups` unit (restoring the configured sizes from the HCL),
   then **waits for the cluster API to become reachable** (the restored nodes + the in-cluster Tailscale router
   that fronts the private endpoint take a few minutes to come back), then re-applies the **`karpenter` unit**
