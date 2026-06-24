@@ -1,6 +1,5 @@
 locals {
-  create      = var.create
-  create_irsa = local.create && var.oidc_provider_arn != ""
+  create = var.create
 
   # Sanitize tags for K8s label compliance (RFC 1123): lowercase, valid chars, max 63 chars
   k8s_labels = {
@@ -24,46 +23,31 @@ locals {
 
     podLabels = local.k8s_labels
 
-    serviceAccount = {
-      annotations = local.create_irsa ? {
-        "eks.amazonaws.com/role-arn" = aws_iam_role.external_dns[0].arn
-      } : {}
-    }
+    # AWS identity via EKS Pod Identity (ADR-047): the SA is matched by the pod-identity
+    # association below — no IRSA `eks.amazonaws.com/role-arn` annotation needed.
   }
 }
 
 # ---------------------------------------------------------------------------
-# IRSA — IAM Role for external-dns (Route53 record management)
+# IAM — external-dns role (Route53 records); AWS identity via EKS Pod Identity (ADR-047)
 # ---------------------------------------------------------------------------
 
 data "aws_iam_policy_document" "external_dns_trust" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create ? 1 : 0
 
   statement {
     effect  = "Allow"
-    actions = ["sts:AssumeRoleWithWebIdentity"]
+    actions = ["sts:AssumeRole", "sts:TagSession"]
 
     principals {
-      type        = "Federated"
-      identifiers = [var.oidc_provider_arn]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "${var.oidc_provider_url}:aud"
-      values   = ["sts.amazonaws.com"]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "${var.oidc_provider_url}:sub"
-      values   = ["system:serviceaccount:${var.namespace}:external-dns"]
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
     }
   }
 }
 
 resource "aws_iam_role" "external_dns" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create ? 1 : 0
 
   name_prefix        = "${var.cluster_name}-ext-dns-"
   assume_role_policy = data.aws_iam_policy_document.external_dns_trust[0].json
@@ -72,7 +56,7 @@ resource "aws_iam_role" "external_dns" {
 }
 
 data "aws_iam_policy_document" "external_dns_route53" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create ? 1 : 0
 
   statement {
     effect = "Allow"
@@ -94,11 +78,23 @@ data "aws_iam_policy_document" "external_dns_route53" {
 }
 
 resource "aws_iam_role_policy" "external_dns_route53" {
-  count = local.create_irsa ? 1 : 0
+  count = local.create ? 1 : 0
 
   name   = "route53-records"
   role   = aws_iam_role.external_dns[0].id
   policy = data.aws_iam_policy_document.external_dns_route53[0].json
+}
+
+# Pod Identity association: binds the role to the `external-dns` ServiceAccount (the chart's SA name)
+# in this namespace. The pod-identity agent injects creds at pod launch — no SA annotation, no OIDC trust.
+resource "aws_eks_pod_identity_association" "external_dns" {
+  count = local.create ? 1 : 0
+
+  cluster_name    = var.cluster_name
+  namespace       = var.namespace
+  service_account = "external-dns"
+  role_arn        = aws_iam_role.external_dns[0].arn
+  tags            = var.tags
 }
 
 # ---------------------------------------------------------------------------
@@ -123,5 +119,6 @@ resource "helm_release" "external_dns" {
     yamlencode(local.external_dns_values),
   ]
 
-  depends_on = [aws_iam_role.external_dns]
+  # The association must exist before the SA/pod rolls so the new pod gets Pod-Identity creds immediately.
+  depends_on = [aws_eks_pod_identity_association.external_dns]
 }
