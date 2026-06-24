@@ -48,6 +48,12 @@ release all cost (~$0), use 'platctl teardown --env <env>' instead.`,
 				fmt.Println("Aborted.")
 				return nil
 			}
+			// Drain Karpenter-managed nodes BEFORE the managed groups scale to zero — otherwise the controller
+			// (on the system group) dies mid-park and leaves orphaned EC2 instances. No-op without Karpenter.
+			fmt.Printf("Draining Karpenter-managed nodes on %s (delete NodePool; drains gracefully)...\n", kc.Cluster)
+			if err := drainKarpenterNodesFn(context.Background(), kc); err != nil {
+				fmt.Printf("  warning: %v (continuing — check for orphaned Karpenter instances)\n", err)
+			}
 			return scaleNodeGroupsToZero(kc)
 		},
 	}
@@ -96,6 +102,21 @@ from the HCL — the inverse of 'platctl down'. Takes ~1-2 minutes.`,
 			ctx := context.Background()
 			if err := runner.Run(ctx, unit, engine.Apply); err != nil {
 				return err
+			}
+			// Restore the Karpenter NodePool that 'platctl down' deletes to drain Karpenter's nodes (so the
+			// cluster regains node autoscaling). No-op if this env has no karpenter unit.
+			kpPath := filepath.Join(repoRoot, env.Path, "karpenter")
+			if _, statErr := os.Stat(kpPath); statErr == nil {
+				kpUnit := &engine.Unit{
+					Name:     envName + "/karpenter",
+					Path:     kpPath,
+					Provider: env.Provider,
+					Auth:     cfg.AuthForUnit(envName, "karpenter"),
+				}
+				fmt.Printf("Restoring %s Karpenter NodePool (terragrunt apply)...\n", envName)
+				if err := runner.Run(ctx, kpUnit, engine.Apply); err != nil {
+					return err
+				}
 			}
 			// Repair the cross-environment path a park/restore can leave stale (e.g. platform→preprod cross-VPC
 			// DNS + the ArgoCD controller's cached connection). Idempotent; no-op when not configured.
@@ -168,19 +189,19 @@ func rolloutRestart(ctx context.Context, cfg *config.Config, rr config.Reconnect
 
 var rolloutRestartFn = doRolloutRestart
 
-// doRolloutRestart builds a throwaway kubeconfig for the cluster (so it doesn't depend on the operator's local
-// contexts, matching the bootstrap hooks) and runs `kubectl rollout restart`.
-func doRolloutRestart(ctx context.Context, kc config.KubeconfigEntry, namespace, target string) error {
-	tmp, err := os.CreateTemp("", "platctl-reconnect-kubeconfig-*.yaml")
+// tempKubeconfig writes a throwaway kubeconfig for the cluster (independent of the operator's local contexts,
+// matching the bootstrap hooks). The caller must invoke the returned cleanup.
+func tempKubeconfig(ctx context.Context, kc config.KubeconfigEntry, alias string) (string, func(), error) {
+	tmp, err := os.CreateTemp("", "platctl-kubeconfig-*.yaml")
 	if err != nil {
-		return err
+		return "", func() {}, err
 	}
 	path := tmp.Name()
 	_ = tmp.Close()
-	defer func() { _ = os.Remove(path) }()
+	cleanup := func() { _ = os.Remove(path) }
 
 	kcArgs := []string{"eks", "update-kubeconfig", "--name", kc.Cluster, "--region", kc.Region,
-		"--kubeconfig", path, "--alias", "platctl-reconnect"}
+		"--kubeconfig", path, "--alias", alias}
 	if kc.KubectlRoleARN != "" {
 		kcArgs = append(kcArgs, "--role-arn", kc.KubectlRoleARN)
 	}
@@ -188,8 +209,19 @@ func doRolloutRestart(ctx context.Context, kc config.KubeconfigEntry, namespace,
 		kcArgs = append(kcArgs, "--profile", kc.Profile)
 	}
 	if out, err := exec.CommandContext(ctx, "aws", kcArgs...).CombinedOutput(); err != nil {
-		return fmt.Errorf("update-kubeconfig: %v: %s", err, strings.TrimSpace(string(out)))
+		cleanup()
+		return "", func() {}, fmt.Errorf("update-kubeconfig: %v: %s", err, strings.TrimSpace(string(out)))
 	}
+	return path, cleanup, nil
+}
+
+// doRolloutRestart runs `kubectl rollout restart` against a throwaway kubeconfig for the cluster.
+func doRolloutRestart(ctx context.Context, kc config.KubeconfigEntry, namespace, target string) error {
+	path, cleanup, err := tempKubeconfig(ctx, kc, "platctl-reconnect")
+	if err != nil {
+		return err
+	}
+	defer cleanup()
 
 	rsArgs := []string{"--kubeconfig", path, "rollout", "restart", target}
 	if namespace != "" {
@@ -197,6 +229,36 @@ func doRolloutRestart(ctx context.Context, kc config.KubeconfigEntry, namespace,
 	}
 	if out, err := exec.CommandContext(ctx, "kubectl", rsArgs...).CombinedOutput(); err != nil {
 		return fmt.Errorf("kubectl rollout restart: %v: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// drainKarpenterNodesFn is indirected so tests can stub the kubectl boundary.
+var drainKarpenterNodesFn = doDrainKarpenterNodes
+
+// doDrainKarpenterNodes deletes the Karpenter NodePool(s) so Karpenter drains and terminates the nodes it
+// manages before the managed node groups (incl. the system group the controller runs on) scale to zero. The
+// NodePool finalizer blocks the delete until the owned NodeClaims are drained, so this also waits for the
+// graceful teardown. 'platctl up' re-applies the karpenter unit to recreate the NodePool. No-op on clusters
+// without Karpenter (the CRD is absent).
+func doDrainKarpenterNodes(ctx context.Context, kc config.KubeconfigEntry) error {
+	path, cleanup, err := tempKubeconfig(ctx, kc, "platctl-drain")
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	out, err := exec.CommandContext(ctx, "kubectl", "--kubeconfig", path,
+		"delete", "nodepool", "--all", "--ignore-not-found", "--timeout=5m").CombinedOutput()
+	if err != nil {
+		// No Karpenter CRD on this cluster → nothing to drain.
+		if strings.Contains(string(out), "the server doesn't have a resource type") {
+			return nil
+		}
+		return fmt.Errorf("kubectl delete nodepool: %v: %s", err, strings.TrimSpace(string(out)))
+	}
+	if s := strings.TrimSpace(string(out)); s != "" {
+		fmt.Printf("  %s\n", s)
 	}
 	return nil
 }

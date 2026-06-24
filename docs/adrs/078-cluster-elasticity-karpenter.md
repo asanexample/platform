@@ -1,6 +1,7 @@
 # ADR-078: Cluster Elasticity — Karpenter + Workload Autoscaling
 
-**Status:** Proposed (2026-06-23)
+**Status:** Accepted — Phase 1 (Karpenter) implemented + live on both clusters, 2026-06-23 (#643). Phase 2
+(HPA/KEDA on the paved road) outstanding.
 
 ## Context
 
@@ -124,3 +125,29 @@ at all.
   PodDisruptionBudgets on critical workloads.
 - **−** Capacity is no longer statically legible ("how many nodes do we have?" becomes "it depends on load") —
   the right trade, but it shifts the mental model and makes the observability cost dashboard more dynamic.
+
+## Implementation notes (as-built, Phase 1)
+
+Things the design didn't anticipate, learned applying it live (module `infra/modules/aws/karpenter`):
+
+- **Org SCP exemption is mandatory.** The controller role must be in `exempt_roles`
+  (`mgmt/global/organizations`, pattern `*-karpenter-*`) alongside the crossplane provisioners. Two SCPs block a
+  non-exempt provisioner: `DenyTeamTagTampering` (the `Team` tag on `ec2:CreateTags`) and `require-tagging`
+  (denies `ec2:RunInstances` when Environment/ManagedBy/Owner are absent from the *request* — Karpenter tags via
+  the launch template, not RunInstances). This must be applied **before** Karpenter provisions, or every launch
+  is a 403 — a real rebuild-ordering dependency.
+- **EC2NodeClass `spec.tags`** must not carry `kubernetes.io/cluster/<name>` or `karpenter.*` keys (Karpenter
+  manages them — they're rejected as invalid). The IAM policy needs **both** the CreateAction-scoped
+  `AllowScopedResourceCreationTagging` *and* the standalone `AllowScopedResourceTagging` (the `nodeclaim.tagging`
+  controller tags the instance after launch).
+- **Minimum node size matters (D5 corollary).** The per-node DaemonSet slab (Cilium, Beyla, Alloy, node-exporter,
+  otel) is ~3.2 GiB; a 4 GiB node exhausts memory and the kubelet flaps `NotReady`, churning. The NodePool sets a
+  `karpenter.k8s.aws/instance-memory` floor (`min_instance_memory_mib = 6144` → 8 GiB+, matching the system group).
+- **Park integration.** `platctl down` deletes the NodePool (its finalizer drains the nodes) *before* scaling the
+  managed groups to zero, else the controller dies mid-park and orphans EC2; `up` re-applies the karpenter unit.
+- **System-node sizing is its own decision.** Node-pinned DaemonSet pods can't be served by Karpenter, so the
+  fixed system group must itself be large enough to hold the DaemonSet slab + standing load — the platform system
+  group went `t4g.large → t4g.xlarge`. Changing a managed group's `instance_types` is **ForceNew**
+  (destroy-then-create; the module's `create_before_destroy` is only on the launch template + the group name is
+  fixed) → a ~3-min hub blip, during which the in-cluster Tailscale subnet router is evicted so the private EKS
+  API is briefly unreachable. Plan such changes as a deliberate, monitored step.

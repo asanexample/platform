@@ -95,6 +95,8 @@ inputs = {
   consolidate_after    = "1m"
   cpu_limit            = 48
   memory_limit         = "192Gi"
+  # Require 8 GiB+ nodes — the per-node DaemonSet slab (Cilium, Beyla, Alloy) exhausts a 4 GiB t4g.medium.
+  min_instance_memory_mib = 6144
 
   high_availability  = include.base.locals.high_availability
   helm_chart_version = include.base.locals.helm_versions.karpenter

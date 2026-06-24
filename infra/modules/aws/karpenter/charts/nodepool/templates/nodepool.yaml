@@ -28,6 +28,13 @@ spec:
             {{- range .Values.instanceFamilies }}
             - {{ . | quote }}
             {{- end }}
+        {{- if gt (int .Values.minInstanceMemoryMib) 0 }}
+        # Floor on node size — the heavy per-node DaemonSet slab (Cilium/Beyla/Alloy/node-exporter) exhausts
+        # too-small nodes and the kubelet goes NotReady. Require enough memory headroom.
+        - key: karpenter.k8s.aws/instance-memory
+          operator: Gt
+          values: [{{ .Values.minInstanceMemoryMib | quote }}]
+        {{- end }}
       # BYOCNI: block pods until Cilium is ready on the node; Cilium removes this taint (D5).
       startupTaints:
         - key: {{ .Values.startupTaintKey }}

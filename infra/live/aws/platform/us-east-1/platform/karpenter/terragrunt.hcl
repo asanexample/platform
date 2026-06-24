@@ -97,6 +97,9 @@ inputs = {
   consolidate_after    = "1m"
   cpu_limit            = 32
   memory_limit         = "128Gi"
+  # Require 8 GiB+ nodes (t4g.large, like the system group). The observability hub's per-node DaemonSets
+  # (Cilium, Beyla, Alloy, node-exporter) eat ~3.2 GiB — a 4 GiB t4g.medium exhausts memory and flaps NotReady.
+  min_instance_memory_mib = 6144
 
   high_availability  = include.base.locals.high_availability
   helm_chart_version = include.base.locals.helm_versions.karpenter
