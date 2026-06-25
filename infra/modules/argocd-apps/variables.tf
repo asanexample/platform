@@ -80,3 +80,19 @@ variable "ecr_registry" {
   type        = string
   default     = ""
 }
+
+variable "platform_services" {
+  description = "ADR-081: platform-OWNED internal services/agents, keyed by service name. One ApplicationSet per service; its git-files generator fans out over gitops/releases/platform/<name>/*.yaml → one Application delivering the repo's `path` (Kustomize). Built at the unit from gitops/platform-services/*.yaml."
+  type = map(object({
+    repo_url  = string # the service repo (PlatformService.repo), https URL — the Application source
+    path      = string # the Kustomize app path in the service repo (e.g. deploy)
+    namespace = string # the platform-cluster namespace to deliver into
+  }))
+  default = {}
+}
+
+variable "platform_cluster_server" {
+  description = "ADR-081: API server URL for platform-OWNED service delivery. The agent/services run on the PLATFORM cluster where ArgoCD itself runs (in-cluster), NOT the preprod cluster that `cluster_server` targets for tenant apps."
+  type        = string
+  default     = "https://kubernetes.default.svc"
+}
