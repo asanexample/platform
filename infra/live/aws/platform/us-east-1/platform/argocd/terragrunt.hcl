@@ -210,12 +210,14 @@ inputs = {
       ]
     })
 
-    # GitOps tenant claims (BACK stack Phase 1): Crossplane writes back into the XTenant XR — `spec.crossplane`
+    # GitOps Environment claims (v3, ADR-067): Crossplane writes back into the XEnvironment XR — `spec.crossplane`
     # (compositionRef / compositionRevisionRef / resourceRefs) and the `composite.apiextensions.crossplane.io`
     # finalizer — which are NOT in the git claim YAML. Without this, selfHeal would treat them as drift and
-    # strip them on sync, severing the composition binding and tearing the tenant. Ignore the XR fields
-    # Crossplane owns; the claim's own spec (team/domains/apps/aws) still syncs from git.
-    "resource.customizations.ignoreDifferences.platform.refplat.org_XTenant" = yamlencode({
+    # strip them on sync, severing the composition binding and tearing the environment. Ignore the XR fields
+    # Crossplane owns; the claim's own spec (team/product/stage/domains/services) still syncs from git.
+    # (Renamed from the v2 _XTenant customization — XTenant was greenfield-renamed to XEnvironment at the v3
+    # cutover, so the old key matched a kind that no longer exists, leaving XEnvironment drift unguarded.)
+    "resource.customizations.ignoreDifferences.platform.refplat.org_XEnvironment" = yamlencode({
       jqPathExpressions = [".spec.crossplane"]
       jsonPointers      = ["/metadata/finalizers"]
     })
