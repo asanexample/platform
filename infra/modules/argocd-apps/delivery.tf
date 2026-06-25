@@ -172,6 +172,123 @@ resource "helm_release" "product_appset" {
 }
 
 # ===========================================================================================================
+# platform-services (ADR-081) — GitOps delivery for platform-OWNED internal services/agents. Mirrors the
+# per-Product ApplicationSet but FLAT (owner=platform; no team/product/envelope) and targets the PLATFORM
+# cluster (var.platform_cluster_server = in-cluster, where ArgoCD runs) — NOT the preprod cluster tenant apps
+# target. ADDITIVE + GATED on var.platform_repo_url. Image: <ecr_registry>/platform/<name>@<digest>.
+# ===========================================================================================================
+locals {
+  platform_services = var.create && var.platform_repo_url != "" ? var.platform_services : {}
+}
+
+resource "kubernetes_manifest" "platform_service_appproject" {
+  for_each = local.platform_services
+
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "AppProject"
+    metadata = {
+      name      = "platform-service-${each.key}"
+      namespace = var.argocd_namespace
+    }
+    spec = {
+      description = "delivery for platform-owned service ${each.key}"
+      sourceRepos = compact([each.value.repo_url, var.platform_repo_url])
+      destinations = [{
+        server    = var.platform_cluster_server
+        namespace = each.value.namespace
+      }]
+      # Platform services own a small set of namespaced kinds + their read-only cluster RBAC (ADR-081 D4).
+      clusterResourceWhitelist = [
+        { group = "", kind = "Namespace" },
+        { group = "rbac.authorization.k8s.io", kind = "ClusterRole" },
+        { group = "rbac.authorization.k8s.io", kind = "ClusterRoleBinding" },
+      ]
+      namespaceResourceWhitelist = [
+        { group = "", kind = "ConfigMap" },
+        { group = "", kind = "Secret" },
+        { group = "", kind = "Service" },
+        { group = "", kind = "ServiceAccount" },
+        { group = "apps", kind = "Deployment" },
+        { group = "external-secrets.io", kind = "ExternalSecret" },
+      ]
+    }
+  }
+}
+
+resource "helm_release" "platform_service_appset" {
+  for_each = local.platform_services
+
+  name             = "platform-service-${each.key}"
+  namespace        = var.argocd_namespace
+  chart            = "${path.module}/charts/applicationset-raw"
+  create_namespace = false
+
+  # Same passthrough-chart technique as product_appset (the recursive generator schema crashes the
+  # kubernetes_manifest provider) — Helm emits the manifest verbatim; ArgoCD's {{ }} survive.
+  values = [yamlencode({ manifest = yamlencode({
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "ApplicationSet"
+    metadata = {
+      name      = "platform-service-${each.key}"
+      namespace = var.argocd_namespace
+      labels    = { "platform.refplat.org/platform-service" = each.key }
+    }
+    spec = {
+      goTemplate        = true
+      goTemplateOptions = ["missingkey=error"]
+      # Fan out over the service's Release record(s) — gitops/releases/platform/<name>/*.yaml carries the
+      # deployed digest. No Release yet → NO Application (no doomed :placeholder sync); the first build's
+      # promote writes the Release and the App appears (same semantics as the per-Product appset).
+      generators = [{
+        git = {
+          repoURL  = var.platform_repo_url
+          revision = "HEAD"
+          files    = [{ path = "gitops/releases/platform/${each.key}/*.yaml" }]
+        }
+      }]
+      template = {
+        metadata = {
+          name   = "platform-${each.key}"
+          labels = { "platform.refplat.org/platform-service" = each.key }
+        }
+        spec = {
+          project = "platform-service-${each.key}"
+          source = {
+            repoURL        = each.value.repo_url
+            targetRevision = "HEAD"
+            path           = each.value.path
+          }
+          destination = {
+            server    = var.platform_cluster_server
+            namespace = each.value.namespace
+          }
+          syncPolicy = {
+            automated   = { selfHeal = true, prune = true }
+            syncOptions = ["CreateNamespace=true"]
+            retry       = local.first_deploy_retry
+          }
+        }
+      }
+      # Inject the Release digest as a kustomize image override — name MUST match the deploy/ image
+      # (<ecr_registry>/platform/<name>). A Release without a digest injects nothing (the :placeholder
+      # governs and the sync fails fast until pinned). ${...} = Terraform, {{...}} = ArgoCD goTemplate.
+      templatePatch = <<-EOT
+        {{- if hasKey .spec "digest" }}
+        spec:
+          source:
+            kustomize:
+              images:
+                - "${var.ecr_registry}/platform/${each.key}@{{ .spec.digest }}"
+        {{- end }}
+      EOT
+    }
+  }) })]
+
+  depends_on = [kubernetes_manifest.platform_service_appproject]
+}
+
+# ===========================================================================================================
 # registry-sync (ADR-069 §1 / #389) — project the git-native Product registry + Environment claims onto the
 # cluster as CRs, so Kyverno admission (restrict-environment-envelope) and the Composition can read them. The
 # dual-representation contract: delivery derives from the git registry; the cluster reads the projected CRs.

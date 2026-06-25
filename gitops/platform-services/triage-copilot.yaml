@@ -1,0 +1,12 @@
+# Platform-owned internal service registry (ADR-081). The triage copilot (ADR-080) is the reference
+# implementation. The argocd-apps unit reads this at Terragrunt time and emits a platform-services
+# ApplicationSet that delivers the repo's `deploy/` Kustomize app to the platform cluster, digest-pinned
+# from gitops/releases/platform/triage-copilot/*.yaml (written by the first signed build's promote).
+apiVersion: platform.refplat.org/v1beta1
+kind: PlatformService
+metadata:
+  name: triage-copilot
+spec:
+  repo: asanexample/triage-copilot
+  path: deploy
+  namespace: triage-copilot
