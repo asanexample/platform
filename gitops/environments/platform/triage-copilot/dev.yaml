@@ -5,7 +5,7 @@
 #
 # Two platform-trust things tenants can't do (both gated by Team platform's envelope at admission):
 #   - platformTrust.clusterRoles: bind the read-only cluster role so the agent reads pods/Applications cluster-wide.
-#   - services.copilot bedrock:InvokeModel: the agent's only AWS permission (bedrock is outside the deny-set).
+#   - services.server bedrock:InvokeModel: the agent's only AWS permission (bedrock is outside the deny-set).
 # The image is omitted until the first signed CI build promotes a digest into k8s/overlays/dev.
 apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
@@ -21,7 +21,7 @@ spec:
   platformTrust:
     clusterRoles: ["platform-trust-observability-reader"]
   services:
-    copilot:
+    server:
       serviceAccount: triage-copilot # Pod Identity binds this named SA; the app repo's k8s/ creates it
       permissions:
         aws:
