@@ -155,6 +155,7 @@ generate "helm_provider" {
 inputs = {
   create       = true
   cluster_name = dependency.eks.outputs.cluster_id
+  region       = include.base.locals.region # AWS_REGION/regional-STS env for argocd-k8s-auth cross-account auth
 
   # AWS identity via EKS Pod Identity (ADR-047, #594) — no OIDC/IRSA inputs needed.
 

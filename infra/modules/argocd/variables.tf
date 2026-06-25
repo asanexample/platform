@@ -9,6 +9,12 @@ variable "cluster_name" {
   type        = string
 }
 
+variable "region" {
+  description = "AWS region — pinned into every ArgoCD component's env (AWS_REGION / regional STS) so argocd-k8s-auth uses the reachable regional STS endpoint for cross-account managed-cluster auth (EKS Pod Identity injects no region, ADR-047)."
+  type        = string
+  default     = "us-east-1"
+}
+
 variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)

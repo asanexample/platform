@@ -26,6 +26,16 @@ locals {
   argocd_values = {
     global = {
       podLabels = local.k8s_labels
+      # AWS_REGION + regional STS for every component's AWS SDK / argocd-k8s-auth (used for cross-account managed-
+      # cluster AssumeRole, ADR-047). EKS Pod Identity injects ONLY the container-credentials env — NOT AWS_REGION,
+      # which the retired IRSA webhook used to provide. Without it the SDK falls back to the GLOBAL sts.amazonaws.com
+      # endpoint, which a private VPC can't route (only a regional com.amazonaws.<region>.sts interface endpoint
+      # exists) → cross-account cluster auth times out. Pinning the region makes it use the reachable regional STS.
+      env = [
+        { name = "AWS_REGION", value = var.region },
+        { name = "AWS_DEFAULT_REGION", value = var.region },
+        { name = "AWS_STS_REGIONAL_ENDPOINTS", value = "regional" },
+      ]
     }
 
     configs = {
