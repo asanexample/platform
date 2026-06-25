@@ -23,9 +23,8 @@ locals {
     ssm_bastion    = "${local.source_base}/aws//ssm-bastion"
 
     # IAM
-    iam_roles               = "${local.source_base}/aws//iam_roles"
-    eks_pod_identity        = "${local.source_base}/aws//eks-pod-identity"
-    triage_copilot_identity = "${local.source_base}/aws//triage-copilot-identity" # ADR-080 agent identity (bedrock:InvokeModel only)
+    iam_roles        = "${local.source_base}/aws//iam_roles"
+    eks_pod_identity = "${local.source_base}/aws//eks-pod-identity"
 
     # Storage & secrets
     ecr      = "${local.source_base}/aws//ecr"

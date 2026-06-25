@@ -33,12 +33,6 @@ inputs = {
       tag_mutability = "IMMUTABLE_WITH_EXCLUSION" # image tags immutable; cosign sha256-* tags exempt
       tags           = { Service = "gha-runner" }
     }
-    # The triage-copilot agent image (platform infra; ADR-080 — the template platform agent). Built +
-    # cosign-signed by the asanexample/triage-copilot repo's CI, pulled by the agent Deployment on this cluster.
-    "platform/triage-copilot" = {
-      tag_mutability = "IMMUTABLE_WITH_EXCLUSION" # image tags immutable; cosign sha256-* tags exempt
-      tags           = { Service = "triage-copilot" }
-    }
   }
 
   # Accounts granted cross-account image pull access
