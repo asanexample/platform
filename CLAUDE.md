@@ -28,6 +28,13 @@ tasks and load automatically when relevant. Prefer them over re-deriving from th
 - **observability-authoring** — adding dashboards/alerts/SLOs + instrumenting workloads in the LGTM+P stack
 - **backstage-portal** — configuring the Backstage portal/plugins/auth/catalog from the infra `backstage` module
 
+**Vendored (third-party).** `terraform-skill` is a community skill (antonbabenko/terraform-skill,
+Apache-2.0) vendored + pinned for diagnostic Terraform/OpenTofu depth — failure-mode routing,
+`count`/`for_each` churn, `moved`/`import`/`removed`, `write_only` secrets, state recovery. It is
+generic Terraform (not Terragrunt-aware), so the `terraform-style` / `terragrunt-units` house skills
+win on conflict (no provider/backend blocks in modules here). Source + audit:
+`.claude/skills/terraform-skill/PROVENANCE.md`.
+
 ## Terragrunt Config Hierarchy
 
 > Authoring or editing units: the **`terragrunt-units`** skill.

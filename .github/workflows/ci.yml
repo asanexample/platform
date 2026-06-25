@@ -121,10 +121,13 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: |
           npm install -g markdownlint-cli2
+          # Vendored third-party skills follow upstream markdown style, not house lint
+          # (see e.g. .claude/skills/terraform-skill/PROVENANCE.md). markdownlint-cli2
+          # ignores .markdownlintignore for explicitly-passed files, so exclude here.
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            FILES=$(git diff --name-only --diff-filter=ACM "origin/${BASE_REF}...HEAD" -- '*.md' | grep -v '.terraform/' | grep -v '.terragrunt-cache/' || true)
+            FILES=$(git diff --name-only --diff-filter=ACM "origin/${BASE_REF}...HEAD" -- '*.md' | grep -v '.terraform/' | grep -v '.terragrunt-cache/' | grep -v '.claude/skills/terraform-skill/' || true)
           else
-            FILES=$(git diff --name-only --diff-filter=ACM HEAD~1 -- '*.md' | grep -v '.terraform/' | grep -v '.terragrunt-cache/' || true)
+            FILES=$(git diff --name-only --diff-filter=ACM HEAD~1 -- '*.md' | grep -v '.terraform/' | grep -v '.terragrunt-cache/' | grep -v '.claude/skills/terraform-skill/' || true)
           fi
           if [ -n "$FILES" ]; then
             echo "$FILES" | xargs markdownlint-cli2

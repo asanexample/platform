@@ -1,3 +1,6 @@
 .terraform/
 .terragrunt-cache/
 node_modules/
+
+# Vendored third-party skill — follows upstream markdown style, not house lint (see its PROVENANCE.md)
+.claude/skills/terraform-skill/
