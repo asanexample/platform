@@ -118,7 +118,10 @@ auto-inject); only the **agent/GenAI-specific** signals are hand-instrumented, v
 
 **Placement:** the agent is **platform infrastructure** — platform-team-owned, reading cross-tenant telemetry, running
 on the platform cluster — so it sits *outside* the per-Product Kyverno envelope / environment-namespace tenant model
-(it's a platform-system workload like the obs stack itself, not a tenant environment workload).
+(it's a platform-system workload like the obs stack itself, not a tenant environment workload). *(ADR-081 briefly routed
+the agent through the tenant Environment model, landing it on preprod where its hub-resident obs is unreachable;
+[ADR-082](082-platform-agent-runtime-xagent.md) restores this D3 intent via the purpose-built `XAgent` runtime — the agent
+is `XAgent` #1, hub-placed, provisioned by the agent Composition, not the tenant one.)*
 
 ### D4 — Identity & authority (zero infrastructure privilege)
 
@@ -247,8 +250,9 @@ behaviour, never worse). **Metering seam + runaway guard** — an alert storm mu
 spend; the concrete storm controls are **D9**. A **cost-appropriate model tier** — **Sonnet 4.6** as the triage default (correlation is real reasoning),
 **Haiku 4.5** for cheap structuring/classification sub-steps, **Opus 4.8** only on escalation; the eval set (D6), not a
 guess, justifies any change. Steady-state spend is trivial (~cents per triage); the cost risk is a runaway alert storm,
-which the runaway guard — not the model tier — bounds. Runtime shape (standalone service vs. `Agent` CRD) is the
-ADR-074/075 open question, most likely a standalone service first.
+which the runaway guard — not the model tier — bounds. Runtime shape (standalone service vs. `Agent` CRD) was the
+ADR-074/075 open question; it is now **resolved to the first-class `XAgent` composite** ([ADR-082](082-platform-agent-runtime-xagent.md)) —
+a declarative claim provisions the agent's identity/RBAC, ArgoCD delivers the signed workload.
 
 ### D9 — Storm control & the unit of triage
 

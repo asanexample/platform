@@ -1,0 +1,15 @@
+{{- if .Values.agent }}
+# Cluster constants the Agent Composition reads (the hub cluster name, the platform account, region, the
+# agent permissions-boundary ARN) but that don't belong in an XAgent claim. Loaded into the Composition
+# pipeline context by function-environment-configs; the go-template reads `.context[...]`. Helm-templated
+# from the module's inputs so it is per-cluster while the Composition stays cluster-agnostic.
+apiVersion: apiextensions.crossplane.io/v1beta1
+kind: EnvironmentConfig
+metadata:
+  name: platform-agent-config
+data:
+  clusterName: {{ .Values.agent.clusterName | quote }}
+  region: {{ .Values.agent.region | quote }}
+  workloadAccountId: {{ .Values.agent.workloadAccountId | quote }}
+  permissionsBoundaryArn: {{ .Values.agent.permissionsBoundaryArn | default "" | quote }}
+{{- end }}

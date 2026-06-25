@@ -20,6 +20,13 @@ rules:
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  {{- if .Values.enableAgentProvisioner }}
+  # The Agent Composition (ADR-082, hub only) creates the agent's named ServiceAccount — a resource the tenant
+  # Environment Composition never makes (tenant SAs come from the app manifests). Granted only on the hub.
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  {{- end }}
   - apiGroups: [""]
     resources: ["resourcequotas", "limitranges"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]

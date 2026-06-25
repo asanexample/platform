@@ -1,0 +1,35 @@
+# Defaults overridden by the crossplane module (helm_release values). Present so `helm template` + the
+# .kyverno-tests harness work standalone. Greenfield (no migration) → Enforce from the start.
+
+# restrict-agent-control-plane action: who may author XAgent / ProviderConfig. Enforce = reject at admission.
+validationFailureAction: Enforce
+# restrict-agent-envelope action (the awsPermissions deny-set). Enforce from day one (admin-gated, greenfield).
+envelopeFailureAction: Enforce
+# Render the envelope policy. On by default (greenfield); the module can gate it for an Audit-first roll.
+enableAgentEnvelope: true
+# Generated-webhook failure policy: Fail (fail-closed) under Enforce.
+failurePolicy: Fail
+
+# Principals allowed to author XAgent control-plane resources (skipped by restrict-agent-control-plane). The
+# composite controller + provider-kubernetes author as crossplane-system; ArgoCD is the in-cluster GitOps writer
+# on the hub (same-cluster, so its IN-cluster SA — not a cross-account assumed role like the tenant workload clusters).
+excludePrincipals:
+  - "system:serviceaccount:argocd:*"
+  - "system:serviceaccount:kube-system:*"
+  - "system:serviceaccount:crossplane-system:*"
+  - "system:nodes:*"
+  - "system:kube-controller-manager"
+# Appended to excludePrincipals (env-specific). Unused on the hub (ArgoCD is in-cluster), kept for symmetry.
+extraExcludePrincipals: []
+
+# The platform-global IAM deny-set (ADR-062 §4) — services whose actions an XAgent's awsPermissions may NOT
+# request. ⊇ the AWS permissions boundary; a bare '*'/'*:*' action has prefix '*' which set-wildcard-matches any
+# entry, so broad wildcards are caught too. Identical to the tenant deny-set — agents get no exception.
+iamSensitiveServices:
+  - iam
+  - sts
+  - organizations
+  - account
+
+# Extra labels stamped on every ClusterPolicy.
+commonLabels: {}

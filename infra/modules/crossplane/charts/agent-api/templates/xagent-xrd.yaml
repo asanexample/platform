@@ -1,0 +1,158 @@
+# The Agent API (ADR-082). Crossplane v2 XRD, Cluster-scoped: an XAgent provisions a namespace + a
+# cluster-scoped RBAC binding (it is not "in" a namespace), and cluster scope is required to create an XAgent
+# at all — so authoring one needs cluster RBAC; developers cannot self-provision (the gate S1). Claims are
+# delivered by a platform-controlled GitOps path (gitops/agents/), CODEOWNERS-gated, and validated by Kyverno
+# (restrict-agent-envelope) + the CI gate (validate-agents.sh) before admission.
+#
+# Agent-shaped and deliberately LEAN — it is NOT the tenant XEnvironment (no quotas/tiers/stages/isolation/
+# developer-access/domains). The runtime side of ADR-074's declarative Agent; the favored XAgent composite.
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xagents.platform.refplat.org
+spec:
+  scope: Cluster
+  group: platform.refplat.org
+  names:
+    kind: XAgent
+    plural: xagents
+  versions:
+    - name: v1beta1
+      served: true
+      referenceable: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - team
+                - product
+              properties:
+                team:
+                  type: string
+                  description: >-
+                    Owning Team (carried explicitly, like XEnvironment) — the join key to the Product registry
+                    (gitops/products/<team>/<product>.yaml) for the app repo + the ECR image scope
+                    team-<team>/<product>, and the Release path gitops/releases/<team>/<product>/. Platform
+                    agents are team `platform`.
+                product:
+                  type: string
+                  description: >-
+                    Owning Product within the Team (gitops/products/<team>/<product>.yaml) — drives the image/ECR
+                    scope + signing identity via the supply chain (ADR-081, unchanged). The agent's namespace,
+                    ServiceAccount, and Pod-Identity role are named from the XAgent's metadata.name.
+                placement:
+                  type: object
+                  description: Where the agent RUNS. Hub-only today; per-cluster federation is deferred (ADR-082 D2).
+                  default: { cluster: platform }
+                  properties:
+                    cluster:
+                      type: string
+                      enum: ["platform"]
+                      default: platform
+                model:
+                  type: object
+                  description: >-
+                    The model the agent invokes. Mints a least-privilege Bedrock data-plane grant onto the
+                    agent's Pod-Identity role (invoke/converse only). The model id is PINNED (ADR-074 — no
+                    floating model); a change is a new release.
+                  default: { provider: bedrock }
+                  properties:
+                    provider:
+                      type: string
+                      enum: ["bedrock", "none"]
+                      default: bedrock
+                    id:
+                      type: string
+                      description: 'e.g. us.anthropic.claude-sonnet-4-6 (a cross-region inference profile, ADR-082 D8).'
+                obsRead:
+                  type: boolean
+                  default: false
+                  description: >-
+                    Bind the read-only platform-trust-observability-reader ClusterRole to the agent's
+                    ServiceAccount (cluster-wide read of pods/events/services/deployments + ArgoCD Applications;
+                    NO Secrets). The obs/k8s-state evidence an observability agent gathers (ADR-080 D1/D4).
+                access:
+                  type: object
+                  description: >-
+                    Clusters the agent may READ cross-cluster (mints a scoped cross-account read role per cluster,
+                    the Backstage pattern). DEFERRED — Phase 2 (ADR-082 D2); the schema lands now, the roles later.
+                  default: { clusters: [] }
+                  properties:
+                    clusters:
+                      type: array
+                      items: { type: string }
+                      default: []
+                awsPermissions:
+                  type: object
+                  description: >-
+                    Extra IAM beyond the model grant, attached to the agent's Pod-Identity role. Deny-set
+                    validated (ADR-062 §4 — iam/sts/organizations/account + bare-* rejected) by the CI gate +
+                    Kyverno, and permissions-boundary-capped at runtime. Empty for an obs-read-only agent.
+                  default: { policyStatements: [] }
+                  properties:
+                    policyStatements:
+                      type: array
+                      default: []
+                      items:
+                        type: object
+                        required: ["actions", "resources"]
+                        properties:
+                          sid: { type: string }
+                          effect:
+                            type: string
+                            enum: ["Allow", "Deny"]
+                            default: Allow
+                          actions:
+                            type: array
+                            items: { type: string }
+                          resources:
+                            type: array
+                            items: { type: string }
+                autonomy:
+                  type: object
+                  description: Bounded autonomy (ADR-074/080 D9). propose-only is the only mode today (safety invariant).
+                  default: { mode: propose-only }
+                  properties:
+                    mode:
+                      type: string
+                      enum: ["propose-only"]
+                      default: propose-only
+                    maxConcurrent:
+                      type: integer
+                      default: 4
+                      description: Runner concurrency cap (storm control); informational to the Composition, enforced by the agent.
+                    tokenBudget:
+                      type: string
+                      description: Rolling token/cost budget (the circuit breaker); informational to the Composition.
+                trigger:
+                  type: object
+                  description: How the agent is invoked. Informational — the Alertmanager route is wired separately (Phase 5).
+                  properties:
+                    kind:
+                      type: string
+                      enum: ["alertmanager-webhook", "schedule", "manual"]
+                lifecycle:
+                  type: object
+                  description: >-
+                    The kill-switch (ADR-082 D7). `suspended` removes the Pod-Identity association — a hard stop
+                    (no Bedrock, the agent cannot reason), selfHeal-proof because the workload (ArgoCD-owned) keeps
+                    running but is defanged. Flip back to active to restore.
+                  default: { phase: active }
+                  properties:
+                    phase:
+                      type: string
+                      enum: ["active", "suspended"]
+                      default: active
+            status:
+              type: object
+              properties:
+                namespace:
+                  type: string
+                  description: The provisioned agent namespace (never authored).
+                roleArn:
+                  type: string
+                  description: The agent's Pod-Identity role ARN (never authored).

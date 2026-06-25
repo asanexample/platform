@@ -1,0 +1,11 @@
+# Sample cluster-constants EnvironmentConfig the Agent Composition's load-config step merges. Dummy values —
+# render only needs the shape (the real one is Helm-templated per-cluster by the module on the hub).
+apiVersion: apiextensions.crossplane.io/v1beta1
+kind: EnvironmentConfig
+metadata:
+  name: platform-agent-config
+data:
+  clusterName: "platform-use1-eks"
+  region: "us-east-1"
+  workloadAccountId: "111122223333"
+  permissionsBoundaryArn: "arn:aws:iam::111122223333:policy/agent-boundary"

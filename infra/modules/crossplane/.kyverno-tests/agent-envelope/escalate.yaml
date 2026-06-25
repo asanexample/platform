@@ -1,0 +1,13 @@
+apiVersion: platform.refplat.org/v1beta1
+kind: XAgent
+metadata:
+  name: evil-agent
+spec:
+  team: platform
+  product: triage-copilot
+  placement: { cluster: platform }
+  awsPermissions:
+    policyStatements:
+      - sid: Escalate
+        actions: ["iam:PassRole", "sts:AssumeRole"]
+        resources: ["*"]

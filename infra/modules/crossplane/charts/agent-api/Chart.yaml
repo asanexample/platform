@@ -1,0 +1,14 @@
+apiVersion: v2
+name: crossplane-agent-api
+description: >-
+  The Agent API (ADR-082): a Crossplane v2 CompositeResourceDefinition (XAgent) + a function-go-templating
+  Composition that provisions a platform AGENT's runtime slot on the hub — namespace, named ServiceAccount,
+  least-privilege EKS Pod Identity (the model's Bedrock grant + deny-set-validated awsPermissions), and the
+  read-only observability RBAC binding. The agent's WORKLOAD is delivered separately by ArgoCD (the signed,
+  promoted digest); this chart provisions the slot it lands in. The sibling of the tenant environment-api,
+  built for agents (model, obs-read, bounded autonomy, propose-only posture) — not tenants. Hub-only;
+  consistent with the per-cluster federation (ADR-048): a different, in-cluster Composition, no remote creds.
+type: application
+# 0.1.0: initial XAgent control plane (ADR-082) — the runtime side of ADR-074. Triage copilot is XAgent #1.
+version: 0.1.0
+appVersion: "1.0.0"

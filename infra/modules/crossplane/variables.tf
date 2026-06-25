@@ -145,6 +145,19 @@ variable "enable_environment_api" {
   default     = false
 }
 
+variable "enable_agent_api" {
+  description = <<-EOT
+    Install the AGENT control plane (ADR-082): the XAgent XRD + Composition (agent-api chart) + the XAgent
+    admission policies (agent-policies chart). The HUB only — it provisions platform agents (hub-local platform
+    infra), NOT tenant Environments (so it is independent of, and never co-enabled with, enable_environment_api).
+    Requires enable_kubernetes_provider (the Composition creates ns/SA/RBAC), provider_services ⊇ {iam, eks}
+    (the Pod-Identity role + association), the Composition functions, and enable_environment_provisioning (the
+    scoped provisioner role + the deny-escalation permissions boundary the agent's role is capped by).
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "provider_service_account" {
   description = "ServiceAccount name the provider pods run as (pinned via DeploymentRuntimeConfig so the Pod Identity association can target it). Environment workloads never use this SA."
   type        = string
@@ -159,6 +172,12 @@ variable "providerconfig_name" {
 
 variable "environment_policy_values" {
   description = "Overrides for the environment control-plane Kyverno policies chart (restrict-environment-envelope + restrict-environment-control-plane), merged over its values.yaml. Keys: validationFailureAction (control-plane, default Enforce), envelopeFailureAction (default Audit — set Enforce at the ADR-049 A6 cutover), failurePolicy, excludePrincipals, commonLabels. Default {} keeps the chart defaults, which reproduce what the policy unit passed pre-move. Only applied when enable_environment_api."
+  type        = any
+  default     = {}
+}
+
+variable "agent_policy_values" {
+  description = "Overrides for the agent-policies Kyverno chart (restrict-agent-envelope + restrict-agent-control-plane), merged over its values.yaml. Keys: validationFailureAction, envelopeFailureAction, enableAgentEnvelope, failurePolicy, excludePrincipals, iamSensitiveServices, commonLabels. Default {} keeps the chart defaults (Enforce). Only applied when enable_agent_api."
   type        = any
   default     = {}
 }

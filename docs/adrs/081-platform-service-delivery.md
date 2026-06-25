@@ -1,6 +1,18 @@
 # ADR-081: Platform-Team Products on the One Delivery Road — Unified Provisioning + Per-Environment Placement
 
-**Status:** Proposed (2026-06-24)
+**Status:** Proposed (2026-06-24) · **Runtime-placement decision (D2/D3) superseded for platform agents by [ADR-082](082-platform-agent-runtime-xagent.md) (2026-06-25)**
+
+> **Amendment (2026-06-25).** This ADR conflated two separable concerns under "one road": **supply-chain/registry
+> unification** (D1, D4, D5 — one `Product`/`Release` registry, one build→sign→promote backbone, one OIDC/ECR story) and
+> **runtime placement** (D2, D3, D6, D7 — provisioning a platform product via the *tenant* `XEnvironment` Composition,
+> generalized for placement + a `platformTrust` envelope). **The supply-chain unification was right and stands for all
+> workloads, platform and tenant alike.** The runtime unification was the over-correction: it forced a
+> platform-infrastructure agent through the tenant Environment model, and the agent landed on a workload cluster (preprod),
+> blind to its hub-resident observability. [ADR-082](082-platform-agent-runtime-xagent.md) fixes only the runtime half:
+> **runtime forks by workload type** — tenant → `XEnvironment` Composition on a workload cluster (unchanged); platform agent →
+> a purpose-built `XAgent` Composition on the hub. D2/D3/D6/D7 below are **superseded for platform agents** by that lane; the
+> `platformTrust` envelope becomes vestigial for the agent. D1/D4/D5 (supply chain) are unchanged. This realizes the
+> "declarative `Agent` CRD (a future layer above this, ADR-074)" that D7/Scope explicitly left out of scope.
 
 ## Context
 

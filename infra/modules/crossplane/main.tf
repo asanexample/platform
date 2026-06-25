@@ -6,6 +6,7 @@ locals {
 
   enable_aws                      = local.create && length(var.provider_services) > 0
   enable_environment_provisioning = local.create && var.enable_environment_provisioning
+  enable_agent_api                = local.create && var.enable_agent_api
 
   # The per-app Pod-* workload IAM roles (v2: Pod-<team>-<name>-<env>-<app>) the provisioning role may
   # create/manage (in this workload account). PassRole is scoped to these only (the roles handed to EKS
@@ -74,7 +75,7 @@ locals {
   # change. Hash every file in the chart dir; the value is inert (charts don't read it) but its change forces
   # the in-place upgrade.
   chart_checksum = {
-    for c in ["runtime", "config", "environment-api", "environment-policies"] :
+    for c in ["runtime", "config", "environment-api", "environment-policies", "agent-api", "agent-policies"] :
     c => sha256(join(",", [for f in sort(tolist(fileset("${path.module}/charts/${c}", "**"))) : filesha256("${path.module}/charts/${c}/${f}")]))
   }
 }
@@ -158,12 +159,15 @@ resource "helm_release" "crossplane_config" {
   atomic = false
 
   values = [yamlencode({
-    namespace             = var.namespace
-    providerConfigName    = var.providerconfig_name
-    enableAws             = local.enable_aws
-    enableKubernetes      = var.enable_kubernetes_provider
-    ecrProvisionerRoleArn = var.ecr_provisioner_role_arn # platform-ecr ProviderConfig (assumeRoleChain)
-    chartChecksum         = local.chart_checksum["config"]
+    namespace          = var.namespace
+    providerConfigName = var.providerconfig_name
+    enableAws          = local.enable_aws
+    enableKubernetes   = var.enable_kubernetes_provider
+    # On the hub the agent Composition's provider-kubernetes also creates ServiceAccounts (the agent's SA) — a
+    # resource the tenant Environment Composition never makes — so grant it only there (ADR-082 Phase 2).
+    enableAgentProvisioner = var.enable_agent_api
+    ecrProvisionerRoleArn  = var.ecr_provisioner_role_arn # platform-ecr ProviderConfig (assumeRoleChain)
+    chartChecksum          = local.chart_checksum["config"]
   })]
 
   depends_on = [helm_release.crossplane_runtime]
@@ -254,6 +258,62 @@ resource "helm_release" "crossplane_environment_policies" {
 }
 
 # ---------------------------------------------------------------------------
+# Agent API (local chart): the XAgent XRD + Composition + the obs-read ClusterRole (ADR-082)
+# ---------------------------------------------------------------------------
+# The HUB only. Provisions platform agents (hub-local platform infra) via provider-kubernetes + provider-aws
+# (iam/eks) — a different, in-cluster Composition than the tenant one (ADR-048 consistent). The agent's WORKLOAD
+# is delivered separately by ArgoCD (the signed digest); this provisions its runtime slot. The permissions
+# boundary (from enable_environment_provisioning) caps the agent's minted Pod-Identity role.
+resource "helm_release" "crossplane_agent_api" {
+  count = local.enable_agent_api ? 1 : 0
+
+  name      = "crossplane-agent-api"
+  chart     = "${path.module}/charts/agent-api"
+  namespace = var.namespace
+  timeout   = var.helm_timeout
+  wait      = var.helm_wait
+  atomic    = var.helm_wait
+
+  values = [yamlencode({
+    chartChecksum              = local.chart_checksum["agent-api"]
+    createObsReaderClusterRole = true
+    # Cluster constants for the Agent Composition, injected via an EnvironmentConfig (platform-agent-config).
+    agent = {
+      clusterName            = var.cluster_name
+      region                 = var.region
+      workloadAccountId      = var.account_id
+      permissionsBoundaryArn = local.enable_environment_provisioning ? aws_iam_policy.environment_boundary[0].arn : ""
+    }
+  })]
+
+  depends_on = [helm_release.crossplane_config]
+}
+
+# ---------------------------------------------------------------------------
+# Agent control-plane Kyverno policies (local chart) — the XAgent admission gate (ADR-082 D6)
+# ---------------------------------------------------------------------------
+# Installed AFTER agent-api (which creates the XAgent CRD) so admission registration is clean — same reasoning as
+# environment-policies. Gated on enable_agent_api: no XAgent CRD → nothing to guard.
+resource "helm_release" "crossplane_agent_policies" {
+  count = local.enable_agent_api ? 1 : 0
+
+  name      = "crossplane-agent-policies"
+  chart     = "${path.module}/charts/agent-policies"
+  namespace = var.namespace
+  timeout   = var.helm_timeout
+  wait      = var.helm_wait
+  # NOT atomic: ClusterPolicies are additive/idempotent (same reasoning as environment-policies).
+  atomic          = false
+  cleanup_on_fail = false
+
+  values = [yamlencode(merge(var.agent_policy_values, {
+    chartChecksum = local.chart_checksum["agent-policies"]
+  }))]
+
+  depends_on = [helm_release.crossplane_agent_api]
+}
+
+# ---------------------------------------------------------------------------
 # Teardown: drain Crossplane CR finalizers before the helm uninstalls
 # ---------------------------------------------------------------------------
 # Provider/ProviderRevision/Function/XRD/Composition/ProviderConfig/Usage CRs carry finalizers the package +
@@ -329,6 +389,8 @@ resource "null_resource" "crd_finalizer_cleanup" {
     helm_release.crossplane_config,
     helm_release.crossplane_environment_api,
     helm_release.crossplane_environment_policies,
+    helm_release.crossplane_agent_api,
+    helm_release.crossplane_agent_policies,
   ]
 }
 

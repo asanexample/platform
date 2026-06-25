@@ -10,6 +10,7 @@
 #            product_files      space-separated added/modified gitops/products/**/*.yaml
 #            environment_files  space-separated added/modified gitops/environments/**/*.yaml
 #            release_files      space-separated added/modified gitops/releases/**/*.yaml (ADR-071 digest bumps)
+#            agent_files        space-separated added/modified gitops/agents/*.yaml (ADR-082 XAgent claims)
 #            prod_release_files space-separated added/modified releases targeting the PROD stage
 #                               (<stem> = prod or <customer>-prod) — the gated-prod subset (#377 Phase 3)
 #            deletions          "true" if any registry file was removed or renamed-away
@@ -26,6 +27,8 @@ ENVIRON_RE='^gitops/environments/[a-z0-9-]+/[a-z0-9-]+/[a-z0-9.-]+\.ya?ml$'
 RELEASE_RE='^gitops/releases/[a-z0-9-]+/[a-z0-9-]+/[a-z0-9.-]+\.ya?ml$'
 # A prod-stage release: stem is `prod` (pooled) or `<customer>-prod` (per-customer). The gated subset (#377 P3).
 PROD_RELEASE_RE='^gitops/releases/[a-z0-9-]+/[a-z0-9-]+/(prod|[a-z0-9-]+-prod)\.ya?ml$'
+# Platform-agent claims (ADR-082): gitops/agents/<name>.yaml (flat; README.md is excluded — .md, not .ya?ml).
+AGENT_RE='^gitops/agents/[a-z0-9.-]+\.ya?ml$'
 
 files_json="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate --jq '[.[] | {filename, status, previous_filename}]')"
 
@@ -33,6 +36,7 @@ product_files=()
 environment_files=()
 release_files=()
 prod_release_files=()
+agent_files=()
 deleted_files=()
 deletions=false
 non_registry_changes=false
@@ -47,9 +51,10 @@ add() {
       # whole classify step) exit 1 for every non-prod release PR.
       if [[ "$2" =~ $PROD_RELEASE_RE ]]; then prod_release_files+=("$2"); fi
       ;;
+    agent) agent_files+=("$2") ;;
   esac
 }
-match() { [[ "$1" =~ $PRODUCT_RE ]] && { echo product; return; }; [[ "$1" =~ $ENVIRON_RE ]] && { echo environment; return; }; [[ "$1" =~ $RELEASE_RE ]] && { echo release; return; }; echo ""; }
+match() { [[ "$1" =~ $PRODUCT_RE ]] && { echo product; return; }; [[ "$1" =~ $ENVIRON_RE ]] && { echo environment; return; }; [[ "$1" =~ $RELEASE_RE ]] && { echo release; return; }; [[ "$1" =~ $AGENT_RE ]] && { echo agent; return; }; echo ""; }
 
 while IFS=$'\t' read -r filename status previous; do
   kind="$(match "$filename")"
@@ -71,7 +76,7 @@ while IFS=$'\t' read -r filename status previous; do
 done < <(jq -r '.[] | [.filename, .status, (.previous_filename // "")] | @tsv' <<<"$files_json")
 
 any=false
-{ [ ${#product_files[@]} -gt 0 ] || [ ${#environment_files[@]} -gt 0 ] || [ ${#release_files[@]} -gt 0 ]; } && any=true
+{ [ ${#product_files[@]} -gt 0 ] || [ ${#environment_files[@]} -gt 0 ] || [ ${#release_files[@]} -gt 0 ] || [ ${#agent_files[@]} -gt 0 ]; } && any=true
 
 out="${GITHUB_OUTPUT:-/dev/stdout}"
 {
@@ -79,6 +84,7 @@ out="${GITHUB_OUTPUT:-/dev/stdout}"
   echo "environment_files=${environment_files[*]:-}"
   echo "release_files=${release_files[*]:-}"
   echo "prod_release_files=${prod_release_files[*]:-}"
+  echo "agent_files=${agent_files[*]:-}"
   echo "deletions=${deletions}"
   echo "deleted_files=${deleted_files[*]:-}"
   echo "non_registry_changes=${non_registry_changes}"
