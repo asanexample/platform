@@ -180,6 +180,9 @@ jobs:
         # restrict-environment-envelope / restrict-environment-control-plane moved to the crossplane module (they match
         # Crossplane CRDs, so they install after them — see charts/environment-policies/Chart.yaml). Same tooling.
         run: infra/modules/crossplane/.kyverno-tests/run.sh
+      - name: Render & test agent control-plane policies (crossplane, ADR-082)
+        # restrict-agent-envelope / restrict-agent-control-plane (the XAgent admission gate).
+        run: infra/modules/crossplane/.kyverno-tests/run-agents.sh
 
   # (The v2 "Kyverno Shift-Left (dogfood)" job was removed at the v3 cutover: the kyverno-validate composite
   # action it dogfooded is v2-coupled — it derived the route host from the now-deleted XTenant claim and rendered
@@ -283,6 +286,9 @@ jobs:
       - name: Render the Composition and assert the environment footprint
         if: steps.scope.outputs.run == 'true'
         run: infra/modules/crossplane/.environment-api-tests/render.sh
+      - name: Render the Agent Composition and assert the runtime slot (ADR-082)
+        if: steps.scope.outputs.run == 'true'
+        run: infra/modules/crossplane/.agent-api-tests/render.sh
 
   tflint:
     name: TFLint
