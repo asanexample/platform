@@ -1,5 +1,20 @@
 {
   "enabledMcpjsonServers": ["grafana", "aws-api"],
+  "permissions": {
+    "allow": [
+      "Bash(kubectl get *)",
+      "Bash(kubectl describe *)",
+      "Bash(tofu validate *)",
+      "Bash(tofu fmt -check *)",
+      "Bash(terragrunt hcl fmt --check *)",
+      "mcp__grafana__query_prometheus",
+      "mcp__grafana__query_loki_logs",
+      "mcp__grafana__list_datasources",
+      "mcp__grafana__alerting_manage_rules",
+      "mcp__aws-api__call_aws",
+      "mcp__aws-api__suggest_aws_commands"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
