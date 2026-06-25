@@ -1,123 +1,111 @@
-# ADR-081: Platform-Owned Internal Service Delivery — a GitOps Paved Road for Internally-Developed Services and Agents
+# ADR-081: Platform-Team Products on the One Delivery Road — Unified Provisioning + Per-Environment Placement
 
 **Status:** Proposed (2026-06-24)
 
 ## Context
 
-The platform has two delivery worlds, and only one is paved.
+Internally-developed, platform-owned services and agents had no standard delivery path: backstage and the ARC runner are
+bespoke Terragrunt-Helm one-offs, and [ADR-080](080-triage-copilot.md)'s triage copilot was on track to be a third. The
+first instinct (an earlier draft of this ADR) was a *parallel* "platform-services" GitOps road alongside the tenant one.
 
-**Tenant apps** ride a rich, standardized, GitOps-native paved road: a `Product` registry + an `XEnvironment` claim
-([ADR-067](067-idp-domain-model.md)/[ADR-069](069-delivery-source-of-truth-product-environment.md))
-→ a per-Product `ApplicationSet` → a `Release`-carried image digest injected by `templatePatch`
-([ADR-071](071-digest-promotion-via-control-plane.md)) → signed CI ([ADR-050](050-shared-build-sign-reusable-workflow.md)). Adding a
-tenant service is a registry edit. But that road is **tenant-scoped by construction** — team/product nesting, the
-Crossplane Environment Composition, the Kyverno envelope, quotas.
-
-**Platform-owned, internally-developed services** have **no paved road at all.** Backstage and the self-hosted ARC
-runner are each bespoke Terragrunt-Helm modules; each invented its own delivery, pins its image manually in Helm values,
-and is invisible to ArgoCD (no drift detection, no self-heal, no sync status). They are one-offs.
-
-[ADR-074](074-agentic-workloads-platform.md) makes agents a first-class workload class and anticipates running *many* of them; the
-triage copilot ([ADR-080](080-triage-copilot.md)) is the first. Graduating it the bespoke way would make it a **third**
-one-off — and the fourth, fifth, and Nth agents would each be hand-rolled too. The gap is real: there is no standardized,
-GitOps-native way to deploy an internally-developed, platform-owned service or agent.
+That was the wrong call. **A parallel road is duplication** — a second ApplicationSet, a second registry, a second
+promote/validation story — and it re-introduces exactly the platform-vs-tenant split the platform is trying to erase.
+Platform-team products are *more* trusted than dev-team products, **but not by much**, and they deserve the same
+structure, gating, validation, and promotion as everyone else. There should be **one delivery road**.
 
 ## Decision
 
-Define a **thin, GitOps-native paved road for platform-owned internal services** (including agents), by **reusing the
-existing ArgoCD / ApplicationSet / promotion machinery platform-scoped** — not by inventing a new substrate. A platform
-service becomes a one-line registry entry plus a small set of supply-chain conventions. **The triage copilot is the
-reference implementation.**
+**The platform team is a first-class Team, and its products flow through the entire tenant delivery machinery** — the
+`Product`/`XEnvironment`/`Release` registries, the Crossplane Environment **Composition**, the per-Product
+`ApplicationSet`, `promote.yml`, the gitops Gate, and the Kyverno envelope — with exactly **two generalizations**:
+
+1. **Placement** is a per-**Environment** property (which cluster a deployment lands on), realizing the long-degenerate
+   `Deployment → Placement` of [ADR-067](067-idp-domain-model.md).
+2. A **platform-trust envelope** lets the platform Team declare what tenants can't (cluster-scoped read, the Bedrock
+   action, broader namespaces) — but it is still an envelope, still admission-gated.
+
+There is **one provisioning path for everyone.** A platform product is provisioned by the same Composition that
+provisions tenant products, wherever it lands.
 
 ## Design
 
-### D1 — Registry: `gitops/platform-services/<name>.yaml`
+### D1 — `platform` is a Team
 
-A flat registry (no team/product nesting), one file per service, `kind: PlatformService`, owner = platform. Static spec
-only — repo, the in-repo deploy path, the target namespace:
+`gitops/teams/platform.yaml` is a normal `Team` with a **platform-trust envelope** (D6). Its products live at
+`gitops/products/platform/<product>.yaml`; the triage copilot is the **reference product**.
 
-```yaml
-apiVersion: platform.refplat.org/v1beta1
-kind: PlatformService
-metadata:
-  name: triage-copilot
-spec:
-  repo: asanexample/triage-copilot
-  path: deploy           # Kustomize app in the service repo
-  namespace: triage-copilot
-```
+### D2 — Placement is a per-Environment property (the multi-cluster seam)
 
-### D2 — Delivery: a platform-services `ApplicationSet`, cloned from the per-Product one
+The `Environment` declares its target cluster: `spec.cluster: platform | preprod | prod` (default **`preprod`** — today's
+behavior, so nothing existing changes). The per-Product ApplicationSet resolves `destination.name` from it against
+ArgoCD's registered clusters; the Composition provisions on that cluster. **Placement is not a platform concept** — any
+team's environment can set it — it just *happens* that the triage copilot's first Environment targets `platform`. A later
+platform agent might target `preprod` or `prod`; a tenant could one day multi-cluster too. No platform special-case.
 
-The `argocd-apps` module reads `gitops/platform-services/` at Terragrunt time (the same `fileset` pattern it uses for
-`gitops/products/`) and emits, per service, a near-copy of the per-Product `ApplicationSet`: a **git-files generator**
-over `gitops/releases/platform/<name>/*.yaml` (via the `applicationset-raw` chart), an Application whose **source** is the
-service repo's `deploy/` (Kustomize) and whose **destination** is the platform cluster + `spec.namespace`, with
-`automated { selfHeal, prune }`. A per-service `AppProject` scopes it to that namespace and those two repos.
+### D3 — One Composition provisions everything
 
-### D3 — Image pinning: reuse the `Release` digest + `templatePatch` (ADR-071)
+A platform product's `XEnvironment` is provisioned by the **same Composition** as tenants — namespace, ResourceQuota,
+per-Service identity, ECR — generalized to (a) be **placement-aware** (provision on `spec.cluster`) and (b) honor the
+**platform-trust envelope**. No platform-specific Terragrunt provisioning units.
 
-Unchanged from the tenant flow: a static registry file (D1) plus a churning `gitops/releases/platform/<name>.yaml`
-carrying the built digest, CI-bumped through the existing promote App / gitops Gate. The ApplicationSet's `templatePatch`
-overlays it as a Kustomize image override. No rebuild-to-deploy; the exact signed digest is what ships.
+### D4 — Identity via the existing per-Service policyStatements
 
-### D4 — Supply-chain + identity conventions (part of the standard)
+The agent's `bedrock:InvokeModel` is declared as a normal `services.<svc>.permissions.aws.policyStatements` entry and
+minted as a per-Service **EKS Pod Identity** role by the Composition — the same mechanism tenant services use for AWS
+access. Bedrock is not in the deny-set ([ADR-062](062-self-service-tenant-provisioning.md) §4), so it passes the envelope
+validator unchanged. **No bespoke identity unit.**
 
-Every platform service: its **own repo**; a **signed image** at `platform/<svc>` (a dedicated `github-actions-ecr-push-<svc>`
-OIDC role, cosign keyless + SBOM — the backstage/gha-runner pattern, [ADR-050](050-shared-build-sign-reusable-workflow.md) posture); a
-**least-privilege Pod Identity** unit ([ADR-047](047-pod-identity-as-aws-identity-standard.md)); and **read-only RBAC** scoped to what it reads.
-The triage-copilot's already-merged pieces instantiate this (its Pod Identity unit; its ECR repo + OIDC role; its RBAC).
+### D5 — Supply chain via the shared backbone
 
-### D5 — Repo credentials: reuse the org-wide ArgoCD PAT
+The agent is a thin caller of `asanexample/trusted-ci/build-sign.yml` + `slsa-provenance.yml` + `promote.yml` like any
+app ([ADR-050](050-shared-build-sign-reusable-workflow.md)/[ADR-071](071-digest-promotion-via-control-plane.md)). Its
+image is the tenant-shaped `team-platform/<product>-<svc>`, built by the registry-derived per-Product OIDC role,
+cosign-signed, SBOM'd, and digest-promoted into `gitops/releases/platform/<product>/<stage>.yaml`. **No dedicated ECR or
+OIDC role; no bespoke `build.yml`.**
 
-ArgoCD already holds an org-wide `repo-creds` Secret for `https://github.com/asanexample` (a PAT from Secrets Manager).
-Any new `asanexample/*` service repo is authenticated automatically — **no per-service credential.**
+### D6 — The platform-trust envelope (the "more or less")
 
-### D6 — Deliberately not tenant-shaped
+The platform Team's envelope is broader than a tenant's — it may allow **cluster-scoped read RBAC** (an observability
+agent reads across namespaces; tenants are namespace-scoped), the **Bedrock action**, and platform-appropriate stages —
+but it is the **same envelope mechanism**, declared in `gitops/teams/platform.yaml`, validated at admission. Trust is a
+*parameter* of the one model, not a second model.
 
-Platform services are **trusted infrastructure**, not tenants, so this road omits the tenant guardrails by design: **no**
-Crossplane/`XEnvironment`, **no** Kyverno team-envelope or quota, **no** team/product nesting, and **no** promotion
-ladder (single target = the platform cluster; a preprod target is a future option). The trust boundary is platform
-ownership + code review + the gitops Gate, not the per-tenant admission envelope.
+### D7 — This supersedes the parallel-road approach
 
-### D7 — Relationship to a declarative `PlatformService`/`Agent` CRD (ADR-074)
-
-This paved road is the **substrate**, not the ceiling. A future declarative `Agent`/`PlatformService` CRD (the ADR-074
-hypothesis) would *compile down to* a registry entry + these conventions, exactly as `XEnvironment` compiles down to a
-per-Product ApplicationSet today. Building the substrate first does not foreclose the CRD; it earns it.
+The earlier `gitops/platform-services` registry + separate ApplicationSet (and the platform-specific Pod Identity / ECR /
+OIDC units merged as #685/#686/#688) are **withdrawn** in favor of the single road: the agent becomes a `platform`-team
+Product. backstage / gha-runner MAY migrate onto it later (out of scope).
 
 ## Scope
 
-- **In:** the `gitops/platform-services` registry, the platform-services ApplicationSet in `argocd-apps`, the D4 supply-chain
-  conventions, and the triage copilot as the reference implementation.
-- **Out (for now):** migrating backstage / gha-runner onto the road (opt-in, later); the declarative CRD (D7); a preprod /
-  multi-cluster target; any change to the tenant paved road.
+- **In:** `platform` as a Team; per-Environment Placement (the ApplicationSet + Composition generalization); the
+  platform-trust envelope; the triage copilot re-expressed as a `platform`-team Product (reference instance).
+- **Out (for now):** migrating backstage / gha-runner; registering the prod cluster as an ArgoCD destination (done when a
+  prod-targeted Environment first needs it); a declarative `Agent` CRD (a future layer above this, ADR-074).
 
 ## Consequences
 
-- Onboarding a platform service/agent becomes a **registry edit**, with GitOps visibility, drift detection, and self-heal —
-  and it sets the template for the ADR-074 agent fleet.
-- **Two delivery worlds persist** until backstage/gha-runner migrate. Accepted: migration is opt-in and out of scope here.
-- Platform services **bypass the tenant guardrails by design** — the safety story rests on platform ownership + review, which
-  is appropriate for trusted infra but must stay an explicit, conscious boundary.
-- The reused machinery (per-Product ApplicationSet, promote App, `templatePatch`) now has a second consumer, so changes to it
-  must consider both tenants and platform services.
+- **One road, no platform exceptions** — same registries, gating, validation, promotion, and provisioning for platform
+  and tenant products alike. Onboarding any platform service is a Team-scoped Product, identical to a tenant Product.
+- **The cost is real: the Composition must generalize** — placement-awareness (provision on a named cluster, not just
+  preprod) and the platform-trust envelope are non-trivial changes to tenant-critical infra and must be done carefully.
+- **Today's merged work folds away** (#685/#686/#688) — cheaply, since nothing was applied. The agent's identity, image,
+  delivery, and provisioning all collapse onto the standard path.
+- Placement is a genuinely useful capability beyond platform — it is the start of real multi-cluster delivery.
 
 ## Alternatives considered
 
-- **Standardize the Terragrunt-Helm one-off** (a shared chart skeleton + conventions, matching backstage). Lighter and proven,
-  but not GitOps-native (no drift/self-heal/visibility) and it cements two delivery worlds permanently. Rejected for a
-  GitOps-first platform.
-- **Go straight to a declarative `PlatformService`/`Agent` CRD.** The eventual north star (D7), but the heaviest option and
-  premature before the substrate is proven. Deferred.
-- **Reuse the tenant paved road as-is.** Forces platform services through the team/product/Crossplane/Kyverno envelope they do
-  not fit, and conflates trusted infra with tenant workloads. Rejected.
+- **A parallel platform-services road** (this ADR's earlier draft). Rejected — duplication, and it re-creates the
+  platform-vs-tenant split.
+- **Unify governance/delivery but keep platform-specific provisioning units.** Rejected — the moment a platform product
+  targets preprod/prod it needs provisioning *there*, which is exactly what the Composition already does; platform units
+  quietly re-introduce the split.
 
 ## Related
 
-- [ADR-067](067-idp-domain-model.md) / [ADR-069](069-delivery-source-of-truth-product-environment.md) — the
-  tenant delivery source-of-truth this mirrors.
-- [ADR-071](071-digest-promotion-via-control-plane.md) — the digest-promotion / `templatePatch` flow reused for D3.
-- [ADR-074](074-agentic-workloads-platform.md) — agents as a first-class workload class; D7's future CRD.
-- [ADR-080](080-triage-copilot.md) — the triage copilot, this road's reference implementation.
-- [ADR-047](047-pod-identity-as-aws-identity-standard.md) — Pod Identity (D4). [ADR-050](050-shared-build-sign-reusable-workflow.md) — signed CI posture (D4).
+- [ADR-067](067-idp-domain-model.md) — the Team→Product→Environment model + the `Placement` concept this realizes.
+- [ADR-069](069-delivery-source-of-truth-product-environment.md) / [ADR-071](071-digest-promotion-via-control-plane.md) —
+  the delivery source-of-truth + digest promotion the platform Team reuses unchanged.
+- [ADR-062](062-self-service-tenant-provisioning.md) — the policyStatements deny-set the agent's Bedrock identity passes (D4).
+- [ADR-074](074-agentic-workloads-platform.md) — agents as a workload class; a future declarative `Agent` CRD above this road.
+- [ADR-080](080-triage-copilot.md) — the triage copilot, this road's reference product.
