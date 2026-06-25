@@ -30,6 +30,15 @@ resource "kubernetes_cluster_role_v1" "platform_operator" {
     resources  = ["pods/exec", "pods/portforward"]
     verbs      = ["create"]
   }
+  # Debug: launch a throwaway debug pod (`kubectl run`/`kubectl debug`) or attach an ephemeral debug container to a
+  # running pod (`kubectl debug --target`) — e.g. an aws-cli/netshoot sidecar sharing a workload's ServiceAccount +
+  # network namespace to reproduce auth/connectivity from its exact context. Pod specs stay Kyverno-gated; this is
+  # operational debugging, NOT platform authoring (Deployments/Applications remain ArgoCD/PlatformDeployer, ADR-040).
+  rule {
+    api_groups = [""]
+    resources  = ["pods", "pods/ephemeralcontainers"]
+    verbs      = ["create", "update", "patch"]
+  }
 
   # Operate: delete a stuck pod; evict pods when draining a node; patch pod metadata — e.g. clear the
   # karpenter.sh/do-not-disrupt annotation during `platctl down` so the park drain isn't blocked by stateful
