@@ -87,8 +87,10 @@ bin/
 # Local tooling (not committed)
 .claude/*
 # ...except house-authored skills, which are committed and shared with the team.
-# Third-party/installed skills (speckit-*, etc.) stay ignored. Add one negation
-# line per house skill.
+# Transient/installed skills (speckit-*, etc.) stay ignored. Vendored third-party
+# skills are the exception: a pinned, audited copy IS committed (see its
+# PROVENANCE.md) so it's reviewable and doesn't silently auto-update. Add one
+# negation line per house or vendored skill.
 !.claude/skills/
 .claude/skills/*
 !.claude/skills/terraform-style/
@@ -101,6 +103,8 @@ bin/
 !.claude/skills/environment-onboarding/
 !.claude/skills/supply-chain-onboarding/
 !.claude/skills/skill-self-correction/
+# Vendored third-party skill (pinned + audited — see PROVENANCE.md):
+!.claude/skills/terraform-skill/
 # Shared team settings (MCP allow-list, hooks, etc.). The personal settings.local.json stays ignored.
 !.claude/settings.json
 # Committed Claude Code hook scripts (referenced from settings.json).
