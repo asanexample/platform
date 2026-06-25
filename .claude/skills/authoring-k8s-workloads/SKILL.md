@@ -60,11 +60,16 @@ Every one of these is `Enforce` on preprod + platform. Omitting or violating it 
 | **`livenessProbe` AND `readinessProbe`** | `require-pod-probes` | both, on every container |
 | **Services are `ClusterIP`** | `block-public-loadbalancer` | `LoadBalancer` / `NodePort` denied — ingress is via the shared Gateway (`HTTPRoute`) |
 | **Route hostnames in the allow-list** | `restrict-route-hostnames-<team>-<product>-<stage>` | HTTPRoute/GRPCRoute/TLSRoute hostnames must be in the Environment claim's `spec.domains`; another team's/platform's hostname, or an empty list, is denied (ADR-029) |
-| **Named ServiceAccount, NO IRSA annotation** | `disallow-irsa-annotation-cross-team` | set `serviceAccountName` (never `default`); a ServiceAccount must NOT carry `eks.amazonaws.com/role-arn` — environment AWS access is platform-managed Pod Identity (ADR-041), so the annotation is a cross-team escalation and is denied |
+| **No IRSA annotation on ServiceAccounts** | `disallow-irsa-annotation-cross-team` | a ServiceAccount must NOT carry `eks.amazonaws.com/role-arn` — IRSA is platform-only; the annotation is a cross-team escalation and is denied |
 | **No workloads in `default`** | `disallow-default-namespace` | use the `<team>-<product>-<stage>` namespace |
 | **No privilege escalation / Unconfined seccomp** | `disallow-privilege-escalation`, `require-seccomp` | don't set `allowPrivilegeEscalation: true` or `seccompProfile.type: Unconfined` (backstops the mutate defaults) |
 | **No `cluster-admin`, no wildcards in RBAC** | `restrict-binding-clusteradmin`, `restrict-wildcard-rbac` | (Cluster)RoleBindings to `cluster-admin` denied; Roles/ClusterRoles with `*` in `verbs`, `resources`, or `apiGroups` denied |
 | **Images are cosign-signed (+ attested)** | `verify-images-product-*`, `verify-attestations-product-*` | image signature **and** SBOM + SLSA provenance are verified; **both Enforce on preprod** (since 2026-05-30). See "Image & supply chain" |
+
+**Also use a named ServiceAccount** (`serviceAccountName`, never `default`) — but note this is a
+**Pod Identity requirement, not a Kyverno rejection**: a `default` SA passes admission, it just
+won't receive the platform-managed AWS credentials (the association binds creds to a named SA,
+ADR-041). Declare the access in the `XEnvironment` claim, not on the SA.
 
 ## Image & supply chain
 
