@@ -207,6 +207,11 @@ manufacture the *novel* incident, which is exactly where the agent's value and r
 
 The full spike (scenarios, build checklist, GO/NO-GO) is `docs/plans/080-triage-copilot-eval-spike.md`.
 
+**Spike executed 2026-06-24/25 → GO** (results in the plan doc): the eval mechanism works end-to-end on real injected
+telemetry plus a 12-fixture corpus on Bedrock, the agent abstains on healthy data rather than bluffing, and D2
+change-correlation (ArgoCD + GitHub) is wired and empirically confirmed as the highest-yield signal. The agent build is
+de-risked to proceed; the ADR stays **Proposed** until that build is actually pulled.
+
 ### D7 — Observability of the agent itself (rides ADR-076 — and closes the loop)
 
 The agent is the **first real producer** of the [ADR-076](076-agent-observability.md) one-trace-four-consumers model:
