@@ -27,9 +27,7 @@ spec:
       allowedEngines: []
       maxPerEnvironment: 0
       isolationFloor: shared
-  # Platform-trust envelope (ADR-081) — what this Team's Environments may request beyond a tenant's:
-  platformTrust:
-    # cluster-scoped read RBAC the Composition may bind (a pre-created, platform-labeled read-only ClusterRole)
-    clusterRoles: ["platform-trust-observability-reader"]
-    # IAM actions allowed past the policyStatements deny-set (documentary — bedrock is already outside the deny-set)
-    allowedIamActions: ["bedrock:InvokeModel"]
+  # platformTrust envelope removed (ADR-082): platform agents now run on the hub via the XAgent runtime and get
+  # cluster-read (+ their Bedrock grant) from the XAgent Composition's obsRead/model, NOT from a tenant
+  # Environment requesting the Team's platformTrust. The platform Team deploys agents (XAgent), not XEnvironments,
+  # so the envelope is no longer used. Re-add if a non-agent platform Environment ever needs it.
