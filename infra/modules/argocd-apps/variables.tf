@@ -69,6 +69,26 @@ variable "platform_repo_url" {
   default     = ""
 }
 
+# ---------------------------------------------------------------------------
+# Platform-agent delivery (ADR-082) — the agents registry-sync + per-agent workload ApplicationSet, on the HUB
+# ---------------------------------------------------------------------------
+variable "agents" {
+  description = "ADR-082: platform agents keyed by XAgent name. Their WORKLOAD is delivered to the HUB (hub_cluster_server) into the Composition-made namespace platform-agent-<name>; their identity/RBAC come from the XAgent Composition (not ArgoCD). product_key is the gitops/products registry key (<team>-<product>), used to EXCLUDE the agent's Product from the preprod per-Product delivery (it ships to the hub instead)."
+  type = map(object({
+    team        = string # owning team (platform)
+    product     = string # product short name (drives the ECR image team-<team>/<product>-<svc>)
+    product_key = string # the gitops/products registry key <team>-<product> (the var.products key to exclude)
+    repo_url    = string # the app repo (Product.repo), https URL — the Application source
+  }))
+  default = {}
+}
+
+variable "hub_cluster_server" {
+  description = "ADR-082: the in-cluster (hub) API server the agent control plane + workloads target. ArgoCD's built-in in-cluster (https://kubernetes.default.svc) — the platform cluster ArgoCD itself runs on. The agent control plane lives on the hub (ADR-048-consistent), unlike tenant delivery which targets the preprod workload cluster (cluster_server)."
+  type        = string
+  default     = "https://kubernetes.default.svc"
+}
+
 variable "platform_repo_branch" {
   description = "v3: branch of the platform GitOps repo the registry-sync apps + the per-Product ApplicationSet track."
   type        = string

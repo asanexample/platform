@@ -3,5 +3,6 @@ kind: XAgent
 metadata:
   name: wrong-cluster
 spec:
+  team: platform
   product: triage-copilot
   placement: { cluster: preprod }

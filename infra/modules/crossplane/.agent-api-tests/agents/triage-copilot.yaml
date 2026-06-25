@@ -4,6 +4,7 @@ kind: XAgent
 metadata:
   name: triage-copilot
 spec:
+  team: platform
   product: triage-copilot
   placement:
     cluster: platform

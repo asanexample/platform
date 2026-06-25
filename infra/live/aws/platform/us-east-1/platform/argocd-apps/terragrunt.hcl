@@ -24,6 +24,20 @@ locals {
       repo_url = "https://github.com/${yamldecode(file("${local.products_dir}/${f}")).spec.repo}"
     }
   }
+
+  # Platform-agent delivery (ADR-082): the XAgent claims (gitops/agents/<name>.yaml) drive the agents
+  # registry-sync + the per-agent workload ApplicationSet on the HUB. Join with the Product registry (above) for
+  # the app repo URL; product_key = <team>-<product> excludes the agent's Product from the preprod per-Product
+  # delivery (it ships to the hub instead). Empty until the first XAgent claim lands — the delivery is gated on it.
+  agents_dir = "${get_repo_root()}/gitops/agents"
+  agents = { for f in fileset(local.agents_dir, "**/*.yaml") :
+    yamldecode(file("${local.agents_dir}/${f}")).metadata.name => {
+      team        = yamldecode(file("${local.agents_dir}/${f}")).spec.team
+      product     = yamldecode(file("${local.agents_dir}/${f}")).spec.product
+      product_key = "${yamldecode(file("${local.agents_dir}/${f}")).spec.team}-${yamldecode(file("${local.agents_dir}/${f}")).spec.product}"
+      repo_url    = local.products["${yamldecode(file("${local.agents_dir}/${f}")).spec.team}-${yamldecode(file("${local.agents_dir}/${f}")).spec.product}"].repo_url
+    }
+  }
 }
 
 dependency "eks" {
@@ -106,6 +120,7 @@ inputs = {
   # (gitops/environments/<team>/<product>/*.yaml) → one Application per Environment. Derived from gitops/products.
   # Replaces the retired v2 XTenant-claim delivery (the legacy `tenants` Applications were removed at the cutover).
   products       = local.products
+  agents         = local.agents # ADR-082: platform agents delivered to the hub (in-cluster); their Products are excluded from preprod delivery
   preview_domain = "preprod.aws.refplat.org"
   # ADR-071: the platform-account ECR host — the ApplicationSet injects the Release digest as a kustomize image
   # override (<ecr_registry>/team-<team>/<product>-<svc>), matching the app overlay's image name.

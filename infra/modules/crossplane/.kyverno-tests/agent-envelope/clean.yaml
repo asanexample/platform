@@ -3,6 +3,7 @@ kind: XAgent
 metadata:
   name: triage-copilot
 spec:
+  team: platform
   product: triage-copilot
   placement: { cluster: platform }
   model: { provider: bedrock, id: us.anthropic.claude-sonnet-4-6 }

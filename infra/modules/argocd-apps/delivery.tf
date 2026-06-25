@@ -13,7 +13,13 @@
 # this is a first draft that is cluster-verification-bound — unlike the crossplane-validated F1/L2a.
 # ===========================================================================================================
 locals {
-  products = var.create && var.platform_repo_url != "" ? var.products : {}
+  # Agent Products deliver to the HUB via the platform-agent ApplicationSet (agents.tf, ADR-082), NOT to preprod
+  # via this per-Product appset — so exclude them here, else the agent would be double-delivered (and to a
+  # tenant namespace it no longer has). Keyed by the gitops/products registry key <team>-<product>.
+  agent_product_keys = toset([for a in var.agents : a.product_key])
+  products = var.create && var.platform_repo_url != "" ? {
+    for k, v in var.products : k => v if !contains(local.agent_product_keys, k)
+  } : {}
 }
 
 resource "kubernetes_manifest" "product_appproject" {

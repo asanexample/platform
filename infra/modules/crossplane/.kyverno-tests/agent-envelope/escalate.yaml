@@ -3,6 +3,7 @@ kind: XAgent
 metadata:
   name: evil-agent
 spec:
+  team: platform
   product: triage-copilot
   placement: { cluster: platform }
   awsPermissions:

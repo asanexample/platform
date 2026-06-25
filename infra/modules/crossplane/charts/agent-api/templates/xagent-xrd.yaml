@@ -28,12 +28,20 @@ spec:
             spec:
               type: object
               required:
+                - team
                 - product
               properties:
+                team:
+                  type: string
+                  description: >-
+                    Owning Team (carried explicitly, like XEnvironment) — the join key to the Product registry
+                    (gitops/products/<team>/<product>.yaml) for the app repo + the ECR image scope
+                    team-<team>/<product>, and the Release path gitops/releases/<team>/<product>/. Platform
+                    agents are team `platform`.
                 product:
                   type: string
                   description: >-
-                    Owning platform Product (gitops/products/platform/<product>.yaml) — drives the image/ECR
+                    Owning Product within the Team (gitops/products/<team>/<product>.yaml) — drives the image/ECR
                     scope + signing identity via the supply chain (ADR-081, unchanged). The agent's namespace,
                     ServiceAccount, and Pod-Identity role are named from the XAgent's metadata.name.
                 placement:

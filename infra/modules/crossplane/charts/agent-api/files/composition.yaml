@@ -78,6 +78,7 @@ spec:
                       app.kubernetes.io/managed-by: crossplane
                       platform.refplat.org/runtime: platform-agent
                       platform.refplat.org/agent: {{ $name }}
+                      platform.refplat.org/team: {{ $spec.team }}
                       platform.refplat.org/product: {{ $spec.product }}
                       pod-security.kubernetes.io/enforce: baseline
                       pod-security.kubernetes.io/warn: restricted
@@ -117,7 +118,7 @@ spec:
                 permissionsBoundary: {{ $cfg.permissionsBoundaryArn | quote }}
                 {{- end }}
                 tags:
-                  Team: platform
+                  Team: {{ $spec.team }}
                   Runtime: platform-agent
                   Agent: {{ $name }}
             {{- /* IAM for the agent's role: the model's Bedrock data-plane grant (invoke/converse only — never
