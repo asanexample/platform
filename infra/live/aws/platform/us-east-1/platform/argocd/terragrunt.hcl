@@ -16,7 +16,10 @@ locals {
   # syncs. Only the team KEYS (metadata.name) matter here; they drive team-scoped ArgoCD RBAC (B3).
   teams_dir = "${get_repo_root()}/gitops/teams"
   teams = { for f in fileset(local.teams_dir, "*.yaml") :
-    yamldecode(file("${local.teams_dir}/${f}")).metadata.name => yamldecode(file("${local.teams_dir}/${f}")).spec
+    # Only the team KEYS matter here (team-scoped RBAC); the value is unused (`_cfg` below). Empty {} keeps the
+    # map element type fixed, so a Team-spec field some teams have and others don't (platform's platformTrust,
+    # ADR-081) can't make the types inconsistent.
+    yamldecode(file("${local.teams_dir}/${f}")).metadata.name => {}
   }
 
   # Team-scoped RBAC, generated from the registry (ADR-053). Each team group → a role scoped to its AppProject

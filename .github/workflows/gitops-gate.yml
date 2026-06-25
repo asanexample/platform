@@ -108,6 +108,7 @@ jobs:
           path: head
           sparse-checkout: |
             gitops/products
+            gitops/teams
             gitops/environments
             gitops/releases
           sparse-checkout-cone-mode: true
