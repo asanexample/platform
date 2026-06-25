@@ -6,7 +6,12 @@ description: >-
   destroy invocation with its dangerous flags. Use when applying a unit or a whole
   environment, tearing down/rebuilding, or reasoning about deployment order (what must come
   before what). Prefer platctl for full bootstrap/teardown. CRITICAL: get the destroy
-  command and the private-EKS endpoint handling right. NOT for authoring a unit (terragrunt-units)
+  command and the private-EKS endpoint handling right. Consult this ANY time you run a
+  `terragrunt plan`/`apply` (or `tofu` equivalent) on this repo — it covers running them so you can
+  actually READ the result: capture output to a file instead of piping the only copy through a lossy
+  grep, the `AWS_PROFILE=management` requirement (plan/apply assume PlatformDeployer; validate
+  doesn't), and the "don't start a second run on the same unit / state-lock held by multiple users"
+  trap with long backgrounded applies. NOT for authoring a unit (terragrunt-units)
   or module (terraform-style).
 ---
 
@@ -42,6 +47,45 @@ terragrunt run --all destroy --filter-allow-destroy -- -auto-approve
 - **`--`** separates Terragrunt flags from the `-auto-approve` passed through to OpenTofu.
 - Every dependency block has `mock_outputs` + `mock_outputs_allowed_terraform_commands`
   including `destroy`, so reverse-DAG destroy works even when upstream state is already gone.
+
+## Running a plan/apply and actually reading the result
+
+A plan/apply you can't read is worse than useless — you end up guessing whether it worked, or
+re-running it and making things worse. Three failure modes bite repeatedly here; all are avoidable.
+
+**Capture to a file, then grep the file — never pipe the only copy through a filter.** Terragrunt
+prefixes every line with a timestamped `INFO` log and the real signal (`Plan: N to add, M to
+change, K to destroy`, `Apply complete! Resources: ...`, or the actual `Error:`) is a few lines in
+a long stream. Piping the live command through `... | grep -E 'Plan:|Apply'` routinely swallows
+exactly those lines (wrong pattern, ANSI codes, or buffering) and leaves you with *no* copy to
+re-read. Instead redirect everything to a file and inspect that — if your first filter misses, the
+full output is still there:
+
+```bash
+AWS_PROFILE=management terragrunt plan  -no-color > /tmp/plan.txt  2>&1; grep -iE 'Plan:|No changes|Error' /tmp/plan.txt
+AWS_PROFILE=management terragrunt apply -no-color -auto-approve > /tmp/apply.txt 2>&1; tail -20 /tmp/apply.txt
+```
+
+`-no-color` keeps ANSI escapes from corrupting your grep. On a change you believe is additive,
+**`0 to destroy`** in the plan is the signal it's safe.
+
+**Long applies get backgrounded — wait for them; do NOT start a second run on the same unit.** An
+apply that upgrades a big helm release (observability, crossplane) exceeds the foreground limit and
+is moved to the background; its summary lands in the task output file when the completion
+notification arrives. If you start a *second* `plan`/`apply` on that unit while the first is still
+running, OpenTofu's DynamoDB state lock rejects it — `Error acquiring the state lock ... held by
+multiple users` — and now you can't tell whether the first one succeeded. So: one run per unit at a
+time. Read the backgrounded run's output file (`grep 'Apply complete\|Error'`) before doing anything
+else with that unit. A genuinely **stale** lock (no apply is actually running — confirm via the task
+notifications and `ps aux | grep terragrunt`) is cleared with `terragrunt force-unlock <LOCK_ID>`
+(the ID is printed in the error) — never force-unlock while an apply might still be live, or you risk
+corrupting state.
+
+**`AWS_PROFILE=management` is required for plan/apply, not for validate.** The providers assume
+`PlatformDeployer` (root.hcl), so `plan`/`apply` need `AWS_PROFILE=management` — without it you get
+`Cannot assume IAM Role ... 403`. `terragrunt validate` works *without* it (it only needs the
+state-backend role), which is the trap: a green `validate` does **not** mean your creds are right for
+the apply.
 
 ## Preferred: platctl for full bootstrap/teardown
 
