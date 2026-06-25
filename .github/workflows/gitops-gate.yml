@@ -303,6 +303,7 @@ jobs:
           AUTHOR: ${{ github.event.pull_request.user.login }}
           BASE_DIR: ${{ github.workspace }}/base
           STATUS_CONTEXT: gitops Approval
+          SOLO_MAINTAINER: ${{ vars.SOLO_MAINTAINER }} # single-admin project: admin author self-attests (publish-verdict.sh)
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DELETIONS: ${{ steps.classify.outputs.deletions }}
           DELETED_FILES: ${{ steps.classify.outputs.deleted_files }}

@@ -83,5 +83,15 @@ run deny "decommission: only the author approved"         LIFECYCLE_DECOMMISSION
 run ok   "decommission: write-level approver is fine"     LIFECYCLE_DECOMMISSION=true AUTHOR=bot VERDICT_TEST_APPROVERS="dev" VERDICT_TEST_PERMS="dev=write"
 run ok   "no reasons → success"                           AUTHOR=dev VERDICT_TEST_APPROVERS=""
 
+# Solo-maintainer escape (single-admin project): SOLO_MAINTAINER=true + an admin/maintainer AUTHOR self-attests
+# every privileged surface (no separate approver needed — GitHub won't let you approve your own PR). A non-admin
+# author is unaffected, and with the flag OFF an admin author still can't self-approve (the bug we're fixing).
+run ok   "solo: admin author self-attests team-roles"     SOLO_MAINTAINER=true TEAM_ROLES_CHANGES=true AUTHOR=gangster VERDICT_TEST_PERMS="gangster=admin" VERDICT_TEST_APPROVERS=""
+run ok   "solo: maintain author self-attests prod release" SOLO_MAINTAINER=true PROD_RELEASES=$P/web/prod.yaml AUTHOR=gangster VERDICT_TEST_PERMS="gangster=maintain" VERDICT_TEST_APPROVERS=""
+run ok   "solo: admin author self-attests deletion"       SOLO_MAINTAINER=true DELETIONS=true AUTHOR=gangster VERDICT_TEST_PERMS="gangster=admin" VERDICT_TEST_APPROVERS=""
+run ok   "solo: admin author self-attests prod-env purge" SOLO_MAINTAINER=true DELETIONS=true DELETED_FILES=$E/web/prod.yaml AUTHOR=gangster VERDICT_TEST_PERMS="gangster=admin" VERDICT_TEST_APPROVERS=""
+run deny "solo: NON-admin author still needs approval"    SOLO_MAINTAINER=true TEAM_ROLES_CHANGES=true AUTHOR=dev VERDICT_TEST_PERMS="dev=write" VERDICT_TEST_APPROVERS=""
+run deny "solo OFF: admin author can't self-approve (control)" TEAM_ROLES_CHANGES=true AUTHOR=gangster VERDICT_TEST_PERMS="gangster=admin" VERDICT_TEST_APPROVERS=""
+
 echo "publish-verdict: ${pass} passed, ${failc} failed"
 [ "$failc" -eq 0 ]
