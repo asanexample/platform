@@ -101,6 +101,8 @@ bin/
 !.claude/skills/environment-onboarding/
 !.claude/skills/supply-chain-onboarding/
 !.claude/skills/skill-self-correction/
-# Shared team settings (MCP allow-list, etc.). The personal settings.local.json stays ignored.
+# Shared team settings (MCP allow-list, hooks, etc.). The personal settings.local.json stays ignored.
 !.claude/settings.json
+# Committed Claude Code hook scripts (referenced from settings.json).
+!.claude/hooks/
 .specify/

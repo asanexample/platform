@@ -1,3 +1,29 @@
 {
-  "enabledMcpjsonServers": ["grafana", "aws-api"]
+  "enabledMcpjsonServers": ["grafana", "aws-api"],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-sensitive-edits.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/format-on-edit.sh",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
 }
