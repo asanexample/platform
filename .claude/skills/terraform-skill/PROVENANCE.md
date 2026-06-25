@@ -48,6 +48,15 @@ cover: failure-mode routing (identity churn, blast radius, state corruption),
 `count` vs `for_each` identity churn, `moved`/`removed`/`import` blocks, provider
 removal, `write_only` secrets, state recovery, and per-feature version floors.
 
+## House lint
+
+This payload is **excluded from the repo's Markdown Lint CI** — the vendored files follow
+upstream's markdown style, not this repo's `.markdownlint.yml`. The exclusion lives in two
+places: `.markdownlintignore` (for local glob runs) and an explicit `grep -v` in the
+`Lint changed markdown files` step of `.github/workflows/ci.yml` (markdownlint-cli2 does
+not honor `.markdownlintignore` for files passed explicitly by path). Keeping the payload
+byte-identical to upstream is intentional — it keeps the pin auditable and updates clean.
+
 ## Re-audit / update procedure
 
 To bump the pin: diff the upstream payload against this copy, re-run the red-flag
