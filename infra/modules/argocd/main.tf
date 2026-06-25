@@ -158,7 +158,10 @@ resource "aws_iam_role_policy_attachment" "extra" {
   policy_arn = each.value
 }
 
-# Allows ArgoCD to assume cross-account roles for managing remote EKS clusters
+# Allows ArgoCD to assume cross-account roles for managing remote EKS clusters. TagSession is required alongside
+# AssumeRole: under EKS Pod Identity (ADR-047) the controller's session carries tags that propagate into the
+# cross-account AssumeRole, so the CALLER's identity policy must permit sts:TagSession too (the target role's trust
+# must allow it as well — see the preprod ArgoCD role). IRSA carried no tags, so this shipped as AssumeRole-only.
 resource "aws_iam_role_policy" "remote_clusters" {
   count = local.create && length(var.remote_cluster_role_arns) > 0 ? 1 : 0
 
@@ -169,7 +172,7 @@ resource "aws_iam_role_policy" "remote_clusters" {
     Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
-      Action   = "sts:AssumeRole"
+      Action   = ["sts:AssumeRole", "sts:TagSession"]
       Resource = var.remote_cluster_role_arns
     }]
   })
