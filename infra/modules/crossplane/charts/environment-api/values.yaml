@@ -4,3 +4,8 @@ providerConfigName: default
 # Create the shared `environment-developer` ClusterRole here. Leave false on clusters where the `environment` module
 # already owns it (coexistence — preprod has alpha/bravo on teams.hcl); set true on a fresh cluster.
 createDeveloperClusterRole: false
+
+# Create the platform-trust read-only ClusterRole(s) (ADR-081) the Composition binds for platform-OWNED Teams.
+# Harmless where unused (a ClusterRole bound to nothing grants nothing); the Composition's binding is gated by
+# the Team's platformTrust envelope + Kyverno.
+createPlatformTrustClusterRoles: true

@@ -1,0 +1,28 @@
+{{- if .Values.createPlatformTrustClusterRoles }}
+# Platform-trust ClusterRoles (ADR-081) — read-only roles the Composition may bind (via ClusterRoleBinding) to a
+# platform-OWNED Team's environment ServiceAccounts, for the cross-namespace reads tenants don't get (e.g. an
+# observability/triage agent reading pods + ArgoCD Applications cluster-wide). Platform-PROVIDED and labeled
+# `platform.refplat.org/trust: "true"` so a Team's platformTrust.clusterRoles can only reference a blessed,
+# read-only role — an Environment can REQUEST a binding but cannot define what it grants. Deliberately NO secrets.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: platform-trust-observability-reader
+  labels:
+    app.kubernetes.io/managed-by: crossplane
+    platform.refplat.org/trust: "true"
+rules:
+  - apiGroups: [""]
+    resources: [pods, events, services, endpoints, nodes, namespaces, replicationcontrollers]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, replicasets, statefulsets, daemonsets]
+    verbs: [get, list, watch]
+  - apiGroups: [events.k8s.io]
+    resources: [events]
+    verbs: [get, list, watch]
+  # ArgoCD sync history — the get_recent_changes change-correlation signal (ADR-080 D2)
+  - apiGroups: [argoproj.io]
+    resources: [applications]
+    verbs: [get, list, watch]
+{{- end }}

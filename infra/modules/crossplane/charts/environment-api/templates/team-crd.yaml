@@ -122,6 +122,28 @@ spec:
                     releaseApprover:
                       type: array
                       items: { type: string }
+                platformTrust:
+                  type: object
+                  description: >-
+                    Platform-trust envelope (ADR-081) — capabilities reserved for platform-OWNED Teams that
+                    tenants cannot request. Empty {} for ordinary teams. Changes are approval-gated like roles
+                    (Teams Gate). Two grants: cluster-scoped read RBAC, and IAM actions outside the
+                    policyStatements deny-set.
+                  default: {}
+                  properties:
+                    clusterRoles:
+                      type: array
+                      description: >-
+                        Names of pre-created, platform-labeled ClusterRoles the Composition binds (via a
+                        ClusterRoleBinding) to this Team's environment SA group — for the cross-namespace reads
+                        tenants don't get (e.g. an observability agent reading pods/Applications cluster-wide).
+                      items: { type: string }
+                    allowedIamActions:
+                      type: array
+                      description: >-
+                        IAM actions a Service's permissions.aws.policyStatements may use despite the deny-set
+                        (platform-only), e.g. bedrock:InvokeModel. Enforced by Kyverno restrict-environment-envelope.
+                      items: { type: string }
             status:
               type: object
               properties:

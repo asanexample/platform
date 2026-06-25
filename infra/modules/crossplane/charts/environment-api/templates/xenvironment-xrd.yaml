@@ -245,6 +245,19 @@ spec:
                       enum: ["active", "suspended", "decommissioning"]
                       default: active
                       description: suspended/decommissioning zeroes the ResourceQuota (reversible); decommissioning triggers ordered teardown.
+                platformTrust:
+                  type: object
+                  description: >-
+                    Platform-trust REQUEST (ADR-081) — cluster-scoped capabilities this Environment asks for. Only
+                    honored if the owning Team's platformTrust allows them: Kyverno validates the subset
+                    (env.platformTrust.clusterRoles ⊆ Team.platformTrust.clusterRoles) at admission, and the
+                    Composition binds them. Empty/absent for ordinary tenant environments.
+                  default: {}
+                  properties:
+                    clusterRoles:
+                      type: array
+                      description: Platform-provided ClusterRole names to bind to this Environment's ServiceAccounts (cross-namespace read).
+                      items: { type: string }
                 encryption:
                   type: object
                   description: "Reserved (deferred): key custody (BYOK/HYOK). Inert until the KMS paved-road ships."
