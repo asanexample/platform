@@ -1,0 +1,201 @@
+# Agent Composition (Crossplane v2, Pipeline mode) — ADR-082, the runtime side of ADR-074.
+#
+# Renders an XAgent into its runtime SLOT on the hub: namespace platform-agent-<name>, a named ServiceAccount,
+# a least-privilege EKS Pod Identity (the model's Bedrock data-plane grant + deny-set-validated awsPermissions,
+# permissions-boundary-capped), and — when obsRead — a ClusterRoleBinding of platform-trust-observability-reader
+# to the agent's SA. The agent's WORKLOAD (Deployment/Service) is delivered separately by ArgoCD with the signed,
+# promoted digest (ADR-071); this Composition does NOT render it.
+#
+# Shipped raw (.Files.Get) so Helm leaves the go-template delimiters intact. Render-tested with `crossplane render`.
+# Sibling of the tenant environment Composition; mirrors its provider-kubernetes Object + provider-aws Role/
+# PodIdentityAssociation/RolePolicy patterns, but agent-shaped and lean (no quota/netpol/developer-RBAC/ECR).
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: agent
+  labels:
+    crossplane.io/xrd: xagents.platform.refplat.org
+spec:
+  compositeTypeRef:
+    apiVersion: platform.refplat.org/v1beta1
+    kind: XAgent
+  mode: Pipeline
+  pipeline:
+    - step: load-config
+      functionRef:
+        name: function-environment-configs
+      input:
+        apiVersion: environmentconfigs.fn.crossplane.io/v1beta1
+        kind: Input
+        spec:
+          environmentConfigs:
+            - type: Reference
+              ref:
+                name: platform-agent-config
+    - step: render-resources
+      functionRef:
+        name: function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: |
+            {{- $spec := .observed.composite.resource.spec }}
+            {{- $name := .observed.composite.resource.metadata.name }}
+            {{- $cfg := index .context "apiextensions.crossplane.io/environment" }}
+            {{- /* Namespace platform-agent-<name>; truncate-and-hash past the 63-char DNS-1123 limit. */}}
+            {{- $nsRaw := printf "platform-agent-%s" $name }}
+            {{- $ns := $nsRaw }}
+            {{- if gt (len $nsRaw) 63 }}{{- $ns = printf "%s-%s" (substr 0 56 $nsRaw) (substr 0 6 (sha256sum $nsRaw)) }}{{- end }}
+            {{- /* The agent's ServiceAccount = the XAgent name (the app's Deployment references it). */}}
+            {{- $sa := $name }}
+            {{- if gt (len $sa) 63 }}{{- $sa = printf "%s-%s" (substr 0 56 $name) (substr 0 6 (sha256sum $name)) }}{{- end }}
+            {{- /* Pod-Identity role Pod-platform-agent-<name>; truncate-and-hash past the 64-char IAM limit. */}}
+            {{- $roleRaw := printf "Pod-platform-agent-%s" $name }}
+            {{- $role := $roleRaw }}
+            {{- if gt (len $roleRaw) 64 }}{{- $role = printf "%s-%s" (substr 0 57 $roleRaw) (substr 0 6 (sha256sum $roleRaw)) }}{{- end }}
+            {{- /* Kill-switch (ADR-082 D7): suspended removes the Pod-Identity association — a hard stop (no
+                   Bedrock). The workload (ArgoCD-owned) keeps running but is defanged; flip back to restore. */}}
+            {{- $phase := (($spec.lifecycle | default dict).phase) | default "active" }}
+            {{- $active := ne $phase "suspended" }}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: namespace
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: Namespace
+                  metadata:
+                    name: {{ $ns }}
+                    labels:
+                      app.kubernetes.io/managed-by: crossplane
+                      platform.refplat.org/runtime: platform-agent
+                      platform.refplat.org/agent: {{ $name }}
+                      platform.refplat.org/product: {{ $spec.product }}
+                      pod-security.kubernetes.io/enforce: baseline
+                      pod-security.kubernetes.io/warn: restricted
+                      pod-security.kubernetes.io/audit: restricted
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: serviceaccount
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: v1
+                  kind: ServiceAccount
+                  metadata:
+                    name: {{ $sa }}
+                    namespace: {{ $ns }}
+                    labels:
+                      app.kubernetes.io/managed-by: crossplane
+                      platform.refplat.org/agent: {{ $name }}
+            ---
+            apiVersion: iam.aws.upbound.io/v1beta1
+            kind: Role
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: pod-role
+                crossplane.io/external-name: {{ $role }}
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                assumeRolePolicy: {{ (dict "Version" "2012-10-17" "Statement" (list (dict "Effect" "Allow" "Principal" (dict "Service" "pods.eks.amazonaws.com") "Action" (list "sts:AssumeRole" "sts:TagSession") "Condition" (dict "StringEquals" (dict "aws:SourceAccount" $cfg.workloadAccountId))))) | toJson | quote }}
+                {{- if $cfg.permissionsBoundaryArn }}
+                permissionsBoundary: {{ $cfg.permissionsBoundaryArn | quote }}
+                {{- end }}
+                tags:
+                  Team: platform
+                  Runtime: platform-agent
+                  Agent: {{ $name }}
+            {{- /* IAM for the agent's role: the model's Bedrock data-plane grant (invoke/converse only — never
+                   management) + explicit awsPermissions (deny-set validated upstream). The cross-region us.*
+                   inference profile invokes the underlying foundation-model in us-east-1/2 + us-west-2, so the
+                   grant spans regions; the model-access agreement + the pinned model id gate which model. */}}
+            {{- $stmts := list }}
+            {{- $model := $spec.model | default dict }}
+            {{- if and (eq ($model.provider | default "bedrock") "bedrock") $model.id }}
+            {{- $stmts = append $stmts (dict "Sid" "ModelInvoke" "Effect" "Allow" "Action" (list "bedrock:InvokeModel" "bedrock:InvokeModelWithResponseStream" "bedrock:Converse" "bedrock:ConverseStream") "Resource" (list "arn:aws:bedrock:*::foundation-model/*" (printf "arn:aws:bedrock:*:%s:inference-profile/*" $cfg.workloadAccountId))) }}
+            {{- end }}
+            {{- range $s := ((($spec.awsPermissions | default dict).policyStatements) | default list) }}
+            {{- $st := dict "Effect" ($s.effect | default "Allow") "Action" $s.actions "Resource" $s.resources }}
+            {{- if $s.sid }}{{- $st = merge $st (dict "Sid" $s.sid) }}{{- end }}
+            {{- $stmts = append $stmts $st }}
+            {{- end }}
+            {{- if $stmts }}
+            ---
+            apiVersion: iam.aws.upbound.io/v1beta1
+            kind: RolePolicy
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: pod-rolepolicy
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                role: {{ $role }}
+                policy: {{ (dict "Version" "2012-10-17" "Statement" $stmts) | toJson | quote }}
+            {{- end }}
+            {{- if $active }}
+            ---
+            apiVersion: eks.aws.upbound.io/v1beta1
+            kind: PodIdentityAssociation
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: pod-identity
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                region: {{ $cfg.region }}
+                clusterName: {{ $cfg.clusterName }}
+                namespace: {{ $ns }}
+                serviceAccount: {{ $sa }}
+                roleArn: arn:aws:iam::{{ $cfg.workloadAccountId }}:role/{{ $role }}
+            {{- end }}
+            {{- /* obs-read (ADR-082 D5): bind the read-only platform-trust-observability-reader ClusterRole to the
+                   agent's SA — cluster-wide read of pods/events/apps, NO Secrets. Tight: bound to the named SA,
+                   not the whole namespace's SAs. */}}
+            {{- if $spec.obsRead }}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: clusterrolebinding-obsread
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: rbac.authorization.k8s.io/v1
+                  kind: ClusterRoleBinding
+                  metadata:
+                    name: {{ printf "platform-agent-%s-obsread" $name }}
+                    labels:
+                      app.kubernetes.io/managed-by: crossplane
+                      platform.refplat.org/agent: {{ $name }}
+                  roleRef:
+                    apiGroup: rbac.authorization.k8s.io
+                    kind: ClusterRole
+                    name: platform-trust-observability-reader
+                  subjects:
+                    - kind: ServiceAccount
+                      name: {{ $sa }}
+                      namespace: {{ $ns }}
+            {{- end }}
+    - step: ready
+      functionRef:
+        name: function-auto-ready

@@ -1,0 +1,15 @@
+# Agent API chart values. Set by the crossplane module on the HUB unit (enable_agent_api). The `agent` block
+# Helm-templates the AgentConfig (cluster constants the Composition reads via .context); the chart stays
+# cluster-agnostic. createObsReaderClusterRole installs platform-trust-observability-reader on the hub (the
+# environment-api chart is NOT deployed here, so the agent Composition's obs-read binding needs its own copy).
+
+# The AgentConfig (EnvironmentConfig) constants. Empty default → the template guards on `.Values.agent`.
+agent: {}
+#   clusterName: platform
+#   region: us-east-1
+#   workloadAccountId: "829808296602"
+#   permissionsBoundaryArn: arn:aws:iam::829808296602:policy/agent-permissions-boundary-platform
+
+# Install the read-only platform-trust-observability-reader ClusterRole on this cluster (the obs-read profile
+# an XAgent's obsRead binds). Mirrors environment-api/templates/platform-trust-cluster-roles.yaml.
+createObsReaderClusterRole: true

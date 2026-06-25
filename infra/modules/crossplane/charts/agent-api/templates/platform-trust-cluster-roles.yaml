@@ -1,0 +1,28 @@
+{{- if .Values.createObsReaderClusterRole }}
+# The read-only obs/k8s-state ClusterRole an XAgent's `obsRead: true` binds to its ServiceAccount (ADR-082 D5).
+# Identical to environment-api/templates/platform-trust-cluster-roles.yaml — installed here because that chart
+# is NOT deployed on the hub, and the agent Composition's ClusterRoleBinding needs the role to exist locally.
+# Platform-PROVIDED, labeled platform.refplat.org/trust: "true", and deliberately NO Secrets — an agent can be
+# bound to it but can never redefine what it grants. The cluster-wide read an observability/triage agent needs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: platform-trust-observability-reader
+  labels:
+    app.kubernetes.io/managed-by: crossplane
+    platform.refplat.org/trust: "true"
+rules:
+  - apiGroups: [""]
+    resources: [pods, events, services, endpoints, nodes, namespaces, replicationcontrollers]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, replicasets, statefulsets, daemonsets]
+    verbs: [get, list, watch]
+  - apiGroups: [events.k8s.io]
+    resources: [events]
+    verbs: [get, list, watch]
+  # ArgoCD sync history — the get_recent_changes change-correlation signal (ADR-080 D2)
+  - apiGroups: [argoproj.io]
+    resources: [applications]
+    verbs: [get, list, watch]
+{{- end }}
