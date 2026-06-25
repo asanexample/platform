@@ -126,7 +126,7 @@ platctl kubeconfig
 
 # Format checks
 tofu fmt -check -recursive infra/modules/
-terragrunt hclfmt --check
+terragrunt hcl fmt --check
 
 # Tests (Terratest, Go)
 cd infra/tests/aws/<module> && go test -v -timeout 30m
@@ -137,7 +137,7 @@ cd infra/tests/aws/<module> && go test -v -timeout 30m
 
 ## Pre-commit Hooks
 
-`.githooks/pre-commit` runs tofu fmt, terragrunt hclfmt, and tofu validate on staged files. Activate with:
+`.githooks/pre-commit` runs tofu fmt, terragrunt hcl fmt, and tofu validate on staged files. Activate with:
 
 ```bash
 git config core.hooksPath .githooks
