@@ -86,5 +86,31 @@ uncertainty, surfaces). This spike builds **only** the answer-key machinery.
 
 ## Artifacts
 
-Scripts under `~/spikes/spike-triage-eval/` (mirroring the prior Spike-1/2/3 layout); fixtures in-repo +
-S3; a `FINDINGS.md` with the GO/NO-GO verdict and the scorecards.
+Scripts under `~/spikes/spike-triage-eval/` (mirroring the prior Spike-1/2/3 layout); a `FINDINGS.md`
+with the full GO/NO-GO verdict and scorecards.
+
+## Results — GO ✅ (executed 2026-06-24/25)
+
+The spike was built and run end to end; **verdict: GO**. Detail + scorecards in `FINDINGS.md`.
+
+- **Infra prerequisite was already met.** Preprod is up and the metrics/logs/traces spokes were already
+  built (#625) + applied; verified end-to-end (preprod app logs + traces + metrics queryable on the hub).
+  *(The "logs/traces spokes unbuilt" framing above was stale — corrected.)*
+- **Real injection, end to end.** Deployed a breakable app in a throwaway `eval-triage` namespace (no team
+  label → escapes the env-scoped Kyverno policies), injected a crashloop, captured from the hub, the real
+  model triaged it correctly (`pass^k`=3 stable, graded 1.00), then tore it down. `alpha-*-dev` untouched.
+- **Full corpus on the production model path.** 12 fixtures across the whole failure taxonomy ran on
+  **Bedrock** (`AnthropicBedrock` + `us.anthropic.claude-sonnet-4-6`): triage_score (service + failure-class)
+  = **1.00**; abstains correctly on healthy real telemetry (no bluffing).
+- **D2 change-correlation wired in** (ArgoCD sync history + GitHub commit / changed-files): change-attribution
+  **5/11 → 8/11**, the residual being correct "no change captured → none" — empirically confirming D2 as the
+  highest-yield signal.
+
+**GO criteria:** automatable ✓ · discriminating ✓ (oracle 1.00 vs degraded 0.20) · stable ✓ (`pass^k`).
+**→ the agent build is de-risked to proceed.**
+
+**Findings carried into the build:** structured-taxonomy grading works (set-membership, not judgment);
+`dependency` is awkward as a *change-type* (candidate to drop — a degraded dependency isn't a change);
+out-of-band (non-GitOps) changes are invisible to change-correlation by design; the Bedrock model id is
+`us.anthropic.claude-sonnet-4-6` (InvokeModel, not Mantle); the hub/deployer kube contexts need
+`AWS_PROFILE=management`. The harness graduates into the repo as the regression suite when the build starts.
