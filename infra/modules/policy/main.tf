@@ -267,6 +267,14 @@ resource "helm_release" "kyverno" {
 # no plan-time access to the Kyverno CRDs (which the engine release above installs in the same
 # apply), avoiding the kubernetes_manifest chicken-and-egg. depends_on guarantees CRDs exist first.
 
+locals {
+  # Inert checksum over every policies-chart file — its change forces a helm upgrade when any ClusterPolicy
+  # template changes. helm_release tracks VALUES, not chart-dir content, so without this an edit to a policy
+  # template (e.g. an exclude rule) renders identically in terraform and never re-applies. Mirrors the crossplane
+  # module's chart_checksum.
+  policies_chart_checksum = sha256(join(",", [for f in sort(tolist(fileset("${path.module}/policies-chart", "**"))) : filesha256("${path.module}/policies-chart/${f}")]))
+}
+
 resource "helm_release" "policies" {
   count     = local.create ? 1 : 0
   name      = "kyverno-platform-policies"
@@ -284,6 +292,7 @@ resource "helm_release" "policies" {
 
   values = [
     yamlencode(local.policies_values),
+    yamlencode({ chartChecksum = local.policies_chart_checksum }),
   ]
 
   depends_on = [helm_release.kyverno]

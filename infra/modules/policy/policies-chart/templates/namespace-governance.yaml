@@ -68,6 +68,16 @@ spec:
                 matchExpressions:
                   - key: {{ .Values.environmentNamespaceLabel }}
                     operator: Exists
+      # Platform-agent runtime namespaces (ADR-082, platform-agent-<name>) carry the team label — so the per-product
+      # cosign verify-images policy applies — but are NOT tenant environments, so they don't follow the
+      # <team>-<product>-<stage> naming. Exclude them from this tenant-naming guard (no-op on workload clusters,
+      # which host no platform agents).
+      exclude:
+        any:
+          - resources:
+              selector:
+                matchLabels:
+                  platform.refplat.org/runtime: platform-agent
       validate:
         failureAction: {{ .Values.validationFailureAction }}
         # v3 (ADR-067): Environment namespaces are <team>-<product>-<stage> or, per-customer,
