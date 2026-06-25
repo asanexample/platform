@@ -92,4 +92,5 @@ bin/
 !.claude/skills/
 .claude/skills/*
 !.claude/skills/terraform-style/
+!.claude/skills/authoring-k8s-workloads/
 .specify/
