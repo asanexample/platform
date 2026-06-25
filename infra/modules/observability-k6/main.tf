@@ -53,6 +53,11 @@ resource "kubernetes_cron_job_v1" "k6" {
       }
       spec {
         backoff_limit = 0
+        # Auto-delete finished Jobs (incl. failed) after 1h, so a transient failure — e.g. probes
+        # getting connection-refused while the cluster is parked/scaled-down — doesn't leave a stale
+        # Failed Job firing KubeJobFailed for days. The Kyverno cleanup policy only reaps *succeeded*
+        # jobs (they carry completionTime); failed jobs have none, so they need this TTL.
+        ttl_seconds_after_finished = 3600
         template {
           metadata {
             labels = merge(local.k8s_labels, { "app.kubernetes.io/name" = "k6" })
