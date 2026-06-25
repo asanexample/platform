@@ -1,0 +1,24 @@
+# XAgent #1 — the triage copilot (ADR-080/082). The platform's first agent, migrated off the tenant Environment
+# model (preprod, where it was blind to hub-resident obs) onto the purpose-built XAgent runtime on the hub. The
+# Agent Composition provisions ns platform-agent-triage-copilot + the Pod-Identity (data-plane Bedrock) + the
+# obs-read RBAC; the per-agent ApplicationSet delivers the signed image. Authoring is admin-gated (CODEOWNERS) +
+# validated by the gitops Gate (validate-agents.sh) and Kyverno (restrict-agent-envelope) before admission.
+apiVersion: platform.refplat.org/v1beta1
+kind: XAgent
+metadata:
+  name: triage-copilot
+spec:
+  team: platform
+  product: triage-copilot
+  placement:
+    cluster: platform # hub-only (ADR-082 D2)
+  model:
+    provider: bedrock
+    id: us.anthropic.claude-sonnet-4-6 # pinned; cross-region inference profile (ADR-082 D8)
+  obsRead: true # cluster-wide read of pods/events/apps for evidence gathering (NO Secrets)
+  autonomy:
+    mode: propose-only # the safety invariant (ADR-074) — read + propose, never act
+  trigger:
+    kind: alertmanager-webhook
+  lifecycle:
+    phase: active # set `suspended` to kill-switch (drops the Pod Identity → no Bedrock)
