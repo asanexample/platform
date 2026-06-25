@@ -2,7 +2,25 @@
 
 **Date:** 2026-05-28
 
-**Status:** Accepted
+**Status:** Accepted — **not yet implemented on the v3 delivery model** (see [Implementation Status](#implementation-status))
+
+## Implementation Status
+
+**Not currently implemented.** This ADR describes the **v2** design: preview was opt-in per app
+via `preview = true` in `teams.hcl` (ADR-031), and the `argocd-apps` module built a per-app PR-generator
+ApplicationSet from `tenants` / `github_org` inputs. That entire surface (`tenants`, `github_org`,
+`preview_appset`, `github_token_secret_name`, `teams.hcl`) was **removed at the v3 cutover**
+(ADR-067/069), which replaced per-tenant delivery with registry-derived, **Release-keyed** per-Product
+ApplicationSets (`gitops/releases/<team>/<product>/*.yaml`).
+
+What exists on the v3 model today is only `preview_domain`: when set, the standard per-Product delivery
+ApplicationSet rewrites each **Environment's** `HTTPRoute` hostname to `<product>-<team>-<stage>.<preview_domain>`
+— a per-stage host rewrite, **not** a per-PR ephemeral environment.
+
+Re-implementing per-PR previews (a GitHub `pullRequest` generator over the v3 Release/Environment model,
+with the `pr-<N>-` isolation + per-PR hostname/image described below) is **future work**. The design
+below remains the intended approach; references to `teams.hcl`, `tenants`, and `github_org` are v2 and
+no longer exist in the module.
 
 ## Context
 

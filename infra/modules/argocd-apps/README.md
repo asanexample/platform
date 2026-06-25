@@ -1,6 +1,8 @@
 # ArgoCD Apps
 
-Creates ArgoCD AppProjects, Applications, and ApplicationSets for multi-tenant workload deployment. Each tenant gets an AppProject scoped to its namespace and permitted resource types. Each app within a tenant gets a stable Application using Kustomize with `commonLabels` to avoid label selector collisions. Apps with `preview = true` get an additional ApplicationSet using the GitHub PR generator for ephemeral per-PR deployments, with automatic hostname rewriting and ECR image tag injection based on the PR head SHA.
+Creates the ArgoCD AppProjects, Applications, and ApplicationSets that deliver workloads on the platform cluster (the GitOps hub), driven by the git-native registries (ADR-067/069). For each **Product** it creates a scoped `product-<team>-<product>` AppProject and an ApplicationSet whose git-files generator fans out over the Product's **Release** records (`gitops/releases/<team>/<product>/*.yaml`, ADR-071) — one Application per Environment that has a Release, sourcing the app repo's `k8s/overlays/<stage>` with the deployed digest injected as a kustomize image override. With `platform_repo_url` set it also creates the **registry-sync** apps (Products / Environments / Grants), and with `enable_teams` the Team-CR sync app. When `preview_domain` is set, each Environment's `HTTPRoute` hostname is rewritten to `<product>-<team>-<stage>.<preview_domain>`.
+
+> **Note:** per-PR ephemeral preview environments (ADR-032) are **not implemented** on this v3 delivery model — the old `tenants` / `github_org` / per-app PR-generator surface was removed at the v3 cutover. See [Notes](#notes).
 
 ## Usage
 
@@ -8,30 +10,27 @@ Creates ArgoCD AppProjects, Applications, and ApplicationSets for multi-tenant w
 module "argocd_apps" {
   source = "../../modules/argocd-apps"
 
-  cluster_name   = "preprod"
   cluster_server = "https://EXAMPLE.gr7.us-east-1.eks.amazonaws.com"
+  ecr_registry   = "<PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com"
 
-  github_org               = "centric"
-  ecr_registry             = "<PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com"
-  preview_domain           = "preprod.aws.refplat.org"
-  github_token_secret_name = "github-pat"
+  # The platform GitOps repo: drives the registry-sync apps and per-Product delivery.
+  platform_repo_url = "https://github.com/asanexample/platform"
 
-  tenants = {
-    acme = {
-      mode = "namespace"
-      apps = {
-        web = {
-          repo_url = "https://github.com/centric/acme-web"
-          preview  = true
-        }
-        api = {
-          repo_url    = "https://github.com/centric/acme-api"
-          repo_path   = "k8s/preprod"
-          repo_branch = "main"
-        }
-      }
+  # Sync git-native Team CRs (Kyverno admission inputs) ahead of Environments.
+  enable_teams   = true
+  teams_repo_url = "https://github.com/asanexample/platform"
+
+  # Per-Product delivery: one ApplicationSet per product, keyed <team>-<product>.
+  products = {
+    "alpha-shop" = {
+      team     = "alpha"
+      product  = "shop"
+      repo_url = "https://github.com/asanexample/app-alpha"
     }
   }
+
+  # Optional: rewrite each Environment's HTTPRoute host under this base domain.
+  preview_domain = "preprod.aws.refplat.org"
 }
 ```
 
@@ -43,30 +42,25 @@ module "argocd_apps" {
 module "argocd_apps" {
   source = "../../modules/argocd-apps"
 
-  create       = false
-  cluster_name = "preprod"
+  create = false
 }
 ```
 
-### Manual Sync (No Auto-Sync)
+### Registry-sync + Teams only (no per-Product delivery yet)
 
 ```hcl
 module "argocd_apps" {
   source = "../../modules/argocd-apps"
 
-  cluster_name   = "preprod"
-  cluster_server = "https://EXAMPLE.gr7.us-east-1.eks.amazonaws.com"
-  auto_sync      = false
+  cluster_server    = "https://EXAMPLE.gr7.us-east-1.eks.amazonaws.com"
+  platform_repo_url = "https://github.com/asanexample/platform"
 
-  tenants = {
-    acme = {
-      apps = {
-        web = {
-          repo_url = "https://github.com/centric/acme-web"
-        }
-      }
-    }
-  }
+  enable_teams   = true
+  teams_repo_url = "https://github.com/asanexample/platform"
+
+  # products left empty → registry-sync (Products/Environments/Grants) + Teams run,
+  # but no Product delivers yet.
+  products = {}
 }
 ```
 
@@ -76,12 +70,14 @@ module "argocd_apps" {
 | Name | Version |
 | ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.5 |
+| <a name="requirement_helm"></a> [helm](#requirement\_helm) | >= 3.0 |
 | <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | >= 3.0 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
+| <a name="provider_helm"></a> [helm](#provider\_helm) | >= 3.0 |
 | <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | >= 3.0 |
 
 ## Modules
@@ -92,40 +88,40 @@ No modules.
 
 | Name | Type |
 | ---- | ---- |
-| [kubernetes_manifest.app_project](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
-| [kubernetes_manifest.application](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
-| [kubernetes_manifest.preview_appset](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
+| [helm_release.product_appset](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
+| [kubernetes_manifest.product_appproject](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
+| [kubernetes_manifest.registry_app](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
+| [kubernetes_manifest.registry_project](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
+| [kubernetes_manifest.teams_app](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
+| [kubernetes_manifest.teams_project](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | Name of the target cluster in ArgoCD (e.g. 'preprod') | `string` | n/a | yes |
 | <a name="input_argocd_namespace"></a> [argocd\_namespace](#input\_argocd\_namespace) | Namespace where ArgoCD is installed | `string` | `"argocd"` | no |
-| <a name="input_auto_sync"></a> [auto\_sync](#input\_auto\_sync) | Enable automated sync with self-heal and prune | `bool` | `true` | no |
 | <a name="input_cluster_server"></a> [cluster\_server](#input\_cluster\_server) | API server URL of the target cluster | `string` | `""` | no |
 | <a name="input_create"></a> [create](#input\_create) | Whether to create ArgoCD app resources | `bool` | `true` | no |
-| <a name="input_ecr_registry"></a> [ecr\_registry](#input\_ecr\_registry) | ECR registry URL (e.g. <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com) | `string` | `""` | no |
-| <a name="input_github_org"></a> [github\_org](#input\_github\_org) | GitHub org for PR preview generators | `string` | `""` | no |
-| <a name="input_github_token_secret_name"></a> [github\_token\_secret\_name](#input\_github\_token\_secret\_name) | Name of the Kubernetes Secret in the ArgoCD namespace containing the GitHub PAT (key: token) | `string` | `""` | no |
-| <a name="input_preview_domain"></a> [preview\_domain](#input\_preview\_domain) | Base domain for PR preview hostnames (e.g. preprod.aws.refplat.org) | `string` | `""` | no |
-| <a name="input_tenants"></a> [tenants](#input\_tenants) | Map of tenant names to their apps and isolation mode | <pre>map(object({<br/>    mode      = optional(string, "namespace")<br/>    namespace = optional(string)<br/>    apps = map(object({<br/>      repo_url    = string<br/>      repo_path   = optional(string, "k8s/preprod")<br/>      repo_branch = optional(string, "main")<br/>      preview     = optional(bool, false)<br/>    }))<br/>  }))</pre> | `{}` | no |
+| <a name="input_ecr_registry"></a> [ecr\_registry](#input\_ecr\_registry) | ECR registry host for the per-Product image (ADR-071). The ApplicationSet injects the Release digest as a kustomize image override whose name must match the app overlay's image — <ecr\_registry>/team-<team>/<product>-<service>. | `string` | `""` | no |
+| <a name="input_enable_teams"></a> [enable\_teams](#input\_enable\_teams) | Create the platform-teams AppProject + Application that syncs git-native Team CRs to the target cluster (replaces the crossplane-teams Helm projection, ADR-063). | `bool` | `false` | no |
+| <a name="input_platform_repo_branch"></a> [platform\_repo\_branch](#input\_platform\_repo\_branch) | v3: branch of the platform GitOps repo the registry-sync apps + the per-Product ApplicationSet track. | `string` | `"main"` | no |
+| <a name="input_platform_repo_url"></a> [platform\_repo\_url](#input\_platform\_repo\_url) | v3: the platform GitOps repo read by the registry-sync apps (gitops/{products,environments,grants}/) and the per-Product delivery ApplicationSet (gitops/releases/<team>/<product>/). Empty disables delivery. | `string` | `""` | no |
+| <a name="input_preview_domain"></a> [preview\_domain](#input\_preview\_domain) | Optional base domain. When set, the per-Product delivery ApplicationSet rewrites each Environment's HTTPRoute hostname to <product>-<team>-<stage>.<preview\_domain> (a per-stage host rewrite — NOT per-PR previews; those, ADR-032, are not yet implemented on the v3 model). | `string` | `""` | no |
+| <a name="input_products"></a> [products](#input\_products) | v3: per-Product delivery, keyed <team>-<product>. One ApplicationSet per product; its git-files generator fans out over the Product's Release records gitops/releases/<team>/<product>/*.yaml → one Application per Environment that has a Release (ADR-071, #377). | <pre>map(object({<br/>    team     = string # owning team<br/>    product  = string # product short name (the gitops/{releases,environments}/<team>/<product>/ dir)<br/>    repo_url = string # the app repo (Product.repo), https URL — the Application source<br/>  }))</pre> | `{}` | no |
+| <a name="input_teams_repo_branch"></a> [teams\_repo\_branch](#input\_teams\_repo\_branch) | Branch/revision for the Team CRs repo. | `string` | `"main"` | no |
+| <a name="input_teams_repo_path"></a> [teams\_repo\_path](#input\_teams\_repo\_path) | Path within the repo to the Team CR YAMLs (e.g. gitops/teams). | `string` | `"gitops/teams"` | no |
+| <a name="input_teams_repo_url"></a> [teams\_repo\_url](#input\_teams\_repo\_url) | Git repo URL holding the Team CR YAMLs (the platform repo). | `string` | `""` | no |
 
 ## Outputs
 
-| Name | Description |
-| ---- | ----------- |
-| <a name="output_app_projects"></a> [app\_projects](#output\_app\_projects) | Map of tenant names to their ArgoCD AppProject names |
-| <a name="output_applications"></a> [applications](#output\_applications) | Map of app keys to their ArgoCD Application names |
-| <a name="output_preview_appsets"></a> [preview\_appsets](#output\_preview\_appsets) | Map of app keys to their ArgoCD ApplicationSet names (preview-enabled apps only) |
+No outputs.
 <!-- END_TF_DOCS -->
 
 ## Notes
 
 - AppProject whitelists are restrictive by design: Deployments, StatefulSets, Services, ConfigMaps, Secrets, Jobs, CronJobs, HTTPRoutes, and ExternalSecrets.
-- Preview ApplicationSets use Kustomize `namePrefix` (`pr-<number>-`) and `commonLabels` (`app.kubernetes.io/instance: pr-<number>`) to isolate preview pods from stable deployments.
-- Preview hostname rewriting patches `HTTPRoute` hostnames to `<app>-pr-<number>.<preview_domain>`.
-- The `github_org` variable must be set for PR preview generators to be created; if empty, preview ApplicationSets are skipped.
+- `preview_domain` (optional): when set, the per-Product delivery ApplicationSet rewrites each **Environment's** `HTTPRoute` hostname to `<product>-<team>-<stage>.<preview_domain>` — a per-stage host rewrite on the standard delivery, **not** a per-PR ephemeral environment.
+- **Per-PR ephemeral preview environments (ADR-032) are NOT implemented** on the v3 delivery model. The v2 surface that drove them (`tenants`, `github_org`, `preview_appset`, `github_token_secret_name`, the `preview = true` per-app flag in `teams.hcl`) was removed at the v3 cutover (ADR-067/069). Re-implementing previews on the Release-keyed model — a GitHub `pullRequest` generator with `pr-<N>-` isolation + per-PR hostname/image — is future work; ADR-032 remains the intended design.
 - `enable_teams` adds a `platform-teams` AppProject + `teams` Application that syncs the git-native `Team` CRs (`teams_repo_path`, e.g. `gitops/teams`) to the target cluster — replacing the `crossplane-teams` Helm projection (ADR-063). The Team CRs are Kyverno admission inputs (envelope / team-must-exist), so the app carries a `sync-wave: "-1"` ahead of the environments registry-sync app; selfHeal converges a claim transiently rejected before its Team lands.
 - Setting `platform_repo_url` enables the **registry-sync** apps (ADR-069 §1): per registry kind, a `platform-<kind>` AppProject + an Application that projects the git-native registries onto the cluster as CRs — `products` (`gitops/products`, `Product` CRs, wave `-2`), `environments` (`gitops/environments`, the cluster-scoped `XEnvironment` claims, wave `0`), and `grants` (`gitops/grants`, `AccessGrant` CRs). The `XEnvironment` claims are thus delivered by the `environments` Application under the `platform-environments` AppProject — the retired `enable_tenant_claims`/`platform-tenants`/`tenant-claims-<env>`/`XTenant`/`tenant_claims_repo_path` wiring is replaced by this.
 - Per-Product **delivery** (`products` variable, gated on `platform_repo_url`): one `product-<team>-<product>` AppProject + ApplicationSet whose git-files generator fans out over the product's Release records to one Application per Environment.
