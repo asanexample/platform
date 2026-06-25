@@ -196,6 +196,12 @@ variable "slack_channel" {
   default     = "#platform-alerts"
 }
 
+variable "triage_webhook_url" {
+  description = "ADR-082: the triage agent's in-cluster webhook URL (e.g. http://triage-copilot-server.platform-agent-triage-copilot.svc.cluster.local/webhook). When set, a curated alert subset (critical) is fanned to the agent ADDITIVELY (continue=true, the alert still reaches SNS/Slack). Empty disables the triage receiver/route."
+  type        = string
+  default     = ""
+}
+
 variable "pagerduty_routing_key_secret_name" {
   description = "AWS Secrets Manager secret name holding the PagerDuty Events API v2 routing/integration key (JSON property 'routingKey'). Empty disables the PagerDuty receiver. Synced to Alertmanager via External Secrets — never enters Terraform state or helm values. Critical alerts page PagerDuty."
   type        = string

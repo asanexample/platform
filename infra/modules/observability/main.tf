@@ -45,7 +45,9 @@ locals {
   }] : []
 
   # Slack/PagerDuty receivers wired when their secret names are provided (synced via External Secrets).
-  slack_enabled     = var.slack_webhook_secret_name != ""
+  slack_enabled = var.slack_webhook_secret_name != ""
+  # ADR-082: fan a curated alert subset to the triage agent's in-cluster webhook (empty url = off).
+  triage_enabled    = var.triage_webhook_url != ""
   pagerduty_enabled = var.pagerduty_routing_key_secret_name != ""
 
   # Grafana SSO via Keycloak OIDC (#592). On when an issuer is provided; the client secret syncs via ESO and
@@ -116,11 +118,17 @@ locals {
       group_interval  = "5m"
       repeat_interval = "4h"
       receiver        = "null"
-      routes = [
-        { receiver = "null", matchers = ["alertname = \"Watchdog\""] },
-        { receiver = "critical", matchers = ["severity = \"critical\""], continue = false },
-        { receiver = "warning", matchers = ["severity = \"warning\""], continue = false },
-      ]
+      # Watchdog → null (and does NOT reach triage, since it has no `continue`). The triage route (ADR-082) fans a
+      # curated subset (critical) to the agent's webhook ADDITIVELY — `continue = true` so the same alert still
+      # flows on to the critical receiver (SNS/Slack/PagerDuty). The agent's own storm controls (ADR-080 D9) bound it.
+      routes = concat(
+        [{ receiver = "null", matchers = ["alertname = \"Watchdog\""] }],
+        local.triage_enabled ? [{ receiver = "triage", matchers = ["severity = \"critical\""], continue = true }] : [],
+        [
+          { receiver = "critical", matchers = ["severity = \"critical\""], continue = false },
+          { receiver = "warning", matchers = ["severity = \"warning\""], continue = false },
+        ],
+      )
     }
     inhibit_rules = [{
       source_matchers = ["severity = \"critical\""]
@@ -132,6 +140,11 @@ locals {
     # object type; concat keeps the differently-shaped "null" receiver separate.
     receivers = concat(
       [{ name = "null" }],
+      # The triage agent's webhook (ADR-082) — a curated subset is fanned here additively (the route above).
+      local.triage_enabled ? [{
+        name            = "triage"
+        webhook_configs = [{ url = var.triage_webhook_url, send_resolved = false }]
+      }] : [],
       [
         {
           name              = "critical"
