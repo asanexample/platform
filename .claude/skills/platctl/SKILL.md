@@ -62,7 +62,9 @@ make build-platctl     # → ./bin/platctl  (cd cmd/platctl && go build -o ../..
   so the system group dying mid-park doesn't orphan Karpenter-provisioned EC2 (ADR-078). `up`
   waits for the cluster API before re-applying karpenter (applying early orphans its helm
   releases) and best-effort restarts Kyverno (sigstore TUF cache can fail-close all policed pods).
-- **Logs**: full terragrunt output per unit under `.platctl-logs/latest/<wave>_<unit>.log`.
+- **Logs**: full terragrunt output per unit under `.platctl-logs/latest/<wave>_<unit>.log`
+  (`latest` is a symlink to the timestamped run dir; `/` in unit names becomes `--`, e.g.
+  `001_platform--eks.log`).
 
 ## `.platctl.yaml`
 

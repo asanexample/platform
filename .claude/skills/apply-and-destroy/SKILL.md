@@ -31,9 +31,14 @@ terragrunt run --all destroy --filter-allow-destroy -- -auto-approve
 ```
 
 - It is **`terragrunt run --all <cmd>`**, never the legacy `run-all`.
-- **`--filter-allow-destroy`** skips units whose state holds `prevent_destroy` resources —
-  this is what keeps the **state backend** (S3 + DynamoDB) and the **SOPS KMS key** (`sops-kms`,
-  `prevent_destroy = true`) from being destroyed by a teardown. Don't drop it.
+- **`--filter-allow-destroy`** is Terragrunt's guard that *permits* a destroy across the
+  filtered DAG (per its `--help`: "Allow destroy runs when using Git-based filters") — it's a
+  safety acknowledgement, **not** a protector of critical units. Keep it in the destroy
+  invocation (it's the documented form), but don't rely on it to spare anything.
+- What actually protects critical state on teardown: the **state backend** (S3 + DynamoDB) lives
+  *outside* the teardown trees entirely, and the **SOPS KMS key** (`sops-kms`) carries
+  `prevent_destroy = true` — OpenTofu's resource-level lifecycle guard, enforced independently of
+  any Terragrunt flag.
 - **`--`** separates Terragrunt flags from the `-auto-approve` passed through to OpenTofu.
 - Every dependency block has `mock_outputs` + `mock_outputs_allowed_terraform_commands`
   including `destroy`, so reverse-DAG destroy works even when upstream state is already gone.

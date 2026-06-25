@@ -47,11 +47,16 @@ The chosen approach (often numbered design points D1, D2, …).
 ### Negative
 ### Risks
 
-## Alternatives Considered   (if not folded into Context)
+## Alternatives considered   (if not folded into Context)
 
-## Related
+## Related   (optional; real ADRs vary — "Related", "Related ADRs", "Relationships", or omitted)
 Links to related ADRs / PRs / issues, e.g. [ADR-067](067-idp-domain-model.md).
 ```
+
+Match the casing real ADRs use — section headings like `## Alternatives considered` are
+lowercase after the first word. Context / Decision / Consequences are the consistent spine;
+the trailing sections (Alternatives, Related, Scope/Follow-Up) are optional and their naming
+varies, so follow a nearby recent ADR rather than treating this template as rigid.
 
 Reference other ADRs as `[ADR-NNN](NNN-kebab-title.md)`; in commits use `docs(adr-NNN): …`.
 
