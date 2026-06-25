@@ -48,7 +48,12 @@ terraform {
 locals {
   teams_dir = "${get_repo_root()}/gitops/teams"
   teams = { for f in fileset(local.teams_dir, "*.yaml") :
-    yamldecode(file("${local.teams_dir}/${f}")).metadata.name => yamldecode(file("${local.teams_dir}/${f}")).spec
+    yamldecode(file("${local.teams_dir}/${f}")).metadata.name => {
+      # Extract ONLY the fields the module consumes — a fixed shape, so a Team-spec field that some teams have and
+      # others don't (e.g. platform's platformTrust, ADR-081) can't make the map's element types inconsistent.
+      ssoGroup = yamldecode(file("${local.teams_dir}/${f}")).spec.ssoGroup
+      envelope = yamldecode(file("${local.teams_dir}/${f}")).spec.envelope
+    }
   }
 }
 
