@@ -98,4 +98,6 @@ bin/
 !.claude/skills/cluster-access/
 !.claude/skills/apply-and-destroy/
 !.claude/skills/authoring-adrs/
+!.claude/skills/environment-onboarding/
+!.claude/skills/supply-chain-onboarding/
 .specify/
