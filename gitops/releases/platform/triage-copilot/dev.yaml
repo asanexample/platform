@@ -1,0 +1,9 @@
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata:
+  name: platform-triage-copilot-dev
+spec:
+  environmentRef: platform-triage-copilot-dev
+  services:
+    server:
+      digest: sha256:fc9020f8c587c7884d7825e6be2ccd91a09af361ac66cccd79d07123f5c713aa
