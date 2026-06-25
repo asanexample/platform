@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "grafana": {
+      "command": "mcp-grafana",
+      "args": ["--disable-write"],
+      "env": {
+        "GRAFANA_URL": "${GRAFANA_URL:-https://grafana.aws.refplat.org}",
+        "GRAFANA_SERVICE_ACCOUNT_TOKEN": "${GRAFANA_SERVICE_ACCOUNT_TOKEN}"
+      }
+    },
+    "aws-api": {
+      "command": "uvx",
+      "args": ["awslabs.aws-api-mcp-server@latest"],
+      "env": {
+        "READ_OPERATIONS_ONLY": "true",
+        "AWS_REGION": "us-east-1",
+        "AWS_API_MCP_PROFILE_NAME": "${AWS_API_MCP_PROFILE_NAME:-management}",
+        "AWS_API_MCP_TELEMETRY": "false"
+      }
+    }
+  }
+}
