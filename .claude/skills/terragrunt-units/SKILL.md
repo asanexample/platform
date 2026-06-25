@@ -28,7 +28,7 @@ some paths, so the structure below is verified against `infra/live/aws/.../eks/t
 
 A unit inherits a stack of config layers, each `read_terragrunt_config`-loaded by `_base.hcl`:
 
-```
+```text
 infra/root.hcl                                   remote state (S3) + AWS provider generation + SOPS; terraform_binary = "tofu"
   └─ infra/live/aws/common.hcl                   org-wide defaults, loads SOPS secrets → account_ids/emails/SSO
       └─ infra/live/aws/<env>/env.hcl            environment + account_id (from secrets), env tags, feature toggles
