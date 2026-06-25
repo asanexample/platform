@@ -43,6 +43,27 @@ convention-specific attribute mapping lives behind a **single thin instrumentati
 so a convention change is one edit, not a fleet-wide rewrite. Vendor-neutral; no lock-in. This is consistent with
 the OSS-default, capability-not-vendor stance of ADR-043 and the build-vs-adopt ladder of ADR-074.
 
+**Concrete schema (verified against the OTel GenAI semconv, 2026).** Status is **`Development`** (OTel's pre-stable
+tier) and the spec has **graduated into its own repo** (`open-telemetry/semantic-conventions-genai`) — active, but
+still shifting, so the wrapper stays. The pieces we pin:
+
+- **Operations** (`gen_ai.operation.name`, *required*): `invoke_agent`, `chat`, `execute_tool` (also `create_agent`,
+  `invoke_workflow`, `embeddings`). These map 1:1 to our loop — an **`invoke_agent {agent.name}`** parent span over
+  child **`chat {model}`** and **`execute_tool {tool.name}`** spans.
+- **Attributes**: `gen_ai.provider.name="aws.bedrock"` (set at span creation), `gen_ai.request.model` /
+  `response.model`, `gen_ai.usage.input_tokens` / `output_tokens` plus **`cache_read.input_tokens` /
+  `cache_creation.input_tokens`** (prompt-cache-aware), `gen_ai.agent.name`/`id`, `gen_ai.tool.name` (*required*) /
+  `tool.call.id`, `gen_ai.conversation.id`, `gen_ai.response.finish_reasons`, `error.type`.
+- **Content is `Opt-In` in the spec itself** — `gen_ai.input.messages` / `gen_ai.output.messages` /
+  `gen_ai.system_instructions` default OFF and may be emitted as a **separate event decoupled from the trace**. This
+  *validates D3 by construction*: metadata-first is the spec default; content is the deliberate opt-in, and decoupling
+  it as an event lets us route content to a separate sink with its own retention/redaction.
+- **Metrics**: `gen_ai.client.token.usage` (histogram) + `gen_ai.client.operation.duration` (histogram). **There is no
+  cost metric** — cost is *derived* from tokens × `model@version` price, i.e. exactly the ADR-074 metering seam.
+- **Eval as a first-class event**: the semconv defines a **`gen_ai.evaluation.result`** event
+  (`gen_ai.evaluation.name` / `score.value` / `score.label` / `explanation`) — a native carrier for our eval verdict,
+  so the eval-online-signal consumer (D2) rides a standard event rather than a bespoke field.
+
 ### D2 — Telemetry model: one trace, four consumers
 
 Each agent invocation is one trace — a span tree over: elicitation turns → model calls (tokens in/out, cost,

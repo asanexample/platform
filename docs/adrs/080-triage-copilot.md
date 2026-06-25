@@ -295,6 +295,33 @@ Keycloak identity later.)*
 | **Alerts / SLOs** | Real failure modes (model timeout, rate-limit, tool failure, bad-context retry) → meaningful error-budget burn; finally gives **P6 APM / P9 SLOs** live input. |
 | **Correlations** | The headline drill end-to-end: alert → trace → tool spans → logs → token-cost metric → profile; plus quality↔cost↔latency from the eval loop. |
 
+## Design grounding (researched 2026)
+
+A deep, adversarially-verified literature pass (Anthropic agent engineering, OWASP LLM01:2025, the prompt-injection
+design-patterns paper arXiv 2506.08837, IMDA MGF, CSA Agentic NIST AI RMF Profile, Simon Willison's lethal-trifecta)
+**confirmed the major design calls** and added a few sharpeners:
+
+- **Single agent, not multi.** Multi-agent runs ~15× the tokens and is an explicit *poor fit* where agents must share
+  context / are interdependent — exactly triage. The single-agent topology (D3) is the evidence-backed choice.
+- **Plan-Then-Execute as a security property.** Decide *which* read tools to call **before** ingesting untrusted
+  content, so a malicious log line / commit message / k8s field cannot redirect tool calls (control-flow integrity).
+  This upgrades the deterministic-context-pack-then-bounded-follow-up loop (D1) from "tidy" to "injection-resistant".
+- **The lethal trifecta, and why we're safe.** Triage has *private data* (telemetry) + *untrusted content* (logs are
+  attacker-influenceable) but **no exfiltration path** — read-only, no remediation tool in the codebase, output only
+  to the incident channel. Breaking the third leg is the whole defense (D4/D5). Guard the output surface so it cannot
+  become an exfil channel.
+- **Authority in trusted code, never the prompt** (IMDA, almost verbatim): read-only lives in Pod Identity + the tool
+  layer; *no write/remediation tool is wired in at all*. "Never remediates" is an IAM/code fact, not an instruction.
+- **Behavioral telemetry as an injection canary** (CSA Tier-2): emit action-velocity, permission-escalation-rate,
+  cross-boundary-invocation, exception-rate. For a read-only agent these are **~0 by construction**, so any nonzero
+  value is a strong tamper/injection signal — a cheap, high-value addition to D7.
+- **Governance tier (correction).** Our "on-the-loop" agent maps to **CSA Tier-2 "constrained autonomy"** (document
+  the action scope, escalation trigger, approval authority; catalogue the agent identity centrally as a non-human
+  identity). *Note:* the four-level "agent proposes / collaborates / operates / observes" spectrum is **not** in the
+  IMDA MGF (that attribution was refuted in verification) — cite CSA Tier-2, not an IMDA spectrum.
+- **Prompt injection is unsolved by construction** — no published defense is individually reliable; design against it
+  as a permanent constraint (the read-only/propose-only posture), not a patchable bug.
+
 ## Scope
 
 **In:** the channel-agnostic core + one surface adapter (Slack/incident channel); the ingest/runner/eval-scorer
