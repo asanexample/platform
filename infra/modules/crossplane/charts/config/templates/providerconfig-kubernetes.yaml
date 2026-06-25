@@ -50,6 +50,20 @@ rules:
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Platform-trust ClusterRoleBindings (ADR-081): a platform-OWNED Team's Environment can request that a blessed,
+  # read-only platform-trust ClusterRole be bound to its ServiceAccounts for cross-namespace reads (e.g. an
+  # observability/triage agent). The Composition creates a cluster-scoped ClusterRoleBinding via provider-kubernetes,
+  # so the provider must manage clusterrolebindings AND — per the RBAC escalation check — hold "bind" on the
+  # platform-trust roles. The "bind" is scoped by resourceNames to exactly the platform-provided roles, never
+  # arbitrary (mirrors the environment-developer grant above). NOTE: add any new platform-trust ClusterRole to BOTH
+  # this resourceNames list and environment-api/templates/platform-trust-cluster-roles.yaml.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterrolebindings"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    resourceNames: ["platform-trust-observability-reader"]
+    verbs: ["bind"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
