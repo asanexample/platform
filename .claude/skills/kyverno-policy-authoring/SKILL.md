@@ -19,8 +19,8 @@ description: >-
 # Authoring Kyverno ClusterPolicies (the `policy` module)
 
 This is the **producer** side of policy — writing the guardrails. The consumer side
-(writing workloads that pass them) is `authoring-k8s-workloads`. Kyverno is **3.8.1**,
-in **Enforce** on both preprod and platform (ADR-014). The authoritative per-cluster
+(writing workloads that pass them) is `authoring-k8s-workloads`. Kyverno is **chart 3.8.1
+/ engine appVersion 1.18.1**, in **Enforce** on both preprod and platform (ADR-014). The authoritative per-cluster
 catalog is `docs/architecture/kyverno-policy-catalog.md`; break-glass and the
 Audit→Enforce flip live in `docs/runbooks/kyverno-break-glass.md`.
 
@@ -50,9 +50,10 @@ with `depends_on` — avoids the webhook chicken-and-egg. Don't merge them.
 - **`spec.background`**: `true` for background-scannable rules; **`false`** for any rule
   that reads `request.userInfo` (RBAC / default-namespace / principal-aware) — Kyverno
   forbids userInfo in background scans, and a `true` there silently won't evaluate.
-- **`spec.failurePolicy: {{ .Values.failurePolicy }}`** and per-rule
-  `validationFailureAction: {{ .Values.validationFailureAction }}` — never hardcode
-  Audit/Enforce; it's driven per-cluster from the unit.
+- **`spec.failurePolicy: {{ .Values.failurePolicy }}`** and the per-rule action — never
+  hardcode Audit/Enforce, drive it per-cluster from the unit. On **validate** rules the
+  field is `validate.failureAction: {{ .Values.validationFailureAction }}`; the **verify**
+  (cosign) policies set it spec-level as `validationFailureAction: {{ .Values.verifyFailureAction }}`.
 - **Mutate policies always fail-open** (`failurePolicy: Ignore`) — a best-effort default
   must never block admission. Only validate/verify rules fail-closed.
 - **Scoping** — pick the helper, don't write raw selectors:
@@ -151,7 +152,8 @@ Add a pass/fail case to `.kyverno-tests/`, run `run.sh`, then Audit→Enforce→
   **9444** (Crossplane's provider-kubernetes squats :9443). The chart's probe ports must
   be overridden to match the server port, and `controllerRuntimeMetrics.bindAddress`
   disabled — otherwise CrashLoopBackOff on restart. See `main.tf` comments.
-- **`validationFailureAction` (per-policy: Audit/Enforce)** is distinct from
+- **The action field (per-policy: Audit/Enforce — `validate.failureAction` on validate
+  rules, spec-level `validationFailureAction` on verify policies)** is distinct from
   **`failurePolicy` (webhook config: Ignore/Fail)** — the latter is derived from the
   former in `main.tf`. In Enforce, `failurePolicy: Fail` blocks pod creation if the
   webhook is slow — that's the break-glass scenario.

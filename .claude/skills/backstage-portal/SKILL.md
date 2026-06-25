@@ -67,9 +67,10 @@ registries via the read-only GitHub App and projects entities:
 | app repo `catalog-info.yaml` | Component (via GitHub discovery) |
 | Crossplane-composed AWS resources | Resource (via K8s plugin) |
 
-`projection_mode = "v3"` selects the current model (v2 = legacy). Flipping it needs **no
-image rebuild** — the code is dormant in the image. `catalog.rules: [Component, Location]`
-keeps app repos from self-registering Groups/Systems.
+`projection_mode = "v3"` selects the current model (the live unit sets `"v3"`; the module
+**defaults to `""`** = the image default, v2 legacy). Flipping it needs **no image
+rebuild** — the code is dormant in the image. `catalog.rules: [Component, Location]` keeps
+app repos from self-registering Groups/Systems.
 
 ## Plugins & GitHub Apps
 
@@ -85,9 +86,12 @@ Enable via unit feature flags:
 - **Scaffolder** (`enable_scaffolder`): write App `platform/backstage/scaffolder-github-app`,
   scoped to `asanexample/platform` only (Contents+PRs read/write, no admin/merge).
 
-**Keep the two GitHub Apps' installations disjoint** — read-only on app repos, write on
-the platform repo; overlapping installs shadow credentials and scaffolder PRs fail.
-Scaffolder templates live **here**: `scaffolder/templates/new-{environment,product,team,resource}/`.
+**Keep the two GitHub Apps' installations disjoint** (a runbook convention — nothing in
+the module enforces it) — read-only on app repos, write on the platform repo; overlapping
+installs shadow credentials and scaffolder PRs fail. Scaffolder templates live **here**:
+`scaffolder/templates/` — the provisioning set `new-{environment,product,team,resource}/`,
+the teardown set `deprovision-{environment,product}/`, plus `request-promotion/` and
+`hello-world/`.
 
 ## Change config / deploy
 

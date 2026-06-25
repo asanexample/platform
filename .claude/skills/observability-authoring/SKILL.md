@@ -77,11 +77,13 @@ unit's `slos` input:
 slos = [{
   name        = "kubernetes-apiserver"
   service     = "kubernetes-apiserver"
+  slo_name    = "requests-availability"          # required
+  description = "API server request availability" # required
   objective   = 99.9
   error_query = "sum(rate(apiserver_request_total{code=~\"5..\"}[{{.window}}]))"
   total_query = "sum(rate(apiserver_request_total[{{.window}}]))"
   alert_name  = "K8sApiserverAvailability"
-}]
+}]   # per-SLO severities default page=critical / ticket=warning (page_severity/ticket_severity optional)
 ```
 
 `{{.window}}` is a Sloth placeholder — it passes through Helm untouched and Sloth fills

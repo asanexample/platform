@@ -51,7 +51,11 @@ ResourceQuota (ADR-062 reversible suspend).
 
 ## What the Composition emits (per claim)
 
-- **K8s** (via provider-kubernetes `Object`s): Namespace `<team>-<product>-<stage>[-<customer>]`
+- **K8s** (via provider-kubernetes `Object`s): Namespace `<team>-<product>-<stage>`
+  (per-customer: `<team>-<product>-<customer>-<stage>` — **customer is inserted before the
+  stage**, not appended; the same ordering applies to the `Pod-…` IAM role name. Note the
+  in-code comments and the XRD description mis-state this as a trailing suffix — the
+  `printf` templating in `composition.yaml` is authoritative)
   (PSA labels), ResourceQuota (zeroed if suspended), LimitRange, default-deny +
   allow-gateway + allow-dns NetworkPolicies, CiliumNetworkPolicies (ingress entity +
   Pod-Identity egress), the `environment-developers` RoleBinding, per-`platformTrust`
@@ -85,8 +89,11 @@ go-template gotchas:**
   status (routes never go Active).
 - Every *real* composed resource **must** have a unique
   `gotemplating.fn.crossplane.io/composition-resource-name` annotation.
-- To read observed status, capture `{{- $observed := .observed.resources | default dict }}`
-  **before** any `range`, then `index $observed "<name>"`.
+- The current Composition computes `status.domains` from `$spec` only — it does **not**
+  read observed resources (it binds `.observed.composite.resource`, never
+  `.observed.resources`). *If* you ever need to read prior observed composed state, capture
+  `{{- $observed := .observed.resources | default dict }}` once before any `range`, then
+  `index $observed "<name>"` — but that pattern is not used here today.
 
 The Kyverno `restrict-route-hostnames-<ns>` admits a route only while its host is
 `state: Active` in `status.domains[]`.

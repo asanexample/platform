@@ -44,7 +44,8 @@ gitops/
   products/<team>/<product>.yaml            # Product CR (repo, tenancy, domains; ADR-069)
   environments/<team>/<product>/<stage>.yaml# XEnvironment claim (reconciled by Crossplane)
   releases/<team>/<product>/<stage>.yaml    # Release record — per-service digest pins (ADR-071)
-  grants/...                                # AccessGrant CRs (cross-team)
+  grants/...                                # AccessGrant CRs (cross-team, ADR-068) — the registry-sync
+                                            #   app references this path, but no grant files exist yet
 ```
 
 Modules read these with `fileset()`+`yamldecode()` (no external tool). **Registry-sync
@@ -56,19 +57,24 @@ ApplicationSets** read `gitops/releases/**` and deploy the app overlays.
 ```
 wave -2  products registry-sync
 wave -1  teams registry-sync
-wave  0  environments + grants registry-sync, and per-Product delivery ApplicationSets
+wave  0  environments + grants registry-sync
 ```
 
 Team CRs must exist before XEnvironment admission (the Kyverno envelope gate reads them);
 Products before Environments. Registry-sync apps use `ServerSideApply=true` (Crossplane
-owns its own fields; we own only the spec).
+owns its own fields; we own only the spec). The **per-Product delivery ApplicationSets are
+NOT wave-ordered** — they're applied directly by Terraform (`helm_release` /
+`kubernetes_manifest`), not as wave-annotated Applications.
 
 ## Per-Product delivery (ADR-069)
 
-The per-Product ApplicationSet (a passthrough Helm chart, `charts/applicationset-raw`,
-because the recursive `merge` generator crashes Terraform's `kubernetes_manifest`) uses a
-**git/files generator over `gitops/releases/<team>/<product>/*.yaml`** — one Application
-per Release (i.e. per environment that has a promoted digest). The template:
+The per-Product ApplicationSet ships as a passthrough Helm chart,
+`charts/applicationset-raw` (Terraform's `kubernetes_manifest` can't represent ArgoCD's
+recursive generator schema, so the chart applies the manifest verbatim). It uses a single
+**`git`/files generator over `gitops/releases/<team>/<product>/*.yaml`** — one Application
+per Release (i.e. per environment that has a promoted digest). (The in-code rationale
+comment still says "merge" generator — historical; the live generator is git/files.) The
+template:
 
 - names the Application `<team>-<product>-<stage>` (stage derived from the Release's
   `environmentRef`), source = `<Product.repo>/k8s/overlays/<stage>`;
@@ -79,19 +85,23 @@ per Release (i.e. per environment that has a promoted digest). The template:
   `:placeholder` until CI pins the digest — a long retry would hammer a doomed revision
   for 45 min).
 
-## PR preview environments (ADR-032)
+## PR preview environments (ADR-032) — DESIGN INTENT, not yet shipped
 
-A per-Product preview ApplicationSet with a **GitHub `pullRequest` generator** (polls
-~60s). Per open PR it creates an ephemeral `<team>-<product>-pr-<n>` Application with
-`namePrefix: pr-<n>-`, instance-scoped `commonLabels`, the PR-head-SHA image, and an
-HTTPRoute hostname rewrite to `<app>-pr-<n>.<preview-domain>`. On PR close the
-Application is deleted and resources pruned.
+> **Verify against code before relying on this.** As of writing, the `argocd-apps`
+> module has **no `pullRequest` generator, no `preview_appset`, and no `github_org`/
+> `tenants` variable** — the full per-PR ApplicationSet described in ADR-032 lives only in
+> the (v2-era) `argocd-apps/README.md`, not in the deployed code.
 
-App-repo requirement for preview: a `k8s/<stage>/name-reference.yaml` teaching kustomize
-to rewrite Gateway-API HTTPRoute `backendRefs` under the name prefix (kustomize's built-in
-nameReference doesn't know HTTPRoute), and a cluster-free render regression check in CI.
-**Private repos** need a GitHub token Secret in the `argocd` namespace or PRs are silently
-skipped; **fork PRs** can't mint `id-token` so image push fails (expected).
+What **is** wired today: `var.preview_domain` on the standard per-Product delivery
+ApplicationSet. When set, the `templatePatch` rewrites the per-stage HTTPRoute host to
+`<product>-<team>-<stage>.<preview_domain>` (`delivery.tf`). That's a per-stage host
+rewrite, **not** a per-PR ephemeral environment.
+
+The ADR-032 per-PR design (a GitHub `pullRequest` generator creating ephemeral
+`<team>-<product>-pr-<n>` Applications with `namePrefix: pr-<n>-`, and an app-repo
+`k8s/<stage>/name-reference.yaml` to rewrite Gateway-API HTTPRoute `backendRefs` under the
+prefix) is the intended end-state — treat it as roadmap until the generator exists in
+`delivery.tf`.
 
 ## Platform-service vs tenant delivery (ADR-081)
 
@@ -99,9 +109,10 @@ At the GitOps layer they're **the same road** once the Product is in git: the pl
 team has a `gitops/teams/platform.yaml` with a broader `platformTrust` envelope, a
 `gitops/products/platform/<svc>.yaml`, an environment claim, and a Release — same
 machinery as a tenant app. The platform-trust difference is validated at admission
-(Kyverno envelope), not at delivery. `triage-copilot` is the reference instance. (Note:
-platform *agents* are provisioned by a separate `XAgent` Composition, not the tenant
-Environment Composition.)
+(Kyverno envelope), not at delivery. `triage-copilot` is the reference instance (its
+`gitops/{teams,products,environments}/platform/...` files exist). (Note: platform *agents*
+are intended to be provisioned by a separate `XAgent` Composition per ADR-080 — that
+Composition is **not yet in `infra/`/`gitops/`**, so treat it as design intent.)
 
 ## Add a tenant app (happy path)
 
@@ -124,12 +135,15 @@ Environment Composition.)
   namespace is owned by the Environment Composition. If the XEnvironment isn't READY, the
   namespace doesn't exist and sync errors — fix the environment first.
 - **Crossplane drift on environments**: Crossplane writes finalizers/`spec.crossplane`
-  into claims; ArgoCD sees drift. Mitigated by `ignoreDifferences` + `ServerSideApply` on
-  the environments registry-sync app — re-apply the `argocd` unit if it flaps OutOfSync.
+  into claims; ArgoCD sees drift. The registry-sync app uses `ServerSideApply=true`
+  (`delivery.tf`); separately there's a cluster-wide `resource.customizations.ignoreDifferences`
+  in the `argocd` unit's `argocd-cm` — but note it's still keyed to the **v2 `XTenant`** kind
+  (`spec.crossplane`/finalizers), not `XEnvironment`, so an `XEnvironment`-scoped
+  customization is currently missing. Re-apply the `argocd` unit if it flaps OutOfSync.
 - **Backstage ArgoCD token 401**: a Helm apply can drop the minted backstage account
   token from `argocd-cm`; re-mint and update Secrets Manager (`docs/runbooks/backstage-argocd.md`).
-- **No offline test for the merge generator** — first draft of a delivery ApplicationSet
-  is verified only against a live ArgoCD.
+- **No offline test for the delivery ApplicationSet generator** — first draft of a
+  delivery ApplicationSet is verified only against a live ArgoCD.
 - EKS is private (ADR-010): reach it over Tailscale (`cluster-access`), never the public
   endpoint.
 
