@@ -148,12 +148,29 @@ D3 rules **verbatim, on the read side:**
 model's context, the model endpoint must be **in-cloud / in-account** — the public Anthropic API is ruled out for the
 content path (even with Workload Identity Federation, content still leaves the cloud). On AWS that means **Amazon
 Bedrock** (AWS-operated, in-region, not used for training; auth is **SigV4/IAM straight onto the agent's EKS Pod
-Identity** — no API keys to vault, matching ADR-041/047). Bedrock's feature gaps don't bite triage — tool use, manual
-prompt caching, structured outputs, and adaptive thinking/effort are all GA there; we don't use the Batches/Files APIs
-or server-side web tools. The model is reached behind a **thin provider seam** (the same wrapper ADR-076 D1 mandates for
-GenAI instrumentation; the ADR-074 "model gateway" concept) so multi-cloud is a deployment knob: **AWS → Bedrock,
-GCP → Vertex AI, Azure → Microsoft Foundry**, always the host cloud's managed Claude, content pinned to that cloud and
-(for regulated tiers) region. **Metadata-only-to-the-Anthropic-API** stays the regulated-tier degrade.
+Identity** — no API keys to vault, matching ADR-041/047).
+
+**The model is reached through a thin `Model` port we own — never a vendor SDK.** The runtime depends only on a small
+internal interface (system + messages + a forced tool/schema → structured result + token usage); each provider is an
+*adapter* behind it, swappable by config. This delivers vendor- and **local-model** portability and avoids any hard
+dependency on a model-vendor SDK:
+
+- **First adapter: the Bedrock `Converse` API via `aws-sdk-go-v2`** — *not* the Anthropic SDK. Converse is one API
+  shape across **all** Bedrock models, so swapping Claude ↔ Llama/Mistral/Titan is a model-id change; `aws-sdk-go-v2` is
+  already a platform-wide dependency (no new vendor lib); it's AWS-native (Pod Identity); and it carries `toolConfig`
+  (force the structured-output tool), `usage` (incl. cache tokens), and the validated `us.anthropic.claude-sonnet-4-6`
+  inference-profile id.
+- **Portability map:** Bedrock Converse now → an **OpenAI-compatible adapter** (covers local Ollama/vLLM, OpenAI,
+  OpenRouter) and **Vertex / Foundry** adapters when a second model or cloud is actually wanted. Build the port + one
+  adapter now; defer the rest (no speculative provider zoo).
+- **Trade-off:** Converse is lower-level than a Claude SDK (no provider `strict` mode), so structured output is enforced
+  by **schema validation + retry in our code** — which is more portable (other vendors/local lack strict mode) and which
+  our grader's taxonomy validation already half-implements.
+- The **OTel GenAI instrumentation wrapper (ADR-076 D1) sits at this port boundary**, so every adapter is instrumented
+  identically — one wrapper, all providers.
+
+Content stays pinned to the host cloud and (for regulated tiers) region; **metadata-only-to-the-public-API** is the
+regulated-tier degrade.
 
 This per-tier read rule — plus the in-cloud model constraint it forces — is what makes this an *agent* observability
 decision and not a generic dashboard.
