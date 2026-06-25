@@ -94,4 +94,8 @@ bin/
 !.claude/skills/terraform-style/
 !.claude/skills/authoring-k8s-workloads/
 !.claude/skills/terragrunt-units/
+!.claude/skills/platctl/
+!.claude/skills/cluster-access/
+!.claude/skills/apply-and-destroy/
+!.claude/skills/authoring-adrs/
 .specify/
