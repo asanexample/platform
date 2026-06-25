@@ -1,0 +1,18 @@
+# Tested against the platform Team envelope + pooled platform-triage-copilot Product (values-platformtrust.yaml).
+# Everything else within-envelope so ONLY platformtrust-clusterroles-within-envelope can flag.
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata: { name: ptok }
+spec: { team: platform, product: triage-copilot, stage: prod, tier: standard, residency: { allowedLocations: ["*"] }, quota: { cpu: "4", memory: 8Gi, pods: 20 }, platformTrust: { clusterRoles: ["platform-trust-observability-reader"] }, services: { copilot: { serviceAccount: triage-copilot } } }
+---
+# requests a ClusterRole NOT in the platform team's allowlist → flagged.
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata: { name: ptbadrole }
+spec: { team: platform, product: triage-copilot, stage: prod, tier: standard, residency: { allowedLocations: ["*"] }, quota: { cpu: "4", memory: 8Gi, pods: 20 }, platformTrust: { clusterRoles: ["cluster-admin-sneaky"] }, services: { copilot: { serviceAccount: triage-copilot } } }
+---
+# no platformTrust request → the rule's precondition skips it → admitted.
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata: { name: ptnone }
+spec: { team: platform, product: triage-copilot, stage: prod, tier: standard, residency: { allowedLocations: ["*"] }, quota: { cpu: "4", memory: 8Gi, pods: 20 }, services: { copilot: { serviceAccount: triage-copilot } } }

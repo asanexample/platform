@@ -256,6 +256,7 @@ spec:
                   properties:
                     clusterRoles:
                       type: array
+                      default: []
                       description: Platform-provided ClusterRole names to bind to this Environment's ServiceAccounts (cross-namespace read).
                       items: { type: string }
                 encryption:

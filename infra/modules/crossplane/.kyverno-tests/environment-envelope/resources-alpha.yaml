@@ -28,3 +28,10 @@ apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata: { name: pooledcust }
 spec: { team: alpha, product: demo, stage: prod, customer: acme, tier: standard, residency: { allowedLocations: ["*"] }, quota: { cpu: "4", memory: 8Gi, pods: 20 } }
+---
+# tenant (alpha) Environment requesting a platform-trust ClusterRole binding → platformtrust-clusterroles-within-envelope
+# (alpha has no platformTrust allowlist). The critical "tenants cannot self-grant cluster RBAC" test (ADR-081).
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata: { name: trustcreep }
+spec: { team: alpha, product: demo, stage: dev, tier: standard, residency: { allowedLocations: ["*"] }, quota: { cpu: "4", memory: 8Gi, pods: 20 }, platformTrust: { clusterRoles: ["platform-trust-observability-reader"] } }

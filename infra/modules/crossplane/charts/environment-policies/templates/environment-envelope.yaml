@@ -111,6 +111,37 @@ spec:
                 operator: AnyNotIn
                 value: "{{`{{ team.spec.envelope.allowedStages }}`}}"
 
+    # platformTrust.clusterRoles ⊆ Team.platformTrust.clusterRoles (ADR-081). Only platform-OWNED Teams (whose Team CR
+    # lists the role in platformTrust.clusterRoles) may bind cluster-scoped read roles to their environment SAs; a
+    # tenant Environment that requests one is denied. The 2nd precondition skips ordinary environments (no request).
+    - name: platformtrust-clusterroles-within-envelope
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1beta1/XEnvironment
+      {{- include "ktp.envContext" . | nindent 6 }}
+      preconditions:
+        all:
+          - key: "{{`{{ team.metadata.name || '' }}`}}"
+            operator: Equals
+            value: "{{`{{ request.object.spec.team }}`}}"
+          - key: "{{`{{ request.object.spec.platformTrust.clusterRoles[0] || '' }}`}}"
+            operator: NotEquals
+            value: ""
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: >-
+          spec.platformTrust.clusterRoles requests a role not in Team
+          '{{`{{ request.object.spec.team }}`}}' platformTrust.clusterRoles
+          {{`{{ team.spec.platformTrust.clusterRoles }}`}} — only platform-owned Teams may bind cluster-scoped roles.
+        deny:
+          conditions:
+            any:
+              - key: "{{`{{ request.object.spec.platformTrust.clusterRoles }}`}}"
+                operator: AnyNotIn
+                value: "{{`{{ team.spec.platformTrust.clusterRoles }}`}}"
+
     # residency.allowedLocations ⊆ Team.envelope.allowedLocations
     - name: residency-within-envelope
       match:

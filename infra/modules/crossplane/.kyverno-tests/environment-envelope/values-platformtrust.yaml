@@ -1,0 +1,22 @@
+# Platform-OWNED Team `platform` (ADR-081) — its envelope PLUS a platformTrust.clusterRoles allowlist, and the
+# pooled Product platform-triage-copilot. Mocked as the ktp.envContext apiCall responses (team + product).
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Values
+metadata: { name: values }
+globalValues:
+  team:
+    metadata: { name: platform }
+    spec:
+      envelope:
+        allowedTiers: ["standard"]
+        allowedStages: ["dev", "prod"]
+        allowedLocations: ["*"]
+        quotaCap: { cpu: "16", memory: "32Gi", pods: 60 }
+      platformTrust:
+        clusterRoles: ["platform-trust-observability-reader"]
+        allowedIamActions: ["bedrock:InvokeModel"]
+  product:
+    metadata: { name: platform-triage-copilot }
+    spec:
+      team: platform
+      tenancy: pooled

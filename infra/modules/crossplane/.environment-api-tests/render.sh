@@ -115,4 +115,11 @@ printf '%s' "$OUT" | grep -q 'arn:aws:dynamodb:us-east-1:[0-9]*:table/refplat-al
 printf '%s' "$OUT" | grep -q 'SESSIONS_TABLE:'                              || { echo "::error::SESSIONS_TABLE output key missing"; exit 1; }
 echo "  ✓ resources-s3-dev OK (S3 + SQS + SNS topic (SSE/TLS-only/publish+kms) + DynamoDB table (on-demand/SSE/PITR/item IAM); all engine-scoped IAM; web-resources ConfigMap)"
 
-echo "Environment Composition render checks passed (L2a — product-scoped footprint + identity; ADR-073 — S3/SQS/SNS/DynamoDB resources)."
+echo "== render triage-copilot-prod (ADR-081 platform-trust: cluster-read ClusterRoleBinding) =="
+OUT="$(render "${here}/environments/triage-copilot-prod.yaml")"
+printf '%s' "$OUT" | grep -q 'kind: ClusterRoleBinding'                                  || { echo "::error::platform-trust ClusterRoleBinding not rendered"; printf '%s\n' "$OUT"; exit 1; }
+printf '%s' "$OUT" | grep -q 'name: platform-trust-observability-reader'                 || { echo "::error::ClusterRoleBinding must reference the requested ClusterRole"; exit 1; }
+printf '%s' "$OUT" | grep -q 'name: system:serviceaccounts:platform-triage-copilot-prod' || { echo "::error::ClusterRoleBinding must bind the env-namespace ServiceAccounts"; exit 1; }
+echo "  ✓ triage-copilot-prod OK (cluster-read ClusterRoleBinding → platform-trust-observability-reader, env SAs)"
+
+echo "Environment Composition render checks passed (L2a — product-scoped footprint + identity; ADR-073 — S3/SQS/SNS/DynamoDB resources; ADR-081 — platform-trust cluster RBAC)."

@@ -133,6 +133,7 @@ spec:
                   properties:
                     clusterRoles:
                       type: array
+                      default: [] # so the Kyverno subset-check reads [] (not null) for ordinary teams
                       description: >-
                         Names of pre-created, platform-labeled ClusterRoles the Composition binds (via a
                         ClusterRoleBinding) to this Team's environment SA group — for the cross-namespace reads
