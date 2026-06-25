@@ -26,6 +26,16 @@ locals {
   argocd_values = {
     global = {
       podLabels = local.k8s_labels
+      # AWS_REGION + regional STS for every component's AWS SDK / argocd-k8s-auth (used for cross-account managed-
+      # cluster AssumeRole, ADR-047). EKS Pod Identity injects ONLY the container-credentials env — NOT AWS_REGION,
+      # which the retired IRSA webhook used to provide. Without it the SDK falls back to the GLOBAL sts.amazonaws.com
+      # endpoint, which a private VPC can't route (only a regional com.amazonaws.<region>.sts interface endpoint
+      # exists) → cross-account cluster auth times out. Pinning the region makes it use the reachable regional STS.
+      env = [
+        { name = "AWS_REGION", value = var.region },
+        { name = "AWS_DEFAULT_REGION", value = var.region },
+        { name = "AWS_STS_REGIONAL_ENDPOINTS", value = "regional" },
+      ]
     }
 
     configs = {
@@ -148,7 +158,10 @@ resource "aws_iam_role_policy_attachment" "extra" {
   policy_arn = each.value
 }
 
-# Allows ArgoCD to assume cross-account roles for managing remote EKS clusters
+# Allows ArgoCD to assume cross-account roles for managing remote EKS clusters. TagSession is required alongside
+# AssumeRole: under EKS Pod Identity (ADR-047) the controller's session carries tags that propagate into the
+# cross-account AssumeRole, so the CALLER's identity policy must permit sts:TagSession too (the target role's trust
+# must allow it as well — see the preprod ArgoCD role). IRSA carried no tags, so this shipped as AssumeRole-only.
 resource "aws_iam_role_policy" "remote_clusters" {
   count = local.create && length(var.remote_cluster_role_arns) > 0 ? 1 : 0
 
@@ -159,7 +172,7 @@ resource "aws_iam_role_policy" "remote_clusters" {
     Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
-      Action   = "sts:AssumeRole"
+      Action   = ["sts:AssumeRole", "sts:TagSession"]
       Resource = var.remote_cluster_role_arns
     }]
   })
