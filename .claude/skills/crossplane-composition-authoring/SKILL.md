@@ -136,18 +136,22 @@ create XEnvironments. Add cross-object validation there, not in the XRD.
 ## Minimal example — add an additive spec field
 
 1. XRD (`xenvironment-xrd.yaml`), under `spec.properties` — additive, with a default:
+
    ```yaml
    labels:
      type: object
      additionalProperties: { type: string }
      default: {}
    ```
+
 2. Composition (`composition.yaml`), in the Namespace Object's labels:
+
    ```yaml
    {{- range $k, $v := ($spec.labels | default dict) }}
    {{ $k }}: {{ $v | quote }}
    {{- end }}
    ```
+
 3. `render.sh` (or `crossplane render`) to confirm the rendered namespace carries them;
    then `terragrunt apply` — existing XRs reconcile within ~5 min.
 

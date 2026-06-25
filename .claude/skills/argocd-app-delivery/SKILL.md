@@ -38,7 +38,7 @@ dynamically from `gitops/`, so **creating an environment is a git PR, not a
 
 ## The gitops/ registry layout (source of truth)
 
-```
+```text
 gitops/
   teams/<team>.yaml                         # Team CR (ADR-063)
   products/<team>/<product>.yaml            # Product CR (repo, tenancy, domains; ADR-069)
@@ -54,7 +54,7 @@ ApplicationSets** read `gitops/releases/**` and deploy the app overlays.
 
 ## Sync waves
 
-```
+```text
 wave -2  products registry-sync
 wave -1  teams registry-sync
 wave  0  environments + grants registry-sync
