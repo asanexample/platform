@@ -45,9 +45,16 @@ kubectl get nodes
 
 ## Which role
 
-- **kubectl → `PlatformAdmin`** — read + operate, **not author** (ADR-040): inspect, logs,
-  `exec`/`port-forward`, delete a stuck pod, cordon/drain, `rollout restart`. You **cannot**
-  create/edit resources — author via Git→ArgoCD, AWS infra via Terragrunt (PlatformDeployer),
+- **kubectl → `PlatformAdmin`** — cluster-wide **read** on everything, plus a *bounded* operate
+  verb set (ADR-040 — read + operate, **not author**). "Operate" is a specific allow-list, not
+  general mutation — verify against `infra/modules/cluster-rbac/main.tf` before assuming. It covers:
+  `exec`/`port-forward` + ephemeral debug containers; **delete/patch Pods** (only Pods, among
+  workloads); evict pods + cordon/drain Nodes; **patch** (not delete) Deployments/StatefulSets/
+  DaemonSets for `rollout restart`; and patch/update/delete a **named allow-list of CRDs** (Karpenter
+  NodeClaims, Crossplane managed resources). It does **NOT** cover deleting other workload objects —
+  e.g. **deleting a Job, Deployment, or anything in a system namespace like `observability` is denied**
+  (that needs PlatformDeployer or break-glass, which the model deliberately reserves). You cannot
+  create/author resources — author via Git→ArgoCD, AWS infra via Terragrunt (PlatformDeployer),
   emergencies via break-glass (`OrganizationAccountAccessRole`).
 - **terragrunt apply / Helm / K8s providers → `PlatformDeployer`** (handled by root.hcl / `_base.hcl`).
 
