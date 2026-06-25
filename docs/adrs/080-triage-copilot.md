@@ -148,12 +148,29 @@ D3 rules **verbatim, on the read side:**
 model's context, the model endpoint must be **in-cloud / in-account** — the public Anthropic API is ruled out for the
 content path (even with Workload Identity Federation, content still leaves the cloud). On AWS that means **Amazon
 Bedrock** (AWS-operated, in-region, not used for training; auth is **SigV4/IAM straight onto the agent's EKS Pod
-Identity** — no API keys to vault, matching ADR-041/047). Bedrock's feature gaps don't bite triage — tool use, manual
-prompt caching, structured outputs, and adaptive thinking/effort are all GA there; we don't use the Batches/Files APIs
-or server-side web tools. The model is reached behind a **thin provider seam** (the same wrapper ADR-076 D1 mandates for
-GenAI instrumentation; the ADR-074 "model gateway" concept) so multi-cloud is a deployment knob: **AWS → Bedrock,
-GCP → Vertex AI, Azure → Microsoft Foundry**, always the host cloud's managed Claude, content pinned to that cloud and
-(for regulated tiers) region. **Metadata-only-to-the-Anthropic-API** stays the regulated-tier degrade.
+Identity** — no API keys to vault, matching ADR-041/047).
+
+**The model is reached through a thin `Model` port we own — never a vendor SDK.** The runtime depends only on a small
+internal interface (system + messages + a forced tool/schema → structured result + token usage); each provider is an
+*adapter* behind it, swappable by config. This delivers vendor- and **local-model** portability and avoids any hard
+dependency on a model-vendor SDK:
+
+- **First adapter: the Bedrock `Converse` API via `aws-sdk-go-v2`** — *not* the Anthropic SDK. Converse is one API
+  shape across **all** Bedrock models, so swapping Claude ↔ Llama/Mistral/Titan is a model-id change; `aws-sdk-go-v2` is
+  already a platform-wide dependency (no new vendor lib); it's AWS-native (Pod Identity); and it carries `toolConfig`
+  (force the structured-output tool), `usage` (incl. cache tokens), and the validated `us.anthropic.claude-sonnet-4-6`
+  inference-profile id.
+- **Portability map:** Bedrock Converse now → an **OpenAI-compatible adapter** (covers local Ollama/vLLM, OpenAI,
+  OpenRouter) and **Vertex / Foundry** adapters when a second model or cloud is actually wanted. Build the port + one
+  adapter now; defer the rest (no speculative provider zoo).
+- **Trade-off:** Converse is lower-level than a Claude SDK (no provider `strict` mode), so structured output is enforced
+  by **schema validation + retry in our code** — which is more portable (other vendors/local lack strict mode) and which
+  our grader's taxonomy validation already half-implements.
+- The **OTel GenAI instrumentation wrapper (ADR-076 D1) sits at this port boundary**, so every adapter is instrumented
+  identically — one wrapper, all providers.
+
+Content stays pinned to the host cloud and (for regulated tiers) region; **metadata-only-to-the-public-API** is the
+regulated-tier degrade.
 
 This per-tier read rule — plus the in-cloud model constraint it forces — is what makes this an *agent* observability
 decision and not a generic dashboard.
@@ -294,6 +311,33 @@ Keycloak identity later.)*
 | **Profiles** | Correlation/summarization + the eval-scorer batch = genuinely CPU-variable Pyroscope flame graphs. |
 | **Alerts / SLOs** | Real failure modes (model timeout, rate-limit, tool failure, bad-context retry) → meaningful error-budget burn; finally gives **P6 APM / P9 SLOs** live input. |
 | **Correlations** | The headline drill end-to-end: alert → trace → tool spans → logs → token-cost metric → profile; plus quality↔cost↔latency from the eval loop. |
+
+## Design grounding (researched 2026)
+
+A deep, adversarially-verified literature pass (Anthropic agent engineering, OWASP LLM01:2025, the prompt-injection
+design-patterns paper arXiv 2506.08837, IMDA MGF, CSA Agentic NIST AI RMF Profile, Simon Willison's lethal-trifecta)
+**confirmed the major design calls** and added a few sharpeners:
+
+- **Single agent, not multi.** Multi-agent runs ~15× the tokens and is an explicit *poor fit* where agents must share
+  context / are interdependent — exactly triage. The single-agent topology (D3) is the evidence-backed choice.
+- **Plan-Then-Execute as a security property.** Decide *which* read tools to call **before** ingesting untrusted
+  content, so a malicious log line / commit message / k8s field cannot redirect tool calls (control-flow integrity).
+  This upgrades the deterministic-context-pack-then-bounded-follow-up loop (D1) from "tidy" to "injection-resistant".
+- **The lethal trifecta, and why we're safe.** Triage has *private data* (telemetry) + *untrusted content* (logs are
+  attacker-influenceable) but **no exfiltration path** — read-only, no remediation tool in the codebase, output only
+  to the incident channel. Breaking the third leg is the whole defense (D4/D5). Guard the output surface so it cannot
+  become an exfil channel.
+- **Authority in trusted code, never the prompt** (IMDA, almost verbatim): read-only lives in Pod Identity + the tool
+  layer; *no write/remediation tool is wired in at all*. "Never remediates" is an IAM/code fact, not an instruction.
+- **Behavioral telemetry as an injection canary** (CSA Tier-2): emit action-velocity, permission-escalation-rate,
+  cross-boundary-invocation, exception-rate. For a read-only agent these are **~0 by construction**, so any nonzero
+  value is a strong tamper/injection signal — a cheap, high-value addition to D7.
+- **Governance tier (correction).** Our "on-the-loop" agent maps to **CSA Tier-2 "constrained autonomy"** (document
+  the action scope, escalation trigger, approval authority; catalogue the agent identity centrally as a non-human
+  identity). *Note:* the four-level "agent proposes / collaborates / operates / observes" spectrum is **not** in the
+  IMDA MGF (that attribution was refuted in verification) — cite CSA Tier-2, not an IMDA spectrum.
+- **Prompt injection is unsolved by construction** — no published defense is individually reliable; design against it
+  as a permanent constraint (the read-only/propose-only posture), not a patchable bug.
 
 ## Scope
 
