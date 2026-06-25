@@ -68,9 +68,22 @@ inputs = {
   helm_chart_version = include.base.locals.helm_versions.crossplane
   helm_wait          = true
 
-  # P1: ECR only — proves reconciliation + drift correction with the smallest footprint. Later phases
-  # extend provider_services (and the module's provisioning IAM policy) for the Tenant Composition.
-  provider_services = ["ecr"]
+  # Agent control plane (ADR-082): the hub provisions platform AGENTS (XAgent) — hub-local platform infra —
+  # NOT tenant Environments, so enable_environment_api stays OFF (ADR-048 holds). iam/eks mint the agent's
+  # Pod-Identity role + association; provider-kubernetes (in-cluster) creates its ns/SA/obs-read RBAC; the
+  # functions drive the Composition; enable_environment_provisioning supplies the scoped provisioner role +
+  # the deny-escalation permissions boundary the agent's minted role is capped by.
+  provider_services               = ["ecr", "iam", "eks"]
+  enable_kubernetes_provider      = true
+  kubernetes_provider_hostnetwork = true
+  functions = [
+    { name = "function-go-templating", package = "xpkg.upbound.io/crossplane-contrib/function-go-templating:v0.12.1" },
+    { name = "function-auto-ready", package = "xpkg.upbound.io/crossplane-contrib/function-auto-ready:v0.6.5" },
+    { name = "function-environment-configs", package = "xpkg.upbound.io/crossplane-contrib/function-environment-configs:v0.7.1" },
+  ]
+  enable_environment_provisioning = true
+  management_account_id           = include.base.locals.account_ids["mgmt"]
+  enable_agent_api                = true
 
   # Destroy-time CR finalizer cleanup auth (scripts/k8s-finalizer-clear.sh) — see crd_finalizer_cleanup.
   deployer_role_arn      = include.base.locals.deployer_role_arn
