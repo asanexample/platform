@@ -24,18 +24,6 @@ locals {
       repo_url = "https://github.com/${yamldecode(file("${local.products_dir}/${f}")).spec.repo}"
     }
   }
-
-  # platform-services delivery (ADR-081): platform-OWNED internal services/agents, flat registry
-  # (gitops/platform-services/<name>.yaml). spec.{repo,path,namespace} drive the Application; delivered to the
-  # PLATFORM cluster (in-cluster default), not preprod.
-  platform_services_dir = "${get_repo_root()}/gitops/platform-services"
-  platform_services = { for f in fileset(local.platform_services_dir, "*.yaml") :
-    yamldecode(file("${local.platform_services_dir}/${f}")).metadata.name => {
-      repo_url  = "https://github.com/${yamldecode(file("${local.platform_services_dir}/${f}")).spec.repo}"
-      path      = yamldecode(file("${local.platform_services_dir}/${f}")).spec.path
-      namespace = yamldecode(file("${local.platform_services_dir}/${f}")).spec.namespace
-    }
-  }
 }
 
 dependency "eks" {
@@ -119,12 +107,6 @@ inputs = {
   # Replaces the retired v2 XTenant-claim delivery (the legacy `tenants` Applications were removed at the cutover).
   products       = local.products
   preview_domain = "preprod.aws.refplat.org"
-
-  # ADR-081: platform-OWNED service/agent delivery — one ApplicationSet per service, fanning out over
-  # gitops/releases/platform/<name>/*.yaml → one Application delivering the repo's Kustomize `path` to the
-  # PLATFORM cluster (platform_cluster_server defaults to in-cluster, where ArgoCD runs). Derived from
-  # gitops/platform-services. The reference instance is the triage copilot (ADR-080).
-  platform_services = local.platform_services
   # ADR-071: the platform-account ECR host — the ApplicationSet injects the Release digest as a kustomize image
   # override (<ecr_registry>/team-<team>/<product>-<svc>), matching the app overlay's image name.
   ecr_registry = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com"
