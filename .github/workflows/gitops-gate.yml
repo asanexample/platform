@@ -111,6 +111,7 @@ jobs:
             gitops/teams
             gitops/environments
             gitops/releases
+            gitops/agents
           sparse-checkout-cone-mode: true
           persist-credentials: false
 
@@ -157,6 +158,14 @@ jobs:
           HEAD_DIR: ${{ github.workspace }}/head
           RELEASE_FILES: ${{ steps.classify.outputs.release_files }}
         run: bash base/.github/scripts/gitops-gate/validate-releases.sh
+
+      - name: Validate Agents (XAgent schema + deny-set shift-left, ADR-082)
+        if: steps.classify.outputs.any == 'true' && steps.classify.outputs.agent_files != ''
+        env:
+          BASE_DIR: ${{ github.workspace }}/base
+          HEAD_DIR: ${{ github.workspace }}/head
+          AGENT_FILES: ${{ steps.classify.outputs.agent_files }}
+        run: bash base/.github/scripts/gitops-gate/validate-agents.sh
 
       # --- composition render: prove each Environment claim BUILDS against the Composition (the
       # Environment+Product join), catching schema/envelope-valid-but-render-breaking claims. Only when there
