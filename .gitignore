@@ -105,4 +105,6 @@ bin/
 !.claude/settings.json
 # Committed Claude Code hook scripts (referenced from settings.json).
 !.claude/hooks/
+# Committed project slash commands.
+!.claude/commands/
 .specify/
