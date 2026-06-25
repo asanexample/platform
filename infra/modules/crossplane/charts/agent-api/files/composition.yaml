@@ -197,6 +197,90 @@ spec:
                       name: {{ $sa }}
                       namespace: {{ $ns }}
             {{- end }}
+            {{- /* NetworkPolicies (ADR-082 D8) — mirror the tenant Composition's proven shape on this Cilium:
+                   default-deny ingress (the kubelet health probes still work — Cilium exempts host traffic);
+                   allow ingress ONLY from observability (the Alertmanager webhook) + kube-system, on the agent's
+                   8080; and allow egress to DNS + everything EXCEPT the EC2 IMDS (169.254.169.254) — that lets
+                   the agent reach Bedrock/Slack/the obs stores/the k8s API AND the EKS Pod-Identity agent
+                   (169.254.170.23, not blocked) while closing the IMDS SSRF path. */}}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: netpol-default-deny-ingress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: networking.k8s.io/v1
+                  kind: NetworkPolicy
+                  metadata:
+                    name: default-deny-ingress
+                    namespace: {{ $ns }}
+                  spec:
+                    podSelector: {}
+                    policyTypes: ["Ingress"]
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: netpol-allow-trigger-ingress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: networking.k8s.io/v1
+                  kind: NetworkPolicy
+                  metadata:
+                    name: allow-trigger-ingress
+                    namespace: {{ $ns }}
+                  spec:
+                    podSelector: {}
+                    policyTypes: ["Ingress"]
+                    ingress:
+                      - from:
+                          - namespaceSelector:
+                              matchLabels:
+                                kubernetes.io/metadata.name: observability
+                          - namespaceSelector:
+                              matchLabels:
+                                kubernetes.io/metadata.name: kube-system
+                        ports:
+                          - port: 8080
+                            protocol: TCP
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: netpol-allow-egress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: networking.k8s.io/v1
+                  kind: NetworkPolicy
+                  metadata:
+                    name: allow-egress
+                    namespace: {{ $ns }}
+                  spec:
+                    podSelector: {}
+                    policyTypes: ["Egress"]
+                    egress:
+                      - ports:
+                          - port: 53
+                            protocol: UDP
+                          - port: 53
+                            protocol: TCP
+                      - to:
+                          - ipBlock:
+                              cidr: 0.0.0.0/0
+                              except: ["169.254.169.254/32"]
     - step: ready
       functionRef:
         name: function-auto-ready
