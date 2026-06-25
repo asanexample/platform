@@ -22,6 +22,11 @@ tasks and load automatically when relevant. Prefer them over re-deriving from th
 - **environment-onboarding** — provisioning a Product/Environment via the registries + `XEnvironment` claim
 - **supply-chain-onboarding** — wiring an app's CI to the shared signing/provenance workflows
 - **authoring-adrs** — writing/evolving ADRs in `docs/adrs/`
+- **kyverno-policy-authoring** — authoring ClusterPolicies in the `policy` module (producer side; vs `authoring-k8s-workloads` consumer side)
+- **crossplane-composition-authoring** — editing the XEnvironment XRD + Composition (provisioner internals; vs `environment-onboarding` claim use)
+- **argocd-app-delivery** — ArgoCD ApplicationSets, PR previews, Release-keyed delivery, platform vs tenant roads
+- **observability-authoring** — adding dashboards/alerts/SLOs + instrumenting workloads in the LGTM+P stack
+- **backstage-portal** — configuring the Backstage portal/plugins/auth/catalog from the infra `backstage` module
 
 ## Terragrunt Config Hierarchy
 
