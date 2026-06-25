@@ -18,6 +18,12 @@ spec:
   product: triage-copilot
   stage: dev
   tier: standard
+  # Decommissioning (ADR-062): the triage agent migrated to the hub via the XAgent runtime (ADR-082), so this
+  # preprod Environment is obsolete (its workload was already pruned at the cutover). Reversible decommission
+  # first (zeroes the quota); the claim removal (purge) follows — the gitops Gate allows the purge only because
+  # the claim is decommissioning on base.
+  lifecycle:
+    phase: decommissioning
   platformTrust:
     clusterRoles: ["platform-trust-observability-reader"]
   services:
