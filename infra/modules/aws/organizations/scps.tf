@@ -314,6 +314,15 @@ data "aws_iam_policy_document" "deny_regions" {
       "invoicing:*",
       "payments:*",
       "savingsplans:*",
+      # Bedrock cross-region inference (ADR-080 agents). Models like Claude Sonnet 4.x are INFERENCE_PROFILE-only,
+      # and the system `us.*` inference profiles route InvokeModel/Converse across us-east-1/us-east-2/us-west-2 for
+      # capacity — a multi-region call by design (the agent's request is denied if it lands in a non-allowed region).
+      # Exempt only the DATA-PLANE invoke actions from the region restriction; control-plane/management Bedrock
+      # actions stay region-pinned. The `us.*` profile keeps routing within US regions.
+      "bedrock:InvokeModel",
+      "bedrock:InvokeModelWithResponseStream",
+      "bedrock:Converse",
+      "bedrock:ConverseStream",
     ]
     resources = ["*"]
     condition {
