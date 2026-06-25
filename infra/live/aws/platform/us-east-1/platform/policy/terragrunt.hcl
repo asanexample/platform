@@ -15,6 +15,24 @@ locals {
   # The platform cluster hosts shared services, not tenants — there is no teams.hcl here. The engine,
   # cluster-scoped hardening (RBAC, default-namespace), and the registry floor still apply.
   ecr_registry = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com"
+
+  # Platform AGENTS run on the hub (ADR-082), so their images are admitted HERE — cosign-verify them with the
+  # same per-Product verify-images/verify-attestations the preprod policy unit applies to tenants, but scoped to
+  # ONLY the agent Products (gitops/agents → their Product), since tenants run on preprod, not here. Join to the
+  # Product registry for spec.repo (the signer's githubWorkflowRepository identity). Empty until the first
+  # XAgent claim lands. README.md is excluded (**/*.yaml).
+  agents_dir   = "${get_repo_root()}/gitops/agents"
+  products_dir = "${get_repo_root()}/gitops/products"
+  agent_entries = [for f in fileset(local.agents_dir, "**/*.yaml") : {
+    team    = yamldecode(file("${local.agents_dir}/${f}")).spec.team
+    product = yamldecode(file("${local.agents_dir}/${f}")).spec.product
+  }]
+  verify_subjects_product = { for e in local.agent_entries : "${e.team}-${e.product}" => {
+    team           = e.team
+    product        = e.product
+    repo           = yamldecode(file("${local.products_dir}/${e.team}/${e.product}.yaml")).spec.repo
+    registryPrefix = "${local.ecr_registry}/team-${e.team}/${e.product}"
+  } }
 }
 
 dependency "eks" {
@@ -73,6 +91,10 @@ inputs = {
   webhook_host_network = true
 
   allowed_registries = [local.ecr_registry] # no tenants on the platform cluster
+
+  # Cosign verify-images/verify-attestations for the platform agents that run on the hub (ADR-082). Empty until
+  # the first XAgent claim — so this is inert today and lands the agent's image-signing guarantee on the hub.
+  verify_subjects_product = local.verify_subjects_product
 
   # Crossplane (the tenant control plane, ADR-046) runs here. Its rbac-manager authors wildcard
   # provider ClusterRoles at runtime as its own ServiceAccount (not the deployer), which the
