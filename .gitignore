@@ -103,6 +103,11 @@ bin/
 !.claude/skills/environment-onboarding/
 !.claude/skills/supply-chain-onboarding/
 !.claude/skills/skill-self-correction/
+!.claude/skills/kyverno-policy-authoring/
+!.claude/skills/crossplane-composition-authoring/
+!.claude/skills/argocd-app-delivery/
+!.claude/skills/observability-authoring/
+!.claude/skills/backstage-portal/
 # Vendored third-party skill (pinned + audited — see PROVENANCE.md):
 !.claude/skills/terraform-skill/
 # Shared team settings (MCP allow-list, hooks, etc.). The personal settings.local.json stays ignored.
