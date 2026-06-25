@@ -119,6 +119,9 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-073: Self-Service Cloud Resources (the resource paved road)](073-self-service-cloud-resources.md) | Accepted |
 | [ADR-074: Agentic Workloads — a Governed Platform for Running AI Agents](074-agentic-workloads-platform.md) | Proposed |
 | [ADR-075: The Resource Agent — Conversational Self-Service (ADR-073 Phase B)](075-resource-agent.md) | Proposed |
+| [ADR-080: The Triage Copilot — Propose-Only On-Call Incident Triage](080-triage-copilot.md) | Proposed |
+| [ADR-081: Platform-Team Products on the One Delivery Road](081-platform-service-delivery.md) | Proposed (runtime placement superseded by ADR-082) |
+| [ADR-082: The `XAgent` Platform-Agent Runtime — a GitOps-Native Agent Control Plane](082-platform-agent-runtime-xagent.md) | Proposed |
 
 ## Observability, Resilience & Compliance Assurance
 

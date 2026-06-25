@@ -48,6 +48,13 @@ The platform (hub) cluster keeps its Crossplane (installed in P1) as a standard 
 other clusters' tenants. The `Tenant` XRD + Composition are deployed to each workload cluster as a Terragrunt
 add-on unit — the same per-cluster pattern as `policy`, `cilium`, `cert-manager`, and every other add-on.
 
+> **Note (2026-06-25, [ADR-082](082-platform-agent-runtime-xagent.md)).** The hub's Crossplane gains an **`XAgent`**
+> XRD + Composition to provision **platform agents** (hub-local platform infrastructure). This is consistent with this
+> ADR: it is a *different* Composition from the tenant one, provisions **hub-local, in-cluster** resources via
+> `InjectedIdentity` provider-kubernetes (no cross-cluster reach, no remote provider creds, not a provisioning SPOF for
+> other clusters), and does **not** provision tenants. Tenants still run only on workload clusters; the hub still hosts
+> platform infra — agents are simply more of it.
+
 **Tenant claims are delivered by GitOps**, not submitted to a central API: Backstage (or a platform engineer)
 writes a `Tenant` claim into a platform-controlled git path; ArgoCD syncs it to the target cluster; that
 cluster's local Crossplane reconciles it. Centralized *visibility* (all claims in git) without centralized
