@@ -1,0 +1,13 @@
+# Platform-team Environment requesting a platform-trust ClusterRole binding (ADR-081). Asserts the Composition
+# renders a ClusterRoleBinding for the requested role (Kyverno gates the request ⊆ the Team's allowlist upstream).
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata: { name: triage-copilot-prod }
+spec:
+  team: platform
+  product: triage-copilot
+  stage: prod
+  platformTrust:
+    clusterRoles: ["platform-trust-observability-reader"]
+  services:
+    copilot: { serviceAccount: triage-copilot }

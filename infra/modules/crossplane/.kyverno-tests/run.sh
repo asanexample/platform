@@ -50,6 +50,7 @@ must_flag  "$OUT" badtier    "tier-within-envelope"
 must_flag  "$OUT" badstage   "stage-within-envelope"
 must_flag  "$OUT" overquota  "quota-within-cap"
 must_flag  "$OUT" pooledcust "customer-forbidden-on-pooled"
+must_flag  "$OUT" trustcreep "platformtrust-clusterroles-within-envelope" # tenant can't self-grant cluster RBAC (ADR-081)
 
 # No projected Team → team-must-exist.
 OUT="$(run_env resources-ghost.yaml values-ghost.yaml)"
@@ -77,6 +78,12 @@ must_admit "$OUT" iamnoperm  # no permissions block (foreach no-op)
 must_flag  "$OUT" iambad   "policystatements-no-escalation"  # iam:CreateUser
 must_flag  "$OUT" iamsts   "policystatements-no-escalation"  # sts:AssumeRole (service-prefix subsumption)
 must_flag  "$OUT" iammulti "policystatements-no-escalation"  # escalation hidden in a 2nd service
+
+# platformTrust.clusterRoles (ADR-081) — only platform-OWNED Teams may bind cluster-scoped read roles.
+OUT="$(run_env resources-platformtrust.yaml values-platformtrust.yaml)"
+must_admit "$OUT" ptok                                                    # role ∈ the platform team's allowlist
+must_admit "$OUT" ptnone                                                  # no request → precondition skips the rule
+must_flag  "$OUT" ptbadrole "platformtrust-clusterroles-within-envelope"  # role ∉ allowlist
 
 # Self-service cloud resources (ADR-073) — engine ∈ allowedEngines + count ≤ maxPerEnvironment. Team alpha opted
 # in to s3, cap 2.

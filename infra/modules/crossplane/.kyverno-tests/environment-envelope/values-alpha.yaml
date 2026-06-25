@@ -12,6 +12,8 @@ globalValues:
         allowedStages: ["dev", "prod"]
         allowedLocations: ["*"]
         quotaCap: { cpu: "8", memory: "16Gi", pods: 40 }
+      # ordinary tenant team — empty platform-trust allowlist (CRD-defaulted []), so any cluster-role request is denied
+      platformTrust: { clusterRoles: [] }
   product:
     metadata: { name: alpha-demo }
     spec:

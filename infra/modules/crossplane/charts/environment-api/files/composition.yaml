@@ -290,6 +290,39 @@ spec:
                     - kind: Group
                       name: {{ $ns }}:developers
                       apiGroup: rbac.authorization.k8s.io
+            {{- /* Platform-trust cluster-scoped RBAC (ADR-081). Only platform-OWNED Teams may request these; Kyverno
+                   (platformtrust-clusterroles-within-envelope) validates spec.platformTrust.clusterRoles ⊆ the Team's
+                   allowlist BEFORE admission, so anything that reaches here is already authorized. Binds each
+                   platform-provided, read-only ClusterRole to THIS environment's ServiceAccounts — the cross-namespace
+                   reads tenants don't get (e.g. an observability agent reading pods/Applications cluster-wide). */}}
+            {{- range $crName := (($spec.platformTrust | default dict).clusterRoles | default list) }}
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: clusterrolebinding-{{ $crName }}
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: rbac.authorization.k8s.io/v1
+                  kind: ClusterRoleBinding
+                  metadata:
+                    name: {{ printf "platform-trust-%s-%s" $ns $crName }}
+                    labels:
+                      platform.refplat.org/team: {{ $team }}
+                      platform.refplat.org/product: {{ $product }}
+                  roleRef:
+                    apiGroup: rbac.authorization.k8s.io
+                    kind: ClusterRole
+                    name: {{ $crName }}
+                  subjects:
+                    - kind: Group
+                      name: system:serviceaccounts:{{ $ns }}
+                      apiGroup: rbac.authorization.k8s.io
+            {{- end }}
             {{- /* Per-SERVICE delivery surface. ECR is PRODUCT-scoped — team-<team>/<product>-<service> (ADR-067
                    §7) — built once and promoted across stages. Identity/ECR provision for every declared service
                    regardless of `image` (a no-image service is provisioned-but-not-yet-deployed; the workload is
