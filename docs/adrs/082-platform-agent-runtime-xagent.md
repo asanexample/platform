@@ -117,8 +117,8 @@ ADR-074's "safety invariants are not configurable" needs an enforcement surface;
 - **Kyverno `restrict-agent-envelope`** ClusterPolicy (an `agent-policies` chart, mirroring `restrict-environment-envelope`):
   validates ownership, `placement`, the `awsPermissions` deny-set, and that `obsRead`/`model` resolve to the *fixed* blessed
   profiles — a claim cannot mint escalation.
-- **CI `validate-agents.sh`** gitops-Gate validator (mirroring `validate-environments.sh`): shape/hygiene + the same deny-set
-  + composition-render, shift-left.
+- **CI `validate-agents.sh`** gitops-Gate validator (mirroring `validate-environments.sh`): shape/hygiene plus the same
+  deny-set and composition-render, shift-left.
 - **`CODEOWNERS` for `gitops/agents/`**: authoring an agent grants cluster-read + Bedrock, so it is **admin/platform-gated** at
   the PR (author ≠ approver for privileged change, ADR-074).
 - **cosign verification on the hub**: because the agent's image is now admitted on the hub, `verify-images-product` /
@@ -166,7 +166,7 @@ hub**, fully consistent with ADR-048's intent. Tenants still run only on workloa
 
 - **In:** the `agent-api` chart (`XAgent` XRD + Composition + `agent-policies` + the obs-read ClusterRole); the one-time hub
   control-plane bootstrap; the `gitops/agents/` claim-sync + ArgoCD hub registration; the platform-agent workload ApplicationSet
-  + the tight AppProject; the triage copilot re-expressed as `XAgent` #1 and migrated off preprod; the curated Alertmanager
+  - the tight AppProject; the triage copilot re-expressed as `XAgent` #1 and migrated off preprod; the curated Alertmanager
   trigger + kill-switch.
 - **Out (for now):** `XPlatformService` (non-agent platform workloads); running an agent *on* a workload cluster (per-cluster
   `XAgent` federation); `access.clusters` cross-cluster read roles (Phase 2); migrating backstage/argocd/obs onto the lane.
