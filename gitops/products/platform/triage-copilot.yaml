@@ -1,0 +1,16 @@
+# Product "triage-copilot" owned by Team platform (ADR-080/081) — the reference platform-owned Product. The
+# git-native registry entry; delivery (argocd-apps, github-oidc, policy) derives repo/image-scope from here exactly
+# as for a tenant Product. Image scope: team-platform/triage-copilot-*.
+apiVersion: platform.refplat.org/v1beta1
+kind: Product
+metadata:
+  name: platform-triage-copilot
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/part-of: environment-api
+spec:
+  team: platform
+  repo: asanexample/triage-copilot
+  tenancy: pooled
+  defaultIsolation: { compute: dedicated-namespace }
+  domains: []
