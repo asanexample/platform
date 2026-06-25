@@ -1,0 +1,33 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-agent-control-plane
+  labels:
+    {{- include "kap.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Restrict Agent Control-Plane Resources
+    policies.kyverno.io/category: Security, Agentic
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: XAgent
+    policies.kyverno.io/description: >-
+      The XAgent control plane (ADR-082) provisions a cluster-read identity + a Bedrock grant, so XAgent claims
+      may be authored only by platform principals (GitOps / the deployer), never ad-hoc. XAgent is cluster-scoped
+      (callers already need cluster RBAC) and gitops/agents is CODEOWNERS-gated; this is defense-in-depth and
+      makes the intent explicit. The composite controller + provider-kubernetes author as crossplane-system
+      (allow-listed), so the Composition itself is unaffected.
+spec:
+  # background: false is required — the rule references request.userInfo.username (platform-principal skip).
+  background: false
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    - name: deny-non-platform-agent-control-plane
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1beta1/XAgent
+      {{- include "kap.skipPlatformPrincipals" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.validationFailureAction }}
+        message: "XAgent claims may only be managed by platform principals (GitOps / the deployer), not ad-hoc."
+        deny: {}

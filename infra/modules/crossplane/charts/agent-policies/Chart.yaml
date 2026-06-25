@@ -1,0 +1,11 @@
+apiVersion: v2
+name: crossplane-agent-policies
+description: >-
+  Kyverno admission policies for the XAgent control plane (ADR-082 D6) — the gate that makes ADR-074's safety
+  invariants un-bypassable on the hub. restrict-agent-control-plane: only platform principals (GitOps/deployer)
+  may author XAgent claims. restrict-agent-envelope: an XAgent's awsPermissions.policyStatements may not request
+  the deny-set IAM services (iam/sts/organizations/account + bare-* wildcards) — the same escalation guard as the
+  tenant envelope (ADR-062 §4), so a claim cannot mint itself privilege beyond the permissions boundary.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

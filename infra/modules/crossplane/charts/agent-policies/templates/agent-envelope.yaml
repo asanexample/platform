@@ -1,0 +1,59 @@
+{{- if .Values.enableAgentEnvelope }}
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-agent-envelope
+  labels:
+    {{- include "kap.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Restrict Agent Envelope
+    policies.kyverno.io/category: Security, Agentic
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: XAgent
+    policies.kyverno.io/description: >-
+      The envelope plane for XAgent (ADR-082 D6). An XAgent's awsPermissions.policyStatements may not request the
+      deny-set IAM services (the same escalation guard as the tenant envelope, ADR-062 §4) — the minted Pod-Identity
+      role is also boundary-capped at runtime. placement is hub-only and model/autonomy are XRD-enum-constrained;
+      the free-form risk is awsPermissions, gated here.
+spec:
+  background: true
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    - name: policystatements-no-escalation
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1beta1/XAgent
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: >-
+          an XAgent's awsPermissions.policyStatements requests a disallowed IAM action — the services
+          {{ .Values.iamSensitiveServices | join ", " }} (and bare '*' wildcards) are denied; the minted role
+          is also capped by the AWS permissions boundary (ADR-062 §4 / ADR-082 D5).
+        foreach:
+          - list: "request.object.spec.awsPermissions.policyStatements[].actions[]"
+            deny:
+              conditions:
+                any:
+                  - key: "{{`{{ to_lower(split(element, (':'))[0]) }}`}}"
+                    operator: AnyIn
+                    value:
+{{- range .Values.iamSensitiveServices }}
+                      - {{ . | quote }}
+{{- end }}
+    # Defense-in-depth on placement (the XRD enum is primary): an XAgent runs only on the hub today.
+    - name: placement-hub-only
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1beta1/XAgent
+      validate:
+        failureAction: {{ .Values.envelopeFailureAction }}
+        message: "an XAgent may only be placed on the platform (hub) cluster (ADR-082 D2)."
+        pattern:
+          spec:
+            =(placement):
+              =(cluster): "platform"
+{{- end }}
