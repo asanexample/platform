@@ -85,5 +85,11 @@ bin/
 **/.DS_Store
 
 # Local tooling (not committed)
-.claude/
+.claude/*
+# ...except house-authored skills, which are committed and shared with the team.
+# Third-party/installed skills (speckit-*, etc.) stay ignored. Add one negation
+# line per house skill.
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/terraform-style/
 .specify/
