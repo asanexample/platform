@@ -149,9 +149,16 @@ inputs = {
       managed_policies = ["arn:aws:iam::aws:policy/AdministratorAccess"]
     }
 
-    # Assumed by ArgoCD IRSA service accounts in the platform cluster
+    # Assumed by ArgoCD's EKS Pod Identity service-account role on the platform cluster (ADR-047, #677)
     ArgoCD = {
       description = "Cross-account ArgoCD cluster management from platform hub"
+
+      # argocd-k8s-auth assumes this role from a Pod Identity session, which PROPAGATES session tags — so the trust
+      # must allow TagSession in addition to AssumeRole (mirrors the Backstage role below). Without it the
+      # cross-account AssumeRole is denied 'not authorized to perform: sts:TagSession', and every preprod-targeted
+      # Application wedges. Regression from the IRSA→Pod Identity migration (#677): the prior web-identity flow
+      # carried no tags, so this trust shipped with AssumeRole only.
+      trust_actions = ["sts:AssumeRole", "sts:TagSession"]
 
       trust_principals = {
         aws = ["arn:aws:iam::${include.base.locals.account_ids["platform"]}:root"] # Platform account
