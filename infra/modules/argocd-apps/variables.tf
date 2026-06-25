@@ -17,7 +17,7 @@ variable "argocd_namespace" {
 }
 
 variable "preview_domain" {
-  description = "Base domain for PR preview hostnames (e.g. preprod.aws.refplat.org)"
+  description = "Optional base domain. When set, the per-Product delivery ApplicationSet rewrites each Environment's HTTPRoute hostname to <product>-<team>-<stage>.<preview_domain> (a per-stage host rewrite — NOT per-PR previews; those, ADR-032, are not yet implemented on the v3 model)."
   type        = string
   default     = ""
 }
@@ -54,17 +54,17 @@ variable "teams_repo_path" {
 # delivery (ADR-069 / L2b #384) — per-Product ApplicationSets from the git registry
 # ---------------------------------------------------------------------------
 variable "products" {
-  description = "v3: per-Product delivery, keyed <team>-<product>. One ApplicationSet per product; its git-files generator fans out over gitops/environments/<team>/<product>/*.yaml → one Application per Environment (decision c)."
+  description = "v3: per-Product delivery, keyed <team>-<product>. One ApplicationSet per product; its git-files generator fans out over the Product's Release records gitops/releases/<team>/<product>/*.yaml → one Application per Environment that has a Release (ADR-071, #377)."
   type = map(object({
     team     = string # owning team
-    product  = string # product short name (the gitops/environments/<team>/<product>/ dir)
+    product  = string # product short name (the gitops/{releases,environments}/<team>/<product>/ dir)
     repo_url = string # the app repo (Product.repo), https URL — the Application source
   }))
   default = {}
 }
 
 variable "platform_repo_url" {
-  description = "v3: the platform GitOps repo the per-Product ApplicationSet git-files generator reads Environment claims from (gitops/environments/). Empty disables delivery."
+  description = "v3: the platform GitOps repo read by the registry-sync apps (gitops/{products,environments,grants}/) and the per-Product delivery ApplicationSet (gitops/releases/<team>/<product>/). Empty disables delivery."
   type        = string
   default     = ""
 }

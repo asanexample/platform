@@ -67,7 +67,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-028: ECR Cross-Account Container Registry](028-ecr-cross-account-container-registry.md) | Accepted |
 | [ADR-029: Preprod Public Ingress via Gateway API](029-preprod-public-ingress-gateway-api.md) | Accepted |
 | [ADR-031: Multi-App Tenant Model](031-multi-app-tenant-model.md) | Accepted |
-| [ADR-032: PR Preview Environments](032-pr-preview-environments.md) | Accepted |
+| [ADR-032: PR Preview Environments](032-pr-preview-environments.md) | Accepted (not yet implemented on v3) |
 | [ADR-033: Defer vCluster Tenant Support](033-defer-vcluster-tenant-support.md) | Accepted |
 | [ADR-046: Adopt the BACK Stack for Developer Self-Service](046-back-stack-for-developer-self-service.md) | Accepted |
 | [ADR-048: Federated, Per-Cluster Crossplane for Tenant Provisioning](048-federated-per-cluster-crossplane.md) | Accepted |
