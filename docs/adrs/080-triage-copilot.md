@@ -323,9 +323,10 @@ Rides the **live** backbone (ADR-077; #102 P1–P5/P11) and the ADR-076 agent-tr
 substrate primitives. **Gated on the first-agent eval-feasibility spike** — fault-injecting known failures in a
 walled-off preprod namespace, freezing the telemetry into graded fixtures (D6), and confirming the harness produces a
 usable graded signal **before** committing to the full agent (D6 is the risk; de-risk it first). Plan:
-`docs/plans/080-triage-copilot-eval-spike.md`. The spike rides the **P10 preprod-spoke work (#150)** — metrics are
-already live; the agent reads Loki/Tempo, so it needs the **logs/traces spokes** (the P10 follow-on) finished, preprod
-scaled up, and the test app's namespace enabled for scrape. This is the **first agent built on the substrate**, revising the
+`docs/plans/080-triage-copilot-eval-spike.md`. The spike rides the **P10 preprod-spoke work** — the metrics, **logs,
+and traces** spokes are **already built (#625)** and the hub receives the `preprod` tenant, so what remains is
+**operational**: scale preprod up, **apply + verify** the logs/traces spokes flow to the hub, and enable the eval test
+app's namespace for scrape. This is the **first agent built on the substrate**, revising the
 ADR-074/075 plan that put the oracle-able resource agent first (see Context). The resource agent (ADR-075) is **not a
 prerequisite** — it remains a valuable **complementary, later** build whose deterministic oracle is a cleaner, though
 lower-coverage, substrate check.

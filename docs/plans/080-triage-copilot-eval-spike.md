@@ -63,7 +63,7 @@ Scenario 10 is the deliberate test of the "injected faults are too clean" gap.
 
 ## Sequence
 
-- **Phase 0 — venue.** Scale up preprod; create the throwaway eval namespace; deploy the test app; confirm the **preprod observability spoke (P10, #150)** captures the app's metrics **and logs/traces**. *(Hard dependency: P10 metrics are live, but the **logs/traces spokes are a P10 follow-on not yet built** — and the agent reads Loki/Tempo, so this must be finished first. Also needs `allow-metrics-scrape` on the test app's Environment namespace.)*
+- **Phase 0 — venue.** Scale up preprod; apply the preprod observability spoke units; create the throwaway eval namespace; deploy the test app; confirm the spoke captures the app's metrics **and logs/traces** in the hub Grafana. *(The metrics/logs/traces spokes are **already built (#625)** and the hub receives the `preprod` tenant — but they have **not been applied/verified on a live preprod** (it's scaled down). So Phase 0 is operational: scale up → apply → verify telemetry reaches the hub. Also needs `allow-metrics-scrape` on the test app's Environment namespace.)*
 - **Phase 1 — freeze first, no agent.** Build C + D + E. Prove you can take a faithful "photograph" of a window and read it back.
 - **Phase 2 — three easy faults.** Build B for scenarios 1, 5, 6 (cleanest) → produce 3 fixtures.
 - **Phase 3 — first graded run.** Build F + G; run over the 3 fixtures; confirm you get *a* graded score at all.
@@ -82,7 +82,7 @@ uncertainty, surfaces). This spike builds **only** the answer-key machinery.
 - **Faults too clean** — real incidents are noisy/cascading. *Mitigation:* scenario #10 (compound under load); calibrate difficulty against the few real postmortems later.
 - **Taxonomy doesn't fit a real fault** — *Mitigation:* the `other/unknown` escape hatch + a flag to grow the enum; a high `other` rate is itself a finding.
 - **Preprod entanglement** — demolition disturbs other staging work. *Mitigation:* a dedicated eval namespace/test-product; faults scoped to it.
-- **Preprod logs/traces not flowing** — P10 (#150) shipped *metrics* only; the logs/traces spokes are an unbuilt follow-on, and the agent reads Loki/Tempo. *Mitigation:* Phase 0 gates on finishing them; if that slips, the fallback is a small dedicated cluster in the test account (higher build cost — see ADR-080 venue discussion).
+- **Preprod logs/traces not flowing** — the spokes are built (#625) but **unproven live**; applying them to a scaled-up preprod may surface issues (the agent reads Loki/Tempo). *Mitigation:* Phase 0 applies + verifies them; if preprod can't be stood up, the fallback is a small dedicated cluster in the test account (higher build cost — see ADR-080 venue discussion).
 
 ## Artifacts
 
