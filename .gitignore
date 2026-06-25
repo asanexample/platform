@@ -100,6 +100,7 @@ bin/
 !.claude/skills/authoring-adrs/
 !.claude/skills/environment-onboarding/
 !.claude/skills/supply-chain-onboarding/
+!.claude/skills/skill-self-correction/
 # Shared team settings (MCP allow-list, etc.). The personal settings.local.json stays ignored.
 !.claude/settings.json
 .specify/
