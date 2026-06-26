@@ -381,18 +381,19 @@ resource "helm_release" "nodepool" {
   wait             = false
 
   values = [yamlencode({
-    clusterName          = var.cluster_name
-    nodeRole             = local.node_role_name
-    subnetIds            = local.selected_subnets
-    securityGroupId      = var.cluster_security_group_id
-    arch                 = local.k8s_arch
-    instanceFamilies     = local.instance_families
-    minInstanceMemoryMib = var.min_instance_memory_mib
-    capacityTypes        = var.capacity_types
-    consolidationPolicy  = var.consolidation_policy
-    consolidateAfter     = var.consolidate_after
-    cpuLimit             = var.cpu_limit
-    memoryLimit          = var.memory_limit
+    clusterName            = var.cluster_name
+    nodeRole               = local.node_role_name
+    subnetIds              = local.selected_subnets
+    securityGroupId        = var.cluster_security_group_id
+    arch                   = local.k8s_arch
+    instanceFamilies       = local.instance_families
+    minInstanceMemoryMib   = var.min_instance_memory_mib
+    capacityTypes          = var.capacity_types
+    consolidationPolicy    = var.consolidation_policy
+    consolidateAfter       = var.consolidate_after
+    terminationGracePeriod = var.node_termination_grace_period
+    cpuLimit               = var.cpu_limit
+    memoryLimit            = var.memory_limit
     # BYOCNI: pods must not land before Cilium is ready; Cilium removes this taint (D5).
     startupTaintKey = "node.cilium.io/agent-not-ready"
     maxPods         = 110

@@ -91,6 +91,12 @@ variable "consolidate_after" {
   default     = "1m"
 }
 
+variable "node_termination_grace_period" {
+  description = "NodePool terminationGracePeriod (ADR-085): the maximum a node drain waits on blocking PodDisruptionBudgets or karpenter.sh/do-not-disrupt pods before Karpenter forcibly drains. Bounds how long a workload PDB can stall consolidation/drift/upgrades. Empty string omits the field (Karpenter default: unbounded)."
+  type        = string
+  default     = "8h"
+}
+
 variable "cpu_limit" {
   description = "NodePool ceiling on total provisioned vCPU (cost guardrail)."
   type        = number

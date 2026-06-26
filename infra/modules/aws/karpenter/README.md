@@ -25,6 +25,10 @@ replacing the static spot workload node group. Cluster-agnostic + parameterized 
 
 `limits.{cpu,memory}` cap total provisioned capacity. Single-AZ (dev) is honored by selecting one subnet.
 
+`node_termination_grace_period` (default `8h`) bounds how long a blocking PodDisruptionBudget or a
+`karpenter.sh/do-not-disrupt` pod can stall a node drain before Karpenter forcibly drains — the backstop that
+keeps a bad single-replica PDB from wedging consolidation, drift, or an EKS upgrade (ADR-085).
+
 ## Inputs of note
 
 `node_role_arn` (the node-groups unit's output — Karpenter nodes assume the same role), plus
