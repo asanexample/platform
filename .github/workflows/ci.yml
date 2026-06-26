@@ -21,7 +21,7 @@ jobs:
       terragrunt: ${{ steps.read.outputs.terragrunt }}
       helm: ${{ steps.read.outputs.helm }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - id: read
         name: Read /.tool-versions
         run: |
@@ -35,8 +35,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: versions
     steps:
-      - uses: actions/checkout@v7
-      - uses: opentofu/setup-opentofu@v2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: opentofu/setup-opentofu@847eaa4afeb791b06daa46e8eafa8b1b68d7cfb4 # v2.0.1
         with:
           tofu_version: ${{ needs.versions.outputs.opentofu }}
       - name: Check formatting
@@ -50,8 +50,8 @@ jobs:
       # Provider plugin cache — without it every module's `tofu init` re-downloads aws/helm/kubernetes (~30×).
       TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.tofu-plugin-cache
     steps:
-      - uses: actions/checkout@v7
-      - uses: opentofu/setup-opentofu@v2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: opentofu/setup-opentofu@847eaa4afeb791b06daa46e8eafa8b1b68d7cfb4 # v2.0.1
         with:
           tofu_version: ${{ needs.versions.outputs.opentofu }}
 
@@ -75,7 +75,7 @@ jobs:
       # Persist the provider plugins across runs; restore-keys give a partial hit when versions change.
       - name: Cache provider plugins
         if: steps.scope.outputs.run == 'true'
-        uses: actions/cache@v5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ${{ env.TF_PLUGIN_CACHE_DIR }}
           key: tofu-plugins-${{ runner.os }}-${{ hashFiles('infra/modules/**/versions.tf', '.github/workflows/ci.yml') }}
@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: versions
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Install Terragrunt
         env:
           # Version from /.tool-versions (the `versions` job); the release tag is v-prefixed.
@@ -111,7 +111,7 @@ jobs:
     name: Markdown Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
       - name: Lint changed markdown files
@@ -142,7 +142,7 @@ jobs:
     name: Gate Scripts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Install yq (mikefarah)
         run: |
           sudo curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
@@ -166,8 +166,8 @@ jobs:
       # Pin to the chart's appVersion (helm_versions.kyverno = 3.8.1) so test semantics match.
       KYVERNO_VERSION: "1.18.1"
     steps:
-      - uses: actions/checkout@v7
-      - uses: azure/setup-helm@v5
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           # Canonical Helm pin from /.tool-versions — keep CLI rendering on the 3.x line (not floating to v4).
           version: v${{ needs.versions.outputs.helm }}
@@ -202,7 +202,7 @@ jobs:
     env:
       CROSSPLANE_VERSION: "v2.2.1" # crank CLI version (built from source — see install step)
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       # Scope: this validates the crossplane module's OWN example fixtures (.environment-api-tests) against the
       # XRD — a PR that changes no infra/modules/crossplane/** can't affect it. Short-circuit to green (the job
       # still runs + reports, so it stays a valid required check), skipping the ~2-min crank build. Registry PRs
@@ -221,12 +221,12 @@ jobs:
           else
             echo "run=false" >> "$GITHUB_OUTPUT"; echo "no crossplane module change → skipping (gitops claims are validated by the gitops Gate)"
           fi
-      - uses: azure/setup-helm@v5 # the harness renders the crossplane-teams chart (registry → projection)
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1 — renders the crossplane-teams chart (registry → projection)
         if: steps.scope.outputs.run == 'true'
         with:
           # Canonical Helm pin from /.tool-versions — keep CLI rendering on the 3.x line (not floating to v4).
           version: v${{ needs.versions.outputs.helm }}
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         if: steps.scope.outputs.run == 'true'
         with:
           go-version: stable
@@ -253,7 +253,7 @@ jobs:
     env:
       CROSSPLANE_VERSION: "v2.2.1" # crank CLI version (built from source — see install step)
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       # Scope: this renders the crossplane module's OWN Composition + example fixtures — a PR that changes no
       # infra/modules/crossplane/** can't affect it. Short-circuit to green (skip the ~2.5-min crank build +
       # function-image pulls), staying a valid required check. Registry PRs (gitops/**, e.g. a decommission) have
@@ -272,7 +272,7 @@ jobs:
           else
             echo "run=false" >> "$GITHUB_OUTPUT"; echo "no crossplane module change → skipping (gitops claims are rendered by the gitops Gate)"
           fi
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         if: steps.scope.outputs.run == 'true'
         with:
           go-version: stable
@@ -297,8 +297,8 @@ jobs:
     name: TFLint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: terraform-linters/setup-tflint@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: terraform-linters/setup-tflint@b480b8fcdaa6f2c577f8e4fa799e89e756bb7c93 # v6.2.2
       - name: Lint all modules
         run: |
           FAILED=0
@@ -336,7 +336,7 @@ jobs:
     env:
       TRIVY_VERSION: "0.70.0" # pinned clean release; v0.69.4 was the malicious one
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Install Trivy CLI (download release binary + verify SHA-256)
         run: |
           base="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
@@ -367,7 +367,7 @@ jobs:
           dep() { trivy fs infra/tests/aws --scanners vuln --severity HIGH,CRITICAL "$@"; }
           dep --format sarif --output trivy-deps.sarif --exit-code 0
           echo "::group::Trivy dependency findings"; dep --format table --exit-code 1; echo "::endgroup::"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: trivy-sarif
@@ -377,8 +377,8 @@ jobs:
     name: Semgrep (SAST)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
       - name: Install Semgrep (pinned)
@@ -395,7 +395,7 @@ jobs:
           echo "::group::Semgrep findings"
           semgrep scan $rulesets --exclude '*.sarif' --metrics off --error
           echo "::endgroup::"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: semgrep-sarif
