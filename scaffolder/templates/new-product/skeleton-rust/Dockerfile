@@ -10,7 +10,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends musl-tools && r
 # Copy manifests + lock first so the dependency build caches across source-only changes.
 COPY Cargo.toml Cargo.lock ./
 COPY src/ src/
-RUN cargo build --release --locked --target "$(uname -m)-unknown-linux-musl" && \
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/app/target \
+    cargo build --release --locked --target "$(uname -m)-unknown-linux-musl" && \
     cp "target/$(uname -m)-unknown-linux-musl/release/app" /app/app-bin
 
 FROM gcr.io/distroless/static-debian12:nonroot

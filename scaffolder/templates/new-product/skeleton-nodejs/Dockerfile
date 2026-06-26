@@ -5,7 +5,7 @@ FROM node:22-slim AS build
 WORKDIR /app
 # Copy the manifests first so the dependency layer caches across source-only changes.
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
 
 COPY src/ src/
 
