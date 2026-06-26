@@ -31,6 +31,11 @@ spec:
       # App does not talk to the Kubernetes API — drop the SA token (least privilege). Required by the
       # platform Kyverno policy restrict-automount-sa-token (also auto-injected by mutate when absent).
       automountServiceAccountToken: false
+      # Graceful drain (ADR-085): the container preStop sleep keeps the pod serving for a beat after it goes
+      # Terminating so endpoint de-programming wins the race with SIGTERM; this budget must exceed that sleep
+      # plus the app's in-flight drain. The platform mutate injects the same default when absent — set here so
+      # the zero-downtime shape is explicit. Your app must still drain in-flight work on SIGTERM.
+      terminationGracePeriodSeconds: 30
       # Explicit hardened pod securityContext (defense-in-depth — the platform mutate would inject the
       # container-level bits, but a best-practice starter sets them outright). The image runs as a non-root
       # user (Dockerfile USER), so runAsNonRoot is satisfiable.
@@ -38,6 +43,28 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+      # Spread replicas across nodes and AZs so a single node/AZ loss (or a Karpenter consolidation) can't take
+      # all replicas at once (ADR-085). ScheduleAnyway (soft) — a hard constraint would strand pods Pending on a
+      # small or scaling-from-zero cluster. matchLabelKeys adds pod-template-hash so each rollout revision spreads
+      # independently. This lives in the skeleton (not the platform mutate) because the labelSelector must match
+      # this workload's own pods, which a generic mutate can't know.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          matchLabelKeys:
+            - pod-template-hash
+          labelSelector:
+            matchLabels:
+              app: app-${{ values.team }}-${{ values.product }}
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          matchLabelKeys:
+            - pod-template-hash
+          labelSelector:
+            matchLabels:
+              app: app-${{ values.team }}-${{ values.product }}
       containers:
         - name: app-${{ values.team }}-${{ values.product }}
           # Product-scoped ECR image (v3: team-<team>/<product>-<service>). The :placeholder tag is the
@@ -91,6 +118,12 @@ spec:
               path: /healthz
               port: 8080
             periodSeconds: 10
+          # Native SleepAction (k8s 1.35, no shell needed) — hold for a beat after SIGTERM so the Gateway/Cilium
+          # stops routing here before the process exits (ADR-085). The platform mutate injects this when absent.
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 10
           volumeMounts:
             - name: tmp
               mountPath: /tmp

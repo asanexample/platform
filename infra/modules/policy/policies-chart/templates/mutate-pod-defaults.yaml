@@ -6,18 +6,21 @@ metadata:
   labels:
     {{- include "kpp.labels" . | nindent 4 }}
   annotations:
-    policies.kyverno.io/title: Default Hardened Pod securityContext + automount
+    policies.kyverno.io/title: Default Hardened Pod securityContext + automount + graceful drain
     policies.kyverno.io/category: Security, Pod Security
     policies.kyverno.io/severity: medium
     policies.kyverno.io/subject: Pod
     policies.kyverno.io/description: >-
       Adds safe defaults to environment pods when not already set: a hardened container securityContext
-      (allowPrivilegeEscalation=false, drop ALL capabilities, seccompProfile=RuntimeDefault) and
-      automountServiceAccountToken=false. add-if-absent so it never overrides an explicit choice.
-      runAsNonRoot is intentionally left to the workload (forcing it crashes root images) — enforced
-      for regulated tiers via require-pod-security-restricted. Paired with the
-      disallow-privilege-escalation / require-seccomp validate backstops. (securityContext and
-      automount share one patch so the strategic-merge type resolves correctly under autogen.)
+      (allowPrivilegeEscalation=false, drop ALL capabilities, seccompProfile=RuntimeDefault),
+      automountServiceAccountToken=false, and graceful-drain defaults (a preStop sleep + a 30s
+      terminationGracePeriodSeconds) so rolling updates and node disruptions don't drop in-flight traffic
+      (ADR-085). add-if-absent so it never overrides an explicit choice. runAsNonRoot is intentionally left
+      to the workload (forcing it crashes root images) — enforced for regulated tiers via
+      require-pod-security-restricted. Paired with the disallow-privilege-escalation / require-seccomp
+      validate backstops. (All defaults share one patch so the strategic-merge type resolves correctly
+      under autogen. topologySpreadConstraints are NOT injected here — their labelSelector needs the
+      workload's own labels, which a static patch lacks; they live in the scaffolder skeleton, ADR-085 D2.)
 spec:
   # Mutations fail open: a best-effort default must never block admission (validation is separate).
   failurePolicy: Ignore
@@ -33,6 +36,10 @@ spec:
         patchStrategicMerge:
           spec:
             +(automountServiceAccountToken): false
+            # Graceful drain: keep serving for a beat after the pod goes Terminating so endpoint
+            # de-programming (Cilium/Envoy) wins the race with SIGTERM. terminationGracePeriodSeconds
+            # must exceed the preStop sleep plus the app's own in-flight drain budget (ADR-085 D2).
+            +(terminationGracePeriodSeconds): 30
             containers:
               - (name): "?*"
                 securityContext:
@@ -42,6 +49,11 @@ spec:
                   +(capabilities):
                     drop:
                       - ALL
+                # Native SleepAction (GA on the cluster's k8s 1.35) — no shell, safe on distroless images.
+                lifecycle:
+                  +(preStop):
+                    sleep:
+                      seconds: 10
             initContainers:
               - (name): "?*"
                 securityContext:
