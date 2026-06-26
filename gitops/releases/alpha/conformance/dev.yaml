@@ -6,4 +6,4 @@ spec:
   environmentRef: alpha-conformance-dev
   services:
     web:
-      digest: sha256:048b9ebe3d551638cf505057e252461ee7c85b5d1e048685c8748c7df84d602c
+      digest: sha256:c81ac572f56b3c8ad470fb9c0fc95eee75280c5abe3c1be11a99d6e9ac1e6f87
