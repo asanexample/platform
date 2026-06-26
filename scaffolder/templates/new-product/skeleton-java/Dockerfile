@@ -5,10 +5,10 @@ FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /app
 # Resolve dependencies first so the (large) dependency layer caches across source-only changes.
 COPY pom.xml ./
-RUN mvn -B -q -DskipTests dependency:go-offline
+RUN --mount=type=cache,target=/root/.m2 mvn -B -q -DskipTests dependency:go-offline
 
 COPY src/ src/
-RUN mvn -B -q -Dmaven.test.skip=true package
+RUN --mount=type=cache,target=/root/.m2 mvn -B -q -Dmaven.test.skip=true package
 
 FROM gcr.io/distroless/java21-debian12:nonroot
 

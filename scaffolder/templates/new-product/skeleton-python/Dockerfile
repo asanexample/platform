@@ -6,7 +6,7 @@ FROM python:3.11-slim AS build
 WORKDIR /app
 # Copy requirements first so the dependency layer caches across source-only changes.
 COPY requirements.txt ./
-RUN pip install --no-cache-dir --target /deps -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip pip install --target /deps -r requirements.txt
 
 COPY app/ app/
 
