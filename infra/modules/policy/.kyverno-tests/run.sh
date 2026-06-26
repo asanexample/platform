@@ -25,7 +25,7 @@ kyverno test .
 echo "Running mutation smoke-check ..."
 # kyverno apply exits non-zero when a resource fails a validate policy (the bare pod intentionally
 # does), so tolerate that and inspect the captured output instead.
-MUT="$(kyverno apply rendered/policies.yaml --resource resources/mutate-input.yaml --values-file values.yaml 2>&1 || true)"
+MUT="$(kyverno apply rendered/policies.yaml --resource resources/mutate-input.yaml --values-file values.yaml -o "$DIR/rendered/mutated" 2>&1 || true)"
 APPLIED="$(printf '%s' "$MUT" | grep -c 'Mutation has been applied successfully' || true)"
 if ! grep -q 'error: 0' <<<"$MUT"; then
   echo "FAIL: mutate produced errors"; printf '%s\n' "$MUT"; exit 1
@@ -34,6 +34,16 @@ if [ "$APPLIED" -lt 2 ]; then
   echo "FAIL: expected >=2 mutations on the bare Deployment, got $APPLIED"; printf '%s\n' "$MUT"; exit 1
 fi
 echo "Mutation smoke-check passed ($APPLIED mutations applied via autogen, 0 errors)."
+
+# Field-level assertions on the mutated Deployment: mutate-pod-defaults must inject the ADR-085 graceful-drain
+# defaults under autogen (spec.template.spec) — the mutation count above can't distinguish which fields landed,
+# so grep the actual patched resource. topologySpreadConstraints is NOT asserted (it lives in the scaffolder,
+# not this mutate — ADR-085 D2).
+MUTATED="$(cat "$DIR/rendered/mutated"/* 2>/dev/null)"
+for field in 'terminationGracePeriodSeconds: 30' 'preStop:' 'seconds: 10'; do
+  grep -q "$field" <<<"$MUTATED" || { echo "FAIL: mutate did not inject '$field' on the bare Deployment"; printf '%s\n' "$MUTATED"; exit 1; }
+done
+echo "Graceful-drain field-injection check passed (terminationGracePeriodSeconds + preStop sleep)."
 
 # Render-check the per-PRODUCT supply-chain verification (verify-images-product + verify-attestations-product,
 # ADR-067/069 §6 — the successors to the per-team verify-images/verify-attestations, which moved here from
