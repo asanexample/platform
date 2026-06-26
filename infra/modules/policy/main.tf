@@ -148,6 +148,7 @@ locals {
     environmentNamespaceLabel = var.environment_namespace_label
     requiredWorkloadLabels    = var.required_workload_labels
     enableMutateDefaults      = var.enable_mutate_defaults
+    enablePdbGenerate         = var.enable_pdb_generate
     enableImageVerification   = var.enable_image_verification
     verifyFailureAction       = var.verify_failure_action
     verifyFailurePolicy       = local.verify_failure_policy

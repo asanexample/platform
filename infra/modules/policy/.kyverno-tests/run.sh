@@ -45,6 +45,20 @@ for field in 'terminationGracePeriodSeconds: 30' 'preStop:' 'seconds: 10'; do
 done
 echo "Graceful-drain field-injection check passed (terminationGracePeriodSeconds + preStop sleep)."
 
+# Generate-check: generate-workload-pdb must emit a PodDisruptionBudget for the trigger Deployment with a
+# selector COPIED from the workload's own matchLabels (ADR-085 W2). The same kyverno-apply run above already
+# wrote the generated resource into rendered/mutated (generate fires on the same bare-app Deployment). The
+# crux being proven here is that "{{ request.object.spec.selector.matchLabels }}" resolves to the workload's
+# selector MAP, not a string. The trigger's selector is { app: bare-app } in namespace team-alpha.
+GEN="$(cat "$DIR/rendered/mutated"/*generated* 2>/dev/null || cat "$DIR/rendered/mutated"/* 2>/dev/null)"
+grep -q 'kind: PodDisruptionBudget' <<<"$GEN" || { echo "FAIL: no PodDisruptionBudget generated for the trigger Deployment"; printf '%s\n' "$GEN"; exit 1; }
+grep -q 'name: bare-app-pdb' <<<"$GEN" || { echo "FAIL: generated PDB not named <workload>-pdb"; printf '%s\n' "$GEN"; exit 1; }
+grep -q 'maxUnavailable: 1' <<<"$GEN" || { echo "FAIL: generated PDB must be maxUnavailable: 1 (drain-safe)"; printf '%s\n' "$GEN"; exit 1; }
+# Selector must carry the trigger's own label (proves the map substitution, not a literal string).
+grep -qE 'app: bare-app' <<<"$GEN" || { echo "FAIL: generated PDB selector did not copy the workload matchLabels"; printf '%s\n' "$GEN"; exit 1; }
+grep -q '{{ request.object' <<<"$GEN" && { echo "FAIL: generated PDB still contains an unresolved Kyverno variable"; printf '%s\n' "$GEN"; exit 1; }
+echo "PDB generate-check passed (bare-app-pdb, maxUnavailable: 1, selector copied from the workload)."
+
 # Render-check the per-PRODUCT supply-chain verification (verify-images-product + verify-attestations-product,
 # ADR-067/069 §6 — the successors to the per-team verify-images/verify-attestations, which moved here from
 # the retired per-team policies at the cutover). Every product uses the SHARED trusted-ci signer (build-sign for
