@@ -32,7 +32,11 @@ echo "environment-control-plane render-check passed."
 # ---------------------------------------------------------------------------
 echo "Testing environment-envelope policy (envelope plane) ..."
 ENVPOL="$DIR/rendered/environment-envelope.yaml"
-helm template ktp "$CHART" --set enableEnvironmentEnvelope=true --show-only templates/environment-envelope.yaml >"$ENVPOL"
+# envelopeSkipReconcilePrincipal="" omits spec.webhookConfiguration.matchConditions (TD2-04): that field is
+# admission-webhook ROUTING (skip Crossplane's reconcile UPDATEs), not rule deny-logic, so it's irrelevant to
+# this behavioral test — and `kyverno apply` v1.18.1 panics (nil-pointer) on matchConditions offline. The live
+# Kyverno CRD supports the field; it's exercised in-cluster, not here.
+helm template ktp "$CHART" --set enableEnvironmentEnvelope=true --set envelopeSkipReconcilePrincipal= --show-only templates/environment-envelope.yaml >"$ENVPOL"
 ED="$DIR/environment-envelope"
 run_env() { kyverno apply "$ENVPOL" --resource "$ED/$1" --values-file "$ED/$2" 2>&1 || true; }
 must_flag() { # output resource rule
