@@ -2,9 +2,11 @@
 # Free on private repos (unlike Code Scanning / GHAS). Part of #112 (108a, supply-chain hardening).
 version: 2
 updates:
-  # Go modules used by the Terratest suites.
+  # Go modules: the Terratest suites + the platctl orchestrator CLI.
   - package-ecosystem: "gomod"
-    directory: "/infra/tests/aws"
+    directories:
+      - "/infra/tests/aws"
+      - "/cmd/platctl"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
@@ -36,4 +38,16 @@ updates:
     labels: ["dependencies", "terraform"]
     groups:
       terraform:
+        patterns: ["*"]
+
+  # Base images in the self-hosted GitHub Actions runner image (ADR-065).
+  # (Scaffolded product repos get their own docker coverage via the skeleton's dependabot.yml.)
+  - package-ecosystem: "docker"
+    directory: "/docker/gha-runner"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "docker"]
+    groups:
+      docker:
         patterns: ["*"]
