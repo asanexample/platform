@@ -197,14 +197,13 @@ spec:
                       name: {{ $sa }}
                       namespace: {{ $ns }}
             {{- end }}
-            {{- /* NetworkPolicies (ADR-082 D8) — INGRESS lock only (the valuable control: only Alertmanager can
-                   reach the agent). default-deny ingress (kubelet health probes still work — Cilium exempts host
-                   traffic) + allow ingress ONLY from observability (the Alertmanager webhook) + kube-system on 8080.
-                   EGRESS is intentionally left open here: a k8s ipBlock egress does NOT work on Cilium for the
-                   agent's real destinations — Cilium matches in-cluster (otel-collector/mimir/loki) by IDENTITY and
-                   the EKS Pod-Identity agent (169.254.170.23) is HOST traffic, neither of which a CIDR ipBlock
-                   covers, so it silently blocked Bedrock creds + obs. Proper egress bounding needs a Cilium policy
-                   (toEntities host/cluster/kube-apiserver + toFQDNs for Bedrock/Slack) — tracked as a follow-up. */}}
+            {{- /* NetworkPolicies (ADR-082 D8). INGRESS lock (k8s NetworkPolicy): default-deny ingress (kubelet
+                   probes still work — Cilium exempts host) + allow ingress ONLY from observability (the Alertmanager
+                   webhook) + kube-system on 8080. EGRESS bound (CiliumNetworkPolicy below): a k8s ipBlock egress does
+                   NOT work on Cilium for the agent's destinations — in-cluster (otel-collector/mimir/loki) is
+                   IDENTITY-matched and the Pod-Identity agent (169.254.170.23) is HOST traffic, neither covered by a
+                   CIDR ipBlock — so egress is a CiliumNetworkPolicy: DNS + kube-apiserver + host(Pod-Identity) +
+                   the observability ns + toFQDNs(Bedrock/Slack) only. */}}
             ---
             apiVersion: kubernetes.crossplane.io/v1alpha2
             kind: Object
@@ -254,6 +253,61 @@ spec:
                         ports:
                           - port: 8080
                             protocol: TCP
+            ---
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: cnp-allow-egress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: cilium.io/v2
+                  kind: CiliumNetworkPolicy
+                  metadata:
+                    name: allow-egress
+                    namespace: {{ $ns }}
+                  spec:
+                    # A k8s ipBlock egress can't express the agent's real destinations on Cilium (in-cluster is
+                    # identity-matched, the Pod-Identity agent is host-local, and Bedrock/Slack are dynamic IPs) —
+                    # so this is a CiliumNetworkPolicy. Default-deny egress, allowing exactly:
+                    endpointSelector: {}
+                    egress:
+                      # DNS to kube-dns (also enables toFQDNs IP-learning via Cilium's L7 DNS proxy).
+                      - toEndpoints:
+                          - matchLabels:
+                              k8s:io.kubernetes.pod.namespace: kube-system
+                              k8s:k8s-app: kube-dns
+                        toPorts:
+                          - ports:
+                              - port: "53"
+                                protocol: ANY
+                            rules:
+                              dns:
+                                - matchPattern: "*"
+                      # k8s API — get_recent_changes (ReplicaSets/events) + ArgoCD Applications (the change source).
+                      - toEntities: ["kube-apiserver"]
+                      # EKS Pod-Identity agent (169.254.170.23:80, node-local) for Bedrock creds — mirrors the tenant
+                      # cnp-allow-pod-identity-egress. (IMDS, also host-local, is guarded by node IMDSv2 hop-limit.)
+                      - toEntities: ["host"]
+                        toPorts:
+                          - ports:
+                              - port: "80"
+                                protocol: TCP
+                      # In-cluster obs — loki/mimir gateways (query_logs/query_metrics) + otel-collector (traces).
+                      - toEndpoints:
+                          - matchLabels:
+                              k8s:io.kubernetes.pod.namespace: observability
+                      # External egress is bounded to Bedrock + Slack ONLY — the actual hardening.
+                      - toFQDNs:
+                          - matchPattern: "bedrock-runtime.*.amazonaws.com"
+                          - matchName: "hooks.slack.com"
+                        toPorts:
+                          - ports:
+                              - port: "443"
+                                protocol: TCP
     - step: ready
       functionRef:
         name: function-auto-ready
