@@ -34,6 +34,12 @@ spec:
               kinds:
                 - Deployment
                 - StatefulSet
+                {{- if .Values.enableRolloutKind }}
+                # Argo Rollouts (ADR-056) — every workload is a direct-template Rollout. Gated because a Kyverno
+                # rule naming a kind whose CRD is absent fails to create (#7839); flip on once the Rollout CRD
+                # is installed. Rollout exposes the same spec.selector/replicas paths as a Deployment.
+                - argoproj.io/v1alpha1/Rollout
+                {{- end }}
               {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
       generate:
         apiVersion: policy/v1
@@ -84,4 +90,14 @@ rules:
       - get
       - list
       - watch
+  {{- if .Values.enableRolloutKind }}
+  - apiGroups:
+      - argoproj.io
+    resources:
+      - rollouts
+    verbs:
+      - get
+      - list
+      - watch
+  {{- end }}
 {{- end }}

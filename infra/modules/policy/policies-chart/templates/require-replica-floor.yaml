@@ -27,6 +27,9 @@ spec:
               kinds:
                 - Deployment
                 - StatefulSet
+                {{- if .Values.enableRolloutKind }}
+                - argoproj.io/v1alpha1/Rollout # ADR-056: Rollout exposes spec.replicas like a Deployment
+                {{- end }}
               # Prod stage only (namespace name suffix) AND an environment namespace (carries the team label).
               namespaces:
                 - "*-prod"

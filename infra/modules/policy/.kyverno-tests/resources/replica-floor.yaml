@@ -60,3 +60,51 @@ spec:
       containers:
         - name: app
           image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:1.0.0
+---
+# ADR-056: the replica floor also covers Argo Rollouts (when enableRolloutKind=true). >=2 replicas -> pass.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: rollout-prod-ha
+  namespace: alpha-demo-prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: rollout-prod-ha
+  template:
+    metadata:
+      labels:
+        app: rollout-prod-ha
+    spec:
+      containers:
+        - name: app
+          image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:1.0.0
+  strategy:
+    canary:
+      steps:
+        - setWeight: 100
+---
+# Violation: single-replica prod Rollout -> fail.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: rollout-prod-single
+  namespace: alpha-demo-prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rollout-prod-single
+  template:
+    metadata:
+      labels:
+        app: rollout-prod-single
+    spec:
+      containers:
+        - name: app
+          image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:1.0.0
+  strategy:
+    canary:
+      steps:
+        - setWeight: 100

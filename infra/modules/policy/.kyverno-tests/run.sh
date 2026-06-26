@@ -10,6 +10,7 @@ mkdir -p "$DIR/rendered"
 helm template kpp "$CHART" \
   --set validationFailureAction=Enforce \
   --set replicaFloorFailureAction=Enforce \
+  --set enableRolloutKind=true \
   --set failurePolicy=Fail \
   --set complianceTier=standard \
   --set-json 'allowedRegistries=["829808296602.dkr.ecr.us-east-1.amazonaws.com"]' \
@@ -68,6 +69,19 @@ grep -q 'maxUnavailable: 1' <<<"$GEN" || { echo "FAIL: generated PDB must be max
 grep -qE 'app: bare-app' <<<"$GEN" || { echo "FAIL: generated PDB selector did not copy the workload matchLabels"; printf '%s\n' "$GEN"; exit 1; }
 grep -q '{{ request.object' <<<"$GEN" && { echo "FAIL: generated PDB still contains an unresolved Kyverno variable"; printf '%s\n' "$GEN"; exit 1; }
 echo "PDB generate-check passed (bare-app-pdb, maxUnavailable: 1, selector copied from the workload)."
+
+# Rollout-kind check (ADR-056, enableRolloutKind=true): the availability policies must also fire on an Argo
+# `Rollout`. Apply the bare-rollout fixture and assert (a) generate-workload-pdb makes a PDB with the Rollout's
+# own selector, and (b) mutate-topology-spread injects spread keyed on `rollouts-pod-template-hash` (NOT
+# pod-template-hash — Rollout pods carry the former). Proves the Rollout match + the separate Rollout topology
+# rule, the way the Phase-0 spike proved it live.
+RO="$(kyverno apply rendered/policies.yaml --resource resources/rollout-input.yaml --values-file values.yaml -o "$DIR/rendered/rollout" 2>&1 || true)"
+ROUT="$(cat "$DIR/rendered/rollout"/* 2>/dev/null)"
+grep -q 'name: bare-rollout-pdb' <<<"$ROUT" || { echo "FAIL: no PDB generated for the Rollout"; printf '%s\n' "$RO" "$ROUT"; exit 1; }
+grep -qE 'app: bare-rollout' <<<"$ROUT" || { echo "FAIL: Rollout PDB/spread did not copy the Rollout's matchLabels"; printf '%s\n' "$ROUT"; exit 1; }
+grep -q 'topologySpreadConstraints' <<<"$ROUT" || { echo "FAIL: topology spread not injected on the Rollout"; printf '%s\n' "$ROUT"; exit 1; }
+grep -q 'rollouts-pod-template-hash' <<<"$ROUT" || { echo "FAIL: Rollout topology spread must use rollouts-pod-template-hash"; printf '%s\n' "$ROUT"; exit 1; }
+echo "Rollout-kind check passed (bare-rollout-pdb + topology spread on rollouts-pod-template-hash)."
 
 # Render-check the per-PRODUCT supply-chain verification (verify-images-product + verify-attestations-product,
 # ADR-067/069 §6 — the successors to the per-team verify-images/verify-attestations, which moved here from
