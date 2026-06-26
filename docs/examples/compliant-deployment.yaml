@@ -65,3 +65,8 @@ spec:
 # (allowPrivilegeEscalation: false, capabilities.drop: [ALL], seccompProfile.type: RuntimeDefault) and the
 # `team` label. Services must be ClusterIP; HTTPRoute hostnames must be in the Environment's allow-list.
 # Regulated tiers (hipaa/pci) additionally REQUIRE runAsNonRoot: true + readOnlyRootFilesystem: true.
+#
+# Also auto-handled by ADR-085 (do not author): graceful-drain defaults (a container preStop sleep +
+# terminationGracePeriodSeconds) and topologySpreadConstraints are mutate-injected, and a maxUnavailable=1
+# PodDisruptionBudget is generated per workload (selector derived from this Deployment, GC'd with it). Run
+# >=2 replicas for these to matter (required in *-prod), and handle SIGTERM in-app to actually drain in-flight.

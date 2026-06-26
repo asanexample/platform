@@ -44,9 +44,37 @@ Kyverno adds these when absent, so leave them out (setting them is harmless but 
   `capabilities.drop: [ALL]`, `seccompProfile.type: RuntimeDefault`
 - **Pod `automountServiceAccountToken: false`**
 - **The `team` label** on the Pod — derived from the namespace name (`alpha-demo-dev` → `team: alpha`)
+- **Graceful-drain defaults** (ADR-085) — a container `lifecycle.preStop` (native `sleep`) +
+  pod `terminationGracePeriodSeconds: 30`, so a rolling update / node disruption doesn't drop
+  in-flight traffic. (`mutate-pod-defaults`.)
+- **`topologySpreadConstraints`** (ADR-085) — across zone + node, soft (`ScheduleAnyway`), with a
+  `labelSelector` derived from your workload's own selector, so replicas don't all land on one
+  node/AZ. (`mutate-topology-spread`, matches the Deployment/StatefulSet directly.)
 
 Note: **`app.kubernetes.io/name` is NOT auto-injected and NOT required** — it's
 recommended (it can't be derived under autogen). Set it yourself if you want it.
+
+## Auto-generated FOR you — do NOT author these
+
+- **A `PodDisruptionBudget`** (`<workload>-pdb`, `maxUnavailable: 1`) is generated for every
+  environment `Deployment`/`StatefulSet`, with a selector copied from your workload (ADR-085).
+  Don't write your own — it's created, kept in sync, and garbage-collected when you delete the
+  workload. It's drain-safe (`maxUnavailable: 1` never blocks a node drain) and only gives real
+  protection once you run **≥ 2 replicas**.
+
+## Availability is your job too (not enforced, but expected)
+
+The platform makes deploys/disruptions *non-dropping*, but only if your app cooperates (ADR-085):
+
+- **Run ≥ 2 replicas** for anything that should survive a rollout or node disruption — a single
+  replica can't be zero-downtime, and its PDB/spread do nothing. In **`*-prod`** namespaces this is
+  **required** (`require-prod-replica-floor`: `spec.replicas >= 2`) — Audit today, Enforce later; an
+  HPA must set `minReplicas >= 2`. Lower stages may stay at 1 for cost. (Don't expect to mutate
+  replicas — it's validated, never injected, so it doesn't fight your HPA/overlay.)
+- **Handle `SIGTERM`**: stop accepting new work, drain in-flight, exit. The injected `preStop` sleep
+  only buys the window for the datapath to stop routing to you — it does **not** drain your
+  in-flight requests; your process must. **Long-lived connections** (websockets, gRPC streams) need
+  app-level connection-age limits / `GOAWAY` — the preStop sleep won't cover them.
 
 ## Required — or the resource is REJECTED
 
