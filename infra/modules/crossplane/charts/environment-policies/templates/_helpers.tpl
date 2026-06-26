@@ -56,6 +56,10 @@ preconditions:
     - key: "{{`{{ team.metadata.name || '' }}`}}"
       operator: Equals
       value: "{{`{{ request.object.spec.team }}`}}"
+    # skip a TERMINATING Environment — its finalizer-removal UPDATE must not be re-validated, or the delete wedges
+    - key: "{{`{{ request.object.metadata.deletionTimestamp || '' }}`}}"
+      operator: Equals
+      value: ""
 {{- end -}}
 
 {{/*
@@ -82,4 +86,7 @@ preconditions:
     - key: "{{`{{ product.metadata.name || '' }}`}}"
       operator: Equals
       value: "{{`{{ request.object.spec.team }}-{{ request.object.spec.product }}`}}"
+    - key: "{{`{{ request.object.metadata.deletionTimestamp || '' }}`}}"
+      operator: Equals
+      value: ""
 {{- end -}}
