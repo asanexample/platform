@@ -4,13 +4,28 @@
 
 **Status:** Proposed
 
+> **Amendment (2026-06-26):** Phase 0 implementation sharpened two architectural points.
+> **(1) Two abstracted boundaries, not one.** The directory is a CQRS **read model** with *both* a
+> **query** interface (`resolveOwner`, D1, consumer-facing) **and** a **source** interface — pluggable
+> `TeamSource` / `WorkloadSource` adapters — so the *source of truth* for team/ownership facts can change
+> (git → Backstage → an IdP) by swapping an adapter, with `resolveOwner` and every consumer untouched.
+> The two sources are kept separate so team definitions and workload-ownership can come from different
+> systems.
+> **(2) Consumers read the git source of truth, not cluster CR projections.** Projecting registry CRs onto
+> a cluster (Team/Environment) is for *that cluster's admission* (preprod's Kyverno) — the agent is a
+> *consumer*, not a control plane, so it reads the registry from **git** (a `gitTeamSource` adapter via
+> the GitHub App). We do **not** project tenant CRDs onto the hub for agent convenience — that would erode
+> the hub (agent control plane) vs. preprod (tenant Environment control plane) separation (ADR-048/067).
+> Phase 0 runs the read model **in-process** (a cached git projection); Phase 1 materializes it (Postgres)
+> when identity-at-scale / memory / incident-state need persistence. (platform PR #834; triage-copilot owner-routing PR.)
+
 ## Context
 
 The triage agent (ADR-080 / ADR-082) needs to route an incident to the human who should act — the
 **author of the culprit commit**, falling back to the **owning team's on-call**. Building that surfaced
 a latent platform gap: we have **auth identity** (Keycloak — ADR-053 / ADR-059), **team ownership**
 (the git-native `Team` registry — ADR-067 / ADR-072), and external accounts (the GitHub org, the Slack
-workspace, PagerDuty), but **no canonical directory of _people_ and their cross-system identities** that
+workspace, PagerDuty), but **no canonical directory of *people* and their cross-system identities** that
 integrations can query. There is no reliable bridge from "GitHub commit author" → "Slack `@mention`" →
 "PagerDuty on-call."
 
@@ -19,10 +34,10 @@ Two realities shape the design:
 1. **Email is not a reliable join key.** Most shops get away with matching identities by email; we
    cannot — in this org a person's GitHub, Slack, and PagerDuty emails differ. More generally it is a
    brittle assumption we refuse to bake in: a GitHub commit email is often a `noreply`, secondary
-   emails are private (only `GET /user/emails` _as that user_), and nothing guarantees the same address
+   emails are private (only `GET /user/emails` *as that user*), and nothing guarantees the same address
    across systems.
 2. **We are on free GitHub/Slack tiers today**, with paid GitHub Enterprise + Slack (and their
-   SAML/SCIM) a _future_ possibility. The design must work now and _upgrade_ cleanly later, not be
+   SAML/SCIM) a *future* possibility. The design must work now and *upgrade* cleanly later, not be
    rebuilt.
 
 The naive fixes are all corners: a static config map the agent owns (stale, agent-private);
@@ -38,19 +53,19 @@ Treat identity as a **platform primitive**, not an agent feature.
 **D1 — Identity is a platform concern; integrations are consumers behind an interface.** No integration
 owns the identity record. Each resolves through a narrow
 `resolveOwner({namespace, culpritGithubLogin?}) → {person?, team, on_call, tiers}` that returns identity
-_facts only_. The triage agent is **consumer #1**. **Resolution (mechanism) is separate from mention
+*facts only*. The triage agent is **consumer #1**. **Resolution (mechanism) is separate from mention
 policy:** the resolver knows nothing of paging, severity, or disposition; a small reusable
 `applyMentionPolicy(resolved, {severity, disposition})` helper applies the ladder + gate consumer-side
 (D8). This keeps the shared resolver consumer-agnostic, and means a directory bug can never itself cause
 an errant page — the page decision always lives with the consumer that has the incident context.
 
-**D2 — Keycloak is the identity _anchor_ and the _linking engine_.** It remains the source of truth for
+**D2 — Keycloak is the identity *anchor* and the *linking engine*.** It remains the source of truth for
 the person (`sub` / name) and brokers **GitHub, Slack, and PagerDuty as OAuth/OIDC identity providers**
 (all three support social login on free tiers). Each brokered link is a first-class Keycloak
 `FEDERATED_IDENTITY` carrying the provider's native id — GitHub **login**, Slack **user id**, PagerDuty
 **user id** — explicit, email-free, **authoritative**. Reaffirms ADR-053 / ADR-059.
 
-**D3 — Email is never a join key.** An external identity attaches to a `person` only by an _explicit_
+**D3 — Email is never a join key.** An external identity attaches to a `person` only by an *explicit*
 assertion, never by inferring a shared attribute. Assertions carry a precedence **tier**:
 
 | Tier | Source |
@@ -60,7 +75,7 @@ assertion, never by inferring a shared attribute. Assertions carry a precedence 
 | **declared** | reviewed admin / registry link |
 
 (The earlier `heuristic` / email-match tier is **removed**.) Email is stored as a contact attribute
-only — used for _nothing_ in resolution. `resolveOwner` returns the **highest-tier** link, and the tier
+only — used for *nothing* in resolution. `resolveOwner` returns the **highest-tier** link, and the tier
 **gates action**: an `@mention` fires only at `declared`+; anything weaker degrades to a team mention or
 plain text, so a guess can never page the wrong person.
 
@@ -83,8 +98,8 @@ login, there are **no stub records and no merging**.
 once; a **"Connect your accounts" step** (a Keycloak first-login required action, surfaced via
 Backstage) links GitHub / Slack / PagerDuty with **one OAuth click each** — no codes, no typing, no
 email. The directory syncs the resulting federated identities. This **supersedes a bespoke device-flow
-bot**; the Slack bot demotes to an optional _nudge_ for stragglers that deep-links the same Account
-Console. This is the most frictionless _reliable_ path; **true zero-touch** (no clicks) needs paid
+bot**; the Slack bot demotes to an optional *nudge* for stragglers that deep-links the same Account
+Console. This is the most frictionless *reliable* path; **true zero-touch** (no clicks) needs paid
 SCIM/SAML — at which point provisioned links supersede the OAuth ones at the same `authoritative` tier,
 with no redesign.
 
@@ -132,9 +147,9 @@ today).
 **D11 — Freshness matches volatility; the directory is a rebuildable projection.** Every fact has a
 system of record (Keycloak, the git registries, PagerDuty) — the directory only caches / denormalizes,
 never authors — so there is **no dual-write to keep consistent**, and a corrupt or lost directory is
-_rebuilt from source_, not a crisis. Two speeds: **slow / projected** data (identities, `team_membership`,
+*rebuilt from source*, not a crisis. Two speeds: **slow / projected** data (identities, `team_membership`,
 `workload_owner`, handles, the PagerDuty pointer) reconciles **periodically (~5 min**; the git-sourced
-parts ride the existing registry-sync), with the team floor covering the gap if someone _just_ linked;
+parts ride the existing registry-sync), with the team floor covering the gap if someone *just* linked;
 **on-call** is the one volatile fact — resolved **live from PagerDuty per query, short TTL (~1–5 min),
 stale-if-error** (serve last-known / fall to the static contact, never fail the route). Keycloak identity
 sync is periodic-reconcile for v1; event-driven push is a later enhancement.
@@ -148,20 +163,20 @@ three degrade cleanly to the team floor. For an **unlinked org member**, the age
 the miss into onboarding. Co-authored commits use the primary author; an author who is also the on-call
 or a team member is deduped to a single mention; the `≥ declared` tier gate (D3) still applies.
 
-**D13 — The directory is a scoped, audited, resolve-only API — never raw access.** It holds _identifiers,
-not secrets_ (linking OAuth tokens are discarded, D5), so a leak is a privacy / targeting concern, not a
+**D13 — The directory is a scoped, audited, resolve-only API — never raw access.** It holds *identifiers,
+not secrets* (linking OAuth tokens are discarded, D5), so a leak is a privacy / targeting concern, not a
 credential compromise — but PII still warrants discipline. Consumers reach it **only through
 `resolveOwner`**, never the tables; the API **resolves but does not enumerate** (no "list all persons");
 it **minimizes responses** to the operational handles a caller needs (`slack_id`, `team`, `on_call`) and
 **never returns emails or the full identity set**. Three principal classes hold separate credentials —
-_readers_ (resolve-only), _sync jobs_ (write, from the systems of record), _admins_ (manage). **Every
+*readers* (resolve-only), *sync jobs* (write, from the systems of record), *admins* (manage). **Every
 resolve is audited** (caller, input, returned tier) for provenance + abuse detection. While colocated in
 the agent's Postgres the API is in-process; the `resolveOwner` interface is the boundary, so extraction
 to a standalone service adds network authn (mTLS / scoped token) with no redesign.
 
 **D14 — Data lifecycle: consent-by-linking, user-revocable, offboarding by pruning reconcile.** A
-_proven_ link is the person's own OAuth act, which carries consent to store the handle for platform
-routing; _authoritative_ / _declared_ links are org-provisioned. The person can **unlink** at any time
+*proven* link is the person's own OAuth act, which carries consent to store the handle for platform
+routing; *authoritative* / *declared* links are org-provisioned. The person can **unlink** at any time
 (same Account Console / bot surface) and the directory drops it. **Offboarding is automatic:** because
 persons anchor on the Keycloak `sub` and the directory is a rebuildable projection (D11), a reconcile
 that finds a person absent from the source **prunes the person + their links** — they stop resolving and
@@ -196,7 +211,7 @@ empty / below a sanity threshold, treating that as a source failure rather than 
 ### Risks
 
 - **Memory poisoning** — injected incident content could write a misleading "past triage"; institutional
-  memory must be consumed as _evidence, never instructions_. (Identity writes are constrained to
+  memory must be consumed as *evidence, never instructions*. (Identity writes are constrained to
   authoritative / proven / declared sources, never model-driven.)
 - **PII custody** — the directory holds handles; access-controlled, internal-only, not in git.
 - **PagerDuty dependency** — live on-call lookups must be cached + fall back to a static contact so
@@ -208,17 +223,17 @@ empty / below a sanity threshold, treating that as a source failure rather than 
 ## Alternatives considered
 
 - **Static, agent-owned config map.** Rejected: stale, agent-private, not org data.
-- **Email as the join key.** Rejected: brittle in general and _broken for us_ (our GitHub / Slack /
+- **Email as the join key.** Rejected: brittle in general and *broken for us* (our GitHub / Slack /
   PagerDuty emails differ); commit emails are often `noreply` and secondaries are private. Email is
   stored as contact info, never a matcher.
 - **Bespoke Slack device-flow linking bot.** Superseded: Keycloak brokering is smoother (one OAuth click
-  vs. a device code), reuses native machinery, and lands _authoritative_ links on the canonical person.
+  vs. a device code), reuses native machinery, and lands *authoritative* links on the canonical person.
 - **Backstage as the directory of record.** Rejected: its catalog is a source-fed projection, not a
   transactional store, and it is a developer portal we will not place on the incident-routing path. It
-  is the human _view_, fed from the directory.
-- **Keycloak as the universal directory.** Rejected for the _operational_ layer: serving every
+  is the human *view*, fed from the directory.
+- **Keycloak as the universal directory.** Rejected for the *operational* layer: serving every
   integration from Keycloak forces Admin API access on consumers and mixes operational metadata into the
-  auth control plane. Keycloak stays the _anchor_ + linking engine; the directory is the least-privilege
+  auth control plane. Keycloak stays the *anchor* + linking engine; the directory is the least-privilege
   projection + handle store in front of it.
 - **Hardcoded on-call lists.** Rejected: PagerDuty is the system of record for on-call; a static list has
   no rotation / escalation. A registry pointer + live PagerDuty (with static fallback) replaces it.
@@ -228,14 +243,14 @@ empty / below a sanity threshold, treating that as a source failure rather than 
 
 ## Sequencing
 
-Value is tiered by effort; each phase adds a resolution _source_ behind the stable `resolveOwner` /
+Value is tiered by effort; each phase adds a resolution *source* behind the stable `resolveOwner` /
 `applyMentionPolicy` interface — never a rebuild (seed-not-cathedral).
 
 **Phase 0 — the team floor (no new datastore).** Config / registry-derived only — no Postgres, no PII.
 
 - **Extend the `Team` schema with the ownership block** (`slack.channel` / `slack.userGroup`,
   `pagerduty.escalationPolicyId`, accountable roles) and **equip the `platform` team first** — it is the
-  resolution floor for every platform-owned incident, _including the agent's own_ (`team=platform`), which
+  resolution floor for every platform-owned incident, *including the agent's own* (`team=platform`), which
   today routes nowhere.
 - `resolveOwner(namespace)` derives `namespace → product → team` and routes to the team's `slack.channel`.
   The `workload_owner` projection sources tenant namespaces from the Product / XEnvironment registries
