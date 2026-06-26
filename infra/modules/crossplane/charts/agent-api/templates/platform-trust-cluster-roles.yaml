@@ -25,8 +25,9 @@ rules:
   - apiGroups: [argoproj.io]
     resources: [applications]
     verbs: [get, list, watch]
-  # the Product registry — get_change_detail reads spec.repo to map a namespace to its GitHub repo (ADR-080 D2)
+  # the Product + Team registries — owner resolution maps a namespace to its team and reads the team's
+  # incident channel / on-call (ADR-084); get_change_detail also reads Product spec.repo (ADR-080 D2)
   - apiGroups: [platform.refplat.org]
-    resources: [products]
+    resources: [products, teams]
     verbs: [get, list, watch]
 {{- end }}

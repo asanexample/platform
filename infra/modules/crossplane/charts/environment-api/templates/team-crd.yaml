@@ -145,6 +145,46 @@ spec:
                         IAM actions a Service's permissions.aws.policyStatements may use despite the deny-set
                         (platform-only), e.g. bedrock:InvokeModel. Enforced by Kyverno restrict-environment-envelope.
                       items: { type: string }
+                slack:
+                  type: object
+                  description: >-
+                    The Team's Slack identity for incident routing (ADR-084 D6). Optional, non-PII config —
+                    a Team without a channel falls back to the central incident channel. The owner-resolution
+                    floor: the triage agent posts a Team's incidents into spec.slack.channel.
+                  properties:
+                    channel:
+                      type: string
+                      description: >-
+                        Incident channel — a name (#team-platform) or id (C…). The agent's bot must be invited
+                        to it; on not_in_channel it falls back to the central channel.
+                    userGroup:
+                      type: string
+                      description: Slack user-group handle for whole-team @mention. Reserved for paid Slack; unused today.
+                pagerduty:
+                  type: object
+                  description: >-
+                    PagerDuty pointer for live on-call resolution (ADR-084 D7) — a pointer, never people.
+                    Consumed in Phase 2. Empty {} when the Team has no PagerDuty.
+                  default: {}
+                  properties:
+                    escalationPolicyId:
+                      type: string
+                      description: Escalation policy id (P…). The resolver queries /oncalls against it for the live on-call.
+                oncall:
+                  type: object
+                  description: >-
+                    Static accountable contacts (ADR-084 D7 fallback) — GitHub logins, used when PagerDuty is
+                    unconfigured/unreachable. Informational for now.
+                  default: {}
+                  properties:
+                    primary:
+                      type: array
+                      items: { type: string }
+                      default: []
+                    fallback:
+                      type: array
+                      items: { type: string }
+                      default: []
             status:
               type: object
               properties:
