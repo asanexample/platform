@@ -152,6 +152,7 @@ locals {
     enableTopologySpread      = var.enable_topology_spread
     enableReplicaFloor        = var.enable_replica_floor
     replicaFloorFailureAction = var.replica_floor_failure_action
+    enableRolloutKind         = var.enable_rollout_kind
     enableImageVerification   = var.enable_image_verification
     verifyFailureAction       = var.verify_failure_action
     verifyFailurePolicy       = local.verify_failure_policy

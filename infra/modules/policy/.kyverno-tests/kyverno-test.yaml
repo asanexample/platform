@@ -113,6 +113,17 @@ results:
     kind: Deployment
     resources: [dev-single] # not prod-stage -> policy does not match
     result: skip
+  # ADR-056: the replica floor also covers Argo Rollouts (enableRolloutKind=true in the render).
+  - policy: require-prod-replica-floor
+    rule: validate-prod-replicas
+    kind: Rollout
+    resources: [rollout-prod-ha] # >= 2 replicas
+    result: pass
+  - policy: require-prod-replica-floor
+    rule: validate-prod-replicas
+    kind: Rollout
+    resources: [rollout-prod-single] # single replica
+    result: fail
   # NB the per-team restrict-images-team-* and restrict-route-hostnames-team-* policies moved to the Crossplane
   # Composition (product-scoped, per-Environment) at the v3 cutover (ADR-067) — they no longer render from this
   # chart, so their assertions were removed here. That coverage now lives in the Composition render test

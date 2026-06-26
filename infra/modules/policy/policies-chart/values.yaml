@@ -57,6 +57,12 @@ enableTopologySpread: true
 enableReplicaFloor: true
 replicaFloorFailureAction: Audit
 
+# Also match the Argo Rollouts `Rollout` kind in the availability policies (ADR-056). Default false because a
+# Kyverno rule naming a kind whose CRD is absent fails to create (#7839) — flip to true per cluster ONLY after
+# the argo-rollouts unit (CRDs) is applied there. When all workloads are Rollouts, the PDB/topology/replica-floor
+# guarantees follow them; pod-level policies already cover Rollout pods via ReplicaSet autogen.
+enableRolloutKind: false
+
 # Deploy per-team verifyImages policies (cosign keyless). Requires signed images + Kyverno ECR IRSA.
 enableImageVerification: false
 # verifyImages action/failurePolicy — independent so verification rolls Audit-first under Enforce.

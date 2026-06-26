@@ -52,4 +52,35 @@ spec:
                       - pod-template-hash
                     labelSelector:
                       matchLabels: "{{`{{ request.object.spec.selector.matchLabels }}`}}"
+    {{- if .Values.enableRolloutKind }}
+    # Argo Rollouts (ADR-056) need their own rule: Rollout pods carry `rollouts-pod-template-hash`, not
+    # `pod-template-hash`, so per-revision spread requires the different matchLabelKeys (gated on the CRD, #7839).
+    - name: add-topology-spread-rollout
+      match:
+        any:
+          - resources:
+              kinds:
+                - argoproj.io/v1alpha1/Rollout
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
+      mutate:
+        patchStrategicMerge:
+          spec:
+            template:
+              spec:
+                +(topologySpreadConstraints):
+                  - maxSkew: 1
+                    topologyKey: topology.kubernetes.io/zone
+                    whenUnsatisfiable: ScheduleAnyway
+                    matchLabelKeys:
+                      - rollouts-pod-template-hash
+                    labelSelector:
+                      matchLabels: "{{`{{ request.object.spec.selector.matchLabels }}`}}"
+                  - maxSkew: 1
+                    topologyKey: kubernetes.io/hostname
+                    whenUnsatisfiable: ScheduleAnyway
+                    matchLabelKeys:
+                      - rollouts-pod-template-hash
+                    labelSelector:
+                      matchLabels: "{{`{{ request.object.spec.selector.matchLabels }}`}}"
+    {{- end }}
 {{- end }}

@@ -1,0 +1,24 @@
+# A bare Argo Rollouts Rollout in an environment namespace (ADR-056) — exercises the Rollout-aware availability
+# policies (generate-workload-pdb + mutate-topology-spread) the same way mutate-input.yaml does for a Deployment.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: bare-rollout
+  namespace: team-alpha
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: bare-rollout
+  template:
+    metadata:
+      labels:
+        app: bare-rollout
+    spec:
+      containers:
+        - name: app
+          image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:1.0.0
+  strategy:
+    canary:
+      steps:
+        - setWeight: 100

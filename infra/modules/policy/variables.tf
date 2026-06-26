@@ -179,6 +179,12 @@ variable "enable_replica_floor" {
   default     = true
 }
 
+variable "enable_rollout_kind" {
+  description = "Also match the Argo Rollouts `Rollout` kind in the availability policies (PDB-generate, topology-spread, replica-floor, default-namespace) for ADR-056. Default false: a Kyverno rule naming a kind whose CRD is absent fails to create (#7839), so enable per cluster ONLY after the argo-rollouts unit (CRDs) is applied there."
+  type        = bool
+  default     = false
+}
+
 variable "replica_floor_failure_action" {
   description = "failureAction for require-prod-replica-floor — its own knob so it rolls Audit-first even where the cluster-wide validationFailureAction is Enforce. Flip to Enforce after reviewing the Audit PolicyReports."
   type        = string

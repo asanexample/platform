@@ -98,6 +98,17 @@ when using an HPA, set `minReplicas >= 2`. It has its own `replica_floor_failure
 it rolls Audit-first even where the cluster-wide `validationFailureAction` is `Enforce` — flip to `Enforce`
 after reviewing the Audit PolicyReports.
 
+### Availability: Argo Rollouts support (`enable_rollout_kind`, default false)
+
+When all workloads become Argo `Rollout`s ([ADR-056](../../../docs/adrs/056-progressive-delivery-and-safe-rollback.md)),
+the three controller-kind availability policies above match `Deployment`/`StatefulSet` *by kind* and would
+silently no-op on a `Rollout`. Setting `enable_rollout_kind = true` adds `argoproj.io/v1alpha1/Rollout` to their
+matches (and the rollouts read-RBAC for the PDB backfill), and gives topology-spread a Rollout-specific rule
+keyed on `rollouts-pod-template-hash` (Rollout pods carry that label, not `pod-template-hash`). Pod-level
+policies (securityContext, preStop, image/cosign) already cover Rollout pods via ReplicaSet autogen, so they
+need no change. **Default `false`**: a Kyverno rule naming a kind whose CRD is absent fails to create
+(Kyverno #7839), so enable this **per cluster only after the `argo-rollouts` unit (CRDs) is applied** there.
+
 ## Usage
 
 ```hcl

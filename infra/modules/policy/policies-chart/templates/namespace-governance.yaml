@@ -31,6 +31,9 @@ spec:
                 - ReplicaSet
                 - Job
                 - CronJob
+                {{- if .Values.enableRolloutKind }}
+                - argoproj.io/v1alpha1/Rollout # ADR-056
+                {{- end }}
               namespaces:
                 - default
       {{- include "kpp.skipPlatformPrincipals" . | nindent 6 }}
