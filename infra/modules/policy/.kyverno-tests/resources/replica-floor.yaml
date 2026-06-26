@@ -1,0 +1,62 @@
+# Fixtures for require-prod-replica-floor (ADR-085). The policy matches Deployment/StatefulSet in prod-stage
+# environment namespaces (*-prod carrying the team label) and requires spec.replicas >= 2.
+---
+# Compliant: prod workload with >= 2 replicas -> pass.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prod-ha
+  namespace: alpha-demo-prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: prod-ha
+  template:
+    metadata:
+      labels:
+        app: prod-ha
+    spec:
+      containers:
+        - name: app
+          image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:1.0.0
+---
+# Violation: single-replica prod workload -> fail.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prod-single
+  namespace: alpha-demo-prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prod-single
+  template:
+    metadata:
+      labels:
+        app: prod-single
+    spec:
+      containers:
+        - name: app
+          image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:1.0.0
+---
+# Out of scope: a single-replica DEV workload is NOT prod-stage, so the policy does not match (skip).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-single
+  namespace: alpha-demo-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dev-single
+  template:
+    metadata:
+      labels:
+        app: dev-single
+    spec:
+      containers:
+        - name: app
+          image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/demo:1.0.0

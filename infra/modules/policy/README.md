@@ -76,6 +76,16 @@ edited or deleted. The template also installs a ClusterRole aggregated into Kyve
 controller** (`rbac.kyverno.io/aggregate-to-background-controller`) so it can create the PDBs — without it
 the policy admits but silently generates nothing.
 
+### Availability: prod replica floor (`enable_replica_floor`, default true)
+
+`require-prod-replica-floor` requires `spec.replicas >= 2` on `Deployment`/`StatefulSet` in **prod-stage**
+environment namespaces (`<team>-<product>-prod`) — a single replica can't be zero-downtime, and a
+`maxUnavailable: 1` PDB plus topology spread are meaningless on it (ADR-085). Lower stages stay at 1 replica
+for cost. Replicas are **validated, never mutated** (mutating them would fight the HPA and the prod overlay);
+when using an HPA, set `minReplicas >= 2`. It has its own `replica_floor_failure_action` (default `Audit`) so
+it rolls Audit-first even where the cluster-wide `validationFailureAction` is `Enforce` — flip to `Enforce`
+after reviewing the Audit PolicyReports.
+
 ## Usage
 
 ```hcl

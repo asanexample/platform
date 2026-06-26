@@ -1,0 +1,42 @@
+{{- if .Values.enableReplicaFloor }}
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-prod-replica-floor
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Require >=2 replicas for production workloads
+    policies.kyverno.io/category: Availability
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Deployment, StatefulSet
+    policies.kyverno.io/description: >-
+      Production workloads must run at least 2 replicas so a rolling update, a PodDisruptionBudget, and topology
+      spread are actually meaningful — a single replica can't be zero-downtime, and a maxUnavailable=1 PDB does
+      nothing for it (ADR-085). Scoped to prod-stage environment namespaces (<team>-<product>-prod) only; lower
+      stages stay at 1 replica for cost. Validates spec.replicas directly and is NOT mutated (mutating replicas
+      would fight the HPA and the prod Kustomize overlay). Rolls Audit-first via replicaFloorFailureAction.
+spec:
+  background: true
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    - name: validate-prod-replicas
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+                - StatefulSet
+              # Prod stage only (namespace name suffix) AND an environment namespace (carries the team label).
+              namespaces:
+                - "*-prod"
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
+      validate:
+        failureAction: {{ .Values.replicaFloorFailureAction }}
+        message: >-
+          Production workloads must run at least 2 replicas for zero-downtime rollouts and disruption tolerance
+          (ADR-085). Set spec.replicas >= 2 (when using an HPA, set minReplicas >= 2).
+        pattern:
+          spec:
+            replicas: ">=2"
+{{- end }}

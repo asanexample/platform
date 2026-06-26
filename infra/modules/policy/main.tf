@@ -149,6 +149,8 @@ locals {
     requiredWorkloadLabels    = var.required_workload_labels
     enableMutateDefaults      = var.enable_mutate_defaults
     enablePdbGenerate         = var.enable_pdb_generate
+    enableReplicaFloor        = var.enable_replica_floor
+    replicaFloorFailureAction = var.replica_floor_failure_action
     enableImageVerification   = var.enable_image_verification
     verifyFailureAction       = var.verify_failure_action
     verifyFailurePolicy       = local.verify_failure_policy

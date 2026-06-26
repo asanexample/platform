@@ -11,3 +11,11 @@ namespaceSelector:
   - name: team-bravo
     labels:
       platform.refplat.org/team: bravo
+  # Environment namespaces for the prod replica-floor fixtures (ADR-085): both carry the team label; the
+  # policy additionally name-matches *-prod, so alpha-demo-prod is in scope and alpha-demo-dev is not.
+  - name: alpha-demo-prod
+    labels:
+      platform.refplat.org/team: alpha
+  - name: alpha-demo-dev
+    labels:
+      platform.refplat.org/team: alpha

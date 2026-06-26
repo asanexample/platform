@@ -167,6 +167,22 @@ variable "enable_pdb_generate" {
   default     = true
 }
 
+variable "enable_replica_floor" {
+  description = "Deploy the require-prod-replica-floor validate policy: prod-stage environment workloads (<team>-<product>-prod) must run spec.replicas >= 2 (ADR-085). Lower stages are unaffected (cost)."
+  type        = bool
+  default     = true
+}
+
+variable "replica_floor_failure_action" {
+  description = "failureAction for require-prod-replica-floor — its own knob so it rolls Audit-first even where the cluster-wide validationFailureAction is Enforce. Flip to Enforce after reviewing the Audit PolicyReports."
+  type        = string
+  default     = "Audit"
+  validation {
+    condition     = contains(["Audit", "Enforce"], var.replica_floor_failure_action)
+    error_message = "replica_floor_failure_action must be Audit or Enforce."
+  }
+}
+
 # ---------------------------------------------------------------------------
 # Image verification (Phase 3 — cosign keyless)
 # ---------------------------------------------------------------------------

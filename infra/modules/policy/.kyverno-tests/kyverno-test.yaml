@@ -11,6 +11,7 @@ resources:
   - resources/service.yaml
   - resources/securitycontext.yaml
   - resources/httproutes.yaml
+  - resources/replica-floor.yaml
 variables: values.yaml
 results:
   # --- compliant workload passes every environment Pod policy ---
@@ -96,6 +97,22 @@ results:
     kind: Pod
     resources: [good-app]
     result: pass
+  # --- Availability: prod replica floor (ADR-085) ---
+  - policy: require-prod-replica-floor
+    rule: validate-prod-replicas
+    kind: Deployment
+    resources: [prod-ha] # >= 2 replicas in a prod namespace
+    result: pass
+  - policy: require-prod-replica-floor
+    rule: validate-prod-replicas
+    kind: Deployment
+    resources: [prod-single] # single replica in a prod namespace
+    result: fail
+  - policy: require-prod-replica-floor
+    rule: validate-prod-replicas
+    kind: Deployment
+    resources: [dev-single] # not prod-stage -> policy does not match
+    result: skip
   # NB the per-team restrict-images-team-* and restrict-route-hostnames-team-* policies moved to the Crossplane
   # Composition (product-scoped, per-Environment) at the v3 cutover (ADR-067) — they no longer render from this
   # chart, so their assertions were removed here. That coverage now lives in the Composition render test

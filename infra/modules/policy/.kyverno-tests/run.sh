@@ -9,6 +9,7 @@ CHART="$DIR/../policies-chart"
 mkdir -p "$DIR/rendered"
 helm template kpp "$CHART" \
   --set validationFailureAction=Enforce \
+  --set replicaFloorFailureAction=Enforce \
   --set failurePolicy=Fail \
   --set complianceTier=standard \
   --set-json 'allowedRegistries=["829808296602.dkr.ecr.us-east-1.amazonaws.com"]' \

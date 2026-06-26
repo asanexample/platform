@@ -39,6 +39,13 @@ spec:
       startupTaints:
         - key: {{ .Values.startupTaintKey }}
           effect: NoSchedule
+      {{- if .Values.terminationGracePeriod }}
+      # Backstop bound (ADR-085): the maximum a node drain waits on blocking PodDisruptionBudgets (or
+      # karpenter.sh/do-not-disrupt pods) before Karpenter forcibly drains. A workload PDB can never wedge
+      # consolidation / drift / an EKS upgrade longer than this — long enough not to bite a normal drain,
+      # short enough that a bad single-replica PDB can't stall node lifecycle indefinitely.
+      terminationGracePeriod: {{ .Values.terminationGracePeriod }}
+      {{- end }}
   disruption:
     # WhenEmpty (platform, stateful-safe — only reclaims empty nodes) or WhenEmptyOrUnderutilized (preprod).
     consolidationPolicy: {{ .Values.consolidationPolicy }}
