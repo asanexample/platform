@@ -92,9 +92,16 @@ inputs = {
 
   allowed_registries = [local.ecr_registry] # no tenants on the platform cluster
 
-  # Cosign verify-images/verify-attestations for the platform agents that run on the hub (ADR-082). Empty until
-  # the first XAgent claim — so this is inert today and lands the agent's image-signing guarantee on the hub.
-  verify_subjects_product = local.verify_subjects_product
+  # Cosign verify-images/verify-attestations for the platform agents that run on the hub (ADR-082), now that the
+  # triage-copilot XAgent (gitops/agents/triage-copilot.yaml) is live. Enforced — matching preprod. Rolled out
+  # Audit-first and confirmed the agent's signed+attested image passes in-cluster (Kyverno PolicyReports showed
+  # verify-images-product + verify-attestations-product = pass, "image verified") before this Enforce flip.
+  # Attestation verification requires image verification (reuses the ECR-read Pod Identity).
+  verify_subjects_product         = local.verify_subjects_product
+  enable_image_verification       = true
+  verify_failure_action           = "Enforce"
+  enable_attestation_verification = true
+  attest_failure_action           = "Enforce"
 
   # Crossplane (the tenant control plane, ADR-046) runs here. Its rbac-manager authors wildcard
   # provider ClusterRoles at runtime as its own ServiceAccount (not the deployer), which the
