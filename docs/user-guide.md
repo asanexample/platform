@@ -341,7 +341,7 @@ kubectl get pods -A
 ### Teardown
 
 To destroy the full platform stack, use `platctl teardown` (the reverse-DAG
-orchestrator; a legacy `scripts/teardown-platform.sh` also exists):
+orchestrator):
 
 ```bash
 platctl teardown
