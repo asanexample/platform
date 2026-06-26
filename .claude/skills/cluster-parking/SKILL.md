@@ -67,6 +67,22 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-06-26 — first UNPARK (platform + preprod), one `platctl up --env <env>` each. ✅ Both restored + healthy.**
+  Node groups back (platform `system`=2, preprod `system`=1), kubectl reachable again once nodes + the Tailscale
+  router returned (a few min after `up`), and the agent / ArgoCD / obs all Running. **`up` AUTO-HANDLES the park's
+  watch-items — no manual steps:** it runs a terragrunt apply that **recreates the Karpenter NodePool**
+  (`helm_release.nodepool` destroy→create) and prints **"Reconnect complete — platform can reach the restored
+  preprod cluster"** (the **cross-vpc-dns reconnect** — so the historical "stale PHZ → re-apply argocd" item did NOT
+  recur, nor did the Kyverno-helm-import one). `up` is slower than `down` (re-applies the karpenter module + waits
+  for nodes) — ~10 min for both envs; run it in the background.
+  **⚠️ False-alarm note for future unparks:** two ArgoCD apps stayed not-green but were **PRE-EXISTING, not
+  unpark-caused** — `grants` (sync `Unknown`: its source path `gitops/grants` does not exist → a broken app) and
+  `environments` (`OutOfSync`: the vestigial `platform-triage-copilot-dev` XEnvironment is **stuck terminating** —
+  Kyverno `restrict-environment-envelope` blocks its finalizer removal — the deferred agent-moved-to-hub cleanup).
+  Don't chase the standing not-green set on unpark; judge health by *new* breakage. `platctl validate` ran
+  slow/inconclusive this cycle → fell back to manual checks: **AWS EKS node-group sizes + `kubectl get nodes` + key
+  pods + ArgoCD app health**.
+
 - **2026-06-25 — first skill-tracked PARK (platform + preprod), one `platctl down --env <env> --yes` each. ✅ Both
   parked.** Confirmed via the AWS EKS API: each cluster's `system` node group → `desiredSize=0, minSize=0`.
   `down` (per its own output) **drained Karpenter first** (deleted the NodePool, graceful drain → terminate), then
