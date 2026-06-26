@@ -14,10 +14,11 @@ spec:
   roles:
     releaseApprover: ["gangster"]
   # Incident routing (ADR-084 D6) — the resolution floor for every platform-owned incident, including the
-  # triage agent's OWN (team=platform). The agent posts platform incidents into this channel; its bot must be
-  # invited. Channel name (resolved to an id at runtime); change to your real platform incident channel.
+  # triage agent's OWN (team=platform). The agent posts platform incidents here; its bot must be a member.
+  # A channel ID is used directly (the channel is private → the id avoids needing a groups:read scope for
+  # name resolution).
   slack:
-    channel: "#platform-incidents"
+    channel: "C0BEBSKJPLY" # #platform-incidents (private)
   envelope:
     allowedTiers: ["standard"]
     allowedStages: ["dev", "prod"]
