@@ -13,6 +13,14 @@ name: Deploy
 on:
   push:
     branches: [main]
+    # platform#739: manifest/docs-only changes deliver via ArgoCD (the workload ApplicationSet sources
+    # k8s/ at targetRevision: HEAD), so skip the full build+sign+promote when nothing that affects the image
+    # changed. paths-ignore errs toward building: a push is skipped ONLY if EVERY changed file matches below, so
+    # any code/Dockerfile/dependency change still rebuilds.
+    paths-ignore:
+      - 'k8s/**'
+      - 'docs/**'
+      - '**/*.md'
 
 permissions:
   id-token: write
