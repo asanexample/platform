@@ -6,4 +6,4 @@ spec:
   environmentRef: alpha-shop-dev
   services:
     web:
-      digest: sha256:3b199fe2f96b5aee2d1c745240af39c72bc5ba10643859a466cd2802e4ebc749
+      digest: sha256:f6b37d869df95615498ba621fd8f897ad09b8fcdf94082b59abef9523f2117ec
