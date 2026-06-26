@@ -197,12 +197,14 @@ spec:
                       name: {{ $sa }}
                       namespace: {{ $ns }}
             {{- end }}
-            {{- /* NetworkPolicies (ADR-082 D8) — mirror the tenant Composition's proven shape on this Cilium:
-                   default-deny ingress (the kubelet health probes still work — Cilium exempts host traffic);
-                   allow ingress ONLY from observability (the Alertmanager webhook) + kube-system, on the agent's
-                   8080; and allow egress to DNS + everything EXCEPT the EC2 IMDS (169.254.169.254) — that lets
-                   the agent reach Bedrock/Slack/the obs stores/the k8s API AND the EKS Pod-Identity agent
-                   (169.254.170.23, not blocked) while closing the IMDS SSRF path. */}}
+            {{- /* NetworkPolicies (ADR-082 D8) — INGRESS lock only (the valuable control: only Alertmanager can
+                   reach the agent). default-deny ingress (kubelet health probes still work — Cilium exempts host
+                   traffic) + allow ingress ONLY from observability (the Alertmanager webhook) + kube-system on 8080.
+                   EGRESS is intentionally left open here: a k8s ipBlock egress does NOT work on Cilium for the
+                   agent's real destinations — Cilium matches in-cluster (otel-collector/mimir/loki) by IDENTITY and
+                   the EKS Pod-Identity agent (169.254.170.23) is HOST traffic, neither of which a CIDR ipBlock
+                   covers, so it silently blocked Bedrock creds + obs. Proper egress bounding needs a Cilium policy
+                   (toEntities host/cluster/kube-apiserver + toFQDNs for Bedrock/Slack) — tracked as a follow-up. */}}
             ---
             apiVersion: kubernetes.crossplane.io/v1alpha2
             kind: Object
@@ -252,35 +254,6 @@ spec:
                         ports:
                           - port: 8080
                             protocol: TCP
-            ---
-            apiVersion: kubernetes.crossplane.io/v1alpha2
-            kind: Object
-            metadata:
-              annotations:
-                gotemplating.fn.crossplane.io/composition-resource-name: netpol-allow-egress
-            spec:
-              providerConfigRef:
-                name: default
-              forProvider:
-                manifest:
-                  apiVersion: networking.k8s.io/v1
-                  kind: NetworkPolicy
-                  metadata:
-                    name: allow-egress
-                    namespace: {{ $ns }}
-                  spec:
-                    podSelector: {}
-                    policyTypes: ["Egress"]
-                    egress:
-                      - ports:
-                          - port: 53
-                            protocol: UDP
-                          - port: 53
-                            protocol: TCP
-                      - to:
-                          - ipBlock:
-                              cidr: 0.0.0.0/0
-                              except: ["169.254.169.254/32"]
     - step: ready
       functionRef:
         name: function-auto-ready
