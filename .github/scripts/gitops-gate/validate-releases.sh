@@ -40,19 +40,24 @@ for rel in $RELEASE_FILES; do
   envref="$(yq -r '.spec.environmentRef // ""' "$f")"
   [ -n "$envref" ] || note "${pf}: spec.environmentRef is required"
 
-  # path is load-bearing: gitops/releases/<team>/<product>/<file> joins to the SIBLING Environment claim at
-  # gitops/environments/<team>/<product>/<file>. Derive team/product/file from the path.
+  # path is load-bearing: gitops/releases/<team>/<product>/<file> joins to its SIBLING target — either a tenant/
+  # platform Environment claim at gitops/environments/<team>/<product>/<file>, OR (for platform agents — ADR-082,
+  # XAgent not XEnvironment) the agent claim at gitops/agents/<product>.yaml. The path's <product> ties the
+  # release to its target either way. Derive team/product/file from the path.
   dir_product="$(basename "$(dirname "$rel")")"
   dir_team="$(basename "$(dirname "$(dirname "$rel")")")"
   fname="$(basename "$rel")"
   env_rel="gitops/environments/${dir_team}/${dir_product}/${fname}"
   env_f="${HEAD_DIR}/${env_rel}"
   [ -f "$env_f" ] || env_f="${BASE_DIR}/${env_rel}"
-  if [ ! -f "$env_f" ]; then
-    note "${pf}: no sibling Environment claim ${env_rel} — a Release must target an existing Environment"
-  else
+  agent_rel="gitops/agents/${dir_product}.yaml"
+  agent_f="${HEAD_DIR}/${agent_rel}"
+  [ -f "$agent_f" ] || agent_f="${BASE_DIR}/${agent_rel}"
+  if [ -f "$env_f" ]; then
     env_name="$(yq -r '.metadata.name // ""' "$env_f")"
     [ "$envref" = "$env_name" ] || note "${pf}: spec.environmentRef '${envref}' must equal the Environment claim's metadata.name '${env_name}' (${env_rel})"
+  elif [ ! -f "$agent_f" ]; then
+    note "${pf}: no sibling Environment claim ${env_rel} nor Agent claim ${agent_rel} — a Release must target an existing Environment or Agent"
   fi
 
   # ≥1 service; each released Service must be DECLARED on the Environment; each digest is a real manifest digest.
