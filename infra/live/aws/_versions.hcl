@@ -55,6 +55,7 @@ locals {
     argocd                       = "${local.source_base}/argocd"
     argocd_clusters              = "${local.source_base}/argocd-clusters"
     argocd_apps                  = "${local.source_base}/argocd-apps"
+    argo_rollouts                = "${local.source_base}/argo-rollouts"
     cert_manager                 = "${local.source_base}/cert-manager"
     external_dns                 = "${local.source_base}/external-dns"
     external_secrets             = "${local.source_base}/external-secrets"
@@ -97,6 +98,7 @@ locals {
   helm_versions = {
     cilium                = "1.19.4"
     argocd                = "9.5.14"
+    argo_rollouts         = "2.41.0" # argoproj/argo-rollouts — progressive delivery (ADR-056); app v1.9.0
     cert_manager          = "1.17.1"
     external_dns          = "1.16.1"
     external_secrets      = "0.14.3"
