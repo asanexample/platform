@@ -6,9 +6,11 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - serviceaccount.yaml
-  - deployment.yaml
+  - rollout.yaml
   - service.yaml
   - httproute.yaml
-# Rewrite HTTPRoute backendRefs when a namePrefix is applied (PR previews). See name-reference.yaml.
+# Rewrite HTTPRoute backendRefs when a namePrefix is applied (PR previews, see name-reference.yaml); and teach
+# the replicas transformer to target the Argo Rollout (kustomizeconfig.yaml, ADR-056).
 configurations:
   - name-reference.yaml
+  - kustomizeconfig.yaml

@@ -1,0 +1,8 @@
+# Teach kustomize's built-in `replicas:` transformer to also target Argo Rollouts (ADR-056). By default it
+# only patches Deployment/StatefulSet/ReplicaSet/ReplicationController, so without this the per-stage overlay
+# `replicas:` count would be silently dropped for a Rollout.
+replicas:
+  - path: spec/replicas
+    create: true
+    group: argoproj.io
+    kind: Rollout

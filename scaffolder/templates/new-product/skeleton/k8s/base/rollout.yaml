@@ -5,8 +5,11 @@
 {%- else -%}
 {%- set cpuReq = '50m' -%}{%- set memReq = '64Mi' -%}{%- set cpuLim = '250m' -%}{%- set memLim = '128Mi' -%}{%- set startFail = 12 -%}
 {%- endif -%}
-apiVersion: apps/v1
-kind: Deployment
+# Workloads are Argo Rollouts, not Deployments (ADR-056) — every stage, so prod is never the first place a
+# Rollout runs. The strategy below is the trivial auto-promote (dogfood) shape used in dev/test/preprod; prod
+# gets a stepped, metric-gated canary patched in by its overlay once the Gateway-API canary lands (Phase 2).
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: app-${{ values.team }}-${{ values.product }}
   labels:
@@ -18,6 +21,15 @@ spec:
   selector:
     matchLabels:
       app: app-${{ values.team }}-${{ values.product }}
+  strategy:
+    canary:
+      # Auto-promote in one step — exercises the Rollout/admission/PDB path without canary cost. maxSurge: 1 +
+      # maxUnavailable: 0 brings the new pod up before the old terminates, so even a 1-replica stage is
+      # zero-downtime (paired with the preStop drain below). Prod overlays add stepped weights + analysis later.
+      maxSurge: 1
+      maxUnavailable: 0
+      steps:
+        - setWeight: 100
   template:
     metadata:
       labels:
@@ -45,15 +57,14 @@ spec:
           type: RuntimeDefault
       # Spread replicas across nodes and AZs so a single node/AZ loss (or a Karpenter consolidation) can't take
       # all replicas at once (ADR-085). ScheduleAnyway (soft) — a hard constraint would strand pods Pending on a
-      # small or scaling-from-zero cluster. matchLabelKeys adds pod-template-hash so each rollout revision spreads
-      # independently. This lives in the skeleton (not the platform mutate) because the labelSelector must match
-      # this workload's own pods, which a generic mutate can't know.
+      # small or scaling-from-zero cluster. matchLabelKeys uses `rollouts-pod-template-hash` (the label Argo
+      # Rollouts puts on pods, NOT `pod-template-hash`) so each rollout revision spreads independently.
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
           whenUnsatisfiable: ScheduleAnyway
           matchLabelKeys:
-            - pod-template-hash
+            - rollouts-pod-template-hash
           labelSelector:
             matchLabels:
               app: app-${{ values.team }}-${{ values.product }}
@@ -61,7 +72,7 @@ spec:
           topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: ScheduleAnyway
           matchLabelKeys:
-            - pod-template-hash
+            - rollouts-pod-template-hash
           labelSelector:
             matchLabels:
               app: app-${{ values.team }}-${{ values.product }}

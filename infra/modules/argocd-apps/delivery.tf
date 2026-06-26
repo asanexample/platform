@@ -46,6 +46,12 @@ resource "kubernetes_manifest" "product_appproject" {
         { group = "", kind = "ServiceAccount" },
         { group = "apps", kind = "Deployment" },
         { group = "apps", kind = "StatefulSet" },
+        # Argo Rollouts (ADR-056): every workload is a Rollout; AnalysisTemplate/AnalysisRun back the metric
+        # gates. Without these in the whitelist ArgoCD refuses to sync the Rollout ("resource not permitted in
+        # project"). Deployment/StatefulSet are kept for the migration window.
+        { group = "argoproj.io", kind = "Rollout" },
+        { group = "argoproj.io", kind = "AnalysisTemplate" },
+        { group = "argoproj.io", kind = "AnalysisRun" },
         { group = "batch", kind = "Job" },
         { group = "batch", kind = "CronJob" },
         { group = "gateway.networking.k8s.io", kind = "HTTPRoute" },
