@@ -33,13 +33,13 @@ variable "endpoint_private_access" {
 }
 
 variable "endpoint_public_access" {
-  description = "Enable public API server endpoint"
+  description = "Enable the public API server endpoint. Defaults to false — private-only is the house policy (ADR-010); reach the API over Tailscale/SSM. Set true only deliberately (and narrow public_access_cidrs)."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "public_access_cidrs" {
-  description = "CIDR blocks allowed to access the public API endpoint"
+  description = "CIDR blocks allowed to reach the public API endpoint. Only applies when endpoint_public_access = true — narrow this to operator IPs; do NOT rely on the open default if you enable public access."
   type        = list(string)
   default     = ["0.0.0.0/0"]
 }

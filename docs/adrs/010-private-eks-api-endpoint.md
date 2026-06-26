@@ -43,15 +43,16 @@ endpoint_public_access  = false
 
 ### Per-Cluster Status
 
-The **platform** cluster runs private-only (as above). The **preprod** cluster is currently **public to
-`0.0.0.0/0`** (`endpoint_public_access = true`, IAM-SigV4-only) — a **known posture gap** inconsistent
-with this ADR, tracked for remediation. It originated as a workaround for reaching preprod's private
-endpoint cross-VPC, but the supporting infrastructure now exists (preprod's own Tailscale subnet router,
-plus the platform `cross-vpc-dns` PHZ for preprod's endpoint — [ADR-035](035-cross-vpc-dns-resolution.md)),
-so flipping preprod to private-only should now be achievable. (The EKS module *defaults* the public
-endpoint on for the bootstrap/cross-VPC case — [ADR-029](029-preprod-public-ingress-gateway-api.md) —
-so each unit must set its posture explicitly; preprod should set `endpoint_public_access = false`, or at
-minimum restrict `public_access_cidrs` away from `0.0.0.0/0` in the interim.)
+Both the **platform** and **preprod** clusters run **private-only** (`endpoint_public_access = false`).
+Reach the API over each environment's Tailscale subnet router (operators), or — for ArgoCD on platform
+reaching preprod — the TGW + the platform `cross-vpc-dns` PHZ for preprod's endpoint
+([ADR-035](035-cross-vpc-dns-resolution.md)). Preprod's earlier public-to-`0.0.0.0/0` posture (a cross-VPC
+bootstrap workaround) has since been remediated to private-only, matching platform.
+
+The EKS module now **defaults `endpoint_public_access` to `false`**, so a new unit is private-by-default
+(defense-in-depth — a dropped override can't silently expose the API). The only time the public endpoint
+is enabled is a full from-scratch bootstrap, which `platctl` toggles on and re-disables automatically
+(its unlock/lockdown phases — see `docs/runbooks/platform-rebuild-from-scratch.md`).
 
 ### Access Methods
 
