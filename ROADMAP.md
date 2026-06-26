@@ -13,6 +13,7 @@ detail. "Complete picture" means every capability and area is represented — no
 | 2025-05-15 | 0.2     | J. Deeden | Updated for AWS Organizations, SCPs, and state management             |
 | 2026-06-18 | 1.0     | J. Deeden | Consolidated to a capability map (Area × Horizon); backfilled shipped work, reframed to the current AWS IDP, retired stale multi-cloud status tables |
 | 2026-06-23 | 1.1     | J. Deeden | Added Compute & Elasticity (Karpenter, ADR-078, #643); observability data plane marked complete |
+| 2026-06-25 | 1.2     | J. Deeden | Added Reliability & Tech Debt to Next (epic #769, tech-debt audit inventory)          |
 
 ## Executive Summary
 
@@ -98,6 +99,10 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 #### Cost & FinOps
 
 - **Cost guardrails — aggregate budgets + FinOps visibility** — Forward half of Cost & FinOps. Aggregate per-team budgets/caps (the quota-cap dial seam left by Phase 3), cost dashboards/FinOps visibility, anomaly alerts.
+
+#### Reliability & Tech Debt
+
+- [#769](https://github.com/asanexample/platform/issues/769) **Epic: tech-debt paydown — 2026 H2 inventory.** Deep 10-pass audit ([`docs/tech-debt-audit-2026-06-25.md`](docs/tech-debt-audit-2026-06-25.md), ~150 `TD-NNN` findings). Tier 1 (security/correctness, spot-verified): enforce cosign on the hub ([#770](https://github.com/asanexample/platform/issues/770)), private-only EKS default ([#771](https://github.com/asanexample/platform/issues/771)), fail-closed gate scripts ([#772](https://github.com/asanexample/platform/issues/772)), DeveloperAccess regression ([#647](https://github.com/asanexample/platform/issues/647)). Tier 2 (systemic): provider-constraint standardization ([#773](https://github.com/asanexample/platform/issues/773)), `.tool-versions` SSOT ([#774](https://github.com/asanexample/platform/issues/774)), Azure-carcass removal ([#775](https://github.com/asanexample/platform/issues/775)), Action SHA-pinning ([#776](https://github.com/asanexample/platform/issues/776)), Dependabot coverage ([#777](https://github.com/asanexample/platform/issues/777)), tests-into-PR-gates ([#778](https://github.com/asanexample/platform/issues/778)). Security/IAM findings fold into the existing tracker [#654](https://github.com/asanexample/platform/issues/654).
 
 ### Later
 

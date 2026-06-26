@@ -1,6 +1,6 @@
 # ADR-080: The Triage Copilot — Propose-Only On-Call Incident Triage, and the Observability Stack's First Real Workload
 
-**Status:** Proposed (2026-06-24)
+**Status:** Accepted (2026-06-24) — agent built + live
 
 ## Context
 

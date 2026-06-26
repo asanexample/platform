@@ -1,7 +1,7 @@
 # ADR-063: Team as a First-Class Git-Native Object
 
 **Date:** 2026-06-09
-**Status:** Proposed — design-stage. Sharpens the **Team** source-of-truth left open in
+**Status:** Accepted — built + live (gitops/teams + github-teams). Sharpens the **Team** source-of-truth left open in
 [ADR-049](049-tenant-model-team-tenant-zone.md) / [tenant-api-v2.md](../architecture/tenant-api-v2.md); lands
 with the rebuild. Enables [ADR-062](062-self-service-tenant-provisioning.md) (self-service).
 
