@@ -1,6 +1,12 @@
 # ADR-082: The `XAgent` Platform-Agent Runtime — a First-Class, GitOps-Native Agent Control Plane
 
-**Status:** Proposed (2026-06-25)
+**Status:** Accepted (2026-06-25) — built + live (2026-06-26)
+
+> **Amendment (2026-06-26, epic #718):** Built and live. The triage agent (`XAgent` #1) autonomously triages
+> real incidents → confident root-cause hypotheses (logs + metrics + change-correlation) → Slack, and is
+> multi-cluster-aware. The cross-cluster *reach* (D2) was refined: it needs **no** cross-cluster k8s auth —
+> ArgoCD on the hub already records every cluster's deploys, so the "what changed" signal is hub-local. See
+> **Implementation status & learnings** below.
 
 ## Context
 
@@ -184,6 +190,52 @@ hub**, fully consistent with ADR-048's intent. Tenants still run only on workloa
 - **This is a sizeable, initially-unproven build for one agent.** Mitigated by validating the Composition with `crossplane
   render` before any apply and **keeping the preprod agent alive (abstaining is harmless) as fallback until the hub `XAgent`
   verifiably triages** — no cut-over on faith.
+
+## Implementation status & learnings (2026-06-26)
+
+Built and live (epic #718). The agent autonomously triages real incidents to confident hypotheses on
+**logs + metrics + change-correlation**, posted to the incident channel, multi-cluster-aware.
+
+**What shipped beyond the core Composition:** the Mimir **ruler** (P4 — so a spoke/preprod alert can fire
+and reach the agent at all, vs. only the hub Prometheus's locally-scraped metrics); the
+**`get_recent_changes`** change-correlation tool (ADR-080 D2 — it had been planned but never registered, so
+the agent's strongest heuristic was inert and it abstained on every alert); per-tool **gather logging**
+(OTel traces can be network-blocked, so stdout is the real debugging surface); **tenant-aware obs** (the
+`X-Scope-OrgID` follows the alert's `cluster` label); and **ArgoCD as the cross-cluster change source**.
+
+**Cross-cluster reach (D2), refined — no cross-cluster k8s auth needed.** The plan had the agent read
+*preprod's* k8s API for "what changed" (cross-account IAM + an EKS access entry + a network path).
+Unnecessary: **ArgoCD runs on the hub and records deploys for every managed cluster**, so
+`get_recent_changes` reads ArgoCD hub-local for the change timeline and the obs tenant follows the alert's
+cluster. A preprod incident gets its full picture (symptom + logs/metrics + change) without the agent ever
+touching preprod's API. The deferred `access.clusters` cross-cluster *k8s* read is thus off the critical path.
+
+**Durable agent-infra learnings — the theme is RBAC ≠ reachability.** A hub-resident agent needs explicit
+network + identity wiring that tenant workloads inherit for free:
+
+- **SA token must be explicitly mounted.** `get_recent_changes` reads the k8s API, but Kyverno's
+  `mutate-automount` stamps `automountServiceAccountToken=false` when absent — leaving only the Pod-Identity
+  (Bedrock) token. Fix = `automountServiceAccountToken: true` **and** excluding `runtime=platform-agent` from
+  the `restrict-automount-sa-token` policy.
+- **The observability namespace default-denies ingress** — obs-read RBAC grants *what* the agent may read,
+  not *whether it can connect*. Needs a NetworkPolicy admitting `runtime=platform-agent` to the obs stores.
+- **The gitops Release gate had to learn a Release can target an `XAgent`**, not only an `XEnvironment` —
+  else every agent image promote fails the sibling-claim check.
+- **Cilium: a k8s `ipBlock` egress NetworkPolicy does not cover in-cluster (identity-matched) or host (the
+  Pod-Identity agent) traffic** — mirroring the tenant ipBlock netpol onto the agent silently blocked Bedrock
+  - obs. A proper Cilium-native agent egress policy is still owed.
+- **ArgoCD won't auto-retry a sync that failed and exhausted its retries on the same revision**; fixing a
+  *different* resource doesn't unstick it — trigger the sync explicitly.
+
+**Correction (record-keeping):** an earlier working note claimed manifest-only app changes need a rebuild
+because the workload ApplicationSet pins manifests to the Release commit. That is wrong — the ApplicationSet
+sources manifests at **`targetRevision: HEAD`**; only the image **digest** is Release-pinned ([ADR-071](071-digest-promotion-via-control-plane.md)).
+A manifest-only change delivers on the next sync with no rebuild (platform#739 additionally added a
+`deploy.yml` path-filter so such commits don't even trigger CI).
+
+**Remaining follow-ups:** per-tenant ruler **rules-sync** (the curated alert rules loaded into the Mimir
+ruler per tenant, IaC-managed — today only a hand-loaded demo rule fires for preprod); a proper
+Cilium-native agent **egress** policy.
 
 ## Alternatives considered
 
