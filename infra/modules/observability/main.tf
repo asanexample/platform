@@ -437,6 +437,32 @@ resource "kubernetes_network_policy_v1" "allow_intra_namespace" {
   }
 }
 
+# Platform agents (ADR-082, runtime=platform-agent namespaces) READ the obs stores in-cluster: the triage
+# agent queries loki-gateway/mimir-gateway and exports traces to otel-collector. The ns default-denies ingress,
+# so explicitly admit the agent namespaces (identity-based namespaceSelector — works on Cilium, unlike a CIDR
+# ipBlock). Read-only data; the agent's obs-read RBAC already scopes WHAT it can read. No-op where no agents run.
+resource "kubernetes_network_policy_v1" "allow_platform_agent_read" {
+  count = local.create ? 1 : 0
+
+  metadata {
+    name      = "allow-platform-agent-read"
+    namespace = kubernetes_namespace_v1.this[0].metadata[0].name
+  }
+  spec {
+    pod_selector {}
+    policy_types = ["Ingress"]
+    ingress {
+      from {
+        namespace_selector {
+          match_labels = {
+            "platform.refplat.org/runtime" = "platform-agent"
+          }
+        }
+      }
+    }
+  }
+}
+
 # Grafana ingress from the Cilium Gateway. The gateway's Envoy connects with the reserved Cilium
 # `ingress` identity (8), which a STANDARD k8s NetworkPolicy `from:` cannot match (it's not a
 # namespace/pod) — so this must be a CiliumNetworkPolicy with `fromEntities: ["ingress"]`
