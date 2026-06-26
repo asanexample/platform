@@ -32,11 +32,13 @@ printf '%s' "$OUT" | grep -q 'name: platform-agent-triage-copilot-obsread'      
 printf '%s' "$OUT" | grep -q 'name: platform-trust-observability-reader'        || { echo "::error::obs-read binding must reference platform-trust-observability-reader"; exit 1; }
 # obs-read binds the NAMED SA, not the whole namespace's SAs (tighter than the tenant platform-trust binding).
 printf '%s' "$OUT" | grep -A20 'name: platform-agent-triage-copilot-obsread' | grep -A2 'subjects:' | grep -q 'kind: ServiceAccount' || { echo "::error::obs-read binding must target the named ServiceAccount subject"; exit 1; }
-# NetworkPolicies (ADR-082 D8): default-deny ingress, allow trigger from observability, egress open-except-IMDS.
+# NetworkPolicies (ADR-082 D8): INGRESS lock — default-deny + allow trigger only from observability. (Egress is
+# left open: a k8s ipBlock egress doesn't work on Cilium for in-cluster/host destinations — see the composition
+# comment; proper Cilium-native egress bounding is a follow-up.)
 printf '%s' "$OUT" | grep -q 'name: default-deny-ingress' || { echo "::error::default-deny-ingress NetworkPolicy not rendered"; exit 1; }
 printf '%s' "$OUT" | grep -A12 'name: allow-trigger-ingress' | grep -q 'kubernetes.io/metadata.name: observability' || { echo "::error::ingress must be allowed from the observability namespace (Alertmanager)"; exit 1; }
-printf '%s' "$OUT" | grep -A14 'name: allow-egress' | grep -q '169.254.169.254/32' || { echo "::error::egress must exclude the EC2 IMDS (SSRF guard) while allowing the rest"; exit 1; }
-echo "  ✓ triage-copilot OK (ns + SA + Pod-Identity role/policy/association with data-plane bedrock + boundary; obs-read CRB → named SA; netpols: deny-ingress + allow-observability + egress-except-IMDS)"
+printf '%s' "$OUT" | grep -q 'name: allow-egress' && { echo "::error::the broken k8s ipBlock allow-egress must NOT be rendered (it blocks in-cluster/host egress on Cilium)"; exit 1; } || true
+echo "  ✓ triage-copilot OK (ns + SA + Pod-Identity role/policy/association with data-plane bedrock + boundary; obs-read CRB → named SA; netpols: deny-ingress + allow-observability ingress lock)"
 
 echo "== render triage-copilot-suspended (kill-switch) → NO PodIdentityAssociation, slot retained =="
 OUT="$(render "${here}/agents/triage-copilot-suspended.yaml")"
