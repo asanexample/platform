@@ -300,13 +300,15 @@ spec:
                       - toEndpoints:
                           - matchLabels:
                               k8s:io.kubernetes.pod.namespace: observability
-                      # External egress is bounded to Bedrock + Slack ONLY — the actual hardening. *.slack.com
+                      # External egress is bounded to Bedrock + Slack + GitHub ONLY — the actual hardening. *.slack.com
                       # covers the webhook (hooks.slack.com), the Socket Mode API (slack.com/apps.connections.open),
-                      # and the Socket Mode WebSocket (wss-*.slack.com) — all egress-only.
+                      # and the Socket Mode WebSocket (wss-*.slack.com); api.github.com is the change-correlation read
+                      # (get_change_detail). All egress-only.
                       - toFQDNs:
                           - matchPattern: "bedrock-runtime.*.amazonaws.com"
                           - matchName: "slack.com"
                           - matchPattern: "*.slack.com"
+                          - matchName: "api.github.com"
                         toPorts:
                           - ports:
                               - port: "443"
