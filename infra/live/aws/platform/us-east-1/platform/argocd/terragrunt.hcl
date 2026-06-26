@@ -164,6 +164,11 @@ inputs = {
 
   high_availability = include.base.locals.high_availability # dev = single instance; prod = HA (cost_profile)
 
+  # Faster GitOps loop: reconcile apps every 60s (default 180s, + ArgoCD's 60s jitter ≈ 3-4 min worst case →
+  # ~1-2 min). With ArgoCD private (no GitHub→ArgoCD webhook reachable, ADR-010), this is the lever that
+  # shortens "merge → live". Trivial load at our app count; the repo-server caches the git state.
+  reconciliation_timeout = "60s"
+
   # Prometheus metrics + ServiceMonitors for the observability hub dashboards (#102 P1).
   metrics_enabled = true
 
