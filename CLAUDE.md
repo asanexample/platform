@@ -217,6 +217,11 @@ per-cluster catalog: `docs/architecture/kyverno-policy-catalog.md`. When writing
 - Container `securityContext`: `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`, `seccompProfile.type: RuntimeDefault`
 - Pod `automountServiceAccountToken: false`
 - The `team` label (derived from the namespace name)
+- **Graceful-drain defaults** (ADR-085): a container `lifecycle.preStop` sleep + pod `terminationGracePeriodSeconds: 30`, and `topologySpreadConstraints` (zone + node, soft, selector derived from your workload) — so deploys/disruptions don't drop traffic
+
+**Auto-generated for you — do NOT author (ADR-085):**
+
+- A **`PodDisruptionBudget`** (`<workload>-pdb`, `maxUnavailable: 1`, selector derived from your workload) per environment Deployment/StatefulSet — created, kept in sync, GC'd with the workload. Drain-safe; only meaningful at **≥ 2 replicas**.
 
 **Required — omitting these gets the resource REJECTED:**
 
@@ -231,6 +236,9 @@ per-cluster catalog: `docs/architecture/kyverno-policy-catalog.md`. When writing
 - **No `eks.amazonaws.com/role-arn` annotation** on a ServiceAccount — IRSA is platform-only; an environment annotation is denied (`disallow-irsa-annotation-cross-team`). (Separately, environment AWS access is platform-managed **Pod Identity** (ADR-041): use a **named** ServiceAccount and declare access in the `XEnvironment` claim's deny-set-validated `policyStatements` — a Pod Identity requirement, *not* a Kyverno rejection. See the `environment-onboarding` skill.)
 - **Images must be cosign-signed + attested** (keyless; Enforce on preprod). Your app CI is a thin caller of the shared `trusted-ci` build-sign/provenance workflows; trust is registry-derived from `spec.repo`. See the `supply-chain-onboarding` skill.
 - **No** `cluster-admin` (Cluster)RoleBindings or wildcard (`*`) verbs/resources in Roles
+- **`replicas >= 2` in `*-prod` namespaces** (`require-prod-replica-floor`, ADR-085) — a single replica can't be zero-downtime; an HPA must set `minReplicas >= 2`. Currently **Audit** (rolling to Enforce, issue #844); lower stages may stay at 1 for cost. Replicas are validated, never mutated.
+
+**Your responsibility (not enforced, ADR-085):** handle **`SIGTERM`** — stop accepting, drain in-flight, exit (the injected `preStop` sleep only buys the datapath-deprogramming window; it does not drain your requests). Long-lived connections (websockets/gRPC streams) need app-level age limits / `GOAWAY`.
 
 **Recommended (not enforced):** `app.kubernetes.io/name` (can't be auto-derived).
 

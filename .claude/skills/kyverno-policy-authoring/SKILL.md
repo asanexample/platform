@@ -65,6 +65,34 @@ with `depends_on` — avoids the webhook chicken-and-egg. Don't merge them.
   and tier gates (`{{- if ne .Values.complianceTier "standard" }}` for hipaa/pci-only
   rules like `require-ro-rootfs`, `require-pod-security-restricted`).
 
+## Deriving a resource/field from the trigger workload (ADR-085)
+
+Reusable techniques from the availability defaults (`generate-workload-pdb`,
+`mutate-topology-spread`, `require-prod-replica-floor`) — don't relearn them:
+
+- **Copy the workload's own selector instead of guessing labels.** When a generated PDB or an
+  injected `topologySpreadConstraints` needs a `labelSelector`, derive it from the trigger:
+  `` matchLabels: "{{`{{ request.object.spec.selector.matchLabels }}`}}" ``. Kyverno resolves the
+  variable to the typed **map** (not a string) — proven offline. Label-convention-agnostic and
+  correct per workload, where the Crossplane Composition can't be (no per-service pod label).
+- **Match the controller directly when you need a controller-level field.** A Pod has no
+  `spec.selector`, and autogen only relocates a *Pod*-matching patch. So a rule that reads the
+  selector must `match` `Deployment`/`StatefulSet` (not `Pod`) and patch `spec.template.spec`
+  itself — that's why `mutate-topology-spread` matches controllers, unlike `mutate-pod-defaults`
+  (Pod + autogen). Keep the graceful-drain bits (preStop/grace) on the Pod-matching patch so
+  autogen still resolves them.
+- **`generate` needs RBAC *and* `generateExisting`.** The background controller can't create a new
+  kind (e.g. PodDisruptionBudget) without an aggregated ClusterRole labelled
+  `rbac.kyverno.io/aggregate-to-background-controller: "true"` granting `create` on it — **and**
+  `get/list/watch` on the trigger kind for the backfill. Set `spec.generateExisting: true`, or only
+  newly-admitted workloads get the resource; existing ones stay uncovered until their next deploy.
+  (Both bit us as follow-up fixes.) `synchronize: true` reconciles + GCs the generated resource.
+- **Roll one policy Audit-first under an Enforce cluster** with its *own* action value
+  (`require-prod-replica-floor` → `replica_floor_failure_action`, default `Audit`) instead of the
+  shared `validationFailureAction` — so a new gate soaks in Audit while everything else enforces.
+- **Stage-keyed match** has no chart value — there's no per-stage knob, so scope a prod-only rule by
+  the namespace-name glob (`namespaces: ["*-prod"]`) ANDed with the env-namespace selector.
+
 ## Per-product supply-chain policies (the ADR-046 split)
 
 **Platform owns** the trust-root verification — `verify-images-product-<team>-<product>`
