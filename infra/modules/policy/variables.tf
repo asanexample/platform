@@ -167,6 +167,12 @@ variable "enable_pdb_generate" {
   default     = true
 }
 
+variable "enable_topology_spread" {
+  description = "Inject topologySpreadConstraints (zone + node, soft/ScheduleAnyway) on environment Deployments/StatefulSets when absent, with a labelSelector derived from the workload's own selector (ADR-085) — so replicas don't all land on one node/AZ. add-if-absent; applies on admission (existing workloads pick it up on next deploy)."
+  type        = bool
+  default     = true
+}
+
 variable "enable_replica_floor" {
   description = "Deploy the require-prod-replica-floor validate policy: prod-stage environment workloads (<team>-<product>-prod) must run spec.replicas >= 2 (ADR-085). Lower stages are unaffected (cost)."
   type        = bool

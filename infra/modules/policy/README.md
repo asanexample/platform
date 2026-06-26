@@ -76,6 +76,18 @@ edited or deleted. The template also installs a ClusterRole aggregated into Kyve
 controller** (`rbac.kyverno.io/aggregate-to-background-controller`) so it can create the PDBs — without it
 the policy admits but silently generates nothing.
 
+### Availability: topology spread (`enable_topology_spread`, default true)
+
+`mutate-topology-spread` injects `topologySpreadConstraints` (across `topology.kubernetes.io/zone` and
+`kubernetes.io/hostname`) on environment `Deployment`/`StatefulSet` workloads when absent, so a workload's
+replicas don't all land on one node/AZ (ADR-085). Like the PDB, the `labelSelector` is **derived from the
+workload's own `spec.selector.matchLabels`** — which is why this rule matches the controller directly (not
+the Pod via autogen), since a static patch can't know the selector. `whenUnsatisfiable: ScheduleAnyway` keeps
+it a soft preference (never strands pods `Pending` on a small or scaling-from-zero cluster); `matchLabelKeys:
+[pod-template-hash]` spreads each rollout revision independently. add-if-absent (the scaffolder skeleton's
+explicit spread is never overridden), and it applies on admission — existing workloads pick it up on their
+next deploy.
+
 ### Availability: prod replica floor (`enable_replica_floor`, default true)
 
 `require-prod-replica-floor` requires `spec.replicas >= 2` on `Deployment`/`StatefulSet` in **prod-stage**

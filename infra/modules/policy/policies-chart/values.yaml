@@ -48,6 +48,10 @@ enableMutateDefaults: true
 # Also installs the ClusterRole that lets Kyverno's background controller create/sync the PDBs.
 enablePdbGenerate: true
 
+# Inject topologySpreadConstraints (zone + node) on environment Deployments/StatefulSets when absent, with a
+# labelSelector derived from the workload's own selector (ADR-085). Soft (ScheduleAnyway); add-if-absent.
+enableTopologySpread: true
+
 # Require >=2 replicas on prod-stage environment workloads (ADR-085). Dedicated failureAction so it rolls
 # Audit-first even where the cluster-wide validationFailureAction is Enforce; flip to Enforce after review.
 enableReplicaFloor: true

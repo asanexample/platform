@@ -1,0 +1,55 @@
+{{- if .Values.enableTopologySpread }}
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: mutate-topology-spread
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Default topology spread per workload
+    policies.kyverno.io/category: Availability
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Deployment, StatefulSet
+    policies.kyverno.io/description: >-
+      Injects topologySpreadConstraints (across zone and node) on environment Deployments/StatefulSets when
+      absent, so a workload's replicas don't all land on one node/AZ — a single node/AZ loss then can't take
+      every replica (ADR-085). The labelSelector is derived from the workload's OWN spec.selector.matchLabels
+      (the same technique generate-workload-pdb uses), because a static patch can't know it; this is why the
+      rule matches the controller directly (not the Pod via autogen). whenUnsatisfiable=ScheduleAnyway keeps it
+      a soft preference (never strands pods Pending on a small or scaling-from-zero cluster); matchLabelKeys
+      pod-template-hash makes each rollout revision spread independently. add-if-absent — an explicit choice on
+      the workload (e.g. the scaffolder skeleton's static spread) is never overridden. Applies on admission, so
+      existing workloads pick it up on their next deploy.
+spec:
+  # Mutations fail open: a best-effort default must never block admission.
+  failurePolicy: Ignore
+  rules:
+    - name: add-topology-spread
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+                - StatefulSet
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
+      mutate:
+        patchStrategicMerge:
+          spec:
+            template:
+              spec:
+                +(topologySpreadConstraints):
+                  - maxSkew: 1
+                    topologyKey: topology.kubernetes.io/zone
+                    whenUnsatisfiable: ScheduleAnyway
+                    matchLabelKeys:
+                      - pod-template-hash
+                    labelSelector:
+                      matchLabels: "{{`{{ request.object.spec.selector.matchLabels }}`}}"
+                  - maxSkew: 1
+                    topologyKey: kubernetes.io/hostname
+                    whenUnsatisfiable: ScheduleAnyway
+                    matchLabelKeys:
+                      - pod-template-hash
+                    labelSelector:
+                      matchLabels: "{{`{{ request.object.spec.selector.matchLabels }}`}}"
+{{- end }}
