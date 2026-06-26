@@ -13,6 +13,10 @@ spec:
   ssoGroup: Dev-alpha
   roles:
     releaseApprover: ["gangster"] # prod release-approver default (ADR-068 §7, #501)
+  # Incident routing (ADR-084 D6) — the triage agent posts alpha's incidents into this channel; its bot must be
+  # a member. Channel id used directly (private channel → avoids needing groups:read for name resolution).
+  slack:
+    channel: "C0BDL14RN8Z" # #alpha-incidents (private)
   envelope:
     allowedTiers: ["standard"]
     allowedStages: ["dev", "test", "uat", "staging", "prod"]
