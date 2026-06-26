@@ -12,14 +12,6 @@ enableEnvironmentEnvelope: false
 # Generated-webhook failure policy: Ignore (fail-open) or Fail (fail-closed). Fail under Enforce.
 failurePolicy: Fail
 
-# TD2-04 (epic #809): skip the envelope ADMISSION webhook for Crossplane's own reconcile writes to the
-# XEnvironment XR (status / spec normalization). Crossplane continuously re-UPDATEs each XR; without this, every
-# no-op reconcile fires all ~12 envelope rules — each doing Team+Product context lookups — pinning the admission
-# controller at ~1 core (observed on preprod). A webhook-level CEL matchCondition is independent of
-# `background: true`, so the Audit-first PolicyReports still cover the stored spec, and the envelope is still
-# enforced at the AUTHORING boundary (the ArgoCD apply of gitops/environments/**). Empty string disables the skip.
-envelopeSkipReconcilePrincipal: "system:serviceaccount:crossplane-system:crossplane"
-
 # Requesting-principal (userInfo.username) wildcards skipped by restrict-environment-control-plane so platform
 # controllers can author XTenant/ProviderConfig. crossplane-system is REQUIRED — the Composition's
 # provider-kubernetes + the composite controller create ProviderConfigs as crossplane-system principals.
