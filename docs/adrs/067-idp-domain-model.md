@@ -1,7 +1,7 @@
 # ADR-067: IDP Domain Model — Team / Product / Service / Environment / Customer
 
 **Date:** 2026-06-11
-**Status:** Proposed — the north-star conceptual model the golden-path work (New Service, promotion, access,
+**Status:** Accepted (built + live, v3 model 2026-06-11) — the north-star conceptual model the golden-path work (New Service, promotion, access,
 multi-cluster, customers) is built *toward*. The current platform is an explicit **degenerate instance** of it.
 **Supersedes the Zone/Customer parts of [ADR-049](049-tenant-model-team-tenant-zone.md)** (keeps its
 separation-of-axes insight; replaces its rigid `Zone` with a graduated isolation dial).

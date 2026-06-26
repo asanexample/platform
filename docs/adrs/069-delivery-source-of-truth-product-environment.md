@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-11
 
-**Status:** Proposed — **refines [ADR-061](061-tenant-ingress-and-custom-domain-strategy.md).** ADR-061
+**Status:** Accepted — built + live; **refines [ADR-061](061-tenant-ingress-and-custom-domain-strategy.md).** ADR-061
 established *claim-as-single-source* (the per-tenant claim is the sole registry `argocd-apps` / `policy` /
 `github-oidc` derive from). [ADR-067](067-idp-domain-model.md) split `app → Product/Service` and
 `Tenant → Environment`, so delivery metadata now lives across **two** objects — this ADR redesigns the

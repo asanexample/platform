@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-10
 
-**Status:** Proposed
+**Status:** Accepted — built + live (secrets.enc.yaml committed, #338–342)
 
 ## Context
 

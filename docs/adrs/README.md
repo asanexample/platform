@@ -54,7 +54,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-025: Secret Naming Convention and Path Hierarchy](025-secret-naming-convention.md) | Accepted |
 | [ADR-026: Cross-Account Secret Isolation](026-cross-account-secret-isolation.md) | Accepted |
 | [ADR-037: CloudTrail for Secrets Audit Logging](037-cloudtrail-audit-logging.md) | Accepted |
-| [ADR-066: SOPS-Encrypted Config Secrets in Git (KMS)](066-sops-encrypted-config-secrets.md) | Proposed |
+| [ADR-066: SOPS-Encrypted Config Secrets in Git (KMS)](066-sops-encrypted-config-secrets.md) | Accepted |
 | [ADR-070: Tenant Application Config & Secrets](070-tenant-app-config-and-secrets.md) | Proposed |
 
 ## Tenancy, Isolation & Policy
@@ -75,10 +75,10 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-058: Per-Cloud Tenant Composition Strategy](058-per-cloud-tenant-composition-strategy.md) | Proposed |
 | [ADR-060: Tenant App Hostname Convention — Derive and Inject](060-tenant-app-hostname-convention.md) | Accepted |
 | [ADR-061: Tenant Ingress & Custom Domain Strategy](061-tenant-ingress-and-custom-domain-strategy.md) | Accepted |
-| [ADR-062: Self-Service Tenant Provisioning (Backstage + GitOps) & Its Security Model](062-self-service-tenant-provisioning.md) | Proposed |
-| [ADR-063: Team as a First-Class Git-Native Object](063-team-as-first-class-git-object.md) | Proposed |
-| [ADR-067: IDP Domain Model — Team / Product / Service / Environment / Customer](067-idp-domain-model.md) | Proposed |
-| [ADR-069: Delivery Source-of-Truth — Product Registry + Environment Claims](069-delivery-source-of-truth-product-environment.md) | Proposed |
+| [ADR-062: Self-Service Tenant Provisioning (Backstage + GitOps) & Its Security Model](062-self-service-tenant-provisioning.md) | Accepted |
+| [ADR-063: Team as a First-Class Git-Native Object](063-team-as-first-class-git-object.md) | Accepted |
+| [ADR-067: IDP Domain Model — Team / Product / Service / Environment / Customer](067-idp-domain-model.md) | Accepted |
+| [ADR-069: Delivery Source-of-Truth — Product Registry + Environment Claims](069-delivery-source-of-truth-product-environment.md) | Accepted |
 
 ## Workload & Human Identity
 
@@ -104,6 +104,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-050: Shared `build-sign` Reusable Workflow + Shared-Signer Policy Model](050-shared-build-sign-reusable-workflow.md) | Accepted |
 | [ADR-056: Progressive Delivery & Safe Rollback](056-progressive-delivery-and-safe-rollback.md) | Proposed |
 | [ADR-071: Image-Digest Promotion via the Control Plane (Protected-Main Delivery)](071-digest-promotion-via-control-plane.md) | Accepted |
+| [ADR-072: App-Repo Naming & Team Ownership](072-app-repo-naming-and-team-ownership.md) | Accepted |
 
 ## Developer Portal & Experience
 
@@ -119,7 +120,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-073: Self-Service Cloud Resources (the resource paved road)](073-self-service-cloud-resources.md) | Accepted |
 | [ADR-074: Agentic Workloads — a Governed Platform for Running AI Agents](074-agentic-workloads-platform.md) | Proposed |
 | [ADR-075: The Resource Agent — Conversational Self-Service (ADR-073 Phase B)](075-resource-agent.md) | Proposed |
-| [ADR-080: The Triage Copilot — Propose-Only On-Call Incident Triage](080-triage-copilot.md) | Proposed |
+| [ADR-080: The Triage Copilot — Propose-Only On-Call Incident Triage](080-triage-copilot.md) | Accepted |
 | [ADR-081: Platform-Team Products on the One Delivery Road](081-platform-service-delivery.md) | Proposed (runtime placement superseded by ADR-082) |
 | [ADR-082: The `XAgent` Platform-Agent Runtime — a GitOps-Native Agent Control Plane](082-platform-agent-runtime-xagent.md) | Accepted (built + live 2026-06-26) |
 

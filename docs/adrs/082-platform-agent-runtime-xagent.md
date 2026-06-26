@@ -257,6 +257,6 @@ favored) · [ADR-080](080-triage-copilot.md) (`XAgent` #1; D3's placement intent
 superseded for platform agents) · [ADR-048](048-federated-per-cluster-crossplane.md) (the tenant per-cluster control plane this
 keeps intact; the agent Composition is consistent, D10) · [ADR-067](067-idp-domain-model.md) (Team→Product; Placement) ·
 [ADR-071](071-digest-promotion-via-control-plane.md) (the Release-digest delivery reused) · [ADR-062](062-self-service-tenant-provisioning.md)
-(the policyStatements deny-set) · [ADR-041](041-eks-pod-identity.md)/[ADR-047](047-irsa-to-pod-identity.md) (Pod Identity) ·
-[ADR-014](014-kyverno-policy-engine.md) (the admission gate) · [ADR-076](076-agent-observability.md) (the agent-trace model).
+(the policyStatements deny-set) · [ADR-041](041-pod-identity-for-tenant-workloads.md)/[ADR-047](047-pod-identity-as-aws-identity-standard.md) (Pod Identity) ·
+[ADR-014](014-kyverno-as-policy-engine.md) (the admission gate) · [ADR-076](076-agent-observability.md) (the agent-trace model).
 Epic: #554 (agentic) / #102 (observability).

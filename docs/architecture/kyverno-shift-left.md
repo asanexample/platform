@@ -61,7 +61,7 @@ registry — the envelope authority — is always read from the trusted base.
 
 Beyond validation, this same job arms the auto-merge / deletion-guard / gated-prod lifecycle (ADR-062/068,
 issues #377/#501); that machinery is documented in the gate workflow header and
-[`tenant-claims-automerge.md`](../runbooks/tenant-claims-automerge.md), not here.
+[`gitops-gate-automerge.md`](../runbooks/gitops-gate-automerge.md), not here.
 
 ## 2. App-repo manifest checks (overlays + Kyverno CLI)
 

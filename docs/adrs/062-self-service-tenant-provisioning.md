@@ -1,7 +1,7 @@
 # ADR-062: Self-Service Tenant Provisioning (Backstage + GitOps) & Its Security Model
 
 **Date:** 2026-06-09
-**Status:** Proposed — design-stage. The delivery surface for the [ADR-049](049-tenant-model-team-tenant-zone.md)
+**Status:** Accepted — built + live (Phase 3, #278–285). The delivery surface for the [ADR-049](049-tenant-model-team-tenant-zone.md)
 multi-tenancy model; lands with (and after) the rebuild's tenant-api-v2 step. Builds on
 [ADR-046](046-back-stack-for-developer-self-service.md) (BACK stack),
 [ADR-053](053-identity-and-cross-system-authorization-strategy.md) (access-as-code),
