@@ -371,6 +371,25 @@ spec:
                 repository: {{ $repo }}
                 policy: {{ (dict "Version" "2012-10-17" "Statement" (list (dict "Sid" "CrossAccountPull" "Effect" "Allow" "Principal" (dict "AWS" $ecrPrincipals) "Action" (list "ecr:BatchGetImage" "ecr:GetDownloadUrlForLayer" "ecr:BatchCheckLayerAvailability")))) | toJson | quote }}
             {{- end }}
+            ---
+            {{- /* Bound image accumulation on the product-scoped repo (TD2-14). Untagged expiry is safe.
+                   The keep-last cap is a runaway backstop — note images are promoted by DIGEST across stages
+                   (ADR-067 §7), so a very old digest still pinned by a prod Release could in principle be
+                   expired; 100 is generous for realistic stage counts. deletionPolicy Orphan mirrors the repo:
+                   the repo is shared across stages, so tearing down one Environment must not strip its policy. */}}
+            apiVersion: ecr.aws.upbound.io/v1beta1
+            kind: LifecyclePolicy
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: ecr-lifecycle-{{ $svc }}
+            spec:
+              deletionPolicy: Orphan
+              providerConfigRef:
+                name: {{ $ecrCfg }}
+              forProvider:
+                region: {{ $cfg.region }}
+                repository: {{ $repo }}
+                policy: {{ (dict "rules" (list (dict "rulePriority" 1 "description" "Expire untagged images after 7 days" "selection" (dict "tagStatus" "untagged" "countType" "sinceImagePushed" "countUnit" "days" "countNumber" 7) "action" (dict "type" "expire")) (dict "rulePriority" 2 "description" "Keep last 100 tagged images" "selection" (dict "tagStatus" "tagged" "tagPatternList" (list "*") "countType" "imageCountMoreThan" "countNumber" 100) "action" (dict "type" "expire")))) | toJson | quote }}
             {{- end }}
             {{- if $svccfg.serviceAccount }}
             {{- /* Pod-Identity role Pod-<team>-<product>-<stage>-<service>, or Pod-<team>-<product>-<customer>-
