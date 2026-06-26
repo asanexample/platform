@@ -23,6 +23,16 @@ spec:
               kinds:
                 - Pod
               {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
+      # Platform-agent runtime namespaces (ADR-082, platform-agent-<name>) carry the team label — so this rule
+      # would match — but the agent legitimately reads the k8s API (the triage agent's get_recent_changes
+      # change-correlation) and so MUST mount its SA token. Exclude them: a deliberate platform exception, mirroring
+      # the tenant-naming exclusion (#727). No-op on workload clusters, which host no platform agents.
+      exclude:
+        any:
+          - resources:
+              namespaceSelector:
+                matchLabels:
+                  platform.refplat.org/runtime: platform-agent
       validate:
         failureAction: {{ .Values.validationFailureAction }}
         message: "automountServiceAccountToken must be set to false on the pod spec."
