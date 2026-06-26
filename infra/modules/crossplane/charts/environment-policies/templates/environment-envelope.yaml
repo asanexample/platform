@@ -34,6 +34,12 @@ spec:
               kinds:
                 - platform.refplat.org/v1beta1/XEnvironment
       {{- include "ktp.envContext" . | nindent 6 }}
+      preconditions:
+        all:
+          # skip a TERMINATING Environment — don't re-validate a resource that is already being deleted
+          - key: "{{`{{ request.object.metadata.deletionTimestamp || '' }}`}}"
+            operator: Equals
+            value: ""
       validate:
         failureAction: {{ .Values.envelopeFailureAction }}
         message: >-
@@ -129,6 +135,9 @@ spec:
           - key: "{{`{{ request.object.spec.platformTrust.clusterRoles[0] || '' }}`}}"
             operator: NotEquals
             value: ""
+          - key: "{{`{{ request.object.metadata.deletionTimestamp || '' }}`}}"
+            operator: Equals
+            value: ""
       validate:
         failureAction: {{ .Values.envelopeFailureAction }}
         message: >-
@@ -161,6 +170,9 @@ spec:
           - key: "{{`{{ contains(team.spec.envelope.allowedLocations, '*') }}`}}"
             operator: Equals
             value: false
+          - key: "{{`{{ request.object.metadata.deletionTimestamp || '' }}`}}"
+            operator: Equals
+            value: ""
       validate:
         failureAction: {{ .Values.envelopeFailureAction }}
         message: >-
@@ -234,6 +246,12 @@ spec:
           - resources:
               kinds:
                 - platform.refplat.org/v1beta1/XEnvironment
+      preconditions:
+        all:
+          # skip a TERMINATING Environment — don't re-validate a resource that is already being deleted
+          - key: "{{`{{ request.object.metadata.deletionTimestamp || '' }}`}}"
+            operator: Equals
+            value: ""
       validate:
         failureAction: {{ .Values.envelopeFailureAction }}
         message: >-
