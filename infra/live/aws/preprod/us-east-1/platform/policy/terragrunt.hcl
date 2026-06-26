@@ -53,6 +53,16 @@ dependency "node_groups" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+# CRD-before-policy (ADR-056): the availability policies match the `Rollout` kind (enable_rollout_kind below),
+# and a Kyverno rule naming a kind whose CRD is absent fails to create (#7839). The argo-rollouts unit installs
+# the CRDs, so policy must apply after it.
+dependency "argo_rollouts" {
+  config_path = "../argo-rollouts"
+
+  mock_outputs                            = {}
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
 generate "helm_provider" {
   path      = "helm-provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -102,6 +112,10 @@ inputs = {
 
   helm_chart_version = include.base.locals.helm_versions.kyverno
   helm_wait          = true
+
+  # ADR-056: the availability policies also match the Argo `Rollout` kind. Safe to enable now that the
+  # argo-rollouts unit (CRDs) is applied here (see the dependency above; #7839).
+  enable_rollout_kind = true
 
   # Phase 3 — cosign keyless image verification (Audit-first, independent of the Enforce above).
   enable_image_verification = true
