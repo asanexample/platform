@@ -56,16 +56,20 @@ patch that already injects the hardened `securityContext` — to also inject, **
 - **`lifecycle.preStop.sleep.seconds: 10`** on each container, using the **native `SleepAction`** (GA on 1.35; no shell,
   so it is safe on distroless images). This delays SIGTERM so endpoint-deprogramming wins the termination race.
 - **`terminationGracePeriodSeconds: 30`** at pod level (must exceed the preStop sleep plus the app's drain budget).
-- **`topologySpreadConstraints`** at pod level: `maxSkew: 1`, across `kubernetes.io/hostname` and
-  `topology.kubernetes.io/zone`, **`whenUnsatisfiable: ScheduleAnyway`** (soft — `DoNotSchedule` would leave pods
-  `Pending` on a small or scaling-from-zero cluster), with **`matchLabelKeys: [pod-template-hash]`** so skew is computed
-  per-revision and a rolling update doesn't pile all new pods into one domain.
 
-All three stay in the **single** `add-pod-defaults` patch. This is deliberate: keeping one strategic-merge block preserves
-the property that Kyverno **autogen** can relocate the patch cleanly under `spec.template.spec` for every controller kind
+Both stay in the **single** `add-pod-defaults` patch. This is deliberate: keeping one strategic-merge block preserves the
+property that Kyverno **autogen** can relocate the patch cleanly under `spec.template.spec` for every controller kind
 (Deployment/StatefulSet/…). `preStop` sits at the same per-container depth as the existing `securityContext` injection;
-`terminationGracePeriodSeconds` and `topologySpreadConstraints` sit at the same pod-spec depth as the existing
-`automountServiceAccountToken` default.
+`terminationGracePeriodSeconds` sits at the same pod-spec depth as the existing `automountServiceAccountToken` default.
+
+**`topologySpreadConstraints` is handled separately, not in this mutate.** A spread constraint's `labelSelector` must match
+the *workload's own* pods, and a static strategic-merge patch has no per-workload label data (an empty selector silently
+spreads nothing). So topology spread is carried in the **scaffolder skeleton** — where the app's `app:` label is known and
+a real selector can be written statically (`maxSkew: 1` across `kubernetes.io/hostname` and `topology.kubernetes.io/zone`,
+`whenUnsatisfiable: ScheduleAnyway` so a small/scaling-from-zero cluster doesn't strand pods `Pending`, with
+`matchLabelKeys: [pod-template-hash]` so skew is computed per-revision). Retroactive coverage of hand-written workloads via
+a Kyverno rule that **derives** the selector from the workload (reusing the D3 generate technique) is a follow-on, not part
+of the default mutate.
 
 **Honest scope of D2.** Cilium's `enable-k8s-terminating-endpoint` (terminating-but-serving) is on by default, so it
 already protects *established* connections and the *last-replica* new-connection case. The preStop sleep closes the
