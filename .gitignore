@@ -98,6 +98,7 @@ bin/
 !.claude/skills/terragrunt-units/
 !.claude/skills/platctl/
 !.claude/skills/cluster-access/
+!.claude/skills/cluster-parking/
 !.claude/skills/apply-and-destroy/
 !.claude/skills/authoring-adrs/
 !.claude/skills/environment-onboarding/
