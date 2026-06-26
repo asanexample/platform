@@ -23,7 +23,7 @@ and the real files under `gitops/`.
 
 | Registry | Path | Declares |
 |---|---|---|
-| **Team** | `gitops/teams/<team>.yaml` | `ssoGroup`, `roles.releaseApprover`, and the **envelope** (`allowedTiers`/`allowedStages`/`allowedLocations`, `quotaCap`, `maxDedicatedIsolation`, self-service `resources`) that caps everything the team can claim |
+| **Team** | `gitops/teams/<team>.yaml` | `ssoGroup`, `roles.releaseApprover`, and the **envelope** (`allowedTiers`/`allowedStages`/`allowedLocations`, `quotaCap`, `maxDedicatedIsolation`, self-service `resources`) that caps everything the team can claim; plus an optional `slack.channel` for incident routing (ADR-084 — the triage agent posts the team's incidents there) |
 | **Product** | `gitops/products/<team>/<product>.yaml` | `team`, `repo` (the app GitHub repo — drives ECR scope, signing subject, delivery), `tenancy` (`pooled`/`per-customer`), `defaultIsolation`, `domains` |
 | **XEnvironment claim** | `gitops/environments/<team>/<product>/<stage>[-<customer>].yaml` | one complete environment — the actual provisioning request (below) |
 
@@ -98,3 +98,4 @@ role is boundary-capped at runtime. (Resource scoping like `s3:*` on `*` is allo
 - `docs/architecture/crossplane-environment-api.md`
 - Real examples: `gitops/teams/alpha.yaml`, `gitops/products/alpha/shop.yaml`, `gitops/environments/alpha/shop/dev.yaml`
 - Related skills: **supply-chain-onboarding** (the app CI), **authoring-k8s-workloads** (the manifests)
+- **Equip a team for incident routing** (the optional `slack.channel`) — the triage agent's `docs/owner-routing-setup.md` (asanexample/platform-triage-copilot, ADR-084): create the channel, invite the bot, add the block, PR.
