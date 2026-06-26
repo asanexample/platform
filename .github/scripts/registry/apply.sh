@@ -18,6 +18,9 @@
 #
 # Env: GITHUB_STEP_SUMMARY (Actions-provided). Run on the in-VPC platform-infra runner (Pod Identity →
 # TG_FORCE_DEPLOYER assumes PlatformDeployer + TerraformStateAccess).
+# NOTE: -e is intentionally omitted. `terragrunt plan -detailed-exitcode` returns 2 for "has changes"
+# (handled via `|| rc=$?`), and each unit fails closed with an explicit `|| exit 1`. Adding -e would
+# abort on the expected exit-2. Do not add -e.
 set -uo pipefail
 SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/null}"
 PLATFORM="infra/live/aws/platform/us-east-1/platform"
