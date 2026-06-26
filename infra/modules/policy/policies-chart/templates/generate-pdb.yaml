@@ -18,9 +18,14 @@ metadata:
       maxUnavailable=1 is drain-safe by construction: it always permits one eviction, so it never blocks a node
       drain (Karpenter consolidation, EKS upgrade, platctl park), yet it protects the replica floor once
       replicas>=2 (require-prod-replica-floor). synchronize=true reconciles the PDB back if edited or deleted.
+      generateExisting=true backfills a PDB for workloads that already exist when the policy lands (otherwise
+      a generate rule only fires on new admissions, leaving current workloads unprotected until their next deploy).
 spec:
   # Generate is handled by the background controller; it does not gate admission.
   background: true
+  # Backfill PDBs for Deployments/StatefulSets that already exist when this policy is installed/updated — not
+  # just ones admitted afterwards. The aggregated RBAC below grants the read access this enumeration needs.
+  generateExisting: true
   rules:
     - name: generate-pdb
       match:
@@ -48,7 +53,8 @@ spec:
 ---
 # RBAC: Kyverno's background controller has no permission to create PodDisruptionBudgets by default. This
 # ClusterRole is aggregated into the background controller's role (via the kyverno aggregation label) so it
-# can create/sync the generated PDBs. Without it the policy admits but silently generates nothing.
+# can create/sync the generated PDBs, and read the Deployments/StatefulSets it generates from (needed for the
+# generateExisting backfill to enumerate existing triggers). Without it the policy admits but generates nothing.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -66,6 +72,15 @@ rules:
       - update
       - patch
       - delete
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+      - statefulsets
+    verbs:
       - get
       - list
       - watch
