@@ -164,4 +164,8 @@ inputs = {
   # Team taxonomy — one Keycloak group per Team + the developer-access roles, from the canonical registry.
   # platform_groups defaults to { platform-admins } in the module (the non-team admin group ArgoCD maps to org-admin).
   teams = local.teams
+
+  # ADR-084 Phase 1: broker GitHub + Slack as linkable IdPs + the directory-sync service account (reads the IdP
+  # app secrets from platform/keycloak/{github,slack}-idp; publishes the directory-sync secret for the agent).
+  enable_account_linking = true
 }

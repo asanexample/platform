@@ -455,3 +455,157 @@ resource "keycloak_custom_identity_provider_mapper" "platform_group" {
     keycloak_oidc_identity_provider.upstream,
   ]
 }
+
+# ---------------------------------------------------------------------------
+# Account linking — broker GitHub + Slack as LINKABLE identity providers (ADR-084 Phase 1). A person links
+# their accounts once via the Account Console; the directory-sync service account then reads the resulting
+# federated identities so the triage agent can resolve a culprit commit's author → their Slack @mention.
+# Off by default (var.enable_account_linking); the two IdP app secrets are read from Secrets Manager. The IdPs
+# are hidden from the login page — this is for LINKING (an authenticated user), not a login option.
+# ---------------------------------------------------------------------------
+
+locals {
+  enable_linking = local.create && var.enable_account_linking
+  gh             = local.enable_linking ? jsondecode(data.aws_secretsmanager_secret_version.github_idp[0].secret_string) : {}
+  sl             = local.enable_linking ? jsondecode(data.aws_secretsmanager_secret_version.slack_idp[0].secret_string) : {}
+}
+
+data "aws_secretsmanager_secret_version" "github_idp" {
+  count     = local.enable_linking ? 1 : 0
+  secret_id = "platform/keycloak/github-idp"
+}
+
+data "aws_secretsmanager_secret_version" "slack_idp" {
+  count     = local.enable_linking ? 1 : 0
+  secret_id = "platform/keycloak/slack-idp"
+}
+
+# GitHub — Keycloak's built-in `github` social provider (OAuth2 + api.github.com/user; GitHub is NOT OIDC, so
+# provider_id selects the github implementation). No id_token → no signature validation.
+resource "keycloak_oidc_identity_provider" "github" {
+  count = local.enable_linking ? 1 : 0
+
+  realm              = keycloak_realm.this[0].id
+  alias              = "github"
+  provider_id        = "github"
+  display_name       = "GitHub"
+  enabled            = true
+  hide_on_login_page = true
+
+  authorization_url = "https://github.com/login/oauth/authorize"
+  token_url         = "https://github.com/login/oauth/access_token"
+  user_info_url     = "https://api.github.com/user"
+  client_id         = local.gh["client-id"]
+  client_secret     = local.gh["client-secret"]
+  default_scopes    = "read:user user:email"
+
+  sync_mode   = "FORCE"
+  trust_email = true
+  store_token = false
+}
+
+# Slack — "Sign in with Slack" (OpenID Connect). The Slack user id is the standard `sub` claim ("U…").
+resource "keycloak_oidc_identity_provider" "slack" {
+  count = local.enable_linking ? 1 : 0
+
+  realm              = keycloak_realm.this[0].id
+  alias              = "slack"
+  display_name       = "Slack"
+  enabled            = true
+  hide_on_login_page = true
+
+  authorization_url = "https://slack.com/openid/connect/authorize"
+  token_url         = "https://slack.com/api/openid.connect.token"
+  user_info_url     = "https://slack.com/api/openid.connect.userInfo"
+  jwks_url          = "https://slack.com/openid/connect/keys"
+  client_id         = local.sl["client-id"]
+  client_secret     = local.sl["client-secret"]
+  default_scopes    = "openid profile email"
+
+  validate_signature = true
+  sync_mode          = "FORCE"
+  trust_email        = true
+  store_token        = false
+}
+
+# Project each provider's native id onto a Keycloak user attribute — the directory-sync reads these. GitHub's
+# profile `login` matches a commit author.login; Slack's `sub` is the U… id the agent renders as <@U…>.
+resource "keycloak_attribute_importer_identity_provider_mapper" "github_login" {
+  count = local.enable_linking ? 1 : 0
+
+  realm                   = keycloak_realm.this[0].id
+  name                    = "github-login"
+  identity_provider_alias = "github"
+  claim_name              = "login"
+  user_attribute          = "githubLogin"
+  extra_config            = { syncMode = "INHERIT" }
+
+  depends_on = [keycloak_oidc_identity_provider.github]
+}
+
+resource "keycloak_attribute_importer_identity_provider_mapper" "slack_userid" {
+  count = local.enable_linking ? 1 : 0
+
+  realm                   = keycloak_realm.this[0].id
+  name                    = "slack-userid"
+  identity_provider_alias = "slack"
+  claim_name              = "sub"
+  user_attribute          = "slackUserId"
+  extra_config            = { syncMode = "INHERIT" }
+
+  depends_on = [keycloak_oidc_identity_provider.slack]
+}
+
+# directory-sync service account — the triage agent's directory reads users + their federated identities as this
+# client (client-credentials), granted realm-management `view-users` (read-only). Its secret is published to SM
+# for the agent's ExternalSecret (platform/keycloak/directory-sync).
+resource "random_password" "directory_sync" {
+  count   = local.enable_linking ? 1 : 0
+  length  = 40
+  special = false
+}
+
+resource "keycloak_openid_client" "directory_sync" {
+  count = local.enable_linking ? 1 : 0
+
+  realm_id                     = keycloak_realm.this[0].id
+  client_id                    = "directory-sync"
+  name                         = "Directory Sync (ADR-084)"
+  enabled                      = true
+  access_type                  = "CONFIDENTIAL"
+  standard_flow_enabled        = false
+  direct_access_grants_enabled = false
+  service_accounts_enabled     = true
+  client_secret                = random_password.directory_sync[0].result
+}
+
+data "keycloak_openid_client" "realm_management" {
+  count     = local.enable_linking ? 1 : 0
+  realm_id  = keycloak_realm.this[0].id
+  client_id = "realm-management"
+}
+
+resource "keycloak_openid_client_service_account_role" "directory_sync_view_users" {
+  count = local.enable_linking ? 1 : 0
+
+  realm_id                = keycloak_realm.this[0].id
+  service_account_user_id = keycloak_openid_client.directory_sync[0].service_account_user_id
+  client_id               = data.keycloak_openid_client.realm_management[0].id
+  role                    = "view-users"
+}
+
+resource "aws_secretsmanager_secret" "directory_sync" {
+  count = local.enable_linking ? 1 : 0
+
+  name                    = "platform/keycloak/directory-sync"
+  description             = "Keycloak directory-sync service-account client secret (ADR-084 Phase 1)."
+  recovery_window_in_days = var.secret_recovery_window_days
+  tags                    = var.tags
+}
+
+resource "aws_secretsmanager_secret_version" "directory_sync" {
+  count = local.enable_linking ? 1 : 0
+
+  secret_id     = aws_secretsmanager_secret.directory_sync[0].id
+  secret_string = jsonencode({ "client-secret" = random_password.directory_sync[0].result })
+}
