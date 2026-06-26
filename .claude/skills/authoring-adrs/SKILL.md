@@ -78,6 +78,21 @@ This is the convention to get right (it's a standing piece of feedback):
 - **Write a NEW ADR** only for an *evolving BUILT decision* or a *distinct domain* — a new axis,
   a new model, a new governance boundary, or a decision to defer/halt a feature.
 
+## Record the as-built outcome (when a Proposed ADR ships)
+
+When a *Proposed* ADR is actually built, do two things: flip the status to **Accepted**, and add a dated
+section recording what *shipping* taught you. `## Consequences` are predicted at decision time; the build
+surfaces the real thing — the integration gotchas the next person will hit, refinements to the plan, and
+sometimes an outright **correction** of an assumption the ADR made. Capture: what shipped beyond the core
+decision, the durable gotchas, any refinement/correction, and remaining follow-ups (cite the epic/PRs and
+date it). Recording a *correction* is the highest-value part — it's how the decision record stays
+trustworthy instead of quietly diverging from reality.
+
+Like the other trailing sections, the exact heading varies — **follow a recent exemplar rather than coining
+a fifth**: `## Implementation notes (as-built)` ([ADR-078](078-cluster-elasticity-karpenter.md)) or
+`## Implementation status & learnings` ([ADR-082](082-platform-agent-runtime-xagent.md)). (Older ADRs drifted
+to "Implementation Status"/"Implementation outline" — don't add new variants.)
+
 ## Keep the index in sync
 
 `docs/adrs/README.md` is the canonical, hand-maintained list grouped by domain. **Adding an ADR
