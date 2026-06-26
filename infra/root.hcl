@@ -24,7 +24,12 @@ remote_state {
 
 // Provider version pins and generation
 generate "versions" {
-  path      = "versions.tf"
+  path = "versions.tf"
+  # FALLBACK ONLY — `skip` means this is used solely for a unit whose sourced module ships NO versions.tf.
+  # Every shared module now declares its own required_providers (ADR-083), so in practice this is skipped and
+  # the MODULE's versions.tf is authoritative. Keep these bounds in lockstep with ADR-083 so the fallback can't
+  # drift from the module standard. (Earlier this pinned aws = "6.47.0" exact, which was dead — silently
+  # skipped by the module's own versions.tf — so units actually resolved the module's looser bound, not 6.47.0.)
   if_exists = "skip"
   contents  = <<EOF
 terraform {
@@ -32,15 +37,15 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "6.47.0"
+      version = "~> 6.0"
     }
     helm = {
       source  = "hashicorp/helm"
-      version = ">= 3.0"
+      version = "~> 3.0"
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = ">= 2.35.0"
+      version = "~> 3.0"
     }
   }
 }

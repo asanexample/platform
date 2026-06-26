@@ -25,7 +25,7 @@ generate "versions_override" {
         }
         aws = {
           source  = "hashicorp/aws"
-          version = "6.47.0"
+          version = "~> 6.0"
         }
       }
     }
