@@ -27,6 +27,10 @@ jobs:
 
   provenance:
     needs: build
+    # Skip provenance on dependabot/fork PRs: build-sign runs BUILD-ONLY there (no OIDC -> no pushed image ->
+    # no digest to attest), so this job has nothing to provenance and would fail (a false-negative). Mirrors
+    # build-sign's push gate; real same-repo PRs still build+push+sign+provenance.
+    if: github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork != true
     permissions:
       id-token: write
       contents: read
