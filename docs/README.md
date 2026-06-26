@@ -91,6 +91,6 @@ infra/modules/      Reusable OpenTofu modules (aws/ + shared; azure/, gcp/ scaff
 infra/live/aws/     Terragrunt live configurations per env/region/workload (AWS only today)
 infra/tests/        Terratest (Go) module integration tests
 infra/docs/         Infrastructure design documentation (numbered series)
-infra/scripts/      Helper scripts and Terragrunt hooks
+scripts/            Operational helper scripts (eks-tunnel, orphan sweeps, ...)
 cmd/platctl/        platctl orchestration CLI (Go, ADR-038)
 ```
