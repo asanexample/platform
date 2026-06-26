@@ -11,14 +11,29 @@ permissions:
 
 env:
   TEST_AWS_REGION: us-west-2
-  # Canonical pin — keep in sync with /.tool-versions (the single source of truth). This weekly Terratest
-  # workflow uses a workflow-level env (one place to change) rather than the `versions` job in ci.yml.
-  TOFU_VERSION: "1.12.1"
-  GO_VERSION: "1.22"
 
 jobs:
+  # Single source of truth for CLI tool versions: read /.tool-versions once and expose each pin as a job
+  # output (mirrors the `versions` job in ci.yml). Bump versions in /.tool-versions, never inline here.
+  # (Go is pinned by the test module's go.mod via setup-go's go-version-file, kept current by Dependabot.)
+  versions:
+    name: Tool Versions
+    runs-on: ubuntu-latest
+    outputs:
+      opentofu: ${{ steps.read.outputs.opentofu }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: read
+        name: Read /.tool-versions
+        run: |
+          while read -r tool version _; do
+            case "$tool" in '' | \#*) continue ;; esac
+            echo "${tool}=${version}" >> "$GITHUB_OUTPUT"
+          done < .tool-versions
+
   test-networking:
     name: Networking Module
+    needs: versions
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -34,12 +49,12 @@ jobs:
       - name: Install OpenTofu
         uses: opentofu/setup-opentofu@v2
         with:
-          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_version: ${{ needs.versions.outputs.opentofu }}
 
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: infra/tests/aws/go.mod
           cache-dependency-path: infra/tests/aws/go.sum
 
       - name: Run networking tests
@@ -50,6 +65,7 @@ jobs:
 
   test-eks:
     name: EKS Module
+    needs: versions
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -65,12 +81,12 @@ jobs:
       - name: Install OpenTofu
         uses: opentofu/setup-opentofu@v2
         with:
-          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_version: ${{ needs.versions.outputs.opentofu }}
 
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: infra/tests/aws/go.mod
           cache-dependency-path: infra/tests/aws/go.sum
 
       - name: Run EKS tests
