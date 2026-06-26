@@ -62,14 +62,15 @@ property that Kyverno **autogen** can relocate the patch cleanly under `spec.tem
 (Deployment/StatefulSet/…). `preStop` sits at the same per-container depth as the existing `securityContext` injection;
 `terminationGracePeriodSeconds` sits at the same pod-spec depth as the existing `automountServiceAccountToken` default.
 
-**`topologySpreadConstraints` is handled separately, not in this mutate.** A spread constraint's `labelSelector` must match
-the *workload's own* pods, and a static strategic-merge patch has no per-workload label data (an empty selector silently
-spreads nothing). So topology spread is carried in the **scaffolder skeleton** — where the app's `app:` label is known and
-a real selector can be written statically (`maxSkew: 1` across `kubernetes.io/hostname` and `topology.kubernetes.io/zone`,
-`whenUnsatisfiable: ScheduleAnyway` so a small/scaling-from-zero cluster doesn't strand pods `Pending`, with
-`matchLabelKeys: [pod-template-hash]` so skew is computed per-revision). Retroactive coverage of hand-written workloads via
-a Kyverno rule that **derives** the selector from the workload (reusing the D3 generate technique) is a follow-on, not part
-of the default mutate.
+**`topologySpreadConstraints` is handled separately, not in this `add-pod-defaults` patch.** A spread constraint's
+`labelSelector` must match the *workload's own* pods, and a static strategic-merge patch on the pod spec has no per-workload
+label data (an empty selector silently spreads nothing). The fix (built, #846) is the same **derive-from-trigger** technique
+D3 uses for the PDB: a separate mutate (`mutate-topology-spread`) that **matches the controller directly** (Deployment/
+StatefulSet, not the Pod via autogen) so it can read `request.object.spec.selector.matchLabels` and inject it as the spread
+`labelSelector` (`maxSkew: 1` across `kubernetes.io/hostname` and `topology.kubernetes.io/zone`, `whenUnsatisfiable:
+ScheduleAnyway` so a small/scaling-from-zero cluster doesn't strand pods `Pending`, with `matchLabelKeys: [pod-template-hash]`
+so skew is computed per-revision). add-if-absent, so the scaffolder skeleton's explicit static spread is never overridden;
+applies on admission, so existing workloads pick it up on their next deploy.
 
 **Honest scope of D2.** Cilium's `enable-k8s-terminating-endpoint` (terminating-but-serving) is on by default, so it
 already protects *established* connections and the *last-replica* new-connection case. The preStop sleep closes the

@@ -38,13 +38,22 @@ echo "Mutation smoke-check passed ($APPLIED mutations applied via autogen, 0 err
 
 # Field-level assertions on the mutated Deployment: mutate-pod-defaults must inject the ADR-085 graceful-drain
 # defaults under autogen (spec.template.spec) — the mutation count above can't distinguish which fields landed,
-# so grep the actual patched resource. topologySpreadConstraints is NOT asserted (it lives in the scaffolder,
-# not this mutate — ADR-085 D2).
+# so grep the actual patched resource.
 MUTATED="$(cat "$DIR/rendered/mutated"/* 2>/dev/null)"
 for field in 'terminationGracePeriodSeconds: 30' 'preStop:' 'seconds: 10'; do
   grep -q "$field" <<<"$MUTATED" || { echo "FAIL: mutate did not inject '$field' on the bare Deployment"; printf '%s\n' "$MUTATED"; exit 1; }
 done
 echo "Graceful-drain field-injection check passed (terminationGracePeriodSeconds + preStop sleep)."
+
+# Topology-spread check: mutate-topology-spread must inject topologySpreadConstraints with a labelSelector
+# DERIVED from the workload's own selector (ADR-085) — same trigger-derived technique as the PDB. The bare-app
+# Deployment's selector is { app: bare-app }, so the injected spread must select on it (proving the map
+# substitution again, here inside a controller-matching mutate rather than generate).
+for field in 'topologySpreadConstraints:' 'whenUnsatisfiable: ScheduleAnyway' 'topology.kubernetes.io/zone' 'pod-template-hash'; do
+  grep -q "$field" <<<"$MUTATED" || { echo "FAIL: topology-spread mutate did not inject '$field'"; printf '%s\n' "$MUTATED"; exit 1; }
+done
+grep -q '{{ request.object' <<<"$MUTATED" && { echo "FAIL: topology spread left an unresolved Kyverno variable"; printf '%s\n' "$MUTATED"; exit 1; }
+echo "Topology-spread injection check passed (zone + node, ScheduleAnyway, derived selector)."
 
 # Generate-check: generate-workload-pdb must emit a PodDisruptionBudget for the trigger Deployment with a
 # selector COPIED from the workload's own matchLabels (ADR-085 W2). The same kyverno-apply run above already
