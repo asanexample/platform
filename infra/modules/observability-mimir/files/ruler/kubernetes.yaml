@@ -1,0 +1,55 @@
+# Mimir ruler alert rules for SPOKE tenants (P4, ADR-082). Loaded per-tenant by the rules-sync CronJob
+# (mimirtool rules sync) so a spoke's remote-written metrics produce alerts that reach the hub Alertmanager →
+# the triage agent. The filename ("kubernetes") is the Mimir ruler namespace.
+#
+# The `cluster` label rides through from each metric's remote-write external label (the prometheus-agent stamps
+# cluster=<spoke>), so a fired alert already carries its source cluster — which the agent uses (ADR-082 Phase 2)
+# to pick the obs tenant. `critical` alerts fan to the agent's webhook (the Alertmanager triage route); the rest
+# follow normal severity routing.
+groups:
+  - name: kubernetes-workloads
+    rules:
+      - alert: KubePodCrashLooping
+        # A container repeatedly restarting — the canonical "something just broke" signal the agent triages.
+        expr: max_over_time(kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"}[5m]) >= 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping"
+          description: "Container {{ $labels.container }} in {{ $labels.namespace }}/{{ $labels.pod }} has been in CrashLoopBackOff for >5m."
+      - alert: KubePodNotReady
+        # A pod stuck non-running (Pending/Unknown/Failed) well past startup — a stalled rollout or a scheduling/dep problem.
+        expr: |
+          sum by (namespace, pod, cluster) (
+            max by (namespace, pod, cluster) (kube_pod_status_phase{phase=~"Pending|Unknown|Failed"})
+            * on (namespace, pod, cluster) group_left() (max by (namespace, pod, cluster) (kube_pod_owner{owner_kind!="Job"}))
+          ) > 0
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} not ready"
+          description: "{{ $labels.namespace }}/{{ $labels.pod }} has been in a non-ready phase for >15m."
+      - alert: KubeContainerOOMKilled
+        # A container was OOMKilled and restarted — a memory limit/leak the agent can correlate with a recent deploy.
+        expr: |
+          (kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1)
+          and on (namespace, pod, container, cluster) (increase(kube_pod_container_status_restarts_total[10m]) > 0)
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container OOMKilled in {{ $labels.namespace }}/{{ $labels.pod }}"
+          description: "{{ $labels.container }} in {{ $labels.namespace }}/{{ $labels.pod }} was OOMKilled and restarted in the last 10m."
+      - alert: KubeDeploymentReplicasMismatch
+        # A Deployment that can't reach its desired replicas and isn't actively rolling — a wedged deploy.
+        expr: |
+          (kube_deployment_spec_replicas != kube_deployment_status_replicas_available)
+          and (changes(kube_deployment_status_replicas_updated[10m]) == 0)
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Deployment {{ $labels.namespace }}/{{ $labels.deployment }} replica mismatch"
+          description: "{{ $labels.namespace }}/{{ $labels.deployment }} has not matched its desired replicas for >15m and is not progressing."

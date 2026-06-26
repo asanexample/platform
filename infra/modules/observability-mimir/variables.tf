@@ -139,6 +139,24 @@ variable "ruler_alertmanager_url" {
   default     = "http://kube-prometheus-stack-alertmanager.observability.svc:9093"
 }
 
+variable "ruler_tenants" {
+  description = "Spoke tenants (X-Scope-OrgID) to load the curated ruler alert rules into — the rules-sync CronJob runs `mimirtool rules sync` per tenant so each spoke's remote-written metrics produce alerts (→ hub Alertmanager → triage agent). Empty = no sync Job. Only used when enable_ruler."
+  type        = list(string)
+  default     = []
+}
+
+variable "mimirtool_version" {
+  description = "grafana/mimirtool image tag for the ruler rules-sync CronJob (match the Mimir app version)."
+  type        = string
+  default     = "3.0.4"
+}
+
+variable "ruler_rules_sync_schedule" {
+  description = "Cron schedule for the ruler rules-sync (reconciles each tenant's ruler to the curated rules ConfigMap)."
+  type        = string
+  default     = "*/15 * * * *"
+}
+
 # ---------------------------------------------------------------------------
 # Cross-cluster spoke ingest (P10) — Gateway-API-native, no proxy
 # ---------------------------------------------------------------------------
