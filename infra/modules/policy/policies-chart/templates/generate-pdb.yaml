@@ -1,0 +1,72 @@
+{{- if .Values.enablePdbGenerate }}
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: generate-workload-pdb
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Default PodDisruptionBudget per workload
+    policies.kyverno.io/category: Availability
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: PodDisruptionBudget
+    policies.kyverno.io/description: >-
+      Generates a maxUnavailable=1 PodDisruptionBudget for every Deployment/StatefulSet in an environment
+      namespace, with a selector copied from the workload's OWN spec.selector.matchLabels (ADR-085). Deriving
+      the selector from the trigger keeps it label-convention-agnostic and correct per workload (multi-service
+      safe), where the Crossplane Composition cannot — its per-service axis has no matching pod label.
+      maxUnavailable=1 is drain-safe by construction: it always permits one eviction, so it never blocks a node
+      drain (Karpenter consolidation, EKS upgrade, platctl park), yet it protects the replica floor once
+      replicas>=2 (require-prod-replica-floor). synchronize=true reconciles the PDB back if edited or deleted.
+spec:
+  # Generate is handled by the background controller; it does not gate admission.
+  background: true
+  rules:
+    - name: generate-pdb
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+                - StatefulSet
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
+      generate:
+        apiVersion: policy/v1
+        kind: PodDisruptionBudget
+        name: "{{`{{ request.object.metadata.name }}`}}-pdb"
+        namespace: "{{`{{ request.object.metadata.namespace }}`}}"
+        synchronize: true
+        data:
+          metadata:
+            labels:
+              {{- include "kpp.labels" . | nindent 14 }}
+          spec:
+            maxUnavailable: 1
+            # The variable resolves to the workload's matchLabels MAP — Kyverno injects it as a typed object.
+            selector:
+              matchLabels: "{{`{{ request.object.spec.selector.matchLabels }}`}}"
+---
+# RBAC: Kyverno's background controller has no permission to create PodDisruptionBudgets by default. This
+# ClusterRole is aggregated into the background controller's role (via the kyverno aggregation label) so it
+# can create/sync the generated PDBs. Without it the policy admits but silently generates nothing.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kyverno:generate-pdb
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+    rbac.kyverno.io/aggregate-to-background-controller: "true"
+rules:
+  - apiGroups:
+      - policy
+    resources:
+      - poddisruptionbudgets
+    verbs:
+      - create
+      - update
+      - patch
+      - delete
+      - get
+      - list
+      - watch
+{{- end }}

@@ -58,10 +58,23 @@ The module is **cloud-agnostic and holds no team-specific data** — per-environ
 
 Auto-inject safe defaults on environment workloads (add-if-absent; webhooks fail open):
 `mutate-pod-defaults` (allowPrivilegeEscalation=false, drop ALL caps, seccompProfile=RuntimeDefault,
-automountServiceAccountToken=false — one patch so it resolves under autogen) and
+automountServiceAccountToken=false, plus the ADR-085 graceful-drain defaults — a native `preStop`
+sleep + `terminationGracePeriodSeconds: 30` — one patch so it resolves under autogen) and
 `mutate-workload-labels` (`team`, derived from the namespace). Pair with ArgoCD `ignoreDifferences`
 for the mutated fields. See the
 [policy catalog](../../../docs/architecture/kyverno-policy-catalog.md#mutate-policies-phase-2).
+
+### Availability: PodDisruptionBudget generation (`enable_pdb_generate`, default true)
+
+`generate-workload-pdb` creates a `maxUnavailable: 1` PodDisruptionBudget (`<workload>-pdb`) for every
+environment `Deployment`/`StatefulSet`, with a selector **copied from the workload's own
+`spec.selector.matchLabels`** (ADR-085 W2) — label-convention-agnostic and correct per workload, where the
+Crossplane Composition cannot be (its per-service axis has no matching pod label). `maxUnavailable: 1` is
+drain-safe by construction: it never blocks a node drain (Karpenter consolidation, EKS upgrade, `platctl`
+park) yet protects the replica floor once `replicas >= 2`. `synchronize: true` reconciles the PDB back if
+edited or deleted. The template also installs a ClusterRole aggregated into Kyverno's **background
+controller** (`rbac.kyverno.io/aggregate-to-background-controller`) so it can create the PDBs — without it
+the policy admits but silently generates nothing.
 
 ## Usage
 

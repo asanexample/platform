@@ -44,6 +44,10 @@ requiredWorkloadLabels:
 # Deploy the mutate policies (safe-default securityContext / automount / labels) on environment workloads.
 enableMutateDefaults: true
 
+# Generate a default PodDisruptionBudget (maxUnavailable=1) per environment Deployment/StatefulSet (ADR-085).
+# Also installs the ClusterRole that lets Kyverno's background controller create/sync the PDBs.
+enablePdbGenerate: true
+
 # Deploy per-team verifyImages policies (cosign keyless). Requires signed images + Kyverno ECR IRSA.
 enableImageVerification: false
 # verifyImages action/failurePolicy — independent so verification rolls Audit-first under Enforce.

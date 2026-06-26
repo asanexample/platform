@@ -156,7 +156,13 @@ variable "helm_wait" {
 }
 
 variable "enable_mutate_defaults" {
-  description = "Deploy the mutate policies that auto-inject safe defaults (hardened securityContext, automountServiceAccountToken=false, team/app labels) on environment workloads. Mutate webhooks fail open. The validate backstops (disallow-privilege-escalation, require-seccomp) deploy regardless."
+  description = "Deploy the mutate policies that auto-inject safe defaults (hardened securityContext, automountServiceAccountToken=false, team/app labels, graceful-drain preStop + terminationGracePeriodSeconds) on environment workloads. Mutate webhooks fail open. The validate backstops (disallow-privilege-escalation, require-seccomp) deploy regardless."
+  type        = bool
+  default     = true
+}
+
+variable "enable_pdb_generate" {
+  description = "Generate a default maxUnavailable=1 PodDisruptionBudget per environment Deployment/StatefulSet, with a selector copied from the workload's own matchLabels (ADR-085). Also installs the ClusterRole that lets Kyverno's background controller create the PDBs. Drain-safe by construction (never blocks a node drain)."
   type        = bool
   default     = true
 }
