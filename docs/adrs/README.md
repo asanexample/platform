@@ -95,6 +95,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-053: Identity & Cross-System Authorization Strategy](053-identity-and-cross-system-authorization-strategy.md) | Accepted |
 | [ADR-059: Identity Topology — Keycloak as the Pluggable Identity Seam](059-identity-topology-pluggable-idp-seam.md) | Accepted |
 | [ADR-068: Product-Scoped & Cross-Team Access Model](068-product-scoped-and-cross-team-access-model.md) | Proposed |
+| [ADR-084: Platform Identity Directory and Owner Resolution](084-platform-identity-directory-and-owner-resolution.md) | Proposed |
 
 ## Supply Chain & Delivery
 
