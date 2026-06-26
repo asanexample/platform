@@ -11,7 +11,7 @@ terraform {
     # credential data source via a generate block, using this versions.tf).
     aws = {
       source  = "hashicorp/aws"
-      version = ">= 6.0"
+      version = "~> 6.0"
     }
     random = {
       source  = "hashicorp/random"

@@ -18,6 +18,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-005: Organizational Unit Hierarchy Design](005-ou-hierarchy-design.md) | Accepted |
 | [ADR-006: State Bootstrap Pattern](006-state-bootstrap-pattern.md) | Accepted |
 | [ADR-007: Platform IAM Role Model](007-iam-role-model.md) | Accepted |
+| [ADR-083: Provider Version-Constraint Standardization](083-provider-version-constraint-standardization.md) | Accepted |
 
 ## Networking & Connectivity
 
