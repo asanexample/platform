@@ -223,7 +223,7 @@ network + identity wiring that tenant workloads inherit for free:
   else every agent image promote fails the sibling-claim check.
 - **Cilium: a k8s `ipBlock` egress NetworkPolicy does not cover in-cluster (identity-matched) or host (the
   Pod-Identity agent) traffic** — mirroring the tenant ipBlock netpol onto the agent silently blocked Bedrock
-  - obs. A proper Cilium-native agent egress policy is still owed.
+  - obs. A proper Cilium-native agent egress policy shipped since (identity/entity-based, not ipBlock — see below).
 - **ArgoCD won't auto-retry a sync that failed and exhausted its retries on the same revision**; fixing a
   *different* resource doesn't unstick it — trigger the sync explicitly.
 
@@ -233,9 +233,15 @@ sources manifests at **`targetRevision: HEAD`**; only the image **digest** is Re
 A manifest-only change delivers on the next sync with no rebuild (platform#739 additionally added a
 `deploy.yml` path-filter so such commits don't even trigger CI).
 
-**Remaining follow-ups:** per-tenant ruler **rules-sync** (the curated alert rules loaded into the Mimir
-ruler per tenant, IaC-managed — today only a hand-loaded demo rule fires for preprod); a proper
-Cilium-native agent **egress** policy.
+**Shipped since (2026-06-26):** both follow-ups landed — the per-tenant Mimir ruler **rules-sync** (curated spoke
+rules as a ConfigMap, loaded per tenant by a self-healing `mimirtool rules sync` CronJob) and the proper
+Cilium-native agent **egress** policy (default-deny egress allowing DNS + `kube-apiserver` + host(Pod-Identity) +
+the observability ns + `toFQDNs` Bedrock/Slack — later widened to `*.slack.com` for Socket Mode). The reference
+agent (triage) also matured into a deep workload — per-failure-mode playbooks, six grounded tools, a rich card,
+and a closed feedback loop over Socket Mode — recorded in [ADR-080](080-triage-copilot.md).
+
+**Remaining follow-ups:** the eval harness as a CI **regression gate** and ADR-076 content-capture — both tracked
+in [ADR-080](080-triage-copilot.md).
 
 ## Alternatives considered
 

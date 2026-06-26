@@ -421,3 +421,31 @@ is the first real producer of) · [ADR-077](077-application-instrumentation-stra
 on-ramp this rides) · [ADR-043](043-self-hosted-observability-stack.md) + [ADR-044](044-mimir-durable-multi-tenant-metrics.md) + `docs/plans/102-observability-stack.md` (the backbone; P6 APM / P9 SLOs / P13 the workload feeds) ·
 [ADR-013](013-compliance-tier-model.md) (tiers drive the D5 read gate) · [ADR-051](051-backstage-developer-portal.md)
 (CNPG datastore pattern). Epics: #554 (agentic), #102 (observability).
+
+## Implementation notes (as-built, 2026-06-26)
+
+Built and live on the hub as `XAgent` #1 ([ADR-082](082-platform-agent-runtime-xagent.md)). What shipped beyond the design:
+
+- **The loop (D1/D3):** PLAN → GATHER → REASON → DISPOSE in Go — one structured Bedrock call (Sonnet, validate-and-retry),
+  calibrated abstention below the confidence floor. Multi-cluster: the obs `X-Scope-OrgID` tenant follows the alert's
+  `cluster` label, and ArgoCD on the hub is the cross-cluster change source — so **cross-cluster k8s auth proved unnecessary**.
+- **Playbooks (PLAN), per failure mode:** `SelectPlaybook` routes the alertname to one of **crashloop / oom / not_ready /
+  latency / default**, each with its own ordered gather plan + a reasoning *focus* appended to the prompt. The plan is fixed
+  before any untrusted content is read (Plan-Then-Execute integrity). The single-playbook slice grew into five.
+- **Six grounded tools (D2/D12):** `get_recent_changes` (ReplicaSets/Events + ArgoCD — the change-correlation signal),
+  `get_workload_status` (the pod's own restart count / last-terminated reason+exit code / deployment replicas — the first
+  thing a human checks, and the only tool that returns signal for a dead pod that served no RED metric), `resource_metrics`
+  (memory-vs-limit + restarts — the OOM signal), `query_metrics` (Beyla RED), `query_traces` (Tempo — the slow span),
+  `query_logs` (Loki). Each playbook gathers only the tools that carry signal for it.
+- **The surface (D11):** a Block-Kit card — severity color bar, plain-English summary, ranked causes each with a one-line
+  rationale/evidence, a next step, Grafana deep links, model/trace/cost footer.
+- **The feedback loop (D6/D11), closed + verified live:** Accept/Correct/Dismiss record a verdict (`feedback verdict=… → Loki`)
+  — the online calibration signal (accept-rate per playbook/disposition, by LogQL). **Learning:** a *private* agent (no inbound,
+  ADR-010) can't host a public Slack Request URL, so interactivity is delivered via **Socket Mode** — the agent dials *out* over
+  a WebSocket; only an app-level token is needed and the card update rides the interaction's `response_url`. The agent's egress
+  CNP (the Composition) was widened to `*.slack.com` for it (ADR-082's egress posture).
+
+**Remaining (deliberately deferred):** the eval harness (fault-injection corpus + grader, D6) still lives in the spike —
+wiring it as a CI **regression gate** (forks on model-in-CI: deterministic fixture-replay vs live Bedrock) is the next quality
+lever; ADR-076 content-capture (the tiered prompt/response on the trace) is partial (the chat span already carries
+model/tokens/provider).
