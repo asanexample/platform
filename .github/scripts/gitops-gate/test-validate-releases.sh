@@ -29,6 +29,16 @@ spec:
     api: {}
 Y
 
+# Platform agent (ADR-082): an XAgent claim at gitops/agents/<product>.yaml is ALSO a valid Release target
+# (agents are XAgents, not XEnvironments). Note the agent's name (copilot) differs from the release name.
+mkdir -p "${head}/gitops/agents"
+cat >"${head}/gitops/agents/copilot.yaml" <<'Y'
+apiVersion: platform.refplat.org/v1beta1
+kind: XAgent
+metadata: { name: copilot }
+spec: { product: copilot }
+Y
+
 D1="sha256:69ff1ab2abeb52b7fde3fec3b75e548116a7d33a27816bf2afd36df1f93527a7"
 
 pass=0; failc=0
@@ -97,6 +107,24 @@ apiVersion: platform.refplat.org/v1beta1
 kind: Release
 metadata: { name: alpha-shop-prod }
 spec: { environmentRef: alpha-shop-prod, services: { web: { digest: "${D1}" } } }
+Y
+)"
+# ADR-082: a platform agent's Release has no sibling Environment, but a sibling Agent claim
+# (gitops/agents/copilot.yaml) — accepted. The path ties release→agent; environmentRef isn't matched against an
+# Environment name (the agent is named differently). This is the regression #732/#733 exposed.
+run ok   "accepts an Agent-targeted release (agent claim, no Environment)" gitops/releases/platform/copilot/dev.yaml "$(cat <<Y
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata: { name: platform-copilot-dev }
+spec: { environmentRef: platform-copilot-dev, services: { server: { digest: "${D1}" } } }
+Y
+)"
+# But a Release with NEITHER a sibling Environment NOR an Agent claim is still a dangling target → deny.
+run deny "rejects a release with no Environment and no Agent" gitops/releases/platform/ghost/dev.yaml "$(cat <<Y
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata: { name: platform-ghost-dev }
+spec: { environmentRef: platform-ghost-dev, services: { server: { digest: "${D1}" } } }
 Y
 )"
 
