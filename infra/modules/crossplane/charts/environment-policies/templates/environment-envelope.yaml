@@ -25,17 +25,6 @@ metadata:
 spec:
   background: true
   failurePolicy: {{ .Values.failurePolicy }}
-  {{- if .Values.envelopeSkipReconcilePrincipal }}
-  # TD2-04: don't fire the webhook for Crossplane's own reconcile UPDATEs of the XEnvironment XR (status / spec
-  # normalization). Those no-op writes otherwise re-run every rule below (each doing Team+Product context
-  # lookups), pinning the admission controller (~1 core). A webhook-level CEL matchCondition is independent of
-  # `background: true` above, so the Audit-first PolicyReports still cover the stored spec; the envelope is still
-  # enforced at the AUTHORING boundary — the ArgoCD apply of gitops/environments/**.
-  webhookConfiguration:
-    matchConditions:
-      - name: skip-crossplane-reconcile
-        expression: "request.userInfo.username != '{{ .Values.envelopeSkipReconcilePrincipal }}'"
-  {{- end }}
   rules:
     # The Environment must reference a Team projected onto this cluster (its envelope is knowable).
     - name: team-must-exist
