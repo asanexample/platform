@@ -98,7 +98,7 @@ for tf in $TEAM_FILES; do
 
   # --- no unknown keys (the CRD prunes them silently at admission) -----------------------------------
   for k in $(yq '.spec | keys | .[]' "$f" 2>/dev/null); do
-    case "$k" in ssoGroup | envelope | roles | platformTrust) ;; *) note "${tf}: unknown spec key '${k}' (typo? it would be silently dropped)";; esac
+    case "$k" in ssoGroup | envelope | roles | platformTrust | slack | pagerduty | oncall) ;; *) note "${tf}: unknown spec key '${k}' (typo? it would be silently dropped)";; esac
   done
 
   # --- release-approver set (ADR-068 §7, #501): if present, a non-empty list of valid GitHub logins. This is the
