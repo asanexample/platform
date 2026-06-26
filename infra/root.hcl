@@ -73,16 +73,6 @@ EOF
   )
 }
 
-inputs = {
-  common_tags = {
-    Environment = local.environment
-    ManagedBy   = "Terragrunt"
-    Project     = "Multi-Cloud Infrastructure"
-    CostCenter  = local.cost_center
-    Owner       = local.owner
-  }
-}
-
 locals {
   # Detect cloud provider from directory path (kept for future multi-cloud)
   _path_parts_cloud = split("/", path_relative_to_include())
@@ -106,15 +96,4 @@ locals {
   # stand-in for the operator's cross-account identity. Default off → byte-identical for local operators.
   force_deployer  = get_env("TG_FORCE_DEPLOYER", "") == "1"
   aws_assume_role = local.force_deployer || (local.aws_account_id != "" ? local.aws_account_id != get_aws_account_id() : false)
-
-  cost_center = get_env("TF_VAR_cost_center", "Engineering")
-  owner       = get_env("TF_VAR_owner", "Platform Team")
-
-  common_tags = {
-    Environment = local.environment
-    ManagedBy   = "Terragrunt"
-    Project     = "Multi-Cloud Infrastructure"
-    CostCenter  = local.cost_center
-    Owner       = local.owner
-  }
 }
