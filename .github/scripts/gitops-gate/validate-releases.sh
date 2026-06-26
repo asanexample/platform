@@ -18,6 +18,9 @@
 #   HEAD_DIR        untrusted PR head checkout (the Release + maybe its Environment claim)
 #   RELEASE_FILES   space-separated added/modified gitops/releases/**/*.yaml (relative)
 # Requires: yq (mikefarah).
+# NOTE: -e is intentionally omitted. These checks accumulate ALL failures (rc=1 per problem) and
+# fail closed via the explicit `exit` at the end — one incidental non-zero must not abort the run
+# before every input is validated. Do not add -e.
 set -uo pipefail
 : "${BASE_DIR:?}" "${HEAD_DIR:?}"
 RELEASE_FILES="${RELEASE_FILES:-}"

@@ -5,6 +5,9 @@
 #
 # Env in: TF_PLUGIN_CACHE_DIR (shared provider cache, created if absent).
 # Requires: tofu, find, grep. Run from the repo root.
+# NOTE: -e is intentionally omitted. These checks accumulate ALL failures (rc=1 per problem) and
+# fail closed via the explicit `exit` at the end — one incidental non-zero must not abort the run
+# before every input is validated. Do not add -e.
 set -uo pipefail
 
 mkdir -p "${TF_PLUGIN_CACHE_DIR:?TF_PLUGIN_CACHE_DIR must be set}"

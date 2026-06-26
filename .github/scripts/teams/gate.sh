@@ -25,6 +25,9 @@
 #   MAX_RESOURCES_PER_ENV     envelope.resources.maxPerEnvironment ceiling (ADR-073; default 25)
 #   DENIED_SSO_GROUPS         space/comma-separated privileged groups a team may NOT map to (default platform-admins)
 # Requires: yq (mikefarah), python3.
+# NOTE: -e is intentionally omitted. These checks accumulate ALL failures (rc=1 per problem) and
+# fail closed via the explicit `exit` at the end — one incidental non-zero must not abort the run
+# before every input is validated. Do not add -e.
 set -uo pipefail
 
 : "${BASE_DIR:?}" "${HEAD_DIR:?}" "${REPORT_MD:?}"
