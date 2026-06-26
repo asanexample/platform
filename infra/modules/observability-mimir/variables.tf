@@ -127,6 +127,18 @@ variable "enable_federated_datasource" {
   default     = false
 }
 
+variable "enable_ruler" {
+  description = "Enable the Mimir ruler (P4) — evaluates alerting rules against EACH tenant's metrics (incl. the spokes' remote-written data) and sends fired alerts to ruler_alertmanager_url, so a spoke (e.g. preprod) failure produces an alert that reaches the hub Alertmanager → the triage agent (ADR-082). Rules are loaded per-tenant into ruler_storage via mimirtool/the ruler API (the rules-sync). Hub only. Off by default."
+  type        = bool
+  default     = false
+}
+
+variable "ruler_alertmanager_url" {
+  description = "Alertmanager the Mimir ruler posts fired alerts to (the hub kube-prometheus-stack Alertmanager). Only used when enable_ruler."
+  type        = string
+  default     = "http://kube-prometheus-stack-alertmanager.observability.svc:9093"
+}
+
 # ---------------------------------------------------------------------------
 # Cross-cluster spoke ingest (P10) — Gateway-API-native, no proxy
 # ---------------------------------------------------------------------------

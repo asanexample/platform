@@ -63,6 +63,20 @@ locals {
           s3      = { bucket_name = try(aws_s3_bucket.blocks[0].bucket, "") }
         }
 
+        # Ruler (P4, gated on var.enable_ruler) — evaluates alerting rules against EACH tenant's metrics
+        # (incl. the spokes' remote-written data) and sends fired alerts to the hub Alertmanager, which fans
+        # critical alerts to the triage agent (ADR-082). Without it, only the hub Prometheus's locally-scraped
+        # metrics produce alerts, so a preprod failure never reaches the agent. Rules are loaded per-tenant into
+        # ruler_storage (the blocks bucket, `ruler/` prefix) via mimirtool/the ruler API (the (B) rules-sync).
+        ruler_storage = var.enable_ruler ? {
+          backend        = "s3"
+          s3             = { bucket_name = try(aws_s3_bucket.blocks[0].bucket, "") }
+          storage_prefix = "ruler"
+        } : null
+        ruler = var.enable_ruler ? {
+          alertmanager_url = var.ruler_alertmanager_url
+        } : null
+
         # Classic write path (distributor -> ingester gRPC push). The chart's base config defaults to
         # the Kafka-based ingest-storage architecture (ingest_storage.enabled: true +
         # push_grpc_method_enabled: false); override both to OFF so no Kafka is needed. Kafka itself is
@@ -126,8 +140,8 @@ locals {
       podAnnotations   = { "karpenter.sh/do-not-disrupt" = "true" }
     }
 
-    # --- Disabled in P2 (ruler/alertmanager -> P4; the rest are HA-only) ---
-    ruler              = { enabled = false }
+    # --- ruler gated on var.enable_ruler (P4); alertmanager stays off (we route to the kube-prometheus one) ---
+    ruler              = { enabled = var.enable_ruler, replicas = 1 }
     alertmanager       = { enabled = false }
     overrides_exporter = { enabled = var.high_availability }
     rollout_operator   = { enabled = var.high_availability }

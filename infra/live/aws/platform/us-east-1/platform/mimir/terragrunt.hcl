@@ -131,5 +131,10 @@ inputs = {
   # datasource spanning platform|preprod. Platform-admin overview lane (per-team scoping = P13).
   enable_federated_datasource = true
 
+  # P4 / ADR-082: the ruler evaluates alerting rules against EACH tenant's metrics (incl. preprod's
+  # remote-written data) and posts fired alerts to the hub Alertmanager → the triage agent. Rules are loaded
+  # per-tenant (the rules-sync); without them the ruler runs idle.
+  enable_ruler = true
+
   tags = include.base.locals.tags
 }
