@@ -280,6 +280,81 @@ func TestK8sWorkloadCheck_NoPods(t *testing.T) {
 	}
 }
 
+// --- KarpenterReadyCheck tests ---
+
+func TestKarpenterReadyCheck_Healthy(t *testing.T) {
+	ncJSON, _ := json.Marshal(map[string]interface{}{"items": []map[string]interface{}{{"metadata": map[string]string{"name": "default"}}}})
+	npJSON, _ := json.Marshal(map[string]interface{}{"items": []map[string]interface{}{
+		{"metadata": map[string]string{"name": "default"}, "status": map[string]interface{}{"conditions": []map[string]string{{"type": "Ready", "status": "True"}}}},
+	}})
+	run := newMockRunner(
+		mockCall{prefix: "kubectl --context test get ec2nodeclass", out: ncJSON},
+		mockCall{prefix: "kubectl --context test get nodepool", out: npJSON},
+	)
+	check := &KarpenterReadyCheck{Name: "preprod/karpenter/ready", KubeContext: "test", Run: run}
+	if r := check.Check(context.Background()); r.Status != "ok" {
+		t.Errorf("expected ok, got %s: %s", r.Status, r.Message)
+	}
+}
+
+func TestKarpenterReadyCheck_NoNodeClass(t *testing.T) {
+	ncJSON, _ := json.Marshal(map[string]interface{}{"items": []interface{}{}})
+	run := newMockRunner(mockCall{prefix: "kubectl --context test get ec2nodeclass", out: ncJSON})
+	check := &KarpenterReadyCheck{Name: "preprod/karpenter/ready", KubeContext: "test", Run: run}
+	r := check.Check(context.Background())
+	if r.Status != "failed" || !strings.Contains(r.Message, "no EC2NodeClass") {
+		t.Errorf("expected failed/no EC2NodeClass, got %s: %s", r.Status, r.Message)
+	}
+}
+
+func TestKarpenterReadyCheck_NodePoolNotReady(t *testing.T) {
+	ncJSON, _ := json.Marshal(map[string]interface{}{"items": []map[string]interface{}{{"metadata": map[string]string{"name": "default"}}}})
+	npJSON, _ := json.Marshal(map[string]interface{}{"items": []map[string]interface{}{
+		{"metadata": map[string]string{"name": "default"}, "status": map[string]interface{}{"conditions": []map[string]string{{"type": "Ready", "status": "False", "reason": "NodeClassNotReady"}}}},
+	}})
+	run := newMockRunner(
+		mockCall{prefix: "kubectl --context test get ec2nodeclass", out: ncJSON},
+		mockCall{prefix: "kubectl --context test get nodepool", out: npJSON},
+	)
+	check := &KarpenterReadyCheck{Name: "preprod/karpenter/ready", KubeContext: "test", Run: run}
+	r := check.Check(context.Background())
+	if r.Status != "failed" || !strings.Contains(r.Message, "not Ready") {
+		t.Errorf("expected failed/not Ready, got %s: %s", r.Status, r.Message)
+	}
+}
+
+// --- AdmissionBlockedCheck tests ---
+
+func TestAdmissionBlockedCheck_Healthy(t *testing.T) {
+	depsJSON, _ := json.Marshal(map[string]interface{}{"items": []map[string]interface{}{
+		{"metadata": map[string]string{"name": "app", "namespace": "ns"}, "spec": map[string]interface{}{"replicas": 2}, "status": map[string]interface{}{"replicas": 2}},
+	}})
+	run := newMockRunner(mockCall{prefix: "kubectl --context test get deploy", out: depsJSON})
+	check := &AdmissionBlockedCheck{Name: "preprod/policy/admission", KubeContext: "test", Run: run}
+	if r := check.Check(context.Background()); r.Status != "ok" {
+		t.Errorf("expected ok, got %s: %s", r.Status, r.Message)
+	}
+}
+
+func TestAdmissionBlockedCheck_Blocked(t *testing.T) {
+	depsJSON, _ := json.Marshal(map[string]interface{}{"items": []map[string]interface{}{
+		{"metadata": map[string]string{"name": "app", "namespace": "alpha-shop-prod"}, "spec": map[string]interface{}{"replicas": 2}, "status": map[string]interface{}{}},
+	}})
+	run := newMockRunner(
+		mockCall{prefix: "kubectl --context test get deploy", out: depsJSON},
+		mockCall{prefix: "kubectl --context test get events", out: []byte(`admission webhook "mutate.kyverno.svc-fail" denied: ecr BatchGetImage denied`)},
+	)
+	check := &AdmissionBlockedCheck{Name: "preprod/policy/admission", KubeContext: "test", Run: run}
+	r := check.Check(context.Background())
+	if r.Status != "failed" {
+		t.Fatalf("expected failed, got %s: %s", r.Status, r.Message)
+	}
+	joined := strings.Join(r.Details, " | ")
+	if !strings.Contains(joined, "alpha-shop-prod/app") || !strings.Contains(joined, "BatchGetImage denied") {
+		t.Errorf("expected blocked workload + admission error in details, got: %s", joined)
+	}
+}
+
 // --- IAMCheck tests ---
 
 func TestIAMCheck_AllValid(t *testing.T) {

@@ -816,6 +816,178 @@ func (d *CrossVPCDNSCheck) Check(ctx context.Context) CheckResult {
 }
 
 // ---------------------------------------------------------------------------
+// KarpenterReadyCheck — EC2NodeClass present + every NodePool Ready=True
+// ---------------------------------------------------------------------------
+
+// KarpenterReadyCheck verifies Karpenter can actually provision capacity: at least one EC2NodeClass exists and
+// every NodePool reports Ready=True. The node/pod checks MISS a broken NodePool — a NodeClassReady=False NodePool
+// has no nodes to be unready and the system node is fine, yet every workload pod stays Pending. (2026-06-27 unpark:
+// `down` deleted the NodePool but left the EC2NodeClass; `up`'s force-replace lost the leftover finalizer'd
+// NodeClass → NodePool NodeClassReady=False, all workloads stranded.)
+type KarpenterReadyCheck struct {
+	Name        string
+	KubeContext string
+	Run         CommandRunner
+}
+
+// CheckName returns the check name for skip messages.
+func (k *KarpenterReadyCheck) CheckName() string { return k.Name }
+
+// Check asserts an EC2NodeClass exists and every NodePool is Ready=True.
+func (k *KarpenterReadyCheck) Check(ctx context.Context) CheckResult {
+	start := time.Now()
+
+	ncOut, err := k.Run(ctx, "kubectl", "--context", k.KubeContext, "get", "ec2nodeclass", "-o", "json")
+	if err != nil {
+		if strings.Contains(string(ncOut), "doesn't have a resource type") {
+			return CheckResult{Name: k.Name, Status: "skipped", Message: "Karpenter not installed (no EC2NodeClass CRD)", Elapsed: time.Since(start)}
+		}
+		return CheckResult{Name: k.Name, Status: "failed", Message: "cannot list EC2NodeClass",
+			Details: []string{strings.TrimSpace(string(ncOut)), "try: kubectl --context " + k.KubeContext + " get ec2nodeclass"}, Elapsed: time.Since(start)}
+	}
+	var nc struct {
+		Items []json.RawMessage `json:"items"`
+	}
+	if err := json.Unmarshal(ncOut, &nc); err != nil {
+		return CheckResult{Name: k.Name, Status: "failed", Message: "EC2NodeClass JSON parse failed", Details: []string{err.Error()}, Elapsed: time.Since(start)}
+	}
+	if len(nc.Items) == 0 {
+		return CheckResult{Name: k.Name, Status: "failed", Message: "no EC2NodeClass — Karpenter cannot provision; workloads strand Pending",
+			Details: []string{"recover: helm get manifest karpenter-nodepool -n karpenter | kubectl apply -f -"}, Elapsed: time.Since(start)}
+	}
+
+	npOut, err := k.Run(ctx, "kubectl", "--context", k.KubeContext, "get", "nodepool", "-o", "json")
+	if err != nil {
+		return CheckResult{Name: k.Name, Status: "failed", Message: "cannot list NodePool", Details: []string{strings.TrimSpace(string(npOut))}, Elapsed: time.Since(start)}
+	}
+	var np struct {
+		Items []struct {
+			Metadata struct {
+				Name string `json:"name"`
+			} `json:"metadata"`
+			Status struct {
+				Conditions []struct {
+					Type   string `json:"type"`
+					Status string `json:"status"`
+					Reason string `json:"reason"`
+				} `json:"conditions"`
+			} `json:"status"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(npOut, &np); err != nil {
+		return CheckResult{Name: k.Name, Status: "failed", Message: "NodePool JSON parse failed", Details: []string{err.Error()}, Elapsed: time.Since(start)}
+	}
+	if len(np.Items) == 0 {
+		return CheckResult{Name: k.Name, Status: "failed", Message: "no NodePool present — Karpenter cannot provision", Elapsed: time.Since(start)}
+	}
+
+	var notReady []string
+	for _, p := range np.Items {
+		status, reason := "", ""
+		for _, c := range p.Status.Conditions {
+			if c.Type == "Ready" {
+				status, reason = c.Status, c.Reason
+				break
+			}
+		}
+		if status != "True" {
+			notReady = append(notReady, fmt.Sprintf("NodePool %s Ready=%q (%s)", p.Metadata.Name, status, reason))
+		}
+	}
+	if len(notReady) > 0 {
+		details := append(notReady,
+			"a NodeClassReady=False NodePool provisions nothing — every workload pod stays Pending",
+			"recover: helm get manifest karpenter-nodepool -n karpenter | kubectl apply -f -")
+		return CheckResult{Name: k.Name, Status: "failed", Message: fmt.Sprintf("%d/%d NodePool(s) not Ready", len(notReady), len(np.Items)), Details: details, Elapsed: time.Since(start)}
+	}
+	return CheckResult{Name: k.Name, Status: "ok", Message: fmt.Sprintf("%d EC2NodeClass, %d NodePool(s) Ready", len(nc.Items), len(np.Items)), Elapsed: time.Since(start)}
+}
+
+// ---------------------------------------------------------------------------
+// AdmissionBlockedCheck — Deployments that want pods but have none (admission)
+// ---------------------------------------------------------------------------
+
+// AdmissionBlockedCheck flags Deployments that want pods (spec.replicas>0) but have NONE (status.replicas 0/absent)
+// — the signature of a fail-closed admission webhook (e.g. Kyverno) rejecting every pod. The pod-health checks miss
+// this: a Deployment with zero pods has nothing unhealthy to report. It surfaces the latest FailedCreate admission
+// error so the cause is diagnosable. (2026-06-27: an account-less kyverno-ecr ARN failed verify-images closed,
+// blocking every product workload's admission post-unpark — with no node/pod symptom to see.)
+type AdmissionBlockedCheck struct {
+	Name        string
+	KubeContext string
+	Run         CommandRunner
+}
+
+// CheckName returns the check name for skip messages.
+func (a *AdmissionBlockedCheck) CheckName() string { return a.Name }
+
+// Check flags Deployments that want pods but have none and surfaces the admission error.
+func (a *AdmissionBlockedCheck) Check(ctx context.Context) CheckResult {
+	start := time.Now()
+	out, err := a.Run(ctx, "kubectl", "--context", a.KubeContext, "get", "deploy", "--all-namespaces", "-o", "json")
+	if err != nil {
+		return CheckResult{Name: a.Name, Status: "failed", Message: "cannot list deployments", Details: []string{strings.TrimSpace(string(out))}, Elapsed: time.Since(start)}
+	}
+	var deps struct {
+		Items []struct {
+			Metadata struct {
+				Name      string `json:"name"`
+				Namespace string `json:"namespace"`
+			} `json:"metadata"`
+			Spec struct {
+				Replicas *int `json:"replicas"`
+			} `json:"spec"`
+			Status struct {
+				Replicas int `json:"replicas"`
+			} `json:"status"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(out, &deps); err != nil {
+		return CheckResult{Name: a.Name, Status: "failed", Message: "deployment JSON parse failed", Details: []string{err.Error()}, Elapsed: time.Since(start)}
+	}
+
+	var blocked []string
+	firstNS := ""
+	for _, d := range deps.Items {
+		want := 1
+		if d.Spec.Replicas != nil {
+			want = *d.Spec.Replicas
+		}
+		if want > 0 && d.Status.Replicas == 0 {
+			blocked = append(blocked, d.Metadata.Namespace+"/"+d.Metadata.Name)
+			if firstNS == "" {
+				firstNS = d.Metadata.Namespace
+			}
+		}
+	}
+	if len(blocked) == 0 {
+		return CheckResult{Name: a.Name, Status: "ok", Message: "no admission-blocked workloads", Elapsed: time.Since(start)}
+	}
+
+	details := make([]string, 0, len(blocked)+1)
+	for _, b := range blocked {
+		details = append(details, b+" wants pods but has none")
+	}
+	if msg := a.latestFailedCreate(ctx, firstNS); msg != "" {
+		details = append(details, "admission error ("+firstNS+"): "+msg)
+	}
+	return CheckResult{Name: a.Name, Status: "failed",
+		Message: fmt.Sprintf("%d workload(s) blocked from creating pods (fail-closed admission webhook?)", len(blocked)),
+		Details: details, Elapsed: time.Since(start)}
+}
+
+// latestFailedCreate returns the most recent ReplicaSet FailedCreate event message in a namespace — the admission
+// rejection explaining why a Deployment can't create pods.
+func (a *AdmissionBlockedCheck) latestFailedCreate(ctx context.Context, ns string) string {
+	out, err := a.Run(ctx, "kubectl", "--context", a.KubeContext, "get", "events", "-n", ns,
+		"--field-selector", "reason=FailedCreate", "--sort-by=.lastTimestamp", "-o", "jsonpath={.items[-1:].message}")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// ---------------------------------------------------------------------------
 // ResolveCheckers — builds Checker slices from discovered units and config
 // ---------------------------------------------------------------------------
 
@@ -983,6 +1155,35 @@ func ResolveCheckers(
 					Name:        u.Name + "/status",
 					KubeContext: kubeCtx,
 					ClusterWide: true,
+					Run:         run,
+				})
+			}
+
+		case "karpenter":
+			checks = append(checks, &StateCheck{
+				Name:   u.Name + "/state",
+				Unit:   u,
+				Binary: "terragrunt",
+			})
+			if kubeCtx != "" {
+				checks = append(checks, &KarpenterReadyCheck{
+					Name:        u.Name + "/ready",
+					KubeContext: kubeCtx,
+					Run:         run,
+				})
+			}
+
+		case "policy":
+			checks = append(checks, &StateCheck{
+				Name:   u.Name + "/state",
+				Unit:   u,
+				Binary: "terragrunt",
+			})
+			if kubeCtx != "" {
+				// Kyverno is the admission engine — flag any workload its (or any) fail-closed webhook blocks.
+				checks = append(checks, &AdmissionBlockedCheck{
+					Name:        u.Name + "/admission",
+					KubeContext: kubeCtx,
 					Run:         run,
 				})
 			}
