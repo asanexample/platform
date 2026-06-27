@@ -204,8 +204,11 @@ Once the roster is in git, **adding a system is adding a connector** that consum
 | auditor     | read     | read | read (audit) | — | — |
 
 - **AWS** — Identity Center permission sets + assignments, generated from the registry (today
-  hand-maintained HCL — the live gap; closes the unbuilt per-team access, #647). Human kubectl goes
-  **OIDC-native** (Keycloak as EKS OIDC IdP, ADR-068 §6); IAM federation retained only for break-glass.
+  hand-maintained HCL — the live gap; "add a person" to AWS console access becomes one PR). **Cluster**
+  access is a *separate plane*: human kubectl goes **OIDC-native** (Keycloak as EKS OIDC IdP, ADR-068 §6 /
+  [#364](https://github.com/asanexample/platform/issues/364)) — which is where the unbuilt per-team
+  `DeveloperAccess` regression (**#647**) is resolved, *not* the Identity Center generator; IAM federation
+  is retained only for break-glass.
 - **Apps** — Keycloak OIDC claims → ArgoCD / Backstage / Grafana RBAC *(already reads the Team registry)*.
 - **GitHub** — org-team **membership** (the `github-teams` module already makes the teams, ADR-072; this
   adds members). **PagerDuty** — rotation membership; on-call resolved live (ADR-084 §7). **Slack** —
@@ -438,10 +441,12 @@ boundary *is* the decision point). What remains are genuine residual edges:
 Workforce-first, sequenced by value-per-effort. **Hardening is not a later phase** — the `[must]` items in
 §3 land *with* the phase that introduces their surface, not after.
 
-1. **People roster + AWS generator** — add `gitops/people/`; generate Identity Center from it (retire the
-   hand-maintained HCL). *Closes #647; "add a person" becomes one PR.* Lands with: auth strength (§3.1),
+1. **People roster + AWS & Keycloak generators** — add `gitops/people/`; derive *both* Identity Center
+   (AWS console access) **and** keycloak-config (app access) from it, retiring the hand-maintained HCL and
+   the Keycloak seed-users so "add a person" is one PR. (Per-team *cluster* access — the #647 regression —
+   is a separate plane, resolved by OIDC cluster auth, step 5 / #364.) Lands with: auth strength (§3.1),
    meta-governance + watch-the-watchers (§3.6), the intent-vs-effected guardrail + decide/apply split
-   (§3.3). This is the minimal v1 that earns its keep.
+   (§3.3). The minimal v1 that earns its keep.
 2. **GitHub membership connector** — org-team membership from the roster (handles via the directory).
 3. **Temporary-power front door** — the activation controller + timer + risk gate; wrap break-glass first;
    emergency revocation alongside.
