@@ -146,10 +146,20 @@ resource "helm_release" "product_appset" {
           }
           syncPolicy = {
             automated = { selfHeal = true, prune = true }
+            # ServerSideApply (#894): an Argo Rollout carries TWO field managers on its spec — argocd-controller
+            # AND rollouts-controller (the controller mutates spec at runtime). ArgoCD's DEFAULT client-side apply
+            # computes its patch from the `kubectl.kubernetes.io/last-applied-configuration` annotation via a 3-way
+            # merge; with a second manager also writing spec, that merge can resolve a committed `spec.template`
+            # change to a NO-OP — the apply logs `rollout … unchanged`, no new ReplicaSet rolls, and the app stays
+            # OutOfSync (only a manual `kubectl patch` lands it). Server-side apply uses real managedFields
+            # field-ownership instead of the annotation, so argocd-controller's owned spec.template is applied
+            # correctly alongside the rollouts-controller's fields. The registry-sync apps below already run with
+            # SSA on this cluster (ArgoCD v3.4.x).
+            #
             # RespectIgnoreDifferences keeps a SYNC (selfHeal or manual) from overwriting the ignoreDifferences
             # fields below — without it, ignoreDifferences only hides them from the diff, and a sync triggered by
             # any OTHER change still stomps the plugin's live HTTPRoute weights / the rollout's Service selector.
-            syncOptions = ["CreateNamespace=false", "RespectIgnoreDifferences=true"]
+            syncOptions = ["CreateNamespace=false", "RespectIgnoreDifferences=true", "ServerSideApply=true"]
             # Fail-fast (not the 45-min sync_retry): a new Environment's first deploy syncs a `:placeholder`
             # overlay until the app's CI pins the signed digest in a follow-up commit; a short retry lets the
             # doomed pre-pin sync give up so selfHeal picks up the pin commit (revision change) without a manual
