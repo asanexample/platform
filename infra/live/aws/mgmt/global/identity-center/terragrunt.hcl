@@ -28,6 +28,13 @@ dependencies {
 # the machine-checkable invariants (assignments/memberships reference known groups+permission-sets; no wildcard
 # Allow in an inline policy) asserted before APPLY — so a translation bug can't silently over-grant.
 #
+# ⚠️ APPLY WITH `-parallelism=1`. AWS SSO provisions account-assignments PER permission set serially; creating
+# (or swapping) several assignments on the SAME permission set concurrently races and one fails with
+# `unexpected state 'FAILED' … 404 Assignment not found` (hit live on the #888 cutover, where 4 access-admin →
+# AdministratorAccess assignments were created at once). `terragrunt apply -parallelism=1` serializes them. A
+# failed apply is recoverable: re-apply (the deprovisions settle) — and a half-applied admin swap is covered by
+# the IAM-user break-glass (851725353202:user/admin, outside Identity Center) + your live SSO session.
+#
 # STANDING vs on-demand (§2.3): only STANDING grants get a standing assignment here. A grant that is
 # `activation: on-demand` (or whose role's mode is on-demand, e.g. platform-operator / break-glass) is
 # ELIGIBILITY, not standing — P3's activation controller grants it at checkout. So borrowed power never sits as a
