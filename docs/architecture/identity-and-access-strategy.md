@@ -2,55 +2,69 @@
 
 **Status:** Strategy / direction — forward-looking. **Date:** 2026-06-27.
 
-This is the *where we're going* companion to [identity-and-sso.md](identity-and-sso.md) (the *where we
-are* explainer). It sets a single, unified picture for how **every** person, machine, and end-user gets
-an identity and the right access across **every** system the platform touches — today's (AWS, Kubernetes,
-ArgoCD, Backstage, Grafana) and tomorrow's (GitHub, PagerDuty, Slack, the products we host).
+The *where we're going* companion to [identity-and-sso.md](identity-and-sso.md) (the *where we are*
+explainer). It sets one unified picture for how every person and machine gets an identity and the right
+access across every system the platform touches — today's (AWS, Kubernetes, ArgoCD, Backstage, Grafana)
+and tomorrow's (GitHub, PagerDuty, Slack).
 
-It **builds on** a deep existing body of decisions — Keycloak as the IdP of record and access-as-code
-([ADR-053](../adrs/053-identity-and-cross-system-authorization-strategy.md)/[059](../adrs/059-identity-topology-pluggable-idp-seam.md)),
-the product-scoped access model ([ADR-068](../adrs/068-product-scoped-and-cross-team-access-model.md)),
-posture = stage×tier + break-glass ([ADR-040](../adrs/040-platform-engineer-access-model.md)), and the
-platform identity directory ([ADR-084](../adrs/084-platform-identity-directory-and-owner-resolution.md)).
-This strategy is **workforce-first**: it covers the humans (and machines) who build, run, and observe the
-platform and the apps on it. **Customer/end-user identity (CIAM) is deliberately deferred** — named as a
-future plane so today's decisions preserve the seam, but explicitly *not* in the current build (which keeps
-faith with ADR-068's own "Customer auth is a separate plane" call). Within that scope it **evolves** the
-prior decisions in two places, called out below: it names the **full workforce role catalog** (the ADRs
-are developer-centric) and unifies break-glass + grant-expiry into **one temporary-power model**. Where
-this doc and an older ADR disagree, this doc is the newer thinking — the ADRs informed the direction, they
-don't dictate it. Decisions that harden here will be written back as ADR amendments or new ADRs.
+This is a **reference platform**: a goal in its own right is to **demonstrate solving identity & access at
+scale**, even while we are tiny. So the document has two halves — **the model** (§2), which is
+deliberately simple, and **designing for scale** (§3), which honestly owns the hard parts that emerge when
+the model meets thousands of principals, many systems, autonomous agents, and a real org. The second half
+is the point; a clean model that ignores the hard parts isn't a scale demonstration.
+
+It **builds on** a deep existing body of decisions and **evolves** them where this newer thinking goes
+further (the full reconciliation is §4). Where this doc and an older ADR disagree, this is the newer
+thinking — the ADRs inform the direction, they don't dictate it. Decisions that harden here get written
+back as ADR amendments or new ADRs.
+
+## Contents
+
+- **§1 Scope & principles** — what's in scope, and the rules everything else follows.
+- **§2 The model** — planes, roles, temporary power, the git source of truth, projection.
+- **§3 Designing for scale** — the hard parts, by layer, each with the design it forces.
+- **§4 How this lands on the ADRs** · **§5 Roadmap** · **§6 Open questions**
 
 ---
 
-## The vision in one line
+## 1. Scope & principles
 
-> **Decide a principal's access once — as a function of who they are and what they're on — and let the
-> platform derive and project it into every system automatically, handing out the dangerous parts only
-> temporarily.**
+### Scope
 
-Everything below is that sentence, unpacked.
+- **In scope: workforce + machines.** The humans who build, run, and observe the platform and its apps,
+  and the workloads/agents that act for them.
+- **Deferred: customer/end-user identity (CIAM).** Named as a real future plane so today's decisions
+  preserve the seam, but **not built now** (no external end-users yet; external blast radius; scope
+  discipline). Keeps faith with ADR-068's own "Customer auth is a separate plane" call. See §2.7.
 
-## The organizing principle: declare once, derive, project
+### Principles
 
-We already run the whole platform this way: a governed declarative claim in git is the source of truth,
-and controllers reconcile it into live state (Environments, policies, delivery). Identity & access is the
-same pattern applied to *people*:
+> **The vision, in one line:** decide a principal's access once — as a function of who they are and what
+> they're on — and let the platform derive and project it into every system automatically, handing out the
+> dangerous parts only temporarily.
 
-- **Access is not granted by hand, it's *derived*** — a pure function of `(who you are) × (what you own
-  or are assigned) × (policy)`. Membership in a Team, or an explicit grant, *is* the entitlement.
-- **It's *projected* automatically** into each system's **native** enforcement — not adjudicated by a
-  central runtime engine. This is ADR-053's deliberate choice: a single declarative source compiled
-  *outward* into OIDC claims + generated native config, because off-the-shelf tools (AWS, ArgoCD,
-  Grafana, GitHub, PagerDuty) decide internally from token claims and their own config; they will not
-  call a central policy server. A runtime authorization engine (Cedar/OpenFGA) is reserved for **apps we
-  build and control** (see *Consumer plane* below), not the fleet.
+1. **Declare once, derive, project.** A governed declarative claim in git is the source of truth;
+   controllers reconcile it into live state. Access is **derived** — `(who you are) × (what you own or are
+   assigned) × (policy)` — not granted by hand.
+2. **Native enforcement, not a central PDP.** The single source is compiled *outward* into OIDC claims +
+   generated native config, because off-the-shelf tools (AWS, ArgoCD, GitHub, PagerDuty) decide internally
+   from token claims; they will not call a central policy server. A runtime authorization engine
+   (Cedar/OpenFGA) is reserved for **apps we build and control**. *(The one place this principle strains —
+   composed cross-plane authority — is confronted in §3.5.)*
+3. **Least privilege, and most power is temporary.** Standing access is the safe everyday minimum;
+   dangerous breadth is checked out and auto-expires (§2.3).
+4. **Isolated planes, explicit trust edges.** "Unified" means one control pattern over trust-isolated
+   planes — not one identity pool. No ambient trust; short-lived tokens everywhere. *(How this holds up at
+   scale: §3.5.)*
+5. **Design for scale, prove at current scale.** Default to scale-shaped solutions; pair them with
+   dogfooding at today's size so the demonstration is real, not theoretical — design for the 50, prove it
+   on the 3.
 
-## Three planes, one control plane
+---
 
-"Unified" does **not** mean one identity pool for everyone. It means **one control pattern operating three
-trust-isolated planes.** The boundaries between them are a feature — explicit, narrow trust edges, no
-ambient trust, short-lived tokens everywhere.
+## 2. The model
+
+### 2.1 Three planes
 
 | Plane | Who | Trust domain | Anchor |
 |-------|-----|--------------|--------|
@@ -58,10 +72,9 @@ ambient trust, short-lived tokens everywhere.
 | **Machine** | Workloads + agents | Per-workload, short-lived, no static keys | Pod Identity / cosign-OIDC / (future) SPIFFE |
 | **Consumer** *(deferred)* | End-users of the *products we host* (CIAM) | **One isolated realm per Product** | Keycloak realm, vended per-Product |
 
-The operator and consumer planes share machinery (same broker tech, same declare→derive→project pattern,
-same audit) but **zero shared trust or data**. A tenant's customers can never see operators or each other.
-**Only the operator and machine planes are in current scope** — the consumer plane is named here for
-coherence and seam-preservation (see *The consumer plane — deferred*, below), not built.
+The planes share machinery (same broker tech, same declare→derive→project pattern, same audit) but **zero
+shared trust or data**. Only operator + machine are in current scope. The boundaries are a feature — but
+**real work crosses them**, and those *seams* are a first-class design surface, treated in §3.5.
 
 ```text
                          ┌──────────────────────────┐
@@ -79,15 +92,10 @@ coherence and seam-preservation (see *The consumer plane — deferred*, below), 
    CONSUMER plane: a vended Keycloak realm PER hosted Product  (CIAM — deferred, seam preserved)
 ```
 
----
+### 2.2 Roles — the reach × power grid
 
-## The role model — every "user class" is a box on a grid
-
-Don't maintain a flat list of job titles that grows forever. A role is the answer to **two questions**:
-
-1. **Reach** — *your own team* · *all teams (org-wide)* · *the platform plumbing*
-2. **Power** — *look* · *operate* (restart/scale/rerun/read) · *change* (deploy/alter setup) · *manage
-   access* (hand roles to others)
+A role is the answer to two questions, **reach** (your team · org-wide · the platform plumbing) and
+**power** (look · operate · change · manage-access):
 
 |              | **look** | **operate** | **change\*** | **manage-access** |
 |--------------|----------|-------------|--------------|-------------------|
@@ -95,54 +103,38 @@ Don't maintain a flat list of job titles that grows forever. A role is the answe
 | **org-wide** | viewer · auditor | platform-operator | — | access-admin |
 | **platform** | auditor  | platform-operator | — | break-glass |
 
-\* *Big changes happen through a reviewed PR, not a standing login — so "change everything by hand" is
+\* *Big changes go through a reviewed PR, not a standing login — so "change everything by hand" is
 deliberately empty. Even senior engineers are powerful through git + approval, not a god-mode credential.*
 
-**The named starter set:**
+The named starter set:
 
-- **developer** — deploy + operate *their own team's* products; sees nothing outside the team. (ADR-068:
-  team membership implicitly grants all the team's products at owner posture.)
-- **team-admin / team-lead** — developer + governs the team's membership, grants, and envelope; default
-  holder of **release-approver** (gated prod, separation of duties — ADR-068 §7).
-- **viewer** — read-only; **scope-adjustable** (one product for a business user, org-wide for an exec).
-  *This is the "business user" slot the current model doesn't name.*
-- **platform-operator** — org-wide *look + operate* for on-call/SRE; still changes setup via git, not by
-  hand. (Today's `PlatformAdmin`, ADR-040, refined.)
+- **developer** — deploy + operate *their own team's* products; sees nothing outside the team.
+- **team-admin / team-lead** — developer + governs the team's membership, grants, envelope; default holder
+  of **release-approver** (gated prod, separation of duties — ADR-068 §7).
+- **viewer** — read-only, **scope-adjustable** (one product for a business user, org-wide for an exec).
+- **platform-operator** — org-wide *look + operate* for on-call/SRE; changes setup via git, not by hand.
 - **auditor** — org-wide read including security/compliance surfaces; changes nothing.
-- **access-admin** — runs the access system itself (who gets which role); deliberately separate.
-- **break-glass** — full power, off by default, time-boxed, loudly audited (ADR-040).
+- **access-admin** — runs the access system itself; deliberately separate (and the apex risk — §3.6).
+- **break-glass** — full power, off by default, time-boxed, loudly audited.
 
 **Cross-team / restricted access** is *not* a role — it's the explicit, owner-approved, expirable
-`AccessGrant` object (ADR-068 §1), so collaboration never means "drop them in another team's group and
-over-grant everything."
+`AccessGrant` (ADR-068 §1), so collaboration never means "drop them in another team's group."
 
-**Machines reuse this same grid** — an agent is a non-human principal assigned a box (the triage agent is
-*operate · org-wide · read-only*). No separate taxonomy.
+> **The grid is a simplification.** It's two axes of a more-dimensional reality — `stage × tier`
+> (ADR-040), time, and data sensitivity also bound access (`effective = min(grant, posture(stage,tier))`).
+> It's the teaching frame, not the whole truth; keeping it *comprehensible* at scale is itself a control
+> (§3.2). And **machines are not just another box** on it — agents are autonomous, injectable, delegating
+> actors that need their own treatment (§3.4).
 
-> **Evolution note.** ADR-068 names developer / team-admin / release-approver / platform-admin /
-> break-glass — the *building-and-shipping* roles. This grid keeps all of them and adds the
-> **non-builder** classes (viewer/business, auditor, access-admin) and the explicit *reach × power*
-> framing, so a business user or an auditor has a first-class home.
+### 2.3 Power is temporary, not standing
 
----
-
-## Power is temporary, not standing
-
-The split that makes this modern and safe:
-
-- **Safe, everyday access → standing.** A developer scoped to their own team is already low-blast-radius
-  (least privilege + isolation). Leave it on.
-- **Dangerous, broad access → temporary.** Org-wide operate, platform admin, break-glass — *checked out*,
+- **Safe, everyday access → standing** (a developer on their own team is already low-blast-radius).
+- **Dangerous, broad access → temporary** — org-wide operate, platform admin, break-glass are checked out,
   for a reason, auto-expiring.
 
-Two different things people conflate, kept separate:
-
-- **Eligibility** (who *may ever* hold a powerful role) — changes rarely, lives in **git**, reviewed by
-  PR. Slow on purpose.
-- **Activation** (checking it out *right now* for an hour) — frequent, fast, self-expiring. Does **not**
-  live in git (you don't PR at 2am; git can't expire on a timer).
-
-**The front door — a dial, not a switch:**
+Two things kept separate: **eligibility** (who *may ever* hold a powerful role — rare, lives in git,
+PR-reviewed) and **activation** (checking it out now, for an hour — frequent, fast, self-expiring, *not*
+in git: you don't PR at 2am, and git can't expire on a timer).
 
 ```text
   need more  →  request (portal button / `platctl elevate` / Slack)
@@ -153,29 +145,20 @@ Two different things people conflate, kept separate:
 ```
 
 Design rule: **make the emergency path fast** (reads auto-grant, approvals one-tap, break-glass always
-works for a lone operator), or people route around it.
+works for a lone operator), or people route around it. The new build is the activation controller + timer;
+AWS sessions already expire, so it's a gate in front of *assuming* the role.
 
-> **Evolution note.** The pieces exist but aren't unified: ADR-040 gives break-glass + "prod is `view`
-> for everyone, mutate only via gated PR"; ADR-068's `AccessGrant` already carries `expiresAt`. This doc
-> names the **general model** — *every* powerful role is eligibility-in-git + timed activation — of which
-> break-glass and the expirable grant are two instances. The new build is the **activation controller +
-> timer**; AWS sessions already expire on their own, so it's a gate in front of assuming the role.
-
----
-
-## The source of truth: Teams + People + Grants
+### 2.4 The source of truth — Teams, People, Grants
 
 Three git registries, all authored by reviewed PR (the existing Gate):
 
-- **`gitops/teams/*.yaml`** *(exists)* — defines the team: its group, envelope, ownership, the
-  `release-approver` set, on-call pointer, incident channel. *Defines the group and what it can do.*
-- **`gitops/people/*.yaml`** *(new — the missing piece)* — who the humans are and their grants. *Says who
-  is in which group and at what class.* Today people are hardcoded in two places (the Identity Center HCL
-  **and** the Keycloak config); this unifies them.
+- **`gitops/teams/*.yaml`** *(exists)* — the team: its group, envelope, ownership, `release-approver` set,
+  on-call pointer, incident channel.
+- **`gitops/people/*.yaml`** *(new — the missing piece)* — who the humans are and their grants. Today
+  people are hardcoded in two places (the Identity Center HCL **and** Keycloak config); this unifies them.
 - **`AccessGrant`** *(designed, ADR-068)* — the explicit cross-team / restricted exceptions.
 
-A **Person** record carries identity + grants; a grant is `(role × scope)`, optionally `activation:
-on-demand` for the temporary ones:
+A **Person** carries identity + grants; a grant is `(role × scope)`, optionally `activation: on-demand`:
 
 ```yaml
 # gitops/people/sarah-chen.yaml
@@ -185,59 +168,32 @@ metadata: { name: sarah-chen }
 spec:
   person: <keycloak-sub>          # the anchor — the canonical identity (ADR-084)
   grants:
-    - { role: developer, team: alpha }                  # standing — her everyday access
+    - { role: developer, team: alpha }                  # standing — everyday access
     - { role: viewer, scope: platform }                 # standing — read-only elsewhere
     - { role: platform-operator, scope: platform, activation: on-demand }   # eligible, not standing
 ```
 
-### Where identity *handles* live — declared access vs. discovered identity
+**Access facts in git, identity handles in the directory.** The Person roster holds *which person, which
+roles* — **no PII**, the person referenced by Keycloak anchor. The runtime directory (ADR-084, Postgres)
+holds the **handles** (GitHub login, Slack id, PagerDuty id), **discovered** via one-click OAuth at
+onboarding, tiered by trust. **Email is never a join key; person PII never lives in git.** They *compose*:
+git says "Sarah is a developer on alpha"; the directory resolves her GitHub login; the provisioner adds
+that login to `team-alpha`. The bootstrap wrinkle (can't push to GitHub before she's linked) is bridged by
+ADR-084's `declared` tier — an optional bootstrap handle in the roster, upgraded to `proven` on self-link.
 
-This is the one place to be careful, and it's where this doc reconciles the provisioning goal with
-ADR-084. There are **two different jobs**, and they belong in two different places:
+### 2.5 Authoring — Backstage templates (gated PRs)
 
-- **Access facts → git** (the Person roster): *which person, which teams/roles/grants.* No PII. This is
-  what drives **provisioning** (AWS roles, app access, GitHub-team membership, PagerDuty-rotation
-  membership). The person is referenced by their **Keycloak anchor**, not by a pile of hand-typed handles.
-- **Identity handles → the runtime directory** (ADR-084, Postgres): *the same human's GitHub login, Slack
-  user-id, PagerDuty id.* **Discovered**, not declared — a person links them with one-click OAuth at
-  onboarding ("Connect your accounts"); Keycloak brokers GitHub/Slack/PagerDuty and the directory syncs
-  the federated identities, tiered by trust (authoritative / proven / declared). **Email is never a join
-  key. Person PII never lives in git.**
+People author the roster through **Backstage scaffolder templates** (same pattern as New-Product /
+deprovision). A template **proposes, never grants**: a form generates the `gitops/people/<name>.yaml`
+change and **opens a PR** — the gate's approval routing (team-lead for team grants, access-admin for
+platform roles) authorizes it. Joiner/mover/leaver is symmetric. Form-time validation (team + role from
+the registry) shifts errors left; Backstage RBAC scopes *who can see* the template. **Off the template
+path:** *activation* of temporary power (fast controller action, §2.3) and *identity linking* (the OAuth
+"Connect your accounts" flow). Backstage is the view + editor; git is the record.
 
-**They compose** — and that composition is what delivers multi-system provisioning *without* putting PII
-in git: the git roster says *"Sarah is a developer on alpha"*; the directory resolves *"Sarah's GitHub is
-`schen`, her PagerDuty id is `P…`"*; the provisioner adds that login to the `team-alpha` GitHub team and
-that id to alpha's rotation.
+### 2.6 Projection — the connector fan-out
 
-The one wrinkle to decide (see *Open questions*): on free GitHub/Slack tiers you can't push someone into a
-team **before** they've linked. The clean bridge is ADR-084's existing **`declared` tier** — the Person
-roster *may* carry an optional bootstrap handle that seeds provisioning at lowest trust, which the
-directory **upgrades** to `proven`/`authoritative` when the person self-links — a declared handle seeds
-bootstrap provisioning, and the OAuth link then verifies and upgrades it. Paid SCIM/SAML later makes it
-zero-touch with no redesign.
-
-### Authoring UX — Backstage templates (gated PRs)
-
-People author the roster through **Backstage scaffolder templates**, the same pattern as the New-Product /
-deprovision-Product scaffolders (and the access-grant template ADR-068 §8 already plans). A template
-**proposes, never grants**: a form (person, team, role) generates the `gitops/people/<name>.yaml` change
-and **opens a PR** — the gate's approval routing (team-lead for team grants, access-admin for platform
-roles) is what actually authorizes it. Joiner / mover / leaver is symmetric — an offboarding template opens
-a PR *removing* the file. Form-time validation (team from the registry, role from the catalog, extra
-justification for `platform-admin`) shifts errors left, and Backstage RBAC (#197) scopes *who can see* the
-template so it isn't a "make me admin" form for everyone.
-
-**Two things stay off the template path:** *activation* of temporary power (the JIT checkout is a fast,
-expiring action against the access controller — a PR is too slow for an incident) and *identity linking*
-(the GitHub / Slack / PagerDuty "Connect your accounts" OAuth flow, ADR-084). Backstage is the **view +
-editor** over git; git stays the source of truth (ADR-084: the portal is the human view, not the record).
-
----
-
-## The projection fan-out — every system is just another connector
-
-Once the roster lives in git, **adding a system is adding a connector** that consumes the **slice** it
-needs. The role decides which systems a person even lands in — least-privilege per system:
+Once the roster is in git, **adding a system is adding a connector** that consumes the **slice** it needs:
 
 |             | AWS (IC) | apps (Keycloak) | GitHub | PagerDuty | Slack |
 |-------------|----------|-----------------|--------|-----------|-------|
@@ -247,164 +203,240 @@ needs. The role decides which systems a person even lands in — least-privilege
 | platform-operator | broad (on-demand) | broad read | — | platform on-call | — |
 | auditor     | read     | read | read (audit) | — | — |
 
-- **AWS** — Identity Center permission sets + group assignments, **generated from the registry** (today
-  hand-maintained HCL — the real gap; this also closes the unbuilt per-team `DeveloperAccess` role, #647).
-  Human kubectl goes **OIDC-native** (Keycloak as EKS OIDC IdP, ADR-068 §6); IAM federation retained only
-  for break-glass.
-- **Apps** — Keycloak OIDC `groups`/`roles` claims → ArgoCD / Backstage / Grafana native RBAC *(already
-  reads the Team registry)*.
-- **GitHub** — org-team membership. The `github-teams` module already creates the teams from the registry
-  (ADR-072); the missing piece is **membership** (one more Terraform resource, keyed on the resolved
-  handle). *Easy — you're halfway there.*
-- **PagerDuty** — user + rotation membership for on-call-capable roles. The registry holds a **pointer**
-  (`pagerduty.escalationPolicyId`), and on-call is resolved **live** from PagerDuty (system of record,
-  ADR-084 §7), not hardcoded.
-- **Slack** — channel / usergroup membership; the `slackId` comes from the directory.
+- **AWS** — Identity Center permission sets + assignments, generated from the registry (today
+  hand-maintained HCL — the live gap; closes the unbuilt per-team access, #647). Human kubectl goes
+  **OIDC-native** (Keycloak as EKS OIDC IdP, ADR-068 §6); IAM federation retained only for break-glass.
+- **Apps** — Keycloak OIDC claims → ArgoCD / Backstage / Grafana RBAC *(already reads the Team registry)*.
+- **GitHub** — org-team **membership** (the `github-teams` module already makes the teams, ADR-072; this
+  adds members). **PagerDuty** — rotation membership; on-call resolved live (ADR-084 §7). **Slack** —
+  channel/usergroup membership.
 
-**The payoff — joiner-mover-leaver for free.** Add a person → one PR → access appears everywhere. Remove
-the Person file → one PR → they're gone from AWS, the clusters, every GitHub team, and PagerDuty at once.
-The always-forgotten offboarding step becomes atomic — the thing big shops pay SailPoint/Okta Lifecycle
-for, as a side effect of the design.
+**Payoff — joiner-mover-leaver for free:** add a person → one PR → access everywhere; remove the file → one
+PR → gone everywhere. *(The crucial caveat at scale — this does not cross plane boundaries — is §3.5.)*
 
----
+### 2.7 The consumer plane (CIAM) — deferred
 
-## The consumer plane (CIAM) — deferred
-
-**Not in current scope.** Customer/end-user identity is named as a real plane for architectural coherence,
-but we are **not building it now** — there are no external end-users yet, its blast radius is *external*
-(privacy regulation, breach liability on behalf of tenants), and bringing it in is how a tight, shippable
-strategy turns into boil-the-ocean. This keeps faith with ADR-068's own deferral.
-
-**What we preserve now (the seam — nearly free):** keep the consumer plane a *separate trust domain* from
-the operator realm — do **not** bake "one realm, operator-only" assumptions into the workforce build.
-Because identity here would be **realm-per-Product** in the same Keycloak we already run, picking it up
-later is a natural extension, not a retrofit.
-
-**The intended shape, when we do pick it up:** vend customer identity as a **paved-road capability per
-Product** — a per-Product realm + OIDC endpoints provisioned from a claim (like the XEnvironment one), so
-the tenant developer never operates an IdP — with `compliance_tier` driving isolation strength
-(shared-realm → dedicated-realm → dedicated-DB for hipaa/pci). The fork to settle *then, not now*: does the
-road stop at **authn + coarse roles** *(lean: yes — the standard road)* or also offer **fine-grained app
-authz** (Cedar/OpenFGA — the one place a runtime PDP is right, ADR-053 decision 1; *lean: opt-in higher
-tier*). And CIAM's genuinely-harder requirements — consent, GDPR erasure, data residency, passkeys,
-abuse defense — are exactly why it's its own effort, and why per-realm isolation earns its keep.
+**Not in current scope.** Named for coherence; not built (no external users yet; external blast radius).
+**Seam preserved:** keep the consumer plane a *separate trust domain* — don't bake "one realm,
+operator-only" assumptions into the workforce build. **Intended shape later:** vend customer identity as a
+**paved-road capability per Product** (a per-Product realm + OIDC endpoints from a claim, so the tenant
+developer never operates an IdP), `compliance_tier` driving isolation strength. The fork to settle *then*:
+authn + coarse roles only *(lean)* vs. also fine-grained app authz (Cedar/OpenFGA). CIAM's harder
+requirements (consent, GDPR erasure, residency, passkeys, abuse defense) are why it's its own effort.
 
 ---
 
-## How this lands on the existing decisions
+## 3. Designing for scale — the hard parts
+
+The model in §2 is the easy 40%. At scale the complexity doesn't vanish — it **relocates** into the
+projection layer, the machine plane, the cross-plane seams, and the human governance. This section owns
+those, organized by layer. Each item pairs a **risk** with the **design it forces**, tagged:
+
+- **`[must]`** — build-gating; a core property the v1 cannot credibly ship without.
+- **`[op]`** — operational; bites within months of real use.
+- **`[later]`** — named and deliberately deferred.
+
+> Two truths shape the whole section: (a) the elegant central model is a thin veneer over a fat, brittle,
+> per-system translation layer + a set of plane seams — *those* are the real engineering; (b) access
+> programs fail **organizationally**, not technically (§3.6). The scale demonstration is the hard parts,
+> not the model.
+
+### 3.1 Authentication & sessions
+
+- **Auth strength scales with role power `[must]`.** Authz says *what*; authn proves *it's you*, and the
+  proof scales with the role. **Phishing-resistant MFA (passkeys/WebAuthn) is the default** (not SMS/email
+  codes); **step-up at elevation** (a fresh factor at checkout, §2.3); short, role-scoped sessions;
+  enforced in Keycloak flows (`acr` assurance) and **invariant across the IdP seam**. Harden recovery — no
+  self-service reset for privileged accounts (recovery is the usual MFA backdoor).
+- **Session lifetime is a tuned dial `[op]`.** Short limits stolen-token damage; long rides out an IdP
+  blip (§3.3). Set it consciously per role; privileged sessions shorter.
+
+### 3.2 The authorization model
+
+- **The grid is N-dimensional in disguise `[must to acknowledge]`.** `reach × power` is two axes of
+  `reach × power × stage × tier × time`. Don't pretend the grid is the whole model; posture composes
+  (`min(grant, stage×tier)`), and the extra dimensions are explicit, not emergent surprises.
+- **Clean RBAC decays into exception-sprawl — and that kills reviews `[op]`.** At scale, real needs don't
+  fit the catalog: you either deny (→ shadow access) or accrete grants until **nobody can reason about
+  what a role grants**, at which point access reviews (§3.6) degrade to rubber-stamps. *Forces:* bias to
+  groups, a **bounded, comprehensible role catalog**, `AccessGrant` (capped) as the *only* escape hatch,
+  and active resistance to per-team custom roles. Comprehensibility is a control.
+- **Ownership-derived access sits on volatile ground `[op]`.** "Access = what you own" assumes a stable
+  ownership graph; at scale ownership is co-owned, matrixed, and reorg'd constantly, so access **silently
+  shifts** when a product moves teams — possibly mid-incident. *Forces:* an "ownership moved, access
+  shouldn't instantly follow" rule (grace window + notify), not an instantaneous derivation.
+
+### 3.3 The projection layer (the real Tier-0 system)
+
+- **Translation bugs are invisible to drift detection — needs a third guardrail `[must]`.** Drift checks
+  *live config == git*; it does **not** check *git == intent*. A bug in a role→native-permission translator
+  produces config that perfectly matches git and silently over-grants thousands. *Forces:* **intent-vs-
+  effected verification** (policy testing that asserts "a developer cannot reach another team," run on
+  every model change) — the missing guardrail.
+- **Decide/apply split `[must]`.** The projection executes whatever git says with god-tier privilege — a
+  confused deputy whose only check is PR review, the softest boundary (and softer at scale). *Forces:* a
+  separate, minimal-privilege **applier** that enforces machine-checkable invariants (no wildcard, no
+  cross-tenant, no platform-target, no self-escalation) *before* applying — so review isn't the sole
+  thing between a bad merge and god access.
+- **Drift detection & reconciliation `[op]`.** Continuously compare live access to git: detect-and-alert →
+  **auto-prune** (the ArgoCD model, applied to access) where safe, with a **mass-delete guardrail** (don't
+  prune when the source looks suspiciously empty). Close the side doors (no standing console-edit rights).
+- **Revocation lag `[op]`.** Projection is eventually-consistent and rate-limited by downstream APIs; bulk
+  revoke (team disbanded, firm offboarded) is slow exactly when speed matters. *Forces:* a prioritized,
+  rate-limit-aware revoke path; the kill-switch (§3.6) for the acute single-principal case.
+- **Control-plane resilience `[op]`.** Keycloak and the activation controller are SPOFs. **The emergency
+  path must not depend on the system whose outage is the emergency** — break-glass routes through an
+  independent door (AWS IAM, ADR-068 §6), never Keycloak. Make Keycloak HA, backed-up, rebuildable from
+  git; **fail soft** (a blip blocks new logins; existing sessions persist).
+- **Connector credentials are the crown jewels `[op]`.** The access-granting connectors can grant
+  anything — compromise = total. *Forces:* no static keys (short-lived federated creds), each connector
+  scoped to one system, owned + rotated, and ideally itself operating through scoped, time-boxed elevation
+  rather than holding standing god-rights.
+
+### 3.4 The machine plane (co-equal with the operator plane — likely its own ADR)
+
+- **Provisioning is automatic and has no review loop → allowlist bounds, not a deny-set `[must]`.** You
+  can't PR a pod; identities churn thousands/day; **no human re-attests machine access.** So the bound must
+  be airtight — but ADR-041's `policyStatements` deny-set is a *blocklist*, and blocklists don't scale
+  safely. *Forces:* automatically-derived **allowlist** bounds (what a workload *may* do from its declared
+  needs), since there's no human backstop.
+- **Agents are injectable, delegating actors — "just a principal on the grid" is wrong `[must]`.** An agent
+  is autonomous (its needs are emergent, not statically scopable), **prompt-injectable** (memory
+  poisoning, already flagged in ADR-084), and can spawn/delegate. An org-wide-read agent + injection = an
+  **exfiltration tool wielding legitimate, audited-as-normal access.** *Forces:* content-as-data-not-
+  instructions, per-task capability scoping, human-in-the-loop for high-impact actions, and egress control.
+- **Delegation / on-behalf-of `[must]`.** When agent A acts for user U across a multi-hop chain, the
+  effective authority must be the **intersection**, not an accidental union, of identities. *Forces:*
+  proper token exchange (RFC 8693) and a way to reason about chained authority. This is the core hard
+  problem of machine identity.
+- **Ephemeral attribution `[op]`.** The identity that touched a bucket at 3am no longer exists. *Forces:*
+  recording the **genealogy** (ephemeral-id → workload → deployment → team → human owner) so any past
+  machine action is attributable — a forensic requirement, and a real observability build at scale.
+- **Runaway containment `[op]`.** Killing a misbehaving agent ≠ killing a human session: you must stop the
+  process **and** revoke its tokens **and** **cascade-kill** every sub-agent/delegated token it minted.
+- **Root-of-trust & multi-cloud `[later]`.** "No static keys" still bottoms out in *something* trusted; a
+  compromised node or bad token-projection is an identity-forgery factory. And Pod Identity (AWS-locked) ≠
+  SPIFFE (the cloud-neutral fabric, a major build) — the multi-cloud workload-identity story is a headline,
+  not a slash.
+
+### 3.5 The cross-plane seams (where four foundations break)
+
+Real work crosses planes constantly, and each crossing breaks a §1 principle that assumed single-plane
+actions. These are the most differentiating problems to solve well.
+
+- **Delegation voids the operator-plane auth investment `[must]`.** The moment a human delegates to an
+  agent, MFA/step-up/short-session (§3.1) **don't apply to the agent holding the token** — inject it and
+  you've phished the human without touching them. *Forces:* scoped, short-lived, revocable delegation —
+  the human's authority must *attenuate* into the agent, never transfer wholesale.
+- **"No central PDP" has no answer for composed authority `[must]`.** No single native enforcement point
+  sees the whole `human → agent → workload` chain, so nobody authorizes the *composition*. *Forces:* a
+  narrow, explicit **cross-plane decision point** — the one bounded exception to principle 2 — or accept
+  silent over-grant.
+- **Offboarding does not cross planes `[must]`.** "Delete the file → gone everywhere" is **false**: a
+  human's authority delegated to a long-running agent persists after they're offboarded. *Forces:* a
+  cross-plane offboarding **cascade** that reaches delegated machine authority, not just the roster.
+- **Trust-edge explosion `[op]`.** "Narrow edges, no ambient trust" → an unauditable N² mesh, or
+  capitulation to broad ambient trust. *Forces:* a systematic **trust-derivation fabric** (service-mesh /
+  SPIFFE-based authz that mints edges from identity + intent), not hand-authored edges.
+- **Isolation fights accountability `[op]`.** You need plane isolation for trust *and* cross-plane
+  correlation for accountability (and forensics). *Forces:* an identity-correlation fabric that answers
+  "who is ultimately responsible" **without** becoming the ambient-trust backdoor — and a **cross-plane
+  kill-switch** that burns down everything traceable to a principal across planes.
+- **The deferred consumer seam is the most security-critical `[later, design-aware]`.** The
+  `consumer → machine → operator` path connects untrusted outsiders to internals; deferring CIAM deferred
+  the design of the seam that matters most. *Forces:* deliberate seam discipline now so it isn't a
+  retrofit later.
+
+### 3.6 Governance & operations (where access programs actually die)
+
+- **Meta-governance of the model `[must]`.** Changing a role definition **re-permissions thousands at
+  once** — the highest-blast-radius change in the system. *Forces:* **policy CI/CD** for the model itself —
+  blast-radius analysis ("this diff adds delete to 1,400 principals"), staging, **canary** rollout,
+  instant rollback.
+- **Watch the watchers `[must]`.** `access-admin` is the apex insider risk — they can grant anything.
+  *Forces:* two-person control for model/policy changes, full audit of admin actions, rogue-admin
+  detection, and SoD (grantor ≠ beneficiary).
+- **Emergency revocation `[must]`.** The PR path is deliberately slow; a compromised account needs access
+  gone *now*. Revocation is **two acts** — disable future logins **and** invalidate live sessions/tokens.
+  One trusted person can pull it, loudly audited; act-now, reconcile-after. Extends cross-plane (§3.5) and
+  to agents (§3.4); note it can't reach user-minted secondary creds (PATs, access keys) — those need short
+  lifetimes and a credential inventory.
+- **Access reviews `[op]`.** Standing access drifts; SOC2/ISO/HIPAA require recertification. Because access
+  is git-declared, a review is a **diff against one list**, and git history is the audit trail. **TTLs
+  auto-expire most grants**; a **staleness surface** flags the standing rest (using login/activation logs
+  as evidence). Reviewer = the owner; revoke = delete the file.
+- **Learnability is a security property `[op]`.** At scale, hundreds author access; **misconfig-from-
+  misunderstanding is the #1 incident cause.** *Forces:* optimizing the model + templates for correct use
+  under cognitive load, not just elegance — elegance that needs expertise to wield safely becomes
+  over-grants.
+- **Bus factor / operational ownership `[op]`.** The most security-critical system needs a team, on-call,
+  and runbooks. A single owner is the gap between *designed* for scale and *operable* at scale — designing
+  the human operation is part of the scale demonstration.
+- **Governance observability `[op]`.** "We do reviews" is a claim that needs assurance. *Forces:* metrics
+  on the governance process itself — % reviewed on time, mean-time-to-revoke, grant-age distribution,
+  break-glass frequency, mis-grants caught — or healthy is indistinguishable from decorative.
+- **Migration / no-lockout cutover `[op]`.** From today's hand-maintained HCL + seed users to the roster by
+  **dual-run → verify-parity → flip**, independent break-glass live throughout — never a big-bang.
+- **Forkability tension `[later, decide]`.** Deep bespoke integration fights the reference-platform
+  mission (ADR-053's own "un-forkable" worry). *Forces:* keeping bespoke parts behind swappable seams so a
+  fork can substitute.
+- **External/B2B humans & compliance mapping `[later]`.** Contractors/partners/auditors get scoped,
+  TTL'd guest access (reusing temporary-access machinery). Compliance work is **mapping** the controls the
+  model already emits (least privilege, SoD, reviews, audit trail, MFA) to a framework's checkboxes +
+  evidence-on-demand — not new mechanism.
+
+---
+
+## 4. How this lands on the existing decisions
 
 | Existing | This strategy |
 |----------|---------------|
-| **053/059** Keycloak IdP-of-record, access-as-code, pluggable seam, *no* central PDP | **Kept wholesale** — the spine of the operator + consumer planes. |
-| **068** product-scoped model: groups=identity, roles=access, `AccessGrant`, OIDC cluster-auth, release-approver/team-admin | **Kept** — the workforce access model. **Extended** with the non-builder role catalog + the unified temporary-power model. Its CIAM deferral is **kept** — we preserve the seam, not bring CIAM into current scope. |
-| **040** posture = stage×tier, break-glass | **Generalized** into eligibility-in-git + timed activation for *all* powerful roles. |
-| **084** identity directory: discovered handles, PagerDuty on-call, email-never-a-key, PII-never-in-git | **Kept as the runtime resolution + handle store.** **Composed** with the new declared Person roster (access facts in git; handles in the directory; the `declared` tier bridges bootstrap-provisioning). |
-| **072** GitHub org-team ownership; **039/041/047** k8s RBAC + Pod Identity | **Connectors** in the fan-out (GitHub membership; the machine plane). |
+| **053/059** Keycloak IdP-of-record, access-as-code, pluggable seam, *no* central PDP | **Kept wholesale** — the spine. (§3.5 flags the one cross-plane strain on "no PDP".) |
+| **068** product-scoped model: groups=identity, roles=access, `AccessGrant`, OIDC cluster-auth, release-approver/team-admin | **Kept** as the workforce access model. **Extended** with the non-builder role catalog (§2.2) + the unified temporary-power model (§2.3). Its CIAM deferral is **kept** (§2.7). |
+| **040** posture = stage×tier, break-glass | **Generalized** into eligibility-in-git + timed activation for *all* powerful roles (§2.3). |
+| **084** identity directory: discovered handles, PagerDuty on-call, email-never-a-key, PII-never-in-git | **Kept** as the runtime resolution + handle store; **composed** with the declared Person roster (access in git, handles in the directory — §2.4). |
+| **072** GitHub org-team ownership; **039/041/047** k8s RBAC + Pod Identity | **Connectors** in the fan-out (§2.6) + the machine-plane base (§3.4). |
 
-The one place to be deliberate is **084 vs. the Person roster** — keep the split clean (git = access, no
-PII; directory = identity, PII) and they reinforce rather than fight.
+---
 
-## Hardening & operations
+## 5. Roadmap
 
-The model above defines *who gets what and how it's projected*. These are the security and operational
-concerns *around* it — mostly absent from the prior ADRs. The first three are **must-address before
-build** (core security properties, not polish); the next three are operational realities that bite within
-months; the last four are named-and-deferred.
+Workforce-first, sequenced by value-per-effort. **Hardening is not a later phase** — the `[must]` items in
+§3 land *with* the phase that introduces their surface, not after.
 
-### Must-address before build
-
-- **Authentication strength scales with role power.** Authorization says *what* you can do; authentication
-  proves *it's you* — and the proof required scales with the role's power (the same grid). **Phishing-
-  resistant MFA (passkeys/WebAuthn) is the default**, not SMS/email codes; **step-up auth at elevation** (a
-  fresh factor when checking out temporary power — see *Power is temporary*); short, role-scoped
-  session/token lifetimes; enforced in Keycloak flows (group/role-conditional, `acr` assurance) and
-  **invariant across the IdP seam** (honor the upstream's assurance when federated). Harden recovery — no
-  self-service reset for privileged accounts (recovery is the usual MFA backdoor). Machines: the same rule
-  is short-lived workload creds, no static keys. *Defer:* device-posture / contextual conditional access.
-- **Access reviews are owner re-attestation of the git-declared state.** Standing access drifts (role
-  changes, ended projects, "temporary" that stuck); SOC2/ISO/HIPAA require periodic recertification.
-  Because access is declared in git, a review is a **diff against one list**, not a fleet crawl, and git
-  history is the audit trail. **TTLs auto-expire most grants** (ADR-068 `expiresAt`) so reviews are the
-  safety net only for *standing* access; a **staleness surface** flags grants past review, near-expiry
-  TTLs, never-activated eligibility, and dormant accounts (login/activation logs as evidence). Reviewer =
-  the owner (team-admin for team access, access-admin for platform); cadence scales with risk. Revoke =
-  delete the file. *Defer:* formal certification campaigns + separation-of-duties conflict analysis until
-  an audit demands them.
-- **Emergency revocation — a fast kill-switch, the inverse of break-glass.** The declarative PR path is
-  deliberately slow; a compromised or rogue account needs access gone *now*. Revocation is **two acts** —
-  disable future logins **and** invalidate live sessions/tokens (a disabled account keeps working on
-  already-issued tokens until they expire). One trusted person can pull it (no committee mid-breach),
-  loudly audited; **act-now, reconcile-after** (the proper roster PR follows). Short token lifetimes
-  (above) bound the residual window.
-
-### Operational (bites within months)
-
-- **Identity control-plane resilience.** Keycloak (every login) and the activation controller (elevation)
-  are now single points of failure. **Rule: the emergency path must not depend on the system whose outage
-  is the emergency** — break-glass routes through an independent door (AWS IAM, retained per ADR-068 §6),
-  never Keycloak. Make Keycloak robust (HA, backed-up CNPG DB, rebuildable from git); **fail soft** (a
-  brief outage blocks *new* logins; existing sessions persist). Session lifetime is the dial between
-  "limit stolen-token damage" (short) and "ride out an IdP blip" (long) — set it consciously.
-- **The connectors' and robots' own identity + secrets.** Every projector, bot, and CI job needs its
-  *own* credential — and the access-granting connectors are the **crown jewels** (compromise = grant
-  anything). Rules: **no static keys** (short-lived, federated creds — the Pod-Identity/OIDC posture,
-  extended to connectors/bots); **own identity scoped to one job** (the GitHub connector touches only
-  GitHub); **owner + auto-rotation + offboarding** (robots do joiner/leaver too). Unavoidable long-lived
-  tokens (e.g. PagerDuty) live in the secrets store, never git, on a rotation schedule — intersects the
-  known no-rotation gap. Robots sit on the same grid, so they're access-reviewed and kill-switchable like
-  anyone.
-- **Drift detection & continuous reconciliation.** "Git is the source of truth" is hollow if someone can
-  grant access directly in a console behind git's back — and a git-only review would never see it. A
-  reconciler continuously compares live access to git: **detect-and-alert**, graduating to **auto-prune**
-  (remove anything not declared — the ArgoCD model, applied to access) where safe, with a **mass-delete
-  guardrail** (refuse to prune when the source looks suspiciously empty — the ADR-084 pattern). Belt-and-
-  suspenders: close the side doors too (no standing console-edit rights; out-of-band change requires
-  break-glass), so drift is both rare and caught.
-
-### Named & deferred
-
-- **Migration / no-lockout cutover.** Move from today's hand-maintained Identity Center HCL + Keycloak
-  seed users to the roster by **dual-run → verify-parity → flip**, keeping the independent break-glass live
-  throughout — never a big-bang.
-- **Policy testing.** Treat the access model as testable: automated checks that *attempt* forbidden actions
-  (a developer reaching another team, a viewer mutating) and assert they're denied, re-run on every rule
-  change — proactive, above the Kyverno admission backstop (ADR-068 §9).
-- **External / B2B humans** (contractors, partners, outside auditors) — scoped, clearly-marked, **TTL'd
-  guest access** reusing the temporary-access machinery; not employees, not customers.
-- **Compliance-framework mapping** — the model already emits the controls (least privilege, separation of
-  duties via approvers, reviews, audit trail, MFA); the work is mapping them to a framework's checkboxes
-  and producing evidence on demand, not new mechanism.
-
-## Phased path (sketch)
-
-1. **People roster + AWS generator** — add `gitops/people/`; generate Identity Center
-   users/groups/assignments from it (retire the hand-maintained HCL). *Closes #647; "add a person" becomes
-   one PR.* Highest value-per-effort.
-2. **GitHub membership connector** — provision org-team membership from the roster (resolving handles via
-   the directory). Small.
-3. **Temporary-power front door** — the activation controller + timer + risk gate; wrap break-glass first.
-4. **PagerDuty + Slack connectors** — rotation + channel/usergroup membership; live on-call (ADR-084 §7).
+1. **People roster + AWS generator** — add `gitops/people/`; generate Identity Center from it (retire the
+   hand-maintained HCL). *Closes #647; "add a person" becomes one PR.* Lands with: auth strength (§3.1),
+   meta-governance + watch-the-watchers (§3.6), the intent-vs-effected guardrail + decide/apply split
+   (§3.3). This is the minimal v1 that earns its keep.
+2. **GitHub membership connector** — org-team membership from the roster (handles via the directory).
+3. **Temporary-power front door** — the activation controller + timer + risk gate; wrap break-glass first;
+   emergency revocation alongside.
+4. **PagerDuty + Slack connectors** — rotation + channel/usergroup membership; live on-call.
 5. **OIDC-native cluster auth** — Keycloak as EKS OIDC IdP (ADR-068 §6); retire IAM-federation kubectl.
-
-**Hardening is not a later phase.** The three must-address items (auth strength, access reviews, emergency
-revocation) land *with* phase 1, not after it; resilience, robot/connector identity, and drift detection
-ride the projectors as they're built.
+6. **Machine-plane & seams hardening** — the §3.4/§3.5 `[must]` items (allowlist bounds, agent
+   containment, delegation semantics, cross-plane offboarding); likely its own ADR. *The hardest and most
+   differentiating work — the core of the scale demonstration.*
 
 *(Out of this roadmap: the consumer plane / CIAM — a later, separately-scoped effort once real end-users
 exist.)*
 
-## Open questions (the real forks)
+---
 
-1. **(Deferred) CIAM scope** — authn-only vs. authn + fine-grained authz for tenant apps — to settle *if
-   and when* we build the consumer plane, not now. *(Lean: authn standard, FGA opt-in.)*
-2. **Declared vs. discovered handles** — does the Person roster carry bootstrap handles (the `declared`
-   tier) to enable push-provisioning before self-link, or do we wait for OAuth-link / paid SCIM and never
-   put a handle in git? *(Lean: optional declared bootstrap handle, upgraded by self-link.)*
-3. **Approval routing** — when a Person PR mixes a team-scoped grant and a platform-wide role, route
-   approval by *what's changing* (team-lead vs. access-admin)? *(Lean: yes.)*
-4. **Person record home** — one Person file per human (approval routed by content) vs. team membership in
-   the Team file + platform roles central. *(Lean: one Person file.)*
-5. **Standing vs. activate-only per role** — which roles are eligible-only for *our* team specifically.
+## 6. Open questions (the real forks)
+
+1. **Cross-plane decision point** — do we accept a narrow runtime PDP for composed `human→agent→workload`
+   authority (§3.5), the one exception to "no central PDP"? *(Lean: yes, bounded.)*
+2. **Machine bounds** — automatically-derived allowlist vs. the current deny-set for workload access
+   (§3.4)? *(Lean: allowlist, since there's no review loop.)*
+3. **Declared vs. discovered handles** — does the Person roster carry bootstrap handles (the `declared`
+   tier) to push-provision before self-link (§2.4)? *(Lean: optional declared bootstrap, upgraded on
+   link.)*
+4. **Approval routing** — route a mixed Person PR's approval by *what's changing* (team-lead vs.
+   access-admin)? *(Lean: yes.)*
+5. **Build vs. buy / forkability** — how much of the control plane to build (to demonstrate scale) vs. keep
+   behind swappable seams for forkability (§3.6)? *(Lean: build the differentiating parts, seam the rest.)*
+6. **(Deferred) CIAM scope** — authn-only vs. + fine-grained authz, *if and when* the consumer plane is
+   built. *(Lean: authn standard, FGA opt-in.)*
 
 ## Related
 
