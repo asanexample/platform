@@ -1,0 +1,23 @@
+# ${{ values.name }} — workforce roster entry (identity strategy §2.4, #886). Access facts only — no PII; the
+# real identity (email/name) lives in Keycloak + the ADR-084 directory. Authored via the Backstage Manage Person
+# template; the People Gate authorizes the grants below.
+apiVersion: platform.refplat.org/v1beta1
+kind: Person
+metadata:
+  name: ${{ values.name }}
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/part-of: identity-access
+spec:
+  person: ${{ values.person }}
+{%- if values.githubHandle %}
+  handles:
+    github: ${{ values.githubHandle }}
+{%- endif %}
+  grants:
+{%- if values.team %}
+    - { role: ${{ values.teamRole }}, team: ${{ values.team }} }
+{%- endif %}
+{%- if values.platformRole and values.platformRole != 'none' %}
+    - { role: ${{ values.platformRole }}, scope: platform{% if values.platformActivation == 'on-demand' %}, activation: on-demand{% endif %} }
+{%- endif %}
