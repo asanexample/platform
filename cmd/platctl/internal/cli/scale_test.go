@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/asanexample/platform/cmd/platctl/internal/config"
@@ -138,5 +139,50 @@ func TestKubeconfigForEnv(t *testing.T) {
 
 	if _, err := kubeconfigForEnv(cfg, "does-not-exist"); err == nil {
 		t.Error("expected an error for an unknown env, got nil")
+	}
+}
+
+func TestBastionName(t *testing.T) {
+	cases := map[string]string{
+		"platform-use1-eks": "platform-use1-ssm-bastion",
+		"preprod-use1-eks":  "preprod-use1-ssm-bastion",
+	}
+	for cluster, want := range cases {
+		if got := bastionName(cluster); got != want {
+			t.Errorf("bastionName(%q) = %q, want %q", cluster, got, want)
+		}
+	}
+}
+
+func TestFindBlockedDeployments(t *testing.T) {
+	// ns name spec status — app1 wants 2 has 0 (blocked); app2 1/1 (ok); app3 0/0 (not wanted); app4 wants 3, no
+	// status field at all (blocked — the symptom when zero pods exist).
+	k := func(_ ...string) ([]byte, error) {
+		return []byte("a app1 2 0\nb app2 1 1\nc app3 0 0\nd app4 3\n"), nil
+	}
+	got, err := findBlockedDeployments(k)
+	if err != nil {
+		t.Fatalf("findBlockedDeployments: %v", err)
+	}
+	want := map[string]bool{"a/app1": true, "d/app4": true}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %d blocked", got, len(want))
+	}
+	for _, b := range got {
+		if !want[b[0]+"/"+b[1]] {
+			t.Errorf("unexpected blocked workload: %s/%s", b[0], b[1])
+		}
+	}
+}
+
+func TestLatestFailedCreate(t *testing.T) {
+	msg := `admission webhook "mutate.kyverno.svc-fail" denied: ecr BatchGetImage denied`
+	k := func(_ ...string) ([]byte, error) { return []byte(msg + "\n"), nil }
+	if got := latestFailedCreate(k, "ns"); got != msg {
+		t.Errorf("latestFailedCreate = %q, want %q", got, msg)
+	}
+	empty := func(_ ...string) ([]byte, error) { return []byte("   "), nil }
+	if got := latestFailedCreate(empty, "ns"); !strings.Contains(got, "no FailedCreate event") {
+		t.Errorf("expected fallback hint, got %q", got)
 	}
 }
