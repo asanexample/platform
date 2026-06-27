@@ -6,8 +6,25 @@ resources:
 replicas:
   - name: app-${{ values.team }}-${{ values.product }}
     count: 3
+# A JSON6902 patch (not strategic-merge): kustomize has no merge-key schema for the Rollout CR, so a
+# strategic-merge container patch REPLACES the container (dropping the image). A targeted replace of the
+# resources subtree avoids that (ADR-056).
 patches:
-  - path: resources-patch.yaml
+  - target:
+      group: argoproj.io
+      version: v1alpha1
+      kind: Rollout
+      name: app-${{ values.team }}-${{ values.product }}
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
 images:
   - name: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-${{ values.team }}/${{ values.product }}-${{ values.service }}
     newTag: placeholder # CI replaces with the signed digest at deploy (promote-by-PR, #377)
