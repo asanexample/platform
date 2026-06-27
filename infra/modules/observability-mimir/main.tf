@@ -450,8 +450,21 @@ resource "kubernetes_config_map_v1" "ruler_rules" {
     name      = "${var.helm_release_name}-ruler-rules"
     namespace = var.namespace
   }
-  # Each file becomes a Mimir ruler namespace (mimirtool keys on the filename).
-  data = { for f in fileset("${path.module}/files/ruler", "*.yaml") : f => file("${path.module}/files/ruler/${f}") }
+  # Each file becomes a Mimir ruler namespace (mimirtool keys on the filename). The curated static rules plus —
+  # when any per-app SLOs are declared — a generated `app-slos.yaml` namespace (ADR-056 per-app SLOs / W11).
+  data = merge(
+    { for f in fileset("${path.module}/files/ruler", "*.yaml") : f => file("${path.module}/files/ruler/${f}") },
+    length(var.app_slos) > 0 ? {
+      # Enrich each SLO with cleanly-formatted budget/objective ratios (raw `1 - 99.9/100` renders as an ugly
+      # long float); `%g` gives the shortest exact form (0.001) that PromQL parses.
+      "app-slos.yaml" = templatefile("${path.module}/templates/app-slo-rules.yaml.tftpl", {
+        slos = [for s in var.app_slos : merge(s, {
+          error_budget    = format("%g", 1 - s.objective / 100)
+          objective_ratio = format("%g", s.objective / 100)
+        })]
+      })
+    } : {},
+  )
 }
 
 resource "kubernetes_cron_job_v1" "ruler_rules_sync" {
@@ -499,6 +512,8 @@ resource "kubernetes_cron_job_v1" "ruler_rules_sync" {
               args = concat(
                 ["rules", "sync", "--address", "http://${var.helm_release_name}-gateway.${var.namespace}.svc", "--id", each.value],
                 [for f in fileset("${path.module}/files/ruler", "*.yaml") : "/rules/${f}"],
+                # The generated per-app SLO namespace isn't a static file — list it explicitly when present.
+                length(var.app_slos) > 0 ? ["/rules/app-slos.yaml"] : [],
               )
               resources {
                 requests = { cpu = "10m", memory = "32Mi" }

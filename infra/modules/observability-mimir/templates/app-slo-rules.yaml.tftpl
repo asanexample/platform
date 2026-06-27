@@ -1,0 +1,64 @@
+## GENERATED — per-app SLO rules for the Mimir ruler (ADR-056 W11 / per-app SLOs).
+## One Mimir ruler namespace ("app-slos"), loaded into the spoke tenant by the rules-sync CronJob. Each SLO
+## emits Sloth-style multi-window burn-rate rules over the Beyla RED metrics, so the burn-rate metric
+## (slo:current_burn_rate:ratio) and budget alerts exist per app — the foundation the error-budget freeze queries.
+groups:
+%{ for s in slos ~}
+  # --- ${s.id} (objective ${s.objective}%) ----------------------------------------------------------------
+  - name: ${s.id}-sli-recordings
+    rules:
+%{ for w in ["5m", "30m", "1h", "2h", "6h", "1d", "3d"] ~}
+      - record: slo:sli_error:ratio_rate${w}
+        expr: |
+          (${replace(s.error_query, "{{window}}", w)})
+          / (${replace(s.total_query, "{{window}}", w)})
+        labels:
+          sloth_id: ${s.id}
+          sloth_service: ${s.service}
+          sloth_slo: ${s.slo_name}
+%{ endfor ~}
+  - name: ${s.id}-meta-recordings
+    rules:
+      - record: slo:objective:ratio
+        expr: vector(${s.objective_ratio})
+        labels: { sloth_id: ${s.id}, sloth_service: ${s.service}, sloth_slo: ${s.slo_name} }
+      - record: slo:error_budget:ratio
+        expr: vector(${s.error_budget})
+        labels: { sloth_id: ${s.id}, sloth_service: ${s.service}, sloth_slo: ${s.slo_name} }
+      # Current burn rate = the 1h error ratio relative to the error budget; >1 means the budget is being spent
+      # faster than the SLO window allows. This is what the W11 error-budget freeze gate queries per app.
+      - record: slo:current_burn_rate:ratio
+        expr: |
+          slo:sli_error:ratio_rate1h{sloth_id="${s.id}"}
+          / on(sloth_id) group_left() slo:error_budget:ratio{sloth_id="${s.id}"}
+        labels: { sloth_id: ${s.id}, sloth_service: ${s.service}, sloth_slo: ${s.slo_name} }
+  - name: ${s.id}-alerts
+    rules:
+      # Fast burn (page): two short+long windows agree the budget will be exhausted soon. 14.4× and 6× are the
+      # Google SRE multi-window multi-burn-rate thresholds for a 30d window.
+      - alert: ${s.alert_name}HighErrorBudgetBurn
+        expr: |
+          (slo:sli_error:ratio_rate5m{sloth_id="${s.id}"}  > (14.4 * ${s.error_budget}) and slo:sli_error:ratio_rate1h{sloth_id="${s.id}"} > (14.4 * ${s.error_budget}))
+          or
+          (slo:sli_error:ratio_rate30m{sloth_id="${s.id}"} > (6 * ${s.error_budget})   and slo:sli_error:ratio_rate6h{sloth_id="${s.id}"} > (6 * ${s.error_budget}))
+        labels:
+          severity: ${s.page_severity}
+          sloth_severity: page
+          sloth_id: ${s.id}
+          sloth_service: ${s.service}
+        annotations:
+          summary: "High error-budget burn for ${s.service} (${s.slo_name}) — budget exhausting fast."
+      # Slow burn (ticket): slower windows agree the budget is trending down.
+      - alert: ${s.alert_name}ErrorBudgetBurn
+        expr: |
+          (slo:sli_error:ratio_rate2h{sloth_id="${s.id}"} > (3 * ${s.error_budget}) and slo:sli_error:ratio_rate1d{sloth_id="${s.id}"} > (3 * ${s.error_budget}))
+          or
+          (slo:sli_error:ratio_rate6h{sloth_id="${s.id}"} > (1 * ${s.error_budget}) and slo:sli_error:ratio_rate3d{sloth_id="${s.id}"} > (1 * ${s.error_budget}))
+        labels:
+          severity: ${s.ticket_severity}
+          sloth_severity: ticket
+          sloth_id: ${s.id}
+          sloth_service: ${s.service}
+        annotations:
+          summary: "Error-budget burn for ${s.service} (${s.slo_name}) — budget trending down."
+%{ endfor ~}

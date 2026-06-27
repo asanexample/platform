@@ -11,6 +11,27 @@ terraform {
   source = include.base.locals.module_source.observability_mimir
 }
 
+locals {
+  # Per-app availability SLOs (ADR-056 / W11), DERIVED from the prod XEnvironment claims (registries-as-source,
+  # ADR-067) — every prod Environment gets a 99.9% HTTP success-rate SLO over its Beyla RED metrics, evaluated in
+  # THIS hub's Mimir ruler for the spoke tenant (the app metrics live there). Auto-extends as products gain a prod
+  # Environment. Default objective for now; a per-Product/tier override can be added later. NB the SLI filters by
+  # the env namespace = the claim's metadata.name (truncate+hash on >63 chars not handled — fine for current names).
+  envs_dir  = "${get_repo_root()}/gitops/environments"
+  prod_envs = [for f in fileset(local.envs_dir, "**/prod.yaml") : yamldecode(file("${local.envs_dir}/${f}"))]
+  app_slos = [for e in local.prod_envs : {
+    id              = "${e.metadata.name}-availability"
+    service         = "app-${e.spec.team}-${e.spec.product}"
+    slo_name        = "requests-availability"
+    objective       = 99.9
+    alert_name      = "${replace(title(replace(e.metadata.name, "-", " ")), " ", "")}Availability"
+    error_query     = "sum(rate(http_server_request_duration_seconds_count{k8s_namespace_name=\"${e.metadata.name}\",http_response_status_code=~\"5..\"}[{{window}}])) or vector(0)"
+    total_query     = "sum(rate(http_server_request_duration_seconds_count{k8s_namespace_name=\"${e.metadata.name}\"}[{{window}}]))"
+    page_severity   = "critical"
+    ticket_severity = "warning"
+  }]
+}
+
 dependency "eks" {
   config_path = "../eks"
 
@@ -139,6 +160,10 @@ inputs = {
   # CronJob loads the curated spoke ruleset into the ruler for each ruler_tenant (mimirtool rules sync).
   enable_ruler  = true
   ruler_tenants = ["preprod"] # the spoke tenant(s) whose metrics get evaluated
+
+  # Per-app SLO rules (ADR-056 / W11) — registry-derived above; rendered into the `app-slos` ruler namespace and
+  # synced into the preprod tenant's ruler (the burn-rate metric + budget alerts the freeze gate will use).
+  app_slos = local.app_slos
 
   tags = include.base.locals.tags
 }

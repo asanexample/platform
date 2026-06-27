@@ -157,6 +157,28 @@ variable "ruler_rules_sync_schedule" {
   default     = "*/15 * * * *"
 }
 
+variable "app_slos" {
+  description = <<-EOT
+    Per-app SLOs (ADR-056 / per-app SLOs → W11 error-budget freeze). Each entry renders Sloth-style multi-window
+    burn-rate rules into an `app-slos` Mimir ruler namespace, loaded into the ruler tenant by the rules-sync. The
+    `error_query`/`total_query` use a `{{window}}` placeholder (Beyla RED metrics filtered to the app's namespace).
+    Produces `slo:current_burn_rate:ratio{sloth_id=...}` per app (the metric the freeze gate queries) + page/ticket
+    burn alerts → hub Alertmanager. Usually registry-derived in the unit from the prod XEnvironment claims.
+  EOT
+  type = list(object({
+    id              = string # unique SLO id, e.g. "alpha-shop-prod-availability"
+    service         = string # service label, e.g. "app-alpha-shop"
+    slo_name        = string # e.g. "requests-availability"
+    objective       = number # e.g. 99.9
+    error_query     = string # PromQL numerator with {{window}}
+    total_query     = string # PromQL denominator with {{window}}
+    alert_name      = string # base alert name (CamelCase)
+    page_severity   = optional(string, "critical")
+    ticket_severity = optional(string, "warning")
+  }))
+  default = []
+}
+
 # ---------------------------------------------------------------------------
 # Cross-cluster spoke ingest (P10) — Gateway-API-native, no proxy
 # ---------------------------------------------------------------------------
