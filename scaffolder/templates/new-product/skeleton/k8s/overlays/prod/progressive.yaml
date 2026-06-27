@@ -35,13 +35,10 @@ spec:
       protocol: TCP
 {%- endif %}
 ---
-# Metric gate (ADR-056 D5) — READY but NOT yet wired into the Rollout steps (the prod canary/blue-green ships
-# with bake pauses instead; see kustomization.yaml). Enable it once BOTH prerequisites land:
-#   1. The spoke->hub Mimir READ path (W8c) — this cluster can currently only WRITE to the hub Mimir.
-#   2. A NetworkPolicy letting the argo-rollouts controller reach the Mimir query endpoint (the observability
-#      namespace is default-deny). This belongs to the Environment Composition / obs module, not here.
-# It is a PROMETHEUS provider (queried by the controller) — NOT a `job` provider, because Kyverno restrict-images
-# would deny a non-team-ECR analysis Job image in this enforced namespace.
+# Metric gate (ADR-056 D5/W8c) — the canary step in kustomization.yaml references this between weight bumps:
+# the rollouts controller queries the hub Mimir for the new version's HTTP success rate and ABORTS the rollout
+# (auto-rollback) if it misses. A PROMETHEUS provider (queried by the controller) — NOT a `job` provider, which
+# Kyverno restrict-images would deny in an enforced namespace.
 apiVersion: argoproj.io/v1alpha1
 kind: AnalysisTemplate
 metadata:
@@ -54,9 +51,11 @@ spec:
       failureLimit: 2
       provider:
         prometheus:
-          # TODO(W8c): the hub Mimir query endpoint reachable from this cluster + an `X-Scope-OrgID` header for
-          # this cluster's tenant. Until then this template is inert (not referenced by the Rollout).
-          address: http://REPLACE-WITH-MIMIR-QUERY-ENDPOINT/prometheus
+          # The hub Mimir read route (observability-mimir spoke_ingest query path, W8c). The hub force-SETS the
+          # X-Scope-OrgID tenant, so no header is needed and the query is scoped to this cluster's own metrics.
+          # NB: this is the prod STAGE's metric source — prod runs on the preprod cluster today; when a dedicated
+          # prod cluster lands, point this at that cluster's Mimir read route.
+          address: https://preprod-mimir.aws.refplat.org/prometheus
           query: |
             sum(rate(http_server_request_duration_seconds_count{
               k8s_namespace_name="{{ args.namespace }}", http_response_status_code!~"5.."}[1m]))

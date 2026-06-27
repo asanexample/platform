@@ -386,21 +386,23 @@ resource "kubernetes_manifest" "spoke_ingest_route" {
         sectionName = "https"
       }]
       hostnames = ["${each.key}-mimir.${var.spoke_ingest.domain}"]
-      rules = [{
-        # Write-only: only the remote_write push path is routed; everything else (incl. /prometheus) 404s.
-        matches = [{ path = { type = "PathPrefix", value = "/api/v1/push" } }]
-        # Overwrite the tenant from the authenticated route (the hostname), ignoring any client header.
-        filters = [{
-          type = "RequestHeaderModifier"
-          requestHeaderModifier = {
-            set = [{ name = "X-Scope-OrgID", value = each.value }]
-          }
-        }]
-        backendRefs = [{
-          name = "${var.helm_release_name}-gateway"
-          port = 80
-        }]
-      }]
+      # Each rule force-SETS X-Scope-OrgID to this route's tenant, overwriting any client header — so the spoke
+      # can only ever touch its OWN tenant. The push rule is always present; the read rule (/prometheus) is
+      # added only for prefixes opted into query_tenants (W8c: spoke-side metric-gated canary).
+      rules = concat(
+        [{
+          matches     = [{ path = { type = "PathPrefix", value = "/api/v1/push" } }]
+          filters     = [{ type = "RequestHeaderModifier", requestHeaderModifier = { set = [{ name = "X-Scope-OrgID", value = each.value }] } }]
+          backendRefs = [{ name = "${var.helm_release_name}-gateway", port = 80 }]
+        }],
+        contains(var.spoke_ingest.query_tenants, each.key) ? [{
+          # Read path — Mimir's Prometheus query API (/prometheus/api/v1/{query,query_range,series,labels,...}).
+          # Same tenant force-set, so reads are scoped to this spoke's OWN data.
+          matches     = [{ path = { type = "PathPrefix", value = "/prometheus" } }]
+          filters     = [{ type = "RequestHeaderModifier", requestHeaderModifier = { set = [{ name = "X-Scope-OrgID", value = each.value }] } }]
+          backendRefs = [{ name = "${var.helm_release_name}-gateway", port = 80 }]
+        }] : []
+      )
     }
   }
 }

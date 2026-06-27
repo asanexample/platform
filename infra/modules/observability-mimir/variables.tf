@@ -168,7 +168,9 @@ variable "spoke_ingest" {
     Gateway at `<prefix>-mimir.<domain>` that:
       • force-SETS `X-Scope-OrgID` to the mapped tenant, overwriting any client value (the cross-tenant
         spoofing guard — a spoke physically cannot write to another tenant), and
-      • matches only `/api/v1/push` (write-only: no query path is exposed cross-cluster),
+      • matches `/api/v1/push` (write), and — for any prefix in `query_tenants` — ALSO `/prometheus` (read,
+        opt-in; powers spoke-side metric-gated canary, ADR-056 W8c). The read rule force-sets the SAME tenant
+        header, so a spoke can only ever query ITS OWN tenant — never the hub's or another spoke's data,
     plus a CiliumNetworkPolicy admitting the Gateway Envoy's reserved `ingress` identity to the Mimir gateway
     (the observability ns is default-deny). `domain`/`gateway_name`/`gateway_namespace` identify the shared
     Gateway. Empty `tenants` disables the edge. Auth = network isolation (internal NLB + TGW); mTLS is the
@@ -178,13 +180,15 @@ variable "spoke_ingest" {
     domain            = string
     gateway_name      = string
     gateway_namespace = string
-    tenants           = map(string) # hostname-prefix => X-Scope-OrgID tenant
+    tenants           = map(string)               # hostname-prefix => X-Scope-OrgID tenant
+    query_tenants     = optional(set(string), []) # prefixes that ALSO get a read (/prometheus) route (W8c)
   })
   default = {
     domain            = ""
     gateway_name      = ""
     gateway_namespace = ""
     tenants           = {}
+    query_tenants     = []
   }
 }
 
