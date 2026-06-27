@@ -188,12 +188,11 @@ inputs = {
   # anywhere — plus self-service password reset OFF, brute-force defenses, and login/admin event logging (module
   # defaults). Recovery is a backup passkey or admin re-provision.
   #
-  # TWO-APPLY, NO-LOCKOUT ROLLOUT (Keycloak is Tier-0):
-  #   apply-1 (now): enforce_browser_mfa = false — the flow + force-enroll action + realm hardening are created,
-  #     but the built-in browser flow stays live. Then enroll a passkey (+ a backup) on `admin` via the Account
-  #     Console over the gateway, and verify it logs in.
-  #   apply-2: flip enforce_browser_mfa = true to BIND the new flow. Enrolled users log in by passkey; new users
-  #     are force-enrolled. Break-glass if a flow misbehaves: revert to false + re-apply (admin-cli direct-grant
-  #     is independent of any browser flow). Master-realm admin hardening is tracked separately in #899.
-  enforce_browser_mfa = false
+  # TWO-APPLY, NO-LOCKOUT ROLLOUT (Keycloak is Tier-0) — BOUND 2026-06-27 (apply-2 done):
+  #   apply-1: enforce_browser_mfa = false — the flow + force-enroll action + realm hardening were created, the
+  #     built-in browser flow stayed live. `admin` enrolled a passkey (+ a backup) via the Account Console.
+  #   apply-2 (here): enforce_browser_mfa = true BINDS the flow — login is now username+password then a passkey
+  #     challenge; new users are force-enrolled in-flow. Break-glass if a flow misbehaves: revert to false +
+  #     re-apply (admin-cli direct-grant is independent of any browser flow). Master-realm admin hardening: #899.
+  enforce_browser_mfa = true
 }
