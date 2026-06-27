@@ -145,8 +145,11 @@ resource "helm_release" "product_appset" {
             namespace = "{{- $nsRaw := .spec.environmentRef }}{{- if gt (len $nsRaw) 63 }}{{ printf \"%s-%s\" (substr 0 56 $nsRaw) (substr 0 6 (sha256sum $nsRaw)) }}{{- else }}{{ $nsRaw }}{{- end }}"
           }
           syncPolicy = {
-            automated   = { selfHeal = true, prune = true }
-            syncOptions = ["CreateNamespace=false"]
+            automated = { selfHeal = true, prune = true }
+            # RespectIgnoreDifferences keeps a SYNC (selfHeal or manual) from overwriting the ignoreDifferences
+            # fields below — without it, ignoreDifferences only hides them from the diff, and a sync triggered by
+            # any OTHER change still stomps the plugin's live HTTPRoute weights / the rollout's Service selector.
+            syncOptions = ["CreateNamespace=false", "RespectIgnoreDifferences=true"]
             # Fail-fast (not the 45-min sync_retry): a new Environment's first deploy syncs a `:placeholder`
             # overlay until the app's CI pins the signed digest in a follow-up commit; a short retry lets the
             # doomed pre-pin sync give up so selfHeal picks up the pin commit (revision change) without a manual
