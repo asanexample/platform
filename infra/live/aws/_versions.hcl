@@ -89,6 +89,7 @@ locals {
     backstage                    = "${local.source_base}/backstage"
     keycloak                     = "${local.source_base}/keycloak"
     keycloak_config              = "${local.source_base}/keycloak-config"
+    platform_directory           = "${local.source_base}/platform-directory"
     github_teams                 = "${local.source_base}/github-teams"
 
     actions_runner_controller = "${local.source_base}/actions-runner-controller"
