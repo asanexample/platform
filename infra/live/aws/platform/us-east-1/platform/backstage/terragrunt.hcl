@@ -131,10 +131,10 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # 5550b0ae (backstage#48) adds the "Connect accounts" sidebar link to the Keycloak Account Console (link
-  # GitHub+Slack → @mentionable by the triage agent, ADR-084 Phase 1). Carries forward dd4bad6d (#47, the
-  # add-service-resource action), 8c029ab1 (#46), 16ce1f23 (#43), d7abb78a (#42), 754254ba (#41), v1beta1 (#38).
-  image_tag = "5550b0aec9c2fa1164bab09d0a0d1d6ee3f762e7"
+  # 8f2c6877 (backstage#49) adds the platform:offboard-person scaffolder action (opens a roster deletion PR for
+  # the Offboard Person template, identity strategy §2.5 / platform #890). Carries forward 5550b0ae (#48, the
+  # "Connect accounts" link), dd4bad6d (#47, add-service-resource), 8c029ab1 (#46), 16ce1f23 (#43), v1beta1 (#38).
+  image_tag = "8f2c6877d177ea3e8b890d54963799a7692dd6ef"
 
   # platform-projection catalog mode = v3 (Product=System, Environment=custom kind). The v2 projection branch is
   # inert (nothing reads it); removing it + this flag is a backstage-repo follow-up.
