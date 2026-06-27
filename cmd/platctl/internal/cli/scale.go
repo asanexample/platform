@@ -152,6 +152,13 @@ from the HCL — the inverse of 'platctl down'. Takes ~1-2 minutes.`,
 				if err := runner.Run(ctx, kpUnit, engine.Apply, "-replace=helm_release.nodepool[0]"); err != nil {
 					return err
 				}
+				// Health gate: a Ready=False NodePool — e.g. its EC2NodeClass missing — provisions NOTHING and
+				// silently strands every workload pod. (2026-06-27: 'down' deleted only the NodePool, leaving the
+				// EC2NodeClass for this force-replace to lose to a finalizer race → NodeClassReady=False. 'down'
+				// now deletes both for a clean recreate, but assert it actually took before declaring restored.)
+				if err := assertKarpenterReadyFn(ctx, kc); err != nil {
+					fmt.Printf("  ⚠️ %v\n", err)
+				}
 			}
 			// Post-unpark workload recovery: the fail-closed Kyverno image-verification webhook can cache a
 			// failed sigstore TUF init while the network is still settling, blocking every policed workload pod
@@ -206,6 +213,53 @@ func doWaitForClusterAPI(ctx context.Context, kc config.KubeconfigEntry) error {
 	return fmt.Errorf("cluster API for %s not reachable after ~15m; node groups are restored but the karpenter "+
 		"apply was skipped to avoid orphaning its helm releases — re-run 'platctl up' once nodes/Tailscale are up",
 		kc.Cluster)
+}
+
+// assertKarpenterReadyFn is indirected so tests can stub the kubectl boundary.
+var assertKarpenterReadyFn = assertKarpenterReady
+
+// assertKarpenterReady polls until the EC2NodeClass exists AND every NodePool reports Ready=True — i.e. workload
+// scheduling is genuinely restored — or returns an error after a timeout. A Ready=False NodePool (e.g. a missing
+// EC2NodeClass) provisions nothing and silently strands every workload pod, so this is the post-unpark gate.
+func assertKarpenterReady(ctx context.Context, kc config.KubeconfigEntry) error {
+	path, cleanup, err := tempKubeconfig(ctx, kc, "platctl-karpenter")
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	fmt.Println("  verifying Karpenter is ready (EC2NodeClass present + NodePool(s) Ready)...")
+	var nodeClasses string
+	var statuses []string
+	for i := 0; i < 18; i++ { // up to ~3 min for Karpenter to reconcile the recreated CRs
+		nc, _ := exec.CommandContext(ctx, "kubectl", "--kubeconfig", path, "get", "ec2nodeclass", "-o", "name").CombinedOutput()
+		np, _ := exec.CommandContext(ctx, "kubectl", "--kubeconfig", path, "get", "nodepool",
+			"-o", `jsonpath={range .items[*]}{.status.conditions[?(@.type=="Ready")].status} {end}`).CombinedOutput()
+		nodeClasses = strings.TrimSpace(string(nc))
+		statuses = strings.Fields(string(np))
+		if nodeClasses != "" && nodePoolsAllReady(statuses) {
+			fmt.Println("  Karpenter ready: EC2NodeClass present, NodePool(s) Ready=True.")
+			return nil
+		}
+		time.Sleep(10 * time.Second)
+	}
+	return fmt.Errorf("Karpenter NOT ready after ~3m — workload pods will be stranded Pending "+
+		"(ec2nodeclass present=%t, nodepool Ready=%v). Recreate the release's CRs:\n"+
+		"     helm get manifest karpenter-nodepool -n karpenter | kubectl apply -f -\n"+
+		"     (or `terragrunt apply -replace=helm_release.nodepool[0]` on the %s karpenter unit), then re-check",
+		nodeClasses != "", statuses, kc.Alias)
+}
+
+// nodePoolsAllReady reports whether every NodePool's Ready condition is True (and there is at least one NodePool).
+func nodePoolsAllReady(readyStatuses []string) bool {
+	if len(readyStatuses) == 0 {
+		return false
+	}
+	for _, s := range readyStatuses {
+		if s != "True" {
+			return false
+		}
+	}
+	return true
 }
 
 // recoverKyverno repairs the post-unpark Kyverno/sigstore trap (#665). Kyverno's cosign image-verification
@@ -464,15 +518,48 @@ func doDrainKarpenterNodes(ctx context.Context, kc config.KubeconfigEntry) error
 	// before the instances actually terminate. We MUST wait for the NodeClaims to be gone (the controller drains
 	// and terminates them) before returning, because the caller next scales the system group — where the
 	// controller runs — to zero; returning early kills the controller mid-termination and orphans the instances.
+	drained := false
 	for i := 0; i < 36; i++ { // up to ~6 min
 		nc, _ := exec.CommandContext(ctx, "kubectl", "--kubeconfig", path, "get", "nodeclaims", "-o", "name").CombinedOutput()
 		if strings.TrimSpace(string(nc)) == "" {
 			fmt.Println("  Karpenter nodes drained and terminated.")
-			return nil
+			drained = true
+			break
 		}
 		time.Sleep(10 * time.Second)
 	}
-	fmt.Println("  warning: Karpenter NodeClaims still present after 6m — check for orphaned instances before scaling the system group")
+	if !drained {
+		fmt.Println("  warning: Karpenter NodeClaims still present after 6m — check for orphaned instances before scaling the system group")
+	}
+	return deleteEC2NodeClasses(ctx, path)
+}
+
+// deleteEC2NodeClasses deletes the EC2NodeClass(es) too — symmetric with the NodePool delete above. 'down'
+// historically deleted ONLY the NodePool and LEFT the EC2NodeClass, so the next 'up' force-replace (helm
+// uninstall→install) raced the leftover finalizer'd NodeClass into Terminating and lost it — leaving the recreated
+// NodePool NodeClassReady=False with every workload pod stranded Pending (2026-06-27). With the NodeClaims now gone
+// the NodeClass's karpenter finalizer clears, so deleting it here lets 'up' recreate BOTH from a clean slate. We
+// wait for it to be GONE so the system group doesn't scale to zero mid-finalize (a stuck-Terminating NodeClass
+// would re-trigger the same race on 'up'). Best-effort; no-op when the CRD is absent.
+func deleteEC2NodeClasses(ctx context.Context, kubeconfigPath string) error {
+	out, err := exec.CommandContext(ctx, "kubectl", "--kubeconfig", kubeconfigPath,
+		"delete", "ec2nodeclass", "--all", "--ignore-not-found", "--wait=false").CombinedOutput()
+	if err != nil {
+		if strings.Contains(string(out), "the server doesn't have a resource type") {
+			return nil // no EC2NodeClass CRD on this cluster
+		}
+		fmt.Printf("  warning: deleting EC2NodeClass: %s\n", strings.TrimSpace(string(out)))
+		return nil
+	}
+	for i := 0; i < 18; i++ { // up to ~90s for the finalizer to clear
+		ec, _ := exec.CommandContext(ctx, "kubectl", "--kubeconfig", kubeconfigPath, "get", "ec2nodeclass", "-o", "name").CombinedOutput()
+		if strings.TrimSpace(string(ec)) == "" {
+			fmt.Println("  EC2NodeClass deleted.")
+			return nil
+		}
+		time.Sleep(5 * time.Second)
+	}
+	fmt.Println("  warning: EC2NodeClass still present after 90s (finalizer stuck?) — 'up' should reconcile it, but verify it isn't stuck Terminating")
 	return nil
 }
 

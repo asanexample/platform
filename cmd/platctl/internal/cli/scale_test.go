@@ -186,3 +186,22 @@ func TestLatestFailedCreate(t *testing.T) {
 		t.Errorf("expected fallback hint, got %q", got)
 	}
 }
+
+func TestNodePoolsAllReady(t *testing.T) {
+	cases := []struct {
+		name     string
+		statuses []string
+		want     bool
+	}{
+		{"single true", []string{"True"}, true},
+		{"all true", []string{"True", "True"}, true},
+		{"one false", []string{"True", "False"}, false},
+		{"unknown", []string{"Unknown"}, false},
+		{"none (no nodepools)", nil, false},
+	}
+	for _, c := range cases {
+		if got := nodePoolsAllReady(c.statuses); got != c.want {
+			t.Errorf("%s: nodePoolsAllReady(%v) = %t, want %t", c.name, c.statuses, got, c.want)
+		}
+	}
+}
