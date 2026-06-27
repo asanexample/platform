@@ -1,14 +1,17 @@
-# prod. Three replicas + a resource bump (real deltas); digest pinned by CI per promote-by-PR (#377).
+# prod. Three replicas + a resource bump (real deltas); digest pinned by CI per promote-by-PR (#377). prod is
+# where progressive delivery kicks in (ADR-056): the base Rollout's trivial auto-promote strategy is replaced
+# with the chosen ${{ values.deployStrategy }} shape. Lower stages keep the fast base strategy.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../../base
+  - progressive.yaml
 replicas:
   - name: app-${{ values.team }}-${{ values.product }}
     count: 3
-# A JSON6902 patch (not strategic-merge): kustomize has no merge-key schema for the Rollout CR, so a
-# strategic-merge container patch REPLACES the container (dropping the image). A targeted replace of the
-# resources subtree avoids that (ADR-056).
+# JSON6902 patches (not strategic-merge): kustomize has no merge-key schema for the Rollout CR, so a
+# strategic-merge patch REPLACES the container/strategy wholesale (e.g. dropping the image). Targeted replaces
+# of specific subtrees are safe (ADR-056).
 patches:
   - target:
       group: argoproj.io
@@ -25,6 +28,72 @@ patches:
           limits:
             cpu: 500m
             memory: 256Mi
+{%- if values.deployStrategy == 'bluegreen' %}
+  # Blue/green: stand the new version up at full scale on the preview service, then flip the active service's
+  # selector to it atomically (no mixed-version window). autoPromotion cuts over once green is Ready;
+  # scaleDownDelay keeps blue briefly for an instant rollback. Add prePromotionAnalysis once the gate prereqs
+  # land (progressive.yaml). No Gateway-API plugin / weighted route — cutover is a selector swap.
+  - target:
+      group: argoproj.io
+      version: v1alpha1
+      kind: Rollout
+      name: app-${{ values.team }}-${{ values.product }}
+    patch: |-
+      - op: replace
+        path: /spec/strategy
+        value:
+          blueGreen:
+            activeService: app-${{ values.team }}-${{ values.product }}
+            previewService: app-${{ values.team }}-${{ values.product }}-preview
+            autoPromotionEnabled: true
+            scaleDownDelaySeconds: 30
+{%- else %}
+  # Canary: shift weighted traffic stable->canary in steps with bake pauses (the Gateway-API plugin rewrites the
+  # HTTPRoute backendRef weights — needs the plugin + the Application ignoreDifferences on those weights so
+  # ArgoCD selfHeal doesn't fight it). Replace a `pause` with an `analysis` step (progressive.yaml) once the
+  # metric-gate prereqs land. maxSurge/maxUnavailable keep it zero-downtime even at the canary step.
+  - target:
+      group: argoproj.io
+      version: v1alpha1
+      kind: Rollout
+      name: app-${{ values.team }}-${{ values.product }}
+    patch: |-
+      - op: replace
+        path: /spec/strategy
+        value:
+          canary:
+            stableService: app-${{ values.team }}-${{ values.product }}
+            canaryService: app-${{ values.team }}-${{ values.product }}-canary
+            trafficRouting:
+              plugins:
+                argoproj-labs/gatewayAPI:
+                  httpRoute: app-${{ values.team }}-${{ values.product }}
+            maxSurge: 1
+            maxUnavailable: 0
+            steps:
+              - setWeight: 25
+              - pause: { duration: 2m }
+              - setWeight: 50
+              - pause: { duration: 2m }
+              - setWeight: 100
+  # Weighted stable+canary backendRefs (the plugin needs both present to shift weights). Initial 100/0 = all
+  # stable; the plugin owns the weights during a rollout (hence the Application ignoreDifferences).
+  - target:
+      group: gateway.networking.k8s.io
+      version: v1
+      kind: HTTPRoute
+      name: app-${{ values.team }}-${{ values.product }}
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/backendRefs
+        value:
+          - name: app-${{ values.team }}-${{ values.product }}
+            port: 80
+            weight: 100
+          - name: app-${{ values.team }}-${{ values.product }}-canary
+            port: 80
+            weight: 0
+{%- endif %}
 images:
   - name: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-${{ values.team }}/${{ values.product }}-${{ values.service }}
     newTag: placeholder # CI replaces with the signed digest at deploy (promote-by-PR, #377)

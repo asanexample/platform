@@ -153,6 +153,17 @@ resource "helm_release" "product_appset" {
             # terminate-op. The registry-sync app below keeps the long sync_retry.
             retry = local.first_deploy_retry
           }
+          # Argo Rollouts (ADR-056) hands runtime control of two fields to the rollouts controller during a
+          # progressive deploy; without these, `selfHeal` reverts them every reconcile and fights the rollout:
+          #   • Service .spec.selector — the controller injects `rollouts-pod-template-hash` so the stable/canary
+          #     (and blueGreen active/preview) Services target the right revision's pods.
+          #   • HTTPRoute backendRef weights — the Gateway-API trafficrouter plugin shifts them per canary step.
+          # Harmless for non-Rollout / non-canary apps (no such field to ignore). git stays the source of truth
+          # for everything else, including the at-rest weights (the controller restores 100/0 between rollouts).
+          ignoreDifferences = [
+            { group = "", kind = "Service", jqPathExpressions = [".spec.selector"] },
+            { group = "gateway.networking.k8s.io", kind = "HTTPRoute", jqPathExpressions = [".spec.rules[].backendRefs[].weight"] },
+          ]
         }
       }
       # ADR-071: inject the Release digest as a kustomize image override for every Service that has one — the
