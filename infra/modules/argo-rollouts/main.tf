@@ -17,11 +17,22 @@ locals {
     controller = {
       replicas  = var.replica_count
       podLabels = local.k8s_labels
+
+      # Gateway-API traffic-router plugin (ADR-056 D4) — drives weighted canary by editing HTTPRoute
+      # backendRef weights. The controller downloads the binary at startup, so it must match the NODE arch
+      # (Graviton/arm64 here). The bundled ClusterRole already grants the httproutes RBAC the plugin needs.
+      # Proven end-to-end on Cilium 1.19 (a real canary split 50/50 and promoted). Harmless until a Rollout
+      # opts in via strategy.canary.trafficRouting.plugins."argoproj-labs/gatewayAPI".
+      trafficRouterPlugins = var.enable_gateway_api_plugin ? [
+        {
+          name     = "argoproj-labs/gatewayAPI"
+          location = "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/${var.gateway_api_plugin_version}/gatewayapi-plugin-linux-${var.gateway_api_plugin_arch}"
+        }
+      ] : []
     }
 
     # The controller does not gate admission and serves no ingress — the bundled dashboard is operator UI we
-    # don't expose. The Gateway-API traffic-router plugin (for weighted canary, ADR-056 D4) is added in a later
-    # phase alongside the canary wiring, not here.
+    # don't expose.
     dashboard = {
       enabled = false
     }

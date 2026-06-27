@@ -5,8 +5,12 @@ progressive-delivery control plane ([ADR-056](../../../docs/adrs/056-progressive
 Every environment workload becomes a `Rollout` (direct `spec.template`); the tier picks the *strategy*
 (dev/preprod auto-promote to dogfood the path; prod metric-gated canary).
 
-Pure in-cluster controller — no AWS identity. Metric-gated analysis (against the hub Mimir) and the Gateway-API
-traffic-router plugin (weighted HTTPRoute canary) are wired in a later phase, not here.
+Pure in-cluster controller — no AWS identity. Installs the **Gateway-API traffic-router plugin**
+(`enable_gateway_api_plugin`, default on) so Rollouts can do weighted HTTPRoute canary on the Cilium Gateway —
+the controller downloads the arch-matched binary at startup (`gateway_api_plugin_version` / `_arch`; Graviton
+arm64), and the bundled ClusterRole already grants the `httproutes` RBAC. It's inert until a Rollout opts in
+via `strategy.canary.trafficRouting.plugins."argoproj-labs/gatewayAPI"`. Metric-gated analysis (the per-app
+`AnalysisTemplate` querying Mimir) lands in a later phase.
 
 ## Ordering
 
