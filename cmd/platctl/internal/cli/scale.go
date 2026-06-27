@@ -26,9 +26,10 @@ func NewDownCmd() *cobra.Command {
 		Use:   "down --env <env>",
 		Short: "Park an environment: scale its node groups to zero (keeps the cluster + data)",
 		Long: `Scales every managed node group in the environment's cluster to desiredSize=0, minSize=0 via the
-EKS API. The control plane and all EBS volumes (e.g. CNPG databases) are preserved, and pods reschedule when you
-run 'platctl up --env <env>'. Non-destructive and reversible — for parking an idle environment overnight. To
-release all cost (~$0), use 'platctl teardown --env <env>' instead.`,
+EKS API, and stops the env's SSM bastion (a standing EC2 instance outside the node groups) for a truly cost-zero
+park. The control plane and all EBS volumes (e.g. CNPG databases) are preserved, and pods reschedule when you run
+'platctl up --env <env>' (which also restarts the bastion). Non-destructive and reversible — for parking an idle
+environment overnight. To release all cost (~$0), use 'platctl teardown --env <env>' instead.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if envName == "" {
 				return fmt.Errorf("--env is required (e.g. --env preprod)")
@@ -55,7 +56,15 @@ release all cost (~$0), use 'platctl teardown --env <env>' instead.`,
 			if err := drainKarpenterNodesFn(context.Background(), kc); err != nil {
 				fmt.Printf("  warning: %v (continuing — check for orphaned Karpenter instances)\n", err)
 			}
-			return scaleNodeGroupsToZero(kc)
+			if err := scaleNodeGroupsToZero(kc); err != nil {
+				return err
+			}
+			// True cost-zero: the node groups are the big spend, but the SSM bastion is a standing EC2 instance
+			// outside their scope — stop it too (started again by 'up'). Best-effort; no-op when there's no bastion.
+			if err := setBastionPowerFn(kc, false); err != nil {
+				fmt.Printf("  warning: stopping SSM bastion: %v\n", err)
+			}
+			return nil
 		},
 	}
 
@@ -103,6 +112,13 @@ from the HCL — the inverse of 'platctl down'. Takes ~1-2 minutes.`,
 			ctx := context.Background()
 			if err := runner.Run(ctx, unit, engine.Apply); err != nil {
 				return err
+			}
+			// Start the SSM bastion that 'down' stopped (outside the node-group scope, so the apply above doesn't
+			// touch it). Best-effort + early, so SSM access is available while the rest of the cluster comes back.
+			if kc, kcErr := kubeconfigForEnv(cfg, envName); kcErr == nil {
+				if err := setBastionPowerFn(kc, true); err != nil {
+					fmt.Printf("  warning: starting SSM bastion: %v\n", err)
+				}
 			}
 			// Restore the Karpenter NodePool that 'platctl down' deletes to drain Karpenter's nodes (so the
 			// cluster regains node autoscaling). No-op if this env has no karpenter unit.
@@ -209,11 +225,62 @@ func recoverKyverno(ctx context.Context, kc config.KubeconfigEntry) error {
 		return exec.CommandContext(ctx, "kubectl", append([]string{"--kubeconfig", path}, args...)...).CombinedOutput()
 	}
 
-	// Symptom: Deployments that want pods (spec.replicas>0) but have none (status.replicas absent/0).
+	blocked, err := findBlockedDeployments(k)
+	if err != nil {
+		return err
+	}
+	if len(blocked) == 0 {
+		return nil // healthy unpark — nothing blocked
+	}
+
+	// Workloads are blocked. If Kyverno is present, its cached sigstore TUF init likely failed during the network
+	// settle — let CoreDNS come up, then restart it to force a fresh init.
+	kyvernoRestarted := false
+	if _, kErr := k("get", "deploy", "kyverno-admission-controller", "-n", "kyverno"); kErr == nil {
+		fmt.Printf("  %d workload(s) have no pods post-unpark — refreshing Kyverno (sigstore trust roots)...\n", len(blocked))
+		_, _ = k("rollout", "status", "deploy/coredns", "-n", "kube-system", "--timeout=3m") // let DNS settle first
+		if rOut, rErr := k("rollout", "restart", "deploy/kyverno-admission-controller", "-n", "kyverno"); rErr != nil {
+			return fmt.Errorf("restarting kyverno: %s", strings.TrimSpace(string(rOut)))
+		}
+		_, _ = k("rollout", "status", "deploy/kyverno-admission-controller", "-n", "kyverno", "--timeout=2m")
+		kyvernoRestarted = true
+	}
+
+	// Re-roll the blocked Deployments so they recreate immediately rather than waiting out the backoff.
+	for _, b := range blocked {
+		_, _ = k("rollout", "restart", "deploy/"+b[1], "-n", b[0])
+	}
+	fmt.Printf("  re-rolled %d blocked workload(s).\n", len(blocked))
+
+	// Restarting Kyverno fixes a stale sigstore-TUF cache — but NOT a config/IAM gap (e.g. the kyverno-ecr role
+	// lacking ECR read, so verify-images can't pull the signature; IAM is call-time-evaluated, so no restart helps).
+	// Re-check; if workloads stay blocked, SURFACE the actual admission error so the operator knows it's a source
+	// fix, not a transient. (Burned 2026-06-27: an account-less kyverno-ecr ARN blocked every product pod's admission
+	// and the silent restart-and-reroll gave no signal of the real cause.)
+	if !kyvernoRestarted {
+		return nil
+	}
+	var still [][2]string
+	for i := 0; i < 6; i++ { // ~1 min for the re-rolled ReplicaSets to re-attempt admission
+		time.Sleep(10 * time.Second)
+		if still, _ = findBlockedDeployments(k); len(still) == 0 {
+			return nil
+		}
+	}
+	ns, name := still[0][0], still[0][1]
+	fmt.Printf("  ⚠️ %d workload(s) STILL blocked after the Kyverno restart — NOT a transient; likely a config/IAM\n"+
+		"     gap to fix at the source (restarting won't help). First blocked: %s/%s — admission error:\n     %s\n",
+		len(still), ns, name, latestFailedCreate(k, ns))
+	return nil
+}
+
+// findBlockedDeployments returns [namespace, name] for Deployments that want pods (spec.replicas>0) but have none
+// (status.replicas absent/0) — the symptom of a fail-closed admission webhook rejecting every pod.
+func findBlockedDeployments(k func(...string) ([]byte, error)) ([][2]string, error) {
 	out, err := k("get", "deploy", "--all-namespaces",
 		"-o", `jsonpath={range .items[*]}{.metadata.namespace}{" "}{.metadata.name}{" "}{.spec.replicas}{" "}{.status.replicas}{"\n"}{end}`)
 	if err != nil {
-		return fmt.Errorf("listing deployments: %s", strings.TrimSpace(string(out)))
+		return nil, fmt.Errorf("listing deployments: %s", strings.TrimSpace(string(out)))
 	}
 	var blocked [][2]string
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
@@ -229,27 +296,18 @@ func recoverKyverno(ctx context.Context, kc config.KubeconfigEntry) error {
 			blocked = append(blocked, [2]string{f[0], f[1]})
 		}
 	}
-	if len(blocked) == 0 {
-		return nil // healthy unpark — nothing blocked
-	}
+	return blocked, nil
+}
 
-	// Workloads are blocked. If Kyverno is present, its cached sigstore TUF init likely failed during the network
-	// settle — let CoreDNS come up, then restart it to force a fresh init.
-	if _, kErr := k("get", "deploy", "kyverno-admission-controller", "-n", "kyverno"); kErr == nil {
-		fmt.Printf("  %d workload(s) have no pods post-unpark — refreshing Kyverno (sigstore trust roots)...\n", len(blocked))
-		_, _ = k("rollout", "status", "deploy/coredns", "-n", "kube-system", "--timeout=3m") // let DNS settle first
-		if rOut, rErr := k("rollout", "restart", "deploy/kyverno-admission-controller", "-n", "kyverno"); rErr != nil {
-			return fmt.Errorf("restarting kyverno: %s", strings.TrimSpace(string(rOut)))
-		}
-		_, _ = k("rollout", "status", "deploy/kyverno-admission-controller", "-n", "kyverno", "--timeout=2m")
+// latestFailedCreate returns the most recent ReplicaSet FailedCreate event message in a namespace — the admission
+// rejection explaining why a Deployment can't create pods. Falls back to a hint when none is found.
+func latestFailedCreate(k func(...string) ([]byte, error), ns string) string {
+	out, err := k("get", "events", "-n", ns, "--field-selector", "reason=FailedCreate",
+		"--sort-by=.lastTimestamp", "-o", "jsonpath={.items[-1:].message}")
+	if msg := strings.TrimSpace(string(out)); err == nil && msg != "" {
+		return msg
 	}
-
-	// Re-roll the blocked Deployments so they recreate immediately rather than waiting out the backoff.
-	for _, b := range blocked {
-		_, _ = k("rollout", "restart", "deploy/"+b[1], "-n", b[0])
-	}
-	fmt.Printf("  re-rolled %d blocked workload(s).\n", len(blocked))
-	return nil
+	return "(no FailedCreate event found — run `kubectl describe rs` in the namespace for the admission error)"
 }
 
 // runReconnect runs the post-restore repair steps for an environment (see config.EnvConfig.Reconnect):
@@ -522,6 +580,43 @@ func listNodeGroups(kc config.KubeconfigEntry) ([]string, error) {
 		return nil, fmt.Errorf("listing node groups on %s: %s\n%s", kc.Cluster, err, out)
 	}
 	return strings.Fields(string(out)), nil
+}
+
+// bastionName derives the SSM bastion's Name tag from the cluster name (platform-use1-eks → platform-use1-ssm-bastion).
+func bastionName(cluster string) string {
+	return strings.TrimSuffix(cluster, "-eks") + "-ssm-bastion"
+}
+
+// setBastionPowerFn is indirected so tests can stub the EC2 boundary.
+var setBastionPowerFn = setBastionPower
+
+// setBastionPower stops (on=false) or starts (on=true) the env's SSM bastion instance(s). 'platctl down' scales the
+// node groups to zero but the bastion is a standing EC2 instance outside them, so a truly cost-zero park must stop
+// it too; 'up' starts it back. Discovers by the derived Name tag, scoped to the env's account by the profile.
+// Best-effort and a no-op when no bastion is in the relevant state (e.g. an env without the ssm-bastion module).
+func setBastionPower(kc config.KubeconfigEntry, on bool) error {
+	states, verb, label := "running,pending", "stop-instances", "Stopping"
+	if on {
+		states, verb, label = "stopped,stopping", "start-instances", "Starting"
+	}
+	name := bastionName(kc.Cluster)
+	out, err := exec.Command("aws", "ec2", "describe-instances",
+		"--region", kc.Region, "--profile", kc.Profile,
+		"--filters", "Name=tag:Name,Values="+name, "Name=instance-state-name,Values="+states,
+		"--query", "Reservations[].Instances[].InstanceId", "--output", "text").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("describe bastion %s: %s\n%s", name, err, strings.TrimSpace(string(out)))
+	}
+	ids := strings.Fields(string(out))
+	if len(ids) == 0 {
+		return nil // no bastion in that state — nothing to do
+	}
+	fmt.Printf("  %s SSM bastion(s) %v ...\n", label, ids)
+	args := append([]string{"ec2", verb, "--region", kc.Region, "--profile", kc.Profile, "--instance-ids"}, ids...)
+	if out, err := exec.Command("aws", args...).CombinedOutput(); err != nil {
+		return fmt.Errorf("%s bastion %v: %s\n%s", verb, ids, err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 func confirmDown(env, cluster string) bool {
