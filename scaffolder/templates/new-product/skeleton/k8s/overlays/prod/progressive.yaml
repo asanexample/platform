@@ -1,0 +1,68 @@
+# Prod progressive-delivery extras (ADR-056). The base is a plain single-Service Rollout (fast, preview-safe);
+# prod adds the second Service the chosen strategy needs + a ready-to-enable metric gate. The Rollout strategy
+# and (for canary) the weighted HTTPRoute are patched in kustomization.yaml.
+{%- if values.deployStrategy == 'bluegreen' %}
+# Blue/green: the PREVIEW service targets the green pods before cutover (Argo Rollouts injects the
+# rollouts-pod-template-hash into the selector). The active service is the base Service; the HTTPRoute already
+# points at it, so no route patch is needed — cutover is a selector swap, no Gateway-API plugin involved.
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-${{ values.team }}-${{ values.product }}-preview
+spec:
+  type: ClusterIP
+  selector:
+    app: app-${{ values.team }}-${{ values.product }}
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+{%- else %}
+# Canary: the CANARY service targets the new-revision pods (Argo Rollouts injects the
+# rollouts-pod-template-hash). The base Service is the stable service; the HTTPRoute is patched to a weighted
+# stable+canary pair (kustomization.yaml) and the Gateway-API plugin shifts the weights per step.
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-${{ values.team }}-${{ values.product }}-canary
+spec:
+  type: ClusterIP
+  selector:
+    app: app-${{ values.team }}-${{ values.product }}
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+{%- endif %}
+---
+# Metric gate (ADR-056 D5) — READY but NOT yet wired into the Rollout steps (the prod canary/blue-green ships
+# with bake pauses instead; see kustomization.yaml). Enable it once BOTH prerequisites land:
+#   1. The spoke->hub Mimir READ path (W8c) — this cluster can currently only WRITE to the hub Mimir.
+#   2. A NetworkPolicy letting the argo-rollouts controller reach the Mimir query endpoint (the observability
+#      namespace is default-deny). This belongs to the Environment Composition / obs module, not here.
+# It is a PROMETHEUS provider (queried by the controller) — NOT a `job` provider, because Kyverno restrict-images
+# would deny a non-team-ECR analysis Job image in this enforced namespace.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: app-${{ values.team }}-${{ values.product }}-canary-gate
+spec:
+  metrics:
+    - name: success-rate
+      interval: 1m
+      # Fail (and auto-rollback) if the success rate misses twice in a row.
+      failureLimit: 2
+      provider:
+        prometheus:
+          # TODO(W8c): the hub Mimir query endpoint reachable from this cluster + an `X-Scope-OrgID` header for
+          # this cluster's tenant. Until then this template is inert (not referenced by the Rollout).
+          address: http://REPLACE-WITH-MIMIR-QUERY-ENDPOINT/prometheus
+          query: |
+            sum(rate(http_server_request_duration_seconds_count{
+              k8s_namespace_name="{{ args.namespace }}", http_response_status_code!~"5.."}[1m]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{
+              k8s_namespace_name="{{ args.namespace }}"}[1m]))
+      successCondition: "len(result) == 0 || result[0] >= 0.95"
+  args:
+    - name: namespace

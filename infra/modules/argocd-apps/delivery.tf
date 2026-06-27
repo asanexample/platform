@@ -145,14 +145,28 @@ resource "helm_release" "product_appset" {
             namespace = "{{- $nsRaw := .spec.environmentRef }}{{- if gt (len $nsRaw) 63 }}{{ printf \"%s-%s\" (substr 0 56 $nsRaw) (substr 0 6 (sha256sum $nsRaw)) }}{{- else }}{{ $nsRaw }}{{- end }}"
           }
           syncPolicy = {
-            automated   = { selfHeal = true, prune = true }
-            syncOptions = ["CreateNamespace=false"]
+            automated = { selfHeal = true, prune = true }
+            # RespectIgnoreDifferences keeps a SYNC (selfHeal or manual) from overwriting the ignoreDifferences
+            # fields below — without it, ignoreDifferences only hides them from the diff, and a sync triggered by
+            # any OTHER change still stomps the plugin's live HTTPRoute weights / the rollout's Service selector.
+            syncOptions = ["CreateNamespace=false", "RespectIgnoreDifferences=true"]
             # Fail-fast (not the 45-min sync_retry): a new Environment's first deploy syncs a `:placeholder`
             # overlay until the app's CI pins the signed digest in a follow-up commit; a short retry lets the
             # doomed pre-pin sync give up so selfHeal picks up the pin commit (revision change) without a manual
             # terminate-op. The registry-sync app below keeps the long sync_retry.
             retry = local.first_deploy_retry
           }
+          # Argo Rollouts (ADR-056) hands runtime control of two fields to the rollouts controller during a
+          # progressive deploy; without these, `selfHeal` reverts them every reconcile and fights the rollout:
+          #   • Service .spec.selector — the controller injects `rollouts-pod-template-hash` so the stable/canary
+          #     (and blueGreen active/preview) Services target the right revision's pods.
+          #   • HTTPRoute backendRef weights — the Gateway-API trafficrouter plugin shifts them per canary step.
+          # Harmless for non-Rollout / non-canary apps (no such field to ignore). git stays the source of truth
+          # for everything else, including the at-rest weights (the controller restores 100/0 between rollouts).
+          ignoreDifferences = [
+            { group = "", kind = "Service", jqPathExpressions = [".spec.selector"] },
+            { group = "gateway.networking.k8s.io", kind = "HTTPRoute", jqPathExpressions = [".spec.rules[].backendRefs[].weight"] },
+          ]
         }
       }
       # ADR-071: inject the Release digest as a kustomize image override for every Service that has one — the

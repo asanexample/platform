@@ -80,6 +80,21 @@ spec:
             - "Rust (Axum)"
             - "Ruby on Rails (API)"
           default: go
+        deployStrategy:
+          title: Production deploy strategy
+          type: string
+          description: >-
+            How prod rolls out new versions (ADR-056). Canary shifts traffic gradually (weighted, with bake
+            pauses) — best for stateless HTTP. Blue/green stands the new version up in full and flips 100% of
+            traffic atomically — best for breaking API/schema changes or anything that can't have two versions
+            serving at once. Lower stages always use the fast trivial strategy; this only shapes prod.
+          enum:
+            - canary
+            - bluegreen
+          enumNames:
+            - "Canary (gradual weighted shift)"
+            - "Blue/green (atomic cutover)"
+          default: canary
 
   steps:
     - id: verify
@@ -101,6 +116,8 @@ spec:
           # language drives the deployment's resource tier + startupProbe, the Semgrep ruleset, the dependabot
           # ecosystem, and the CI test job in the SHARED files.
           language: ${{ parameters.language }}
+          # deployStrategy shapes ONLY the prod overlay's Rollout strategy (canary vs blue/green, ADR-056).
+          deployStrategy: ${{ parameters.deployStrategy }}
 
     - id: render-lang
       name: Render the ${{ parameters.language }} starter (app source + Dockerfile)
