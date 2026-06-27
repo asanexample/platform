@@ -110,6 +110,8 @@ resource "kubernetes_manifest" "agent_appproject" {
         { group = "", kind = "Service" },
         { group = "apps", kind = "Deployment" },
         { group = "external-secrets.io", kind = "ExternalSecret" },
+        # The agent's in-process directory Postgres (ADR-084 Phase 1) — a CNPG Cluster the operator reconciles.
+        { group = "postgresql.cnpg.io", kind = "Cluster" },
       ]
     }
   }
