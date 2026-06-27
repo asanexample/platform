@@ -34,12 +34,6 @@ spec:
               kinds:
                 - Deployment
                 - StatefulSet
-                {{- if .Values.enableRolloutKind }}
-                # Argo Rollouts (ADR-056) — every workload is a direct-template Rollout. Gated because a Kyverno
-                # rule naming a kind whose CRD is absent fails to create (#7839); flip on once the Rollout CRD
-                # is installed. Rollout exposes the same spec.selector/replicas paths as a Deployment.
-                - argoproj.io/v1alpha1/Rollout
-                {{- end }}
               {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
       generate:
         apiVersion: policy/v1
@@ -56,6 +50,33 @@ spec:
             # The variable resolves to the workload's matchLabels MAP — Kyverno injects it as a typed object.
             selector:
               matchLabels: "{{`{{ request.object.spec.selector.matchLabels }}`}}"
+    {{- if .Values.enableRolloutKind }}
+    # Argo Rollouts (ADR-056) — every workload is a direct-template Rollout. This is a SEPARATE rule, not an
+    # added kind on generate-pdb above, because Kyverno forbids changing an existing generate rule's match
+    # in place ("immutable fields of a generate rule") — an in-place add fails the helm upgrade. Gated because
+    # a rule naming a kind whose CRD is absent fails to create (#7839); flip on once the Rollout CRD is here.
+    - name: generate-pdb-rollout
+      match:
+        any:
+          - resources:
+              kinds:
+                - argoproj.io/v1alpha1/Rollout
+              {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
+      generate:
+        apiVersion: policy/v1
+        kind: PodDisruptionBudget
+        name: "{{`{{ request.object.metadata.name }}`}}-pdb"
+        namespace: "{{`{{ request.object.metadata.namespace }}`}}"
+        synchronize: true
+        data:
+          metadata:
+            labels:
+              {{- include "kpp.labels" . | nindent 14 }}
+          spec:
+            maxUnavailable: 1
+            selector:
+              matchLabels: "{{`{{ request.object.spec.selector.matchLabels }}`}}"
+    {{- end }}
 ---
 # RBAC: Kyverno's background controller has no permission to create PodDisruptionBudgets by default. This
 # ClusterRole is aggregated into the background controller's role (via the kyverno aggregation label) so it
