@@ -32,6 +32,28 @@ variable "helm_wait" {
   default     = true
 }
 
+variable "enable_gateway_api_plugin" {
+  description = "Install the Argo Rollouts Gateway-API traffic-router plugin (ADR-056 D4) — drives weighted HTTPRoute canary on the Cilium Gateway. The controller downloads the binary at startup; harmless until a Rollout opts into trafficRouting.plugins.\"argoproj-labs/gatewayAPI\"."
+  type        = bool
+  default     = true
+}
+
+variable "gateway_api_plugin_version" {
+  description = "Release tag of argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi to load."
+  type        = string
+  default     = "v0.15.0"
+}
+
+variable "gateway_api_plugin_arch" {
+  description = "CPU arch of the plugin binary — MUST match the controller's node arch (the platform runs Graviton/arm64)."
+  type        = string
+  default     = "arm64"
+  validation {
+    condition     = contains(["arm64", "amd64"], var.gateway_api_plugin_arch)
+    error_message = "gateway_api_plugin_arch must be arm64 or amd64."
+  }
+}
+
 variable "tags" {
   description = "Tags projected onto controller pod labels (RFC1123-sanitized)."
   type        = map(string)
