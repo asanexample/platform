@@ -112,6 +112,8 @@ resource "kubernetes_manifest" "agent_appproject" {
         { group = "external-secrets.io", kind = "ExternalSecret" },
         # The agent's in-process directory Postgres (ADR-084 Phase 1) — a CNPG Cluster the operator reconciles.
         { group = "postgresql.cnpg.io", kind = "Cluster" },
+        # The agent's /metrics ServiceMonitor (ADR-076 — scraped → Mimir, tenant platform).
+        { group = "monitoring.coreos.com", kind = "ServiceMonitor" },
       ]
     }
   }
