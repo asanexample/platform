@@ -229,17 +229,33 @@ requirements (consent, GDPR erasure, residency, passkeys, abuse defense) are why
 ## 3. Designing for scale — the hard parts
 
 The model in §2 is the easy 40%. At scale the complexity doesn't vanish — it **relocates** into the
-projection layer, the machine plane, the cross-plane seams, and the human governance. This section owns
-those, organized by layer. Each item pairs a **risk** with the **design it forces**, tagged:
+projection layer, the machine plane, the cross-plane seams, and the human governance; *those* are the real
+engineering, and access programs fail in them **organizationally** more often than technically. This
+section owns them honestly: each item pairs a **risk** with the **design it forces**.
 
-- **`[must]`** — build-gating; a core property the v1 cannot credibly ship without.
-- **`[op]`** — operational; bites within months of real use.
+**How this is grouped.** The subsections cluster each problem where it's most naturally understood — two
+access *functions* (auth, authz), the projection *mechanism*, the machine *plane*, the *seams* between
+planes, and the *governance* around all of it. This is pragmatic clustering, **not a strict taxonomy**:
+the operator plane has no section of its own because its scale problems live in auth (§3.1), the authz
+model (§3.2), and governance (§3.6) — and several concerns deliberately cut across clusters (noted below).
+
+**Maturity tags are independent of phase** (which phase introduces each surface is in the roadmap, §5):
+
+- **`[must]`** — non-negotiable *for its layer*; that layer can't be credibly shipped without it.
+- **`[op]`** — operational; bites within months of the layer being in real use.
 - **`[later]`** — named and deliberately deferred.
 
-> Two truths shape the whole section: (a) the elegant central model is a thin veneer over a fat, brittle,
-> per-system translation layer + a set of plane seams — *those* are the real engineering; (b) access
-> programs fail **organizationally**, not technically (§3.6). The scale demonstration is the hard parts,
-> not the model.
+> **If you read only four things** — the items that actually gate a credible scale claim: **translation
+> bugs are invisible to drift detection** (§3.3), **agents are injectable, delegating actors — not "just a
+> principal"** (§3.4), **delegation voids the operator-plane auth investment** (§3.5), and **meta-
+> governance — changing the model re-permissions thousands** (§3.6). The other ~20 items are real but
+> mostly name-and-address; these four are existential.
+
+**Cross-cutting threads** (the price of clustering by layer — each appears in several places; read them as
+threads, not isolated bullets): **revocation** (lag §3.3 · runaway agents §3.4 · cross-plane kill-switch
+§3.5 · the emergency switch §3.6); **non-human credentials** (connectors §3.3 · workloads/agents §3.4);
+**the "no central PDP" carve-outs** (the decide/apply applier §3.3 · a cross-plane decision point §3.5);
+and **audit / attribution** (ephemeral machine identity §3.4 · reviews and governance observability §3.6).
 
 ### 3.1 Authentication & sessions
 
@@ -253,7 +269,7 @@ those, organized by layer. Each item pairs a **risk** with the **design it force
 
 ### 3.2 The authorization model
 
-- **The grid is N-dimensional in disguise `[must to acknowledge]`.** `reach × power` is two axes of
+- **The grid is N-dimensional in disguise `[must]`.** `reach × power` is two axes of
   `reach × power × stage × tier × time`. Don't pretend the grid is the whole model; posture composes
   (`min(grant, stage×tier)`), and the extra dimensions are explicit, not emergent surprises.
 - **Clean RBAC decays into exception-sprawl — and that kills reviews `[op]`.** At scale, real needs don't
@@ -342,7 +358,7 @@ actions. These are the most differentiating problems to solve well.
   correlation for accountability (and forensics). *Forces:* an identity-correlation fabric that answers
   "who is ultimately responsible" **without** becoming the ambient-trust backdoor — and a **cross-plane
   kill-switch** that burns down everything traceable to a principal across planes.
-- **The deferred consumer seam is the most security-critical `[later, design-aware]`.** The
+- **The deferred consumer seam is the most security-critical `[later]`.** The
   `consumer → machine → operator` path connects untrusted outsiders to internals; deferring CIAM deferred
   the design of the seam that matters most. *Forces:* deliberate seam discipline now so it isn't a
   retrofit later.
@@ -366,9 +382,9 @@ actions. These are the most differentiating problems to solve well.
   auto-expire most grants**; a **staleness surface** flags the standing rest (using login/activation logs
   as evidence). Reviewer = the owner; revoke = delete the file.
 - **Learnability is a security property `[op]`.** At scale, hundreds author access; **misconfig-from-
-  misunderstanding is the #1 incident cause.** *Forces:* optimizing the model + templates for correct use
-  under cognitive load, not just elegance — elegance that needs expertise to wield safely becomes
-  over-grants.
+  misunderstanding is the #1 incident cause.** *Forces:* optimizing the model + the §2.5 authoring
+  templates for correct use under cognitive load, not just elegance — elegance that needs expertise to
+  wield safely becomes over-grants.
 - **Bus factor / operational ownership `[op]`.** The most security-critical system needs a team, on-call,
   and runbooks. A single owner is the gap between *designed* for scale and *operable* at scale — designing
   the human operation is part of the scale demonstration.
@@ -377,7 +393,7 @@ actions. These are the most differentiating problems to solve well.
   break-glass frequency, mis-grants caught — or healthy is indistinguishable from decorative.
 - **Migration / no-lockout cutover `[op]`.** From today's hand-maintained HCL + seed users to the roster by
   **dual-run → verify-parity → flip**, independent break-glass live throughout — never a big-bang.
-- **Forkability tension `[later, decide]`.** Deep bespoke integration fights the reference-platform
+- **Forkability tension `[later]`.** Deep bespoke integration fights the reference-platform
   mission (ADR-053's own "un-forkable" worry). *Forces:* keeping bespoke parts behind swappable seams so a
   fork can substitute.
 - **External/B2B humans & compliance mapping `[later]`.** Contractors/partners/auditors get scoped,
