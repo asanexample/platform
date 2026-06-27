@@ -72,3 +72,12 @@ output "realm_roles" {
   description = "Developer-access realm roles."
   value       = [for r in keycloak_role.posture : r.name]
 }
+
+output "auth_strength" {
+  description = "Auth-strength posture (#885): whether the passkey browser flow is built (standalone realm) and whether it's bound as the realm browser flow (the apply-2 enforce_browser_mfa flip)."
+  value = {
+    passkey_flow_built = local.manage_mfa
+    browser_mfa_bound  = local.manage_mfa && var.enforce_browser_mfa
+    event_logging      = local.create && var.auth_event_logging
+  }
+}

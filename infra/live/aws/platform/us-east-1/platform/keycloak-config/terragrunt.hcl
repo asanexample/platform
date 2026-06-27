@@ -168,4 +168,18 @@ inputs = {
   # ADR-084 Phase 1: broker GitHub + Slack as linkable IdPs + the directory-sync service account (reads the IdP
   # app secrets from platform/keycloak/{github,slack}-idp; publishes the directory-sync secret for the agent).
   enable_account_linking = true
+
+  # Auth strength (#885, identity strategy §3.1). Keycloak is the IdP of record here, so the factor lives in this
+  # realm: a browser flow requires a phishing-resistant passkey (WebAuthn passwordless) for ALL workforce — no OTP
+  # anywhere — plus self-service password reset OFF, brute-force defenses, and login/admin event logging (module
+  # defaults). Recovery is a backup passkey or admin re-provision.
+  #
+  # TWO-APPLY, NO-LOCKOUT ROLLOUT (Keycloak is Tier-0):
+  #   apply-1 (now): enforce_browser_mfa = false — the flow + force-enroll action + realm hardening are created,
+  #     but the built-in browser flow stays live. Then enroll a passkey (+ a backup) on `admin` via the Account
+  #     Console over the gateway, and verify it logs in.
+  #   apply-2: flip enforce_browser_mfa = true to BIND the new flow. Enrolled users log in by passkey; new users
+  #     are force-enrolled. Break-glass if a flow misbehaves: revert to false + re-apply (admin-cli direct-grant
+  #     is independent of any browser flow). Master-realm admin hardening is tracked separately in #899.
+  enforce_browser_mfa = false
 }
