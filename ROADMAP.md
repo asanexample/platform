@@ -14,6 +14,7 @@ detail. "Complete picture" means every capability and area is represented — no
 | 2026-06-18 | 1.0     | J. Deeden | Consolidated to a capability map (Area × Horizon); backfilled shipped work, reframed to the current AWS IDP, retired stale multi-cloud status tables |
 | 2026-06-23 | 1.1     | J. Deeden | Added Compute & Elasticity (Karpenter, ADR-078, #643); observability data plane marked complete |
 | 2026-06-25 | 1.2     | J. Deeden | Added Reliability & Tech Debt to Next (epic #769, tech-debt audit inventory)          |
+| 2026-06-27 | 1.3     | J. Deeden | Added the Identity & Access Strategy north-star (workforce-first model + scale-hardening) and the graduated agent-autonomy access model (ADR-086); framed I&A Phase-1 = People roster + AWS generator (closes #647) |
 
 ## Executive Summary
 
@@ -118,6 +119,7 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 
 #### Identity & Access
 
+- **Identity & Access Strategy — north-star (design-of-record landed, not yet built).** The unified workforce-first model in [`docs/architecture/identity-and-access-strategy.md`](docs/architecture/identity-and-access-strategy.md): decide access once → derive → project into every system (AWS, apps, GitHub, PagerDuty, Slack) from one git source of truth (Teams + **People** + Grants); dangerous power borrowed temporarily (eligibility-in-git + timed activation); auth strength scaling with role; plus the honest scale-hardening (intent-vs-effected verification, decide/apply split, drift detection, meta-governance). **Phase 1 (highest value-per-effort) = the People roster + the Identity Center generator, which closes the DeveloperAccess regression ([#647](https://github.com/asanexample/platform/issues/647)) and makes "add a person" one PR.** The ADR-068 P4 items below (#361–#368) realize the access-model core; the machine/agent plane defers to ADR-074 + the graduated-autonomy model ([ADR-086](docs/adrs/086-autonomous-agent-access.md), see Agentic Workloads). **CIAM (customer identity) is a named, deferred plane.**
 - [#361](https://github.com/asanexample/platform/issues/361) P4 (ADR-068): Product-scoped & cross-team access model
 - [#362](https://github.com/asanexample/platform/issues/362) P4.1 (ADR-068): AccessGrant CRD + cluster projection
 - [#363](https://github.com/asanexample/platform/issues/363) P4.2 (ADR-068): Access-model-as-code — Product roles in Keycloak
@@ -146,7 +148,7 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 
 - **Status: design-of-record landed, at rest.** ADR-074/075/076 (Proposed) + de-risking spikes 1–3 done (all GO); [#554](https://github.com/asanexample/platform/issues/554) tier-0 resource agent epic is build-gated. **Resume trigger:** a concrete, wanted *second* agent → run the eval-feasibility probe. Substrate pulled by demand, not pushed.
 - **Substrate primitives** — Agent CRD + three-identity authority (intersection + attenuating delegation) + tiered disposition + LLM data-boundary + model-gateway metering seam + eval-as-a-service + kill-switch (ADR-074). Built after tier-0 + a decision gate.
-- **Autonomous / multi-agent (A2A)** — autonomous agents + agent-to-agent, behind a mature safety substrate (eval-as-a-service + kill-switch live). Depends on the **AccessGrant/P4** model (see Identity & Access, #361–#368) for cross-team/autonomous authority — the agent initiative is the forcing function to prioritize P4.
+- **Autonomous / multi-agent (A2A)** — autonomous agents + agent-to-agent, behind a mature safety substrate (eval-as-a-service + kill-switch live). The **graduated-autonomy access model** ([ADR-086](docs/adrs/086-autonomous-agent-access.md), extending ADR-074) governs how an agent earns *bounded, reversible, machine-guarded* autonomy — e.g. real-time alert remediation — replacing the human gate with machine-enforced bounds rather than removing it; propose-only is the tier-0 floor, not the ceiling. Depends on the **AccessGrant/P4** model (see Identity & Access, #361–#368) for cross-team/autonomous authority — the agent initiative is the forcing function to prioritize P4.
 - **Deferred component picks (Spike 3)** — CaMeL/dual-LLM IPI defense + a classifier guardrail (PromptGuard/AlignmentCheck) only when an agent can *act*; Inspect + self-hosted Langfuse when the oracle disappears (multi-agent eval); a larger guardrail FP corpus. Tier-0 adopts none of these.
 
 #### Environment & Resource Control Plane
