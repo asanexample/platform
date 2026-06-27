@@ -1,0 +1,150 @@
+# Manage Person (identity strategy §2.5, #890): the authoring UX over the workforce roster — joiner/mover as a
+# form, not hand-edited YAML. Emits a gitops/people/<name>.yaml PR (create OR overwrite-to-change-grants);
+# PROPOSES, never grants — the People Gate authorizes (team-lead approval for a team grant, access-admin for a
+# platform grant). Server-side it verifies the requester is a member of the team they're granting into; the
+# authoritative validation (role ∈ catalog, team exists, reach matches) is the gate.
+#
+# Offboarding (removing a Person) is a gated hand-authored deletion PR — the People Gate routes it to an
+# access-admin approval — same as the environment-purge pattern (a portal "offboard" template would need an
+# app-repo custom delete action, tracked separately).
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: manage-person
+  title: Manage Person (onboard / change access)
+  description: >-
+    Onboard a teammate or change their access: authors the git-native Person object (a Keycloak anchor + role
+    grants) as a reviewed pull request. Nothing is granted until the PR is merged — the People Gate routes it to
+    the right approver (the team's lead for a team grant, an access-admin for a platform grant).
+  tags:
+    - self-service
+    - identity
+    - people
+spec:
+  owner: group:default/platform
+  type: person
+
+  parameters:
+    - title: Person
+      required:
+        - name
+        - person
+      properties:
+        name:
+          title: Roster name
+          type: string
+          description: >-
+            The Person's file name (one file per human). Lowercase letters/digits/hyphens. Use an existing name
+            to CHANGE that person's access (the PR overwrites their file with the access selected below).
+          pattern: '^[a-z][a-z0-9-]{1,30}$'
+          maxLength: 32
+        person:
+          title: Keycloak anchor
+          type: string
+          description: >-
+            The canonical identity — the Keycloak username (the realm `sub` once provisioned). NOT an email and
+            no PII (the real identity lives in the directory, ADR-084).
+          pattern: '^[a-zA-Z0-9._-]{1,64}$'
+        githubHandle:
+          title: GitHub handle (optional)
+          type: string
+          description: Optional bootstrap handle (ADR-084 `declared` tier), upgraded to `proven` on self-link.
+          pattern: '^[A-Za-z0-9-]{1,39}$'
+
+    - title: Access (grants)
+      description: >-
+        Grant a team role and/or a platform role. A grant references a role from the catalog (gitops/roles) — the
+        gate rejects an unknown role, a missing team, or a reach that doesn't match. Set at least one.
+      properties:
+        team:
+          title: Team (for a team grant)
+          type: string
+          description: The team this person works on — your membership is verified server-side.
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+              spec.type: team
+            defaultKind: Group
+            allowArbitraryValues: true
+        teamRole:
+          title: Team role
+          type: string
+          enum: ['developer', 'team-admin', 'viewer']
+          default: developer
+          description: developer = deploy+operate the team's products; team-admin = + governs membership/grants; viewer = read-only.
+        platformRole:
+          title: Platform role (optional)
+          type: string
+          enum: ['none', 'viewer', 'auditor', 'platform-operator', 'access-admin', 'break-glass']
+          default: none
+          description: An org-wide/platform role. Leave 'none' for a team-only person.
+        platformActivation:
+          title: Platform-role activation
+          type: string
+          enum: ['standing', 'on-demand']
+          default: standing
+          description: >-
+            on-demand = eligible-not-standing (the dangerous power is activated at checkout, not held). The
+            catalog already marks operator/break-glass on-demand; this lets you borrow a normally-standing role.
+
+  steps:
+    # Verify the requester belongs to the team they're granting into (skipped for a platform-only grant — there
+    # the access-admin approval on the gate is the control). Server-stored, so a client can't strip it.
+    - id: verify
+      name: Verify team membership
+      if: ${{ parameters.team }}
+      action: platform:verify-team-membership
+      input:
+        team: ${{ parameters.team }}
+
+    - id: render
+      name: Render the Person object
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          name: ${{ parameters.name }}
+          person: ${{ parameters.person }}
+          githubHandle: ${{ parameters.githubHandle }}
+          team: ${{ parameters.team | replace('group:default/', '') if parameters.team else '' }}
+          teamRole: ${{ parameters.teamRole }}
+          platformRole: ${{ parameters.platformRole }}
+          platformActivation: ${{ parameters.platformActivation }}
+
+    - id: pr
+      name: Open the access PR (gated review)
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?owner=asanexample&repo=platform
+        branchName: person/manage-${{ parameters.name }}
+        targetBranchName: main
+        title: 'feat(people): manage access for ${{ parameters.name }}'
+        commitMessage: 'feat(people): manage access for ${{ parameters.name }}'
+        description: |
+          Onboards / updates the access of **${{ parameters.name }}** (anchor `${{ parameters.person }}`).
+
+          Requested via the Backstage **Manage Person** template by `${{ user.ref | default('unknown', true) }}` (audit attribution).
+
+          | | |
+          |---|---|
+          | anchor | `${{ parameters.person }}` |
+          {% if parameters.githubHandle %}| github | `${{ parameters.githubHandle }}` |{% endif %}
+          {% if parameters.team %}| team grant | `${{ parameters.teamRole }}` on `${{ parameters.team | replace('group:default/', '') }}` |{% endif %}
+          {% if parameters.platformRole != 'none' %}| platform grant | `${{ parameters.platformRole }}` (${{ parameters.platformActivation }}) |{% endif %}
+
+          **The People Gate authorizes this** (propose-never-grant): a team grant needs the team's lead (or a
+          repo admin); a platform grant or an offboarding needs an access-admin. Nothing is granted until merge.
+
+          **Review checklist:**
+          - [ ] The anchor is correct and unique (no PII — it's a Keycloak username, never an email)
+          - [ ] The role(s) and reach are the minimum that serves this person
+          - [ ] CI `People Gate` green; `People Approval` satisfied by the right approver
+
+          **After merge:** the generators project the roster — `identity-center` (#888, AWS console) and
+          `keycloak-config` (#889, app access) — on their next apply. One roster, both planes.
+
+  output:
+    links:
+      - title: Access pull request (needs review)
+        url: ${{ steps.pr.output.remoteUrl }}
