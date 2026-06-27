@@ -140,6 +140,15 @@ Composition is **not yet in `infra/`/`gitops/`**, so treat it as design intent.)
   in the `argocd` unit's `argocd-cm` — but note it's still keyed to the **v2 `XTenant`** kind
   (`spec.crossplane`/finalizers), not `XEnvironment`, so an `XEnvironment`-scoped
   customization is currently missing. Re-apply the `argocd` unit if it flaps OutOfSync.
+- **Progressive delivery / Argo Rollouts (ADR-056)**: every env workload is a `Rollout`, and prod runs a
+  metric-gated **canary** (or blue/green). The rollouts controller mutates two fields at runtime that ArgoCD
+  `selfHeal` will otherwise revert mid-rollout — so the **tenant Application `ignoreDifferences`** the Service
+  `.spec.selector` (the injected `rollouts-pod-template-hash`) **and** the HTTPRoute `backendRefs[].weight` (the
+  Gateway-API plugin's canary weights), in `delivery.tf`. **`ignoreDifferences` alone is NOT enough** — without
+  **`RespectIgnoreDifferences=true`** in the Application `syncOptions`, a sync triggered by any *other* change
+  still stomps those fields and fights the canary (found in prod; the offline spikes couldn't surface it). The
+  per-stage canary shape lives in the app's `k8s/overlays/prod` (scaffolder `deployStrategy`), and the prod
+  metric gate queries the hub Mimir via the spoke read route — see ADR-056's as-built section.
 - **Backstage ArgoCD token 401**: a Helm apply can drop the minted backstage account
   token from `argocd-cm`; re-mint and update Secrets Manager (`docs/runbooks/backstage-argocd.md`).
 - **No offline test for the delivery ApplicationSet generator** — first draft of a
