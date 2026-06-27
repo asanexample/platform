@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-04 (amended 2026-06-26)
 
-**Status:** Proposed — strategy + design. Adds health-gated, automatically-reversible rollouts on top of the
+**Status:** Accepted — Phase 1 built + applied (both clusters); Phase 2 mechanics proven (see as-built). Adds health-gated, automatically-reversible rollouts on top of the
 existing GitOps delivery ([ADR-021](021-argocd-for-gitops.md)) and PR preview environments
 ([ADR-032](032-pr-preview-environments.md)), and is the **release-safety half of zero-downtime deployment** —
 the foundation (traffic correctness during the pod lifecycle) is [ADR-085](085-workload-availability-graceful-disruption-defaults.md).
@@ -151,6 +151,48 @@ consolidation.
   on preprod today (Cilium honors weighted backendRefs); only the *metric-gated* half waits on wiring a
   preprod→hub Mimir read route (or runs on the hub for platform-team Rollouts). Phase 1 delivers
   Rollouts-everywhere with the trivial strategy; Phase 2 adds the Gateway canary (preprod-ready) then analysis.
+
+## Implementation status & learnings (as-built)
+
+*2026-06-26 (#851–#861).*
+
+**Built + applied + verified (both clusters):**
+
+- **Phase 1 (Rollouts everywhere, trivial strategy).** Every environment workload is a direct-template Argo
+  `Rollout` (not Deployment). `argo-rollouts` module + unit installs the controller/CRDs; the ADR-085
+  availability policies (PDB-generate, topology-spread, replica-floor) were made `Rollout`-aware
+  (`enable_rollout_kind`); the scaffolder emits a Rollout; `app-alpha-shop` was migrated and a deploy verified
+  **zero-drop under load** (k6, 0/4501 failed). The trivial `setWeight: 100` + `maxSurge:1/maxUnavailable:0`
+  strategy is the safe default — auto-promote, no traffic split — so prod is never the first place a Rollout runs.
+- **Phase 2 mechanics (proven on preprod, spikes torn down).** The **Gateway-API traffic-router plugin** is
+  installed + durable (D4): a real canary drove weighted HTTPRoute `backendRefs` and **Cilium honored them**
+  (50/50 split, promoted). **Both strategies** work on the same controller: **canary** (weighted, needs the
+  plugin) and **blue/green** (D1) — the latter is a pure Service-selector swap, needs **no** plugin, and gives a
+  *stronger* guarantee (a bad version gets **zero** prod traffic vs canary's brief slice). A **health-gated
+  auto-rollback** was proven: a version that is *up but serving wrong content* (which readiness can't catch) fails
+  the analysis gate and auto-reverts.
+
+**Corrections / integration prerequisites the design under-weighted.** The spikes ran in an *unenforced* namespace
+and *outside* ArgoCD; making this the GitOps default for tenant apps requires three things the original D-points
+didn't call out — all because Kyverno (ADR-014) and ArgoCD selfHeal (ADR-021) impose constraints the spike bypassed:
+
+1. **A Job-provider AnalysisTemplate does NOT work in an enforced environment namespace** — Kyverno
+   `restrict-images` denies the analysis Job's image (it isn't team-ECR scoped). Use a **web/Prometheus
+   provider** (runs in the controller, creates no Job pod), not a `job` provider.
+2. **A web/Mimir-provider gate needs a NetworkPolicy** — the rollouts-controller→target reach (canary Service, or
+   the default-deny `observability` namespace for Mimir). This belongs to the Environment Composition (env
+   namespace CNPs) / the obs module, not the app manifests.
+3. **ArgoCD `selfHeal` fights the plugin** — the tenant ApplicationSet runs `selfHeal: true`, so the plugin's
+   HTTPRoute weight rewrites are reverted mid-canary unless the Application **`ignoreDifferences`** the
+   `backendRefs[].weight` path. Required for any selfHeal'd canary.
+
+Net: D5's metric gate is gated on the **Mimir read path** (a spoke is write-only to the hub Mimir, #860) **and**
+the controller→target NetworkPolicy — not on a prod cluster. The traffic-shaping canary/blue-green shapes work in
+enforced namespaces today *given* the ArgoCD `ignoreDifferences`.
+
+**Remaining:** durable per-app/scaffolder wiring (strategy = a per-workload choice, both shapes, + the
+`ignoreDifferences`); the web/Prometheus AnalysisTemplate once the netpol + Mimir read path land; tier-keyed
+strategy depth per stage (D3); the regulated manual-approval gate + error-budget freeze (D6).
 
 ## Related
 
