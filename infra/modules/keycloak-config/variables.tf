@@ -168,6 +168,17 @@ variable "secret_recovery_window_days" {
   default     = 0
 }
 
+variable "enable_account_linking" {
+  description = <<-DESC
+    ADR-084 Phase 1: broker GitHub + Slack as LINKABLE identity providers (+ attribute mappers projecting
+    githubLogin / slackUserId onto users) and create the read-only `directory-sync` service account. The two IdP
+    app secrets are read from Secrets Manager (platform/keycloak/{github,slack}-idp); the directory-sync client
+    secret is generated and published to platform/keycloak/directory-sync for the triage agent.
+  DESC
+  type        = bool
+  default     = false
+}
+
 # ---------------------------------------------------------------------------
 # Team taxonomy (the canonical Team registry → Keycloak groups + roles)
 # ---------------------------------------------------------------------------
