@@ -124,6 +124,9 @@ inputs = {
     gateway_name      = dependency.gateway.outputs.gateway_name
     gateway_namespace = dependency.gateway.outputs.gateway_namespace
     tenants           = { preprod = "preprod" }
+    # Expose the read (/prometheus) path for preprod so its argo-rollouts controller can run metric-gated
+    # canary AnalysisRuns against this hub Mimir (ADR-056 W8c). Force-set tenant ⇒ preprod reads only its own.
+    query_tenants = ["preprod"]
   }
   extra_tenant_datasources = ["preprod"]
 

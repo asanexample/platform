@@ -50,8 +50,9 @@ patches:
 {%- else %}
   # Canary: shift weighted traffic stable->canary in steps with bake pauses (the Gateway-API plugin rewrites the
   # HTTPRoute backendRef weights — needs the plugin + the Application ignoreDifferences on those weights so
-  # ArgoCD selfHeal doesn't fight it). Replace a `pause` with an `analysis` step (progressive.yaml) once the
-  # metric-gate prereqs land. maxSurge/maxUnavailable keep it zero-downtime even at the canary step.
+  # ArgoCD selfHeal doesn't fight it). A BACKGROUND analysis (progressive.yaml's AnalysisTemplate) runs the whole
+  # rollout, querying the hub Mimir for the new version's success rate, and ABORTS (auto-rollback) if it misses
+  # failureLimit times. maxSurge/maxUnavailable keep it zero-downtime even at the canary step.
   - target:
       group: argoproj.io
       version: v1alpha1
@@ -70,6 +71,15 @@ patches:
                   httpRoute: app-${{ values.team }}-${{ values.product }}
             maxSurge: 1
             maxUnavailable: 0
+            # Metric gate (W8c): background AnalysisRun over the whole canary — auto-rollback on a bad version.
+            analysis:
+              templates:
+                - templateName: app-${{ values.team }}-${{ values.product }}-canary-gate
+              args:
+                - name: namespace
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
             steps:
               - setWeight: 25
               - pause: { duration: 2m }
