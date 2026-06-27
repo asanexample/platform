@@ -57,7 +57,39 @@ make build-platctl                          # build ./bin/platctl
 - **Unpark recovery** (`[[reference_preprod_scaleup_recovery]]`): after `up`, preprod has needed — (1) stale
   cross-vpc-dns PHZ → ArgoCD i/o-timeout → re-apply cross-vpc-dns + restart argocd; (2) orphaned Kyverno helm
   releases → `terragrunt import` both + apply. Also watch for a `helm` pending-upgrade lock on slow applies
-  (`[[reference_helm_pending_upgrade_recovery]]`).
+  (`[[reference_helm_pending_upgrade_recovery]]`). **(2026-06-26+: `up` now AUTO-handles the cross-vpc-dns
+  reconnect + Karpenter NodePool recreation — these largely no longer need manual steps; see the log.)**
+- **⚠️ Unpark forces a FRESH ADMISSION of every pod → it EXPOSES latent admission-webhook / IAM bugs that were
+  masked while pods ran continuously.** 2026-06-27: post-unpark NO product workload could be re-created — the
+  Deployment sat at `0/1` with no pod, and the ReplicaSet showed `FailedCreate: admission webhook
+  "mutate.kyverno.svc-fail" denied` → cosign **verify-images** couldn't pull the image signature from ECR
+  (`kyverno-ecr` role `ecr:BatchGetImage` DENIED). It was a **latent bug, not unpark damage**: the platform
+  `policy` unit never set `ecr_account_id`, so the `kyverno-ecr` ECR ARN rendered account-less
+  (`arn:aws:ecr:us-east-1::repository/team-*`) → matched no repo → zero ECR access. Invisible until a *fresh*
+  admission (the agent pod had run continuously). **Diagnostic path:** `get pods` (none) → `get rs` (FailedCreate)
+  → `describe rs` (the full admission error) → the `kyverno-ecr` role's inline policy. Fix: set `ecr_account_id`
+  on the unit, **targeted**-apply `aws_iam_role_policy.kyverno_ecr` (skips bundled pre-existing chart drift), then
+  delete the stuck RS to clear its FailedCreate backoff. ⚠️ Restarting Kyverno does NOT fix an IAM gap (IAM is
+  evaluated at call-time, not cached in creds) — don't waste the detour. **(platform #875: `platctl up`'s
+  `recoverKyverno` now re-checks after its Kyverno restart and SURFACES the actual `FailedCreate` admission error
+  when a block persists — so a non-transient cause like this announces itself instead of leaving silent stuck pods.)**
+- **Post-unpark DNS/secret gap → RESTART startup-only-connect workloads.** CoreDNS + ESO aren't ready instantly:
+  pods that start during the gap log transient `connection refused` to kube-dns (`172.20.0.10:53`), and ESO may
+  briefly fail its SecretsManager sync. A workload that connects to a dependency ONLY at startup (e.g. the triage
+  agent's `directory.Open`) degrades to its fallback and stays there — restart it once DNS/ESO are healthy. ⚠️ A
+  `kubectl rollout restart` is reverted by ArgoCD selfHeal (the annotation reads as drift) — **delete the pod (or
+  RS)** to force a clean restart instead.
+- **Bastions: `down`/`up` now stop/start the SSM bastion automatically (platform #875)** — a park is truly
+  cost-zero with no manual `ec2 stop-instances` step (discovered by the derived `<cluster>-ssm-bastion` Name tag;
+  no-op if absent). The classifier still **gates `platctl down`/`up` until an EXPLICIT, emphatic user go** — a
+  vague "park it" got blocked; "scale down no matter what" cleared it.
+- **Unpark: the NodePool can return while its EC2NodeClass does NOT — zero workload capacity (now fixed).** Symptom:
+  `kubectl get ec2nodeclass` empty + `nodepool` READY=False (`NodeClassReady=False`) + every workload pod Pending +
+  karpenter logs `ignoring nodepool, not ready`. Cause was the down/up asymmetry — `down` deleted only the NodePool,
+  so `up`'s force-replace lost the leftover finalizer'd EC2NodeClass to a Terminating race. Fixed: `down` now deletes
+  BOTH CRs symmetrically and `up` asserts EC2NodeClass-present + NodePool Ready=True before declaring restored. If it
+  ever recurs, unblock with `helm get manifest karpenter-nodepool -n karpenter | kubectl apply -f -` (recreates the
+  NodeClass with no destructive uninstall) — NOT another `-replace`.
 - **Restore sizes:** node groups come back at their configured sizes (system≈2, workload≈1 seen before).
 - **Give unpark time:** scale-to-zero is fast (EKS API), but `up` + full pod reschedule + ArgoCD reconcile is
   slower — don't call it broken prematurely.
@@ -66,6 +98,42 @@ make build-platctl                          # build ./bin/platctl
 ## Learnings log (append a dated entry every park/unpark)
 
 <!-- newest first -->
+
+- **2026-06-27 (same unpark) — Karpenter NodePool came back but its EC2NodeClass did NOT → zero workload capacity.**
+  Symptom: `kubectl get ec2nodeclass` empty, `nodepool default` READY=False (NodeClassReady=False, "NodeClass not
+  found"), karpenter logs `ignoring nodepool, not ready`, every product pod Pending (Insufficient cpu on the lone
+  system node). **Root cause = a down/up ASYMMETRY.** `platctl down` deletes the NodePool CR (to drain Karpenter)
+  but LEFT the EC2NodeClass. On `up`, `-replace=helm_release.nodepool[0]` (helm uninstall→install) then deleted the
+  still-present EC2NodeClass — which carries a karpenter finalizer, so it went Terminating — while cleanly recreating
+  the already-absent NodePool; the NodeClass finalized away *after* the install, so helm's release was "deployed"
+  (rev 1) with the NodeClass in its stored manifest yet the cluster had none (confirmed via `helm get manifest`).
+  **Durable fix (platctl):** (1) `down` now deletes the EC2NodeClass too, symmetrically, AFTER the NodeClaims drain
+  (so its finalizer clears) and waits for it gone — `up` then recreates BOTH from a clean slate, no leftover to
+  race; (2) `up` adds a HEALTH GATE (`assertKarpenterReady`) that polls EC2NodeClass-present + NodePool Ready=True
+  before declaring the env restored (a Ready=False NodePool silently strands every pod). **Immediate unblock (the
+  one that worked):** recreate the NodeClass from the release's own rendered manifest —
+  `helm get manifest karpenter-nodepool -n karpenter | kubectl apply -f -` (deployer context for the write) — NOT
+  another `-replace` (that uninstall→install is exactly what raced). Verified: ec2nodeclass present → NodePool
+  READY=True → Karpenter provisioned 2 nodes → the stranded alpha-shop-prod pods scheduled.
+
+- **2026-06-27 — PARK (overnight) then UNPARK (platform + preprod). ✅ Both cycled — but the unpark EXPOSED a
+  latent verify-images bug (the real lesson).** PARK: `platctl down --env <env> --yes` each — the **classifier
+  blocked it repeatedly** ("possibly-destructive `down`", "`--yes` bypasses confirmation") until an explicit
+  emphatic go ("scale down no matter what"). Confirmed `desiredSize=0` both via the EKS API; also manually
+  **stopped the 2 SSM bastions** (`i-094…` preprod / `i-04c…` platform — out of platctl scope) and verified
+  `ec2 describe-instances` = 0 running for true cost-zero. UNPARK: `platctl up` auto-handled NodePool + cross-vpc-dns
+  (as 2026-06-26); started the bastions back. **THE failure:** every product pod was stuck post-unpark — the agent's
+  Deployment at `0/1`, RS `FailedCreate = mutate.kyverno.svc-fail denied`, because cosign verify-images couldn't
+  read the image sig from ECR. Root cause was a **latent bug**, not unpark damage: the platform `policy` unit never
+  passed `ecr_account_id` → `kyverno-ecr` ECR ARN was account-less (`…us-east-1::repository/team-*`) → zero ECR
+  access; masked because the agent pod ran continuously, exposed by the first fresh admission. Wasted a detour
+  restarting Kyverno (no help — IAM gap ≠ stale creds). Fix: `ecr_account_id = account_ids["platform"]` on the unit
+  (platform PR #874) + **targeted** apply of `aws_iam_role_policy.kyverno_ecr` (avoided bundled pre-existing
+  policies-chart drift) + delete the stuck RS. Separately, the agent's first post-unpark pod booted during the
+  CoreDNS gap → `directory.Open` timed out → directory disabled → needed a **pod delete** (rollout-restart was
+  ArgoCD-reverted) to reconnect once DNS/ESO were healthy. Final confirm: `directory: connected — 1 linked person
+  projected`. Net: unpark itself is smooth now; budget time for *latent admission/IAM bugs* surfacing on the first
+  fresh pod admissions.
 
 - **2026-06-26 — first UNPARK (platform + preprod), one `platctl up --env <env>` each. ✅ Both restored + healthy.**
   Node groups back (platform `system`=2, preprod `system`=1), kubectl reachable again once nodes + the Tailscale
