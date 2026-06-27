@@ -113,6 +113,13 @@ inputs = {
   enable_attestation_verification = true
   attest_failure_action           = "Enforce"
 
+  # The platform account hosting the ECR repos Kyverno reads signatures/attestations from — scopes the
+  # kyverno-ecr role's ECR-read to <account>:repository/team-*. REQUIRED: the module defaults this to "" →
+  # an account-less ARN ("arn:aws:ecr:us-east-1::repository/team-*") that matches NO repo → zero ECR access →
+  # cosign verify-images/verify-attestations fail closed for EVERY product workload's admission. Latent while
+  # pods ran continuously; a park/unpark (forcing fresh admissions) exposes it.
+  ecr_account_id = include.base.locals.account_ids["platform"]
+
   # Crossplane (the tenant control plane, ADR-046) runs here. Its rbac-manager authors wildcard
   # provider ClusterRoles at runtime as its own ServiceAccount (not the deployer), which the
   # cluster-scoped restrict-wildcard-rbac policy would otherwise deny in Enforce — blocking the
