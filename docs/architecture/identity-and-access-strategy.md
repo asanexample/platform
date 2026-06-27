@@ -246,16 +246,17 @@ model (§3.2), and governance (§3.6) — and several concerns deliberately cut 
 - **`[later]`** — named and deliberately deferred.
 
 > **If you read only four things** — the items that actually gate a credible scale claim: **translation
-> bugs are invisible to drift detection** (§3.3), **agents are injectable, delegating actors — not "just a
-> principal"** (§3.4), **delegation voids the operator-plane auth investment** (§3.5), and **meta-
-> governance — changing the model re-permissions thousands** (§3.6). The other ~20 items are real but
-> mostly name-and-address; these four are existential.
+> bugs are invisible to drift detection** (§3.3), **the agent-identity model is decided but its enforcement
+> is deferred** (§3.4 / ADR-074's own gap), **machine access has no review loop, so its bounds must be
+> allowlist-shaped** (§3.4), and **meta-governance — changing the model re-permissions thousands** (§3.6).
+> The other items are real but mostly name-and-address; these are existential.
 
 **Cross-cutting threads** (the price of clustering by layer — each appears in several places; read them as
 threads, not isolated bullets): **revocation** (lag §3.3 · runaway agents §3.4 · cross-plane kill-switch
 §3.5 · the emergency switch §3.6); **non-human credentials** (connectors §3.3 · workloads/agents §3.4);
-**the "no central PDP" carve-outs** (the decide/apply applier §3.3 · a cross-plane decision point §3.5);
-and **audit / attribution** (ephemeral machine identity §3.4 · reviews and governance observability §3.6).
+**the "no central PDP" carve-outs** (the decide/apply applier §3.3 · ADR-074's trusted-boundary agent
+enforcement §3.4); and **audit / attribution** (ephemeral machine identity §3.4 · reviews and governance
+observability §3.6).
 
 ### 3.1 Authentication & sessions
 
@@ -309,55 +310,59 @@ and **audit / attribution** (ephemeral machine identity §3.4 · reviews and gov
   scoped to one system, owned + rotated, and ideally itself operating through scoped, time-boxed elevation
   rather than holding standing god-rights.
 
-### 3.4 The machine plane (co-equal with the operator plane — likely its own ADR)
+### 3.4 The machine plane — model decided (ADR-074), enforcement open
 
-- **Provisioning is automatic and has no review loop → allowlist bounds, not a deny-set `[must]`.** You
-  can't PR a pod; identities churn thousands/day; **no human re-attests machine access.** So the bound must
-  be airtight — but ADR-041's `policyStatements` deny-set is a *blocklist*, and blocklists don't scale
-  safely. *Forces:* automatically-derived **allowlist** bounds (what a workload *may* do from its declared
-  needs), since there's no human backstop.
-- **Agents are injectable, delegating actors — "just a principal on the grid" is wrong `[must]`.** An agent
-  is autonomous (its needs are emergent, not statically scopable), **prompt-injectable** (memory
-  poisoning, already flagged in ADR-084), and can spawn/delegate. An org-wide-read agent + injection = an
-  **exfiltration tool wielding legitimate, audited-as-normal access.** *Forces:* content-as-data-not-
-  instructions, per-task capability scoping, human-in-the-loop for high-impact actions, and egress control.
-- **Delegation / on-behalf-of `[must]`.** When agent A acts for user U across a multi-hop chain, the
-  effective authority must be the **intersection**, not an accidental union, of identities. *Forces:*
-  proper token exchange (RFC 8693) and a way to reason about chained authority. This is the core hard
-  problem of machine identity.
+**The agent-identity model is already decided in
+[ADR-074](../adrs/074-agentic-workloads-platform.md)** — three separate identities (workload identity /
+tool-and-model grant / on-behalf-of delegation), `effective authority = intersection(agent grant, the
+caller's scope)` enforced by **trusted boundary code, never the agent**, **attenuating** non-escalating
+delegation, agents as ADR-068 subjects, a named human sponsor, a per-agent + global **kill-switch**, and
+prompt-injection defense by **provenance separation** (signed system prompt vs. untrusted conversation) —
+all on a **zero-infrastructure-privilege, propose-only** base. That base defuses the scariest framings: an
+agent has near-zero standing authority and can never exceed the live caller. So the items below are *not*
+"design the model" — they're its **open edges**, several of which ADR-074 flags itself.
+
+- **Enforcement of the invariants is the real gap `[must]`.** ADR-074 *decides* the invariants
+  (propose-only, no-bypass, zero-privilege, intersection/attenuation) but explicitly **defers the admission
+  surface** that makes a violating agent un-admittable — *"the Kyverno surface is to be designed, or the
+  invariants are only an intention."* *Forces:* that Kyverno/admission policy + the under-specified
+  `auto-policy-gate`; it rides the rebuild-gated AccessGrant, so "one access model" is target, not interim.
+- **Ordinary-workload bounds: allowlist, not deny-set `[must]`.** Distinct from agents — non-agent
+  workloads churn thousands/day with **no human review loop**, yet are bounded by ADR-041's
+  `policyStatements` *deny-set*, a blocklist that doesn't scale safely. *Forces:* automatically-derived
+  **allowlist** bounds from declared needs, since there's no re-attestation backstop.
 - **Ephemeral attribution `[op]`.** The identity that touched a bucket at 3am no longer exists. *Forces:*
-  recording the **genealogy** (ephemeral-id → workload → deployment → team → human owner) so any past
-  machine action is attributable — a forensic requirement, and a real observability build at scale.
-- **Runaway containment `[op]`.** Killing a misbehaving agent ≠ killing a human session: you must stop the
-  process **and** revoke its tokens **and** **cascade-kill** every sub-agent/delegated token it minted.
+  recording the **genealogy** (ephemeral-id → workload → deployment → team → human sponsor) so any past
+  machine action is attributable — a forensic requirement and a real observability build.
+- **Runaway containment beyond the single agent `[op]`.** ADR-074 has a per-agent + global kill-switch; the
+  open delta is **cascade** (killing an agent must revoke its sub-agents and delegated tokens) and the
+  cross-plane correlation (§3.5).
 - **Root-of-trust & multi-cloud `[later]`.** "No static keys" still bottoms out in *something* trusted; a
-  compromised node or bad token-projection is an identity-forgery factory. And Pod Identity (AWS-locked) ≠
-  SPIFFE (the cloud-neutral fabric, a major build) — the multi-cloud workload-identity story is a headline,
-  not a slash.
+  compromised node is an identity-forgery factory. And Pod Identity (AWS-locked) ≠ SPIFFE (the cloud-neutral
+  fabric, a major build) — the multi-cloud workload-identity story is a headline, not a slash.
 
-### 3.5 The cross-plane seams (where four foundations break)
+### 3.5 The cross-plane seams — mostly bounded by ADR-074, with residuals
 
-Real work crosses planes constantly, and each crossing breaks a §1 principle that assumed single-plane
-actions. These are the most differentiating problems to solve well.
+ADR-074's `effective authority = intersection(agent grant, live caller scope)` + zero-privilege already
+**bounds** most cross-plane risk: an agent can't exceed the live human, and the enforcement point is the
+**trusted boundary** (context + action + gate) — so principle 2 holds (there's no *central* PDP; the
+boundary *is* the decision point). What remains are genuine residual edges:
 
-- **Delegation voids the operator-plane auth investment `[must]`.** The moment a human delegates to an
-  agent, MFA/step-up/short-session (§3.1) **don't apply to the agent holding the token** — inject it and
-  you've phished the human without touching them. *Forces:* scoped, short-lived, revocable delegation —
-  the human's authority must *attenuate* into the agent, never transfer wholesale.
-- **"No central PDP" has no answer for composed authority `[must]`.** No single native enforcement point
-  sees the whole `human → agent → workload` chain, so nobody authorizes the *composition*. *Forces:* a
-  narrow, explicit **cross-plane decision point** — the one bounded exception to principle 2 — or accept
-  silent over-grant.
-- **Offboarding does not cross planes `[must]`.** "Delete the file → gone everywhere" is **false**: a
-  human's authority delegated to a long-running agent persists after they're offboarded. *Forces:* a
-  cross-plane offboarding **cascade** that reaches delegated machine authority, not just the roster.
+- **Auth-strength doesn't follow the human into the agent `[must]`.** The intersection bounds *breadth*,
+  but the human's MFA / step-up (§3.1) doesn't automatically gate the *agent's* actions. *Forces:* a
+  decision on **step-up / re-confirmation at the delegation boundary** for high-impact actions (ADR-074's
+  tiered human-gate partly supplies this — the auth-strength tie-in is the unspecified part).
+- **Offboarding — mostly solved, with a residual `[op]`.** Because authority is `intersection(…, live
+  human)`, offboarding a human **collapses** the intersection — the agent can no longer act for them.
+  Residual: clean up **long-running agent sessions/tokens** minted before offboarding. *Forces:* tying the
+  agent kill-switch (§3.4) to human-lifecycle events.
 - **Trust-edge explosion `[op]`.** "Narrow edges, no ambient trust" → an unauditable N² mesh, or
-  capitulation to broad ambient trust. *Forces:* a systematic **trust-derivation fabric** (service-mesh /
-  SPIFFE-based authz that mints edges from identity + intent), not hand-authored edges.
-- **Isolation fights accountability `[op]`.** You need plane isolation for trust *and* cross-plane
-  correlation for accountability (and forensics). *Forces:* an identity-correlation fabric that answers
-  "who is ultimately responsible" **without** becoming the ambient-trust backdoor — and a **cross-plane
-  kill-switch** that burns down everything traceable to a principal across planes.
+  capitulation to broad ambient trust, as services/agents multiply. *Forces:* a systematic
+  **trust-derivation fabric** (service-mesh / SPIFFE-based authz minting edges from identity + intent).
+- **Isolation fights accountability `[op]`.** Plane isolation for trust fights cross-plane correlation for
+  accountability (and forensics). *Forces:* a correlation fabric that answers "who is ultimately
+  responsible" **without** becoming the ambient-trust backdoor — its operational face is the cross-plane
+  kill-switch.
 - **The deferred consumer seam is the most security-critical `[later]`.** The
   `consumer → machine → operator` path connects untrusted outsiders to internals; deferring CIAM deferred
   the design of the seam that matters most. *Forces:* deliberate seam discipline now so it isn't a
@@ -411,6 +416,7 @@ actions. These are the most differentiating problems to solve well.
 | **068** product-scoped model: groups=identity, roles=access, `AccessGrant`, OIDC cluster-auth, release-approver/team-admin | **Kept** as the workforce access model. **Extended** with the non-builder role catalog (§2.2) + the unified temporary-power model (§2.3). Its CIAM deferral is **kept** (§2.7). |
 | **040** posture = stage×tier, break-glass | **Generalized** into eligibility-in-git + timed activation for *all* powerful roles (§2.3). |
 | **084** identity directory: discovered handles, PagerDuty on-call, email-never-a-key, PII-never-in-git | **Kept** as the runtime resolution + handle store; **composed** with the declared Person roster (access in git, handles in the directory — §2.4). |
+| **074** agentic-workloads — the agent-identity model (three identities, intersection-authority, attenuating delegation, kill-switch, propose-only) | **Owns the machine/agent plane.** This doc **defers to it** (§3.4/§3.5); the open work is ADR-074's own deferred *enforcement* (the admission surface), not a new model. |
 | **072** GitHub org-team ownership; **039/041/047** k8s RBAC + Pod Identity | **Connectors** in the fan-out (§2.6) + the machine-plane base (§3.4). |
 
 ---
@@ -429,9 +435,10 @@ Workforce-first, sequenced by value-per-effort. **Hardening is not a later phase
    emergency revocation alongside.
 4. **PagerDuty + Slack connectors** — rotation + channel/usergroup membership; live on-call.
 5. **OIDC-native cluster auth** — Keycloak as EKS OIDC IdP (ADR-068 §6); retire IAM-federation kubectl.
-6. **Machine-plane & seams hardening** — the §3.4/§3.5 `[must]` items (allowlist bounds, agent
-   containment, delegation semantics, cross-plane offboarding); likely its own ADR. *The hardest and most
-   differentiating work — the core of the scale demonstration.*
+6. **Machine-plane & seams hardening** — the §3.4/§3.5 `[must]` items: **enforcement of ADR-074's
+   already-decided agent invariants** (the deferred admission surface + `auto-policy-gate`), allowlist
+   workload bounds, and the cross-plane residuals (delegation step-up, kill-switch cascade). **Extends
+   ADR-074**, not a new ADR. *The hardest, most differentiating work — the core of the scale demonstration.*
 
 *(Out of this roadmap: the consumer plane / CIAM — a later, separately-scoped effort once real end-users
 exist.)*
@@ -440,8 +447,10 @@ exist.)*
 
 ## 6. Open questions (the real forks)
 
-1. **Cross-plane decision point** — do we accept a narrow runtime PDP for composed `human→agent→workload`
-   authority (§3.5), the one exception to "no central PDP"? *(Lean: yes, bounded.)*
+1. **Agent-invariant enforcement surface** — ADR-074 puts agent authorization at the *trusted boundary*
+   (so principle 2 holds — no central PDP) but defers the **admission policy** that makes a violating agent
+   un-admittable, and the `auto-policy-gate` spec. What does that Kyverno surface look like? *(Open per
+   ADR-074's own gap.)*
 2. **Machine bounds** — automatically-derived allowlist vs. the current deny-set for workload access
    (§3.4)? *(Lean: allowlist, since there's no review loop.)*
 3. **Declared vs. discovered handles** — does the Person roster carry bootstrap handles (the `declared`
@@ -464,6 +473,7 @@ exist.)*
   [084](../adrs/084-platform-identity-directory-and-owner-resolution.md) ·
   [039](../adrs/039-per-team-developer-rbac.md) ·
   [049](../adrs/049-tenant-model-team-tenant-zone.md) ·
-  [067](../adrs/067-idp-domain-model.md) · [072](../adrs/072-app-repo-naming-and-team-ownership.md)
+  [067](../adrs/067-idp-domain-model.md) · [072](../adrs/072-app-repo-naming-and-team-ownership.md) ·
+  [074](../adrs/074-agentic-workloads-platform.md)
 - **Source of truth:** the git-native `Team` CRs (`gitops/teams/`, ADR-063) + the proposed
   `gitops/people/`.
