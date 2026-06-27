@@ -300,7 +300,15 @@ spec:
                       - toEndpoints:
                           - matchLabels:
                               k8s:io.kubernetes.pod.namespace: observability
-                      # External egress is bounded to Bedrock + Slack + GitHub ONLY — the actual hardening. *.slack.com
+                      # The agent's identity directory Postgres (ADR-084 Phase 1) — the platform-directory ns, on 5432.
+                      - toEndpoints:
+                          - matchLabels:
+                              k8s:io.kubernetes.pod.namespace: platform-directory
+                        toPorts:
+                          - ports:
+                              - port: "5432"
+                                protocol: TCP
+                      # External egress is bounded to Bedrock + Slack + GitHub + Keycloak ONLY — the actual hardening. *.slack.com
                       # covers the webhook (hooks.slack.com), the Socket Mode API (slack.com/apps.connections.open),
                       # and the Socket Mode WebSocket (wss-*.slack.com); api.github.com is the change-correlation read
                       # (get_change_detail). All egress-only.
@@ -309,6 +317,8 @@ spec:
                           - matchName: "slack.com"
                           - matchPattern: "*.slack.com"
                           - matchName: "api.github.com"
+                          # Keycloak — the directory-sync reads federated identities from the realm (ADR-084 Phase 1).
+                          - matchName: "keycloak.aws.refplat.org"
                         toPorts:
                           - ports:
                               - port: "443"
