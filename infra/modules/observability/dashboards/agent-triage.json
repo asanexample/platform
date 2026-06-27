@@ -341,6 +341,119 @@
           "legendFormat": "{{gen_ai_tool_name}} (ok={{ok}})"
         }
       ]
+    },
+    {
+      "id": 7,
+      "type": "row",
+      "title": "Eval / calibration (ADR-076 Slice 3)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "panels": []
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Human verdicts",
+      "description": "Volume of human verdicts on triages over time (accept / correct / dismiss) — the online calibration signal.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(rate(triage_feedback_total[1h])) by (verdict)",
+          "legendFormat": "{{verdict}}"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Accept-rate by disposition",
+      "description": "Human-accept fraction per triage disposition (0–1) — the calibration signal. Of all human verdicts on triages of a given disposition (confident_lead / weak_leads / insufficient_evidence), the share that were 'accept'. Confident_leads should be accepted at a high rate; a low accept-rate there means the agent is over-confident.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 21
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(rate(triage_feedback_total{verdict=\"accept\"}[6h])) by (triage_disposition) / sum(rate(triage_feedback_total[6h])) by (triage_disposition)",
+          "legendFormat": "{{triage_disposition}}"
+        }
+      ]
     }
   ]
 }
