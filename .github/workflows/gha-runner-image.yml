@@ -38,7 +38,7 @@ jobs:
           done < .tool-versions
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6.2.0
+        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6.2.1
         with:
           role-to-assume: arn:aws:iam::829808296602:role/github-actions-ecr-push-gha-runner
           aws-region: us-east-1
@@ -63,7 +63,7 @@ jobs:
             AWSCLI_VERSION=${{ steps.tools.outputs.awscli }}
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3.10.1
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v3.10.1
         with:
           cosign-release: "v2.5.2"
 
