@@ -11,13 +11,11 @@ terraform {
   source = include.base.locals.module_source.identity_center
 }
 
-dependency "organizations" {
-  config_path = "../organizations"
-
-  mock_outputs = {
-    account_ids = { Management = "111111111111", Platform = "222222222222", Preprod = "333333333333", Prod = "444444444444" }
-  }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+# Ordering only (so a from-scratch bootstrap applies organizations first). Account IDs come from
+# include.base.locals.account_ids (SOPS, ADR-066) — NOT a dependency output, because Terragrunt evaluates
+# `locals` before dependency outputs are available, and the generation below runs in `locals`.
+dependencies {
+  paths = ["../organizations"]
 }
 
 # ---------------------------------------------------------------------------------------------------
@@ -60,10 +58,10 @@ locals {
 
   # Account targets. Platform roles scope by permission set (admin/RO everywhere; PowerUser off the mgmt account);
   # team developer access is preprod-only (the per-team DeveloperAccess-<team> launchpad, ADR-039).
-  acct_mgmt     = include.base.locals.account_id
-  acct_platform = dependency.organizations.outputs.account_ids["Platform"]
-  acct_preprod  = dependency.organizations.outputs.account_ids["Preprod"]
-  acct_prod     = dependency.organizations.outputs.account_ids["Prod"]
+  acct_mgmt     = include.base.locals.account_ids["mgmt"]
+  acct_platform = include.base.locals.account_ids["platform"]
+  acct_preprod  = include.base.locals.account_ids["preprod"]
+  acct_prod     = include.base.locals.account_ids["prod"]
   all_accounts  = [local.acct_mgmt, local.acct_platform, local.acct_preprod, local.acct_prod]
   ps_accounts = {
     AdministratorAccess = local.all_accounts
