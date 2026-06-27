@@ -106,7 +106,6 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-050: Shared `build-sign` Reusable Workflow + Shared-Signer Policy Model](050-shared-build-sign-reusable-workflow.md) | Accepted |
 | [ADR-056: Progressive Delivery & Safe Rollback](056-progressive-delivery-and-safe-rollback.md) | Proposed |
 | [ADR-085: Workload Availability — Graceful Draining & Disruption-Tolerance Defaults](085-workload-availability-graceful-disruption-defaults.md) | Proposed |
-| [ADR-086: Autonomous Agent Access — Graduated Autonomy under Machine-Enforced Guardrails](086-autonomous-agent-access.md) | Proposed |
 | [ADR-071: Image-Digest Promotion via the Control Plane (Protected-Main Delivery)](071-digest-promotion-via-control-plane.md) | Accepted |
 | [ADR-072: App-Repo Naming & Team Ownership](072-app-repo-naming-and-team-ownership.md) | Accepted |
 
