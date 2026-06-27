@@ -131,10 +131,10 @@ inputs = {
 
   # The signed image built by the asanexample/backstage repo CI (platform/backstage). Bump this SHA +
   # re-apply to roll out a new portal build (Terragrunt-deployed; not GitOps like the tenant apps).
-  # dd4bad6d (backstage#47) adds the platform:add-service-resource action that backs the New Resource template
-  # (ADR-073 #553 self-service write path). Carries forward 8c029ab1 (the resource catalog projection, #46) +
-  # 16ce1f23 (#43) + d7abb78a (#42) + 754254ba (#41) + the v1beta1 projection (#38).
-  image_tag = "dd4bad6dac498b107cd021c53e3f473784de7a73"
+  # 5550b0ae (backstage#48) adds the "Connect accounts" sidebar link to the Keycloak Account Console (link
+  # GitHub+Slack → @mentionable by the triage agent, ADR-084 Phase 1). Carries forward dd4bad6d (#47, the
+  # add-service-resource action), 8c029ab1 (#46), 16ce1f23 (#43), d7abb78a (#42), 754254ba (#41), v1beta1 (#38).
+  image_tag = "5550b0aec9c2fa1164bab09d0a0d1d6ee3f762e7"
 
   # platform-projection catalog mode = v3 (Product=System, Environment=custom kind). The v2 projection branch is
   # inert (nothing reads it); removing it + this flag is a backstage-repo follow-up.
