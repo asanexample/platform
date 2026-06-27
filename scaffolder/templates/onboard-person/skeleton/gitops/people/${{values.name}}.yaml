@@ -1,5 +1,5 @@
 # ${{ values.name }} — workforce roster entry (identity strategy §2.4, #886). Access facts only — no PII; the
-# real identity (email/name) lives in Keycloak + the ADR-084 directory. Authored via the Backstage Manage Person
+# real identity (email/name) lives in Keycloak + the ADR-084 directory. Authored via the Backstage Onboard Person
 # template; the People Gate authorizes the grants below.
 apiVersion: platform.refplat.org/v1beta1
 kind: Person

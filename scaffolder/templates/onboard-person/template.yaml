@@ -1,21 +1,22 @@
-# Manage Person (identity strategy §2.5, #890): the authoring UX over the workforce roster — joiner/mover as a
-# form, not hand-edited YAML. Emits a gitops/people/<name>.yaml PR (create OR overwrite-to-change-grants);
-# PROPOSES, never grants — the People Gate authorizes (team-lead approval for a team grant, access-admin for a
-# platform grant). Server-side it verifies the requester is a member of the team they're granting into; the
-# authoritative validation (role ∈ catalog, team exists, reach matches) is the gate.
-#
-# Offboarding (removing a Person) is a gated hand-authored deletion PR — the People Gate routes it to an
-# access-admin approval — same as the environment-purge pattern (a portal "offboard" template would need an
-# app-repo custom delete action, tracked separately).
+# Onboard Person (identity strategy §2.5, #890): the joiner UX over the workforce roster — add a person as a
+# form, not hand-edited YAML. Authors a fresh gitops/people/<name>.yaml PR (the form is the person's complete
+# access — a new name onboards; an existing name RE-SETS their grants to what's selected, since the template
+# renders a fresh file rather than reading current state — so it's onboard / simple-reset, NOT an incremental
+# grant editor: a true add/remove-one-grant mutation needs a read-modify action, a follow-up). PROPOSES, never
+# grants — the People Gate authorizes (team-lead approval for a team grant, access-admin for a platform grant).
+# Server-side it verifies the requester is a member of the team they're granting into; the authoritative
+# validation (role ∈ catalog, team exists, reach matches) is the gate. Removing a person is the Offboard Person
+# template.
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
-  name: manage-person
-  title: Manage Person (onboard / change access)
+  name: onboard-person
+  title: Onboard Person
   description: >-
-    Onboard a teammate or change their access: authors the git-native Person object (a Keycloak anchor + role
-    grants) as a reviewed pull request. Nothing is granted until the PR is merged — the People Gate routes it to
-    the right approver (the team's lead for a team grant, an access-admin for a platform grant).
+    Add a teammate to the roster (or re-set a person's access): authors the git-native Person object (a Keycloak
+    anchor + role grants) as a reviewed pull request. The form is the person's COMPLETE access — for an existing
+    person it replaces their grants. Nothing is granted until the PR is merged — the People Gate routes it to the
+    right approver (the team's lead for a team grant, an access-admin for a platform grant).
   tags:
     - self-service
     - identity
@@ -117,14 +118,14 @@ spec:
       action: publish:github:pull-request
       input:
         repoUrl: github.com?owner=asanexample&repo=platform
-        branchName: person/manage-${{ parameters.name }}
+        branchName: person/onboard-${{ parameters.name }}
         targetBranchName: main
-        title: 'feat(people): manage access for ${{ parameters.name }}'
-        commitMessage: 'feat(people): manage access for ${{ parameters.name }}'
+        title: 'feat(people): onboard ${{ parameters.name }}'
+        commitMessage: 'feat(people): onboard ${{ parameters.name }}'
         description: |
           Onboards / updates the access of **${{ parameters.name }}** (anchor `${{ parameters.person }}`).
 
-          Requested via the Backstage **Manage Person** template by `${{ user.ref | default('unknown', true) }}` (audit attribution).
+          Requested via the Backstage **Onboard Person** template by `${{ user.ref | default('unknown', true) }}` (audit attribution).
 
           | | |
           |---|---|
