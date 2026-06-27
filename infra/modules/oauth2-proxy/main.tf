@@ -22,7 +22,7 @@ locals {
     "email_domains = ${jsonencode(var.email_domains)}",
     "scope = \"${local.oidc_scope}\"",
     "cookie_secure = true",
-    "cookie_domain = \"${local.cookie_domain}\"",
+    "cookie_domains = [\"${local.cookie_domain}\"]",
     "whitelist_domains = [\"${local.cookie_domain}\"]",
     "http_address = \"0.0.0.0:4180\"",
     "reverse_proxy = true",
