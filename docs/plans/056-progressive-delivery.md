@@ -54,21 +54,28 @@ cost. No metric gates yet.
 
 **Phase 1 exit:** every preprod workload is a Rollout, deploys are zero-drop, all ADR-085 guarantees still hold.
 
-## Phase 2 — Gateway canary + metric gates (prod-shaped)
+## Phase 2 — Gateway canary + metric gates
 
-The real progressive delivery, on the path Phase 1 laid.
+The real progressive delivery, on the path Phase 1 laid. **Not gated on a prod cluster** — the two halves have
+different prerequisites, and neither is prod-ness:
 
-- **W7 — Gateway canary wiring**: the stable+canary Service pair + weighted HTTPRoute per app; reconcile with
-  the PR-preview `name-reference.yaml` / `preview-routing-check` so the second backendRef isn't mis-rewritten.
-- **W8 — analysis infra**: a default `AnalysisTemplate` (Beyla RED metrics — success-rate + p99 latency) against
-  the hub Mimir with the `X-Scope-OrgID` header; a **NetworkPolicy** letting the rollouts-controller namespace
-  reach `mimir-gateway` (obs ns is default-deny — reuse the `platform.refplat.org/runtime: platform-agent`
-  label or add a policy). Tune `failureLimit` / `consecutiveErrorLimit` / `initialDelay`.
+- **W7 — Gateway canary wiring (no metric/cluster dependency — buildable on preprod NOW).** The Argo Rollouts
+  Gateway-API traffic-router plugin (+ its HTTPRoute RBAC) on the existing `argo-rollouts` controller; per app a
+  stable+canary Service pair + weighted HTTPRoute; reconcile with the PR-preview `name-reference.yaml` /
+  `preview-routing-check` so the second backendRef isn't mis-rewritten. Cilium honors weighted backendRefs
+  (Phase-0 proven), so a real stepped canary can be validated on **preprod** immediately. **De-risk first** (the
+  plugin is pre-1.0 and the Cilium+plugin combo is lightly trodden): a spike running one canary Rollout end to
+  end before building the module change.
+- **W8 — metric-gated analysis (gated on the Mimir READ path, not prod).** A default `AnalysisTemplate` (Beyla
+  RED metrics — success-rate + p99 latency) querying Mimir with the `X-Scope-OrgID` header; a **NetworkPolicy**
+  letting the rollouts-controller namespace reach `mimir-gateway` (obs ns is default-deny). The real constraint:
+  the rollout's cluster must be able to *read* Mimir. On the **hub** (platform) that's local — metric gates work
+  there today. On a **spoke** (preprod, and any future prod) Mimir is write-only, so a spoke→hub Mimir **read
+  route** must be wired first (a small networking task, not a new cluster). So W8 lands either by (a) wiring the
+  preprod→hub read path, or (b) validating on the hub for platform-team Rollouts.
 - **W9 — tier-keyed strategy**: the canary strategy becomes a per-stage property (dev/preprod trivial →
   prod/standard stepped+gated). Where this is templated (scaffolder overlays vs the Composition) is the open
   design choice for this phase.
-- **Note:** real metric-gated canary needs a **prod cluster** (preprod is write-only to Mimir). Until one is
-  registered (ADR-081), W8/W9 are validated on the platform/hub cluster (which can read Mimir) or held.
 
 ## Phase 3 — Governance gates
 
@@ -86,7 +93,8 @@ The real progressive delivery, on the path Phase 1 laid.
 ## Rollout & sequencing
 
 Phase 0 (preprod spike) → Phase 1 (migrate, preprod then platform; the trivial strategy is safe — auto-promote,
-no traffic split) → Phase 2/3 gated on the prod cluster. Apply per the `apply-and-destroy` rules
+no traffic split) → Phase 2 Gateway canary on preprod now (W7), metric gates once the Mimir read path is wired
+(W8) → Phase 3. Apply per the `apply-and-destroy` rules
 (`AWS_PROFILE=management`, plan-check `0 to destroy`, preprod before platform). The install (W1) is a new unit
 in the DAG; the policy extension (W2) and scaffolder (W4) are the coupling-sensitive pieces — land them with the
 migration, not before workloads are Rollouts.

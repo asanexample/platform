@@ -78,14 +78,17 @@ a **stable + canary Service** (both ClusterIP) as weighted backends of its singl
 hostname is unchanged, so `restrict-route-hostnames` is not triggered. Lower envs may omit `trafficRouting`
 (basic replica-based canary). A mesh is revisited only for *east-west* canary ([ADR-057](057-service-identity-and-east-west-zero-trust.md)).
 
-### D5 — Metric gates use Beyla RED metrics via the hub Mimir; lower envs don't gate
+### D5 — Metric gates use Beyla RED metrics; the constraint is the Mimir READ path, not prod-ness
 
 There are no per-app SLOs yet (only a control-plane apiserver SLO), so the default canary gate is **Beyla RED
 metrics** — auto-emitted per workload, no instrumentation. AnalysisTemplates query Mimir with an
 `X-Scope-OrgID: <cluster-tenant>` header, and the rollouts-controller namespace needs a **NetworkPolicy** to
-reach `mimir-gateway` (the `observability` namespace is default-deny). **Mimir is hub-only** — preprod is a
-write-only spoke with no read path — so **metric-gated canary is a prod concern**; lower envs auto-promote
-(D3). (Per-app Sloth SLOs can be authored later to replace/augment the Beyla gate.)
+reach `mimir-gateway` (the `observability` namespace is default-deny). The real prerequisite is that **the
+rollout's cluster can READ Mimir**: on the **hub** (platform) Mimir is local, so metric gates work there today;
+on a **spoke** (preprod, and any future prod) Mimir is write-only (remote-write up, no read down), so a
+spoke→hub Mimir **read route** must be wired first — a small networking task, *not* a new cluster. So metric
+gates are gated on that read path, not on prod-ness; lower envs auto-promote without gates regardless (D3).
+(Per-app Sloth SLOs can be authored later to replace/augment the Beyla gate.)
 
 ### D6 — Error budgets gate change velocity
 
@@ -144,9 +147,10 @@ consolidation.
   standardizing.
 - **Kyverno autogen for `Rollout`** if we pursue Rollout-template fast-fail — missing-CRD breaks policy
   creation, and mixed standard+custom autogen is buggy (#7446); keep any Rollout autogen in its own rule.
-- **No prod cluster exists yet** (preprod is today's tenant cluster) — so metric-gated canary (D5) is partly
-  forward-looking; Phase 1 delivers Rollouts-everywhere with the trivial strategy, Phase 2+ the Gateway canary
-  and analysis.
+- **Metric gates need the spoke→hub Mimir read path** (D5) — not a new cluster. The Gateway canary itself works
+  on preprod today (Cilium honors weighted backendRefs); only the *metric-gated* half waits on wiring a
+  preprod→hub Mimir read route (or runs on the hub for platform-team Rollouts). Phase 1 delivers
+  Rollouts-everywhere with the trivial strategy; Phase 2 adds the Gateway canary (preprod-ready) then analysis.
 
 ## Related
 
