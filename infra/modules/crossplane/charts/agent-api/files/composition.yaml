@@ -308,7 +308,13 @@ spec:
                           - ports:
                               - port: "5432"
                                 protocol: TCP
-                      # External egress is bounded to Bedrock + Slack + GitHub + Keycloak ONLY — the actual hardening. *.slack.com
+                      # Keycloak (in-cluster service keycloak-http) — the directory-sync reads federated identities
+                      # from the realm (ADR-084 Phase 1). In-cluster, NOT via the external gateway FQDN (that path is
+                      # unreliable from in-cluster — it timed out in testing).
+                      - toEndpoints:
+                          - matchLabels:
+                              k8s:io.kubernetes.pod.namespace: keycloak
+                      # External egress is bounded to Bedrock + Slack + GitHub ONLY — the actual hardening. *.slack.com
                       # covers the webhook (hooks.slack.com), the Socket Mode API (slack.com/apps.connections.open),
                       # and the Socket Mode WebSocket (wss-*.slack.com); api.github.com is the change-correlation read
                       # (get_change_detail). All egress-only.
@@ -317,8 +323,6 @@ spec:
                           - matchName: "slack.com"
                           - matchPattern: "*.slack.com"
                           - matchName: "api.github.com"
-                          # Keycloak — the directory-sync reads federated identities from the realm (ADR-084 Phase 1).
-                          - matchName: "keycloak.aws.refplat.org"
                         toPorts:
                           - ports:
                               - port: "443"
