@@ -22,6 +22,11 @@
 # grants, access-admin for platform grants/offboarding). This entry is the review-request signal.
 /gitops/people/          @gangster
 
+# The workforce role catalog (identity strategy §2.2 / §3.6, #887): changing a role re-permissions everyone who
+# holds it (the highest-blast-radius change), so it's admin-gated. The HARD gate is the Roles Gate's "Roles
+# Approval" required check (two-person control / meta-governance). This entry is the review-request signal.
+/gitops/roles/           @gangster
+
 # Scaffolder templates: a template defines what a self-service portal run can author (and what can
 # auto-merge), so template changes are platform-only — same review bar as the sensitive infra paths.
 /scaffolder/             @gangster

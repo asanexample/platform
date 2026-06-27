@@ -13,5 +13,5 @@ spec:
   handles:
     github: gangster # bootstrap (ADR-084 `declared`) — the release-approver login across the registries.
   grants:
-    - { role: platform-admin, scope: platform } # standing — the platform owner
-    - { role: access-admin, scope: platform }   # standing — authorizes platform-role grants (the gate's access-admin)
+    - { role: access-admin, scope: platform }                       # standing — runs the access system (the gate's access-admin)
+    - { role: break-glass, scope: platform, activation: on-demand } # eligible — the time-boxed emergency door

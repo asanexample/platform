@@ -1,0 +1,22 @@
+# viewer — read-only, SCOPE-ADJUSTABLE: one product/team for a business user, org-wide for an exec (identity
+# strategy §2.2). reach=any → the grant picks team vs platform; the generators read-only the matching surface.
+apiVersion: platform.refplat.org/v1beta1
+kind: WorkforceRole
+metadata:
+  name: viewer
+  labels: { app.kubernetes.io/managed-by: argocd, app.kubernetes.io/part-of: identity-access }
+spec:
+  reach: any
+  power: look
+  mode: standing
+  riskTier: standard
+  description: Read-only; scope-adjustable (a single team/product for a business user, org-wide for an exec).
+  identityCenter:
+    perTeam: false
+    permissionSet: ReadOnlyAccess
+    sessionDuration: PT8H
+    managedPolicies: ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
+    note: "applies when granted at platform scope; a team-scoped viewer is app-only (Keycloak), no AWS console"
+  keycloak:
+    realmRole: viewer
+    perTeamGroup: true

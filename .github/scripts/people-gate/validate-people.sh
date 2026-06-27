@@ -8,18 +8,15 @@
 # backstop:
 #   1. data hygiene  — no symlinks / multi-doc / oversize; metadata.name matches the filename
 #   2. schema shape  — kind/apiVersion; required fields; no unknown keys; one reach per grant
-#   3. ref integrity — every team grant targets an existing Team (gitops/teams, from BASE); roles ∈ the catalog
+#   3. ref integrity — every grant's role exists in the catalog (gitops/roles, #887) and the role's reach
+#                       permits the grant's scope; every team grant targets an existing Team. Both from BASE.
 #   4. anchor uniqueness — a Keycloak anchor (spec.person) maps to at most one Person
-#
-# The role catalog is provisional until #887 formalizes it; tune via TEAM_ROLES / PLATFORM_ROLES.
 #
 # Env in:
 #   BASE_DIR, HEAD_DIR     the two checkouts
 #   PEOPLE_FILES           space-separated added/modified gitops/people/*.yaml (relative)
 #   PEOPLE_DELETED_FILES   space-separated removed/renamed-away Person files (relative)
 #   REPORT_MD              output markdown body for the sticky comment
-#   TEAM_ROLES             space-separated team-scoped role catalog (default: developer viewer team-admin release-approver)
-#   PLATFORM_ROLES         space-separated platform-scoped role catalog (default: platform-admin platform-operator access-admin auditor viewer)
 # Requires: yq (mikefarah).
 # NOTE: -e is intentionally omitted — checks accumulate ALL failures and fail closed via the explicit exit.
 set -uo pipefail
@@ -27,8 +24,6 @@ set -uo pipefail
 : "${BASE_DIR:?}" "${HEAD_DIR:?}" "${REPORT_MD:?}"
 PEOPLE_FILES="${PEOPLE_FILES:-}"
 PEOPLE_DELETED_FILES="${PEOPLE_DELETED_FILES:-}"
-TEAM_ROLES="${TEAM_ROLES:-developer viewer team-admin release-approver}"
-PLATFORM_ROLES="${PLATFORM_ROLES:-platform-admin platform-operator access-admin auditor viewer}"
 
 NAME_RE='^[a-z][a-z0-9-]{1,30}$'
 ANCHOR_RE='^[a-zA-Z0-9._-]{1,64}$'   # a Keycloak username or sub — no PII, no '@' (email is never the anchor)
@@ -36,6 +31,7 @@ GH_LOGIN_RE='^[A-Za-z0-9-]{1,39}$'
 VALID_SCOPES=" platform "
 VALID_ACTIVATION=" on-demand "
 TEAMS_DIR="${BASE_DIR}/gitops/teams"
+ROLES_DIR="${BASE_DIR}/gitops/roles"   # the WorkforceRole catalog (#887) — grants reference these by name
 PEOPLE_DIR_BASE="${BASE_DIR}/gitops/people"
 
 in_list() { case " $2 " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
@@ -115,7 +111,18 @@ for pf in $PEOPLE_FILES; do
 
     [ -n "$role" ] || note "${pf}: grant[${i}].role is required"
 
-    # exactly one reach (team xor scope)
+    # role must exist as a real artifact in the catalog (gitops/roles, #887) — read its declared reach (trusted base)
+    role_reach=""
+    if [ -n "$role" ]; then
+      rolefile="${ROLES_DIR}/${role}.yaml"; [ -f "$rolefile" ] || rolefile="${ROLES_DIR}/${role}.yml"
+      if [ ! -f "$rolefile" ]; then
+        note "${pf}: grant[${i}] role '${role}' does not exist in the catalog (gitops/roles/) — add the WorkforceRole first (#887)"
+      else
+        role_reach="$(yq '.spec.reach // ""' "$rolefile" 2>/dev/null)"
+      fi
+    fi
+
+    # exactly one reach (team xor scope), and it must be one the role permits
     reach_count=0
     [ -n "$team" ] && reach_count=$((reach_count + 1))
     [ -n "$scope" ] && reach_count=$((reach_count + 1))
@@ -127,10 +134,11 @@ for pf in $PEOPLE_FILES; do
         if [ ! -f "${TEAMS_DIR}/${team}.yaml" ] && [ ! -f "${TEAMS_DIR}/${team}.yml" ]; then
           note "${pf}: grant[${i}] team '${team}' does not exist in gitops/teams/"
         fi
-        [ -z "$role" ] || in_list "$role" "$TEAM_ROLES" || note "${pf}: grant[${i}] role '${role}' is not a team role {${TEAM_ROLES}}"
+        # the role's reach must allow a team-scoped grant
+        [ -z "$role_reach" ] || in_list "$role_reach" " team any " || note "${pf}: grant[${i}] role '${role}' (reach '${role_reach}') cannot be granted at team scope"
       else
         in_list "$scope" "$VALID_SCOPES" || note "${pf}: grant[${i}] scope '${scope}' not in {${VALID_SCOPES# }}"
-        [ -z "$role" ] || in_list "$role" "$PLATFORM_ROLES" || note "${pf}: grant[${i}] role '${role}' is not a platform role {${PLATFORM_ROLES}}"
+        [ -z "$role_reach" ] || in_list "$role_reach" " platform any " || note "${pf}: grant[${i}] role '${role}' (reach '${role_reach}') cannot be granted at platform scope"
       fi
     fi
 
@@ -182,7 +190,7 @@ done < <(sort -u "$anchors_tmp" | awk -F'\t' '{c[$1]++} END {for (a in c) if (c[
   fi
   echo
   echo "---"
-  echo "_Role catalog (provisional, #887): team {\`${TEAM_ROLES}\`}; platform {\`${PLATFORM_ROLES}\`}._"
+  echo "_Grant roles are validated against the \`gitops/roles\` catalog (#887): the role must exist and its reach must permit the grant's scope._"
 } >"$REPORT_MD"
 
 if [ "$overall_rc" -ne 0 ]; then

@@ -29,6 +29,35 @@ metadata: { name: existing }
 spec: { person: taken, grants: [{ role: developer, team: alpha }] }
 Y
 
+# Trusted base: the role catalog (#887). Grants reference these by name; the role's reach gates the grant scope.
+# Note 'platform-admin' is intentionally absent (it's not a catalog role) so the unknown-role case can assert deny.
+mkdir -p "${base}/gitops/roles"
+role() { cat >"${base}/gitops/roles/$1.yaml"; }
+role developer <<'Y'
+apiVersion: platform.refplat.org/v1beta1
+kind: WorkforceRole
+metadata: { name: developer }
+spec: { reach: team, power: change, mode: standing, riskTier: standard, description: dev }
+Y
+role viewer <<'Y'
+apiVersion: platform.refplat.org/v1beta1
+kind: WorkforceRole
+metadata: { name: viewer }
+spec: { reach: any, power: look, mode: standing, riskTier: standard, description: viewer }
+Y
+role platform-operator <<'Y'
+apiVersion: platform.refplat.org/v1beta1
+kind: WorkforceRole
+metadata: { name: platform-operator }
+spec: { reach: platform, power: operate, mode: on-demand, riskTier: elevated, description: op }
+Y
+role access-admin <<'Y'
+apiVersion: platform.refplat.org/v1beta1
+kind: WorkforceRole
+metadata: { name: access-admin }
+spec: { reach: platform, power: manage-access, mode: standing, riskTier: apex, description: aa }
+Y
+
 person() { # <name> <yaml-body>  → writes gitops/people/<name>.yaml under head
   local rel="gitops/people/$1.yaml"; mkdir -p "${head}/$(dirname "$rel")"; cat >"${head}/${rel}"
 }
@@ -63,10 +92,18 @@ spec:
   person: admin
   handles: { github: gangster }
   grants:
-    - { role: platform-admin, scope: platform }
+    - { role: access-admin, scope: platform }
     - { role: platform-operator, scope: platform, activation: on-demand }
 Y
 run ok "valid platform + on-demand + handle" gitops/people/valid-platform.yaml
+
+person any-reach <<'Y'
+apiVersion: platform.refplat.org/v1beta1
+kind: Person
+metadata: { name: any-reach }
+spec: { person: viewer-person, grants: [{ role: viewer, team: alpha }, { role: viewer, scope: platform }] }
+Y
+run ok "reach=any role granted at both team and platform scope" gitops/people/any-reach.yaml
 
 # --- schema / identity ------------------------------------------------------------------------------
 person bad-kind <<'Y'
@@ -154,9 +191,9 @@ person bad-team-role <<'Y'
 apiVersion: platform.refplat.org/v1beta1
 kind: Person
 metadata: { name: bad-team-role }
-spec: { person: x, grants: [{ role: platform-admin, team: alpha }] }
+spec: { person: x, grants: [{ role: platform-operator, team: alpha }] }
 Y
-run deny "platform role on a team grant" gitops/people/bad-team-role.yaml
+run deny "platform-reach role at team scope" gitops/people/bad-team-role.yaml
 
 person bad-plat-role <<'Y'
 apiVersion: platform.refplat.org/v1beta1
@@ -164,7 +201,15 @@ kind: Person
 metadata: { name: bad-plat-role }
 spec: { person: x, grants: [{ role: developer, scope: platform }] }
 Y
-run deny "team role on a platform grant" gitops/people/bad-plat-role.yaml
+run deny "team-reach role at platform scope" gitops/people/bad-plat-role.yaml
+
+person ghost-role <<'Y'
+apiVersion: platform.refplat.org/v1beta1
+kind: Person
+metadata: { name: ghost-role }
+spec: { person: x, grants: [{ role: platform-admin, scope: platform }] }
+Y
+run deny "role not in the catalog" gitops/people/ghost-role.yaml
 
 person bad-scope <<'Y'
 apiVersion: platform.refplat.org/v1beta1
