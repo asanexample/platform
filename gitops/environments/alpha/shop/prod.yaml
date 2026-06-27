@@ -1,0 +1,18 @@
+# Environment (alpha × shop × prod) — provisioned to validate the ADR-056 prod canary end-to-end. Namespace
+# alpha-shop-prod. Synced by ArgoCD (the `environments` registry-sync app) and reconciled by the Crossplane
+# Environment Composition (v3). The deployed digest is pinned in the Release (promoted from dev).
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata:
+  name: alpha-shop-prod
+  annotations:
+    platform.refplat.org/requested-by: user:default/dev-alpha
+spec:
+  team: alpha
+  product: shop
+  stage: prod
+  tier: standard
+  services:
+    web:
+      serviceAccount: app-alpha # Pod Identity binds this named SA; the app repo's serviceaccount.yaml creates it
+      # image omitted — the per-Product ApplicationSet injects the digest from the Release (ADR-071).
