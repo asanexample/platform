@@ -1,0 +1,13 @@
+# Sample developer for team bravo (ADR-039 per-team isolation). Unifies the Identity Center `bravo-dev` user
+# (Developers-bravo → Dev-bravo permission set) and the keycloak-config `dev-bravo` seed user (group bravo).
+apiVersion: platform.refplat.org/v1beta1
+kind: Person
+metadata:
+  name: bravo-dev
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/part-of: identity-access
+spec:
+  person: dev-bravo # the Keycloak anchor (the `dev-bravo` seed user / group bravo).
+  grants:
+    - { role: developer, team: bravo } # standing — everyday access to team bravo

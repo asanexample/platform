@@ -1,0 +1,128 @@
+name: People — gate on PR
+
+# Validate Person-registry changes (gitops/people/**) on a PR: schema shape, the role catalog, team-ref
+# integrity, anchor uniqueness (gate.sh sibling: validate-people.sh), AND route approval BY CONTENT — a team
+# grant needs the team's lead; a platform grant or an offboarding needs an access-admin (publish-verdict.sh →
+# the "People Approval" commit status). The sibling of the Teams Gate: People CRs GRANT access and stay
+# deliberately HUMAN-reviewed (CODEOWNERS @gangster) — this is the automated backstop a reviewer can't eyeball,
+# and is meant to be a REQUIRED status check on main. No live provisioning yet (#888/#889 project the roster).
+#
+# CI-GATE INTEGRITY: `pull_request_target` means THIS definition and every script it calls run from the
+# PROTECTED BASE BRANCH — a PR cannot edit the gate that judges it. The PR's Person CRs are checked out
+# separately, sparse, credential-free, and read strictly as YAML DATA (yq only); nothing from the head
+# checkout is ever executed, templated, or interpolated. Approver sets are read ONLY from base.
+
+# Runs on EVERY PR (no paths filter) so it can be a REQUIRED status check: a path-filtered required check would
+# never report on non-people PRs and block them forever. The classify step short-circuits — when the PR touches
+# no Person CRs the validation steps are skipped and the job passes trivially (same pattern as the Teams Gate).
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  pull_request_review:
+    types: [submitted, dismissed] # re-evaluate the "People Approval" gate when an access change is approved
+
+permissions:
+  contents: read
+  pull-requests: write # post/update the sticky gate comment
+  statuses: write # publish the "People Approval" commit status (last-write-wins)
+
+concurrency:
+  group: people-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: People Gate
+    runs-on: ubuntu-latest # pure YAML validation — no cluster/private-API access needed
+    steps:
+      # Trusted: the gate scripts + the Team list (approver authority) all come from BASE. Always runs.
+      # nosemgrep: yaml.github-actions.security.pull-request-target-code-checkout.pull-request-target-code-checkout
+      - name: Checkout base (trusted)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          path: base
+
+      # Classify FIRST (cheap, gh-api only) so the rest short-circuits on non-people PRs → the job still reports
+      # the "People Gate" check (required-check compatible) without doing any validation work.
+      - name: Classify diff
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bash base/.github/scripts/people-gate/classify-people.sh
+
+      # Untrusted: ONLY the people tree, sparse, no credentials, data-only. Nothing here runs; the scripts (from
+      # base) read these files with yq as data. Skipped when the PR touches no Person CRs.
+      # nosemgrep: yaml.github-actions.security.pull-request-target-code-checkout.pull-request-target-code-checkout
+      - name: Checkout PR people (untrusted, data-only)
+        if: steps.classify.outputs.has_people == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: head
+          sparse-checkout: gitops/people
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Install yq
+        if: steps.classify.outputs.has_people == 'true'
+        run: |
+          sudo curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Validate Person registry
+        id: gate
+        if: steps.classify.outputs.has_people == 'true'
+        env:
+          BASE_DIR: ${{ github.workspace }}/base
+          HEAD_DIR: ${{ github.workspace }}/head
+          PEOPLE_FILES: ${{ steps.classify.outputs.people_files }}
+          PEOPLE_DELETED_FILES: ${{ steps.classify.outputs.people_deleted_files }}
+          REPORT_MD: ${{ runner.temp }}/people-gate.md
+        run: |
+          set +e
+          bash base/.github/scripts/people-gate/validate-people.sh
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+
+      # The "People Approval" required check — routes by content (team-lead vs access-admin). Always runs so the
+      # check reports on every PR (non-people PRs have empty PEOPLE_FILES → no requirement → success). Reads the
+      # team approver sets + the grant diff from base/head; survives the pull_request_target→review handoff
+      # (commit statuses are last-write-wins per (sha, context)).
+      - name: Publish approval verdict (commit status)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE_DIR: ${{ github.workspace }}/base
+          HEAD_DIR: ${{ github.workspace }}/head
+          STATUS_CONTEXT: People Approval
+          SOLO_MAINTAINER: ${{ vars.SOLO_MAINTAINER }} # single-admin project: admin author self-attests (publish-verdict.sh)
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PEOPLE_FILES: ${{ steps.classify.outputs.people_files }}
+          PEOPLE_DELETED_FILES: ${{ steps.classify.outputs.people_deleted_files }}
+        run: bash base/.github/scripts/people-gate/publish-verdict.sh
+
+      - name: Post sticky gate comment
+        if: always() && steps.classify.outputs.has_people == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MARKER: "<!-- people-gate -->"
+          BODY_FILE: ${{ runner.temp }}/people-gate.md
+        run: bash base/.github/scripts/teams/sticky-comment.sh
+
+      - name: Enforce gate result
+        if: always() && steps.classify.outputs.has_people == 'true'
+        run: |
+          if [ "${{ steps.gate.outputs.rc }}" != "0" ]; then
+            echo "People gate failed — see the sticky comment on the PR." >&2
+            exit 1
+          fi
