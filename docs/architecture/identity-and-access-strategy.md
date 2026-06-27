@@ -322,11 +322,23 @@ all on a **zero-infrastructure-privilege, propose-only** base. That base defuses
 agent has near-zero standing authority and can never exceed the live caller. So the items below are *not*
 "design the model" — they're its **open edges**, several of which ADR-074 flags itself.
 
+**Propose-only is the *floor*, not the ceiling.** It's the safe tier-0 posture — but the platform's
+ambition is a fully-featured agent developer platform where selected agents *act* (e.g. real-time alert
+remediation), not only propose. Crucially, an autonomous remediation has **no live human caller**, so the
+intersection-with-caller bound doesn't apply — safety then comes entirely from **machine-enforced bounds**:
+a tight capability envelope + reversibility-as-license + action-time policy + circuit breakers + autonomy
+*earned* through evaluation. That is not "remove the guardrails"; it is *moving* them from a
+human-in-the-loop to bounds trustworthy enough to stand in.
+**[ADR-086](../adrs/086-autonomous-agent-access.md)** sketches that graduated-autonomy access model — the
+concrete build-out of the `auto-policy-gate` ADR-074 deferred.
+
 - **Enforcement of the invariants is the real gap `[must]`.** ADR-074 *decides* the invariants
   (propose-only, no-bypass, zero-privilege, intersection/attenuation) but explicitly **defers the admission
   surface** that makes a violating agent un-admittable — *"the Kyverno surface is to be designed, or the
-  invariants are only an intention."* *Forces:* that Kyverno/admission policy + the under-specified
-  `auto-policy-gate`; it rides the rebuild-gated AccessGrant, so "one access model" is target, not interim.
+  invariants are only an intention."* *Forces:* that Kyverno/admission policy + the
+  `auto-policy-gate` (the autonomous-action access model, sketched in
+  [ADR-086](../adrs/086-autonomous-agent-access.md)); it rides the rebuild-gated AccessGrant, so "one access
+  model" is target, not interim.
 - **Ordinary-workload bounds: allowlist, not deny-set `[must]`.** Distinct from agents — non-agent
   workloads churn thousands/day with **no human review loop**, yet are bounded by ADR-041's
   `policyStatements` *deny-set*, a blocklist that doesn't scale safely. *Forces:* automatically-derived
@@ -435,10 +447,11 @@ Workforce-first, sequenced by value-per-effort. **Hardening is not a later phase
    emergency revocation alongside.
 4. **PagerDuty + Slack connectors** — rotation + channel/usergroup membership; live on-call.
 5. **OIDC-native cluster auth** — Keycloak as EKS OIDC IdP (ADR-068 §6); retire IAM-federation kubectl.
-6. **Machine-plane & seams hardening** — the §3.4/§3.5 `[must]` items: **enforcement of ADR-074's
-   already-decided agent invariants** (the deferred admission surface + `auto-policy-gate`), allowlist
-   workload bounds, and the cross-plane residuals (delegation step-up, kill-switch cascade). **Extends
-   ADR-074**, not a new ADR. *The hardest, most differentiating work — the core of the scale demonstration.*
+6. **Machine-plane & seams hardening** — the §3.4/§3.5 `[must]` items: **enforcement of ADR-074's agent
+   invariants** + the **graduated-autonomy access model** ([ADR-086](../adrs/086-autonomous-agent-access.md),
+   extending ADR-074 — autonomous remediation under machine-enforced guardrails), allowlist workload bounds,
+   and the cross-plane residuals (delegation step-up, kill-switch cascade). *The hardest, most
+   differentiating work — the core of the scale demonstration.*
 
 *(Out of this roadmap: the consumer plane / CIAM — a later, separately-scoped effort once real end-users
 exist.)*
@@ -447,10 +460,11 @@ exist.)*
 
 ## 6. Open questions (the real forks)
 
-1. **Agent-invariant enforcement surface** — ADR-074 puts agent authorization at the *trusted boundary*
-   (so principle 2 holds — no central PDP) but defers the **admission policy** that makes a violating agent
-   un-admittable, and the `auto-policy-gate` spec. What does that Kyverno surface look like? *(Open per
-   ADR-074's own gap.)*
+1. **Agent autonomy & enforcement** — ADR-074 keeps agent authorization at the *trusted boundary* (so "no
+   central PDP" holds) but defers the enforcement surface and the `auto-policy-gate`.
+   [ADR-086](../adrs/086-autonomous-agent-access.md) sketches the graduated-autonomy model; the open **crux
+   is the reversibility / blast-radius classification** that licenses an action for autonomous execution.
+   *(Sketched; classification unsolved.)*
 2. **Machine bounds** — automatically-derived allowlist vs. the current deny-set for workload access
    (§3.4)? *(Lean: allowlist, since there's no review loop.)*
 3. **Declared vs. discovered handles** — does the Person roster carry bootstrap handles (the `declared`
