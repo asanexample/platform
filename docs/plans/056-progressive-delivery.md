@@ -9,6 +9,14 @@ Grounded in the design research — the standout finding is the **ADR-085 coupli
 match `Deployment` by kind and silently no-op on a `Rollout`), so the policy extension and the install ordering
 are load-bearing, not afterthoughts.
 
+> **Status (2026-06-27): Phases 0–2 DONE; Phase 3 is future.** Phase 0 spike ✅; Phase 1 (Rollouts everywhere,
+> trivial strategy) ✅ both clusters, zero-drop verified; Phase 2 — W7 Gateway canary ✅, W8/W8c metric gate ✅
+> (spoke→hub Mimir read path + background AnalysisRun), W9 tier-keyed ✅ for the prod/lower-stage split (finer
+> per-stage depth optional). **Proven end-to-end live on alpha-shop prod: a healthy canary promoted on the Mimir
+> gate; a forced-fail canary auto-rolled-back.** Both canary + blue/green shipped via the scaffolder
+> `deployStrategy`. See the ADR's "Implementation status & learnings (as-built)". Phase 3 (W10 manual gate, W11
+> error-budget freeze) remains — W11 needs per-app SLOs authored first.
+
 ## Phase 0 — De-risk (spike, gates the rest)
 
 The two pre-1.0 / lightly-trodden integrations, proven in **preprod** before committing the migration:

@@ -190,9 +190,38 @@ Net: D5's metric gate is gated on the **Mimir read path** (a spoke is write-only
 the controller→target NetworkPolicy — not on a prod cluster. The traffic-shaping canary/blue-green shapes work in
 enforced namespaces today *given* the ArgoCD `ignoreDifferences`.
 
-**Remaining:** durable per-app/scaffolder wiring (strategy = a per-workload choice, both shapes, + the
-`ignoreDifferences`); the web/Prometheus AnalysisTemplate once the netpol + Mimir read path land; tier-keyed
-strategy depth per stage (D3); the regulated manual-approval gate + error-budget freeze (D6).
+*2026-06-27 (#871–#892, alpha-shop #6–#10) — the durable wiring, the metric gate, and the live proof.*
+
+- **Per-workload strategy + ArgoCD `ignoreDifferences`** shipped (#871). A scaffolder `deployStrategy` (canary |
+  blue/green) shapes only the prod overlay (base unchanged → dev/preview stay fast, preview-safe). The tenant
+  Application `ignoreDifferences` the Service `.spec.selector` (rollouts-pod-template-hash) + HTTPRoute
+  `backendRefs[].weight`.
+- **CORRECTION to integration prereq #3 above:** `ignoreDifferences` ALONE is insufficient — it only hides the
+  fields from the *diff*; a sync triggered by any *other* change still overwrites them. The tenant Application
+  also needs **`RespectIgnoreDifferences=true`** in `syncOptions`. Caught in prod (a weight patch went OutOfSync
+  and was reverted) — the spikes couldn't surface it. Two more corrections from the same live validation: an
+  applied-but-**unmerged** module change gets clobbered by the registry-reconcile re-applying from `main` (merge,
+  don't just apply); and Argo Rollouts **fast-tracks a rollback** to an in-history revision (skips the canary
+  steps) — re-trigger a canary with a *fresh* digest. Prod's separation-of-duties gate correctly **blocks a solo
+  maintainer from deploying to prod** (needs a non-author approval) — verified, working as designed.
+- **W8c — the metric gate is BUILT + PROVEN LIVE.** The spoke→hub Mimir **read path** is an opt-in `query_tenants`
+  on the `observability-mimir` `spoke_ingest`: it adds a `/prometheus` rule to the spoke's HTTPRoute,
+  **force-setting the same tenant header** — so a spoke queries only its own metrics (no new exposure; reuses the
+  TGW + internal NLB + Gateway + CNP; no extra netpol needed — correcting prereq #2 for the *cross-cluster* case).
+  The prod canary runs a **background AnalysisRun** (Prometheus provider → that read path) over the Beyla RED
+  success rate, auto-rolling-back below 0.95. Resolves D5 — the gate is gated on the *read path*, not a prod
+  cluster (and the endpoint is the prod stage's Mimir; prod runs on preprod today, repoint when a prod cluster
+  lands).
+- **Proven end-to-end on a real prod app (alpha-shop):** a healthy deploy canaried 25→50→100% while the gate
+  queried Mimir (rate 1.0) and **promoted**; a forced-fail deploy canaried to 25%, the gate assessed **Failed**,
+  and the rollout **auto-aborted and rolled back** (traffic snapped to stable, zero sustained bad-version
+  traffic). Both `strategy.canary` and `strategy.blueGreen` proven; Kyverno admits the signed canary image in the
+  enforced prod namespace throughout.
+
+**Remaining (future):** **W9** tier-keyed *depth* — the binary (prod = gated canary, lower stages = trivial) is
+done; finer per-stage tuning (e.g. a staging canary without the gate) is optional. **Phase 3 / D6** — the
+regulated manual-approval gate (a native Rollout `pause: {}` + RBAC for deployer ≠ approver) and the error-budget
+freeze (needs per-app SLOs authored in `observability-slo` first). These are fresh efforts, not tail work.
 
 ## Related
 
