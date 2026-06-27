@@ -99,6 +99,22 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-06-27 (same unpark) — the hub Mimir QUERY PATH was silently degraded: ALL queries via the mimir
+  gateway returned EMPTY (raw metrics + recording rules), while the mimir-querier served them fine directly.**
+  Found while debugging per-app SLOs (chased a phantom "ruler write-back" bug — the recording rules were actually
+  fine; `cortex_prometheus_last_evaluation_samples` > 0, querier returned the series). Root cause: the post-unpark
+  **gossip-ring DNS-resolution failures** (CoreDNS gap; `memberlist failed to resolve mimir-gossip-ring ...
+  connection refused` in the query-frontend log) left the **query-frontend degraded**, AND the API gateway's
+  nginx held a **stale upstream** to it. Symptom signature: `mimir-querier.observability.svc:8080/.../query`
+  returns data but the `mimir-gateway` (or `preprod-mimir.aws.refplat.org`) returns empty — and 16 queriers are
+  "connected" so it *looks* healthy. **FIX:** restart the query path — `kubectl delete pod -l
+  app.kubernetes.io/component=query-frontend` (+ `=query-scheduler`), restart the querier, THEN restart the **API
+  gateway by name prefix `mimir-gateway-`** (it caches its upstream — the frontend-direct works before the gateway
+  does). ⚠️ GOTCHA: `-l app.kubernetes.io/component=gateway` ALSO matches `mimir-store-gateway` (a StatefulSet) —
+  don't bounce the store-gateway by accident; select the API gateway by name. **Post-unpark watch-item: smoke-test
+  a query through the mimir gateway (not just the querier), since this silently breaks the W8c canary metric gate
+  - W11 too.**
+
 - **2026-06-27 (same unpark) — Karpenter NodePool came back but its EC2NodeClass did NOT → zero workload capacity.**
   Symptom: `kubectl get ec2nodeclass` empty, `nodepool default` READY=False (NodeClassReady=False, "NodeClass not
   found"), karpenter logs `ignoring nodepool, not ready`, every product pod Pending (Insufficient cpu on the lone
