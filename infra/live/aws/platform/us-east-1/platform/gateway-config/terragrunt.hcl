@@ -88,6 +88,14 @@ inputs = {
       service   = "backstage"
       port      = 7007
     }
+    # Argo Rollouts web UI (ADR-056) — live operator view of THIS cluster's rollouts, behind Keycloak SSO.
+    # Routes to the oauth2-proxy (rollouts-sso unit), NOT the dashboard directly — the UI has no native auth, so
+    # the proxy authenticates every request before forwarding to argo-rollouts-dashboard. Tailscale-only.
+    rollouts = {
+      namespace = "argo-rollouts"
+      service   = "rollouts" # the oauth2-proxy Service
+      port      = 80
+    }
     # NOTE: the `keycloak` route is NOT here — Keycloak self-owns its HTTPRoute in the keycloak module (ADR-059)
     # so its endpoint is live before keycloak-config configures the realm through it.
   }

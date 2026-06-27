@@ -29,12 +29,24 @@ locals {
           location = "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/${var.gateway_api_plugin_version}/gatewayapi-plugin-linux-${var.gateway_api_plugin_arch}"
         }
       ] : []
+
+      # Export controller metrics (rollout_info, rollout_phase, analysis run results, …) + a ServiceMonitor so the
+      # cluster's Prometheus/agent scrapes them into Mimir (serviceMonitorSelectorNilUsesHelmValues=false ⇒ all
+      # SMs picked up, no selector label needed). Powers the Argo Rollouts Grafana dashboard — the visibility
+      # for canary weight progression / analysis pass-fail / rollout health (ADR-056).
+      metrics = {
+        enabled        = true
+        serviceMonitor = { enabled = true }
+      }
     }
 
-    # The controller does not gate admission and serves no ingress — the bundled dashboard is operator UI we
-    # don't expose.
+    # The bundled Argo Rollouts WEB UI (a separate Deployment + Service) — the live operator view of rollouts:
+    # canary step/weight progression, AnalysisRun results, and promote/abort controls. Exposed internally via an
+    # HTTPRoute on the shared Gateway (gateway-config `rollouts` route, Tailscale-only). ⚠️ The UI has NO built-in
+    # auth and its ServiceAccount can promote/abort rollouts — same internal-trust model as Hubble; harden with an
+    # OIDC proxy or a read-only SA if it ever needs wider exposure.
     dashboard = {
-      enabled = false
+      enabled = var.enable_dashboard
     }
   }
 }

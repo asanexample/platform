@@ -60,5 +60,9 @@ inputs = {
   replica_count      = 1 # non-prod; platform/hub runs 2 for HA
   helm_wait          = true
 
+  # Argo Rollouts web UI (this cluster's rollouts — incl. the tenant app canaries) — exposed Tailscale-only at
+  # rollouts.preprod.aws.refplat.org via the gateway-config `rollouts` route.
+  enable_dashboard = true
+
   tags = include.base.locals.tags
 }

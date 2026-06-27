@@ -7,7 +7,7 @@ groups:
   # --- ${s.id} (objective ${s.objective}%) ----------------------------------------------------------------
   - name: ${s.id}-sli-recordings
     rules:
-%{ for w in ["5m", "30m", "1h", "2h", "6h", "1d", "3d"] ~}
+%{ for w in ["5m", "30m", "1h", "2h", "6h", "1d", "3d", "30d"] ~}
       - record: slo:sli_error:ratio_rate${w}
         expr: |
           (${replace(s.error_query, "{{window}}", w)})
@@ -32,6 +32,20 @@ groups:
           slo:sli_error:ratio_rate1h{sloth_id="${s.id}"}
           / on(sloth_id) group_left() slo:error_budget:ratio{sloth_id="${s.id}"}
         labels: { sloth_id: ${s.id}, sloth_service: ${s.service}, sloth_slo: ${s.slo_name} }
+      # Period (30d) burn + budget remaining — what the SLO dashboard's "Budget remaining 30 day window" panel reads.
+      - record: slo:period_burn_rate:ratio
+        expr: |
+          slo:sli_error:ratio_rate30d{sloth_id="${s.id}"}
+          / on(sloth_id) group_left() slo:error_budget:ratio{sloth_id="${s.id}"}
+        labels: { sloth_id: ${s.id}, sloth_service: ${s.service}, sloth_slo: ${s.slo_name} }
+      - record: slo:period_error_budget_remaining:ratio
+        expr: 1 - slo:period_burn_rate:ratio{sloth_id="${s.id}"}
+        labels: { sloth_id: ${s.id}, sloth_service: ${s.service}, sloth_slo: ${s.slo_name} }
+      # Sloth metadata series (value 1) — drives the SLO dashboard's inventory counts (count(sloth_slo_info),
+      # count by sloth_service). Mirrors what the Sloth controller emits so the shared dashboard works for app SLOs.
+      - record: sloth_slo_info
+        expr: vector(1)
+        labels: { sloth_id: ${s.id}, sloth_service: ${s.service}, sloth_slo: ${s.slo_name}, sloth_objective: "${s.objective}" }
   - name: ${s.id}-alerts
     rules:
       # Fast burn (page): two short+long windows agree the budget will be exhausted soon. 14.4× and 6× are the

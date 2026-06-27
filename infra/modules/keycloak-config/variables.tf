@@ -146,6 +146,16 @@ variable "clients" {
       # RP-initiated logout: signing out of Grafana also ends the Keycloak SSO session. Mirrors argocd/backstage.
       post_logout_redirect_uris = ["https://grafana.aws.refplat.org/*"]
     }
+    rollouts = {
+      name = "Argo Rollouts"
+      # The Rollouts UI has no native auth, so an oauth2-proxy fronts it (infra/modules/oauth2-proxy); this is its
+      # callback. Both clusters' hosts (platform hub + preprod spoke), each behind its own gateway.
+      redirect_uris = [
+        "https://rollouts.aws.refplat.org/oauth2/callback",
+        "https://rollouts.preprod.aws.refplat.org/oauth2/callback",
+      ]
+      post_logout_redirect_uris = ["https://rollouts.aws.refplat.org/*", "https://rollouts.preprod.aws.refplat.org/*"]
+    }
   }
 }
 

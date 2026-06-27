@@ -38,6 +38,12 @@ variable "enable_gateway_api_plugin" {
   default     = true
 }
 
+variable "enable_dashboard" {
+  description = "Deploy the Argo Rollouts WEB UI (a Deployment + Service) — the live operator view of rollouts (canary progression, AnalysisRuns, promote/abort). Per-cluster: it shows THIS cluster's rollouts. Expose it with a gateway-config `rollouts` route. ⚠️ No built-in auth + write-capable SA — keep it Tailscale-internal."
+  type        = bool
+  default     = false
+}
+
 variable "gateway_api_plugin_version" {
   description = "Release tag of argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi to load."
   type        = string
