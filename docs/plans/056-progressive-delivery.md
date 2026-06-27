@@ -88,7 +88,12 @@ different prerequisites, and neither is prod-ness:
 ## Phase 3 — Governance gates
 
 - **W10 — regulated manual-approval gate** (deployer ≠ approver, ADR-049) + audit, for `prod/regulated`.
-- **W11 — error-budget freeze** (ADR-054): budget exhaustion blocks non-critical rollouts.
+- **W11 — error-budget freeze** (ADR-054): budget exhaustion blocks non-critical rollouts. **DONE (2026-06-27):**
+  per-app SLOs are authored into the Mimir ruler (registry-derived, `observability-mimir` `app_slos`), producing
+  `slo:current_burn_rate:ratio` per prod env; the scaffolder's prod canary runs a one-shot **pre-flight** analysis
+  (`<app>-budget-freeze`) as step 0 — before any traffic shifts — querying that burn rate over the spoke→hub read
+  path and **aborting (freezing) the rollout if the service is already burning ≥2× its budget**. Distinct from the
+  W8c canary gate (which watches the *new version* mid-rollout). Threshold tunable; no-SLO-data → passes.
 
 ## Open decisions (resolve during the phases)
 
