@@ -1,0 +1,21 @@
+# break-glass — full power, OFF by default, time-boxed, loudly audited (identity strategy §2.2 / §3.6). The
+# independent emergency door (must NOT depend on Keycloak — routes through AWS IAM, ADR-068 §6).
+apiVersion: platform.refplat.org/v1beta1
+kind: WorkforceRole
+metadata:
+  name: break-glass
+  labels: { app.kubernetes.io/managed-by: argocd, app.kubernetes.io/part-of: identity-access }
+spec:
+  reach: platform
+  power: manage-access
+  mode: on-demand
+  riskTier: apex
+  description: Full power, off by default, time-boxed and loudly audited — the independent emergency door.
+  identityCenter:
+    perTeam: false
+    permissionSet: AdministratorAccess
+    sessionDuration: PT1H
+    managedPolicies: ["arn:aws:iam::aws:policy/AdministratorAccess"]
+  keycloak:
+    realmRole: break-glass
+    perTeamGroup: false

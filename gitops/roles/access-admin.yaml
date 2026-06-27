@@ -1,0 +1,22 @@
+# access-admin — runs the access system itself; deliberately separate and the APEX insider risk (§3.6
+# watch-the-watchers: two-person control on model changes, SoD grantor != beneficiary, full admin audit).
+apiVersion: platform.refplat.org/v1beta1
+kind: WorkforceRole
+metadata:
+  name: access-admin
+  labels: { app.kubernetes.io/managed-by: argocd, app.kubernetes.io/part-of: identity-access }
+spec:
+  reach: platform
+  power: manage-access
+  mode: standing
+  riskTier: apex
+  description: Runs the access system itself (the apex insider risk — two-person control, SoD, full audit).
+  identityCenter:
+    perTeam: false
+    permissionSet: AdministratorAccess
+    sessionDuration: PT4H
+    managedPolicies: ["arn:aws:iam::aws:policy/AdministratorAccess"]
+  keycloak:
+    realmRole: access-admin
+    perTeamGroup: false
+    group: platform-admins

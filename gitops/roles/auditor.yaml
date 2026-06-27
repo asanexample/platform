@@ -1,0 +1,22 @@
+# auditor — org-wide READ including security/compliance surfaces; changes nothing (identity strategy §2.2).
+apiVersion: platform.refplat.org/v1beta1
+kind: WorkforceRole
+metadata:
+  name: auditor
+  labels: { app.kubernetes.io/managed-by: argocd, app.kubernetes.io/part-of: identity-access }
+spec:
+  reach: platform
+  power: look
+  mode: standing
+  riskTier: elevated
+  description: Org-wide read including security/compliance surfaces; changes nothing.
+  identityCenter:
+    perTeam: false
+    permissionSet: ReadOnlyAccess
+    sessionDuration: PT8H
+    managedPolicies:
+      - "arn:aws:iam::aws:policy/ReadOnlyAccess"
+      - "arn:aws:iam::aws:policy/SecurityAudit"
+  keycloak:
+    realmRole: auditor
+    perTeamGroup: false

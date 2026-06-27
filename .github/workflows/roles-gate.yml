@@ -1,0 +1,119 @@
+name: Roles — gate on PR
+
+# Validate workforce role-catalog changes (gitops/roles/**) on a PR: schema shape, reach/power/mode/risk enums,
+# the IC/Keycloak projection mappings, and the deletion guard (validate-roles.sh → the "Roles Gate" check). AND
+# enforce META-GOVERNANCE (§3.6): changing a role re-permissions everyone who holds it, so the sticky comment
+# reports the BLAST RADIUS (Person grants referencing each changed role) and every catalog change is routed to an
+# admin/maintainer approval (publish-verdict.sh → the "Roles Approval" check). Sibling of the Teams/People gates.
+#
+# CI-GATE INTEGRITY: `pull_request_target` means THIS definition and every script it calls run from the
+# PROTECTED BASE BRANCH — a PR cannot edit the gate that judges it. The PR's role CRs are checked out separately,
+# sparse, credential-free, and read strictly as YAML DATA (yq only). The roster (for blast radius) + approver
+# perms are read from base / the GitHub API.
+#
+# Runs on EVERY PR (no paths filter) so it can be a REQUIRED status check; classify short-circuits to trivially
+# green when no role files changed.
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  pull_request_review:
+    types: [submitted, dismissed] # re-evaluate "Roles Approval" when a catalog change is approved
+
+permissions:
+  contents: read
+  pull-requests: write # post/update the sticky gate comment
+  statuses: write # publish the "Roles Approval" commit status (last-write-wins)
+
+concurrency:
+  group: roles-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Roles Gate
+    runs-on: ubuntu-latest # pure YAML validation — no cluster/private-API access needed
+    steps:
+      # Trusted: the gate scripts + the roster (blast radius) come from BASE. Always runs.
+      # nosemgrep: yaml.github-actions.security.pull-request-target-code-checkout.pull-request-target-code-checkout
+      - name: Checkout base (trusted)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          path: base
+
+      - name: Classify diff
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bash base/.github/scripts/roles-gate/classify-roles.sh
+
+      # Untrusted: ONLY the roles tree, sparse, no credentials, data-only. Skipped when no role CRs changed.
+      # nosemgrep: yaml.github-actions.security.pull-request-target-code-checkout.pull-request-target-code-checkout
+      - name: Checkout PR roles (untrusted, data-only)
+        if: steps.classify.outputs.has_roles == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: head
+          sparse-checkout: gitops/roles
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Install yq
+        if: steps.classify.outputs.has_roles == 'true'
+        run: |
+          sudo curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Validate role catalog
+        id: gate
+        if: steps.classify.outputs.has_roles == 'true'
+        env:
+          BASE_DIR: ${{ github.workspace }}/base
+          HEAD_DIR: ${{ github.workspace }}/head
+          ROLE_FILES: ${{ steps.classify.outputs.role_files }}
+          ROLE_DELETED_FILES: ${{ steps.classify.outputs.role_deleted_files }}
+          REPORT_MD: ${{ runner.temp }}/roles-gate.md
+        run: |
+          set +e
+          bash base/.github/scripts/roles-gate/validate-roles.sh
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+
+      # "Roles Approval" — any catalog change needs an admin/maintainer approval (two-person control, §3.6).
+      # Always runs so the check reports on every PR (non-role PRs → empty lists → success).
+      - name: Publish approval verdict (commit status)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          STATUS_CONTEXT: Roles Approval
+          SOLO_MAINTAINER: ${{ vars.SOLO_MAINTAINER }} # single-admin project: admin author self-attests
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ROLE_FILES: ${{ steps.classify.outputs.role_files }}
+          ROLE_DELETED_FILES: ${{ steps.classify.outputs.role_deleted_files }}
+        run: bash base/.github/scripts/roles-gate/publish-verdict.sh
+
+      - name: Post sticky gate comment
+        if: always() && steps.classify.outputs.has_roles == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MARKER: "<!-- roles-gate -->"
+          BODY_FILE: ${{ runner.temp }}/roles-gate.md
+        run: bash base/.github/scripts/teams/sticky-comment.sh
+
+      - name: Enforce gate result
+        if: always() && steps.classify.outputs.has_roles == 'true'
+        run: |
+          if [ "${{ steps.gate.outputs.rc }}" != "0" ]; then
+            echo "Roles gate failed — see the sticky comment on the PR." >&2
+            exit 1
+          fi

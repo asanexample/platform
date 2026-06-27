@@ -1,0 +1,23 @@
+# team-admin / team-lead — developer + governs the team's membership, grants, and envelope; the default holder of
+# release-approver (gated prod, separation of duties — ADR-068 §7). Manage-access power is exercised via git (the
+# people-gate's team-lead approval), not an AWS credential.
+apiVersion: platform.refplat.org/v1beta1
+kind: WorkforceRole
+metadata:
+  name: team-admin
+  labels: { app.kubernetes.io/managed-by: argocd, app.kubernetes.io/part-of: identity-access }
+spec:
+  reach: team
+  power: manage-access
+  mode: standing
+  riskTier: elevated
+  description: Developer + governs the team's membership/grants/envelope; default release-approver.
+  identityCenter:
+    perTeam: true
+    permissionSet: "Dev-{team}"
+    sessionDuration: PT4H
+    managedPolicies: ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
+    note: "same AWS console reach as developer; the manage-access power is exercised via git/portal, not AWS"
+  keycloak:
+    realmRole: team-admin
+    perTeamGroup: true

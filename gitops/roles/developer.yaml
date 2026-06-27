@@ -1,0 +1,21 @@
+# developer — deploy + operate THEIR OWN team's products; sees nothing outside the team (identity strategy §2.2).
+apiVersion: platform.refplat.org/v1beta1
+kind: WorkforceRole
+metadata:
+  name: developer
+  labels: { app.kubernetes.io/managed-by: argocd, app.kubernetes.io/part-of: identity-access }
+spec:
+  reach: team
+  power: change
+  mode: standing
+  riskTier: standard
+  description: Deploy + operate their own team's products; no visibility outside the team.
+  identityCenter:
+    perTeam: true
+    permissionSet: "Dev-{team}"
+    sessionDuration: PT4H
+    managedPolicies: ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
+    note: "inline: assume DeveloperAccess-<team> in preprod (rendered per team/account by #888)"
+  keycloak:
+    realmRole: developer
+    perTeamGroup: true

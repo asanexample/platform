@@ -1,0 +1,21 @@
+# platform-operator — org-wide LOOK + OPERATE for on-call/SRE; changes setup via git, not by hand (§2.2). Dangerous
+# operate power is borrowed, not standing (§2.3): mode=on-demand → eligible, activated at on-call checkout (P3).
+apiVersion: platform.refplat.org/v1beta1
+kind: WorkforceRole
+metadata:
+  name: platform-operator
+  labels: { app.kubernetes.io/managed-by: argocd, app.kubernetes.io/part-of: identity-access }
+spec:
+  reach: platform
+  power: operate
+  mode: on-demand
+  riskTier: elevated
+  description: Org-wide look + operate for on-call/SRE; setup changes go through git, not a standing login.
+  identityCenter:
+    perTeam: false
+    permissionSet: PowerUserAccess
+    sessionDuration: PT4H
+    managedPolicies: ["arn:aws:iam::aws:policy/PowerUserAccess"]
+  keycloak:
+    realmRole: platform-operator
+    perTeamGroup: false
