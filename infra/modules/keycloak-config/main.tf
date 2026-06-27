@@ -61,6 +61,22 @@ locals {
   # Default client scopes every client gets. The keycloak_openid_client_default_scopes resource is EXHAUSTIVE,
   # so this lists the Keycloak 26 built-in default client scopes PLUS our `groups` scope.
   default_client_scopes = ["acr", "basic", "email", "profile", "roles", "web-origins", "groups"]
+
+  # Auth strength (#885, identity strategy §3.1). Phishing-resistant passkeys (WebAuthn passwordless), NO OTP —
+  # the factor lives HERE because Keycloak is the IdP of record. Built only for the standalone realm: when
+  # federating, the upstream owns the factor and assurance is honored across the seam (ADR-059), so the local
+  # passkey flow is inert.
+  manage_mfa = local.create && !local.has_upstream
+
+  # The WebAuthn Relying Party id MUST be the registrable domain Keycloak is served from (bare host, no scheme
+  # or path) or browsers reject the credential. Derived from keycloak_url (e.g. https://keycloak.aws.refplat.org).
+  # NOTE: changing this host invalidates every enrolled passkey — settle the hostname before rollout.
+  kc_host = split("/", replace(replace(var.keycloak_url, "https://", ""), "http://", ""))[0]
+
+  # acr ↔ Level-of-Authentication map (the assurance seam, §3.1). Defines the assurance vocabulary apps can read
+  # off the `acr` claim and that step-up at elevation (P3 / #361's temporary-power checkout) requests via
+  # acr_values; the passkey flow below is the standing factor, step-up conditions are layered by P3.
+  acr_loa_map = { gold = 2, silver = 1 }
 }
 
 # ---------------------------------------------------------------------------
@@ -75,6 +91,46 @@ resource "keycloak_realm" "this" {
   display_name = var.realm_display_name
   # TLS terminates at the Cilium gateway; require HTTPS for external requests only (the in-cluster hop is HTTP).
   ssl_required = "external"
+
+  # Short, consciously-set session + token lifetimes (§3.1 "session lifetime is a tuned dial") — limit the blast
+  # radius of a stolen token. The role-scoped AWS *console* lifetime is owned by the IdC generator (#888).
+  sso_session_idle_timeout = var.session.sso_idle_timeout
+  sso_session_max_lifespan = var.session.sso_max_lifespan
+  access_token_lifespan    = var.session.access_token_lifespan
+
+  # Recovery hardening (#885): self-service "Forgot password" OFF — passkeys are the factor, so recovery is a
+  # backup passkey or admin re-provision; a self-service reset would be a phishable backdoor. The password policy
+  # still governs the seed accounts' first factor.
+  reset_password_allowed = var.reset_password_allowed
+  password_policy        = var.password_policy
+
+  # Phishing-resistant passkeys (WebAuthn PASSWORDLESS) are the realm's MFA factor — no OTP anywhere (OTP is
+  # phishable: an attacker-in-the-middle relays it). The Relying Party id is the host Keycloak is served from;
+  # user verification + a resident (discoverable) key are REQUIRED. Signature algs cover platform (ES256) +
+  # cross-platform (RS256) authenticators. The passwordless authenticator in the browser flow uses this policy.
+  web_authn_passwordless_policy {
+    relying_party_entity_name     = var.realm_display_name
+    relying_party_id              = local.kc_host
+    signature_algorithms          = ["ES256", "RS256"]
+    user_verification_requirement = "required"
+    require_resident_key          = "Yes"
+  }
+
+  # Brute-force detection — slow down credential stuffing against local accounts.
+  dynamic "security_defenses" {
+    for_each = var.brute_force_protection.enabled ? [1] : []
+    content {
+      brute_force_detection {
+        max_login_failures = var.brute_force_protection.max_login_failures
+        permanent_lockout  = var.brute_force_protection.permanent_lockout
+      }
+    }
+  }
+
+  # acr ↔ LoA assurance map — the vocabulary apps read off the `acr` claim and that step-up requests (P3, §3.1).
+  # Set unconditionally (not gated on enforce_strong_auth): assurance is invariant across the IdP seam, and gating
+  # it would churn a realm-attribute write on every federation flip (racing the flow-binding revert).
+  attributes = local.create ? { "acr.loa.map" = jsonencode(local.acr_loa_map) } : {}
 }
 
 # ---------------------------------------------------------------------------
@@ -608,4 +664,143 @@ resource "aws_secretsmanager_secret_version" "directory_sync" {
 
   secret_id     = aws_secretsmanager_secret.directory_sync[0].id
   secret_string = jsonencode({ "client-secret" = random_password.directory_sync[0].result })
+}
+
+
+# ---------------------------------------------------------------------------
+# Auth strength — phishing-resistant passkeys + hardened recovery (#885, identity strategy §3.1)
+#
+# A custom BROWSER flow requires a phishing-resistant passkey (WebAuthn PASSWORDLESS) for ALL workforce — no OTP
+# anywhere (OTP is phishable via an attacker-in-the-middle relay). Recovery is a backup passkey or admin
+# re-provision, not a self-service password reset (that would be the backdoor). New users are force-enrolled by
+# a default required action. Auth events are logged for the audit trail.
+#
+# Tier-0 no-lockout discipline: the flow + required action + realm hardening are created on apply-1, but the
+# BINDING (making it the realm's browser flow) is gated behind var.enforce_browser_mfa — flip it true on apply-2
+# only AFTER `admin` has enrolled a passkey. `admin-cli`'s master-realm direct-grant is the break-glass, so a bad
+# flow never locks out Terraform. Built only for the STANDALONE realm (local.manage_mfa) — when federating, the
+# upstream owns the factor and assurance is honored across the seam (ADR-059).
+#
+# Ordering: the Keycloak API orders sibling executions by `priority`; we also chain depends_on between siblings
+# so terraform CREATES them in that order (the provider appends to the flow, so creation order must match).
+# ---------------------------------------------------------------------------
+
+# Login + admin event logging — the realm's audit trail (closes the "audit-logging off" gap). jboss-logging
+# lands events in the Keycloak pod logs → Loki. Applies regardless of the MFA flow (realm-level posture).
+resource "keycloak_realm_events" "this" {
+  count = local.create && var.auth_event_logging ? 1 : 0
+
+  realm_id = keycloak_realm.this[0].id
+
+  events_enabled    = true
+  events_expiration = 604800 # 7 days of login events retained in Keycloak's store
+
+  admin_events_enabled         = true
+  admin_events_details_enabled = true
+
+  events_listeners = ["jboss-logging"]
+}
+
+# Force every new user to enroll a passkey (the realm's only factor). default_action stamps NEW users at first
+# login; it does not retroactively prompt existing users — those are force-enrolled in-flow by the REQUIRED
+# passwordless execution below. Uses the PASSWORDLESS register action (not the 2FA webauthn-register).
+resource "keycloak_required_action" "webauthn_register_passwordless" {
+  count = local.manage_mfa ? 1 : 0
+
+  realm_id       = keycloak_realm.this[0].id
+  alias          = "webauthn-register-passwordless"
+  enabled        = true
+  default_action = true
+}
+
+# --- Browser flow — password + a required passkey, no OTP --------------------
+
+resource "keycloak_authentication_flow" "browser" {
+  count = local.manage_mfa ? 1 : 0
+
+  realm_id    = keycloak_realm.this[0].id
+  alias       = "platform-browser"
+  provider_id = "basic-flow"
+  description = "Browser login requiring a phishing-resistant passkey for all workforce (#885)."
+}
+
+# Cookie + IdP redirector at the top (ALTERNATIVE) so an existing SSO cookie or a brokered/social login still
+# short-circuits the username/password + passkey path.
+resource "keycloak_authentication_execution" "browser_cookie" {
+  count = local.manage_mfa ? 1 : 0
+
+  realm_id          = keycloak_realm.this[0].id
+  parent_flow_alias = keycloak_authentication_flow.browser[0].alias
+  authenticator     = "auth-cookie"
+  requirement       = "ALTERNATIVE"
+  priority          = 10
+}
+
+resource "keycloak_authentication_execution" "browser_idp" {
+  count = local.manage_mfa ? 1 : 0
+
+  realm_id          = keycloak_realm.this[0].id
+  parent_flow_alias = keycloak_authentication_flow.browser[0].alias
+  authenticator     = "identity-provider-redirector"
+  requirement       = "ALTERNATIVE"
+  priority          = 20
+  depends_on        = [keycloak_authentication_execution.browser_cookie]
+}
+
+# The forms subflow MUST be ALTERNATIVE (not REQUIRED) — a REQUIRED sibling would defeat the cookie/IdP
+# short-circuit above and force the password form even on an existing SSO session.
+resource "keycloak_authentication_subflow" "browser_forms" {
+  count = local.manage_mfa ? 1 : 0
+
+  realm_id          = keycloak_realm.this[0].id
+  parent_flow_alias = keycloak_authentication_flow.browser[0].alias
+  alias             = "platform-browser-forms"
+  requirement       = "ALTERNATIVE"
+  priority          = 30
+  depends_on        = [keycloak_authentication_execution.browser_idp]
+}
+
+resource "keycloak_authentication_execution" "forms_userpass" {
+  count = local.manage_mfa ? 1 : 0
+
+  realm_id          = keycloak_realm.this[0].id
+  parent_flow_alias = keycloak_authentication_subflow.browser_forms[0].alias
+  authenticator     = "auth-username-password-form"
+  requirement       = "REQUIRED"
+  priority          = 10
+}
+
+# REQUIRED passkey for everyone — a REQUIRED passwordless execution with no credential triggers passkey
+# registration in-flow, so even a user the default action missed is force-enrolled before they can finish login.
+resource "keycloak_authentication_subflow" "browser_mfa" {
+  count = local.manage_mfa ? 1 : 0
+
+  realm_id          = keycloak_realm.this[0].id
+  parent_flow_alias = keycloak_authentication_subflow.browser_forms[0].alias
+  alias             = "platform-browser-mfa"
+  requirement       = "REQUIRED"
+  priority          = 20
+  depends_on        = [keycloak_authentication_execution.forms_userpass]
+}
+
+resource "keycloak_authentication_execution" "mfa_webauthn" {
+  count = local.manage_mfa ? 1 : 0
+
+  realm_id          = keycloak_realm.this[0].id
+  parent_flow_alias = keycloak_authentication_subflow.browser_mfa[0].alias
+  authenticator     = "webauthn-authenticator-passwordless"
+  requirement       = "REQUIRED"
+  priority          = 10
+}
+
+# --- Gated binding — the apply-2 flip ---------------------------------------
+
+# Bind the passkey flow as the realm's browser flow ONLY when enforce_browser_mfa is true (apply-2). On apply-1
+# this resource is absent, so the built-in browser flow stays live and nobody is locked out before enrolling.
+# Separate resource (not the realm's browser_flow attribute) to avoid a realm <-> flow dependency cycle.
+resource "keycloak_authentication_bindings" "this" {
+  count = local.manage_mfa && var.enforce_browser_mfa ? 1 : 0
+
+  realm_id     = keycloak_realm.this[0].id
+  browser_flow = keycloak_authentication_flow.browser[0].alias
 }

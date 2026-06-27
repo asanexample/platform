@@ -1,6 +1,49 @@
 # ADR-076: Agent / GenAI Observability
 
-**Status:** Proposed (2026-06-18)
+**Status:** Accepted (2026-06-18; corrected 2026-06-27)
+
+> **Amendment (2026-06-27): the sequencing premise inverted, and the telemetry model is refined.** This ADR
+> (2026-06-18) assumed the #102 backbone was *unbuilt* and that the **resource agent ([ADR-075](075-resource-agent.md))**
+> would be the first telemetry producer that "pulls it into existence." Both are now false, and operating a *live*
+> agent surfaced a design flaw. The decision still holds — OTel + GenAI semconv, one instrumentation point, the
+> ADR-074 data boundary — but the following corrections supersede the corresponding parts of Context / D2 / D6 /
+> "Dependencies & sequencing":
+>
+> 1. **Backbone is LIVE; the triage agent is tier-0.** The #102 backbone (Mimir/Loki/Tempo/OTel-Collector/Alloy) is
+>    in production (P1–P7), and the **triage agent ([ADR-080](080-triage-copilot.md)) is the first agent** — live,
+>    already exporting OTel spans (`invoke_agent`/`execute_tool`/`chat`) to the collector. The resource agent is still
+>    at-rest. So "tier-0" re-anchors to the **triage** agent, agent obs is buildable **now** (gated on nothing), and
+>    **this is an enrichment, not a greenfield**: the span tree exists; the gap is `gen_ai.*` attributes + a **meter**
+>    (there is none today) + the disposition/eval signal.
+>
+> 2. **"One trace, four consumers" → "instrument once, FAN OUT per consumer."** The kernel (instrument once; no
+>    parallel telemetry paths) stands, but the four consumers do **not** share a substrate: **debug** wants rich,
+>    sampleable, short-retention **traces** (Tempo); **cost** wants aggregatable **metrics** (Mimir histograms);
+>    **eval** wants discrete **events**; **audit** wants *complete, unsampled, durable* records. ⚠️ **A sampled,
+>    retention-bounded Tempo trace is NOT an audit record** — D2's claim that "that same trace is … the audit record
+>    (the no-bypass evidence of ADR-074)" is **withdrawn**. Audit gets its own always-on durable path (a structured
+>    audit log), not the sampled trace. Net: one instrumentation point → traces (debug) + metrics (cost/quality) +
+>    durable events (audit/eval).
+>
+> 3. **Reprioritized for an operating agent.** D2/D6 center the trace (debug). But the daily questions for a *live*
+>    agent are **cost** (tokens/$) and **quality** (confidence calibration, abstention rate, hypotheses accepted vs
+>    rejected) — both **metrics + the eval signal**. The first, highest-value slice is therefore the **meter +
+>    a Grafana dashboard**, not the trace.
+>
+> 4. **Eval-online-signal is live now, not "deferred to the eval phase."** We have an eval harness
+>    (`spike-triage-eval`) and the Slack human-confirm (the production accept/reject) — so the
+>    `gen_ai.evaluation.result` loop (prod outcome → eval) is wired now.
+>
+> **Unchanged:** the GenAI-semconv wrapper (D1 — still `Development`-tier), metadata-first / in-cluster-only /
+> secrets-never (D3; nuance: prompts already transit Bedrock, so the rule is "no SaaS-obs side-channel," not "content
+> never leaves"). **Still deferred:** A2A causality (D5 — single agent), full content-capture-with-redaction (start
+> metadata-only; free-form redaction is best-effort, as D3 admits). **Reconsider pulling *forward*:** the Langfuse
+> LLM lens (D4) — we're iterating on a live agent with an eval harness now, so it may earn its keep before the
+> multi-agent phase D4 assumes.
+>
+> **Build order (triage agent):** (1) **meter + dashboard** (token/cost/latency/disposition/tool metrics →
+> Mimir/Grafana); (2) **enrich the existing spans** with `gen_ai.*` attributes (Tempo); (3) the **eval-online-signal
+> loop**. Defer content-capture, Langfuse, A2A.
 
 ## Context
 

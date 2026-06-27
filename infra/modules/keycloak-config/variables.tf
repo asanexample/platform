@@ -180,6 +180,67 @@ variable "enable_account_linking" {
 }
 
 # ---------------------------------------------------------------------------
+# Auth strength — phishing-resistant passkeys (WebAuthn passwordless), no OTP, hardened recovery (#885, §3.1)
+# ---------------------------------------------------------------------------
+
+variable "enforce_browser_mfa" {
+  description = <<-DESC
+    Gates the BINDING of the custom passkey browser flow as the realm's browser flow — the apply-2 flip of the
+    two-apply, no-lockout rollout (#885). FALSE (default = apply-1): the flow, the WebAuthn-register-passwordless
+    default action, and the realm hardening are all created, but the built-in browser flow stays live so nobody
+    is locked out before enrolling a passkey. TRUE (apply-2): bind the new flow — enrolled users log in by
+    passkey, new users are force-enrolled. Keycloak is Tier-0, so flip this only AFTER `admin` has enrolled a
+    passkey (+ a backup) via the Account Console. `admin-cli` master-realm direct-grant is the break-glass — it's
+    independent of any browser flow, so a bad flow never locks out Terraform.
+  DESC
+  type        = bool
+  default     = false
+}
+
+variable "session" {
+  description = <<-DESC
+    Realm session + access-token lifetimes (Go duration strings) — consciously set to limit stolen-token blast
+    radius (§3.1 "session lifetime is a tuned dial"). Keep sso_idle_timeout >= the apps' silent-refresh need
+    (Backstage relies on Keycloak refresh tokens). The truly role-scoped AWS *console* lifetime (per-permission-
+    set session_duration) is owned by the Identity Center generator (#888); these govern the Keycloak/app side.
+  DESC
+  type = object({
+    sso_idle_timeout      = optional(string, "30m")
+    sso_max_lifespan      = optional(string, "10h")
+    access_token_lifespan = optional(string, "5m")
+  })
+  default = {}
+}
+
+variable "reset_password_allowed" {
+  description = "Self-service \"Forgot password\". OFF by default (#885): passkeys are the factor, so recovery is a backup passkey or admin re-provision — a self-service reset would be a phishable backdoor."
+  type        = bool
+  default     = false
+}
+
+variable "password_policy" {
+  description = "Keycloak realm password policy string for local (seed/IdP-of-record) accounts. Empty disables it (e.g. when federating, where the upstream owns credentials)."
+  type        = string
+  default     = "length(14) and notUsername(undefined) and upperCase(1) and lowerCase(1) and digits(1) and specialChars(1) and passwordHistory(3)"
+}
+
+variable "brute_force_protection" {
+  description = "Realm brute-force detection settings (security_defenses). Enabled by default; tune max_login_failures / lockout behavior here."
+  type = object({
+    enabled            = optional(bool, true)
+    max_login_failures = optional(number, 10)
+    permanent_lockout  = optional(bool, false)
+  })
+  default = {}
+}
+
+variable "auth_event_logging" {
+  description = "Enable Keycloak login + admin event logging (keycloak_realm_events) — the audit trail for the realm (#885; closes the \"audit-logging off\" gap). Listener defaults to jboss-logging so events land in the pod logs → Loki."
+  type        = bool
+  default     = true
+}
+
+# ---------------------------------------------------------------------------
 # Team taxonomy (the canonical Team registry → Keycloak groups + roles)
 # ---------------------------------------------------------------------------
 

@@ -135,7 +135,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-043: Self-Hosted Prometheus/Grafana Observability Stack](043-self-hosted-observability-stack.md) | Accepted |
 | [ADR-044: Grafana Mimir for Durable, Multi-Tenant Metrics Storage](044-mimir-durable-multi-tenant-metrics.md) | Accepted |
 | [ADR-045: Falco for Runtime Threat Detection](045-falco-runtime-threat-detection.md) | Accepted |
-| [ADR-076: Agent / GenAI Observability](076-agent-observability.md) | Proposed |
+| [ADR-076: Agent / GenAI Observability](076-agent-observability.md) | Accepted (corrected 2026-06-27) |
 | [ADR-077: Application Instrumentation Strategy](077-application-instrumentation-strategy.md) | Accepted |
 | [ADR-078: Cluster Elasticity — Karpenter + Workload Autoscaling](078-cluster-elasticity-karpenter.md) | Accepted |
 | [ADR-079: Cloud-Resource Monitoring Scope — Query-Time-First in Grafana](079-cloud-resource-monitoring-scope.md) | Accepted |
