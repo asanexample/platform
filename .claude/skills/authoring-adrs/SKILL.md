@@ -102,4 +102,4 @@ updating its row. This is part of the change, not a follow-up.
 ## References
 
 - `docs/adrs/README.md` — the canonical index (keep in sync)
-- Recent exemplars: `docs/adrs/081-*.md` (latest), `docs/adrs/067-*.md`, `docs/adrs/053-*.md` (amendment style)
+- Recent exemplars: `docs/adrs/088-*.md` (latest), `docs/adrs/082-*.md`, `docs/adrs/067-*.md`, `docs/adrs/053-*.md` (amendment style)

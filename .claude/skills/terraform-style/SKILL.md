@@ -34,9 +34,9 @@ guide. Everything else (naming, typed variables, described outputs, `for_each` o
 | Topic | Generic Terraform guidance | **This repo** |
 |---|---|---|
 | Resource organisation | "data sources first, dependency order"; a separate `locals.tf` | **Section-header banners** grouping resources in `main.tf`; locals live in `main.tf` |
-| Version block file | `terraform.tf` | **`versions.tf`** — and only when the module uses a non-AWS provider (helm, kubernetes, etc.) |
+| Version block file | `terraform.tf` | **`versions.tf`** — **every** module ships one (pins `required_version` + the `aws` provider); a non-AWS provider just adds a `required_providers` entry |
 | Provider blocks | `providers.tf` with `provider "aws" {}` | **None.** Modules declare *zero* provider blocks — providers are injected by Terragrunt (`root.hcl` / `_base.hcl`) |
-| Version constraints | "use the latest major version" | Deliberate `>= X.0` ranges; CLI versions pinned canonically in `/.tool-versions` |
+| Version constraints | "use the latest major version" | Pessimistic `~> MAJOR.0` constraints (aws is on `~> 6.0`); CLI versions pinned canonically in `/.tool-versions` |
 | Format / validate | `terraform fmt` / `terraform validate` | **`tofu fmt`**, `tofu validate`, `terragrunt hcl fmt` |
 | Module tests | `.tftest.hcl` | **Terratest (Go)** in `infra/tests/aws/<module>/` |
 | Secrets | inline / tfvars | config secrets via **SOPS+KMS**; workload hardening enforced by **Kyverno** at admission |
@@ -50,7 +50,7 @@ A module is three files, plus a fourth when needed:
 | `main.tf` | All resources, data sources, and `locals`, grouped under section headers |
 | `variables.tf` | Input variable declarations |
 | `outputs.tf` | Output declarations |
-| `versions.tf` | The `terraform { required_version, required_providers }` block — **only if** the module needs a provider beyond `aws` (e.g. `helm`, `kubernetes`, `keycloak`) |
+| `versions.tf` | The `terraform { required_version, required_providers }` block — **every module has one** (pins `required_version` + the `aws` provider); modules that need a provider beyond `aws` (e.g. `helm`, `kubernetes`, `keycloak`) add it to `required_providers` |
 
 Do **not** create `providers.tf`, `terraform.tf`, or `locals.tf`. We don't split
 providers out because modules never declare them (see below), and locals stay next to
@@ -111,20 +111,21 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = ">= 5.0"
+      version = "~> 6.0"
     }
     helm = {
       source  = "hashicorp/helm"
-      version = ">= 3.0"
+      version = "~> 3.0"
     }
   }
 }
 ```
 
 Note the binary is OpenTofu — the block is still spelled `terraform { ... }` because
-OpenTofu reads it. Use deliberate floor ranges (`>= 5.0`), not "latest major" and not
-exact pins; the actual CLI tool versions (`tofu`, `terragrunt`, etc.) are pinned
-canonically in `/.tool-versions`, which is the single source of truth.
+OpenTofu reads it. Use pessimistic `~> MAJOR.0` constraints (the `aws` provider is on
+`~> 6.0`), not "latest major" and not exact pins; the actual CLI tool versions (`tofu`,
+`terragrunt`, etc.) are pinned canonically in `/.tool-versions`, which is the single
+source of truth.
 
 ## Naming (matches HashiCorp)
 
@@ -244,14 +245,14 @@ modules that can't be safely applied/destroyed in CI. See CLAUDE.md → Testing 
 ## Review checklist
 
 - [ ] `tofu fmt` clean; `terragrunt hcl fmt --check` clean; `tofu validate` passes
-- [ ] Files: `main.tf` / `variables.tf` / `outputs.tf` (+ `versions.tf` only if a non-AWS provider is used); no `providers.tf` / `terraform.tf` / `locals.tf`
+- [ ] Files: `main.tf` / `variables.tf` / `outputs.tf` / `versions.tf` (every module has `versions.tf`); no `providers.tf` / `terraform.tf` / `locals.tf`
 - [ ] No `provider "..." {}` block anywhere in the module
 - [ ] Resources grouped under section-header banners in `main.tf` (or module small enough not to need them)
 - [ ] Every variable has `type` + `description`; every output has `description`; sensitive values marked
 - [ ] Descriptive snake_case singular resource names, excluding the type
 - [ ] `for_each` for sets, `count` only for conditional creation
 - [ ] No hardcoded secrets; AWS resources have encryption/public-access/logging defaults
-- [ ] Provider version requirements expressed as deliberate floor ranges in `versions.tf`
+- [ ] Provider version requirements expressed as pessimistic `~> MAJOR.0` constraints in `versions.tf` (`aws` is `~> 6.0`)
 
 ---
 

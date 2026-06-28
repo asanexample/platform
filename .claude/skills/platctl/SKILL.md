@@ -37,6 +37,7 @@ make build-platctl     # → ./bin/platctl  (cd cmd/platctl && go build -o ../..
 | `status` | Read `.platctl-state.json`, show per-unit state | `--watch`/`-w`, `--interval` (5) |
 | `down` | **Park** an env: drain Karpenter → delete NodePool → scale managed groups to 0/0 → force-terminate stuck nodes. Control plane + EBS survive | `--env` (required), `--yes` |
 | `up` | **Restore** a parked env: re-apply node-groups → wait for cluster API (~15m) → re-apply karpenter → best-effort Kyverno recovery → reconnect steps | `--env` (required) |
+| `access` | **Workforce access (ADR-088 temporary power).** Read-side eligibility resolver over `gitops/people` × `gitops/roles`: `access list` (who holds / can borrow what), `access check <person> <role>` (may this principal BORROW this role?). Also the controller-down break-glass fallback: `access grant`/`revoke <person> <role>` (mint/yank a bounded grant) + `access active` (the local minted-grant ledger) | — |
 
 ```bash
 ./bin/platctl bootstrap --dry-run        # preview the plan
@@ -68,7 +69,8 @@ make build-platctl     # → ./bin/platctl  (cd cmd/platctl && go build -o ../..
 
 ## `.platctl.yaml`
 
-Repo-root config: `environments` (path/provider/auth + `reconnect`), per-unit `overrides`
+Repo-root config — **gitignored**; copy `.platctl.yaml.example` to `.platctl.yaml` to start.
+`environments` (path/provider/auth + `reconnect`), per-unit `overrides`
 (`bootstrap_args`/`teardown_args`, `hook`, `implicit_deps`, `teardown_skip`), `manual_steps`
 (prereq checks), `lockdown` steps, `kubeconfig` entries, and `validate` checks. Edit it to wire
 a new unit's teardown args, a hook, or a manual prerequisite.

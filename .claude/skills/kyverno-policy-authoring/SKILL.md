@@ -87,9 +87,11 @@ Reusable techniques from the availability defaults (`generate-workload-pdb`,
   `get/list/watch` on the trigger kind for the backfill. Set `spec.generateExisting: true`, or only
   newly-admitted workloads get the resource; existing ones stay uncovered until their next deploy.
   (Both bit us as follow-up fixes.) `synchronize: true` reconciles + GCs the generated resource.
-- **Roll one policy Audit-first under an Enforce cluster** with its *own* action value
-  (`require-prod-replica-floor` → `replica_floor_failure_action`, default `Audit`) instead of the
-  shared `validationFailureAction` — so a new gate soaks in Audit while everything else enforces.
+- **Roll one policy Audit-first under an Enforce cluster** with its *own* action value (instead of the
+  shared `validationFailureAction`) — so a new gate soaks in Audit while everything else enforces.
+  `require-prod-replica-floor` → `replica_floor_failure_action` is the pattern's reference; its soak is
+  **complete** — both live clusters promoted it to Enforce (#934), though the module default stays
+  `Audit` for fresh clusters. Reuse the same per-policy-action mechanism for the next gate you stage.
 - **Stage-keyed match** has no chart value — there's no per-stage knob, so scope a prod-only rule by
   the namespace-name glob (`namespaces: ["*-prod"]`) ANDed with the env-namespace selector.
 
