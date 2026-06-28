@@ -188,6 +188,3 @@ resets** across all three. Without this, "zero downtime" is a claim, not a fact.
   Gateway/Envoy + terminating-endpoint datapath whose default behavior D2 pairs with.
 - [ADR-067](067-idp-domain-model.md) — the Team→Product→Service model; multi-service is the case the workload-derived PDB
   selector handles by construction.
-</content>
-
-</invoke>

@@ -151,5 +151,3 @@ The `github-oidc` unit `fileset`s the **Product registry** and mints **one OIDC-
   [ADR-032](032-pr-preview-environments.md) (the preview ApplicationSet it folds in), and
   [ADR-063](063-team-as-first-class-git-object.md) (the dual git-registry-+-projected-CR pattern it reuses).
 - **Promotion gate** shares the `release-approver` projection with [ADR-068](068-product-scoped-and-cross-team-access-model.md) §7.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)

@@ -127,5 +127,3 @@ one-key action.
 - **Contrast:** [ADR-066](066-sops-encrypted-config-secrets.md) (SOPS-in-git) is the **platform's own** config
   secrets; tenant app secrets are **store-brokered, never-in-git** — a deliberately different model for the
   self-service, reveal-in-UI use case.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)

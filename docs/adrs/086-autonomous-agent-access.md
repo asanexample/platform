@@ -153,5 +153,3 @@ an auto-remediation agent consumes is **untrusted data, never instructions.**
 - [ADR-085](085-workload-availability-graceful-disruption-defaults.md) — availability defaults
   (auto-remediation interacts with disruption tolerance).
 - Strategy: [identity-and-access-strategy](../architecture/identity-and-access-strategy.md) §3.4.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
