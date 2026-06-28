@@ -45,12 +45,25 @@ file records what was found, what was changed, and what was deliberately left.
 - Stale factual one-liners (014, 021, 036, 038, 072, 073, 083).
 - Retired-path / vocabulary (028, 031, 040, 046, 048, 050, 053, 059, 060, 062, 068).
 
-## NEEDS LIVE/OWNER VERIFICATION (not edited — confirm against the running platform)
+## Live verification status
 
-- **ADR-006:** has the bootstrap state actually been migrated to S3, or is it intentionally local?
-  (The unit README says local is intentional; the ADR narrates a migration. Left as-is pending the
-  owner's call — flagged in `findings-001-011.md`.)
-- **ADR-010:** preprod's deployed EKS endpoint is actually private-only (IaC default agrees).
+**Verified live 2026-06-28 (AWS API — clusters were parked, so node-group-independent checks only):**
+
+- **ADR-006 — confirmed.** The management state bucket (`tfstate-mgmt-…`) holds 100 state objects but
+  **no `state-bootstrap/terraform.tfstate`**, and the unit's backend is `local`. The bootstrap state is
+  genuinely local, *not* migrated to S3 — the ADR's migrate-to-S3 narrative is confirmed unfinished
+  (correction stands).
+- **ADR-010 — confirmed.** `eks describe-cluster` shows **both** platform and preprod at
+  `endpointPublicAccess=false` / `endpointPrivateAccess=true`. Preprod is private-only as claimed.
+
+**Still blocked — pending unpark (need kubectl to the private API):** ADR-056 (Rollouts applied + the
+alpha-shop prod canary executing), ADR-085 (replica-floor ClusterPolicy = Enforce in etcd), ADR-077
+(Beyla DaemonSet + `Instrumentation` CR scheduled), ADR-087 (master-realm passkey enrollment). While
+parked, the Tailscale `*-eks-subnet-router` (cluster-hosted) is offline, so the private endpoint is
+unreachable from off-cluster.
+
+**External repos (not in this checkout):**
+
 - **ADR-042/050/080:** SLSA-L3 build state, the `trusted-ci` cert identities, and the triage-copilot
   model tiers live in external repos (`asanexample/trusted-ci`, `…/platform-triage-copilot`).
 - **ADR-056:** Rollouts *applied* on both clusters + the alpha-shop prod canary proven live (module +
