@@ -8,7 +8,7 @@ membership is wired by a future connector.
 
 Per team (`for_each var.teams`, keyed by the team names from `gitops/teams/<team>.yaml`):
 
-- `pagerduty_schedule` — a weekly rotation.
+- `pagerduty_schedulev2` — a weekly rotation (v3 Schedules API; the legacy `pagerduty_schedule` is deprecated and shows a "Legacy" badge).
 - `pagerduty_escalation_policy` — re-notify after 15 min, loop twice, targeting the team's schedule.
 - `pagerduty_service` — backed by the team's escalation policy (`create_alerts_and_incidents`).
 - `pagerduty_service_integration` — an Events API v2 (Prometheus/Alertmanager) integration.

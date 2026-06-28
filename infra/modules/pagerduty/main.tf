@@ -39,21 +39,40 @@ data "pagerduty_vendor" "prometheus" {
 # membership connector (see README / the identity & access strategy) replaces this list with the
 # team's real roster. The schedule/EP/service structure below does NOT change — only this list.
 #
-# NOTE: provider 3.x deprecates pagerduty_schedule (legacy v1 API) in favour of pagerduty_schedulev2.
-# We stay on pagerduty_schedule for now: it is still supported and is what the approved plan specifies;
-# migrating to v2 is a follow-up when the membership connector lands (it owns the `users`/layer shape).
-resource "pagerduty_schedule" "team" {
+# Backed by the PagerDuty v3 Schedules API (pagerduty_schedulev2). The legacy pagerduty_schedule (v1
+# API) is deprecated in provider 3.x and renders a "Legacy" badge in the PagerDuty UI; v2 drops it.
+# v2 replaces v1's turn-based `layer` with an explicit `rotation`/`event` window keyed by an RFC-5545
+# RRULE: our weekly turn (the old rotation_turn_length_seconds = 604800) maps to FREQ=WEEKLY over a
+# 7-day window, and the single bootstrap user maps to one `member` under a rotating-member strategy.
+#
+# BOOTSTRAP MEMBERSHIP SEAM — the single `member` is seeded with the existing admin user. This is the
+# ONE input that changes when the identity bridge lands: once the directory holds
+# external_identity(provider='pagerduty') for each person, the roster + directory-derived per-team
+# membership connector (see README / the identity & access strategy) replaces this with the team's
+# real roster (a multi-member rotation). The schedule/EP/service structure below does NOT change.
+resource "pagerduty_schedulev2" "team" {
   for_each = var.teams
 
   name      = "${each.key}-oncall"
   time_zone = "America/Los_Angeles"
 
-  layer {
-    name                         = "Weekly rotation"
-    start                        = "2025-01-01T00:00:00-08:00"
-    rotation_virtual_start       = "2025-01-01T00:00:00-08:00"
-    rotation_turn_length_seconds = 604800 # 1 week
-    users                        = [data.pagerduty_user.oncall.id]
+  rotation {
+    event {
+      name            = "Weekly rotation"
+      start_time      = "2025-01-01T00:00:00-08:00"
+      end_time        = "2025-01-08T00:00:00-08:00" # 7-day continuous shift (was rotation_turn_length_seconds = 604800)
+      effective_since = "2025-01-01T00:00:00-08:00"
+      recurrence      = ["RRULE:FREQ=WEEKLY"]
+
+      assignment_strategy {
+        type = "rotating_member_assignment_strategy"
+
+        member {
+          type    = "user_member"
+          user_id = data.pagerduty_user.oncall.id
+        }
+      }
+    }
   }
 }
 
@@ -69,7 +88,7 @@ resource "pagerduty_escalation_policy" "team" {
 
     target {
       type = "schedule_reference"
-      id   = pagerduty_schedule.team[each.key].id
+      id   = pagerduty_schedulev2.team[each.key].id
     }
   }
 }
