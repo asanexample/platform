@@ -16,7 +16,7 @@ networking, security, and compliance so developers think about their apps; gover
 
 It treats the **platform as a product**, not a pile of Terraform. The running infrastructure — multi-account
 AWS, private EKS, GitOps, a self-hosted LGTM+profiles observability stack, a signed supply chain — is real and
-production-shaped. But the deliverable is the set of **patterns, contracts, and decisions**: **78
+production-shaped. But the deliverable is the set of **patterns, contracts, and decisions**: **88
 [architecture decision records](docs/adrs/)** and a full [design-doc set](infra/docs/) you can study, adapt, or
 lift wholesale.
 
@@ -135,7 +135,7 @@ The infrastructure is the means; the **patterns, contracts, and decisions** are 
 - **Platform / DevEx engineers** adopting patterns — start with the [design docs](infra/docs/) (architecture,
   multi-tenancy, security, supply chain) and compose the [reusable modules](infra/modules/); `infra/live/` shows
   one opinionated composition.
-- **Architects** evaluating an approach — the **78 [ADRs](docs/adrs/)** record *why* each choice was made, and
+- **Architects** evaluating an approach — the **88 [ADRs](docs/adrs/)** record *why* each choice was made, and
   what was rejected.
 - **New team members** — the [Onboarding Guide](docs/onboarding.md) and the [Quick Start](#quick-start) below.
 
@@ -182,14 +182,14 @@ platform/
 ├── cmd/platctl/                 # Go CLI: DAG-aware bootstrap / teardown / validate / kubeconfig
 ├── gitops/                      # The source of truth: Team / Product / Environment / Release registries
 ├── docs/
-│   ├── adrs/                    # 78 architecture decision records
+│   ├── adrs/                    # 88 architecture decision records
 │   ├── architecture/            # System design, supply chain, observability, environment model
 │   ├── compliance/              # SCP → control mapping (SOC2/HIPAA/PCI/ISO/NIST/CIS)
 │   ├── runbooks/                # Operational procedures
 │   └── troubleshooting/         # Known issues and solutions
 ├── infra/
 │   ├── live/aws/                # Terragrunt live configs — mgmt / platform / preprod / prod / test accounts
-│   ├── modules/                 # ~60 reusable OpenTofu modules (cloud-agnostic + aws/ + cloudflare/)
+│   ├── modules/                 # ~67 reusable OpenTofu modules (cloud-agnostic + aws/ + cloudflare/)
 │   ├── tests/                   # Terratest integration tests (Go)
 │   └── root.hcl                 # Root Terragrunt config (S3 state, providers)
 └── scripts/                     # Helper scripts (eks-tunnel, port-forwards, finalizer-clear)
@@ -197,30 +197,33 @@ platform/
 
 ## Modules
 
-~60 reusable OpenTofu modules — a cloud-agnostic platform layer over per-cloud foundations. By domain:
+~67 reusable OpenTofu modules — a cloud-agnostic platform layer over per-cloud foundations. By domain:
 
-- **Delivery & portal** — `argocd`, `argocd-apps`, `argocd-clusters`, `backstage`, `github-teams`
+- **Delivery & portal** — `argocd`, `argocd-apps`, `argocd-clusters`, `argo-rollouts` (progressive delivery,
+  ADR-056), `backstage`, `github-teams`
 - **Environment control plane** — `crossplane` (the `XEnvironment` XRD/Composition), `policy` (Kyverno),
   `cluster-rbac`, `gateway`, `gateway-config`
-- **Identity & secrets** — `keycloak`, `keycloak-config`, `external-secrets`, `secret-stores`,
+- **Identity & secrets** — `keycloak`, `keycloak-config`, `oauth2-proxy` (SSO front for no-native-auth UIs),
+  `platform-directory` (workforce directory + owner-resolution, ADR-084), `external-secrets`, `secret-stores`,
   `cloudnative-pg`
 - **Networking & access** — `cilium`, `cert-manager`, `external-dns`, `tailscale`, `tailscale-admin`
-- **Security** — `policy` (Kyverno), `falco`, plus the SCP/IAM/supply-chain layers
+- **Security & on-call** — `policy` (Kyverno), `falco`, `pagerduty` (per-team on-call IaC, ADR-084), plus the
+  SCP/IAM/supply-chain layers
 - **Observability (17 modules)** — `observability` (kube-prometheus-stack) + the durable stores
   (`observability-mimir`/`-loki`/`-tempo`/`-pyroscope`), collectors (`-alloy`/`-beyla`/`-otel-collector`/
   `-otel-operator`/`-prometheus-agent`/`-pyroscope-ebpf`/`-events`), and the measurement layer
   (`-slo`/`-blackbox`/`-k6`/`-opencost`/`-cloudwatch-exporter`)
-- **AWS foundation (21 modules)** — `organizations`, `networking`, `eks` (+ `eks-addons`/`-node-group`/
+- **AWS foundation (22 modules)** — `organizations`, `networking`, `eks` (+ `eks-addons`/`-node-group`/
   `-pod-identity`), `karpenter` (node autoscaling, ADR-078), `transit-gateway`, `cross-vpc-dns`,
   `route53` (+ `-delegation`), `ecr`, `iam_roles`, `identity_center`, `github_oidc`, `cloudtrail`, `s3`,
-  `sops-kms`, `ssm-bastion`, `sns-notifications`, `state_bootstrap`
+  `sops-kms`, `ssm-bastion`, `sns-notifications`, `cost-allocation-tags`, `state_bootstrap`
 - **Deferred** — `vcluster` (hard multi-tenancy, [ADR-033](docs/adrs/033-defer-vcluster-tenant-support.md))
 
 Full catalog: [infra/modules/README.md](infra/modules/README.md).
 
 ## AWS accounts
 
-Real account IDs live in `infra/live/aws/secrets.hcl` (gitignored; see `secrets.hcl.example`).
+Real account IDs live in `infra/live/aws/secrets.enc.yaml` (SOPS-encrypted, committed; KMS-decrypted at plan/apply, [ADR-066](docs/adrs/066-sops-encrypted-config-secrets.md); see `secrets.hcl.example` for the structure).
 
 | Account | Purpose |
 |---------|---------|
@@ -269,4 +272,4 @@ The foundation is established; the active frontiers:
 | [Supply-Chain Overview](docs/architecture/supply-chain-overview.md) | cosign + SBOM + SLSA L3 + Kyverno, end to end |
 | [Observability Current State](docs/architecture/observability-current-state.md) | As-built LGTM+profiles, multi-cluster |
 | [New Product / Deploy runbooks](docs/runbooks/) | The developer paved road, end to end |
-| [Architecture Decisions](docs/adrs/) | **78 ADRs** documenting every significant choice |
+| [Architecture Decisions](docs/adrs/) | **88 ADRs** documenting every significant choice |

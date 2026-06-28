@@ -4,8 +4,8 @@
 
 Multi-cloud IaC platform using OpenTofu (v1.12.1) + Terragrunt (v1.0.7). Currently targets AWS only (Azure/GCP removed). CLI tool versions (tofu, terragrunt, kubectl, helm, awscli) are pinned canonically in `/.tool-versions` — the single source of truth read by local dev (mise/asdf), CI, and the self-hosted runner image.
 
-- **Shared modules** (`infra/modules/`): actions-runner-controller, argocd, argocd-apps, argocd-clusters, backstage, cert-manager, cilium, cloudflare/dns_delegation, cloudnative-pg, cluster-rbac, crossplane, external-dns, external-secrets, falco, gateway, gateway-config, github-teams, keycloak, keycloak-config, policy, secret-stores, tailscale, tailscale-admin, vcluster, plus `observability` and 16× `observability-*` (the LGTM+P stack: alloy, beyla, blackbox, cloudwatch-exporter, events, k6, loki, mimir, opencost, otel-collector, otel-operator, prometheus-agent, pyroscope, pyroscope-ebpf, slo, tempo)
-- **AWS modules** (`infra/modules/aws/`): cloudtrail, cross-vpc-dns, ecr, eks, eks-addons, eks-node-group, eks-pod-identity, github_oidc, iam_roles, identity_center, karpenter, networking, organizations, route53, route53_delegation, s3, sns-notifications, sops-kms, ssm-bastion, state_bootstrap, transit-gateway
+- **Shared modules** (`infra/modules/`): actions-runner-controller, argo-rollouts, argocd, argocd-apps, argocd-clusters, backstage, cert-manager, cilium, cloudflare/dns_delegation, cloudnative-pg, cluster-rbac, crossplane, external-dns, external-secrets, falco, gateway, gateway-config, github-teams, keycloak, keycloak-config, oauth2-proxy, pagerduty, platform-directory, policy, secret-stores, tailscale, tailscale-admin, vcluster, plus `observability` and 16× `observability-*` (the LGTM+P stack: alloy, beyla, blackbox, cloudwatch-exporter, events, k6, loki, mimir, opencost, otel-collector, otel-operator, prometheus-agent, pyroscope, pyroscope-ebpf, slo, tempo)
+- **AWS modules** (`infra/modules/aws/`): cloudtrail, cost-allocation-tags, cross-vpc-dns, ecr, eks, eks-addons, eks-node-group, eks-pod-identity, github_oidc, iam_roles, identity_center, karpenter, networking, organizations, route53, route53_delegation, s3, sns-notifications, sops-kms, ssm-bastion, state_bootstrap, transit-gateway
 - **Live configs**: `infra/live/aws/` -- environment-specific Terragrunt units
 
 ## House Skills
@@ -18,6 +18,7 @@ tasks and load automatically when relevant. Prefer them over re-deriving from th
 - **authoring-k8s-workloads** — Kyverno-compliant manifests for environment namespaces
 - **apply-and-destroy** — the `run --all` apply/destroy commands + deployment ordering
 - **platctl** — the DAG-aware bootstrap / teardown / validate / park orchestrator
+- **cluster-parking** — parking/unparking environments overnight (`platctl down`/`up`, scale node groups to zero)
 - **cluster-access** — kubectl/EKS access on the private clusters (Tailscale; never the public endpoint)
 - **environment-onboarding** — provisioning a Product/Environment via the registries + `XEnvironment` claim
 - **supply-chain-onboarding** — wiring an app's CI to the shared signing/provenance workflows
@@ -27,6 +28,7 @@ tasks and load automatically when relevant. Prefer them over re-deriving from th
 - **argocd-app-delivery** — ArgoCD ApplicationSets, PR previews, Release-keyed delivery, platform vs tenant roads
 - **observability-authoring** — adding dashboards/alerts/SLOs + instrumenting workloads in the LGTM+P stack
 - **backstage-portal** — configuring the Backstage portal/plugins/auth/catalog from the infra `backstage` module
+- **skill-self-correction** — durably fixing a house skill (under `.claude/skills/`) when it misleads you
 
 **Vendored (third-party).** `terraform-skill` is a community skill (antonbabenko/terraform-skill,
 Apache-2.0) vendored + pinned for diagnostic Terraform/OpenTofu depth — failure-mode routing,
@@ -177,7 +179,7 @@ The **Test** account (`157263244316`, Terratest sandbox) is a standard `Platform
 |------|---------|---------|
 | **PlatformAdmin** | Platform, PreProd | kubectl operate/debug + SSM tunnel — least-privilege (read+operate, NOT author; cluster authoring via ArgoCD, AWS via PlatformDeployer, emergencies via break-glass — ADR-040) |
 | **PlatformDeployer** | Platform, PreProd | Terragrunt apply, Helm/K8s providers |
-| **DeveloperAccess-\<team\>** | PreProd | Per-team, namespace-scoped kubectl (design: one role per team + an EKS access entry → the team's per-Environment `<team>-<product>-<stage>:developers` group bound to the `environment-developer` ClusterRole; group-mapped RBAC — ADR-039). **⚠️ NOT currently provisioned** — the v3 Composition emits only the in-cluster RoleBinding, not the IAM role/access entry (regression tracked in #647); use `platctl kubeconfig`/PlatformAdmin until built |
+| **DeveloperAccess-\<team\>** | PreProd | Per-team, namespace-scoped kubectl (design: one role per team + an EKS access entry → the team's per-Environment `<team>-<product>-<stage>:developers` group bound to the `environment-developer` ClusterRole; group-mapped RBAC — ADR-039). **⚠️ NOT currently provisioned** — the v3 Composition emits only the in-cluster RoleBinding, not the IAM role/access entry (#647 closed as superseded by the cluster-access design in #364 / ADR-068; capability still unbuilt); use `platctl kubeconfig`/PlatformAdmin until built |
 | **TerraformStateAccess** | Management | S3 state bucket + DynamoDB lock table |
 | **OrganizationAccountAccessRole** | All accounts | Break-glass only |
 
@@ -194,7 +196,9 @@ The **Test** account (`157263244316`, Terratest sandbox) is a standard `Platform
 - **Hubble TLS** uses `helm` method on AWS to avoid BYOCNI chicken-and-egg with post-install hooks.
 - **Node groups separated** from EKS module to enforce Cilium-first ordering.
 - **EKS add-ons separated** — coredns can't schedule until CNI + nodes are ready.
-- **ArgoCD SSO** — Dex + SAML bridge to AWS Identity Center. SAML app created manually. Module is cloud-agnostic; SSO config injected via `argocd_cm_extra`.
+- **ArgoCD SSO** — direct Keycloak OIDC (Dex retired, ADR-053/059); ArgoCD brokers OIDC straight to Keycloak, so the unit runs after `keycloak-config` and pulls its client secret via External Secrets.
+- **Argo Rollouts (ADR-056)** — progressive delivery (canary/blue-green) for all workloads; the `argo-rollouts` module deploys the controller + dashboard, the latter fronted by `oauth2-proxy` for Keycloak SSO (no native auth). Metric-gated canary + burn-rate SLO analysis.
+- **Per-team PagerDuty on-call (ADR-084)** — the `pagerduty` module provisions per-team on-call schedules/escalation in IaC; the owner-routing agent resolves the culprit's team via the `platform-directory` identity directory and routes/@mentions accordingly.
 - **Transit Gateway** — hub in platform account, shared to spokes via RAM. Dedicated /28 transit subnets per AZ.
 - **Cross-VPC DNS** — two modes via `dns_method`: custom PHZ (cheap, manual IP updates) or Route53 Resolver endpoints (robust, ~$365/mo). EKS-managed PHZs are inaccessible, so we maintain our own.
 - **Tailscale Operator** — subnet router advertising VPC CIDR to tailnet. Split DNS managed by `tailscale` K8s unit. OAuth from Secrets Manager.
@@ -236,7 +240,7 @@ per-cluster catalog: `docs/architecture/kyverno-policy-catalog.md`. When writing
 - **No `eks.amazonaws.com/role-arn` annotation** on a ServiceAccount — IRSA is platform-only; an environment annotation is denied (`disallow-irsa-annotation-cross-team`). (Separately, environment AWS access is platform-managed **Pod Identity** (ADR-041): use a **named** ServiceAccount and declare access in the `XEnvironment` claim's deny-set-validated `policyStatements` — a Pod Identity requirement, *not* a Kyverno rejection. See the `environment-onboarding` skill.)
 - **Images must be cosign-signed + attested** (keyless; Enforce on preprod). Your app CI is a thin caller of the shared `trusted-ci` build-sign/provenance workflows; trust is registry-derived from `spec.repo`. See the `supply-chain-onboarding` skill.
 - **No** `cluster-admin` (Cluster)RoleBindings or wildcard (`*`) verbs/resources in Roles
-- **`replicas >= 2` in `*-prod` namespaces** (`require-prod-replica-floor`, ADR-085) — a single replica can't be zero-downtime; an HPA must set `minReplicas >= 2`. Currently **Audit** (rolling to Enforce, issue #844); lower stages may stay at 1 for cost. Replicas are validated, never mutated.
+- **`replicas >= 2` in `*-prod` namespaces** (`require-prod-replica-floor`, ADR-085) — a single replica can't be zero-downtime; an HPA must set `minReplicas >= 2`. **Enforce on preprod + platform** (#934) — a single-replica `*-prod` workload is now rejected at admission; lower stages may stay at 1 for cost. Replicas are validated, never mutated.
 
 **Your responsibility (not enforced, ADR-085):** handle **`SIGTERM`** — stop accepting, drain in-flight, exit (the injected `preStop` sleep only buys the datapath-deprogramming window; it does not drain your requests). Long-lived connections (websockets/gRPC streams) need app-level age limits / `GOAWAY`.
 

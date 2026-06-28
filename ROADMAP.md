@@ -17,6 +17,7 @@ detail. "Complete picture" means every capability and area is represented — no
 | 2026-06-27 | 1.3     | J. Deeden | Added the Identity & Access Strategy north-star (workforce-first model + scale-hardening) and the graduated agent-autonomy access model (ADR-086); framed I&A Phase-1 = People roster + AWS generator (closes #647) |
 | 2026-06-27 | 1.4     | J. Deeden | Correction: #647 is per-team *cluster* (kubectl) access — resolved by OIDC cluster auth (#364), not the Identity Center generator (AWS console access is a separate plane); I&A Phase-1 reframed as roster + AWS **and** Keycloak generators |
 | 2026-06-27 | 1.5     | J. Deeden | Linked the I&A workforce-build epic (#884) + Phase-1 sub-issues (#885–#890) into the Identity & Access area |
+| 2026-06-28 | 1.6     | J. Deeden | Moved shipped work into Shipped: zero-downtime/ADR-085 (replica-floor Enforce), Argo Rollouts/ADR-056, I&A Phase-1 (#885–#890), PagerDuty/owner-routing ADR-084, Keycloak hardening ADR-087; ADR-088 temporary-power to Now; Karpenter Phase-1 marked live; closed Tier-1 issues (#770/#771/#772/#647) marked done; #647 re-pointed to #364 |
 
 ## Executive Summary
 
@@ -72,7 +73,11 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 
 #### Compute & Elasticity
 
-- [#643](https://github.com/asanexample/platform/issues/643) **Cluster elasticity — Karpenter + workload autoscaling ([ADR-078](docs/adrs/078-cluster-elasticity-karpenter.md)).** Closes the biggest operational gap: the clusters don't autoscale at any layer. **Phase 1 (in progress)** — Karpenter node autoscaling on both clusters (conservative `on-demand`/`WhenEmpty` on the stateful platform hub; aggressive `spot`/`WhenEmptyOrUnderutilized` on preprod), retiring the static spot node group, with BYOCNI startup-taint ordering + `platctl` park-awareness. **Phase 2** — HPA/KEDA on the paved road (a default HPA emitted by the golden path) so the loop closes: HPA adds pods → Karpenter adds nodes → consolidation reclaims.
+- [#643](https://github.com/asanexample/platform/issues/643) **Cluster elasticity — Karpenter + workload autoscaling ([ADR-078](docs/adrs/078-cluster-elasticity-karpenter.md)).** Closes the biggest operational gap: the clusters don't autoscale at any layer. **Phase 1 shipped/live** — Karpenter node autoscaling on both clusters (conservative `on-demand`/`WhenEmpty` on the stateful platform hub; spot retired in favour of `on-demand`/`WhenEmptyOrUnderutilized` on preprod), with BYOCNI startup-taint ordering + `platctl` park-awareness. **Phase 2 (in flight)** — HPA/KEDA on the paved road (a default HPA emitted by the golden path) so the loop closes: HPA adds pods → Karpenter adds nodes → consolidation reclaims.
+
+#### Identity & Access
+
+- **Temporary-power activation / JIT elevation ([ADR-088](docs/adrs/088-temporary-power-activation.md)).** Eligibility-in-git + timed activation + revocation for dangerous power (break-glass). Foundation merged — `platctl access list`/`access check <person> <role>` + break-glass eligibility (#943/#945/#946); remaining activation/revocation flow in flight.
 
 ### Next
 
@@ -105,7 +110,7 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 
 #### Reliability & Tech Debt
 
-- [#769](https://github.com/asanexample/platform/issues/769) **Epic: tech-debt paydown — 2026 H2 inventory.** Deep 10-pass audit ([`docs/tech-debt-audit-2026-06-25.md`](docs/tech-debt-audit-2026-06-25.md), ~150 `TD-NNN` findings). Tier 1 (security/correctness, spot-verified): enforce cosign on the hub ([#770](https://github.com/asanexample/platform/issues/770)), private-only EKS default ([#771](https://github.com/asanexample/platform/issues/771)), fail-closed gate scripts ([#772](https://github.com/asanexample/platform/issues/772)), DeveloperAccess regression ([#647](https://github.com/asanexample/platform/issues/647)). Tier 2 (systemic): provider-constraint standardization ([#773](https://github.com/asanexample/platform/issues/773)), `.tool-versions` SSOT ([#774](https://github.com/asanexample/platform/issues/774)), Azure-carcass removal ([#775](https://github.com/asanexample/platform/issues/775)), Action SHA-pinning ([#776](https://github.com/asanexample/platform/issues/776)), Dependabot coverage ([#777](https://github.com/asanexample/platform/issues/777)), tests-into-PR-gates ([#778](https://github.com/asanexample/platform/issues/778)). Security/IAM findings fold into the existing tracker [#654](https://github.com/asanexample/platform/issues/654).
+- [#769](https://github.com/asanexample/platform/issues/769) **Epic: tech-debt paydown — 2026 H2 inventory.** Deep 10-pass audit ([`docs/tech-debt-audit-2026-06-25.md`](docs/tech-debt-audit-2026-06-25.md), ~150 `TD-NNN` findings). Tier 1 (security/correctness, spot-verified) — **all four done/closed:** enforce cosign on the hub ([#770](https://github.com/asanexample/platform/issues/770) ✅), private-only EKS default ([#771](https://github.com/asanexample/platform/issues/771) ✅), fail-closed gate scripts ([#772](https://github.com/asanexample/platform/issues/772) ✅), DeveloperAccess regression ([#647](https://github.com/asanexample/platform/issues/647) — closed as superseded by OIDC-native cluster auth [#364](https://github.com/asanexample/platform/issues/364); capability still unbuilt). Tier 2 (systemic): provider-constraint standardization ([#773](https://github.com/asanexample/platform/issues/773)), `.tool-versions` SSOT ([#774](https://github.com/asanexample/platform/issues/774)), Azure-carcass removal ([#775](https://github.com/asanexample/platform/issues/775)), Action SHA-pinning ([#776](https://github.com/asanexample/platform/issues/776)), Dependabot coverage ([#777](https://github.com/asanexample/platform/issues/777)), tests-into-PR-gates ([#778](https://github.com/asanexample/platform/issues/778)). Security/IAM findings fold into the existing tracker [#654](https://github.com/asanexample/platform/issues/654).
 
 ### Later
 
@@ -121,7 +126,7 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 
 #### Identity & Access
 
-- **Identity & Access Strategy — north-star (design-of-record landed; Phase-1 build decomposed — epic [#884](https://github.com/asanexample/platform/issues/884), subs #885–#890).** The unified workforce-first model in [`docs/architecture/identity-and-access-strategy.md`](docs/architecture/identity-and-access-strategy.md): decide access once → derive → project into every system (AWS, apps, GitHub, PagerDuty, Slack) from one git source of truth (Teams + **People** + Grants); dangerous power borrowed temporarily (eligibility-in-git + timed activation); auth strength scaling with role; plus the honest scale-hardening (intent-vs-effected verification, decide/apply split, drift detection, meta-governance). **Phase 1 (highest value-per-effort) = the People roster + deriving AWS (Identity Center console) *and* Keycloak (app) access from it, retiring the hand-maintained HCL/seed-users so "add a person" is one PR.** (The per-team *cluster*-access regression [#647](https://github.com/asanexample/platform/issues/647) is a separate plane — resolved by OIDC-native cluster auth [#364](https://github.com/asanexample/platform/issues/364), not the Identity Center generator.) The ADR-068 P4 items below (#361–#368) realize the access-model core; the machine/agent plane defers to ADR-074 + the graduated-autonomy model ([ADR-086](docs/adrs/086-autonomous-agent-access.md), see Agentic Workloads). **CIAM (customer identity) is a named, deferred plane.**
+- **Identity & Access Strategy — north-star (design-of-record landed; Phase-1 build SHIPPED — epic [#884](https://github.com/asanexample/platform/issues/884), subs #885–#890 all closed; see Shipped → Identity & Access).** The unified workforce-first model in [`docs/architecture/identity-and-access-strategy.md`](docs/architecture/identity-and-access-strategy.md): decide access once → derive → project into every system (AWS, apps, GitHub, PagerDuty, Slack) from one git source of truth (Teams + **People** + Grants); dangerous power borrowed temporarily (eligibility-in-git + timed activation); auth strength scaling with role; plus the honest scale-hardening (intent-vs-effected verification, decide/apply split, drift detection, meta-governance). **Phase 1 (highest value-per-effort) shipped = the People roster + deriving AWS (Identity Center console) *and* Keycloak (app) access from it, retiring the hand-maintained HCL/seed-users so "add a person" is one PR.** (The per-team *cluster*-access regression [#647](https://github.com/asanexample/platform/issues/647) is a separate plane — **closed as superseded** by OIDC-native cluster auth [#364](https://github.com/asanexample/platform/issues/364), not the Identity Center generator; the capability itself is still unbuilt.) The ADR-068 P4 items below (#361–#368) realize the access-model core; the machine/agent plane defers to ADR-074 + the graduated-autonomy model ([ADR-086](docs/adrs/086-autonomous-agent-access.md), see Agentic Workloads). **CIAM (customer identity) is a named, deferred plane.**
 - [#361](https://github.com/asanexample/platform/issues/361) P4 (ADR-068): Product-scoped & cross-team access model
 - [#362](https://github.com/asanexample/platform/issues/362) P4.1 (ADR-068): AccessGrant CRD + cluster projection
 - [#363](https://github.com/asanexample/platform/issues/363) P4.2 (ADR-068): Access-model-as-code — Product roles in Keycloak
@@ -138,7 +143,7 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 
 #### GitOps & Delivery
 
-- [#500](https://github.com/asanexample/platform/issues/500) P2.4 (ADR-056): progressive delivery for prod — Argo Rollouts
+- [#500](https://github.com/asanexample/platform/issues/500) P2.4 (ADR-056): progressive delivery for prod — Argo Rollouts. **Core SHIPPED** (see Shipped → GitOps & Delivery); #500 retained for residual prod-hardening only.
 
 #### Developer Portal
 
@@ -186,12 +191,16 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 - **Cilium CNI — kube-proxy replacement, netpol, Gateway API** — Shipped. Cilium 1.19, kubeProxyReplacement, network policy, Cilium Gateway API. ADR-008/017.
 - **Private EKS (BYOCNI) + node groups + managed addons** — Shipped. Private-only API EKS, BYOCNI ordering, separated node groups + coredns addon. ADR-009/010/023.
 - **Shared Gateway + cert-manager + external-dns** — Shipped. Foundational shared Gateway + ClusterIssuer, Let's Encrypt DNS-01, external-dns. ADR-029/030/059/060/061.
+- **Zero-downtime / graceful-disruption defaults** — Shipped, live both clusters. Kyverno-injected graceful-drain (`preStop` + `terminationGracePeriodSeconds`), generated PodDisruptionBudgets, topology-spread defaults, Karpenter drain backstop, and the `*-prod` replica-floor flipped **Audit→Enforce** (#844). ADR-085.
 
 ### Identity & Access
 
 - **EKS Pod Identity for workload AWS access** — Shipped. Pod Identity associations replace IRSA annotations for environment workloads. ADR-041/047.
 - **Keycloak IdP + OIDC consolidation (Dex/oauth2-proxy retired)** — Shipped. Keycloak as IdP-of-record, OIDC for ArgoCD+Backstage, retired Dex+oauth2-proxy. ADR-052/053/059.
 - **Per-team developer RBAC + platform-engineer access model** — Shipped. DeveloperAccess-<team> namespace-scoped RBAC; PlatformAdmin operate-not-author. ADR-039/040.
+- **Identity & Access Phase 1 — People roster + derived AWS/Keycloak access** — Shipped (epic #884, subs #885–#890 all closed). Git-native People registry + role catalog; Identity Center (AWS console) generator and Keycloak (app) generator both derived from the roster, retiring hand-maintained HCL/seed-users; auth-strength MFA scaling. ADR-086.
+- **Workforce directory + owner-resolution + per-team PagerDuty on-call** — Shipped. The `platform-directory` identity directory + owner-routing agent resolve a culprit's owning team; the `pagerduty` module provisions per-team on-call schedules/escalation in IaC. ADR-084 (#932).
+- **Keycloak admin-plane hardening** — Shipped. Passkey-bound master-realm admin flow + bootstrap-admin seal. ADR-087 (#899/#930/#935/#941).
 
 ### Governance & Supply-chain
 
@@ -207,6 +216,7 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 - **ArgoCD GitOps + per-team AppProjects/RBAC** — Shipped. ArgoCD delivery engine, per-team AppProjects, SSO RBAC. ADR-021.
 - **Multi-stage promotion: auto ≤ staging + gated prod** — Shipped (P2). Promote-by-digest, auto-promote reconciler ≤ staging, gated prod. ADR-067 P2 / #377.
 - **Release-CRD digest promotion + Product-registry source-of-truth** — Shipped. Image-digest promotion via control plane (protected-main); Product registry + Environment claims drive delivery. ADR-069/071.
+- **Progressive delivery — Argo Rollouts (canary/blue-green)** — Shipped (core). `argo-rollouts` controller for all workloads, metric-gated canary + burn-rate SLO analysis, freeze gate, and the Rollouts dashboard fronted by `oauth2-proxy` for Keycloak SSO. ADR-056 (#500 retained for residual prod-hardening).
 
 ### Developer Portal
 

@@ -33,7 +33,7 @@ Only **AWS** is deployed. Azure and GCP are **planned** — no `modules/azure`,
 | Capability | AWS | Azure / GCP |
 |------------|-----|-------------|
 | Config hierarchy, networking, naming patterns | Done | Planned (would reuse the shared shape) |
-| Kubernetes (EKS) + Cilium (ENI) + node groups | Done | Planned (AKS/GKE + Cilium overlay) |
+| Kubernetes (EKS) + Cilium (overlay / VXLAN) + node groups | Done | Planned (AKS/GKE + Cilium overlay) |
 | IAM/Identity (IAM roles, IRSA, Pod Identity) | Done | Planned (managed identities / Workload Identity) |
 | Organizations / Accounts (SCPs, Identity Center) | Done | n/a (AWS-specific) |
 | ArgoCD, cert-manager, external-dns/secrets, Tailscale, gateway | Done | Planned (shared modules, reused) |
@@ -72,8 +72,9 @@ provider (AWS, AzureRM, Google).
 **Shared modules** deploy Helm charts or Kubernetes manifests. They
 accept credentials and identity primitives as variables -- the live unit
 handles sourcing them from cloud-specific stores. For example, the
-`cilium` module accepts a `cloud_provider` variable that switches
-between ENI mode (AWS) and overlay mode (Azure).
+`cilium` module's datapath is parameterized (`ipam_mode` / `routing_mode`):
+AWS runs **overlay (cluster-pool IPAM + VXLAN)** today, with ENI/native
+routing available as a configurable non-default datapath.
 
 ## Cross-Cloud Interface Contracts
 
@@ -111,12 +112,13 @@ second cloud is added.
 
 ### Cilium Cloud Modes
 
-The shared `cilium` module uses `cloud_provider` to select the
-appropriate networking mode:
+The shared `cilium` module's datapath is parameterized (`ipam_mode` /
+`routing_mode`) to select the appropriate networking mode:
 
 | Cloud | Mode | Routing | Masquerade Interface |
 |-------|------|---------|---------------------|
-| AWS | ENI | Native routing via AWS ENI | `ens+` (AL2023 predictable names) |
+| AWS (today) | Overlay (cluster-pool IPAM) | VXLAN tunnel | Default |
+| AWS (optional, non-default) | ENI | Native routing via AWS ENI | `ens+` (AL2023 predictable names) |
 | Azure | Overlay | VXLAN tunnel | Default |
 
 ## Configuration Parity
