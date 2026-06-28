@@ -92,6 +92,11 @@ inputs = {
   # are in exclude_principals. See ADR-014 / kyverno-break-glass runbook.
   validation_failure_action = "Enforce"
 
+  # Replica floor (ADR-085): flipped Audit -> Enforce after review — the audit was clean (the only prod-stage
+  # workload, alpha-shop-prod, runs 3 replicas; 0 PolicyReport violations on either cluster). Prod deploys with
+  # < 2 replicas are now rejected at admission (break-glass for the rare exception).
+  replica_floor_failure_action = "Enforce"
+
   compliance_tier = include.base.locals.compliance_tier
   replica_count   = 3 # HA on the shared platform cluster
 

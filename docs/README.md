@@ -28,6 +28,7 @@ configuration hierarchy that promotes consistency across environments.
 | [Architecture](architecture/) | System design, network topology, and multi-cloud strategy |
 | [Delivery Pipeline](architecture/delivery-pipeline.md) | **End-to-end spine**: scaffold → registry/Composition → supply chain → delivery → promotion → gated prod, with the gates as control plane |
 | [Promotion & Release](architecture/promotion-and-release.md) | Promote-by-digest, the release-keyed ApplicationSet, auto ≤ staging, and the gated-prod release-approver (#377/#501) |
+| [Zero-Downtime Deployments](guides/zero-downtime/) | How deploys avoid dropping traffic — availability defaults (graceful drain, PDB, spread, replica floor) + metric-gated canary/blue-green with auto-rollback + error-budget freeze. Developer & platform explainers + [architecture](architecture/zero-downtime-deployments.md) |
 | [Identity & SSO](architecture/identity-and-sso.md) | How login works: Keycloak (IdP of record) OIDC for ArgoCD/Backstage/Grafana, the access model, the pluggable seam |
 | [Gateway & Ingress](architecture/gateway-and-ingress.md) | Cilium Gateway → NLB → cert-manager → external-dns → Kyverno hostname guard (ADR-060/061) |
 | [Secrets & External Secrets](architecture/secrets-and-external-secrets.md) | Secrets Manager → ESO ClusterSecretStore → ExternalSecret → k8s Secret; platform vs environment |
