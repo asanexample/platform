@@ -34,7 +34,7 @@ Organization with Identity Center makes a *reference* platform un-forkable. We a
   (the whole point of the ADR-052/059 vendor-neutral seam). With a *group-emitting* upstream the membership gap
   closes automatically (the IdP-group→Keycloak-group mapper); with IdC it stays manual.
 - **Unchanged:** everything else in this ADR. Keycloak as the app-facing OIDC IdP, access-as-code from
-  `_teams.hcl`, native per-system enforcement, and AWS account access via Identity Center permission sets
+  the git-native `Team` registry (`gitops/teams/`, ADR-063 — formerly `_teams.hcl`), native per-system enforcement, and AWS account access via Identity Center permission sets
   (orthogonal to the *app* IdP — IdC stays the AWS-access SoR regardless of the upstream choice).
 
 Net: this is a **default flip within the ADR-059 pluggable seam**, not a new direction — it makes the realized

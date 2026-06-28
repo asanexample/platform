@@ -71,6 +71,11 @@ access for preprod and prod. The `infra/modules/aws/ecr/` module manages reposit
 cross-account policies, and lifecycle rules. The ECR live unit is deployed at
 `infra/live/aws/platform/us-east-1/platform/ecr/`.
 
+> **As-built note (ADR-067):** per-team/product ECR repos are now created by the Crossplane **Environment
+> Composition** (`provider-aws-ecr`), keyed off the `Product` registry — not by the `ecr` unit's `teams.hcl`-driven
+> map shown below. The `ecr` unit now holds only **platform** repos (e.g. `platform/backstage`, `platform/gha-runner`).
+> Read the per-team map below as the v2 mechanism.
+
 ### Repository Structure
 
 Repositories follow a `{team}/{app}` naming convention, matching the tenant structure (ADR-027):
@@ -195,8 +200,8 @@ push. Repositories use `AES256` (S3-managed) encryption at rest. If prod images 
 - A compromised CI pipeline could push a malicious image with a new tag. Tag immutability
   prevents overwriting existing tags, but new tags are unrestricted. Mitigated by ECR scan-on-
   push (detects known CVEs) and by **keyless cosign/Sigstore signing, now implemented** — apps
-  sign images after the ECR push and Kyverno's `verify-images-team-<team>` admits only images
-  signed by that team's own GitHub workflow identity (ADR-014 Phase 3; see
+  sign images after the ECR push and Kyverno's per-Product `verify-images-product-<team>-<product>` admits
+  only images signed by that product's own GitHub workflow identity (ADR-014 Phase 3 / ADR-046 split; see
   `docs/architecture/cosign-image-signing.md`). The `IMMUTABLE_WITH_EXCLUSION` `sha256-*` exemption
   above is what lets those signatures be written.
 - The 50-image retention limit may be too aggressive for teams with frequent releases or too
