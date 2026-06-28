@@ -115,10 +115,31 @@ generate "keycloak_provider" {
   EOF
 }
 
+# Second-account (preprod) Secrets Manager provider — to REPLICATE selected shared client secrets there so the
+# preprod cluster's ESO can read them locally (replicate_client_secrets_to_preprod). Assumes the preprod
+# PlatformDeployer from the same management base the default provider uses (applies run AWS_PROFILE=management).
+generate "aws_preprod_provider" {
+  path      = "aws-preprod-provider.tf"
+  if_exists = "overwrite_terragrunt"
+  contents  = <<-EOF
+    provider "aws" {
+      alias  = "preprod"
+      region = "${include.base.locals.region}"
+      assume_role {
+        role_arn = "arn:aws:iam::${include.base.locals.account_ids["preprod"]}:role/PlatformDeployer"
+      }
+    }
+  EOF
+}
+
 inputs = {
   create = true
 
   keycloak_url = dependency.keycloak.outputs.issuer
+
+  # Replicate the Argo Rollouts oauth2-proxy client secret into preprod's Secrets Manager so the preprod Rollouts
+  # dashboard can be fronted with SSO (preprod ESO reads it locally). The Keycloak client is shared across clusters.
+  replicate_client_secrets_to_preprod = ["rollouts"]
 
   # Identity source = Keycloak itself (the IdP of record — ADR-053/059 default). `upstream` is omitted (null), so
   # nothing brokers up to an external IdP; identity + membership live in this realm via `users` below. To federate

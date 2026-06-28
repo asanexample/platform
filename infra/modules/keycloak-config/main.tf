@@ -241,6 +241,28 @@ resource "aws_secretsmanager_secret_version" "client" {
   secret_string = jsonencode({ (local.oidc_secret_key) = random_password.client[each.key].result })
 }
 
+# Preprod-account replica of selected client secrets (var.replicate_client_secrets_to_preprod) — same name + JSON
+# shape, written via the aws.preprod provider, so the spoke cluster's ESO reads the shared secret locally (the
+# Keycloak client is shared; only its secret is copied). Avoids cross-account KMS on the platform secret.
+resource "aws_secretsmanager_secret" "client_preprod" {
+  for_each = local.create ? toset([for c in var.replicate_client_secrets_to_preprod : c if contains(keys(local.clients), c)]) : toset([])
+  provider = aws.preprod
+
+  # `preprod/` prefix so the preprod ESO role (scoped to `secret:preprod/*`) can read it — NOT `platform/`.
+  name                    = "preprod/keycloak/${each.key}-oidc"
+  description             = "Keycloak OIDC client secret for ${local.clients[each.key].name} (realm ${var.realm_name}) — preprod replica of the platform secret."
+  recovery_window_in_days = var.secret_recovery_window_days
+  tags                    = var.tags
+}
+
+resource "aws_secretsmanager_secret_version" "client_preprod" {
+  for_each = aws_secretsmanager_secret.client_preprod
+  provider = aws.preprod
+
+  secret_id     = each.value.id
+  secret_string = jsonencode({ (local.oidc_secret_key) = random_password.client[each.key].result })
+}
+
 resource "keycloak_openid_client" "this" {
   for_each = local.clients
 

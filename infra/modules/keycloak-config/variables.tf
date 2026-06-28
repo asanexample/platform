@@ -159,6 +159,18 @@ variable "clients" {
   }
 }
 
+variable "replicate_client_secrets_to_preprod" {
+  description = <<-DESC
+    Client ids whose generated OIDC secret is ALSO written to the preprod account's Secrets Manager (via the
+    aws.preprod provider), under the same name `platform/keycloak/<id>-oidc`. Lets a SPOKE cluster's ESO read the
+    shared client secret locally (no cross-account KMS) to front a no-native-auth UI there with oauth2-proxy —
+    e.g. `["rollouts"]` for the preprod Argo Rollouts dashboard. The Keycloak client is shared; only its secret
+    is replicated. Empty = no replica.
+  DESC
+  type        = list(string)
+  default     = []
+}
+
 variable "public_clients" {
   description = <<-DESC
     PUBLIC OIDC clients (PKCE S256, NO client secret, no Secrets Manager entry) — for CLIs that can't safely hold
