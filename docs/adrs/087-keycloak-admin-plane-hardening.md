@@ -24,6 +24,15 @@ This was split out of #885 (kept to platform-realm workforce MFA) as [#899](http
 
 4. **INVARIANT — never disable `admin-cli` direct-grant.** It is the greenfield **bootstrap** (a from-zero rebuild configures Keycloak through it before any passkey exists) **and** the **break-glass** (an independent door when the browser flow misbehaves, ADR-068 §6). Disabling it **bricks every rebuild** and removes the recovery path. The master browser-flow hardening is additive to, never a replacement for, this path.
 
+## On the Keycloak 26 "temporary admin" warning
+
+Keycloak 26 flags the env-var bootstrap admin (`KC_BOOTSTRAP_ADMIN_*`) as a **temporary admin** and nags you to "create a permanent admin account and delete the temporary one." Our `admin` user (`platform/keycloak/admin`) *is* that bootstrap admin — and we **keep it on purpose; we do not follow that advice.** Recorded here so it's a decision, not a rediscovery:
+
+- **Deleting it is the one thing we must never do** — Terraform authenticates as it (`admin-cli`), the rebuild recreates it, it's the break-glass (the INVARIANT above). The literal advice bricks us.
+- **The warning's real footguns don't apply.** It targets default / shared / never-rotated admin passwords; ours is **rotated per rebuild**, **SSO + Tailscale-gated** (not internet-facing), and now has a **passkey** on its console login. The one generally-valid concern — a shared `admin` account ruins *attribution* — is **moot at single-operator scale** (it's always the same person); it only bites with a team.
+- **"Create a permanent admin" is exactly the deferred full-SA migration below** — a second keys-to-the-kingdom secret + a brittle two-phase rebuild. Over-engineering for a single-operator platform.
+- **When it *is* warranted (multiple human Keycloak admins), the right fix is to FEDERATE the master console to the real SSO identity** (admins log in as themselves with their normal MFA; the bootstrap admin reverts to machine-only) — **not** a second static permanent admin, which would be a worse version of the same thing. Revisit then.
+
 ## Consequences
 
 - The master admin **console** requires a passkey; the **machine** path (`admin-cli` direct-grant) is unchanged, so Terraform, bootstrap, and break-glass are unaffected — a broken master browser flow never locks out automation (verified: binding the master flow and reverting both work cleanly against an ephemeral Keycloak 26.6.3).

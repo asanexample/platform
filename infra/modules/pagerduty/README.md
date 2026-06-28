@@ -8,7 +8,7 @@ membership is wired by a future connector.
 
 Per team (`for_each var.teams`, keyed by the team names from `gitops/teams/<team>.yaml`):
 
-- `pagerduty_schedule` — a weekly rotation.
+- `pagerduty_schedule` — a weekly rotation (v1 Schedules API). v1 is intentional for now: migrating to `pagerduty_schedulev2` (the v3 "flexible schedules" API) is blocked on an unresolved provider bug ([PagerDuty/terraform-provider-pagerduty#1127](https://github.com/PagerDuty/terraform-provider-pagerduty/issues/1127)) — the provider returns invalid objects on create against the early-access `/v3/schedules` endpoint, with no fix on the latest provider (3.33.0). The v1 resource emits a deprecation warning (expected, harmless); revisit when #1127 is resolved and v3 is GA.
 - `pagerduty_escalation_policy` — re-notify after 15 min, loop twice, targeting the team's schedule.
 - `pagerduty_service` — backed by the team's escalation policy (`create_alerts_and_incidents`).
 - `pagerduty_service_integration` — an Events API v2 (Prometheus/Alertmanager) integration.

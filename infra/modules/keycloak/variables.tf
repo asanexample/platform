@@ -104,6 +104,20 @@ variable "secret_recovery_window_days" {
   default     = 0
 }
 
+variable "admin_secret_reader_role_arns" {
+  description = <<-DESC
+    Seal the bootstrap-admin secret (ADR-087): when non-empty, attach a resource policy to platform/keycloak/admin
+    that DENIES secretsmanager:GetSecretValue to every principal whose role is NOT in this list — so even an
+    AdministratorAccess principal can't read the crown-jewel credential. Pass the ROLE ARNs of the ONLY legitimate
+    readers (each is expanded to its `:role/` and `:sts:…:assumed-role/…/*` forms): the deployer role (Terraform
+    reads it on apply), the External Secrets Operator role (syncs it to the cluster), and a break-glass role.
+    MISSING A READER temporarily breaks that reader (recoverable — the Deny is scoped to GetSecretValue, so
+    PutResourcePolicy still works and an admin can fix it). Empty (default) = no policy = current behavior.
+  DESC
+  type        = list(string)
+  default     = []
+}
+
 # ---------------------------------------------------------------------------
 # Database (in-cluster CloudNativePG — dev; RDS is the prod toggle, deferred)
 # ---------------------------------------------------------------------------

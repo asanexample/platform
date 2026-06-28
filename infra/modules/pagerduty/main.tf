@@ -39,9 +39,12 @@ data "pagerduty_vendor" "prometheus" {
 # membership connector (see README / the identity & access strategy) replaces this list with the
 # team's real roster. The schedule/EP/service structure below does NOT change — only this list.
 #
-# NOTE: provider 3.x deprecates pagerduty_schedule (legacy v1 API) in favour of pagerduty_schedulev2.
-# We stay on pagerduty_schedule for now: it is still supported and is what the approved plan specifies;
-# migrating to v2 is a follow-up when the membership connector lands (it owns the `users`/layer shape).
+# v1 (pagerduty_schedule) is intentional for now. Migrating to pagerduty_schedulev2 (PagerDuty's v3
+# "flexible schedules" API) is blocked on an unresolved provider bug: it targets the early-access
+# /v3/schedules endpoint and the provider returns invalid objects on create
+# (PagerDuty/terraform-provider-pagerduty#1127), with no fix on the latest provider (3.33.0). Revisit
+# when #1127 is resolved and the v3 API is GA. The v1 resource emits a deprecation warning on
+# plan/apply — expected and harmless.
 resource "pagerduty_schedule" "team" {
   for_each = var.teams
 

@@ -465,7 +465,15 @@ resource "keycloak_user" "seed" {
     # trying to reset them on every apply — stripping the forced-change before a user logs in, or re-adding it
     # after they've changed their password. Let Keycloak/the user own it. (initial_password is write-only —
     # ignored so a password the user has since rotated isn't reset back to the generated seed value.)
-    ignore_changes = [required_actions, initial_password]
+    #
+    # federated_identity: a seed user can broker-link their GitHub/Slack accounts via the Keycloak Account Console
+    # (ADR-084 owner-routing — the triage agent's directory-sync reads these federated identities as the
+    # AUTHORITATIVE source for the @mention handle map). We declare NONE here (they're runtime, OAuth-discovered, and
+    # MUST NOT live in git), so without this ignore an apply reconciles the user to federatedIdentities:[] and SILENTLY
+    # deletes every console-linked account — which is exactly what wiped josh's github/slack links and dropped
+    # owner-routing to channel-level (a stray keycloak-config apply, not a park, was the trigger). IaC owns the user;
+    # the runtime owns the brokered links.
+    ignore_changes = [required_actions, initial_password, federated_identity]
   }
 }
 

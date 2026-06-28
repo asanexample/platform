@@ -41,6 +41,12 @@ while the underlying pods drain gracefully and never all disappear at once.
 3. [Operations runbook](../../runbooks/rollout-and-gate-operations.md) — diagnose a Degraded rollout, no-data gates, the freeze, ArgoCD fights, the UI hang
 4. [Architecture](../../architecture/zero-downtime-deployments.md) — components, flows, the decision map
 
+### Reference & extras
+
+- [Glossary](glossary.md) — the terms, defined once
+- [FAQ](faq.md) — quick answers to the common questions
+- [Demo walkthrough](demo-walkthrough.md) — see the safety nets work, live
+
 ## What you get, by stage
 
 | Stage | Rollout strategy | Gates |
@@ -57,7 +63,8 @@ freeze. Deferred: the regulated-tier manual gate (W10). See the
 [architecture doc](../../architecture/zero-downtime-deployments.md#as-built-status) for the precise
 as-built breakdown.
 
-> **Scope.** Both audiences are now covered end to end — the developer set (overview, tutorial,
-> how-to, reference, troubleshooting) and the platform set (internals, extend/tune how-to, operations
-> runbook), plus the architecture. Still planned (polish): a *glossary*, an *FAQ*, a narrated *demo
-> walkthrough*, and surfacing the developer docs in *Backstage TechDocs*.
+> **Scope.** The documentation is complete in-repo — both audiences end to end (developer:
+> overview, tutorial, how-to, reference, troubleshooting; platform: internals, extend/tune how-to,
+> operations runbook), plus architecture, glossary, FAQ, and a demo walkthrough. The one remaining
+> item is *distribution*: surfacing the developer docs in **Backstage TechDocs** — a separate infra
+> effort, tracked in [#938](https://github.com/asanexample/platform/issues/938).
