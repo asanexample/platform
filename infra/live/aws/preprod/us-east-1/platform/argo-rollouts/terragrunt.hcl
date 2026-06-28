@@ -63,6 +63,9 @@ inputs = {
   # Argo Rollouts web UI (this cluster's rollouts — incl. the tenant app canaries) — exposed Tailscale-only at
   # rollouts.preprod.aws.refplat.org via the gateway-config `rollouts` route.
   enable_dashboard = true
+  # The UI hangs on an empty default namespace; default it to a populated one (the demo app's prod). The switcher
+  # still reaches the other tenant namespaces. (Brittle if alpha-shop goes away — revisit with a smarter default.)
+  dashboard_default_namespace = "alpha-shop-prod"
 
   tags = include.base.locals.tags
 }

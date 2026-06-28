@@ -44,6 +44,12 @@ variable "enable_dashboard" {
   default     = false
 }
 
+variable "dashboard_default_namespace" {
+  description = "Default namespace the web UI opens to. The dashboard HANGS on an empty default namespace, so on a cluster where rollouts live in tenant namespaces set this to one that has rollouts (e.g. a primary app's prod ns). The UI's switcher still reaches the others. Empty = the pod's own namespace."
+  type        = string
+  default     = ""
+}
+
 variable "gateway_api_plugin_version" {
   description = "Release tag of argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi to load."
   type        = string

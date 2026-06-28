@@ -47,6 +47,11 @@ locals {
     # OIDC proxy or a read-only SA if it ever needs wider exposure.
     dashboard = {
       enabled = var.enable_dashboard
+      # The dashboard is namespace-scoped and HANGS on an empty default namespace (no initial watch response →
+      # the SPA spins forever). Default it to a namespace that has rollouts so it renders; the UI's namespace
+      # switcher still reaches the others (it discovers them cluster-wide via its ClusterRole). Empty = the pod's
+      # own ns (argo-rollouts) — only safe on a cluster that actually has rollouts there.
+      extraArgs = var.dashboard_default_namespace != "" ? ["--namespace=${var.dashboard_default_namespace}"] : []
     }
   }
 }
