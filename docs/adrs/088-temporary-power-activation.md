@@ -2,6 +2,24 @@
 
 **Status:** Proposed (design — 2026-06-27)
 
+> **Amendment (2026-06-28): the controller's implementation shape is decided.** Decision 1 committed an
+> "always-on controller" but left its shape open. It will be a **Kubernetes operator built with Kubebuilder /
+> controller-runtime** — a cluster-scoped **`Activation` CRD** reconciled by a controller, fronted by a thin
+> **imperative intake API** that verifies eligibility + a fresh passkey step-up and is the *only* principal
+> allowed to create `Activation` CRs (so no borrow can skip step-up). The CR is the source of truth for what is
+> *active now* (etcd); the append-only **audit** history goes to the ADR-084 Postgres. Auto-expiry, retries
+> against the flaky serial-SSO mint path, the kill-switch, and the §3.3 drift backstop all ride
+> controller-runtime's work-queue + `requeueAfter` + **finalizers** — the decisive reason to pick an operator
+> over a hand-rolled service. **Rejected:** a plain always-on service (loses finalizers, free Backstage-plugin
+> visibility, and per-plane reconcile status; reinvents the retry/expiry machinery the
+> [#888](https://github.com/asanexample/platform/issues/888) race proves we need — its only edge, "ship
+> faster," is sequencing not architecture); **Operator SDK** (= Kubebuilder + OLM/bundle machinery aimed at
+> marketplace distribution we don't do); and **modelling activation in Crossplane** (built for declarative
+> git-desired resources — the path this ADR rejected — so it owns the easy *mint* but fights TTL/expiry,
+> step-up, and the non-AWS planes). Full design + the `Activation` CRD/API contract:
+> [temporary-power-activation-controller](../architecture/temporary-power-activation-controller.md). `platctl
+> access grant`/`revoke` remains the controller-down recovery floor (built; AWS-IdC plane; dry-run-verified).
+
 ## Context
 
 The workforce access model splits power in two ([identity strategy §2.3](../architecture/identity-and-access-strategy.md)): **everyday access is standing** (held all the time — `developer`, `viewer`, `auditor`, your own team's *operate* in test environments), but **dangerous power is borrowed, not held**. The dangerous powers are the `on-demand` roles in the catalog ([#887](https://github.com/asanexample/platform/issues/887)):
