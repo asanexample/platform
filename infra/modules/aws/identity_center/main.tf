@@ -100,3 +100,48 @@ resource "aws_ssoadmin_account_assignment" "this" {
   target_id          = each.value.account_id
   target_type        = "AWS_ACCOUNT"
 }
+
+# ---------------------------------------------------------------------------------------------------
+# Projection-hardening invariants (identity strategy §3.3 — the decide/apply split). The unit GENERATES
+# users/groups/permission-sets/assignments from the registries; these checks assert the generated native
+# config matches intent before it's applied, so a translation bug can't silently over-grant. Structural
+# referential integrity (an assignment/membership pointing at an unknown group or permission set) is
+# already enforced by Terraform's resource indexing; these add the SEMANTIC guardrails.
+# ---------------------------------------------------------------------------------------------------
+
+check "assignments_reference_known_groups" {
+  assert {
+    condition     = alltrue([for a in var.account_assignments : contains(keys(var.groups), a.group)])
+    error_message = "an account_assignment targets a group not declared in var.groups (a generation bug)."
+  }
+}
+
+check "assignments_reference_known_permission_sets" {
+  assert {
+    condition     = alltrue([for a in var.account_assignments : contains(keys(var.permission_sets), a.permission_set)])
+    error_message = "an account_assignment references a permission set not declared in var.permission_sets."
+  }
+}
+
+check "memberships_reference_known_groups" {
+  assert {
+    condition     = alltrue(flatten([for u, cfg in var.users : [for g in coalesce(cfg.groups, []) : contains(keys(var.groups), g)]]))
+    error_message = "a user is placed in a group not declared in var.groups."
+  }
+}
+
+# No over-broad standing grant: an inline policy must not grant a wildcard Allow (Action:* on Resource:*).
+# A wildcard DENY (the per-team ABAC backstop) is fine — only Allow is the escalation.
+check "no_wildcard_inline_allow" {
+  assert {
+    condition = alltrue(flatten([
+      for name, ps in var.permission_sets : [
+        for s in try(jsondecode(ps.inline_policy).Statement, []) :
+        !(try(s.Effect, "") == "Allow"
+          && contains(try(tolist(s.Action), [s.Action]), "*")
+        && contains(try(tolist(s.Resource), [s.Resource]), "*"))
+      ]
+    ]))
+    error_message = "a permission set inline_policy grants a wildcard Allow (Action:* on Resource:*) — over-broad standing access."
+  }
+}

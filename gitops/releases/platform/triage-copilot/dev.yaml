@@ -6,4 +6,4 @@ spec:
   environmentRef: platform-triage-copilot-dev
   services:
     server:
-      digest: sha256:732ee9249e1adcc1a3b04fde3667c72d1aab088400d12d52a6dffdb82cc0f09c
+      digest: sha256:ca83dcfb78878a7f8b6299103400609c78bce115d02e8caf43eeb37468d28e11

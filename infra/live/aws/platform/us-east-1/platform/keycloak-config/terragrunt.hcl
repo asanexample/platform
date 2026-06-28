@@ -55,6 +55,38 @@ locals {
       envelope = yamldecode(file("${local.teams_dir}/${f}")).spec.envelope
     }
   }
+
+  # Realm users GENERATED from the roster (identity strategy §2.4/§2.6, #889) — the OTHER half of the single
+  # source of truth: one Person in gitops/people (#886), joined with the role catalog (gitops/roles, #887), feeds
+  # both AWS console access (#888) and app access (here), so people are declared ONCE. Keyed by the Keycloak
+  # anchor (spec.person — the realm username); placed in the realm groups its STANDING grants map to: a team grant
+  # → the team's group (the keycloak module makes one group per Team); a platform grant → the role's keycloak
+  # group (e.g. access-admin → platform-admins). on-demand grants are eligibility, not standing app access (§2.3),
+  # so they don't add a group. No PII in git — email is derived from the anchor + the org domain; display names
+  # are synthetic (the real identity lives in the ADR-084 directory).
+  people_dir = "${get_repo_root()}/gitops/people"
+  roles_dir  = "${get_repo_root()}/gitops/roles"
+  people = { for f in fileset(local.people_dir, "*.yaml") :
+    yamldecode(file("${local.people_dir}/${f}")).metadata.name => yamldecode(file("${local.people_dir}/${f}")).spec
+  }
+  roles = { for f in fileset(local.roles_dir, "*.yaml") :
+    yamldecode(file("${local.roles_dir}/${f}")).metadata.name => yamldecode(file("${local.roles_dir}/${f}")).spec
+  }
+  kc_domain = split("@", include.base.locals.admin_email)[1]
+  gen_users = {
+    for pname, p in local.people : p.person => {
+      email      = "${p.person}@${local.kc_domain}"
+      first_name = title(split("-", pname)[0])
+      last_name  = length(split("-", pname)) > 1 ? title(split("-", pname)[1]) : "User"
+      groups = distinct(flatten([
+        for g in p.grants : (
+          try(g.activation, "") == "on-demand" || try(local.roles[g.role].mode, "standing") != "standing" ? [] :
+          try(g.team, "") != "" ? [g.team] :
+          try(local.roles[g.role].keycloak.group, "") != "" ? [local.roles[g.role].keycloak.group] : []
+        )
+      ]))
+    }
+  }
 }
 
 # Configures the running Keycloak (deployed by the keycloak unit) via the keycloak/keycloak provider — B2,
@@ -143,32 +175,14 @@ inputs = {
 
   # Identity source = Keycloak itself (the IdP of record — ADR-053/059 default). `upstream` is omitted (null), so
   # nothing brokers up to an external IdP; identity + membership live in this realm via `users` below. To federate
-  # a corporate IdP later (Okta/Entra/Google over OIDC, or AWS IdC over SAML) set `upstream = { … }` here and drop
-  # the seed users — NOTHING downstream changes (apps, claims, access model). Presets: docs/runbooks/keycloak-upstream-idp.md.
+  # a corporate IdP later (Okta/Entra/Google over OIDC, or AWS IdC over SAML) set `upstream = { … }` here — the
+  # roster still says WHO, but membership then flows from the upstream group claim. Presets: docs/runbooks/keycloak-upstream-idp.md.
 
-  # Seed users (membership source in standalone mode). Each is placed in its realm group(s), so the
-  # group→role→claim flow is live immediately. Passwords are temporary (must-change on first login) and generated
-  # into Secrets Manager at platform/keycloak/seed-user/<username> — read them with `platctl` / the AWS console.
-  users = {
-    "admin" = {
-      email      = "admin@${split("@", include.base.locals.admin_email)[1]}"
-      first_name = "Platform"
-      last_name  = "Admin"
-      groups     = ["platform-admins"]
-    }
-    "dev-alpha" = {
-      email      = "dev-alpha@${split("@", include.base.locals.admin_email)[1]}"
-      first_name = "Dev"
-      last_name  = "Alpha"
-      groups     = ["alpha"]
-    }
-    "dev-bravo" = {
-      email      = "dev-bravo@${split("@", include.base.locals.admin_email)[1]}"
-      first_name = "Dev"
-      last_name  = "Bravo"
-      groups     = ["bravo"]
-    }
-  }
+  # Realm users GENERATED from the roster (gitops/people × the role catalog, #889) — no longer hand-maintained
+  # here, so a person is declared ONCE (the roster) and feeds both AWS (#888) and apps. Each is placed in its
+  # realm group(s), so the group→role→claim flow is live immediately. Passwords are temporary (must-change on
+  # first login) and generated into Secrets Manager at platform/keycloak/seed-user/<username>. See local.gen_users.
+  users = local.gen_users
 
   # Per-app OIDC clients use the module defaults (ArgoCD + Backstage, both direct OIDC). Secrets are tagged for SM.
   tags = include.base.locals.tags
@@ -195,12 +209,11 @@ inputs = {
   # anywhere — plus self-service password reset OFF, brute-force defenses, and login/admin event logging (module
   # defaults). Recovery is a backup passkey or admin re-provision.
   #
-  # TWO-APPLY, NO-LOCKOUT ROLLOUT (Keycloak is Tier-0):
-  #   apply-1 (now): enforce_browser_mfa = false — the flow + force-enroll action + realm hardening are created,
-  #     but the built-in browser flow stays live. Then enroll a passkey (+ a backup) on `admin` via the Account
-  #     Console over the gateway, and verify it logs in.
-  #   apply-2: flip enforce_browser_mfa = true to BIND the new flow. Enrolled users log in by passkey; new users
-  #     are force-enrolled. Break-glass if a flow misbehaves: revert to false + re-apply (admin-cli direct-grant
-  #     is independent of any browser flow). Master-realm admin hardening is tracked separately in #899.
-  enforce_browser_mfa = false
+  # TWO-APPLY, NO-LOCKOUT ROLLOUT (Keycloak is Tier-0) — BOUND 2026-06-27 (apply-2 done):
+  #   apply-1: enforce_browser_mfa = false — the flow + force-enroll action + realm hardening were created, the
+  #     built-in browser flow stayed live. `admin` enrolled a passkey (+ a backup) via the Account Console.
+  #   apply-2 (here): enforce_browser_mfa = true BINDS the flow — login is now username+password then a passkey
+  #     challenge; new users are force-enrolled in-flow. Break-glass if a flow misbehaves: revert to false +
+  #     re-apply (admin-cli direct-grant is independent of any browser flow). Master-realm admin hardening: #899.
+  enforce_browser_mfa = true
 }
