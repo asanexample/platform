@@ -26,6 +26,14 @@ while the underlying pods drain gracefully and never all disappear at once.
 | Anyone wanting the **architecture** | [Architecture](../../architecture/zero-downtime-deployments.md) — components, flows, diagrams, the decision map |
 | Looking for the **decisions / "why"** | ADRs [085](../../adrs/085-workload-availability-graceful-disruption-defaults.md) (availability), [056](../../adrs/056-progressive-delivery-and-safe-rollback.md) (progressive delivery), [054](../../adrs/054-platform-resilience-and-business-continuity.md) (resilience/SLOs), [049](../../adrs/049-tenant-model-team-tenant-zone.md) (separation of duties) |
 
+### The developer path (in order)
+
+1. [Overview](overview-developers.md) — what's automatic, what's yours, how a deploy flows
+2. [Tutorial: your first zero-downtime deploy](tutorial-first-deploy.md) — watch a canary protect a change, step by step
+3. [How-to: ship, watch, roll back](how-to-ship.md) — the task recipes
+4. [Reference: automatic vs your responsibility](reference-automatic-vs-yours.md) — the look-up tables + the knobs
+5. [Troubleshooting](troubleshooting-developers.md) — when a rollout doesn't do what you expect
+
 ## What you get, by stage
 
 | Stage | Rollout strategy | Gates |
@@ -42,6 +50,7 @@ freeze. Deferred: the regulated-tier manual gate (W10). See the
 [architecture doc](../../architecture/zero-downtime-deployments.md#as-built-status) for the precise
 as-built breakdown.
 
-> **Scope of these docs (Phase 1).** This set covers *how it works* (both audiences) + the
-> architecture. Task guides (ship a canary, roll back, add a gate), reference tables, runbooks, and a
-> demo walkthrough are planned follow-ons.
+> **Scope.** The developer set (overview, tutorial, how-to, reference, troubleshooting), the platform
+> internals, and the architecture are all here. Still planned: platform-engineer *how-to* guides (add
+> a gate, tune the availability defaults), operational *runbooks*, a *glossary*, and a *demo
+> walkthrough*.
