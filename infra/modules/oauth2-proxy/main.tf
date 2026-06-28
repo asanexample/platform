@@ -101,6 +101,10 @@ resource "helm_release" "this" {
   timeout = 600
 
   values = [yamlencode({
+    # Name the chart's resources exactly `var.name` (e.g. Service `rollouts`) instead of the chart default
+    # `<release>-oauth2-proxy`, so the gateway-config route's backend Service name matches (= module output).
+    fullnameOverride = var.name
+
     config = {
       existingSecret = local.secret_name
       configFile     = local.config_file
