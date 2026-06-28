@@ -51,9 +51,9 @@ module against the running Keycloak.
 | Name | Version |
 | ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.11 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 6.0 |
-| <a name="requirement_helm"></a> [helm](#requirement\_helm) | >= 3.0 |
-| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | >= 2.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.0 |
+| <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 3.0 |
+| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 3.0 |
 | <a name="requirement_null"></a> [null](#requirement\_null) | >= 3.0 |
 | <a name="requirement_random"></a> [random](#requirement\_random) | >= 3.0 |
 
@@ -61,9 +61,9 @@ module against the running Keycloak.
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_aws"></a> [aws](#provider\_aws) | >= 6.0 |
-| <a name="provider_helm"></a> [helm](#provider\_helm) | >= 3.0 |
-| <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | >= 2.0 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.0 |
+| <a name="provider_helm"></a> [helm](#provider\_helm) | ~> 3.0 |
+| <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | ~> 3.0 |
 | <a name="provider_null"></a> [null](#provider\_null) | >= 3.0 |
 | <a name="provider_random"></a> [random](#provider\_random) | >= 3.0 |
 
@@ -76,6 +76,7 @@ No modules.
 | Name | Type |
 | ---- | ---- |
 | [aws_secretsmanager_secret.admin](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
+| [aws_secretsmanager_secret_policy.admin](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_policy) | resource |
 | [aws_secretsmanager_secret_version.admin](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [helm_release.keycloak](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
 | [kubernetes_manifest.admin_external_secret](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
@@ -91,6 +92,7 @@ No modules.
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_helm_chart_version"></a> [helm\_chart\_version](#input\_helm\_chart\_version) | Helm chart version (pinned in \_versions.hcl) | `string` | n/a | yes |
+| <a name="input_admin_secret_reader_role_arns"></a> [admin\_secret\_reader\_role\_arns](#input\_admin\_secret\_reader\_role\_arns) | Seal the bootstrap-admin secret (ADR-087): when non-empty, attach a resource policy to platform/keycloak/admin<br/>that DENIES secretsmanager:GetSecretValue to every principal whose role is NOT in this list — so even an<br/>AdministratorAccess principal can't read the crown-jewel credential. Pass the ROLE ARNs of the ONLY legitimate<br/>readers (each is expanded to its `:role/` and `:sts:…:assumed-role/…/*` forms): the deployer role (Terraform<br/>reads it on apply), the External Secrets Operator role (syncs it to the cluster), and a break-glass role.<br/>MISSING A READER temporarily breaks that reader (recoverable — the Deny is scoped to GetSecretValue, so<br/>PutResourcePolicy still works and an admin can fix it). Empty (default) = no policy = current behavior. | `list(string)` | `[]` | no |
 | <a name="input_admin_username"></a> [admin\_username](#input\_admin\_username) | Bootstrap admin username | `string` | `"admin"` | no |
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | EKS cluster name — for the teardown finalizer-clear provisioner (aws eks update-kubeconfig). | `string` | `""` | no |
 | <a name="input_create"></a> [create](#input\_create) | Whether to deploy Keycloak | `bool` | `true` | no |
