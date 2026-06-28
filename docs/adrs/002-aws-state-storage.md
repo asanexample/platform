@@ -54,8 +54,8 @@ problem.
 ### Per-Cloud State Backends
 
 AWS infrastructure state is stored in **S3 with DynamoDB locking** in the AWS management account.
-Azure and GCP state continues to use Azure Blob Storage. Each cloud's state lives in its own
-cloud-native backend.
+Only AWS is deployed today (Azure/GCP were removed). The design keeps state cloud-local: were Azure or GCP
+to return, each cloud's state would live in its own cloud-native backend (e.g. Azure Blob), not in S3.
 
 ### Cloud-Aware-Ready Routing in `root.hcl`
 
@@ -69,35 +69,38 @@ locals {
   # Detect cloud provider from directory path (kept for future multi-cloud)
   _path_parts_cloud = split("/", path_relative_to_include())
   _cloud            = try(local._path_parts_cloud[1], "aws")
-  _secrets          = read_terragrunt_config("${get_repo_root()}/infra/live/aws/secrets.hcl")
+  # SOPS-encrypted, committed (ADR-066). TG_SOPS_BOOTSTRAP=1 falls back to a gitignored plaintext
+  # secrets.hcl for a true from-zero bootstrap before the KMS key exists.
+  _secrets = get_env("TG_SOPS_BOOTSTRAP", "") == "1" ? read_terragrunt_config("${get_repo_root()}/infra/live/aws/secrets.hcl").locals : yamldecode(sops_decrypt_file("${get_repo_root()}/infra/live/aws/secrets.enc.yaml"))
 }
 
 remote_state {
   backend = "s3"
   config = {
-    bucket         = local._secrets.locals.state_bucket    # tfstate-mgmt-<acct>, from secrets.hcl
+    bucket         = local._secrets.state_bucket           # tfstate-mgmt-<acct>, from secrets.enc.yaml
     key            = "${path_relative_to_include()}/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
     dynamodb_table = "terraform-locks"
-    role_arn       = local._secrets.locals.state_role_arn  # TerraformStateAccess (ADR-007)
+    role_arn       = local._secrets.state_role_arn         # TerraformStateAccess (ADR-007)
   }
 }
 ```
 
 When Azure/GCP return, the backend becomes a `local._cloud == "aws" ? "s3" : "azurerm"` conditional
-again. The bucket name and the state-access role ARN come from the gitignored `secrets.hcl`.
+again. The bucket name and the state-access role ARN come from the SOPS-encrypted, committed
+`secrets.enc.yaml` (decrypted at parse time via the management KMS key, [ADR-066](066-sops-encrypted-config-secrets.md)).
 
 ### S3 Backend Configuration
 
 | Setting | Value | Rationale |
 |---------|-------|-----------|
-| Bucket | `tfstate-mgmt-<acct>` (from `secrets.hcl`) | Account-ID suffix prevents global name collisions and makes ownership obvious |
+| Bucket | `tfstate-mgmt-<acct>` (from `secrets.enc.yaml`) | Account-ID suffix prevents global name collisions and makes ownership obvious |
 | Region | `us-east-1` | Primary AWS region; Organizations API endpoint is us-east-1 |
 | Encryption | `true`, SSE-KMS (AWS-managed key) | State files may contain sensitive resource attributes |
 | DynamoDB table | `terraform-locks` | Prevents concurrent state modifications; PAY_PER_REQUEST billing |
 | State key | `{path_relative_to_include}/terraform.tfstate` | Directory structure maps 1:1 to state keys, making state files discoverable |
-| Access role | `TerraformStateAccess` (`role_arn` from `secrets.hcl`) | Dedicated cross-account role scoped to the state bucket + lock table ([ADR-007](007-iam-role-model.md)) |
+| Access role | `TerraformStateAccess` (`role_arn` from `secrets.enc.yaml`) | Dedicated cross-account role scoped to the state bucket + lock table ([ADR-007](007-iam-role-model.md)) |
 
 ### Bootstrap Module for Chicken-and-Egg Resolution
 
@@ -141,7 +144,8 @@ because:
 
 ### Positive
 
-- **Cloud isolation.** An Azure outage does not affect AWS state operations. Each cloud's
+- **Cloud isolation (by design).** Were a second cloud to return, an outage in one would not affect AWS
+  state operations, because each cloud's
   infrastructure can be planned, applied, and recovered independently.
 - **Simplified authentication.** AWS pipelines only need AWS credentials. No cross-cloud
   authentication is required for state access.
