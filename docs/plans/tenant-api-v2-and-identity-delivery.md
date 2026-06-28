@@ -1,5 +1,7 @@
 # Delivery Plan — Tenant API v2 + Identity Strategy (the rebuild cutover)
 
+> **Status: SUPERSEDED — the platform went v1→v2→v3; v3 (ADR-067, XEnvironment) is live. See docs/plans/v3-implementation-plan.md. Retained for history.**
+
 Sequenced delivery for the target tenant model ([ADR-049](../adrs/049-tenant-model-team-tenant-zone.md),
 [schema](../architecture/tenant-api-v2.md)) and the identity/authz strategy
 ([ADR-053](../adrs/053-identity-and-cross-system-authorization-strategy.md)), plus the enterprise-readiness

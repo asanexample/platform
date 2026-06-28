@@ -28,6 +28,10 @@ Keep `terminationGracePeriodSeconds` > preStop sleep + the app's drain budget. S
 
 ## Flip a validate policy Audit → Enforce (e.g. the replica floor)
 
+> **Note:** the replica floor (`require-prod-replica-floor`) is **already promoted to Enforce on both live
+> clusters** (#934) — it's used here only as a worked example of the generic promotion procedure. Apply these
+> steps to whichever validate policy is still Audit.
+
 The validate policies roll **audit-first** so you review before they reject. To promote one:
 
 1. **Review the audit** — there must be no live violations, or you'll break a deploy:

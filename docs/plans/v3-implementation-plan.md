@@ -1,5 +1,7 @@
 # v3 Implementation Plan — building the ADR-067 domain model
 
+> **Status: DELIVERED — v3 is live (see docs/archive/v3-cutover.md). Retained for history.**
+
 The sequenced build plan for the ADR-067/068/069 design (the v1alpha3 model: Team / Product / Service /
 Environment / Customer). The normative contract is [platform-domain-api.md](../architecture/platform-domain-api.md);
 this is *how we get there from the live v2*.

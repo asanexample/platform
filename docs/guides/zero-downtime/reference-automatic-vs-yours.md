@@ -12,7 +12,7 @@ task, the [how-to](how-to-ship.md).
 | Pod `terminationGracePeriodSeconds` | **30** | Kyverno mutate `add-pod-defaults` | Must exceed preStop + your in-flight drain |
 | `PodDisruptionBudget` | `maxUnavailable: 1` | Kyverno generate | One per Deployment/StatefulSet; GC'd with the workload |
 | `topologySpreadConstraints` | zone + node, soft | Kyverno mutate `mutate-topology-spread` | Selector derived from your workload |
-| Container `securityContext` | non-root hardened, drop ALL caps, `RuntimeDefault` | Kyverno mutate | (general policy, not zero-downtime-specific) |
+| Container `securityContext` | `allowPrivilegeEscalation: false`, drop ALL caps, `RuntimeDefault` | Kyverno mutate | (general policy, not zero-downtime-specific; `runAsNonRoot`/`readOnlyRootFilesystem` are regulated-tier-only, not auto-injected on `standard`) |
 | `automountServiceAccountToken` | `false` | Kyverno mutate | |
 | The canary/blue-green **Rollout strategy** (prod) | stepped canary or BG cutover | scaffolder `deployStrategy` | See below |
 | **Stable + canary Services** + weighted HTTPRoute (canary, prod) | — | Argo Rollouts + Gateway plugin | The controller owns their selectors/weights at runtime |

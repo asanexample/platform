@@ -1,5 +1,7 @@
 # Step 4 — Tenant API v2 Cutover Plan
 
+> **Status: SUPERSEDED — the platform went v1→v2→v3; v3 (ADR-067, XEnvironment) is live. See docs/plans/v3-implementation-plan.md. Retained for history.**
+>
 > **Status:** FINALIZED — ready to execute on go-ahead. The cutover is **breaking** and executes via the
 > rebuild (`platctl teardown` → `bootstrap`); it is **gated on explicit go-ahead**. Steps 0–3 of the rebuild
 > keystone are merged (PRs #287–#290); this is the final code (the "cutover commit") + the rebuild execution.

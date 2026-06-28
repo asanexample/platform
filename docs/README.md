@@ -9,8 +9,9 @@ defined declaratively, version-controlled, and deployed through a layered
 configuration hierarchy that promotes consistency across environments.
 
 > **Current identity state:** **Keycloak** is the app-facing IdP of record — ArgoCD,
-> Backstage, and Grafana all sign in directly via Keycloak OIDC. Dex and oauth2-proxy are
-> retired. See [Identity & SSO](architecture/identity-and-sso.md).
+> Backstage, and Grafana all sign in directly via Keycloak OIDC. Dex is retired; oauth2-proxy is
+> no longer the SSO bridge for ArgoCD/Backstage/Grafana (it still fronts the Rollouts UI). See
+> [Identity & SSO](architecture/identity-and-sso.md).
 
 ## Start Here
 

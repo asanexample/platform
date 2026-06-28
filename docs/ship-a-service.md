@@ -16,8 +16,9 @@ without touching Terragrunt, ArgoCD, or AWS directly.
 - **Membership in your team's group** (Keycloak / Backstage). The scaffolder verifies it; it gates what you can
   create. → [Identity & SSO](architecture/identity-and-sso.md).
 - **Backstage portal access** — the portal is the front door for every step below.
-- *(Optional)* **kubectl** for read/debug, via your team's `DeveloperAccess-<team>` role (namespace-scoped). You
-  do **not** need it to ship — delivery is fully GitOps. → [EKS Cluster Access](runbooks/eks-cluster-access.md).
+- *(Optional)* **kubectl** for read/debug. The per-team `DeveloperAccess-<team>` role is **not yet provisioned**
+  (#364) — until it lands, use `platctl kubeconfig` / PlatformAdmin. You do **not** need kubectl to ship —
+  delivery is fully GitOps. → [EKS Cluster Access](runbooks/eks-cluster-access.md).
 
 ---
 

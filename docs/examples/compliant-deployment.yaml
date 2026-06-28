@@ -1,7 +1,8 @@
 # Minimal Kyverno-compliant Deployment for an environment namespace (preprod/platform, ADR-014).
 # The canonical concrete example for CLAUDE.md's "Authoring Policy-Compliant Workloads" section — preserved here
 # (it formerly lived in the retired seed app `app-alpha`). Adapt the team/product/service/image to yours; the
-# New Product scaffolder emits the same shape automatically (scaffolder/templates/new-product/skeleton/k8s/).
+# New Product scaffolder emits the same compliant shape as an Argo Rollout (ADR-056) — this Deployment form is
+# the minimal equivalent (scaffolder/templates/new-product/skeleton/k8s/ renders kind: Rollout).
 #
 # Illustrative names: team `acme`, product `store`, service `web` → namespace acme-store-dev, repo acme-store.
 apiVersion: apps/v1

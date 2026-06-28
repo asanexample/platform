@@ -1,5 +1,7 @@
 # ADR-071 Implementation Plan — Control-Plane Digest Promotion (+ Gap #2 reconcile)
 
+> **Status: DELIVERED — Release control-plane digest promotion is live. Retained for history.**
+
 **Tracks:** [ADR-071](../adrs/071-digest-promotion-via-control-plane.md). **Forcing event:** the New Product
 showcase (alpha/shop, 2026-06-14) — see [the showcase findings](../adrs/071-digest-promotion-via-control-plane.md#context).
 **Goal:** app-repo `main` becomes fully-protected, CI-untouched application source; the deployed image digest
