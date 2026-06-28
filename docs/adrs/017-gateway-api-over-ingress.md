@@ -45,13 +45,13 @@ annotations. Breaks the cross-cloud consistency goal.
 proxies managed by Cilium. No additional controller deployment needed. Standard Kubernetes
 Gateway API resources (Gateway, HTTPRoute) work across any GatewayClass provider, so the
 routing configuration is portable if the platform ever switches CNIs. Cilium handles the
-GatewayClass, and the `gateway-config` module creates Gateway and HTTPRoute resources.
+GatewayClass; the `gateway` module creates the shared Gateway (+ ClusterIssuer) and the `gateway-config` module creates HTTPRoute resources.
 
 ## Decision
 
 Use Kubernetes Gateway API with Cilium as the GatewayClass provider for all HTTP/HTTPS service
-exposure. The `gateway-config` module (`infra/modules/gateway-config/`) creates the necessary
-Gateway API resources and integrates with cert-manager for TLS.
+exposure. The `gateway` module (`infra/modules/gateway/`) creates the shared Gateway + ClusterIssuer
+(cert-manager TLS integration); the `gateway-config` module creates the HTTPRoutes that bind to it.
 
 ### Architecture
 
@@ -71,20 +71,26 @@ Tailscale); **preprod** uses a **public** NLB ([ADR-029](029-preprod-public-ingr
 **Cilium gotcha:** the Gateway's Envoy connects to backends with the reserved Cilium `ingress` identity
 (8), which a *standard* k8s NetworkPolicy `from:` **cannot** match. Tenant CiliumNetworkPolicies
 receiving Gateway traffic must allow `fromEntities: ["ingress"]` (see
-[ADR-008](008-cilium-as-cross-cloud-cni.md); the `gateway-config` and `observability` modules rely on
+[ADR-008](008-cilium-as-cross-cloud-cni.md); the `gateway`/`gateway-config` and `observability` modules rely on
 this).
 
-### Gateway Configuration Module
+### Two modules: `gateway` (shared) and `gateway-config` (routes)
 
-The `gateway-config` module creates three types of resources:
+The Gateway-API resources are split across two modules (the ClusterIssuer + Gateway moved out of
+`gateway-config` into a dedicated, earlier-deployed `gateway` module so the shared Gateway and
+ClusterIssuer come up before any app/route consumer — e.g. keycloak-config):
 
-1. **ClusterIssuer** — cert-manager Let's Encrypt issuer using Route53 DNS01 validation (for
-   automated TLS certificate provisioning)
-2. **Gateway** — Cilium GatewayClass with TLS termination, referencing cert-manager certificates
-3. **HTTPRoute** — per-hostname routing rules directing traffic to backend services, plus HTTP-to-
-   HTTPS redirect routes
+- **`gateway`** (`infra/modules/gateway/`, deployed **early**) creates:
+  1. **ClusterIssuer** — cert-manager Let's Encrypt issuer using Route53 DNS01 validation (`letsencrypt_email`,
+     `route53_hosted_zone_id`, `route53_region` inputs).
+  2. **Gateway** — Cilium GatewayClass with TLS termination; `internal` controls the NLB scheme
+     (platform `internal = true`, preprod `internal = false`; see [ADR-029](029-preprod-public-ingress-gateway-api.md)).
+- **`gateway-config`** (`infra/modules/gateway-config/`, a **leaf**) creates only **HTTPRoutes** —
+  per-hostname routing rules + HTTP→HTTPS redirects (inputs: `domain`, `gateway_name`,
+  `gateway_namespace`, `routes`).
 
 ```hcl
+# in the `gateway` module
 resource "kubernetes_manifest" "gateway" {
   manifest = {
     apiVersion = "gateway.networking.k8s.io/v1"
@@ -104,15 +110,16 @@ resource "kubernetes_manifest" "gateway" {
 ### TLS Integration
 
 TLS certificates are provisioned by cert-manager using Let's Encrypt with DNS01 validation via
-Route53. The ClusterIssuer, Gateway, and HTTPRoutes are all managed by the same module, ensuring
-the TLS chain is consistent.
+Route53. The ClusterIssuer and Gateway live in the `gateway` module; the HTTPRoutes that bind to
+them live in `gateway-config` — the same Gateway/ClusterIssuer backs every route, keeping the TLS
+chain consistent.
 
 ### Dependency Chain
 
-The `gateway-config` unit depends on: EKS (cluster), Cilium (Gateway API CRDs + GatewayClass),
-cert-manager (ClusterIssuer), external-dns (DNS record creation), ArgoCD (if routes point to
-ArgoCD), and Route53 (hosted zone for DNS01 validation). This makes it a leaf node in the
-deployment DAG.
+The `gateway` unit depends on EKS (cluster), Cilium (Gateway API CRDs + GatewayClass), cert-manager
+(for the ClusterIssuer), and Route53 (hosted zone for DNS01 validation), and is deployed **early**
+(no app deps). The `gateway-config` unit is the **leaf** — it depends on the shared `gateway` plus
+external-dns (DNS records) and whatever backends its routes point at.
 
 ## Consequences
 
@@ -135,8 +142,8 @@ deployment DAG.
   iptables-based routing (though Envoy provides L7 visibility and policy that iptables cannot)
 - Dependency on Cilium for both CNI and ingress creates a single point of failure — a Cilium
   issue affects both pod networking and external traffic routing
-- The `gateway-config` module has many dependencies (6 upstream units), making it the most
-  complex leaf node in the deployment DAG
+- The shared `gateway` module has several upstream dependencies (EKS, Cilium, cert-manager, Route53), making it one
+  of the more complex early units in the deployment DAG
 
 **Risks:**
 
