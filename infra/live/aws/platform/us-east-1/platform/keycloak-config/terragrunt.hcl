@@ -216,4 +216,12 @@ inputs = {
   #     challenge; new users are force-enrolled in-flow. Break-glass if a flow misbehaves: revert to false +
   #     re-apply (admin-cli direct-grant is independent of any browser flow). Master-realm admin hardening: #899.
   enforce_browser_mfa = true
+
+  # Master-realm admin-plane hardening (#899, ADR-087). Builds a passkey browser flow on the MASTER realm —
+  # closes the human master-console MFA bypass (admin-cli's direct-grant is untouched: it's the bootstrap +
+  # break-glass, INVARIANT never disabled). Same two-apply rollout: manage_master_admin = true builds it UNBOUND
+  # (master console login unchanged); after a passkey is enrolled on the master `admin`, flip
+  # enforce_master_browser_mfa = true to bind. Built now, bind deferred to the master-passkey enrollment.
+  manage_master_admin        = true
+  enforce_master_browser_mfa = false
 }

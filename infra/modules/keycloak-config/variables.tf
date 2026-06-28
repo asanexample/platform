@@ -219,6 +219,30 @@ variable "enforce_browser_mfa" {
   default     = false
 }
 
+variable "manage_master_admin" {
+  description = <<-DESC
+    Opt-in master-realm admin-plane hardening (#899, ADR-087): build the passkey browser flow + the
+    WebAuthn-register-passwordless default action on the MASTER realm (realm_id = "master"), closing the
+    human-console MFA bypass. Off by default. Does NOT touch admin-cli's direct-grant (the bootstrap +
+    break-glass path — INVARIANT: never disabled). The master realm's keycloak_realm object stays unmanaged;
+    these resources rely on master's default WebAuthn policy. The full service-account provider migration is
+    deliberately deferred (ADR-087). Pairs with enforce_master_browser_mfa for the two-apply bind.
+  DESC
+  type        = bool
+  default     = false
+}
+
+variable "enforce_master_browser_mfa" {
+  description = <<-DESC
+    Gates the BINDING of the master-realm passkey browser flow — the apply-2 flip of the master two-apply rollout
+    (#899). Requires manage_master_admin. FALSE (default = apply-1): the master flow is built but the built-in
+    master browser flow stays live (console not locked out). TRUE (apply-2): bind it — flip ONLY after a passkey
+    is enrolled on the master `admin`. admin-cli direct-grant is unaffected either way (Terraform never locks out).
+  DESC
+  type        = bool
+  default     = false
+}
+
 variable "session" {
   description = <<-DESC
     Realm session + access-token lifetimes (Go duration strings) — consciously set to limit stolen-token blast
