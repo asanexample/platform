@@ -225,8 +225,10 @@ The controller can hand out master keys, so it is the apex thing to protect:
 ## Engineering standards (non-negotiable)
 
 This operator — and every operator/Go service the platform builds after it — is held to a high quality bar.
-It hands out master keys; sloppiness here is a security defect, not just tech debt. The principles below are
-requirements, not aspirations, and they map onto concrete structure:
+It hands out master keys; sloppiness here is a security defect, not just tech debt. The points below are
+**illustrative of the standard, not an exhaustive checklist** — the bar is comprehensive, professional-grade
+software engineering, and anything a competent reviewer would expect applies whether or not it is named here.
+Each maps onto concrete structure:
 
 - **Separation of concerns.** The intake API (authn + step-up + eligibility), the reconciler (lifecycle), the
   per-plane adapters (native mint/revoke), and the audit sink are **distinct packages with distinct
@@ -247,10 +249,46 @@ requirements, not aspirations, and they map onto concrete structure:
   finalizers, not in-memory timers. The drift backstop is the last line: even a controller bug can't leak a
   grant past TTL. Assume AWS is flaky (it is — #888) and design for it.
 - **Idiomatic Go, not sloppy.** `context.Context` threaded through every blocking call (already the `cloud`
-  pattern); no global mutable state; small composable functions; table-driven tests; `gofmt` + `go vet` +
-  `staticcheck` clean; `golangci-lint` in CI. `envtest` covers the reconcile state machine; the eligibility/
-  cap/ledger logic keeps its unit tests. No leftover `TODO`s in merged code, no dead code, no
+  pattern); no global mutable state; small composable functions; accept interfaces, return structs; `gofmt` +
+  `go vet` + `staticcheck` clean; `golangci-lint` in CI. No leftover `TODO`s in merged code, no dead code, no
   copy-paste-and-tweak — comments explain *why*, matching the surrounding house style.
+- **Thorough, comprehensive testing.** Quality is *demonstrated by tests*, not asserted. Cover the **unhappy
+  paths first** — they're where the danger is: a plane mint failing mid-fan-out, AWS throttling/partial
+  failure, a controller crash-and-restart with grants outstanding, an expiry that races a manual revoke, a
+  drift-backstop prune. Layers: **unit** (eligibility / cap / duration / each plane adapter against a fake) +
+  **integration** (`envtest` for the full reconcile state machine: Pending→Active→Expiring→gone, finalizer
+  teardown, requeue-at-expiry) + **end-to-end** against ephemeral/sandbox targets where feasible. The
+  **security invariants are explicit test cases**, not assumptions: only the API SA can create an
+  `Activation`; an expired grant *is* revoked; a borrow without fresh step-up is rejected; revoke is
+  idempotent. Tests are **deterministic** (injected clock — already the `now time.Time` seam — no
+  `time.Sleep`, no real wall-clock), run under `go test -race`, and zero-flake. Coverage is **meaningful**
+  (the state machine and failure branches), not a number chased for its own sake.
+- **Observability built in, not bolted on.** Structured logging (the controller-runtime `logr`/`zap` sink,
+  leveled, with the `Activation` key on every line — never log a token or secret); **Prometheus metrics**
+  (reconcile latency/errors, work-queue depth, mint/revoke success+failure per plane, a gauge of active
+  grants, time-to-revoke); Kubernetes **Events** on the CR for human-visible transitions; traces where a
+  request crosses the API→controller→plane boundary. A privileged action you can't see is a privileged action
+  you can't govern (ADR-088 §3.6).
+- **Security & least privilege end-to-end.** Least-priv RBAC + IAM (the scoped connector roles above);
+  **validate and sanitize** every `spec` field at admission (CEL/OpenAPI + the API); **secure, fail-safe
+  defaults** — on *any* uncertainty (eligibility unreadable, step-up unverifiable, plane unreachable) the
+  answer is **deny / don't grant**, never fail-open; no secrets in logs, CR `status`, or events; signed
+  images via the shared supply chain. Threat-model the component as the apex insider risk it is.
+- **The CRD is a versioned public API — design it deliberately.** Start `v1alpha1`, evolve via real Kubernetes
+  API conventions (additive changes, conversion webhooks if it graduates to `v1beta1`/`v1`, never a silent
+  breaking change); a rich **OpenAPI schema + CEL validation** so bad specs are rejected at admission, not at
+  reconcile; `status` carries standard `conditions`. Consumers (Backstage, the drift detector) depend on this
+  contract.
+- **Operational lifecycle & resource hygiene.** Graceful shutdown (drain in-flight reconciles, release the
+  leader lock); **leader election** for HA (the kill-switch must stay available); health/readiness probes;
+  honor `context` cancellation everywhere; no goroutine or connection leaks (`defer Close`, bounded
+  concurrency); rate-limit/back-off external calls (cache reads via informers). Configuration is explicit
+  (flags/env/CR), with sane defaults and **fail-fast on misconfiguration** at startup.
+- **Simplicity, maintainability, operability.** Prefer the simplest design that meets the need — YAGNI, least
+  astonishment, readable over clever, no premature abstraction. Godoc on exported symbols and package docs;
+  an operator **runbook** (debug a stuck `Activation`, use the kill-switch, read the audit trail); small,
+  reviewable PRs with conventional commits. CI **gates** all of the above (fmt/vet/staticcheck/lint/test/race/
+  coverage) so the bar is enforced by the pipeline, not by memory.
 
 ## Open questions (firm up at build)
 
