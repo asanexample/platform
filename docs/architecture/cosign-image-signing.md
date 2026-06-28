@@ -2,7 +2,7 @@
 
 This is the from-scratch explainer. If you've never touched Sigstore/cosign before, start here and
 read top to bottom. It explains **why** we sign container images, **what** each moving part does, and
-**how** our specific setup (a shared signing workflow called by app CI + Kyverno + ECR + IRSA) fits
+**how** our specific setup (a shared signing workflow called by app CI + Kyverno + ECR + EKS Pod Identity) fits
 together. Reference material lives in
 [ADR-014](../adrs/014-kyverno-as-policy-engine.md),
 [ADR-050](../adrs/050-shared-build-sign-reusable-workflow.md) (the shared `build-sign.yml`), the
@@ -255,7 +255,9 @@ verifyImages:
 
 The primary entry comes from the cluster-wide `trusted_ci_build_subject_regexp` + the per-product caller
 repo (`verify_subjects_product[<team>-<product>].repo`); the optional app-signed entries come from the same
-map's `appSubjects` (retained as the bespoke-build fallback — the "heterogeneity model"). The whole
+map's `appSubjects` (the bespoke-build fallback — the "heterogeneity model"). **In the live units `appSubjects`
+is unpopulated for every product**, so today only the primary shared-signer entry actually renders — the two
+fallback `keyless` entries shown above are inert unless a product sets `appSubjects`. The whole
 `verify_subjects_product` map is **derived automatically** at the Terragrunt unit from the Product registry
 (`gitops/products/<team>/<product>.yaml`, `spec.repo`).
 
@@ -305,35 +307,38 @@ Where the identities come from (`infra/live/aws/preprod/us-east-1/platform/polic
 trusted_ci_build_subject_regexp = "^https://github.com/asanexample/trusted-ci/.github/workflows/build-sign.yml@"
 
 # Per-product trust, derived automatically from the Product registry (gitops/products/<team>/<product>.yaml).
-# Key = <team>-<product>. repo = the githubWorkflowRepository gate; appSubjects = optional app-signed fallback.
-verify_subjects_product = { for k, v in local.products : k => {
-  team           = v.team
-  product        = v.product
-  repo           = v.repo                              # e.g. asanexample/alpha-shop
-  registryPrefix = "team-${v.team}/${v.product}"       # the policy appends -*
-  appSubjects = [ {
-    deploy_subject         = "https://github.com/${v.repo}/.github/workflows/deploy.yml@refs/heads/main"
-    preview_subject_regexp = "https://github.com/${v.repo}/.github/workflows/preview.yml@refs/.*"
-  } ]
+# Key = <team>-<product>. repo = the githubWorkflowRepository gate. The live map carries exactly these four
+# fields — no `appSubjects` is populated today, so the app-signed fallback (§5/§8) is available in the policy
+# template but inert in practice; every live product is verified solely by the shared-signer entry.
+verify_subjects_product = { for name, p in local.products : name => {
+  team           = p.spec.team
+  product        = trimprefix(name, "${p.spec.team}-")
+  repo           = p.spec.repo                                          # e.g. asanexample/alpha-shop
+  registryPrefix = "${local.ecr_registry}/team-${p.spec.team}/${trimprefix(name, "${p.spec.team}-")}"
 } }
 ```
 
-`v.repo` is each product's app repo (`spec.repo`) read from its Product registry entry. With the shared
-signer, the per-product org/repo name appears as the **caller** in `verify_subjects_product[*].repo` (and in
-the optional `appSubjects` fallback) — which is why an org rename is a coordinated change (§8).
+`p.spec.repo` is each product's app repo read from its Product registry entry. With the shared signer, the
+per-product org/repo name appears as the **caller** in `verify_subjects_product[*].repo` — which is why an org
+rename is a coordinated change (§8). The optional `appSubjects` field (the app-signed fallback) is **not set on
+any live product**; the policy template simply renders no fallback attestor entry when it is absent.
 
 ---
 
-## 7. The plumbing: how Kyverno is *allowed* to read signatures from ECR (IRSA)
+## 7. The plumbing: how Kyverno is *allowed* to read signatures from ECR (EKS Pod Identity)
 
 To verify a signature, Kyverno first has to **download** it from ECR — and ECR is a private AWS
-registry. Kyverno authenticates to ECR using **IRSA** (IAM Roles for Service Accounts): its pods assume
-an AWS IAM role via the cluster's OIDC provider.
+registry. Kyverno authenticates to ECR using **EKS Pod Identity** (ADR-047/#594, the platform-wide AWS
+identity standard): the Pod Identity agent hands its pods AWS credentials for an IAM role bound to their
+service account — **no OIDC federation, no `eks.amazonaws.com/role-arn` annotation on the SA**.
 
-The `policy` module creates this role (`aws_iam_role.kyverno_ecr`) when image verification is enabled:
+The `policy` module creates the role (`aws_iam_role.kyverno_ecr`) and a
+`aws_eks_pod_identity_association` per Kyverno SA when image verification is enabled:
 
-- **Trust policy:** only the `kyverno-admission-controller` and `kyverno-reports-controller` service
-  accounts in the `kyverno` namespace can assume it (scoped by the EKS OIDC `sub`).
+- **Trust policy:** the role trusts the `pods.eks.amazonaws.com` service principal (the Pod Identity
+  trust, `sts:AssumeRoleForPodIdentity`); the **association** is what binds it to the
+  `kyverno-admission-controller` and `kyverno-reports-controller` service accounts in the `kyverno`
+  namespace. Only those associated SAs receive the credentials.
 - **Permissions (read-only):** `ecr:GetAuthorizationToken` (to log in) plus `BatchGetImage`,
   `GetDownloadUrlForLayer`, `BatchCheckLayerAvailability` — **scoped to `repository/team-*`** only.
   Kyverno can *read* signatures; it cannot push, delete, or touch non-team repos.
@@ -341,8 +346,9 @@ The `policy` module creates this role (`aws_iam_role.kyverno_ecr`) when image ve
   cross-account — allowed by the ECR repo policy's `pull_account_ids`, same path the node role already
   uses to pull images.
 
-So the trust chain for *verification* is: Kyverno pod → IRSA role → ECR (fetch signature) → Fulcio cert
-check + Rekor lookup → admit/deny. No signing keys anywhere; everything is identity- and log-based.
+So the trust chain for *verification* is: Kyverno pod → Pod Identity association → ECR (fetch signature) →
+Fulcio cert check + Rekor lookup → admit/deny. No signing keys anywhere; everything is identity- and
+log-based.
 
 ---
 
@@ -369,9 +375,11 @@ The fix used `count: 1` + multiple entries to accept **both** identities during 
 3. **Drop** — once the running image is asanexample-signed, set `legacy_org = ""` and apply. The gangster
    entry disappears; only asanexample is accepted. A reschedule test confirms pods still admit.
 
-That's why `verify_subjects_product`'s per-product `appSubjects` is a *list* rather than a single object —
-the list is the seam that makes a zero-downtime identity change possible. Keep the (now-empty)
-`legacy_org` scaffold around; it's the template for the next org/identity change.
+That's why `verify_subjects_product`'s per-product `appSubjects` is modeled as a *list* rather than a single
+object — the list is the seam that makes a zero-downtime identity change possible. **Note:** that migration is
+historical — the `legacy_org`/`gangster` locals and the `appSubjects` entries it used are **no longer present
+in any live unit** (the current map is the 4-field shape in §6). The list remains the documented pattern for
+the next org/identity change, but it would need to be re-introduced; it is not standing wired today.
 
 The same `count: 1` widen→re-sign→drop pattern is how the **shared-signer** cutover (ADR-050) shipped
 without an outage: the policy accepted the legacy app-signed subject **and** the new shared
@@ -432,9 +440,11 @@ The deny message names the policy. Walk it back:
    or, for the fallback, the `Subject` must match the product's app-signed `appSubjects`. After a repo
    move/rename, the caller-repo mismatch is the usual culprit — see §8.
 3. **Can Kyverno reach ECR?** If signatures exist but admission still fails with fetch errors, check the
-   IRSA role (§7) is attached to the Kyverno controllers (`kubectl -n kyverno get sa
-   kyverno-admission-controller -o yaml` should show the `eks.amazonaws.com/role-arn` annotation) and
-   that the pods were restarted to pick it up.
+   Pod Identity association (§7) exists for the Kyverno controllers — `aws eks
+   list-pod-identity-associations --cluster-name <cluster> --namespace kyverno` should list the
+   `kyverno-admission-controller` and `kyverno-reports-controller` SAs mapped to the `kyverno_ecr` role.
+   (Do **not** look for an `eks.amazonaws.com/role-arn` annotation on the SA — Pod Identity uses no such
+   annotation.) Restart the controllers if the association was added after they started.
 4. **Audit to unblock, then fix forward.** If a legitimate workload is blocked and you need air, flip
    `verify_failure_action = "Audit"` for that env, apply, fix the signing, then return to Enforce. Don't
    weaken the *identity* to fit a bad image. For genuine exceptions, follow the
@@ -514,7 +524,7 @@ policy (sections 4–6) remains the primary per-product gate.
 | **Digest** | The immutable `sha256:…` content hash of an image. Signatures bind to it. |
 | **Attestor / `count`** | The set of acceptable signing identities for a policy rule; `count: 1` = any one suffices. |
 | **`mutateDigest`** | Kyverno rewriting an admitted Pod's image tag to the verified digest. |
-| **IRSA** | IAM Roles for Service Accounts — how Kyverno pods assume an AWS role (here, to read ECR signatures). |
+| **EKS Pod Identity** | The platform's AWS-identity standard (ADR-047) — the Pod Identity agent hands a pod credentials for an IAM role bound to its service account via an association, with no SA annotation. Here it lets Kyverno read ECR signatures. |
 | **Audit / Enforce** | Verification records-but-admits (Audit) vs denies (Enforce) on failure. |
 
 ---

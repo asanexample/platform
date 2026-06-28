@@ -134,10 +134,12 @@ The named starter set:
 
 Two things kept separate: **eligibility** (who *may ever* hold a powerful role — rare, lives in git,
 PR-reviewed) and **activation** (checking it out now, for an hour — frequent, fast, self-expiring, *not*
-in git: you don't PR at 2am, and git can't expire on a timer).
+in git: you don't PR at 2am, and git can't expire on a timer). The activation design is
+[ADR-088](../adrs/088-temporary-power-activation.md); the `platctl access` command group (read/list/check
+eligibility, plus a `grant`/`revoke` break-glass fallback for a controller outage) is the first slice.
 
 ```text
-  need more  →  request (portal button / `platctl elevate` / Slack)
+  need more  →  request (portal button / `platctl access` / Slack)
              →  risk gate:  low = auto-grant    medium = 1 approval    high = break-glass
              →  controller flips the role ON  (AWS IC assignment · EKS access entry · k8s RoleBinding)
              →  timer flips it OFF automatically       ← the one genuinely new moving part
@@ -154,9 +156,11 @@ Three git registries, all authored by reviewed PR (the existing Gate):
 
 - **`gitops/teams/*.yaml`** *(exists)* — the team: its group, envelope, ownership, `release-approver` set,
   on-call pointer, incident channel.
-- **`gitops/people/*.yaml`** *(new — the missing piece)* — who the humans are and their grants. Today
-  people are hardcoded in two places (the Identity Center HCL **and** Keycloak config); this unifies them.
-- **`AccessGrant`** *(designed, ADR-068)* — the explicit cross-team / restricted exceptions.
+- **`gitops/people/*.yaml`** *(built, #886)* — who the humans are and their grants. People used to be
+  hardcoded in two places (the Identity Center HCL **and** Keycloak config); the roster now unifies them,
+  and both generators derive from it (#888/#889). The role catalog lives alongside in `gitops/roles/` (#887).
+- **`AccessGrant`** *(designed, ADR-068; `gitops/grants/` registry projection built, authored grants +
+  consumption pending)* — the explicit cross-team / restricted exceptions.
 
 A **Person** carries identity + grants; a grant is `(role × scope)`, optionally `activation: on-demand`:
 
@@ -203,8 +207,9 @@ Once the roster is in git, **adding a system is adding a connector** that consum
 | platform-operator | broad (on-demand) | broad read | — | platform on-call | — |
 | auditor     | read     | read | read (audit) | — | — |
 
-- **AWS** — Identity Center permission sets + assignments, generated from the registry (today
-  hand-maintained HCL — the live gap; "add a person" to AWS console access becomes one PR). **Cluster**
+- **AWS** — Identity Center permission sets + assignments, generated from the roster (`gitops/people` ×
+  `gitops/roles`); the generator is wired (#888), so the HCL is no longer the source of truth and "add a
+  person" to AWS console access is one PR. **Cluster**
   access is a *separate plane*: human kubectl goes **OIDC-native** (Keycloak as EKS OIDC IdP, ADR-068 §6 /
   [#364](https://github.com/asanexample/platform/issues/364)) — which is where the unbuilt per-team
   `DeveloperAccess` regression (**#647**) is resolved, *not* the Identity Center generator; IAM federation
@@ -267,7 +272,8 @@ observability §3.6).
   proof scales with the role. **Phishing-resistant MFA (passkeys/WebAuthn) is the default** (not SMS/email
   codes); **step-up at elevation** (a fresh factor at checkout, §2.3); short, role-scoped sessions;
   enforced in Keycloak flows (`acr` assurance) and **invariant across the IdP seam**. Harden recovery — no
-  self-service reset for privileged accounts (recovery is the usual MFA backdoor).
+  self-service reset for privileged accounts (recovery is the usual MFA backdoor). *(Partly landed: the
+  passkey/WebAuthn flow + admin-plane hardening shipped, #885/#899, [ADR-087](../adrs/087-keycloak-admin-plane-hardening.md).)*
 - **Session lifetime is a tuned dial `[op]`.** Short limits stolen-token damage; long rides out an IdP
   blip (§3.3). Set it consciously per role; privileged sessions shorter.
 
@@ -441,15 +447,17 @@ boundary *is* the decision point). What remains are genuine residual edges:
 Workforce-first, sequenced by value-per-effort. **Hardening is not a later phase** — the `[must]` items in
 §3 land *with* the phase that introduces their surface, not after.
 
-1. **People roster + AWS & Keycloak generators** — add `gitops/people/`; derive *both* Identity Center
-   (AWS console access) **and** keycloak-config (app access) from it, retiring the hand-maintained HCL and
-   the Keycloak seed-users so "add a person" is one PR. (Per-team *cluster* access — the #647 regression —
+1. **People roster + AWS & Keycloak generators** *(built — #886/#887/#888/#889)* — `gitops/people/` +
+   `gitops/roles/`, with *both* Identity Center (AWS console access) **and** keycloak-config (app access)
+   derived from it, retiring the hand-maintained HCL and the Keycloak seed-users so "add a person" is one
+   PR. (Per-team *cluster* access — the #647 regression —
    is a separate plane, resolved by OIDC cluster auth, step 5 / #364.) Lands with: auth strength (§3.1),
    meta-governance + watch-the-watchers (§3.6), the intent-vs-effected guardrail + decide/apply split
    (§3.3). The minimal v1 that earns its keep.
 2. **GitHub membership connector** — org-team membership from the roster (handles via the directory).
-3. **Temporary-power front door** — the activation controller + timer + risk gate; wrap break-glass first;
-   emergency revocation alongside.
+3. **Temporary-power front door** ([ADR-088](../adrs/088-temporary-power-activation.md)) — the activation
+   controller + timer + risk gate; wrap break-glass first; emergency revocation alongside. (The read-only
+   `platctl access` inspector + break-glass fallback is the first slice.)
 4. **PagerDuty + Slack connectors** — rotation + channel/usergroup membership; live on-call.
 5. **OIDC-native cluster auth** — Keycloak as EKS OIDC IdP (ADR-068 §6); retire IAM-federation kubectl.
 6. **Machine-plane & seams hardening** — the §3.4/§3.5 `[must]` items: **enforcement of ADR-074's agent
@@ -494,5 +502,5 @@ exist.)*
   [049](../adrs/049-tenant-model-team-tenant-zone.md) ·
   [067](../adrs/067-idp-domain-model.md) · [072](../adrs/072-app-repo-naming-and-team-ownership.md) ·
   [074](../adrs/074-agentic-workloads-platform.md)
-- **Source of truth:** the git-native `Team` CRs (`gitops/teams/`, ADR-063) + the proposed
-  `gitops/people/`.
+- **Source of truth:** the git-native `Team` CRs (`gitops/teams/`, ADR-063) + the `gitops/people/` roster
+  and `gitops/roles/` catalog (#886/#887).

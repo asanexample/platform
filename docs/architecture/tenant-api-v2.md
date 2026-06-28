@@ -5,8 +5,9 @@
 > **Zone → Isolation dial + Placement**, and **app → Product / Service** (with Customer promoted to a
 > first-class consumer). The **Team envelope** and **per-app/Service cloud-keyed identity** designed here carry
 > forward; the `Tenant`/`Zone` vocabulary and per-team scoping do not. This doc is retained as the ADR-049
-> record and the v1alpha2 predecessor of the [v1alpha3 schema](platform-domain-api.md#migration-from-v1alpha2);
-> read the successor for the current target.
+> record and the v1alpha2 predecessor of the **v1beta1 / ADR-067** schema
+> ([platform-domain-api.md](platform-domain-api.md#migration-from-v1alpha2)); read the successor for the
+> deployed contract.
 
 The finalized, normative object schemas for the multi-tenancy model of
 [ADR-049](../adrs/049-tenant-model-team-tenant-zone.md). ADR-049 sets the *direction* (separate ownership
@@ -15,10 +16,13 @@ enums, and required/optional status that the rebuild implements and that the
 [ADR-053](../adrs/053-identity-and-cross-system-authorization-strategy.md) access-model-as-code generators
 read from.
 
-> **Status: design-stage, normative-on-paper.** These schemas land with the **planned rebuild**, not as an
-> in-place migration (ADR-049). They supersede the v1alpha1 `XTenant` schema documented in
-> [crossplane-environment-api.md](crossplane-environment-api.md) (the current, interim contract). Where this doc and the
-> live `xrd.yaml` disagree, the live file is what's deployed today and this doc is the target.
+> **Status: historical record (superseded).** This was the design-stage, normative-on-paper v1alpha2 contract,
+> meant to land with the rebuild rather than as an in-place migration (ADR-049). The rebuild **happened**, but
+> what landed was the **v1beta1 `XEnvironment`** (ADR-067), not this v1alpha2 `XTenant` — so these schemas never
+> deployed. They were the successor-on-paper to the v1alpha1 `XTenant`; the live, deployed contract is now
+> documented in [platform-domain-api.md](platform-domain-api.md) (and [crossplane-environment-api.md](crossplane-environment-api.md),
+> which today describes the live v1beta1 `XEnvironment`, **not** the old interim v1alpha1). Read this doc only as
+> the ADR-049 record.
 
 Finalizing these schemas is the first implementation step of the rebuild: the Keycloak group taxonomy, the
 per-system RBAC generators, and the Backstage permission policy (#197) all read from the **Team envelope**
@@ -369,8 +373,10 @@ projected `Team` CR:
 
 ## Migration from v1alpha1
 
-The v1alpha1 `XTenant` ([crossplane-environment-api.md](crossplane-environment-api.md)) is the **interim** contract. v2
-is breaking and lands with the rebuild — no in-place migration. Field-level delta:
+The v1alpha1 `XTenant` was the interim contract at the time this was written. (Note:
+[crossplane-environment-api.md](crossplane-environment-api.md) now documents the live **v1beta1
+`XEnvironment`**, not that old v1alpha1 schema.) The v1alpha2 cutover below was breaking and was meant to land
+with the rebuild — but the rebuild landed v1beta1 instead, so this delta is historical. Field-level delta:
 
 | v1alpha1 | v1alpha2 | Change |
 | -------- | -------- | ------ |
@@ -386,4 +392,5 @@ is breaking and lands with the rebuild — no in-place migration. Field-level de
 | `status.namespace` | `status.placement.{cloud,region,account,cluster,zone,namespace}` | Placement derives the full coordinate set, not just the namespace. |
 
 The interim model (`team == tenant`, `teams.hcl` for delivery + supply-chain, the `tenant-claims` Terragrunt
-unit) stands until the rebuild; this schema does not change it.
+unit) stood until the rebuild and was deleted by it — the rebuild replaced it with the v1beta1 `XEnvironment`
+model (ADR-067), not this v1alpha2 schema.

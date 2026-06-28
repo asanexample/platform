@@ -23,10 +23,15 @@ emergency disable / the Audit↔Enforce flip.
   `verify-images-product-<team>-<product>` and `verify-attestations-product-<team>-<product>` render from the
   **Product registry** (`gitops/products/`) in the `policy` unit; the per-environment `restrict-images-<team>-<product>-<stage>` and
   `restrict-route-hostnames-<team>-<product>-<stage>` are owned by the Crossplane Environment Composition (one per environment namespace).
-  Preprod runs the `alpha-shop` + `alpha-checkout` products, so each family contributes two policies; the
-  platform cluster hosts shared services only (no environments), so it carries just the common (non-per-product)
-  policies. The counts above are an indicative snapshot — read the exact live total with `kubectl get cpol`
-  (it shifts as environments/phases change).
+  The registry currently holds **four** products (`alpha-shop`, `alpha-checkout`, `alpha-conformance`,
+  `platform-triage-copilot`), and preprod reads `gitops/products/` unfiltered, so each verify-* family
+  contributes one policy per product. The **platform cluster is not "common policies only"**: it runs a
+  platform-owned workload — the `triage-copilot` XAgent on the hub (ADR-082) — and enables image **and**
+  attestation verification in **Enforce**, so it too renders `verify-images-product-*` /
+  `verify-attestations-product-*` (for the agent's product). It carries no per-_environment_ policies
+  (`restrict-images-*`/`restrict-route-hostnames-*`) because it hosts no tenant environment namespaces. The
+  counts above are an indicative snapshot — read the exact live total with `kubectl get cpol` (it shifts as
+  environments/phases change).
 - **Mode** is controlled by the unit's `validation_failure_action` (`Audit` records PolicyReports and
   fails the webhook open; `Enforce` rejects at admission and fails the webhook closed). The flip is a
   one-line input change + apply.
@@ -35,7 +40,7 @@ emergency disable / the Audit↔Enforce flip.
 
 **Scope** column:
 
-- _tenant_ — matches only namespaces carrying the `platform.refplat.org/environment` label (infra
+- _environment_ — matches only namespaces carrying the `platform.refplat.org/team` label (infra
   namespaces excluded). Inert on clusters with no environment namespaces (e.g. platform).
 - _cluster_ — evaluates cluster-wide at admission; skips the principals in `exclude_principals`
   (the IaC deployer, ArgoCD, and Kubernetes system controllers). These run `background: false`
@@ -44,10 +49,11 @@ emergency disable / the Audit↔Enforce flip.
 | Policy | Target kind(s) | Enforces | Scope | Tier | Clusters |
 | ------ | -------------- | -------- | ----- | ---- | -------- |
 | `restrict-image-registries` | Pod | Images only from approved registries (the platform ECR) | environment | all | preprod, platform |
-| `restrict-images-<team>-<product>-<stage>` | Pod | A product's environment namespace may only run `…/team-<team>/<product>-*` images (one per environment namespace, owned by the Environment Composition) | environment (per-namespace) | all | preprod (alpha-shop, alpha-checkout) |
+| `restrict-images-<team>-<product>-<stage>` | Pod | A product's environment namespace may only run `…/team-<team>/<product>-*` images (one per environment namespace, owned by the Environment Composition) | environment (per-namespace) | all | preprod (one per live env: alpha-shop/dev, alpha-shop/prod, alpha-checkout/dev, alpha-conformance/dev) |
 | `disallow-latest-tag` | Pod | Explicit, non-`latest` image tag required | environment | all | preprod, platform |
 | `require-requests-limits` | Pod | CPU + memory requests **and** limits on every container | environment | all | preprod, platform |
 | `require-pod-probes` | Pod | Liveness + readiness probes on every container | environment | all | preprod, platform |
+| `require-prod-replica-floor` | Deployment, StatefulSet (+ Rollout when enabled) | In `*-prod` namespaces, `replicas >= 2` (or HPA `minReplicas >= 2`) — a single replica can't be zero-downtime (ADR-085); replicas validated, never mutated | environment | all | preprod, platform (**Enforce** both, #844) |
 | `restrict-automount-sa-token` | Pod | `automountServiceAccountToken: false` | environment | all | preprod, platform |
 | `require-workload-labels` | Pod | `app.kubernetes.io/name` + `team` labels | environment | all | preprod, platform |
 | `block-public-loadbalancer` | Service | Deny `LoadBalancer` / `NodePort` (Gateway-only ingress) | environment | all | preprod, platform |
@@ -58,7 +64,7 @@ emergency disable / the Audit↔Enforce flip.
 | `disallow-default-namespace` | Pod, Deployment, StatefulSet, DaemonSet, ReplicaSet, Job, CronJob | No workloads in `default` | cluster | all | preprod, platform |
 | `disallow-privilege-escalation` | Pod | Deny `securityContext.allowPrivilegeEscalation: true` (backstops the mutate default) | environment | all | preprod, platform |
 | `require-seccomp` | Pod | Deny `seccompProfile.type: Unconfined` (backstops the mutate default) | environment | all | preprod, platform |
-| `restrict-route-hostnames-<team>-<product>-<stage>` | HTTPRoute, GRPCRoute, TLSRoute | Per-environment route hostnames must be in the product's allow-list (from `spec.domains`, owned by the Environment Composition, one per environment namespace); deny cross-product/platform hostnames + empty hostname lists (anti-squatting, ADR-029) | environment (per-namespace) | all | preprod |
+| `restrict-route-hostnames-<team>-<product>-<stage>` | HTTPRoute, GRPCRoute, TLSRoute | Per-environment route hostnames must be in the product's allow-list (from `spec.domains`, owned by the Environment Composition, one per environment namespace); deny cross-product/platform hostnames + empty hostname lists (anti-squatting, ADR-029) | environment (per-namespace) | all | preprod (one per live env: alpha-shop/dev, alpha-shop/prod, alpha-checkout/dev, alpha-conformance/dev) |
 | `require-pod-security-restricted` | Pod | Full Restricted Pod Security Standard | environment | **hipaa/pci only** | _(none yet — standard tier)_ |
 | `require-ro-rootfs` | Pod | `readOnlyRootFilesystem: true` | environment | **hipaa/pci only** | _(none yet — standard tier)_ |
 
@@ -77,9 +83,10 @@ matching ArgoCD `ignoreDifferences` is safe.
 
 | Policy | Injects (when absent) | Scope |
 | ------ | --------------------- | ----- |
-| `mutate-pod-defaults` | container `securityContext` (`allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`, `seccompProfile.type: RuntimeDefault`; not `runAsNonRoot`) **and** pod `automountServiceAccountToken: false` — one patch so strategic-merge resolves under autogen | environment |
+| `mutate-pod-defaults` | container `securityContext` (`allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`, `seccompProfile.type: RuntimeDefault`; not `runAsNonRoot`), pod `automountServiceAccountToken: false`, **and the graceful-drain defaults (ADR-085): container `lifecycle.preStop` sleep + pod `terminationGracePeriodSeconds: 30`** — one patch so strategic-merge resolves under autogen | environment |
 | `mutate-automount` | pod `automountServiceAccountToken: false` when unset (least-privilege default; satisfies `restrict-automount-sa-token`) | environment |
 | `mutate-workload-labels` | `team` (derived from the `<team>-<product>-<stage>` namespace name) | environment |
+| `mutate-topology-spread` (ADR-085) | `topologySpreadConstraints` (zone + node, soft) on environment Deployments/StatefulSets when absent, selector derived from the workload | environment |
 
 > `app.kubernetes.io/name` can't be auto-derived under autogen (pod templates have no name), so it is
 > **recommended but not required** — `require-workload-labels` requires only `team`, which is
@@ -88,13 +95,25 @@ matching ArgoCD `ignoreDifferences` is safe.
 ArgoCD is told to ignore the mutated sub-fields (`argocd_cm_extra` →
 `resource.customizations.ignoreDifferences.all`) so selfHeal doesn't fight Kyverno.
 
+## Generate policies (ADR-085 availability)
+
+`generate` policies create and keep-in-sync a companion resource per matching workload. Gated by
+`enable_pdb_generate`.
+
+| Policy | Generates | Scope |
+| ------ | --------- | ----- |
+| `generate-workload-pdb` | A `PodDisruptionBudget` (`<workload>-pdb`, `maxUnavailable: 1`, selector derived from the workload) for every environment Deployment/StatefulSet (+ Rollout when `enableRolloutKind`) — created, kept in sync, and GC'd with the workload; drain-safe, only meaningful at `>= 2` replicas (ADR-085) | environment |
+
+Together with the `mutate-topology-spread` / graceful-drain mutations and the `require-prod-replica-floor`
+validate above, this is the ADR-085 zero-downtime suite — applied live on both clusters.
+
 ## Image verification (Phase 3 — cosign keyless)
 
 Gated by `enable_image_verification`; rolls Audit→Enforce via its **own** `verify_failure_action`
 (independent of the validate/Enforce action above). Image signing now runs in the shared, app-team-
 unwritable **`asanexample/trusted-ci/.github/workflows/build-sign.yml`** reusable workflow (cosign
 keyless, GitHub Actions OIDC → Fulcio/Rekor; ADR-050) — app `deploy.yml`/`preview.yml` are thin callers.
-Kyverno fetches the signature from ECR (via an IRSA role granting ECR read) and admits images signed by
+Kyverno fetches the signature from ECR (via an **EKS Pod Identity** association granting ECR read — ADR-047, no SA annotation) and admits images signed by
 that shared workflow when the cert's `githubWorkflowRepository` extension is the product's own
 `<team>-<product>` caller repo. Two policy inputs drive this: the cluster-wide
 `trusted_ci_build_subject_regexp` (the shared signer subject) and the per-product `verify_subjects_product`
@@ -110,8 +129,10 @@ Per-product identity isolation: the shared signer's cert **subject** is the same
 moves to the `githubWorkflowRepository` cert extension — Fulcio sets it from the _calling_ app repo's OIDC,
 so one product cannot forge another's. A signature whose caller repo (or, for the fallback, whose app
 workflow) is not the product's does **not** satisfy that product's policy — the supply-chain analog of
-per-product registry scoping. Deployed on **preprod** (where environments run); the platform cluster has no
-environment workloads. Verification depends on cluster egress to sigstore (Fulcio/Rekor) — see the break-glass runbook.
+per-product registry scoping. Deployed in **Enforce on both preprod** (tenant environments) **and platform**
+(the `triage-copilot` XAgent on the hub, ADR-082) — the platform cluster does run a platform-owned, signed +
+attested workload, so it renders these per-product policies too. Verification depends on cluster egress to
+sigstore (Fulcio/Rekor) — see the break-glass runbook.
 
 ## Attestation verification (Phase 3 — SBOM + SLSA provenance)
 
@@ -119,8 +140,9 @@ Gated by `enable_attestation_verification` (requires `enable_image_verification`
 `verify_attestations_failure_action` so the SBOM/provenance requirement can roll out Audit-first while
 signature verification stays Enforce. On top of the image _signature_, this requires the image to carry
 two cosign-signed **attestations**: a CycloneDX **SBOM** (`https://cyclonedx.org/bom`) and a **SLSA
-provenance** (`https://slsa.dev/provenance/v0.2`). **Enforce on preprod** as of 2026-05-30. The SBOM is now
-signed by the shared `trusted-ci/build-sign.yml` workflow alongside the image signature (ADR-050).
+provenance** (`https://slsa.dev/provenance/v0.2`). **Enforce on preprod** as of 2026-05-30, and **Enforce on
+platform** for the hub `triage-copilot` agent (ADR-082). The SBOM is now signed by the shared
+`trusted-ci/build-sign.yml` workflow alongside the image signature (ADR-050).
 
 | Policy | Verifies | Scope |
 | ------ | -------- | ----- |

@@ -13,7 +13,7 @@ live domain model (ADR-067/053) and surrounding ADRs (054–057) set direction.
 
 **Legend:** ✅ Strong · 🟡 Partial · ❌ Missing · 📐 Designed (ADR accepted; not yet built)
 
-*Last reviewed: 2026-06-23.*
+*Last reviewed: 2026-06-28.*
 
 ## Scorecard
 

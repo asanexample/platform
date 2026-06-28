@@ -25,13 +25,14 @@
 > *isolation model* — what an environment looks like on the cluster (namespace mode,
 > NetworkPolicies, RBAC, quotas, Pod Identity). What provisions it is a single
 > declarative **`XEnvironment` claim** (`platform.refplat.org/v1beta1`) reconciled by a
-> Crossplane **Environment Composition** (`environment-v3`). Both demo Environments
-> (alpha/demo, bravo/demo) are live on it. The v2-era Terragrunt path — the
+> Crossplane **Environment Composition** (`environment`). The live Environments under the
+> `alpha` team — `shop` (dev + prod), `checkout` (dev), and `conformance` (dev) — run on
+> it (`gitops/environments/alpha/*`). The v2-era Terragrunt path — the
 > `infra/modules/environment` module and the `environments`/`pod-identity` units — was
 > **retired and deleted** at the cutover. For the claim API (XRD schema, Composition
 > pipeline, claim lifecycle, federated topology) see
 > [Crossplane Environment API](crossplane-environment-api.md). Where this doc says "the
-> Composition provisions …", read it as the `environment-v3` Composition rendering per
+> Composition provisions …", read it as the `environment` Composition rendering per
 > `XEnvironment` — the resulting cluster footprint is described below.
 
 ## Overview
@@ -54,7 +55,7 @@ from `gitops/environments/<team>/<product>/`. See
 
 ## Architecture Diagram
 
-### Namespace mode (alpha-demo-dev)
+### Namespace mode (alpha-shop-dev)
 
 ```text
 Internet
@@ -74,19 +75,19 @@ Internet
   |
   v
 +--------------------------------------------------+
-| HTTPRoute         (ns: alpha-demo-dev)           |
+| HTTPRoute         (ns: alpha-shop-dev)           |
 | parentRef: preprod-gateway/default               |
-| hostname: demo-alpha-dev.preprod.aws.refplat.org |
+| hostname: shop-alpha-dev.preprod.aws.refplat.org |
 +--------------------------------------------------+
   |
   v
 +--------------------------------------------------+
-| Service           (ns: alpha-demo-dev)           |
+| Service           (ns: alpha-shop-dev)           |
 +--------------------------------------------------+
   |
   v
 +--------------------------------------------------+
-| Pod               (ns: alpha-demo-dev)           |
+| Pod               (ns: alpha-shop-dev)           |
 | NetworkPolicy: default-deny-ingress              |
 |                + allow-gateway-ingress           |
 |                + allow-dns-egress                |
@@ -94,9 +95,9 @@ Internet
 +--------------------------------------------------+
 ```
 
-### Namespace mode (bravo-demo-dev)
+### Namespace mode (alpha-checkout-dev)
 
-Same architecture as alpha-demo-dev. Both Environments use namespace isolation.
+Same architecture as alpha-shop-dev. All Environments use namespace isolation.
 
 > **vCluster mode** is supported by the environment module but currently deferred
 > (ADR-033) because HTTPRoute sync from virtual to host cluster requires the
@@ -291,8 +292,9 @@ built-in policy enforcement settings. See ADR-033 for current status.
 The **`XEnvironment` claim is the environment source of truth** — it provisions the
 namespace, RBAC, quotas, NetworkPolicies, per-product Kyverno guardrails, the per-service
 `Pod-<team>-<product>-[<customer>-]<stage>-<svc>` role + Pod Identity association, the
-`DeveloperAccess-<team>` role + EKS access entry, and cross-account ECR. The Composition
-provisions all of it from that one CR. See
+in-cluster `environment-developers` RoleBinding, and cross-account ECR. The Composition
+provisions all of it from that one CR. (A `DeveloperAccess-<team>` IAM role + EKS access
+entry is **not** emitted — see the developer-access note below, #647.) See
 [Crossplane Environment API](crossplane-environment-api.md).
 
 The v2 `teams.hcl` app-delivery registry is **retired**. Team identity is the git-native
@@ -304,7 +306,7 @@ policy now **derive** from the `XEnvironment`/`Product` registries:
 +-----------------------------+      +-----------------------------+
 | gitops/environments/        |      |  gitops/products/<team>/    |
 |  XEnvironment per env (YAML) |      |   Product per system (YAML) |
-|  alpha/demo/dev, bravo/...   |      |   alpha/demo, bravo/demo    |
+|  alpha/shop/dev, alpha/...   |      |   alpha/shop, alpha/checkout|
 +-----------+-----------------+       +-----------+-----------------+
             |                                     |
             | ArgoCD sync (per-product AppSet)    | fileset + yamldecode
@@ -314,21 +316,23 @@ policy now **derive** from the `XEnvironment`/`Product` registries:
    Namespace, RBAC, quota,              v                   v
    NetworkPolicies, Kyverno          argocd-apps/        policy/
    restrict-*, Pod Identity,         (delivery)       terragrunt.hcl
-   DeveloperAccess + access            |                   |
-   entry, ECR repos                    v                   v
+   developers RoleBinding,             |                   |
+   ECR repos                           v                   v
                                     ArgoCD Application   verify-images /
                                     per Environment      verify-attestations
                                     + preview            (verify_subjects)
 ```
 
-**EKS access entries** are provisioned by the **Composition** (not `eks/`):
-each team's `DeveloperAccess-<team>` role gets a group-mapped access entry tying
-it to the per-namespace Kubernetes group `<team>-<product>-<stage>:developers`.
-Authorization is the namespace-scoped `environment-developers` RoleBinding the
-Composition provisions (not an AWS-managed policy). See ADR-039. The per-team
-role/access-entry loops were removed from the `eks`/`iam-roles` units.
+**Developer in-cluster authorization** is the namespace-scoped `environment-developers`
+RoleBinding the Composition provisions (binding the per-namespace Kubernetes group
+`<team>-<product>-<stage>:developers` to the `environment-developer` ClusterRole — ADR-039,
+not an AWS-managed policy). The per-team `DeveloperAccess-<team>` IAM role + EKS access
+entry loops were removed from the `eks`/`iam-roles` units, and the v3 Composition does
+**not yet** re-emit them (#647) — so there is no AWS-side principal for developer cluster
+access today. Use `platctl kubeconfig` / PlatformAdmin until that lands; the durable path
+is OIDC-native developer auth (#364, ADR-068).
 
-- All teams: principal `DeveloperAccess-<team>` → group `<team>-<product>-<stage>:developers`
+- All teams (in-cluster only): group `<team>-<product>-<stage>:developers` → `environment-developer` ClusterRole
 
 **ArgoCD apps** (platform cluster, ADR-069): `argocd-apps` runs **one
 ApplicationSet per Product**, a git-files generator over
@@ -340,8 +344,8 @@ get an additional ApplicationSet that creates ephemeral Applications for open
 pull requests (ADR-032).
 
 **Supply-chain policies** (`policy/`, derived from the `Product`/`XEnvironment`
-registries): the platform-owned `verify-images-<product>` /
-`verify-attestations-<product>` policies read each product's repo→identity
+registries): the platform-owned `verify-images-product-<team>-<product>` /
+`verify-attestations-product-<team>-<product>` policies read each product's repo→identity
 mapping. These stay platform-owned for **all** products — an environment must not
 own its own signature trust root, so they are deliberately not part of the
 claim/Composition.
@@ -352,8 +356,8 @@ Onboarding an environment is now an `XEnvironment` claim YAML in
 `gitops/environments/<team>/<product>/` (synced by ArgoCD), under an owning
 `Team` CR and `Product` CR. Follow the
 [environment onboarding runbook](../runbooks/environment-onboarding.md) — it walks the claim
-fields (`team`/`product`/`stage`/`tier`/`services`) and verification. A minimal
-claim example lives at `infra/modules/crossplane/examples/environment-gamma.yaml`.
+fields (`team`/`product`/`stage`/`tier`/`services`) and verification. A live
+claim example lives at `gitops/environments/alpha/shop/dev.yaml`.
 
 ## Environment AWS Access (Pod Identity)
 
@@ -409,13 +413,16 @@ uses `app.kubernetes.io/instance: stable`; each preview uses
 ### What namespace mode protects against
 
 - **Cross-environment network traffic** -- Default-deny ingress with Cilium
-  enforcement. Pods in `alpha-demo-dev` cannot receive traffic from `bravo-demo-dev`.
+  enforcement. Pods in `alpha-shop-dev` cannot receive traffic from `alpha-checkout-dev`.
 - **Resource exhaustion** -- ResourceQuota caps CPU, memory, and pod count.
   LimitRange sets defaults so pods without explicit requests still get bounded.
-- **Unauthorized API access** -- each team's `DeveloperAccess-<team>` role is
-  group-mapped and bound (namespace-scoped) to the `environment-developer` role in each
-  of its Environments' namespaces only. A developer can edit only their own team's
-  Environment namespaces and can assume only their own team's role (ADR-039).
+- **Unauthorized API access** -- the `environment-developers` RoleBinding binds the
+  team's `<team>-<product>-<stage>:developers` group to the `environment-developer`
+  ClusterRole, namespace-scoped, in each of its Environments' namespaces only — so a
+  developer can edit only their own team's Environment namespaces (ADR-039). (The AWS-side
+  `DeveloperAccess-<team>` role + access entry that would map an IAM principal into that
+  group is **not yet provisioned**, #647 — cluster access is via `platctl kubeconfig` /
+  PlatformAdmin today.)
 - **Node escape via pods** -- Pod Security Admission (`enforce=baseline`) blocks
   privileged, hostPath, and host-network/PID pods; the egress policy blocks the IMDS
   endpoint so pods cannot steal node-role credentials.

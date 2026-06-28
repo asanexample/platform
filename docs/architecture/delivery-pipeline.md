@@ -81,7 +81,7 @@ admission and the Crossplane Composition can read them:
 | `gitops/products/<team>/<product>.yaml` | `Product` | admission input; delivery derives directly from git |
 | `gitops/environments/<team>/<product>/<stage>.yaml` | `XEnvironment` (Crossplane claim) | **Crossplane Composition** → namespace, ResourceQuota, ECR, Pod Identity |
 | `gitops/releases/<team>/<product>/<stage>.yaml` | *(read by the delivery ApplicationSet)* | delivery (digest → pod) |
-| `gitops/grants/…` *(planned — P4, not yet built)* | `AccessGrant` | admission + Backstage soft-scoping |
+| `gitops/grants/…` *(projection live — `grants` registry-sync app, wave 0; authored grants + consumption pending)* | `AccessGrant` | admission + Backstage soft-scoping |
 
 The **`XEnvironment` claim is the sole provisioner** of an environment's footprint — the Crossplane Composition
 reconciles it into a namespace, ResourceQuota, scoped ECR repositories, and per-environment AWS access (EKS Pod
@@ -163,7 +163,7 @@ and has its own architecture doc:
 | Product identity (repo, tenancy, domains) | `gitops/products/<team>/<product>.yaml` | team lead (scaffolder) | delivery, Kyverno, github-oidc |
 | Environment footprint | `gitops/environments/<team>/<product>/<stage>.yaml` | team lead (scaffolder) | Crossplane Composition, Kyverno |
 | Deployed digest per stage | `gitops/releases/<team>/<product>/<stage>.yaml` | app CI / promote bot / gated PR | delivery ApplicationSet |
-| Cross-team access *(planned — P4, not yet built)* | `gitops/grants/…` | team admin (gated) | Kyverno, Backstage |
+| Cross-team access *(registry projection live, wave-0 `grants` app; authored grants + consumption pending)* | `gitops/grants/…` | team admin (gated) | Kyverno, Backstage |
 
 This is ADR-069's **"one home per fact"**: delivery and policy *derive* from these registries; they are never the
 source of an independent second copy.
@@ -190,7 +190,7 @@ These are first-class but already have deep docs — linked here, not re-explain
   app skeleton's [`preview.yml`](../../scaffolder/templates/new-product/skeleton/.github/workflows/preview.yml)
   **builds + signs + attests a PR image**, so a preview *would* satisfy Kyverno's verify-images/attestations
   checks. But **PR-preview *delivery* is not wired in v3**: the per-Product ApplicationSet is release-keyed (not a
-  `pullRequest` generator), and Environment claims ship `preview: false`. Ephemeral per-PR environments are a
+  `pullRequest` generator). Ephemeral per-PR environments are a
   **known future enhancement**, not a live capability.
 
 ---

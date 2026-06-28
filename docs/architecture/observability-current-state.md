@@ -69,7 +69,7 @@ credential. Onboarding the next spoke: [`observability-spoke-onboarding.md`](../
   cluster ───▶│   │  (15d local, gp3 PVC)                                 │              ▶ ingester ─┐       │
   targets     │   │                                                       │              ▶ querier   │ S3   │
               │   ▼                                                  query │              ▶ q-frontend│blocks│
-              │  Alertmanager ──sns_configs(sigv4/IRSA)──▶ SNS ──▶ email   │              ▶ store-gw ◀─┘bucket│
+              │  Alertmanager ──sns_configs(sigv4/Pod Identity)──▶ SNS ─▶ email │           ▶ store-gw ◀─┘bucket│
               │   │  (gp3 PVC)                                             │              ▶ compactor ─▶ S3   │
               │   ▼                                                        │                                  │
               │  Grafana ◀── Mimir datasource (default, X-Scope-OrgID: platform) ─────────┘                  │
@@ -90,11 +90,11 @@ Mimir runs in **classic architecture** (distributor → ingester gRPC, RF1), *no
 ingest-storage — lighter for a reference cluster. Components: gateway (nginx), distributor, ingester,
 querier, query-frontend, **query-scheduler** (required — the chart wires querier→scheduler), store-gateway,
 compactor. Ingester/store-gateway/compactor are StatefulSets on **gp3** PVCs; durable blocks live in the
-**AES256** S3 bucket reached via **IRSA** (no static keys).
+**AES256** S3 bucket reached via **EKS Pod Identity** (ADR-047, no static keys).
 
-> Mimir itself is **off in the dev cost_profile** today (`enable_mimir=false`); the above is the metrics
-> path when Mimir is enabled (prod profile, or a future dev flip). In dev, Prometheus serves metrics
-> directly (no remote-write) and is Grafana's metrics datasource.
+> Mimir is **ON** on the platform hub today (`enable_mimir=true` in the platform `env.hcl`); the above is the
+> live metrics path. Other clusters default to the `dev` cost_profile with Mimir off, where Prometheus serves
+> metrics directly (no remote-write).
 
 ### Logs path: Loki + Alloy (P3a)
 
@@ -221,7 +221,7 @@ see Gotchas). Rules live in `infra/modules/observability/alerts/curated.yaml`.
 | `warning` | **Slack** |
 | `info` / `Watchdog` / else | dashboard-only (`null`) |
 
-SNS publishes via **IRSA + sigv4** (SSE-KMS topic). The **Slack webhook** and **PagerDuty routing key** are
+SNS publishes via **sigv4 + EKS Pod Identity** (ADR-047; SSE-KMS topic). The **Slack webhook** and **PagerDuty routing key** are
 synced from Secrets Manager by **External Secrets** and read by Alertmanager via `api_url_file` /
 `routing_key_file` — the secrets never enter Terraform state or helm values (see the
 [notification-channels runbook](../runbooks/observability-alerts.md#notification-channels--secret-rotation)).
@@ -234,7 +234,7 @@ the platform dashboards so a metric blip can be tied to a rollout.
 |------|-------|-----------|
 | Prometheus TSDB (15d local) | gp3 PVC (20Gi) | survives pod restart; rebuildable from scrape |
 | Alertmanager state | gp3 PVC (5Gi) | — |
-| Mimir ingester WAL / store-gateway / compactor scratch | gp3 PVCs (10/10/20Gi) | local working set (Mimir off in dev) |
+| Mimir ingester WAL / store-gateway / compactor scratch | gp3 PVCs (10/10/20Gi) | local working set (Mimir on, platform hub) |
 | **Mimir blocks (durable history)** | **S3** (AES256, versioned, lifecycle-pruned) | the long-term metrics store |
 | **Loki chunks (logs)** | **S3** (AES256, SSE-S3 request header, Pod Identity) | durable log store |
 | **Tempo blocks (traces)** | **S3** (AES256, SSE-S3 request header, Pod Identity) | durable trace store; `block_retention` 72h |
@@ -245,15 +245,15 @@ gp3 is the cluster-**default** StorageClass (encrypted, expandable, WaitForFirst
 
 ### Decisions & gotchas (durable)
 
-- **New add-ons use EKS Pod Identity, not IRSA** (ADR-047). Loki/Tempo trust `pods.eks.amazonaws.com` (no
-  `eks.amazonaws.com/role-arn` annotation). The existing add-on layer (kube-prometheus-stack / Mimir /
-  Alertmanager, argocd, cert-manager, external-dns, crossplane) is still on IRSA and migrates as a batch in
-  **#594**.
+- **Add-ons use EKS Pod Identity, not IRSA** (ADR-047). Loki/Tempo/Pyroscope, **Mimir S3**, the
+  **Alertmanager→SNS** publish, cert-manager, external-dns, external-secrets, and crossplane all trust
+  `pods.eks.amazonaws.com` (no `eks.amazonaws.com/role-arn` annotation) — the **#594** batch migration is done
+  for these. The lone exception is the **EBS CSI managed add-on**, which legitimately stays on IRSA.
 - **The org `enforce-encryption` SCP denies `s3:PutObject` without the `x-amz-server-side-encryption`
   header** — bucket default encryption alone doesn't add it. **Every S3 client must send SSE explicitly**
   (Loki `storage.s3.sse=SSE-S3`, Tempo `storage.trace.s3.sse=SSE-S3`). Loki was the first store to actually
   write, so it surfaced this; Mimir needs the same when enabled.
-- **External Secrets IRSA is scoped to `secret:platform/*`** (the platform `external-secrets` unit sets
+- **The External Secrets role is scoped to `secret:platform/*`** (the platform `external-secrets` unit sets
   `secret_path_prefix=platform`). **Every ES-synced Secrets Manager secret must be named `platform/…`** or
   ESO gets `AccessDenied` (the Slack webhook + PD routing-key secrets live under that prefix).
 - **Chart ServiceMonitors are unreliable, so scraping is defined on the observability side.** Cilium's chart
@@ -294,12 +294,13 @@ gp3 is the cluster-**default** StorageClass (encrypted, expandable, WaitForFirst
 - **P3 (logs + traces) and P4 (alerting + notifications) are applied and live** on the platform cluster
   (PRs #596–#612): logs queryable in Grafana (Loki + Alloy + K8s events), traces flowing (Tempo + OTel
   collector, with trace↔logs correlation), and 28 curated alerts routing to SNS / Slack / PagerDuty.
-- **Metrics are Prometheus-only in dev** — Mimir is code-complete but `enable_mimir=false` (cost_profile),
-  so there's no `remote_write` and Prometheus is Grafana's metrics datasource. The P2 Mimir path (merged
-  PR #147) activates when Mimir is enabled (prod profile). Known wrinkle when enabling: a prometheus-operator
-  webhook-latency gotcha during the helm reconcile — see the
+- **Metrics run through Mimir on the platform hub** — `enable_mimir=true`, so Prometheus `remote_write`s to
+  Mimir and **Mimir is Grafana's default metrics datasource** (full history on S3); the Prometheus datasource
+  stays selectable for recent/local queries. The P2 Mimir path merged as PR #147. Known wrinkle when first
+  enabling on a cluster: a prometheus-operator webhook-latency gotcha during the helm reconcile — see the
   [troubleshooting runbook](../runbooks/observability-troubleshooting.md).
 - **Sizing follows `cost_profile`** — `dev` (default) is single-replica with durable stores off; `prod`
-  flips the bundle to HA/RF3. The platform cluster runs `dev` with logs + traces toggled on.
-- **Grafana SSO** (OIDC) is a deferred hardening step — admin login for now. When it lands, keep a
-  local-admin break-glass (OIDC-only would break programmatic/automation access).
+  flips the bundle to HA/RF3. The platform cluster runs `dev` sizing with the durable stores (Mimir + logs +
+  traces) toggled **on**.
+- **Grafana SSO** (OIDC against Keycloak, #592) is **live** — see "Grafana SSO" above. Group→role mapping
+  (`platform-admins`→Admin, else Viewer) is applied; the local-admin login is retained as break-glass.

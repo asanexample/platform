@@ -61,9 +61,13 @@ flowchart TB
   to new after a health check — a clean instant cutover, **zero** traffic to a bad version.
 
 Because the controller owns the Service selectors and the route weights at runtime, the tenant
-ArgoCD Application must `ignoreDifferences` on both **and** set `RespectIgnoreDifferences=true`
-(otherwise an unrelated sync stomps them mid-rollout — see the
-[platform internals](../guides/zero-downtime/overview-platform.md#the-argocd-integration--the-one-gotcha-that-bites)).
+ArgoCD Application must run with **`ServerSideApply=true`** and `ignoreDifferences` keyed on
+**`managedFieldsManagers: ["rollouts-controller"]`** (and `["cilium-operator-generic"]` for the
+HTTPRoute) **and** set `RespectIgnoreDifferences=true` (#894). Under client-side apply ArgoCD would
+fight the rollouts-controller's co-owned `spec` fields and show a false empty-diff `OutOfSync`; SSA +
+the managed-fields ignore is what lets the two field managers coexist. Without `RespectIgnoreDifferences`
+an unrelated sync still stomps them mid-rollout — see the
+[platform internals](../guides/zero-downtime/overview-platform.md#the-argocd-integration--the-one-gotcha-that-bites).
 
 ## Deploy lifecycle
 
@@ -92,7 +96,7 @@ datasource so the SLO and Rollouts dashboards span both clusters.
 | L7 weighted-HTTPRoute canary (no mesh) | Gateway-API trafficrouter plugin | [056](../adrs/056-progressive-delivery-and-safe-rollback.md) D4 |
 | Metric gates from Beyla→Mimir; SLOs; error-budget velocity | `observability-mimir` / `observability-slo` | [056](../adrs/056-progressive-delivery-and-safe-rollback.md) D5–D6, [054](../adrs/054-platform-resilience-and-business-continuity.md), [077](../adrs/077-application-instrumentation-strategy.md) |
 | Separation of duties for the (deferred) regulated gate | — | [049](../adrs/049-tenant-model-team-tenant-zone.md) |
-| ArgoCD `ignoreDifferences` + `RespectIgnoreDifferences` | `argocd-apps/delivery.tf` | [056](../adrs/056-progressive-delivery-and-safe-rollback.md) as-built |
+| ArgoCD `ServerSideApply=true` + `ignoreDifferences` (`managedFieldsManagers`) + `RespectIgnoreDifferences` | `argocd-apps/delivery.tf` | [056](../adrs/056-progressive-delivery-and-safe-rollback.md) as-built (#894) |
 
 ## As-built status
 

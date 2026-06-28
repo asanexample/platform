@@ -21,7 +21,7 @@ means creating an `XEnvironment` needs cluster RBAC — developers can't self-pr
 version:
 
 - **`v1beta1`** — `served: true`, **`referenceable: true`**, `storage: true` (the **storage/bound** version,
-  ADR-067). The live `environment-v3` Composition binds to it
+  ADR-067). The live `environment` Composition (`metadata.name: environment`) binds to it
   (`compositeTypeRef.apiVersion: platform.refplat.org/v1beta1`). `spec` is the Environment contract — a
   Product at a Stage [for a Customer]: `team`, `product`, `stage`, optional `customer`, `tier`,
   `isolation.compute`, `residency`, `quota`, `domains`, `lifecycle.phase`, and `services.<svc>` (each with
@@ -60,7 +60,7 @@ name. Each step's `input` is function-specific.
 Per-cluster constants must **not** leak into the environment-facing spec. The `crossplane_environment_api` Helm release
 (`infra/modules/crossplane/main.tf`) templates an `EnvironmentConfig` named `platform-cluster-config` carrying
 `ecrRegistry`, `baseDomain`, `region`, `workloadAccountId`, `managementAccountId`, `clusterName`,
-`pullAccountIds`, `permissionsBoundaryArn`, `providerConfigEcr`, `podIdentityServiceAccnt`. Step 1 references
+`resourcePrefix`, `pullAccountIds`, `permissionsBoundaryArn`, `providerConfigEcr`. Step 1 references
 it by name and merges it into the pipeline **context**, where the template reads it as
 `index .context "apiextensions.crossplane.io/environment"`.
 
@@ -85,21 +85,13 @@ One inline Go template renders **every** composed resource. Two output classes s
 
 Marks the `XEnvironment` `Ready` once its composed resources report Ready. No input.
 
-## The status-loop pattern (read observed status, write composite status)
+## The status-loop pattern (write composite status)
 
-The ADR-061 Phase 2a state machine (`status.domains`) runs **inside the Composition** — **no separate
-controller** — because `function-go-templating` can both *read an observed composed resource's status* and
-*write the composite's own status*. The spike (Q1) proved this; the live template uses it. Two mechanics, two
-gotchas:
-
-**Reading observed composed status.** The observed resources are at `.observed.resources`; for a resource by
-composition-resource-name, `index $observed "<name>"` then `.resource.status.conditions`. Cert issuance *is*
-the verification signal, so a tier-3 host can be gated on an observed `Certificate` `Ready` condition with no
-extra poller.
-
-> **Gotcha — capture root `.` before `range`.** Inside `{{ range }}` Go rebinds `.` to the loop element, so
-> `.observed` is **nil** inside the loop. Capture it first:
-> `{{- $observed := .observed.resources | default dict }}` *before* the range, then index `$observed`.
+The ADR-061 Phase 2a `status.domains` rendering runs **inside the Composition** — **no separate controller**
+— because `function-go-templating` can *write the composite's own status* in the same pass that renders the
+managed resources. The spike (Q1) proved the broader *read-observed-status-and-write* loop; **the live
+template uses only the write half (Phase 2a).** Gating a domain on an observed composed resource's status is
+**Phase 2b design, not built** (covered at the end of this section).
 
 **Writing composite status.** Emit a YAML doc whose `apiVersion`/`kind` are the **XR's own GVK**
 (`platform.refplat.org/v1beta1` / `XEnvironment`) with `metadata.name: {{ $xrName }}` and **NO
@@ -111,11 +103,23 @@ the `kind: XEnvironment` / `status: domains:` block):
 > *composed nested `XEnvironment`* (it shows up as an unready resource and never merges into status). Without it,
 > it merges into the composite status. This is the single most error-prone part of extending the status.
 
-The same template pass builds the `restrict-route-hostnames-<product>` Kyverno allow-list and the
-`status.domains[]` entries from one source: the generated host (`<product>-<team>-<stage>.<baseDomain>` + the
-`-pr-*` preview wildcard) is always `Active`; `spec.domains` aliases under `.<baseDomain>` are `Active`; external
-hosts are `Pending` (Phase 2b not built) and therefore **not** admitted. See
-[gateway-and-ingress.md](gateway-and-ingress.md) for how that allow-list enforces ingress.
+The same template pass builds the `restrict-route-hostnames-<ns>` Kyverno allow-list (`<ns>` =
+`<team>-<product>-<stage>`) and the `status.domains[]` entries from one source. In **Phase 2a, every bound
+host is marked `Active`** — the generated host (`<product>-<team>-<stage>.<baseDomain>` plus the `-pr-*`
+preview wildcard) and each `spec.domains` alias under `.<baseDomain>` alike. There is **no Pending→Active
+state machine today**; the real ingress-admission boundary is the Kyverno allow-list this same pass emits.
+See [gateway-and-ingress.md](gateway-and-ingress.md) for how that allow-list enforces ingress.
+
+**Phase 2b (designed, not built) — reading observed composed status.** `function-go-templating` *can* also
+read an observed composed resource's status — observed resources are at `.observed.resources`; for a resource
+by composition-resource-name, `index $observed "<name>"` then `.resource.status.conditions`. The intended use
+is gating a tier-3 / external host on its observed `Certificate` `Ready` condition (cert issuance *is* the
+verification signal, no extra poller) so such a host stays `Pending` until proven. The **live** template does
+**not** do this yet — its only `.observed` access reads the XR's own spec. If you build it:
+
+> **Gotcha — capture root `.` before `range`.** Inside `{{ range }}` Go rebinds `.` to the loop element, so
+> `.observed` is **nil** inside the loop. Capture it first:
+> `{{- $observed := .observed.resources | default dict }}` *before* the range, then index `$observed`.
 
 ## Providers, ProviderConfig, and Pod Identity
 
