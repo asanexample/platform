@@ -3,6 +3,11 @@
 **Date:** 2026-06-08
 **Status:** Accepted
 
+> **Vocabulary/paths superseded by [ADR-067](067-idp-domain-model.md) / [ADR-069](069-delivery-source-of-truth-product-environment.md):** the claim is now an
+> **`XEnvironment`** (not `XTenant`); claims live at `gitops/environments/<team>/<product>/<stage>.yaml` (not
+> `gitops/tenant-claims/...`); `app → Product/Service` and the `app-` repo prefix was dropped (ADR-072). The
+> derive-and-inject decision below is unchanged — read `tenant-claims`/`XTenant`/`app` as the v2 names.
+
 ## Context
 
 A tenant app's public hostname is currently defined by hand in **two** places that must be kept in sync:

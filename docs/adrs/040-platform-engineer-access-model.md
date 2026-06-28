@@ -73,8 +73,10 @@ Trust is unchanged — only SSO `AdministratorAccess` holders may assume `Platfo
   `GetSecretValue`" is not absolute while exec is granted. Deliberate trade for debuggability; the
   tighter option is logs + port-forward without exec. **Partly mitigated** by Kyverno (ADR-014): the
   `disallow-irsa-annotation-cross-team` policy blocks tenant ServiceAccounts from carrying an IRSA
-  role-arn, so there is no workload IAM role for an exec'd shell to assume today (pre-empts the #64
-  escalation path until per-team IRSA lands).
+  role-arn. Note, however, that per-team workload AWS access has since landed as **Pod Identity**
+  (ADR-041/047), *not* IRSA: where an environment declares `policyStatements`, an exec'd shell **can**
+  reach the Pod Identity agent (`169.254.170.23`) and assume that service's role. So the residual
+  `pods/exec` privilege is real wherever a workload has Pod-Identity AWS access — scope it accordingly.
 - `ReadOnlyAccess` + Deny is **best-effort, not airtight** — it still allows content reads the Deny
   list doesn't enumerate (`lambda:GetFunction`, ECR image pull, log contents). The airtight-but-narrower
   alternative is `ViewOnlyAccess`.

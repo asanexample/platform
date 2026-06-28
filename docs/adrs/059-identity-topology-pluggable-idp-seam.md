@@ -7,9 +7,14 @@
 [ADR-052](052-centralized-dex-sso-broker.md) vendor-neutral issuer seam: it reframes "Identity Center is the
 user store, Keycloak brokers *up* to it" as one **instance** of a general topology in which Keycloak is a stable
 seam and the **upstream IdP is pluggable.** Builds on the realized B1/B2 work (the `keycloak` +
-`keycloak-config` modules, the `_teams.hcl` registry). Lands with the planned rebuild
+`keycloak-config` modules, the access-model registry). Lands with the planned rebuild
 ([ADR-049](049-tenant-model-team-tenant-zone.md)); informs the deferred membership/SCIM work and the
 ArgoCD/Backstage cutovers (B3/B4, #197).
+
+> **Note (2026-06-27, accuracy review):** the body refers to the access-model source of truth as
+> **`_teams.hcl`**. That HCL registry has since been **retired** — the access model is now the git-native
+> **`Team`** object (`gitops/teams/`) plus the `Product` registry ([ADR-063](063-team-as-first-class-git-object.md) /
+> [ADR-067](067-idp-domain-model.md)). Read every `_teams.hcl` reference below as that registry.
 
 ## Amendment — 2026-06-08: Scenario B is the realized default
 

@@ -6,7 +6,7 @@
 
 ## Context
 
-ADR-053 chose Keycloak as the app IdP and "access model as code" — declarative source → standard OIDC group/role claims → generated native RBAC per system. But it was written when the model was **`team == tenant`**, so the access-model-as-code generators and the Keycloak group/role taxonomy mirror **only the Team**. The whole live chain is **team-scoped**:
+ADR-053 chose Keycloak as the app IdP and "access model as code" — declarative source → standard OIDC group/role claims → generated native RBAC per system. But it was written when the model was **`team == tenant`**, so the access-model-as-code generators and the Keycloak group/role taxonomy mirror **only the Team**. The intended team-scoped chain is (note: the `DeveloperAccess-<team>` IAM role + EKS access entry are **not actually provisioned today** — regression [#647](https://github.com/asanexample/platform/issues/647); only the in-cluster RoleBinding is emitted, so the AWS→kubectl hops below are the design, not the deployed state):
 
 ```text
 SSO group → Dev-<team> → DeveloperAccess-<team> IAM role → EKS access entry → team-<team>:developers → namespace RoleBinding
