@@ -41,13 +41,16 @@ type Person struct {
 	Grants []Grant
 }
 
-// Role is a WorkforceRole from the catalog (the fields eligibility needs).
+// Role is a WorkforceRole from the catalog (the fields eligibility + activation need).
 type Role struct {
 	Name     string
 	Reach    string // team | platform | any
 	Power    string // look | operate | change | manage-access
 	Mode     string // standing | on-demand
 	RiskTier string // standard | elevated | apex
+	// AWS Identity Center projection — the activation target for the AWS plane (ADR-088).
+	PermissionSet   string // identityCenter.permissionSet, e.g. "AdministratorAccess" (empty = no AWS console projection)
+	SessionDuration string // identityCenter.sessionDuration, ISO-8601 e.g. "PT1H" — the per-role TTL cap
 }
 
 // Borrowable reports whether a grant is temporary-power (on-demand), not standing: the
@@ -82,10 +85,14 @@ type roleDoc struct {
 		Name string `yaml:"name"`
 	} `yaml:"metadata"`
 	Spec struct {
-		Reach    string `yaml:"reach"`
-		Power    string `yaml:"power"`
-		Mode     string `yaml:"mode"`
-		RiskTier string `yaml:"riskTier"`
+		Reach          string `yaml:"reach"`
+		Power          string `yaml:"power"`
+		Mode           string `yaml:"mode"`
+		RiskTier       string `yaml:"riskTier"`
+		IdentityCenter struct {
+			PermissionSet   string `yaml:"permissionSet"`
+			SessionDuration string `yaml:"sessionDuration"`
+		} `yaml:"identityCenter"`
 	} `yaml:"spec"`
 }
 
@@ -163,11 +170,13 @@ func LoadRoles(repoRoot string) (map[string]Role, error) {
 			continue
 		}
 		roles[doc.Metadata.Name] = Role{
-			Name:     doc.Metadata.Name,
-			Reach:    doc.Spec.Reach,
-			Power:    doc.Spec.Power,
-			Mode:     doc.Spec.Mode,
-			RiskTier: doc.Spec.RiskTier,
+			Name:            doc.Metadata.Name,
+			Reach:           doc.Spec.Reach,
+			Power:           doc.Spec.Power,
+			Mode:            doc.Spec.Mode,
+			RiskTier:        doc.Spec.RiskTier,
+			PermissionSet:   doc.Spec.IdentityCenter.PermissionSet,
+			SessionDuration: doc.Spec.IdentityCenter.SessionDuration,
 		}
 	}
 	return roles, nil
