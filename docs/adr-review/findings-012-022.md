@@ -5,6 +5,7 @@ Adversarial accuracy review against the worktree at `/Users/josh/centric/platfor
 ---
 
 ## ADR-012: ArgoCD SSO via Dex and SAML
+
 - **Status quoted:** `Superseded by ADR-053 / ADR-059 (Keycloak OIDC is the ArgoCD IdP)`
 - **Findings:**
   - [SEVERITY: low] Status accurate and matches the index (`README.md:88`) and reality — the live argocd unit sets `dex_enabled = false` and brokers SSO through Keycloak OIDC. **Evidence:** `infra/live/aws/platform/us-east-1/platform/argocd/terragrunt.hcl:176`, lines 229–244. — **Proposed fix:** none.
@@ -14,6 +15,7 @@ Adversarial accuracy review against the worktree at `/Users/josh/centric/platfor
 ---
 
 ## ADR-013: Compliance Tier Model
+
 - **Status quoted:** `Accepted`
 - **Findings:**
   - [SEVERITY: low] All named Phase-1 baseline policies exist as live `ClusterPolicy` names (`require-requests-limits`, `require-workload-labels`, `require-pod-probes`, `disallow-latest-tag`, `block-public-loadbalancer`, `disallow-default-namespace`, tier-gated `require-pod-security-restricted`/`require-ro-rootfs`). Verified-correct. **Evidence:** `grep "name:" infra/modules/policy/policies-chart/templates/*.yaml`. — **Proposed fix:** none.
@@ -24,6 +26,7 @@ Adversarial accuracy review against the worktree at `/Users/josh/centric/platfor
 ---
 
 ## ADR-014: Kyverno as Policy Engine
+
 - **Status quoted:** `Accepted — **Deployed (Phase 1, 2026-05-29)**. ...`
 - **Findings:**
   - [SEVERITY: medium] Stale namespace label. ADR states "Tenant-targeted policies match the `platform.refplat.org/tenant` namespace label." Live module matches `platform.refplat.org/team`. **Evidence:** `infra/modules/policy/variables.tf:97`, `infra/modules/policy/policies-chart/values.yaml:37`. — **Proposed fix:** `…/tenant` → `…/team`, "Tenant-targeted" → "Environment-targeted".
@@ -35,6 +38,7 @@ Adversarial accuracy review against the worktree at `/Users/josh/centric/platfor
 ---
 
 ## ADR-015: CIDR Allocation Strategy
+
 - **Status quoted:** `Accepted`
 - **Findings:**
   - [SEVERITY: high] The "Overlay CIDRs (Kubernetes)" table is wrong three ways and could cause a misconfiguration. (a) It lists Service CIDR `10.241.0.0/16` and DNS IP `10.241.0.10`; the real EKS service CIDR is `172.20.0.0/16` with CoreDNS at `172.20.0.10`. (b) `10.241.0.0/16` is actually **preprod's pod CIDR** — the ADR's "service CIDR" collides with a live pod range. (c) It claims overlay ranges are "shared across all clusters," but pod CIDRs are deliberately **per-cluster non-overlapping** from a reserved `10.240.0.0/14` supernet (ClusterMesh-ready). **Evidence:** `infra/live/aws/platform/us-east-1/network.hcl:7-8`, `infra/live/aws/preprod/us-east-1/network.hcl:8`, `infra/docs/06-cidr-allocation.md:87-97`. — **Proposed fix:** rewrite to pod supernet `10.240.0.0/14` with per-cluster pod CIDRs (platform `10.240/16`, preprod `10.241/16`, prod `10.242/16` reserved) and EKS service CIDR `172.20.0.0/16` (DNS `172.20.0.10`); delete "shared across all clusters."
@@ -45,6 +49,7 @@ Adversarial accuracy review against the worktree at `/Users/josh/centric/platfor
 ---
 
 ## ADR-016: OpenTofu over HashiCorp Terraform
+
 - **Status quoted:** `Accepted`
 - **Findings:**
   - [SEVERITY: low] Verified-correct: `terraform_binary = "tofu"` (`infra/root.hcl:3`); OpenTofu `v1.12.1`, floor `>= 1.6.0`; CI runs `tofu fmt`/`validate`. **Evidence:** `.tool-versions`, `infra/modules/aws/networking/versions.tf:2`, `.github/workflows/ci.yml:59`. — **Proposed fix:** none.
@@ -55,6 +60,7 @@ Adversarial accuracy review against the worktree at `/Users/josh/centric/platfor
 ---
 
 ## ADR-017: Gateway API over Traditional Ingress
+
 - **Status quoted:** `Accepted`
 - **Findings:**
   - [SEVERITY: medium] Module misattribution. ADR says `gateway-config` creates **ClusterIssuer + Gateway + HTTPRoute** (with an embedded `kubernetes_manifest "gateway"`). In the repo the **ClusterIssuer and Gateway live in a separate `gateway` module** (deployed EARLY per CLAUDE.md); `gateway-config` now creates **only HTTPRoutes**. **Evidence:** `infra/modules/gateway/main.tf:9` (ClusterIssuer), `:50` (Gateway, `gatewayClassName = "cilium"`); `infra/modules/gateway-config/main.tf` only `kind = "HTTPRoute"` (lines 16, 47). — **Proposed fix:** rewrite the module section to reflect the `gateway` (ClusterIssuer+Gateway, early) vs `gateway-config` (HTTPRoutes, leaf) split.
@@ -64,6 +70,7 @@ Adversarial accuracy review against the worktree at `/Users/josh/centric/platfor
 ---
 
 ## ADR-018: IRSA for Pod-Level AWS Identity
+
 - **Status quoted:** `Superseded by ADR-047 … existing IRSA add-ons keep working until they migrate at the planned rebuild.`
 - **Findings:**
   - [SEVERITY: low] Status consistent with ADR-047 in this checkout. **Evidence:** `docs/adrs/047…:44-46`, `README.md:89`. — **NEEDS LIVE/OWNER VERIFICATION:** the add-on modules (`argocd`, `cert-manager`, `external-dns`, `external-secrets`) now carry *both* an IRSA path and an `aws_eks_pod_identity_association` path; project memory claims #594 migrated platform add-ons to Pod Identity live (2026-06-24), which would contradict "migrate at the rebuild." The deployed state can't be resolved from the repo. **Evidence:** both `pod_identity` and `eks.amazonaws.com/role-arn` grep-match those four module `main.tf`s.
@@ -73,6 +80,7 @@ Adversarial accuracy review against the worktree at `/Users/josh/centric/platfor
 ---
 
 ## ADR-019: External Secrets Operator for Secrets Management
+
 - **Status quoted:** `Accepted`
 - **Findings:**
   - [SEVERITY: low] Verified-correct: ESO chart `0.14.3`; `ClusterSecretStore` via separate `secret-stores` module (ADR-024); `platform/tailscale/oauth` secret path exists. **Evidence:** `_versions.hcl`, `infra/live/aws/platform/us-east-1/platform/tailscale/terragrunt.hcl:95`. — **Proposed fix:** none.
@@ -83,6 +91,7 @@ Adversarial accuracy review against the worktree at `/Users/josh/centric/platfor
 ---
 
 ## ADR-020: SSM Session Manager Bastion over SSH Bastion
+
 - **Status quoted:** `Accepted`
 - **Findings:**
   - [SEVERITY: low] Fully verified-correct: `t3.nano`; `AmazonSSMManagedInstanceCore`; Amazon Linux 2023 from SSM AMI param; egress-only SG; `scripts/eks-tunnel.sh` using `AWS-StartPortForwardingSessionToRemoteHost`; PlatformAdmin tag-scoped `ssm:StartSession` (ADR-040). **Evidence:** `infra/modules/aws/ssm-bastion/variables.tf:25`, `main.tf:36,8,87-88`, `scripts/eks-tunnel.sh:77`. — **Proposed fix:** none.
@@ -91,6 +100,7 @@ Adversarial accuracy review against the worktree at `/Users/josh/centric/platfor
 ---
 
 ## ADR-021: ArgoCD for GitOps Delivery
+
 - **Status quoted:** `Accepted`
 - **Findings:**
   - [SEVERITY: medium] Stale, in-force SSO claim. "ArgoCD authenticates users via **Dex and SAML**, integrated with AWS Identity Center (ADR-012). Group claims from SAML drive RBAC." Live unit disables Dex and uses **Keycloak OIDC** (ADR-053/059); the ADR cross-references the *superseded* ADR-012 as current. **Evidence:** `infra/live/aws/platform/us-east-1/platform/argocd/terragrunt.hcl:176` (`dex_enabled = false`), 229–244, 82. — **Proposed fix:** replace with "authenticates via Keycloak OIDC (Dex disabled; ADR-053/059)," drop/mark-historical the ADR-012 cross-ref.
@@ -101,6 +111,7 @@ Adversarial accuracy review against the worktree at `/Users/josh/centric/platfor
 ---
 
 ## ADR-022: DNS Architecture — Route53 with Cloudflare Delegation
+
 - **Status quoted:** `Accepted`
 - **Findings:**
   - [SEVERITY: medium] Same ClusterIssuer misattribution as ADR-017: "ClusterIssuer (configured in the `gateway-config` module)" — it now lives in the `gateway` module. **Evidence:** `infra/modules/gateway/main.tf:9`; `gateway-config/main.tf` has no ClusterIssuer. — **Proposed fix:** "configured in the `gateway` module."

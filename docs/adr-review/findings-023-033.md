@@ -5,7 +5,8 @@ Adversarial accuracy pass against `/Users/josh/centric/platform-adr-review` (lat
 ---
 
 ## ADR-023: EKS Managed Node Groups over Self-Managed or Karpenter
-- **Status quoted:** `Accepted — **partly superseded by [ADR-078](078-cluster-elasticity-karpenter.md)**: Karpenter now provisions and consolidates *workload* nodes; managed node groups are retained only for the fixed `system` (controller/bootstrap) floor.`
+
+- **Status quoted:** `Accepted — **partly superseded by [ADR-078](078-cluster-elasticity-karpenter.md)**: Karpenter now provisions and consolidates *workload* nodes; managed node groups are retained only for the fixed`system`(controller/bootstrap) floor.`
 - **Findings:**
   - [SEVERITY: medium] The **Node Group Configuration table** is stale on every value. It lists `system` t3.large 2–4 and `workload` t3.large 1–6, "Both groups span all 3 AZs." Reality: only the `system` group exists (workload group **retired**, Karpenter owns it), instance is **t4g.xlarge / t3.xlarge (4 vCPU/16 GiB)** not t3.large, system is **min 2 / max 3**, and groups are **single-AZ** in the dev profile. The status note flags the workload→Karpenter supersession but the body table still shows concrete wrong numbers. — **Evidence:** `infra/live/aws/platform/us-east-1/platform/node-groups/terragrunt.hcl:48,60-80,69-71,58` — **Proposed fix:** add a current-sizing note: single `system` group, t4g.xlarge/t3.xlarge, 2–3, single-AZ; workload = Karpenter (ADR-078).
   - [SEVERITY: low] "pods use IRSA, ADR-018" is stale — pod AWS identity is now **Pod Identity** (ADR-047; ADR-018 marked superseded in the index). IMDSv2 rationale itself still valid. — **Evidence:** `docs/adrs/README.md:89`; `infra/modules/external-secrets/main.tf:121`.
@@ -16,6 +17,7 @@ Adversarial accuracy pass against `/Users/josh/centric/platform-adr-review` (lat
 ---
 
 ## ADR-024: Secrets Management Architecture
+
 - **Status quoted:** `Accepted`
 - **Findings:**
   - [SEVERITY: medium] The **Identity Model** rests on IRSA ("ESO to Secrets Manager: IRSA (ADR-018)"). ESO now authenticates via **EKS Pod Identity** — module creates `aws_eks_pod_identity_association`; ClusterSecretStores drop `serviceAccountRef` to use the controller identity (ADR-047/#594). — **Evidence:** `infra/modules/external-secrets/main.tf:17-18,121`; `infra/modules/secret-stores/main.tf:6,32` — **Proposed fix:** amend to Pod Identity (ADR-047); path-scoping unchanged.
@@ -28,6 +30,7 @@ Adversarial accuracy pass against `/Users/josh/centric/platform-adr-review` (lat
 ---
 
 ## ADR-025: Secret Naming Convention and Path Hierarchy
+
 - **Status quoted:** `Accepted`
 - **Findings:**
   - [SEVERITY: low] "IRSA policies (ADR-018)" in IAM Integration — scoping is now on a **Pod Identity** role (ADR-047). Path/ARN patterns unchanged and accurate. — **Evidence:** `external-secrets/main.tf:85,121`.
@@ -37,6 +40,7 @@ Adversarial accuracy pass against `/Users/josh/centric/platform-adr-review` (lat
 ---
 
 ## ADR-026: Cross-Account Secret Isolation
+
 - **Status quoted:** `Accepted`
 - **Findings:**
   - [SEVERITY: low] Architecture diagram annotates ESO as "ClusterSecretStore (IRSA → this account only)"; auth is now **Pod Identity** (ADR-047), and per-cluster trust is the Pod Identity association rather than the OIDC-issuer trust policy the Context describes. Isolation property unchanged. — **Evidence:** `external-secrets/main.tf:17-18,121`; `secret-stores/main.tf:6`.
@@ -47,6 +51,7 @@ Adversarial accuracy pass against `/Users/josh/centric/platform-adr-review` (lat
 ---
 
 ## ADR-027: Hybrid Tenant Isolation Model
+
 - **Status quoted:** `Accepted (vCluster mode deferred — see ADR-033)`
 - **Findings:**
   - [SEVERITY: low] Both amendment banners correctly flag `infra/modules/tenant` + `tenants` unit retired — **verified** (module absent, no `teams.hcl`). Body marked historical. Good hygiene.
@@ -56,6 +61,7 @@ Adversarial accuracy pass against `/Users/josh/centric/platform-adr-review` (lat
 ---
 
 ## ADR-028: ECR Cross-Account Container Registry
+
 - **Status quoted:** `Accepted`
 - **Findings:**
   - [SEVERITY: medium] **Repository Structure** stale. Shows `team-alpha/demo`/`team-bravo/demo` created by this unit, "keys match `teams.hcl` apps." Today tenant ECR repos are **Crossplane Composition-owned** (`provider-aws-ecr`); the `ecr` unit holds only **platform repos** (`platform/backstage`, `platform/gha-runner`); `teams.hcl` gone. — **Evidence:** `infra/live/aws/platform/us-east-1/platform/ecr/terragrunt.hcl:21-38` — **Proposed fix:** add status note that per-team repos moved to the Composition.
@@ -67,6 +73,7 @@ Adversarial accuracy pass against `/Users/josh/centric/platform-adr-review` (lat
 ---
 
 ## ADR-029: Preprod Public Ingress via Gateway API
+
 - **Status quoted:** `Accepted`
 - **Findings:**
   - [SEVERITY: medium] Attributes the NLB-scheme control to the **`gateway-config`** module ("supports an `internal` boolean variable that controls the NLB scheme"). The Gateway (with `internal`/scheme, Let's Encrypt cert, Route53) **split into a separate `gateway` module/unit**; `gateway-config` no longer has `internal`/`letsencrypt_email`/`route53_*`. — **Evidence:** `infra/modules/gateway-config/variables.tf` (only create/domain/gateway_name/gateway_namespace/routes); `infra/modules/gateway/variables.tf:54`, `main.tf:66-68`; `…/preprod/.../gateway-config/terragrunt.hcl:88-90` — **Proposed fix:** retarget prose to the `gateway` module; note the split.
@@ -80,6 +87,7 @@ Adversarial accuracy pass against `/Users/josh/centric/platform-adr-review` (lat
 ---
 
 ## ADR-030: Route53 Subdomain Delegation for Environment DNS
+
 - **Status quoted:** `Accepted`
 - **Findings:**
   - [SEVERITY: low] All structural claims **verified**: `route53_delegation` module creates only NS records; NS TTL default **172800** (`route53_delegation/variables.tf:21`); preprod `route53` + platform `route53-delegation` units exist; route53 module supports **CAA** (`route53/main.tf:11-18`); preprod zone `force_destroy=true` + CAA (`…/preprod/.../route53/terragrunt.hcl:18,21`).
@@ -89,6 +97,7 @@ Adversarial accuracy pass against `/Users/josh/centric/platform-adr-review` (lat
 ---
 
 ## ADR-031: Multi-App Tenant Model
+
 - **Status quoted:** `Accepted`
 - **Findings:**
   - [SEVERITY: medium] The single supersession banner points only to **ADR-049** and frames the future as "the **v2 `Tenant` claim** (design-stage; lands with the rebuild)." Reality: the whole `teams.hcl`/`tenants`/`apps`-map surface was **removed at the v3 cutover (ADR-067/069), which is LIVE**; no `teams.hcl` exists. Unlike ADR-032, it gives no signal its mechanism is gone. — **Evidence:** no `teams.hcl`; `docs/adrs/032…:9-23`; `crossplane/.environment-api-tests/README.md:6` — **Proposed fix:** add an Implementation Status note mirroring ADR-032.
@@ -98,6 +107,7 @@ Adversarial accuracy pass against `/Users/josh/centric/platform-adr-review` (lat
 ---
 
 ## ADR-032: PR Preview Environments
+
 - **Status quoted:** `Accepted — **not yet implemented on the v3 delivery model** (see Implementation Status)`
 - **Findings:**
   - [SEVERITY: low] Exemplary Implementation Status — correctly states the v2 `preview`/`teams.hcl`/`tenants`/`github_org`/`preview_appset` surface was **removed at v3 cutover (ADR-067/069)**; only `preview_domain` host-rewrite exists. Matches repo (`gitops/releases/` exists; no `teams.hcl`).
@@ -108,6 +118,7 @@ Adversarial accuracy pass against `/Users/josh/centric/platform-adr-review` (lat
 ---
 
 ## ADR-033: Defer vCluster Tenant Support
+
 - **Status quoted:** `Accepted` (`Supersedes: Partially supersedes ADR-027`)
 - **Findings:**
   - [SEVERITY: low] "vCluster module… upgraded to chart version **0.34.1**" — **verified** (`vcluster/variables.tf:24,30`; module present). Decision (namespace-only) accurate.

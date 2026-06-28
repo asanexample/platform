@@ -5,6 +5,7 @@ Reviewer: adversarial accuracy pass. Checkout: `/Users/josh/centric/platform-adr
 ---
 
 ## ADR-034: Transit Gateway for Cross-Account VPC Connectivity
+
 - **Status quoted:** `**Status:** Accepted`
 - **Findings:**
   - [SEVERITY: low] Core claims verified correct. `create_tgw` / `ram_share_principals` / `setproduct` exist in the module. — **Evidence:** `infra/modules/aws/transit-gateway/variables.tf:12,30`, `main.tf:3,8,56` — **Proposed fix:** none.
@@ -13,6 +14,7 @@ Reviewer: adversarial accuracy pass. Checkout: `/Users/josh/centric/platform-adr
 - **Decision concerns:** none. Cost/scaling tradeoff vs peering is sound and the module matches the prose.
 
 ## ADR-035: Cross-VPC DNS Resolution for Private EKS Endpoints
+
 - **Status quoted:** `**Status:** Accepted`
 - **Findings:**
   - [SEVERITY: low] Verified accurate. `dns_method` validation accepts exactly `phz`/`resolver_outbound`/`resolver_inbound`; `phz_records` + `eks_lookup_role_arn`; TTL default 60. — **Evidence:** `infra/modules/aws/cross-vpc-dns/variables.tf:12-19,32-39` — **Proposed fix:** none.
@@ -20,6 +22,7 @@ Reviewer: adversarial accuracy pass. Checkout: `/Users/josh/centric/platform-adr
 - **Decision concerns:** none.
 
 ## ADR-036: GitHub Actions OIDC Federation for CI/CD
+
 - **Status quoted:** `**Status:** Accepted`
 - **Findings:**
   - [SEVERITY: medium] **Stale implementation, no amendment.** The "Per-Team ECR Push Roles" section claims roles `github-actions-ecr-push-<team>` from a `roles = { for team, cfg in local.teams ... }` map, scoped to `team-<team>/*`. The live unit is now **per-Product**, derived from the **Product registry** (`gitops/products/**`): role name `github-actions-ecr-push-product-<product>`, ECR scope `team-<team>/<product>-*`, branches `["main","refs/tags/*"]` (not just `["main"]`), broader inline policy (adds `ecr:DescribeRepositories`, `GetDownloadUrlForLayer`, `BatchGetImage`, plus `secretsmanager:GetSecretValue` on `platform/promote/github-app-*`). This is the registries-as-single-source migration (ADR-061/063/067/069); CLAUDE.md confirms `github-oidc` now derives per-Product and `teams.hcl` is retired. — **Evidence:** `infra/live/aws/platform/us-east-1/platform/github-oidc/terragrunt.hcl:30-75` — **Proposed fix:** add an amendment (like ADRs 039/041) and update the snippet, or mark it "historical."
@@ -29,6 +32,7 @@ Reviewer: adversarial accuracy pass. Checkout: `/Users/josh/centric/platform-adr
 - **Decision concerns:** The decision (OIDC over keys) is sound and unchanged; only the implementation narrative drifted. Worth an amendment so readers don't author against the dead flat-variable interface.
 
 ## ADR-037: CloudTrail for Secrets Audit Logging
+
 - **Status quoted:** `**Status:** Accepted`
 - **Findings:**
   - [SEVERITY: low] Verified accurate: module resources, defaults (`log_retention_days` 90, `cloudwatch_retention_days` 30, `force_destroy` false, `is_multi_region` false, `enable_cloudwatch` true), alarm name `<trail-name>-secrets-write-activity`, `treat_missing_data = "notBreaching"`, and metric-filter pattern matching `GetSecretValue||PutSecretValue||CreateSecret||DeleteSecret`. — **Evidence:** `infra/modules/aws/cloudtrail/variables.tf:12-75`, `main.tf:214-244` — **Proposed fix:** none.
@@ -37,6 +41,7 @@ Reviewer: adversarial accuracy pass. Checkout: `/Users/josh/centric/platform-adr
 - **Decision concerns:** none. Unusually careful ADR (correctly pre-empts the GetSecretValue-management-event misconception).
 
 ## ADR-038: platctl CLI for Platform Operations
+
 - **Status quoted:** `**Status:** Accepted`
 - **Findings:**
   - [SEVERITY: medium] **Stale command surface.** ADR says "**five subcommands**" (bootstrap, teardown, validate, kubeconfig, status). The binary has **seven** — it also ships `down`/`up` (cluster park/unpark, ADR-078), in `scale.go`; CLAUDE.md and the `platctl` skill treat park/unpark as first-class. — **Evidence:** `cmd/platctl/internal/cli/scale.go:26` (`Use: "down --env <env>"`), `:82` (`Use: "up --env <env>"`) — **Proposed fix:** add `down`/`up` to the list (or an amendment).
@@ -45,6 +50,7 @@ Reviewer: adversarial accuracy pass. Checkout: `/Users/josh/centric/platform-adr
 - **Decision concerns:** none on the decision; keep the command inventory current (CLI surface drifts fastest).
 
 ## ADR-039: Per-Team Developer RBAC
+
 - **Status quoted:** `**Status:** Accepted`
 - **Findings:**
   - [SEVERITY: high] **The amendment overstates what is actually provisioned.** It says the `DeveloperAccess-<team>` IAM role, the EKS access entry, **and** the namespace RoleBinding "are now rendered per team by the Crossplane … Composition." In reality the v3 Composition emits **only the developer RoleBinding** — the IAM role + access entry are **not yet emitted** (regression #647). CLAUDE.md flags this ("⚠️ NOT currently provisioned … use `platctl kubeconfig`/PlatformAdmin until built"). A reader would wrongly conclude per-team developer cluster access works end-to-end. — **Evidence:** `infra/modules/crossplane/README.md:15-19` ("…**not yet emitted** by the v3 Composition — a regression tracked in [#647]"); composition renders only `rolebinding-developers` at `charts/environment-api/files/composition.yaml:274-291` — **Proposed fix:** correct the amendment to "only the RoleBinding is emitted; IAM role + access entry are a known gap (#647)."
@@ -53,6 +59,7 @@ Reviewer: adversarial accuracy pass. Checkout: `/Users/josh/centric/platform-adr
 - **Decision concerns:** Model is sound, but the ADR reads as "shipped" when the IAM/access-entry half is a known regression. Highest-risk inaccuracy in the batch — reconcile against #647.
 
 ## ADR-040: Platform Engineer Access Model
+
 - **Status quoted:** `**Status:** Accepted`
 - **Findings:**
   - [SEVERITY: low] Mechanism verified: `platform-operator` ClusterRole, group `platform-operators`, `AmazonEKSViewPolicy` for read, exact added verbs (pods/log, pods/exec, pods/portforward, delete pods, pods/eviction, patch nodes, patch deployments/statefulsets/daemonsets). — **Evidence:** `infra/modules/cluster-rbac/main.tf:18,30,55,68,120`, `README.md:11-14`, `variables.tf:8-10` — **Proposed fix:** none.
@@ -60,6 +67,7 @@ Reviewer: adversarial accuracy pass. Checkout: `/Users/josh/centric/platform-adr
 - **Decision concerns:** Decision sound; one consequence needs refreshing post-ADR-041.
 
 ## ADR-041: EKS Pod Identity for Tenant Workloads
+
 - **Status quoted:** `**Status:** Accepted — narrows ADR-018 … Broadened by ADR-047 …`
 - **Findings:**
   - [SEVERITY: low] Mechanism verified: `eks-pod-identity` module exists; `policyStatements`-driven per-service Pod-Identity IAM rendered by the Composition; the Cilium `host`-entity egress + IMDSv2 hop-limit reasoning matches platform stance. Runbook target `../runbooks/environment-aws-access-pod-identity.md` exists. — **Evidence:** `infra/modules/aws/eks-pod-identity/`; `composition.yaml:441-446`; `docs/runbooks/environment-aws-access-pod-identity.md` — **Proposed fix:** none.
@@ -68,6 +76,7 @@ Reviewer: adversarial accuracy pass. Checkout: `/Users/josh/centric/platform-adr
 - **Decision concerns:** Decision is correct and now the platform standard (ADR-047, #594 LIVE). Only unit/claim naming drifted.
 
 ## ADR-042: Isolated Build Provenance for SLSA Build L3
+
 - **Status quoted:** `**Status:** Accepted — extends ADR-036 … P1–P3 done on preprod … P4 … pending. Generalized by ADR-050 …`
 - **Findings:**
   - [SEVERITY: low] cosign pin `v2.5.2` consistent with the repo's cosign pin. The `trusted-ci` signer repo is external (`asanexample/trusted-ci`), not in this checkout, so the L3 cert-identity claims can't be machine-verified here. — **Evidence:** `.github/workflows/gha-runner-image.yml:68` (`cosign-release: "v2.5.2"`) — **Proposed fix:** none.
@@ -75,6 +84,7 @@ Reviewer: adversarial accuracy pass. Checkout: `/Users/josh/centric/platform-adr
 - **Decision concerns:** none. The L3 reasoning (reusable-workflow Fulcio SAN; `job_workflow_ref` not honored by AWS STS) is precise and caveated.
 
 ## ADR-043: Self-Hosted Prometheus/Grafana Observability Stack
+
 - **Status quoted:** `**Status:** Accepted — P1 implemented + live on the platform cluster …`
 - **Findings:**
   - [SEVERITY: low] Chart pin verified: `kube-prometheus-stack` `helm_chart_version` default `86.1.0`. — **Evidence:** `infra/modules/observability/variables.tf:72-75` — **Proposed fix:** none.
@@ -82,6 +92,7 @@ Reviewer: adversarial accuracy pass. Checkout: `/Users/josh/centric/platform-adr
 - **Decision concerns:** none.
 
 ## ADR-044: Grafana Mimir for Durable, Multi-Tenant Metrics Storage
+
 - **Status quoted:** `**Status:** Accepted — P2 implemented + live on the platform cluster …`
 - **Findings:**
   - [SEVERITY: low] Chart pin verified: `mimir-distributed` default `6.0.6` (and the "6.0.x stable / 6.1.0-weekly dev-only" note matches the variable description). — **Evidence:** `infra/modules/observability-mimir/variables.tf:69-75` — **Proposed fix:** none.

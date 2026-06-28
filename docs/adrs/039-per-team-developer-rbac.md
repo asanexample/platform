@@ -13,6 +13,8 @@
 > `tenant` module (all removed/retired). Read the `iam-roles`/`eks`/`tenant` references below as the
 > historical mechanism.
 
+<!-- -->
+
 > **Amendment (2026-06-27, accuracy review) — corrects the 2026-06-03 note above:**
 > **(1) Only the in-cluster RoleBinding is emitted today.** The v3 (`XEnvironment`) Composition renders the
 > namespace **RoleBinding** but **not** the `DeveloperAccess-<team>` IAM role or the EKS access entry — that

@@ -5,6 +5,7 @@ Checkout: `/Users/josh/centric/platform-adr-review`. Ground truth: repo modules/
 ---
 
 ## ADR-001: Multi-Cloud Terragrunt Monorepo Structure
+
 - **Status quoted:** `**Status:** Accepted`
 - **Findings:**
   - [SEVERITY: medium] Presents `secrets.hcl` (gitignored) as the live secrets mechanism (layout tree, Layer-2 table "common.hcl loads secrets.hcl", closing note lines 101–102). Live mechanism is SOPS-encrypted `secrets.enc.yaml` **committed** to git (ADR-066); `secrets.hcl` is only a `TG_SOPS_BOOTSTRAP=1` fallback. — **Evidence:** `infra/live/aws/` has `secrets.enc.yaml` + `secrets.hcl.example` (no `secrets.hcl`); `infra/live/aws/common.hcl:11` `_secrets = … sops_decrypt_file(…secrets.enc.yaml)`; `.gitignore:70-73`. — **Proposed fix:** Show `secrets.enc.yaml` (SOPS, committed) as primary, `secrets.hcl` as bootstrap fallback; cross-ref ADR-066.
@@ -14,6 +15,7 @@ Checkout: `/Users/josh/centric/platform-adr-review`. Ground truth: repo modules/
 ---
 
 ## ADR-002: AWS State Storage in S3 with Cloud-Aware Routing
+
 - **Status quoted:** `**Status:** Accepted`
 - **Findings:**
   - [SEVERITY: medium] False present-tense / internal contradiction: "Azure and GCP state **continues to use** Azure Blob Storage" (line 57) and "an **Azure outage** does not affect AWS state operations" (line 144) contradict the ADR's own Context (Azure/GCP deferred, not deployed). — **Evidence:** ADR lines 15–20 vs 57, 144; `infra/live/` has only `aws/`. — **Proposed fix:** Reword to conditional/future.
@@ -24,6 +26,7 @@ Checkout: `/Users/josh/centric/platform-adr-review`. Ground truth: repo modules/
 ---
 
 ## ADR-003: Service Control Policy Design Philosophy
+
 - **Status quoted:** `**Status:** Accepted`
 - **Findings:**
   - [SEVERITY: high] SCP budget/attachment model stale. ADR: Platform OU has 1 direct SCP (`protect-data-and-network`) → 5 effective / 0 remaining (lines 134, 143, 153). Live attaches **3** to Platform OU (`protect-data-and-network`, `require-tagging`, `restrict-iam-users`), matching Workloads (deliberate security-audit change). — **Evidence:** `infra/live/aws/mgmt/global/organizations/terragrunt.hcl:38-42` + comment 34-37. — **Proposed fix:** Update attachment example + budget table (Platform = 3 direct / 7 effective).
@@ -34,6 +37,7 @@ Checkout: `/Users/josh/centric/platform-adr-review`. Ground truth: repo modules/
 ---
 
 ## ADR-004: AWS Account Management Strategy
+
 - **Status quoted:** `**Status:** Accepted`
 - **Findings:**
   - [SEVERITY: low] Dual-mode design, `create_organization` default false, live uses `true` — verified. — **Evidence:** `organizations/variables.tf:7-11`; `organizations/terragrunt.hcl:16`. — **Proposed fix:** none.
@@ -43,6 +47,7 @@ Checkout: `/Users/josh/centric/platform-adr-review`. Ground truth: repo modules/
 ---
 
 ## ADR-005: Organizational Unit Hierarchy Design
+
 - **Status quoted:** `**Status:** Accepted`
 - **Findings:**
   - [SEVERITY: high] **"Test Account Placement" rationale now false.** ADR (lines 209–216, 241–244): Test sits in Platform OU so it inherits only root SCPs + `protect-data-and-network` and **not** Workloads `require-tagging`/`restrict-iam-users`. Live attaches both to the Platform OU, so Test *does* inherit them; the sandbox is unblocked via `exempt_roles` instead. — **Evidence:** `organizations/terragrunt.hcl:40` + comment 34-37. — **Proposed fix:** Rewrite: Platform OU now carries the same 3 SCPs; sandbox unblocked via exempt IaC roles.
@@ -53,6 +58,7 @@ Checkout: `/Users/josh/centric/platform-adr-review`. Ground truth: repo modules/
 ---
 
 ## ADR-006: State Bootstrap Pattern
+
 - **Status quoted:** `**Status:** Accepted`
 - **Findings:**
   - [SEVERITY: medium] The Decision narrative presents migrate-to-S3 as implemented (State-Lifecycle section, comparison table "Local (first apply) → S3", Deploy Order "Migrates its own state into the new S3 bucket"), but it is **not** implemented: live unit is permanently local, and the unit README frames local as **intentional**. The ADR's own caveat (144–145) admits it's a follow-up, and its claim that "the unit README documents the procedure" is false — the README says the opposite. — **Evidence:** `state-bootstrap/terragrunt.hcl:13-22` (`backend = "local"`); unit `README.md:20` ("intentional … it cannot use that bucket itself"). — **Proposed fix:** Demote migrate-to-S3 to a marked follow-up (or implement); fix the README claim.
@@ -62,6 +68,7 @@ Checkout: `/Users/josh/centric/platform-adr-review`. Ground truth: repo modules/
 ---
 
 ## ADR-007: Platform IAM Role Model
+
 - **Status quoted:** `**Status:** Accepted (DeveloperAccess refined into per-team roles in ADR-039; PlatformAdmin rescoped to operate-not-author in ADR-040)`
 - **Findings:**
   - [SEVERITY: medium] Stale source-of-truth: per-team `DeveloperAccess-<team>` roles/access-entries/RBAC "generated from **`teams.hcl`** (the single source of truth)" (lines 70, 120–121). `teams.hcl` no longer exists (registries-as-single-source, ADR-061/063/067; CLAUDE.md "teams.hcl is retired"), and DeveloperAccess is **not currently provisioned** (#647). — **Evidence:** `find … teams.hcl` → no matches; CLAUDE.md IAM-roles table. — **Proposed fix:** Replace `teams.hcl` with the registries / point to ADR-039; note DeveloperAccess not yet provisioned.
@@ -71,6 +78,7 @@ Checkout: `/Users/josh/centric/platform-adr-review`. Ground truth: repo modules/
 ---
 
 ## ADR-008: Cilium as Cross-Cloud CNI
+
 - **Status quoted:** `**Status:** Accepted`
 - **Findings:**
   - [SEVERITY: high] **Live AWS datapath is overlay (cluster-pool IPAM + VXLAN), not ENI native routing.** Contradicts the AWS-column table (IPAM=ENI/Routing=Native/Masquerade=`ens+`), the "AWS ENI Mode" section ("pod gets an IP from the VPC subnet via ENI secondary IPs … without encapsulation"), the `egressMasqueradeInterfaces = ens+` "must set / else lose egress" claim, and the Risk ("ENI mode ties pod IP allocation to VPC subnet capacity … mitigated by the /26 kubernetes subnet"). Pods draw from a dedicated `pod_cidr` (10.240.0.0/16, "non-routable; VXLAN-encapsulated"), not the /26 node subnet. — **Evidence:** `cilium/variables.tf` defaults `ipam_mode="cluster-pool"` (33-37), `routing_mode="tunnel"` (43-47), `tunnel_protocol="vxlan"` (53-57), `egress_masquerade_interfaces=""` (89-93); platform + preprod cilium units set only `cloud_provider="aws"`/`pod_cidr` with comment "Overlay datapath (cluster-pool IPAM + VXLAN) … Override here (e.g. ipam_mode=\"eni\") to use native"; platform `network.hcl` `pod_cidr="10.240.0.0/16"`. — **Proposed fix:** Rewrite the AWS column / "AWS ENI Mode" section / masquerade + subnet-exhaustion risk to reflect overlay (cluster-pool/VXLAN); present ENI as a non-default mode.
@@ -80,6 +88,7 @@ Checkout: `/Users/josh/centric/platform-adr-review`. Ground truth: repo modules/
 ---
 
 ## ADR-009: EKS Component Separation
+
 - **Status quoted:** `**Status:** Accepted`
 - **Findings:**
   - [SEVERITY: low] Four-unit split (`eks → cilium → node-groups → eks-addons`), module mapping, `bootstrap_self_managed_addons=false`, `dependency`+`mock_outputs`, reverse-order destroy all verified. — **Evidence:** module dirs exist; platform cilium unit `dependency "eks"` w/ `mock_outputs`. — **Proposed fix:** none.
@@ -88,6 +97,7 @@ Checkout: `/Users/josh/centric/platform-adr-review`. Ground truth: repo modules/
 ---
 
 ## ADR-010: Private-Only EKS API Endpoint
+
 - **Status quoted:** `**Status:** Accepted`
 - **Findings:**
   - [SEVERITY: low] EKS module defaults `endpoint_public_access=false`/`endpoint_private_access=true` — verified. — **Evidence:** `aws/eks/variables.tf:29-39`. — **Proposed fix:** none.
@@ -98,6 +108,7 @@ Checkout: `/Users/josh/centric/platform-adr-review`. Ground truth: repo modules/
 ---
 
 ## ADR-011: Tailscale Operator for Private Cluster Access
+
 - **Status quoted:** `**Status:** Accepted`
 - **Findings:**
   - [SEVERITY: low] Verified: subnet-router operator; per-cluster CIDRs (platform `10.100.0.0/16`, preprod `10.101.0.0/16`); `TS_USERSPACE=true` ProxyClass; `split_dns`→`10.100.0.2`; cloud-agnostic module; SSM fallback. — **Evidence:** `tailscale/main.tf:63`, `variables.tf:56`, `README.md:124`; preprod `network.hcl`. — **Proposed fix:** none.
