@@ -10,6 +10,10 @@ type: application
 # deployed-digest record. Cluster-scoped, data-only; CI promotes a digest via a gated PR bumping
 # gitops/releases/<team>/<product>/<stage>.yaml, the ApplicationSet injects it. Version bump so the helm provider
 # installs the new CRD on an in-place upgrade.
+# 0.5.0: ADR-088 / #887 — add the projected `WorkforceRole` CRD (workforceroles.platform.refplat.org), the role
+# catalog the temporary-power activation operator reads at runtime (the borrow cap + permission set). Cluster-scoped,
+# data-only; ArgoCD's `roles` app syncs gitops/roles → cluster. Version bump so the helm provider installs the new
+# CRD on an in-place upgrade.
 # 0.3.1: per-customer Environment completeness (#422) — the Pod-Identity role now carries the customer
 # (Pod-<team>-<product>-<customer>-<stage>-<svc> + a Customer tag) so two per-customer prod Environments of one
 # Product/Service no longer collide on one IAM role. Version bump so the helm provider re-renders the raw
@@ -17,5 +21,5 @@ type: application
 # 0.3.0: v3 cutover (ADR-067) — XEnvironment is the sole composite; the v1alpha2 XTenant XRD + composition-v2 +
 # the v1alpha2 Team version are removed. (0.2.0: deprovisioning safety, ADR-062 #283 — lifecycle.phase zeroes the
 # ResourceQuota; ECR → deletionPolicy: Orphan.)
-version: 0.4.0
+version: 0.5.0
 appVersion: "1.0.0"
