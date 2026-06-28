@@ -53,6 +53,24 @@ test-platctl: ## Run platctl unit tests
 	@cd cmd/platctl && go test ./... -timeout 30s
 
 #----------------------------------------------
+# Activation operator (operators/activation) — passthroughs to its own Kubebuilder Makefile
+#----------------------------------------------
+
+.PHONY: build-operator
+build-operator: ## Build the activation operator binary
+	@echo "$(GREEN)Building activation operator...$(NC)"
+	@cd operators/activation && $(MAKE) build
+
+.PHONY: test-operator
+test-operator: ## Run the activation operator tests (provisions envtest assets)
+	@echo "$(GREEN)Running activation operator tests...$(NC)"
+	@cd operators/activation && $(MAKE) test
+
+.PHONY: operator-manifests
+operator-manifests: ## Regenerate the activation operator's CRDs + deepcopy
+	@cd operators/activation && $(MAKE) manifests generate
+
+#----------------------------------------------
 # AWS Testing (Terratest)
 #----------------------------------------------
 

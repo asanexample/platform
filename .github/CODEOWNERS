@@ -31,6 +31,10 @@
 # auto-merge), so template changes are platform-only — same review bar as the sensitive infra paths.
 /scaffolder/             @gangster
 
+# First-party operators (ADR-088 temporary-power activation, …): a control-plane operator that hands
+# out real power — the apex-sensitivity surface. Platform-only review.
+/operators/              @gangster
+
 # CI workflows and the tenant-claims gate scripts: the gate judges automerge, so changes here deserve
 # eyes (signal only — see the note above; pull_request_target already prevents a PR from editing the
 # gate that evaluates it).

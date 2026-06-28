@@ -10,9 +10,23 @@ ADR-088 fixed the **what** (eligibility decided slowly in git; activation fast a
 loud-and-reviewed break-glass; AWS slow-but-honest, cluster instant). This doc fixes the **how**: a
 Kubernetes **operator** built with **Kubebuilder / controller-runtime**, fronted by a thin imperative API.
 
-> **Status:** design (not built). The shape (operator, Kubebuilder, the `Activation` CRD, the API front edge)
-> is decided — see [ADR-088](../adrs/088-temporary-power-activation.md) (amended 2026-06-28). Field names and
-> the per-plane details below are a starting contract, expected to firm up during the build.
+> **Status:** increment 1 BUILT (`operators/activation/`) — the `Activation` CRD + reconcile lifecycle + the
+> AWS Identity Center plane + envtest/unit tests. The shape (operator, Kubebuilder, the `Activation` CRD, the
+> API front edge) is decided — see [ADR-088](../adrs/088-temporary-power-activation.md). Field names and the
+> per-plane details below are a starting contract that firmed up during the build.
+>
+> **Amendment (2026-06-28, increment-1 build): two corrections the build forced.**
+> (1) **The AWS plane uses AWS SDK Go v2, not a shell-out seam.** The `platctl` CLI shells out to the `aws`
+> binary; a long-running operator wants a distroless image, typed errors (`ConflictException` →
+> requeue, not failure), and no process-spawn-per-poll, so the adapter is SDK-native. The pure-Go
+> eligibility/cap logic (`access.PlanActivation`/`ParseSessionDuration`) is still the thing to reuse — that
+> reuse lands with the (deferred) cap/eligibility increment, not here.
+> (2) **Mint and revoke are ASYNCHRONOUS and polled.** `create`/`delete-account-assignment` return
+> `IN_PROGRESS` and must be polled (`describe-…-status`) to terminal; AWS serializes them per permission set.
+> So a single reconcile cannot complete a mint — the adapter drives a per-account state machine across many
+> reconciles, one in-flight op at a time. (`platctl` is fire-and-forget here — it never polls — a latent
+> serialization bug; a **platctl durable-fix follow-up**.) Revoke reads the live AWS footprint (USER
+> assignments) as source of truth, never `status`, so a lost status write can't leak a grant.
 
 ## Why an operator (not a plain service)
 
@@ -188,11 +202,13 @@ adapter with `mint`/`revoke`/`reconcile`:
 
 | Plane | Native grant | Status | Source of footprint |
 |-------|--------------|--------|---------------------|
-| **AWS Identity Center** | a USER account-assignment to the role's permission set on its accounts | **built now** (the `platctl`/`cloud.IdentityCenter` logic, promoted) | the permission set's live provisioned-accounts (no SOPS needed) |
+| **AWS Identity Center** | a USER account-assignment to the role's permission set on its accounts | **built** (increment 1; SDK Go v2, async-polled) | the permission set's live provisioned-accounts (no SOPS needed) |
 | **Keycloak** | role's realm-role / group membership | later | `gitops/roles[*].keycloak` |
 | **Cluster (Teleport)** | a Teleport access request / short role | later (ADR-088 D2: evaluate Teleport) | roles projected from `gitops/people` |
 
-The AWS adapter is a near-direct lift of `cmd/platctl/internal/cloud/identitycenter.go` and the
+The AWS adapter is an **SDK-native reimplementation** of the behavior contract proven by
+`cmd/platctl/internal/cloud/identitycenter.go` (study it for the API sequence; do not inherit its
+fire-and-forget no-poll error handling — see the amendment), reusing the
 `access.PlanActivation` eligibility/cap logic — built and live-verified read-side already.
 
 ## Credentials — the crown jewels (ADR-088 §3.3)
@@ -214,9 +230,9 @@ The controller can hand out master keys, so it is the apex thing to protect:
 - **Delivery:** a platform-owned workload on the hub via the ADR-081/082 service road (the rails the triage
   agent runs on) — image built/signed through the shared supply chain, CRD + controller + API delivered by
   ArgoCD, observable in the LGTM stack, behind the internal gateway.
-- **Testing:** `envtest` for the reconciler (Kubebuilder default) + reuse of the existing Go unit tests for
-  the eligibility/cap/duration logic. The AWS adapter keeps the `cloud` package's CLI-shell-out seam so it can
-  be faked.
+- **Testing:** `envtest` for the reconciler (Kubebuilder default), driven by an injected clock + a fake Plane
+  so the async lifecycle and expiry are deterministic; the AWS adapter is unit-tested against a fake `API`
+  that **models the async state machine** (`IN_PROGRESS`→poll→`SUCCEEDED`, `Conflict`, delete-`NotFound`).
 - **`platctl` stays the recovery floor.** ADR-088: the controller is the *convenient* path; recovery must not
   depend on the thing whose outage is the emergency. `platctl access grant`/`revoke` (+ the IAM-user
   break-glass) remain the controller-down fallback **forever** — this operator never becomes a single point of
@@ -238,8 +254,8 @@ Each maps onto concrete structure:
   grant. Each reconcile pass advances one `Activation` toward its declared state. No god-objects, no
   "manager" that knows every plane's internals.
 - **Decoupling via interfaces.** Planes sit behind a small `Plane` interface (`Mint`/`Revoke`/`Observe`); the
-  reconciler depends on the interface, not on AWS/Keycloak/Teleport. The existing `cloud.IdentityCenter`
-  shell-out seam (fakeable in tests) is the model — keep it. New planes are added, not woven in.
+  reconciler depends on the interface, not on AWS/Keycloak/Teleport. The AWS plane's SDK calls sit behind a
+  small fakeable `API` interface (the same decoupling discipline). New planes are added, not woven in.
 - **Robust error handling.** Errors are **typed and wrapped** (`fmt.Errorf("…: %w")`, `errors.Is/As`), never
   swallowed and never `panic` in a reconcile path. Distinguish *retryable* (throttling, transient AWS) from
   *terminal* (eligibility revoked, malformed spec): retryable → requeue with backoff; terminal → `Failed` +

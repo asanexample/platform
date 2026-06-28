@@ -1,0 +1,39 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - platform.refplat.org
+  resources:
+  - activations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - platform.refplat.org
+  resources:
+  - activations/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - platform.refplat.org
+  resources:
+  - activations/status
+  verbs:
+  - get
+  - patch
+  - update
