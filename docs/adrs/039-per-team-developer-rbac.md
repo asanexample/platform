@@ -13,6 +13,18 @@
 > `tenant` module (all removed/retired). Read the `iam-roles`/`eks`/`tenant` references below as the
 > historical mechanism.
 
+> **Amendment (2026-06-27, accuracy review) — corrects the 2026-06-03 note above:**
+> **(1) Only the in-cluster RoleBinding is emitted today.** The v3 (`XEnvironment`) Composition renders the
+> namespace **RoleBinding** but **not** the `DeveloperAccess-<team>` IAM role or the EKS access entry — that
+> half is a **known regression, [#647](https://github.com/asanexample/platform/issues/647)**. So the
+> end-to-end AWS→kubectl chain is **not** wired; operators use `platctl kubeconfig` / PlatformAdmin until it
+> is. **(2) Names changed under ADR-067.** The live binding is group **`<environment-namespace>:developers`**
+> (e.g. `alpha-demo-dev:developers`) → ClusterRole **`environment-developer`**, not `team-<team>:developers`
+> → `tenant-developer`. **(3) Vocabulary/source:** "Crossplane *Tenant* Composition" is now the
+> **`XEnvironment`** Composition; `teams.hcl` and the `tenant` module are retired in favour of the git-native
+> registries (ADR-063/067). Read the body's `tenant-developer` / `team-<team>:developers` / `teams.hcl`
+> references through these corrections.
+
 ## Context
 
 ADR-007 introduced a `DeveloperAccess` IAM role for "namespace-scoped kubectl." In practice the

@@ -3,9 +3,17 @@
 **Date:** 2026-06-04
 
 **Status:** Accepted — implements the BACK stack's portal layer ([ADR-046](046-back-stack-for-developer-self-service.md)),
-authenticates via the centralized Dex broker ([ADR-052](052-centralized-dex-sso-broker.md)), and renders the tenant
-model defined by [ADR-049](049-tenant-model-team-tenant-zone.md). Phases 2.0–2.3a are live; 2.4 (live plugins) and
+authenticates via **direct Keycloak OIDC** ([ADR-053](053-identity-and-cross-system-authorization-strategy.md)), and renders the
+Team→Product→Environment model defined by [ADR-067](067-idp-domain-model.md). Phases 2.0–2.3a are live; 2.4 (live plugins) and
 the Phase-3 Scaffolder are planned follow-ups.
+
+> **Amendment (2026-06-27, accuracy review).** Two things in the body below are superseded:
+> **(1) Auth.** The original Identity Center → **Dex** (SAML→OIDC) broker, the "SSO via the centralized Dex
+> broker" decision, and the oauth2-proxy session-cookie workaround (#202) are all **retired**. Backstage now
+> authenticates via **direct Keycloak OIDC** (secret `platform/keycloak/backstage-oidc`); Dex and the
+> oauth2-proxy were removed (see ADR-052 "superseded + REMOVED" and ADR-053). The SAML refresh-token / session
+> constraints are no longer relevant. **(2) Catalog source.** The projection reads **`XEnvironment`** claims
+> (Team→Product→Environment, ADR-067), not the `XTenant` claims named below.
 
 ## Context
 

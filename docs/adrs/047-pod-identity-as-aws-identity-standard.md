@@ -4,8 +4,10 @@
 
 **Status:** Accepted — supersedes [ADR-018](018-irsa-for-pod-identity.md)'s rejection of Pod Identity and
 broadens [ADR-041](041-pod-identity-for-tenant-workloads.md) from *tenant* workloads to **all** pod-level
-AWS access. Go-forward standard; the existing IRSA platform add-ons migrate during the planned stack
-rebuild, not in place.
+AWS access. Go-forward standard. **As-built (#594, 2026-06-24): the platform add-ons were migrated *in
+place*, ahead of any rebuild** — argocd, cert-manager, external-dns, external-secrets, and the Kyverno-ECR
+role now use `aws_eks_pod_identity_association`. The `aws-ebs-csi-driver` stays on IRSA — not as a
+rebuild deferral, but because the **managed addon does not support Pod Identity**.
 
 ## Context
 
@@ -41,11 +43,12 @@ workloads alike. Specifically:
 
 - **New components use Pod Identity.** Crossplane (ADR-046) already does and is the first platform
   component on the standard; it is the reference, not drift to undo.
-- **Existing IRSA platform add-ons migrate at the rebuild, not in place.** argocd, cert-manager,
-  external-dns, external-secrets, the aws-ebs-csi-driver IRSA role, and the Kyverno-ECR role keep working
-  on IRSA until the planned rebuild, which is the clean place to cut them over (each: drop the OIDC-trust +
-  SA annotation, add an `aws_eks_pod_identity_association`). A big-bang in-place migration of working
-  controllers buys little now and would be redone by the rebuild.
+- **The IRSA platform add-ons were migrated in place (#594, 2026-06-24).** The original plan deferred
+  this to the rebuild, but the cutover proved low-risk and was done ahead of it: argocd, cert-manager,
+  external-dns, external-secrets, and the Kyverno-ECR role each dropped the OIDC-trust + SA annotation and
+  added an `aws_eks_pod_identity_association`. The one exception is the **`aws-ebs-csi-driver`**, which
+  remains on IRSA permanently for a technical reason — Pod Identity is unsupported for that *managed
+  addon* — not because of rebuild timing.
 - **Every cluster runs the `eks-pod-identity-agent` addon.** Already true for preprod and the platform
   cluster; it becomes a standing requirement for any new cluster.
 - **The tenant IRSA-annotation ban stays.** The Kyverno `disallow-irsa-annotation-cross-team` policy that
