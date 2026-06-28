@@ -59,17 +59,17 @@ module "argocd" {
 | Name | Version |
 | ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.6.0 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 5.0 |
-| <a name="requirement_helm"></a> [helm](#requirement\_helm) | >= 3.0 |
-| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | >= 2.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.0 |
+| <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 3.0 |
+| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 3.0 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_aws"></a> [aws](#provider\_aws) | >= 5.0 |
-| <a name="provider_helm"></a> [helm](#provider\_helm) | >= 3.0 |
-| <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | >= 2.0 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.0 |
+| <a name="provider_helm"></a> [helm](#provider\_helm) | ~> 3.0 |
+| <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | ~> 3.0 |
 
 ## Modules
 
@@ -95,6 +95,7 @@ No modules.
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | Name of the EKS cluster (used for IAM role naming) | `string` | n/a | yes |
 | <a name="input_applicationset_enabled"></a> [applicationset\_enabled](#input\_applicationset\_enabled) | Enable ApplicationSet controller | `bool` | `true` | no |
 | <a name="input_argocd_cm_extra"></a> [argocd\_cm\_extra](#input\_argocd\_cm\_extra) | Additional key-value pairs to merge into argocd-cm ConfigMap | `map(string)` | `{}` | no |
+| <a name="input_component_resources"></a> [component\_resources](#input\_component\_resources) | Per-component resource requests/limits for the ArgoCD pods (controller, server, repoServer, applicationSet,<br/>redis). The upstream chart ships NONE, so on a packed/small cluster the bursty application-controller can be<br/>CPU-starved under contention → a sluggish UI. Defaults set modest requests to GUARANTEE a baseline and<br/>deliberately set NO cpu limit (a cpu limit would throttle the controller's reconcile/cache-rebuild bursts).<br/>Override per component as needed; an omitted component falls back to no resources (chart default). | <pre>map(object({<br/>    requests = optional(map(string), {})<br/>    limits   = optional(map(string), {})<br/>  }))</pre> | <pre>{<br/>  "applicationSet": {<br/>    "requests": {<br/>      "cpu": "50m",<br/>      "memory": "128Mi"<br/>    }<br/>  },<br/>  "controller": {<br/>    "requests": {<br/>      "cpu": "250m",<br/>      "memory": "512Mi"<br/>    }<br/>  },<br/>  "redis": {<br/>    "requests": {<br/>      "cpu": "50m",<br/>      "memory": "64Mi"<br/>    }<br/>  },<br/>  "repoServer": {<br/>    "requests": {<br/>      "cpu": "100m",<br/>      "memory": "256Mi"<br/>    }<br/>  },<br/>  "server": {<br/>    "requests": {<br/>      "cpu": "100m",<br/>      "memory": "128Mi"<br/>    }<br/>  }<br/>}</pre> | no |
 | <a name="input_create"></a> [create](#input\_create) | Controls whether ArgoCD resources should be created | `bool` | `true` | no |
 | <a name="input_credential_templates"></a> [credential\_templates](#input\_credential\_templates) | Credential templates for repo pattern matching | `any` | `{}` | no |
 | <a name="input_dex_enabled"></a> [dex\_enabled](#input\_dex\_enabled) | Enable Dex SSO server | `bool` | `false` | no |
@@ -119,6 +120,7 @@ No modules.
 | <a name="input_rbac_policy_csv"></a> [rbac\_policy\_csv](#input\_rbac\_policy\_csv) | RBAC policy rules in ArgoCD CSV format | `string` | `"p, role:org-admin, applications, *, */*, allow\np, role:org-admin, clusters, get, *, allow\np, role:org-admin, repositories, *, *, allow\np, role:org-admin, logs, get, *, allow\np, role:org-admin, exec, create, */*, allow\ng, org-admin, role:org-admin\n"` | no |
 | <a name="input_rbac_scopes"></a> [rbac\_scopes](#input\_rbac\_scopes) | OIDC scopes to inspect for RBAC (e.g., '[groups]' for named group claims) | `string` | `""` | no |
 | <a name="input_reconciliation_timeout"></a> [reconciliation\_timeout](#input\_reconciliation\_timeout) | How often ArgoCD re-syncs applications | `string` | `"180s"` | no |
+| <a name="input_region"></a> [region](#input\_region) | AWS region — pinned into every ArgoCD component's env (AWS\_REGION / regional STS) so argocd-k8s-auth uses the reachable regional STS endpoint for cross-account managed-cluster auth (EKS Pod Identity injects no region, ADR-047). | `string` | `"us-east-1"` | no |
 | <a name="input_remote_cluster_role_arns"></a> [remote\_cluster\_role\_arns](#input\_remote\_cluster\_role\_arns) | Cross-account IAM role ARNs that ArgoCD needs to assume for remote cluster management | `list(string)` | `[]` | no |
 | <a name="input_repositories"></a> [repositories](#input\_repositories) | Repository credentials for ArgoCD (map of repo objects) | `any` | `{}` | no |
 | <a name="input_resource_exclusions"></a> [resource\_exclusions](#input\_resource\_exclusions) | Resources ArgoCD should ignore (list of {apiGroups, kinds, clusters}) | `any` | <pre>[<br/>  {<br/>    "apiGroups": [<br/>      "cilium.io"<br/>    ],<br/>    "clusters": [<br/>      "*"<br/>    ],<br/>    "kinds": [<br/>      "CiliumIdentity"<br/>    ]<br/>  }<br/>]</pre> | no |
@@ -133,8 +135,8 @@ No modules.
 | <a name="output_helm_release_name"></a> [helm\_release\_name](#output\_helm\_release\_name) | Name of the ArgoCD Helm release |
 | <a name="output_helm_release_status"></a> [helm\_release\_status](#output\_helm\_release\_status) | Status of the ArgoCD Helm release |
 | <a name="output_helm_release_version"></a> [helm\_release\_version](#output\_helm\_release\_version) | Version of the ArgoCD Helm chart deployed |
-| <a name="output_role_arn"></a> [role\_arn](#output\_role\_arn) | ARN of the ArgoCD IAM role (bound to the controller/server/repo-server SAs via EKS Pod Identity) |
 | <a name="output_namespace"></a> [namespace](#output\_namespace) | Kubernetes namespace where ArgoCD is installed |
+| <a name="output_role_arn"></a> [role\_arn](#output\_role\_arn) | ARN of the ArgoCD IAM role (bound to the controller/server/repo-server SAs via EKS Pod Identity) |
 <!-- END_TF_DOCS -->
 
 ## Notes

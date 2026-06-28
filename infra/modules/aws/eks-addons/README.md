@@ -53,12 +53,14 @@ module "eks_addons" {
 | ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.6.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.0 |
+| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 3.0 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
 | <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.0 |
+| <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | ~> 3.0 |
 
 ## Modules
 
@@ -71,6 +73,7 @@ No modules.
 | [aws_eks_addon.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eks_addon) | resource |
 | [aws_iam_role.addon](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role_policy_attachment.addon](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
+| [kubernetes_storage_class_v1.gp3](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/storage_class_v1) | resource |
 | [aws_iam_policy_document.addon_trust](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 
 ## Inputs
@@ -80,6 +83,7 @@ No modules.
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | Name of the EKS cluster | `string` | n/a | yes |
 | <a name="input_addons"></a> [addons](#input\_addons) | Map of EKS managed add-ons to install. Key is addon name, value is config. | <pre>map(object({<br/>    addon_version            = optional(string)<br/>    configuration_values     = optional(string)<br/>    service_account_role_arn = optional(string)<br/>    irsa = optional(object({<br/>      service_account_name      = string<br/>      service_account_namespace = string<br/>      policy_arns               = list(string)<br/>    }))<br/>  }))</pre> | `{}` | no |
 | <a name="input_create"></a> [create](#input\_create) | Whether to create resources | `bool` | `true` | no |
+| <a name="input_create_default_storageclass"></a> [create\_default\_storageclass](#input\_create\_default\_storageclass) | Create a gp3 StorageClass (via the EBS CSI driver) and mark it the cluster default. Needs the aws-ebs-csi-driver addon. Off by default; enable on clusters that need dynamic PVCs (e.g. the observability hub / Mimir, #102 P2). | `bool` | `false` | no |
 | <a name="input_oidc_provider_arn"></a> [oidc\_provider\_arn](#input\_oidc\_provider\_arn) | ARN of the EKS OIDC provider (required for addons that use IRSA) | `string` | `""` | no |
 | <a name="input_oidc_provider_url"></a> [oidc\_provider\_url](#input\_oidc\_provider\_url) | URL of the EKS OIDC provider without https:// prefix | `string` | `""` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to resources | `map(string)` | `{}` | no |

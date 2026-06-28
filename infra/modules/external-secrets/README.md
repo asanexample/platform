@@ -42,15 +42,15 @@ module "external_secrets" {
 | Name | Version |
 | ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.6.0 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 5.0 |
-| <a name="requirement_helm"></a> [helm](#requirement\_helm) | >= 3.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.0 |
+| <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 3.0 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_aws"></a> [aws](#provider\_aws) | >= 5.0 |
-| <a name="provider_helm"></a> [helm](#provider\_helm) | >= 3.0 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.0 |
+| <a name="provider_helm"></a> [helm](#provider\_helm) | ~> 3.0 |
 
 ## Modules
 
@@ -81,18 +81,20 @@ No modules.
 | <a name="input_helm_timeout"></a> [helm\_timeout](#input\_helm\_timeout) | Timeout for Helm operations in seconds | `number` | `600` | no |
 | <a name="input_helm_wait"></a> [helm\_wait](#input\_helm\_wait) | Whether to wait for Helm release to complete | `bool` | `true` | no |
 | <a name="input_kms_key_arns"></a> [kms\_key\_arns](#input\_kms\_key\_arns) | KMS key ARNs that external-secrets is allowed to decrypt | `list(string)` | `[]` | no |
+| <a name="input_metrics_enabled"></a> [metrics\_enabled](#input\_metrics\_enabled) | Expose the ESO controller metrics Service + a ServiceMonitor for Prometheus. Requires the Prometheus-operator CRDs (the observability hub, #102). Off by default. | `bool` | `false` | no |
 | <a name="input_namespace"></a> [namespace](#input\_namespace) | Kubernetes namespace to install external-secrets into | `string` | `"external-secrets"` | no |
 | <a name="input_secret_path_prefix"></a> [secret\_path\_prefix](#input\_secret\_path\_prefix) | Secrets Manager path prefix for scoping access (e.g., 'platform') | `string` | `"*"` | no |
 | <a name="input_ssm_path_prefix"></a> [ssm\_path\_prefix](#input\_ssm\_path\_prefix) | SSM Parameter Store path prefix for scoping access (e.g., '/platform') | `string` | `"/*"` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to all resources | `map(string)` | `{}` | no |
+| <a name="input_webhook_host_network"></a> [webhook\_host\_network](#input\_webhook\_host\_network) | Run the external-secrets webhook on hostNetwork (node VPC IP) with port moved off 10250. Required on EKS with an overlay CNI (Cilium cluster-pool), where the managed control plane cannot route to overlay pod IPs. Leave false for VPC-routable (ENI) datapaths. | `bool` | `false` | no |
 
 ## Outputs
 
 | Name | Description |
 | ---- | ----------- |
 | <a name="output_helm_release_status"></a> [helm\_release\_status](#output\_helm\_release\_status) | Status of the external-secrets Helm release |
-| <a name="output_role_arn"></a> [role\_arn](#output\_role\_arn) | ARN of the external-secrets IAM role (bound to the controller SA via EKS Pod Identity) |
 | <a name="output_namespace"></a> [namespace](#output\_namespace) | Kubernetes namespace where external-secrets is installed |
+| <a name="output_role_arn"></a> [role\_arn](#output\_role\_arn) | ARN of the external-secrets IAM role (bound to the controller SA via EKS Pod Identity) |
 <!-- END_TF_DOCS -->
 
 ## Notes

@@ -61,16 +61,16 @@ module "tailscale" {
 | Name | Version |
 | ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.6.0 |
-| <a name="requirement_helm"></a> [helm](#requirement\_helm) | >= 3.0 |
-| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | >= 2.35.0 |
+| <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 3.0 |
+| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 3.0 |
 | <a name="requirement_tailscale"></a> [tailscale](#requirement\_tailscale) | ~> 0.29 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_helm"></a> [helm](#provider\_helm) | >= 3.0 |
-| <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | >= 2.35.0 |
+| <a name="provider_helm"></a> [helm](#provider\_helm) | ~> 3.0 |
+| <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | ~> 3.0 |
 | <a name="provider_null"></a> [null](#provider\_null) | n/a |
 | <a name="provider_tailscale"></a> [tailscale](#provider\_tailscale) | ~> 0.29 |
 
@@ -85,8 +85,7 @@ No modules.
 | [helm_release.tailscale_operator](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
 | [kubernetes_manifest.connector](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.proxy_class](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
-| [null_resource.connector_finalizer_cleanup](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
-| [null_resource.proxy_class_finalizer_cleanup](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
+| [null_resource.crd_finalizer_cleanup](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
 | [tailscale_dns_split_nameservers.this](https://registry.terraform.io/providers/tailscale/tailscale/latest/docs/resources/dns_split_nameservers) | resource |
 
 ## Inputs
@@ -98,6 +97,8 @@ No modules.
 | <a name="input_advertise_routes"></a> [advertise\_routes](#input\_advertise\_routes) | CIDR ranges to advertise via the Tailscale subnet router | `list(string)` | `[]` | no |
 | <a name="input_connector_hostname"></a> [connector\_hostname](#input\_connector\_hostname) | Hostname suffix for the Tailscale Connector device | `string` | `"subnet-router"` | no |
 | <a name="input_create"></a> [create](#input\_create) | Controls whether resources should be created | `bool` | `true` | no |
+| <a name="input_deployer_role_arn"></a> [deployer\_role\_arn](#input\_deployer\_role\_arn) | IAM role ARN to assume for destroy-time finalizer cleanup (the PlatformDeployer) | `string` | `""` | no |
+| <a name="input_finalizer_clear_script"></a> [finalizer\_clear\_script](#input\_finalizer\_clear\_script) | Absolute path to scripts/k8s-finalizer-clear.sh (passed from the unit via get\_repo\_root()) | `string` | `""` | no |
 | <a name="input_helm_chart"></a> [helm\_chart](#input\_helm\_chart) | Name of the Helm chart | `string` | `"tailscale-operator"` | no |
 | <a name="input_helm_release_name"></a> [helm\_release\_name](#input\_helm\_release\_name) | Name of the Helm release | `string` | `"tailscale-operator"` | no |
 | <a name="input_helm_repository"></a> [helm\_repository](#input\_helm\_repository) | Repository URL for the Tailscale operator Helm chart | `string` | `"https://pkgs.tailscale.com/helmcharts"` | no |
@@ -106,6 +107,7 @@ No modules.
 | <a name="input_namespace"></a> [namespace](#input\_namespace) | Kubernetes namespace to install the Tailscale operator into | `string` | `"tailscale-system"` | no |
 | <a name="input_oauth_client_id"></a> [oauth\_client\_id](#input\_oauth\_client\_id) | Tailscale OAuth client ID (not needed when using generated oauth\_override.tf) | `string` | `""` | no |
 | <a name="input_oauth_client_secret"></a> [oauth\_client\_secret](#input\_oauth\_client\_secret) | Tailscale OAuth client secret (not needed when using generated oauth\_override.tf) | `string` | `""` | no |
+| <a name="input_region"></a> [region](#input\_region) | AWS region of the cluster (for destroy-time finalizer cleanup auth) | `string` | `""` | no |
 | <a name="input_split_dns"></a> [split\_dns](#input\_split\_dns) | Map of domain to nameserver IPs for split DNS (created after subnet router is online) | `map(list(string))` | `{}` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to all resources | `map(string)` | `{}` | no |
 

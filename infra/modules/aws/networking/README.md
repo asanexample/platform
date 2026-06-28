@@ -157,13 +157,17 @@ module "networking" {
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-No requirements.
+| Name | Version |
+| ---- | ------- |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.6.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.0 |
+| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 3.0 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_aws"></a> [aws](#provider\_aws) | n/a |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.0 |
 
 ## Modules
 
@@ -201,10 +205,7 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| <a name="input_environment"></a> [environment](#input\_environment) | Environment name (e.g. ops, dev, staging, prod) | `string` | n/a | yes |
-| <a name="input_region_abbv"></a> [region\_abbv](#input\_region\_abbv) | Abbreviated region name for resource naming | `string` | n/a | yes |
 | <a name="input_vpc_name"></a> [vpc\_name](#input\_vpc\_name) | Name of the VPC to create | `string` | n/a | yes |
-| <a name="input_workload"></a> [workload](#input\_workload) | Workload identifier for resource names | `string` | n/a | yes |
 | <a name="input_address_space"></a> [address\_space](#input\_address\_space) | CIDR blocks for the VPC | `list(string)` | <pre>[<br/>  "10.0.0.0/16"<br/>]</pre> | no |
 | <a name="input_create"></a> [create](#input\_create) | Whether to create resources in this module | `bool` | `true` | no |
 | <a name="input_create_internet_gateway"></a> [create\_internet\_gateway](#input\_create\_internet\_gateway) | Create an internet gateway. Set false for airgapped environments. | `bool` | `true` | no |

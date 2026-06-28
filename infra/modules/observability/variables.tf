@@ -52,7 +52,7 @@ variable "namespace" {
 }
 
 variable "helm_release_name" {
-  description = "Helm release name. Pinned so the Grafana Service (<release>-grafana) and the Alertmanager ServiceAccount (<release>-alertmanager) names are deterministic for the gateway route and IRSA."
+  description = "Helm release name. Pinned so the Grafana Service (<release>-grafana) and the Alertmanager ServiceAccount (<release>-alertmanager) names are deterministic for the gateway route and the Pod Identity association (ADR-047)."
   type        = string
   default     = "kube-prometheus-stack"
 }

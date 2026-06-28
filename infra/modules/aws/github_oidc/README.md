@@ -65,13 +65,16 @@ module "github_oidc" {
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-No requirements.
+| Name | Version |
+| ---- | ------- |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.6.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.0 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_aws"></a> [aws](#provider\_aws) | n/a |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.0 |
 
 ## Modules
 
@@ -93,7 +96,7 @@ No modules.
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_github_org"></a> [github\_org](#input\_github\_org) | GitHub organization name | `string` | n/a | yes |
 | <a name="input_create"></a> [create](#input\_create) | Whether to create the OIDC provider and roles | `bool` | `true` | no |
-| <a name="input_roles"></a> [roles](#input\_roles) | Map of IAM role name to its GitHub Actions OIDC configuration (repos, branches, events, policies). | <pre>map(object({<br/>    repos                = list(string)<br/>    branches             = optional(list(string), ["main"])<br/>    events               = optional(list(string), [])<br/>    role_policy_arns     = optional(list(string), [])<br/>    inline_policy        = optional(string)<br/>    max_session_duration = optional(number, 3600)<br/>    tags                 = optional(map(string), {})<br/>  }))</pre> | `{}` | no |
+| <a name="input_roles"></a> [roles](#input\_roles) | Map of IAM role name to its GitHub Actions OIDC configuration. Each role trusts<br/>only the listed repos (scoped via the OIDC `sub` claim) for the given branches<br/>and events, and carries the given managed/inline policies. | <pre>map(object({<br/>    repos                = list(string)<br/>    branches             = optional(list(string), ["main"])<br/>    events               = optional(list(string), [])<br/>    role_policy_arns     = optional(list(string), [])<br/>    inline_policy        = optional(string)<br/>    max_session_duration = optional(number, 3600)<br/>    tags                 = optional(map(string), {}) # merged onto var.tags (e.g. { Team = "alpha" })<br/>  }))</pre> | `{}` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to all resources | `map(string)` | `{}` | no |
 
 ## Outputs
