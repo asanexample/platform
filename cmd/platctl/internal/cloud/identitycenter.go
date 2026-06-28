@@ -13,6 +13,14 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+	"time"
+)
+
+// Poll cadence for the asynchronous account-assignment create/delete (AWS provisions them
+// serially per permission set and reports IN_PROGRESS → SUCCEEDED/FAILED).
+const (
+	pollInterval = 2 * time.Second
+	pollTimeout  = 5 * time.Minute
 )
 
 // IdentityCenter targets one AWS Identity Center instance via an AWS CLI profile + region.
@@ -143,7 +151,60 @@ func (ic IdentityCenter) ProvisionedAccounts(ctx context.Context, instanceARN, p
 // assignmentStatus is the shared shape of create/delete-account-assignment responses.
 type assignmentStatus struct {
 	Status        string `json:"Status"`        // IN_PROGRESS | SUCCEEDED | FAILED
+	RequestId     string `json:"RequestId"`     // poll handle for describe-…-status
 	FailureReason string `json:"FailureReason"` //
+}
+
+// pollToTerminal polls describe until the status leaves IN_PROGRESS (or ctx is done). This is
+// what makes the per-permission-set serialization REAL: a create/delete is not "done" until
+// AWS confirms it, so the next account's op never starts while one is still in flight on the
+// same permission set (the #888 race). Pure (the AWS call is injected) so it is unit-tested.
+func pollToTerminal(ctx context.Context, interval time.Duration, describe func(context.Context) (assignmentStatus, error)) (assignmentStatus, error) {
+	for {
+		s, err := describe(ctx)
+		if err != nil {
+			return s, err
+		}
+		if s.Status != "IN_PROGRESS" {
+			return s, nil
+		}
+		select {
+		case <-ctx.Done():
+			return s, fmt.Errorf("timed out waiting for assignment to settle (last status %s): %w", s.Status, ctx.Err())
+		case <-time.After(interval):
+		}
+	}
+}
+
+// describeCreateStatus / describeDeleteStatus poll one in-flight request.
+func (ic IdentityCenter) describeCreateStatus(ctx context.Context, instanceARN, requestID string) (assignmentStatus, error) {
+	out, err := ic.run(ctx, "sso-admin", "describe-account-assignment-creation-status",
+		"--instance-arn", instanceARN, "--account-assignment-creation-request-id", requestID)
+	if err != nil {
+		return assignmentStatus{}, err
+	}
+	var resp struct {
+		AccountAssignmentCreationStatus assignmentStatus `json:"AccountAssignmentCreationStatus"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return assignmentStatus{}, fmt.Errorf("parsing describe-account-assignment-creation-status: %w", err)
+	}
+	return resp.AccountAssignmentCreationStatus, nil
+}
+
+func (ic IdentityCenter) describeDeleteStatus(ctx context.Context, instanceARN, requestID string) (assignmentStatus, error) {
+	out, err := ic.run(ctx, "sso-admin", "describe-account-assignment-deletion-status",
+		"--instance-arn", instanceARN, "--account-assignment-deletion-request-id", requestID)
+	if err != nil {
+		return assignmentStatus{}, err
+	}
+	var resp struct {
+		AccountAssignmentDeletionStatus assignmentStatus `json:"AccountAssignmentDeletionStatus"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return assignmentStatus{}, fmt.Errorf("parsing describe-account-assignment-deletion-status: %w", err)
+	}
+	return resp.AccountAssignmentDeletionStatus, nil
 }
 
 // assignArgs builds the common create/delete-account-assignment argument list.
@@ -157,9 +218,11 @@ func assignArgs(verb, instanceARN, account, psARN, userID string) []string {
 	}
 }
 
-// CreateAssignment mints a USER account-assignment (permission set → account). AWS
-// provisions assignments serially per permission set (the race that bit the #888 cutover),
-// so callers MUST invoke this one account at a time. Returns AWS's status verbatim.
+// CreateAssignment mints a USER account-assignment (permission set → account) and WAITS for
+// AWS to finish provisioning it. AWS provisions assignments serially per permission set (the
+// race that bit the #888 cutover) and the create call returns IN_PROGRESS immediately, so we
+// poll to terminal before returning — that is what makes "one account at a time" safe rather
+// than lucky. Returns the terminal status (SUCCEEDED) or an error on FAILED/timeout.
 func (ic IdentityCenter) CreateAssignment(ctx context.Context, instanceARN, account, psARN, userID string) (string, error) {
 	out, err := ic.run(ctx, assignArgs("create-account-assignment", instanceARN, account, psARN, userID)...)
 	if err != nil {
@@ -172,13 +235,25 @@ func (ic IdentityCenter) CreateAssignment(ctx context.Context, instanceARN, acco
 		return "", fmt.Errorf("parsing create-account-assignment: %w", err)
 	}
 	s := resp.AccountAssignmentCreationStatus
+	if s.Status == "IN_PROGRESS" && s.RequestId != "" {
+		reqID := s.RequestId
+		pctx, cancel := context.WithTimeout(ctx, pollTimeout)
+		defer cancel()
+		if s, err = pollToTerminal(pctx, pollInterval, func(c context.Context) (assignmentStatus, error) {
+			return ic.describeCreateStatus(c, instanceARN, reqID)
+		}); err != nil {
+			return s.Status, fmt.Errorf("waiting for assignment on %s: %w", account, err)
+		}
+	}
 	if s.Status == "FAILED" {
 		return s.Status, fmt.Errorf("assignment on %s FAILED: %s", account, s.FailureReason)
 	}
 	return s.Status, nil
 }
 
-// DeleteAssignment removes a USER account-assignment. Returns AWS's status verbatim.
+// DeleteAssignment removes a USER account-assignment and WAITS for AWS to finish (delete is
+// asynchronous and serialized per permission set, exactly like create). Returns the terminal
+// status (SUCCEEDED) or an error on FAILED/timeout.
 func (ic IdentityCenter) DeleteAssignment(ctx context.Context, instanceARN, account, psARN, userID string) (string, error) {
 	out, err := ic.run(ctx, assignArgs("delete-account-assignment", instanceARN, account, psARN, userID)...)
 	if err != nil {
@@ -191,6 +266,16 @@ func (ic IdentityCenter) DeleteAssignment(ctx context.Context, instanceARN, acco
 		return "", fmt.Errorf("parsing delete-account-assignment: %w", err)
 	}
 	s := resp.AccountAssignmentDeletionStatus
+	if s.Status == "IN_PROGRESS" && s.RequestId != "" {
+		reqID := s.RequestId
+		pctx, cancel := context.WithTimeout(ctx, pollTimeout)
+		defer cancel()
+		if s, err = pollToTerminal(pctx, pollInterval, func(c context.Context) (assignmentStatus, error) {
+			return ic.describeDeleteStatus(c, instanceARN, reqID)
+		}); err != nil {
+			return s.Status, fmt.Errorf("waiting for assignment deletion on %s: %w", account, err)
+		}
+	}
 	if s.Status == "FAILED" {
 		return s.Status, fmt.Errorf("assignment deletion on %s FAILED: %s", account, s.FailureReason)
 	}
