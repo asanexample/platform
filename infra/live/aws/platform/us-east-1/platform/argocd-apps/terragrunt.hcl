@@ -141,6 +141,14 @@ inputs = {
   teams_repo_branch = "main"
   teams_repo_path   = "gitops/teams"
 
+  # The WorkforceRole catalog (gitops/roles) projected onto the cluster as a read-only mirror (ADR-088 / #887),
+  # so the activation operator can read each role's borrow cap (identityCenter.sessionDuration) + permission set
+  # at runtime. Git stays the source of truth (prune/selfHeal); same early sync-wave as Teams.
+  enable_roles      = true
+  roles_repo_url    = "https://github.com/asanexample/platform"
+  roles_repo_branch = "main"
+  roles_repo_path   = "gitops/roles"
+
   # delivery surface, activated by platform_repo_url: the registry-sync apps (project gitops/products +
   # gitops/environments → cluster CRs, sync-wave -2/0) AND the per-Product ApplicationSet (delivers each app's
   # k8s/overlays/<stage>, injecting ns + host). Teams still sync via enable_teams above.
