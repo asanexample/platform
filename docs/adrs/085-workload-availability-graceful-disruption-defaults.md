@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-26
 
-**Status:** Proposed
+**Status:** Accepted — built + live on both clusters (2026-06-26); replica-floor flipped Audit → Enforce 2026-06-27 (#934). Graceful-drain/PDB/topology-spread defaults and the prod replica-floor are admission-enforced by the `policy` module.
 
 ## Context
 

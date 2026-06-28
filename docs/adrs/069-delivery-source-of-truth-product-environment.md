@@ -6,8 +6,9 @@
 established *claim-as-single-source* (the per-tenant claim is the sole registry `argocd-apps` / `policy` /
 `github-oidc` derive from). [ADR-067](067-idp-domain-model.md) split `app → Product/Service` and
 `Tenant → Environment`, so delivery metadata now lives across **two** objects — this ADR redesigns the
-derivation and replaces "single *object*" with "single *home per fact*." **Rebuild-gated** for implementation;
-the contract is the [platform-domain-api.md](../architecture/platform-domain-api.md) normative schema.
+derivation and replaces "single *object*" with "single *home per fact*." Delivered **in place** via the
+additive v3 cutover (2026-06-11), not via the planned rebuild; the contract is the
+[platform-domain-api.md](../architecture/platform-domain-api.md) normative schema.
 
 ## Context
 
@@ -133,7 +134,8 @@ The `github-oidc` unit `fileset`s the **Product registry** and mints **one OIDC-
   (matrix/git) — a deliberate trade for git-native delivery.
 - **Migrations:** `gitops/tenant-claims/` → `gitops/products/` + `gitops/environments/`; the `argocd-apps`
   module is rewritten (per-(team,app) Applications → per-Product ApplicationSet); `github-oidc` gains registry
-  derivation; the Composition's `restrict-images` keys off Product. All ride the rebuild, not in-place.
+  derivation; the Composition's `restrict-images` keys off Product. All of this landed **in place** via the
+  additive v3 cutover (2026-06-11), not via a from-scratch rebuild.
 - **Open follow-on:** the generated hostname still must encode a **Service** (multi-service) and **Customer**
   (per-customer) — tracked as an ADR-060/061 extension (platform-domain-api Open-questions §3); the owns/binds
   split here closes the *ownership* half only.
