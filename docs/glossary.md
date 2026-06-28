@@ -3,6 +3,9 @@
 Platform-specific terms, one or two lines each, with a link to the deep doc or ADR that defines them.
 General Kubernetes/AWS terms are omitted. Alphabetical.
 
+**Domain glossary:** zero-downtime / progressive-delivery terms (canary, blue-green, gate, burn
+rate, error budget, …) live in the [zero-downtime glossary](guides/zero-downtime/glossary.md).
+
 > **Last reviewed:** 2026-06-12
 
 ---
