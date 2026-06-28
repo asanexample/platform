@@ -58,11 +58,12 @@ Kyverno is deployed via Helm chart (version 3.8.1 / app v1.18.1, pinned in `_ver
 3 on platform, 1 on preprod) and a bundled local chart (`policies-chart/`) of the platform's
 ClusterPolicies. A local chart needs no plan-time access to the Kyverno CRDs (which the engine
 installs in the same apply), avoiding the `kubernetes_manifest` chicken-and-egg. The module is
-cloud-agnostic and **holds no team-specific data** — per-tenant values (`tenant_registry_map`,
-`allowed_registries`) are supplied by the Terragrunt unit from `teams.hcl`. The `compliance_tier`
+cloud-agnostic and **holds no team-specific data** — per-Product values (e.g. `verify_subjects_product`,
+`allowed_registries`) are derived by the Terragrunt unit from the `Product` registry (`gitops/products/**`,
+ADR-063/067); `teams.hcl` and the old `tenant_registry_map` input are retired. The `compliance_tier`
 variable gates restricted-grade pod policies (rendered only for `hipaa`/`pci`).
 
-Tenant-targeted policies match the `platform.refplat.org/tenant` namespace label; infra namespaces
+Environment-targeted policies match the `platform.refplat.org/team` namespace label; infra namespaces
 are excluded. Cluster-scoped policies (RBAC bindings, default-namespace) skip platform controllers
 via an `exclude_principals` allow-list so addon reconciliation is never blocked.
 

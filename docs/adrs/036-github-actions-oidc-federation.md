@@ -4,6 +4,17 @@
 
 **Status:** Accepted
 
+> **Amendment (2026-06-27, accuracy review).** The implementation snippets below predate the
+> registries-as-single-source migration (ADR-061/063/067/069) and the `github_oidc` module interface.
+> As-built: the per-team ECR-push roles became **per-Product**, derived from the `Product` registry
+> (`gitops/products/**`) — role `github-actions-ecr-push-product-<product>`, ECR scope `team-<team>/<product>-*`,
+> branches `["main", "refs/tags/*"]`. `teams.hcl` is retired. Also, the `github_oidc` module exposes only
+> `create` / `github_org` / `roles` / `tags`; the flat top-level `github_repo` / `github_branches` /
+> `role_name` / `role_policy_arns` shown below are **not** module inputs — per-role attributes live inside the
+> `roles` map. And the Terratest `AdministratorAccess` role now carries an explicit Deny overlay
+> (`DenyPersistenceEscalationAndGuardrailDisable`) blocking IAM-user/key/federation creation,
+> `organizations:*`, `account:*`, and audit/detection teardown. Read the snippets as illustrative-historical.
+
 ## Context
 
 CI/CD workflows running in GitHub Actions need AWS API access for ECR image pushes (ADR-028),

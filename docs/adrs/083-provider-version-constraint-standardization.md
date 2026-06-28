@@ -67,7 +67,7 @@ representative modules under the new majors (`aws/eks`, `aws/networking`, `cloud
 - A future provider **major** (aws 7.x, kubernetes 4.x, …) no longer auto-qualifies on
   `init -upgrade`; it requires bumping the `~>` bound in a PR — surfaced by Dependabot, reviewed,
   and validated before adoption.
-- All ~58 shared modules now state a consistent, honest provider contract; modules validate
+- Nearly all shared modules now state a consistent, honest provider contract (a handful predating this ADR still float `kubernetes`/`helm` with an unbounded `>=` — `cluster-rbac`, `observability-k6`, `argocd-clusters` — tracked for follow-up); modules validate
   standalone (and in the CI `OpenTofu Validate` job) against a known major.
 
 ### Out of scope (follow-ups)
