@@ -220,6 +220,39 @@ resource "aws_secretsmanager_secret_version" "admin" {
   })
 }
 
+# Seal the crown-jewel secret (ADR-087): deny GetSecretValue to anyone outside the sealed-reader allow-list — so
+# even AdministratorAccess can't read it. Each reader role ARN is expanded to its `:role/` form AND its
+# `:sts:…:assumed-role/…/*` session form (aws:PrincipalArn can present either), so a legit reader is never denied.
+# The Deny is scoped to GetSecretValue only (PutResourcePolicy stays open → an admin can always unseal/fix it, so a
+# bad list is recoverable, never a permanent lockout). Off until var.admin_secret_reader_role_arns is set.
+locals {
+  seal_admin_secret = local.create && length(var.admin_secret_reader_role_arns) > 0
+  admin_reader_arn_patterns = flatten([
+    for a in var.admin_secret_reader_role_arns : [
+      a,
+      "${replace(replace(a, "arn:aws:iam::", "arn:aws:sts::"), ":role/", ":assumed-role/")}/*",
+    ]
+  ])
+}
+
+resource "aws_secretsmanager_secret_policy" "admin" {
+  count      = local.seal_admin_secret ? 1 : 0
+  secret_arn = aws_secretsmanager_secret.admin[0].arn
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "DenyReadExceptSealedReaders"
+      Effect    = "Deny"
+      Principal = "*"
+      Action    = "secretsmanager:GetSecretValue"
+      Resource  = "*"
+      Condition = {
+        StringNotLike = { "aws:PrincipalArn" = local.admin_reader_arn_patterns }
+      }
+    }]
+  })
+}
+
 resource "kubernetes_manifest" "admin_external_secret" {
   count = local.create ? 1 : 0
 

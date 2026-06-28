@@ -34,7 +34,7 @@ dependency "node_groups" {
 dependency "external_secrets" {
   config_path = "../external-secrets"
 
-  mock_outputs                            = { namespace = "external-secrets" }
+  mock_outputs                            = { namespace = "external-secrets", role_arn = "arn:aws:iam::000000000000:role/mock-ext-sec" }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
@@ -127,6 +127,15 @@ inputs = {
   cluster_name           = dependency.eks.outputs.cluster_id
   region                 = include.base.locals.region
   deployer_role_arn      = include.base.locals.deployer_role_arn
+
+  # Seal the bootstrap-admin secret (ADR-087): only these three roles may read platform/keycloak/admin —
+  # the deployer (Terraform reads it on apply), the External Secrets Operator role (syncs it into the cluster),
+  # and OrganizationAccountAccessRole (break-glass). Everyone else — incl. AdministratorAccess — is denied.
+  admin_secret_reader_role_arns = [
+    include.base.locals.deployer_role_arn,
+    dependency.external_secrets.outputs.role_arn,
+    "arn:aws:iam::${include.base.locals.account_id}:role/OrganizationAccountAccessRole",
+  ]
 
   tags = include.base.locals.tags
 }
