@@ -68,6 +68,12 @@ locals {
   # passkey flow is inert.
   manage_mfa = local.create && !local.has_upstream
 
+  # Master-realm admin-plane hardening (#899, ADR-087). Opt-in passkey on the master *browser* (human console)
+  # flow — closes the master-console MFA bypass. Does NOT touch admin-cli's direct-grant (the bootstrap +
+  # break-glass path, which MUST survive). The master realm's keycloak_realm object is deliberately NOT managed
+  # here, so master resources target realm_id = "master" directly and rely on master's default WebAuthn policy.
+  manage_master = local.create && var.manage_master_admin
+
   # The WebAuthn Relying Party id MUST be the registrable domain Keycloak is served from (bare host, no scheme
   # or path) or browsers reject the credential. Derived from keycloak_url (e.g. https://keycloak.aws.refplat.org).
   # NOTE: changing this host invalidates every enrolled passkey — settle the hostname before rollout.
@@ -825,4 +831,108 @@ resource "keycloak_authentication_bindings" "this" {
 
   realm_id     = keycloak_realm.this[0].id
   browser_flow = keycloak_authentication_flow.browser[0].alias
+}
+
+# ---------------------------------------------------------------------------
+# Master-realm admin-plane hardening (#899, ADR-087) — a passkey on the MASTER browser flow
+#
+# Terraform authenticates as the master-realm `admin` user (admin-cli), a near-superuser that bypasses the
+# platform-realm MFA above. MFA on the master *browser* flow closes the HUMAN-CONSOLE bypass (a person logging
+# into the master realm UI), mirroring the #885 platform flow with realm_id = "master". It does NOT — and must
+# not — touch admin-cli's DIRECT-GRANT flow: that is the greenfield bootstrap + the break-glass, and disabling it
+# bricks every rebuild (INVARIANT, ADR-087). The master realm's keycloak_realm object is deliberately NOT brought
+# under management, so these target realm_id = "master" and use master's DEFAULT WebAuthn passwordless policy
+# (RP id defaults to the request host, the same keycloak host). Same two-apply, no-lockout rollout as #885: built
+# when manage_master_admin, BOUND only when enforce_master_browser_mfa — enroll a passkey on the master `admin`
+# first. Opt-in (default off). state_purge drops keycloak_* on teardown, so these purge with the rest.
+# ---------------------------------------------------------------------------
+
+resource "keycloak_required_action" "master_webauthn_register_passwordless" {
+  count = local.manage_master ? 1 : 0
+
+  realm_id       = "master"
+  alias          = "webauthn-register-passwordless"
+  enabled        = true
+  default_action = true
+}
+
+resource "keycloak_authentication_flow" "master_browser" {
+  count = local.manage_master ? 1 : 0
+
+  realm_id    = "master"
+  alias       = "master-passkey-browser"
+  provider_id = "basic-flow"
+  description = "Master-realm console login requiring a phishing-resistant passkey (#899). admin-cli direct-grant is unaffected."
+}
+
+resource "keycloak_authentication_execution" "master_cookie" {
+  count = local.manage_master ? 1 : 0
+
+  realm_id          = "master"
+  parent_flow_alias = keycloak_authentication_flow.master_browser[0].alias
+  authenticator     = "auth-cookie"
+  requirement       = "ALTERNATIVE"
+  priority          = 10
+}
+
+resource "keycloak_authentication_execution" "master_idp" {
+  count = local.manage_master ? 1 : 0
+
+  realm_id          = "master"
+  parent_flow_alias = keycloak_authentication_flow.master_browser[0].alias
+  authenticator     = "identity-provider-redirector"
+  requirement       = "ALTERNATIVE"
+  priority          = 20
+  depends_on        = [keycloak_authentication_execution.master_cookie]
+}
+
+resource "keycloak_authentication_subflow" "master_forms" {
+  count = local.manage_master ? 1 : 0
+
+  realm_id          = "master"
+  parent_flow_alias = keycloak_authentication_flow.master_browser[0].alias
+  alias             = "master-passkey-forms"
+  requirement       = "ALTERNATIVE"
+  priority          = 30
+  depends_on        = [keycloak_authentication_execution.master_idp]
+}
+
+resource "keycloak_authentication_execution" "master_userpass" {
+  count = local.manage_master ? 1 : 0
+
+  realm_id          = "master"
+  parent_flow_alias = keycloak_authentication_subflow.master_forms[0].alias
+  authenticator     = "auth-username-password-form"
+  requirement       = "REQUIRED"
+  priority          = 10
+}
+
+resource "keycloak_authentication_subflow" "master_mfa" {
+  count = local.manage_master ? 1 : 0
+
+  realm_id          = "master"
+  parent_flow_alias = keycloak_authentication_subflow.master_forms[0].alias
+  alias             = "master-passkey-mfa"
+  requirement       = "REQUIRED"
+  priority          = 20
+  depends_on        = [keycloak_authentication_execution.master_userpass]
+}
+
+resource "keycloak_authentication_execution" "master_mfa_webauthn" {
+  count = local.manage_master ? 1 : 0
+
+  realm_id          = "master"
+  parent_flow_alias = keycloak_authentication_subflow.master_mfa[0].alias
+  authenticator     = "webauthn-authenticator-passwordless"
+  requirement       = "REQUIRED"
+  priority          = 10
+}
+
+# Gated binding (apply-2). Bind master's browser flow ONLY when enforce_master_browser_mfa — until then the
+# built-in master browser flow stays live so the admin console isn't locked out before enrolling a passkey.
+resource "keycloak_authentication_bindings" "master" {
+  count = local.manage_master && var.enforce_master_browser_mfa ? 1 : 0
+
+  realm_id     = "master"
+  browser_flow = keycloak_authentication_flow.master_browser[0].alias
 }
