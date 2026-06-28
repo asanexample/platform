@@ -90,6 +90,11 @@ inputs = {
   # confirmed PolicyReports clean against the live alpha workload (ADR-014 rollout).
   validation_failure_action = "Enforce"
 
+  # Replica floor (ADR-085): flipped Audit -> Enforce after review — the audit was clean (the only prod-stage
+  # workload, alpha-shop-prod, runs 3 replicas; 0 PolicyReport violations). Prod deploys with < 2 replicas are
+  # now rejected at admission (break-glass for the rare exception).
+  replica_floor_failure_action = "Enforce"
+
   compliance_tier = include.base.locals.compliance_tier
   replica_count   = 1 # non-prod; platform runs 3 for HA
 
