@@ -82,7 +82,8 @@ resource "kubernetes_manifest" "secret" {
       }
       data = [{
         secretKey = "clientSecret"
-        remoteRef = { key = var.oidc_client_secret_sm_key }
+        # keycloak-config stores the secret as JSON {"client-secret":"..."} — extract the property, not the blob.
+        remoteRef = { key = var.oidc_client_secret_sm_key, property = var.oidc_client_secret_sm_property }
       }]
     }
   }

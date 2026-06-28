@@ -52,6 +52,12 @@ variable "secret_store_name" {
   type        = string
 }
 
+variable "oidc_client_secret_sm_property" {
+  description = "JSON property to extract from the SM secret. keycloak-config stores clients as {\"client-secret\":\"...\"}, so the bare secret is the `client-secret` property (NOT the whole blob)."
+  type        = string
+  default     = "client-secret"
+}
+
 variable "allowed_groups" {
   description = "Keycloak group memberships allowed in (oauth2-proxy `--allowed-group`). Empty = any authenticated realm user (still gated by `email_domains`). Requires a `groups` claim mapper on the client."
   type        = list(string)
