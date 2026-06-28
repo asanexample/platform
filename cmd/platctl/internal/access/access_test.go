@@ -129,3 +129,50 @@ func TestLoadPeopleMissingDir(t *testing.T) {
 		t.Error("expected an error when gitops/people is absent")
 	}
 }
+
+func TestEligible(t *testing.T) {
+	root := writeFixtures(t)
+	people, _ := LoadPeople(root)
+	roles, _ := LoadRoles(root)
+
+	cases := []struct {
+		name           string
+		who, role      string
+		team, scope    string
+		wantAllowed    bool
+		reasonContains string
+	}{
+		{"borrowable platform-operator", "dev-a", "platform-operator", "", "platform", true, "eligible to borrow"},
+		{"by anchor too", "anchor-a", "platform-operator", "", "platform", true, "eligible to borrow"},
+		{"owner on-demand access-admin", "owner", "access-admin", "", "platform", true, "eligible to borrow"},
+		{"standing developer = no borrow", "dev-a", "developer", "alpha", "", false, "STANDING"},
+		{"wrong reach (no grant)", "dev-a", "developer", "", "platform", false, "not eligible"},
+		{"unknown principal", "nobody", "developer", "alpha", "", false, "unknown principal"},
+		{"role not in catalog", "dev-a", "ghost-role", "alpha", "", false, "not in the catalog"},
+		{"no reach", "dev-a", "developer", "", "", false, "exactly one reach"},
+		{"both reaches", "dev-a", "developer", "alpha", "platform", false, "exactly one reach"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			d := Eligible(people, roles, c.who, c.role, c.team, c.scope)
+			if d.Allowed != c.wantAllowed {
+				t.Fatalf("Allowed = %v, want %v (reason: %s)", d.Allowed, c.wantAllowed, d.Reason)
+			}
+			if !contains(d.Reason, c.reasonContains) {
+				t.Errorf("reason %q does not contain %q", d.Reason, c.reasonContains)
+			}
+		})
+	}
+}
+
+func contains(s, sub string) bool {
+	return sub == "" || (len(s) >= len(sub) && indexOf(s, sub) >= 0)
+}
+func indexOf(s, sub string) int {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return i
+		}
+	}
+	return -1
+}

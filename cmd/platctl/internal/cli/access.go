@@ -24,6 +24,7 @@ func NewAccessCmd() *cobra.Command {
 (eligible, not standing — activated for a bounded window, ADR-088).`,
 	}
 	cmd.AddCommand(newAccessListCmd())
+	cmd.AddCommand(newAccessCheckCmd())
 	return cmd
 }
 
@@ -69,3 +70,50 @@ func newAccessListCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&borrowableOnly, "borrowable", false, "Only show on-demand (borrowable) grants — i.e. what's eligible to activate")
 	return cmd
 }
+
+func newAccessCheckCmd() *cobra.Command {
+	var team, scope string
+
+	cmd := &cobra.Command{
+		Use:   "check <person-or-anchor> <role>",
+		Short: "Check whether a principal may BORROW a role (the activation eligibility decision)",
+		Long: `Decide whether a principal (by Person name or Keycloak anchor) is eligible to
+borrow a role at a given reach — the authorization the activation controller
+makes before minting temporary access (ADR-088). Exits non-zero when denied.
+
+  platctl access check dev-a platform-operator --scope platform
+  platctl access check alpha-dev developer --team alpha`,
+		Args:          cobra.ExactArgs(2),
+		SilenceErrors: true, // we print "DENIED: …" via the returned error in main; don't let cobra double-print
+		RunE: func(_ *cobra.Command, args []string) error {
+			repoRoot, err := findRepoRoot()
+			if err != nil {
+				return err
+			}
+			people, err := access.LoadPeople(repoRoot)
+			if err != nil {
+				return err
+			}
+			roles, err := access.LoadRoles(repoRoot)
+			if err != nil {
+				return err
+			}
+
+			d := access.Eligible(people, roles, args[0], args[1], team, scope)
+			if d.Allowed {
+				fmt.Printf("ALLOWED: %s\n", d.Reason)
+				return nil
+			}
+			// Denied — print and exit non-zero (scriptable) without a usage dump.
+			return &silentExitError{msg: "DENIED: " + d.Reason}
+		},
+	}
+	cmd.Flags().StringVar(&team, "team", "", "Team-scoped reach (mutually exclusive with --scope)")
+	cmd.Flags().StringVar(&scope, "scope", "", "Platform-scoped reach, e.g. 'platform' (mutually exclusive with --team)")
+	return cmd
+}
+
+// silentExitError carries a message and exits non-zero without cobra printing usage.
+type silentExitError struct{ msg string }
+
+func (e *silentExitError) Error() string { return e.msg }
