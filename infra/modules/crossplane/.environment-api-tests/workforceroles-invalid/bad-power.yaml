@@ -1,0 +1,9 @@
+# Invalid: power is not in the enum (look|operate|change|manage-access) — must be rejected.
+apiVersion: platform.refplat.org/v1beta1
+kind: WorkforceRole
+metadata: { name: bad-power }
+spec:
+  reach: platform
+  power: superuser
+  mode: standing
+  riskTier: standard

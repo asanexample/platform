@@ -1,0 +1,35 @@
+# Valid WorkforceRole records (must pass): an on-demand apex role with an IdC projection (break-glass shape)
+# and a standing team role — the two ends of the reach×power grid the activation operator reads.
+apiVersion: platform.refplat.org/v1beta1
+kind: WorkforceRole
+metadata: { name: break-glass }
+spec:
+  reach: platform
+  power: manage-access
+  mode: on-demand
+  riskTier: apex
+  description: Full power, off by default, time-boxed and loudly audited.
+  identityCenter:
+    perTeam: false
+    permissionSet: AdministratorAccess
+    sessionDuration: PT1H
+    managedPolicies: ["arn:aws:iam::aws:policy/AdministratorAccess"]
+  keycloak:
+    realmRole: break-glass
+    perTeamGroup: false
+---
+apiVersion: platform.refplat.org/v1beta1
+kind: WorkforceRole
+metadata: { name: developer }
+spec:
+  reach: team
+  power: change
+  mode: standing
+  riskTier: standard
+  identityCenter:
+    perTeam: true
+    permissionSet: "Dev-{team}"
+    sessionDuration: PT4H
+  keycloak:
+    realmRole: developer
+    perTeamGroup: true
