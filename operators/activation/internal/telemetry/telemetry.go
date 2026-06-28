@@ -130,28 +130,31 @@ func (t *Telemetry) Shutdown(ctx context.Context) error {
 func newMetrics(meter metric.Meter) (*Metrics, error) {
 	m := &Metrics{meter: meter}
 	var err error
+	// Instrument names follow OTel convention (no unit, no _total suffix) — the Prometheus
+	// exporter appends "_seconds" for the unit and "_total" for monotonic counters, giving
+	// activation_mint_duration_seconds and activation_mint_failures_total in Mimir.
 	if m.MintDuration, err = meter.Float64Histogram(
-		"activation_mint_duration_seconds",
+		"activation_mint_duration",
 		metric.WithDescription("Wall time to fully grant a borrowed power across all accounts."),
 		metric.WithUnit("s"),
 	); err != nil {
 		return nil, err
 	}
 	if m.RevokeDuration, err = meter.Float64Histogram(
-		"activation_revoke_duration_seconds",
+		"activation_revoke_duration",
 		metric.WithDescription("Wall time to fully revoke a borrowed power across all accounts."),
 		metric.WithUnit("s"),
 	); err != nil {
 		return nil, err
 	}
 	if m.MintFailures, err = meter.Int64Counter(
-		"activation_mint_failures_total",
+		"activation_mint_failures",
 		metric.WithDescription("Terminal failures while minting a borrowed power."),
 	); err != nil {
 		return nil, err
 	}
 	if m.RevokeFailures, err = meter.Int64Counter(
-		"activation_revoke_failures_total",
+		"activation_revoke_failures",
 		metric.WithDescription("Terminal failures while revoking a borrowed power."),
 	); err != nil {
 		return nil, err
