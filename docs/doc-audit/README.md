@@ -26,6 +26,6 @@ Severity: **high** (wrong/misleading enough to cause a bad operational decision)
 | W2-C | other shared module READMEs (~28) | findings-readmes-shared.md | done |
 | W2-D | house skills (16) + CLAUDE.md | findings-skills-claudemd.md | done |
 | W2-E | ROADMAP + REQUIREMENTS + root/infra README + infra/docs | findings-toplevel-planning.md | done |
-| W3-* | GAP HUNT (undocumented shipped features) | findings-gaps.md | pending |
+| W3-* | GAP HUNT (undocumented shipped features) | findings-gaps.md | done |
 
 Final synthesis: `REPORT.md` (themes, prioritized inventory, recommended fixes for the next pass).
