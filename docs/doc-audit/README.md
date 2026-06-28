@@ -21,11 +21,11 @@ Severity: **high** (wrong/misleading enough to cause a bad operational decision)
 | W1-C | docs/architecture (21) | findings-architecture.md | done |
 | W1-D | docs/plans (11) + archive/compliance/examples | findings-plans.md | done |
 | W1-E | docs/guides/zero-downtime + docs top-level | findings-guides-toplevel.md | done |
-| W2-A | infra/modules/aws/* READMEs (22) | findings-readmes-aws.md | pending |
-| W2-B | observability* module READMEs (17) | findings-readmes-observability.md | pending |
-| W2-C | other shared module READMEs (~28) | findings-readmes-shared.md | pending |
-| W2-D | house skills (16) + CLAUDE.md | findings-skills-claudemd.md | pending |
-| W2-E | ROADMAP + REQUIREMENTS + root/infra README + infra/docs | findings-toplevel-planning.md | pending |
+| W2-A | infra/modules/aws/* READMEs (22) | findings-readmes-aws.md | done |
+| W2-B | observability* module READMEs (17) | findings-readmes-observability.md | done |
+| W2-C | other shared module READMEs (~28) | findings-readmes-shared.md | done |
+| W2-D | house skills (16) + CLAUDE.md | findings-skills-claudemd.md | done |
+| W2-E | ROADMAP + REQUIREMENTS + root/infra README + infra/docs | findings-toplevel-planning.md | done |
 | W3-* | GAP HUNT (undocumented shipped features) | findings-gaps.md | pending |
 
 Final synthesis: `REPORT.md` (themes, prioritized inventory, recommended fixes for the next pass).
