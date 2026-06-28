@@ -99,6 +99,22 @@ docs-check: ## Check if terraform-docs are up to date (CI use)
 	@echo "$(GREEN)All module docs are up to date.$(NC)"
 
 #----------------------------------------------
+# Static analysis (SAST)
+#----------------------------------------------
+
+# Pinned to match CI — keep in sync with the Semgrep job in .github/workflows/ci.yml.
+SEMGREP_VERSION  := 1.164.0
+SEMGREP_RULESETS := --config p/terraform --config p/github-actions --config p/secrets --config p/golang --config p/dockerfile
+
+.PHONY: sast
+sast: ## Run Semgrep SAST over the entire codebase (mirrors CI; --error = blocking)
+	@command -v semgrep >/dev/null 2>&1 || { printf "$(RED)semgrep not found.$(NC) Install the CI-pinned version:\n  pipx install semgrep==$(SEMGREP_VERSION)\n"; exit 1; }
+	@have=$$(semgrep --version 2>/dev/null | head -1); \
+		[ "$$have" = "$(SEMGREP_VERSION)" ] || printf "$(YELLOW)warning: semgrep $$have installed, CI pins $(SEMGREP_VERSION)$(NC)\n"
+	@echo "$(GREEN)Running Semgrep SAST (full codebase)...$(NC)"
+	@semgrep scan $(SEMGREP_RULESETS) --exclude '*.sarif' --metrics off --error
+
+#----------------------------------------------
 # Utility operations
 #----------------------------------------------
 
