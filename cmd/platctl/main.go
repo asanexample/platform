@@ -32,6 +32,7 @@ execution of independent units.`,
 	root.AddCommand(cli.NewKubeconfigCmd())
 	root.AddCommand(cli.NewDownCmd())
 	root.AddCommand(cli.NewUpCmd())
+	root.AddCommand(cli.NewAccessCmd())
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
