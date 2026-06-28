@@ -82,8 +82,9 @@ A /16 provides 65,536 addresses per environment — enough for multiple regions,
 
 ### Subnet Tier Scheme
 
-Each region gets a /21 (2,048 IPs) from the environment's /16, subdivided into 6 tiers across
-3 availability zones (18 subnets total):
+Each **AZ** gets a /24 (256 IPs) carved from the environment's /16 (`cidrsubnet(vpc_cidr, 8, az_idx)`);
+within each AZ's /24 the 6 tiers below are carved by `newbits`/`netnum` (18 subnets total across 3 AZs).
+The `Bits` column is relative to the AZ's /24 parent:
 
 | Tier | Size per AZ | Bits | Purpose |
 |------|-------------|------|---------|
@@ -99,15 +100,21 @@ The networking module reads these values and creates subnets without manual CIDR
 
 ### Overlay CIDRs (Kubernetes)
 
-Kubernetes overlay networks use separate, non-routable ranges shared across all clusters:
+Kubernetes overlay networks use separate, non-routable ranges. Pod CIDRs are **per-cluster and
+non-overlapping** — each a /16 from the reserved `10.240.0.0/14` pod supernet (ClusterMesh-ready) — not
+a single range shared across clusters. The Service CIDR is the EKS cluster default:
 
 | Purpose | CIDR |
 |---------|------|
-| Pod CIDR | `10.240.0.0/16` |
-| Service CIDR | `10.241.0.0/16` |
-| DNS Service IP | `10.241.0.10` |
+| Pod supernet (reserved) | `10.240.0.0/14` |
+| Pod CIDR — platform | `10.240.0.0/16` |
+| Pod CIDR — preprod | `10.241.0.0/16` |
+| Pod CIDR — prod (reserved) | `10.242.0.0/16` |
+| Service CIDR (EKS default) | `172.20.0.0/16` |
+| DNS Service IP | `172.20.0.10` |
 
-These are encapsulated by Cilium (VXLAN or ENI) and never appear on the VPC/VNet routing table.
+Pod traffic is VXLAN-encapsulated by Cilium (the overlay datapath) and never appears on the VPC/VNet
+routing table; the Service CIDR is virtual, handled by Cilium's kube-proxy replacement.
 
 ### Authoritative Source
 

@@ -55,9 +55,9 @@ the appropriate networking mode for each cloud.
 
 | Setting | AWS (EKS) | Azure (AKS) | GCP (GKE) |
 |---------|-----------|-------------|-----------|
-| IPAM mode | ENI | Cluster pool | Kubernetes |
-| Routing | Native (AWS ENI) | VXLAN tunnel | Native |
-| Masquerade interface | `ens+` (AL2023 predictable names) | Default | Default |
+| IPAM mode | Cluster pool (overlay) | Cluster pool | Kubernetes |
+| Routing | VXLAN tunnel | VXLAN tunnel | Native |
+| Masquerade | BPF (overlay default) | Default | `ens+` for native |
 | kube-proxy replacement | Required (`true`) | Configurable | Configurable |
 | Hubble | Enabled (TLS via `helm` method) | Enabled | Enabled |
 | Gateway API | Enabled | Enabled | Enabled |
@@ -65,14 +65,20 @@ the appropriate networking mode for each cloud.
 Only **AWS (EKS)** is deployed today; the Azure/GCP columns are the module's `cloud_provider` branches
 (present and validated in `infra/modules/cilium/`), ready for when those clouds land.
 
-### AWS ENI Mode
+### AWS Overlay Datapath (cluster-pool IPAM + VXLAN)
 
-On EKS, Cilium uses AWS ENI mode with native routing. Each pod gets an IP from the VPC subnet via
-ENI secondary IPs. Pod-to-pod traffic stays within the VPC fabric without encapsulation overhead.
+On EKS today, Cilium runs an **overlay** datapath: `ipam_mode = "cluster-pool"` with
+`routing_mode = "tunnel"` / `tunnel_protocol = "vxlan"` (the module defaults). Pods draw from a
+dedicated, non-routable `pod_cidr` (platform `10.240.0.0/16`, a per-cluster /16 from the reserved
+`10.240.0.0/14` pod supernet — ClusterMesh-ready), **not** from the VPC node subnet, and pod-to-pod
+traffic is VXLAN-encapsulated between nodes. Egress masquerade uses Cilium's BPF masquerade
+(`egress_masquerade_interfaces` empty) rather than an interface glob.
 
-The `egressMasqueradeInterfaces` must be set to `ens+` (regex) because Amazon Linux 2023 uses
-predictable network interface names (`ens5`, not `eth0`). Without this setting, pods lose internet
-egress through NAT gateways.
+> **AWS ENI/native mode is an opt-in override, not the default.** Setting `ipam_mode = "eni"` (with
+> `routing_mode = "native"` and `egress_masquerade_interfaces = "ens+"` for Amazon Linux 2023's
+> predictable interface names) switches the cluster to VPC-native ENI routing — pods then get VPC
+> subnet IPs via ENI secondary IPs. The platform does not run this mode today; choose it only when
+> VPC-native pod IPs are a hard requirement, mindful of subnet-IP exhaustion.
 
 ### Kube-Proxy Replacement on EKS
 
@@ -85,9 +91,10 @@ connections to service ports are refused.
 
 Cilium's Gateway API implementation uses an external Envoy DaemonSet running with `hostNetwork`.
 When Envoy makes upstream connections to backend pods, it does **not** use the node's primary IP
-or the `host` Cilium identity. Instead, Cilium allocates a separate ENI secondary IP and assigns
-it the reserved `ingress` identity (identity 8). This IP is configured via the
-`cilium.bpf_metadata` listener filter's `ipv4_source_address` field.
+or the `host` Cilium identity. Instead, Cilium assigns the upstream source the reserved `ingress`
+identity (identity 8), configured via the `cilium.bpf_metadata` listener filter's
+`ipv4_source_address` field. (This identity behaviour is datapath-independent — it holds under both
+the overlay and ENI modes.)
 
 Any CiliumNetworkPolicy protecting tenant namespaces that receive Gateway API traffic must include
 `ingress` in their `fromEntities` list. Standard Kubernetes NetworkPolicy `ipBlock` CIDR rules do
@@ -142,8 +149,9 @@ The module accepts a `helm_chart_version` variable that defaults to 1.19.4 as a 
 
 - BYOCNI adds deployment complexity — clusters cannot schedule any pods until Cilium is installed,
   requiring strict ordering (see ADR-009)
-- Cloud-specific tuning required — ENI/native on AWS, VXLAN on Azure, etc. — means the "single module"
-  still carries cloud-conditional logic (the Azure/GCP branches exist but are dormant today)
+- Cloud-specific tuning still exists (e.g. the optional ENI/native override on AWS, masquerade-interface
+  globs) — the "single module" carries cloud-conditional logic (the Azure/GCP branches exist but are
+  dormant today)
 - A Cilium upgrade affects every cluster on that cloud at once (today: the AWS clusters) — mitigated by
   testing in the platform environment before preprod/prod
 - Hubble TLS using `helm` method means certificates are not integrated with the platform's
@@ -154,6 +162,7 @@ The module accepts a `helm_chart_version` variable that defaults to 1.19.4 as a 
 - Cilium is a critical-path dependency. If a Cilium upgrade introduces a regression, all clusters
   are affected. Mitigated by pinning chart versions and testing upgrades in the platform environment
   before promoting to preprod/prod.
-- ENI mode on AWS ties pod IP allocation to VPC subnet capacity. Large clusters may exhaust subnet
-  IPs. Mitigated by the /26 kubernetes subnet tier (62 IPs per AZ), which is sized for current
-  node counts.
+- The overlay datapath decouples pod IPs from VPC subnet capacity (pods draw from the dedicated
+  `10.240.0.0/16` pod CIDR), so the node subnet only sizes node/ENI IPs. If a cluster ever opts into
+  ENI/native mode, pod IP allocation would then be tied to VPC subnet capacity and large clusters could
+  exhaust subnet IPs — size the node subnet accordingly before making that switch.
