@@ -74,7 +74,7 @@ Three Terragrunt units manage the DNS infrastructure:
 
 ### cert-manager Integration
 
-cert-manager's ClusterIssuer (configured in the `gateway-config` module) uses Route53 DNS01
+cert-manager's ClusterIssuer (configured in the `gateway` module) uses Route53 DNS01
 validation:
 
 ```yaml

@@ -110,9 +110,12 @@ condition {
 
 The module's default exempt role is `OrganizationAccountAccessRole` (the cross-account administrative
 role AWS Organizations creates in every member account — used for initial setup and break-glass). The
-`exempt_roles` variable adds more; in the live org these are **`PlatformDeployer`** (the Terragrunt
-apply role — it *must* be exempt, or every apply would hit SCP denies) and the Terratest CI role (see
-[ADR-007](007-iam-role-model.md)).
+`exempt_roles` variable adds more; in the live org these include **`PlatformDeployer`** (the Terragrunt
+apply role — it *must* be exempt, or every apply would hit SCP denies), the Terratest CI role (see
+[ADR-007](007-iam-role-model.md)), and the IaC controllers that must set governance tags on resources
+they create — `crossplane-ecr-provisioner`, `crossplane-provisioner-*`, and the per-cluster
+`platform-use1-eks-karpenter-*` / `preprod-use1-eks-karpenter-*` node-provisioner roles (anchored
+per-cluster, not a leading wildcard, per a security audit).
 
 The exempt role pattern is deliberately narrow:
 
@@ -130,7 +133,7 @@ SCPs are attached at the **OU level**, not at individual accounts:
 variable "scp_attachments" {
   default = {
     "root"      = ["baseline-guardrails", "protect-security-services", "enforce-encryption", "deny-regions"]
-    "Platform"  = ["protect-data-and-network"]
+    "Platform"  = ["protect-data-and-network", "require-tagging", "restrict-iam-users"]
     "Workloads" = ["protect-data-and-network", "require-tagging", "restrict-iam-users"]
   }
 }
@@ -139,7 +142,9 @@ variable "scp_attachments" {
 This means:
 
 - **Root-level SCPs** (4 policies) are inherited by every OU and account in the organization.
-- **Platform OU** gets 1 additional SCP (5 total including inherited).
+- **Platform OU** gets 3 additional SCPs (7 total including inherited) — `require-tagging` and
+  `restrict-iam-users` were added alongside `protect-data-and-network` (a security-audit change) so the
+  most-privileged account isn't left without tag/IAM-user enforcement; it now matches Workloads.
 - **Workloads OU** gets 3 additional SCPs (7 total including inherited).
 
 ### 5-Per-Target Budget Allocation Strategy
@@ -150,7 +155,7 @@ growth:
 | Target | Attached | Inherited | Total Effective | Budget Remaining |
 |--------|----------|-----------|-----------------|-----------------|
 | Root | 4 | 0 | 4 | 1 |
-| Platform | 1 | 4 | 5 | 0 (at OU), but child OUs/accounts have 5 free slots |
+| Platform | 3 | 4 | 7* | 2 (audit-driven — matches Workloads; child accounts have 5 free slots) |
 | Workloads | 3 | 4 | 7* | N/A (child OUs bear the attachment) |
 | Workloads/Preprod | 0 | 4 | 4 | 1 (plus child-OU-inherited from Workloads) |
 | Workloads/Prod | 0 | 4 | 4 | 1 |

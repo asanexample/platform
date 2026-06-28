@@ -1,6 +1,6 @@
 # ADR-087: Keycloak Admin-Plane Hardening — master-realm passkey + sealed break-glass
 
-**Status:** Accepted (2026-06-27 — master-realm passkey applied + verified live; the SM/IAM sealing is a follow-on)
+**Status:** Accepted (2026-06-27) — built + bound live on the platform cluster (#899/#935).
 
 ## Context
 

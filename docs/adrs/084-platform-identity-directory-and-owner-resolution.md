@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-26
 
-**Status:** Proposed
+**Status:** Proposed — Phase 0 (owner-resolution read model) built + live; Phase 2 (PagerDuty on-call structure) foundation landed (#932); Phases 1/3 outstanding.
 
 > **Amendment (2026-06-26):** Phase 0 implementation sharpened two architectural points.
 > **(1) Two abstracted boundaries, not one.** The directory is a CQRS **read model** with *both* a

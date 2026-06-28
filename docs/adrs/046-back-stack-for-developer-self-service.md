@@ -11,6 +11,8 @@ architecture for developer self-service now that the platform foundation is in p
 ([ADR-027](027-hybrid-tenant-isolation-model.md)/[031](031-multi-app-tenant-model.md)), Pod Identity
 ([ADR-041](041-pod-identity-for-tenant-workloads.md)), and policy-as-code ([ADR-014](014-kyverno-as-policy-engine.md)).
 
+> **Vocabulary superseded by [ADR-067](067-idp-domain-model.md):** "Tenant"/`Tenant` claim → **Environment**/`XEnvironment` (Team→Product→Service; the intermediate `XTenant` was also removed); `teams.hcl` → the git-native `Team` + `Product` registries. The decision/topology below is unchanged — read the tenant vocabulary as the v2 naming.
+
 ## Context
 
 The platform's goal is a Vercel-like developer experience: product teams self-serve onto a governed, secure,

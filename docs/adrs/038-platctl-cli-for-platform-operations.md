@@ -68,7 +68,8 @@ validation framework. The same language as Terratest, so the team already has Go
 
 ## Decision
 
-Build a Go CLI (`cmd/platctl/`) with five subcommands:
+Build a Go CLI (`cmd/platctl/`) with seven subcommands (the five below, plus `down`/`up` for overnight
+cluster parking — scale the managed node groups to zero and restore them, ADR-078):
 
 ### `platctl bootstrap`
 
@@ -120,9 +121,15 @@ Displays the state of the last bootstrap or teardown operation from the persiste
 `.platctl-state.json` file, showing per-unit status (completed, failed, skipped, pending)
 with durations.
 
+### `platctl down` / `platctl up`
+
+Park / unpark an environment overnight (ADR-078): `down` scales the managed node groups to zero
+(non-destructive — control plane + EBS/CNPG data preserved, Karpenter drained first), `up` restores
+them. See the `cluster-parking` skill.
+
 ### Architecture
 
-The CLI has four internal packages:
+The CLI's internal packages include:
 
 - **`config`** — Parses `.platctl.yaml` (environments, per-unit overrides, manual steps,
   lockdown steps, kubeconfig entries, validation config). Auto-discovers units by walking

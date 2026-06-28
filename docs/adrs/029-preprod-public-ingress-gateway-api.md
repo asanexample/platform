@@ -18,7 +18,7 @@ preprod services over the public internet without VPN enrollment. Requiring Tail
 person who needs to view a staging deployment creates friction that slows the development cycle.
 
 The platform already uses Cilium Gateway API with GatewayClass `cilium` (ADR-017). The shared
-`gateway-config` module (`infra/modules/gateway-config/`) supports an `internal` boolean variable
+`gateway` module (`infra/modules/gateway/`) supports an `internal` boolean variable
 that controls the NLB scheme via the `service.beta.kubernetes.io/aws-load-balancer-scheme`
 annotation on the Gateway's infrastructure block. The platform live unit sets `internal = true`;
 the question is what the preprod live unit should use.
@@ -33,7 +33,7 @@ Key constraints:
 3. **Cilium NetworkPolicy enforcement.** All clusters run Cilium (ADR-008) with network policies
    that restrict pod-to-pod traffic. Public ingress only exposes what is explicitly routed through
    the Gateway — pods without HTTPRoutes are unreachable from the NLB.
-4. **Module reuse.** The gateway-config module already parameterizes the NLB scheme. No new module
+4. **Module reuse.** The `gateway` module already parameterizes the NLB scheme. No new module
    code is needed for either internal or public ingress.
 
 ### Alternatives Considered
@@ -47,7 +47,7 @@ managing VPN access for non-engineering users outweighs the security benefit, es
 preprod holds no production data.
 
 **2. Public NLB with Cilium Gateway API (chosen).** Deploy the Gateway with `internal = false`,
-using the same gateway-config module with different input values. The NLB is internet-facing, TLS
+using the same `gateway` module with different input values. The NLB is internet-facing, TLS
 is terminated at the Gateway via Let's Encrypt DNS-01 (cert-manager + Route53), and services are
 accessible at `*.preprod.aws.refplat.org`. This is the simplest approach — one variable change
 in the live unit, full reuse of existing module code and patterns.
@@ -67,7 +67,7 @@ production will run, not a different ingress mechanism.
 ## Decision
 
 Deploy a public internet-facing NLB via Cilium Gateway API on the preprod cluster. The preprod
-`gateway-config` live unit sets `internal = false` (the module default), while the platform live
+`gateway` live unit sets `internal = false` (the module default), while the platform live
 unit retains `internal = true`.
 
 ### Implementation

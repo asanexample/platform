@@ -104,6 +104,8 @@ branch protection), not from privacy.** Public read makes the signing workflow a
 ### Not yet (future)
 
 - The per-team `github-actions-ecr-push-<team>` role (`github-oidc` unit) and the policy unit's
-  `shared_signer_teams`/`verify_subjects` inputs are still static (`teams.hcl`-derived), **not vended by the
-  Crossplane Tenant claim**. A claim-/Backstage-vended tenant would get its ECR repo + Pod-Identity but not its
+  verify-policy inputs are static, **not vended by the Crossplane claim**. _(As-built under ADR-067/069: these
+  became per-**Product** and registry-derived — `github-actions-ecr-push-product-<product>` and
+  `verify_subjects_product`, from the `Product` registry; the old `shared_signer_teams`/`verify_subjects`/`teams.hcl`
+  inputs were removed.)_ A claim-/Backstage-vended product gets its ECR repo + Pod-Identity but not yet its
   CI push identity or verify policies — Phase 3 (vend-from-Backstage) closes this.

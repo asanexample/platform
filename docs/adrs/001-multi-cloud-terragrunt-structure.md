@@ -64,8 +64,9 @@ infra/
   root.hcl                                # Layer 1: Root (remote state, providers, tofu binary)
   live/
     aws/
-      common.hcl                          # Layer 2: Cloud-wide defaults (loads secrets.hcl)
-      secrets.hcl                         # Sensitive values — account IDs, emails (gitignored)
+      common.hcl                          # Layer 2: Cloud-wide defaults (decrypts secrets.enc.yaml)
+      secrets.enc.yaml                     # Sensitive values — account IDs, emails (SOPS-encrypted, committed; ADR-066)
+      secrets.hcl.example                 # plaintext template; real secrets.hcl is a bootstrap-only fallback (gitignored)
       _base.hcl                           # Per-cloud base include (loads all layers, exposes them)
       _versions.hcl                       # Module source + Helm chart version pins
       {env}/
@@ -92,13 +93,13 @@ Each layer has a well-defined scope and override semantics (later layers win for
 | Layer | File | Scope | Examples |
 |-------|------|-------|---------|
 | 1. Root | `infra/root.hcl` | Global | Remote state routing, provider generation, common tags, OpenTofu binary |
-| 2. Cloud | `infra/live/{cloud}/common.hcl` | Cloud-wide | Project name, default workload, environment-to-account-ID safety map; loads `secrets.hcl` |
+| 2. Cloud | `infra/live/{cloud}/common.hcl` | Cloud-wide | Project name, default workload, environment-to-account-ID safety map; decrypts `secrets.enc.yaml` |
 | 3. Environment | `infra/live/{cloud}/{env}/env.hcl` | Per-account | Account ID, environment name, data classification, env-specific tags |
 | 4. Region | `infra/live/{cloud}/{env}/{region}/region.hcl` + `network.hcl` | Per-region | Region name/abbreviation, VPC CIDRs, region tags |
 | 5. Workload | `infra/live/{cloud}/{env}/{region}/{workload}/workload.hcl` | Per-workload | Workload name, compliance tier, workload-specific tags |
 | 6. Module | `infra/live/{cloud}/{env}/{region}/{workload}/{module}/terragrunt.hcl` | Per-deployment | Final source reference, input overrides, dependencies |
 
-(Sensitive values live in the gitignored `secrets.hcl`, loaded by `common.hcl` and exposed through
+(Sensitive values live in the SOPS-encrypted, committed `secrets.enc.yaml` (ADR-066), decrypted by `common.hcl` and exposed through
 `_base.hcl` — see [ADR-024](024-secrets-management-architecture.md) / [ADR-026](026-cross-account-secret-isolation.md).)
 
 ### Per-Cloud Base Include (`_base.hcl`)

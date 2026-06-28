@@ -63,8 +63,8 @@ single hub manages every cluster.
 
 ### SSO Integration
 
-ArgoCD authenticates users via Dex and SAML, integrated with AWS Identity Center (ADR-012). Group
-claims from SAML drive RBAC within ArgoCD.
+ArgoCD authenticates users via **Keycloak OIDC** (ADR-053/059); Dex is disabled (`dex_enabled = false`).
+Keycloak group claims drive RBAC within ArgoCD. *(Originally Dex + SAML via AWS Identity Center, ADR-012 — now superseded.)*
 
 ### IRSA for ECR Access
 
@@ -106,7 +106,7 @@ by changing only the live unit's inputs.
 **Negative:**
 
 - ArgoCD is a complex system — server, repo-server, application-controller, Redis, and
-  optionally Dex. More components to monitor and troubleshoot than Flux's controller-per-concern
+  optionally Dex (disabled on this platform). More components to monitor and troubleshoot than Flux's controller-per-concern
   model.
 - ArgoCD's Helm chart has many configuration options and frequent releases — upgrades require
   review of breaking changes

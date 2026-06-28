@@ -7,7 +7,9 @@
 > **Superseded in part (2026-06-03, [ADR-049](049-tenant-model-team-tenant-zone.md)):** the app/team identity
 > decoupling here carries forward — each app keeps its own identity — but the `team == tenant` container is
 > replaced by the **Team → Tenant → Zone** model, and per-app AWS identity, per-tenant placement, and
-> compliance now live in the v2 `Tenant` claim (design-stage; lands with the rebuild).
+> compliance now live in the v2 `Tenant` claim. **Further superseded by [ADR-067](067-idp-domain-model.md) (v3, LIVE):** the
+> `teams.hcl`/`tenants`/`apps`-map surface was removed at the additive v3 cutover (2026-06-11); the claim kind is
+> now **`XEnvironment`** and Product/Service replaced the app abstraction. Read the body's `teams.hcl`/`apps` plumbing as retired.
 
 ## Context
 

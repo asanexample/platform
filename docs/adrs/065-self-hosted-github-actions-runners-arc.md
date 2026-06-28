@@ -99,7 +99,9 @@ recorded as a follow-up, not built up front.
 ## Decision
 
 Adopt **Actions Runner Controller (ARC)** as the self-hosted runner platform, deployed to the
-**platform EKS cluster via ArgoCD**, to give CI workflows in-VPC reachability for Terragrunt applies
+**platform EKS cluster via Terragrunt (`helm_release`) — not ArgoCD** (ARC is what lets CI manage the
+cluster, so it can't bootstrap itself through the GitOps road it enables; see point 1 and the
+Consequences), to give CI workflows in-VPC reachability for Terragrunt applies
 of cluster-facing units (and any other in-cluster CI work). GitHub-hosted runners + OIDC remain the
 path for AWS-only units and for non-cluster CI (lint, validate, build/sign).
 

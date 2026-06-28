@@ -229,8 +229,8 @@ The full spike (scenarios, build checklist, GO/NO-GO) is `docs/plans/080-triage-
 
 **Spike executed 2026-06-24/25 → GO** (results in the plan doc): the eval mechanism works end-to-end on real injected
 telemetry plus a 12-fixture corpus on Bedrock, the agent abstains on healthy data rather than bluffing, and D2
-change-correlation (ArgoCD + GitHub) is wired and empirically confirmed as the highest-yield signal. The agent build is
-de-risked to proceed; the ADR stays **Proposed** until that build is actually pulled.
+change-correlation (ArgoCD + GitHub) is wired and empirically confirmed as the highest-yield signal. The agent build was
+de-risked, and has since been pulled into production; this ADR is **Accepted** (built + live, 2026-06-24).
 
 ### D7 — Observability of the agent itself (rides ADR-076 — and closes the loop)
 

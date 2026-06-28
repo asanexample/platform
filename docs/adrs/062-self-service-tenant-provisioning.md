@@ -63,7 +63,7 @@ render tests. A Tenant PR auto-merges only if **all** pass:
 2. **Claim schema** — `kubeconform` against the XRD.
 3. **Composition render** — render the Composition against the new claim; must produce valid output.
 4. **Path/diff restriction** — the diff touches **only** the allowed claim path(s)
-   (`gitops/tenant-claims/…/<team>/…`). Any other path → automerge denied, human review required (see §4).
+   (`gitops/environments/…/<team>/<product>/<stage>.yaml`). Any other path → automerge denied, human review required (see §4).
 5. **Aggregate-quota** — `sum(team's existing tenant quotas + this one) ≤ Team.quotaCap`, and tenant-count ≤ a
    per-team cap. CI is *stateful* (it reads every claim file), so it hard-gates what admission cannot: the
    team-aggregate cap is "report-first" at runtime (tenant-api-v2.md) — CI makes it a *blocking* check.

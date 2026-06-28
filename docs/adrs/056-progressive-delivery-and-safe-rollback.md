@@ -232,4 +232,3 @@ freeze (needs per-app SLOs authored in `observability-slo` first). These are fre
 - [ADR-054](054-platform-resilience-and-business-continuity.md) — the SLO/error-budget contract (D5/D6).
 - [ADR-017](017-gateway-api-over-ingress.md) — the Cilium Gateway weighted routing (D4).
 - [ADR-014](014-kyverno-as-policy-engine.md) — the admission layer that must learn `Rollout` (D2).
-</content>

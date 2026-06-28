@@ -146,7 +146,7 @@ and realized by platform-owned machinery.** Specifics:
 - **Bound the Crossplane provisioner role.** Creating buckets/queues/tables needs broad create/delete power — a
   high-value target. Scope the provisioner role to *only the catalog's services*, with a **`refplat-*` name-prefix
   condition** and a **permissions boundary**, so a compromised Composition/provider cannot create arbitrary or
-  non-platform resources. (Today's `crossplane-provisioner` role is ECR-only; widen it deliberately.)
+  non-platform resources. (Today's `crossplane-provisioner` role already manages ECR **and** the per-environment IAM roles — name-prefix-scoped, permissions-boundary-capped; widen it to the new resource services under that same discipline.)
 - **Least-privilege by derivation + explicit `access` intent.** Runtime access is computed by the Composition
   from the provisioned ARN and the claim's `access` field — minimal verbs, scoped to that ARN only. Developers
   never author resource IAM; the deny-set-validated `permissions.aws.policyStatements` remains only as a bounded

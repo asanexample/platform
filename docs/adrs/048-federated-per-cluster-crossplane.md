@@ -10,6 +10,8 @@ tenant control plane and described it running on the platform (hub) cluster. Thi
 Crossplane runs on **each workload cluster** and provisions that cluster's tenants locally, rather than a
 single hub reaching across clusters. The rest of ADR-046 is unchanged.
 
+> **Vocabulary superseded by [ADR-067](067-idp-domain-model.md):** "Tenant"/`Tenant` claim → **Environment**/`XEnvironment` (Team→Product→Service; the intermediate `XTenant` was also removed); `teams.hcl` → the git-native `Team` + `Product` registries. The decision/topology below is unchanged — read the tenant vocabulary as the v2 naming.
+
 ## Context
 
 Tenants run on workload clusters (preprod today, prod later), **not** on the platform (hub) cluster — the

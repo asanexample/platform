@@ -6,7 +6,7 @@
 
 ## Context
 
-ADR-053 chose Keycloak as the app IdP and "access model as code" — declarative source → standard OIDC group/role claims → generated native RBAC per system. But it was written when the model was **`team == tenant`**, so the access-model-as-code generators and the Keycloak group/role taxonomy mirror **only the Team**. The whole live chain is **team-scoped**:
+ADR-053 chose Keycloak as the app IdP and "access model as code" — declarative source → standard OIDC group/role claims → generated native RBAC per system. But it was written when the model was **`team == tenant`**, so the access-model-as-code generators and the Keycloak group/role taxonomy mirror **only the Team**. The intended team-scoped chain is (note: the `DeveloperAccess-<team>` IAM role + EKS access entry are **not actually provisioned today** — regression [#647](https://github.com/asanexample/platform/issues/647); only the in-cluster RoleBinding is emitted, so the AWS→kubectl hops below are the design, not the deployed state):
 
 ```text
 SSO group → Dev-<team> → DeveloperAccess-<team> IAM role → EKS access entry → team-<team>:developers → namespace RoleBinding
@@ -143,5 +143,3 @@ Both layers validate:
 - **Implements the access half of** [ADR-067](067-idp-domain-model.md) (ownership ≠ access; product-scoped; posture from `stage × tier`); this is ADR-067's **P4**.
 - **Builds on** [ADR-040](040-platform-engineer-access-model.md) (posture = `stage × tier`, break-glass), [ADR-041](041-pod-identity-for-tenant-workloads.md)/[ADR-047](047-pod-identity-as-aws-identity-standard.md) (workload identity is Pod Identity — humans don't carry AWS), [ADR-063](063-team-as-first-class-git-object.md) (git-native Team + cluster projection — the pattern §9 reuses), and [ADR-062](062-self-service-tenant-provisioning.md) (the gate + deny-set machinery).
 - **Identity topology** is invariant under [ADR-052](052-centralized-dex-sso-broker.md)/[ADR-059](059-identity-topology-pluggable-idp-seam.md): the upstream IdP stays pluggable; group membership feeds the Team groups; **Customer/end-user auth = the separate broker-seam plane**, out of scope here.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)

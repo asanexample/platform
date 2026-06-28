@@ -32,8 +32,8 @@ Two facts constrain how far we can change this:
 - **GitHub's repo namespace is flat per org.** Two teams cannot both own `shop`. Org Teams do **not** add a
   namespace. So *product-only* repo names require either globally-unique product names or a GitHub org per team.
 
-GitHub org Teams are **not used today** — team identity flows through Keycloak groups (Backstage RBAC, ADR-053),
-the gitops `Team` CR (ADR-063), and the repo-name prefix (supply chain, ADR-050). The motivation here is (a)
+GitHub org Teams were **not used at the time of writing** — team identity flowed through Keycloak groups (Backstage RBAC, ADR-053),
+the gitops `Team` CR (ADR-063), and the repo-name prefix (supply chain, ADR-050). *(As-built: Flavor A has since landed — the `github-teams` unit now derives org Teams + repo push grants from `gitops/teams`/`gitops/products`, epic #532.)* The motivation here is (a)
 nicer repo names and (b) GitHub-native team ownership of app repos.
 
 ## Decision
@@ -59,7 +59,7 @@ nicer repo names and (b) GitHub-native team ownership of app repos.
 4. The Product registry `spec.repo`, the per-Product OIDC role, and Kyverno all key off `spec.repo` already, so
    they follow the new name with no logic change — only the registry value changes.
 
-Flavor A is **low-risk** (the supply-chain trust anchor is untouched in substance) and there are **zero app repos
+Flavor A is **low-risk** (the supply-chain trust anchor is untouched in substance) and there are **zero app repos under the new naming
 today**, so it is a clean cutover with no migration.
 
 ### Flavor B — ideal end state (deferred)

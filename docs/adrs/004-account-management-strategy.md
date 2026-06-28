@@ -241,7 +241,7 @@ capability for adopting an organization created outside this module.
 ### Risks
 
 - **Stale `environment_account_map`.** The safety validation in `_base.hcl` checks each env's account
-  ID against the `environment_account_map` (defined in `common.hcl` / the gitignored `secrets.hcl`).
+  ID against the `environment_account_map` (defined in `common.hcl` / the SOPS-encrypted `secrets.enc.yaml`, ADR-066).
   If a new environment is added without updating the map, validation fails. Mitigation: keep the map
   complete; review/CI should catch omissions.
 - **Root account email compromise.** All AWS accounts use email addresses in the same domain. If

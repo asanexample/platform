@@ -95,7 +95,9 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-053: Identity & Cross-System Authorization Strategy](053-identity-and-cross-system-authorization-strategy.md) | Accepted |
 | [ADR-059: Identity Topology — Keycloak as the Pluggable Identity Seam](059-identity-topology-pluggable-idp-seam.md) | Accepted |
 | [ADR-068: Product-Scoped & Cross-Team Access Model](068-product-scoped-and-cross-team-access-model.md) | Proposed |
-| [ADR-084: Platform Identity Directory and Owner Resolution](084-platform-identity-directory-and-owner-resolution.md) | Proposed |
+| [ADR-084: Platform Identity Directory and Owner Resolution](084-platform-identity-directory-and-owner-resolution.md) | Proposed (Phase 0 + PagerDuty foundation built + live; Phases 1/3 outstanding) |
+| [ADR-087: Keycloak Admin-Plane Hardening — master-realm passkey + sealed break-glass](087-keycloak-admin-plane-hardening.md) | Accepted (built + bound live 2026-06-27) |
+| [ADR-088: Temporary-Power Activation — just-in-time elevation & emergency revocation](088-temporary-power-activation.md) | Proposed (design) |
 
 ## Supply Chain & Delivery
 
@@ -104,11 +106,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-036: GitHub Actions OIDC Federation for CI/CD](036-github-actions-oidc-federation.md) | Accepted |
 | [ADR-042: Isolated Build Provenance for SLSA Build L3](042-isolated-build-provenance-slsa-l3.md) | Accepted |
 | [ADR-050: Shared `build-sign` Reusable Workflow + Shared-Signer Policy Model](050-shared-build-sign-reusable-workflow.md) | Accepted |
-| [ADR-056: Progressive Delivery & Safe Rollback](056-progressive-delivery-and-safe-rollback.md) | Proposed |
-| [ADR-085: Workload Availability — Graceful Draining & Disruption-Tolerance Defaults](085-workload-availability-graceful-disruption-defaults.md) | Proposed |
-| [ADR-086: Autonomous Agent Access — Graduated Autonomy under Machine-Enforced Guardrails](086-autonomous-agent-access.md) | Proposed |
-| [ADR-087: Keycloak Admin-Plane Hardening — master-realm passkey + sealed break-glass](087-keycloak-admin-plane-hardening.md) | Accepted |
-| [ADR-088: Temporary-Power Activation — just-in-time elevation & emergency revocation](088-temporary-power-activation.md) | Proposed |
+| [ADR-056: Progressive Delivery & Safe Rollback](056-progressive-delivery-and-safe-rollback.md) | Accepted (Phase 1 built + applied, both clusters) |
 | [ADR-071: Image-Digest Promotion via the Control Plane (Protected-Main Delivery)](071-digest-promotion-via-control-plane.md) | Accepted |
 | [ADR-072: App-Repo Naming & Team Ownership](072-app-repo-naming-and-team-ownership.md) | Accepted |
 
@@ -129,6 +127,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-080: The Triage Copilot — Propose-Only On-Call Incident Triage](080-triage-copilot.md) | Accepted |
 | [ADR-081: Platform-Team Products on the One Delivery Road](081-platform-service-delivery.md) | Proposed (runtime placement superseded by ADR-082) |
 | [ADR-082: The `XAgent` Platform-Agent Runtime — a GitOps-Native Agent Control Plane](082-platform-agent-runtime-xagent.md) | Accepted (built + live 2026-06-26) |
+| [ADR-086: Autonomous Agent Access — Graduated Autonomy under Machine-Enforced Guardrails](086-autonomous-agent-access.md) | Proposed (draft / sketch) |
 
 ## Observability, Resilience & Compliance Assurance
 
@@ -140,6 +139,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-076: Agent / GenAI Observability](076-agent-observability.md) | Accepted (corrected 2026-06-27) |
 | [ADR-077: Application Instrumentation Strategy](077-application-instrumentation-strategy.md) | Accepted |
 | [ADR-078: Cluster Elasticity — Karpenter + Workload Autoscaling](078-cluster-elasticity-karpenter.md) | Accepted |
+| [ADR-085: Workload Availability — Graceful Draining & Disruption-Tolerance Defaults](085-workload-availability-graceful-disruption-defaults.md) | Accepted (built + live both clusters; replica-floor Enforce 2026-06-27) |
 | [ADR-079: Cloud-Resource Monitoring Scope — Query-Time-First in Grafana](079-cloud-resource-monitoring-scope.md) | Accepted |
 | [ADR-054: Platform Resilience & Business Continuity](054-platform-resilience-and-business-continuity.md) | Proposed |
 | [ADR-055: Compliance Assurance & Continuous Control Evidence](055-compliance-assurance-and-continuous-control-evidence.md) | Proposed |
