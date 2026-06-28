@@ -98,6 +98,15 @@ dependency "networking" {
 - For a pure ordering edge (no outputs consumed), use `mock_outputs = {}` with the same
   allowed-commands list.
 - Cross-account/cross-env deps use a longer relative path, e.g. `config_path = "../../../../preprod/us-east-1/platform/iam-roles"`.
+- ⚠️ **`locals` CANNOT read `dependency.*.outputs`.** Terragrunt evaluates the unit's `locals`
+  block **before** dependency outputs are resolved, so `locals { x = dependency.foo.outputs.bar }`
+  fails at plan with *"local reference … is not evaluated … not ready yet in the current pass"*.
+  Dependency outputs are only available in **`inputs`** (and in `generate` block contents). So:
+  *(a)* reference `dependency.*.outputs` directly in `inputs`, or *(b)* if you need the value to
+  drive `locals`-based generation (e.g. a `fileset`/`yamldecode` registry projection), source it
+  from **`include.base.locals.*`** instead — `include.base.locals` (account IDs, region, tags, the
+  SOPS secrets) **is** available in the `locals` pass. For an ordering-only edge with the value
+  sourced elsewhere, use `dependencies { paths = [...] }` (not a `dependency` block).
 
 ### Inputs — pull from `include.base.locals.*` and dependency outputs
 
