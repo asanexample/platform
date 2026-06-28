@@ -223,5 +223,5 @@ inputs = {
   # (master console login unchanged); after a passkey is enrolled on the master `admin`, flip
   # enforce_master_browser_mfa = true to bind. Built now, bind deferred to the master-passkey enrollment.
   manage_master_admin        = true
-  enforce_master_browser_mfa = false
+  enforce_master_browser_mfa = true
 }
