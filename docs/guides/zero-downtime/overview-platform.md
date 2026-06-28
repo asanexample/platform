@@ -149,12 +149,12 @@ fields. (This was found in prod; the offline spikes couldn't surface it.) Wired 
   preprod tenants); the Grafana "Argo Rollouts" dashboard reads the **federated** datasource, so it
   shows rollouts from both clusters in one pane. The native UI is the per-cluster operator console.
 
-## Operate / extend (pointers — runbooks are a planned follow-on)
+## Operate / extend
 
-- Verify a workload is paved: `kubectl get rollout,pdb,svc -n <ns>` — you should see the PDB, the
-  stable+canary Services, and (prod) the analysis on the canary steps.
-- A metric gate returning **no data** usually means the spoke→hub Mimir **read path** is down (we hit
-  a post-unpark query-frontend degradation once) or the SLO rules aren't syncing into the ruler.
-- Tuning the availability defaults, adding a new analysis gate, or onboarding a per-app SLO are
-  `policy` / `observability-mimir` / scaffolder changes — see ADR-085 / ADR-056 and the
-  `kyverno-policy-authoring` + `observability-authoring` guidance.
+- **Extend / tune** — enable/disable a default, change a value, flip a validate to Enforce, add a
+  metric gate, onboard or customize an SLO: the [extend & tune how-to](how-to-extend-platform.md).
+- **Operate / debug** — a Degraded rollout, a gate with no data (incl. the post-unpark Mimir
+  read-path fix), the freeze blocking deploys, ArgoCD fighting the canary, the web UI hanging: the
+  [operations runbook](../../runbooks/rollout-and-gate-operations.md).
+- Quick paved-ness check: `kubectl get rollout,pdb,svc,analysistemplate -n <ns>` — expect the PDB,
+  the stable+canary Services, and (prod) the analysis on the canary steps.
