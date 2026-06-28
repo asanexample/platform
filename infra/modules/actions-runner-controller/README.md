@@ -15,12 +15,26 @@ workloads). Because ARC is what lets CI manage the cluster, its unit is applied 
 - A repo-scoped **gha-runner-scale-set** (`runs-on: platform-infra`), running the custom
   `platform/gha-runner` toolchain image, scale-to-zero, no docker-in-docker.
 - An **ExternalSecret** projecting the GitHub App creds (Secrets Manager → `arc-github-app`).
+- The runner's **AWS identity**: a dedicated `${cluster}-arc-runner` IAM role + inline policy, the runner
+  `ServiceAccount`, and an **EKS Pod Identity association** binding them.
 
 ## Scope (this module)
 
-Gets runners **registered and idle**. The privileged AWS-creds path — runner Pod Identity → assume
-`PlatformDeployer`, the `PlatformDeployer` trust amendment, and the `terragrunt plan` smoke proof — lands
-separately so the high-privilege bits review on their own.
+This module implements the **full** runner→AWS-creds path, not just registration. Runner pods get AWS
+credentials via **EKS Pod Identity** bound to a dedicated, narrowly-scoped `${cluster}-arc-runner` role.
+Its inline policy grants exactly what a CI `terragrunt apply` needs and nothing more:
+
+- `sts:AssumeRole` + `sts:TagSession` into **`PlatformDeployer`** (providers/secrets/keycloak
+  port-forward) and the cross-account deployers in `additional_deployer_role_arns` (e.g. preprod, for
+  registry-reconcile applying another account's units).
+- `sts:AssumeRole` + `sts:TagSession` into **`TerraformStateAccess`** (the S3/DynamoDB backend in the
+  management account; terragrunt assumes it separately with a tagged session — hence `TagSession`).
+- `kms:Decrypt`/`kms:DescribeKey` on the **SOPS config key** (ADR-066), alias-scoped to `platform-sops`
+  so it's not a blanket decrypt — for decrypting `secrets.enc.yaml` at config-eval.
+
+So the runner carries real apply-privilege. The high-privilege trust amendments live on the assumed
+roles (the `PlatformDeployer`/`TerraformStateAccess` trust policies must allow this runner role +
+`sts:TagSession`).
 
 ## Prerequisites
 

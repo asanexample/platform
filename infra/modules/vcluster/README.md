@@ -2,7 +2,7 @@
 
 Deploys a vCluster (virtual Kubernetes cluster) instance on a host cluster via Helm. Creates a dedicated namespace with platform labels, configures the vCluster control plane with optional persistence, resource limits, and resource sync rules. Supports syncing ingresses, storage classes, nodes, and custom resources between the virtual and host clusters. Built-in policies for resource quotas, limit ranges, and network policies can be toggled individually.
 
-**Note:** vCluster mode is currently deferred (ADR-033) because OSS vCluster cannot sync HTTPRoute CRDs to the host cluster's Gateway. The `tenant` module defaults all teams to `namespace` mode instead.
+**Note:** vCluster mode is currently deferred (ADR-033) because OSS vCluster cannot sync HTTPRoute CRDs to the host cluster's Gateway. All teams run in `namespace`-isolation mode instead; this module is **not** wired into the current Crossplane Environment provisioning path (ADR-067).
 
 ## Usage
 
@@ -12,8 +12,6 @@ module "vcluster" {
 
   cluster_name = "team-isolated"
   namespace    = "vc-isolated"
-  environment  = "preprod"
-  region_abbv  = "use1"
 
   chart_version       = "0.34.1"
   persistence_enabled = true
@@ -48,8 +46,6 @@ module "vcluster" {
   create       = false
   cluster_name = "team-isolated"
   namespace    = "vc-isolated"
-  environment  = "preprod"
-  region_abbv  = "use1"
 }
 ```
 
@@ -61,8 +57,6 @@ module "vcluster" {
 
   cluster_name = "team-isolated"
   namespace    = "vc-isolated"
-  environment  = "preprod"
-  region_abbv  = "use1"
 
   custom_resource_sync = [
     {
@@ -135,7 +129,7 @@ No modules.
 - The module creates its own namespace (`kubernetes_namespace`) and sets `create_namespace = false` on the Helm release to ensure proper label management.
 - The kubeconfig for the virtual cluster is stored in a Kubernetes secret named `vc-<cluster_name>` in the vCluster namespace.
 - Persistence is enabled by default. Set `persistence_enabled = false` for ephemeral clusters, but note that data is lost on pod restart.
-- This module is typically invoked indirectly via the `tenant` module when a tenant's `mode` is set to `"vcluster"`.
+- This module is not currently invoked by any live unit — vCluster isolation is deferred (ADR-033) and the Environment provisioning path uses namespace isolation only (ADR-067).
 
 ## Related ADRs
 

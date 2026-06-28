@@ -71,3 +71,13 @@ module "observability" {
 - **emptyDir → PVC is an in-place StatefulSet recreation** (operator-driven, immutable volumeClaimTemplates).
   It deadlocks `helm --wait`; do that migration with `helm_wait=false`. See the troubleshooting runbook.
 - Dashboards are provisioned as code from `dashboards/*.json` (Grafana sidecar ConfigMaps).
+- **Alerting receivers (SNS / Slack / PagerDuty / triage).** Beyond the SNS receiver, Alertmanager can
+  also fan out to **Slack** (`slack_webhook_secret_name` / `slack_channel`), **PagerDuty**
+  (`pagerduty_routing_key_secret_name`), and the **triage-agent** webhook (`triage_webhook_url`, ADR-082)
+  — all opt-in, wired only when their inputs are set.
+- **Grafana SSO (Keycloak OIDC).** Set `grafana_oidc_issuer` / `grafana_oidc_client_id` /
+  `grafana_oidc_secret_manager_key` (+ `grafana_oidc_role_attribute_path` for role mapping) to log into
+  Grafana via Keycloak (#592); the client secret is projected from Secrets Manager. Admin-password auth
+  remains the fallback.
+- **Grafana CloudWatch datasource (P5a).** `cloudwatch_enabled = true` adds a CloudWatch datasource (read
+  access via the same Pod Identity path) so AWS metrics are queryable alongside the Prometheus/Mimir data.

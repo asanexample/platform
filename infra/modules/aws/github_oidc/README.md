@@ -110,7 +110,7 @@ No modules.
 
 ## Notes
 
-- The OIDC thumbprint is set to all `f`s, which is the recommended approach for GitHub Actions since AWS validates the certificate chain rather than a pinned thumbprint.
+- The OIDC thumbprint is set to all `f`s because AWS no longer validates GitHub OIDC thumbprints (since July 2023) — a dummy value is still required by the API, so this placeholder is intentional.
 - One OIDC provider is created per account (singleton); each entry in `roles` becomes a separate IAM role scoped to its own `repos`. Map key = IAM role name.
 - Branch patterns that do not start with `refs/` are automatically prefixed with `refs/heads/`.
 - Event-based claims (e.g., `pull_request`) are combined with branch-based claims in each role's trust policy using `StringLike`.

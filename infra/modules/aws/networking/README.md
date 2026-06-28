@@ -10,9 +10,6 @@ module "networking" {
 
   vpc_name      = "vpc-platform-ops-use1"
   address_space = ["10.100.0.0/16"]
-  environment   = "ops"
-  workload      = "platform"
-  region_abbv   = "use1"
 
   subnets = {
     "snet-platform-ops-public-use1-a" = {
@@ -56,10 +53,7 @@ module "networking" {
   source = "../../modules/aws/networking"
   create = false
 
-  vpc_name    = "unused"
-  environment = "dev"
-  workload    = "platform"
-  region_abbv = "use1"
+  vpc_name = "unused"
 }
 ```
 
@@ -71,9 +65,6 @@ module "networking" {
 
   vpc_name            = "vpc-dev-use1"
   address_space       = ["10.50.0.0/16"]
-  environment         = "dev"
-  workload            = "platform"
-  region_abbv         = "use1"
   create_nat_gateways = false
 
   subnets = {
@@ -98,9 +89,6 @@ module "networking" {
 
   vpc_name                = "vpc-airgapped-use1"
   address_space           = ["10.60.0.0/16"]
-  environment             = "prod"
-  workload                = "hipaa"
-  region_abbv             = "use1"
   create_internet_gateway = false
   create_nat_gateways     = false
 
@@ -127,9 +115,6 @@ module "networking" {
 
   vpc_name           = "vpc-preprod-use1"
   address_space      = ["10.200.0.0/16"]
-  environment        = "preprod"
-  workload           = "platform"
-  region_abbv        = "use1"
   single_nat_gateway = true
 
   subnets = {

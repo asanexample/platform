@@ -213,8 +213,9 @@ No modules.
 - The `configHash` Helm value forces a rollout on any values change, even if the structural diff is empty.
 - Cilium is installed into `kube-system` by default (not a custom namespace).
 - **Switching `ipam_mode` on a running cluster is disruptive** (existing pods keep their old IPs with no matching CiliumNode PodCIDR). Roll it out by scaling node groups to 0, applying, then scaling back up — new nodes come up on the new datapath. The variable surface doubles as a clean rollback (flip back to `eni`/`native`).
-- **Overlay + IMDS:** with masquerade, verify tenant pods still cannot reach IMDS (`169.254.169.254`) — link-local must stay masquerade-excluded so the IMDSv2 hop-limit defense holds. Tenant infra (incl. IMDS isolation) is now provisioned by the Crossplane Tenant Composition (ADR-046/048).
+- **Overlay + IMDS:** with masquerade, verify tenant pods still cannot reach IMDS (`169.254.169.254`) — link-local must stay masquerade-excluded so the IMDSv2 hop-limit defense holds. Environment infra (incl. IMDS isolation) is now provisioned by the Crossplane Environment Composition (ADR-046/048/067).
 - `bpf_masquerade = true` requires `egress_masquerade_interfaces = ""` (eBPF masquerade ignores the interface glob); the module enforces this via a precondition.
+- `prometheus_service_monitor_enabled` is **not wired** — `main.tf` hardcodes the agent's `serviceMonitor.enabled = false` regardless of the input, so setting it has no effect (Prometheus scrapes Cilium via the annotation-based discovery instead).
 
 ## Related ADRs
 

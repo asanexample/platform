@@ -9,8 +9,9 @@ Cross-account S3 access from an IAM role requires grants on **both** ends: this 
 caller's own identity policy (granted on the team role via the `iam_roles` module). Used to give a
 tenant's EKS Pod Identity role read access to a shared dataset in another account (see ADR-041).
 
-The module is team-agnostic: the per-bucket `reader_role_arns` are assembled at the terragrunt unit from
-`teams.hcl`.
+The module is team-agnostic: the per-bucket `reader_role_arns` are assembled at the terragrunt unit,
+derived per-Product from the registries (`gitops/products/` / the `XEnvironment` claims) — not the
+retired `teams.hcl`.
 
 ## Usage
 

@@ -147,7 +147,7 @@ No modules.
 
 ## Notes
 
-- Organization, OUs, and accounts have `prevent_destroy` lifecycle rules to avoid accidental deletion.
+- The Organization and OUs have `prevent_destroy` lifecycle rules to avoid accidental deletion. Accounts do **not** — they instead set `close_on_deletion = false` (removing an account from state never closes the AWS account) and `ignore_changes = [role_name]`.
 - Set `create_organization = false` (the default) to use a data source for an existing organization rather than creating a new one.
 - Built-in SCPs exempt roles listed in `exempt_roles` from deny statements using `ArnNotLike` conditions. The default exemption is `OrganizationAccountAccessRole`.
 - The `service_control_policies` variable replaces all built-in SCPs when set. Use it only if you need complete control over SCP content.

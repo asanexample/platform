@@ -5,13 +5,16 @@ cluster** ([ADR-048](../../../docs/adrs/048-federated-per-cluster-crossplane.md)
 Crossplane and provisions its own environments locally. Part of the BACK stack
 ([ADR-046](../../../docs/adrs/046-back-stack-for-developer-self-service.md)).
 
-Two roles, selected by inputs:
+Roles, selected by inputs:
 
 - **Platform (hub) cluster** — Upbound AWS provider family (Pod Identity) for shared AWS provisioning (P1:
-  ECR repositories).
+  ECR repositories). The hub **also** hosts the **Agent control plane** (`enable_agent_api`, ADR-082): the
+  `XAgent` XRD + Composition (`charts/agent-api`) plus its admission policies (`charts/agent-policies`,
+  `restrict-agent-envelope` / `restrict-agent-control-plane`) — provisioning **platform agents** (hub-local
+  platform infra), which is independent of, and never co-enabled with, the tenant `enable_environment_api`.
 - **Workload clusters (preprod/prod)** — `provider-kubernetes` (in-cluster) + the Upbound AWS provider
-  family (`ecr`/`iam`/`eks`, Pod Identity) + Composition Functions + the **`Environment` XRD/Composition**
-  (`charts/environment-api`). A single `Environment` claim provisions a **complete** environment: the Kubernetes side
+  family (`ecr`/`iam`/`eks`, Pod Identity) + Composition Functions + the **`XEnvironment` XRD/Composition**
+  (`charts/environment-api`). A single `XEnvironment` provisions a **complete** environment: the Kubernetes side
   (namespace, ResourceQuota/LimitRange, NetworkPolicies, CiliumNetworkPolicies, developer RoleBinding,
   per-team Kyverno `restrict-images`/`restrict-route-hostnames`) **and** the AWS side (`Pod-team-<team>` IAM
   role + EKS Pod Identity association, cross-account ECR repo). *(The `DeveloperAccess-<team>` IAM role + EKS
@@ -23,8 +26,8 @@ Two roles, selected by inputs:
 Claims are delivered by the `argocd-apps` registry-sync of `gitops/environments/` (one Application per `XEnvironment`
 claim), **not** a Terragrunt unit — the old `tenant-claims` unit is retired.
 The cosign/SLSA supply-chain policies (`verify-images`/`verify-attestations`) are **not** in the claim — they
-stay platform-owned in the `policy` module (applied to all teams, including migrated ones via its
-`migrated_teams` input).
+stay platform-owned in the `policy` module (applied to all products, derived from the Product registry
+via the module's `verify_subjects_product` input).
 
 The two Kyverno policies that govern the environment **control plane** itself — `restrict-environment-envelope`
 ([ADR-049](../../../docs/adrs/049-tenant-model-team-tenant-zone.md)) and `restrict-environment-control-plane` (ADR-046/048) — **do**
@@ -99,14 +102,26 @@ helm_release.crossplane_runtime  DeploymentRuntimeConfig (pins SA "provider-aws"
         │                        aws.upbound.io ProviderConfig CRD is Established
 helm_release.crossplane_config   ProviderConfig (credentials.source: PodIdentity)
 
+# Workload clusters (enable_environment_api):
+helm_release.crossplane_environment_api       XEnvironment XRD + Composition (charts/environment-api)
+helm_release.crossplane_environment_policies  control-plane Kyverno policies (charts/environment-policies)
+
+# Hub only (enable_agent_api, ADR-082):
+helm_release.crossplane_agent_api             XAgent XRD + Composition (charts/agent-api)
+helm_release.crossplane_agent_policies        XAgent admission policies (charts/agent-policies)
+
 aws_iam_role.provisioner         scoped to ECR repository/team-*  ──┐
 aws_eks_pod_identity_association (crossplane-system, provider-aws) ─┘  credentials the provider pods
 ```
 
-Why three Helm releases: the `aws.upbound.io` ProviderConfig CRD is installed by the provider **package**
-(asynchronously), not the core chart. Splitting runtime (providers + a Healthy-gate Job) from config
-(ProviderConfig) lets the gate guarantee the CRD exists before the ProviderConfig is applied — avoiding the
-`kubernetes_manifest` CRD-at-plan-time problem (same rationale as the `policy` module's local chart).
+The module creates up to **seven** Helm releases — the three core releases above are always present, plus
+the two `environment-*` releases on workload clusters (`enable_environment_api`) and the two `agent-*`
+releases on the hub (`enable_agent_api`). Why split the core three: the `aws.upbound.io` ProviderConfig CRD
+is installed by the provider **package** (asynchronously), not the core chart. Splitting runtime (the
+providers plus a Healthy-gate Job) from config (ProviderConfig) lets the gate guarantee the CRD exists
+before the ProviderConfig is applied — avoiding the `kubernetes_manifest` CRD-at-plan-time problem (same rationale as
+the `policy` module's local chart). The `*-api`/`*-policies` releases are likewise local charts that install
+their XRDs before the policies that match them.
 
 ## Acceptance / smoke test
 
