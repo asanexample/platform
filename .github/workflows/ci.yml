@@ -71,21 +71,44 @@ jobs:
         with:
           tofu_version: ${{ needs.versions.outputs.opentofu }}
 
-      # Scope: a PR that changes no infra/**/*.tf can't change module validation — short-circuit to green (the
-      # job still runs + reports, so it stays a valid required check). Push events always run the full validate.
-      - name: Scope to infra changes
+      # Scope (modules are independent leaves — a change in one can't affect another's validation):
+      #   - push/main           -> full sweep of every module.
+      #   - PR touching the harness (this workflow, the validate script, or /.tool-versions) -> full sweep,
+      #     since those can affect ALL modules and must stay tested.
+      #   - PR touching specific modules -> validate ONLY those module dirs (resolved to the nearest ancestor
+      #     containing *.tf, so a changed chart/.tftpl re-validates its owning module). Most PRs hit 1-3.
+      #   - PR touching no module -> skip (run=false). The job still runs + reports, so it stays a valid
+      #     required check.
+      - name: Scope to changed modules
         id: scope
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          mods_file="$RUNNER_TEMP/changed-modules.txt"; : > "$mods_file"
           if [ "${{ github.event_name }}" != "pull_request" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"; echo "non-PR event → full validate"; exit 0
           fi
-          if gh api "repos/${{ github.repository }}/pulls/${{ github.event.number }}/files" --paginate \
-               --jq '.[].filename' | grep -qE '^infra/.*\.tf$'; then
-            echo "run=true" >> "$GITHUB_OUTPUT"; echo "infra/*.tf changed → validating"
+          files=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.number }}/files" --paginate --jq '.[].filename')
+          # Harness change → full sweep (affects every module).
+          if echo "$files" | grep -qE '^(\.github/scripts/ci/validate-modules\.sh|\.github/workflows/ci\.yml|\.tool-versions)$'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"; echo "validate harness changed → full validate"; exit 0
+          fi
+          # Resolve each changed file under infra/modules/ to its owning module dir (nearest ancestor with *.tf).
+          while IFS= read -r f; do
+            case "$f" in infra/modules/*) ;; *) continue ;; esac
+            d=$(dirname "$f")
+            while [ "$d" != "." ] && [ "$d" != "infra/modules" ]; do
+              if compgen -G "$d/*.tf" > /dev/null 2>&1; then echo "$d" >> "$mods_file"; break; fi
+              d=$(dirname "$d")
+            done
+          done <<< "$files"
+          sort -u -o "$mods_file" "$mods_file"
+          if [ -s "$mods_file" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "mods_file=$mods_file" >> "$GITHUB_OUTPUT"
+            echo "changed modules:"; cat "$mods_file"
           else
-            echo "run=false" >> "$GITHUB_OUTPUT"; echo "no infra/*.tf changed → skipping module validation"
+            echo "run=false" >> "$GITHUB_OUTPUT"; echo "no module changed → skipping module validation"
           fi
 
       # Persist the provider plugins across runs; restore-keys give a partial hit when versions change.
@@ -98,9 +121,18 @@ jobs:
           restore-keys: |
             tofu-plugins-${{ runner.os }}-
 
-      - name: Validate all modules
+      # No args -> full sweep; a scoped PR passes just its changed module dirs. Either way the script fans
+      # init+validate out across the runner's cores (xargs -P).
+      - name: Validate modules
         if: steps.scope.outputs.run == 'true'
-        run: .github/scripts/ci/validate-modules.sh
+        env:
+          MODS_FILE: ${{ steps.scope.outputs.mods_file }}
+        run: |
+          if [ -n "${MODS_FILE:-}" ] && [ -s "${MODS_FILE:-}" ]; then
+            xargs -a "$MODS_FILE" .github/scripts/ci/validate-modules.sh
+          else
+            .github/scripts/ci/validate-modules.sh
+          fi
 
   terragrunt-hclfmt:
     name: Terragrunt HCL Format
