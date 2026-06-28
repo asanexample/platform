@@ -280,10 +280,31 @@ Each maps onto concrete structure:
   reconcile; `status` carries standard `conditions`. Consumers (Backstage, the drift detector) depend on this
   contract.
 - **Operational lifecycle & resource hygiene.** Graceful shutdown (drain in-flight reconciles, release the
-  leader lock); **leader election** for HA (the kill-switch must stay available); health/readiness probes;
-  honor `context` cancellation everywhere; no goroutine or connection leaks (`defer Close`, bounded
-  concurrency); rate-limit/back-off external calls (cache reads via informers). Configuration is explicit
-  (flags/env/CR), with sane defaults and **fail-fast on misconfiguration** at startup.
+  leader lock); health/readiness probes; honor `context` cancellation everywhere; no goroutine or connection
+  leaks (`defer Close`, bounded concurrency); rate-limit/back-off external calls (cache reads via informers).
+  Configuration is explicit (flags/env/CR), with sane defaults and **fail-fast on misconfiguration** at
+  startup.
+
+### High availability
+
+HA is required, and it differs by plane:
+
+- **Controller — active-*passive*, via controller-runtime leader election** (the framework built-in; on by
+  default in Kubebuilder, backed by a `Lease`). Run ≥ 2 replicas; **one leader reconciles, the rest are warm
+  standbys.** Active-active is deliberately *avoided* — two reconcilers racing one `Activation` would
+  double-mint/revoke against the serial-SSO path. The ADR-085 mutate auto-injects the PDB + zone/node
+  topology-spread, so replicas land across failure domains for free.
+- **Intake API — active-active**, the normal stateless way: N replicas behind a Service, all serving. No
+  leader election.
+- **State rides existing HA:** active grants in etcd (the cluster's, already HA); audit in CNPG Postgres
+  (its own HA, subject to the known CNPG backup/failover caveats in the backlog).
+- **Failover is leak-safe, not instant.** On leader loss there is a lease-duration gap (~15s) with no
+  reconcile — but all durable state is `status.expiresAt` + the CRs, so **nothing leaks**; auto-expiry pauses
+  and catches up when a standby takes the lease.
+- **The emergency guarantee is independence, not the controller's HA.** Per ADR-088, the recovery floor
+  (`platctl access grant`/`revoke` + the IAM-user break-glass) has **no dependency on the controller**, so a
+  total controller outage cannot block emergency revoke. Leader-election HA keeps the *convenient* path up;
+  the *recovery* path is guaranteed by being out-of-band entirely.
 - **Simplicity, maintainability, operability.** Prefer the simplest design that meets the need — YAGNI, least
   astonishment, readable over clever, no premature abstraction. Godoc on exported symbols and package docs;
   an operator **runbook** (debug a stuck `Activation`, use the kill-switch, read the audit trail); small,
