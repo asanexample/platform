@@ -41,6 +41,10 @@ locals {
     configs = {
       params = {
         "server.insecure" = var.server_insecure
+        # ADR/#894: ServerSideDiff — diff via server-side apply dry-run, matching the sync-status computation.
+        # Eliminates the benign empty-diff OutOfSync on SSA-applied canary Rollouts/HTTPRoutes co-owned by
+        # the rollouts/cilium controllers.
+        "controller.diff.server.side" = "true"
       }
 
       cm = merge(
