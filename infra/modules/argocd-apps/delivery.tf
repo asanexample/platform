@@ -176,6 +176,11 @@ resource "helm_release" "product_appset" {
           ignoreDifferences = [
             { group = "", kind = "Service", jqPathExpressions = [".spec.selector"] },
             { group = "gateway.networking.k8s.io", kind = "HTTPRoute", jqPathExpressions = [".spec.rules[].backendRefs[].weight"] },
+            # #894: under ServerSideApply, foreign controllers co-own these via Update (rollouts-controller on the
+            # Rollout, cilium-operator-generic on the HTTPRoute), producing an empty-diff-but-OutOfSync artifact.
+            # Ignore the fields those trusted managers own so sync status reflects real drift only.
+            { group = "argoproj.io", kind = "Rollout", managedFieldsManagers = ["rollouts-controller"] },
+            { group = "gateway.networking.k8s.io", kind = "HTTPRoute", managedFieldsManagers = ["cilium-operator-generic"] },
           ]
         }
       }
