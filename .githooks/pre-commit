@@ -46,7 +46,7 @@ if [ -n "$MODULE_TF" ]; then
     DIRS=$(echo "$MODULE_TF" | xargs -n1 dirname | sort -u)
     for dir in $DIRS; do
       if [ -f "$dir/README.md" ] && grep -q "BEGIN_TF_DOCS" "$dir/README.md" 2>/dev/null; then
-        terraform-docs markdown table --output-file README.md --output-mode inject "$dir" > /dev/null 2>&1
+        terraform-docs --config .terraform-docs.yml "$dir" > /dev/null 2>&1  # config sets formatter/output/sort
         if ! git diff --quiet "$dir/README.md" 2>/dev/null; then
           echo "terraform-docs: $dir/README.md is out of date (auto-updated, re-stage it)"
           git add "$dir/README.md"

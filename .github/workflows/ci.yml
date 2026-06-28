@@ -183,6 +183,63 @@ jobs:
             echo "No changed markdown files to lint."
           fi
 
+  # Documentation-currency backstops (see the `maintaining-docs` skill for the judgment layer).
+  # Deterministic guards against the doc-drift the 2026-06 audit found: modules shipping with no
+  # README, and module code changing without its terraform-docs block being regenerated.
+  doc-currency:
+    name: Doc Currency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      # Backstop 1 (always, full sweep): every leaf module under infra/modules/ has a README.md.
+      # New modules with no README fail; pre-existing debt is tolerated only via the shrinking
+      # baseline in known-missing-readmes.txt.
+      - name: Module READMEs exist
+        run: .github/scripts/docs/check-module-readmes.sh
+
+      - name: Install terraform-docs (pinned in /.tool-versions)
+        run: |
+          VERSION=$(awk '$1=="terraform-docs"{print $2}' .tool-versions)
+          curl -fsSL -o /tmp/tfdocs.tar.gz \
+            "https://github.com/terraform-docs/terraform-docs/releases/download/v${VERSION}/terraform-docs-v${VERSION}-linux-amd64.tar.gz"
+          tar -xzf /tmp/tfdocs.tar.gz -C /tmp terraform-docs
+          sudo install /tmp/terraform-docs /usr/local/bin/terraform-docs
+          terraform-docs --version
+
+      # Backstop 2 (scoped to CHANGED modules): a module whose code changed must have its
+      # terraform-docs README block regenerated. Scoping to changed modules ratchets the fix in
+      # without failing on untouched pre-existing staleness (mirrors tofu-validate scoping).
+      # ${{ }} via env, not interpolated into the script (semgrep run-shell-injection / #112).
+      - name: terraform-docs fresh on changed modules
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            RANGE="origin/${BASE_REF}...HEAD"
+          else
+            RANGE="HEAD~1"
+          fi
+          mods="$RUNNER_TEMP/changed-mods.txt"; : > "$mods"
+          # Resolve each changed file under infra/modules/ to its owning module dir (nearest ancestor with *.tf).
+          git diff --name-only --diff-filter=ACM "$RANGE" -- 'infra/modules/**' | while IFS= read -r f; do
+            d=$(dirname "$f")
+            while [ "$d" != "." ] && [ "$d" != "infra/modules" ]; do
+              if compgen -G "$d/*.tf" > /dev/null 2>&1; then echo "$d" >> "$mods"; break; fi
+              d=$(dirname "$d")
+            done
+          done
+          sort -u -o "$mods" "$mods"
+          if [ -s "$mods" ]; then
+            echo "changed modules:"; cat "$mods"
+            xargs -a "$mods" .github/scripts/docs/check-terraform-docs.sh
+          else
+            echo "No module code changed -> terraform-docs check skipped."
+          fi
+
   gate-scripts:
     # Run the gitops/teams gate-script unit tests (verdict, validators) — these guard security-critical merge
     # gating (release-approver #501, prod #377, deletions #283). Previously local-only, which let a classify-diff

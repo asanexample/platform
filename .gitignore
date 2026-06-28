@@ -110,6 +110,7 @@ bin/
 !.claude/skills/observability-authoring/
 !.claude/skills/backstage-portal/
 !.claude/skills/authoring-platform-agents/
+!.claude/skills/maintaining-docs/
 # Vendored third-party skill (pinned + audited — see PROVENANCE.md):
 !.claude/skills/terraform-skill/
 # Shared team settings (MCP allow-list, hooks, etc.). The personal settings.local.json stays ignored.
