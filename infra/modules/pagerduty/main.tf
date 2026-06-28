@@ -53,7 +53,7 @@ data "pagerduty_vendor" "prometheus" {
 resource "pagerduty_schedulev2" "team" {
   for_each = var.teams
 
-  name      = "${each.key}-oncall"
+  name      = "${each.key}-on-call"
   time_zone = "America/Los_Angeles"
 
   rotation {
