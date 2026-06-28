@@ -132,8 +132,8 @@ Root
   |
   +-- Platform
   |     Inherited: [all 4 root SCPs]
-  |     Direct: protect-data-and-network
-  |     Effective: 5 SCPs (4 inherited + 1 direct)
+  |     Direct: protect-data-and-network, require-tagging, restrict-iam-users
+  |     Effective: 7 SCPs (4 inherited + 3 direct)
   |
   +-- Workloads
         Inherited: [all 4 root SCPs]
@@ -160,7 +160,7 @@ Root
 attached SCPs count. This means:
 
 - Root: 4 direct, 1 slot remaining.
-- Platform: 1 direct, 4 slots remaining.
+- Platform: 3 direct, 2 slots remaining.
 - Workloads: 3 direct, 2 slots remaining.
 - Preprod/Prod/Regulated: 0 direct, **5 slots remaining each**.
 
@@ -208,12 +208,14 @@ by default. This is an AWS best practice because:
 
 ### Test Account Placement
 
-The **Test** account (the Terratest sandbox) sits in the **Platform** OU, not Workloads/Preprod. This
-is deliberate: there it inherits only the root SCPs + `protect-data-and-network`, and **not** the
-Workloads `require-tagging` / `restrict-iam-users` SCPs — which would otherwise block a
-create-and-destroy test sandbox from making IAM resources or untagged fixtures. Its IaC still runs via
-`PlatformDeployer` like every other account (see [ADR-040](040-platform-engineer-access-model.md) and
-the test-sandbox runbook).
+The **Test** account (the Terratest sandbox) sits in the **Platform** OU, not Workloads/Preprod. With
+the post-audit attachments, the Platform OU now carries the **same** SCPs as Workloads
+(`protect-data-and-network`, `require-tagging`, `restrict-iam-users`), so the Test account inherits
+them too — it is **not** placed there to dodge those controls. What unblocks the create-and-destroy
+sandbox is role-level exemption, not OU placement: the Terratest CI role (`github-actions-terratest`)
+and `PlatformDeployer` are in the org's `exempt_roles`, so their applies aren't blocked by
+`require-tagging` / `DenyTeamTagTampering`. Its IaC runs via `PlatformDeployer` like every other
+account (see [ADR-040](040-platform-engineer-access-model.md) and the test-sandbox runbook).
 
 ## Consequences
 
@@ -238,10 +240,11 @@ the test-sandbox runbook).
 - **Platform OU is a catch-all.** Currently there is no sub-OU structure under Platform. As the
   number of platform accounts grows (networking, security, logging, CI/CD), a flat OU may become
   difficult to manage. Mitigation: sub-OUs can be added later without disrupting existing accounts.
-- **No dedicated Sandbox OU.** The Test (Terratest sandbox) account lives in the Platform OU to dodge
-  the Workloads tagging/IAM restrictions (see "Test Account Placement"). That covers the CI-sandbox
-  case; a dedicated root-level Sandbox OU may still be worth adding if interactive experimentation
-  accounts proliferate.
+- **No dedicated Sandbox OU.** The Test (Terratest sandbox) account lives in the Platform OU and now
+  inherits the same SCPs as the most-privileged account; the sandbox is unblocked by exempting its CI
+  role, not by OU placement (see "Test Account Placement"). That covers the CI-sandbox case; a dedicated
+  root-level Sandbox OU — where the tagging/IAM SCPs could be deliberately *omitted* rather than
+  role-exempted — may still be worth adding if interactive experimentation accounts proliferate.
 - **Regulated OU is unused.** The Regulated OU exists but has no accounts yet and the HIPAA SCP is
   not enabled. This is forward-looking design, but empty OUs add visual noise.
 - **OU renames are state-breaking.** The `for_each` key for OUs is the OU name (e.g.,
