@@ -34,6 +34,13 @@ while the underlying pods drain gracefully and never all disappear at once.
 4. [Reference: automatic vs your responsibility](reference-automatic-vs-yours.md) — the look-up tables + the knobs
 5. [Troubleshooting](troubleshooting-developers.md) — when a rollout doesn't do what you expect
 
+### The platform-engineer path
+
+1. [Internals](overview-platform.md) — the full mechanism, component by component
+2. [Extend & tune how-to](how-to-extend-platform.md) — toggles, value changes, flip-to-Enforce, add a gate, SLOs
+3. [Operations runbook](../../runbooks/rollout-and-gate-operations.md) — diagnose a Degraded rollout, no-data gates, the freeze, ArgoCD fights, the UI hang
+4. [Architecture](../../architecture/zero-downtime-deployments.md) — components, flows, the decision map
+
 ## What you get, by stage
 
 | Stage | Rollout strategy | Gates |
@@ -50,7 +57,7 @@ freeze. Deferred: the regulated-tier manual gate (W10). See the
 [architecture doc](../../architecture/zero-downtime-deployments.md#as-built-status) for the precise
 as-built breakdown.
 
-> **Scope.** The developer set (overview, tutorial, how-to, reference, troubleshooting), the platform
-> internals, and the architecture are all here. Still planned: platform-engineer *how-to* guides (add
-> a gate, tune the availability defaults), operational *runbooks*, a *glossary*, and a *demo
-> walkthrough*.
+> **Scope.** Both audiences are now covered end to end — the developer set (overview, tutorial,
+> how-to, reference, troubleshooting) and the platform set (internals, extend/tune how-to, operations
+> runbook), plus the architecture. Still planned (polish): a *glossary*, an *FAQ*, a narrated *demo
+> walkthrough*, and surfacing the developer docs in *Backstage TechDocs*.
