@@ -16,8 +16,13 @@ push — just find and fix formatting/lint/validation issues in the current chan
    - `*.hcl` under `infra/live/` → `terragrunt hcl fmt --check` (fix with `terragrunt hcl fmt`).
    - `*.md` → `npx -y markdownlint-cli2 --fix <files>`, then resolve anything it can't auto-fix
      (e.g. **MD040** needs a language on the fence; **MD031** is auto-fixed).
-3. **Report** a short summary: what was checked, what got fixed, and anything still failing + why.
+3. **SAST (Semgrep):** if the diff touches anything Semgrep scans — `*.tf`, `.github/**` workflows,
+   `*.go`, a `Dockerfile`, or anything that could carry a secret — run `make sast` and fix any
+   findings. Note this scan is **full-repo** (not diff-scoped), exactly like the CI gate, so it can
+   surface a finding outside your diff; if so, say so rather than papering over it. Needs the
+   CI-pinned semgrep (`pipx install semgrep==1.164.0`) — the target prints this if it's missing.
+4. **Report** a short summary: what was checked, what got fixed, and anything still failing + why.
 
-This mirrors the CI jobs (OpenTofu Format, OpenTofu Validate, Terragrunt HCL Format, Markdown Lint)
-so the PR lands green on the first try. The format-on-edit hook handles most of this incrementally;
-this is the explicit full-sweep before you push.
+This mirrors the CI jobs (OpenTofu Format, OpenTofu Validate, Terragrunt HCL Format, Markdown Lint,
+Semgrep) so the PR lands green on the first try. The format-on-edit hook handles most of this
+incrementally; this is the explicit full-sweep before you push.
