@@ -19,6 +19,13 @@
 > step-up, and the non-AWS planes). Full design + the `Activation` CRD/API contract:
 > [temporary-power-activation-controller](../architecture/temporary-power-activation-controller.md). `platctl
 > access grant`/`revoke` remains the controller-down recovery floor (built; AWS-IdC plane; dry-run-verified).
+>
+> **Increment 1 BUILT (`operators/activation/`):** the `Activation` CRD + reconcile lifecycle + the AWS
+> Identity Center plane + envtest/unit tests. Two build-forced corrections (detailed in the design doc): the
+> AWS plane uses **AWS SDK Go v2** (not a shell-out seam), and mint/revoke are **asynchronous, polled, and
+> serialized per permission set** — so a reconcile advances a per-account state machine across many passes,
+> and revoke reads the live AWS footprint (not status) as source of truth. Deferred: the intake API + step-up,
+> cap/eligibility source, audit sink, delivery, and the Keycloak/cluster planes.
 
 ## Context
 

@@ -1,0 +1,48 @@
+# Activation operator (operators/activation) — build, generated-drift gate, lint, and envtest tests.
+# Path-filtered so the heavy controller-runtime/k8s.io build only runs on PRs that touch the operator.
+# Go is pinned by operators/activation/go.mod via setup-go's go-version-file (kept current by Dependabot).
+name: Activation Operator
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "operators/activation/**"
+      - ".github/workflows/operator.yml"
+  pull_request:
+    paths:
+      - "operators/activation/**"
+      - ".github/workflows/operator.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  operator-test:
+    name: Activation Operator Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: operators/activation/go.mod
+          cache-dependency-path: operators/activation/go.sum
+
+      - name: Generated manifests + deepcopy are up to date
+        working-directory: operators/activation
+        run: |
+          make manifests generate
+          git diff --exit-code -- config api || {
+            echo "::error::CRD/deepcopy are stale — run 'make manifests generate' and commit." ; exit 1 ; }
+
+      - name: Vet
+        working-directory: operators/activation
+        run: make vet
+
+      - name: Lint
+        working-directory: operators/activation
+        run: make lint
+
+      - name: Test (envtest)
+        working-directory: operators/activation
+        run: make test

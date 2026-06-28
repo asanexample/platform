@@ -1,0 +1,9 @@
+apiVersion: platform.refplat.org/v1alpha1
+kind: Activation
+metadata:
+  labels:
+    app.kubernetes.io/name: activation
+    app.kubernetes.io/managed-by: kustomize
+  name: activation-sample
+spec:
+  # TODO(user): Add fields here
