@@ -38,6 +38,18 @@ variable "enable_gateway_api_plugin" {
   default     = true
 }
 
+variable "enable_dashboard" {
+  description = "Deploy the Argo Rollouts WEB UI (a Deployment + Service) — the live operator view of rollouts (canary progression, AnalysisRuns, promote/abort). Per-cluster: it shows THIS cluster's rollouts. Expose it with a gateway-config `rollouts` route. ⚠️ No built-in auth + write-capable SA — keep it Tailscale-internal."
+  type        = bool
+  default     = false
+}
+
+variable "dashboard_default_namespace" {
+  description = "Default namespace the web UI opens to. The dashboard HANGS on an empty default namespace, so on a cluster where rollouts live in tenant namespaces set this to one that has rollouts (e.g. a primary app's prod ns). The UI's switcher still reaches the others. Empty = the pod's own namespace."
+  type        = string
+  default     = ""
+}
+
 variable "gateway_api_plugin_version" {
   description = "Release tag of argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi to load."
   type        = string

@@ -12,6 +12,9 @@ terraform {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 6.0"
+      # aws.preprod: a second account's Secrets Manager, to REPLICATE selected shared client secrets there so a
+      # spoke cluster's ESO can read them locally (var.replicate_client_secrets_to_preprod). The unit supplies it.
+      configuration_aliases = [aws.preprod]
     }
     random = {
       source  = "hashicorp/random"

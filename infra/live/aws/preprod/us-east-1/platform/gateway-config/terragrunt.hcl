@@ -91,5 +91,14 @@ inputs = {
   gateway_name      = dependency.gateway.outputs.gateway_name
   gateway_namespace = dependency.gateway.outputs.gateway_namespace
 
-  routes = {}
+  routes = {
+    # Argo Rollouts web UI (ADR-056) — live operator view of THIS cluster's app rollouts, behind Keycloak SSO.
+    # Routes to the oauth2-proxy (rollouts-sso unit), NOT the dashboard directly. Tailscale-only at
+    # rollouts.preprod.aws.refplat.org.
+    rollouts = {
+      namespace = "argo-rollouts"
+      service   = "rollouts" # the oauth2-proxy Service
+      port      = 80
+    }
+  }
 }

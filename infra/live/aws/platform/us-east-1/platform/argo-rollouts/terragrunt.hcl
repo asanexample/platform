@@ -60,5 +60,9 @@ inputs = {
   replica_count      = 2 # platform/hub — HA controller
   helm_wait          = true
 
+  # Argo Rollouts web UI (this cluster's rollouts) — exposed Tailscale-only at rollouts.aws.refplat.org
+  # via the gateway-config `rollouts` route.
+  enable_dashboard = true
+
   tags = include.base.locals.tags
 }

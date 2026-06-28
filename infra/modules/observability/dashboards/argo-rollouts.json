@@ -1,0 +1,388 @@
+{
+  "uid": "argo-rollouts",
+  "title": "Argo Rollouts (progressive delivery)",
+  "tags": [
+    "argo-rollouts",
+    "ADR-056"
+  ],
+  "editable": true,
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "mimir-all"
+        },
+        "query": {
+          "query": "label_values(rollout_info,exported_namespace)",
+          "refId": "A"
+        },
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "rollout",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "mimir-all"
+        },
+        "query": {
+          "query": "label_values(rollout_info{exported_namespace=~\"$namespace\"},name)",
+          "refId": "A"
+        },
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Rollouts",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir-all"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir-all"
+          },
+          "expr": "count(rollout_info{exported_namespace=~\"$namespace\"})",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Degraded",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir-all"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir-all"
+          },
+          "expr": "count(rollout_info{exported_namespace=~\"$namespace\",phase=\"Degraded\"}) or vector(0)",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Paused",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir-all"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir-all"
+          },
+          "expr": "count(rollout_info{exported_namespace=~\"$namespace\",phase=\"Paused\"}) or vector(0)",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Rollout status",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir-all"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir-all"
+          },
+          "expr": "rollout_info{exported_namespace=~\"$namespace\"}",
+          "legendFormat": "",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 5,
+      "title": "Replicas \u2014 $rollout",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir-all"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir-all"
+          },
+          "expr": "rollout_info_replicas_desired{exported_namespace=~\"$namespace\",name=~\"$rollout\"}",
+          "legendFormat": "desired {{exported_namespace}}/{{name}}",
+          "format": "time_series",
+          "instant": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir-all"
+          },
+          "expr": "rollout_info_replicas_available{exported_namespace=~\"$namespace\",name=~\"$rollout\"}",
+          "legendFormat": "available {{exported_namespace}}/{{name}}",
+          "format": "time_series",
+          "instant": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir-all"
+          },
+          "expr": "rollout_info_replicas_updated{exported_namespace=~\"$namespace\",name=~\"$rollout\"}",
+          "legendFormat": "updated {{exported_namespace}}/{{name}}",
+          "format": "time_series",
+          "instant": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir-all"
+          },
+          "expr": "rollout_info_replicas_unavailable{exported_namespace=~\"$namespace\",name=~\"$rollout\"}",
+          "legendFormat": "unavailable {{exported_namespace}}/{{name}}",
+          "format": "time_series",
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 6,
+      "title": "Rollout phase",
+      "type": "state-timeline",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir-all"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir-all"
+          },
+          "expr": "rollout_phase{exported_namespace=~\"$namespace\"} > 0",
+          "legendFormat": "{{exported_namespace}}/{{name}} {{phase}}",
+          "format": "time_series",
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 7,
+      "title": "AnalysisRun phase (canary gates)",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir-all"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir-all"
+          },
+          "expr": "analysis_run_phase > 0",
+          "legendFormat": "",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 8,
+      "title": "Reconcile + events rate",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir-all"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir-all"
+          },
+          "expr": "sum(rate(rollout_reconcile_count{exported_namespace=~\"$namespace\"}[5m])) by (exported_namespace,name)",
+          "legendFormat": "reconcile {{exported_namespace}}/{{name}}",
+          "format": "time_series",
+          "instant": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir-all"
+          },
+          "expr": "sum(rate(rollout_events_total{exported_namespace=~\"$namespace\"}[5m])) by (exported_namespace,name)",
+          "legendFormat": "events {{exported_namespace}}/{{name}}",
+          "format": "time_series",
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    }
+  ],
+  "annotations": {
+    "list": []
+  }
+}

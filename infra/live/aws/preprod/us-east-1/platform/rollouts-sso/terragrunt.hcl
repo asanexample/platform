@@ -8,8 +8,15 @@ include "root" {
 }
 
 terraform {
-  source = include.base.locals.module_source.observability_slo
+  source = include.base.locals.module_source.oauth2_proxy
 }
+
+# oauth2-proxy fronting the PREPROD Argo Rollouts web UI (no native auth) with Keycloak OIDC SSO. The Keycloak
+# client + secret live on the platform hub; keycloak-config replicates the secret into THIS account's Secrets
+# Manager (replicate_client_secrets_to_preprod=["rollouts"]) so the proxy reads it via local ESO. The proxy
+# reaches the hub Keycloak over TGW (verified: cross-vpc-dns + 200 on OIDC discovery), so NO host-alias is needed
+# (that's a hub-only hairpin workaround). The gateway-config `rollouts` route points at THIS proxy, never the
+# dashboard directly.
 
 dependency "eks" {
   config_path = "../eks"
@@ -22,21 +29,11 @@ dependency "eks" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-dependency "node_groups" {
-  config_path = "../node-groups"
+# The dashboard it fronts is owned by the argo-rollouts unit (enable_dashboard); order after it.
+dependency "argo_rollouts" {
+  config_path = "../argo-rollouts"
 
   mock_outputs                            = {}
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
-}
-
-# SLOs evaluate against metrics in the hub Prometheus + render dashboards via the observability Grafana
-# sidecar. Depend on observability so the namespace exists and the rule/dashboard discovery is in place.
-dependency "observability" {
-  config_path = "../observability"
-
-  mock_outputs = {
-    namespace = "observability"
-  }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
@@ -78,27 +75,23 @@ generate "kubernetes_provider" {
 
 inputs = {
   create    = true
-  namespace = dependency.observability.outputs.namespace
+  name      = "rollouts"
+  namespace = "argo-rollouts"
 
-  helm_chart_version = include.base.locals.helm_versions.sloth
+  upstream_url = "http://argo-rollouts-dashboard.argo-rollouts.svc:3100"
+  external_url = "https://rollouts.preprod.aws.refplat.org"
 
-  # SLO dashboard (14643) queries the FEDERATED Mimir datasource (`mimir-all` = platform|preprod) so it shows
-  # BOTH the platform-tenant apiserver SLO (Sloth controller) AND the preprod-tenant per-app SLOs (the Mimir-ruler
-  # burn-rate rules from observability-mimir app_slos). Needs enable_federated_datasource on the mimir unit.
-  slo_dashboard_datasource_uid = "mimir-all"
+  # Hub Keycloak issuer (stable canonical URL) + the client minted there; the secret is replicated into THIS
+  # account's SM by keycloak-config, so the store is the local one.
+  oidc_issuer_url = "https://keycloak.aws.refplat.org/realms/platform"
+  oidc_client_id  = "rollouts"
+  # The preprod-account replica (keycloak-config replicate_client_secrets_to_preprod), under the `preprod/` prefix
+  # so the preprod ESO role can read it.
+  oidc_client_secret_sm_key = "preprod/keycloak/rollouts-oidc"
+  secret_store_name         = "aws-secrets-manager"
 
-  # First SLO: API server request availability — the one control-plane signal EKS exposes, always has
-  # traffic. Sloth fills {{.window}} per burn-rate window. Burn-rate alerts route via the P4 Alertmanager.
-  slos = [{
-    name        = "kubernetes-apiserver"
-    service     = "kubernetes-apiserver"
-    slo_name    = "requests-availability"
-    description = "API server request availability (non-5xx responses)."
-    objective   = 99.9
-    error_query = "sum(rate(apiserver_request_total{code=~\"5..\"}[{{.window}}]))"
-    total_query = "sum(rate(apiserver_request_total[{{.window}}]))"
-    alert_name  = "K8sApiserverAvailability"
-  }]
+  # No host-alias: the issuer is on the HUB gateway, reached over TGW (not a local hairpin). Verified reachable.
+  issuer_host_alias = ""
 
   tags = include.base.locals.tags
 }
