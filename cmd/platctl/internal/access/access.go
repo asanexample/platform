@@ -216,3 +216,59 @@ func Resolve(people []Person, roles map[string]Role, borrowableOnly bool) []Entr
 	})
 	return out
 }
+
+// Decision is the result of an eligibility check — the authorization the activation
+// controller makes before minting temporary access.
+type Decision struct {
+	Allowed bool
+	Reason  string
+}
+
+// find returns the person matching name-or-anchor (and whether found).
+func find(people []Person, who string) (Person, bool) {
+	for _, p := range people {
+		if p.Name == who || p.Anchor == who {
+			return p, true
+		}
+	}
+	return Person{}, false
+}
+
+// Eligible decides whether `who` (a Person name or Keycloak anchor) may BORROW `role` at
+// the given reach (exactly one of team / scope). Allowed only when a matching grant exists
+// AND it is borrowable (on-demand). A matching standing grant is reported as already-held
+// (no borrow needed); a missing grant, unknown principal, or unknown role is denied.
+func Eligible(people []Person, roles map[string]Role, who, role, team, scope string) Decision {
+	if (team == "") == (scope == "") {
+		return Decision{false, "specify exactly one reach: --team <team> or --scope <scope>"}
+	}
+	reach := team
+	if scope != "" {
+		reach = scope
+	}
+	p, ok := find(people, who)
+	if !ok {
+		return Decision{false, fmt.Sprintf("unknown principal %q (not in gitops/people)", who)}
+	}
+	if _, ok := roles[role]; !ok {
+		return Decision{false, fmt.Sprintf("role %q is not in the catalog (gitops/roles)", role)}
+	}
+
+	standing := false
+	for _, g := range p.Grants {
+		if g.Role != role {
+			continue
+		}
+		if (team != "" && g.Team == team) || (scope != "" && g.Scope == scope) {
+			if g.Borrowable(roles) {
+				r := roles[role]
+				return Decision{true, fmt.Sprintf("%s is eligible to borrow %s on %s (%s, %s)", p.Name, role, reach, r.Mode, r.RiskTier)}
+			}
+			standing = true
+		}
+	}
+	if standing {
+		return Decision{false, fmt.Sprintf("%s already holds %s on %s as STANDING access — no borrow needed", p.Name, role, reach)}
+	}
+	return Decision{false, fmt.Sprintf("%s has no %s grant on %s — not eligible", p.Name, role, reach)}
+}
