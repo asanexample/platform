@@ -40,6 +40,9 @@ locals {
     cross_vpc_dns      = "${local.source_base}/aws//cross-vpc-dns"
     dns_delegation     = "${local.source_base}/cloudflare//dns_delegation"
 
+    # On-call / paging
+    pagerduty = "${local.source_base}/pagerduty"
+
     # CI/CD
     github_oidc = "${local.source_base}/aws//github_oidc"
 

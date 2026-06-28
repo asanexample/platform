@@ -120,7 +120,9 @@ inputs = {
   # (manually created — see docs/runbooks/observability-alerts.md). warning → Slack, critical → Slack + SNS.
   slack_webhook_secret_name = "platform/observability/slack-webhook"
   # PagerDuty: critical alerts page via Events API v2; routing key synced from SM via External Secrets.
-  pagerduty_routing_key_secret_name = "platform/observability/pagerduty-routing-key"
+  # Now the IaC-owned platform-team routing key from the `pagerduty` unit (platform/pagerduty/<team>-routing-key)
+  # instead of the old hand-made platform/observability/pagerduty-routing-key (now dead).
+  pagerduty_routing_key_secret_name = "platform/pagerduty/platform-routing-key"
 
   # ADR-082: fan critical alerts to the triage agent's in-cluster webhook (additively — the alert still pages
   # Slack/SNS). The agent triages + posts a card; its own storm controls (ADR-080 D9) bound the fan-out.
