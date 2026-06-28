@@ -14,8 +14,9 @@ are load-bearing, not afterthoughts.
 > (spoke→hub Mimir read path + background AnalysisRun), W9 tier-keyed ✅ for the prod/lower-stage split (finer
 > per-stage depth optional). **Proven end-to-end live on alpha-shop prod: a healthy canary promoted on the Mimir
 > gate; a forced-fail canary auto-rolled-back.** Both canary + blue/green shipped via the scaffolder
-> `deployStrategy`. See the ADR's "Implementation status & learnings (as-built)". Phase 3 (W10 manual gate, W11
-> error-budget freeze) remains — W11 needs per-app SLOs authored first.
+> `deployStrategy`. See the ADR's "Implementation status & learnings (as-built)". Phase 3: **W11 error-budget
+> freeze ✅** (per-app SLOs + the pre-flight freeze gate, #900/#906); **W10 manual gate is DEFERRED** to the
+> compliance-tier work ([#908](https://github.com/asanexample/platform/issues/908)) — no regulated tier exists yet.
 
 ## Phase 0 — De-risk (spike, gates the rest)
 
@@ -88,7 +89,15 @@ different prerequisites, and neither is prod-ness:
 ## Phase 3 — Governance gates
 
 - **W10 — regulated manual-approval gate** (deployer ≠ approver, ADR-049) + audit, for `prod/regulated`.
-- **W11 — error-budget freeze** (ADR-054): budget exhaustion blocks non-critical rollouts.
+  **DEFERRED → [#908](https://github.com/asanexample/platform/issues/908).** Picked up with the compliance-tier
+  work — no `regulated` tier exists yet (both clusters are `standard`), so a native `pause: {}` + approver RBAC
+  would be speculative. The *automated* budget gate (W11) covers the standard tier today.
+- **W11 — error-budget freeze** (ADR-054): budget exhaustion blocks non-critical rollouts. **DONE (2026-06-27):**
+  per-app SLOs are authored into the Mimir ruler (registry-derived, `observability-mimir` `app_slos`), producing
+  `slo:current_burn_rate:ratio` per prod env; the scaffolder's prod canary runs a one-shot **pre-flight** analysis
+  (`<app>-budget-freeze`) as step 0 — before any traffic shifts — querying that burn rate over the spoke→hub read
+  path and **aborting (freezing) the rollout if the service is already burning ≥2× its budget**. Distinct from the
+  W8c canary gate (which watches the *new version* mid-rollout). Threshold tunable; no-SLO-data → passes.
 
 ## Open decisions (resolve during the phases)
 

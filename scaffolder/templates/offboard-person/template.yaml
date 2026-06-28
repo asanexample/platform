@@ -1,0 +1,54 @@
+# Offboard Person (identity strategy §2.5, #890): the leaver UX over the workforce roster — remove a person via
+# a gated PR, not a hand-edited deletion. Opens a PR DELETING gitops/people/<name>.yaml via the
+# platform:offboard-person action (the additive publish action can't delete files). PROPOSES, never grants: the
+# People Gate authorizes — a Person deletion is routed to an ACCESS-ADMIN approval (≠ author) and is never
+# auto-merged, so the PR waits for that sign-off. Requires the platform:offboard-person backend action
+# (asanexample/backstage).
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: offboard-person
+  title: Offboard Person
+  description: >-
+    Remove a teammate from the roster: opens a reviewed pull request deleting their Person object. Nothing is
+    revoked until the PR is merged — the People Gate routes it to an access-admin for sign-off (never
+    auto-merged). On merge the generators (#888 AWS console, #889 apps) drop them on their next apply.
+  tags:
+    - self-service
+    - identity
+    - people
+    - lifecycle
+spec:
+  owner: group:default/platform
+  type: person
+
+  parameters:
+    - title: Person to offboard
+      required:
+        - name
+        - confirm
+      properties:
+        name:
+          title: Roster name
+          type: string
+          description: The Person's roster name (the gitops/people/<name>.yaml to remove).
+          pattern: '^[a-z][a-z0-9-]{1,30}$'
+          maxLength: 32
+        confirm:
+          title: Confirm roster name
+          type: string
+          description: Type the roster name again to confirm — checked server-side.
+
+  steps:
+    - id: offboard
+      name: Open the offboarding PR (gated review)
+      action: platform:offboard-person
+      input:
+        name: ${{ parameters.name }}
+        confirm: ${{ parameters.confirm }}
+        requestedBy: ${{ user.ref | default('unknown', true) }}
+
+  output:
+    links:
+      - title: Offboarding pull request (needs an access-admin approval)
+        url: ${{ steps.offboard.output.remoteUrl }}

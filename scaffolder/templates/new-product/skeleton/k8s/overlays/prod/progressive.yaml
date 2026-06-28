@@ -65,3 +65,27 @@ spec:
       successCondition: "len(result) == 0 || result[0] >= 0.95"
   args:
     - name: namespace
+---
+# Error-budget FREEZE (ADR-056 W11 / ADR-054) — a PRE-FLIGHT gate, run once at the very start of the rollout
+# (before any traffic shifts), querying THIS env's SLO burn rate. If the service is already burning its error
+# budget too fast (an active incident / recent unreliability), the check FAILS and the rollout is FROZEN (aborts)
+# rather than pushing change into an already-shaky service. Distinct from the canary success-rate gate above:
+# that watches the NEW version mid-rollout; THIS asks "is the service healthy enough to deploy at all?".
+# The per-env SLO is authored in observability-mimir (app_slos); sloth_id = <namespace>-availability. No SLO data
+# yet (brand-new env) → passes (never blocks the first deploy). Threshold 2 = burning >=2x the budget; tunable.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: app-${{ values.team }}-${{ values.product }}-budget-freeze
+spec:
+  args:
+    - name: namespace
+  metrics:
+    - name: error-budget-burn
+      count: 1 # one-shot pre-flight check, not a continuous watch
+      provider:
+        prometheus:
+          address: https://preprod-mimir.aws.refplat.org/prometheus
+          query: |
+            slo:current_burn_rate:ratio{sloth_id="{{args.namespace}}-availability"}
+      successCondition: "len(result) == 0 || result[0] < 2"
