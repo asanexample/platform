@@ -43,8 +43,8 @@ Product at a Stage; its namespace is `<team>-<product>-<stage>` (pooled) or `<te
 
 - **Kubernetes:** the `<team>-<product>-<stage>` namespace (labels `platform.refplat.org/{team,product,stage,tier}`),
   the `environment-quota` ResourceQuota, a LimitRange, default-deny + allow NetworkPolicies, CiliumNetworkPolicies,
-  the `<namespace>:developers` RoleBinding (→ ClusterRole `environment-developer`), and the per-**Product** Kyverno
-  `restrict-images` (`team-<team>/<product>-*`) + `restrict-route-hostnames` policies.
+  the `<namespace>:developers` RoleBinding (→ ClusterRole `environment-developer`), and the per-**environment**
+  Kyverno `restrict-images-<ns>` (scoped to `team-<team>/<product>-*`) + `restrict-route-hostnames-<ns>` policies.
 - **AWS (preprod), per Service:** the `Pod-<team>-<product>-[<customer>-]<stage>-<svc>` IAM role (capped by the
   `environment-permissions-boundary-<cluster>` boundary) + an EKS Pod Identity association binding the Service's
   named ServiceAccount; the `DeveloperAccess-<team>` IAM role + EKS access entry → the `<namespace>:developers`

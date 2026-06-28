@@ -342,8 +342,8 @@ step (one-time, in Tailscale admin > Settings > Keys).
 - Creating the Tailscale account (one-time, step 1)
 - Creating the API key for the Terraform provider (one-time, step 2)
 - Enabling/disabling EKS public endpoint during rebuild
-- Removing stale devices after cluster teardown (admin console or
-  `tailscale api delete device`)
+- Removing stale devices after cluster teardown (admin console → Machines → remove,
+  or the Tailscale HTTP API `DELETE /api/v2/device/{deviceID}`)
 
 ---
 

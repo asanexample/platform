@@ -117,9 +117,13 @@ while old ones still verify.
 This is a **dual-subject transition** (worked example in
 [`cosign-image-signing.md`](../architecture/cosign-image-signing.md) §"Org migration"):
 
-1. **Before** the cutover, add the **new** identity to the product's `verify_subjects_product` entry — its
-   `appSubjects` list (and the cluster-wide `trusted_ci_subject_regexp` if the trusted-ci repo moved) —
-   **alongside** the old one; the policy lists alternatives (`count: 1` matches any). Apply the `policy` unit.
+1. **Before** the cutover, point the **new** identity at the product. For a **product repo** rename this is the
+   Product registry `spec.repo` (`gitops/products/<team>/<product>.yaml`) — registry-derived into the per-product
+   gate (`verify_subjects_product[*].repo`); the `appSubjects` list is only the unpopulated self-signing fallback.
+   If the **trusted-ci** repo/workflow path itself moved, update **both** cluster-wide regexps **alongside** the
+   old value — `trusted_ci_subject_regexp` (the SLSA-provenance subject) **and** `trusted_ci_build_subject_regexp`
+   (the `build-sign.yml` subject that gates the image **signature + SBOM**) — missing the latter leaves signatures
+   and SBOM failing. The policy lists alternatives (`count: 1` matches any). Apply the `policy` unit.
 2. Cut over CI to the new identity; new images now match the new entry, old images still match the old.
 3. After all running images are rebuilt under the new identity, **remove** the old entry and re-apply.
 

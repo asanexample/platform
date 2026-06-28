@@ -60,7 +60,7 @@ gateway ClusterIP. If that Service was recreated, the pinned IP is stale.
 
 ```bash
 kubectl -n default get svc cilium-gateway-platform-gateway -o jsonpath='{.spec.clusterIP}'
-# Compare to host_aliases[].ip in the backstage unit; update + re-apply if changed.
+# Compare to oidc_gateway_alias_host in the backstage unit; update + re-apply if changed.
 kubectl -n keycloak get certificate,httproute   # gateway TLS for keycloak.aws.refplat.org healthy?
 ```
 

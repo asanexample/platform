@@ -46,6 +46,8 @@ to the module instead (see below).
 | **Platform Health** | custom (`platform-health.json`) | cluster vitals, API-server availability/latency, capacity headroom, + a **GitOps row** (ArgoCD apps healthy / out-of-sync) |
 | **Platform Services APM / RED** | custom (`platform-apm.json`, P6) | per-service RED (rate / errors / duration) for the platform services, from the Beyla/OTel data |
 | **Platform Cost (OpenCost)** | custom (`platform-cost.json`) | cluster/namespace cost allocation from OpenCost |
+| **Agent Triage** | custom (`agent-triage.json`) | triage-copilot agent activity / GenAI signals (ADR-076) |
+| **Argo Rollouts** | custom (`argo-rollouts.json`) | progressive-delivery rollout/analysis state (ADR-056) |
 | **ArgoCD** | grafana.com 14584 (`argocd.json`) | ArgoCD controller/server/repo-server health, sync/app metrics |
 | **Tier-1 bundled** | kube-prometheus-stack | Compute Resources (cluster/namespace/pod), Node Exporter, Kubernetes/API-server, CoreDNS, Prometheus/Alertmanager overview |
 

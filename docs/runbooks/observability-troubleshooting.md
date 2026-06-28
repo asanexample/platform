@@ -104,16 +104,24 @@ Known patterns:
   **classic**: `kafka.enabled=false` + `ingest_storage.enabled=false` + `ingester.push_grpc_method_enabled=true`.
   (Delete the orphaned `kafka-data-*` PVC if it lingers after switching.)
 
-### S3 / IRSA errors (`AccessDenied`)
+### S3 / Pod-Identity errors (`AccessDenied`)
 
 ```bash
 kubectl -n observability logs sts/mimir-ingester -c ingester --tail=100 | grep -iE "AccessDenied|forbidden|s3"
 ```
 
-The Mimir ServiceAccount (`mimir`) must carry the IRSA role annotation and the role must allow
-`s3:List/Get/Put/Delete` on the blocks bucket. The bucket is **AES256 (SSE-S3)** specifically so the IRSA
-role needs **no** KMS permissions — an SSE-KMS bucket would require `kms:GenerateDataKey*`/`Decrypt` or every
-write fails with `AccessDenied` (this is why the bucket is AES256, not KMS).
+Mimir authenticates to S3 via **EKS Pod Identity** (ADR-047), so the `mimir` ServiceAccount has **no**
+`eks.amazonaws.com/role-arn` annotation — don't look for one. Confirm the Pod Identity **association** is in
+place and the associated role allows `s3:List/Get/Put/Delete` on the blocks bucket:
+
+```bash
+aws eks list-pod-identity-associations --cluster-name platform-use1-eks \
+  --namespace observability --service-account mimir
+```
+
+The bucket is **AES256 (SSE-S3)** specifically so the role needs **no** KMS permissions — an SSE-KMS bucket
+would require `kms:GenerateDataKey*`/`Decrypt` or every write fails with `AccessDenied` (this is why the bucket
+is AES256, not KMS).
 
 ### Read path returns nothing / hangs
 

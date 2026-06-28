@@ -17,7 +17,8 @@ now lives in the **`gitops Gate`** (`.github/workflows/gitops-gate.yml`), which 
 surfaces (`gitops/products/**`, `gitops/environments/**`). Same model — see that workflow's header decision
 table. What's different for v3:
 
-- **Scaffolder templates:** New Product, New Environment, Deprovision (not New Environment). A bot-authored,
+- **Scaffolder templates:** New Product, New Environment, Deprovision (the v2 "New Tenant" template is
+  retired). A bot-authored,
   registry-only, non-deletion, fully-validated PR arms auto-merge; deletions are decommission-first
   (`spec.lifecycle.phase: decommissioning` on base) + a current-SHA admin approval.
 - **Deletion guards (`validate-deletions.sh`, two checks):**
@@ -64,7 +65,7 @@ The rest of this runbook (CI-gate integrity, threat model, repo settings rationa
 4. **Schema** — `crossplane beta validate` against the BASE XRD.
 5. **Composition render** — `crossplane render` with the BASE Composition v2 + the
    `.environment-api-tests/render/` fixtures must succeed.
-6. **IAM deny-set** (ADR-062 §4, #282) — `spec.apps.*.permissions.aws.policyStatements` is allowed but
+6. **IAM deny-set** (ADR-062 §4, #282) — `spec.services.*.permissions.aws.policyStatements` is allowed but
    **deny-set-validated**: any action whose lowercased service prefix is a sensitive service
    (`iam`/`sts`/`organizations`/`account`), or a bare `*`/`*:*` wildcard, is rejected. The check lives in the
    `restrict-environment-envelope` Kyverno policy (`policystatements-no-escalation` rule), so the envelope dry-run
@@ -73,12 +74,14 @@ The rest of this runbook (CI-gate integrity, threat model, repo settings rationa
    un-strippable by the provisioner). The deny-set is intentionally ⊇ the boundary. **Not resource-scoped:**
    `s3:*` on `resources: ["*"]` (all account buckets) passes — broad but not escalation; per-team resource
    prefixes are a documented follow-up, not #282.
-7. **Requester attribution** — scaffolder-authored claims must carry the
-   `platform.refplat.org/requested-by` annotation (ADR-062 §4; presence-only in v1, see threat model).
-8. **Aggregate quota** (stateful, per team): sum of the team's claims' quotas in the PR-result tree
-   (BASE overlaid with the PR) ≤ `Team.envelope.quotaCap`, and environment count ≤ `MAX_TENANTS_PER_TEAM`
-   (workflow env, 10). This hard-gates what admission can't — the runtime aggregate check is
-   report-first.
+7. **Requester attribution** — scaffolder-authored claims carry the `platform.refplat.org/requested-by`
+   annotation (ADR-062 §4). Note this is **not gate-enforced** in v3 (presence is advisory metadata, not a
+   blocking check — see threat model).
+8. **Aggregate quota** (v2-only / not implemented in v3): the retired Environment Claims Gate summed a team's
+   claim quotas against `Team.envelope.quotaCap` and capped environment count at `MAX_TENANTS_PER_TEAM` (10).
+   **The v3 `gitops Gate` does not implement this** — there is no aggregate-sum or env-count logic (and no
+   `MAX_TENANTS_PER_TEAM` var) in `.github/scripts/gitops-gate/*.sh`. The runtime aggregate check remains
+   report-first; a CI-time aggregate gate is future work.
 
 ## CI-gate integrity (why a PR can't cheat)
 
@@ -124,8 +127,8 @@ block claim PRs from auto-merging, defeating self-service. The compensating cont
 the envelope (admission), and the review-aware gate rule for non-claim App PRs. `enforce_admins=false`
 keeps the admin bypass for operational PRs.
 
-**Order matters:** only add "Environment Claims Gate" to required checks after the workflow exists on `main`,
-or every open PR deadlocks waiting for a check that never reports.
+**Order matters:** only add the `gitops Gate` / `gitops Approval` checks to required checks after the workflow
+exists on `main`, or every open PR deadlocks waiting for a check that never reports.
 
 ## Threat model / residual risks (v1, explicit)
 
@@ -156,10 +159,12 @@ see `environment-onboarding.md`. Candidate for the #305 terragrunt-in-CI converg
 ## Local testing
 
 ```bash
-# All gate scripts run locally (yq v4, helm, kyverno 1.18, crossplane CLI; docker for the render check):
-BASE_DIR=$PWD HEAD_DIR=/tmp/fake-head \
-  CHANGED_FILES="gitops/environments/alpha/shop/dev.yaml" \
-  BOT_AUTHOR=true RENDER_CHECK=false .github/scripts/gitops-gate/validate-environments.sh
+# All gate scripts run locally (yq v4, helm, kyverno 1.18, crossplane CLI; docker for the render check).
+# validate-environments.sh reads BASE_DIR / HEAD_DIR / ENVIRONMENT_FILES / IAM_SENSITIVE (NOT CHANGED_FILES /
+# BOT_AUTHOR / RENDER_CHECK — those are unread and would silently pass nothing):
+BASE_DIR=$PWD HEAD_DIR=$PWD \
+  ENVIRONMENT_FILES="gitops/environments/alpha/shop/dev.yaml" \
+  .github/scripts/gitops-gate/validate-environments.sh
 # Other validators: validate-products.sh, validate-releases.sh, validate-deletions.sh
 #   (+ classify-diff.sh / render-environments.sh / publish-verdict.sh — see .github/scripts/gitops-gate/)
 ```

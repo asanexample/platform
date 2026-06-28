@@ -24,8 +24,8 @@ upstream = {
   protocol    = "saml"
   group_claim = "" # IdC emits no groups — membership mappers inert
   saml = {
-    sso_url = var.keycloak_sso_url      # secrets.hcl
-    ca_data = var.keycloak_sso_ca_data  # BARE base64 cert body (no PEM headers)
+    sso_url = include.base.locals.keycloak_sso_url      # from SOPS secrets.enc.yaml
+    ca_data = include.base.locals.keycloak_sso_ca_data  # BARE base64 cert body (no PEM headers)
   }
 }
 ```
@@ -51,7 +51,7 @@ upstream = {
     client_id         = "0oa…"
   }
 }
-# + upstream_oidc_client_secret in secrets.hcl
+# + keycloak_upstream_oidc_client_secret in SOPS secrets.enc.yaml (see "OIDC plumbing" note below)
 ```
 
 ## Microsoft Entra ID (OIDC)
@@ -75,7 +75,7 @@ upstream = {
     client_id         = "…"
   }
 }
-# + upstream_oidc_client_secret in secrets.hcl; ssoGroup = the group OBJECT-ID
+# + keycloak_upstream_oidc_client_secret in SOPS secrets.enc.yaml (see "OIDC plumbing" note below); ssoGroup = the group OBJECT-ID
 ```
 
 ## Google Workspace (OIDC)
@@ -98,11 +98,16 @@ upstream = {
     client_id         = "….apps.googleusercontent.com"
   }
 }
-# + upstream_oidc_client_secret in secrets.hcl
+# + keycloak_upstream_oidc_client_secret in SOPS secrets.enc.yaml (see "OIDC plumbing" note below)
 ```
 
 ## Notes
 
+- **OIDC plumbing (not yet wired):** the OIDC presets reference `keycloak_upstream_oidc_client_secret` (the key
+  in `secrets.enc.yaml` / `secrets.hcl.example`), but that path is **documented-but-not-plumbed** today — there is
+  no `common.hcl`/`_base.hcl` exposure of the secret and no unit input that sets it. Wiring an OIDC upstream means
+  first surfacing the secret through those layers and setting the `keycloak-config` unit input. The SAML
+  (Identity Center) path is the only one currently plumbed end-to-end.
 - **Tip:** Keycloak's admin console can import an OIDC provider's endpoints from its discovery URL
   (`https://…/.well-known/openid-configuration`) once, to capture the four URLs for a preset.
 - **Offboarding:** the membership mappers use `sync_mode = FORCE`, re-evaluated each login — a user dropped from

@@ -43,11 +43,11 @@ Causes, in order of likelihood:
    ⚠️ **Known post-unpark failure:** the gossip-ring DNS gap on unpark can degrade the Mimir
    **query-frontend**, and the API gateway caches a **stale upstream** to it — so the gateway returns
    empty while the **querier serves fine directly**. Fix: restart the query path, then the API
-   gateway *by name* (the `component=gateway` label also matches `mimir-store-gateway` — don't bounce
-   that):
+   gateway (scope the gateway delete with `name=mimir` so it hits only the API gateway):
 
    ```bash
-   kubectl -n observability delete pod -l app.kubernetes.io/component=query-frontend -l app.kubernetes.io/component=query-scheduler
+   # Two -l flags on the SAME label key AND-combine and match nothing — use a set-based selector:
+   kubectl -n observability delete pod -l 'app.kubernetes.io/component in (query-frontend,query-scheduler)'
    kubectl -n observability delete pod -l app.kubernetes.io/component=querier
    kubectl -n observability delete pod -l app.kubernetes.io/name=mimir,app.kubernetes.io/component=gateway   # the API gateway
    ```

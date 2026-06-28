@@ -6,8 +6,9 @@ the **Team registry** (`gitops/teams/`) and `push` grants from the **Product reg
 a team is materialised in GitHub on Team-CR convergence — the same apply-on-merge moment as its Keycloak group.
 
 > **Live instance:** provisioned — the `github-teams` unit
-> (`infra/live/aws/platform/us-east-1/platform/github-teams/`) is applied and live (PR #533; alpha/bravo org
-> teams created). Creds in Secrets Manager at `platform/github-ownership/app` (platform account). Installed
+> (`infra/live/aws/platform/us-east-1/platform/github-teams/`) is applied and live (PR #533; one org team per
+> `gitops/teams/` — currently alpha/bravo/platform). Creds in Secrets Manager at `platform/github-ownership/app`
+> (platform account). Installed
 > **org-wide** (`asanexample`).
 
 ## Security posture (why it's shaped this way)

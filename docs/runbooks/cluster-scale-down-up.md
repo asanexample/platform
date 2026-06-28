@@ -13,7 +13,9 @@ every failure mode we've hit (incident 2026-06-04) and how to prevent/fix each.
 The supported path is **`platctl down --env <env>`** — it **drains Karpenter** (deletes the NodePool; its
 finalizer waits for the nodes Karpenter manages to terminate) *before* scaling the managed node groups to zero,
 so the controller (which runs on the `system` group) doesn't die mid-park and **orphan EC2 instances** (ADR-078).
-PVCs, S3, and all control-plane CRs persist.
+PVCs, S3, and all control-plane CRs persist. `platctl down` **also stops the SSM bastion** EC2 instance (cost) —
+so after a park the SSM tunnel is unavailable until you scale back up (`platctl up` restarts it). See failure
+mode #7.
 
 ```bash
 ./bin/platctl down --env platform
@@ -21,11 +23,22 @@ PVCs, S3, and all control-plane CRs persist.
 ```
 
 **Break-glass (manual)** — only if platctl is unavailable. Only the `system` group exists now (workload capacity
-is Karpenter's); you MUST delete the NodePool first, or Karpenter's nodes are orphaned:
+is Karpenter's); you MUST drain Karpenter and **wait for its NodeClaims/instances to actually terminate** before
+zeroing the `system` group, or the EC2 instances are orphaned. `kubectl delete nodepool` returns *before* the
+nodes drain, so don't immediately zero the group — `platctl down` does this ordering for you (it also clears
+`do-not-disrupt` and deletes the `EC2NodeClass`); prefer it.
 
 ```bash
 for c in platform preprod; do
-  kubectl --context $c delete nodepool --all                    # drain Karpenter FIRST
+  # 1. Clear any do-not-disrupt annotations so Karpenter can reclaim its nodes, then delete the NodePool.
+  kubectl --context $c annotate nodes -l karpenter.sh/nodepool karpenter.sh/do-not-disrupt- --all 2>/dev/null || true
+  kubectl --context $c delete nodepool --all                    # drain Karpenter FIRST (returns before nodes go)
+  # 2. WAIT until Karpenter's NodeClaims are gone (its instances have terminated) — do NOT skip this.
+  until [ -z "$(kubectl --context $c get nodeclaims -o name 2>/dev/null)" ]; do
+    echo "waiting for $c NodeClaims to terminate…"; sleep 15
+  done
+  kubectl --context $c delete ec2nodeclass --all                # remove the EC2NodeClass too
+  # 3. Only now zero the managed system group.
   AWS_PROFILE=$c aws eks update-nodegroup-config --cluster-name ${c}-use1-eks --nodegroup-name system \
     --scaling-config minSize=0,desiredSize=0 --region us-east-1
 done
@@ -35,10 +48,11 @@ Pods go `Pending`; that's expected. Nothing else to do.
 
 ## Scale UP (restore)
 
-**1. Restore capacity.** The supported path is **`platctl up --env <env>`** — it re-applies the `node-groups`
-unit (restoring the `system` group) **and the `karpenter` unit** (recreating the NodePool that `down` deleted,
-so node autoscaling returns), then runs the reconnect steps (re-applies `cross-vpc-dns` + restarts the platform
-ArgoCD controller). ~3–5 min.
+**1. Restore capacity.** The supported path is **`platctl up --env <env>`** — it **restarts the SSM bastion**,
+re-applies the `node-groups` unit (restoring the `system` group) **and the `karpenter` unit** (force-replacing
+the NodePool helm release that `down` deleted, so node autoscaling returns), then runs the reconnect steps
+(re-applies `cross-vpc-dns` + restarts the platform ArgoCD controller). Budget ~3–5 min, but it can wait up to
+~15 min for nodes/health.
 
 ```bash
 ./bin/platctl up --env platform
@@ -55,9 +69,11 @@ ArgoCD controller). ~3–5 min.
 ```bash
 AWS_PROFILE=platform aws eks update-nodegroup-config --cluster-name platform-use1-eks --nodegroup-name system --scaling-config minSize=2,maxSize=3,desiredSize=2 --region us-east-1
 AWS_PROFILE=preprod  aws eks update-nodegroup-config --cluster-name preprod-use1-eks  --nodegroup-name system --scaling-config minSize=1,maxSize=2,desiredSize=1 --region us-east-1
-# recreate the Karpenter NodePool (deleted on scale-down) so autoscaling returns:
-(cd infra/live/aws/platform/us-east-1/platform/karpenter && terragrunt apply)
-(cd infra/live/aws/preprod/us-east-1/platform/karpenter && terragrunt apply)
+# Recreate the Karpenter NodePool (deleted out-of-band on scale-down) so autoscaling returns. A plain
+# `terragrunt apply` reports 0 changes — Terraform still has the NodePool in state, so it doesn't notice the
+# kubectl-side deletion. You MUST force-replace the helm release that renders it (this is what `platctl up` does):
+(cd infra/live/aws/platform/us-east-1/platform/karpenter && terragrunt apply -replace='helm_release.nodepool[0]')
+(cd infra/live/aws/preprod/us-east-1/platform/karpenter && terragrunt apply -replace='helm_release.nodepool[0]')
 ```
 
 **2. Wait for nodes.** Check via the **AWS API first** (kubectl won't work until the in-cluster Tailscale
@@ -154,7 +170,9 @@ operator, nothing is wrong. (The original single-use auth key in `cap-*.hujson` 
 not re-minted on reissue.)
 
 **Diagnose** (needs PlatformDeployer — PlatformAdmin can't read `tailscale.com` CRs / secrets; reach the cluster
-via the SSM tunnel since Tailscale is the very thing that's down):
+via the SSM tunnel since Tailscale is the very thing that's down). **Caveat:** a manual `platctl down` park
+*stops* the SSM bastion, so the tunnel only works once the bastion is running again — `platctl up` restarts it,
+or start the bastion instance by hand before relying on the tunnel here:
 
 ```bash
 kubectl -n tailscale-system get pods                              # subnet-router pod CrashLoopBackOff?

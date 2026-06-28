@@ -47,7 +47,7 @@ A self-service PR-with-automerge flow is a privilege-delegation engine, so this 
 
 ## Elevating the App for New Product (repo-on-demand)
 
-The **New Product** scaffolder template (`scaffolder/templates/new-product/`, ADR-067 §"New Product lifecycle")
+The **New Product** scaffolder template (`scaffolder/templates/new-product/`, ADR-062 §5 "The GitHub write App")
 **creates a new app repo** (`<team>-<product>`) via `publish:github` — and that repo ships its own CI
 workflows. Creating org repos and pushing workflow files are privileges the claim-writing flows don't have, so
 New Product requires elevating this App. **This is a deliberate, material privilege increase** — the App goes

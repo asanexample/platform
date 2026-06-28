@@ -6,8 +6,8 @@
 > presets see [keycloak-upstream-idp.md](keycloak-upstream-idp.md).
 
 How to wire Keycloak's `aws-sso` SAML identity-provider broker (ADR-053, B2) to AWS Identity Center, so
-Keycloak federates authentication **up** to AWS SSO. Mirrors the Dex setup (`dex-sso.md`) — Keycloak gets its
-**own** Identity Center SAML application (separate from Dex's and ArgoCD's), hence its own signing certificate.
+Keycloak federates authentication **up** to AWS SSO. Keycloak gets its **own** Identity Center SAML application,
+hence its own signing certificate.
 
 The broker itself is created as code by the `keycloak-config` unit (`keycloak_saml_identity_provider`). This
 runbook covers the **one-time manual Identity Center app** + the two secrets it produces.
@@ -36,7 +36,7 @@ The broker uses the NameID (Subject) as the principal (`principal_type = SUBJECT
 Email`) and imports the `email` attribute. Do **not** add a groups mapping — Identity Center can't emit groups
 over SAML (the named group claims come from Keycloak itself once the access-model-as-code taxonomy lands).
 
-## 3. Extract the two secrets → `secrets.hcl`
+## 3. Extract the two secrets → `secrets.enc.yaml`
 
 From the application's IdP metadata:
 
@@ -46,8 +46,7 @@ From the application's IdP metadata:
   `<X509Certificate>` content from the metadata): the base64 between the PEM `-----BEGIN/END CERTIFICATE-----`
   markers, on a single line, **with no headers or newlines**.
 
-  ⚠️ This differs from `dex_sso_ca_data` (which is base64-of-PEM). Keycloak's `signing_certificate` wants the
-  raw cert body. From a PEM file:
+  ⚠️ Keycloak's `signing_certificate` wants the raw cert body, **not** base64-of-PEM. From a PEM file:
 
   ```bash
   # bare base64 DER body, single line
@@ -55,18 +54,22 @@ From the application's IdP metadata:
   # (or, if you have the metadata XML, copy the <ds:X509Certificate> text verbatim — already in this form)
   ```
 
-Add both to `infra/live/aws/secrets.hcl` (gitignored; see `secrets.hcl.example`):
+Add both to the committed SOPS store `infra/live/aws/secrets.enc.yaml` (ADR-066), via
+`sops infra/live/aws/secrets.enc.yaml` (decrypts at the management `platform-sops` KMS key):
 
-```hcl
-  keycloak_sso_url     = "https://portal.sso.us-east-1.amazonaws.com/saml/assertion/<id>"
-  keycloak_sso_ca_data = "MIID...single-line-no-headers..."
+```yaml
+keycloak_sso_url: "https://portal.sso.us-east-1.amazonaws.com/saml/assertion/<id>"
+keycloak_sso_ca_data: "MIID...single-line-no-headers..."
 ```
+
+(The gitignored plaintext `secrets.hcl` is only the `TG_SOPS_BOOTSTRAP` from-zero escape, before the KMS key exists.)
 
 ## 4. Apply + verify
 
-`keycloak-config` applies via the `keycloak/keycloak` provider against the running Keycloak (deployer must be on
-Tailscale to reach `keycloak.aws.refplat.org`; Keycloak must be serving). Verify the broker **without any app
-client** via the account console:
+`keycloak-config` applies over an in-cluster **port-forward** to `http://localhost:18080` — its `start_pf` hook
+runs `scripts/kc-portforward.sh`, so the provider talks to Keycloak through the forwarded port, **not** the tailnet
+hostname (Keycloak must be serving). Tailscale is only needed for the **browser verify** step below. Verify the
+broker **without any app client** via the account console:
 
 ```text
 https://keycloak.aws.refplat.org/realms/platform/account
@@ -77,6 +80,6 @@ SAML email.
 
 ## Gotchas
 
-- **Cert format** is the #1 failure mode — a base64-of-PEM (Dex-style) value makes Keycloak reject the IdP
+- **Cert format** is the #1 failure mode — a base64-of-PEM value makes Keycloak reject the IdP
   signature silently. Use the bare body.
 - **Audience mismatch** — the IdC SAML audience must exactly equal `https://keycloak.aws.refplat.org/realms/platform`.

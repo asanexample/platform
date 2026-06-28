@@ -27,7 +27,9 @@ The organizations module provides two approaches for managing SCPs:
 
 1. **Default SCPs (recommended):** Eight built-in SCPs defined as
    `aws_iam_policy_document` data sources in `scps.tf`. These are used automatically
-   when `var.service_control_policies` is `null` (the default).
+   when `var.service_control_policies` is `null` (the default). **Only seven are created
+   by default** — the eighth, `hipaa-eligible-services`, is conditional on
+   `enable_hipaa_scp = true`.
 
 2. **Custom override:** Set `var.service_control_policies` to a `map(string)` of
    pre-rendered JSON policy documents. This **replaces all default SCPs entirely** -- the
@@ -95,10 +97,10 @@ interpolation, automatic JSON formatting).
 ### Modifying Exempt Roles
 
 To change which roles are exempt from SCP deny statements, modify `var.exempt_roles`
-in `terragrunt.hcl`. **The current live value has SIX entries — keep them ALL and append**;
+in `terragrunt.hcl`. **The current live value has SEVEN entries — keep them ALL and append**;
 dropping `PlatformDeployer`/`github-actions-terratest` breaks Terragrunt apply / Terratest CI,
-dropping the `crossplane-*` entries breaks environment ECR/IAM provisioning, and dropping
-`*-karpenter-*` breaks Karpenter node provisioning org-wide (ADR-078):
+dropping the `crossplane-*` entries breaks environment ECR/IAM provisioning, and dropping either
+anchored `*-eks-karpenter-*` entry breaks Karpenter node provisioning for that cluster (ADR-078):
 
 ```hcl
 inputs = {
@@ -108,11 +110,16 @@ inputs = {
     "PlatformDeployer",              # IaC apply role — DO NOT REMOVE
     "crossplane-ecr-provisioner",    # environment ECR provisioning — DO NOT REMOVE
     "crossplane-provisioner-*",      # environment IAM/EKS provisioning — DO NOT REMOVE
-    "*-karpenter-*",                 # Karpenter node provisioning (ADR-078) — DO NOT REMOVE
+    "platform-use1-eks-karpenter-*", # Karpenter node provisioning, platform (ADR-078) — DO NOT REMOVE
+    "preprod-use1-eks-karpenter-*",  # Karpenter node provisioning, preprod (ADR-078) — DO NOT REMOVE
     "EmergencyBreakGlassRole",       # <-- new role being added
   ]
 }
 ```
+
+> The Karpenter entries are **anchored per-cluster** (`<cluster>-eks-karpenter-*`), not a leading-wildcard
+> `*-karpenter-*`, so an unrelated role merely containing `-karpenter-` can't inherit the exemption (security
+> audit). Add a new cluster's anchored pattern when you stand one up.
 
 The module builds the ARN pattern `arn:aws:iam::*:role/<role-name>` for each entry.
 Adding roles here weakens SCP enforcement -- document the justification and obtain
@@ -160,7 +167,7 @@ security team approval.
    Add the new entry to the map inside the `default_scps` local:
 
    ```hcl
-   local {
+   locals {
      default_scps = merge(
        { for k, v in {
          # ... existing SCPs ...
@@ -243,7 +250,7 @@ created. Plan for this and consider applying during a maintenance window.
 
 ### Changing Which OUs Receive Which SCPs
 
-The `scp_attachments` variable maps target names to lists of SCP names:
+The `scp_attachments` variable maps target names to lists of SCP names. The **module default** is:
 
 ```hcl
 scp_attachments = {
@@ -252,6 +259,10 @@ scp_attachments = {
   "Workloads" = ["protect-data-and-network", "require-tagging", "restrict-iam-users"]
 }
 ```
+
+> **Note:** the **live** `terragrunt.hcl` overrides the Platform OU to also carry `require-tagging` +
+> `restrict-iam-users` (matching Workloads — a security-audit OU-coverage fix), so the live Platform value is
+> `["protect-data-and-network", "require-tagging", "restrict-iam-users"]`, not the module default shown above.
 
 **Target names:**
 
@@ -276,12 +287,20 @@ AWS allows a maximum of **5 SCPs per target** (OU or account). The module does n
 validate this limit. Check before applying:
 
 ```bash
-# Count attachments per target
-for target in root Platform Workloads; do
-  count=$(echo '["baseline-guardrails","protect-security-services"]' | jq length)
+# Count attachments per target — live, straight from AWS Organizations (the real 5-per-target limit).
+# Lists the root + every OU, then counts SERVICE_CONTROL_POLICY attachments on each.
+root_id=$(aws organizations list-roots --query 'Roots[0].Id' --output text)
+ou_ids=$(aws organizations list-organizational-units-for-parent --parent-id "$root_id" \
+  --query 'OrganizationalUnits[].Id' --output text)
+for target in "$root_id" $ou_ids; do
+  count=$(aws organizations list-policies-for-target --target-id "$target" \
+    --filter SERVICE_CONTROL_POLICY --query 'length(Policies)' --output text)
   echo "$target: $count SCPs"
 done
 ```
+
+(To check **before** applying, count the lists in the `scp_attachments` map in `terragrunt.hcl` directly — each
+target's value is the list of SCP names attached to it.)
 
 If you are at the limit, consider consolidating SCPs or rebalancing across OUs.
 
@@ -426,7 +445,7 @@ dynamic "statement" {
 
 ### Add an Emergency Exempt Role
 
-In `terragrunt.hcl` — **append to the existing six entries, do not replace them**:
+In `terragrunt.hcl` — **append to the existing seven entries, do not replace them**:
 
 ```hcl
 inputs = {
@@ -436,7 +455,8 @@ inputs = {
     "PlatformDeployer",         # keep — IaC apply
     "crossplane-ecr-provisioner",  # keep — environment ECR provisioning
     "crossplane-provisioner-*",    # keep — environment IAM/EKS provisioning
-    "*-karpenter-*",               # keep — Karpenter node provisioning (ADR-078)
+    "platform-use1-eks-karpenter-*", # keep — Karpenter node provisioning, platform (ADR-078)
+    "preprod-use1-eks-karpenter-*",  # keep — Karpenter node provisioning, preprod (ADR-078)
     "BreakGlassRole",           # <-- emergency role being added
   ]
 }
