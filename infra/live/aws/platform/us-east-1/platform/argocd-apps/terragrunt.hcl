@@ -141,6 +141,14 @@ inputs = {
   teams_repo_branch = "main"
   teams_repo_path   = "gitops/teams"
 
+  # Governance-registry record sync (ADR-089): project the WorkforceRole catalog (gitops/roles) + the Person
+  # roster (gitops/people) onto the HUB (this cluster) as read-only mirrors, for the activation operator to read.
+  # The CRDs come from the crossplane governance-registry chart (enable_governance_registry on the crossplane unit).
+  enable_roles           = true
+  enable_people          = true
+  governance_repo_url    = "https://github.com/asanexample/platform"
+  governance_repo_branch = "main"
+
   # delivery surface, activated by platform_repo_url: the registry-sync apps (project gitops/products +
   # gitops/environments → cluster CRs, sync-wave -2/0) AND the per-Product ApplicationSet (delivers each app's
   # k8s/overlays/<stage>, injecting ns + host). Teams still sync via enable_teams above.

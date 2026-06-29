@@ -93,6 +93,8 @@ No modules.
 | [kubernetes_manifest.agent_appproject](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.agent_registry_app](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.agent_registry_project](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
+| [kubernetes_manifest.governance_app](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
+| [kubernetes_manifest.governance_project](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.product_appproject](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.registry_app](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.registry_project](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
@@ -108,7 +110,11 @@ No modules.
 | <a name="input_cluster_server"></a> [cluster\_server](#input\_cluster\_server) | API server URL of the target cluster | `string` | `""` | no |
 | <a name="input_create"></a> [create](#input\_create) | Whether to create ArgoCD app resources | `bool` | `true` | no |
 | <a name="input_ecr_registry"></a> [ecr\_registry](#input\_ecr\_registry) | ECR registry host for the per-Product image (ADR-071). The ApplicationSet injects the Release digest as a kustomize image override whose name must match the app overlay's image — <ecr\_registry>/team-<team>/<product>-<service>. | `string` | `""` | no |
+| <a name="input_enable_people"></a> [enable\_people](#input\_enable\_people) | Create the platform-people Application that syncs the git-native Person roster (gitops/people) onto the hub (ADR-089). | `bool` | `false` | no |
+| <a name="input_enable_roles"></a> [enable\_roles](#input\_enable\_roles) | Create the platform-roles Application that syncs the git-native WorkforceRole catalog (gitops/roles) onto the hub (ADR-089). | `bool` | `false` | no |
 | <a name="input_enable_teams"></a> [enable\_teams](#input\_enable\_teams) | Create the platform-teams AppProject + Application that syncs git-native Team CRs to the target cluster (replaces the crossplane-teams Helm projection, ADR-063). | `bool` | `false` | no |
+| <a name="input_governance_repo_branch"></a> [governance\_repo\_branch](#input\_governance\_repo\_branch) | Branch/revision for the governance-registry records. | `string` | `"main"` | no |
+| <a name="input_governance_repo_url"></a> [governance\_repo\_url](#input\_governance\_repo\_url) | Git repo URL holding the governance-registry record YAMLs (the platform repo). | `string` | `""` | no |
 | <a name="input_hub_cluster_server"></a> [hub\_cluster\_server](#input\_hub\_cluster\_server) | ADR-082: the in-cluster (hub) API server the agent control plane + workloads target. ArgoCD's built-in in-cluster (https://kubernetes.default.svc) — the platform cluster ArgoCD itself runs on. The agent control plane lives on the hub (ADR-048-consistent), unlike tenant delivery which targets the preprod workload cluster (cluster\_server). | `string` | `"https://kubernetes.default.svc"` | no |
 | <a name="input_platform_repo_branch"></a> [platform\_repo\_branch](#input\_platform\_repo\_branch) | v3: branch of the platform GitOps repo the registry-sync apps + the per-Product ApplicationSet track. | `string` | `"main"` | no |
 | <a name="input_platform_repo_url"></a> [platform\_repo\_url](#input\_platform\_repo\_url) | v3: the platform GitOps repo read by the registry-sync apps (gitops/{products,environments,grants}/) and the per-Product delivery ApplicationSet (gitops/releases/<team>/<product>/). Empty disables delivery. | `string` | `""` | no |

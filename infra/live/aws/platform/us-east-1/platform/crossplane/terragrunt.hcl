@@ -85,6 +85,11 @@ inputs = {
   management_account_id           = include.base.locals.account_ids["mgmt"]
   enable_agent_api                = true
 
+  # Governance registry (ADR-089): install the WorkforceRole + Person CRDs on the hub so the activation
+  # operator (and, as they grow, owner-routing / Backstage) can read the role catalog + workforce roster
+  # locally. The records are projected by the argocd-apps `roles`/`people` apps; git stays the source.
+  enable_governance_registry = true
+
   # Destroy-time CR finalizer cleanup auth (scripts/k8s-finalizer-clear.sh) — see crd_finalizer_cleanup.
   deployer_role_arn      = include.base.locals.deployer_role_arn
   finalizer_clear_script = "${get_repo_root()}/scripts/k8s-finalizer-clear.sh"

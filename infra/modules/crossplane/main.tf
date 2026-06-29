@@ -75,7 +75,7 @@ locals {
   # change. Hash every file in the chart dir; the value is inert (charts don't read it) but its change forces
   # the in-place upgrade.
   chart_checksum = {
-    for c in ["runtime", "config", "environment-api", "environment-policies", "agent-api", "agent-policies"] :
+    for c in ["runtime", "config", "environment-api", "environment-policies", "agent-api", "agent-policies", "governance-registry"] :
     c => sha256(join(",", [for f in sort(tolist(fileset("${path.module}/charts/${c}", "**"))) : filesha256("${path.module}/charts/${c}/${f}")]))
   }
 }
@@ -179,6 +179,31 @@ resource "helm_release" "crossplane_config" {
 # Workload clusters only (ADR-048). The Composition (function-go-templating) renders a environment's Kubernetes
 # resources via provider-kubernetes. Applied after config so the kubernetes ProviderConfig + the function
 # exist. Crossplane core validates XRD/Composition at admission — see the README note on the overlay webhook.
+
+# ---------------------------------------------------------------------------
+# Governance registry (ADR-089): the cluster-scoped, data-only WorkforceRole + Person CRDs — the
+# schema home for the workforce governance/identity registries the platform control plane reads.
+# Enabled on the hub (where the activation operator + agents + portal read them); ArgoCD projects
+# gitops/roles + gitops/people onto them as read-only mirrors. Independent of the environment API
+# (a hub has governance readers but no tenant Environments), so it's gated on its own flag.
+# ---------------------------------------------------------------------------
+
+resource "helm_release" "crossplane_governance_registry" {
+  count = local.create && var.enable_governance_registry ? 1 : 0
+
+  name      = "crossplane-governance-registry"
+  chart     = "${path.module}/charts/governance-registry"
+  namespace = var.namespace
+  timeout   = var.helm_timeout
+  wait      = var.helm_wait
+  atomic    = var.helm_wait
+
+  values = [yamlencode({
+    chartChecksum = local.chart_checksum["governance-registry"]
+  })]
+
+  depends_on = [helm_release.crossplane_config]
+}
 
 resource "helm_release" "crossplane_environment_api" {
   count = local.create && var.enable_environment_api ? 1 : 0

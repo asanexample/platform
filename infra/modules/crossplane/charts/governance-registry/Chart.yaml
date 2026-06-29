@@ -1,0 +1,16 @@
+apiVersion: v2
+name: governance-registry
+description: >-
+  The hub governance-registry schema home (ADR-089): the cluster-scoped, data-only CRDs for the
+  workforce governance/identity registries the platform control plane reads — WorkforceRole (the role
+  catalog, #887) and Person (the workforce roster, ADR-084). Plain CRDs, NOT Crossplane composites — they
+  provision nothing; ArgoCD projects the git records (gitops/roles, gitops/people) onto them as read-only
+  mirrors, and in-cluster readers (the ADR-088 activation operator now; owner-routing/Backstage as they
+  grow) consume them. The Team CRD stays in the tenant environment-api chart until its hub consumer lands
+  (ADR-089 D3) and is consolidated here then.
+type: application
+# 0.1.0: initial — WorkforceRole + Person CRDs (retires the operator-vendored copies). The CRD schemas are
+# generated from operators/activation/api/v1beta1 (the operator's Go read-shim types); regenerate + copy on
+# change. A chartChecksum value forces the helm in-place upgrade on any change (no version bump needed).
+version: 0.1.0
+appVersion: "1.0.0"
