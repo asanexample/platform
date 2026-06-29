@@ -159,6 +159,27 @@ func TestMintAsyncSerialHappyPath(t *testing.T) {
 	}
 }
 
+func TestMintExcludesGuardedAccounts(t *testing.T) {
+	api := newFakeAPI("111", "222", "333")
+	a := New(api, mapResolver(map[string]string{roleBG: "AdministratorAccess"}), "222") // 222 = blast-radius guard
+	ps := &activationv1alpha1.PlaneStatus{Name: PlaneName}
+
+	if err := driveMint(t, a, bgActivation(), ps); err != nil {
+		t.Fatalf("Mint: %v", err)
+	}
+	if len(ps.Accounts) != 2 {
+		t.Fatalf("excluded account must be dropped from the footprint; want 2, got %d", len(ps.Accounts))
+	}
+	for _, acct := range ps.Accounts {
+		if acct.AccountID == "222" {
+			t.Error("excluded account 222 must not be in the footprint")
+		}
+	}
+	if api.live["222"] {
+		t.Error("excluded account 222 must never be granted in AWS")
+	}
+}
+
 func TestMintConflictIsRetryableNotTerminal(t *testing.T) {
 	api := newFakeAPI("111")
 	api.conflictOnce["111"] = true // first create conflicts (serialization signal)

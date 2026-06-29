@@ -113,9 +113,9 @@ func (r *ActivationReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// Nothing to do once it's reached a terminal/active rest state (expiry is handled above).
+	// Failed is terminal for minting, but any partial grants must still be rolled back (leak-safe).
 	if act.Status.Phase == activationv1alpha1.PhaseFailed {
-		return ctrl.Result{}, nil
+		return r.reconcileFailedCleanup(ctx, &act)
 	}
 	if act.Status.Phase == activationv1alpha1.PhaseActive {
 		// Hold until expiry; requeue with a bounded delay so a dropped timer self-heals.
@@ -182,6 +182,9 @@ func (r *ActivationReconciler) reconcileMint(ctx context.Context, act *activatio
 
 	switch {
 	case mintErr != nil && plane.IsTerminal(mintErr):
+		// Settle into Failed immediately so we stop minting (the Failed branch in Reconcile then ROLLS BACK
+		// any partial grants — the serial mint may have granted earlier accounts before a later one failed).
+		// Doing the revoke here would oscillate: the next reconcile would re-mint what we just revoked.
 		act.Status.Phase = activationv1alpha1.PhaseFailed
 		meta.SetStatusCondition(&act.Status.Conditions, metav1.Condition{
 			Type: conditionReady, Status: metav1.ConditionFalse, Reason: "MintFailed", Message: mintErr.Error(),
@@ -189,8 +192,11 @@ func (r *ActivationReconciler) reconcileMint(ctx context.Context, act *activatio
 		span.SetStatus(codes.Error, mintErr.Error())
 		r.Telemetry.Metrics.MintFailures.Add(ctx, 1, attrs(act, r.Plane.Name()))
 		r.Recorder.Event(act, "Warning", "MintFailed", mintErr.Error())
-		log.Error(mintErr, "minting failed terminally")
-		return ctrl.Result{}, r.Status().Update(ctx, act)
+		log.Error(mintErr, "minting failed terminally; rolling back any partial grants")
+		if err := r.Status().Update(ctx, act); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{Requeue: true}, nil // → reconcileFailedCleanup revokes the partial footprint
 	case mintErr != nil:
 		act.Status.Phase = activationv1alpha1.PhaseProvisioning
 		if err := r.Status().Update(ctx, act); err != nil {
@@ -260,6 +266,38 @@ func (r *ActivationReconciler) reconcileTeardown(ctx context.Context, act *activ
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, client.IgnoreNotFound(r.Delete(ctx, act))
+}
+
+// reconcileFailedCleanup rolls back a Failed activation's partial grants: a terminal mint failure leaves the
+// already-granted accounts live, and they must not dangle. It revokes the live footprint (leak-safe — keeps
+// retrying until zero), then drops the finalizer so the CR rests as a Failed record we no longer act on.
+func (r *ActivationReconciler) reconcileFailedCleanup(ctx context.Context, act *activationv1alpha1.Activation) (ctrl.Result, error) {
+	if !controllerutil.ContainsFinalizer(act, finalizerName) {
+		return ctrl.Result{}, nil // already rolled back and released — nothing we own
+	}
+	ctx, span := r.Telemetry.Tracer.Start(ctx, "FailedRollback")
+	defer span.End()
+
+	ps := planeStatus(act, r.Plane.Name())
+	done, revErr := r.Plane.Revoke(ctx, act, ps)
+	setPlaneStatus(act, ps)
+	if revErr != nil {
+		r.Telemetry.Metrics.RevokeFailures.Add(ctx, 1, attrs(act, r.Plane.Name()))
+		r.Recorder.Event(act, "Warning", "RollbackRetrying", revErr.Error())
+		_ = r.Status().Update(ctx, act)
+		return ctrl.Result{}, revErr // never give up with a live grant
+	}
+	if !done {
+		_ = r.Status().Update(ctx, act)
+		return ctrl.Result{RequeueAfter: pollBackoff}, nil
+	}
+	if err := r.Status().Update(ctx, act); err != nil {
+		return ctrl.Result{}, err
+	}
+	r.Recorder.Event(act, "Normal", "RolledBack", "partial grants rolled back after mint failure")
+	base := act.DeepCopy()
+	controllerutil.RemoveFinalizer(act, finalizerName)
+	return ctrl.Result{}, r.Patch(ctx, act, client.MergeFrom(base))
 }
 
 func (r *ActivationReconciler) expired(act *activationv1alpha1.Activation) bool {

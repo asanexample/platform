@@ -125,9 +125,11 @@ resource "helm_release" "activation_operator" {
     replicas              = var.replicas
     awsRegion             = var.region
     identityCenterRoleArn = local.mgmt_ic_role_arn
-    syncPeriod            = var.sync_period
-    otelEndpoint          = var.otel_endpoint
-    chartChecksum         = local.chart_checksum
+    # Never let the operator assign in the org-root management account — break-glass there stays manual.
+    excludeAccountIds = var.management_account_id
+    syncPeriod        = var.sync_period
+    otelEndpoint      = var.otel_endpoint
+    chartChecksum     = local.chart_checksum
   })]
 
   depends_on = [
