@@ -108,24 +108,42 @@ generate "github_repo_creds" {
       }
     }
 
-    data "aws_secretsmanager_secret_version" "github_pat" {
-      secret_id = "platform/github/argocd-pat"
-    }
-
-    resource "kubernetes_secret_v1" "argocd_repo_creds_github" {
-      metadata {
-        name      = "github-asanexample-creds"
-        namespace = "argocd"
-        labels = {
-          "argocd.argoproj.io/secret-type" = "repo-creds"
+    # ArgoCD repo credentials via a GitHub App (TD2-02b) — ArgoCD mints + auto-refreshes installation tokens
+    # itself, so there is no PAT to expire (the failure that silently broke repo sync, 2026-06-29). The App's
+    # {appId, installationId, privateKey} live in Secrets Manager (platform/argocd/github-app, the standard
+    # GitHub-App JSON shape); External Secrets projects them into the repo-creds secret, keeping the private key
+    # OUT of terraform state. ArgoCD selects this credential by the repo-creds label + url prefix.
+    resource "kubernetes_manifest" "argocd_repo_creds_github" {
+      manifest = {
+        apiVersion = "external-secrets.io/v1beta1"
+        kind       = "ExternalSecret"
+        metadata = {
+          name      = "github-asanexample-app-creds"
+          namespace = "argocd"
         }
-      }
-
-      data = {
-        type     = "git"
-        url      = "https://github.com/asanexample"
-        username = "x-access-token"
-        password = data.aws_secretsmanager_secret_version.github_pat.secret_string
+        spec = {
+          refreshInterval = "1h"
+          secretStoreRef  = { name = "aws-secrets-manager", kind = "ClusterSecretStore" }
+          target = {
+            name           = "github-asanexample-app-creds"
+            creationPolicy = "Owner"
+            template = {
+              metadata = { labels = { "argocd.argoproj.io/secret-type" = "repo-creds" } }
+              data = {
+                type                    = "git"
+                url                     = "https://github.com/asanexample"
+                githubAppID             = "{{ .appId }}"
+                githubAppInstallationID = "{{ .installationId }}"
+                githubAppPrivateKey     = "{{ .privateKey }}"
+              }
+            }
+          }
+          data = [
+            { secretKey = "appId", remoteRef = { key = "platform/argocd/github-app", property = "appId" } },
+            { secretKey = "installationId", remoteRef = { key = "platform/argocd/github-app", property = "installationId" } },
+            { secretKey = "privateKey", remoteRef = { key = "platform/argocd/github-app", property = "privateKey" } },
+          ]
+        }
       }
 
       depends_on = [helm_release.argocd]
