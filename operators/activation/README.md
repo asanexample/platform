@@ -21,9 +21,14 @@ This is **increment 1** — a working vertical slice:
   per permission set** (the AWS behavior the `platctl` live test exposed);
 - **full OpenTelemetry telemetry** (traces + metrics over OTLP) and the leaked-grant signal.
 
+The operator reads the **role catalog** (in-cluster `WorkforceRole` CRs, git-projected) to **enforce the
+borrow cap** (`expiresAt = grantedAt + min(spec.duration, role.sessionDuration)`) and resolve the AWS
+permission set — failing closed on a role it can't find.
+
 **Deferred (later increments):** the imperative intake API + passkey step-up (the *sole* CR-creator), the
-role-catalog/eligibility source + drift backstop, the Postgres audit sink, hub delivery, the Keycloak and
-cluster (Teleport) planes, and the `revoke-all` kill-switch.
+**eligibility re-check** (Person CRs) + drift backstop, the Postgres audit sink, hub delivery (incl. installing
+the `WorkforceRole` CRD on the hub + syncing `gitops/roles`), the Keycloak and cluster (Teleport) planes, and
+the `revoke-all` kill-switch.
 
 ## ⚠️ Security posture (increment 1)
 
@@ -32,15 +37,16 @@ boundary** — anyone who can create one gets the borrowed power with no step-up
 
 - **Lock `create`/`update`/`delete` on `activations` to a named admin/operator ServiceAccount** at delivery
   time. This increment is **NOT safe to expose to self-service.**
-- The operator **fails closed**: on any uncertainty (unresolved role, AWS error) it does not grant.
-- The duration **cap is not yet enforced** (that is the intake API's job); the bound here is create-RBAC.
+- The operator **fails closed**: on any uncertainty (role not in the catalog, AWS error) it does not grant.
+- The duration **cap IS enforced** from the role catalog; an unbounded-duration request is capped to the role's
+  `sessionDuration`. (The *eligibility* re-check — who may borrow what — is still the deferred intake API's job;
+  the bound on who can request is create-RBAC.)
 
 ## Configuration
 
 | Flag | Default | Purpose |
 |------|---------|---------|
 | `--aws-region` | `us-east-1` | Identity Center region. |
-| `--role-permission-sets` | *(empty)* | `role=permissionSet` map, e.g. `break-glass=AdministratorAccess`. The increment-1 stopgap for the deferred runtime role catalog. |
 | `--sync-period` | `2m` | Cache resync — the safety net that re-reconciles every Activation so a dropped expiry timer self-heals while the drift backstop is deferred. |
 | `--leader-elect` | `false` | Active-passive HA (enable in delivery; ≥2 replicas). |
 

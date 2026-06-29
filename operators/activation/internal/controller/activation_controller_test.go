@@ -31,10 +31,30 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	activationv1alpha1 "github.com/asanexample/platform/operators/activation/api/v1alpha1"
+	platformv1beta1 "github.com/asanexample/platform/operators/activation/api/v1beta1"
+	"github.com/asanexample/platform/operators/activation/internal/catalog"
 	"github.com/asanexample/platform/operators/activation/internal/plane"
 	planefake "github.com/asanexample/platform/operators/activation/internal/plane/fake"
 	"github.com/asanexample/platform/operators/activation/internal/telemetry"
 )
+
+// fakeCatalog is a controllable role catalog for the reconciler tests.
+type fakeCatalog struct{ roles map[string]catalog.RoleInfo }
+
+func (f fakeCatalog) Lookup(_ context.Context, role string) (catalog.RoleInfo, error) {
+	if info, ok := f.roles[role]; ok {
+		return info, nil
+	}
+	return catalog.RoleInfo{}, catalog.ErrNotInCatalog
+}
+
+// defaultCatalog knows break-glass with a cap (2h) larger than the tests' 1h borrow, so the
+// existing lifecycle tests aren't capped; the cap test overrides r.Catalog with a tighter cap.
+func defaultCatalog() fakeCatalog {
+	return fakeCatalog{roles: map[string]catalog.RoleInfo{
+		"break-glass": {PermissionSet: "AdministratorAccess", Cap: 2 * time.Hour, Mode: "on-demand", RiskTier: "apex"},
+	}}
+}
 
 // fakeClock is a controllable clock for deterministic expiry tests.
 type fakeClock struct {
@@ -59,6 +79,7 @@ func newReconciler(t *testing.T, p plane.Plane, clk *fakeClock) *ActivationRecon
 		Client:    k8sClient,
 		Scheme:    k8sClient.Scheme(),
 		Plane:     p,
+		Catalog:   defaultCatalog(),
 		Telemetry: telem,
 		Recorder:  record.NewFakeRecorder(256),
 		Clock:     clk.now,
@@ -190,6 +211,68 @@ func TestControllerTerminalFailure(t *testing.T) {
 	act := pump(t, r, "failure", phaseIs(activationv1alpha1.PhaseFailed))
 	if act.Status.Phase != activationv1alpha1.PhaseFailed {
 		t.Errorf("phase = %v, want Failed", act.Status.Phase)
+	}
+}
+
+func TestControllerCapEnforced(t *testing.T) {
+	clk := &fakeClock{t: time.Now()}
+	p := planefake.NewPlane("111")
+	r := newReconciler(t, p, clk)
+	// The role's catalog cap is 1h; the borrow requests 4h — it must be capped to 1h.
+	r.Catalog = fakeCatalog{roles: map[string]catalog.RoleInfo{
+		"break-glass": {PermissionSet: "AdministratorAccess", Cap: time.Hour},
+	}}
+	act := newActivation("capped")
+	act.Spec.Duration = metav1.Duration{Duration: 4 * time.Hour}
+	mustCreate(t, act)
+
+	got := pump(t, r, "capped", phaseIs(activationv1alpha1.PhaseActive))
+	exp, granted := got.Status.ExpiresAt.Time, got.Status.GrantedAt.Time
+	if exp.Sub(granted) != time.Hour {
+		t.Errorf("borrow must be capped to the role's 1h ceiling, got %v", exp.Sub(granted))
+	}
+}
+
+// TestControllerCapViaRealCatalog exercises the whole chain end-to-end: a real WorkforceRole CR
+// projected into envtest, read by the real clientCatalog, capping a 4h borrow to the role's 1h.
+func TestControllerCapViaRealCatalog(t *testing.T) {
+	clk := &fakeClock{t: time.Now()}
+	p := planefake.NewPlane("111")
+	r := newReconciler(t, p, clk)
+	r.Catalog = catalog.New(k8sClient)
+
+	wf := &platformv1beta1.WorkforceRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "break-glass"},
+		Spec: platformv1beta1.WorkforceRoleSpec{
+			Reach: "platform", Power: "manage-access", Mode: "on-demand", RiskTier: "apex",
+			IdentityCenter: &platformv1beta1.IdentityCenterProjection{PermissionSet: "AdministratorAccess", SessionDuration: "PT1H"},
+		},
+	}
+	if err := k8sClient.Create(context.Background(), wf); err != nil {
+		t.Fatalf("create WorkforceRole: %v", err)
+	}
+
+	act := newActivation("realcap")
+	act.Spec.Duration = metav1.Duration{Duration: 4 * time.Hour}
+	mustCreate(t, act)
+
+	got := pump(t, r, "realcap", phaseIs(activationv1alpha1.PhaseActive))
+	exp, granted := got.Status.ExpiresAt.Time, got.Status.GrantedAt.Time
+	if exp.Sub(granted) != time.Hour {
+		t.Errorf("real-catalog borrow must be capped to the role's 1h, got %v", exp.Sub(granted))
+	}
+}
+
+func TestControllerRoleNotInCatalogFailsClosed(t *testing.T) {
+	clk := &fakeClock{t: time.Now()}
+	p := planefake.NewPlane("111")
+	r := newReconciler(t, p, clk)
+	r.Catalog = fakeCatalog{roles: map[string]catalog.RoleInfo{}} // break-glass absent
+	mustCreate(t, newActivation("uncataloged"))
+
+	pump(t, r, "uncataloged", phaseIs(activationv1alpha1.PhaseFailed))
+	if p.LiveCount() != 0 {
+		t.Error("an uncataloged role must fail closed — nothing minted")
 	}
 }
 

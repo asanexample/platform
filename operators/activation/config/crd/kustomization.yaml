@@ -3,6 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/platform.refplat.org_activations.yaml
+- bases/platform.refplat.org_workforceroles.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

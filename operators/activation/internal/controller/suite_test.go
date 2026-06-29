@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	activationv1alpha1 "github.com/asanexample/platform/operators/activation/api/v1alpha1"
+	platformv1beta1 "github.com/asanexample/platform/operators/activation/api/v1beta1"
 )
 
 // The controller tests run against a real API server (envtest) and drive Reconcile directly
@@ -47,6 +48,10 @@ func TestMain(m *testing.M) {
 
 	if err := activationv1alpha1.AddToScheme(scheme.Scheme); err != nil {
 		fmt.Fprintln(os.Stderr, "add scheme:", err)
+		os.Exit(1)
+	}
+	if err := platformv1beta1.AddToScheme(scheme.Scheme); err != nil {
+		fmt.Fprintln(os.Stderr, "add v1beta1 scheme:", err)
 		os.Exit(1)
 	}
 

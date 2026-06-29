@@ -1,0 +1,133 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: workforceroles.platform.refplat.org
+spec:
+  group: platform.refplat.org
+  names:
+    kind: WorkforceRole
+    listKind: WorkforceRoleList
+    plural: workforceroles
+    shortNames:
+    - wfrole
+    singular: workforcerole
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.power
+      name: Power
+      type: string
+    - jsonPath: .spec.mode
+      name: Mode
+      type: string
+    - jsonPath: .spec.riskTier
+      name: Risk
+      type: string
+    - jsonPath: .spec.identityCenter.sessionDuration
+      name: Cap
+      type: string
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: WorkforceRole is the Schema for the workforceroles API (read-only
+          registry projection).
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: WorkforceRoleSpec is the role catalog entry (mirrors gitops/roles/*.yaml).
+            properties:
+              description:
+                type: string
+              identityCenter:
+                description: identityCenter is the AWS projection — the permission
+                  set + the session-duration cap.
+                properties:
+                  managedPolicies:
+                    items:
+                      type: string
+                    type: array
+                  note:
+                    type: string
+                  perTeam:
+                    type: boolean
+                  permissionSet:
+                    description: permissionSet is the AWS permission set name (e.g.
+                      AdministratorAccess) — the activation target.
+                    type: string
+                  sessionDuration:
+                    description: sessionDuration is an ISO-8601 duration (e.g. PT1H)
+                      — the borrow-duration ceiling (the cap).
+                    type: string
+                type: object
+              keycloak:
+                description: KeycloakProjection is the Keycloak (app-access) mapping
+                  (not consumed by the operator yet).
+                properties:
+                  group:
+                    type: string
+                  perTeamGroup:
+                    type: boolean
+                  realmRole:
+                    type: string
+                type: object
+              mode:
+                description: 'mode: standing = held all the time; on-demand = borrowed
+                  via activation (ADR-088).'
+                enum:
+                - standing
+                - on-demand
+                type: string
+              power:
+                description: power is what the role can do, weakest→strongest.
+                enum:
+                - look
+                - operate
+                - change
+                - manage-access
+                type: string
+              reach:
+                description: reach is the breadth a grant of this role targets.
+                enum:
+                - team
+                - platform
+                - any
+                type: string
+              riskTier:
+                description: riskTier is the insider-risk weight — drives step-up
+                  strength + review bar.
+                enum:
+                - standard
+                - elevated
+                - apex
+                type: string
+            required:
+            - mode
+            - power
+            - reach
+            - riskTier
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources: {}
