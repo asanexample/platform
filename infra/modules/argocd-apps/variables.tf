@@ -50,30 +50,6 @@ variable "teams_repo_path" {
   default     = "gitops/teams"
 }
 
-variable "enable_roles" {
-  description = "Create the platform-roles AppProject + Application that syncs the git-native WorkforceRole catalog (gitops/roles) to the target cluster as a read-only projection (ADR-088 — the activation operator reads the borrow cap + permission set from it)."
-  type        = bool
-  default     = false
-}
-
-variable "roles_repo_url" {
-  description = "Git repo URL holding the WorkforceRole CR YAMLs (the platform repo)."
-  type        = string
-  default     = ""
-}
-
-variable "roles_repo_branch" {
-  description = "Branch/revision for the WorkforceRole CRs repo."
-  type        = string
-  default     = "main"
-}
-
-variable "roles_repo_path" {
-  description = "Path within the repo to the WorkforceRole CR YAMLs (e.g. gitops/roles)."
-  type        = string
-  default     = "gitops/roles"
-}
-
 # ---------------------------------------------------------------------------
 # delivery (ADR-069 / L2b #384) — per-Product ApplicationSets from the git registry
 # ---------------------------------------------------------------------------
