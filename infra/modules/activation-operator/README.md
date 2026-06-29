@@ -50,6 +50,7 @@ No modules.
 | [aws_iam_role.operator](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role_policy.assume_mgmt](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [helm_release.activation_operator](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
+| [kubernetes_config_map_v1.dashboard](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/config_map_v1) | resource |
 | [kubernetes_namespace_v1.operator](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/namespace_v1) | resource |
 | [aws_iam_policy_document.assume_mgmt](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_iam_policy_document.trust](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
@@ -62,6 +63,7 @@ No modules.
 | <a name="input_image"></a> [image](#input\_image) | Fully-qualified, digest-pinned operator image (the operator-image.yml build output in platform ECR). | `string` | n/a | yes |
 | <a name="input_management_account_id"></a> [management\_account\_id](#input\_management\_account\_id) | Management account ID — home of the activation-operator-identity-center role the operator assumes for the Identity Center plane. | `string` | n/a | yes |
 | <a name="input_create"></a> [create](#input\_create) | Master toggle for the add-on. | `bool` | `true` | no |
+| <a name="input_grafana_namespace"></a> [grafana\_namespace](#input\_grafana\_namespace) | Namespace the Grafana sidecar watches for dashboard ConfigMaps (the observability namespace). | `string` | `"observability"` | no |
 | <a name="input_helm_timeout"></a> [helm\_timeout](#input\_helm\_timeout) | Helm release timeout (seconds). | `number` | `300` | no |
 | <a name="input_helm_wait"></a> [helm\_wait](#input\_helm\_wait) | Wait for the release to become ready (and make it atomic). | `bool` | `true` | no |
 | <a name="input_namespace"></a> [namespace](#input\_namespace) | System namespace the operator runs in (NOT a tenant namespace). | `string` | `"activation-system"` | no |
