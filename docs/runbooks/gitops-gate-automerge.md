@@ -156,6 +156,37 @@ consumers applied (they derive from the claims): `policy` (preprod), `argocd-app
 see `environment-onboarding.md`. Candidate for the #305 terragrunt-in-CI converge job (phase 1.5: trigger on
 `gitops/environments/**`).
 
+## Sibling gates: People & Roles registries
+
+The gitops Gate guards the **environment/product** registries. Two sibling gates guard the
+**workforce identity** registries with the same `pull_request_target` integrity model (the gate
+definition + scripts run from the protected base branch; the PR's CRs are checked out sparse,
+credential-free, and read strictly as YAML data with `yq`). Both run on **every** PR (no paths
+filter) so they can be required status checks, and short-circuit to trivially green when their tree
+isn't touched. **No live provisioning yet** — #888/#889 project the roster downstream; these gates
+validate and route approval.
+
+- **People Gate** (`.github/workflows/people-gate.yml`, `.github/scripts/people-gate/`) — validates
+  `gitops/people/**` Person CRs: schema shape, the role catalog, team-ref integrity, and anchor
+  uniqueness (`validate-people.sh`). Unlike the environment gate, People CRs **grant access** and stay
+  deliberately human-reviewed: `publish-verdict.sh` routes approval **by content** to the **"People
+  Approval"** commit status — a *team* grant needs that team's lead; a *platform* grant or an
+  *offboarding* needs an access-admin. The approver sets are read only from base, so a
+  team+grant-in-one-PR escalation is structurally impossible.
+- **Roles Gate** (`.github/workflows/roles-gate.yml`, `.github/scripts/roles-gate/`) — validates
+  `gitops/roles/**` role-catalog CRs: schema shape, the reach/power/mode/risk enums, the IC/Keycloak
+  projection mappings, and the deletion guard (`validate-roles.sh`). Because changing a role
+  re-permissions everyone who holds it, it enforces **meta-governance**: the sticky comment reports the
+  **blast radius** (Person grants referencing each changed role) and every catalog change is routed to
+  an admin/maintainer approval via the **"Roles Approval"** commit status (two-person control).
+
+Both publish a sticky PR comment, are last-write-wins per `(sha, context)` so they survive the
+`pull_request_target`→`pull_request_review` handoff, and have script-level unit tests
+(`test-validate-*.sh`, `test-publish-verdict.sh`). On a single-admin project the `SOLO_MAINTAINER`
+repo var lets an admin author self-attest. To make them binding, add **"People Gate" / "People
+Approval"** and **"Roles Gate" / "Roles Approval"** to `main`'s required checks (same ordering caveat
+as above — only after the workflows exist on `main`).
+
 ## Local testing
 
 ```bash
