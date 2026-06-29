@@ -74,9 +74,13 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var awsRegion string
+	var identityCenterRoleArn string
 	var syncPeriod time.Duration
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&awsRegion, "aws-region", "us-east-1", "AWS region of the Identity Center instance.")
+	flag.StringVar(&identityCenterRoleArn, "identity-center-role-arn", "",
+		"Management-account IAM role the operator assumes to reach the Identity Center sso-admin plane "+
+			"(cross-account). Empty uses the pod's own credentials directly.")
 	flag.DurationVar(&syncPeriod, "sync-period", 2*time.Minute,
 		"Cache resync period — the safety net that re-reconciles every Activation so a dropped expiry "+
 			"timer self-heals while the drift backstop is deferred.")
@@ -226,7 +230,7 @@ func main() {
 	}
 
 	// The AWS Identity Center plane (live SDK client), resolving role→permission-set from the catalog.
-	awsClient, err := awsidc.NewClient(rootCtx, awsRegion)
+	awsClient, err := awsidc.NewClient(rootCtx, awsRegion, identityCenterRoleArn)
 	if err != nil {
 		setupLog.Error(err, "Failed to build AWS Identity Center client")
 		os.Exit(1)

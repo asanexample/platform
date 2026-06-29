@@ -38,6 +38,9 @@ spec:
         - --health-probe-bind-address=:8081
         - --aws-region={{ .Values.awsRegion }}
         - --sync-period={{ .Values.syncPeriod }}
+        {{- if .Values.identityCenterRoleArn }}
+        - --identity-center-role-arn={{ .Values.identityCenterRoleArn }}
+        {{- end }}
         env:
         - name: OTEL_SERVICE_NAME
           value: activation-operator

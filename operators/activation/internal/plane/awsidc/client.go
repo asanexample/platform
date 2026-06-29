@@ -24,10 +24,12 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/identitystore"
 	idstypes "github.com/aws/aws-sdk-go-v2/service/identitystore/types"
 	"github.com/aws/aws-sdk-go-v2/service/ssoadmin"
 	ssotypes "github.com/aws/aws-sdk-go-v2/service/ssoadmin/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
 
 	"github.com/asanexample/platform/operators/activation/internal/plane"
@@ -40,12 +42,18 @@ type Client struct {
 	ids *identitystore.Client
 }
 
-// NewClient builds a Client from the default AWS config (EKS Pod Identity in cluster), with
-// otelaws tracing middleware so every AWS call is a child span.
-func NewClient(ctx context.Context, region string) (*Client, error) {
+// NewClient builds a Client from the default AWS config (EKS Pod Identity in cluster), with otelaws
+// tracing middleware so every AWS call is a child span. Identity Center lives in the MANAGEMENT account,
+// so when assumeRoleArn is set the base (Pod Identity) credentials are chained through an STS AssumeRole
+// into that cross-account admin role — every sso/identitystore call then runs as the assumed role. An
+// empty assumeRoleArn uses the base credentials directly (tests / same-account).
+func NewClient(ctx context.Context, region, assumeRoleArn string) (*Client, error) {
 	cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(region))
 	if err != nil {
 		return nil, fmt.Errorf("loading AWS config: %w", err)
+	}
+	if assumeRoleArn != "" {
+		cfg.Credentials = aws.NewCredentialsCache(stscreds.NewAssumeRoleProvider(sts.NewFromConfig(cfg), assumeRoleArn))
 	}
 	otelaws.AppendMiddlewares(&cfg.APIOptions)
 	return &Client{sso: ssoadmin.NewFromConfig(cfg), ids: identitystore.NewFromConfig(cfg)}, nil

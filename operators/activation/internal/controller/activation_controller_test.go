@@ -26,6 +26,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -297,6 +298,36 @@ func TestControllerRoleNotInCatalogFailsClosed(t *testing.T) {
 	if p.LiveCount() != 0 {
 		t.Error("an uncataloged role must fail closed — nothing minted")
 	}
+}
+
+// TestControllerNonCanonicalDurationApplies is the regression for the live-smoke bug: a human applying
+// `duration: 30m` (non-canonical) must still reconcile. spec is immutable (CEL self == oldSelf), and a
+// full Update round-trips metav1.Duration "30m" -> "30m0s", which the apiserver reads as a spec mutation
+// and rejects — so the finalizer is added via Patch instead. Created as unstructured because the typed Go
+// client always marshals the canonical form (which is why the original tests missed this).
+func TestControllerNonCanonicalDurationApplies(t *testing.T) {
+	clk := &fakeClock{t: time.Now()}
+	p := planefake.NewPlane("111")
+	r := newReconciler(t, p, clk)
+
+	u := &unstructured.Unstructured{}
+	u.SetGroupVersionKind(activationv1alpha1.GroupVersion.WithKind("Activation"))
+	u.SetName("noncanon")
+	if err := unstructured.SetNestedField(u.Object, map[string]any{
+		"principal":   "josh",
+		"role":        "break-glass",
+		"reach":       map[string]any{"scope": "platform"},
+		"duration":    "30m", // non-canonical on purpose
+		"reason":      "test",
+		"requestedBy": "josh",
+	}, "spec"); err != nil {
+		t.Fatal(err)
+	}
+	if err := k8sClient.Create(context.Background(), u); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	pump(t, r, "noncanon", phaseIs(activationv1alpha1.PhaseActive))
 }
 
 func TestControllerNotEligibleFailsClosed(t *testing.T) {

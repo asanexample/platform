@@ -101,8 +101,13 @@ func (r *ActivationReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// Ensure the finalizer is present before minting anything (so teardown can never be skipped).
-	if controllerutil.AddFinalizer(&act, finalizerName) {
-		if err := r.Update(ctx, &act); err != nil {
+	// Add it with a PATCH, not a full Update: spec is immutable (CEL self == oldSelf), and a round-trip
+	// Update re-serializes metav1.Duration to its canonical form ("30m" -> "30m0s"), which the apiserver
+	// reads as a spec mutation and rejects. A merge patch touches only metadata.finalizers.
+	if !controllerutil.ContainsFinalizer(&act, finalizerName) {
+		base := act.DeepCopy()
+		controllerutil.AddFinalizer(&act, finalizerName)
+		if err := r.Patch(ctx, &act, client.MergeFrom(base)); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, nil
@@ -243,8 +248,10 @@ func (r *ActivationReconciler) reconcileTeardown(ctx context.Context, act *activ
 	r.Recorder.Event(act, "Normal", "Revoked", "borrowed power revoked")
 
 	if deleting {
+		// Patch (not Update) — same spec-immutability reason as the finalizer add.
+		base := act.DeepCopy()
 		controllerutil.RemoveFinalizer(act, finalizerName)
-		return ctrl.Result{}, r.Update(ctx, act)
+		return ctrl.Result{}, r.Patch(ctx, act, client.MergeFrom(base))
 	}
 	// Expiry path: mark Expired, then delete the CR so its (deterministic) name frees up. The
 	// deletion reconcile re-verifies zero live assignments and removes the finalizer.
