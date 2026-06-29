@@ -84,13 +84,33 @@ resource "aws_eks_pod_identity_association" "operator" {
 # The operator workload (Activation CRD + RBAC + Deployment).
 # ---------------------------------------------------------------------------------------------
 
+# The namespace is created here (not by the chart): Helm needs the target namespace to exist before it can
+# store its release metadata in it. Platform control-plane namespace — restricted PSA (the manager pod is
+# distroless nonroot, drops all caps, read-only rootfs). NOT a tenant namespace (no platform.refplat.org/team
+# label), so the Kyverno environment policies don't apply here.
+resource "kubernetes_namespace_v1" "operator" {
+  count = local.create ? 1 : 0
+
+  metadata {
+    name = var.namespace
+    labels = {
+      "app.kubernetes.io/name"             = "activation-operator"
+      "app.kubernetes.io/managed-by"       = "terraform"
+      "control-plane"                      = "activation-operator"
+      "pod-security.kubernetes.io/enforce" = "restricted"
+      "pod-security.kubernetes.io/audit"   = "restricted"
+      "pod-security.kubernetes.io/warn"    = "restricted"
+    }
+  }
+}
+
 resource "helm_release" "activation_operator" {
   count = local.create ? 1 : 0
 
   name             = "activation-operator"
   chart            = "${path.module}/chart"
   namespace        = var.namespace
-  create_namespace = false # the chart owns the namespace (PSA labels)
+  create_namespace = false # the namespace is created above (kubernetes_namespace_v1.operator)
   timeout          = var.helm_timeout
   wait             = var.helm_wait
   atomic           = var.helm_wait
@@ -106,5 +126,8 @@ resource "helm_release" "activation_operator" {
     chartChecksum      = local.chart_checksum
   })]
 
-  depends_on = [aws_eks_pod_identity_association.operator]
+  depends_on = [
+    aws_eks_pod_identity_association.operator,
+    kubernetes_namespace_v1.operator,
+  ]
 }
