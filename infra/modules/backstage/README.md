@@ -41,7 +41,7 @@ catalog discovery, and the live Kubernetes / ArgoCD plugins.
 - `host_aliases` — split-horizon resolution of the OIDC issuer host to the in-cluster gateway.
 - `cluster_name`, `region`, `deployer_role_arn`, `finalizer_clear_script` — for Pod Identity + the destroy drain.
 
-## Outputs
+## Key outputs
 
 - `namespace`, `service_name`, `service_port` (7007) — the HTTPRoute backend target.
 - `db_cluster_name` (in-cluster mode) and `helm_release_status`.
