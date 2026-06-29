@@ -514,12 +514,16 @@ resource "aws_eks_pod_identity_association" "k8s_reader" {
 }
 
 # Read-only access on the platform cluster itself (the workload clusters grant their own access entries).
+# The `backstage-activators` group is the ONE write capability (ADR-088): the activation-operator chart binds
+# it to create-only on Activations, so the Activate Power backend (this pod) can create a borrow — and
+# nothing else. The AmazonEKSViewPolicy below stays read-only (no Secrets); the group adds only that grant.
 resource "aws_eks_access_entry" "k8s_reader" {
   count = local.enable_k8s ? 1 : 0
 
-  cluster_name  = var.cluster_name
-  principal_arn = aws_iam_role.k8s_reader[0].arn
-  type          = "STANDARD"
+  cluster_name      = var.cluster_name
+  principal_arn     = aws_iam_role.k8s_reader[0].arn
+  kubernetes_groups = ["backstage-activators"]
+  type              = "STANDARD"
 }
 
 resource "aws_eks_access_policy_association" "k8s_reader" {

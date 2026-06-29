@@ -86,3 +86,40 @@ subjects:
 - kind: ServiceAccount
   name: {{ .Values.serviceAccountName }}
   namespace: {{ .Values.namespace }}
+{{- if .Values.activatorGroup }}
+---
+# Sole-creator boundary (ADR-088): ONLY the Activate Power backend may create Activations — so no borrow can
+# skip the passkey step-up. The backend reaches the cluster as `{{ .Values.activatorGroup }}` (its Backstage
+# pod's EKS access entry, infra/modules/backstage). create on Activations + read on the registries it checks
+# for eligibility; nothing else (no update/delete — only the operator manages the lifecycle).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: activation-creator
+  labels:
+    app.kubernetes.io/name: activation-operator
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups: [platform.refplat.org]
+  resources: [activations]
+  verbs: [create, get, list, watch]
+- apiGroups: [platform.refplat.org]
+  resources: [people, workforceroles]
+  verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: activation-creator
+  labels:
+    app.kubernetes.io/name: activation-operator
+    app.kubernetes.io/managed-by: Helm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: activation-creator
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: {{ .Values.activatorGroup }}
+{{- end }}
