@@ -59,9 +59,9 @@ inputs = {
   management_account_id = include.base.locals.account_ids["mgmt"]
 
   # Digest-pinned operator image (built + cosign-signed by operator-image.yml → platform ECR). Bump this
-  # digest to the build output and re-apply, like the ARC runner_image (ADR-071 digest-pin). Placeholder
-  # until the first image is built + pushed.
-  image = "829808296602.dkr.ecr.us-east-1.amazonaws.com/platform/activation-operator@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  # digest to the build output and re-apply, like the ARC runner_image (ADR-071 digest-pin). First build:
+  # commit 144f41af (operator-image.yml run 28390004342).
+  image = "829808296602.dkr.ecr.us-east-1.amazonaws.com/platform/activation-operator@sha256:f00025019e01ab01b5da28aea297336896750c66c54f941d9e36ada2ead60a5b"
 
   # Unified telemetry → the cluster otel-collector (traces+metrics OTLP). Empty would disable export.
   otel_endpoint = "http://otel-collector.observability.svc:4317"
