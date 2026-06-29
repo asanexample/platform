@@ -23,7 +23,11 @@ Deploys ArgoCD for GitOps-based continuous delivery in the platform cluster.
 | `remote_cluster_role_arns` | Preprod ArgoCD role ARN | Allows ArgoCD to assume into preprod for cross-cluster deployments |
 | `helm_wait` | `false` | |
 
-Also generates a `kubernetes_secret_v1` for GitHub repo credentials (PAT from Secrets Manager `platform/github/argocd-pat`).
+Also generates an `ExternalSecret` for GitHub repo credentials via a **GitHub App** (TD2-02b) — ArgoCD mints +
+auto-refreshes installation tokens itself, so there is no PAT to expire. The App's `{appId, installationId,
+privateKey}` live in Secrets Manager (`platform/argocd/github-app`); ESO projects them into the
+`github-asanexample-app-creds` repo-creds secret (private key never enters terraform state). The retired
+`platform/github/argocd-pat` secret can be deleted once this is applied.
 
 ## Commands
 
