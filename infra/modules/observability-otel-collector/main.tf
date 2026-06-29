@@ -19,6 +19,27 @@ locals {
     }
   }
 
+  # METRICS pipeline (#628 follow-up): OTLP metrics from OTEL-native workloads (e.g. the ADR-088 activation
+  # operator) → Mimir via Prometheus remote_write. Only wired when mimir_endpoint is set, so a
+  # traces-only collector stays unchanged. resource_to_telemetry_conversion turns OTEL resource attributes
+  # (service.name, …) into Prometheus labels so the metrics are queryable per workload.
+  metrics_enabled = var.mimir_endpoint != ""
+  mimir_exporter = local.metrics_enabled ? {
+    prometheusremotewrite = {
+      endpoint                         = var.mimir_endpoint
+      headers                          = { "X-Scope-OrgID" = var.tenant_id }
+      tls                              = { insecure = var.exporter_tls_insecure }
+      resource_to_telemetry_conversion = { enabled = true }
+    }
+  } : {}
+  metrics_pipeline = local.metrics_enabled ? {
+    metrics = {
+      receivers  = ["otlp"]
+      processors = local.pipeline_processors
+      exporters  = ["prometheusremotewrite"]
+    }
+  } : {}
+
   # A resource processor stamps static attributes (e.g. cluster=preprod on a spoke). Omitted when none.
   resource_processor = length(var.resource_attributes) > 0 ? {
     resource = { attributes = [for k, v in var.resource_attributes : { key = k, action = "upsert", value = v }] }
@@ -45,7 +66,7 @@ locals {
     }
 
     config = {
-      exporters = local.tempo_exporter
+      exporters = merge(local.tempo_exporter, local.mimir_exporter)
       processors = merge({
         # memory_limiter must run first; batch (from the chart) coalesces spans before export.
         memory_limiter = {
@@ -55,13 +76,13 @@ locals {
         }
       }, local.resource_processor)
       service = {
-        pipelines = {
+        pipelines = merge({
           traces = {
             receivers  = ["otlp"]
             processors = local.pipeline_processors
             exporters  = [local.exporter_name]
           }
-        }
+        }, local.metrics_pipeline)
       }
     }
   }

@@ -50,6 +50,15 @@ dependency "tempo" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+dependency "mimir" {
+  config_path = "../mimir"
+
+  mock_outputs = {
+    push_endpoint = "http://mimir-gateway.observability.svc/api/v1/push"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
 generate "helm_provider" {
   path      = "helm-provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -76,6 +85,10 @@ inputs = {
 
   # OTLP/gRPC exporter wants host:port (no scheme) — strip http:// from the tempo output.
   tempo_otlp_endpoint = replace(dependency.tempo.outputs.otlp_grpc_endpoint, "http://", "")
+
+  # OTLP metrics → Mimir (the hub's remote_write gateway). Lights up the metrics pipeline for OTEL-native
+  # workloads (the activation operator + future ones); the X-Scope-OrgID tenant header is `platform` below.
+  mimir_endpoint = dependency.mimir.outputs.push_endpoint
 
   # Tempo is multi-tenant (#628): stamp the hub's own traces (Beyla et al.) as tenant `platform`. Set this
   # BEFORE Tempo flips multitenancyEnabled so there's no rejection window (a single-tenant Tempo ignores it).
