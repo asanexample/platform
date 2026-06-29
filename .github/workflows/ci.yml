@@ -42,7 +42,12 @@ jobs:
         with:
           go-version-file: cmd/platctl/go.mod
           cache-dependency-path: cmd/platctl/go.sum
-      - name: go test
+      # pkg/access is the shared eligibility/activation logic platctl (and the activation operator)
+      # both build on; platctl consumes it via a local `replace`, so test it here in the same job.
+      - name: go test (pkg)
+        working-directory: pkg
+        run: go test ./... -timeout 120s
+      - name: go test (platctl)
         working-directory: cmd/platctl
         run: go test ./... -timeout 120s
 
