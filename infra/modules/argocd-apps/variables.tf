@@ -50,6 +50,31 @@ variable "teams_repo_path" {
   default     = "gitops/teams"
 }
 
+# Governance-registry record sync (ADR-089) — project the role catalog + roster onto the HUB.
+variable "enable_roles" {
+  description = "Create the platform-roles Application that syncs the git-native WorkforceRole catalog (gitops/roles) onto the hub (ADR-089)."
+  type        = bool
+  default     = false
+}
+
+variable "enable_people" {
+  description = "Create the platform-people Application that syncs the git-native Person roster (gitops/people) onto the hub (ADR-089)."
+  type        = bool
+  default     = false
+}
+
+variable "governance_repo_url" {
+  description = "Git repo URL holding the governance-registry record YAMLs (the platform repo)."
+  type        = string
+  default     = ""
+}
+
+variable "governance_repo_branch" {
+  description = "Branch/revision for the governance-registry records."
+  type        = string
+  default     = "main"
+}
+
 # ---------------------------------------------------------------------------
 # delivery (ADR-069 / L2b #384) — per-Product ApplicationSets from the git registry
 # ---------------------------------------------------------------------------

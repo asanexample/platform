@@ -119,3 +119,79 @@ resource "kubernetes_manifest" "teams_app" {
   depends_on = [kubernetes_manifest.teams_project]
 }
 
+# ---------------------------------------------------------------------------
+# Governance-registry record sync (ADR-089): project the WorkforceRole catalog (gitops/roles) and the
+# Person roster (gitops/people) onto the HUB (var.hub_cluster_server — ArgoCD's in-cluster), as read-only
+# mirrors, so the activation operator reads them locally. The CRDs ship with the crossplane
+# governance-registry chart; git stays the source of truth (prune/selfHeal). Unlike the Team sync (which
+# targets the workload cluster for tenant admission), these target the hub — that's where the readers are.
+# ---------------------------------------------------------------------------
+
+locals {
+  governance_records = {
+    roles  = { enabled = var.enable_roles, path = "gitops/roles", kind = "WorkforceRole" }
+    people = { enabled = var.enable_people, path = "gitops/people", kind = "Person" }
+  }
+  governance_records_on = { for k, v in local.governance_records : k => v if v.enabled }
+}
+
+resource "kubernetes_manifest" "governance_project" {
+  for_each = local.governance_records_on
+
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "AppProject"
+    metadata = {
+      name      = "platform-${each.key}"
+      namespace = var.argocd_namespace
+    }
+    spec = {
+      description = "Git-native ${each.value.kind} governance registry on the hub (ADR-089)"
+      sourceRepos = [var.governance_repo_url]
+      destinations = [{
+        server    = var.hub_cluster_server
+        namespace = "crossplane-system"
+      }]
+      clusterResourceWhitelist = [
+        { group = "platform.refplat.org", kind = each.value.kind },
+      ]
+      namespaceResourceWhitelist = []
+    }
+  }
+}
+
+resource "kubernetes_manifest" "governance_app" {
+  for_each = local.governance_records_on
+
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata = {
+      name      = each.key
+      namespace = var.argocd_namespace
+      labels    = { "platform.refplat.org/component" = each.key }
+      # Same early wave as Teams — a runtime/admission input the readers depend on.
+      annotations = { "argocd.argoproj.io/sync-wave" = "-1" }
+    }
+    spec = {
+      project = "platform-${each.key}"
+      source = {
+        repoURL        = var.governance_repo_url
+        targetRevision = var.governance_repo_branch
+        path           = each.value.path
+      }
+      destination = {
+        server    = var.hub_cluster_server
+        namespace = "crossplane-system"
+      }
+      syncPolicy = {
+        automated   = { selfHeal = true, prune = true }
+        syncOptions = ["CreateNamespace=false", "ServerSideApply=true"]
+        retry       = local.sync_retry
+      }
+    }
+  }
+
+  depends_on = [kubernetes_manifest.governance_project]
+}
+

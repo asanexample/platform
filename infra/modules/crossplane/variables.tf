@@ -145,6 +145,12 @@ variable "enable_environment_api" {
   default     = false
 }
 
+variable "enable_governance_registry" {
+  description = "Install the governance-registry CRDs (WorkforceRole + Person — the role catalog + workforce roster, ADR-089). Enable wherever the platform control plane reads them (the hub today)."
+  type        = bool
+  default     = false
+}
+
 variable "enable_agent_api" {
   description = <<-EOT
     Install the AGENT control plane (ADR-082): the XAgent XRD + Composition (agent-api chart) + the XAgent
