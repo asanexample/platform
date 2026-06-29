@@ -55,9 +55,12 @@ data "aws_iam_policy_document" "assume_mgmt" {
   count = local.create ? 1 : 0
 
   statement {
-    sid       = "AssumeIdentityCenterAdmin"
-    effect    = "Allow"
-    actions   = ["sts:AssumeRole"]
+    sid    = "AssumeIdentityCenterAdmin"
+    effect = "Allow"
+    # TagSession alongside AssumeRole: EKS Pod Identity credentials carry session tags, so the cross-account
+    # AssumeRole propagates them — the assume fails with AccessDenied on sts:TagSession otherwise. The mgmt
+    # role's trust already permits both.
+    actions   = ["sts:AssumeRole", "sts:TagSession"]
     resources = [local.mgmt_ic_role_arn]
   }
 }
