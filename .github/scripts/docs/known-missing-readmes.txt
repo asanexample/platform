@@ -5,5 +5,3 @@
 # correction pass should ADD the missing README and DELETE its line here — the list only shrinks.
 #
 # One module path per line (relative to repo root), '#' comments and blank lines ignored.
-infra/modules/oauth2-proxy
-infra/modules/platform-directory
