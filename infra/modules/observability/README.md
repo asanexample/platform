@@ -53,7 +53,7 @@ module "observability" {
 | `grafana_hostname` | `grafana.aws.refplat.org` | `root_url` + cookie domain; the gateway HTTPRoute backend is `<release>-grafana`. |
 | `secret_path_prefix` | `"platform"` | Grafana admin credential at `<prefix>/observability/grafana-admin` (Secrets Manager). |
 
-## Outputs
+## Key outputs
 
 `namespace`, `grafana_service_name` (gateway HTTPRoute backend), `grafana_admin_secret_arn`,
 `alertmanager_role_arn`.
