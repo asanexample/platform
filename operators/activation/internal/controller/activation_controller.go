@@ -33,6 +33,7 @@ import (
 
 	activationv1alpha1 "github.com/asanexample/platform/operators/activation/api/v1alpha1"
 	"github.com/asanexample/platform/operators/activation/internal/catalog"
+	"github.com/asanexample/platform/operators/activation/internal/eligibility"
 	"github.com/asanexample/platform/operators/activation/internal/plane"
 	"github.com/asanexample/platform/operators/activation/internal/telemetry"
 )
@@ -54,11 +55,12 @@ const (
 // machine one step and requeues; status.expiresAt is the crash-safe expiry clock.
 type ActivationReconciler struct {
 	client.Client
-	Scheme    *runtime.Scheme
-	Plane     plane.Plane
-	Catalog   catalog.Catalog
-	Telemetry *telemetry.Telemetry
-	Recorder  record.EventRecorder
+	Scheme      *runtime.Scheme
+	Plane       plane.Plane
+	Catalog     catalog.Catalog
+	Eligibility eligibility.Checker
+	Telemetry   *telemetry.Telemetry
+	Recorder    record.EventRecorder
 	// Clock is injected for deterministic tests; defaults to time.Now.
 	Clock func() time.Time
 }
@@ -70,7 +72,7 @@ func (r *ActivationReconciler) now() time.Time {
 	return time.Now()
 }
 
-// +kubebuilder:rbac:groups=platform.refplat.org,resources=workforceroles,verbs=get;list;watch
+// +kubebuilder:rbac:groups=platform.refplat.org,resources=workforceroles;people,verbs=get;list;watch
 // +kubebuilder:rbac:groups=platform.refplat.org,resources=activations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=platform.refplat.org,resources=activations/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=platform.refplat.org,resources=activations/finalizers,verbs=update
@@ -123,6 +125,25 @@ func (r *ActivationReconciler) reconcileMint(ctx context.Context, act *activatio
 	ctx, span := r.Telemetry.Tracer.Start(ctx, "Mint")
 	defer span.End()
 	log := logf.FromContext(ctx)
+
+	// Re-check eligibility (defense-in-depth): may this principal actually borrow this role at this
+	// reach? Fail CLOSED — a definitive "no" is terminal; a registry-read error is retryable (we
+	// must not grant while eligibility is unproven).
+	decision, err := r.Eligibility.Eligible(ctx, act.Spec.Principal, act.Spec.Role, act.Spec.Reach.Team, act.Spec.Reach.Scope)
+	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		return ctrl.Result{}, err
+	}
+	if !decision.Allowed {
+		act.Status.Phase = activationv1alpha1.PhaseFailed
+		meta.SetStatusCondition(&act.Status.Conditions, metav1.Condition{
+			Type: conditionReady, Status: metav1.ConditionFalse, Reason: "NotEligible", Message: decision.Reason,
+		})
+		span.SetStatus(codes.Error, "not eligible: "+decision.Reason)
+		r.Recorder.Event(act, "Warning", "NotEligible", decision.Reason)
+		log.Info("borrow rejected — not eligible", "principal", act.Spec.Principal, "role", act.Spec.Role, "reason", decision.Reason)
+		return ctrl.Result{}, r.Status().Update(ctx, act)
+	}
 
 	// Resolve the role from the catalog (fail CLOSED): an unknown role cannot be granted — we
 	// can't bound its duration (the cap) or target its permission set.

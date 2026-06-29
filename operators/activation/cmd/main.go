@@ -42,6 +42,7 @@ import (
 	platformv1beta1 "github.com/asanexample/platform/operators/activation/api/v1beta1"
 	"github.com/asanexample/platform/operators/activation/internal/catalog"
 	"github.com/asanexample/platform/operators/activation/internal/controller"
+	"github.com/asanexample/platform/operators/activation/internal/eligibility"
 	"github.com/asanexample/platform/operators/activation/internal/plane/awsidc"
 	"github.com/asanexample/platform/operators/activation/internal/telemetry"
 	// +kubebuilder:scaffold:imports
@@ -233,11 +234,12 @@ func main() {
 	awsPlane := awsidc.New(awsClient, resolvePS)
 
 	if err := (&controller.ActivationReconciler{
-		Client:    mgr.GetClient(),
-		Scheme:    mgr.GetScheme(),
-		Plane:     awsPlane,
-		Catalog:   roleCatalog,
-		Telemetry: telem,
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		Plane:       awsPlane,
+		Catalog:     roleCatalog,
+		Eligibility: eligibility.New(mgr.GetClient()),
+		Telemetry:   telem,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "Activation")
 		os.Exit(1)

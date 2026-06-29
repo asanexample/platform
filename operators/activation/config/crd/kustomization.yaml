@@ -4,6 +4,7 @@
 resources:
 - bases/platform.refplat.org_activations.yaml
 - bases/platform.refplat.org_workforceroles.yaml
+- bases/platform.refplat.org_people.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:
