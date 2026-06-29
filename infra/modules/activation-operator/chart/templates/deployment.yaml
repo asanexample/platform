@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: activation-operator
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: activation-operator
+    app.kubernetes.io/managed-by: Helm
+    control-plane: activation-operator
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: activation-operator
+      control-plane: activation-operator
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+        # Re-roll the pods whenever the chart (image/flags) changes.
+        checksum/chart: {{ .Values.chartChecksum | quote }}
+      labels:
+        app.kubernetes.io/name: activation-operator
+        control-plane: activation-operator
+    spec:
+      serviceAccountName: {{ .Values.serviceAccountName }}
+      terminationGracePeriodSeconds: 10
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: manager
+        image: {{ .Values.image | quote }}
+        command: [/manager]
+        args:
+        - --leader-elect
+        - --health-probe-bind-address=:8081
+        - --aws-region={{ .Values.awsRegion }}
+        - --sync-period={{ .Values.syncPeriod }}
+        env:
+        - name: OTEL_SERVICE_NAME
+          value: activation-operator
+        {{- if .Values.otelEndpoint }}
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: {{ .Values.otelEndpoint | quote }}
+        {{- end }}
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}

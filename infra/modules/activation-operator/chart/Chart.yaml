@@ -1,0 +1,12 @@
+apiVersion: v2
+name: activation-operator
+description: >-
+  The temporary-power activation operator (ADR-088): a Kubebuilder/controller-runtime controller that
+  mints, holds, and revokes time-boxed borrowed power (the Activation CRD) across the AWS Identity Center
+  plane. Runs on the hub in its own system namespace; reads the governance-registry (WorkforceRole/Person)
+  for cap + eligibility; reaches Identity Center (management account) via a Pod Identity role that assumes
+  the activation-operator-identity-center role. The CRD/RBAC/Deployment mirror operators/activation/config
+  (Kubebuilder); a chartChecksum value forces the helm in-place upgrade on any change.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
