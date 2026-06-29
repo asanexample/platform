@@ -28,6 +28,8 @@ tasks and load automatically when relevant. Prefer them over re-deriving from th
 - **argocd-app-delivery** — ArgoCD ApplicationSets, PR previews, Release-keyed delivery, platform vs tenant roads
 - **observability-authoring** — adding dashboards/alerts/SLOs + instrumenting workloads in the LGTM+P stack
 - **backstage-portal** — configuring the Backstage portal/plugins/auth/catalog from the infra `backstage` module
+- **maintaining-docs** — keeping docs current as code changes (the doc-impact map, grep-first for renames, the drift traps); use when finishing a feature / opening a PR
+- **authoring-platform-agents** — authoring/operating a platform agent (the `XAgent` claim, envelope, kill-switch; ADR-082)
 - **skill-self-correction** — durably fixing a house skill (under `.claude/skills/`) when it misleads you
 
 **Vendored (third-party).** `terraform-skill` is a community skill (antonbabenko/terraform-skill,
