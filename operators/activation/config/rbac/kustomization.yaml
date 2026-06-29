@@ -22,6 +22,9 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the activation itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- person_admin_role.yaml
+- person_editor_role.yaml
+- person_viewer_role.yaml
 - workforcerole_admin_role.yaml
 - workforcerole_editor_role.yaml
 - workforcerole_viewer_role.yaml

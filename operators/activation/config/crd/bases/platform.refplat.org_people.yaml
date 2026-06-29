@@ -1,0 +1,89 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: people.platform.refplat.org
+spec:
+  group: platform.refplat.org
+  names:
+    kind: Person
+    listKind: PersonList
+    plural: people
+    singular: person
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.person
+      name: Anchor
+      type: string
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: Person is the Schema for the people API (read-only registry projection).
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PersonSpec is the roster entry (mirrors gitops/people/*.yaml).
+            properties:
+              grants:
+                description: grants are the role×reach entries this person holds.
+                items:
+                  description: PersonGrant is one (role × reach) entry on a Person
+                    — reach is exactly one of team or scope.
+                  properties:
+                    activation:
+                      description: activation marks a grant as borrowed-not-held;
+                        "on-demand" means eligible-to-activate.
+                      type: string
+                    role:
+                      description: role is the WorkforceRole this person may hold/borrow.
+                      type: string
+                    scope:
+                      description: scope is a platform-wide reach (mutually exclusive
+                        with team).
+                      type: string
+                    team:
+                      description: team scopes the grant to a single team (mutually
+                        exclusive with scope).
+                      type: string
+                  required:
+                  - role
+                  type: object
+                type: array
+              handles:
+                description: handles are declared external handles (no PII).
+                properties:
+                  github:
+                    type: string
+                type: object
+              person:
+                description: person is the Keycloak anchor (the identity this roster
+                  entry maps to).
+                type: string
+            required:
+            - person
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources: {}

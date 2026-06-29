@@ -2,4 +2,5 @@
 resources:
 - platform_v1alpha1_activation.yaml
 - platform_v1beta1_workforcerole.yaml
+- platform_v1beta1_person.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

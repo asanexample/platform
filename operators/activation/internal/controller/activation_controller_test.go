@@ -29,14 +29,27 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	activationv1alpha1 "github.com/asanexample/platform/operators/activation/api/v1alpha1"
 	platformv1beta1 "github.com/asanexample/platform/operators/activation/api/v1beta1"
 	"github.com/asanexample/platform/operators/activation/internal/catalog"
+	"github.com/asanexample/platform/operators/activation/internal/eligibility"
 	"github.com/asanexample/platform/operators/activation/internal/plane"
 	planefake "github.com/asanexample/platform/operators/activation/internal/plane/fake"
 	"github.com/asanexample/platform/operators/activation/internal/telemetry"
+	"github.com/asanexample/platform/pkg/access"
 )
+
+// fakeEligibility is a controllable eligibility checker for the reconciler tests.
+type fakeEligibility struct {
+	allowed bool
+	reason  string
+}
+
+func (f fakeEligibility) Eligible(_ context.Context, _, _, _, _ string) (access.Decision, error) {
+	return access.Decision{Allowed: f.allowed, Reason: f.reason}, nil
+}
 
 // fakeCatalog is a controllable role catalog for the reconciler tests.
 type fakeCatalog struct{ roles map[string]catalog.RoleInfo }
@@ -76,13 +89,14 @@ func newReconciler(t *testing.T, p plane.Plane, clk *fakeClock) *ActivationRecon
 		t.Fatalf("telemetry setup: %v", err)
 	}
 	return &ActivationReconciler{
-		Client:    k8sClient,
-		Scheme:    k8sClient.Scheme(),
-		Plane:     p,
-		Catalog:   defaultCatalog(),
-		Telemetry: telem,
-		Recorder:  record.NewFakeRecorder(256),
-		Clock:     clk.now,
+		Client:      k8sClient,
+		Scheme:      k8sClient.Scheme(),
+		Plane:       p,
+		Catalog:     defaultCatalog(),
+		Eligibility: fakeEligibility{allowed: true},
+		Telemetry:   telem,
+		Recorder:    record.NewFakeRecorder(256),
+		Clock:       clk.now,
 	}
 }
 
@@ -140,6 +154,15 @@ func mustCreate(t *testing.T, act *activationv1alpha1.Activation) {
 	t.Helper()
 	if err := k8sClient.Create(context.Background(), act); err != nil {
 		t.Fatalf("create: %v", err)
+	}
+}
+
+// mustCreateObj creates any object, tolerating AlreadyExists (envtest is shared across tests, so a
+// registry fixture like a WorkforceRole may already be present from an earlier test).
+func mustCreateObj(t *testing.T, obj client.Object) {
+	t.Helper()
+	if err := k8sClient.Create(context.Background(), obj); err != nil && !apierrors.IsAlreadyExists(err) {
+		t.Fatalf("create %T: %v", obj, err)
 	}
 }
 
@@ -274,6 +297,48 @@ func TestControllerRoleNotInCatalogFailsClosed(t *testing.T) {
 	if p.LiveCount() != 0 {
 		t.Error("an uncataloged role must fail closed — nothing minted")
 	}
+}
+
+func TestControllerNotEligibleFailsClosed(t *testing.T) {
+	clk := &fakeClock{t: time.Now()}
+	p := planefake.NewPlane("111")
+	r := newReconciler(t, p, clk)
+	r.Eligibility = fakeEligibility{allowed: false, reason: "no break-glass grant"}
+	mustCreate(t, newActivation("ineligible"))
+
+	pump(t, r, "ineligible", phaseIs(activationv1alpha1.PhaseFailed))
+	if p.LiveCount() != 0 {
+		t.Error("an ineligible borrow must fail closed — nothing minted")
+	}
+}
+
+// TestControllerEligibilityViaRealRegistry exercises the real eligibility checker end-to-end:
+// a Person + WorkforceRole projected into envtest, with the borrow allowed only for the holder.
+func TestControllerEligibilityViaRealRegistry(t *testing.T) {
+	clk := &fakeClock{t: time.Now()}
+	p := planefake.NewPlane("111")
+	r := newReconciler(t, p, clk)
+	r.Eligibility = eligibility.New(k8sClient)
+
+	mustCreateObj(t, &platformv1beta1.WorkforceRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "break-glass"},
+		Spec:       platformv1beta1.WorkforceRoleSpec{Reach: "platform", Power: "manage-access", Mode: "on-demand", RiskTier: "apex"},
+	})
+	mustCreateObj(t, &platformv1beta1.Person{
+		ObjectMeta: metav1.ObjectMeta{Name: "josh"},
+		Spec: platformv1beta1.PersonSpec{Person: "admin", Grants: []platformv1beta1.PersonGrant{
+			{Role: "break-glass", Scope: "platform", Activation: "on-demand"},
+		}},
+	})
+
+	// josh (eligible) proceeds; a principal with no grant fails closed.
+	mustCreate(t, newActivation("elig-josh"))
+	pump(t, r, "elig-josh", phaseIs(activationv1alpha1.PhaseActive))
+
+	bad := newActivation("elig-nobody")
+	bad.Spec.Principal = "nobody"
+	mustCreate(t, bad)
+	pump(t, r, "elig-nobody", phaseIs(activationv1alpha1.PhaseFailed))
 }
 
 func TestControllerLeakSafeTeardown(t *testing.T) {

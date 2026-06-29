@@ -21,14 +21,16 @@ This is **increment 1** — a working vertical slice:
   per permission set** (the AWS behavior the `platctl` live test exposed);
 - **full OpenTelemetry telemetry** (traces + metrics over OTLP) and the leaked-grant signal.
 
-The operator reads the **role catalog** (in-cluster `WorkforceRole` CRs, git-projected) to **enforce the
-borrow cap** (`expiresAt = grantedAt + min(spec.duration, role.sessionDuration)`) and resolve the AWS
-permission set — failing closed on a role it can't find.
+The operator reads the **registries** (in-cluster `WorkforceRole` + `Person` CRs, git-projected) to, at mint:
+**re-check eligibility** (may this principal borrow this role at this reach? — reusing the same `pkg/access`
+decision the platctl CLI makes), **enforce the borrow cap**
+(`expiresAt = grantedAt + min(spec.duration, role.sessionDuration)`), and resolve the AWS permission set —
+**failing closed** on an ineligible principal or an unknown role.
 
 **Deferred (later increments):** the imperative intake API + passkey step-up (the *sole* CR-creator), the
-**eligibility re-check** (Person CRs) + drift backstop, the Postgres audit sink, hub delivery (incl. installing
-the `WorkforceRole` CRD on the hub + syncing `gitops/roles`), the Keycloak and cluster (Teleport) planes, and
-the `revoke-all` kill-switch.
+**drift backstop**, the Postgres audit sink, hub delivery (incl. installing the `WorkforceRole`/`Person` CRDs on
+the hub + syncing `gitops/roles`+`gitops/people`), the Keycloak and cluster (Teleport) planes, and the
+`revoke-all` kill-switch.
 
 ## ⚠️ Security posture (increment 1)
 
@@ -37,10 +39,13 @@ boundary** — anyone who can create one gets the borrowed power with no step-up
 
 - **Lock `create`/`update`/`delete` on `activations` to a named admin/operator ServiceAccount** at delivery
   time. This increment is **NOT safe to expose to self-service.**
-- The operator **fails closed**: on any uncertainty (role not in the catalog, AWS error) it does not grant.
+- The operator **fails closed**: on any uncertainty (ineligible principal, role not in the catalog, AWS error)
+  it does not grant.
+- **Eligibility IS re-checked** at mint (defense-in-depth): a principal with no on-demand grant for the role is
+  rejected. The *intake API*'s up-front step-up check is still deferred; the bound on who can even request is
+  create-RBAC.
 - The duration **cap IS enforced** from the role catalog; an unbounded-duration request is capped to the role's
-  `sessionDuration`. (The *eligibility* re-check — who may borrow what — is still the deferred intake API's job;
-  the bound on who can request is create-RBAC.)
+  `sessionDuration`.
 
 ## Configuration
 
