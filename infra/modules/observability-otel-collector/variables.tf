@@ -16,6 +16,12 @@ variable "tempo_otlp_endpoint" {
   default     = "tempo-distributor.observability.svc:4317"
 }
 
+variable "mimir_endpoint" {
+  description = "Mimir Prometheus remote_write URL (e.g. the mimir module's push_endpoint, http://…-gateway…/api/v1/push). When set, the collector adds an OTLP→Mimir metrics pipeline; empty leaves it traces-only."
+  type        = string
+  default     = ""
+}
+
 variable "tenant_id" {
   description = "Tenant (X-Scope-OrgID) stamped on the exported traces (Tempo multitenancy, #628). Hub = `platform`. For a spoke it's belt-and-suspenders — the hub Gateway edge force-overwrites it per-hostname."
   type        = string
