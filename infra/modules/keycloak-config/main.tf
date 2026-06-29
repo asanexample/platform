@@ -348,6 +348,10 @@ resource "keycloak_openid_client" "public" {
   standard_flow_enabled      = true
   valid_redirect_uris        = each.value.redirect_uris
   pkce_code_challenge_method = "S256"
+  # "+" = derive allowed CORS origins from the redirect URIs. Browser PKCE clients (e.g. the Activate Power
+  # step-up popup, ADR-088) do the code→token exchange from their own origin, so the token endpoint needs the
+  # CORS header; CLIs (localhost) are unaffected.
+  web_origins = ["+"]
 }
 
 # Public clients get the same `groups` scope (default) — so CLI tokens carry the access-model claim.
