@@ -5,6 +5,9 @@ serviceAccountName: activation-operator
 # Fully-qualified, digest-pinned image (the operator-image.yml build output in platform ECR).
 image: ""
 replicas: 1
+# The k8s group the Activate Power backend (Backstage) reaches the cluster as; bound create-only on
+# Activations (ADR-088 sole-creator). Empty disables the binding.
+activatorGroup: backstage-activators
 awsRegion: us-east-1
 # Management-account IAM role the operator assumes to reach the Identity Center sso-admin plane
 # (cross-account). Empty uses the pod's own credentials directly.

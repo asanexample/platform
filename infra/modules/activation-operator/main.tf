@@ -125,6 +125,7 @@ resource "helm_release" "activation_operator" {
     serviceAccountName    = var.service_account
     image                 = var.image
     replicas              = var.replicas
+    activatorGroup        = var.activator_group
     awsRegion             = var.region
     identityCenterRoleArn = local.mgmt_ic_role_arn
     # Never let the operator assign in the org-root management account — break-glass there stays manual.

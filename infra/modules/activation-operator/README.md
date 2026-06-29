@@ -62,6 +62,7 @@ No modules.
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | EKS cluster name. The Pod Identity role is named <cluster\_name>-activation-operator, which the management activation-operator-identity-center role trusts. | `string` | n/a | yes |
 | <a name="input_image"></a> [image](#input\_image) | Fully-qualified, digest-pinned operator image (the operator-image.yml build output in platform ECR). | `string` | n/a | yes |
 | <a name="input_management_account_id"></a> [management\_account\_id](#input\_management\_account\_id) | Management account ID — home of the activation-operator-identity-center role the operator assumes for the Identity Center plane. | `string` | n/a | yes |
+| <a name="input_activator_group"></a> [activator\_group](#input\_activator\_group) | The k8s group the Activate Power backend reaches the cluster as (ADR-088 sole-creator) — bound create-only on Activations. Empty disables the binding. | `string` | `"backstage-activators"` | no |
 | <a name="input_create"></a> [create](#input\_create) | Master toggle for the add-on. | `bool` | `true` | no |
 | <a name="input_grafana_namespace"></a> [grafana\_namespace](#input\_grafana\_namespace) | Namespace the Grafana sidecar watches for dashboard ConfigMaps (the observability namespace). | `string` | `"observability"` | no |
 | <a name="input_helm_timeout"></a> [helm\_timeout](#input\_helm\_timeout) | Helm release timeout (seconds). | `number` | `300` | no |

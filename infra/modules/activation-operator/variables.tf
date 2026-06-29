@@ -78,3 +78,9 @@ variable "grafana_namespace" {
   type        = string
   default     = "observability"
 }
+
+variable "activator_group" {
+  description = "The k8s group the Activate Power backend reaches the cluster as (ADR-088 sole-creator) — bound create-only on Activations. Empty disables the binding."
+  type        = string
+  default     = "backstage-activators"
+}
