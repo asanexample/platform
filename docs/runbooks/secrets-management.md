@@ -25,27 +25,35 @@
 
 Secrets flow from AWS Secrets Manager into Kubernetes pods through a
 declarative sync pipeline. The External Secrets Operator (ESO) runs in-cluster
-and uses IRSA to authenticate to Secrets Manager without long-lived credentials.
+and authenticates to Secrets Manager via **EKS Pod Identity** (ADR-047/#594) — no
+`eks.amazonaws.com/role-arn` annotation, no long-lived credentials. A Pod Identity
+association binds the ESO controller's ServiceAccount to its IAM role, and the EKS
+Pod Identity Agent injects short-lived credentials at runtime.
 
 ```text
-AWS Secrets Manager          Kubernetes Cluster
-┌──────────────────┐        ┌──────────────────────────────────┐
-│ platform/        │  IRSA  │                                  │
-│   service/       │◄───────│  ESO Controller                  │
-│     secret-name  │  (STS) │    ↓ fetches secret value        │
-└──────────────────┘        │  ExternalSecret CRD              │
-                            │    ↓ declares source + target    │
-                            │  Kubernetes Secret               │
-                            │    ↓ mounted into pod            │
-                            │  Pod                             │
-                            └──────────────────────────────────┘
+AWS Secrets Manager                  Kubernetes Cluster
+┌──────────────────┐                ┌──────────────────────────────────┐
+│ platform/        │  Pod Identity  │                                  │
+│   service/       │◄───────────────│  ESO Controller                  │
+│     secret-name  │  (assoc → STS) │    ↓ fetches secret value        │
+└──────────────────┘                │  ExternalSecret CRD              │
+                                    │    ↓ declares source + target    │
+                                    │  Kubernetes Secret               │
+                                    │    ↓ mounted into pod            │
+                                    │  Pod                             │
+                                    └──────────────────────────────────┘
 ```
 
-The full chain: **AWS Secrets Manager** -> **IRSA (STS AssumeRoleWithWebIdentity)** ->
+The full chain: **AWS Secrets Manager** -> **EKS Pod Identity (association → injected STS creds)** ->
 **ESO Controller** -> **ExternalSecret CRD** -> **Kubernetes Secret** -> **Pod**.
 
-See [ADR-019](../adrs/019-external-secrets-operator.md) for the decision to adopt ESO
-and [ADR-025](../adrs/025-secret-naming-convention.md) for the naming convention.
+The `ClusterSecretStore`s that ESO consumes (the `aws-secrets-manager` Secrets-Manager store and the SSM
+Parameter Store store) are created by the **`secret-stores`** module — separate from the `external-secrets`
+module that installs the operator itself.
+
+See [ADR-019](../adrs/019-external-secrets-operator.md) for the decision to adopt ESO,
+[ADR-025](../adrs/025-secret-naming-convention.md) for the naming convention, and
+[ADR-047](../adrs/047-pod-identity-as-aws-identity-standard.md) for the IRSA→Pod Identity migration.
 
 ---
 
@@ -148,8 +156,8 @@ where the namespace maps to the environment's Kubernetes namespace (`<team>-<pro
 - The secret must be created in the correct AWS account (preprod or prod, not
   platform)
 - The team must have a namespace-scoped `SecretStore` in their namespace,
-  configured with an IRSA role scoped to their secret path prefix
-- The IRSA role's IAM policy must allow
+  authenticated via an **EKS Pod Identity** association (ADR-047 — not IRSA) scoped to their secret path prefix
+- That association's IAM role must allow
   `secretsmanager:GetSecretValue` on `arn:aws:secretsmanager:*:${account_id}:secret:{namespace}/*`
 
 ### Steps
@@ -221,7 +229,7 @@ may contain stale data from a previous successful sync.
 
 ### Common errors
 
-- **IAM permission denied:** The IRSA role does not have
+- **IAM permission denied:** The Pod Identity association's role does not have
   `secretsmanager:GetSecretValue` for the secret's ARN. Check that the
   secret path matches the IAM policy's resource pattern.
 - **Secret not found:** The `remoteRef.key` path is wrong, or the secret
@@ -242,20 +250,27 @@ kubectl logs -n external-secrets -l app.kubernetes.io/name=external-secrets --ta
 
 Look for errors related to the specific secret path or STS assume-role failures.
 
-### Verify IRSA configuration
+### Verify the Pod Identity association
+
+ESO authenticates via **EKS Pod Identity** (ADR-047), so the `external-secrets` ServiceAccount carries **no**
+`eks.amazonaws.com/role-arn` annotation — don't look for one. Confirm the Pod Identity **association** exists and
+maps the SA to the correct IAM role:
 
 ```bash
-kubectl describe sa external-secrets -n external-secrets
+AWS_PROFILE=platform aws eks list-pod-identity-associations \
+  --cluster-name platform-use1-eks \
+  --namespace external-secrets --service-account external-secrets \
+  --region us-east-1
 ```
 
-Confirm the `eks.amazonaws.com/role-arn` annotation is present and points to
-the correct IAM role.
+A returned association (with the expected `roleArn`) confirms the binding. If empty, the association is missing —
+re-apply the `external-secrets` unit.
 
 ### Verify the IAM policy
 
 ```bash
 AWS_PROFILE=platform aws iam get-role-policy \
-  --role-name <eso-irsa-role-name> \
+  --role-name <eso-pod-identity-role-name> \
   --policy-name secrets-access
 ```
 

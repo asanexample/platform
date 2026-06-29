@@ -185,12 +185,19 @@ base.
 
 ---
 
+## Progressive delivery (built)
+
+- **Progressive delivery is live** ([ADR-056](../adrs/056-progressive-delivery-and-safe-rollback.md), Phase 1
+  built + applied on **both clusters**). `argo-rollouts` is the in-cluster control plane and **every environment
+  workload is an Argo `Rollout`** (direct `spec.template`); the **tier picks the strategy** — dev/preprod
+  auto-promote to dogfood the path, while the scaffolder's prod overlay ships a **metric-gated canary**
+  (`k8s/overlays/prod/progressive.yaml`). So a prod promotion is **not** a 100%-at-once sync — it is a
+  health-gated, automatically-reversible canary. The traffic-correctness foundation (graceful drain / PDB /
+  topology spread) is [zero-downtime-deployments.md](zero-downtime-deployments.md) (ADR-085). Remaining work is
+  tracked under [#500](https://github.com/asanexample/platform/issues/500).
+
 ## Not yet built
 
-- **Progressive delivery for prod** (Argo Rollouts canary + metric-gated auto-rollback) is
-  [#500](https://github.com/asanexample/platform/issues/500) /
-  [ADR-056](../adrs/056-progressive-delivery-and-safe-rollback.md) — **Proposed**, gated on the observability
-  epic landing first. Today a prod promotion is a plain 100%-at-once ArgoCD sync.
 - **Multi-service Request Promotion** — the Backstage template is single-service v1; promoting one Service of a
   multi-Service Product must merge into (not overwrite) the target Release. Tracked as
   [#502](https://github.com/asanexample/platform/issues/502).

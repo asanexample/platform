@@ -44,6 +44,8 @@ Root (r-xxxx)
 |-- OU: Platform
 |     |-- [SCPs attached at Platform]:
 |     |     * protect-data-and-network
+|     |     * require-tagging
+|     |     * restrict-iam-users
 |     |
 |     |-- Account: platform (admin+platform@example.com)
 |     |-- Account: test     (admin+test@example.com)  -- Terratest sandbox
@@ -114,15 +116,17 @@ Allow at a lower level.
     |                   |       |                       |
     | Attached SCPs:    |       | Attached SCPs:        |
     |  - protect-data-  |       |  - protect-data-      |
-    |    and-network    |       |    and-network         |
-    +--------+----------+       |  - require-tagging    |
-             |                  |  - restrict-iam-users |
+    |    and-network    |       |    and-network        |
+    |  - require-tagging|       |  - require-tagging    |
+    |  - restrict-      |       |  - restrict-iam-users |
+    |    iam-users      |       +-----------+-----------+
+    +--------+----------+                   |
              |                  +-----------+-----------+
-    +--------v----------+                   |
-    | Account: platform |       +-----------+-----------+
-    | Effective SCPs:   |       |           |           |
-    | (root 4) + (OU 1) |      Preprod    Prod    Regulated
-    | = 5 total         |       |
+    +--------v----------+       |           |           |
+    | Account: platform |      Preprod    Prod    Regulated
+    | Effective SCPs:   |       |
+    | (root 4) + (OU 3) |       |
+    | = 7 total         |       |
     +-------------------+       |
                        +--------v----------+
                        | Account: preprod  |
@@ -140,8 +144,8 @@ For the **platform** account:
 | Layer     | SCPs Applied                                                    | Count |
 |-----------|-----------------------------------------------------------------|-------|
 | Root      | baseline-guardrails, protect-security-services, enforce-encryption, deny-regions | 4 |
-| Platform  | protect-data-and-network                                        | 1     |
-| **Total** |                                                                 | **5** |
+| Platform  | protect-data-and-network, require-tagging, restrict-iam-users   | 3     |
+| **Total** |                                                                 | **7** |
 
 For the **preprod** account:
 
@@ -235,16 +239,16 @@ inputs.create_organization = true
     |        parent_id = OU["Workloads"].id
     |
     +--> For each entry in inputs.accounts:
-    |      aws_organizations_account.this["platform"]
+    |      aws_organizations_account.this["Platform"]
     |        email     = admin+platform@example.com
     |        parent_id = OU["Platform"].id
-    |      aws_organizations_account.this["test"]
+    |      aws_organizations_account.this["Test"]
     |        email     = admin+test@example.com
     |        parent_id = OU["Platform"].id
-    |      aws_organizations_account.this["preprod"]
+    |      aws_organizations_account.this["Preprod"]
     |        email     = admin+preprod@example.com
     |        parent_id = OU["Workloads/Preprod"].id
-    |      aws_organizations_account.this["prod"]
+    |      aws_organizations_account.this["Prod"]
     |        email     = admin+prod@example.com
     |        parent_id = OU["Workloads/Prod"].id
     |
@@ -262,6 +266,8 @@ inputs.create_organization = true
            aws_organizations_policy_attachment.this["root/enforce-encryption"]
            aws_organizations_policy_attachment.this["root/deny-regions"]
            aws_organizations_policy_attachment.this["Platform/protect-data-and-network"]
+           aws_organizations_policy_attachment.this["Platform/require-tagging"]
+           aws_organizations_policy_attachment.this["Platform/restrict-iam-users"]
            aws_organizations_policy_attachment.this["Workloads/protect-data-and-network"]
            aws_organizations_policy_attachment.this["Workloads/require-tagging"]
            aws_organizations_policy_attachment.this["Workloads/restrict-iam-users"]
@@ -457,7 +463,7 @@ condition {
 ```
 
 The exempt roles are driven by `var.exempt_roles`. The live management unit
-(`infra/live/aws/mgmt/global/organizations/terragrunt.hcl`) sets **six**:
+(`infra/live/aws/mgmt/global/organizations/terragrunt.hcl`) sets **seven**:
 
 | Role | Why it's exempt |
 |------|-----------------|
@@ -466,7 +472,8 @@ The exempt roles are driven by `var.exempt_roles`. The live management unit
 | `github-actions-terratest` | The CI integration-test role in the Test sandbox account; Terratest creates and destroys real resources, so it needs the same administrative latitude. |
 | `crossplane-ecr-provisioner` | The platform Crossplane provisioner that `Team`-tags tenant ECR repositories — needs the `DenyTeamTagTampering` exemption (ADR-048). |
 | `crossplane-provisioner-*` | The per-workload-cluster Crossplane provisioners that `Team`-tag the per-team Pod-identity IAM roles they create — same `DenyTeamTagTampering` exemption (the wildcard covers preprod now + prod later, ADR-048). |
-| `*-karpenter-*` | The Karpenter node-provisioner controller (ADR-078); like the EKS/ASG service roles it must set governance tags on the nodes it provisions (via the launch template), so it is exempt from `DenyTeamTagTampering` + `require-tagging`. |
+| `platform-use1-eks-karpenter-*` | The platform-cluster Karpenter node-provisioner controller (ADR-078); like the EKS/ASG service roles it must set governance tags on the nodes it provisions (via the launch template), so it is exempt from `DenyTeamTagTampering` + `require-tagging`. |
+| `preprod-use1-eks-karpenter-*` | The preprod-cluster Karpenter controller, same rationale. The two Karpenter roles are **anchored per-cluster** (`<cluster>-karpenter-*`, the module's `name_prefix`) rather than a leading-wildcard `*-karpenter-*`, so an unrelated role merely containing `-karpenter-` can't inherit the exemption (security audit). |
 
 Each role name becomes an `arn:aws:iam::*:role/<name>` pattern in `local.exempt_role_arns`.
 
@@ -541,7 +548,7 @@ before adding new policies.
 | Target                | Attached SCPs                                                                                   | Count | Remaining |
 |-----------------------|-------------------------------------------------------------------------------------------------|-------|-----------|
 | Root                  | baseline-guardrails, protect-security-services, enforce-encryption, deny-regions                 | 4     | 1         |
-| Platform OU           | protect-data-and-network                                                                        | 1     | 4         |
+| Platform OU           | protect-data-and-network, require-tagging, restrict-iam-users                                   | 3     | 2         |
 | Workloads OU          | protect-data-and-network, require-tagging, restrict-iam-users                                   | 3     | 2         |
 | Workloads/Preprod OU  | (none directly; inherits from Workloads and Root)                                               | 0     | 5         |
 | Workloads/Prod OU     | (none directly; inherits from Workloads and Root)                                               | 0     | 5         |

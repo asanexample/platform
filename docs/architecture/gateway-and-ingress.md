@@ -34,6 +34,10 @@ flowchart LR
 
 ## The shared Cilium Gateway
 
+> The ingress stack is split across two units: **`gateway`** (the foundational `Gateway` + `ClusterIssuer`,
+> applied early, no app deps) and **`gateway-config`** (the later configuration layered on top). This doc
+> describes the `gateway` side unless noted.
+
 `infra/modules/gateway/main.tf` creates one `Gateway` (`gatewayClassName: cilium`) with two listeners, both
 scoped to the **wildcard** hostname `*.${domain}` (e.g. `*.preprod.aws.refplat.org`):
 
@@ -57,10 +61,12 @@ The Gateway is annotated `cert-manager.io/cluster-issuer: <cluster_issuer_name>`
 also created in `infra/modules/gateway/main.tf`: ACME against Let's Encrypt production, solved by a single
 **DNS-01** solver over **Route53** (`hostedZoneID`, `region`).
 
-cert-manager authenticates to Route53 via **IRSA** (`infra/modules/cert-manager/main.tf`): a role scoped to
+cert-manager authenticates to Route53 via **EKS Pod Identity** (ADR-047,
+`infra/modules/cert-manager/main.tf`): a role scoped to
 `route53:ChangeResourceRecordSets`/`ListResourceRecordSets` on the one hosted-zone ARN, plus
-`route53:GetChange` (challenge-propagation polling) and the unscopable `ListHostedZones*`. A wildcard cert
-requires DNS-01 (HTTP-01 cannot validate a wildcard).
+`route53:GetChange` (challenge-propagation polling) and the unscopable `ListHostedZones*`, bound to the
+cert-manager service account by a Pod Identity association (no `eks.amazonaws.com/role-arn` annotation). A
+wildcard cert requires DNS-01 (HTTP-01 cannot validate a wildcard).
 
 Once issued, Cilium **automatically** copies the Gateway-referenced TLS secret into the `cilium-secrets`
 namespace where Envoy reads it — no module code does this (confirmed in the
@@ -74,7 +80,8 @@ a `domainFilters` of the zone (e.g. `preprod.aws.refplat.org`). For each attache
 matching Route53 record pointing at the Gateway NLB, and a `TXT` ownership record keyed by
 `txtOwnerId = <cluster_name>` (so multiple clusters can share a zone without clobbering each other's records).
 
-Its IRSA role is scoped to `route53:ChangeResourceRecordSets` on the single zone ARN plus the unscopable
+Its role (assumed via **EKS Pod Identity**, ADR-047 — no SA annotation) is scoped to
+`route53:ChangeResourceRecordSets` on the single zone ARN plus the unscopable
 `List*` actions. external-dns is purely a **reconciler of records from routes** — it grants no authorisation;
 which hostnames a route may carry is enforced separately by Kyverno (below).
 
@@ -83,13 +90,14 @@ which hostnames a route may carry is enforced separately by Kyverno (below).
 An environment must not be able to route an arbitrary or another team's hostname. Two mechanisms, one source:
 
 - **Generated host (ADR-060).** Every Environment has an implicit canonical host
-  `<product>-<team>-<stage>.<baseDomain>` (e.g. `demo-alpha-dev.preprod.aws.refplat.org`). It is never
-  declared; `argocd-apps` injects it (plus the `-pr-*` preview wildcard) into the app's `HTTPRoute` at deploy,
-  and the shift-left CI injects the same at PR time (see [kyverno-shift-left.md](kyverno-shift-left.md)).
+  `<product>-<team>-<stage>.<baseDomain>` (e.g. `shop-alpha-dev.preprod.aws.refplat.org`). It is never
+  declared; `argocd-apps` injects it into the app's `HTTPRoute` at deploy — a `preview_domain`-gated patch
+  that rewrites `spec.hostnames[0]` to `<product>-<team>-<stage>.<preview_domain>` (delivery.tf) — and the
+  shift-left CI injects the same at PR time (see [kyverno-shift-left.md](kyverno-shift-left.md)).
 - **`spec.domains` aliases (ADR-061).** Additional vanity hosts declared on the `XEnvironment` claim.
 
 The Environment Composition unions the generated host(s) with `spec.domains` into a per-product Kyverno
-`ClusterPolicy` **`restrict-route-hostnames-<product>`** that **denies** any `HTTPRoute`/`GRPCRoute`/
+`ClusterPolicy` **`restrict-route-hostnames-<ns>`** (`<ns>` = `<team>-<product>-<stage>`) that **denies** any `HTTPRoute`/`GRPCRoute`/
 `TLSRoute` hostname not in the allow-list (Enforce). The allow-list and the matching `status.domains` entries
 are both rendered from the same template pass in
 `infra/modules/crossplane/charts/environment-api/files/composition.yaml` — see

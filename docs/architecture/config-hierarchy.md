@@ -115,8 +115,11 @@ The root configuration applies to every unit. It provides:
   [Config Secrets](#config-secrets-sops)).
 - **Provider generation.** Generates `provider_aws.tf` (the only cloud provider
   generated today; Azure/GCP provider generation would be added when those clouds land).
-- **Version constraints.** Generates `versions.tf` pinning the AWS provider to
-  `6.47.0` and `required_version >= 1.6.0` (OpenTofu pinned in `/.tool-versions`, currently 1.12.1).
+- **Version constraints.** Generates a **fallback-only** `versions.tf` with AWS provider
+  `~> 6.0` and `required_version >= 1.6.0` — emitted with `if_exists = "skip"`, so it applies only to a unit
+  whose sourced module ships no `versions.tf`. Every shared module now declares its own `required_providers`
+  (ADR-083), so in practice this block is skipped and the **module's** `versions.tf` is authoritative.
+  (OpenTofu is pinned in `/.tool-versions`, currently 1.12.1.)
 - **Cloud detection.** Parses the relative path to extract the cloud provider, defaulting
   to `aws`:
 
@@ -294,7 +297,7 @@ module_source = {
   organizations = "${local.source_base}/aws//organizations"
   networking    = "${local.source_base}/aws//networking"
   eks           = "${local.source_base}/aws//eks"
-  # ... ~61 modules total (shared modules + aws/ modules)
+  # ... ~66 modules total (shared modules + aws/ modules)
 }
 ```
 

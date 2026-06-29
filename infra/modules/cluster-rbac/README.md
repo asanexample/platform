@@ -8,13 +8,24 @@ This is the "operate, don't author" half of the platform-engineer access model (
 read comes from the AWS-managed `AmazonEKSViewPolicy` associated with the same access entry, so this
 ClusterRole only adds the **delta** View lacks:
 
-- **Debug:** `pods/log` (get), `pods/exec` (create), `pods/portforward` (create)
-- **Operate:** `pods` (delete), `pods/eviction` (create — drain), `nodes` (get/list/watch + patch —
-  cordon/drain; View doesn't grant cluster-scoped node read),
+- **Debug:** `pods/log` (get), `pods/exec` + `pods/portforward` (create), and `pods` +
+  `pods/ephemeralcontainers` (create/update/patch — `kubectl run`/`kubectl debug` throwaway/ephemeral
+  debug containers)
+- **Operate:** `pods` (delete + patch metadata), `pods/eviction` (create — drain), `nodes`
+  (get/list/watch + patch — cordon/drain; View doesn't grant cluster-scoped node read),
   `deployments`/`statefulsets`/`daemonsets` (patch — `kubectl rollout restart`)
+- **CR-level recovery:** `patch`/`update`/`delete` on a **named allow-list** of operational CR groups
+  (`karpenter.sh`/`karpenter.k8s.aws`, `platform.refplat.org` (XEnvironment), the Crossplane groups
+  `apiextensions.crossplane.io`/`pkg.crossplane.io`/`kubernetes.crossplane.io`/`aws*.upbound.io`/`ecr.aws*.upbound.io`,
+  `postgresql.cnpg.io` (CNPG)) — bounded mutate for stuck NodeClaims, wedged finalizers, bouncing a
+  CNPG Cluster. No `create` here, and not arbitrary CRDs.
+- **Read:** cluster-wide `get/list/watch` on `*/*` — **including CRDs and Secrets** (View can't read
+  CRDs, and `pods/exec` already lets an operator read any mounted Secret, so a direct Secret read is
+  no new boundary — it just makes debugging honest)
 
-It deliberately grants **no `create`** and no other resource types. Resource authoring flows through
-GitOps (ArgoCD); emergencies use break-glass (`OrganizationAccountAccessRole`).
+It grants **no `create` of authoring resources** (Deployments/Applications/etc.) and no wildcard
+mutate — pod/ephemeral-container `create` is for operational debugging only. Resource authoring flows
+through GitOps (ArgoCD); emergencies use break-glass (`OrganizationAccountAccessRole`).
 
 > Note: RBAC verbs are not field-level — `patch` on nodes/workloads technically permits arbitrary
 > patches to those objects, not just cordon/restart. For ArgoCD-managed resources, manual drift is

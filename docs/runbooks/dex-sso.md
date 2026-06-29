@@ -1,8 +1,9 @@
 # Runbook: Dex SSO Broker
 
-> ⚠️ **REMOVED.** Dex (and the oauth2-proxy that fronted Backstage) were retired once Backstage moved to
-> **direct Keycloak OIDC** — both `dex` and `oauth2-proxy` units/modules are gone. ArgoCD and Backstage now
-> authenticate directly against Keycloak. This runbook is kept only for history; for the live model see
+> ⚠️ **REMOVED.** Dex was retired once Backstage moved to **direct Keycloak OIDC** — the `dex` unit/module
+> is gone. ArgoCD and Backstage now authenticate directly against Keycloak. (The `oauth2-proxy` module was
+> only removed from *fronting Backstage*; it still exists and now provides SSO for the Argo Rollouts
+> dashboard.) This runbook is kept only for history; for the live model see
 > [identity-and-sso](../architecture/identity-and-sso.md) and, for login problems,
 > [identity-sso-troubleshooting](identity-sso-troubleshooting.md).
 >

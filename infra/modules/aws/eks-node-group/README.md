@@ -88,13 +88,16 @@ module "node_groups" {
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-No requirements.
+| Name | Version |
+| ---- | ------- |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.6.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.0 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_aws"></a> [aws](#provider\_aws) | n/a |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.0 |
 
 ## Modules
 
@@ -118,7 +121,8 @@ No modules.
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | Name of the EKS cluster to attach node groups to | `string` | n/a | yes |
 | <a name="input_create"></a> [create](#input\_create) | Whether to create resources in this module | `bool` | `true` | no |
-| <a name="input_node_groups"></a> [node\_groups](#input\_node\_groups) | Managed node group definitions | <pre>map(object({<br/>    subnet_ids      = list(string)<br/>    instance_types  = list(string)<br/>    desired_size    = number<br/>    max_size        = number<br/>    min_size        = number<br/>    capacity_type   = optional(string, "ON_DEMAND")<br/>    ami_type        = optional(string, "AL2023_x86_64_STANDARD")<br/>    max_unavailable = optional(number, 1)<br/>    labels          = optional(map(string), {})<br/>  }))</pre> | `{}` | no |
+| <a name="input_node_groups"></a> [node\_groups](#input\_node\_groups) | Managed node group definitions | <pre>map(object({<br/>    subnet_ids      = list(string)<br/>    instance_types  = list(string)<br/>    desired_size    = number<br/>    max_size        = number<br/>    min_size        = number<br/>    capacity_type   = optional(string, "ON_DEMAND")<br/>    ami_type        = optional(string, "AL2023_x86_64_STANDARD")<br/>    max_unavailable = optional(number, 1)<br/>    labels          = optional(map(string), {})<br/>    # Override kubelet --max-pods. EKS/AL2023 defaults this to the instance's ENI IP<br/>    # capacity (e.g. ~35 on t3.large), which artificially caps pod density under a<br/>    # Cilium overlay (cluster-pool) where pods don't consume ENI IPs. Set higher for overlay.<br/>    max_pods = optional(number)<br/>  }))</pre> | `{}` | no |
+| <a name="input_single_az"></a> [single\_az](#input\_single\_az) | Cost/dev profile: place every node group in a SINGLE AZ (the first of its subnet\_ids, sorted) instead of spreading across all. No AZ resilience — intended for build/test. gp3 is WaitForFirstConsumer, so EBS volumes follow the pods into that AZ. | `bool` | `false` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to all resources | `map(string)` | `{}` | no |
 
 ## Outputs

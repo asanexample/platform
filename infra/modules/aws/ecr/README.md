@@ -38,13 +38,16 @@ module "ecr" {
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-No requirements.
+| Name | Version |
+| ---- | ------- |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.6.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.0 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_aws"></a> [aws](#provider\_aws) | n/a |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.0 |
 
 ## Modules
 
@@ -66,7 +69,8 @@ No modules.
 | <a name="input_force_delete"></a> [force\_delete](#input\_force\_delete) | Whether to allow deletion of non-empty repositories | `bool` | `false` | no |
 | <a name="input_max_image_count"></a> [max\_image\_count](#input\_max\_image\_count) | Maximum number of tagged images to retain per repository | `number` | `50` | no |
 | <a name="input_pull_account_ids"></a> [pull\_account\_ids](#input\_pull\_account\_ids) | AWS account IDs allowed to pull images cross-account | `list(string)` | `[]` | no |
-| <a name="input_repositories"></a> [repositories](#input\_repositories) | Map of repository names to configuration. Keys are repo names (e.g. 'team-alpha/app'). | <pre>map(object({<br/>    tag_mutability = optional(string, "IMMUTABLE")<br/>    tags           = optional(map(string), {})<br/>  }))</pre> | `{}` | no |
+| <a name="input_repositories"></a> [repositories](#input\_repositories) | Map of repository names to configuration. Keys are repo names (e.g. 'team-alpha/app'). Set tag\_mutability = IMMUTABLE\_WITH\_EXCLUSION to keep image tags immutable while exempting cosign's sha256-* tags (see tag\_mutability\_exclusion\_filters). | <pre>map(object({<br/>    tag_mutability = optional(string, "IMMUTABLE")<br/>    tags           = optional(map(string), {}) # merged onto var.tags (e.g. { Team = "alpha" })<br/>  }))</pre> | `{}` | no |
+| <a name="input_tag_mutability_exclusion_filters"></a> [tag\_mutability\_exclusion\_filters](#input\_tag\_mutability\_exclusion\_filters) | WILDCARD tag patterns exempted from immutability for repos using tag\_mutability = IMMUTABLE\_WITH\_EXCLUSION. Default exempts cosign's `sha256-*` signature/attestation tags so they can be updated (needed to hold multiple attestations — SBOM + provenance) while image tags stay immutable. | `list(string)` | <pre>[<br/>  "sha256-*"<br/>]</pre> | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to all resources | `map(string)` | `{}` | no |
 
 ## Outputs

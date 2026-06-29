@@ -1,5 +1,7 @@
 # SLSA Build L3 — isolated provenance via slsa-github-generator (#131)
 
+> **Status: DELIVERED — P4 (platform cluster) landed; verify/attest in Enforce. The verify policy is now product-scoped (v3). Retained for history.**
+>
 > **Status:** **P1–P3 DONE on preprod — Build L3 achieved (2026-05-30).** P0 ruled out the off-the-shelf
 > generator for ECR; P1 built the custom isolated signer (`asanexample/trusted-ci`); P2/P3 dropped the
 > app's hand-authored provenance so trusted-ci is the **sole** provenance signer and flipped Kyverno

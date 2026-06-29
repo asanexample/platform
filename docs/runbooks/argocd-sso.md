@@ -163,7 +163,9 @@ The `configHash` in the Helm release triggers an automatic pod restart.
 
 **Cause:** Dex is not enabled in the ArgoCD deployment.
 
-**Fix:** Verify `dex_enabled = true` in the ArgoCD unit and re-apply.
+**Fix:** Verify `dex_enabled = true` in the ArgoCD unit and re-apply. (Legacy: the
+current deployment runs `dex_enabled = false` — ArgoCD authenticates directly against
+Keycloak. This step applies only to the historical Dex+SAML setup.)
 
 ```bash
 kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-dex-server

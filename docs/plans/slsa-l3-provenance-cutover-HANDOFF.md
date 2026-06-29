@@ -1,5 +1,7 @@
 # SLSA L3 provenance cutover — working handoff (updated 2026-05-30 ~18:25 PT)
 
+> **Status: COMPLETE — P4 landed; this handoff is historical.**
+>
 > **✅ COMPLETE (2026-05-30).** The cutover is done: app-alpha emits trusted-ci as its **sole** provenance
 > signer and preprod Kyverno `verify-attestations` is in **Enforce** requiring it — **Build L3 achieved on
 > preprod**. The permanent record is [ADR-042](../adrs/042-isolated-build-provenance-slsa-l3.md) and the

@@ -46,6 +46,9 @@ gitops/
   releases/<team>/<product>/<stage>.yaml    # Release record — per-service digest pins (ADR-071)
   grants/...                                # AccessGrant CRs (cross-team, ADR-068) — the registry-sync
                                             #   app references this path, but no grant files exist yet
+  agents/<name>.yaml                        # XAgent claims (platform agents; ADR-082) — hub-targeted sync
+  people/<person>.yaml                      # workforce Person records (ADR-086/088)
+  roles/<role>.yaml                         # workforce Role definitions (ADR-088 temporary power)
 ```
 
 Modules read these with `fileset()`+`yamldecode()` (no external tool). **Registry-sync
@@ -110,9 +113,20 @@ team has a `gitops/teams/platform.yaml` with a broader `platformTrust` envelope,
 `gitops/products/platform/<svc>.yaml`, an environment claim, and a Release — same
 machinery as a tenant app. The platform-trust difference is validated at admission
 (Kyverno envelope), not at delivery. `triage-copilot` is the reference instance (its
-`gitops/{teams,products,environments}/platform/...` files exist). (Note: platform *agents*
-are intended to be provisioned by a separate `XAgent` Composition per ADR-080 — that
-Composition is **not yet in `infra/`/`gitops/`**, so treat it as design intent.)
+`gitops/{teams,products,environments}/platform/...` files exist).
+
+**Platform agents have their own road (ADR-082, live).** Agents are provisioned by an `XAgent`
+Composition (`crossplane/charts/agent-api/`), and their delivery is **hub-targeted** in
+`argocd-apps/agents.tf` (unlike tenant delivery, which targets the preprod workload cluster):
+
+1. an **`agents` registry-sync** projects `gitops/agents/*.yaml` (XAgent claims) onto the **hub's**
+   Crossplane (`crossplane-system`), so admission (`restrict-agent-envelope`) + the Agent Composition
+   reconcile them — mirrors the environments registry-sync;
+2. a **per-agent workload ApplicationSet** delivers the agent's signed image (promoted Release digest)
+   into the Composition-made `platform-agent-<name>` namespace. The Composition owns the agent's
+   ns/SA/identity/RBAC; ArgoCD delivers **only** the workload (Deployment/Service), bounded by a tight
+   AppProject (`clusterResourceWhitelist []`). `triage-copilot` is the reference agent
+   (`gitops/agents/triage-copilot.yaml`).
 
 ## Add a tenant app (happy path)
 
@@ -137,9 +151,9 @@ Composition is **not yet in `infra/`/`gitops/`**, so treat it as design intent.)
 - **Crossplane drift on environments**: Crossplane writes finalizers/`spec.crossplane`
   into claims; ArgoCD sees drift. The registry-sync app uses `ServerSideApply=true`
   (`delivery.tf`); separately there's a cluster-wide `resource.customizations.ignoreDifferences`
-  in the `argocd` unit's `argocd-cm` — but note it's still keyed to the **v2 `XTenant`** kind
-  (`spec.crossplane`/finalizers), not `XEnvironment`, so an `XEnvironment`-scoped
-  customization is currently missing. Re-apply the `argocd` unit if it flaps OutOfSync.
+  in the `argocd` unit's `argocd-cm`, correctly keyed to the **`XEnvironment`** kind
+  (`...ignoreDifferences.platform.refplat.org_XEnvironment`, ignoring `spec.crossplane`/finalizers —
+  renamed from the v2 `_XTenant` key at the v3 cutover). Re-apply the `argocd` unit if it flaps OutOfSync.
 - **Progressive delivery / Argo Rollouts (ADR-056)**: every env workload is a `Rollout`, and prod runs a
   metric-gated **canary** (or blue/green). The rollouts controller mutates two fields at runtime that ArgoCD
   `selfHeal` will otherwise revert mid-rollout — so the **tenant Application `ignoreDifferences`** the Service
@@ -164,4 +178,4 @@ Composition is **not yet in `infra/`/`gitops/`**, so treat it as design intent.)
 - `infra/modules/argocd-apps/delivery.tf`, `gitops/{products,environments,releases}/`
 - ADRs: 021 (ArgoCD), 032 (PR preview), 047 (Pod Identity), 061 (ingress),
   063 (Team git-native), 067 (domain model), 069 (delivery source-of-truth),
-  071 (digest promotion), 081 (platform-service delivery)
+  071 (digest promotion), 081 (platform-service delivery), 082 (XAgent runtime / agent delivery)

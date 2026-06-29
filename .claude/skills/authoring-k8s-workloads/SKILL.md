@@ -32,9 +32,9 @@ or the Namespace itself is rejected (`require-environment-namespace-naming`).
 
 These do **not** apply to system/infra namespaces, which are excluded: `kube-system`,
 `kube-node-lease`, `kube-public`, `kyverno`, `cert-manager`, `external-secrets`,
-`external-dns`, `argocd`, `tailscale`, `falco`, `observability`. So platform component
-manifests aren't governed by this skill — environment workloads are. Workloads in
-`default` are denied outright (`disallow-default-namespace`).
+`external-dns`, `argocd`, `tailscale`. So platform component manifests aren't governed by
+this skill — environment workloads are. Workloads in `default` are denied outright
+(`disallow-default-namespace`).
 
 ## Auto-injected by `mutate` — do NOT set these
 
@@ -43,7 +43,7 @@ Kyverno adds these when absent, so leave them out (setting them is harmless but 
 - **Container & initContainer `securityContext`** — `allowPrivilegeEscalation: false`,
   `capabilities.drop: [ALL]`, `seccompProfile.type: RuntimeDefault`
 - **Pod `automountServiceAccountToken: false`**
-- **The `team` label** on the Pod — derived from the namespace name (`alpha-demo-dev` → `team: alpha`)
+- **The `team` label** on the Pod — auto-injected, derived from the namespace name (known derivation bug, tracked — the mutate rule currently picks the wrong token, so don't rely on its exact value)
 - **Graceful-drain defaults** (ADR-085) — a container `lifecycle.preStop` (native `sleep`) +
   pod `terminationGracePeriodSeconds: 30`, so a rolling update / node disruption doesn't drop
   in-flight traffic. (`mutate-pod-defaults`.)
@@ -68,9 +68,11 @@ The platform makes deploys/disruptions *non-dropping*, but only if your app coop
 
 - **Run ≥ 2 replicas** for anything that should survive a rollout or node disruption — a single
   replica can't be zero-downtime, and its PDB/spread do nothing. In **`*-prod`** namespaces this is
-  **required** (`require-prod-replica-floor`: `spec.replicas >= 2`) — Audit today, Enforce later; an
-  HPA must set `minReplicas >= 2`. Lower stages may stay at 1 for cost. (Don't expect to mutate
-  replicas — it's validated, never injected, so it doesn't fight your HPA/overlay.)
+  **required** (`require-prod-replica-floor`: `spec.replicas >= 2`) — **Enforce on both preprod and
+  platform** (#934), so a single-replica `*-prod` workload is rejected at admission; an HPA must set
+  `minReplicas >= 2`. (The module DEFAULT stays Audit for fresh clusters; the live clusters flipped to
+  Enforce.) Lower stages may stay at 1 for cost. (Don't expect to mutate replicas — it's validated,
+  never injected, so it doesn't fight your HPA/overlay.)
 - **Handle `SIGTERM`**: stop accepting new work, drain in-flight, exit. The injected `preStop` sleep
   only buys the window for the datapath to stop routing to you — it does **not** drain your
   in-flight requests; your process must. **Long-lived connections** (websockets, gRPC streams) need
@@ -92,7 +94,7 @@ Every one of these is `Enforce` on preprod + platform. Omitting or violating it 
 | **No workloads in `default`** | `disallow-default-namespace` | use the `<team>-<product>-<stage>` namespace |
 | **No privilege escalation / Unconfined seccomp** | `disallow-privilege-escalation`, `require-seccomp` | don't set `allowPrivilegeEscalation: true` or `seccompProfile.type: Unconfined` (backstops the mutate defaults) |
 | **No `cluster-admin`, no wildcards in RBAC** | `restrict-binding-clusteradmin`, `restrict-wildcard-rbac` | (Cluster)RoleBindings to `cluster-admin` denied; Roles/ClusterRoles with `*` in `verbs`, `resources`, or `apiGroups` denied |
-| **Images are cosign-signed (+ attested)** | `verify-images-product-*`, `verify-attestations-product-*` | image signature **and** SBOM + SLSA provenance are verified; **both Enforce on preprod** (since 2026-05-30). See "Image & supply chain" |
+| **Images are cosign-signed (+ attested)** | `verify-images-product-*`, `verify-attestations-product-*` | image signature **and** SBOM + SLSA provenance are verified; **Enforce on both preprod and platform**. See "Image & supply chain" |
 
 **Also use a named ServiceAccount** (`serviceAccountName`, never `default`) — but note this is a
 **Pod Identity requirement, not a Kyverno rejection**: a `default` SA passes admission, it just

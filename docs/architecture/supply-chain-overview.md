@@ -118,8 +118,10 @@ v2.5.2** for the legacy `.att` format (see the onboarding runbook).
 
 Both are generated per product from the single `verify_subjects_product` input — derived at the `policy`
 unit from the **Product registry** (`gitops/products/<team>/<product>.yaml`, `spec.repo`), keyed
-`<team>-<product>` and carrying `repo` (the caller-repo gate), `registryPrefix`, and optional `appSubjects` —
-plus the cluster-wide `trusted_ci_build_subject_regexp` input that admits the shared
+`<team>-<product>` and carrying `repo` (the caller-repo gate), `registryPrefix`, and optional `appSubjects`
+(the app-signed bespoke-build fallback — **not currently populated for any live product**, so today every
+product is verified solely by the shared-signer gate) — plus the cluster-wide
+`trusted_ci_build_subject_regexp` input that admits the shared
 `build-sign.yml` signer (ADR-050). Each has its **own**
 `validationFailureAction`/`failurePolicy` so signatures can be **Enforce** while attestations roll out
 **Audit-first**. `webhookTimeoutSeconds: 30` covers the signature fetch + Rekor lookup.

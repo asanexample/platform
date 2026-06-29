@@ -107,15 +107,15 @@ module "cilium" {
 | Name | Version |
 | ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.6.0 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 5.0 |
-| <a name="requirement_helm"></a> [helm](#requirement\_helm) | >= 3.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.0 |
+| <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 3.0 |
 | <a name="requirement_null"></a> [null](#requirement\_null) | >= 3.0 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_helm"></a> [helm](#provider\_helm) | >= 3.0 |
+| <a name="provider_helm"></a> [helm](#provider\_helm) | ~> 3.0 |
 | <a name="provider_null"></a> [null](#provider\_null) | >= 3.0 |
 
 ## Modules
@@ -134,11 +134,14 @@ No modules.
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | Name of the Kubernetes cluster | `string` | n/a | yes |
-| <a name="input_cloud_provider"></a> [cloud\_provider](#input\_cloud\_provider) | Cloud provider for platform-specific CNI config | `string` | `"azure"` | no |
+| <a name="input_bpf_masquerade"></a> [bpf\_masquerade](#input\_bpf\_masquerade) | Use eBPF masquerade instead of iptables. Requires kubeProxyReplacement and an empty egress\_masquerade\_interfaces (BPF masquerade ignores the interface glob). | `bool` | `false` | no |
+| <a name="input_cloud_provider"></a> [cloud\_provider](#input\_cloud\_provider) | Cloud provider for platform-specific CNI config | `string` | `"aws"` | no |
 | <a name="input_cni"></a> [cni](#input\_cni) | CNI configuration for Cilium | `any` | <pre>{<br/>  "chainingMode": null,<br/>  "exclusive": false<br/>}</pre> | no |
 | <a name="input_cni_exclusive"></a> [cni\_exclusive](#input\_cni\_exclusive) | Make Cilium take ownership over the container runtime CNI configuration | `bool` | `false` | no |
 | <a name="input_create"></a> [create](#input\_create) | Controls whether Cilium resources should be created | `bool` | `true` | no |
 | <a name="input_debug"></a> [debug](#input\_debug) | Debug configuration for Cilium | `any` | <pre>{<br/>  "enabled": false<br/>}</pre> | no |
+| <a name="input_egress_masquerade_interfaces"></a> [egress\_masquerade\_interfaces](#input\_egress\_masquerade\_interfaces) | Interface glob to masquerade on (e.g. 'ens+' for ENI native). Empty = all interfaces (overlay default). Must be empty when bpf\_masquerade = true. | `string` | `""` | no |
+| <a name="input_enable_ipv4_masquerade"></a> [enable\_ipv4\_masquerade](#input\_enable\_ipv4\_masquerade) | Masquerade pod egress to the node IP for traffic leaving the cluster. | `bool` | `true` | no |
 | <a name="input_environment"></a> [environment](#input\_environment) | Environment name (e.g., dev, test, prod) | `string` | `"dev"` | no |
 | <a name="input_external_ips_enabled"></a> [external\_ips\_enabled](#input\_external\_ips\_enabled) | Enable ExternalIPs service support | `bool` | `true` | no |
 | <a name="input_gateway_api_crd_version"></a> [gateway\_api\_crd\_version](#input\_gateway\_api\_crd\_version) | Gateway API CRD version to install (experimental channel). Set to empty string to skip CRD installation. | `string` | `"v1.3.0"` | no |
@@ -160,17 +163,22 @@ No modules.
 | <a name="input_hubble_tls_schedule"></a> [hubble\_tls\_schedule](#input\_hubble\_tls\_schedule) | Cron schedule for Hubble TLS certificate generation | `string` | `"0 0 1 */4 *"` | no |
 | <a name="input_hubble_ui_enabled"></a> [hubble\_ui\_enabled](#input\_hubble\_ui\_enabled) | Enable Hubble UI | `bool` | `true` | no |
 | <a name="input_identityAllocationMode"></a> [identityAllocationMode](#input\_identityAllocationMode) | The method to use for identity allocation (CRD or kvstore) | `string` | `"crd"` | no |
+| <a name="input_ipam_mode"></a> [ipam\_mode](#input\_ipam\_mode) | Cilium IPAM mode: cluster-pool (overlay), eni (AWS VPC-native), or kubernetes (host-scope). | `string` | `"cluster-pool"` | no |
 | <a name="input_k8s_service_host"></a> [k8s\_service\_host](#input\_k8s\_service\_host) | Kubernetes API server hostname (required for BYOCNI — in-cluster service IP unreachable before CNI exists) | `string` | `""` | no |
 | <a name="input_k8s_service_port"></a> [k8s\_service\_port](#input\_k8s\_service\_port) | Kubernetes API server port | `string` | `"443"` | no |
 | <a name="input_kube_proxy_replacement"></a> [kube\_proxy\_replacement](#input\_kube\_proxy\_replacement) | KubeProxy replacement mode (false, 'strict', 'partial', 'probe') | `string` | `"false"` | no |
 | <a name="input_kubeconfig_path"></a> [kubeconfig\_path](#input\_kubeconfig\_path) | Path to a kubeconfig file for kubectl operations. If empty, uses the default kubeconfig. | `string` | `""` | no |
+| <a name="input_mtu"></a> [mtu](#input\_mtu) | Override the device MTU. 0 = auto-detect (Cilium subtracts tunnel overhead). Pin to 1500 if jumbo frames cause PMTU black-holing on egress. | `number` | `0` | no |
 | <a name="input_namespace"></a> [namespace](#input\_namespace) | Kubernetes namespace to install Cilium into | `string` | `"kube-system"` | no |
+| <a name="input_native_routing_cidr"></a> [native\_routing\_cidr](#input\_native\_routing\_cidr) | CIDR that Cilium treats as natively routable (no masquerade within it). Required when routing\_mode = native AND ipam\_mode != eni; ENI mode auto-derives it. | `string` | `""` | no |
 | <a name="input_node_port_enabled"></a> [node\_port\_enabled](#input\_node\_port\_enabled) | Enable NodePort service support | `bool` | `true` | no |
 | <a name="input_operator_prometheus_enabled"></a> [operator\_prometheus\_enabled](#input\_operator\_prometheus\_enabled) | Enable Prometheus metrics for Cilium operator | `bool` | `true` | no |
 | <a name="input_operator_resources_limits_cpu"></a> [operator\_resources\_limits\_cpu](#input\_operator\_resources\_limits\_cpu) | CPU limit for Cilium operator | `string` | `"500m"` | no |
 | <a name="input_operator_resources_limits_memory"></a> [operator\_resources\_limits\_memory](#input\_operator\_resources\_limits\_memory) | Memory limit for Cilium operator | `string` | `"512Mi"` | no |
 | <a name="input_operator_resources_requests_cpu"></a> [operator\_resources\_requests\_cpu](#input\_operator\_resources\_requests\_cpu) | CPU request for Cilium operator | `string` | `"50m"` | no |
 | <a name="input_operator_resources_requests_memory"></a> [operator\_resources\_requests\_memory](#input\_operator\_resources\_requests\_memory) | Memory request for Cilium operator | `string` | `"64Mi"` | no |
+| <a name="input_pod_cidr"></a> [pod\_cidr](#input\_pod\_cidr) | IPv4 pool for cluster-pool IPAM (required when ipam\_mode = cluster-pool). Must be non-routable on the VPC and distinct from the VPC and service CIDRs. Empty for eni/kubernetes IPAM. | `string` | `""` | no |
+| <a name="input_pod_cidr_mask_size"></a> [pod\_cidr\_mask\_size](#input\_pod\_cidr\_mask\_size) | Per-node block size carved from pod\_cidr for cluster-pool IPAM (e.g. 24 = 256 IPs/node). | `number` | `24` | no |
 | <a name="input_prometheus_enabled"></a> [prometheus\_enabled](#input\_prometheus\_enabled) | Enable Prometheus metrics for Cilium agent | `bool` | `true` | no |
 | <a name="input_prometheus_service_monitor_enabled"></a> [prometheus\_service\_monitor\_enabled](#input\_prometheus\_service\_monitor\_enabled) | Enable Prometheus ServiceMonitor for Cilium agent | `bool` | `true` | no |
 | <a name="input_region_abbv"></a> [region\_abbv](#input\_region\_abbv) | Abbreviated name of the region (e.g., eus for eastus) | `string` | `""` | no |
@@ -179,9 +187,11 @@ No modules.
 | <a name="input_resources_limits_memory"></a> [resources\_limits\_memory](#input\_resources\_limits\_memory) | Memory limit for Cilium agent | `string` | `"1Gi"` | no |
 | <a name="input_resources_requests_cpu"></a> [resources\_requests\_cpu](#input\_resources\_requests\_cpu) | CPU request for Cilium agent | `string` | `"100m"` | no |
 | <a name="input_resources_requests_memory"></a> [resources\_requests\_memory](#input\_resources\_requests\_memory) | Memory request for Cilium agent | `string` | `"128Mi"` | no |
+| <a name="input_routing_mode"></a> [routing\_mode](#input\_routing\_mode) | Cilium routing mode: tunnel (encapsulated overlay) or native (no encapsulation). | `string` | `"tunnel"` | no |
 | <a name="input_socket_lb_host_namespace_only"></a> [socket\_lb\_host\_namespace\_only](#input\_socket\_lb\_host\_namespace\_only) | Force socket LB in host namespace only | `bool` | `true` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to all resources | `map(string)` | `{}` | no |
 | <a name="input_tls"></a> [tls](#input\_tls) | TLS configuration for Cilium | `any` | <pre>{<br/>  "enabled": false<br/>}</pre> | no |
+| <a name="input_tunnel_protocol"></a> [tunnel\_protocol](#input\_tunnel\_protocol) | Encapsulation protocol when routing\_mode = tunnel. Ignored otherwise. | `string` | `"vxlan"` | no |
 | <a name="input_workload"></a> [workload](#input\_workload) | Workload identifier for resource naming | `string` | `"platform"` | no |
 
 ## Outputs
@@ -203,8 +213,9 @@ No modules.
 - The `configHash` Helm value forces a rollout on any values change, even if the structural diff is empty.
 - Cilium is installed into `kube-system` by default (not a custom namespace).
 - **Switching `ipam_mode` on a running cluster is disruptive** (existing pods keep their old IPs with no matching CiliumNode PodCIDR). Roll it out by scaling node groups to 0, applying, then scaling back up — new nodes come up on the new datapath. The variable surface doubles as a clean rollback (flip back to `eni`/`native`).
-- **Overlay + IMDS:** with masquerade, verify tenant pods still cannot reach IMDS (`169.254.169.254`) — link-local must stay masquerade-excluded so the IMDSv2 hop-limit defense holds. Tenant infra (incl. IMDS isolation) is now provisioned by the Crossplane Tenant Composition (ADR-046/048).
+- **Overlay + IMDS:** with masquerade, verify tenant pods still cannot reach IMDS (`169.254.169.254`) — link-local must stay masquerade-excluded so the IMDSv2 hop-limit defense holds. Environment infra (incl. IMDS isolation) is now provisioned by the Crossplane Environment Composition (ADR-046/048/067).
 - `bpf_masquerade = true` requires `egress_masquerade_interfaces = ""` (eBPF masquerade ignores the interface glob); the module enforces this via a precondition.
+- `prometheus_service_monitor_enabled` is **not wired** — `main.tf` hardcodes the agent's `serviceMonitor.enabled = false` regardless of the input, so setting it has no effect (Prometheus scrapes Cilium via the annotation-based discovery instead).
 
 ## Related ADRs
 

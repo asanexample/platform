@@ -162,17 +162,23 @@ list without modifying the SCP logic.
    ```hcl
    inputs = {
      exempt_roles = [
-       # Keep ALL six live entries — do NOT drop these:
+       # Keep ALL seven live entries — do NOT drop these:
        "OrganizationAccountAccessRole",
        "github-actions-terratest",
        "PlatformDeployer",
-       "crossplane-ecr-provisioner",     # environment ECR provisioning
-       "crossplane-provisioner-*",       # environment IAM/EKS provisioning
-       "*-karpenter-*",                  # Karpenter node provisioning (ADR-078)
-       "TemporaryExempt-INCIDENT-1234",  # <-- add with incident ticket reference
+       "crossplane-ecr-provisioner",      # environment ECR provisioning
+       "crossplane-provisioner-*",        # environment IAM/EKS provisioning
+       "platform-use1-eks-karpenter-*",   # Karpenter node provisioning, platform (ADR-078)
+       "preprod-use1-eks-karpenter-*",    # Karpenter node provisioning, preprod (ADR-078)
+       "TemporaryExempt-INCIDENT-1234",   # <-- add with incident ticket reference
      ]
    }
    ```
+
+   > **Do NOT replace the two anchored `<cluster>-karpenter-*` entries with a
+   > leading-wildcard `*-karpenter-*`.** That broader form was explicitly rejected
+   > by a security audit — it would let any unrelated role merely containing
+   > `-karpenter-` inherit the exemption org-wide.
 
 2. **Plan and apply:**
 

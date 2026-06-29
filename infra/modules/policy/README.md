@@ -6,8 +6,9 @@ ClusterPolicies on a Kubernetes cluster (ADR-014). Kyverno layers above the Pod 
 cross-team IRSA-annotation prevention, RBAC hardening, resource/label requirements, and tier-gated
 restricted Pod Security.
 
-The module is **cloud-agnostic and holds no team-specific data** — per-environment values
-(`tenant_registry_map`, `allowed_registries`) are supplied by the Terragrunt unit from `teams.hcl`.
+The module is **cloud-agnostic and holds no team-specific data** — per-product values
+(`allowed_registries`, `verify_subjects_product`) are supplied by the Terragrunt unit, derived from the
+**Product registry** (`gitops/products/`).
 
 ## Design
 
@@ -15,7 +16,9 @@ The module is **cloud-agnostic and holds no team-specific data** — per-environ
   `helm_release.policies` installs a bundled local chart (`policies-chart/`) of our ClusterPolicies
   and `depends_on` the engine. A local chart needs no plan-time access to the Kyverno CRDs (which the
   engine release installs in the same apply), avoiding the `kubernetes_manifest` chicken-and-egg.
-- **Helm-only provider.** No `kubernetes` provider is required.
+- **Providers: `helm` + `aws`.** No `kubernetes` provider is required. The `aws` provider is used for
+  the Kyverno **ECR-read IAM role + EKS Pod Identity association** (ADR-047) that lets the engine fetch
+  cosign signatures when image verification is enabled.
 - **Audit-first rollout.** `validation_failure_action = "Audit"` records violations as PolicyReports
   without blocking admission, and the generated webhook is fail-open (`failurePolicy: Ignore`).
   Flipping to `"Enforce"` rejects violations and fails the webhook closed (`Fail`). The flip is a
@@ -36,8 +39,7 @@ The module is **cloud-agnostic and holds no team-specific data** — per-environ
 
 | ClusterPolicy | Kind(s) | Purpose |
 | ------------- | ------- | ------- |
-| `restrict-image-registries` | Pod | Environment images only from `allowed_registries` (ECR floor) |
-| `restrict-images-team-<k>` | Pod | `team-<k>` namespace may only run images under its own prefix |
+| `restrict-image-registries` | Pod | Environment images only from `allowed_registries` (cluster-wide ECR floor) |
 | `disallow-latest-tag` | Pod | Require an explicit, non-`latest` tag |
 | `require-requests-limits` | Pod | CPU/memory requests + limits on every container |
 | `require-pod-probes` | Pod | Liveness + readiness probes |
@@ -119,12 +121,9 @@ module "policy" {
   compliance_tier           = "standard"
   replica_count             = 3
 
-  allowed_registries  = ["829808296602.dkr.ecr.us-east-1.amazonaws.com"]
-  tenant_registry_map = {
-    alpha = "829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha"
-    bravo = "829808296602.dkr.ecr.us-east-1.amazonaws.com/team-bravo"
-  }
-  migrated_teams = ["alpha", "bravo"] # Composition owns their restrict-*; verify-* stays here
+  # Cluster-wide ECR floor; the per-Environment restrict-images/restrict-route-hostnames guardrails
+  # are owned by the Crossplane Environment Composition (ADR-046), not this module.
+  allowed_registries = ["829808296602.dkr.ecr.us-east-1.amazonaws.com"]
 
   helm_chart_version = "3.8.1"
   tags               = { Environment = "preprod", ManagedBy = "terraform" }
@@ -158,12 +157,11 @@ If a policy blocks legitimate admission, patch the generated webhook configurati
 | `validation_failure_action` | `Audit` or `Enforce` | `string` | `"Audit"` |
 | `compliance_tier` | `standard`/`hipaa`/`pci` | `string` | `"standard"` |
 | `allowed_registries` | Registry prefixes admitted in environment namespaces | `list(string)` | `[]` |
-| `tenant_registry_map` | environment key → allowed image prefix | `map(string)` | `{}` |
-| `migrated_teams` | Teams whose per-team `restrict-*` policies the Crossplane Environment Composition owns (skipped here) | `list(string)` | `[]` |
+| `verify_subjects_product` | Per-Product cosign/SLSA verification config, derived from `gitops/products/` | `map(object)` | `{}` |
 | `exclude_namespaces` | Infra namespaces excluded from policies | `list(string)` | (see variables.tf) |
 | `exclude_principals` | Principal wildcards skipped by cluster-scoped policies | `list(string)` | (see variables.tf) |
 | `environment_namespace_label` | Namespace label marking environments | `string` | `"platform.refplat.org/team"` |
-| `required_workload_labels` | Labels every workload must carry | `list(string)` | `["app.kubernetes.io/name", "team"]` |
+| `required_workload_labels` | Labels every workload must carry (presence validated; `team` is auto-injected) | `list(string)` | `["team"]` |
 | `replica_count` | Admission controller replicas (HA=3) | `number` | `3` |
 | `helm_chart_version` | Kyverno chart version | `string` | `"3.8.1"` |
 | `additional_policies` | Raw ClusterPolicy YAML (ADR-014 escape hatch) | `map(string)` | `{}` |

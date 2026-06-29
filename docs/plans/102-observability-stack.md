@@ -30,8 +30,9 @@ policy-reporter phase).
 - **Spokes = each workload cluster** (platform-itself first, then preprod, later prod): lightweight
   **collectors** (Prometheus-agent / Grafana Alloy / OpenTelemetry Collector) that **remote-write / push**
   to the hub over **Tailscale / Transit Gateway**.
-- **Tenancy spine:** tenant ID = team = `teams.hcl` key, stamped on the **write path** as `X-Scope-OrgID`
-  from the namespace label `platform.refplat.org/tenant`, enforced **server-side** by `auth_enabled: true`,
+- **Tenancy spine:** tenant ID = team, derived per-Product from the git-native registries (the `Team` CR /
+  `Product` registry — `teams.hcl` is retired, ADR-061/063/067), stamped on the **write path** as `X-Scope-OrgID`
+  from the namespace label `platform.refplat.org/team`, enforced **server-side** by `auth_enabled: true`,
   **pinned per-team on the read path** by Grafana datasources. `cluster`/`env` is an extra label. One model
   across every signal → the central Grafana isolates **per-team across clusters**.
 - **Grafana is Tailscale-only:** exposed via the **platform** `gateway-config` (`internal = true`) at
@@ -165,7 +166,8 @@ license/SaaS credentials come via **External Secrets**, only when a commercial e
   Mimir app versions are current GA too.
 - **Module/unit pattern:** copy `infra/modules/external-secrets/` (helm_release + IRSA); register in
   `infra/live/aws/_versions.hcl`; units mirror external-secrets `terragrunt.hcl`. Per-team data as maps
-  **at the unit** from `teams.hcl`; modules team-agnostic (`map(...)` + `for_each`).
+  **at the unit**, derived per-Product from the git-native registries (`teams.hcl` is retired, ADR-061/063/067);
+  modules team-agnostic (`map(...)` + `for_each`).
 - **Grafana state = dashboards-as-code** (provisioning ConfigMaps/sidecar, dashboards in-repo) +
   provisioned datasources → **stateless, HA-by-replication**: run ≥2 identical replicas each fully
   provisioned (no shared DB needed — every replica is interchangeable). RDS Postgres only if
@@ -322,9 +324,10 @@ independently-verifiable sub-issue + unit(s); do not batch.
   preprod (`observability-prometheus-agent`) `remote_write`s to the hub Mimir under tenant `preprod` over the
   Transit Gateway, through a **Gateway-API-native** write-only HTTPRoute that force-overwrites `X-Scope-OrgID`
   (no proxy, no shared secret; auth = network isolation, mTLS deferred to P10.x). Grafana gets a
-  `Mimir (preprod)` datasource. **Logs/traces spokes** + per-team `X-Scope-OrgID` (vs the single `preprod`
+  `Mimir (preprod)` datasource. **Logs/traces spokes are now built** (`observability-logs-spoke` /
+  `observability-traces-spoke` on preprod). Remaining follow-ons: per-team `X-Scope-OrgID` (vs the single `preprod`
   tenant) + scraping app-alpha's environment namespaces (needs `allow-metrics-scrape` on the Crossplane
-  Environment Composition, constraint #2) are follow-ons. **Verified:** central Grafana shows preprod
+  Environment Composition, constraint #2). **Verified:** central Grafana shows preprod
   cluster/node/KSM metrics under tenant `preprod`; a forged `platform` header is overwritten to `preprod`.
 - **P11 — Cost (in-cluster + cloud).** **OpenCost** per cluster → cost metrics into Mimir
   (per-team/namespace/cluster + cross-cluster-transfer dashboards); plus **AWS CUR → Athena → Grafana**
@@ -473,7 +476,10 @@ The high-signal alerts the mixins don't cover — one rule file per component:
 This set intentionally mirrors the Tier-3 "Platform Health" dashboard panels — the same signals, now
 actionable.
 
-## teams.hcl extension (P13–P14)
+## Per-team observability config (P13–P14)
+
+> **Note:** `teams.hcl` is retired (ADR-061/063/067); the per-team `observability` block below now lives in the
+> git-native `Team`/`Product` registries from which the unit derives. The shape is unchanged.
 
 Optional per-team block (`observability = { enabled, retention }`), everything else derived; derived
 `observability_teams`; unit builds `tenant_id_map`/`grafana_hostname_map`/`tenant_group_map` (GUIDs).

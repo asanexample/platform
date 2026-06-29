@@ -35,7 +35,7 @@ flowchart TB
 ## Layer 1 — availability defaults (ADR-085)
 
 All four mechanisms live in the **`policy`** module as Kyverno rules, applied to every environment
-namespace (`<team>-<product>-<stage>`). They are **paved-by-default and mostly invisible** — tenant
+namespace (`<team>-<product>-<stage>`). They are **paved-by-default and mostly invisible** — app
 manifests carry none of them.
 
 - **Graceful draining — `mutate`.** The `add-pod-defaults` rule (the same add-if-absent
@@ -134,7 +134,7 @@ The Rollouts controller mutates two fields at runtime that ArgoCD `selfHeal` wil
 - the **Service `.spec.selector`** (the injected `rollouts-pod-template-hash`), and
 - the **HTTPRoute `backendRefs[].weight`** (the plugin's canary weights).
 
-So the tenant Application sets `ignoreDifferences` on both **and** —
+So the app's Application sets `ignoreDifferences` on both **and** —
 **critically — `RespectIgnoreDifferences=true` in `syncOptions`.** `ignoreDifferences` *alone is not
 enough*: without `RespectIgnoreDifferences`, a sync triggered by any *other* change still stomps those
 fields. (This was found in prod; the offline spikes couldn't surface it.) Wired in

@@ -37,15 +37,15 @@ module "cert_manager" {
 | Name | Version |
 | ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.6.0 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 5.0 |
-| <a name="requirement_helm"></a> [helm](#requirement\_helm) | >= 3.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.0 |
+| <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 3.0 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_aws"></a> [aws](#provider\_aws) | >= 5.0 |
-| <a name="provider_helm"></a> [helm](#provider\_helm) | >= 3.0 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.0 |
+| <a name="provider_helm"></a> [helm](#provider\_helm) | ~> 3.0 |
 
 ## Modules
 
@@ -77,14 +77,15 @@ No modules.
 | <a name="input_namespace"></a> [namespace](#input\_namespace) | Kubernetes namespace to install cert-manager into | `string` | `"cert-manager"` | no |
 | <a name="input_route53_hosted_zone_arn"></a> [route53\_hosted\_zone\_arn](#input\_route53\_hosted\_zone\_arn) | ARN of the Route53 hosted zone for DNS01 challenge solving | `string` | `""` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to all resources | `map(string)` | `{}` | no |
+| <a name="input_webhook_host_network"></a> [webhook\_host\_network](#input\_webhook\_host\_network) | Run the cert-manager webhook on hostNetwork (node VPC IP) with securePort moved off 10250. Required on EKS with an overlay CNI (Cilium cluster-pool), where the managed control plane cannot route to overlay pod IPs. Leave false for VPC-routable (ENI) datapaths. | `bool` | `false` | no |
 
 ## Outputs
 
 | Name | Description |
 | ---- | ----------- |
 | <a name="output_helm_release_status"></a> [helm\_release\_status](#output\_helm\_release\_status) | Status of the cert-manager Helm release |
-| <a name="output_role_arn"></a> [role\_arn](#output\_role\_arn) | ARN of the cert-manager IAM role (bound to the SA via EKS Pod Identity) |
 | <a name="output_namespace"></a> [namespace](#output\_namespace) | Kubernetes namespace where cert-manager is installed |
+| <a name="output_role_arn"></a> [role\_arn](#output\_role\_arn) | ARN of the cert-manager IAM role (bound to the SA via EKS Pod Identity) |
 <!-- END_TF_DOCS -->
 
 ## Notes

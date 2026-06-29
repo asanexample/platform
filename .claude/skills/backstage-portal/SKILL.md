@@ -90,8 +90,9 @@ Enable via unit feature flags:
 the module enforces it) — read-only on app repos, write on the platform repo; overlapping
 installs shadow credentials and scaffolder PRs fail. Scaffolder templates live **here**:
 `scaffolder/templates/` — the provisioning set `new-{environment,product,team,resource}/`,
-the teardown set `deprovision-{environment,product}/`, plus `request-promotion/` and
-`hello-world/`.
+the teardown set `deprovision-{environment,product}/`, the person-lifecycle set
+`{onboard,offboard}-person/` (back the `gitops/people/` registry, ADR-084/088), plus
+`request-promotion/` and `hello-world/`.
 
 ## Change config / deploy
 

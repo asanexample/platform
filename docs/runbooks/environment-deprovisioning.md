@@ -51,7 +51,9 @@
 
 Portal → **Create** → **Deprovision Environment** → pick the team + product + stage, action **decommission**,
 type the environment name to confirm. It opens a PR setting `spec.lifecycle.phase: decommissioning` +
-`platform.refplat.org/decommissioned-at`. The PR automerges (reversible); ArgoCD syncs → the environment's quota
+`platform.refplat.org/decommissioned-at`. The PR is **not auto-merged — it requires a reviewer approval**
+(≠ the author): the gate excludes any decommission from auto-merge, since draining workloads (incl. prod)
+warrants a human merge even though it's reversible. Once merged, ArgoCD syncs → the environment's quota
 zeroes → the app drains.
 
 (Or by hand: edit `gitops/environments/<team>/<product>/<stage>[-<customer>].yaml`, add `spec.lifecycle.phase:

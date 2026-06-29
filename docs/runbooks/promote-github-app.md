@@ -76,6 +76,12 @@ The per-Product OIDC roles are granted `secretsmanager:GetSecretValue` on this s
 4. The gitops Gate validates (`validate-releases.sh`) and auto-merges (App-authored, release-only, non-deletion).
    The per-Product ApplicationSet then injects the digest; the app repo's `main` is never touched.
 
+> **Second consumer — the platform-side reconciler.** `platform/promote/github-app` is **also** read by the
+> in-repo `.github/workflows/auto-promote.yml` reconciler. It runs on the `platform-infra` ARC runners, assumes
+> **PlatformDeployer** (not a per-Product OIDC role) to read the secret, and mints the same promote-App token to
+> open Release PRs when reconciling the promotion ladder. Factor this consumer in when storing/rotating the secret —
+> PlatformDeployer must retain `secretsmanager:GetSecretValue` on it.
+
 ## Rotation
 
 Generate a new private key on the App, update `platform/promote/github-app`

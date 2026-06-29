@@ -25,9 +25,12 @@ principal, and applies run `AWS_PROFILE=management` → assume `PlatformDeployer
 We considered keeping it "minimal" (apply directly as a human SSO admin, no `PlatformDeployer`), but an
 **org SCP makes that impossible** and shows the intended design:
 
-> **SCP `p-z590g1lk`, statement `DenyTeamTagTampering`** denies `iam:TagRole`/`UntagRole` (+ ECR /
-> SecretsManager / EC2 tagging) for **every** principal **except** `OrganizationAccountAccessRole`,
-> `github-actions-terratest`, and **`PlatformDeployer`**. It protects the `Team`/ABAC tags (#61/#62).
+> **SCP `p-z590g1lk`, statement `DenyTeamTagTampering`** denies mutating the **`Team`** tag key only —
+> scoped via `aws:TagKeys = ["Team"]` across `iam:TagRole`/`UntagRole`, `ecr:TagResource`/`UntagResource`,
+> `secretsmanager:TagResource`/`UntagResource`, and `ec2:CreateTags`/`DeleteTags` — for **every** principal
+> **except** the full `exempt_role_arns` set (the seven `exempt_roles`, incl. `PlatformDeployer` and
+> `github-actions-terratest`) **plus** AWS **service-linked roles** (`role/aws-service-role/*`). It protects
+> the `Team`/ABAC tags (#61/#62).
 
 So a human SSO admin cannot reconcile IAM tags — only `PlatformDeployer` (or break-glass) can. The org
 guardrails are explicitly built around `PlatformDeployer` managing every account, so the Test account
@@ -55,8 +58,8 @@ region = us-east-1
 `aws sso login --profile test` (if the cached session predates the assignment), then
 `aws sts get-caller-identity --profile test` → `157263244316`.
 
-> Human SSO admin in the Test account can do most things, but **not** tag IAM/ECR/Secrets/EC2 (SCP §2).
-> Run IaC via `PlatformDeployer`, not as the SSO admin.
+> Human SSO admin in the Test account can do most things, but **not** mutate the **`Team`** tag on
+> IAM/ECR/Secrets/EC2 resources (SCP §2). Run IaC via `PlatformDeployer`, not as the SSO admin.
 
 ## 4. Applying test-env IaC (the normal path)
 

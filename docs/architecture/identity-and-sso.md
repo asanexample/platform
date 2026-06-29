@@ -52,9 +52,12 @@ flowchart TB
 - **keycloak-config** (`infra/modules/keycloak-config`) — **access-model-as-code.** A Terraform run (the
   Keycloak provider, over an in-cluster `kubectl` port-forward — `scripts/kc-portforward.sh`) that configures
   the *running* Keycloak: the realm, one **group per team** + platform groups (e.g. `platform-admins`), the
-  developer-access **roles** (`environment-operate`, `environment-view`), the per-app **OIDC clients**, the **claim
-  mappers** that put group names into the `groups` claim, the optional **upstream broker**, and (in standalone
-  mode) the **seed users**. All of it derived from the git-native `Team` CRs (`gitops/teams/`, ADR-063).
+  developer-access **roles** (`tenant-operate`, `tenant-view` — the `environment-*` rename is not yet
+  applied), the per-app **OIDC clients**, the **claim
+  mappers** that put group names into the `groups` claim, the optional **upstream broker**, and the **realm
+  users**. Groups, roles, clients, and mappers are derived from the git-native `Team` CRs (`gitops/teams/`,
+  ADR-063); the **users** are now generated from the `gitops/people/` roster (× the `gitops/roles/` catalog,
+  #889), not the Team CRs.
 - **ArgoCD** — consumes Keycloak OIDC **directly** (its own embedded Dex is off: `dex_enabled = false`).
 - **Backstage** — consumes Keycloak OIDC **directly** (the `oidc` sign-in provider; the `backstage` confidential
   client). It is reached directly through the gateway and authenticates each request itself.
@@ -114,16 +117,16 @@ gitops/teams/alpha.yaml            keycloak-config                 claims       
 ─────────────────────────────────  ──────────────────────────────  ───────────────   ────────────────────────
 Team "alpha":                      group  "alpha"                   groups:           ArgoCD:
   envelope.allowedStages             role-of-stage(test)              ["alpha"]          g, alpha, role:team-alpha
-    = [dev, test, …]                   = "environment-operate"            roles:             → get/sync alpha/* apps
-  ssoGroup = "Dev-alpha"             group "alpha" → environment-operate    ["environment-operate"]
+    = [dev, test, …]                   = "tenant-operate"            roles:             → get/sync alpha/* apps
+  ssoGroup = "Dev-alpha"             group "alpha" → tenant-operate    ["tenant-operate"]
                                                                                        Kubernetes:
 platform group "platform-admins"   group "platform-admins"         groups:              alpha-demo-test:developers
                                                                       ["platform-admins"]  (via EKS access entry)
 ```
 
 - **Team key = Keycloak group name** (`alpha` → group `/alpha`).
-- **Roles** are the *developer-access posture* by stage (ADR-049): `environment-operate` for non-prod,
-  `environment-view` for prod. A team's group gets the roles implied by its `envelope.allowedStages`.
+- **Roles** are the *developer-access posture* by stage (ADR-049): `tenant-operate` for non-prod,
+  `tenant-view` for prod. A team's group gets the roles implied by its `envelope.allowedStages`.
 - **`groups` claim** (names, not UUIDs) is what every app keys off. ArgoCD maps it to `role:team-<team>` /
   `role:org-admin`; Kubernetes namespace access is granted separately, per **Environment**, by the Crossplane
   Environment Composition (a `<team>-<product>-<stage>:developers` RoleBinding → ClusterRole
@@ -138,14 +141,15 @@ are three modes (the *pluggable seam*, ADR-059) — the apps are identical acros
 
 | Mode | When | How membership is set | Today? |
 |------|------|------------------------|--------|
-| **Standalone** | No corporate IdP | Seed users in `keycloak-config` are placed into groups; or assign in the Keycloak admin UI | ✅ **current** |
+| **Standalone** | No corporate IdP | Realm users are generated from the `gitops/people/` roster and placed into the groups their roles imply | ✅ **current** |
 | **Federated, group-emitting** (Okta/Entra/Google, OIDC) | You have a corporate IdP that emits group claims | Upstream group claim → an **advanced-group mapper** auto-joins the matching Keycloak group (keyed by `ssoGroup`) | opt-in |
 | **Federated, no groups** (AWS Identity Center, SAML) | AWS-only shop | IdC can't emit group claims → mappers are inert → membership must be assigned **manually** in Keycloak (the "membership gap") | opt-in |
 
-Today (standalone), the seed users are `admin` (→ `platform-admins`), `dev-alpha` (→ `alpha`), `dev-bravo`
-(→ `bravo`); their one-time passwords are in Secrets Manager at `platform/keycloak/seed-user/<username>`. To
-add a person now, create them in the Keycloak admin UI and add them to a group — or wire an upstream IdP so
-membership flows automatically.
+Today (standalone), the realm users are generated from the `gitops/people/` roster (joined with the
+`gitops/roles/` catalog, #889); their one-time passwords are in Secrets Manager at
+`platform/keycloak/seed-user/<username>`. To add a person now, add a `Person` file to `gitops/people/`
+(one reviewed PR) — a user created by hand in the Keycloak admin UI would not be reconciled. Or wire an
+upstream IdP so membership flows from the corporate directory automatically.
 
 ## The pluggable seam (ADR-059), in one breath
 
@@ -165,7 +169,7 @@ standalone and adopt a corporate IdP later without touching the apps.
 | Upstream federation (Okta/Entra/IdC) | ⏳ designed + supported, **not wired** |
 | Hostname `keycloak.aws.refplat.org` → `sso.aws.refplat.org` | ⏳ optional future change |
 | Keycloak→AWS group sync (SCIM) so app groups drive AWS access | ⏳ future (ADR-059); AWS access is manual in IdC today |
-| Backstage group-based RBAC (#197) | ⏳ future |
+| Backstage group-based RBAC (#197) | ✅ done (permission policy live; scaffolder execution is admin-only) |
 
 ## Glossary
 

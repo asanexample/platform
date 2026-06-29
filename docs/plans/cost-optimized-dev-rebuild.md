@@ -1,8 +1,11 @@
 # Cost-Optimized Dev Profile — Rebuild Plan
 
-**Status:** proposed (not yet implemented). **Goal:** rebuild platform + preprod in the *most cost-effective*
-shape for a build/test/iterate environment, where **HA and AZ-resilience are explicitly not required**. Every
-change is a **toggle** so we can flip back to a prod-grade posture later.
+**Status:** partially shipped. The Part C `platctl down`/`up` env-lifecycle commands are live (see the
+`cluster-parking` house skill), and **Karpenter is now live as Phase 1 (ADR-078)** — so the "deferred, NOT now"
+framing below is historical. The dev-profile config levers (Parts A/B) remain a proposal applied at rebuild time.
+**Goal:** rebuild platform + preprod in the *most cost-effective* shape for a build/test/iterate environment, where
+**HA and AZ-resilience are explicitly not required**. Every change is a **toggle** so we can flip back to a
+prod-grade posture later.
 
 Context: the stack is fully torn down (see `platform-rebuild-from-scratch.md`). These changes land **before** the
 next `platctl bootstrap`. Baseline today: **7 × t3.large on-demand ≈ $425/mo**.
@@ -173,7 +176,10 @@ let you drop it (or platform) further when idle.
 `platctl down/up` works for **platform** too (parks ArgoCD/Keycloak/Backstage; CNPG EBS data persists) — for
 nights/weekends when nobody's using the IDP.
 
-## Deferred — Karpenter (future lever, NOT now)
+## Karpenter (since delivered — Phase 1 live, ADR-078)
+
+> **Update:** Karpenter has since landed as Phase 1 (ADR-078). The reasoning below — why it was deferred past this
+> dev-profile rebuild — is retained as the original rationale.
 
 Karpenter scales nodes to pod demand; it does **not** make an always-on control plane cheap to park, so it does
 **not** help the "park preprod when idle" goal (the always-on system stack + the CNI/Karpenter landing node floor

@@ -116,8 +116,14 @@ inputs = {
   transit_gateway_id = dependency.platform_tgw.outputs.transit_gateway_id
   ram_share_arn      = dependency.platform_tgw.outputs.ram_share_arn
 
-  vpc_id     = dependency.networking.outputs.vpc_id
-  subnet_ids = dependency.networking.outputs.transit_subnet_ids
+  vpc_id = dependency.networking.outputs.vpc_id
+
+  # networking exposes one `subnet_ids` map (name -> id); filter to the transit-tier
+  # subnets (/28 per AZ, dedicated to TGW ENIs) — there is no `transit_subnet_ids` output.
+  subnet_ids = [
+    for name, id in dependency.networking.outputs.subnet_ids :
+    id if can(regex("transit$", name))
+  ]
 
   route_table_ids  = dependency.networking.outputs.private_route_table_ids
   destination_cidrs = ["10.100.0.0/16"]   # platform VPC
@@ -200,8 +206,9 @@ AWS_PROFILE=platform aws ec2 describe-route-tables \
   --filters "Name=vpc-id,Values=<platform-vpc-id>" \
   --query 'RouteTables[].Routes[?TransitGatewayId!=null].{CIDR:DestinationCidrBlock,TGW:TransitGatewayId,State:State}'
 
-# Spoke account — verify routes to platform CIDR
-AWS_PROFILE=management aws ec2 describe-route-tables \
+# Spoke account — verify routes to platform CIDR (use the spoke's own profile;
+# AWS_PROFILE=management won't see preprod resources without role assumption)
+AWS_PROFILE=preprod aws ec2 describe-route-tables \
   --filters "Name=vpc-id,Values=<spoke-vpc-id>" \
   --query 'RouteTables[].Routes[?TransitGatewayId!=null].{CIDR:DestinationCidrBlock,TGW:TransitGatewayId,State:State}'
 ```
@@ -224,8 +231,8 @@ AWS_PROFILE=preprod aws ram get-resource-share-invitations \
 From a pod on the platform cluster, test connectivity to the spoke VPC:
 
 ```bash
-# Get a node IP from the spoke cluster
-SPOKE_NODE_IP=$(AWS_PROFILE=management aws ec2 describe-instances \
+# Get a node IP from the spoke cluster (read with the spoke's own profile)
+SPOKE_NODE_IP=$(AWS_PROFILE=preprod aws ec2 describe-instances \
   --filters "Name=tag:eks:cluster-name,Values=preprod-use1-eks" "Name=instance-state-name,Values=running" \
   --query 'Reservations[0].Instances[0].PrivateIpAddress' --output text)
 

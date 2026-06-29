@@ -120,7 +120,7 @@ Do these / be aware of these before/at bootstrap; each cost a `--resume` cycle t
    `OrganizationAccountAccessRole`) before `platctl bootstrap`, then bootstrap/resume normally.
 2. **Disable Tailscale DNS on the runner.** If you're connected to the tailnet, its split-DNS
    (`*.eks.amazonaws.com → VPC resolver`) hijacks EKS-API resolution but the subnet router isn't up yet →
-   keycloak/dex/tailscale fail with `i/o timeout`. Run **`sudo tailscale set --accept-dns=false`** during the
+   keycloak/tailscale fail with `i/o timeout`. Run **`sudo tailscale set --accept-dns=false`** during the
    bootstrap (re-enable after). *(Durable fix TODO: teardown should clear the tailnet split-DNS.)*
 3. **SSO token can corrupt under concurrency.** Parallel units refreshing the SSO token at once can clobber
    `~/.aws/sso/cache` → `get_aws_account_id() ... failed to parse cached SSO token file`. Just

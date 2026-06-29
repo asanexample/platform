@@ -7,7 +7,7 @@
 > **Module path:** `infra/modules/aws/organizations/scps.tf`
 > **Live configuration:** `infra/live/aws/mgmt/global/organizations/terragrunt.hcl`
 >
-> **Last reviewed:** 2026-06-01
+> **Last reviewed:** 2026-06-28
 
 ---
 
@@ -58,7 +58,7 @@ directly applicable, the cell is marked with `--`.
 
 ## Attachment Summary
 
-The default `scp_attachments` (from `variables.tf`) control which OUs receive each SCP:
+The live `scp_attachments` (overridden in the mgmt org unit) control which OUs receive each SCP:
 
 | SCP Name | Attached To |
 |---|---|
@@ -67,9 +67,14 @@ The default `scp_attachments` (from `variables.tf`) control which OUs receive ea
 | enforce-encryption | Organization Root |
 | deny-regions | Organization Root |
 | protect-data-and-network | Platform, Workloads |
-| require-tagging | Workloads |
-| restrict-iam-users | Workloads |
+| require-tagging | Platform, Workloads |
+| restrict-iam-users | Platform, Workloads |
 | hipaa-eligible-services | (Optional, via `enable_hipaa_scp`) |
+
+> **Live override (security-audit fix):** `require-tagging` and `restrict-iam-users` are attached to the
+> **Platform** OU too (not just Workloads, the module default) — the Platform OU holds the most-privileged
+> Platform + Test accounts, which the original Workloads-only coverage left uncovered. The IaC roles
+> (`PlatformDeployer`, `github-actions-terratest`) are in `exempt_roles`, so applies aren't blocked.
 
 SCPs attached at the root propagate to every OU and account in the organization. SCPs
 attached at a child OU apply only within that subtree.
@@ -385,7 +390,7 @@ ORDER BY eventTime DESC;
 
 ## SCP 6: require-tagging
 
-**Attached to:** Workloads
+**Attached to:** Platform, Workloads
 
 ### What It Prevents
 
@@ -440,7 +445,7 @@ aws organizations describe-policy --policy-id "$POLICY_ID" \
 
 ## SCP 7: restrict-iam-users
 
-**Attached to:** Workloads
+**Attached to:** Platform, Workloads
 
 ### What It Prevents
 
@@ -737,20 +742,29 @@ ORDER BY eventTime DESC;
 ### Exempt Role Governance
 
 Most SCP deny statements include an `ArnNotLike` condition for exempt roles. The live
-configuration sets **three** exempt roles (`var.exempt_roles` in the mgmt org unit):
+configuration sets **seven** exempt roles (`var.exempt_roles` in the mgmt org unit):
 
 - `OrganizationAccountAccessRole` — AWS-created in each member account for management-account
   (break-glass) access.
 - `PlatformDeployer` — the Terragrunt/IaC apply role; must perform the administrative operations
   the Deny statements otherwise block (manage encryption defaults, tag resources, etc.).
 - `github-actions-terratest` — the CI integration-test role in the Test sandbox account.
+- `crossplane-ecr-provisioner` — the Crossplane ECR provisioner role; creates/tags per-Product ECR
+  repositories as environments are provisioned.
+- `crossplane-provisioner-*` — the per-environment Crossplane provisioner roles (wildcard) that
+  create and tag the AWS resources backing an environment.
+- `platform-use1-eks-karpenter-*` / `preprod-use1-eks-karpenter-*` — the Karpenter controller roles
+  per cluster (wildcard = the module's `name_prefix`), which create/tag EC2 on the `RunInstances`
+  path. **Anchored per-cluster** (not a leading-wildcard `*-karpenter-*`) so an unrelated role merely
+  containing `-karpenter-` cannot inherit the exemption (security-audit hardening).
 
 Note a subset of statements (`DenyLeaveOrganization`, `DenyRootUserActions`, `DenyRootAccessKeys`,
 the unencrypted-resource denies, `EnforceIMDSv2`) have **no exemption** and bind even these roles.
 
 **Auditor note:** Verify that the exempt role list (`var.exempt_roles`) has not been
-expanded beyond these three / operational necessity. Check the Terraform variable definition and the
-live Terragrunt inputs:
+expanded beyond these seven / operational necessity (and that the `*-karpenter-*` and
+`crossplane-provisioner-*` wildcards remain **anchored**, not leading-wildcard). Check the Terraform
+variable definition and the live Terragrunt inputs:
 
 ```bash
 # Check default in module

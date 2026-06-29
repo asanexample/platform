@@ -121,6 +121,7 @@ inputs = {
 
   accounts = {
     "platform" = { email = "aws+platform@example.com", ou = "Platform" }
+    "test"     = { email = "aws+test@example.com",     ou = "Platform" }
     "preprod"  = { email = "aws+preprod@example.com",  ou = "Workloads/Preprod" }
     "prod"     = { email = "aws+prod@example.com",     ou = "Workloads/Prod" }
   }
@@ -648,7 +649,7 @@ for the design rationale.
 |------|---------|---------|
 | **PlatformAdmin** | Platform, PreProd | kubectl operate/debug + SSM tunnel — read+operate, not author (ADR-040) |
 | **PlatformDeployer** | Platform, PreProd, Test | Terragrunt apply, Helm/K8s providers |
-| **DeveloperAccess-\<team\>** | PreProd | Per-team, namespace-scoped kubectl (one role per team, ADR-039) |
+| **DeveloperAccess-\<team\>** | PreProd | Per-team, namespace-scoped kubectl (one role per team, ADR-039). **⚠️ NOT currently provisioned** — use `platctl kubeconfig` / PlatformAdmin until OIDC-native cluster auth lands (#364, ADR-068) |
 | **TerraformStateAccess** | Management | S3 state + DynamoDB lock table |
 | **OrganizationAccountAccessRole** | All accounts | Break-glass only |
 
@@ -766,9 +767,10 @@ cross-account by preprod (<PREPROD_ACCOUNT_ID>) and prod (<PROD_ACCOUNT_ID>).
 aws ecr get-login-password --region us-east-1 --profile platform \
   | docker login --username AWS --password-stdin <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
 
-# Push an image
-docker tag myapp:latest <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/app:v1.0.0
-docker push <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/app:v1.0.0
+# Push an image — the repo path is team-<team>/<product>-<svc> (ADR-067); any other path is
+# Kyverno-rejected at admission and won't match a provisioned ECR repo.
+docker tag myapp:latest <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/shop-web:v1.0.0
+docker push <PLATFORM_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/shop-web:v1.0.0
 ```
 
 ECR repos are defined in `infra/live/aws/platform/us-east-1/platform/ecr/terragrunt.hcl`.

@@ -9,10 +9,10 @@ only structural difference is **identity**.
 
 - **EKS Pod Identity, not IRSA** (ADR-047). The module creates an IAM role trusting `pods.eks.amazonaws.com` and an
   `aws_eks_pod_identity_association` binding (`namespace`, ServiceAccount `loki`) → role. No OIDC provider inputs, no
-  `eks.amazonaws.com/role-arn` annotation. (The rest of the observability stack still uses IRSA — tracked for
-  migration in the IRSA→Pod-Identity epic.)
+  `eks.amazonaws.com/role-arn` annotation. (The rest of the observability stack has likewise migrated to EKS Pod
+  Identity — ADR-047/#594.)
 - **SingleBinary by default**, `SimpleScalable` (read/write/backend RF3) when `high_availability = true` — one toggle,
-  same pattern as Mimir/Loki.
+  same pattern as Mimir/Tempo.
 - **S3 chunks** bucket created in-module (SSE-S3/AES256, versioned, lifecycle); IAM scoped to that bucket only.
 - **Multitenancy on** (`auth_enabled`): `X-Scope-OrgID` required. In-cluster isolation rests on the `observability`
   namespace default-deny NetworkPolicy (tenant pods can't reach the store). Per-tenant limits double as the

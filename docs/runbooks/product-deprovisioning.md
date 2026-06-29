@@ -61,7 +61,9 @@ The symmetric inverse of **New Product**. For a single environment, use *Deprovi
 # After decommission (per env):
 kubectl get resourcequota -n <team>-<product>-<stage> environment-quota -o jsonpath='{.spec.hard.pods}'  # "0"
 # After purge:
-kubectl get ns -l platform.refplat.org/environment | grep <team>-<product>   # gone
+kubectl get ns -l platform.refplat.org/product=<product>   # gone (Composition labels ns team/product/stage)
+# or check a specific env namespace directly:
+kubectl get ns <team>-<product>-<stage>                    # NotFound
 aws ecr describe-repositories --repository-names team-<team>/<product>-<svc> --profile platform  # still there
 gh repo view asanexample/<team>-<product> --json isArchived --jq .isArchived                 # true
 # The per-Product Terragrunt units converge via registry-reconcile (github-oidc / preprod-policy / argocd-apps).

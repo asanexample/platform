@@ -169,8 +169,8 @@ graph LR
 
 | Service | Chart Version | Purpose |
 |---------|--------------|---------|
-| Cilium | 1.19.4 | CNI (ENI mode, `kubeProxyReplacement`, Hubble observability) |
-| ArgoCD | 9.5.14 | GitOps continuous delivery, SSO via Identity Center SAML |
+| Cilium | 1.19.4 | CNI (overlay / VXLAN cluster-pool IPAM, `kubeProxyReplacement`, Hubble observability) |
+| ArgoCD | 9.5.14 | GitOps continuous delivery, SSO via Keycloak OIDC (ADR-053/059) |
 | cert-manager | 1.17.1 | TLS certificate management (Let's Encrypt, DNS01 via Route53) |
 | external-dns | 1.16.1 | DNS record sync to Route53 |
 | external-secrets | 0.14.3 | Secrets from AWS Secrets Manager + SSM Parameter Store |

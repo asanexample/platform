@@ -23,7 +23,7 @@ The UI is at `https://argocd.aws.refplat.org` (Tailscale). CLI: `argocd login ar
 1. [Read the status first: OutOfSync vs Unknown vs Degraded](#read-the-status-first)
 2. [Cross-account / cluster reachability](#cross-account--cluster-reachability)
 3. [AppProject / RBAC denials](#appproject--rbac-denials)
-4. [ApplicationSet PR-preview generator failures](#applicationset-pr-preview-generator-failures)
+4. [Per-stage preview hostnames (and the per-PR previews gap)](#per-stage-preview-hostnames)
 5. [selfHeal / prune behavior](#selfheal--prune-behavior)
 6. [XEnvironment claims: ServerSideApply + ignoreDifferences](#xenvironment-claims-serversideapply--ignoredifferences)
 
@@ -93,14 +93,16 @@ kubectl logs -n argocd deploy/argocd-application-controller --tail=80 | grep -i 
 **Symptom:** `SyncFailed` / sync error mentioning a resource is "not permitted in project" or a destination
 mismatch.
 
-**Diagnosis.** Each team has an `AppProject` (named for the team) restricting **source repos**, the
-**destination** `(server, namespace)`, and the allowed resource kinds (`namespaceResourceWhitelist`):
-ConfigMap, Secret, Service, ServiceAccount, Deployment, StatefulSet, Job, CronJob, HTTPRoute,
-ExternalSecret. Anything else is rejected by the project, not by Kyverno.
+**Diagnosis.** Each **Product** has an `AppProject` named `product-<team>-<product>` (e.g.
+`product-alpha-shop`) restricting **source repos**, the **destination** `(server, namespace)`, and the
+allowed resource kinds (`namespaceResourceWhitelist`): ConfigMap, Secret, Service, ServiceAccount,
+Deployment, StatefulSet, Rollout, AnalysisTemplate, AnalysisRun (the three `argoproj.io` Argo Rollouts
+kinds, ADR-056), Job, CronJob, HTTPRoute, ExternalSecret. Anything else is rejected by the project, not
+by Kyverno.
 
 ```bash
-argocd proj get alpha
-kubectl get appproject alpha -n argocd -o yaml
+argocd proj get product-alpha-shop
+kubectl get appproject product-alpha-shop -n argocd -o yaml
 ```
 
 **Causes and fixes:**
@@ -120,33 +122,27 @@ kubectl get appproject alpha -n argocd -o yaml
 
 ---
 
-## ApplicationSet PR-preview generator failures
+## Per-stage preview hostnames
 
-**Symptom:** Open PRs don't get preview Applications (`<product>-<team>-pr-<n>`), or the ApplicationSet shows an
-error.
+**Symptom:** an Environment's `HTTPRoute` hostname isn't the expected
+`<product>-<team>-<stage>.<preview_domain>` form.
 
-**Diagnosis.** Preview apps (a Service with `preview: true`) are driven by a per-**Product** `ApplicationSet`
-(ADR-069) whose GitHub `pullRequest` generator polls every 60s. It needs the GitHub org configured and, for
-private repos, a token.
+**Diagnosis.** When the `argocd-apps` unit sets `preview_domain`, the per-Product **delivery**
+ApplicationSet rewrites each Environment's `HTTPRoute` hostname to
+`<product>-<team>-<stage>.<preview_domain>` via a kustomize patch — a **per-stage host rewrite on the
+standard delivery**, applied per Environment that has a Release. If the host is wrong, check that
+`preview_domain` is set on the unit and that the Release/Environment resolved the expected `<stage>`.
 
 ```bash
-kubectl get applicationset -n argocd | grep preview
-kubectl describe applicationset <team>-<product>-preview -n argocd     # generator errors at the bottom
+kubectl get applicationset -n argocd          # the per-Product delivery ApplicationSets
 kubectl logs -n argocd deploy/argocd-applicationset-controller --tail=80
 ```
 
-**Causes and fixes:**
-
-- **Missing/invalid GitHub token (private repos).** The generator reads a token from a Secret in the
-  `argocd` namespace (`tokenRef`). Without it, private-repo PRs are silently not discovered. Confirm with
-  platform that the token Secret exists for the repo's org.
-- **PR labels gate.** Previews can be opt-in via `preview_pr_labels` — only PRs carrying **all** the
-  configured labels get a preview (this excludes Dependabot/routine PRs). A PR missing the label(s) is
-  intentionally skipped; add the label.
-- **`github_org` not set.** If the org is empty, no preview ApplicationSet is created at all
-  (no preview Products are derived) — a platform/`argocd-apps` config gap.
-- **Fork PRs.** Forks can't push to ECR (`id-token: write` blocked), so previews from forks have no image —
-  expected.
+> **Per-PR ephemeral preview environments (ADR-032) are NOT implemented** on the v3 delivery model. There
+> is **no** `pullRequest` generator, no `<product>-<team>-pr-<n>` Applications, and no `github_org` /
+> `preview = true` per-app flag — that entire v2 surface was removed at the v3 cutover (ADR-067/069).
+> Re-implementing previews on the Release-keyed model is future work; ADR-032 remains the intended design.
+> Don't go looking for a preview ApplicationSet — it doesn't exist.
 
 ---
 
@@ -174,24 +170,28 @@ argocd app sync alpha-demo                         # one-shot manual sync
 
 ## XEnvironment claims: ServerSideApply + ignoreDifferences
 
-The per-Product ApplicationSet (project `platform-environments`, ADR-069) syncs the cluster-scoped
-`XEnvironment` claim YAMLs from `gitops/environments/<team>/<product>/` (one Application per environment). It has
-its own quirks:
+A **single** registry-sync `Application` named `environments` (project `platform-environments`, ADR-069)
+recurses **all** the cluster-scoped `XEnvironment` claim YAMLs under `gitops/environments/` (one app for
+every environment, not one app per Product/environment). It has its own quirks:
 
 - It syncs with **`ServerSideApply=true`** + `selfHeal` + `prune`, so ArgoCD owns **only the fields it sets**
   (the claim intent). XRD-applied defaults (`quota`, `tier`, …) and Crossplane's `spec.crossplane`/finalizer
   injections are **not** stripped by self-heal.
-- An **`ignoreDifferences`** customization (in the `argocd` unit) keeps the UI `Synced` despite Crossplane
-  mutating the live object. If an environment Application flaps `OutOfSync` on `spec.crossplane`/finalizers, the
-  `ignoreDifferences` (or ServerSideApply) wasn't applied — re-apply the `argocd` unit.
+- A global **`ignoreDifferences`** resource customization (in the `argocd` unit's argocd-cm —
+  `resource.customizations.ignoreDifferences.platform.refplat.org_XEnvironment`, ignoring `spec.crossplane`
+  and `/metadata/finalizers`) keeps the UI `Synced` despite Crossplane mutating the live object. This is a
+  **cluster-wide** customization, **not** an `Application.spec.ignoreDifferences` field. If the `environments`
+  app flaps `OutOfSync` on `spec.crossplane`/finalizers, that customization (or ServerSideApply) wasn't
+  applied — re-apply the `argocd` unit.
 - ArgoCD applies as the assumed **`ArgoCD` IAM role**, the platform principal excluded from the S1
   `restrict-environment-control-plane` Kyverno backstop. An `XEnvironment` creation denied as an environment
   principal means the claim was applied by something other than this Application.
 
 ```bash
-argocd app get <team>-<product>-<stage>
-kubectl get application <team>-<product>-<stage> -n argocd -o jsonpath='{.spec.ignoreDifferences}' | jq .
-kubectl --context preprod get xenvironment <team>-<product>-<stage>   # SYNCED / READY after the app syncs
+argocd app get environments                                          # the single XEnvironment-claims app
+# The ignoreDifferences is a GLOBAL argocd-cm customization, not an Application field — inspect the ConfigMap:
+kubectl get cm argocd-cm -n argocd -o jsonpath='{.data.resource\.customizations\.ignoreDifferences\.platform\.refplat\.org_XEnvironment}'
+kubectl --context preprod get xenvironment <team>-<product>-<stage>  # SYNCED / READY after the app syncs
 ```
 
 To trace a claim end-to-end after it syncs, see

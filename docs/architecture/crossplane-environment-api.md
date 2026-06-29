@@ -57,19 +57,21 @@ YAML files in `gitops/environments/<team>/<product>/<stage>[-<customer>].yaml` (
 The sibling **`Product`** (`gitops/products/<team>/<product>.yaml`) and **`Team`** (git-native, ADR-063)
 registries are the envelope and delivery authorities; cross-team grants are **`AccessGrant`** CRs.
 
-### `status.domains` — the ingress state machine (ADR-061 Phase 2)
+### `status.domains` — the rendered domain list (ADR-061 Phase 2a)
 
-The Composition writes `status.domains[]` (`{ host, state, mode, reason, message?, dnsTarget?,
-lastTransitionTime? }`) — one entry per generated canonical host + each `spec.domains` alias — and the
-`restrict-route-hostnames` allow-list admits a host **only while its entry is `Active`**. Verification is the
-security boundary: an environment cannot route a domain whose state is not yet `Active`.
+The Composition writes `status.domains[]` (`{ host, state, mode, reason, message? }`) — one entry per
+generated canonical host + each `spec.domains` alias. **Phase 2a marks every bound host `Active`**; there is
+**no live Pending→Active state machine**. The actual ingress-admission boundary is the
+`restrict-route-hostnames-<ns>` Kyverno allow-list the same Composition pass emits — a host is admitted only
+if it is in that allow-list — **not** the `status.domains` state.
 
 - **Generated host** (`<product>-<team>-<stage>.<baseDomain>`, e.g. `demo-alpha-dev.preprod.aws.refplat.org`) +
-  tier-1/2 aliases (host under `.<baseDomain>`, our wildcard cert) → `Active` immediately (platform-owned).
-- **Tier-3 external** hosts → `Pending` (`AwaitingProvisioning`) and **not admitted** until **Phase 2b** wires
-  the per-domain DNS/cert (then they transition `Pending → … → Active`, observed from the backing resources —
-  the [spike](../spikes/adr-061-phase2-ingress-spike.md) proved this runs inside `function-go-templating`, no
-  controller). 2a populates `host/state/mode/reason` only.
+  tier-1/2 aliases (host under `.<baseDomain>`, our wildcard cert) → `Active` (platform-owned).
+- **Tier-3 external** hosts: a future **Phase 2b** would hold them `Pending` (`AwaitingProvisioning`) until the
+  per-domain DNS/cert is wired and observed from the backing resources (the
+  [spike](../spikes/adr-061-phase2-ingress-spike.md) proved this can run inside `function-go-templating`, no
+  controller). That gate is **not built** — today the template renders all bound domains `Active`, and
+  `state/mode/reason` are populated but never transition.
 
 ## What the Composition provisions
 
@@ -89,8 +91,12 @@ renders, from one claim:
   `aws:SourceAccount`; capped by the **`environment-permissions-boundary-<cluster>`** boundary; `Team`/`Customer`
   tags) + its RolePolicy (the service's `permissions.aws.policyStatements`, deny-set-validated)
 - EKS Pod Identity association `(cluster, <ns>, services.<svc>.serviceAccount) → Pod-<team>-<product>-…-<svc>`
-- `DeveloperAccess-<team>` IAM role (trust = the team's `Dev-<team>` SSO permission set in mgmt + workload
-  accounts) + EKS **access entry** mapping it to the `<ns>:developers` group
+
+> **Not yet provisioned (#647).** Developer cluster access today is **only** the in-cluster `<ns>:developers`
+> RoleBinding above — the Composition does **not** emit a `DeveloperAccess-<team>` IAM role or EKS access
+> entry. Use `platctl kubeconfig` / PlatformAdmin for cluster access until built. The v3 regression (#647) was
+> closed as superseded: OIDC-native developer cluster auth is the durable path, tracked in
+> [#364 (ADR-068)](../adrs/068-product-scoped-and-cross-team-access-model.md).
 
 **AWS — platform account** (via `provider-aws` `ecr`, ProviderConfig `platform-ecr` = assumeRoleChain):
 
@@ -124,7 +130,7 @@ try to process its inline go-template `{{ }}`.
 ## Claim delivery & lifecycle
 
 Claims are **GitOps-delivered**: each is a YAML file (`gitops/environments/<team>/<product>/<stage>[-<customer>].yaml`,
-one `XEnvironment`) merged to the platform repo via a CODEOWNERS-gated PR. The `environments-preprod` ArgoCD
+one `XEnvironment`) merged to the platform repo via a CODEOWNERS-gated PR. The `environments` ArgoCD
 Application (in a dedicated `platform-environments` AppProject whose `clusterResourceWhitelist` admits only
 `XEnvironment`) syncs that directory to the cluster with `selfHeal` + `prune` + ServerSideApply. ArgoCD applies
 as the assumed **`ArgoCD` IAM role** — a platform principal excluded from the S1
@@ -135,7 +141,7 @@ pluggable.)
 ```text
 edit gitops/environments/<team>/<product>/<stage>.yaml ──PR (CODEOWNERS)──▶ merge
         │
-        └──ArgoCD (environments-<env> app) sync──▶ XEnvironment CR ──Composition──▶ managed resources
+        └──ArgoCD (environments app) sync──▶ XEnvironment CR ──Composition──▶ managed resources
                                                         │                              (K8s + AWS)
    kubectl get xenvironment <name>  (SYNCED / READY) ◀──┘   kubectl get managed | grep <name>
 ```
@@ -155,7 +161,7 @@ catalog entities ([ADR-049] forward-compat model):
 |---|---|---|
 | `Group <team>` | `spec.team` | `spec.type: team`; supersedes the seed Group |
 | `System <name>` | `metadata.name` | `owner: group:<team>`; carries **`stage`/`tier`** as first-class attributes; `links` from the generated host + `spec.domains` |
-| `Resource`s | the Composition's footprint | a **curated** mirror — the `<team>-<product>-<stage>` namespace + quota, `ecr-team-<team>-<product>-<svc>` per service, `Pod-<team>-<product>-…-<svc>` + `DeveloperAccess-<team>` IAM roles, the `restrict-images`/`restrict-route-hostnames` Kyverno policies; each `owner: group:<team>`, `system: <name>` |
+| `Resource`s | the Composition's footprint | a **curated** mirror — the `<team>-<product>-<stage>` namespace + quota, `ecr-team-<team>-<product>-<svc>` per service, the `Pod-<team>-<product>-…-<svc>` IAM role per service, the `restrict-images`/`restrict-route-hostnames` Kyverno policies; each `owner: group:<team>`, `system: <name>` |
 
 App `Component`s (discovered separately from the app repos' `catalog-info.yaml`) set `spec.system: <name>`, so
 each environment System *contains* its service. The projection is **authoritative** for Groups/Systems/Resources;
@@ -180,9 +186,8 @@ To onboard or migrate a team, see the [environment onboarding runbook](../runboo
 ```bash
 kubectl --context preprod get xenvironment <name>           # SYNCED=True READY=True
 kubectl --context preprod get managed | grep <name>          # all aws.upbound.io + Object MRs Ready
+kubectl --context preprod get rolebinding -n <ns> developers  # the in-cluster developer access (the only one today, #647)
 aws iam get-role --role-name Pod-<team>-<product>-<stage>-<svc> --profile preprod
-aws eks describe-access-entry --cluster-name preprod-use1-eks \
-  --principal-arn arn:aws:iam::<preprod>:role/DeveloperAccess-<team> --profile preprod
 aws ecr describe-repositories --repository-names team-<team>/<product>-<svc> --profile platform
 ```
 

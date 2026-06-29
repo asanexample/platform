@@ -1,5 +1,7 @@
 # Implementation Plan — Workload Availability Defaults (ADR-085)
 
+> **Status: DELIVERED — applied live on both clusters; replica-floor flipped to Enforce 2026-06-27 (#934). Retained for history.**
+
 Companion to [ADR-085](../adrs/085-workload-availability-graceful-disruption-defaults.md). Builds the foundational
 zero-downtime tier across the four injection points: the Kyverno **mutate** (graceful draining), a Kyverno **generate**
 (PDBs), a Kyverno **validate** (replica floor), and the Karpenter **NodePool** (disruption backstop) — plus the scaffolder

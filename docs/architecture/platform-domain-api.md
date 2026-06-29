@@ -49,7 +49,7 @@ the rebuild implements and that the access-model-as-code generators ([ADR-053](.
   | **Product** | Team lead (self-service, "New Product") | Registry → Backstage `System`; **projected as a `Product` CR** for per-product policy (catalog mapping: [ADR-067 §10](../adrs/067-idp-domain-model.md)) |
   | **Service** | Developer (self-service, "New Service") | Repo-native `catalog-info.yaml` → Backstage `Component` (in the Product `System`; selectors span all envs) |
   | **Environment** | Team lead / developer (self-service) | Crossplane `XEnvironment` XR (`v1beta1`), GitOps-delivered → projected as a custom Backstage **`kind: Environment`** (ADR-067 §10) |
-  | **Customer** | Platform / sales ops | Registry → Backstage entity; referenced by per-customer Environments. **No projected CR in F1** — customer *existence* validation lands with P3; F1's projected-CRD set is **four**: the `XEnvironment` XRD + the `Team` / `Product` / `AccessGrant` CRDs. The `customer`-set-iff-per-customer-prod check is structural (reads the `Product` CR). |
+  | **Customer** | Platform / sales ops | Registry → Backstage entity; referenced by per-customer Environments. **No projected CR in F1** — customer *existence* validation lands with P3; F1's projected-CRD set is **five**: the `XEnvironment` XRD + the `Team` / `Product` / `AccessGrant` / `Release` CRDs (the `Release` CRD landed with ADR-071). The `customer`-set-iff-per-customer-prod check is structural (reads the `Product` CR). |
   | **AccessGrant** | Owning team's `team-admin` (self-service) | `AccessGrant` CR in the owning team's git domain ([ADR-068](../adrs/068-product-scoped-and-cross-team-access-model.md)) |
 
 ## Vocabulary & relationships
@@ -435,8 +435,10 @@ written by CI** and stays fully protected. This realizes the mechanism ADR-067 P
 
 `apiVersion: platform.refplat.org/v1beta1`, `kind: Release`, **cluster-scoped**, named identically to its
 `XEnvironment` (`<team>-<product>-<stage>[-<customer>]`) so the join is 1:1. CI-authored (one home per fact — the
-digest is the *only* thing here, kept out of the human-owned claim; the claim's `services.<svc>.image` field is
-retired in favor of this record once ADR-071 is Accepted).
+digest is the *only* thing here, kept out of the human-owned claim. ADR-071 is **Accepted + implemented &
+proven live**, and the `Release` record is now the authoritative deployed-digest home; the claim's
+`services.<svc>.image` field is **retained in the XRD** (first-deploy "declared but not yet deployed" state)
+and the two **coexist** — delivery reads the `Release` digest, not `services.<svc>.image`).
 
 | field | req | type | notes |
 | --- | --- | --- | --- |
@@ -517,9 +519,12 @@ should be resolved before P1 implementation starts.
    no described mechanism for that fan-out (N customers × M products). *A P3 provisioning concern; flag now so the
    Customer object carries what the fan-out needs.*
 
-6. **Promotion artifact tracking.** Promote-by-digest needs a home for "which digest is in which stage" and the
-   bump proposal/record. `Environment.spec.services.<svc>` holds the *current* digest, but the cross-stage
-   ledger + the gated-bump workflow are unspecified (P2 / #377).
+6. **✅ Promotion artifact tracking — RESOLVED by [ADR-071](../adrs/071-digest-promotion-via-control-plane.md)
+   (Accepted + implemented & proven live).** The deployed digest's home is the control-plane **`Release`** record
+   (`gitops/releases/<team>/<product>/<stage>[-<customer>].yaml`), CI-authored via a gated auto-merged bump PR;
+   the per-Product ApplicationSet injects it as a kustomize image override (app repo `main` never written). The
+   `XEnvironment` `services.<svc>.image` field coexists for the first-deploy state but is no longer the delivery
+   source. Shipped via #445–#453.
 
 7. **Cost & showback granularity.** `costCenter` is **Team-level only.** The Product (a `Domain`) is the natural
    product-line cost unit, and per-customer Environments need per-customer **chargeback**. The cost model needs a

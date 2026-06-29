@@ -36,11 +36,12 @@
 
 ## Promote on demand
 
-**From Backstage (preferred).** Open the **Request Promotion** template, pick the Product, Service, and the
-*from* stage. It resolves that stage's running digest, renders the target stage's Release, and opens the PR.
+**From Backstage (preferred).** Open the **Request Promotion** template, pick the Product, Service, the
+*from* stage **and** the *to* (target) stage — both are required. It resolves the *from* stage's running digest,
+renders the *to* stage's Release, and opens the PR. (The *to* stage must already have an Environment.)
 
 **From the app repo.** Run the app's `promote.yml` via **Actions → Run workflow** (`workflow_dispatch`), giving
-the `from_stage` input. The source digest is resolved after clone — you don't paste a digest.
+both the `from_stage` and `to_stage` inputs. The source digest is resolved after clone — you don't paste a digest.
 
 Either way the result is an `asanexample-promote[bot]` Release PR on the platform repo. For test/uat/staging it
 auto-merges once green; for prod see [below](#approve-a-prod-promotion-release-approver).
@@ -55,7 +56,8 @@ flight. You usually don't touch it — it keeps the lower stages current on thei
 
 ## Approve a prod promotion (release-approver)
 
-You'll be asked to review a Release PR titled like `promote: <team>-<product>-prod -> <digest>`.
+You'll be asked to review a Release PR titled like `promote: <team>-<product>-prod <service> (staging→prod)`.
+(The `-> <digest>` form is the **commit message**, not the PR title.)
 
 1. Confirm you are a **release-approver** for that Product/Team and that **you did not author** the PR (the gate
    excludes the author).

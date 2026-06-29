@@ -347,8 +347,10 @@ aws secretsmanager describe-secret \
   --secret-id platform/tailscale/api-key \
   --region us-east-1 \
   --profile platform \
-  --query '{LastChanged:LastChangedDate,NextRotation:NextRotationDate}' \
+  --query '{LastChanged:LastChangedDate}' \
   --output table
+# NOTE: NextRotationDate is always empty here — these secrets have no
+# aws_secretsmanager_secret_rotation configured (rotation is manual, per this runbook).
 ```
 
 **Tailscale OAuth client:**

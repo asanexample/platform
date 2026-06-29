@@ -38,7 +38,8 @@ prometheus-agent ──remote_write──▶  https://<spoke>-mimir.aws.refplat.
 1. **Hub** — in the `mimir` unit, add the spoke to `spoke_ingest.tenants` (`prod = "prod"`) and to
    `extra_tenant_datasources` (`["preprod", "prod"]`). Apply the `mimir` unit. This publishes
    `prod-mimir.aws.refplat.org` (covered by the Gateway's `*.aws.refplat.org` wildcard cert — no DNS-01 wait)
-   and adds a `Mimir (prod)` Grafana datasource.
+   and adds a `Mimir (prod)` Grafana datasource. (Optionally also set `query_tenants` / `ruler_tenants` on the
+   `mimir` unit — the live config does — if the spoke needs hub-side canary reads or hub-evaluated ruler alerts.)
 2. **Spoke** — copy the preprod `observability-spoke` unit into the new cluster's live tree, set
    `cluster_label` + `remote_write_url = https://prod-mimir.aws.refplat.org/api/v1/push`. Apply it.
 3. The spoke cluster must reach the hub VPC privately (Transit Gateway / Tailscale) and Kyverno must exclude

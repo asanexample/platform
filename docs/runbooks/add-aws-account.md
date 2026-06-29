@@ -53,7 +53,7 @@ Root
 
 | Account Purpose | Recommended OU | Rationale |
 |---|---|---|
-| Shared infrastructure (CI/CD, networking, logging) | `Platform` | Gets `protect-data-and-network` SCP |
+| Shared infrastructure (CI/CD, networking, logging) | `Platform` | Gets `protect-data-and-network`, `require-tagging`, `restrict-iam-users` SCPs |
 | Development / staging | `Workloads/Preprod` | Inherits Workloads SCPs (data protection, tagging, IAM restriction) |
 | Production workloads | `Workloads/Prod` | Same as Preprod, plus tighter change controls |
 | HIPAA / PCI regulated workloads | `Workloads/Regulated` | Same as Workloads, intended for compliance-scoped apps |
@@ -63,11 +63,13 @@ SCPs that apply depend on the OU. Root-level SCPs (`baseline-guardrails`,
 regardless of OU placement. OU-specific SCPs are documented in
 `docs/compliance/scp-control-mapping.md`.
 
-Six entries are exempt from SCP deny statements: `OrganizationAccountAccessRole`
+Seven entries are exempt from SCP deny statements: `OrganizationAccountAccessRole`
 (break-glass), `PlatformDeployer` (Terragrunt apply), `github-actions-terratest`
 (CI test runner), `crossplane-ecr-provisioner` + `crossplane-provisioner-*` (environment
-provisioning), and `*-karpenter-*` (Karpenter node provisioning, ADR-078). See
-`docs/runbooks/modify-scps.md` for details on exempt roles.
+provisioning), and the two anchored per-cluster Karpenter node-provisioner roles
+`platform-use1-eks-karpenter-*` + `preprod-use1-eks-karpenter-*` (ADR-078). The Karpenter
+entries are anchored per-cluster (not a leading-wildcard `*-karpenter-*`, which a security
+audit rejected). See `docs/runbooks/modify-scps.md` for details on exempt roles.
 
 ---
 
@@ -76,25 +78,32 @@ provisioning), and `*-karpenter-*` (Karpenter node provisioning, ADR-078). See
 Edit `infra/live/aws/mgmt/global/organizations/terragrunt.hcl` and add the new account
 to the `accounts` map:
 
+Emails are **not** hardcoded — they are read from the SOPS-encrypted secrets via the
+`account_emails[...]` accessor (ADR-066), keyed by a lowercase short name. Add the
+account's email to `infra/live/aws/secrets.enc.yaml` under `account_emails` first, then
+reference it here:
+
 ```hcl
 inputs = {
   # ... existing configuration ...
 
   accounts = {
     # Existing accounts
-    "platform" = { email = "admin+platform@example.com", ou = "Platform" }
-    "preprod"  = { email = "admin+preprod@example.com",  ou = "Workloads/Preprod" }
+    "Platform" = { email = include.base.locals.account_emails["platform"], ou = "Platform" }
+    "Preprod"  = { email = include.base.locals.account_emails["preprod"], ou = "Workloads/Preprod" }
 
     # NEW: Add your account here
-    "myapp-prod" = { email = "admin+myapp-prod@example.com", ou = "Workloads/Prod" }
+    "MyappProd" = { email = include.base.locals.account_emails["myapp-prod"], ou = "Workloads/Prod" }
   }
 }
 ```
 
 **Naming conventions:**
 
-- Use lowercase, hyphen-separated names.
-- Include the environment suffix if not obvious from the OU (`-dev`, `-staging`, `-prod`).
+- The map **key** becomes the AWS account name (`name = each.key` in the module), so use
+  the Capitalized form the live config uses (`Platform`, `Test`, `Preprod`, `Prod`).
+- The `account_emails[...]` lookup key is a lowercase short name matching the SOPS secret.
+- Include the environment suffix if not obvious from the OU (`Dev`, `Staging`, `Prod`).
 - Keep names under 50 characters (AWS limit).
 
 **Important:** The `ou` value must exactly match a key in the `organizational_units` map.
@@ -227,7 +236,7 @@ relevant Terragrunt modules for the new account. This typically involves:
 
 - Creating the account-level directory structure under `infra/live/aws/<account>/`.
 - Copying `env.hcl` and setting the `account_id` and `environment` values.
-- Running the baseline modules (e.g., `cloudtrail`, `config`, `guardduty-member`).
+- Running the baseline modules (e.g., `cloudtrail`).
 
 ### 5. Enable EBS Default Encryption
 
@@ -353,15 +362,15 @@ mailbox while satisfying AWS's unique-email requirement.
 
 ### Can I rename an account after creation?
 
-Yes. Changing the `name` key in the `accounts` map will cause Terraform to destroy and
-recreate the account, which is NOT what you want. Instead, use the AWS Console or CLI
-to rename:
+Yes, but there is **no AWS CLI/API to rename a member account's name** (no
+`UpdateAccount` operation exists). Changing the map key in the `accounts` map would cause
+Terraform to destroy and recreate the account, which is NOT what you want. To rename:
 
-```bash
-aws organizations update-account --account-id 123456789012 --name "new-name"
-```
+- Sign in to the member account as root (password reset via the account email), then
+  change the account name under **Account Settings** in the AWS Console.
 
-Then update the map key in `terragrunt.hcl` and import the account into the new key.
+Then update the map key in `terragrunt.hcl` and `terraform state mv` / re-import the
+account into the new key so state matches.
 
 ### What if I need to move an existing account into the organization?
 

@@ -10,9 +10,6 @@ module "networking" {
 
   vpc_name      = "vpc-platform-ops-use1"
   address_space = ["10.100.0.0/16"]
-  environment   = "ops"
-  workload      = "platform"
-  region_abbv   = "use1"
 
   subnets = {
     "snet-platform-ops-public-use1-a" = {
@@ -56,10 +53,7 @@ module "networking" {
   source = "../../modules/aws/networking"
   create = false
 
-  vpc_name    = "unused"
-  environment = "dev"
-  workload    = "platform"
-  region_abbv = "use1"
+  vpc_name = "unused"
 }
 ```
 
@@ -71,9 +65,6 @@ module "networking" {
 
   vpc_name            = "vpc-dev-use1"
   address_space       = ["10.50.0.0/16"]
-  environment         = "dev"
-  workload            = "platform"
-  region_abbv         = "use1"
   create_nat_gateways = false
 
   subnets = {
@@ -98,9 +89,6 @@ module "networking" {
 
   vpc_name                = "vpc-airgapped-use1"
   address_space           = ["10.60.0.0/16"]
-  environment             = "prod"
-  workload                = "hipaa"
-  region_abbv             = "use1"
   create_internet_gateway = false
   create_nat_gateways     = false
 
@@ -127,9 +115,6 @@ module "networking" {
 
   vpc_name           = "vpc-preprod-use1"
   address_space      = ["10.200.0.0/16"]
-  environment        = "preprod"
-  workload           = "platform"
-  region_abbv        = "use1"
   single_nat_gateway = true
 
   subnets = {
@@ -157,13 +142,17 @@ module "networking" {
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-No requirements.
+| Name | Version |
+| ---- | ------- |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.6.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.0 |
+| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 3.0 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_aws"></a> [aws](#provider\_aws) | n/a |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.0 |
 
 ## Modules
 
@@ -201,10 +190,7 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| <a name="input_environment"></a> [environment](#input\_environment) | Environment name (e.g. ops, dev, staging, prod) | `string` | n/a | yes |
-| <a name="input_region_abbv"></a> [region\_abbv](#input\_region\_abbv) | Abbreviated region name for resource naming | `string` | n/a | yes |
 | <a name="input_vpc_name"></a> [vpc\_name](#input\_vpc\_name) | Name of the VPC to create | `string` | n/a | yes |
-| <a name="input_workload"></a> [workload](#input\_workload) | Workload identifier for resource names | `string` | n/a | yes |
 | <a name="input_address_space"></a> [address\_space](#input\_address\_space) | CIDR blocks for the VPC | `list(string)` | <pre>[<br/>  "10.0.0.0/16"<br/>]</pre> | no |
 | <a name="input_create"></a> [create](#input\_create) | Whether to create resources in this module | `bool` | `true` | no |
 | <a name="input_create_internet_gateway"></a> [create\_internet\_gateway](#input\_create\_internet\_gateway) | Create an internet gateway. Set false for airgapped environments. | `bool` | `true` | no |

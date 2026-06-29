@@ -32,11 +32,14 @@ catalog. Module source paths and Helm chart versions are pinned centrally in
 | `eks-node-group` | EKS managed node groups (system/workload) with hardened launch templates (ADR-023) |
 | `eks-addons` | EKS managed add-ons (coredns) + gp3 default StorageClass + EBS CSI IRSA (ADR-009) |
 | `eks-pod-identity` | EKS Pod Identity associations for environment AWS access (ADR-041) |
+| `karpenter` | Karpenter node autoscaling (NodePools/EC2NodeClasses, consolidation, BYOCNI startup-taint ordering) on both clusters (ADR-078) |
 | `ecr` | Centralized, per-team ECR repositories with cross-account pull + immutable tags (ADR-028) |
 | `s3` | Reusable private/encrypted S3 buckets (e.g. environment data, mimir blocks) |
 | `ssm-bastion` | SSM Session Manager bastion (no SSH/inbound) for private cluster access (ADR-020) |
 | `cloudtrail` | Per-account CloudTrail trail (S3, KMS, CloudWatch, secrets alarms) (ADR-037) |
 | `sns-notifications` | SNS topic(s) for alerting (Alertmanager → email, Falco publisher) |
+| `sops-kms` | Management `platform-sops` KMS key for SOPS-encrypted committed config secrets (ADR-066) |
+| `cost-allocation-tags` | Activates AWS cost-allocation tags (Team/Product/Stage) for cost visibility |
 
 ## Cloud-Agnostic / Shared Modules (`infra/modules/`)
 
@@ -44,14 +47,22 @@ Deployed via Helm / the Kubernetes provider onto any cluster; reusable across cl
 
 | Module | Purpose |
 |--------|---------|
-| `cilium` | Cilium CNI (BYOCNI, `kubeProxyReplacement`, Gateway API, Hubble) — `cloud_provider` selects ENI/overlay (ADR-008) |
-| `argocd` | ArgoCD GitOps engine + Dex/SAML SSO + IRSA for ECR (ADR-021/012) |
+| `cilium` | Cilium CNI (BYOCNI, `kubeProxyReplacement`, Gateway API, Hubble) — datapath via `ipam_mode`/`routing_mode`; AWS runs overlay (cluster-pool + VXLAN), ENI optional/non-default (ADR-008) |
+| `argo-rollouts` | Argo Rollouts controller + dashboard for progressive delivery (canary/blue-green, metric-gated analysis); dashboard fronted by `oauth2-proxy` (ADR-056) |
+| `argocd` | ArgoCD GitOps engine + direct Keycloak OIDC SSO (Dex retired) + Pod Identity for ECR (ADR-021/053/059) |
 | `argocd-apps` | Per-team AppProjects, Applications, and PR-preview ApplicationSets (ADR-031/032) |
 | `argocd-clusters` | Registers spoke clusters (e.g. preprod) with the ArgoCD hub |
+| `backstage` | Backstage developer portal (catalog, scaffolder, plugins) with direct Keycloak OIDC (ADR-051/064) |
 | `cert-manager` | TLS via Let's Encrypt DNS-01 (Route53), ClusterIssuers |
 | `external-dns` | Syncs Gateway/Service hostnames to Route53 |
-| `external-secrets` | External Secrets Operator (IRSA → Secrets Manager / SSM) (ADR-019) |
+| `external-secrets` | External Secrets Operator (Pod Identity → Secrets Manager / SSM) (ADR-019/047) |
 | `secret-stores` | ClusterSecretStore (Secrets Manager + SSM backends) (ADR-024) |
+| `keycloak` | Keycloak IdP-of-record deployment (the app-facing OIDC provider) (ADR-052/053/059) |
+| `keycloak-config` | Keycloak realm/client/role configuration (OIDC clients for ArgoCD, Backstage, Grafana, …) (ADR-053) |
+| `oauth2-proxy` | Reusable Keycloak-SSO front for UIs with no native auth (e.g. the Argo Rollouts dashboard) |
+| `platform-directory` | Workforce identity directory + owner-resolution (maps commit/team → owning team for routing) (ADR-084) |
+| `cloudnative-pg` | CloudNative-PG operator + PostgreSQL clusters (e.g. the Backstage database) |
+| `gateway` | Foundational shared Cilium Gateway + ClusterIssuer (internal/public NLB), brought up early (ADR-029/060) |
 | `gateway-config` | Cilium Gateway API: Gateway, HTTPRoutes, ClusterIssuer (internal/public NLB) (ADR-017/029) |
 | `github-teams` | GitHub org-Team ownership of app repos, derived from the Team/Product registries (ADR-072) |
 | `tailscale` / `tailscale-admin` | Tailscale subnet-router operator + tailnet ACL/OAuth management (ADR-011) |
@@ -60,8 +71,9 @@ Deployed via Helm / the Kubernetes provider onto any cluster; reusable across cl
 | `crossplane` | Crossplane v2 control plane — hub ECR provisioning + the per-cluster `XEnvironment` XRD/Composition, shipping the `crossplane-environment-api` + `environment-policies` charts (ADR-046/048/067) |
 | `cluster-rbac` | `platform-operator` ClusterRole for the operate-not-author access model (ADR-040) |
 | `observability` | kube-prometheus-stack hub: Prometheus + Grafana + Alertmanager (ADR-043) |
-| `observability-mimir` | Grafana mimir — durable, S3-backed, multi-tenant metrics store (ADR-044) |
+| `observability-*` (17 modules) | The LGTM+profiles stack: durable stores `-mimir`/`-loki`/`-tempo`/`-pyroscope` (ADR-044); collectors `-alloy`/`-beyla`/`-otel-collector`/`-otel-operator`/`-prometheus-agent`/`-pyroscope-ebpf`/`-events`; measurement `-slo`/`-blackbox`/`-k6`/`-opencost`/`-cloudwatch-exporter` (ADR-077) |
 | `falco` | Runtime threat detection (modern eBPF) + falcosidekick (ADR-045) |
+| `pagerduty` | Per-team on-call schedules + escalation policies in IaC, derived from team ownership (ADR-084) |
 | `cloudflare/dns_delegation` | NS records in the Cloudflare parent zone delegating to Route53 (ADR-022) |
 | `vcluster` | Virtual Kubernetes clusters — **deferred** (ADR-033) — see below |
 

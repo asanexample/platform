@@ -116,8 +116,10 @@ alerts route through the same Alertmanager (page = critical, ticket = warning).
   durable stores → Prometheus-only; platform overrides enable Mimir/Loki/Tempo).
 - **Identity**: new add-ons use EKS Pod Identity (ADR-047); some legacy components still
   IRSA (batch migration). Grafana CloudWatch access is Pod Identity.
-- **Secrets**: all named `platform/*` (ESO IRSA scoped there) — Grafana admin/OIDC, Slack
-  webhook, PagerDuty key.
+- **Secrets**: all named `platform/*` (ESO scoped there via Pod Identity, ADR-047) — Grafana admin/OIDC,
+  Slack webhook, PagerDuty key.
+- **Per-team on-call**: the global PagerDuty receiver here pages one routing key; per-team on-call
+  schedules + escalation policies as code live in the `pagerduty` module (ADR-084) — see its README.
 - **Exposure**: Grafana on the internal Cilium Gateway, Tailscale-only; stores are
   ClusterIP-only, never exposed. Cross-cluster ingest is a Gateway HTTPRoute that
   **force-overwrites `X-Scope-OrgID`** at the edge.

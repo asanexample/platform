@@ -122,7 +122,7 @@ module's Alertmanager config):
 | `info` / `Watchdog` / else | dashboard-only |
 
 A `critical` inhibits a matching `warning` (same `namespace`+`alertname`) so one incident doesn't
-double-notify. SNS auth is IRSA + sigv4. The **Slack webhook** and **PagerDuty routing key** are pulled from
+double-notify. SNS auth is EKS Pod Identity (ADR-047) + sigv4. The **Slack webhook** and **PagerDuty routing key** are pulled from
 Secrets Manager by **External Secrets**, mounted into Alertmanager (`alertmanagerSpec.secrets`), and read via
 `api_url_file` / `routing_key_file` — so the secret values never enter Terraform state or helm values.
 

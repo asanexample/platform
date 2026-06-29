@@ -85,14 +85,19 @@ module "eks" {
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-No requirements.
+| Name | Version |
+| ---- | ------- |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.6.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.0 |
+| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 3.0 |
+| <a name="requirement_tls"></a> [tls](#requirement\_tls) | ~> 4.0 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_aws"></a> [aws](#provider\_aws) | n/a |
-| <a name="provider_tls"></a> [tls](#provider\_tls) | n/a |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.0 |
+| <a name="provider_tls"></a> [tls](#provider\_tls) | ~> 4.0 |
 
 ## Modules
 
@@ -120,16 +125,16 @@ No modules.
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | Name of the EKS cluster | `string` | n/a | yes |
 | <a name="input_subnet_ids"></a> [subnet\_ids](#input\_subnet\_ids) | Subnet IDs for the EKS cluster ENIs | `list(string)` | n/a | yes |
-| <a name="input_access_entries"></a> [access\_entries](#input\_access\_entries) | IAM principal to Kubernetes access policy mappings | <pre>map(object({<br/>    principal_arn     = string<br/>    policy_arn        = optional(string)<br/>    type              = optional(string, "STANDARD")<br/>    scope_type        = optional(string, "cluster")<br/>    namespaces        = optional(list(string))<br/>    kubernetes_groups = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
+| <a name="input_access_entries"></a> [access\_entries](#input\_access\_entries) | IAM principal to Kubernetes access policy mappings | <pre>map(object({<br/>    principal_arn = string<br/>    # Optional: when set, an AWS-managed access policy is associated (e.g. AmazonEKSEditPolicy).<br/>    # When null, the entry maps the principal to kubernetes_groups for cluster-managed RBAC instead.<br/>    policy_arn        = optional(string)<br/>    type              = optional(string, "STANDARD")<br/>    scope_type        = optional(string, "cluster")<br/>    namespaces        = optional(list(string))<br/>    kubernetes_groups = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
 | <a name="input_additional_security_group_ids"></a> [additional\_security\_group\_ids](#input\_additional\_security\_group\_ids) | Additional security group IDs to attach to the cluster (e.g. networking module's EKS SG) | `list(string)` | `[]` | no |
 | <a name="input_create"></a> [create](#input\_create) | Whether to create resources in this module | `bool` | `true` | no |
 | <a name="input_eks_addons"></a> [eks\_addons](#input\_eks\_addons) | EKS managed add-ons to install (e.g. coredns, kube-proxy) | <pre>map(object({<br/>    most_recent = optional(bool, true)<br/>  }))</pre> | `{}` | no |
 | <a name="input_enable_secrets_encryption"></a> [enable\_secrets\_encryption](#input\_enable\_secrets\_encryption) | Enable KMS envelope encryption for Kubernetes secrets | `bool` | `true` | no |
 | <a name="input_enabled_cluster_log_types"></a> [enabled\_cluster\_log\_types](#input\_enabled\_cluster\_log\_types) | EKS control plane log types to enable | `list(string)` | <pre>[<br/>  "api",<br/>  "audit",<br/>  "authenticator",<br/>  "controllerManager",<br/>  "scheduler"<br/>]</pre> | no |
 | <a name="input_endpoint_private_access"></a> [endpoint\_private\_access](#input\_endpoint\_private\_access) | Enable private API server endpoint | `bool` | `true` | no |
-| <a name="input_endpoint_public_access"></a> [endpoint\_public\_access](#input\_endpoint\_public\_access) | Enable public API server endpoint | `bool` | `true` | no |
+| <a name="input_endpoint_public_access"></a> [endpoint\_public\_access](#input\_endpoint\_public\_access) | Enable the public API server endpoint. Defaults to false — private-only is the house policy (ADR-010); reach the API over Tailscale/SSM. Set true only deliberately (and narrow public\_access\_cidrs). | `bool` | `false` | no |
 | <a name="input_kubernetes_version"></a> [kubernetes\_version](#input\_kubernetes\_version) | Kubernetes version for the EKS cluster | `string` | `"1.35"` | no |
-| <a name="input_public_access_cidrs"></a> [public\_access\_cidrs](#input\_public\_access\_cidrs) | CIDR blocks allowed to access the public API endpoint | `list(string)` | <pre>[<br/>  "0.0.0.0/0"<br/>]</pre> | no |
+| <a name="input_public_access_cidrs"></a> [public\_access\_cidrs](#input\_public\_access\_cidrs) | CIDR blocks allowed to reach the public API endpoint. Only applies when endpoint\_public\_access = true — narrow this to operator IPs; do NOT rely on the open default if you enable public access. | `list(string)` | <pre>[<br/>  "0.0.0.0/0"<br/>]</pre> | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to all resources | `map(string)` | `{}` | no |
 
 ## Outputs

@@ -4,7 +4,9 @@
 > **Related ADR:** [014-kyverno-as-policy-engine](../adrs/014-kyverno-as-policy-engine.md), [040-platform-engineer-access-model](../adrs/040-platform-engineer-access-model.md)
 > **Module:** `infra/modules/policy` · **Units:** `infra/live/aws/{preprod,platform}/us-east-1/platform/policy`
 >
-> **Last reviewed:** 2026-05-29
+> **Last reviewed:** 2026-06-28
+>
+> **Current state:** both clusters run Kyverno in **Enforce** (the replica-floor flip landed in #934); §2 below describes the Audit→Enforce promotion for reference and rollback.
 
 ---
 
@@ -82,7 +84,7 @@ kubectl get clusterpolicy -o wide                 # READY column should be true
   it — verify in `Audit` before re-flipping to `Enforce`.
 - Kyverno self-manages its webhook CA (1-year, auto-rotated); no cert-manager dependency.
 - **Image verification (Phase 3)** depends on cluster egress to **sigstore** (Fulcio/Rekor) and on the
-  Kyverno **IRSA** role (ECR read). A sigstore outage under Enforce blocks admission of *new* images —
+  Kyverno ECR-read role, bound via **EKS Pod Identity** (ADR-047). A sigstore outage under Enforce blocks admission of *new* images —
   break-glass by setting `verify_failure_action = "Audit"` on the `policy` unit and applying (or
   fail-open the verify webhook as above). The verify policies roll Audit→Enforce independently of the
   other policies via `verify_failure_action`.

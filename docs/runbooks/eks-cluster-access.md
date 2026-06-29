@@ -109,6 +109,15 @@ developer can assume only their own team's role (the role's trust is restricted 
 the team's `Dev-<team>` SSO permission set). The platform cluster does not have
 developer access -- it is admin-only. See ADR-039 for the full model.
 
+> ⚠️ **Not yet provisioned (#364 / ADR-068).** The `DeveloperAccess-<team>` IAM role
+> and its EKS access entry are **not emitted** by the Crossplane Composition today (it
+> creates only the in-cluster `RoleBinding`), so the `aws eks update-kubeconfig
+> --role-arn …/DeveloperAccess-<team>` flow below **does not work yet** — there is no
+> role to assume into. **Until OIDC-native developer cluster auth (#364, ADR-068) lands,
+> use `./bin/platctl kubeconfig` / a PlatformAdmin context.** The steps below document
+> the intended end-state. (#647 was closed but the capability was superseded by #364, not
+> delivered.)
+
 ### Prerequisites
 
 - AWS CLI v2 with SSO configured
@@ -162,9 +171,11 @@ Access is provisioned when a team's environment is onboarded — the namespace
 The SSO permission set/group are added in the `identity-center` unit. See the
 [Environment Onboarding](environment-onboarding.md) runbook.
 
-> **Note (#647):** the per-team `DeveloperAccess-<team>` IAM role and its EKS access
-> entry are **not yet emitted** by the Composition. Until then the namespace
-> `RoleBinding` exists but there is no team-scoped IAM role to assume into it.
+> **Note (#364 / ADR-068):** the per-team `DeveloperAccess-<team>` IAM role and its EKS
+> access entry are **not yet emitted** by the Composition (see the caveat at the top of
+> this section). Until OIDC-native developer cluster auth (#364) lands, the namespace
+> `RoleBinding` exists but there is no team-scoped IAM role to assume into it — use
+> `./bin/platctl kubeconfig` / PlatformAdmin.
 
 If you cannot access your namespace, verify with the platform team that your team's
 registry entries (`gitops/teams/<team>.yaml` + an `XEnvironment` claim under

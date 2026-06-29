@@ -72,15 +72,16 @@ aws sso login --profile preprod-dev
 Configure kubeconfig for the preprod cluster (the recommended path):
 
 ```bash
-platctl kubeconfig --env preprod
+./bin/platctl kubeconfig --env preprod
 ```
 
 > **Note:** Per-team, namespace-scoped `DeveloperAccess-<team>` roles
 > (ADR-039) are **not yet provisioned** — see
-> [#647](https://github.com/asanexample/platform/issues/647). Until they
-> land, use `platctl kubeconfig` (which configures the cluster context
-> against the available role); there is no per-team scoped kubectl access
-> to assume.
+> [#647](https://github.com/asanexample/platform/issues/647) (closed;
+> superseded by [#364](https://github.com/asanexample/platform/issues/364),
+> ADR-068 OIDC-native developer auth). Until they land, use
+> `./bin/platctl kubeconfig` (which configures the cluster context against
+> the available role); there is no per-team scoped kubectl access to assume.
 
 Verify access to your environment namespace:
 
@@ -343,8 +344,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          # Per-team push role (ADR-036, #60) — trusts only this team's repo, pushes only to team-alpha/*
-          role-to-assume: arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/github-actions-ecr-push-alpha
+          # Per-Product push role (ADR-069 §5) — trusts only this Product's repo, pushes only to team-alpha/shop-*
+          role-to-assume: arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/github-actions-ecr-push-product-alpha-shop
           aws-region: us-east-1
 
       - name: Login to ECR
@@ -475,8 +476,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          # Per-team push role (ADR-036). The team's role trusts pull_request events too (github_events).
-          role-to-assume: arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/github-actions-ecr-push-alpha
+          # Per-Product push role (ADR-069 §5). The Product's role trusts pull_request events too (preview builds).
+          role-to-assume: arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/github-actions-ecr-push-product-alpha-shop
           aws-region: us-east-1
 
       - name: Login to ECR

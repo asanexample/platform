@@ -4,7 +4,7 @@ Deploys **Grafana Mimir** (`mimir-distributed` chart) as the hub's durable, mult
 long-range metrics store, into the existing `observability` namespace (so it shares Grafana's datasource
 sidecar and the namespace's default-deny NetworkPolicy isolation). The hub Prometheus `remote_write`s to it;
 Grafana queries it as the default datasource. Includes the **S3 blocks bucket** (SSE-S3/AES256) and an
-An IAM role for Mimir's ServiceAccount, bound via **EKS Pod Identity** (ADR-047). This is **P2** of the observability stack (#102).
+IAM role for Mimir's ServiceAccount, bound via **EKS Pod Identity** (ADR-047). This is **P2** of the observability stack (#102).
 
 Runs in **classic architecture** (distributor → ingester gRPC, RF1) at minimal single-replica sizing — not
 the chart's default Kafka ingest-storage. `multitenancy_enabled` is on; the hub's own metrics use tenant
@@ -51,6 +51,18 @@ module "mimir" {
 
 `blocks_bucket_name`, `mimir_role_arn`, `push_endpoint`
 (`http://mimir-gateway.observability.svc/api/v1/push`), `query_endpoint` (`.../prometheus`).
+
+## Hub-only extras (ruler · app SLOs · spoke ingest)
+
+Beyond the base store, the hub Mimir also carries (all opt-in):
+
+- **Ruler (P4)** — `enable_ruler` turns on Mimir's ruler for server-side recording/alerting rules;
+  `ruler_tenants` scopes which tenants it evaluates and `ruler_alertmanager_url` points it at the hub
+  Alertmanager.
+- **Per-app SLO burn-rate rules (ADR-056)** — `app_slos` renders multi-window burn-rate alerting rules
+  per application into the ruler.
+- **Cross-cluster `spoke_ingest` (P10)** — authenticated remote-write ingest from observability spoke
+  clusters into the hub store (the P10 multi-cluster path).
 
 ## Notes / gotchas
 

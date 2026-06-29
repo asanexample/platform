@@ -33,13 +33,16 @@ module "pod_identity" {
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-No requirements.
+| Name | Version |
+| ---- | ------- |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.6.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.0 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_aws"></a> [aws](#provider\_aws) | n/a |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.0 |
 
 ## Modules
 
@@ -56,7 +59,7 @@ No modules.
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | EKS cluster name the associations are created for | `string` | n/a | yes |
-| <a name="input_associations"></a> [associations](#input\_associations) | Map of association key -> binding. Each binds a (namespace, service\_account) on the cluster to an IAM<br/>role; pods running as that ServiceAccount receive the role's credentials via the EKS Pod Identity<br/>agent. Team-agnostic: the per-environment map is built by the caller from the git-native registries (gitops/; teams.hcl retired). | <pre>map(object({<br/>    namespace       = string<br/>    service_account = string<br/>    role_arn        = string<br/>  }))</pre> | `{}` | no |
+| <a name="input_associations"></a> [associations](#input\_associations) | Map of association key -> binding. Each binds a (namespace, service\_account) on the cluster to an IAM<br/>role; pods running as that ServiceAccount receive the role's credentials via the EKS Pod Identity<br/>agent. Team-agnostic: the per-service map is built at the terragrunt unit from the git-native<br/>Team/Product registries (gitops/teams, gitops/products), not teams.hcl (retired, ADR-063/067). | <pre>map(object({<br/>    namespace       = string<br/>    service_account = string<br/>    role_arn        = string<br/>  }))</pre> | `{}` | no |
 | <a name="input_create"></a> [create](#input\_create) | Controls whether resources should be created | `bool` | `true` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags applied to the associations | `map(string)` | `{}` | no |
 

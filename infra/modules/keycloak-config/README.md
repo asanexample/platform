@@ -33,7 +33,7 @@ clients**, the **Team group/role taxonomy**, and — only when federating — th
 - **Public clients** (`var.public_clients`, e.g. `argocd-cli`) — PUBLIC `keycloak_openid_client` with PKCE S256,
   **no** secret / no Secrets Manager entry (for CLIs that can't safely hold a confidential secret), with the same
   `groups`/`roles` claim mappers.
-- **Team taxonomy** (`var.teams`, from the canonical `infra/live/aws/_teams.hcl`) — one `keycloak_group` per Team,
+- **Team taxonomy** (`var.teams`, derived from the canonical `gitops/teams/` registry) — one `keycloak_group` per Team,
   plus the ADR-049 developer-access realm roles (`tenant-operate` for preprod, `tenant-view` for prod), assigned
   to each group by its envelope.
 - **Platform groups** (`var.platform_groups`, e.g. `platform-admins`) — non-team realm groups (no envelope/roles)
@@ -95,7 +95,7 @@ module "keycloak_config" {
   upstream = {
     alias       = "aws-sso"
     protocol    = "saml"
-    group_claim = "" # AWS IdC emits no groups — membership mappers stay inert (use _teams.hcl/UI)
+    group_claim = "" # AWS IdC emits no groups — membership mappers stay inert (use gitops/teams/ + UI)
     saml = {
       sso_url = var.keycloak_sso_url
       ca_data = var.keycloak_sso_ca_data # BARE base64 cert body — see the runbook
@@ -133,13 +133,13 @@ three sources depending on mode:
   advanced-group mappers — when a brokered login's group claim (`upstream.group_claim`) carries a team's
   `ssoGroup`, the user joins `/<team>` and inherits its roles. This is the enterprise membership mechanism.
 - **Federated, AWS Identity Center:** IdC emits **no** group claims, so the mappers are inert — membership falls
-  back to `_teams.hcl`/UI. This is an **IdC limitation, not a Keycloak one** (ADR-059), and is why IdC is an
+  back to `gitops/teams/`/UI. This is an **IdC limitation, not a Keycloak one** (ADR-059), and is why IdC is an
   optional federation mode, not the default.
 
 ## Not here (→ later)
 
 Outbound **SCIM** (Keycloak→AWS in standalone mode, external SaaS — ADR-059 item 4); wiring a **live** upstream
-tenant; per-environment registry filtering; full `teams.hcl` consolidation.
+tenant; per-environment registry filtering; full `gitops/teams/` registry consolidation.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
