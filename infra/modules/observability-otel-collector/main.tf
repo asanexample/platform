@@ -20,23 +20,23 @@ locals {
   }
 
   # METRICS pipeline (#628 follow-up): OTLP metrics from OTEL-native workloads (e.g. the ADR-088 activation
-  # operator) → Mimir via Prometheus remote_write. Only wired when mimir_endpoint is set, so a
-  # traces-only collector stays unchanged. resource_to_telemetry_conversion turns OTEL resource attributes
-  # (service.name, …) into Prometheus labels so the metrics are queryable per workload.
+  # operator) → Mimir via OTLP/HTTP (Mimir's native OTLP ingest at /otlp/v1/metrics — it converts OTEL
+  # resource attributes to labels). otlphttp is used because the otelcol-k8s distro doesn't ship
+  # prometheusremotewrite. Only wired when mimir_endpoint is set, so a traces-only collector (e.g. a spoke)
+  # stays unchanged.
   metrics_enabled = var.mimir_endpoint != ""
   mimir_exporter = local.metrics_enabled ? {
-    prometheusremotewrite = {
-      endpoint                         = var.mimir_endpoint
-      headers                          = { "X-Scope-OrgID" = var.tenant_id }
-      tls                              = { insecure = var.exporter_tls_insecure }
-      resource_to_telemetry_conversion = { enabled = true }
+    "otlphttp/mimir" = {
+      metrics_endpoint = var.mimir_endpoint # full URL, e.g. http://mimir-distributor…:8080/otlp/v1/metrics
+      headers          = { "X-Scope-OrgID" = var.tenant_id }
+      tls              = { insecure = var.exporter_tls_insecure }
     }
   } : {}
   metrics_pipeline = local.metrics_enabled ? {
     metrics = {
       receivers  = ["otlp"]
       processors = local.pipeline_processors
-      exporters  = ["prometheusremotewrite"]
+      exporters  = ["otlphttp/mimir"]
     }
   } : {}
 

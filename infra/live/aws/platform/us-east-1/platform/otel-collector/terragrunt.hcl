@@ -86,9 +86,10 @@ inputs = {
   # OTLP/gRPC exporter wants host:port (no scheme) — strip http:// from the tempo output.
   tempo_otlp_endpoint = replace(dependency.tempo.outputs.otlp_grpc_endpoint, "http://", "")
 
-  # OTLP metrics → Mimir (the hub's remote_write gateway). Lights up the metrics pipeline for OTEL-native
-  # workloads (the activation operator + future ones); the X-Scope-OrgID tenant header is `platform` below.
-  mimir_endpoint = dependency.mimir.outputs.push_endpoint
+  # OTLP metrics → Mimir's native OTLP ingest (the distributor). Lights up the metrics pipeline for
+  # OTEL-native workloads (the activation operator + future ones); the X-Scope-OrgID tenant header is
+  # `platform` below. (Mimir's gateway exposes /api/v1/push, not /otlp, so target the distributor directly.)
+  mimir_endpoint = "http://mimir-distributor.${dependency.observability.outputs.namespace}.svc:8080/otlp/v1/metrics"
 
   # Tempo is multi-tenant (#628): stamp the hub's own traces (Beyla et al.) as tenant `platform`. Set this
   # BEFORE Tempo flips multitenancyEnabled so there's no rejection window (a single-tenant Tempo ignores it).
