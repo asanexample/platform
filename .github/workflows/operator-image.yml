@@ -1,0 +1,85 @@
+name: Build operator image
+
+# Builds the activation operator image (operators/activation/Dockerfile, repo-root build context so the
+# pkg/ replace resolves) and pushes it — cosign-signed + SBOM-attested — to the PLATFORM ECR repo
+# platform/activation-operator (ADR-088). The Terragrunt activation-operator add-on pins a digest from here.
+# Mirrors gha-runner-image.yml (the in-repo image-build precedent). Path-scoped so ordinary IaC changes
+# don't trigger a rebuild.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - operators/activation/**
+      - pkg/**
+      - .github/workflows/operator-image.yml
+  workflow_dispatch:
+
+permissions:
+  id-token: write # OIDC: AWS (ECR push) + cosign keyless signing
+  contents: read
+
+env:
+  ECR_REGISTRY: 829808296602.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REPO: platform/activation-operator
+
+jobs:
+  build:
+    # Native arm64 runner: the platform is all-Graviton, so the image must be arm64.
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6.2.1
+        with:
+          role-to-assume: arn:aws:iam::829808296602:role/github-actions-ecr-push-activation-operator
+          aws-region: us-east-1
+
+      - uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2.1.6
+      - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+
+      - name: Build and push image
+        id: build
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          # Repo-root context: the Dockerfile COPYs operators/activation/ AND pkg/ (the `replace` target).
+          context: .
+          file: operators/activation/Dockerfile
+          push: true
+          platforms: linux/arm64 # arm64-only — the platform is all-Graviton
+          tags: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}:${{ github.sha }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v3.10.1
+        with:
+          cosign-release: "v2.5.2"
+
+      - name: Sign image (cosign keyless)
+        run: cosign sign --yes "${ECR_REGISTRY}/${ECR_REPO}@${{ steps.build.outputs.digest }}"
+
+      - name: Install Syft (download release binary + verify SHA-256)
+        env:
+          SYFT_VERSION: "1.44.0"
+        run: |
+          set -euo pipefail
+          # Match the runner arch — this job runs on a native arm64 runner (ubuntu-24.04-arm).
+          case "$(uname -m)" in
+            x86_64) goarch=amd64 ;;
+            aarch64 | arm64) goarch=arm64 ;;
+            *) echo "unsupported arch: $(uname -m)" >&2; exit 1 ;;
+          esac
+          base="https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}"
+          asset="syft_${SYFT_VERSION}_linux_${goarch}.tar.gz"
+          curl -sfL "${base}/${asset}" -o "${asset}"
+          curl -sfL "${base}/syft_${SYFT_VERSION}_checksums.txt" -o syft_checksums.txt
+          grep " ${asset}\$" syft_checksums.txt | sha256sum -c -
+          tar xzf "${asset}" syft && sudo install -m 0755 syft /usr/local/bin/syft
+
+      - name: Generate + attest SBOM (CycloneDX, cosign keyless)
+        env:
+          REF: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}@${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          syft "$REF" -o cyclonedx-json=sbom.cdx.json
+          cosign attest --yes --type cyclonedx --predicate sbom.cdx.json "$REF"

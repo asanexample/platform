@@ -33,6 +33,13 @@ inputs = {
       tag_mutability = "IMMUTABLE_WITH_EXCLUSION" # image tags immutable; cosign sha256-* tags exempt
       tags           = { Service = "gha-runner" }
     }
+    # The activation operator image (ADR-088): the temporary-power activation controller. Built +
+    # cosign-signed + SBOM-attested by this repo's operator-image.yml from operators/activation/, pulled
+    # by the activation-operator Terragrunt add-on (digest-pinned) on the platform cluster.
+    "platform/activation-operator" = {
+      tag_mutability = "IMMUTABLE_WITH_EXCLUSION" # image tags immutable; cosign sha256-* tags exempt
+      tags           = { Service = "activation-operator" }
+    }
   }
 
   # Accounts granted cross-account image pull access

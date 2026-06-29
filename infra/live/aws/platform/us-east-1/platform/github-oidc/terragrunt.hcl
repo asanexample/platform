@@ -16,10 +16,11 @@ dependency "ecr" {
 
   mock_outputs = {
     repository_arns = {
-      "team-alpha/demo"     = "arn:aws:ecr:us-east-1:000000000000:repository/team-alpha/demo"
-      "team-bravo/demo"     = "arn:aws:ecr:us-east-1:000000000000:repository/team-bravo/demo"
-      "platform/backstage"  = "arn:aws:ecr:us-east-1:000000000000:repository/platform/backstage"
-      "platform/gha-runner" = "arn:aws:ecr:us-east-1:000000000000:repository/platform/gha-runner"
+      "team-alpha/demo"              = "arn:aws:ecr:us-east-1:000000000000:repository/team-alpha/demo"
+      "team-bravo/demo"              = "arn:aws:ecr:us-east-1:000000000000:repository/team-bravo/demo"
+      "platform/backstage"           = "arn:aws:ecr:us-east-1:000000000000:repository/platform/backstage"
+      "platform/gha-runner"          = "arn:aws:ecr:us-east-1:000000000000:repository/platform/gha-runner"
+      "platform/activation-operator" = "arn:aws:ecr:us-east-1:000000000000:repository/platform/activation-operator"
     }
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
@@ -158,6 +159,41 @@ inputs = {
               "ecr:CompleteLayerUpload",
             ]
             Resource = [dependency.ecr.outputs.repository_arns["platform/gha-runner"]]
+          },
+        ]
+      })
+    }
+    # The activation operator image-build role (ADR-088). Trusts ONLY the asanexample/platform repo on main;
+    # can push ONLY to platform/activation-operator. Separate role from gha-runner / the deployer — least
+    # privilege, no shared blast radius (mirrors github-actions-ecr-push-gha-runner).
+    "github-actions-ecr-push-activation-operator" = {
+      repos    = ["platform"]
+      branches = ["main"]
+      events   = [] # main only — the image rebuilds on merge (no PR preview builds)
+      tags     = { Service = "activation-operator" }
+
+      inline_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [
+          {
+            Sid      = "ECRAuth"
+            Effect   = "Allow"
+            Action   = ["ecr:GetAuthorizationToken"]
+            Resource = "*"
+          },
+          {
+            Sid    = "ECRPush"
+            Effect = "Allow"
+            Action = [
+              "ecr:BatchCheckLayerAvailability",
+              "ecr:GetDownloadUrlForLayer",
+              "ecr:BatchGetImage",
+              "ecr:PutImage",
+              "ecr:InitiateLayerUpload",
+              "ecr:UploadLayerPart",
+              "ecr:CompleteLayerUpload",
+            ]
+            Resource = [dependency.ecr.outputs.repository_arns["platform/activation-operator"]]
           },
         ]
       })
