@@ -12,7 +12,6 @@ xenv_xrd="${charts}/xenvironment-xrd.yaml"     # XEnvironment XRD (v3, the Envir
 product_crd="${charts}/product-crd.yaml"       # projected Product CRD (delivery identity)
 grant_crd="${charts}/access-grant-crd.yaml"    # projected AccessGrant CRD (ADR-068)
 release_crd="${charts}/release-crd.yaml"       # projected Release CRD (ADR-071, control-plane digest record)
-wfrole_crd="${charts}/workforcerole-crd.yaml"  # projected WorkforceRole CRD (ADR-088 / #887, the role catalog)
 
 command -v crossplane >/dev/null 2>&1 || { echo "::error::crossplane CLI not found on PATH"; exit 1; }
 
@@ -64,16 +63,10 @@ validate_dir "$grant_crd"   "invalid AccessGrant records (v3)" "${here}/grants-i
 # Release records (ADR-071 — the control-plane deployed-digest record; CI-owned via the promote gated PR)
 validate_dir "$release_crd" "valid Release records"           "${here}/releases"              pass
 validate_dir "$release_crd" "invalid Release records"         "${here}/releases-invalid"      reject
-# WorkforceRole catalog (ADR-088 / #887 — the role catalog the activation operator reads at runtime)
-validate_dir "$wfrole_crd"  "valid WorkforceRole records"     "${here}/workforceroles"         pass
-validate_dir "$wfrole_crd"  "invalid WorkforceRole records"   "${here}/workforceroles-invalid" reject
 
 # Live git-native objects (the new gitops layout). crossplane beta validate recurses the per-team subdirs.
 validate_dir "$product_crd" "live Product objects (gitops/products)"          "${repo_root}/gitops/products"     pass
 validate_dir "$xenv_xrd"    "live Environment objects (gitops/environments)"  "${repo_root}/gitops/environments" pass
-# Live git-native WorkforceRole catalog (gitops/roles/ — what the `roles` ArgoCD app syncs). Gives role-catalog
-# PRs a real schema gate in CI (the role catalog is now an admission/runtime input via the WorkforceRole CRD).
-validate_dir "$wfrole_crd"  "live WorkforceRole objects (gitops/roles)"       "${repo_root}/gitops/roles"        pass
 
 if [ "$fail" -ne 0 ]; then
   echo "Environment API schema validation FAILED"

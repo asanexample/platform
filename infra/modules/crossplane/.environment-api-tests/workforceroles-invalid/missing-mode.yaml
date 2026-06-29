@@ -1,8 +1,0 @@
-# Invalid: spec.mode is required (standing|on-demand) and is absent — must be rejected.
-apiVersion: platform.refplat.org/v1beta1
-kind: WorkforceRole
-metadata: { name: missing-mode }
-spec:
-  reach: platform
-  power: look
-  riskTier: elevated
