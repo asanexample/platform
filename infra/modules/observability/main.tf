@@ -463,6 +463,44 @@ resource "kubernetes_network_policy_v1" "allow_platform_agent_read" {
   }
 }
 
+# OTLP ingress to the collector for platform control-plane add-ons that EMIT telemetry (e.g. the ADR-088
+# activation operator). default-deny-ingress otherwise blocks them; this is a reusable, scoped grant — only
+# the collector pod, only the OTLP ports (4317 gRPC / 4318 HTTP), only from namespaces a platform operator
+# explicitly labels `platform.refplat.org/otel-export = "true"`.
+resource "kubernetes_network_policy_v1" "allow_otlp_from_platform_telemetry" {
+  count = local.create ? 1 : 0
+
+  metadata {
+    name      = "allow-otlp-from-platform-telemetry"
+    namespace = kubernetes_namespace_v1.this[0].metadata[0].name
+  }
+  spec {
+    pod_selector {
+      match_labels = {
+        "app.kubernetes.io/name" = "opentelemetry-collector"
+      }
+    }
+    policy_types = ["Ingress"]
+    ingress {
+      from {
+        namespace_selector {
+          match_labels = {
+            "platform.refplat.org/otel-export" = "true"
+          }
+        }
+      }
+      ports {
+        protocol = "TCP"
+        port     = "4317"
+      }
+      ports {
+        protocol = "TCP"
+        port     = "4318"
+      }
+    }
+  }
+}
+
 # Grafana ingress from the Cilium Gateway. The gateway's Envoy connects with the reserved Cilium
 # `ingress` identity (8), which a STANDARD k8s NetworkPolicy `from:` cannot match (it's not a
 # namespace/pod) — so this must be a CiliumNetworkPolicy with `fromEntities: ["ingress"]`

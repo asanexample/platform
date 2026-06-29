@@ -97,9 +97,11 @@ resource "kubernetes_namespace_v1" "operator" {
   metadata {
     name = var.namespace
     labels = {
-      "app.kubernetes.io/name"             = "activation-operator"
-      "app.kubernetes.io/managed-by"       = "terraform"
-      "control-plane"                      = "activation-operator"
+      "app.kubernetes.io/name"       = "activation-operator"
+      "app.kubernetes.io/managed-by" = "terraform"
+      "control-plane"                = "activation-operator"
+      # Lets the observability default-deny-ingress admit the operator's OTLP export to the collector.
+      "platform.refplat.org/otel-export"   = "true"
       "pod-security.kubernetes.io/enforce" = "restricted"
       "pod-security.kubernetes.io/audit"   = "restricted"
       "pod-security.kubernetes.io/warn"    = "restricted"
