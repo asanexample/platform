@@ -1,7 +1,13 @@
 // Package access resolves workforce access eligibility from the git-native registries
-// (gitops/people × gitops/roles). It is the read side of the ADR-088 temporary-power
-// model: it answers "who holds what, and what is borrowable (on-demand) vs standing" —
-// the same eligibility logic the future activation controller reuses. Read-only.
+// (gitops/people × gitops/roles). It is the read + planning side of the ADR-088
+// temporary-power model: it answers "who holds what, and what is borrowable (on-demand)
+// vs standing", caps a borrow to its role's session-duration, and parses the catalog's
+// ISO-8601 durations.
+//
+// It is the SHARED module both the `platctl access` break-glass CLI and the activation
+// operator build on, so the eligibility/cap logic stays in lockstep (one decision, two
+// callers — never two copies). Pure (stdlib + yaml); the file-ledger helpers are
+// platctl's break-glass record and unused by the operator.
 package access
 
 import (

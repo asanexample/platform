@@ -2,11 +2,12 @@
 # Free on private repos (unlike Code Scanning / GHAS). Part of #112 (108a, supply-chain hardening).
 version: 2
 updates:
-  # Go modules: the Terratest suites + the platctl orchestrator CLI + the activation operator.
+  # Go modules: the Terratest suites + the platctl orchestrator CLI + the shared pkg + the activation operator.
   - package-ecosystem: "gomod"
     directories:
       - "/infra/tests/aws"
       - "/cmd/platctl"
+      - "/pkg"
       - "/operators/activation"
     schedule:
       interval: "weekly"

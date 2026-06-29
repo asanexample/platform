@@ -10,8 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/asanexample/platform/cmd/platctl/internal/access"
 	"github.com/asanexample/platform/cmd/platctl/internal/cloud"
+	"github.com/asanexample/platform/pkg/access"
 )
 
 // NewAccessCmd creates the `access` command group — inspect, and (as the controller-down
