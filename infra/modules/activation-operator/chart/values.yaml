@@ -6,6 +6,9 @@ serviceAccountName: activation-operator
 image: ""
 replicas: 1
 awsRegion: us-east-1
+# Management-account IAM role the operator assumes to reach the Identity Center sso-admin plane
+# (cross-account). Empty uses the pod's own credentials directly.
+identityCenterRoleArn: ""
 # Cache resync — the safety net that re-reconciles every Activation so a dropped expiry self-heals.
 syncPeriod: 2m
 # OTLP endpoint for the unified telemetry pipeline (traces+metrics → the cluster otel-collector). Empty

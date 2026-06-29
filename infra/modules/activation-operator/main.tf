@@ -116,14 +116,15 @@ resource "helm_release" "activation_operator" {
   atomic           = var.helm_wait
 
   values = [yamlencode({
-    namespace          = var.namespace
-    serviceAccountName = var.service_account
-    image              = var.image
-    replicas           = var.replicas
-    awsRegion          = var.region
-    syncPeriod         = var.sync_period
-    otelEndpoint       = var.otel_endpoint
-    chartChecksum      = local.chart_checksum
+    namespace             = var.namespace
+    serviceAccountName    = var.service_account
+    image                 = var.image
+    replicas              = var.replicas
+    awsRegion             = var.region
+    identityCenterRoleArn = local.mgmt_ic_role_arn
+    syncPeriod            = var.sync_period
+    otelEndpoint          = var.otel_endpoint
+    chartChecksum         = local.chart_checksum
   })]
 
   depends_on = [
