@@ -72,3 +72,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "grafana_namespace" {
+  description = "Namespace the Grafana sidecar watches for dashboard ConfigMaps (the observability namespace)."
+  type        = string
+  default     = "observability"
+}

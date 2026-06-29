@@ -139,3 +139,25 @@ resource "helm_release" "activation_operator" {
     kubernetes_namespace_v1.operator,
   ]
 }
+
+# ---------------------------------------------------------------------------------------------
+# Grafana dashboard (dashboard-as-code). A ConfigMap the Grafana sidecar discovers by the
+# grafana_dashboard=1 label in the observability namespace. Panels: leaked-grant (the paging signal),
+# active borrows by role, mint/revoke rates + failures, and grant/revoke latency — against the operator's
+# OTEL metrics (which reach Mimir via the collector's OTLP→Mimir pipeline).
+# ---------------------------------------------------------------------------------------------
+
+resource "kubernetes_config_map_v1" "dashboard" {
+  count = local.create ? 1 : 0
+
+  metadata {
+    name        = "activation-operator-dashboard"
+    namespace   = var.grafana_namespace
+    labels      = { grafana_dashboard = "1" }
+    annotations = { grafana_folder = "Platform" }
+  }
+
+  data = {
+    "activation-operator.json" = file("${path.module}/dashboards/activation-operator.json")
+  }
+}
