@@ -8,11 +8,15 @@ on:
     branches: [main]
     paths:
       - "operators/activation/**"
+      - "infra/modules/crossplane/charts/governance-registry/**"
       - ".github/workflows/operator.yml"
+      - ".github/scripts/sync-governance-registry-crds.sh"
   pull_request:
     paths:
       - "operators/activation/**"
+      - "infra/modules/crossplane/charts/governance-registry/**"
       - ".github/workflows/operator.yml"
+      - ".github/scripts/sync-governance-registry-crds.sh"
 
 permissions:
   contents: read
@@ -34,6 +38,12 @@ jobs:
           make manifests generate
           git diff --exit-code -- config api || {
             echo "::error::CRD/deepcopy are stale — run 'make manifests generate' and commit." ; exit 1 ; }
+
+      - name: Governance-registry chart CRDs match the operator schema
+        run: |
+          .github/scripts/sync-governance-registry-crds.sh
+          git diff --exit-code -- infra/modules/crossplane/charts/governance-registry/templates || {
+            echo "::error::governance-registry chart CRDs are stale vs operators/activation/api/v1beta1 — run .github/scripts/sync-governance-registry-crds.sh and commit." ; exit 1 ; }
 
       - name: Vet
         working-directory: operators/activation
