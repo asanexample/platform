@@ -17,7 +17,7 @@ variable "tempo_otlp_endpoint" {
 }
 
 variable "mimir_endpoint" {
-  description = "Mimir Prometheus remote_write URL (e.g. the mimir module's push_endpoint, http://…-gateway…/api/v1/push). When set, the collector adds an OTLP→Mimir metrics pipeline; empty leaves it traces-only."
+  description = "Mimir OTLP/HTTP metrics URL (e.g. http://mimir-distributor.<ns>.svc:8080/otlp/v1/metrics). When set, the collector adds an OTLP→Mimir metrics pipeline (otlphttp exporter); empty leaves it traces-only."
   type        = string
   default     = ""
 }
