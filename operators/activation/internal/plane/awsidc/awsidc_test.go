@@ -105,6 +105,12 @@ func (f *fakeAPI) HasUserAssignment(_ context.Context, in AssignmentInput) (bool
 	return f.live[in.AccountID], nil
 }
 
+// mapResolver builds a PermissionSetResolver from a static map (a missing role resolves to the
+// empty permission set, which the adapter treats as terminal — matching catalog behavior).
+func mapResolver(m map[string]string) PermissionSetResolver {
+	return func(_ context.Context, role string) (string, error) { return m[role], nil }
+}
+
 const roleBG = "break-glass"
 
 func bgActivation() *activationv1alpha1.Activation {
@@ -130,7 +136,7 @@ func driveMint(t *testing.T, a *Adapter, act *activationv1alpha1.Activation, ps 
 func TestMintAsyncSerialHappyPath(t *testing.T) {
 	api := newFakeAPI("111", "222", "333")
 	api.pollsToSucceed = 2 // each account needs two polls → exercises the async loop
-	a := New(api, map[string]string{roleBG: "AdministratorAccess"})
+	a := New(api, mapResolver(map[string]string{roleBG: "AdministratorAccess"}))
 	ps := &activationv1alpha1.PlaneStatus{Name: PlaneName}
 
 	err := driveMint(t, a, bgActivation(), ps)
@@ -156,7 +162,7 @@ func TestMintAsyncSerialHappyPath(t *testing.T) {
 func TestMintConflictIsRetryableNotTerminal(t *testing.T) {
 	api := newFakeAPI("111")
 	api.conflictOnce["111"] = true // first create conflicts (serialization signal)
-	a := New(api, map[string]string{roleBG: "AdministratorAccess"})
+	a := New(api, mapResolver(map[string]string{roleBG: "AdministratorAccess"}))
 	ps := &activationv1alpha1.PlaneStatus{Name: PlaneName}
 	act := bgActivation()
 
@@ -186,7 +192,7 @@ func TestMintConflictIsRetryableNotTerminal(t *testing.T) {
 func TestMintTerminalFailure(t *testing.T) {
 	api := newFakeAPI("111", "222")
 	api.failAccount = "222"
-	a := New(api, map[string]string{roleBG: "AdministratorAccess"})
+	a := New(api, mapResolver(map[string]string{roleBG: "AdministratorAccess"}))
 	ps := &activationv1alpha1.PlaneStatus{Name: PlaneName}
 
 	err := driveMint(t, a, bgActivation(), ps)
@@ -196,7 +202,7 @@ func TestMintTerminalFailure(t *testing.T) {
 }
 
 func TestMintUnknownRoleIsTerminal(t *testing.T) {
-	a := New(newFakeAPI("111"), map[string]string{}) // no mapping for break-glass
+	a := New(newFakeAPI("111"), mapResolver(map[string]string{})) // no mapping for break-glass
 	ps := &activationv1alpha1.PlaneStatus{Name: PlaneName}
 	_, err := a.Mint(context.Background(), bgActivation(), ps)
 	if err == nil || !plane.IsTerminal(err) {
@@ -206,7 +212,7 @@ func TestMintUnknownRoleIsTerminal(t *testing.T) {
 
 func TestRevokeDrainsLiveAssignments(t *testing.T) {
 	api := newFakeAPI("111", "222")
-	a := New(api, map[string]string{roleBG: "AdministratorAccess"})
+	a := New(api, mapResolver(map[string]string{roleBG: "AdministratorAccess"}))
 	ps := &activationv1alpha1.PlaneStatus{Name: PlaneName}
 	act := bgActivation()
 	if err := driveMint(t, a, act, ps); err != nil {
@@ -237,7 +243,7 @@ func TestRevokeIsSourceOfTruthWhenStatusLost(t *testing.T) {
 	api := newFakeAPI("111", "222")
 	api.live["111"] = true
 	api.live["222"] = true
-	a := New(api, map[string]string{roleBG: "AdministratorAccess"})
+	a := New(api, mapResolver(map[string]string{roleBG: "AdministratorAccess"}))
 	ps := &activationv1alpha1.PlaneStatus{Name: PlaneName} // empty — no recorded accounts
 
 	for range 50 {
@@ -256,7 +262,7 @@ func TestRevokeIsSourceOfTruthWhenStatusLost(t *testing.T) {
 
 func TestRevokeNoopWhenNothingLive(t *testing.T) {
 	api := newFakeAPI("111")
-	a := New(api, map[string]string{roleBG: "AdministratorAccess"})
+	a := New(api, mapResolver(map[string]string{roleBG: "AdministratorAccess"}))
 	ps := &activationv1alpha1.PlaneStatus{Name: PlaneName}
 	done, err := a.Revoke(context.Background(), bgActivation(), ps)
 	if err != nil {

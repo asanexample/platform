@@ -21,7 +21,6 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
-	"strings"
 	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -40,6 +39,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	platformv1alpha1 "github.com/asanexample/platform/operators/activation/api/v1alpha1"
+	platformv1beta1 "github.com/asanexample/platform/operators/activation/api/v1beta1"
+	"github.com/asanexample/platform/operators/activation/internal/catalog"
 	"github.com/asanexample/platform/operators/activation/internal/controller"
 	"github.com/asanexample/platform/operators/activation/internal/plane/awsidc"
 	"github.com/asanexample/platform/operators/activation/internal/telemetry"
@@ -48,21 +49,6 @@ import (
 
 // version is the operator build version, stamped via -ldflags at build time.
 var version = "dev"
-
-// parseRoleMap parses "role=permissionSet,role2=permissionSet2" into a map.
-func parseRoleMap(s string) map[string]string {
-	m := map[string]string{}
-	for pair := range strings.SplitSeq(s, ",") {
-		pair = strings.TrimSpace(pair)
-		if pair == "" {
-			continue
-		}
-		if k, v, ok := strings.Cut(pair, "="); ok {
-			m[strings.TrimSpace(k)] = strings.TrimSpace(v)
-		}
-	}
-	return m
-}
 
 var (
 	scheme   = runtime.NewScheme()
@@ -73,6 +59,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(platformv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(platformv1beta1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -86,13 +73,9 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var awsRegion string
-	var roleMapRaw string
 	var syncPeriod time.Duration
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&awsRegion, "aws-region", "us-east-1", "AWS region of the Identity Center instance.")
-	flag.StringVar(&roleMapRaw, "role-permission-sets", "",
-		"Comma-separated role=permissionSet map for the AWS plane (stopgap for the deferred role catalog), "+
-			"e.g. 'break-glass=AdministratorAccess,platform-operator=PowerUserAccess'.")
 	flag.DurationVar(&syncPeriod, "sync-period", 2*time.Minute,
 		"Cache resync period — the safety net that re-reconciles every Activation so a dropped expiry "+
 			"timer self-heals while the drift backstop is deferred.")
@@ -230,19 +213,30 @@ func main() {
 		os.Exit(1)
 	}
 
-	// The AWS Identity Center plane (live SDK client). The role→permission-set map is the
-	// increment-1 stopgap for the deferred runtime role catalog.
+	// The role catalog (in-cluster WorkforceRole CRs) backs both the borrow cap and the
+	// permission-set resolution, replacing the bootstrap --role-permission-sets flag.
+	roleCatalog := catalog.New(mgr.GetClient())
+	resolvePS := func(ctx context.Context, role string) (string, error) {
+		info, err := roleCatalog.Lookup(ctx, role)
+		if err != nil {
+			return "", err
+		}
+		return info.PermissionSet, nil
+	}
+
+	// The AWS Identity Center plane (live SDK client), resolving role→permission-set from the catalog.
 	awsClient, err := awsidc.NewClient(rootCtx, awsRegion)
 	if err != nil {
 		setupLog.Error(err, "Failed to build AWS Identity Center client")
 		os.Exit(1)
 	}
-	awsPlane := awsidc.New(awsClient, parseRoleMap(roleMapRaw))
+	awsPlane := awsidc.New(awsClient, resolvePS)
 
 	if err := (&controller.ActivationReconciler{
 		Client:    mgr.GetClient(),
 		Scheme:    mgr.GetScheme(),
 		Plane:     awsPlane,
+		Catalog:   roleCatalog,
 		Telemetry: telem,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "Activation")

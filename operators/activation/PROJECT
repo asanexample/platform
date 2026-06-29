@@ -18,4 +18,12 @@ resources:
   kind: Activation
   path: github.com/asanexample/platform/operators/activation/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: refplat.org
+  group: platform
+  kind: WorkforceRole
+  path: github.com/asanexample/platform/operators/activation/api/v1beta1
+  version: v1beta1
 version: "3"

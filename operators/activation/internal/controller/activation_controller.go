@@ -32,6 +32,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	activationv1alpha1 "github.com/asanexample/platform/operators/activation/api/v1alpha1"
+	"github.com/asanexample/platform/operators/activation/internal/catalog"
 	"github.com/asanexample/platform/operators/activation/internal/plane"
 	"github.com/asanexample/platform/operators/activation/internal/telemetry"
 )
@@ -55,6 +56,7 @@ type ActivationReconciler struct {
 	client.Client
 	Scheme    *runtime.Scheme
 	Plane     plane.Plane
+	Catalog   catalog.Catalog
 	Telemetry *telemetry.Telemetry
 	Recorder  record.EventRecorder
 	// Clock is injected for deterministic tests; defaults to time.Now.
@@ -68,6 +70,7 @@ func (r *ActivationReconciler) now() time.Time {
 	return time.Now()
 }
 
+// +kubebuilder:rbac:groups=platform.refplat.org,resources=workforceroles,verbs=get;list;watch
 // +kubebuilder:rbac:groups=platform.refplat.org,resources=activations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=platform.refplat.org,resources=activations/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=platform.refplat.org,resources=activations/finalizers,verbs=update
@@ -121,15 +124,34 @@ func (r *ActivationReconciler) reconcileMint(ctx context.Context, act *activatio
 	defer span.End()
 	log := logf.FromContext(ctx)
 
+	// Resolve the role from the catalog (fail CLOSED): an unknown role cannot be granted — we
+	// can't bound its duration (the cap) or target its permission set.
+	info, err := r.Catalog.Lookup(ctx, act.Spec.Role)
+	if err != nil {
+		act.Status.Phase = activationv1alpha1.PhaseFailed
+		meta.SetStatusCondition(&act.Status.Conditions, metav1.Condition{
+			Type: conditionReady, Status: metav1.ConditionFalse, Reason: "RoleNotResolved", Message: err.Error(),
+		})
+		span.SetStatus(codes.Error, err.Error())
+		r.Recorder.Event(act, "Warning", "RoleNotResolved", err.Error())
+		log.Error(err, "role not resolvable from the WorkforceRole catalog")
+		return ctrl.Result{}, r.Status().Update(ctx, act)
+	}
+
 	ps := planeStatus(act, r.Plane.Name())
 	done, mintErr := r.Plane.Mint(ctx, act, ps)
 	setPlaneStatus(act, ps)
 
-	// Stamp the crash-safe clock once, on the first confirmed-granted account.
+	// Stamp the crash-safe clock once, on the first confirmed-granted account — capping the
+	// borrow to the role's sessionDuration ceiling (the blast-radius bound).
 	if act.Status.GrantedAt == nil && anyGranted(ps) {
 		now := r.now()
+		d := act.Spec.Duration.Duration
+		if info.Cap > 0 && d > info.Cap {
+			d = info.Cap
+		}
 		act.Status.GrantedAt = &metav1.Time{Time: now}
-		act.Status.ExpiresAt = &metav1.Time{Time: now.Add(act.Spec.Duration.Duration)}
+		act.Status.ExpiresAt = &metav1.Time{Time: now.Add(d)}
 	}
 
 	switch {

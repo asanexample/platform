@@ -85,18 +85,22 @@ type API interface {
 	HasUserAssignment(ctx context.Context, in AssignmentInput) (bool, error)
 }
 
+// PermissionSetResolver maps a WorkforceRole name to its AWS permission set name, from the
+// in-cluster role catalog. A missing role / unresolvable name returns an error (the adapter
+// fails closed). Decouples the adapter from the catalog implementation.
+type PermissionSetResolver func(ctx context.Context, role string) (string, error)
+
 // Adapter implements plane.Plane for AWS Identity Center.
 type Adapter struct {
 	api API
-	// roleToPermissionSet maps a WorkforceRole name to its AWS permission set name. This is the
-	// increment-1 stopgap for the deferred runtime role catalog; replaced when the intake API /
-	// role-catalog source lands.
-	roleToPermissionSet map[string]string
+	// resolvePS resolves a role to its permission-set name (the role catalog, replacing the
+	// former bootstrap --role-permission-sets flag).
+	resolvePS PermissionSetResolver
 }
 
-// New builds the adapter from an API implementation and the role→permission-set map.
-func New(api API, roleToPermissionSet map[string]string) *Adapter {
-	return &Adapter{api: api, roleToPermissionSet: roleToPermissionSet}
+// New builds the adapter from an API implementation and the role→permission-set resolver.
+func New(api API, resolvePS PermissionSetResolver) *Adapter {
+	return &Adapter{api: api, resolvePS: resolvePS}
 }
 
 // Name implements plane.Plane.
@@ -105,9 +109,12 @@ func (a *Adapter) Name() string { return PlaneName }
 // resolve fills in the plane's permission set ARN and the per-account assignment list (once),
 // and returns the instance ARN + principal id needed for the per-account operations.
 func (a *Adapter) resolve(ctx context.Context, act *activationv1alpha1.Activation, ps *activationv1alpha1.PlaneStatus) (instanceArn, principalID string, err error) {
-	psName, ok := a.roleToPermissionSet[act.Spec.Role]
-	if !ok {
-		return "", "", plane.Terminalf("role %q has no AWS Identity Center permission set configured", act.Spec.Role)
+	psName, err := a.resolvePS(ctx, act.Spec.Role)
+	if err != nil {
+		return "", "", err
+	}
+	if psName == "" {
+		return "", "", plane.Terminalf("role %q has no AWS Identity Center permission set", act.Spec.Role)
 	}
 	instanceArn, identityStoreID, err := a.api.Instance(ctx)
 	if err != nil {
@@ -184,11 +191,6 @@ func (a *Adapter) Mint(ctx context.Context, act *activationv1alpha1.Activation, 
 
 // Revoke advances teardown by one step, reading AWS as the source of truth. Implements plane.Plane.
 func (a *Adapter) Revoke(ctx context.Context, act *activationv1alpha1.Activation, ps *activationv1alpha1.PlaneStatus) (bool, error) {
-	psName, ok := a.roleToPermissionSet[act.Spec.Role]
-	if !ok {
-		// Without a permission set we cannot target a revoke; nothing this adapter minted can be live.
-		return true, nil
-	}
 	instanceArn, identityStoreID, err := a.api.Instance(ctx)
 	if err != nil {
 		return false, err
@@ -197,8 +199,15 @@ func (a *Adapter) Revoke(ctx context.Context, act *activationv1alpha1.Activation
 	if err != nil {
 		return false, err
 	}
+	// Prefer the permission-set ARN recorded at mint (so revoke survives the role leaving the
+	// catalog); only fall back to the catalog when nothing was recorded.
 	psArn := ps.PermissionSetArn
 	if psArn == "" {
+		psName, err := a.resolvePS(ctx, act.Spec.Role)
+		if err != nil || psName == "" {
+			// Nothing recorded and the role no longer resolves → nothing this adapter can target.
+			return true, nil
+		}
 		if psArn, err = a.api.PermissionSetARN(ctx, instanceArn, psName); err != nil {
 			return false, err
 		}
@@ -232,7 +241,7 @@ func (a *Adapter) Revoke(ctx context.Context, act *activationv1alpha1.Activation
 		if _, status, failure, err := a.api.DeleteAssignment(ctx, in); err != nil {
 			return false, err
 		} else if status == StatusFailed {
-			return false, fmt.Errorf("delete of %s on %s failed: %s", psName, acctID, failure)
+			return false, fmt.Errorf("delete of %s on %s failed: %s", psArn, acctID, failure)
 		}
 		setAccountState(ps, acctID, activationv1alpha1.AssignmentInProgress, "")
 		return false, nil // serialize per permission set; requeue
