@@ -98,6 +98,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-084: Platform Identity Directory and Owner Resolution](084-platform-identity-directory-and-owner-resolution.md) | Proposed (Phase 0 + PagerDuty foundation built + live; Phases 1/3 outstanding) |
 | [ADR-087: Keycloak Admin-Plane Hardening — master-realm passkey + sealed break-glass](087-keycloak-admin-plane-hardening.md) | Accepted (built + bound live 2026-06-27) |
 | [ADR-088: Temporary-Power Activation — just-in-time elevation & emergency revocation](088-temporary-power-activation.md) | Proposed (design) |
+| [ADR-089: Governance Registry Topology — one git source, projected per-cluster](089-governance-registry-topology.md) | Proposed (design) |
 
 ## Supply Chain & Delivery
 
