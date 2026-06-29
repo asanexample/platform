@@ -194,6 +194,17 @@ inputs = {
       name          = "ArgoCD CLI"
       redirect_uris = ["http://localhost:8085/auth/callback"]
     }
+    # The Activate Power step-up popup (ADR-088): a browser PKCE client the Backstage page re-authenticates
+    # against with max_age=0 (+ acr_values), forcing a FRESH passkey before a borrow. PUBLIC (no secret — it
+    # runs in the browser); the realm's passkey flow is the only MFA factor, so a fresh re-auth IS a fresh
+    # passkey. localhost is for local dev of the Backstage app.
+    "activate-power" = {
+      name = "Activate Power (step-up)"
+      redirect_uris = [
+        "https://backstage.aws.refplat.org/activate-power/callback",
+        "http://localhost:3000/activate-power/callback",
+      ]
+    }
   }
 
   # Team taxonomy — one Keycloak group per Team + the developer-access roles, from the canonical registry.
