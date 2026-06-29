@@ -9,14 +9,16 @@ on:
     paths:
       - "operators/activation/**"
       - "infra/modules/crossplane/charts/governance-registry/**"
+      - "infra/modules/activation-operator/chart/**"
       - ".github/workflows/operator.yml"
-      - ".github/scripts/sync-governance-registry-crds.sh"
+      - ".github/scripts/sync-operator-crds.sh"
   pull_request:
     paths:
       - "operators/activation/**"
       - "infra/modules/crossplane/charts/governance-registry/**"
+      - "infra/modules/activation-operator/chart/**"
       - ".github/workflows/operator.yml"
-      - ".github/scripts/sync-governance-registry-crds.sh"
+      - ".github/scripts/sync-operator-crds.sh"
 
 permissions:
   contents: read
@@ -39,11 +41,13 @@ jobs:
           git diff --exit-code -- config api || {
             echo "::error::CRD/deepcopy are stale — run 'make manifests generate' and commit." ; exit 1 ; }
 
-      - name: Governance-registry chart CRDs match the operator schema
+      - name: Chart CRDs match the operator schema
         run: |
-          .github/scripts/sync-governance-registry-crds.sh
-          git diff --exit-code -- infra/modules/crossplane/charts/governance-registry/templates || {
-            echo "::error::governance-registry chart CRDs are stale vs operators/activation/api/v1beta1 — run .github/scripts/sync-governance-registry-crds.sh and commit." ; exit 1 ; }
+          .github/scripts/sync-operator-crds.sh
+          git diff --exit-code -- \
+            infra/modules/crossplane/charts/governance-registry/templates \
+            infra/modules/activation-operator/chart/templates/activation-crd.yaml || {
+            echo "::error::vendored chart CRDs are stale vs operators/activation/api/* — run .github/scripts/sync-operator-crds.sh and commit." ; exit 1 ; }
 
       - name: Vet
         working-directory: operators/activation

@@ -88,6 +88,7 @@ locals {
     observability_pyroscope      = "${local.source_base}/observability-pyroscope"
     observability_pyroscope_ebpf = "${local.source_base}/observability-pyroscope-ebpf"
     crossplane                   = "${local.source_base}/crossplane"
+    activation_operator          = "${local.source_base}/activation-operator"
     cloudnative_pg               = "${local.source_base}/cloudnative-pg"
     backstage                    = "${local.source_base}/backstage"
     keycloak                     = "${local.source_base}/keycloak"

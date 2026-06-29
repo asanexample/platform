@@ -1,0 +1,292 @@
+# Canonical schema home (ADR-089 D4). Generated from operators/activation/api/* — the operator's
+# Go types. Regenerate with .github/scripts/sync-operator-crds.sh; CI checks freshness.
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: activations.platform.refplat.org
+spec:
+  group: platform.refplat.org
+  names:
+    kind: Activation
+    listKind: ActivationList
+    plural: activations
+    shortNames:
+    - act
+    singular: activation
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.principal
+      name: Principal
+      type: string
+    - jsonPath: .spec.role
+      name: Role
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.expiresAt
+      name: Expires
+      type: date
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          Activation is one borrowed-power window — the imperative cousin of a standing grant.
+          Cluster-scoped; minted/expired/revoked by the activation controller (ADR-088).
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: spec is the immutable borrow request.
+            properties:
+              duration:
+                description: |-
+                  duration is the requested borrow window (e.g. "1h", "30m"). The intake API caps it to
+                  the role's sessionDuration ceiling (cap enforcement is deferred to that API).
+                type: string
+              principal:
+                description: principal is the borrower — the Person.Name / Identity
+                  Center username.
+                minLength: 1
+                type: string
+              reach:
+                description: reach is the target of the borrow — exactly one of team
+                  or scope.
+                properties:
+                  scope:
+                    description: scope is a platform-wide reach (e.g. "platform").
+                    type: string
+                  team:
+                    description: team scopes the borrow to a single team (e.g. "alpha").
+                    type: string
+                type: object
+                x-kubernetes-validations:
+                - message: exactly one of reach.team or reach.scope must be set
+                  rule: has(self.team) != has(self.scope)
+              reason:
+                description: reason is the required justification, recorded for audit.
+                minLength: 1
+                type: string
+              requestedBy:
+                description: requestedBy is the authenticated requester (audit; usually
+                  equal to principal).
+                minLength: 1
+                type: string
+              role:
+                description: role is the WorkforceRole being borrowed (e.g. "break-glass").
+                minLength: 1
+                type: string
+              stepUp:
+                description: stepUp is the recorded result of the fresh passkey step-up
+                  (the API populates it).
+                properties:
+                  acr:
+                    description: acr is the authentication-context-class of the step-up
+                      (the passkey assurance level).
+                    type: string
+                  authTime:
+                    description: authTime is the OIDC auth_time of the fresh re-authentication.
+                    format: date-time
+                    type: string
+                required:
+                - acr
+                - authTime
+                type: object
+            required:
+            - duration
+            - principal
+            - reach
+            - reason
+            - requestedBy
+            - role
+            type: object
+            x-kubernetes-validations:
+            - message: Activation spec is immutable; let it expire or revoke and request
+                a new borrow
+              rule: self == oldSelf
+          status:
+            description: status defines the observed state of Activation
+            properties:
+              conditions:
+                description: conditions represent the current state of the Activation
+                  resource.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              expiresAt:
+                description: |-
+                  expiresAt = grantedAt + duration. The authoritative expiry clock; a restart re-derives
+                  all timers from it, so a grant cannot leak past its TTL.
+                format: date-time
+                type: string
+              grantedAt:
+                description: |-
+                  grantedAt is set once, on the first confirmed-granted account, and never recomputed
+                  (the crash-safe basis for expiresAt).
+                format: date-time
+                type: string
+              phase:
+                description: phase is the high-level lifecycle position.
+                enum:
+                - Pending
+                - Provisioning
+                - Active
+                - Expiring
+                - Expired
+                - Revoked
+                - Failed
+                type: string
+              planes:
+                description: planes is the per-plane projection state.
+                items:
+                  description: |-
+                    PlaneStatus is the aggregate state of one projection plane (AWS Identity Center now;
+                    Keycloak / cluster later) plus its per-account detail.
+                  properties:
+                    accounts:
+                      description: accounts is the per-account assignment detail.
+                      items:
+                        description: |-
+                          AccountAssignment tracks one permission-set assignment on one AWS account, including the
+                          in-flight AWS request id used to poll the asynchronous create/delete to completion.
+                        properties:
+                          accountID:
+                            description: accountID is the AWS account the assignment
+                              targets.
+                            type: string
+                          message:
+                            description: message carries an AWS failure reason when
+                              state is Failed.
+                            type: string
+                          requestID:
+                            description: requestID is the AWS account-assignment creation/deletion
+                              request id, polled to terminal.
+                            type: string
+                          state:
+                            description: state is the current state of this account's
+                              assignment.
+                            enum:
+                            - Pending
+                            - InProgress
+                            - Granted
+                            - Revoked
+                            - Failed
+                            type: string
+                        required:
+                        - accountID
+                        - state
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - accountID
+                      x-kubernetes-list-type: map
+                    name:
+                      description: name identifies the plane (e.g. "aws-identity-center").
+                      type: string
+                    permissionSetArn:
+                      description: permissionSetArn is the resolved AWS permission
+                        set the assignments target.
+                      type: string
+                    state:
+                      description: state is the aggregate state across accounts (Granted
+                        only when all accounts are Granted).
+                      enum:
+                      - Pending
+                      - InProgress
+                      - Granted
+                      - Revoked
+                      - Failed
+                      type: string
+                  required:
+                  - name
+                  - state
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

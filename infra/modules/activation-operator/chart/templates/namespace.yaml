@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: activation-operator
+    app.kubernetes.io/managed-by: Helm
+    control-plane: activation-operator
+    # Platform control-plane namespace — restricted PSA (the manager pod is distroless nonroot, drops all
+    # caps, read-only rootfs). NOT a tenant namespace (no platform.refplat.org/team label), so the Kyverno
+    # environment policies don't apply here — this is platform infra, like crossplane/kyverno themselves.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

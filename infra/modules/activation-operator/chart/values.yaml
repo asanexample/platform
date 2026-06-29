@@ -1,0 +1,22 @@
+# Set by the activation-operator module (helm_release values). No sensible defaults for image/region —
+# they must be supplied.
+namespace: activation-system
+serviceAccountName: activation-operator
+# Fully-qualified, digest-pinned image (the operator-image.yml build output in platform ECR).
+image: ""
+replicas: 1
+awsRegion: us-east-1
+# Cache resync — the safety net that re-reconciles every Activation so a dropped expiry self-heals.
+syncPeriod: 2m
+# OTLP endpoint for the unified telemetry pipeline (traces+metrics → the cluster otel-collector). Empty
+# disables export (telemetry.Setup is a no-op), so the operator runs without a collector.
+otelEndpoint: ""
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 64Mi
+# Inert; its change forces the helm in-place upgrade (charts don't read it).
+chartChecksum: ""
