@@ -96,11 +96,22 @@ type Adapter struct {
 	// resolvePS resolves a role to its permission-set name (the role catalog, replacing the
 	// former bootstrap --role-permission-sets flag).
 	resolvePS PermissionSetResolver
+	// exclude is a blast-radius guard: account IDs the operator must NEVER assign in, even when the
+	// permission set is provisioned to them (e.g. the org-root management account — those grants stay
+	// a manual/human path, ADR-088).
+	exclude map[string]bool
 }
 
-// New builds the adapter from an API implementation and the role→permission-set resolver.
-func New(api API, resolvePS PermissionSetResolver) *Adapter {
-	return &Adapter{api: api, resolvePS: resolvePS}
+// New builds the adapter from an API implementation and the role→permission-set resolver. excludeAccounts
+// are account IDs the operator must never assign in (filtered out of every mint footprint).
+func New(api API, resolvePS PermissionSetResolver, excludeAccounts ...string) *Adapter {
+	exclude := make(map[string]bool, len(excludeAccounts))
+	for _, id := range excludeAccounts {
+		if id != "" {
+			exclude[id] = true
+		}
+	}
+	return &Adapter{api: api, resolvePS: resolvePS, exclude: exclude}
 }
 
 // Name implements plane.Plane.
@@ -141,9 +152,15 @@ func (a *Adapter) resolve(ctx context.Context, act *activationv1alpha1.Activatio
 		}
 		ps.Accounts = make([]activationv1alpha1.AccountAssignment, 0, len(accounts))
 		for _, acct := range accounts {
+			if a.exclude[acct] {
+				continue // blast-radius guard — never assign in an excluded account
+			}
 			ps.Accounts = append(ps.Accounts, activationv1alpha1.AccountAssignment{
 				AccountID: acct, State: activationv1alpha1.AssignmentPending,
 			})
+		}
+		if len(ps.Accounts) == 0 {
+			return "", "", plane.Terminalf("permission set %q is provisioned to no accounts outside the excluded set", psName)
 		}
 	}
 	return instanceArn, principalID, nil

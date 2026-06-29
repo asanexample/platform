@@ -330,6 +330,23 @@ func TestControllerNonCanonicalDurationApplies(t *testing.T) {
 	pump(t, r, "noncanon", phaseIs(activationv1alpha1.PhaseActive))
 }
 
+// TestControllerMintFailureRollsBackPartialGrants: minting is serial across accounts, so when a later
+// account fails terminally the earlier ones are already granted — a Failed activation must NOT leave that
+// dangling admin. The terminal-failure path revokes the partial footprint before settling into Failed.
+func TestControllerMintFailureRollsBackPartialGrants(t *testing.T) {
+	clk := &fakeClock{t: time.Now()}
+	p := planefake.NewPlane("111", "222", "333")
+	p.FailOn = "333" // 111 + 222 grant, then 333 fails terminally
+	r := newReconciler(t, p, clk)
+	mustCreate(t, newActivation("rollback"))
+
+	// Settles into Failed, then the Failed-phase cleanup revokes the partial grants over subsequent
+	// reconciles — wait for both.
+	pump(t, r, "rollback", func(a *activationv1alpha1.Activation) bool {
+		return a != nil && a.Status.Phase == activationv1alpha1.PhaseFailed && p.LiveCount() == 0
+	})
+}
+
 func TestControllerNotEligibleFailsClosed(t *testing.T) {
 	clk := &fakeClock{t: time.Now()}
 	p := planefake.NewPlane("111")

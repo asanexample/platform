@@ -41,6 +41,9 @@ spec:
         {{- if .Values.identityCenterRoleArn }}
         - --identity-center-role-arn={{ .Values.identityCenterRoleArn }}
         {{- end }}
+        {{- if .Values.excludeAccountIds }}
+        - --exclude-account-ids={{ .Values.excludeAccountIds }}
+        {{- end }}
         env:
         - name: OTEL_SERVICE_NAME
           value: activation-operator

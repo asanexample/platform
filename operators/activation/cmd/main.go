@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
+	"strings"
 	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -75,12 +76,16 @@ func main() {
 	var enableHTTP2 bool
 	var awsRegion string
 	var identityCenterRoleArn string
+	var excludeAccountIDs string
 	var syncPeriod time.Duration
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&awsRegion, "aws-region", "us-east-1", "AWS region of the Identity Center instance.")
 	flag.StringVar(&identityCenterRoleArn, "identity-center-role-arn", "",
 		"Management-account IAM role the operator assumes to reach the Identity Center sso-admin plane "+
 			"(cross-account). Empty uses the pod's own credentials directly.")
+	flag.StringVar(&excludeAccountIDs, "exclude-account-ids", "",
+		"Comma-separated AWS account IDs the operator must NEVER assign in, even when a permission set is "+
+			"provisioned to them (a blast-radius guard — e.g. the org-root management account stays a manual path).")
 	flag.DurationVar(&syncPeriod, "sync-period", 2*time.Minute,
 		"Cache resync period — the safety net that re-reconciles every Activation so a dropped expiry "+
 			"timer self-heals while the drift backstop is deferred.")
@@ -235,7 +240,13 @@ func main() {
 		setupLog.Error(err, "Failed to build AWS Identity Center client")
 		os.Exit(1)
 	}
-	awsPlane := awsidc.New(awsClient, resolvePS)
+	var excludeAccounts []string
+	for id := range strings.SplitSeq(excludeAccountIDs, ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			excludeAccounts = append(excludeAccounts, id)
+		}
+	}
+	awsPlane := awsidc.New(awsClient, resolvePS, excludeAccounts...)
 
 	if err := (&controller.ActivationReconciler{
 		Client:      mgr.GetClient(),
