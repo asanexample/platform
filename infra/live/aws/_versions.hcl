@@ -52,6 +52,7 @@ locals {
     cloudtrail           = "${local.source_base}/aws//cloudtrail"
     state_bootstrap      = "${local.source_base}/aws//state_bootstrap"
     cost_allocation_tags = "${local.source_base}/aws//cost-allocation-tags" # billing tag activation (#668, P11 pt2)
+    cost_monitoring      = "${local.source_base}/aws//cost-monitoring"      # Budgets + Cost Anomaly Detection → SNS (ADR-092, #1054)
 
     # Cloud-agnostic (Kubernetes add-ons)
     cilium                       = "${local.source_base}/cilium"

@@ -40,6 +40,7 @@ catalog. Module source paths and Helm chart versions are pinned centrally in
 | `sns-notifications` | SNS topic(s) for alerting (Alertmanager → email, Falco publisher) |
 | `sops-kms` | Management `platform-sops` KMS key for SOPS-encrypted committed config secrets (ADR-066) |
 | `cost-allocation-tags` | Activates AWS cost-allocation tags (Team/Product/Stage) for cost visibility |
+| `cost-monitoring` | AWS Budgets + Cost Anomaly Detection → SNS → Slack (Chatbot) + email; platform bill-level cost alerting (ADR-092) |
 
 ## Cloud-Agnostic / Shared Modules (`infra/modules/`)
 
