@@ -1,0 +1,16 @@
+# release-approver — the gated-prod separation-of-duties approver (ADR-068 §7, ADR-090). A GOVERNANCE role:
+# unlike the access roles it projects to NO AWS/Keycloak reach — its only power is the right to approve a prod
+# promotion (and a prod-env teardown), enforced by the gitops gate from the holders' GitHub handles. Held via a
+# Person grant (the single source, ADR-090 D2) at team reach; the default holder is the team-admin/lead. This
+# REPLACES the hand-authored Team.roles.releaseApprover / Product.spec.roles.releaseApprover (ADR-090 D3).
+apiVersion: platform.refplat.org/v1beta1
+kind: WorkforceRole
+metadata:
+  name: release-approver
+  labels: { app.kubernetes.io/managed-by: argocd, app.kubernetes.io/part-of: identity-access }
+spec:
+  reach: team
+  power: manage-access
+  mode: standing
+  riskTier: elevated
+  description: Gated-prod release approver (separation of duties); projects only to the gitops prod-promotion gate, not to AWS/Keycloak access.
