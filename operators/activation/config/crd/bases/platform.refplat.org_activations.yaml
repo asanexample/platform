@@ -194,6 +194,13 @@ spec:
                   all timers from it, so a grant cannot leak past its TTL.
                 format: date-time
                 type: string
+              grantAuditedAt:
+                description: |-
+                  grantAuditedAt records when the durable "granted" audit row was written, so the grant is audited
+                  exactly once (the write is retried each reconcile until it lands). The "revoked" audit is written in
+                  the finalizer path before the CR is deleted, so it needs no status flag.
+                format: date-time
+                type: string
               grantedAt:
                 description: |-
                   grantedAt is set once, on the first confirmed-granted account, and never recomputed

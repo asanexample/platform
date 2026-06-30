@@ -185,6 +185,12 @@ type ActivationStatus struct {
 	// +listMapKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// grantAuditedAt records when the durable "granted" audit row was written, so the grant is audited
+	// exactly once (the write is retried each reconcile until it lands). The "revoked" audit is written in
+	// the finalizer path before the CR is deleted, so it needs no status flag.
+	// +optional
+	GrantAuditedAt *metav1.Time `json:"grantAuditedAt,omitempty"`
 }
 
 // +kubebuilder:object:root=true

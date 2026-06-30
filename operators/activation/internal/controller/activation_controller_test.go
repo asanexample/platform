@@ -445,3 +445,72 @@ func TestActivationReachOneOf(t *testing.T) {
 func containsFinalizer(act *activationv1alpha1.Activation) bool {
 	return slices.Contains(act.Finalizers, finalizerName)
 }
+
+// fakeAudit is an in-memory audit.Recorder for asserting the grant/revoke audit wiring.
+type fakeAudit struct {
+	grants     int
+	revokes    int
+	failRevoke bool
+}
+
+func (f *fakeAudit) RecordGrant(context.Context, *activationv1alpha1.Activation) error {
+	f.grants++
+	return nil
+}
+
+func (f *fakeAudit) RecordRevoke(context.Context, *activationv1alpha1.Activation) error {
+	f.revokes++
+	if f.failRevoke {
+		return errors.New("audit db down")
+	}
+	return nil
+}
+
+func (f *fakeAudit) Close() {}
+
+// The end-of-borrow event must be durably recorded BEFORE the CR can vanish. So while the revoke audit
+// fails, the finalizer is held (the CR is not collected) even though the grants are already revoked; once
+// the audit succeeds, the finalizer drops.
+func TestControllerRevokeAuditGatesFinalizer(t *testing.T) {
+	clk := &fakeClock{t: time.Now()}
+	p := planefake.NewPlane("111")
+	r := newReconciler(t, p, clk)
+	fa := &fakeAudit{failRevoke: true}
+	r.Audit = fa
+
+	mustCreate(t, newActivation("auditgate"))
+	pump(t, r, "auditgate", phaseIs(activationv1alpha1.PhaseActive))
+	if fa.grants != 1 {
+		t.Fatalf("grant audited %d times on the way to Active, want 1", fa.grants)
+	}
+
+	var act activationv1alpha1.Activation
+	if err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "auditgate"}, &act); err != nil {
+		t.Fatal(err)
+	}
+	if err := k8sClient.Delete(context.Background(), &act); err != nil {
+		t.Fatal(err)
+	}
+
+	// Revoke audit keeps failing → finalizer held → CR still present, but grants already pulled back.
+	for range 8 {
+		_, _ = r.Reconcile(context.Background(), req("auditgate"))
+	}
+	var held activationv1alpha1.Activation
+	if err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "auditgate"}, &held); err != nil {
+		t.Fatalf("CR deleted while the revoke audit was failing — the audit did not gate the finalizer: %v", err)
+	}
+	if !containsFinalizer(&held) {
+		t.Fatal("finalizer removed despite the revoke audit failing")
+	}
+	if p.LiveCount() != 0 {
+		t.Errorf("grants should be revoked already (only the audit fails); %d still live", p.LiveCount())
+	}
+
+	// Audit recovers → the borrow's end is recorded → the finalizer drops → the CR is collected.
+	fa.failRevoke = false
+	pump(t, r, "auditgate", isGone)
+	if fa.revokes == 0 {
+		t.Fatal("revoke audit never attempted")
+	}
+}

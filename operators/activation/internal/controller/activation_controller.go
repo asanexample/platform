@@ -32,6 +32,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	activationv1alpha1 "github.com/asanexample/platform/operators/activation/api/v1alpha1"
+	"github.com/asanexample/platform/operators/activation/internal/audit"
 	"github.com/asanexample/platform/operators/activation/internal/catalog"
 	"github.com/asanexample/platform/operators/activation/internal/eligibility"
 	"github.com/asanexample/platform/operators/activation/internal/plane"
@@ -60,6 +61,7 @@ type ActivationReconciler struct {
 	Catalog     catalog.Catalog
 	Eligibility eligibility.Checker
 	Telemetry   *telemetry.Telemetry
+	Audit       audit.Recorder
 	Recorder    record.EventRecorder
 	// Clock is injected for deterministic tests; defaults to time.Now.
 	Clock func() time.Time
@@ -70,6 +72,14 @@ func (r *ActivationReconciler) now() time.Time {
 		return r.Clock()
 	}
 	return time.Now()
+}
+
+// auditor returns the configured durable-audit Recorder, or a no-op when unset (tests, or AUDIT_DB_DSN absent).
+func (r *ActivationReconciler) auditor() audit.Recorder {
+	if r.Audit == nil {
+		return audit.Nop{}
+	}
+	return r.Audit
 }
 
 // +kubebuilder:rbac:groups=platform.refplat.org,resources=workforceroles;people,verbs=get;list;watch
@@ -217,6 +227,22 @@ func (r *ActivationReconciler) reconcileMint(ctx context.Context, act *activatio
 	})
 	r.Telemetry.Metrics.MintDuration.Record(ctx, r.now().Sub(act.CreationTimestamp.Time).Seconds(), attrs(act, r.Plane.Name()))
 	r.Recorder.Eventf(act, "Normal", "Granted", "borrowed %s until %s", act.Spec.Role, act.Status.ExpiresAt)
+
+	// Durable governance audit — write the grant ONCE (also idempotent in SQL). On a write error, keep the
+	// borrow Active but leave grantAuditedAt unset and requeue soon so it's retried; never block a live borrow
+	// on the audit DB (the grant is also in Loki meanwhile).
+	if act.Status.GrantAuditedAt == nil {
+		if err := r.auditor().RecordGrant(ctx, act); err != nil {
+			log.Error(err, "audit: grant write failed; retrying")
+			r.Recorder.Event(act, "Warning", "AuditRetrying", err.Error())
+			if uerr := r.Status().Update(ctx, act); uerr != nil {
+				return ctrl.Result{}, uerr
+			}
+			return ctrl.Result{RequeueAfter: pollBackoff}, nil
+		}
+		act.Status.GrantAuditedAt = &metav1.Time{Time: r.now()}
+	}
+
 	if err := r.Status().Update(ctx, act); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -254,6 +280,13 @@ func (r *ActivationReconciler) reconcileTeardown(ctx context.Context, act *activ
 	r.Recorder.Event(act, "Normal", "Revoked", "borrowed power revoked")
 
 	if deleting {
+		// Durable audit BEFORE the CR can vanish — the end-of-borrow event MUST be recorded or it's lost
+		// forever (the CR is about to be deleted). Fail-safe: on a write error, keep the finalizer (return err
+		// → requeue) so the CR persists until its revoke is audited.
+		if err := r.auditor().RecordRevoke(ctx, act); err != nil {
+			r.Recorder.Event(act, "Warning", "AuditRetrying", err.Error())
+			return ctrl.Result{}, err
+		}
 		// Patch (not Update) — same spec-immutability reason as the finalizer add.
 		base := act.DeepCopy()
 		controllerutil.RemoveFinalizer(act, finalizerName)
