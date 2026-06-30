@@ -115,6 +115,7 @@ No modules.
 | <a name="input_db_cluster_name"></a> [db\_cluster\_name](#input\_db\_cluster\_name) | CloudNativePG Cluster name. | `string` | `"triage-copilot-db"` | no |
 | <a name="input_db_secret_name"></a> [db\_secret\_name](#input\_db\_secret\_name) | Secrets Manager name for the published connection string (uri). | `string` | `"platform/triage-copilot/directory-db"` | no |
 | <a name="input_deployer_role_arn"></a> [deployer\_role\_arn](#input\_deployer\_role\_arn) | Deployer role ARN (for the teardown finalizer-cleanup). | `string` | `""` | no |
+| <a name="input_extra_consumer_namespaces"></a> [extra\_consumer\_namespaces](#input\_extra\_consumer\_namespaces) | Additional namespaces allowed to reach the DB on 5432 — e.g. the activation operator's, which writes the governance audit (ADR-088 §3.6). | `list(string)` | `[]` | no |
 | <a name="input_finalizer_clear_script"></a> [finalizer\_clear\_script](#input\_finalizer\_clear\_script) | Path to scripts/k8s-finalizer-clear.sh (empty disables the teardown cleanup). | `string` | `""` | no |
 | <a name="input_instances"></a> [instances](#input\_instances) | CNPG instance count (1 = single; a rebuildable projection needs no HA). | `number` | `1` | no |
 | <a name="input_namespace"></a> [namespace](#input\_namespace) | Platform-infra namespace for the directory DB (NOT a tenant env — no platform.refplat.org/team label, so the tenant Kyverno policies don't apply). | `string` | `"platform-directory"` | no |

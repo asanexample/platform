@@ -22,6 +22,12 @@ variable "consumer_namespace" {
   default     = "platform-agent-triage-copilot"
 }
 
+variable "extra_consumer_namespaces" {
+  description = "Additional namespaces allowed to reach the DB on 5432 — e.g. the activation operator's, which writes the governance audit (ADR-088 §3.6)."
+  type        = list(string)
+  default     = []
+}
+
 variable "instances" {
   description = "CNPG instance count (1 = single; a rebuildable projection needs no HA)."
   type        = number

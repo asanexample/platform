@@ -85,8 +85,11 @@ resource "kubernetes_manifest" "db_ingress" {
     spec = {
       endpointSelector = { matchLabels = { "cnpg.io/cluster" = var.db_cluster_name } }
       ingress = [{
-        fromEndpoints = [{ matchLabels = { "k8s:io.kubernetes.pod.namespace" = var.consumer_namespace } }]
-        toPorts       = [{ ports = [{ port = "5432", protocol = "TCP" }] }]
+        fromEndpoints = [
+          for ns in concat([var.consumer_namespace], var.extra_consumer_namespaces) :
+          { matchLabels = { "k8s:io.kubernetes.pod.namespace" = ns } }
+        ]
+        toPorts = [{ ports = [{ port = "5432", protocol = "TCP" }] }]
       }]
     }
   }

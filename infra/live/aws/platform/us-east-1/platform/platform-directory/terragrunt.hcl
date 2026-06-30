@@ -69,6 +69,10 @@ inputs = {
   # namespace (no tenant label → not tenant-policed, like keycloak/backstage) and gate access to the triage agent's
   # namespace. The connection string is published to platform/triage-copilot/directory-db for the agent's ESO.
 
+  # Also admit the activation operator's namespace — it writes the borrowed-power governance audit to this
+  # DB (ADR-088 §3.6). Additive to the triage agent's access.
+  extra_consumer_namespaces = ["activation-system"]
+
   # Teardown: drain the CNPG Cluster + PVC finalizers before the namespace delete (else it hangs Terminating).
   finalizer_clear_script = "${get_repo_root()}/scripts/k8s-finalizer-clear.sh"
   cluster_name           = dependency.eks.outputs.cluster_id
