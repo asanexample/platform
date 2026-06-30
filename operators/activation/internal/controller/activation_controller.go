@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -128,11 +129,89 @@ func (r *ActivationReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return r.reconcileFailedCleanup(ctx, &act)
 	}
 	if act.Status.Phase == activationv1alpha1.PhaseActive {
-		// Hold until expiry; requeue with a bounded delay so a dropped timer self-heals.
+		// Apply any pending extend (renewal) request, then hold until the (possibly pushed-out) expiry.
+		if _, err := r.reconcileRenewal(ctx, &act); err != nil {
+			return ctrl.Result{}, err
+		}
+		// Requeue with a bounded delay so a dropped timer self-heals.
 		return ctrl.Result{RequeueAfter: r.untilExpiry(&act)}, nil
 	}
 
 	return r.reconcileMint(ctx, &act)
+}
+
+// renewAnnotation carries an extend request (set by the intake API after it verifies a fresh passkey). The
+// value is a renewRequest JSON; the operator applies it once per nonce.
+const renewAnnotation = "activate.platform.refplat.org/renew"
+
+type renewRequest struct {
+	Nonce    string      `json:"nonce"`
+	AuthTime metav1.Time `json:"authTime"`
+	ACR      string      `json:"acr,omitempty"`
+}
+
+// reconcileRenewal applies a pending extend to an ACTIVE borrow: re-prove eligibility, push expiresAt out by
+// the borrow's duration — never past grantedAt + the role's sessionDuration ceiling — then record + audit it.
+// Idempotent by the request nonce; returns true if it processed a new request.
+func (r *ActivationReconciler) reconcileRenewal(ctx context.Context, act *activationv1alpha1.Activation) (bool, error) {
+	raw := act.Annotations[renewAnnotation]
+	if raw == "" {
+		return false, nil
+	}
+	var req renewRequest
+	if err := json.Unmarshal([]byte(raw), &req); err != nil {
+		r.Recorder.Event(act, "Warning", "RenewInvalid", "unparseable renew annotation")
+		return false, nil
+	}
+	if req.Nonce == "" || req.Nonce == act.Status.LastRenewalNonce {
+		return false, nil // nothing new
+	}
+	log := logf.FromContext(ctx)
+
+	// Re-prove eligibility at extend (defense-in-depth, same as mint). Fail CLOSED — a read error is
+	// retryable (nonce not acked → reprocessed); a definitive "no" acks the nonce and declines.
+	decision, err := r.Eligibility.Eligible(ctx, act.Spec.Principal, act.Spec.Role, act.Spec.Reach.Team, act.Spec.Reach.Scope)
+	if err != nil {
+		return false, err
+	}
+	if !decision.Allowed {
+		r.Recorder.Event(act, "Warning", "RenewDenied", decision.Reason)
+		act.Status.LastRenewalNonce = req.Nonce
+		return true, r.Status().Update(ctx, act)
+	}
+
+	info, err := r.Catalog.Lookup(ctx, act.Spec.Role)
+	if err != nil {
+		return false, err // retryable
+	}
+
+	now := r.now()
+	newExpiry := now.Add(act.Spec.Duration.Duration)
+	if act.Status.GrantedAt != nil && info.Cap > 0 {
+		if ceiling := act.Status.GrantedAt.Add(info.Cap); newExpiry.After(ceiling) {
+			newExpiry = ceiling // never extend past the role's max lifetime from the grant
+		}
+	}
+	if act.Status.ExpiresAt != nil && !newExpiry.After(act.Status.ExpiresAt.Time) {
+		// At (or past) the ceiling — cannot extend further. Ack so we don't reprocess.
+		r.Recorder.Event(act, "Normal", "RenewCapped", "already at the role's maximum lifetime — re-borrow instead")
+		act.Status.LastRenewalNonce = req.Nonce
+		return true, r.Status().Update(ctx, act)
+	}
+
+	renewal := activationv1alpha1.Renewal{At: metav1.Time{Time: now}, AuthTime: req.AuthTime, ACR: req.ACR}
+	seq := len(act.Status.Renewals) + 1
+	// Durable audit FIRST (idempotent by "renewed-<seq>") — on failure, requeue WITHOUT acking so it retries.
+	if err := r.auditor().RecordRenew(ctx, act, seq, renewal, newExpiry); err != nil {
+		r.Recorder.Event(act, "Warning", "AuditRetrying", err.Error())
+		return false, err
+	}
+	act.Status.Renewals = append(act.Status.Renewals, renewal)
+	act.Status.ExpiresAt = &metav1.Time{Time: newExpiry}
+	act.Status.LastRenewalNonce = req.Nonce
+	r.Recorder.Eventf(act, "Normal", "Renewed", "borrow extended until %s (renewal %d)", newExpiry.UTC().Format(time.RFC3339), seq)
+	log.Info("borrow extended", "principal", act.Spec.Principal, "role", act.Spec.Role, "until", newExpiry, "renewal", seq)
+	return true, r.Status().Update(ctx, act)
 }
 
 // reconcileMint advances minting and sets grantedAt/expiresAt on the first granted account.

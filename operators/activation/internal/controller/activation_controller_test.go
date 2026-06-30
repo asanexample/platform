@@ -446,10 +446,11 @@ func containsFinalizer(act *activationv1alpha1.Activation) bool {
 	return slices.Contains(act.Finalizers, finalizerName)
 }
 
-// fakeAudit is an in-memory audit.Recorder for asserting the grant/revoke audit wiring.
+// fakeAudit is an in-memory audit.Recorder for asserting the grant/revoke/renew audit wiring.
 type fakeAudit struct {
 	grants     int
 	revokes    int
+	renews     int
 	failRevoke bool
 }
 
@@ -463,6 +464,11 @@ func (f *fakeAudit) RecordRevoke(context.Context, *activationv1alpha1.Activation
 	if f.failRevoke {
 		return errors.New("audit db down")
 	}
+	return nil
+}
+
+func (f *fakeAudit) RecordRenew(context.Context, *activationv1alpha1.Activation, int, activationv1alpha1.Renewal, time.Time) error {
+	f.renews++
 	return nil
 }
 
@@ -512,5 +518,84 @@ func TestControllerRevokeAuditGatesFinalizer(t *testing.T) {
 	pump(t, r, "auditgate", isGone)
 	if fa.revokes == 0 {
 		t.Fatal("revoke audit never attempted")
+	}
+}
+
+// Extend pushes the window out on a fresh renew nonce, is idempotent per nonce, and never extends past the
+// role's sessionDuration ceiling from grantedAt (the cap = 2h in the test catalog; 1h borrow window).
+func TestControllerExtend(t *testing.T) {
+	clk := &fakeClock{t: time.Now()}
+	p := planefake.NewPlane("111")
+	r := newReconciler(t, p, clk)
+	fa := &fakeAudit{}
+	r.Audit = fa
+
+	mustCreate(t, newActivation("extend"))
+	pump(t, r, "extend", phaseIs(activationv1alpha1.PhaseActive))
+
+	get := func() *activationv1alpha1.Activation {
+		var a activationv1alpha1.Activation
+		if err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "extend"}, &a); err != nil {
+			t.Fatal(err)
+		}
+		return &a
+	}
+	renew := func(nonce string) {
+		a := get()
+		if a.Annotations == nil {
+			a.Annotations = map[string]string{}
+		}
+		a.Annotations[renewAnnotation] = `{"nonce":"` + nonce + `","authTime":"` +
+			clk.now().UTC().Format(time.RFC3339) + `","acr":"silver"}`
+		if err := k8sClient.Update(context.Background(), a); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := r.Reconcile(context.Background(), req("extend")); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	start := get().Status.ExpiresAt.Time // grantedAt + 1h
+
+	// r1 at +30m → extends to ~now+1h.
+	clk.advance(30 * time.Minute)
+	renew("r1")
+	a := get()
+	if !a.Status.ExpiresAt.After(start) {
+		t.Fatalf("not extended: %v !> %v", a.Status.ExpiresAt.Time, start)
+	}
+	if len(a.Status.Renewals) != 1 || fa.renews != 1 || a.Status.LastRenewalNonce != "r1" {
+		t.Fatalf("renewal not recorded/audited/acked: renewals=%d audited=%d nonce=%s",
+			len(a.Status.Renewals), fa.renews, a.Status.LastRenewalNonce)
+	}
+
+	// Same nonce again → idempotent (no second renewal).
+	if _, err := r.Reconcile(context.Background(), req("extend")); err != nil {
+		t.Fatal(err)
+	}
+	if len(get().Status.Renewals) != 1 || fa.renews != 1 {
+		t.Fatal("a repeated nonce must not re-process")
+	}
+
+	// r2 at +1h15m would reach now+1h = grantedAt+2h15m, but the cap clamps it to grantedAt+2h.
+	clk.advance(45 * time.Minute)
+	renew("r2")
+	ceiling := get().Status.ExpiresAt.Time // grantedAt + 2h
+	if len(get().Status.Renewals) != 2 {
+		t.Fatalf("capped-to-ceiling extension should still record: %d", len(get().Status.Renewals))
+	}
+
+	// r3 when already at the ceiling → no gain: RenewCapped, no new renewal record, nonce acked.
+	clk.advance(30 * time.Minute)
+	renew("r3")
+	a = get()
+	if a.Status.ExpiresAt.After(ceiling) {
+		t.Fatalf("extended past the cap: %v > %v", a.Status.ExpiresAt.Time, ceiling)
+	}
+	if len(a.Status.Renewals) != 2 {
+		t.Fatalf("a no-gain renewal must not add a record: %d", len(a.Status.Renewals))
+	}
+	if a.Status.LastRenewalNonce != "r3" {
+		t.Fatal("capped nonce not acked")
 	}
 }

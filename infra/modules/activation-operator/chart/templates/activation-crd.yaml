@@ -209,6 +209,11 @@ spec:
                   (the crash-safe basis for expiresAt).
                 format: date-time
                 type: string
+              lastRenewalNonce:
+                description: |-
+                  lastRenewalNonce is the nonce of the most recently PROCESSED extend request, so a renewal is applied
+                  exactly once (the intake API stamps a fresh nonce per extend; the operator ignores a nonce it has seen).
+                type: string
               phase:
                 description: phase is the high-level lifecycle position.
                 enum:
@@ -289,6 +294,33 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              renewals:
+                description: renewals is the audit trail of extensions applied to
+                  this borrow (each re-proved with a fresh passkey).
+                items:
+                  description: |-
+                    Renewal records one extension of a live borrow — each one re-proved with a FRESH passkey
+                    (the intake API verifies it before requesting the renewal). The operator pushes expiresAt
+                    out by the borrow's duration, never past the role's sessionDuration ceiling from grantedAt.
+                  properties:
+                    acr:
+                      description: acr is the assurance level of that step-up.
+                      type: string
+                    at:
+                      description: at is when the operator processed the renewal.
+                      format: date-time
+                      type: string
+                    authTime:
+                      description: authTime is the OIDC auth_time of the fresh step-up
+                        that authorized this renewal.
+                      format: date-time
+                      type: string
+                  required:
+                  - at
+                  - authTime
+                  type: object
+                type: array
+                x-kubernetes-list-type: atomic
             type: object
         required:
         - spec

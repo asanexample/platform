@@ -14,7 +14,7 @@ spec:
   identityCenter:
     perTeam: false
     permissionSet: AdministratorAccess
-    sessionDuration: PT1H
+    sessionDuration: PT4H  # max total lifetime — extend in 1h windows (re-tap passkey) up to here, then re-borrow (ADR-088 extend)
     managedPolicies: ["arn:aws:iam::aws:policy/AdministratorAccess"]
   keycloak:
     realmRole: break-glass

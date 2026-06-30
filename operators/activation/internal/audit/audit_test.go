@@ -129,3 +129,28 @@ func contains(s, sub string) bool {
 	}
 	return false
 }
+
+func TestRecordRenew_SeqEventAndOverrides(t *testing.T) {
+	fx := &fakeExec{}
+	r := &pgRecorder{db: fx, now: time.Now}
+	at := time.Date(2026, 6, 30, 2, 50, 0, 0, time.UTC)
+	newExpiry := time.Date(2026, 6, 30, 3, 50, 0, 0, time.UTC)
+	renewal := v1alpha1.Renewal{
+		At:       metav1.NewTime(at),
+		AuthTime: metav1.NewTime(at.Add(-10 * time.Second)),
+		ACR:      "gold",
+	}
+	if err := r.RecordRenew(context.Background(), sampleActivation(), 2, renewal, newExpiry); err != nil {
+		t.Fatal(err)
+	}
+	// event is "renewed-2" (arg #2), step_up_acr is the renewal's (arg #8), expires_at is the new one (#12).
+	if fx.args[1] != "renewed-2" {
+		t.Fatalf("event = %v, want renewed-2", fx.args[1])
+	}
+	if fx.args[7] != "gold" {
+		t.Fatalf("step_up_acr = %v, want the renewal's (gold)", fx.args[7])
+	}
+	if exp, ok := fx.args[11].(*time.Time); !ok || !exp.Equal(newExpiry) {
+		t.Fatalf("expires_at = %v, want the pushed-out %v", fx.args[11], newExpiry)
+	}
+}
