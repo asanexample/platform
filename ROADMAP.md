@@ -106,7 +106,7 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 
 #### Cost & FinOps
 
-- **Cost guardrails — aggregate budgets + FinOps visibility** — Forward half of Cost & FinOps. Aggregate per-team budgets/caps (the quota-cap dial seam left by Phase 3), cost dashboards/FinOps visibility, anomaly alerts.
+- [#1052](https://github.com/asanexample/platform/issues/1052) **Platform FinOps practice (epic) — adopt the FinOps Framework ([ADR-092](docs/adrs/092-platform-finops-practice.md)).** The operating model (Inform → Optimize → Operate) for the platform's **own** cost, above the per-team guardrails (ADR-091, shipped). Free OSS/native only (no spend budget); Savings Plans + paid tiers documented-but-deferred. Workstreams: platform-shared cost bucket ([#1053](https://github.com/asanexample/platform/issues/1053)), AWS Budgets + Cost Anomaly Detection ([#1054](https://github.com/asanexample/platform/issues/1054)), Compute Optimizer rightsizing ([#1055](https://github.com/asanexample/platform/issues/1055)), Infracost shift-left cost-in-PR ([#1056](https://github.com/asanexample/platform/issues/1056)), kube-green off-hours idle ([#1057](https://github.com/asanexample/platform/issues/1057)), Cloud Custodian account janitor ([#1058](https://github.com/asanexample/platform/issues/1058)), FinOps cadence + forecasting ([#1059](https://github.com/asanexample/platform/issues/1059)); true-spend CUR→Athena ([#668](https://github.com/asanexample/platform/issues/668)).
 
 #### Reliability & Tech Debt
 
@@ -249,6 +249,7 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 ### Cost & FinOps
 
 - **Per-environment ResourceQuota + cost-allocation tags** — Shipped baseline. Per-environment ResourceQuota; Team/Product/Stage cost-allocation tags on resources.
+- **Cost guardrails — per-team budgets, attribution, phased enforcement** — Shipped (ADR-091, A+B+C live 2026-06-30). `Team.spec.envelope.budget`, OpenCost + CUR→Athena attribution, Grafana cost dashboards + Backstage Cost tab, budget burn-rate alerts → owner-routing, and audit-first Kyverno enforcement on over-budget `XEnvironment` provisioning.
 
 ### Platform Tooling & Ops
 
