@@ -94,16 +94,16 @@ kubectl --context platform -n argocd get secret argocd-initial-admin-secret \
 │   ├── live/aws/                 # Terragrunt live configs (~90 units; AWS is the only cloud today)
 │   │   ├── _base.hcl             # Composer: loads the config layers + safety assertions
 │   │   ├── _versions.hcl         # Module source paths + Helm version pins
-│   │   ├── common.hcl            # Cloud-wide defaults; loads secrets.hcl (gitignored)
+│   │   ├── common.hcl            # Cloud-wide defaults; loads the SOPS secrets.enc.yaml (committed)
 │   │   ├── mgmt/global/          # Management account (Organizations, SCPs, state, Identity Center)
 │   │   ├── platform/us-east-1/   # Platform account — the hub cluster + shared services
 │   │   ├── preprod/us-east-1/    # Preprod account — environment workloads
 │   │   ├── prod/  & test/        # Prod (networking only) and the Terratest sandbox
-│   ├── modules/                  # ~60 reusable OpenTofu modules
-│   │   ├── aws/                  # 20 AWS-specific (organizations, eks, networking, ecr, tgw, …)
+│   ├── modules/                  # ~70 reusable OpenTofu modules
+│   │   ├── aws/                  # 23 AWS-specific (organizations, eks, networking, ecr, tgw, …)
 │   │   ├── cloudflare/           # DNS delegation
 │   │   └── (cloud-agnostic)      # argocd, crossplane, policy, keycloak, backstage, cilium,
-│   │                             #   17× observability-*, secret-stores, tailscale, falco, …
+│   │                             #   16× observability-*, secret-stores, tailscale, falco, …
 │   └── tests/                    # Terratest (Go) module integration tests
 └── infra/docs/                   # Infrastructure design docs (numbered 00–20)
 ```
@@ -121,7 +121,7 @@ Terragrunt composes inputs through layers, each overriding the broader one above
 [config-hierarchy.md](architecture/config-hierarchy.md)):
 
 1. **Root** (`infra/root.hcl`) — remote state, providers, role assumption
-2. **Cloud** (`common.hcl`) — cloud-wide defaults, loads `secrets.hcl`, account mapping, `cost_profile`
+2. **Cloud** (`common.hcl`) — cloud-wide defaults, loads `secrets.enc.yaml`, account mapping, `cost_profile`
 3. **Environment** (`{env}/env.hcl`) — account ID, env tags, feature toggles
 4. **Region / network** (`{env}/{region}/region.hcl` + `network.hcl`) — region, CIDRs
 5. **Workload** (`…/{workload}/workload.hcl`) — workload name, compliance tier
@@ -129,7 +129,10 @@ Terragrunt composes inputs through layers, each overriding the broader one above
 
 Units pull all of it via `include "base"`. Tags merge across layers (narrower wins); `_base.hcl` also asserts
 the directory path matches the configured environment and account ID. Sensitive values (account IDs, emails)
-live in `infra/live/aws/secrets.hcl` (gitignored — see `secrets.hcl.example`).
+live in `infra/live/aws/secrets.enc.yaml` — **SOPS-encrypted and committed**, decrypted at plan/apply via the
+management `platform-sops` KMS key ([ADR-066](adrs/066-sops-encrypted-config-secrets.md)). The
+`TG_SOPS_BOOTSTRAP=1` escape falls back to a local plaintext `secrets.hcl` (gitignored — see
+`secrets.hcl.example`), needed only on a true from-zero bootstrap before that key exists.
 
 ---
 
@@ -227,7 +230,7 @@ summarized in [CLAUDE.md](../CLAUDE.md#authoring-policy-compliant-workloads-kyve
 | I want to… | Go to… |
 |---|---|
 | The big picture | [README](../README.md) |
-| Understand **why** a decision was made | [`docs/adrs/`](adrs/) — 78 ADRs |
+| Understand **why** a decision was made | [`docs/adrs/`](adrs/) — 90 ADRs |
 | Understand **how** the system is designed | [`docs/architecture/`](architecture/) + [`infra/docs/`](../infra/docs/) |
 | Follow a **procedure** | [`docs/runbooks/`](runbooks/) |
 | Configure/deploy a **module** | [User Guide](user-guide.md) + module READMEs |

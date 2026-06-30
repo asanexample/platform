@@ -311,7 +311,7 @@ platctl bootstrap --dry-run   # preview the execution waves
 platctl bootstrap --resume    # continue after a partial failure
 ```
 
-The flow includes two manual steps:
+The flow includes one manual step:
 
 1. **Tailscale account setup** (after node groups are deployed) -- create an
    account, generate an API key, store it in Secrets Manager
