@@ -63,9 +63,14 @@ resource "kubernetes_config_map_v1" "cost_dashboard" {
   count = local.create ? 1 : 0
 
   metadata {
-    name        = "cost-dashboard-by-team"
-    namespace   = var.namespace
-    labels      = merge(var.tags, { grafana_dashboard = "1" })
+    name      = "cost-dashboard-by-team"
+    namespace = var.namespace
+    # k8s LABEL values (not the AWS tags — those allow spaces/arbitrary values that k8s rejects).
+    labels = {
+      grafana_dashboard              = "1"
+      "app.kubernetes.io/part-of"    = "observability"
+      "app.kubernetes.io/managed-by" = "terraform"
+    }
     annotations = { grafana_folder = "Cost" }
   }
 
