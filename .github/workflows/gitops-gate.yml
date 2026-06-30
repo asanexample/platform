@@ -18,7 +18,7 @@ name: gitops — gate on PR
 #   promote/scaff   ⊆ gitops/{products,environments,    gate green + auto-merge armed (merges when ALL
 #    App            releases ≤ staging}, no deletions    required checks pass) — auto ≤ staging
 #   promote/scaff   a PROD release (…/prod.yaml)         NOT auto-armed + an approval (≠ author) from the
-#    App                                                 release-approver set (Product/Team spec.roles, #501) on
+#    App                                                 release-approver set (derived from Person grants, ADR-090) on
 #                                                        the "gitops Approval" check; pci/hipaa ⇒ ≥2 — gated prod
 #   any             a Product spec.roles edit            an admin/maintainer approval (≠ author) — can't add an
 #                                                        approver then self-approve (#501 two-step guard)
