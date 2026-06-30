@@ -1,0 +1,88 @@
+{
+  "title": "Cost — by Team & Environment (OpenCost)",
+  "uid": "cost-by-team",
+  "tags": ["cost", "finops", "opencost", "platform"],
+  "schemaVersion": 39,
+  "editable": true,
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "5m",
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total estimated monthly cost",
+      "description": "Compute (CPU+RAM allocation × node hourly cost) projected to a month (×730h). Excludes network/LB/storage.",
+      "gridPos": { "x": 0, "y": 0, "w": 8, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "__COST_DS_UID__" },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 0 }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "__COST_DS_UID__" },
+          "expr": "sum( (container_cpu_allocation * on(node) group_left() node_cpu_hourly_cost) + ((container_memory_allocation_bytes / 1024^3) * on(node) group_left() node_ram_hourly_cost) ) * 730"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "bargauge",
+      "title": "Estimated monthly cost by team",
+      "description": "Team derived from the environment namespace prefix (<team>-<product>-<stage>). Compare against the Team's envelope.budget.monthlyUSD (platform $5000, alpha/bravo $2000).",
+      "gridPos": { "x": 8, "y": 0, "w": 16, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "__COST_DS_UID__" },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 0 }, "overrides": [] },
+      "options": { "orientation": "horizontal", "displayMode": "gradient", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "__COST_DS_UID__" },
+          "expr": "sum by (team) ( label_replace( sum by (namespace) ( (container_cpu_allocation * on(node) group_left() node_cpu_hourly_cost) + ((container_memory_allocation_bytes / 1024^3) * on(node) group_left() node_ram_hourly_cost) ) * 730, \"team\", \"$1\", \"namespace\", \"^([a-z0-9]+)-.*\" ) )",
+          "legendFormat": "{{team}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Estimated monthly cost by environment (namespace)",
+      "description": "Each environment namespace is <team>-<product>-<stage>.",
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 12 },
+      "datasource": { "type": "prometheus", "uid": "__COST_DS_UID__" },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 2, "custom": { "align": "auto" } }, "overrides": [] },
+      "options": { "showHeader": true, "sortBy": [{ "displayName": "Value", "desc": true }] },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "datasource": { "type": "prometheus", "uid": "__COST_DS_UID__" },
+          "expr": "sort_desc( sum by (namespace) ( (container_cpu_allocation * on(node) group_left() node_cpu_hourly_cost) + ((container_memory_allocation_bytes / 1024^3) * on(node) group_left() node_ram_hourly_cost) ) * 730 )"
+        }
+      ],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true }, "renameByName": { "namespace": "Environment", "Value": "Est. $/mo" } } }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Hourly compute cost rate by environment",
+      "description": "Live hourly cost rate (not projected). Sum across all environments ≈ the burn rate.",
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 12 },
+      "datasource": { "type": "prometheus", "uid": "__COST_DS_UID__" },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 4, "custom": { "drawStyle": "line", "fillOpacity": 20, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean"] }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "__COST_DS_UID__" },
+          "expr": "sum by (namespace) ( (container_cpu_allocation * on(node) group_left() node_cpu_hourly_cost) + ((container_memory_allocation_bytes / 1024^3) * on(node) group_left() node_ram_hourly_cost) )",
+          "legendFormat": "{{namespace}}"
+        }
+      ]
+    }
+  ]
+}

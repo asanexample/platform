@@ -57,3 +57,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "dashboard_datasource_uid" {
+  description = "Grafana datasource uid the cost dashboard queries (the Mimir where OpenCost metrics land). ADR-091."
+  type        = string
+  default     = "mimir"
+}

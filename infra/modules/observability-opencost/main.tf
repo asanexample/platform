@@ -51,3 +51,28 @@ resource "helm_release" "opencost" {
 
   values = [yamlencode(local.helm_values)]
 }
+
+# ---------------------------------------------------------------------------
+# Cost dashboard (ADR-091 Phase A) — provisioned as code via the Grafana sidecar (label
+# grafana_dashboard=1). Per-team / per-environment compute cost from the OpenCost allocation × node
+# hourly-cost metrics this module scrapes; team is derived from the environment-namespace prefix. The
+# datasource placeholder is filled with the Mimir uid (where these metrics land).
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_config_map_v1" "cost_dashboard" {
+  count = local.create ? 1 : 0
+
+  metadata {
+    name        = "cost-dashboard-by-team"
+    namespace   = var.namespace
+    labels      = merge(var.tags, { grafana_dashboard = "1" })
+    annotations = { grafana_folder = "Cost" }
+  }
+
+  data = {
+    "team-cost.json" = replace(
+      file("${path.module}/dashboards/team-cost.json"),
+      "__COST_DS_UID__", var.dashboard_datasource_uid
+    )
+  }
+}
