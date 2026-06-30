@@ -29,13 +29,12 @@ dependency "node_groups" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-# Deploys into the shared observability namespace and queries the kube-prometheus-stack Prometheus there.
-dependency "observability" {
-  config_path = "../observability"
+# Ordering only — OpenCost deploys into the spoke's observability namespace and its ServiceMonitor is scraped by
+# the spoke prometheus-agent (which selects all ServiceMonitors) → shipped to the hub Mimir's `preprod` tenant.
+dependency "observability_spoke" {
+  config_path = "../observability-spoke"
 
-  mock_outputs = {
-    namespace = "observability"
-  }
+  mock_outputs                            = {}
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
@@ -58,7 +57,7 @@ generate "helm_provider" {
   EOF
 }
 
-# Kubernetes provider — for the cost dashboard ConfigMap (ADR-091); the helm provider above can't create it.
+# Required even though create_dashboard=false here (the count=0 ConfigMap resource still needs the provider).
 generate "kubernetes_provider" {
   path      = "kubernetes-provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -77,16 +76,20 @@ generate "kubernetes_provider" {
 }
 
 inputs = {
-  # Cost-profile toggle (enable_cost_metrics): off in dev by default, on for the platform cluster (env.hcl).
+  # Cost-profile toggle (enable_cost_metrics): turned on for preprod in env.hcl (ADR-091) so tenant-environment
+  # cost is measured where the workloads run (the spoke).
   create = include.base.locals.enable_cost_metrics
 
-  namespace            = dependency.observability.outputs.namespace
-  prometheus_service   = "kube-prometheus-stack-prometheus"
-  prometheus_namespace = dependency.observability.outputs.namespace
+  namespace = "observability"
 
-  # Cost dashboard queries the FEDERATED Mimir datasource (tenants platform|preprod) so it shows BOTH the
-  # platform-team cost AND the tenant-environment cost emitted by the preprod OpenCost spoke (ADR-091).
-  dashboard_datasource_uid = "mimir-all"
+  # Spoke has no in-cluster queryable Prometheus (agent-only) — point OpenCost at the hub Mimir's query API via
+  # its external ingress (the same host the agent writes to; the ingress injects the `preprod` tenant by
+  # hostname, so no header is needed). The dashboard reads OpenCost's EXPORTER metrics, so this query path is
+  # only for the allocation API; exporter metrics flow regardless.
+  prometheus_external_url = "https://preprod-mimir.aws.refplat.org/prometheus"
+
+  # No Grafana on the spoke — only emit metrics; the hub dashboard (federated `mimir-all` datasource) renders them.
+  create_dashboard = false
 
   helm_chart_version = include.base.locals.helm_versions.opencost
 

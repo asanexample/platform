@@ -13,6 +13,11 @@ locals {
   # metrics -> Beyla's ServiceMonitor -> the preprod metrics agent -> hub Mimir (tenant preprod).
   enable_instrumentation = true
 
+  # Cost metrics (ADR-091): run OpenCost on preprod so tenant-environment cost (alpha/bravo) is measured where
+  # the workloads run. Its exporter metrics -> the spoke prometheus-agent -> hub Mimir (tenant preprod); the hub
+  # cost dashboard's federated `mimir-all` datasource renders them. (Cost overrides the dev profile's default.)
+  enable_cost_metrics = true
+
   tags = {
     Environment        = local.environment
     ManagedBy          = "Terragrunt"

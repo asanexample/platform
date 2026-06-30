@@ -63,3 +63,15 @@ variable "dashboard_datasource_uid" {
   type        = string
   default     = "mimir"
 }
+
+variable "prometheus_external_url" {
+  description = "External Prometheus-compatible query URL for OpenCost (e.g. the hub Mimir's query ingress, for a spoke with no in-cluster Prometheus). Empty = use the in-cluster prometheus_service. ADR-091."
+  type        = string
+  default     = ""
+}
+
+variable "create_dashboard" {
+  description = "Create the Grafana cost dashboard ConfigMap. True on a cluster that runs Grafana (the hub); false on a spoke that only emits metrics. ADR-091."
+  type        = bool
+  default     = true
+}

@@ -1,6 +1,27 @@
 locals {
   create = var.create
 
+  # On a spoke (no in-cluster queryable Prometheus) point OpenCost at an EXTERNAL Prometheus-compatible
+  # endpoint — the hub Mimir's query API via its external ingress (which injects the tenant by hostname).
+  # The dashboard uses OpenCost's EXPORTER metrics (computed from the k8s API + AWS pricing), so the
+  # allocation-API query path is secondary — exporter metrics flow even if the query is degraded.
+  use_external_prometheus = var.prometheus_external_url != ""
+
+  opencost_prometheus = local.use_external_prometheus ? {
+    external = {
+      enabled = true
+      url     = var.prometheus_external_url
+    }
+    internal = { enabled = false }
+    } : {
+    internal = {
+      enabled       = true
+      serviceName   = var.prometheus_service
+      namespaceName = var.prometheus_namespace
+      port          = var.prometheus_port
+    }
+  }
+
   helm_values = {
     # No bundled Prometheus — we point OpenCost at the existing kube-prometheus-stack Prometheus.
     prometheus = {
@@ -9,15 +30,9 @@ locals {
     }
 
     opencost = {
-      # OpenCost queries this Prometheus for node/pod resource usage → cost allocation.
-      prometheus = {
-        internal = {
-          enabled       = true
-          serviceName   = var.prometheus_service
-          namespaceName = var.prometheus_namespace
-          port          = var.prometheus_port
-        }
-      }
+      # OpenCost queries this Prometheus for node/pod resource usage → cost allocation (in-cluster on the
+      # hub; external = the hub Mimir for a spoke).
+      prometheus = local.opencost_prometheus
       # Scrape OpenCost's own cost metrics back into Prometheus (serviceMonitorSelectorNilUsesHelmValues=false
       # on the platform Prometheus → all ServiceMonitors are scraped).
       metrics = {
@@ -60,7 +75,7 @@ resource "helm_release" "opencost" {
 # ---------------------------------------------------------------------------
 
 resource "kubernetes_config_map_v1" "cost_dashboard" {
-  count = local.create ? 1 : 0
+  count = local.create && var.create_dashboard ? 1 : 0
 
   metadata {
     name      = "cost-dashboard-by-team"
