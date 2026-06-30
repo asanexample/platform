@@ -429,6 +429,12 @@ resource "random_password" "user" {
   length           = 24
   special          = true
   override_special = "-_.!@" # readable + safe to paste; the user rotates it on first login anyway
+  # GUARANTEE one of each character class — `special = true` only puts specials in the pool, so an unlucky
+  # draw can omit one and fail the realm's password_policy (upperCase/lowerCase/digits/specialChars(1) each).
+  min_upper   = 1
+  min_lower   = 1
+  min_numeric = 1
+  min_special = 1
 }
 
 resource "aws_secretsmanager_secret" "user" {
