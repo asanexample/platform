@@ -90,3 +90,15 @@ variable "audit_db_secret" {
   type        = string
   default     = ""
 }
+
+variable "audit_db_secret_id" {
+  description = "Secrets Manager secret id (key `uri`) holding the directory Postgres connection, projected into audit_db_secret by an ExternalSecret. Empty = no ExternalSecret (audit disabled unless audit_db_secret is supplied another way)."
+  type        = string
+  default     = ""
+}
+
+variable "audit_secret_store" {
+  description = "ClusterSecretStore the audit ExternalSecret reads from."
+  type        = string
+  default     = "aws-secrets-manager"
+}

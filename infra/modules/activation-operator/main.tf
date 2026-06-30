@@ -133,6 +133,8 @@ resource "helm_release" "activation_operator" {
     syncPeriod        = var.sync_period
     otelEndpoint      = var.otel_endpoint
     auditDbSecret     = var.audit_db_secret
+    auditDbSecretId   = var.audit_db_secret_id
+    auditSecretStore  = var.audit_secret_store
     chartChecksum     = local.chart_checksum
   })]
 

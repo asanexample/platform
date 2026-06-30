@@ -77,11 +77,17 @@ inputs = {
 
   # Digest-pinned operator image (built + cosign-signed by operator-image.yml → platform ECR). Bump this
   # digest to the build output and re-apply, like the ARC runner_image (ADR-071 digest-pin). Current:
-  # the exclude-mgmt + partial-mint-rollback build (PR #999).
-  image = "829808296602.dkr.ecr.us-east-1.amazonaws.com/platform/activation-operator@sha256:2cb1f15c2fd7ea5abb4b76ea03f5fdf0866446a5e7977fe67ab8b58dd190e249"
+  # the durable governance audit-sink build (PR #1019).
+  image = "829808296602.dkr.ecr.us-east-1.amazonaws.com/platform/activation-operator@sha256:e65682b4acf01a00ce04bf32f67d9bf7b1b52816cce33f2d286fa852e827f871"
 
   # Unified telemetry → the cluster otel-collector (traces+metrics OTLP). Empty would disable export.
   otel_endpoint = "http://otel-collector.observability.svc:4317"
+
+  # Durable governance audit (ADR-088 §3.6): project the ADR-084 directory Postgres connection from Secrets
+  # Manager into the `activation-audit-db` Secret, which the operator reads as AUDIT_DB_DSN. The directory DB's
+  # CiliumNetworkPolicy admits this namespace (platform-directory.extra_consumer_namespaces).
+  audit_db_secret    = "activation-audit-db"
+  audit_db_secret_id = "platform/triage-copilot/directory-db"
 
   tags = include.base.locals.tags
 }

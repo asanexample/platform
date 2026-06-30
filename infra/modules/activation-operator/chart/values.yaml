@@ -20,9 +20,12 @@ syncPeriod: 2m
 # OTLP endpoint for the unified telemetry pipeline (traces+metrics → the cluster otel-collector). Empty
 # disables export (telemetry.Setup is a no-op), so the operator runs without a collector.
 otelEndpoint: ""
-# Name of the k8s Secret (key `dsn`) holding the durable-audit Postgres connection (ADR-088 §3.6). Empty
-# disables the audit env — the operator runs with the no-op recorder (logs/metrics only).
+# Durable-audit Postgres connection (ADR-088 §3.6). auditDbSecret is the k8s Secret (key `dsn`) the Deployment
+# reads as AUDIT_DB_DSN; when auditDbSecretId is also set, the chart creates an ExternalSecret projecting that
+# SM secret's `uri` into it via auditSecretStore. All empty = audit disabled (no-op recorder, logs/metrics only).
 auditDbSecret: ""
+auditDbSecretId: ""
+auditSecretStore: aws-secrets-manager
 resources:
   limits:
     cpu: 500m
