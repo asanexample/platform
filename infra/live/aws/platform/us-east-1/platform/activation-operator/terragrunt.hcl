@@ -77,8 +77,8 @@ inputs = {
 
   # Digest-pinned operator image (built + cosign-signed by operator-image.yml → platform ECR). Bump this
   # digest to the build output and re-apply, like the ARC runner_image (ADR-071 digest-pin). Current:
-  # the extend (renew) build (PR #1022).
-  image = "829808296602.dkr.ecr.us-east-1.amazonaws.com/platform/activation-operator@sha256:9ae426ba746e6f136da9d3fc523765e9bc0933bb4d38192643213173e3487ec5"
+  # the extend renew-annotation-key fix (PR #1024).
+  image = "829808296602.dkr.ecr.us-east-1.amazonaws.com/platform/activation-operator@sha256:5ed7d936bc6603dfc347d354d6b0932ab7dfc3f58074d6947cd906a8398afc3a"
 
   # Unified telemetry → the cluster otel-collector (traces+metrics OTLP). Empty would disable export.
   otel_endpoint = "http://otel-collector.observability.svc:4317"
