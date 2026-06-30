@@ -74,6 +74,7 @@ status. **✅ Live** · **◐ Partial / modeled** · **○ Designed / deferred**
 | **Software supply chain** | ✅ | cosign keyless + CycloneDX SBOM + SLSA Build L3, **verified at admission per team** ([ADR-042](docs/adrs/042-isolated-build-provenance-slsa-l3.md)/[050](docs/adrs/050-shared-build-sign-reusable-workflow.md)) |
 | **Multi-tenancy & isolation** | ✅ | Ownership decoupled from the deployment unit; namespace + default-deny networking + quotas + per-team Pod Identity ([ADR-027](docs/adrs/027-hybrid-tenant-isolation-model.md)/[067](docs/adrs/067-idp-domain-model.md)) |
 | **Identity & SSO** | ✅ | Keycloak OIDC across ArgoCD, Backstage, and Grafana; pluggable-IdP seam ([ADR-053](docs/adrs/053-identity-and-cross-system-authorization-strategy.md)/[059](docs/adrs/059-identity-topology-pluggable-idp-seam.md)) |
+| **Temporary privileged access** | ✅ | Just-in-time admin: an eligibility-checked `Activation` mints short-lived, account-scoped credentials, auto-revoked on expiry and fully audited; Keycloak admin-plane hardened ([ADR-087](docs/adrs/087-keycloak-admin-plane-hardening.md)/[088](docs/adrs/088-temporary-power-activation.md)) |
 | **Secrets — zero static creds** | ✅ | External Secrets ↔ Secrets Manager; AWS access via Pod Identity / OIDC only ([ADR-047](docs/adrs/047-pod-identity-as-aws-identity-standard.md)) |
 | **Networking** | ✅ | Cilium (kube-proxy-replacement, Gateway API, Hubble), private EKS, TGW hub/spoke, Tailscale ([ADR-008](docs/adrs/008-cilium-as-cross-cloud-cni.md)/[010](docs/adrs/010-private-eks-api-endpoint.md)/[017](docs/adrs/017-gateway-api-over-ingress.md)/[034](docs/adrs/034-transit-gateway-cross-account-connectivity.md)) |
 | **Compute elasticity** | ✅ / ◐ | Karpenter node autoscaling (consolidation + spot + Graviton, BYOCNI-aware) on both clusters; HPA/KEDA workload autoscaling on the paved road next ([ADR-078](docs/adrs/078-cluster-elasticity-karpenter.md)) |
@@ -81,10 +82,10 @@ status. **✅ Live** · **◐ Partial / modeled** · **○ Designed / deferred**
 | **Runtime threat detection** | ✅ preprod | Falco (eBPF) on the workload cluster ([ADR-045](docs/adrs/045-falco-runtime-threat-detection.md)) |
 | **Cost visibility** | ✅ / ◐ | OpenCost in-cluster allocation + Grafana dashboard live; AWS CUR→Athena (true cloud spend by team) planned |
 | **Day-2 operability** | ✅ | `platctl` — DAG-aware bootstrap / teardown / validate ([ADR-038](docs/adrs/038-platctl-cli-for-platform-operations.md)) |
+| **Agentic workloads** | ✅ / ◐ | GitOps platform-agent control plane (`XAgent` claim + safety envelope / kill-switch); the triage copilot runs autonomously on the hub with OTel GenAI-semconv observability. Self-service resource agents still designed ([ADR-082](docs/adrs/082-platform-agent-runtime-xagent.md)/[080](docs/adrs/080-triage-copilot.md)/[076](docs/adrs/076-agent-observability.md)/[074](docs/adrs/074-agentic-workloads-platform.md)/[075](docs/adrs/075-resource-agent.md)) |
 | **Compliance tiers** | ◐ modeled | `compliance_tier` selects controls; SCPs mapped to SOC2/HIPAA/PCI/ISO/NIST/CIS. Clusters run `standard`; HIPAA/PCI selectable, not yet exercised ([ADR-013](docs/adrs/013-compliance-tier-model.md)) |
 | **Per-team observability isolation** | ○ designed | Re-tenant every signal by team so devs see only their own telemetry ([#590](https://github.com/asanexample/platform/issues/590)) |
 | **Self-service cloud resources** | ○ designed | S3/SQS/SNS/DynamoDB as governed Crossplane claims with derived least-privilege IAM ([ADR-073](docs/adrs/073-self-service-cloud-resources.md)) |
-| **Agentic workloads** | ○ designed | Run/govern/secure AI agents as a first-class, safety-paramount capability ([ADR-074](docs/adrs/074-agentic-workloads-platform.md)/[075](docs/adrs/075-resource-agent.md)/[076](docs/adrs/076-agent-observability.md)) |
 | **Multi-cloud** | ○ deferred | Cloud-agnostic layer ready; Azure/GCP after the AWS reference matures |
 
 ## Observability you'd actually want to operate
@@ -258,8 +259,10 @@ The foundation is established; the active frontiers:
   developers see only their own telemetry across clusters ([#590](https://github.com/asanexample/platform/issues/590)).
 - **Self-service cloud resources** — S3/SQS/SNS/DynamoDB as governed Crossplane claims with derived
   least-privilege IAM ([ADR-073](docs/adrs/073-self-service-cloud-resources.md)).
-- **Agentic workloads** — running and governing AI agents as a first-class, safety-paramount platform capability
-  ([ADR-074](docs/adrs/074-agentic-workloads-platform.md)/[075](docs/adrs/075-resource-agent.md)/[076](docs/adrs/076-agent-observability.md)).
+- **Self-service resource agents** — the platform-agent runtime is live (the triage copilot runs autonomously on the
+  hub, [ADR-082](docs/adrs/082-platform-agent-runtime-xagent.md)/[080](docs/adrs/080-triage-copilot.md)); next is
+  letting teams declare their own agents as a first-class, safety-paramount capability
+  ([ADR-074](docs/adrs/074-agentic-workloads-platform.md)/[075](docs/adrs/075-resource-agent.md)).
 - **Multi-cloud** — Azure/GCP foundations under the existing cloud-agnostic layer, once the AWS reference is mature.
 
 ## Documentation
