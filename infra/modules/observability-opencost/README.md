@@ -55,12 +55,14 @@ No modules.
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_create"></a> [create](#input\_create) | Controls whether resources are created (cost\_profile toggle — enable\_cost\_metrics). | `bool` | `true` | no |
+| <a name="input_create_dashboard"></a> [create\_dashboard](#input\_create\_dashboard) | Create the Grafana cost dashboard ConfigMap. True on a cluster that runs Grafana (the hub); false on a spoke that only emits metrics. ADR-091. | `bool` | `true` | no |
 | <a name="input_dashboard_datasource_uid"></a> [dashboard\_datasource\_uid](#input\_dashboard\_datasource\_uid) | Grafana datasource uid the cost dashboard queries (the Mimir where OpenCost metrics land). ADR-091. | `string` | `"mimir"` | no |
 | <a name="input_helm_chart"></a> [helm\_chart](#input\_helm\_chart) | Chart name. | `string` | `"opencost"` | no |
 | <a name="input_helm_chart_version"></a> [helm\_chart\_version](#input\_helm\_chart\_version) | OpenCost chart version. | `string` | `"2.5.23"` | no |
 | <a name="input_helm_repository"></a> [helm\_repository](#input\_helm\_repository) | OpenCost chart repository. | `string` | `"https://opencost.github.io/opencost-helm-chart"` | no |
 | <a name="input_helm_timeout"></a> [helm\_timeout](#input\_helm\_timeout) | Timeout for Helm operations in seconds. | `number` | `600` | no |
 | <a name="input_namespace"></a> [namespace](#input\_namespace) | Namespace to deploy into (the shared observability namespace). | `string` | `"observability"` | no |
+| <a name="input_prometheus_external_url"></a> [prometheus\_external\_url](#input\_prometheus\_external\_url) | External Prometheus-compatible query URL for OpenCost (e.g. the hub Mimir's query ingress, for a spoke with no in-cluster Prometheus). Empty = use the in-cluster prometheus\_service. ADR-091. | `string` | `""` | no |
 | <a name="input_prometheus_namespace"></a> [prometheus\_namespace](#input\_prometheus\_namespace) | Namespace of the in-cluster Prometheus service. | `string` | `"observability"` | no |
 | <a name="input_prometheus_port"></a> [prometheus\_port](#input\_prometheus\_port) | Port of the in-cluster Prometheus service. | `number` | `9090` | no |
 | <a name="input_prometheus_service"></a> [prometheus\_service](#input\_prometheus\_service) | In-cluster Prometheus service name OpenCost queries for allocation data. | `string` | `"kube-prometheus-stack-prometheus"` | no |
