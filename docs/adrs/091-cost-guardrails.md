@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-30
 
-**Status:** Proposed
+**Status:** Accepted (Phases A surface + B alert built + live 2026-06-30; C enforce designed, not built)
 
 ## Context
 
@@ -87,6 +87,43 @@ Karpenter/`platctl` path). This turns today's by-hand nightly park into a demons
 - **A cost/FinOps agent now** — deferred: an autonomous spend-watcher fits the `XAgent` runtime
   ([ADR-082](082-platform-agent-runtime-xagent.md)) *once* the budgets + surfacing exist for it to act on; it's
   a consumer of this model, not the first step.
+
+## Implementation notes (as-built)
+
+**Phases A (surface) + B (alert) are built + live + proven end-to-end (2026-06-30).** A real spend-vs-budget
+loop across both clusters, verified at every hop (Grafana/Mimir are private, so each link was checked by hand).
+
+- **A1 — budget on the Team envelope** (`Team.spec.envelope.budget.monthlyUSD`; CRD + teams-gate + data). A
+  build-forced finding: the env-API `Team` CRD lives on **preprod** (`enable_environment_api`), *not* the
+  platform hub (off there, ADR-048) — so the change applies via the **preprod** crossplane unit (see
+  [[feedback_verify_on_the_right_cluster]]).
+- **A2 — cost dashboard** + **OpenCost on the preprod spoke** so tenant cost is measured where the workloads
+  run, federated to the hub (`mimir-all` datasource). The dashboard reads OpenCost's *exporter* metrics
+  (k8s + AWS pricing), so a spoke with no queryable Prometheus still works.
+- **Budget-as-metric + overlay** — `kube-state-metrics` CustomResourceState emits `team_budget_monthly_usd`
+  from the Team CR (single source); the dashboard's "Budget utilization by team (%)" panel joins spend ÷ budget
+  (verified: alpha 0.4%, platform 0.0%).
+- **B — burn-rate alerts** — a **Mimir ruler** rule (in the spoke tenant, where spend + budget coexist;
+  *not* the hub's local Prometheus, which lacks spoke data): warning ≥ 80% → Slack, critical ≥ 100% → the
+  team's channel via owner-routing (ADR-084). Verified loaded + `health=ok`, correctly not firing.
+
+**Phase C (enforce) — design (not yet built).** The build surfaced the key constraint: **the gitops gate
+can't enforce this.** It runs on GitHub-hosted `ubuntu-latest` (by security design — it validates untrusted PR
+content off-cluster), so it has no network path to the private Mimir where the budget signal lives. Enforcement
+must therefore be **runtime**, on the preprod env-API cluster (where the `XEnvironment` claims, the `Team` CRs,
+and Kyverno all live). The mechanism: a **Kyverno `ClusterPolicy`** on `XEnvironment` **CREATE** that, for the
+claim's `spec.team`, reads the team's current budget utilization and **denies new provisioning when over budget**
+(unless an admin override annotation is set) — **audit-first**, flipped to Enforce later like every other policy.
+Two ways to feed Kyverno the over-budget signal: **(a)** Kyverno queries Mimir directly via `apiCall.service`
+to the spoke's Mimir ingress (one component; needs the TLS caBundle + a URL-encoded utilization query + a
+fail-open default so a Mimir outage never blocks provisioning); or **(b)** a small annotator CronJob (in the
+preprod observability ns, which already has Mimir egress) writes the over-budget teams to a ConfigMap that
+Kyverno reads natively. **(b) is the more robust, testable path.** It never evicts running workloads — it only
+gates *new* `XEnvironment` provisioning (and, optionally, quota increases). Sized as a focused next build.
+
+**Remaining (Phase A/B extensions):** the Backstage cost tab (A3 — cost in the dev portal; the backend can
+reach the hub Mimir in-cluster), idle-park automation (D4 — systematize the nightly park per-environment), and
+the CUR→Athena true-spend work (issue #668 — the authoritative half of D2).
 
 ## Related
 
