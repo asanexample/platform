@@ -36,14 +36,16 @@ spec:
             name: cost-budget-status
             namespace: {{ .Values.costBudgetStatusNamespace | default "observability" }}
         # The owning team's status from the ConfigMap; default ok when the key is absent (fail-open).
+        # The owning team's status from the ConfigMap; default ok when the key is absent (fail-open). Kyverno
+        # requires jmesPath (not value) when a default is set.
         - name: teamStatus
           variable:
-            value: {{`'{{ budgetStatus.data."{{ request.object.spec.team }}" }}'`}}
+            jmesPath: {{`'budgetStatus.data."{{ request.object.spec.team }}"'`}}
             default: ok
         # An admin override on the claim lets a deliberate exception through.
         - name: budgetOverride
           variable:
-            value: {{`'{{ request.object.metadata.annotations."cost.refplat.org/budget-override" }}'`}}
+            jmesPath: 'request.object.metadata.annotations."cost.refplat.org/budget-override"'
             default: "false"
       validate:
         failureAction: {{ .Values.costBudgetFailureAction | default "Audit" }}
