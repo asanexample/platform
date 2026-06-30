@@ -92,7 +92,7 @@ the app build cannot produce regardless of which role pushes the bytes.
    certificate's **GitHub-workflow-repository extension** = the team's own `app-<team>` repo
    (`--certificate-github-workflow-repository`).
 
-### Rollout (each gated, preprod first; full plan in `docs/plans/131-slsa-build-l3.md`)
+### Rollout (each gated, preprod first)
 
 - **P1 (done):** trusted-ci repo + reusable signer; provenance job in app CI **alongside** the
   hand-authored step (**dual provenance**); no Kyverno change → zero admission risk. Verified end-to-end.
