@@ -1,8 +1,10 @@
 # Cost-Optimized Dev Profile — Rebuild Plan
 
-**Status:** partially shipped. The Part C `platctl down`/`up` env-lifecycle commands are live (see the
-`cluster-parking` house skill), and **Karpenter is now live as Phase 1 (ADR-078)** — so the "deferred, NOT now"
-framing below is historical. The dev-profile config levers (Parts A/B) remain a proposal applied at rebuild time.
+**Status:** SHIPPED — the dev-profile levers (Parts A/B) landed as the live `cost_profile` / `node_arch` /
+`single_az_nodes` switches in `common.hcl` (currently `dev` / `arm64` / single-AZ; lever #3 spot superseded by
+Karpenter, ADR-078). Part C (`platctl down`/`up`) is live (see the `cluster-parking` house skill). **This doc is
+retained as the design rationale behind the `cost_profile` switch** — `common.hcl` and `_base.hcl` link here for
+the ARM audit, the single-AZ/Mimir trade-off, and the cost math. The toggle framing below is the as-built reference.
 **Goal:** rebuild platform + preprod in the *most cost-effective* shape for a build/test/iterate environment, where
 **HA and AZ-resilience are explicitly not required**. Every change is a **toggle** so we can flip back to a
 prod-grade posture later.
