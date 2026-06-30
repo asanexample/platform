@@ -1,4 +1,21 @@
 {{- if .Values.enableCostBudgetEnforcement }}
+# Kyverno's admission + reports controllers only get RBAC for kinds via aggregated ClusterRoles. The policy
+# below matches XEnvironment (a non-core kind), so without this the reports-controller can't read it to generate
+# the audit PolicyReports (and the admission-controller can't load the resource for context). Aggregate it in.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kyverno:cost-budget-xenvironment
+  labels:
+    rbac.kyverno.io/aggregate-to-admission-controller: "true"
+    rbac.kyverno.io/aggregate-to-reports-controller: "true"
+    rbac.kyverno.io/aggregate-to-background-controller: "true"
+    {{- include "kpp.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["platform.refplat.org"]
+    resources: ["xenvironments"]
+    verbs: ["get", "list", "watch"]
+---
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
