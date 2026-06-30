@@ -188,6 +188,7 @@ No modules.
 | [keycloak_authentication_execution.master_idp](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs/resources/authentication_execution) | resource |
 | [keycloak_authentication_execution.master_mfa_webauthn](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs/resources/authentication_execution) | resource |
 | [keycloak_authentication_execution.master_userpass](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs/resources/authentication_execution) | resource |
+| [keycloak_authentication_execution.mfa_conditional](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs/resources/authentication_execution) | resource |
 | [keycloak_authentication_execution.mfa_webauthn](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs/resources/authentication_execution) | resource |
 | [keycloak_authentication_flow.browser](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs/resources/authentication_flow) | resource |
 | [keycloak_authentication_flow.master_browser](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs/resources/authentication_flow) | resource |
