@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-30
 
-**Status:** Accepted (Phases A surface + B alert built + live 2026-06-30; C enforce designed, not built)
+**Status:** Accepted (Phases A surface + B alert + C enforce built + live 2026-06-30)
 
 ## Context
 
@@ -107,7 +107,7 @@ loop across both clusters, verified at every hop (Grafana/Mimir are private, so 
   *not* the hub's local Prometheus, which lacks spoke data): warning ≥ 80% → Slack, critical ≥ 100% → the
   team's channel via owner-routing (ADR-084). Verified loaded + `health=ok`, correctly not firing.
 
-**Phase C (enforce) — design (not yet built).** The build surfaced the key constraint: **the gitops gate
+**Phase C (enforce) — built + live (audit-first), deny PROVEN.** The build surfaced the key constraint: **the gitops gate
 can't enforce this.** It runs on GitHub-hosted `ubuntu-latest` (by security design — it validates untrusted PR
 content off-cluster), so it has no network path to the private Mimir where the budget signal lives. Enforcement
 must therefore be **runtime**, on the preprod env-API cluster (where the `XEnvironment` claims, the `Team` CRs,
@@ -118,8 +118,11 @@ Two ways to feed Kyverno the over-budget signal: **(a)** Kyverno queries Mimir d
 to the spoke's Mimir ingress (one component; needs the TLS caBundle + a URL-encoded utilization query + a
 fail-open default so a Mimir outage never blocks provisioning); or **(b)** a small annotator CronJob (in the
 preprod observability ns, which already has Mimir egress) writes the over-budget teams to a ConfigMap that
-Kyverno reads natively. **(b) is the more robust, testable path.** It never evicts running workloads — it only
-gates *new* `XEnvironment` provisioning (and, optionally, quota increases). Sized as a focused next build.
+Kyverno reads natively. **Built path (b)** (#1047–1049): the annotator CronJob (opencost module, preprod
+observability ns) writes `cost-budget-status`; the Kyverno `ClusterPolicy` (policy module) denies over-budget
+`XEnvironment` CREATE. **Deny PROVEN live** — forcing `alpha=exceeded` + Enforce, a dry-run create of an alpha
+environment was blocked by Kyverno; reverted to Audit. It never evicts running workloads — only gates *new*
+provisioning. Shipped **Audit-first** (flip `cost_budget_failure_action` → Enforce once PolicyReports are clean).
 
 **Remaining (Phase A/B extensions):** the Backstage cost tab (A3 — cost in the dev portal; the backend can
 reach the hub Mimir in-cluster), idle-park automation (D4 — systematize the nightly park per-environment), and
