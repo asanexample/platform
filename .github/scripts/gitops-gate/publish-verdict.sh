@@ -65,18 +65,22 @@ collab_perm() {
   fi
 }
 
-# Require an approval from the (team,product) release-approver set — Product.spec.roles.releaseApprover else
-# the Team default, read from BASE, author excluded; pci/hipaa tier ⇒ ≥2 distinct. Empty set FAILS CLOSED.
-# On any shortfall sets the globals ok=false/state=failure/desc and returns 1; on success sets desc, returns 0.
-# Args: <team> <product> <tier> <label>. Shared by prod promotion and prod-env teardown (Deprovision Product).
+# Require an approval from the (team) release-approver set — DERIVED from Person grants (ADR-090 D3: the
+# single source of truth), read from BASE, author excluded; pci/hipaa tier ⇒ ≥2 distinct. Empty set FAILS
+# CLOSED. On any shortfall sets the globals ok=false/state=failure/desc and returns 1; on success sets desc,
+# returns 0. Args: <team> <product> <tier> <label>. Shared by prod promotion and prod-env teardown.
 require_release_approver() {
   local team="$1" product="$2" tier="$3" label="$4"
-  local pfile="${BASE}/gitops/products/${team}/${product}.yaml"
-  local tfile="${BASE}/gitops/teams/${team}.yaml"
-  local set_logins=""
-  [ -f "$pfile" ] && set_logins="$(yq -r '(.spec.roles.releaseApprover // [])[]' "$pfile" 2>/dev/null)"
-  if [ -z "$set_logins" ] && [ -f "$tfile" ]; then
-    set_logins="$(yq -r '(.spec.roles.releaseApprover // [])[]' "$tfile" 2>/dev/null)"
+  # The approver set = People holding `release-approver` at THIS team's reach → their declared github handle
+  # (ADR-090 replaces the hand-authored Team/Product.spec.roles.releaseApprover). reach is team-or-platform;
+  # a per-product approver override would need a reach extension — deferred (no Product uses one today).
+  local people_dir="${BASE}/gitops/people" pf set_logins=""
+  if [ -d "$people_dir" ]; then
+    for pf in "$people_dir"/*.yaml; do
+      [ -e "$pf" ] || continue
+      [ "$(team="$team" yq -r '[.spec.grants[]? | select(.role == "release-approver" and .team == strenv(team))] | length' "$pf" 2>/dev/null || echo 0)" -ge 1 ] || continue
+      set_logins+="$(yq -r '.spec.handles.github // ""' "$pf" 2>/dev/null)"$'\n'
+    done
   fi
   set_logins="$(printf '%s\n' "$set_logins" | tr '[:upper:]' '[:lower:]' | sed '/^$/d' | sort -u)"
   if [ -z "$set_logins" ]; then

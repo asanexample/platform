@@ -11,30 +11,44 @@ command -v yq >/dev/null 2>&1 || { echo "::error::mikefarah yq required"; exit 1
 
 base="$(mktemp -d)"
 trap 'rm -rf "$base"' EXIT
-mkdir -p "$base/gitops/teams" "$base/gitops/products/alpha" "$base/gitops/environments/alpha/reg"
+mkdir -p "$base/gitops/teams" "$base/gitops/products/alpha" "$base/gitops/people" \
+  "$base/gitops/environments/alpha/reg" "$base/gitops/environments/alpha/web"
 
-# Team alpha: default approvers alice+bob. Team noapprover: no roles (fail-closed source).
+# Teams just exist (ssoGroup); approver-holding is now a Person grant (ADR-090), NOT Team.roles.
 cat >"$base/gitops/teams/alpha.yaml" <<'Y'
 kind: Team
-spec: { ssoGroup: Dev-alpha, roles: { releaseApprover: [alice, bob] } }
+spec: { ssoGroup: Dev-alpha }
 Y
 cat >"$base/gitops/teams/noapprover.yaml" <<'Y'
 kind: Team
 spec: { ssoGroup: Dev-x }
 Y
-# Product alpha/shop OVERRIDES the team default to [carol]. alpha/reg + alpha/web have no override (team default).
+# Products carry no approver override anymore (retired with the per-product reach — ADR-090 D3).
 cat >"$base/gitops/products/alpha/shop.yaml" <<'Y'
 kind: Product
-spec: { team: alpha, repo: o/r, roles: { releaseApprover: [carol] } }
+spec: { team: alpha, repo: o/r }
+Y
+# The release-approver set for team alpha is DERIVED from these Person grants → {alice, bob}. alice's handle is
+# mixed-case (proves case-insensitive matching); bob also holds developer (proves the role filter); carol holds
+# only developer (proves a non-holder is excluded — and that the retired per-product 'carol' override is gone).
+cat >"$base/gitops/people/alice.yaml" <<'Y'
+kind: Person
+spec: { person: alice, handles: { github: Alice }, grants: [ { role: release-approver, team: alpha } ] }
+Y
+cat >"$base/gitops/people/bob.yaml" <<'Y'
+kind: Person
+spec: { person: bob, handles: { github: bob }, grants: [ { role: developer, team: alpha }, { role: release-approver, team: alpha } ] }
+Y
+cat >"$base/gitops/people/carol.yaml" <<'Y'
+kind: Person
+spec: { person: carol, handles: { github: carol }, grants: [ { role: developer, team: alpha } ] }
 Y
 # A pci prod environment → requires 2 distinct approvers.
 cat >"$base/gitops/environments/alpha/reg/prod.yaml" <<'Y'
 kind: XEnvironment
 spec: { team: alpha, product: reg, stage: prod, tier: pci }
 Y
-# Prod-env teardown fixtures (Deprovision Product purge): a standard prod env + a dev env under alpha/web
-# (web has no Product override → team default approvers alice+bob).
-mkdir -p "$base/gitops/environments/alpha/web"
+# Prod-env teardown fixtures (Deprovision Product purge): a standard prod env + a dev env under alpha/web.
 cat >"$base/gitops/environments/alpha/web/prod.yaml" <<'Y'
 kind: XEnvironment
 spec: { team: alpha, product: web, stage: prod, tier: standard }
@@ -59,8 +73,8 @@ run ok   "prod: team approver, != author"                 PROD_RELEASES=$P/web/p
 run deny "prod: only the author approved"                 PROD_RELEASES=$P/web/prod.yaml AUTHOR=alice VERDICT_TEST_APPROVERS="alice"
 run deny "prod: approver not in the set"                  PROD_RELEASES=$P/web/prod.yaml AUTHOR=dev VERDICT_TEST_APPROVERS="mallory"
 run deny "prod: fail-closed (no approver configured)"     PROD_RELEASES=gitops/releases/noapprover/x/prod.yaml AUTHOR=dev VERDICT_TEST_APPROVERS="alice"
-run ok   "prod: Product override (carol) accepted"        PROD_RELEASES=$P/shop/prod.yaml AUTHOR=dev VERDICT_TEST_APPROVERS="carol"
-run deny "prod: team default rejected when override set"   PROD_RELEASES=$P/shop/prod.yaml AUTHOR=dev VERDICT_TEST_APPROVERS="alice"
+run ok   "prod: shop uses team-derived set (alice)"        PROD_RELEASES=$P/shop/prod.yaml AUTHOR=dev VERDICT_TEST_APPROVERS="alice"
+run deny "prod: shop rejects carol (per-product override retired)" PROD_RELEASES=$P/shop/prod.yaml AUTHOR=dev VERDICT_TEST_APPROVERS="carol"
 run deny "prod: pci tier needs 2 (have 1)"                PROD_RELEASES=$P/reg/prod.yaml AUTHOR=dev VERDICT_TEST_APPROVERS="alice"
 run ok   "prod: pci tier needs 2 (have 2)"                PROD_RELEASES=$P/reg/prod.yaml AUTHOR=dev VERDICT_TEST_APPROVERS="alice bob"
 run deny "prod: pci 2 but one is the author"              PROD_RELEASES=$P/reg/prod.yaml AUTHOR=bob VERDICT_TEST_APPROVERS="alice bob"
