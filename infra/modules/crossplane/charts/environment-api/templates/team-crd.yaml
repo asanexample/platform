@@ -72,6 +72,14 @@ spec:
                         cpu: { type: string }
                         memory: { type: string }
                         pods: { type: integer }
+                    budget:
+                      type: object
+                      description: >-
+                        Cost budget for this team (ADR-091 cost guardrails). A governance limit like quotaCap —
+                        declared here, surfaced/alerted/enforced by the cost guardrails (not read by the
+                        Composition). Absent ⇒ surfaced-but-unbounded.
+                      properties:
+                        monthlyUSD: { type: number, minimum: 0 }
                     maxDedicatedIsolation:
                       type: object
                       description: How many Environments may dial to the expensive isolation rungs. 0 = pooled namespace/nodes only.

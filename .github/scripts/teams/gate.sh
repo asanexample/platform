@@ -104,8 +104,15 @@ for tf in $TEAM_FILES; do
   # release-approver holding moved to Person grants (ADR-090 D2/D3) — the hand-authored Team.roles field is
   # retired; the gitops-gate derives the approver set from gitops/people. (`roles` is no longer a Team spec key.)
   for k in $(yq '.spec.envelope | keys | .[]' "$f" 2>/dev/null); do
-    case "$k" in allowedTiers | allowedStages | allowedLocations | quotaCap | maxDedicatedIsolation | maxCrossTeamGrantsPerProduct | resources) ;; *) note "${tf}: unknown spec.envelope key '${k}'";; esac
+    case "$k" in allowedTiers | allowedStages | allowedLocations | quotaCap | budget | maxDedicatedIsolation | maxCrossTeamGrantsPerProduct | resources) ;; *) note "${tf}: unknown spec.envelope key '${k}'";; esac
   done
+
+  # --- cost budget (ADR-091): if present, monthlyUSD must be a positive number ----------------------
+  if [ "$(yq '.spec.envelope | has("budget")' "$f")" = "true" ]; then
+    b="$(yq '.spec.envelope.budget.monthlyUSD // ""' "$f" 2>/dev/null)"
+    { [ -n "$b" ] && [[ "$b" =~ ^[0-9]+(\.[0-9]+)?$ ]] && [ "$(yq '.spec.envelope.budget.monthlyUSD > 0' "$f" 2>/dev/null)" = "true" ]; } \
+      || note "${tf}: spec.envelope.budget.monthlyUSD must be a positive number (or omit budget)"
+  fi
 
   # --- required fields ------------------------------------------------------------------------------
   sso="$(yq '.spec.ssoGroup // ""' "$f")"
