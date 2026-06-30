@@ -1,5 +1,9 @@
 # ADR Adversarial Accuracy Review — Report (2026-06-28)
 
+> **Retained backlog (not an orphan).** The raw per-batch `findings-NNN-NNN.md` files were pruned in
+> the docs-housekeeping pass; this synthesis is kept deliberately as the doc-currency backlog. #977
+> applied part of it; the remainder is a planned theme-based sweep — **do not delete until burned down.**
+
 **Scope:** all 88 ADRs (`docs/adrs/001`–`088`) + the canonical index (`README.md`).
 **Method:** every checkable claim verified against the repo (modules, live units, scripts, CI,
 `gitops/`, `cmd/`), `CLAUDE.md`, and cross-ADR consistency. Claims that hinge on "is this actually

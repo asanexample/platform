@@ -225,7 +225,7 @@ manufacture the *novel* incident, which is exactly where the agent's value and r
 (2) Injected faults can be **too clean**; mitigate by injecting **compound faults under k6 load** for realistic noise.
 (3) Snapshot fidelity is bounded by what we capture — the window + query set is recorded with each fixture.
 
-The full spike (scenarios, build checklist, GO/NO-GO) is `docs/plans/080-triage-copilot-eval-spike.md`.
+The full spike (scenarios, build checklist, GO/NO-GO) gated D6; it is complete — the agent shipped (details in git history).
 
 **Spike executed 2026-06-24/25 → GO** (results in the plan doc): the eval mechanism works end-to-end on real injected
 telemetry plus a 12-fixture corpus on Bedrock, the agent abstains on healthy data rather than bluffing, and D2
@@ -375,8 +375,8 @@ Langfuse LLM lens (ADR-076 D4, adopt-when-triggered).
 Rides the **live** backbone (ADR-077; #102 P1–P5/P11) and the ADR-076 agent-trace layer; exercises the ADR-074
 substrate primitives. **Gated on the first-agent eval-feasibility spike** — fault-injecting known failures in a
 walled-off preprod namespace, freezing the telemetry into graded fixtures (D6), and confirming the harness produces a
-usable graded signal **before** committing to the full agent (D6 is the risk; de-risk it first). Plan:
-`docs/plans/080-triage-copilot-eval-spike.md`. The spike rides the **P10 preprod-spoke work** — the metrics, **logs,
+usable graded signal **before** committing to the full agent (D6 is the risk; de-risk it first). The
+spike rode the **P10 preprod-spoke work** — the metrics, **logs,
 and traces** spokes are **already built (#625)** and the hub receives the `preprod` tenant, so what remains is
 **operational**: scale preprod up, **apply + verify** the logs/traces spokes flow to the hub, and enable the eval test
 app's namespace for scrape. This is the **first agent built on the substrate**, revising the

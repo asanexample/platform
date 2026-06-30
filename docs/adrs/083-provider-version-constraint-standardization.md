@@ -7,8 +7,7 @@
 ## Context
 
 Provider version constraints across the shared OpenTofu modules (`infra/modules/**`) had drifted
-into three problems (surfaced by the 2026-06-25 tech-debt audit, `docs/tech-debt-audit-2026-06-25.md`
-TD-002 / TD-101):
+into three problems (surfaced by the 2026-06-25 tech-debt audit, findings TD-002 / TD-101):
 
 1. **Fragmented constraints for the same provider.** AWS appeared as `>= 5.0` (15 modules),
    `>= 6.0` (3), and `~> 6.0` (6). Kubernetes spanned `>= 2.0`, `>= 2.10.0`, `>= 2.35.0`, and
@@ -81,4 +80,4 @@ representative modules under the new majors (`aws/eks`, `aws/networking`, `cloud
   floor (any fresh init resolves 3.2.0). This ADR documents/bounds it but does not force a re-apply;
   units pick up 3.x on their next normal apply and should be spot-checked then.
 
-Implements TD-002 / TD-101. See `docs/tech-debt-audit-2026-06-25.md` and ADR-016 (OpenTofu).
+Implements TD-002 / TD-101 (from the 2026-06-25 tech-debt audit). See ADR-016 (OpenTofu).

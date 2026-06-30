@@ -1,5 +1,11 @@
 # Documentation Audit — Report (2026-06-28)
 
+> **Retained backlog (not an orphan).** The raw per-batch `findings-*.md` files were pruned in the
+> docs-housekeeping pass; this synthesis + `findings-gaps.md` are kept deliberately as the doc-currency
+> backlog. #977 applied part of it (and #1029/#1030 cleared a couple more); the remainder — esp. the
+> Theme-4 "oauth2-proxy is retired" inverse error (still live) and the gap list — is a planned
+> theme-based sweep. **Do not delete until burned down.**
+
 A comprehensive, adversarial **accuracy + completeness** audit of all non-ADR documentation. (The
 88 ADRs were audited separately — PR #948.) **Inventory only — no edits to the docs themselves;**
 corrections happen in a later pass.

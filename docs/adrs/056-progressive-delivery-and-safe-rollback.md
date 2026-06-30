@@ -20,7 +20,7 @@ and the Gateway API ([ADR-017](017-gateway-api-over-ingress.md)) for traffic sha
 > 2. Workloads are **direct `spec.template` Rollouts** (the Rollout owns the pod template; no Deployment), which
 >    makes `Rollout` a first-class pod controller the admission layer must understand (D2).
 >
-> D1–D8 reflect this; the integration design + phased rollout live in `docs/plans/056-progressive-delivery.md`.
+> D1–D8 reflect this; the phased rollout (Phases 0–3) is recorded in "Implementation status & learnings (as-built)" below.
 
 ## Context
 

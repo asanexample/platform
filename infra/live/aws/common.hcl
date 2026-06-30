@@ -53,7 +53,6 @@ locals {
   # ---------------------------------------------------------------------------
   # Cost / environment profile (dev = cost-optimized). Flip these to go prod-grade.
   # Overridable per-env in env.hcl (the env layer wins in _base.hcl's all_vars merge).
-  # See docs/plans/cost-optimized-dev-rebuild.md.
   # ---------------------------------------------------------------------------
   cost_profile = "dev"   # ONE SWITCH. "dev" = cost-optimized (single-AZ, single-replica, durable stores off); "prod" = HA (RF3, multi-AZ, stores on). Per-knob overrides (high_availability / single_az_nodes / enable_mimir / enable_loki) win over the preset — set them here or in env.hcl.
   node_arch    = "arm64" # Graviton (cheaper, prod-grade); independent of cost_profile. "amd64" = t3 / x86.

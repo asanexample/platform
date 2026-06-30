@@ -54,7 +54,6 @@ locals {
 
   # ---------------------------------------------------------------------------
   # Cost / environment-profile toggles (defaults in common.hcl; env.hcl may override).
-  # See docs/plans/cost-optimized-dev-rebuild.md.
   # ---------------------------------------------------------------------------
   # One switch (cost_profile) sets the bundle; an explicit per-knob override wins over the preset.
   cost_profile = try(local.all_vars.cost_profile, "dev")
