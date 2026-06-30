@@ -1,0 +1,15 @@
+# Robin Vega — a regular platform engineer (test persona). A plain member of the platform Team via the
+# `developer` role: everyday access to the team's products and nothing more — NO access-admin, NO break-glass,
+# NO Keycloak admin. So Activate Power correctly shows them nothing to borrow (the non-privileged member path).
+# Access facts only — no PII (synthetic identity; the real one would live in the ADR-084 directory).
+apiVersion: platform.refplat.org/v1beta1
+kind: Person
+metadata:
+  name: robin-vega
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/part-of: identity-access
+spec:
+  person: robin # the Keycloak anchor — own named user (email robin@<org>; group platform).
+  grants:
+    - { role: developer, team: platform } # standing — everyday access to the platform Team's products
