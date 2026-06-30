@@ -1,0 +1,80 @@
+# Infracost — shift-left cost-in-PR (ADR-092 D5/D6, #1056).
+#
+# Posts a cost diff comment on PRs that change a shared module under infra/modules/, so the cost impact of an
+# infra change is visible before apply. SCOPE: modules only. Infracost's own Terragrunt HCL evaluator can't
+# parse this repo's live-unit config hierarchy (the env.hcl conditional + SOPS), so live units aren't priced —
+# but the cost-bearing resources (NAT, EKS, node groups, instances, ...) are DEFINED in the modules, which
+# Infracost prices fine, credential-free. Unit-level precision is a follow-up (see #1056).
+#
+# Uses the FREE Infracost CLI + pricing API (self-hosted here, not Infracost Cloud). Requires the repo secret
+# INFRACOST_API_KEY (free, no card — https://www.infracost.io/docs/#2-get-api-key). Until it's set, the job
+# is a clean no-op (it does NOT fail the PR).
+
+name: Infracost
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "infra/modules/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  infracost:
+    name: Infracost
+    runs-on: ubuntu-latest
+    env:
+      INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+    steps:
+      - name: Gate on API key (clean no-op when unset)
+        id: gate
+        run: |
+          if [ -n "$INFRACOST_API_KEY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::INFRACOST_API_KEY not set — skipping cost diff. Add the free key as a repo secret to enable (see .github/workflows/infracost.yml)."
+          fi
+
+      - name: Setup Infracost
+        if: steps.gate.outputs.enabled == 'true'
+        uses: infracost/actions/setup@e9d6e6cd65e168e76b0de50ff9957d2fe8bb1832 # v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Checkout base branch
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+
+      - name: Infracost baseline (target branch)
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          infracost breakdown --path=infra/modules \
+            --format=json \
+            --out-file=/tmp/infracost-base.json
+
+      - name: Checkout PR branch
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Infracost diff vs baseline
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          infracost diff --path=infra/modules \
+            --format=json \
+            --compare-to=/tmp/infracost-base.json \
+            --out-file=/tmp/infracost.json
+
+      - name: Post / update PR comment
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          infracost comment github --path=/tmp/infracost.json \
+            --repo="$GITHUB_REPOSITORY" \
+            --pull-request="${{ github.event.pull_request.number }}" \
+            --github-token="${{ github.token }}" \
+            --behavior=update
