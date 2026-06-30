@@ -134,7 +134,7 @@ inputs = {
   # 8f2c6877 (backstage#49) adds the platform:offboard-person scaffolder action (opens a roster deletion PR for
   # the Offboard Person template, identity strategy §2.5 / platform #890). Carries forward 5550b0ae (#48, the
   # "Connect accounts" link), dd4bad6d (#47, add-service-resource), 8c029ab1 (#46), 16ce1f23 (#43), v1beta1 (#38).
-  image_tag = "59bbee6e8b9e0558f02539ca358861649f3d3380"
+  image_tag = "b089aff58eb6ec4425b8426406257d9d18d52412"
 
   # platform-projection catalog mode = v3 (Product=System, Environment=custom kind). The v2 projection branch is
   # inert (nothing reads it); removing it + this flag is a backstage-repo follow-up.
@@ -187,6 +187,12 @@ inputs = {
   # would fail TLS). Read-only token (account `backstage`, role:readonly) synced from Secrets Manager
   # (platform/argocd/backstage-token) → ARGOCD_AUTH_TOKEN. Components link via `argocd/app-selector`.
   enable_argocd_plugin = true
+
+  # My Access view (ADR-088 §3.6): read borrow HISTORY from the ADR-084 directory Postgres. Projects the
+  # connection (same SM secret the triage agent uses) into AUDIT_DB_DSN. platform-directory admits this
+  # namespace via extra_consumer_namespaces.
+  audit_db_secret_id = "platform/triage-copilot/directory-db"
+
   argocd_instances = [{
     name         = "platform"
     url          = "http://argocd-server.argocd.svc" # backend → in-cluster API (HTTP, insecure)

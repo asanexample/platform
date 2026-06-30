@@ -71,7 +71,7 @@ inputs = {
 
   # Also admit the activation operator's namespace — it writes the borrowed-power governance audit to this
   # DB (ADR-088 §3.6). Additive to the triage agent's access.
-  extra_consumer_namespaces = ["activation-system"]
+  extra_consumer_namespaces = ["activation-system", "backstage"]
 
   # Teardown: drain the CNPG Cluster + PVC finalizers before the namespace delete (else it hangs Terminating).
   finalizer_clear_script = "${get_repo_root()}/scripts/k8s-finalizer-clear.sh"

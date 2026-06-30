@@ -317,3 +317,9 @@ variable "projection_mode" {
     error_message = "projection_mode must be \"\", \"v2\", or \"v3\"."
   }
 }
+
+variable "audit_db_secret_id" {
+  description = "Secrets Manager secret id (key `uri`) holding the ADR-084 directory Postgres connection, projected into AUDIT_DB_DSN for the My Access view's borrow history (ADR-088 §3.6). Empty disables history."
+  type        = string
+  default     = ""
+}
