@@ -1,6 +1,6 @@
 # ADR-088: Temporary-Power Activation — just-in-time elevation & emergency revocation
 
-**Status:** Proposed (design — 2026-06-27)
+**Status:** Accepted (built + live — 2026-06-30)
 
 > **Amendment (2026-06-28): the controller's implementation shape is decided.** Decision 1 committed an
 > "always-on controller" but left its shape open. It will be a **Kubernetes operator built with Kubebuilder /
@@ -109,6 +109,34 @@ The controller can hand out master keys, so it is the apex thing to protect ([§
 - **Real on-call wiring (P4)** — PagerDuty rotation as an eligibility input ("you're on-call → eligible to activate"), live Slack/PagerDuty integration. This ADR is demonstration-scale.
 - **Reversibility / blast-radius classification** — reuse [ADR-086](086-autonomous-agent-access.md)'s machine-action classification for *human* borrowing (higher-blast-radius power → shorter TTL / tighter step-up). Named, not yet specified here.
 - **Fast AWS via pre-staging** — revisit only if AWS-console elevation latency proves painful in practice.
+
+## Implementation notes (as-built)
+
+**The full front door shipped and is live + proven on real AWS (2026-06-30), driven by a real human with a real passkey.** End-to-end: a borrower opens the Backstage **Activate Power** page → a fresh-passkey step-up popup → the backend verifies it → creates the `Activation` CR → the operator mints real `break-glass` on the workload accounts → Active; plus **view / revoke / extend** and a per-person **My Access** view. Built across two repos: `asanexample/platform` (the operator + infra) and `asanexample/backstage` (the intake API + UI).
+
+**What shipped beyond Increment 1:**
+
+- **The intake API is the Backstage `activate-power` backend plugin — not a separate service.** It is the **sole creator** of `Activation` CRs (cluster RBAC grants `create activations` only to the Backstage pod's group), so no borrow can skip the step-up. Routes: `/eligible`, `/activate` (verify step-up → bind to caller → front-door eligibility → create CR), `/activations` (+ `?all` for access-admin), `DELETE /:name` (revoke), `POST /:name/extend`, `/access` (the joined view). It verifies a **fresh passkey id_token** against Keycloak's JWKS (signature, issuer/audience, `auth_time` freshness, optional `acr`) and **binds it to the signed-in caller** — a hijacked session can't replay a passkey.
+- **The step-up ceremony** is a popup OIDC re-auth against a dedicated Keycloak **`activate-power` public PKCE client** with `max_age=0`. Since the realm's only second factor IS the passkey, a fresh re-auth is a fresh passkey.
+- **Durable audit (§3.6) is live:** the operator writes append-only `granted`/`revoked`/`renewed-<n>` rows (with the step-up `acr`) to the ADR-084 directory Postgres (`activation_audit`), idempotent by `(activation_uid, event)`, **fail-safe** (the revoke audit gates the finalizer — a borrow's end is never lost). The My Access view reads it back.
+- **Extend (Phase 2):** a fresh passkey re-proves the borrower and pushes `expiresAt` out by the borrow window, **capped at `grantedAt + sessionDuration`** (`break-glass` bumped PT1H→PT4H so the cap is the max *total* lifetime — 1h windows, re-tap up to 4h, then re-borrow). Annotation-triggered (no spec mutation), recorded in `status.renewals[]` + audited.
+- **Identity decoupled** (a prerequisite the build surfaced): the platform owner is now his **own** Keycloak user (`spec.person: josh`, not the generic `admin` seed) + a platform-Team lead; `robin-vega` is a non-privileged test persona.
+
+**Build-forced corrections / live-caught gotchas (the part worth carrying forward):**
+
+- **Eligibility resolves a Person by `spec.person` (the login anchor), NOT the record name** — the registry slug and the login differ by convention (`alpha-dev`↔`dev-alpha`).
+- **Admin-API-created Keycloak seed users can't bootstrap their first passkey** under an enforced passkey flow: `default_action` only applies to self-registration, and the passwordless authenticator authenticates an existing passkey, it doesn't enrol one. Fix: seed the `webauthn-register-passwordless` required action **and** make the MFA subflow **CONDITIONAL** (`conditional-user-configured`) so a new user logs in on the password and is force-enrolled before the session issues.
+- **Backstage app config schema is inline in `packages/app/package.json`** (the `config.d.ts` is decorative); a `packages/backend/config.d.ts` crashes the config-loader. Frontend-visible config must go in the app package's inline schema.
+- **Cross-repo contract:** the extend annotation key is `platform.refplat.org/renew` — the operator and the backend must match (a stray prefix made Extend a silent no-op).
+- **Seed `random_password` needs explicit per-class minimums** to satisfy the realm password policy.
+
+**Decided / deferred (the named loose ends):**
+
+- **`requiredAcr` is intentionally left unset.** `max_age=0` already guarantees a *fresh passkey* (it's the realm's only factor), and the observed step-up `acr` (`silver`) is not a hardened contract; forcing a specific `acr` would need LoA-conditional surgery on the **live** browser-login flow (which gates every login, incl. break-glass) for marginal gain. Revisit only if a higher assurance bar is required.
+- **Least-privilege dedicated audit-DB user — deferred.** The operator and Backstage both connect as the `directory` role today. A scoped INSERT-only (operator) / SELECT-only (Backstage) user is cleaner but awkward because the `activation_audit` table is **operator-created at runtime** (declarative grants need a DB-side init/migration). A worthwhile hardening, sized as a follow-up.
+- **Additional planes (Keycloak app-access, Teleport infra-access)** — the operator's `Plane` port was built to add them; only the AWS Identity Center plane is implemented. **Cap enforcement** for renewals now lands here (the role's `sessionDuration`); broader cap/eligibility evolution stays as the §6 follow-ups.
+
+Key PRs: backstage#50/51 (backend + page), #52/53/54 (config-loader + anchor + visibility fixes), #55 (Active Power), #56 (Extend), #57 (My Access); platform #1005 (sole-creator RBAC), #1006 (Keycloak client), #1009/1010 (identity decouple + test persona), #1013/1014 (passkey bootstrap), #1019/1021 (audit sink + wiring), #1022/1024 (extend), #1026 (Backstage→audit-DB).
 
 ## Related
 

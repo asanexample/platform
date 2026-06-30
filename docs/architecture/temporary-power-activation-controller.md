@@ -2,18 +2,19 @@
 
 The implementation design for the always-on activation controller of
 [ADR-088](../adrs/088-temporary-power-activation.md) — the service that lets an eligible operator **borrow**
-a dangerous power for a bounded window and **yank it back** in an emergency. This is the *design*; it is not
-yet built. The eligibility read-side and the controller-down break-glass CLI (`platctl access
-grant`/`revoke`) exist; this controller is the activation half ADR-088 deferred.
+a dangerous power for a bounded window and **yank it back** in an emergency. **Built and live** (2026-06-30):
+the operator (`operators/activation/`) + the Backstage intake API + UI. The controller-down break-glass CLI
+(`platctl access grant`/`revoke`) remains the recovery floor.
 
 ADR-088 fixed the **what** (eligibility decided slowly in git; activation fast at a controller; self-service +
 loud-and-reviewed break-glass; AWS slow-but-honest, cluster instant). This doc fixes the **how**: a
 Kubernetes **operator** built with **Kubebuilder / controller-runtime**, fronted by a thin imperative API.
 
-> **Status:** increment 1 BUILT (`operators/activation/`) — the `Activation` CRD + reconcile lifecycle + the
-> AWS Identity Center plane + envtest/unit tests. The shape (operator, Kubebuilder, the `Activation` CRD, the
-> API front edge) is decided — see [ADR-088](../adrs/088-temporary-power-activation.md). Field names and the
-> per-plane details below are a starting contract that firmed up during the build.
+> **Status:** BUILT + LIVE end-to-end (2026-06-30). The `Activation` CRD + reconcile lifecycle + the AWS
+> Identity Center plane (increment 1), then the **intake API** (the Backstage `activate-power` plugin — sole
+> CR creator, passkey step-up verify), **extend** (capped renewals), the **durable audit sink** (→ ADR-084
+> Postgres), and the **My Access** view. The as-built record + the live-caught gotchas live in
+> [ADR-088 § Implementation notes](../adrs/088-temporary-power-activation.md#implementation-notes-as-built).
 >
 > **Amendment (2026-06-28, increment-1 build): two corrections the build forced.**
 > (1) **The AWS plane uses AWS SDK Go v2, not a shell-out seam.** The `platctl` CLI shells out to the `aws`
