@@ -31,6 +31,20 @@ authorized — this is a manual, one-time console step (no API):
    Until `slack_team_id` is set the Chatbot resources are gated off and delivery is **email-only** — that's a
    valid state to ship in.
 
+## Cost Anomaly Detection monitor
+
+AWS permits only **one** dimensional (SERVICE) anomaly monitor per account and auto-creates a
+`Default-Services-Monitor` the first time Cost Anomaly Detection is used. The module therefore **subscribes to
+the existing monitor** (`existing_monitor_arn`) rather than creating a second one — creating another fails with
+`ValidationException: Limit exceeded on dimensional spend monitor creation`. Find the ARN with:
+
+```bash
+AWS_PROFILE=management aws ce get-anomaly-monitors \
+  --query 'AnomalyMonitors[?MonitorType==`DIMENSIONAL`].MonitorArn' --output text
+```
+
+Leave `existing_monitor_arn` empty only in an account that has no default monitor yet.
+
 ## Confirm the email subscription
 
 After the first apply, AWS sends a *Subscription Confirmation* email to each `alert_emails` address. The

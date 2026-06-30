@@ -74,6 +74,32 @@ func TestCostMonitoring_Plan(t *testing.T) {
 		"Chatbot role should be absent without slack_team_id")
 }
 
+func TestCostMonitoring_ExistingMonitor(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := copyFixtureToTemp(t)
+
+	vars := map[string]interface{}{
+		"create":               true,
+		"existing_monitor_arn": "arn:aws:ce::111122223333:anomalymonitor/00000000-0000-0000-0000-000000000000",
+		"budgets": map[string]interface{}{
+			"consolidated": map[string]interface{}{"limit_usd": 2000},
+		},
+	}
+
+	opts := newTerraformOptions(t, tmpDir, vars)
+	opts.PlanFilePath = tmpDir + "/plan.out"
+	planStruct := terraform.InitAndPlanAndShowWithStruct(t, opts)
+
+	// With an existing monitor ARN, the module subscribes to it and does NOT create a monitor.
+	assert.NotContains(t, planStruct.ResourcePlannedValuesMap,
+		"module.cost_monitoring.aws_ce_anomaly_monitor.services[0]",
+		"should not create a monitor when existing_monitor_arn is set")
+	assert.Contains(t, planStruct.ResourcePlannedValuesMap,
+		"module.cost_monitoring.aws_ce_anomaly_subscription.this[0]",
+		"should still create the anomaly subscription")
+}
+
 func TestCostMonitoring_WithSlack(t *testing.T) {
 	t.Parallel()
 

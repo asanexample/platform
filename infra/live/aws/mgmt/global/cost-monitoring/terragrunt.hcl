@@ -37,6 +37,10 @@ inputs = {
   # park down/up swing can read as anomalous, so calibrate before treating these as urgent (see runbook).
   anomaly_threshold_usd = 50
 
+  # Subscribe to the account's auto-created default SERVICE monitor — AWS permits only one dimensional
+  # monitor per account, so we don't create a second (it 400s with "Limit exceeded"). See the runbook.
+  existing_monitor_arn = "arn:aws:ce::851725353202:anomalymonitor/a147a6bf-b817-44a5-b005-9e97a3e8b293"
+
   # Slack delivery via AWS Chatbot. Empty until the one-time workspace authorization is done (then email-only).
   # Capture the workspace + channel IDs per docs/runbooks/cost-alerting.md.
   slack_team_id    = ""

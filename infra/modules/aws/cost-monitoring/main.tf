@@ -16,6 +16,10 @@ data "aws_caller_identity" "current" {}
 locals {
   create_chatbot = var.create && var.slack_team_id != ""
 
+  # Subscribe to the account's existing (default) dimensional monitor when given;
+  # otherwise the one this module creates. Null when disabled.
+  monitor_arn = var.create ? (var.existing_monitor_arn != "" ? var.existing_monitor_arn : aws_ce_anomaly_monitor.services[0].arn) : null
+
   # Alert at 80% actual, 100% actual, and 100% forecasted month-end spend.
   budget_notifications = {
     actual_80      = { threshold = 80, type = "PERCENTAGE", notification_type = "ACTUAL" }
@@ -126,8 +130,15 @@ resource "aws_budgets_budget" "this" {
 # An ML monitor over the consolidated bill, dimensioned by SERVICE so a spike in
 # any one service (the EKS-control-plane-logging $356/mo fire-drill is the
 # canonical example) surfaces on its own. Org-wide from the payer.
+#
+# AWS allows only ONE dimensional (SERVICE) monitor per account, and it
+# auto-creates a "Default-Services-Monitor" the first time Cost Anomaly
+# Detection is touched. So by default we SUBSCRIBE to that existing monitor
+# (var.existing_monitor_arn) rather than create a second one (which fails with
+# "Limit exceeded on dimensional spend monitor creation"). Leave the var empty
+# only in an account that has no default monitor yet.
 resource "aws_ce_anomaly_monitor" "services" {
-  count = var.create ? 1 : 0
+  count = var.create && var.existing_monitor_arn == "" ? 1 : 0
 
   name              = "${var.name_prefix}-services"
   monitor_type      = "DIMENSIONAL"
@@ -142,7 +153,7 @@ resource "aws_ce_anomaly_subscription" "this" {
 
   name             = "${var.name_prefix}-immediate"
   frequency        = "IMMEDIATE"
-  monitor_arn_list = [aws_ce_anomaly_monitor.services[0].arn]
+  monitor_arn_list = [local.monitor_arn]
 
   subscriber {
     type    = "SNS"
