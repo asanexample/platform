@@ -165,5 +165,8 @@ inputs = {
   # synced into the preprod tenant's ruler (the burn-rate metric + budget alerts the freeze gate will use).
   app_slos = local.app_slos
 
+  # ADR-091 A3: admit Backstage's Cost tab to query the Mimir gateway directly (the ns default-denies ingress).
+  query_consumer_namespaces = ["backstage"]
+
   tags = include.base.locals.tags
 }
