@@ -399,7 +399,7 @@ lives in groups (= Teams); access lives in roles (= products at a posture)** (AD
 | ------------------ | --------- | ------ |
 | Keycloak **group** (= Team) | `Team.name`, `Team.ssoGroup` | One group per Team; people only. Every Keycloak group is a Team. |
 | Keycloak **role** `access:<team>/<product>:{operate\|view}` | `Product`, `AccessGrant` | Assigned to the team group (default), withheld for `restrictWithinTeam`, or assigned to a grant subject (cross-team) at its posture cap. |
-| Keycloak role `release-approver:<team>/<product>` | `Team.roles.releaseApprover`, `Product` | Projected into CODEOWNERS / required-reviewers on the prod path (ADR-068 §7). |
+| `release-approver` (WorkforceRole, gate-only) | `release-approver` Person grants at team reach (ADR-090) | Derived by the gitops gate into the required-reviewer set on the prod path (ADR-068 §7). |
 | Kubernetes RoleBinding (per Environment namespace) | the resolved roles claim, `Environment.status.placement.namespace` | `access:<team>/<product>:<posture>` → operate/view ClusterRole bound in the namespace. **Developer cluster auth is OIDC-native** (Keycloak = EKS OIDC IdP; ADR-068 §6) — the roles claim is the single source of k8s groups. |
 | ArgoCD policy | `Product`, the roles claim | Product-scoped sync/logs (operate) or read (view) on the Product's apps. |
 | Backstage permission policy (#197) | the roles claim, ownership refs | Product-scoped operate/view (honors service-level scoping, §5). |

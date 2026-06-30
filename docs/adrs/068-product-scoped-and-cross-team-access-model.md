@@ -97,9 +97,11 @@ This collapses the awkward IAM-federation path into the same OIDC plane ArgoCD a
 
 ### 7. Release-approver — gated prod, separation of duties
 
-> **Implemented** (#501) — `spec.roles.releaseApprover` on the `Team`/`Product` records, enforced by the gitops/Teams
-> Gate verdict (read from base, author-excluded, fail-closed, ≥2 for pci/hipaa). Realized via a required
-> commit-status check rather than CODEOWNERS. Mechanics: [Promotion & Release](../architecture/promotion-and-release.md).
+> **Implemented** (#501), then **revised by [ADR-090](090-governance-identity-model.md)** — the approver set is
+> now **derived from `release-approver` Person grants** (the single source of truth), not the hand-authored
+> `spec.roles.releaseApprover` (retired). Same gitops-gate verdict (read from base, author-excluded, fail-closed,
+> ≥2 for pci/hipaa) via a required commit-status check rather than CODEOWNERS — this realizes the
+> "generator-managed role, projected" intent §7 stated. Mechanics: [Promotion & Release](../architecture/promotion-and-release.md).
 
 Promotion to prod is a GitOps operation (a **digest-bump PR**). Separation of duties is enforced by making the **access model the source** and **GitHub the enforcement**:
 

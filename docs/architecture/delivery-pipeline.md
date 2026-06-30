@@ -159,7 +159,7 @@ and has its own architecture doc:
 | Fact | Home (git) | Author | Read by |
 |------|-----------|--------|---------|
 | Team envelope (stages, tiers, quota) | `gitops/teams/<team>.yaml` | platform / team lead | Kyverno envelope, Teams Gate |
-| Release approvers (`spec.roles.releaseApprover`) | `Team` (default) / `Product` (override) | team admin (gated) | gitops/Teams Gate verdict |
+| Release approvers (`release-approver` Person grants, ADR-090) | `gitops/people` (derived per team) | team admin (gated) | gitops Gate verdict |
 | Product identity (repo, tenancy, domains) | `gitops/products/<team>/<product>.yaml` | team lead (scaffolder) | delivery, Kyverno, github-oidc |
 | Environment footprint | `gitops/environments/<team>/<product>/<stage>.yaml` | team lead (scaffolder) | Crossplane Composition, Kyverno |
 | Deployed digest per stage | `gitops/releases/<team>/<product>/<stage>.yaml` | app CI / promote bot / gated PR | delivery ApplicationSet |

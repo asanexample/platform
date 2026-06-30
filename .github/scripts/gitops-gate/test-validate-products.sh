@@ -35,6 +35,7 @@ kind: Product
 metadata: { name: alpha-shop }
 spec: { team: alpha, repo: asanexample/alpha-shop, tenancy: pooled }
 Y
+# The retired per-Product roles override (ADR-090 D3): `roles` is no longer a Product spec key → rejected.
 prod "alpha/approver.yaml" <<'Y'
 apiVersion: platform.refplat.org/v1beta1
 kind: Product
@@ -80,12 +81,6 @@ kind: Product
 metadata: { name: alpha-badrepo }
 spec: { team: alpha, repo: justrepo }
 Y
-prod "alpha/emptyapprover.yaml" <<'Y'
-apiVersion: platform.refplat.org/v1beta1
-kind: Product
-metadata: { name: alpha-emptyapprover }
-spec: { team: alpha, repo: asanexample/x, roles: { releaseApprover: [] } }
-Y
 # Owning team 'beta' has no gitops/teams/beta.yaml in base → ownership failure.
 prod "beta/orphan.yaml" <<'Y'
 apiVersion: platform.refplat.org/v1beta1
@@ -114,7 +109,7 @@ run() {
 
 echo "== validate-products.sh unit tests =="
 run ok   "valid product"                       "gitops/products/alpha/shop.yaml"
-run ok   "valid releaseApprover list"          "gitops/products/alpha/approver.yaml"
+run deny "retired roles override rejected (ADR-090)" "gitops/products/alpha/approver.yaml"
 run ok   "no product files (empty)"            ""
 run deny "wrong kind"                          "gitops/products/alpha/badkind.yaml"
 run deny "missing spec.team"                   "gitops/products/alpha/noteam.yaml"
@@ -122,7 +117,6 @@ run deny "metadata.name mismatch"              "gitops/products/alpha/namemismat
 run deny "invalid tenancy enum"                "gitops/products/alpha/badtenancy.yaml"
 run deny "unknown spec key (typo)"             "gitops/products/alpha/unknownkey.yaml"
 run deny "repo not owner/repo"                 "gitops/products/alpha/badrepo.yaml"
-run deny "empty releaseApprover override"      "gitops/products/alpha/emptyapprover.yaml"
 run deny "owning Team does not exist"          "gitops/products/beta/orphan.yaml"
 run deny "directory != spec.team"              "gitops/products/beta/wrongdir.yaml"
 run deny "file missing from head checkout"     "gitops/products/alpha/ghost.yaml"

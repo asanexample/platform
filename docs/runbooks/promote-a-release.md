@@ -70,21 +70,24 @@ For **`pci`/`hipaa`** environments, **two distinct** release-approvers must appr
 
 ## Add or change a release-approver
 
-The approver set is registry-sourced — GitHub logins under `spec.roles.releaseApprover`:
+The approver set is **derived from Person grants** (ADR-090 — the single source of truth for role-holding):
+whoever holds the `release-approver` `WorkforceRole` for the team. To add or change an approver, edit the
+**Person** record:
 
-- **Team default:** `gitops/teams/<team>.yaml` → `spec.roles.releaseApprover`.
-- **Per-Product override:** `gitops/products/<team>/<product>.yaml` → `spec.roles.releaseApprover` (wins over the
-  Team default for that Product).
+- Give someone the role: add `{ role: release-approver, team: <team> }` to their `spec.grants` in
+  `gitops/people/<person>.yaml` (they must have a `spec.handles.github`). Remove the grant to revoke it.
+- The gate derives the required-reviewer set = the github handles of the People holding `release-approver` for
+  that team (case-insensitive, author excluded).
 
-Editing `spec.roles` is **itself privileged** (the two-step guard): a Product-roles change is held by the
-**gitops Gate** (`gitops Approval`), a Team-roles change by the **Teams Gate** (`Teams Approval`) — each needs an
-**admin/maintainer** approval (≠ author). This is what stops *"add myself, then approve my own prod."*
+Editing a Person's grants is **itself privileged** (the two-step guard): the change is held by the **People
+Gate** (`People Approval`) and needs an **admin/team-lead** approval (≠ author). This is what stops *"add
+myself, then approve my own prod."* (`spec.roles.releaseApprover` on the Team/Product is **retired** — ADR-090.)
 
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| **`gitops Approval` = failure: "no release-approver configured"** | Product/Team has an empty `spec.roles.releaseApprover`; prod is **fail-closed** | Add an approver (see above) and merge that (gated) roles PR first |
+| **`gitops Approval` = failure: "no release-approver configured"** | No Person holds `release-approver` for the team; prod is **fail-closed** | Grant the role to someone (see above) and merge that (gated) People PR first |
 | **`gitops Approval` stays failure after you approved** | You authored the PR, or you're not in the set, or the review isn't on the **current** HEAD | Have a *different* configured approver review the latest commit |
 | **`pci`/`hipaa` prod won't merge with one approval** | Regulated tiers need **≥2 distinct** approvers | Get a second release-approver to approve |
 | **Gate rejects: no sibling Environment for the target stage** | Promoting to a stage that has no Environment | Create the Environment first (Backstage → New Environment) |

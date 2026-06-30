@@ -53,21 +53,12 @@ for rel in $PRODUCT_FILES; do
 
   # no unknown spec keys (the CRD prunes them silently → a typo would vanish)
   for k in $(yq '.spec | keys | .[]' "$f" 2>/dev/null); do
-    case "$k" in team | repo | tenancy | defaultIsolation | restrictWithinTeam | domains | displayName | roles) ;;
+    case "$k" in team | repo | tenancy | defaultIsolation | restrictWithinTeam | domains | displayName) ;;
       *) note "${pf}: unknown spec key '${k}' (typo? it would be silently dropped)";; esac
   done
 
-  # release-approver override (ADR-068 §7, #501): if present, a non-empty list of valid GitHub logins (an empty
-  # override would silently fall through to the Team default — forbid it; omit the block to inherit). The login
-  # rule (no brackets) already excludes App bots like `…[bot]`, which must never be release-approvers.
-  if [ "$(yq '(.spec.roles | has("releaseApprover")) // false' "$f" 2>/dev/null)" = "true" ]; then
-    n="$(yq '.spec.roles.releaseApprover | length' "$f" 2>/dev/null || echo 0)"
-    [ "$n" -ge 1 ] || note "${pf}: spec.roles.releaseApprover is empty — omit the block to inherit the Team default"
-    while IFS= read -r login; do
-      [ -z "$login" ] && continue
-      [[ "$login" =~ ^[A-Za-z0-9-]{1,39}$ ]] || note "${pf}: release-approver '${login}' is not a valid GitHub login"
-    done < <(yq -r '(.spec.roles.releaseApprover // [])[]' "$f" 2>/dev/null)
-  fi
+  # The per-Product release-approver override is retired (ADR-090 D3): release-approver holding is a Person
+  # grant at team reach; the gitops-gate derives the set from gitops/people. `roles` is no longer a Product key.
 
   # ownership: the owning Team must exist in the trusted base (its envelope is knowable at admission).
   [ -f "${BASE_DIR}/gitops/teams/${team}.yaml" ] || note "${pf}: spec.team '${team}' has no gitops/teams/${team}.yaml — a Product must be owned by an existing Team"
