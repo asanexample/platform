@@ -16,4 +16,7 @@ spec:
   grants:
     - { role: access-admin, scope: platform }                       # standing — runs the access system (the gate's access-admin)
     - { role: team-admin, team: platform }                          # standing — platform Team lead/member (group platform; deploys its products)
+    - { role: release-approver, team: platform }                    # standing — gated-prod approver for platform (ADR-090; replaces Team.roles.releaseApprover)
+    - { role: release-approver, team: alpha }                       # standing — gated-prod approver for the alpha demo team (was the team's hand-authored field)
+    - { role: release-approver, team: bravo }                       # standing — gated-prod approver for the bravo demo team (was the team's hand-authored field)
     - { role: break-glass, scope: platform, activation: on-demand } # eligible (not standing) — the time-boxed emergency door (ADR-088)
