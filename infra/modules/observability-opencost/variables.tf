@@ -75,3 +75,21 @@ variable "create_dashboard" {
   type        = bool
   default     = true
 }
+
+variable "enable_budget_enforcer" {
+  description = "Run the budget-enforcement annotator (ADR-091 Phase C): an hourly CronJob that writes over-budget teams to the cost-budget-status ConfigMap the Kyverno policy reads. Enable on the spoke that runs OpenCost + the Team CRD (preprod)."
+  type        = bool
+  default     = false
+}
+
+variable "budget_enforcer_schedule" {
+  description = "Cron schedule for the budget-enforcement annotator (ADR-091 Phase C). Cost is slow-moving — hourly is plenty."
+  type        = string
+  default     = "17 * * * *"
+}
+
+variable "budget_enforcer_image" {
+  description = "Image for the budget-enforcement annotator (needs kubectl + curl + jq). ADR-091 Phase C."
+  type        = string
+  default     = "alpine/k8s:1.31.1"
+}

@@ -311,3 +311,27 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "enable_cost_budget_enforcement" {
+  description = "Enable the Kyverno policy that blocks new XEnvironment provisioning for over-budget teams (ADR-091 Phase C). Reads the cost-budget-status ConfigMap maintained by the budget-enforcement annotator."
+  type        = bool
+  default     = false
+}
+
+variable "cost_budget_status_namespace" {
+  description = "Namespace holding the cost-budget-status ConfigMap the over-budget policy reads (ADR-091 Phase C)."
+  type        = string
+  default     = "observability"
+}
+
+variable "cost_budget_failure_action" {
+  description = "Audit or Enforce for the over-budget provisioning policy (ADR-091 Phase C). Audit-first, like every other policy."
+  type        = string
+  default     = "Audit"
+}
+
+variable "cost_budget_failure_policy" {
+  description = "Kyverno failurePolicy for the over-budget policy (ADR-091 Phase C). Ignore = fail-open (an observability outage never blocks provisioning) — recommended."
+  type        = string
+  default     = "Ignore"
+}
