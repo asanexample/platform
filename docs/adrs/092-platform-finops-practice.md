@@ -92,8 +92,11 @@ Converge on **one pane**: the existing Grafana cost dashboards + the Backstage C
 **D5 — Operate (govern & automate):**
 
 - **Budgets & anomaly detection** — stand up **AWS Budgets** (per-account + a platform-shared budget) and
-  **AWS Cost Anomaly Detection** (ML, the clear current gap), wired to the **existing owner-routing / Slack /
-  PagerDuty** fabric (ADR-084) via SNS — so a cost anomaly reaches a human the same way an outage does.
+  **AWS Cost Anomaly Detection** (ML, the clear current gap), delivered to the **platform team** in Slack +
+  email. *(Build correction, #1054: these are payer-account services whose owner is the platform team, so they
+  deliver via a dedicated SNS topic → AWS Chatbot → Slack — **not** the in-cluster, tenant-scoped owner-routing
+  fabric of ADR-084. Owner-routing resolves which **tenant** team owns a problem; **tenant** budget alerts
+  already ride ADR-091's Mimir-ruler → owner-routing. See `docs/runbooks/cost-alerting.md`.)*
 - **Shift-left cost** — surface the cost delta of an infrastructure change **in the PR**, on the Terragrunt /
   OpenTofu repo, before apply (tooling in D6). This is the "everyone owns their usage" principle made real for
   *platform* engineers, mirroring ADR-091's shift-left for tenants.
@@ -147,7 +150,7 @@ Backstage, the ADR-084 owner-routing). Verdicts: **Reaffirm** (keep), **Adopt** 
 | **OpenCost** | Reaffirm | In-cluster allocation, already live both clusters; the Inform speedometer. |
 | **CUR → Athena + OpenCost `cloudCost`** | Adopt | The authoritative bill (#668); OpenCost `cloudCost` reuses Mimir + our dashboards — no Grafana Athena plugin needed (ADR-079). |
 | **AWS Cost Allocation Tags** | Adopt | The CUR join key (#673); apply early (~24h forward-only lag). IaC'd already, just needs applying. |
-| **AWS Budgets** | Adopt | Account + `platform-shared` budgets; native, IaC via the AWS provider; alerts → SNS → owner-routing. |
+| **AWS Budgets** | Adopt | Account + `platform-shared` budgets; native, IaC via the AWS provider; alerts → SNS → Chatbot/Slack + email (platform team). |
 | **AWS Cost Anomaly Detection** | Adopt | ML anomaly detection, **free**, fills the biggest capability gap; SNS → the ADR-084 fabric. Begins working within ~24h. |
 | **AWS Compute Optimizer** | Adopt | Free rightsizing recommendations (EC2/ASG/EBS); feeds workload optimization. |
 | **Savings Plans (Compute SP)** | **Defer** (no budget) | The biggest steady-state lever in a *real* company — but commitments cost real money up front and we have no spend budget. **Document, don't buy**: sized to the 24/7 floor only, Cost Explorer SP recommendations, 1-year no-upfront first. Adopt when budgeted. |
