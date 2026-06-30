@@ -249,3 +249,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "query_consumer_namespaces" {
+  description = "Namespaces admitted to the Mimir gateway's query API directly in-cluster (e.g. backstage for the ADR-091 Cost tab). The observability ns default-denies ingress, so this is the allow."
+  type        = list(string)
+  default     = []
+}

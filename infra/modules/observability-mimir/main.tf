@@ -434,6 +434,35 @@ resource "kubernetes_manifest" "spoke_ingest_from_gateway" {
   }
 }
 
+# Direct in-cluster query consumers (ADR-091 A3): admit named namespaces (e.g. backstage's Cost tab) to the
+# Mimir gateway's query API. The ns default-denies ingress, so this Cilium allow is what lets them query.
+resource "kubernetes_manifest" "query_from_namespaces" {
+  count = local.create && length(var.query_consumer_namespaces) > 0 ? 1 : 0
+
+  manifest = {
+    apiVersion = "cilium.io/v2"
+    kind       = "CiliumNetworkPolicy"
+    metadata = {
+      name      = "${var.helm_release_name}-query-from-namespaces"
+      namespace = var.namespace
+    }
+    spec = {
+      endpointSelector = {
+        matchLabels = {
+          "app.kubernetes.io/name"      = var.helm_release_name
+          "app.kubernetes.io/component" = "gateway"
+        }
+      }
+      ingress = [{
+        fromEndpoints = [
+          for ns in var.query_consumer_namespaces :
+          { matchLabels = { "k8s:io.kubernetes.pod.namespace" = ns } }
+        ]
+      }]
+    }
+  }
+}
+
 # ---------------------------------------------------------------------------
 # Ruler rules-sync (P4, ADR-082) — load the curated spoke alert rules into the ruler PER TENANT, so a spoke's
 # remote-written metrics produce alerts that reach the hub Alertmanager → the triage agent. The ConfigMap is the

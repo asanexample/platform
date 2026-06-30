@@ -134,7 +134,7 @@ inputs = {
   # 8f2c6877 (backstage#49) adds the platform:offboard-person scaffolder action (opens a roster deletion PR for
   # the Offboard Person template, identity strategy §2.5 / platform #890). Carries forward 5550b0ae (#48, the
   # "Connect accounts" link), dd4bad6d (#47, add-service-resource), 8c029ab1 (#46), 16ce1f23 (#43), v1beta1 (#38).
-  image_tag = "b089aff58eb6ec4425b8426406257d9d18d52412"
+  image_tag = "83d4c77898c18e500e4d42426999848825a17529"
 
   # platform-projection catalog mode = v3 (Product=System, Environment=custom kind). The v2 projection branch is
   # inert (nothing reads it); removing it + this flag is a backstage-repo follow-up.
