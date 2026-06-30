@@ -25,6 +25,8 @@ spec:
       cpu: "16"
       memory: 32Gi
       pods: 60
+    budget:
+      monthlyUSD: 5000 # ADR-091 cost guardrails (demo budget)
     maxDedicatedIsolation: { cluster: 0, account: 0 }
     # Platform agents are read-only/stateless — no self-service cloud resources.
     resources:
