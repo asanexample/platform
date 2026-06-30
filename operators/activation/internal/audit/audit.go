@@ -19,16 +19,21 @@ import (
 	v1alpha1 "github.com/asanexample/platform/operators/activation/api/v1alpha1"
 )
 
-// Event kinds. They are the unique key (with the activation UID), so a borrow has at most one of each.
+// Event kinds. They are the unique key (with the activation UID), so a borrow has at most one of each —
+// except renewals, which are "renewed-<seq>" so every extension is its own immutable row.
 const (
 	EventGranted = "granted"
 	EventRevoked = "revoked"
+	EventRenewed = "renewed"
 )
 
 // Recorder writes the durable audit trail. A nil/Nop recorder disables it (the operator still runs).
 type Recorder interface {
 	RecordGrant(ctx context.Context, act *v1alpha1.Activation) error
 	RecordRevoke(ctx context.Context, act *v1alpha1.Activation) error
+	// RecordRenew records one extension: event "renewed-<seq>", the renewal's own fresh step-up, and the
+	// pushed-out expiry.
+	RecordRenew(ctx context.Context, act *v1alpha1.Activation, seq int, renewal v1alpha1.Renewal, newExpiry time.Time) error
 	Close()
 }
 
@@ -133,8 +138,7 @@ func New(ctx context.Context, dsn string) (Recorder, error) {
 	return &pgRecorder{db: pool, pool: pool, now: time.Now}, nil
 }
 
-func (r *pgRecorder) record(ctx context.Context, act *v1alpha1.Activation, event string) error {
-	e := entryFor(act, event, r.now())
+func (r *pgRecorder) insert(ctx context.Context, e entry) error {
 	_, err := r.db.Exec(ctx, insertSQL,
 		nullable(e.activationUID), e.event, e.principal, e.role,
 		nullable(e.reachTeam), nullable(e.reachScope), nullable(e.reason),
@@ -142,17 +146,27 @@ func (r *pgRecorder) record(ctx context.Context, act *v1alpha1.Activation, event
 		e.grantedAt, e.expiresAt, e.revokedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("audit: write %s for %s: %w", event, e.activationUID, err)
+		return fmt.Errorf("audit: write %s for %s: %w", e.event, e.activationUID, err)
 	}
 	return nil
 }
 
 func (r *pgRecorder) RecordGrant(ctx context.Context, act *v1alpha1.Activation) error {
-	return r.record(ctx, act, EventGranted)
+	return r.insert(ctx, entryFor(act, EventGranted, r.now()))
 }
 
 func (r *pgRecorder) RecordRevoke(ctx context.Context, act *v1alpha1.Activation) error {
-	return r.record(ctx, act, EventRevoked)
+	return r.insert(ctx, entryFor(act, EventRevoked, r.now()))
+}
+
+func (r *pgRecorder) RecordRenew(ctx context.Context, act *v1alpha1.Activation, seq int, renewal v1alpha1.Renewal, newExpiry time.Time) error {
+	e := entryFor(act, fmt.Sprintf("%s-%d", EventRenewed, seq), renewal.At.Time)
+	// The renewal carries its OWN fresh step-up and the pushed-out expiry — override the originals.
+	e.expiresAt = &newExpiry
+	e.stepUpACR = renewal.ACR
+	at := renewal.AuthTime.Time
+	e.stepUpAuthTime = &at
+	return r.insert(ctx, e)
 }
 
 func (r *pgRecorder) Close() {
@@ -174,4 +188,7 @@ type Nop struct{}
 
 func (Nop) RecordGrant(context.Context, *v1alpha1.Activation) error  { return nil }
 func (Nop) RecordRevoke(context.Context, *v1alpha1.Activation) error { return nil }
-func (Nop) Close()                                                   {}
+func (Nop) RecordRenew(context.Context, *v1alpha1.Activation, int, v1alpha1.Renewal, time.Time) error {
+	return nil
+}
+func (Nop) Close() {}

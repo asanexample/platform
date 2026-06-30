@@ -43,6 +43,21 @@ type StepUp struct {
 	ACR string `json:"acr"`
 }
 
+// Renewal records one extension of a live borrow — each one re-proved with a FRESH passkey
+// (the intake API verifies it before requesting the renewal). The operator pushes expiresAt
+// out by the borrow's duration, never past the role's sessionDuration ceiling from grantedAt.
+type Renewal struct {
+	// at is when the operator processed the renewal.
+	// +required
+	At metav1.Time `json:"at"`
+	// authTime is the OIDC auth_time of the fresh step-up that authorized this renewal.
+	// +required
+	AuthTime metav1.Time `json:"authTime"`
+	// acr is the assurance level of that step-up.
+	// +optional
+	ACR string `json:"acr,omitempty"`
+}
+
 // ActivationSpec is the immutable request to borrow a power for a bounded window. A borrow
 // is never edited — let it expire or revoke it and request a new one (enforced immutable).
 type ActivationSpec struct {
@@ -191,6 +206,16 @@ type ActivationStatus struct {
 	// the finalizer path before the CR is deleted, so it needs no status flag.
 	// +optional
 	GrantAuditedAt *metav1.Time `json:"grantAuditedAt,omitempty"`
+
+	// renewals is the audit trail of extensions applied to this borrow (each re-proved with a fresh passkey).
+	// +optional
+	// +listType=atomic
+	Renewals []Renewal `json:"renewals,omitempty"`
+
+	// lastRenewalNonce is the nonce of the most recently PROCESSED extend request, so a renewal is applied
+	// exactly once (the intake API stamps a fresh nonce per extend; the operator ignores a nonce it has seen).
+	// +optional
+	LastRenewalNonce string `json:"lastRenewalNonce,omitempty"`
 }
 
 // +kubebuilder:object:root=true
