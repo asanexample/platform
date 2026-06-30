@@ -1,6 +1,7 @@
-# Josh Deeden — the platform owner / sole admin. Unifies the roster's two hand-maintained sources: the Identity
-# Center `josh` user (group Admins → AdministratorAccess) and the keycloak-config `admin` seed user (group
-# platform-admins). Access facts only — no PII (the email/identity live in Keycloak + the ADR-084 directory).
+# Josh Deeden — the platform owner / sole admin + platform Team lead. His Keycloak identity is now his OWN
+# `josh` user (decoupled from the generic `admin` seed, ADR-088): one named identity across Identity Center,
+# Keycloak, the Person record, Backstage login, and every borrow's audit trail. Access facts only — no PII
+# (the email/identity live in Keycloak + the ADR-084 directory).
 apiVersion: platform.refplat.org/v1beta1
 kind: Person
 metadata:
@@ -9,9 +10,10 @@ metadata:
     app.kubernetes.io/managed-by: argocd
     app.kubernetes.io/part-of: identity-access
 spec:
-  person: admin # the Keycloak anchor (the `admin` seed user / platform-admins). The `sub` once #889 provisions it.
+  person: josh # the Keycloak anchor — his own named user (email josh@<org>; groups platform-admins + platform).
   handles:
     github: gangster # bootstrap (ADR-084 `declared`) — the release-approver login across the registries.
   grants:
     - { role: access-admin, scope: platform }                       # standing — runs the access system (the gate's access-admin)
+    - { role: team-admin, team: platform }                          # standing — platform Team lead/member (group platform; deploys its products)
     - { role: break-glass, scope: platform, activation: on-demand } # eligible (not standing) — the time-boxed emergency door (ADR-088)
