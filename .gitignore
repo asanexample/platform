@@ -120,3 +120,5 @@ bin/
 # Committed project slash commands.
 !.claude/commands/
 .specify/
+# Infracost local cache (shift-left cost-in-PR; CI uses a fresh checkout)
+.infracost/
