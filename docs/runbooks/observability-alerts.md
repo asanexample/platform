@@ -110,6 +110,21 @@ all three resources is on the **AWS Cloud Resources** dashboard (Platform folder
   15m; cross-account traffic (platform hub ↔ preprod spoke) is hitting a missing/misconfigured route. Check
   the TGW route tables and VPC attachments (the `transit-gateway` units).
 
+## Cost budget
+
+Cost guardrails (ADR-091). Evaluated by the **Mimir ruler** in the env-API spoke tenant (where both the spend —
+OpenCost `container_*_allocation × node_*_hourly_cost` — and the budget — `team_budget_monthly_usd{team}`, from
+each `Team`'s `spec.envelope.budget.monthlyUSD` via kube-state-metrics CustomResourceState — are present). The
+value is projected month-end compute spend (current allocation × 730h) as a % of the team's budget. The `team`
+label routes via owner-routing (ADR-084): **critical** reaches the team's channel through the triage agent.
+
+- **TeamCostBudgetProjectedOverrun** (warning, ≥ 80%) — team `{{ $labels.team }}` is on track to use ≥ 80% of
+  its monthly cost budget. Heads-up: review what's deployed on the **Cost** dashboard (by-team / by-environment)
+  before it overruns; park or scale down idle environments.
+- **TeamCostBudgetOverrun** (critical, ≥ 100%) — projected to **exceed** the budget this month. Cut spend
+  (scale down, park idle environments) or raise `envelope.budget.monthlyUSD` on the `Team` (a governance change).
+  Note projection is naive (constant run rate); a short-lived spike clears on its own once allocation drops.
+
 ## Notification channels & secret rotation
 
 How alerts leave the cluster, and the recurring operational tasks. Routing (set in the `observability`

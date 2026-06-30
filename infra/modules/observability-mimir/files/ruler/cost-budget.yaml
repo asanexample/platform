@@ -1,0 +1,48 @@
+# Cost-budget burn-rate alerts (ADR-091 Phase B). Synced per-tenant by the rules-sync CronJob; fires only in a
+# tenant where BOTH the spend (OpenCost) and the budget (team_budget_monthly_usd, from the Team CR via KSM
+# CustomResourceState) are present — i.e. the env-API spoke tenant (preprod). The metric is projected month-end
+# compute spend (current allocation × 730h) as a % of the team's envelope.budget.monthlyUSD. The `team` label
+# rides through for owner-routing (ADR-084) to the team's Slack/PagerDuty.
+groups:
+  - name: cost-budget.rules
+    rules:
+      - alert: TeamCostBudgetProjectedOverrun
+        # ≥ 80% of the monthly budget on the current run rate — heads-up before the overrun.
+        expr: |
+          100 * (
+            sum by (team) ( label_replace(
+              sum by (namespace) (
+                (container_cpu_allocation * on(node) group_left() node_cpu_hourly_cost)
+                + ((container_memory_allocation_bytes / 1024^3) * on(node) group_left() node_ram_hourly_cost)
+              ) * 730,
+              "team", "$1", "namespace", "^([a-z0-9]+)-.*"
+            ) )
+            / on(team) group_left() max by (team) (team_budget_monthly_usd)
+          ) >= 80
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Team {{ $labels.team }} projected to use {{ printf \"%.0f\" $value }}% of its monthly cost budget"
+          description: "On the current run rate, team {{ $labels.team }}'s projected month-end compute spend is {{ printf \"%.0f\" $value }}% of its envelope budget. Review what's deployed (the Cost dashboard) before it overruns."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cost-budget"
+      - alert: TeamCostBudgetOverrun
+        # ≥ 100% — projected to exceed the budget on the current run rate.
+        expr: |
+          100 * (
+            sum by (team) ( label_replace(
+              sum by (namespace) (
+                (container_cpu_allocation * on(node) group_left() node_cpu_hourly_cost)
+                + ((container_memory_allocation_bytes / 1024^3) * on(node) group_left() node_ram_hourly_cost)
+              ) * 730,
+              "team", "$1", "namespace", "^([a-z0-9]+)-.*"
+            ) )
+            / on(team) group_left() max by (team) (team_budget_monthly_usd)
+          ) >= 100
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Team {{ $labels.team }} projected to EXCEED its monthly cost budget ({{ printf \"%.0f\" $value }}%)"
+          description: "On the current run rate, team {{ $labels.team }} will exceed its envelope cost budget this month (projected {{ printf \"%.0f\" $value }}%). Cut spend (scale down / park idle environments) or raise the budget."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cost-budget"
