@@ -204,13 +204,50 @@ adapter with `mint`/`revoke`/`reconcile`:
 | Plane | Native grant | Status | Source of footprint |
 |-------|--------------|--------|---------------------|
 | **AWS Identity Center** | a USER account-assignment to the role's permission set on its accounts | **built** (increment 1; SDK Go v2, async-polled) | the permission set's live provisioned-accounts (no SOPS needed) |
-| **Keycloak** | role's realm-role / group membership | later | `gitops/roles[*].keycloak` |
+| **Keycloak** | role's realm-role / group membership | **designed — next** (see below) | the role's `keycloak` projection on its `WorkforceRole` CR |
 | **Cluster (Teleport)** | a Teleport access request / short role | later (ADR-088 D2: evaluate Teleport) | roles projected from `gitops/people` |
 
 The AWS adapter is an **SDK-native reimplementation** of the behavior contract proven by
 `cmd/platctl/internal/cloud/identitycenter.go` (study it for the API sequence; do not inherit its
 fire-and-forget no-poll error handling — see the amendment), reusing the
 `access.PlanActivation` eligibility/cap logic — built and live-verified read-side already.
+
+### Keycloak app-access plane (designed — the next plane)
+
+The 2nd plane mints **elevated app access**: every platform app (ArgoCD, Grafana, Backstage, the Rollouts
+dashboard) authorizes off Keycloak group/role claims, so temporarily adding the borrower to an elevated group
+*is* a temporary admin grant. It implements the same `Plane` port behind a new `internal/plane/keycloak/`
+adapter — the CRD, intake API, step-up, audit, extend, and My Access view are untouched.
+
+**Worked example** (`argocd-admin`): a new on-demand `WorkforceRole` with a `keycloak` projection
+(`group: /argocd-admins`) and **no** `identityCenter` block (app-only — which is why those blocks are optional,
+the same reason `release-approver` is gate-only, ADR-090). josh is eligible via a Person grant
+(`{role: argocd-admin, scope: platform, activation: on-demand}`). He borrows it through Activate Power
+(identical UX) → the operator looks up the role's `keycloak` projection and joins his Keycloak user to
+`/argocd-admins` → he re-authenticates to ArgoCD and his fresh token carries the group → admin. At
+expiry/revoke the operator removes him **and** force-logs-out his sessions so the next token drops the group.
+
+**Three design choices:**
+
+1. **Role → projection comes from the `WorkforceRole` CR** (already synced to the hub by the governance
+   registry, ADR-089 — the source ADR-090 made authoritative). The operator reads the role's `keycloak` block
+   to know which group to join; **retrofit the AWS plane to read its `identityCenter` block the same way**, so
+   "which planes run + what they target" is uniformly *decide-once-in-the-role, project-everywhere*.
+2. **Synchronous, not polled.** A Keycloak group join takes effect immediately, so this plane's `Reconcile`
+   returns `Active` in one pass — simpler than the AWS plane's async per-permission-set state machine.
+3. **Multi-plane fan-out is the payoff.** A role with *both* `identityCenter` + `keycloak` grants AWS operate
+   **and** elevated app access in one borrow, revoked together. `status.planes[]` being a list makes it free.
+
+**The one wrinkle — token propagation.** Group membership only applies on the next token issuance: a borrow
+*arms* access (re-login to pick it up) and a naive revoke leaves a live token elevated until its TTL. The fix is
+the **session-logout-on-revoke** above (the §3.6 "two acts": pull the native grant *and* invalidate live
+sessions) plus short token TTLs.
+
+**Build delta:** the Keycloak Admin-API adapter (idempotent join/leave + logout, typed errors, fake for tests)
+· the role→projection lookup from the `WorkforceRole` CR (+ the AWS-plane retrofit) · a **tightly-scoped**
+Keycloak admin client (manage membership of the borrowable groups only — fine-grained admin perms, *not* realm
+admin) wired via ESO · one or two borrowable app-admin roles + eligibility grants · the plane-unit and
+multi-plane envtest coverage · an ADR-088 amendment recording the plane as built.
 
 ## Credentials — the crown jewels (ADR-088 §3.3)
 
