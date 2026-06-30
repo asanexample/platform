@@ -22,10 +22,12 @@ authorized — this is a manual, one-time console step (no API):
    - **Channel ID** — in Slack, right-click the channel → *View channel details* → bottom of the dialog
      (starts with `C…`).
 4. Set them on the unit and re-apply:
+
    ```hcl
    slack_team_id    = "T0XXXXXXX"
    slack_channel_id = "C0XXXXXXX"
    ```
+
    Until `slack_team_id` is set the Chatbot resources are gated off and delivery is **email-only** — that's a
    valid state to ship in.
 

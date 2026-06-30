@@ -36,6 +36,18 @@ misconfigurations:
       customer-managed CMK is tracked hardening in #118 (regulated-tier),
       deferred to avoid key-policy/cross-account complexity now.
 
+  - id: AWS-0095
+    paths:
+      - "aws/cost-monitoring/main.tf"
+    statement: >-
+      The cost-alerts SNS topic is intentionally unencrypted (ADR-092 #1054):
+      the AWS-managed key (alias/aws/sns) cannot grant the budgets.amazonaws.com
+      / costalerts.amazonaws.com publishers, and AWS Chatbot cannot subscribe to
+      a managed-key-encrypted topic — so SSE-KMS here would silently break
+      delivery. Payloads are low-sensitivity (account ids + dollar amounts). A
+      customer-managed CMK whose key policy admits those principals is the #118
+      upgrade path.
+
   - id: AWS-0132
     paths:
       - "aws/cloudtrail/main.tf"

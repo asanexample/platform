@@ -12,7 +12,7 @@ owner-routing (ADR-084); platform/account cost is owned by the platform team and
 
 ## Delivery
 
-```
+```text
 AWS Budgets ─┐
              ├─► SNS topic (platform-cost-alerts) ─┬─► AWS Chatbot ─► Slack #cost
 Cost Anomaly ┘   (unencrypted — see note)          └─► email
