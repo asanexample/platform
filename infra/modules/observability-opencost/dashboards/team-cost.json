@@ -83,6 +83,33 @@
           "legendFormat": "{{namespace}}"
         }
       ]
+    },
+    {
+      "id": 5,
+      "type": "bargauge",
+      "title": "Budget utilization by team (% of monthly budget)",
+      "description": "Projected monthly compute spend ÷ the team's envelope.budget.monthlyUSD (emitted from the Team CR by kube-state-metrics). ADR-091 spend-vs-budget.",
+      "gridPos": { "x": 0, "y": 18, "w": 24, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "__COST_DS_UID__" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "min": 0,
+          "max": 120,
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 80 }, { "color": "red", "value": 100 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "orientation": "horizontal", "displayMode": "gradient", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "__COST_DS_UID__" },
+          "expr": "100 * ( sum by (team) ( label_replace( sum by (namespace) ( (container_cpu_allocation * on(node) group_left() node_cpu_hourly_cost) + ((container_memory_allocation_bytes / 1024^3) * on(node) group_left() node_ram_hourly_cost) ) * 730, \"team\", \"$1\", \"namespace\", \"^([a-z0-9]+)-.*\" ) ) / on(team) group_left() max by (team) (team_budget_monthly_usd) )",
+          "legendFormat": "{{team}}"
+        }
+      ]
     }
   ]
 }

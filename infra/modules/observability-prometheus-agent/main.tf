@@ -18,6 +18,40 @@ locals {
     queueConfig = { capacity = 10000, maxSamplesPerSend = 2000, maxShards = 10 }
   }] : []
 
+  # kube-state-metrics CustomResourceState (ADR-091): emit team_budget_monthly_usd{team} from the Team CR's
+  # spec.envelope.budget.monthlyUSD — the single source — so the cost dashboard/alerts compare spend vs budget.
+  # Always rendered (avoids a conditional-type clash); only `enabled` toggles it, gated to the spoke that runs
+  # the env-API Team CRD (the RBAC to read Team CRs is harmless when off).
+  ksm_values = {
+    rbac = {
+      extraRules = [{
+        apiGroups = ["platform.refplat.org"]
+        resources = ["teams"]
+        verbs     = ["list", "watch"]
+      }]
+    }
+    customResourceState = {
+      enabled = var.enable_team_budget_metric
+      config = {
+        spec = {
+          resources = [{
+            groupVersionKind = { group = "platform.refplat.org", version = "v1beta1", kind = "Team" }
+            metricNamePrefix = "team"
+            metrics = [{
+              name = "budget_monthly_usd"
+              help = "Team monthly cost budget in USD (ADR-091 cost guardrails)"
+              each = {
+                type  = "Gauge"
+                gauge = { path = ["spec", "envelope", "budget", "monthlyUSD"] }
+              }
+              labelsFromPath = { team = ["metadata", "name"] }
+            }]
+          }]
+        }
+      }
+    }
+  }
+
   # ---- kube-prometheus-stack in AGENT mode: scrape-and-ship only, no UI / no alerting / no local query. ----
   helm_values = {
     fullnameOverride = var.helm_release_name
@@ -68,7 +102,7 @@ locals {
     }
 
     # node-exporter needs host access — the ns is created (below) with PSA `privileged` for it.
-    "kube-state-metrics" = {}
+    "kube-state-metrics" = local.ksm_values
     nodeExporter         = { enabled = true }
   }
 }

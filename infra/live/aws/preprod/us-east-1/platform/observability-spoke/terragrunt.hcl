@@ -91,6 +91,10 @@ inputs = {
 
   # Sizing follows cost_profile (dev = single replica; prod = HA).
   high_availability = include.base.locals.high_availability
+
+  # ADR-091: emit team_budget_monthly_usd{team} via KSM CustomResourceState from the Team CRs (which live on
+  # this env-API cluster) → hub Mimir tenant preprod → the cost dashboard's spend-vs-budget overlay.
+  enable_team_budget_metric = true
   # WAL on emptyDir (module default): preprod has no gp3 StorageClass, and an ephemeral WAL is fine for a
   # lightweight spoke (the agent re-scrapes on restart). Set to an existing class for a durable WAL.
 
