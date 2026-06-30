@@ -41,6 +41,7 @@ catalog. Module source paths and Helm chart versions are pinned centrally in
 | `sops-kms` | Management `platform-sops` KMS key for SOPS-encrypted committed config secrets (ADR-066) |
 | `cost-allocation-tags` | Activates AWS cost-allocation tags (Team/Product/Stage) for cost visibility |
 | `cost-monitoring` | AWS Budgets + Cost Anomaly Detection → SNS → Slack (Chatbot) + email; platform bill-level cost alerting (ADR-092) |
+| `cost-export` | Cost & Usage Report → S3 → Glue → Athena (true cloud cost by `Team` tag) + cross-account read role; #668 / ADR-079 D4 |
 
 ## Cloud-Agnostic / Shared Modules (`infra/modules/`)
 
