@@ -100,3 +100,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "enable_team_budget_metric" {
+  description = "Configure kube-state-metrics CustomResourceState to emit team_budget_monthly_usd{team} from the Team CR (ADR-091). Enable only on the spoke that runs the env-API Team CRD (preprod)."
+  type        = bool
+  default     = false
+}
