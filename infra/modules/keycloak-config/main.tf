@@ -825,17 +825,34 @@ resource "keycloak_authentication_execution" "forms_userpass" {
   priority          = 10
 }
 
-# REQUIRED passkey for everyone — a REQUIRED passwordless execution with no credential triggers passkey
-# registration in-flow, so even a user the default action missed is force-enrolled before they can finish login.
+# Passkey step — CONDITIONAL on the user already having one. The "require-if-configured + force-setup" pattern
+# (Keycloak's recommended way to mandate a factor): the passwordless AUTHENTICATOR only authenticates an
+# EXISTING passkey — it does not enrol one, and a REQUIRED execution with no credential dead-ends at "credential
+# setup required" (it does NOT auto-register). So gate it on `conditional-user-configured`: a user WITH a passkey
+# must use it; a brand-new user skips this subflow, finishes login on the password, and is then force-enrolled by
+# the seeded `webauthn-register-passwordless` required action before the session is issued — after which every
+# subsequent login requires the passkey. Net: passkey mandatory, but bootstrappable on first login (no separate
+# realm-wide "MFA-off" window per new user).
 resource "keycloak_authentication_subflow" "browser_mfa" {
   count = local.manage_mfa ? 1 : 0
 
   realm_id          = keycloak_realm.this[0].id
   parent_flow_alias = keycloak_authentication_subflow.browser_forms[0].alias
   alias             = "platform-browser-mfa"
-  requirement       = "REQUIRED"
+  requirement       = "CONDITIONAL"
   priority          = 20
   depends_on        = [keycloak_authentication_execution.forms_userpass]
+}
+
+# The condition: run the passkey step ONLY if the user has a passwordless credential configured.
+resource "keycloak_authentication_execution" "mfa_conditional" {
+  count = local.manage_mfa ? 1 : 0
+
+  realm_id          = keycloak_realm.this[0].id
+  parent_flow_alias = keycloak_authentication_subflow.browser_mfa[0].alias
+  authenticator     = "conditional-user-configured"
+  requirement       = "REQUIRED"
+  priority          = 10
 }
 
 resource "keycloak_authentication_execution" "mfa_webauthn" {
@@ -845,7 +862,8 @@ resource "keycloak_authentication_execution" "mfa_webauthn" {
   parent_flow_alias = keycloak_authentication_subflow.browser_mfa[0].alias
   authenticator     = "webauthn-authenticator-passwordless"
   requirement       = "REQUIRED"
-  priority          = 10
+  priority          = 20
+  depends_on        = [keycloak_authentication_execution.mfa_conditional]
 }
 
 # --- Gated binding — the apply-2 flip ---------------------------------------
