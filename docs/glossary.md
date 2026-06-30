@@ -107,9 +107,10 @@ See [Promotion & Release](architecture/promotion-and-release.md) ([ADR-067 §8](
 a time**; ≤ staging is automatic (health-gated), prod is gated by a release-approver.
 See [Promotion & Release](architecture/promotion-and-release.md) (#377).
 
-**release-approver** — The GitHub logins authorized to approve a **gated prod** promotion, declared at
-`spec.roles.releaseApprover` on the `Team` (default) or `Product` (override). Read from the base branch, author
-excluded, fail-closed when empty, ≥2 for `pci`/`hipaa`. See [Promotion & Release](architecture/promotion-and-release.md) (#501).
+**release-approver** — A `WorkforceRole` whose holders may approve a **gated prod** promotion. Held via a
+`Person` grant at team reach (the single source of truth, ADR-090); the gitops-gate **derives** the approver
+set from the holders' `spec.handles.github`. Read from the base branch, author excluded, fail-closed when
+empty, ≥2 for `pci`/`hipaa`. See [Promotion & Release](architecture/promotion-and-release.md) (ADR-090, #501).
 
 **Release record** — A git record (`gitops/releases/<team>/<product>/<stage>.yaml`, `kind: Release`, in the
 **platform** repo) naming the digest deployed at one stage (`spec.environmentRef` + per-Service `digest`). The

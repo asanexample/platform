@@ -99,7 +99,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-087: Keycloak Admin-Plane Hardening — master-realm passkey + sealed break-glass](087-keycloak-admin-plane-hardening.md) | Accepted (built + bound live 2026-06-27) |
 | [ADR-088: Temporary-Power Activation — just-in-time elevation & emergency revocation](088-temporary-power-activation.md) | Accepted (built + live) |
 | [ADR-089: Governance Registry Topology — one git source, projected per-cluster](089-governance-registry-topology.md) | Proposed (design) |
-| [ADR-090: Governance Identity Model — one source for role-holding, and the layer glossary](090-governance-identity-model.md) | Proposed (design) |
+| [ADR-090: Governance Identity Model — one source for role-holding, and the layer glossary](090-governance-identity-model.md) | Accepted (built + live) |
 
 ## Supply Chain & Delivery
 

@@ -57,7 +57,7 @@ Every PR that touches `gitops/people/**` is validated by the **People Gate** (`.
 — schema shape, enum bounds, and **team/role refs exist** — and routed for approval by **content** via the
 **People Approval** required check:
 
-- A **team grant** (`team: X`) → an approval (≠ author) from **team X's approver set** (`Team.spec.roles.releaseApprover`) or a repo admin/maintainer (the "team lead" authority).
+- A **team grant** (`team: X`) → an approval (≠ author) from **team X's `release-approver` holders** (themselves a Person grant, ADR-090) or a repo admin/maintainer (the "team lead" authority).
 - A **platform grant** (`scope: platform`) or a **Person deletion** (offboarding) → an admin/maintainer approval (≠ author) — the **access-admin** authority.
 
 Like the Teams / gitops gates, the gate runs from the **protected base** (`pull_request_target`); the PR's files

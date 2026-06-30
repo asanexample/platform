@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-29
 
-**Status:** Proposed (design — 2026-06-29)
+**Status:** Accepted (built + live — 2026-06-30)
 
 ## Context
 
@@ -103,6 +103,35 @@ is about products, not workforce — but that is deferred.)
   roles live on the Team, others on the Person" splits the model in a worse way.
 - **Rename `AccessGrant` now.** Deferred — it is a live CRD (ADR-068); the glossary resolves the clarity cost
   without the rename churn.
+
+## Implementation notes (as-built)
+
+**Built + live (2026-06-30)** as the migration sequence prescribed, in three reviewed PRs — no big-bang of the
+live prod-promotion gate:
+
+- **#1031 (step 1a)** — added `release-approver` to the `WorkforceRole` catalog (`gitops/roles`). It's the
+  first **gate-only** role: `reach: team`, no `identityCenter`/`keycloak` projection (those blocks are
+  optional in the schema). The build confirmed `team-admin` role-holding was *already* Person-only, so the
+  redundancy was specifically `releaseApprover`.
+- **#1032 (step 1b)** — authored josh's `release-approver` grants for platform/alpha/bravo, mirroring exactly
+  the hand-authored `Team.roles.releaseApprover` (= `gangster`) so the derived set is identical.
+- **#1033 (step 2)** — rewired the gitops-gate's `require_release_approver` to **derive** the approver set
+  from Person grants (`role: release-approver` at the team's reach → `spec.handles.github`, case-insensitive,
+  author-excluded, fail-closed, pci/hipaa ⇒ ≥2).
+- **#1034 (step 3, this)** — dropped `spec.roles` from the 3 Team CRs, the field validation
+  (teams-gate + validate-products), the CRD schema field (`Team`/`Product` `spec.roles`), and the tests. With
+  the field gone, **"role" means `WorkforceRole`, full stop.**
+
+**Build-forced refinements / gotchas (worth carrying forward):**
+
+- **The people-gate validates each grant's role against the BASE catalog**, so a role and a grant of it cannot
+  land in one PR — step 1 *had* to be split (role first, then grants).
+- **`SOLO_MAINTAINER` self-attest** is the path that lets the single admin merge these governance PRs (the gate
+  waives separation-of-duties when the admin author self-attests — GitHub won't let you approve your own PR).
+- **The per-Product approver override was retired, not migrated** — Person-grant `reach` is team-or-platform,
+  with no product reach, and no Product used the override. A product-reach extension is deferred.
+- **The CRD schema field removal ships via the crossplane module** (a `terragrunt apply` of `crossplane` +
+  `policy`), separate from the gitops data sync; the field is optional so existing CRs prune it on next write.
 
 ## Related
 

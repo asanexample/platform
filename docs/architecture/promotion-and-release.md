@@ -125,7 +125,7 @@ a required **`gitops Approval`** commit status:
 ```mermaid
 flowchart TD
     PR[Release PR touches<br/>gitops/releases/**/prod.yaml] --> Verdict{publish-verdict.sh}
-    Verdict -->|read approver set<br/>from BASE branch| Set["Product.spec.roles.releaseApprover<br/>else Team.spec.roles.releaseApprover"]
+    Verdict -->|derive approver set<br/>from BASE branch| Set["People holding release-approver<br/>for the team → spec.handles.github"]
     Set -->|empty| Fail1[FAIL CLOSED:<br/>no release-approver configured]
     Set -->|non-empty| Need{tier pci/hipaa?}
     Need -->|yes| Two[need ≥ 2 distinct approvers]
@@ -138,8 +138,9 @@ flowchart TD
 
 The properties that make this trustworthy:
 
-- **Registry-sourced approver set.** The approvers are GitHub logins in `spec.roles.releaseApprover` — read from
-  the **`Product`** record if set, otherwise the **`Team`** default. Defined as code, reviewed as code.
+- **Registry-sourced approver set.** The approvers are **derived from Person grants** (ADR-090, the single
+  source for role-holding) — the People holding `release-approver` for the team, projected to their
+  `spec.handles.github`. Defined as code, reviewed as code.
 - **Read from the BASE branch only.** `publish-verdict.sh` reads the approver list, tiers, and environment files
   from the trusted base checkout (`$BASE_DIR`) — never from the PR's head — so a PR **cannot edit its own
   approver list to self-approve**.
