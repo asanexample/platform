@@ -59,6 +59,16 @@ misconfigurations:
 
   - id: AWS-0132
     paths:
+      - "aws/cost-export/main.tf"
+    statement: >-
+      The CUR bucket uses SSE-S3 (AES256), not a CMK, by necessity (#668): the
+      CUR service (billingreports.amazonaws.com) can't use the AWS-managed KMS
+      key, and AES256 keeps the cross-account OpenCost reader free of kms:Decrypt.
+      Contents are billing data (not secrets). CMK is the regulated-tier upgrade
+      (#118), same as the observability stores.
+
+  - id: AWS-0132
+    paths:
       - "observability-mimir/main.tf"
     statement: >-
       The Mimir blocks bucket uses SSE-S3 (AES256), not a CMK. AES256 is the right

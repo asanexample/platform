@@ -1,6 +1,8 @@
 # ADR-079: Cloud-Resource Monitoring Scope — Query-Time-First in Grafana
 
-**Status:** Accepted — P5a (Grafana CloudWatch metrics + Logs datasource) and P5b (YACE → Mimir) built + live on the platform hub; true-cloud-cost (CUR → Athena, P11 pt 2), curated AWS dashboards/alerts, and the scope descopes below are the outstanding work (2026-06-24)
+**Status:** Accepted — P5a (Grafana CloudWatch metrics + Logs datasource) and P5b (YACE → Mimir) built + live on the platform hub; curated AWS dashboards/alerts and the scope descopes below are the outstanding work (2026-06-24)
+
+> Amendment (2026-06-30, #668): the true-cloud-cost **CUR → Athena** pipeline (D4, P11 pt 2) Phase 1 is built — the `aws/cost-export` module (legacy CUR → S3 → Glue → Athena + cross-account read role) in the payer account. Consumption via OpenCost `cloudCost` (Phase 2a) + dashboards (Phase 3) remain. See `docs/runbooks/cost-true-spend.md`.
 
 ## Context
 
