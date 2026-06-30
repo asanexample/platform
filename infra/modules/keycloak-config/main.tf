@@ -469,6 +469,14 @@ resource "keycloak_user" "seed" {
     temporary = true # forces a password change on first login
   }
 
+  # Seed the passkey-enrollment required action so first login = change password + enrol a passkey. This is
+  # REQUIRED for admin-API-created users (which is what Terraform does): Keycloak does NOT apply the realm's
+  # default_actions to admin-created users (only to self-registration), and the browser flow's passwordless
+  # AUTHENTICATOR authenticates an EXISTING passkey — it does not enrol one. Without this, a brand-new user who
+  # has changed their password hits the passkey step with no credential and gets "credential setup required".
+  # Set on create only (required_actions stays in ignore_changes below) so Keycloak/the user own it after.
+  required_actions = local.manage_mfa ? ["webauthn-register-passwordless"] : []
+
   lifecycle {
     # temporary=true makes Keycloak set an UPDATE_PASSWORD required action, which it then CLEARS once the user
     # changes their password at first login. We don't manage required_actions, so terraform would otherwise keep
@@ -747,9 +755,10 @@ resource "keycloak_realm_events" "this" {
   events_listeners = ["jboss-logging"]
 }
 
-# Force every new user to enroll a passkey (the realm's only factor). default_action stamps NEW users at first
-# login; it does not retroactively prompt existing users — those are force-enrolled in-flow by the REQUIRED
-# passwordless execution below. Uses the PASSWORDLESS register action (not the 2FA webauthn-register).
+# Force every new user to enroll a passkey (the realm's only factor). default_action stamps SELF-REGISTERED
+# users; it does NOT apply to admin-API-created users (our seed users) — those get the action seeded explicitly
+# on the keycloak_user.seed resource above (the browser flow's passwordless authenticator only AUTHENTICATES an
+# existing passkey, it does not enrol one). Uses the PASSWORDLESS register action (not the 2FA webauthn-register).
 resource "keycloak_required_action" "webauthn_register_passwordless" {
   count = local.manage_mfa ? 1 : 0
 
