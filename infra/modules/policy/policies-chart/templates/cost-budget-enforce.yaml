@@ -1,0 +1,64 @@
+{{- if .Values.enableCostBudgetEnforcement }}
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-over-budget-provisioning
+  labels:
+    {{- include "kpp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Restrict Over-Budget Provisioning
+    policies.kyverno.io/category: Cost
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: XEnvironment
+    policies.kyverno.io/description: >-
+      Blocks NEW environment provisioning (XEnvironment CREATE) for a team that is over its cost budget
+      (ADR-091 Phase C, gated soft brake). The over-budget set is maintained in the cost-budget-status
+      ConfigMap by the budget-enforcement annotator (which reads the live spend-vs-budget from Mimir).
+      Audit-first; fail-open (a missing/blank status is treated as ok → allowed, so an observability outage
+      never blocks provisioning); admin override via the cost.refplat.org/budget-override annotation. Never
+      affects running workloads — it only gates new provisioning.
+spec:
+  # Admission-time only — the ConfigMap context is read per-request; no background scans.
+  background: false
+  failurePolicy: {{ .Values.costBudgetFailurePolicy | default "Ignore" }}
+  rules:
+    - name: deny-new-env-over-budget
+      match:
+        any:
+          - resources:
+              kinds:
+                - XEnvironment
+              operations:
+                - CREATE
+      context:
+        - name: budgetStatus
+          configMap:
+            name: cost-budget-status
+            namespace: {{ .Values.costBudgetStatusNamespace | default "observability" }}
+        # The owning team's status from the ConfigMap; default ok when the key is absent (fail-open).
+        - name: teamStatus
+          variable:
+            value: {{`'{{ budgetStatus.data."{{ request.object.spec.team }}" }}'`}}
+            default: ok
+        # An admin override on the claim lets a deliberate exception through.
+        - name: budgetOverride
+          variable:
+            value: {{`'{{ request.object.metadata.annotations."cost.refplat.org/budget-override" }}'`}}
+            default: "false"
+      validate:
+        failureAction: {{ .Values.costBudgetFailureAction | default "Audit" }}
+        message: >-
+          Team {{`{{ request.object.spec.team }}`}} is over its monthly cost budget — new environment
+          provisioning is blocked (ADR-091). Reduce spend (park or scale down idle environments — see the
+          Cost dashboard) or raise the team's envelope.budget.monthlyUSD. Deliberate exception: annotate this
+          claim cost.refplat.org/budget-override="true".
+        deny:
+          conditions:
+            all:
+              - key: {{`'{{ teamStatus }}'`}}
+                operator: Equals
+                value: exceeded
+              - key: {{`'{{ budgetOverride }}'`}}
+                operator: NotEquals
+                value: "true"
+{{- end }}

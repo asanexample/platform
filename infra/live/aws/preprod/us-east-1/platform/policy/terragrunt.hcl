@@ -90,6 +90,12 @@ inputs = {
   # confirmed PolicyReports clean against the live alpha workload (ADR-014 rollout).
   validation_failure_action = "Enforce"
 
+  # Cost-budget enforcement (ADR-091 Phase C): block new XEnvironment provisioning for over-budget teams.
+  # Audit-first (flip cost_budget_failure_action → Enforce once proven); fail-open (Ignore failurePolicy by
+  # default — an observability outage never blocks provisioning). Reads cost-budget-status (observability).
+  enable_cost_budget_enforcement = true
+  cost_budget_failure_action     = "Audit"
+
   # Replica floor (ADR-085): flipped Audit -> Enforce after review — the audit was clean (the only prod-stage
   # workload, alpha-shop-prod, runs 3 replicas; 0 PolicyReport violations). Prod deploys with < 2 replicas are
   # now rejected at admission (break-glass for the rare exception).

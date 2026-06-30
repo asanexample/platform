@@ -91,6 +91,10 @@ inputs = {
   # No Grafana on the spoke — only emit metrics; the hub dashboard (federated `mimir-all` datasource) renders them.
   create_dashboard = false
 
+  # Budget enforcement (ADR-091 Phase C): the hourly annotator writes over-budget teams to cost-budget-status
+  # (read by the Kyverno policy in the policy unit). Runs here — the Team CRs + Mimir egress + OpenCost are here.
+  enable_budget_enforcer = true
+
   helm_chart_version = include.base.locals.helm_versions.opencost
 
   tags = include.base.locals.tags

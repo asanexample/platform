@@ -171,6 +171,12 @@ locals {
     enableCleanup               = var.enable_cleanup
     additionalPolicies          = var.additional_policies
     commonLabels                = local.k8s_labels
+
+    # Cost-budget enforcement (ADR-091 Phase C) — block new XEnvironment provisioning for over-budget teams.
+    enableCostBudgetEnforcement = var.enable_cost_budget_enforcement
+    costBudgetStatusNamespace   = var.cost_budget_status_namespace
+    costBudgetFailureAction     = var.cost_budget_failure_action
+    costBudgetFailurePolicy     = var.cost_budget_failure_policy
   }
 }
 

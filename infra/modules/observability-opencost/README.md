@@ -48,15 +48,23 @@ No modules.
 | Name | Type |
 | ---- | ---- |
 | [helm_release.opencost](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
+| [kubernetes_config_map_v1.budget_status](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/config_map_v1) | resource |
 | [kubernetes_config_map_v1.cost_dashboard](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/config_map_v1) | resource |
+| [kubernetes_cron_job_v1.budget_enforcer](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/cron_job_v1) | resource |
+| [kubernetes_role_binding_v1.budget_enforcer](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/role_binding_v1) | resource |
+| [kubernetes_role_v1.budget_enforcer](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/role_v1) | resource |
+| [kubernetes_service_account_v1.budget_enforcer](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/service_account_v1) | resource |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_budget_enforcer_image"></a> [budget\_enforcer\_image](#input\_budget\_enforcer\_image) | Image for the budget-enforcement annotator (needs kubectl + curl + jq). ADR-091 Phase C. | `string` | `"alpine/k8s:1.31.1"` | no |
+| <a name="input_budget_enforcer_schedule"></a> [budget\_enforcer\_schedule](#input\_budget\_enforcer\_schedule) | Cron schedule for the budget-enforcement annotator (ADR-091 Phase C). Cost is slow-moving — hourly is plenty. | `string` | `"17 * * * *"` | no |
 | <a name="input_create"></a> [create](#input\_create) | Controls whether resources are created (cost\_profile toggle — enable\_cost\_metrics). | `bool` | `true` | no |
 | <a name="input_create_dashboard"></a> [create\_dashboard](#input\_create\_dashboard) | Create the Grafana cost dashboard ConfigMap. True on a cluster that runs Grafana (the hub); false on a spoke that only emits metrics. ADR-091. | `bool` | `true` | no |
 | <a name="input_dashboard_datasource_uid"></a> [dashboard\_datasource\_uid](#input\_dashboard\_datasource\_uid) | Grafana datasource uid the cost dashboard queries (the Mimir where OpenCost metrics land). ADR-091. | `string` | `"mimir"` | no |
+| <a name="input_enable_budget_enforcer"></a> [enable\_budget\_enforcer](#input\_enable\_budget\_enforcer) | Run the budget-enforcement annotator (ADR-091 Phase C): an hourly CronJob that writes over-budget teams to the cost-budget-status ConfigMap the Kyverno policy reads. Enable on the spoke that runs OpenCost + the Team CRD (preprod). | `bool` | `false` | no |
 | <a name="input_helm_chart"></a> [helm\_chart](#input\_helm\_chart) | Chart name. | `string` | `"opencost"` | no |
 | <a name="input_helm_chart_version"></a> [helm\_chart\_version](#input\_helm\_chart\_version) | OpenCost chart version. | `string` | `"2.5.23"` | no |
 | <a name="input_helm_repository"></a> [helm\_repository](#input\_helm\_repository) | OpenCost chart repository. | `string` | `"https://opencost.github.io/opencost-helm-chart"` | no |
