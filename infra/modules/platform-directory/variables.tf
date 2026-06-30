@@ -83,3 +83,15 @@ variable "deployer_role_arn" {
   type        = string
   default     = ""
 }
+
+variable "audit_writer_secret_name" {
+  description = "Secrets Manager id for the activation-audit WRITER connection (the operator; INSERT-only on activation_audit). ADR-088 §3.6."
+  type        = string
+  default     = "platform/activation-operator/audit-writer-db"
+}
+
+variable "audit_reader_secret_name" {
+  description = "Secrets Manager id for the activation-audit READER connection (Backstage; SELECT-only on activation_audit). ADR-088 §3.6."
+  type        = string
+  default     = "platform/backstage/audit-reader-db"
+}

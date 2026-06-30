@@ -8,6 +8,14 @@
 
 locals {
   create = var.create
+
+  # Scoped activation-audit Postgres roles (ADR-088 §3.6 least-privilege): the operator writes as
+  # `activation_writer` (INSERT-only on activation_audit), Backstage reads as `activation_reader` (SELECT-only)
+  # — neither can touch the directory's identity tables. Their connections are published to the SM ids below.
+  audit_db_roles = local.create ? {
+    "activation_writer" = var.audit_writer_secret_name
+    "activation_reader" = var.audit_reader_secret_name
+  } : {}
 }
 
 resource "kubernetes_namespace_v1" "this" {
@@ -60,19 +68,27 @@ resource "kubernetes_manifest" "db" {
       # Keep Karpenter from voluntarily disrupting the node a Postgres instance runs on.
       inheritedMetadata = { annotations = { "karpenter.sh/do-not-disrupt" = "true" } }
       bootstrap         = { initdb = { database = "directory", owner = "directory" } }
-      # Set the directory role's password to our deterministic secret (so the SM DSN matches).
+      # Set the directory role's password to our deterministic secret (so the SM DSN matches). The scoped
+      # activation-audit roles (writer/reader, ADR-088 §3.6 least-privilege) are managed the same way; their
+      # table-level grants on activation_audit (no access to the directory's identity tables) are a one-time
+      # SQL run as the directory owner (the table is operator-created — see docs/runbooks/audit-db-grants.md).
       managed = {
-        roles = [{
+        roles = concat([{
           name           = "directory"
           ensure         = "present"
           login          = true
           passwordSecret = { name = kubernetes_secret_v1.db_role[0].metadata[0].name }
-        }]
+          }], [for r in keys(local.audit_db_roles) : {
+          name           = r
+          ensure         = "present"
+          login          = true
+          passwordSecret = { name = kubernetes_secret_v1.audit_role[r].metadata[0].name }
+        }])
       }
       enableSuperuserAccess = false
     }
   }
-  depends_on = [kubernetes_namespace_v1.this, kubernetes_secret_v1.db_role]
+  depends_on = [kubernetes_namespace_v1.this, kubernetes_secret_v1.db_role, kubernetes_secret_v1.audit_role]
 }
 
 # Default-deny posture: allow ONLY the agent's namespace to reach the DB on 5432.
@@ -110,6 +126,46 @@ resource "aws_secretsmanager_secret_version" "db" {
   secret_id = aws_secretsmanager_secret.db[0].id
   secret_string = jsonencode({
     uri = "postgresql://directory:${random_password.db[0].result}@${var.db_cluster_name}-rw.${var.namespace}.svc.cluster.local:5432/directory"
+  })
+}
+
+# ---------------------------------------------------------------------------
+# Scoped activation-audit roles (ADR-088 §3.6 least-privilege) — writer (operator) + reader (Backstage).
+# ---------------------------------------------------------------------------
+
+resource "random_password" "audit_role" {
+  for_each = local.audit_db_roles
+  length   = 32
+  special  = false # alphanumeric — safe across the SM->ESO->DSN path
+}
+
+resource "kubernetes_secret_v1" "audit_role" {
+  for_each = local.audit_db_roles
+  metadata {
+    name      = "${var.db_cluster_name}-${replace(each.key, "_", "-")}"
+    namespace = var.namespace
+  }
+  type = "kubernetes.io/basic-auth"
+  data = {
+    username = each.key
+    password = random_password.audit_role[each.key].result
+  }
+  depends_on = [kubernetes_namespace_v1.this]
+}
+
+resource "aws_secretsmanager_secret" "audit_role" {
+  for_each                = local.audit_db_roles
+  name                    = each.value
+  description             = "Scoped activation-audit Postgres connection (${each.key}) — ADR-088 §3.6 least-privilege."
+  recovery_window_in_days = var.secret_recovery_window_days
+  tags                    = var.tags
+}
+
+resource "aws_secretsmanager_secret_version" "audit_role" {
+  for_each  = local.audit_db_roles
+  secret_id = aws_secretsmanager_secret.audit_role[each.key].id
+  secret_string = jsonencode({
+    uri = "postgresql://${each.key}:${random_password.audit_role[each.key].result}@${var.db_cluster_name}-rw.${var.namespace}.svc.cluster.local:5432/directory"
   })
 }
 

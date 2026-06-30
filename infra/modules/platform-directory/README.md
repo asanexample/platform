@@ -96,19 +96,25 @@ No modules.
 
 | Name | Type |
 | ---- | ---- |
+| [aws_secretsmanager_secret.audit_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.db](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
+| [aws_secretsmanager_secret_version.audit_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.db](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [kubernetes_manifest.db](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.db_ingress](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_namespace_v1.this](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/namespace_v1) | resource |
+| [kubernetes_secret_v1.audit_role](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/secret_v1) | resource |
 | [kubernetes_secret_v1.db_role](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/secret_v1) | resource |
 | [null_resource.cnpg_finalizer_cleanup](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
+| [random_password.audit_role](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
 | [random_password.db](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_audit_reader_secret_name"></a> [audit\_reader\_secret\_name](#input\_audit\_reader\_secret\_name) | Secrets Manager id for the activation-audit READER connection (Backstage; SELECT-only on activation\_audit). ADR-088 §3.6. | `string` | `"platform/backstage/audit-reader-db"` | no |
+| <a name="input_audit_writer_secret_name"></a> [audit\_writer\_secret\_name](#input\_audit\_writer\_secret\_name) | Secrets Manager id for the activation-audit WRITER connection (the operator; INSERT-only on activation\_audit). ADR-088 §3.6. | `string` | `"platform/activation-operator/audit-writer-db"` | no |
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | EKS cluster name (for the teardown finalizer-cleanup). | `string` | `""` | no |
 | <a name="input_consumer_namespace"></a> [consumer\_namespace](#input\_consumer\_namespace) | The namespace allowed to reach the DB on 5432 (the triage agent's). | `string` | `"platform-agent-triage-copilot"` | no |
 | <a name="input_create"></a> [create](#input\_create) | Whether to provision the directory database. | `bool` | `true` | no |
