@@ -90,8 +90,9 @@ subjects:
 ---
 # Sole-creator boundary (ADR-088): ONLY the Activate Power backend may create Activations — so no borrow can
 # skip the passkey step-up. The backend reaches the cluster as `{{ .Values.activatorGroup }}` (its Backstage
-# pod's EKS access entry, infra/modules/backstage). create on Activations + read on the registries it checks
-# for eligibility; nothing else (no update/delete — only the operator manages the lifecycle).
+# pod's EKS access entry, infra/modules/backstage). create + delete on Activations (delete = the Active Power
+# page's revoke, which the operator's finalizer turns into a full grant teardown) + read on the registries it
+# checks for eligibility; NO update (the operator owns the lifecycle/status, the backend never mutates spec).
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -102,7 +103,7 @@ metadata:
 rules:
 - apiGroups: [platform.refplat.org]
   resources: [activations]
-  verbs: [create, get, list, watch]
+  verbs: [create, get, list, watch, delete]
 - apiGroups: [platform.refplat.org]
   resources: [people, workforceroles]
   verbs: [get, list]
