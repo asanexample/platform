@@ -38,9 +38,15 @@ variable "anomaly_threshold_usd" {
 }
 
 variable "anomaly_monitor_dimension" {
-  description = "Dimension for the DIMENSIONAL Cost Anomaly Detection monitor (SERVICE or LINKED_ACCOUNT)."
+  description = "Dimension for the DIMENSIONAL Cost Anomaly Detection monitor (SERVICE or LINKED_ACCOUNT). Only used when existing_monitor_arn is empty."
   type        = string
   default     = "SERVICE"
+}
+
+variable "existing_monitor_arn" {
+  description = "ARN of an existing Cost Anomaly Detection monitor to subscribe to (typically the account's auto-created Default-Services-Monitor). AWS permits only one dimensional monitor per account, so set this rather than creating a second. Empty = create one (only valid in an account without a default monitor)."
+  type        = string
+  default     = ""
 }
 
 variable "slack_team_id" {

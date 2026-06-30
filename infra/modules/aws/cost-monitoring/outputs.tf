@@ -9,8 +9,8 @@ output "budget_names" {
 }
 
 output "anomaly_monitor_arn" {
-  description = "ARN of the Cost Anomaly Detection monitor."
-  value       = try(aws_ce_anomaly_monitor.services[0].arn, null)
+  description = "ARN of the Cost Anomaly Detection monitor the subscription watches (the created one, or existing_monitor_arn)."
+  value       = local.monitor_arn
 }
 
 output "chatbot_configuration_arn" {
