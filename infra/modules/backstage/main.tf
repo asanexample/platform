@@ -124,6 +124,16 @@ locals {
   argocd_env = local.enable_argocd ? [
     { name = "ARGOCD_AUTH_TOKEN", valueFrom = { secretKeyRef = { name = local.argocd_k8s_secret, key = var.argocd_token_secret_key } } },
   ] : []
+
+  # Durable-audit read (ADR-088 §3.6): the My Access view reads borrow HISTORY from the ADR-084 directory
+  # Postgres. The connection (SM `uri`) is projected by the ExternalSecret below into AUDIT_DB_DSN; the backend
+  # reads it env-side (a secret — never a flag). Empty audit_db_secret_id disables it (view degrades to
+  # standing + live). The directory DB's CiliumNetworkPolicy must admit this namespace.
+  enable_audit_db  = var.create && var.audit_db_secret_id != ""
+  audit_k8s_secret = "backstage-audit-db"
+  audit_env = local.enable_audit_db ? [
+    { name = "AUDIT_DB_DSN", valueFrom = { secretKeyRef = { name = local.audit_k8s_secret, key = "dsn" } } },
+  ] : []
   argocd_app_config = local.enable_argocd ? {
     argocd = {
       appLocatorMethods = [{
@@ -198,7 +208,7 @@ locals {
         { name = "POSTGRES_PORT", value = "5432" },
         { name = "POSTGRES_USER", valueFrom = { secretKeyRef = { name = local.db_secret, key = local.db_user_key } } },
         { name = "POSTGRES_PASSWORD", valueFrom = { secretKeyRef = { name = local.db_secret, key = local.db_pass_key } } },
-      ], local.oidc_env, local.github_env, local.scaffolder_env, local.argocd_env)
+      ], local.oidc_env, local.github_env, local.scaffolder_env, local.argocd_env, local.audit_env)
 
       # Extra app-config layer (chart renders it to a ConfigMap and appends --config): OIDC session
       # support (auth.session.secret) + the complete integrations.github (Phase 2.2). Empty {} when both off.
@@ -339,6 +349,33 @@ resource "kubernetes_manifest" "oidc_external_secret" {
       data = [{
         secretKey = var.oidc_secret_key
         remoteRef = { key = var.oidc_secret_name, property = var.oidc_secret_key }
+      }]
+    }
+  }
+
+  depends_on = [kubernetes_namespace_v1.backstage]
+}
+
+# Durable-audit read (ADR-088 §3.6): project the ADR-084 directory Postgres connection (SM `uri`) into the
+# backstage namespace as backstage-audit-db/dsn, which the backend reads as AUDIT_DB_DSN for the My Access
+# view's borrow history.
+resource "kubernetes_manifest" "audit_db_external_secret" {
+  count = local.enable_audit_db ? 1 : 0
+
+  manifest = {
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = local.audit_k8s_secret
+      namespace = var.namespace
+    }
+    spec = {
+      refreshInterval = "1h"
+      secretStoreRef  = { name = var.secret_store_name, kind = "ClusterSecretStore" }
+      target          = { name = local.audit_k8s_secret, creationPolicy = "Owner" }
+      data = [{
+        secretKey = "dsn"
+        remoteRef = { key = var.audit_db_secret_id, property = "uri" }
       }]
     }
   }
