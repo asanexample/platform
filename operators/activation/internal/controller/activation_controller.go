@@ -142,7 +142,10 @@ func (r *ActivationReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 // renewAnnotation carries an extend request (set by the intake API after it verifies a fresh passkey). The
 // value is a renewRequest JSON; the operator applies it once per nonce.
-const renewAnnotation = "activate.platform.refplat.org/renew"
+//
+// CROSS-REPO CONTRACT: this key MUST match what the Backstage backend stamps (activate-power's requestExtend
+// → `<group>/renew`). Keep it group-prefixed like the teardown annotations above.
+const renewAnnotation = "platform.refplat.org/renew"
 
 type renewRequest struct {
 	Nonce    string      `json:"nonce"`
