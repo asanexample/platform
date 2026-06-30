@@ -84,3 +84,9 @@ variable "activator_group" {
   type        = string
   default     = "backstage-activators"
 }
+
+variable "audit_db_secret" {
+  description = "Name of the k8s Secret (key `dsn`) holding the durable-audit Postgres connection (ADR-088 §3.6). Empty disables the audit env (the operator uses the no-op recorder)."
+  type        = string
+  default     = ""
+}

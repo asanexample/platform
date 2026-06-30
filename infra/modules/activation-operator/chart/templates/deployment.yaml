@@ -51,6 +51,15 @@ spec:
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
           value: {{ .Values.otelEndpoint | quote }}
         {{- end }}
+        {{- if .Values.auditDbSecret }}
+        # Durable governance audit (ADR-088 §3.6) — the directory Postgres DSN, projected from Secrets
+        # Manager by the ExternalSecret. Unset = audit disabled (operator still mints/revokes).
+        - name: AUDIT_DB_DSN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.auditDbSecret }}
+              key: dsn
+        {{- end }}
         securityContext:
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false

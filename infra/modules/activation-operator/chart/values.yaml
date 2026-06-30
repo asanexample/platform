@@ -20,6 +20,9 @@ syncPeriod: 2m
 # OTLP endpoint for the unified telemetry pipeline (traces+metrics → the cluster otel-collector). Empty
 # disables export (telemetry.Setup is a no-op), so the operator runs without a collector.
 otelEndpoint: ""
+# Name of the k8s Secret (key `dsn`) holding the durable-audit Postgres connection (ADR-088 §3.6). Empty
+# disables the audit env — the operator runs with the no-op recorder (logs/metrics only).
+auditDbSecret: ""
 resources:
   limits:
     cpu: 500m

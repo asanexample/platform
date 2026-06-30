@@ -41,6 +41,7 @@ import (
 
 	platformv1alpha1 "github.com/asanexample/platform/operators/activation/api/v1alpha1"
 	platformv1beta1 "github.com/asanexample/platform/operators/activation/api/v1beta1"
+	"github.com/asanexample/platform/operators/activation/internal/audit"
 	"github.com/asanexample/platform/operators/activation/internal/catalog"
 	"github.com/asanexample/platform/operators/activation/internal/controller"
 	"github.com/asanexample/platform/operators/activation/internal/eligibility"
@@ -248,6 +249,24 @@ func main() {
 	}
 	awsPlane := awsidc.New(awsClient, resolvePS, excludeAccounts...)
 
+	// Durable governance audit (ADR-088 §3.6) — every grant/revoke is recorded to the ADR-084 directory
+	// Postgres, so the trail outlives the (deleted) CR and telemetry retention. The DSN is a secret, so it
+	// comes from the environment (AUDIT_DB_DSN), never a flag (flags are visible in the process args). Unset =
+	// no durable audit (logged loudly); the operator still mints/revokes.
+	var auditRecorder audit.Recorder = audit.Nop{}
+	if dsn := os.Getenv("AUDIT_DB_DSN"); dsn != "" {
+		rec, err := audit.New(context.Background(), dsn)
+		if err != nil {
+			setupLog.Error(err, "Failed to connect the audit sink — refusing to start without the governance trail")
+			os.Exit(1)
+		}
+		defer rec.Close()
+		auditRecorder = rec
+		setupLog.Info("durable audit sink connected")
+	} else {
+		setupLog.Info("AUDIT_DB_DSN unset — durable governance audit is DISABLED (logs/metrics only)")
+	}
+
 	if err := (&controller.ActivationReconciler{
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
@@ -255,6 +274,7 @@ func main() {
 		Catalog:     roleCatalog,
 		Eligibility: eligibility.New(mgr.GetClient()),
 		Telemetry:   telem,
+		Audit:       auditRecorder,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "Activation")
 		os.Exit(1)

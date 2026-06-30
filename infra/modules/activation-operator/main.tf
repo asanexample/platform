@@ -132,6 +132,7 @@ resource "helm_release" "activation_operator" {
     excludeAccountIds = var.management_account_id
     syncPeriod        = var.sync_period
     otelEndpoint      = var.otel_endpoint
+    auditDbSecret     = var.audit_db_secret
     chartChecksum     = local.chart_checksum
   })]
 
