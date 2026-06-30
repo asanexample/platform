@@ -87,7 +87,7 @@ inputs = {
   # Manager into the `activation-audit-db` Secret, which the operator reads as AUDIT_DB_DSN. The directory DB's
   # CiliumNetworkPolicy admits this namespace (platform-directory.extra_consumer_namespaces).
   audit_db_secret    = "activation-audit-db"
-  audit_db_secret_id = "platform/triage-copilot/directory-db"
+  audit_db_secret_id = "platform/activation-operator/audit-writer-db"
 
   tags = include.base.locals.tags
 }

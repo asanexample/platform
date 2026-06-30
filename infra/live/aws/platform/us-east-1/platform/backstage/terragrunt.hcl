@@ -191,7 +191,7 @@ inputs = {
   # My Access view (ADR-088 §3.6): read borrow HISTORY from the ADR-084 directory Postgres. Projects the
   # connection (same SM secret the triage agent uses) into AUDIT_DB_DSN. platform-directory admits this
   # namespace via extra_consumer_namespaces.
-  audit_db_secret_id = "platform/triage-copilot/directory-db"
+  audit_db_secret_id = "platform/backstage/audit-reader-db"
 
   argocd_instances = [{
     name         = "platform"
