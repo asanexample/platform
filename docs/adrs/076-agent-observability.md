@@ -32,7 +32,9 @@
 >
 > 4. **Eval-online-signal is live now, not "deferred to the eval phase."** We have an eval harness
 >    (`spike-triage-eval`) and the Slack human-confirm (the production accept/reject) — so the
->    `gen_ai.evaluation.result` loop (prod outcome → eval) is wired now.
+>    `gen_ai.evaluation.result` loop (prod outcome → eval) is wired now. The durable **corpus** behind this loop —
+>    captured fixtures + eval results — now lands write-once in the `agent-eval-store` S3 bucket (ADR-080 D6), the
+>    retention-safe home the online Loki signal isn't.
 >
 > **Unchanged:** the GenAI-semconv wrapper (D1 — still `Development`-tier), metadata-first / in-cluster-only /
 > secrets-never (D3; nuance: prompts already transit Bedrock, so the rule is "no SaaS-obs side-channel," not "content

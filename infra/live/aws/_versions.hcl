@@ -27,9 +27,10 @@ locals {
     eks_pod_identity = "${local.source_base}/aws//eks-pod-identity"
 
     # Storage & secrets
-    ecr      = "${local.source_base}/aws//ecr"
-    s3       = "${local.source_base}/aws//s3"
-    sops_kms = "${local.source_base}/aws//sops-kms" # SOPS config-encryption key (ADR-066)
+    ecr              = "${local.source_base}/aws//ecr"
+    s3               = "${local.source_base}/aws//s3"
+    sops_kms         = "${local.source_base}/aws//sops-kms"         # SOPS config-encryption key (ADR-066)
+    agent_eval_store = "${local.source_base}/aws//agent-eval-store" # durable forward-capture eval corpus (ADR-080 D6)
 
     # Notifications
     sns_notifications = "${local.source_base}/aws//sns-notifications"

@@ -108,6 +108,12 @@ inputs = {
   high_availability = include.base.locals.high_availability
   storage_class     = "gp3"
 
+  # Retention bumped 14d→45d for the agent-eval capture substrate (ADR-080 D6): gives a grace window for
+  # label back-fill (an incident's RCA / accept-reject can land weeks after it fires) plus a modest
+  # live-backtest window. Loki here is ~sub-GB, so the extra retention is ~free. (Tempo stays at its 3d
+  # default — traces are the priciest, least label-dense store, and forward-capture freezes the snapshot.)
+  retention_period = "1080h" # 45d (module default 336h/14d)
+
   # Cross-cluster log spoke ingest (#627): self-route a write-only, tenant-overwriting HTTPRoute per spoke +
   # surface each spoke's tenant (and a federated all-clusters view) as Grafana datasources.
   spoke_ingest = {

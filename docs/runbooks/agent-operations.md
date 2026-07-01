@@ -85,6 +85,42 @@ Multi-cluster: a spoke/preprod alert reaches the agent via the **Mimir ruler** (
 all), the obs query tenant follows the alert's `cluster` label (`X-Scope-OrgID`), and "what changed" is read
 **hub-local from ArgoCD** sync history — the agent never touches the spoke's API (ADR-082 D2, refined).
 
+## The eval capture substrate (forward-capture)
+
+The triage agent's evaluation corpus is **built forward** ([ADR-080](../adrs/080-triage-copilot.md) D6): telemetry
+retention is short, so a real incident not captured *when it fires* is lost. At triage time the agent writes a
+**write-once fixture** — `{alert-group, telemetry snapshot, structured label, rubric}` — into the durable corpus,
+and its label **back-fills later** from the accept/reject signal (and the eventual RCA). Accrued forward, this is
+the `production-shadow` source that feeds the `shadow → proven → promoted` graduation signal
+([ADR-086](../adrs/086-autonomous-agent-access.md)).
+
+- **Store:** the `agent-eval-store` unit provisions a durable, keep-forever S3 bucket **`platform-agent-eval-corpus`**
+  (platform account) — dedicated CMK (SSE-KMS), TLS-only, versioned, write-once (the agent has `PutObject`/`GetObject`
+  but **no `DeleteObject`**), and `teardown_skip` so it survives a rebuild (like the state backend). Provisioned
+  independently of any agent version.
+- **Write access:** identity-based on the agent's Pod-Identity role, declared in `gitops/agents/triage-copilot.yaml`
+  (`awsPermissions.policyStatements`: S3 object write + KMS use). No cross-account read role exists yet (the module's
+  `reader_role_arns` seam is empty until a CI replay/grader lands, ADR-080 D6 — an app-repo follow-up).
+- **Config contract (app repo):** the agent reads the target bucket from config; the name is the deterministic
+  constant `platform-agent-eval-corpus`. **Metadata-first** — capture structured values + bounded context, **not**
+  raw unredacted logs/traces, until ADR-076's content-capture-with-redaction lands.
+
+### Capture-health
+
+A silently-failing capture makes the "ready-for-scale" premise quietly false, so watch it. Today only the
+**trigger layer** is observable: **`AgentTriageWebhookDeliveryFailing`** (curated alert) fires when Alertmanager
+webhook delivery fails — the agent isn't receiving criticals, so it can neither triage nor capture. The fuller
+**"fixtures captured == 0 while criticals fired"** alert lands once the agent emits an
+`agent_eval_fixtures_captured_total` counter on its `/metrics` endpoint (→ Mimir, the ADR-076 path).
+
+### Synthetic-alert isolation (convention for the injection slice)
+
+A later slice adds an autonomous **fault-injection** runner (bounded catalog, walled-off namespace) to bootstrap
+the corpus with self-labeled known failures. Its injected alerts **MUST** carry the label **`synthetic="true"`**;
+the injection slice then adds an Alertmanager route fanning `synthetic="true"` to the `triage` receiver **only —
+never PagerDuty/SNS** (modeled on the `Watchdog → null` pattern), so a fake incident can't page real on-call or
+@mention a real culprit. The convention is documented now; the route ships with its producer.
+
 ## Suspend an agent — the kill-switch
 
 To stop an agent **now**, set its lifecycle phase to `suspended` and commit:
@@ -142,7 +178,9 @@ default-deny ingress; see the ADR-082 "Implementation status & learnings" sectio
   roles don't. Today the agent triages from hub-central obs + ArgoCD change history alone (ADR-082 D2).
 - **Running an agent *on* a workload cluster** (per-cluster `XAgent` federation) is deferred — agents are
   hub-only today.
-- **An eval-harness CI regression gate** and ADR-076 content-capture are tracked follow-ups (ADR-080/082).
+- The forward-capture **corpus** substrate is built (see "The eval capture substrate" above); the eval
+  **grader / CI regression gate** (app repo), the autonomous fault-injection **runner**, and ADR-076
+  content-capture remain tracked follow-ups (ADR-080/082).
 
 ## References
 

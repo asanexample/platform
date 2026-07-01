@@ -128,7 +128,11 @@ an auto-remediation agent consumes is **untrusted data, never instructions.**
   harm; conservative-by-default + review is the mitigation, not a guarantee.
 - **Powerful + injectable is the nightmare** — accepted only because injection defense + bounded envelope +
   reversibility + circuit breakers **compound**; no single control is trusted alone.
-- **Gated on ADR-074 maturity** — no autonomy until eval-as-a-service + kill-switch are proven.
+- **Gated on ADR-074 maturity** — no autonomy until eval-as-a-service + kill-switch are proven. *(In progress: the
+  kill-switch is live (ADR-082); the eval-as-a-service prerequisite has begun with the forward-capture **capture
+  substrate** — a durable, always-on S3 corpus of real triage episodes with late-binding labels (ADR-080 D6, the
+  `agent-eval-store` unit) — the first building block of the shadow→proven→promoted graduation signal. The grader,
+  reversibility registry, and action-time policy remain unbuilt.)*
 
 ## Alternatives considered
 
