@@ -4,8 +4,8 @@
 
 Multi-cloud IaC platform using OpenTofu (v1.12.1) + Terragrunt (v1.0.7). Currently targets AWS only (Azure/GCP removed). CLI tool versions (tofu, terragrunt, kubectl, helm, awscli) are pinned canonically in `/.tool-versions` — the single source of truth read by local dev (mise/asdf), CI, and the self-hosted runner image.
 
-- **Shared modules** (`infra/modules/`): actions-runner-controller, argo-rollouts, argocd, argocd-apps, argocd-clusters, backstage, cert-manager, cilium, cloudflare/dns_delegation, cloudnative-pg, cluster-rbac, crossplane, external-dns, external-secrets, falco, gateway, gateway-config, github-teams, keycloak, keycloak-config, oauth2-proxy, pagerduty, platform-directory, policy, secret-stores, tailscale, tailscale-admin, vcluster, plus `observability` and 16× `observability-*` (the LGTM+P stack: alloy, beyla, blackbox, cloudwatch-exporter, events, k6, loki, mimir, opencost, otel-collector, otel-operator, prometheus-agent, pyroscope, pyroscope-ebpf, slo, tempo)
-- **AWS modules** (`infra/modules/aws/`): cloudtrail, cost-allocation-tags, cross-vpc-dns, ecr, eks, eks-addons, eks-node-group, eks-pod-identity, github_oidc, iam_roles, identity_center, karpenter, networking, organizations, route53, route53_delegation, s3, sns-notifications, sops-kms, ssm-bastion, state_bootstrap, transit-gateway
+- **Shared modules**: `infra/modules/` (`ls` for the current list) — includes the LGTM+P observability stack as `observability` + 16× `observability-*`
+- **AWS modules**: `infra/modules/aws/`
 - **Live configs**: `infra/live/aws/` -- environment-specific Terragrunt units
 
 ## House Skills
@@ -72,53 +72,22 @@ include.base.locals.admin_email                # contact email
 include.base.locals.account_emails["preprod"]  # per-account email
 ```
 
-## Deployment Ordering (AWS)
+## Deployment Ordering & Apply/Destroy (AWS)
 
-> Running apply/destroy or full bootstrap/teardown: the **`apply-and-destroy`** and **`platctl`** skills.
+> Applying/destroying a unit, bootstrapping/tearing down, or reasoning about what depends on what:
+> the **`apply-and-destroy`** and **`platctl`** skills own this — the full DAG, the exact `run --all`
+> commands, and the per-unit "why" (Keycloak self-routing, the ESO→argocd chain, Karpenter's
+> Cilium-first taint, etc.) live there and in `docs/runbooks/platform-rebuild-from-scratch.md`.
 
-```text
-iam-roles, networking ─> eks ─> cilium ─> node-groups ─> ssm-bastion
-  (BYOCNI: Cilium MUST precede node groups; eks-addons/coredns need CNI + nodes)
-then on the cluster:
-  route53 · eks-addons · cert-manager · external-dns · external-secrets · secret-stores · cluster-rbac
-  gateway            (EARLY — no app deps; shared Gateway+ClusterIssuer up before keycloak-config)
-  policy ─> crossplane   (policy first — its ClusterPolicies match crossplane's XEnvironment CRDs)
-  keycloak ─> keycloak-config ─> argocd ─> argocd-clusters ─> argocd-apps
-  cloudnative-pg · backstage · karpenter · tailscale · cross-vpc-dns · transit-gateway · gateway-config
-cloud-only (no cluster deps): tailscale-admin · cloudtrail · cloudflare-dns
-actions-runner-controller — applied LOCALLY / via platctl (it's what lets CI manage the cluster, so
-  it can't bootstrap itself; prereq: the GitHub App, docs/runbooks/arc-github-app.md)
-```
+The one fact worth keeping resident: the EKS API is **private-only by design** (ADR-010) — reach it
+over **Tailscale**, never the public endpoint, for routine ops. The only exception is a full
+from-scratch teardown/rebuild, where `platctl` bootstraps/locks down the public endpoint automatically.
 
-Full annotated ordering and the per-unit "why" (Keycloak self-routing, the ESO→argocd chain,
-Karpenter's Cilium-first taint, etc.) live in the **`apply-and-destroy`** skill and
-`docs/runbooks/platform-rebuild-from-scratch.md`. Preprod is similar, adding the federated
-`crossplane` Environment control plane (ADR-048/067) and `transit-gateway` as a spoke.
-Cross-environment units on the platform cluster: route53-delegation, ecr, github-oidc, argocd-apps,
-github-teams (registry-derived org-Team ownership, ADR-072).
-
-### Apply / Destroy
-
-Full from-scratch teardown + rebuild via `platctl`: `docs/runbooks/platform-rebuild-from-scratch.md` (note:
-`platctl` is built to `./bin/platctl` via `make build-platctl` — it is not on PATH by default).
-
-```bash
-# Apply (from any env's unit directory, e.g. infra/live/aws/platform/us-east-1/platform/)
-terragrunt run --all apply
-
-# Destroy (reverse DAG)
-terragrunt run --all destroy --filter-allow-destroy -- -auto-approve
-```
-
-The EKS API is **private-only by design** (ADR-010). For routine apply/maintenance, reach it over
-**Tailscale** — the `*-eks-subnet-router` advertises the VPC CIDR and split-DNS resolves the private
-endpoint to its VPC ENI IPs, so `terragrunt apply`, `kubectl`, etc. work directly once you're on the
-tailnet (`tailscale status` should list the subnet routers). **Do NOT enable the public endpoint** for
-ordinary operations. The only exception is a full from-scratch teardown/rebuild, where Tailscale itself
-is destroyed — `platctl` handles that bootstrap escape (its unlock/lockdown phases toggle the endpoint
-and re-disable it automatically; see `docs/runbooks/platform-rebuild-from-scratch.md`).
-
-All dependency blocks have `mock_outputs` so destroy works even if upstream dependencies are already gone.
+**⚠️ NEVER run `terragrunt apply`/`plan` from a git worktree** — always apply from the main checkout.
+The crossplane unit's orphan-sweep `null_resource`s (`infra/modules/crossplane/main.tf`) trigger off
+absolute script paths; a worktree's different absolute path makes Terraform see a changed trigger,
+replace the resource, and fire its `when = destroy` provisioner — force-deleting live environment IAM
+roles + ECR repos on what looks like a routine apply.
 
 ## Key Commands
 
@@ -158,6 +127,13 @@ cd infra/tests/aws/<module> && go test -v -timeout 30m
 ```bash
 git config core.hooksPath .githooks
 ```
+
+## Git Workflow
+
+Branches are kebab-case with a short type or domain prefix, e.g. `docs-`, `feat-`, `fix-`, or a
+domain word like `cost-`/`adr-`/`govreg-` (check `gh pr list --state merged --json headRefName`
+for precedent if unsure). `EnterWorktree`'s auto-generated `worktree-*` branch name doesn't follow
+this — rename it (`git branch -m`) before opening a PR.
 
 ## Module Code Style & Testing
 
@@ -205,7 +181,7 @@ The **Test** account (`157263244316`, Terratest sandbox) is a standard `Platform
 - **Cross-VPC DNS** — two modes via `dns_method`: custom PHZ (cheap, manual IP updates) or Route53 Resolver endpoints (robust, ~$365/mo). EKS-managed PHZs are inaccessible, so we maintain our own.
 - **Tailscale Operator** — subnet router advertising VPC CIDR to tailnet. Split DNS managed by `tailscale` K8s unit. OAuth from Secrets Manager.
 - **Internal Gateway NLB** — `internal` scheme, services only reachable through Tailscale. TLS via Let's Encrypt DNS-01.
-- **Team→Product→Service→Environment model (ADR-067)** — ownership (Team) decoupled from the deployment unit (Environment = a Product at a Stage). ECR: `team-<team>/<product>-<svc>`. Namespace isolation only; vCluster deferred (ADR-033). Environments are provisioned by the **Crossplane `Environment` Composition** via an `XEnvironment` claim (`gitops/environments/<team>/<product>/<stage>.yaml`) — the sole provisioner; the old v2 `tenant`/`tenant-claims`/`pod-identity`/`s3-shared` units are retired. **Registries-as-single-source (ADR-061/063/067):** the git-native `Team` CR (`gitops/teams/`), `Product` registry (`gitops/products/<team>/<product>.yaml` — repo, tenancy, domains), and `XEnvironment` claims (`gitops/environments/`) are the source of truth — `argocd-apps`, `policy`, and `github-oidc` derive (`fileset`+`yamldecode`) per-Product from the registry; the app-delivery `teams.hcl` is retired. **Deprovisioning (ADR-062 #283):** `spec.lifecycle.phase: decommissioning` is a reversible suspend (the Composition zeroes the ResourceQuota); the hard-delete (claim removal) is gated decommission-first + admin-reviewed by the gitops Gate, and ECR is retained (`deletionPolicy: Orphan`). See `docs/runbooks/environment-deprovisioning.md`. See `docs/architecture/crossplane-environment-api.md`.
+- **Team→Product→Service→Environment model (ADR-067)** — ownership (Team) decoupled from the deployment unit (Environment = a Product at a Stage). ECR: `team-<team>/<product>-<svc>`. Namespace isolation only; vCluster deferred (ADR-033). Environments are provisioned by the Crossplane `Environment` Composition via an `XEnvironment` claim (`gitops/environments/<team>/<product>/<stage>.yaml`) — the sole provisioner; the old v2 `tenant`/`tenant-claims`/`pod-identity`/`s3-shared` units are retired. Registries-as-single-source (ADR-061/063/067): the git-native `Team` CR (`gitops/teams/`), `Product` registry (`gitops/products/<team>/<product>.yaml` — repo, tenancy, domains), and `XEnvironment` claims (`gitops/environments/`) are the source of truth — `argocd-apps`, `policy`, and `github-oidc` derive (`fileset`+`yamldecode`) per-Product from the registry; the app-delivery `teams.hcl` is retired. Deprovisioning (ADR-062 #283): `spec.lifecycle.phase: decommissioning` is a reversible suspend (the Composition zeroes the ResourceQuota); the hard-delete (claim removal) is gated decommission-first + admin-reviewed by the gitops Gate, and ECR is retained (`deletionPolicy: Orphan`). See `docs/runbooks/environment-deprovisioning.md` and `docs/architecture/crossplane-environment-api.md`.
 - **PR preview environments** — ArgoCD ApplicationSet PR generator. Apps with `preview = true` get ephemeral deployments. Kustomize patches rewrite HTTPRoute hostnames.
 - **Kyverno policy engine** (3.8.1 / app v1.18.1, ADR-014) — `policy` module deploys the HA engine + a bundled local `policies-chart` of ClusterPolicies, layered above the PSA `baseline` floor. Per-product image-registry scoping + cross-team IRSA-annotation backstop (environment AWS access is Pod Identity, ADR-041) + RBAC hardening. **Audit-first** (`validation_failure_action`) then flip to Enforce. No team data in the module (per-product maps derived from the `Product` registry at the unit — `verify_subjects_product`/`attest_caller_repos` from `spec.repo`). **Supply-chain split (ADR-046)**: per-product `restrict-images`/`restrict-route-hostnames` are owned by the Crossplane Environment Composition; the platform-owned cosign/SLSA `verify-images-product`/`verify-attestations-product` stay here for all products. Phased rollout (Phases 2–5: mutate/generate, cosign verifyImages, CLI shift-left, reporting/cleanup).
 
@@ -244,12 +220,10 @@ per-cluster catalog: `docs/architecture/kyverno-policy-catalog.md`. When writing
 - **No** `cluster-admin` (Cluster)RoleBindings or wildcard (`*`) verbs/resources in Roles
 - **`replicas >= 2` in `*-prod` namespaces** (`require-prod-replica-floor`, ADR-085) — a single replica can't be zero-downtime; an HPA must set `minReplicas >= 2`. **Enforce on preprod + platform** (#934) — a single-replica `*-prod` workload is now rejected at admission; lower stages may stay at 1 for cost. Replicas are validated, never mutated.
 
-**Your responsibility (not enforced, ADR-085):** handle **`SIGTERM`** — stop accepting, drain in-flight, exit (the injected `preStop` sleep only buys the datapath-deprogramming window; it does not drain your requests). Long-lived connections (websockets/gRPC streams) need app-level age limits / `GOAWAY`.
-
-**Recommended (not enforced):** `app.kubernetes.io/name` (can't be auto-derived).
-
-**Regulated tiers only** (`compliance_tier` = hipaa/pci — not the current `standard` clusters):
-`runAsNonRoot: true` and `readOnlyRootFilesystem: true` become required.
+Lower-stakes guidance that won't get a workload rejected — SIGTERM/drain handling (ADR-085), the
+recommended-but-not-enforced `app.kubernetes.io/name` label, and regulated-tier (hipaa/pci) extras
+(`runAsNonRoot`, `readOnlyRootFilesystem`) — lives in the **`authoring-k8s-workloads`** skill, not
+resident here.
 
 If a workload legitimately needs to violate a policy, that's a platform decision — see
 `docs/runbooks/kyverno-break-glass.md`; don't weaken a policy to fit one app. A minimal compliant

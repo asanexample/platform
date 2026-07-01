@@ -57,6 +57,13 @@ kubectl get nodes
   create/author resources — author via Git→ArgoCD, AWS infra via Terragrunt (PlatformDeployer),
   emergencies via break-glass (`OrganizationAccountAccessRole`).
 - **terragrunt apply / Helm / K8s providers → `PlatformDeployer`** (handled by root.hcl / `_base.hcl`).
+- **One-off kubectl writes outside PlatformAdmin's allow-list** (e.g. running a debug pod, clearing a
+  stuck finalizer/helm secret) → a separate `platform-deployer` kubectl context, not the default one:
+  `AWS_PROFILE=platform aws eks update-kubeconfig --name <cluster> --region us-east-1 --role-arn
+  arn:aws:iam::<PLATFORM_ACCOUNT_ID>:role/PlatformDeployer --alias platform-deployer`, then
+  `kubectl --context platform-deployer ...`. Forgetting `--context` silently runs against the default
+  PlatformAdmin context, which just denies the write. See `docs/runbooks/audit-db-grants.md` for a
+  worked example.
 
 ## Fallback — SSM tunnel
 

@@ -124,6 +124,16 @@ Ad-hoc render: `crossplane render xr.yaml composition.yaml functions.yaml [--obs
 Adding a provider service: add it to `var.provider_services`, append to
 `local.aws_providers` (auto-indexed), extend the provisioner IAM policy if needed.
 
+## ⚠️ Verify on the right cluster
+
+The env-API CRDs (`XEnvironment`, `Team`, `Product`, the XRD/Composition) are enabled on **preprod**
+(`enable_environment_api`), NOT the platform hub (off there, ADR-048). `kubectl get crd <name> |
+grep -c <pattern>` against the wrong cluster silently returns `0` instead of erroring — a false
+negative that reads as "not found" rather than "wrong cluster." Confirmed live twice
+(ADR-090, cost-A1 were both wrongly "verified" against platform when they only applied to preprod).
+Use `-o jsonpath` or `kubectl api-resources` and double-check `kubectl config current-context`
+before trusting a CRD-absence result.
+
 ## Envelope checks are Kyverno, not schema
 
 The XRD stays structural/self-contained. Cross-object rules — `spec.team ==
