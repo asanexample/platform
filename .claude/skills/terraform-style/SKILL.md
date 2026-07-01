@@ -235,6 +235,64 @@ resource "aws_rds_cluster" "this" {
 }
 ```
 
+## Destroy-time teardown-drain `null_resource`s
+
+Several modules (`crossplane`, `backstage`, `keycloak`, `platform-directory`, `tailscale`,
+`observability`) need a destroy-time `null_resource` that force-drains a stateful
+workload (CNPG Cluster, Crossplane CRs, Connector/ProxyClass, …) before the namespace/
+release deletes — an operator-managed finalizer otherwise hangs the real teardown. If
+you're authoring a new one of these, two rules, both learned the hard way (#1077/#1081):
+
+1. **Never bake the script's absolute path into `triggers`.** `triggers` is the *only*
+   thing that drives a `null_resource` replace, and a destroy-time provisioner can only
+   reference `self`/`count.index`/`each.key` (verified — OpenTofu rejects a direct
+   `var.x` reference there). So resolve the script path **inside the provisioner
+   command itself**, at shell-execution time, via `git rev-parse --show-toplevel` — not
+   as a Terraform-computed value passed through `triggers`. Baking an absolute path into
+   `triggers` makes the resource worktree-path-sensitive: a worktree's different path
+   looks like a changed trigger, forcing a replace that fires the destroy provisioner
+   for real outside of any actual teardown.
+
+   ```hcl
+   resource "null_resource" "namespace_drain" {
+     count = local.create && var.finalizer_clear_script != "" ? 1 : 0
+
+     triggers = {
+       cluster   = var.cluster_name
+       region    = var.region
+       role_arn  = var.deployer_role_arn
+       namespace = var.namespace
+       refs      = "clusters.postgresql.cnpg.io pods"
+     }
+
+     provisioner "local-exec" {
+       when    = destroy
+       command = "bash \"$(git rev-parse --show-toplevel)/scripts/k8s-finalizer-clear.sh\" --delete ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} ${self.triggers.namespace} ${self.triggers.refs}"
+     }
+   }
+   ```
+
+   `finalizer_clear_script` is only checked for non-emptiness (`!= ""` gates `count`) —
+   its value is never read for the path itself. It stays a path-shaped string purely
+   for unit-wiring compatibility (units pass `get_repo_root()`).
+
+2. **Removing a `triggers` key from an *existing* resource needs `lifecycle.ignore_changes`.**
+   If a resource already has state with a key that your change removes from `triggers`
+   (e.g. migrating an old `script = var.finalizer_clear_script` trigger away per rule 1
+   above), that removal alone forces a replace — which fires the destroy provisioner
+   for real on whatever you next apply, not just on an actual teardown. Pin the
+   soon-to-be-orphaned key so its removal from config doesn't register as a diff:
+
+   ```hcl
+   lifecycle {
+     ignore_changes = [triggers["script"]]
+   }
+   ```
+
+   A genuine change to any *other* trigger key still forces a replace as intended —
+   `ignore_changes` only pins the one named key. Not needed when authoring a brand-new
+   resource from scratch (nothing in state to orphan).
+
 ## Testing
 
 Modules are tested with **Terratest (Go)**, not `.tftest.hcl`. Tests live in
@@ -253,6 +311,7 @@ modules that can't be safely applied/destroyed in CI. See CLAUDE.md → Testing 
 - [ ] `for_each` for sets, `count` only for conditional creation
 - [ ] No hardcoded secrets; AWS resources have encryption/public-access/logging defaults
 - [ ] Provider version requirements expressed as pessimistic `~> MAJOR.0` constraints in `versions.tf` (`aws` is `~> 6.0`)
+- [ ] Any destroy-time teardown-drain `null_resource` resolves its script path via `git rev-parse --show-toplevel` in the provisioner command, never bakes an absolute path into `triggers`; removing an existing trigger key gets `lifecycle.ignore_changes`
 
 ---
 
