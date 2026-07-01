@@ -423,6 +423,14 @@ resource "null_resource" "crd_finalizer_cleanup" {
     helm_release.crossplane_agent_api,
     helm_release.crossplane_agent_policies,
   ]
+
+  # The `script` key is gone from `triggers` (see above) — pin its old value via ignore_changes so
+  # existing state (which still has it) doesn't see that as a removed key and force a replace, which
+  # would fire the destroy provisioner for real on a live cluster (verified: removing a `triggers` key
+  # always forces replacement). A genuine change to cluster/region/role_arn/refs still replaces normally.
+  lifecycle {
+    ignore_changes = [triggers["script"]]
+  }
 }
 
 # ---------------------------------------------------------------------------
@@ -451,6 +459,12 @@ resource "null_resource" "environment_iam_orphan_sweep" {
     when    = destroy
     command = "bash \"$(git rev-parse --show-toplevel)/scripts/environment-iam-orphan-sweep.sh\" ${self.triggers.boundary_arn} ${self.triggers.region} ${self.triggers.role_arn}"
   }
+
+  # See crd_finalizer_cleanup above — pins the removed `script` trigger key so existing state doesn't
+  # force a replace (which would fire this destroy provisioner for real, deleting live IAM roles).
+  lifecycle {
+    ignore_changes = [triggers["script"]]
+  }
 }
 
 # Sibling of the IAM sweep for the cross-account environment ECR repos (team-<team>/<app>) the Composition created
@@ -470,6 +484,12 @@ resource "null_resource" "environment_ecr_orphan_sweep" {
   provisioner "local-exec" {
     when    = destroy
     command = "bash \"$(git rev-parse --show-toplevel)/scripts/environment-ecr-orphan-sweep.sh\" ${self.triggers.role_arn} ${self.triggers.region}"
+  }
+
+  # See crd_finalizer_cleanup above — pins the removed `script` trigger key so existing state doesn't
+  # force a replace (which would fire this destroy provisioner for real, deleting live ECR repos).
+  lifecycle {
+    ignore_changes = [triggers["script"]]
   }
 }
 
