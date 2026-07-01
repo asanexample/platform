@@ -88,23 +88,32 @@ template:
   `:placeholder` until CI pins the digest — a long retry would hammer a doomed revision
   for 45 min).
 
-## PR preview environments (ADR-032) — DESIGN INTENT, not yet shipped
+## PR preview environments (ADR-032) — code landed, pending live verification
 
-> **Verify against code before relying on this.** As of writing, the `argocd-apps`
-> module has **no `pullRequest` generator, no `preview_appset`, and no `github_org`/
-> `tenants` variable** — the full per-PR ApplicationSet described in ADR-032 lives only in
-> the (v2-era) `argocd-apps/README.md`, not in the deployed code.
+> **Verify against code/cluster before relying on this.** `pr-preview.tf` adds a separate,
+> product-scoped `pullRequest`-generator ApplicationSet, gated per-product on
+> `products[*].preview` (from `spec.preview` on the product's `dev` XEnvironment claim). It's
+> new — pending a manual GitHub App permission check (see below) and a live end-to-end test
+> before treating it as proven.
 
-What **is** wired today: `var.preview_domain` on the standard per-Product delivery
-ApplicationSet. When set, the `templatePatch` rewrites the per-stage HTTPRoute host to
-`<product>-<team>-<stage>.<preview_domain>` (`delivery.tf`). That's a per-stage host
-rewrite, **not** a per-PR ephemeral environment.
+`var.preview_domain` still does double duty: it's both the base domain the standard
+per-Product delivery ApplicationSet rewrites per-stage hosts to (`<product>-<team>-<stage>.<preview_domain>`,
+`delivery.tf`) AND the base domain the new PR-preview ApplicationSet uses
+(`<product>-<team>-dev-pr-<N>.<preview_domain>`, `pr-preview.tf`) — two different mechanisms,
+same variable.
 
-The ADR-032 per-PR design (a GitHub `pullRequest` generator creating ephemeral
-`<team>-<product>-pr-<n>` Applications with `namePrefix: pr-<n>-`, and an app-repo
-`k8s/<stage>/name-reference.yaml` to rewrite Gateway-API HTTPRoute `backendRefs` under the
-prefix) is the intended end-state — treat it as roadmap until the generator exists in
-`delivery.tf`.
+The PR-preview ApplicationSet deploys into the **existing `dev` namespace** (no new Environment
+per PR — too slow/heavy to provision via Crossplane on every PR open), isolated by kustomize
+`namePrefix: pr-<N>-` + `commonLabels`. It reuses the **GitHub App ArgoCD already authenticates
+repo-creds with** (TD2-02b, `github_app_secret_name` → `appSecretName`) rather than a separate
+token — that App's installation needs **Pull requests: Read-only** in addition to its existing
+Contents/Metadata scope, a manual one-time addition, not a new App. Images are the PR's own
+head-SHA-tagged, cosign-signed build (`preview.yml`, already scaffolded per product) — no
+Release record, no digest promotion; previews intentionally bypass the gitops-Gate ladder. The
+preview hostname pattern is already unconditionally allow-listed by the Crossplane
+Composition's `restrict-route-hostnames-<ns>` (a wildcard `-pr-*` entry) — no per-PR admission
+wiring needed. The app-repo `k8s/base/name-reference.yaml` (also already scaffolded) rewrites
+Gateway-API HTTPRoute `backendRefs` under the `pr-<n>-` prefix.
 
 ## Platform-service vs tenant delivery (ADR-081)
 

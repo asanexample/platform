@@ -431,21 +431,26 @@ argocd app diff alpha-demo
 
 ## PR Preview Environments
 
-Services with `preview: true` on their `XEnvironment` claim get automatic preview
-deployments for every open pull request. See
-[ADR-032](../adrs/032-pr-preview-environments.md) for the full design.
+> **Status:** code landed (ADR-032), pending a manual GitHub App permission check and live
+> verification — see the ADR's Implementation Status before relying on this as already working
+> end-to-end. Confirm with the platform team if in doubt.
+
+Products with `spec.preview: true` on their `dev` `XEnvironment` claim get automatic preview
+deployments for every open pull request, deployed into that same `dev` namespace (not a separate
+environment). See [ADR-032](../adrs/032-pr-preview-environments.md) for the full design.
 
 ### How It Works
 
 1. Developer opens a PR against the app repo
-2. GitHub Actions (`preview.yml`) builds and pushes the image to ECR
-   with the PR's head commit SHA as the tag
-3. ArgoCD's ApplicationSet controller detects the open PR (polls every
-   60s) and creates an ephemeral Application
-4. Kustomize overrides rename resources (`namePrefix`), isolate label
-   selectors (`commonLabels`), rewrite the HTTPRoute hostname (patch),
-   and update backendRefs automatically (`nameReference`)
-5. Preview is live at `<product>-<team>-pr-<N>.preprod.aws.refplat.org`
+2. GitHub Actions (`preview.yml`, already scaffolded for every product) builds, cosign-signs, and
+   pushes the image to ECR with the PR's head commit SHA as the tag
+3. ArgoCD's ApplicationSet controller detects the open PR (polls every 60s, authenticating via the
+   same GitHub App already used for repo-creds) and creates an ephemeral Application
+4. Kustomize overrides rename resources (`namePrefix`), isolate label selectors (`commonLabels`),
+   rewrite the HTTPRoute hostname (patch), and update backendRefs automatically (`nameReference`,
+   already scaffolded)
+5. Preview is live at `<product>-<team>-dev-pr-<N>.preprod.aws.refplat.org` — already allow-listed
+   by admission unconditionally, no per-PR Kyverno wiring needed
 6. When the PR is closed or merged, ArgoCD auto-deletes the preview
 
 ### PR Preview Workflow
@@ -498,10 +503,10 @@ The ApplicationSet handles deployment — no manifest updates needed.
 
 ```bash
 # List preview applications
-argocd app list | grep preview
+argocd app list | grep pr-preview
 
-# Check a specific preview
-argocd app get alpha-demo-pr-42
+# Check a specific preview (name = <team>-<product>-dev-pr-<N>)
+argocd app get alpha-demo-dev-pr-42
 
 # View preview pods
 kubectl get pods -n alpha-demo-dev -l app.kubernetes.io/instance=pr-42
@@ -509,19 +514,14 @@ kubectl get pods -n alpha-demo-dev -l app.kubernetes.io/instance=pr-42
 
 ### Private Repos
 
-Private app repos need additional configuration for ArgoCD access:
+Private app repos need ArgoCD to both clone the repo and list its open PRs. Both already go
+through the same GitHub App ArgoCD uses for repo-creds today (TD2-02b) — no separate token or
+per-team secret to configure. The one prerequisite is that App's installation carrying
+**Pull requests: Read-only** in addition to its existing Contents/Metadata scope; without it, PR
+previews silently fail to detect open PRs.
 
-1. **ArgoCD credential template** — the platform team configures this in the
-   ArgoCD module so ArgoCD can clone the repo. Teams do not need to do this
-   themselves.
-
-2. **GitHub token for PR generator** — required for the ApplicationSet to
-   discover open PRs on private repos. The platform team manages this as a
-   secret in the `argocd` namespace. Without it, PR previews silently fail
-   to detect open PRs.
-
-If your PR previews are not detecting open PRs, confirm with the platform
-team that the GitHub token is configured for your repo's organization.
+If your PR previews are not detecting open PRs, confirm with the platform team that the App's
+permissions include PR read access.
 
 ### Limitations
 

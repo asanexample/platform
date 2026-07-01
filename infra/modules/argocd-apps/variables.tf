@@ -17,7 +17,7 @@ variable "argocd_namespace" {
 }
 
 variable "preview_domain" {
-  description = "Optional base domain. When set, the per-Product delivery ApplicationSet rewrites each Environment's HTTPRoute hostname to <product>-<team>-<stage>.<preview_domain> (a per-stage host rewrite — NOT per-PR previews; those, ADR-032, are not yet implemented on the v3 model)."
+  description = "Optional base domain. When set: (1) the per-Product delivery ApplicationSet rewrites each Environment's HTTPRoute hostname to <product>-<team>-<stage>.<preview_domain> (per-stage), and (2) it's also the base domain the ADR-032 PR-preview ApplicationSet (pr-preview.tf) uses for <product>-<team>-dev-pr-<N>.<preview_domain>."
   type        = string
   default     = ""
 }
@@ -81,9 +81,11 @@ variable "governance_repo_branch" {
 variable "products" {
   description = "v3: per-Product delivery, keyed <team>-<product>. One ApplicationSet per product; its git-files generator fans out over the Product's Release records gitops/releases/<team>/<product>/*.yaml → one Application per Environment that has a Release (ADR-071, #377)."
   type = map(object({
-    team     = string # owning team
-    product  = string # product short name (the gitops/{releases,environments}/<team>/<product>/ dir)
-    repo_url = string # the app repo (Product.repo), https URL — the Application source
+    team     = string       # owning team
+    product  = string       # product short name (the gitops/{releases,environments}/<team>/<product>/ dir)
+    repo_url = string       # the app repo (Product.repo), https URL — the Application source
+    preview  = bool         # ADR-032: spec.preview from the product's dev Environment claim — gates the PR-preview ApplicationSet
+    services = list(string) # ADR-032: keys(spec.services) from the dev Environment claim — the PR generator's payload carries no service data, so the per-service image override list has to be built from this (Terraform-known) side, not a git-files generator's payload like delivery.tf's does
   }))
   default = {}
 }
@@ -118,6 +120,15 @@ variable "platform_repo_branch" {
   description = "v3: branch of the platform GitOps repo the registry-sync apps + the per-Product ApplicationSet track."
   type        = string
   default     = "main"
+}
+
+# ---------------------------------------------------------------------------
+# PR preview (ADR-032) — pullRequest-generator ApplicationSet, gated per-product on products[*].preview
+# ---------------------------------------------------------------------------
+variable "github_app_secret_name" {
+  description = "ADR-032: name of the existing GitHub App repo-creds Secret (in argocd_namespace) the PR-preview ApplicationSet's pullRequest.github generator authenticates with via appSecretName. Reuses the same App already used for repo-creds (TD2-02b, github-asanexample-app-creds) — its githubAppID/githubAppInstallationID/githubAppPrivateKey keys are exactly what appSecretName expects. Empty disables PR-preview delivery even if products have preview=true."
+  type        = string
+  default     = ""
 }
 
 variable "ecr_registry" {

@@ -17,12 +17,24 @@ locals {
   # ApplicationSet per product; the per-Environment fan-out reads gitops/environments/<team>/<product>/*.yaml.
   # metadata.name = <team>-<product> (e.g. alpha-demo); spec.{team,repo} drive the Application source.
   products_dir = "${get_repo_root()}/gitops/products"
-  products = { for f in fileset(local.products_dir, "**/*.yaml") :
-    yamldecode(file("${local.products_dir}/${f}")).metadata.name => {
-      team     = yamldecode(file("${local.products_dir}/${f}")).spec.team
-      product  = trimprefix(yamldecode(file("${local.products_dir}/${f}")).metadata.name, "${yamldecode(file("${local.products_dir}/${f}")).spec.team}-")
-      repo_url = "https://github.com/${yamldecode(file("${local.products_dir}/${f}")).spec.repo}"
+  # ADR-032: preview + services come from the product's `dev` XEnvironment claim (spec.preview,
+  # keys(spec.services)) — default false/[] if the claim doesn't exist yet (a brand-new product whose
+  # first environment hasn't been onboarded). The PR generator's own payload carries no product/service
+  # data, so the per-service image override in pr-preview.tf has to be built Terraform-side from this.
+  environments_dir = "${get_repo_root()}/gitops/environments"
+  product_files    = { for f in fileset(local.products_dir, "**/*.yaml") : f => yamldecode(file("${local.products_dir}/${f}")) }
+  products = { for f, p in local.product_files :
+    p.metadata.name => {
+      team     = p.spec.team
+      product  = trimprefix(p.metadata.name, "${p.spec.team}-")
+      repo_url = "https://github.com/${p.spec.repo}"
+      preview  = try(local.dev_environments[p.metadata.name].spec.preview, false)
+      services = try(keys(local.dev_environments[p.metadata.name].spec.services), [])
     }
+  }
+  dev_environments = { for f, p in local.product_files :
+    p.metadata.name => yamldecode(file("${local.environments_dir}/${p.spec.team}/${trimprefix(p.metadata.name, "${p.spec.team}-")}/dev.yaml"))
+    if fileexists("${local.environments_dir}/${p.spec.team}/${trimprefix(p.metadata.name, "${p.spec.team}-")}/dev.yaml")
   }
 
   # Platform-agent delivery (ADR-082): the XAgent claims (gitops/agents/<name>.yaml) drive the agents
@@ -122,6 +134,9 @@ inputs = {
   products       = local.products
   agents         = local.agents # ADR-082: platform agents delivered to the hub (in-cluster); their Products are excluded from preprod delivery
   preview_domain = "preprod.aws.refplat.org"
+  # ADR-032: reuse the GitHub App ArgoCD already authenticates repo-creds with (TD2-02b) for the PR-preview
+  # ApplicationSet's pullRequest generator too — same Secret, same keys, no new credential.
+  github_app_secret_name = "github-asanexample-app-creds"
   # ADR-071: the platform-account ECR host — the ApplicationSet injects the Release digest as a kustomize image
   # override (<ecr_registry>/team-<team>/<product>-<svc>), matching the app overlay's image name.
   ecr_registry = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com"
