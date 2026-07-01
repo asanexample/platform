@@ -1,7 +1,6 @@
 # Environment (alpha × shop × dev) — the first stage, authored by the Backstage
 # New Product template (ADR-067 v1beta1). Namespace alpha-shop-dev. Synced by
 # ArgoCD (the `environments` registry-sync app) and reconciled by the Crossplane Environment Composition (v3).
-# The image is omitted until the new repo's first CI build pins a signed digest into k8s/overlays/dev.
 apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata:
@@ -14,8 +13,7 @@ spec:
   product: shop
   stage: dev
   tier: standard
+  preview: true # ADR-032: opt into PR-preview delivery (pr-preview.tf) — alpha-shop is the reference product for its first live verification
   services:
     web:
       serviceAccount: app-alpha # Pod Identity binds this named SA; the app repo's serviceaccount.yaml creates it
-      # image omitted — declared but NOT yet deployed (the first-deploy state). The per-Product ApplicationSet
-      # skips this (Environment × Service) pair until the first CI build promotes a digest into k8s/overlays/dev.
