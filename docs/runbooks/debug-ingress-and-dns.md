@@ -132,9 +132,9 @@ AWS_PROFILE=preprod aws route53 list-resource-record-sets \
   [attachment](#httproute-not-attaching-to-the-gateway) first.
 - **TXT-owner conflict.** external-dns sets `txtOwnerId = <cluster_name>`; a record owned by another cluster
   is left alone. Check for a stale TXT record from a previous cluster.
-- **IRSA missing Route53 perms.** external-dns assumes an IRSA role limited to
-  `route53:ChangeResourceRecordSets` on the zone + list actions. A `403` in the logs means the role/zone
-  binding is wrong — escalate to platform.
+- **Pod Identity missing Route53 perms.** external-dns assumes an EKS Pod Identity role (ADR-047 — not
+  IRSA) limited to `route53:ChangeResourceRecordSets` on the zone + list actions. A `403` in the logs
+  means the role/zone binding is wrong — escalate to platform.
 - **Force a re-sync:** `kubectl rollout restart deployment -n external-dns external-dns`.
 
 ---
@@ -158,9 +158,9 @@ kubectl logs -n cert-manager -l app.kubernetes.io/name=cert-manager --tail=80
 
 **Causes and fixes:**
 
-- **Certificate `Ready: False` / stuck.** The cert-manager IRSA role needs Route53 DNS-01 perms
-  (`GetChange`, `ChangeResourceRecordSets`, `ListResourceRecordSets` on the zone). A `403` in the logs is a
-  role issue — escalate to platform.
+- **Certificate `Ready: False` / stuck.** The cert-manager EKS Pod Identity role (ADR-047 — not IRSA)
+  needs Route53 DNS-01 perms (`GetChange`, `ChangeResourceRecordSets`, `ListResourceRecordSets` on the
+  zone). A `403` in the logs is a role issue — escalate to platform.
 - **Let's Encrypt rate limit.** ~5 certs per domain per week. `describe certificate`/challenge will say so;
   wait it out — do not loop retries.
 - **DNS-01 propagation lag.** The challenge TXT record isn't visible yet; cert-manager polls `GetChange`.

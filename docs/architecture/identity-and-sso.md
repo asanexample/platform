@@ -105,7 +105,11 @@ Backstage → **Dex** → Identity Center over **SAML**, which issues *no* refre
 `/refresh` returned 401 and you were logged out on **every reload**. The fix at the time was an **oauth2-proxy**
 in front of Backstage that held its own durable cookie and injected identity headers. Moving the upstream to
 **Keycloak (OIDC, which issues refresh tokens)** removed that root cause, so Backstage now does direct OIDC and
-both Dex and oauth2-proxy were **retired**.
+both Dex and oauth2-proxy were **retired for this purpose**.
+
+**oauth2-proxy itself was later reintroduced elsewhere** — the `oauth2-proxy` module is now a reusable
+Keycloak-SSO front for UIs with no native auth of their own; the `rollouts-sso` unit uses it to front the
+Argo Rollouts dashboard (#919). Don't read "retired" above as "gone from the platform."
 
 ## Where permissions come from — the access model
 

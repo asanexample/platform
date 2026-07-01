@@ -4,8 +4,10 @@ Start here when someone can't sign into **ArgoCD** or **Backstage**, or logs in 
 how the system fits together, read [identity-and-sso](../architecture/identity-and-sso.md) first.
 
 **Who's the IdP (as of 2026-06):** **Keycloak** (`https://keycloak.aws.refplat.org/realms/platform`). Both
-ArgoCD and Backstage authenticate against it **directly over OIDC**. (Dex and oauth2-proxy were retired — if a
-symptom points at `sso.aws.refplat.org` or an oauth2-proxy pod, it's stale.)
+ArgoCD and Backstage authenticate against it **directly over OIDC**. (Dex is retired, and oauth2-proxy no
+longer bridges ArgoCD/Backstage/Grafana — a symptom pointing at `sso.aws.refplat.org` for those apps is stale.
+oauth2-proxy itself is **not** retired: it was reintroduced as the SSO front for the Argo Rollouts dashboard,
+which has no native auth — see the `rollouts-sso` unit, #919.)
 
 ## Triage by symptom
 

@@ -73,7 +73,7 @@ Namespace `external-secrets`. The Secrets-Manager → Kubernetes sync path that 
   `SecretSyncError` reason (missing SM key, IAM/Pod-Identity perms, store unreachable).
 - **ClusterSecretStoreNotReady** — the `ClusterSecretStore` is `Ready=False`; the AWS provider can't auth
   or reach Secrets Manager. Check the store's status and the ESO controller's AWS credentials
-  (Pod Identity / IRSA).
+  (EKS Pod Identity, ADR-047 — not IRSA).
 
 ## Cilium
 
@@ -143,7 +143,7 @@ Secrets Manager by **External Secrets**, mounted into Alertmanager (`alertmanage
 
 ### ⚠️ Secrets must live under the `platform/` prefix
 
-ESO's IRSA is scoped to `secret:platform/*` (the `external-secrets` unit sets `secret_path_prefix=platform`).
+ESO's Pod Identity role is scoped to `secret:platform/*` (the `external-secrets` unit sets `secret_path_prefix=platform`).
 **Any Secrets-Manager secret ESO syncs must be named `platform/…`** or the ExternalSecret fails with
 `AccessDenied` and the Alertmanager pod gets stuck mounting the missing K8s secret. Current secrets:
 
