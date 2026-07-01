@@ -431,9 +431,9 @@ argocd app diff alpha-demo
 
 ## PR Preview Environments
 
-> **Status:** code landed (ADR-032), pending a manual GitHub App permission check and live
-> verification — see the ADR's Implementation Status before relying on this as already working
-> end-to-end. Confirm with the platform team if in doubt.
+> **Status:** live, proven end-to-end (ADR-032) — verified against a real PR
+> (`asanexample/alpha-shop#14`): image build/sign, ArgoCD-generated preview, HTTPS reachability,
+> isolation from the stable deployment, and cleanup on PR close all confirmed.
 
 Products with `spec.preview: true` on their `dev` `XEnvironment` claim get automatic preview
 deployments for every open pull request, deployed into that same `dev` namespace (not a separate

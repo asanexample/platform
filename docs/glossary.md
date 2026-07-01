@@ -16,7 +16,7 @@ creating **one `Application` per Release** and injecting the signed digest as a 
 **release-keyed** form replaced an earlier `pullRequest`/merge generator (which collided on a null merge key).
 See [Promotion & Release](architecture/promotion-and-release.md). *(PR-preview **delivery** — an ephemeral
 `Application` per open PR, [ADR-032](adrs/032-pr-preview-environments.md) — is a separate, product-scoped
-`pullRequest`-generator ApplicationSet, not this release-keyed one; code landed, pending live verification.)*
+`pullRequest`-generator ApplicationSet, not this release-keyed one; live, proven end-to-end.)*
 
 **BACK stack** — **B**ackstage + **A**rgoCD + **C**rossplane + **K**ubernetes: the chosen architecture for
 developer self-service. ArgoCD delivers, Crossplane provisions environments, Backstage is the portal.
@@ -90,8 +90,9 @@ See [Pod Identity for Tenant Workloads (ADR-041)](adrs/041-pod-identity-for-tena
 
 **PR preview** — The ephemeral per-PR deployment (`<product>-<team>-dev-pr-<n>.<baseDomain>`, into the
 existing `dev` namespace) for Products whose `dev` `XEnvironment` claim has `spec.preview: true`.
-**Status (v3): code landed, pending live verification** — a dedicated `pullRequest`-generator
-ApplicationSet (separate from the release-keyed per-Product one) delivers it, reusing the GitHub App
+**Status (v3): live, proven end-to-end (`asanexample/alpha-shop#14`)** — a dedicated
+`pullRequest`-generator ApplicationSet (separate from the release-keyed per-Product one) delivers
+it, reusing the GitHub App
 already used for repo-creds. See [PR Preview Environments (ADR-032)](adrs/032-pr-preview-environments.md) and the
 [Delivery Pipeline](architecture/delivery-pipeline.md) cross-cutting note.
 

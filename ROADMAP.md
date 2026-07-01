@@ -19,6 +19,7 @@ detail. "Complete picture" means every capability and area is represented — no
 | 2026-06-27 | 1.5     | J. Deeden | Linked the I&A workforce-build epic (#884) + Phase-1 sub-issues (#885–#890) into the Identity & Access area |
 | 2026-06-28 | 1.6     | J. Deeden | Moved shipped work into Shipped: zero-downtime/ADR-085 (replica-floor Enforce), Argo Rollouts/ADR-056, I&A Phase-1 (#885–#890), PagerDuty/owner-routing ADR-084, Keycloak hardening ADR-087; ADR-088 temporary-power to Now; Karpenter Phase-1 marked live; closed Tier-1 issues (#770/#771/#772/#647) marked done; #647 re-pointed to #364 |
 | 2026-07-01 | 1.7     | J. Deeden | Correction: PR preview environments (ADR-032) was wrongly marked Shipped — it was never implemented on the v3 delivery model (issue #721); moved to Now, split out the genuinely-shipped per-Product ApplicationSets as their own line |
+| 2026-07-01 | 1.8     | J. Deeden | PR preview environments (ADR-032) re-implemented and proven end-to-end against a real PR (asanexample/alpha-shop#14); moved from Now back to Shipped; closes issues #721 and #111 |
 
 ## Executive Summary
 
@@ -79,10 +80,6 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 #### Identity & Access
 
 - **Temporary-power activation / JIT elevation ([ADR-088](docs/adrs/088-temporary-power-activation.md)).** Eligibility-in-git + timed activation + revocation for dangerous power (break-glass). Foundation merged — `platctl access list`/`access check <person> <role>` + break-glass eligibility (#943/#945/#946); remaining activation/revocation flow in flight.
-
-#### GitOps & Delivery
-
-- **PR preview environments ([ADR-032](docs/adrs/032-pr-preview-environments.md)).** Code merged — a `pullRequest`-generator ApplicationSet per opted-in Product, deploying into the existing `dev` namespace off the already-signed PR-tagged image. Everything upstream of delivery (build+sign on PR, OIDC trust, hostname allow-listing, backendRef isolation) was already live before this landed. Pending: a manual GitHub App permission check/grant, the unit apply, and live end-to-end verification (issue #721).
 
 ### Next
 
@@ -218,6 +215,7 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 ### GitOps & Delivery
 
 - **Per-Product delivery ApplicationSets** — Shipped. Release-keyed per-Product ApplicationSet generators (ADR-069, #377).
+- **PR preview environments** — Shipped, proven end-to-end 2026-07-01. A `pullRequest`-generator ApplicationSet per opted-in Product deploys into the existing `dev` namespace off the already-signed PR-tagged image, isolated by kustomize `namePrefix`/`commonLabels`, and auto-cleans up on PR close. ADR-032; closes issues #721 and #111.
 - **ArgoCD GitOps + per-team AppProjects/RBAC** — Shipped. ArgoCD delivery engine, per-team AppProjects, SSO RBAC. ADR-021.
 - **Multi-stage promotion: auto ≤ staging + gated prod** — Shipped (P2). Promote-by-digest, auto-promote reconciler ≤ staging, gated prod. ADR-067 P2 / #377.
 - **Release-CRD digest promotion + Product-registry source-of-truth** — Shipped. Image-digest promotion via control plane (protected-main); Product registry + Environment claims drive delivery. ADR-069/071.
