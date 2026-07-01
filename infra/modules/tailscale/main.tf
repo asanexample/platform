@@ -99,11 +99,15 @@ resource "kubernetes_manifest" "connector" {
 # (depends_on => reverse-order destroy). Uses scripts/k8s-finalizer-clear.sh, which sets up its own cluster
 # auth (aws eks update-kubeconfig + the deployer role) — the previous bare `kubectl patch` had no guaranteed
 # context during teardown and silently no-op'd, which is what hung the subnet-router delete. Best-effort.
+#
+# The script path is resolved at RUN TIME via `git rev-parse --show-toplevel`, not baked into `triggers` as
+# an absolute path — a worktree's checkout lives at a different absolute path than the main checkout, which
+# would otherwise make a worktree apply look like a changed trigger and force a replace (firing this
+# `when = destroy` provisioner outside of an actual teardown).
 resource "null_resource" "crd_finalizer_cleanup" {
-  count = local.create && length(var.advertise_routes) > 0 ? 1 : 0
+  count = local.create && length(var.advertise_routes) > 0 && var.finalizer_clear_script != "" ? 1 : 0
 
   triggers = {
-    script   = var.finalizer_clear_script
     cluster  = var.cluster_name
     region   = var.region
     role_arn = var.deployer_role_arn
@@ -119,7 +123,7 @@ resource "null_resource" "crd_finalizer_cleanup" {
     # cluster-scoped CRs (Connector/ProxyClass) -> namespace arg is "-". --delete so the provisioner issues the
     # deletion itself (operator, still up, deprovisions the tailnet device) and force-clears the finalizer in one
     # shot — terraform's later manifest delete is then a clean no-op, with no window for the operator to re-add.
-    command = "bash ${self.triggers.script} --delete ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} - ${self.triggers.refs}"
+    command = "bash \"$(git rev-parse --show-toplevel)/scripts/k8s-finalizer-clear.sh\" --delete ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} - ${self.triggers.refs}"
   }
 
   depends_on = [kubernetes_manifest.connector, kubernetes_manifest.proxy_class]

@@ -36,7 +36,7 @@ variable "deployer_role_arn" {
 }
 
 variable "finalizer_clear_script" {
-  description = "Absolute path to scripts/k8s-finalizer-clear.sh (passed from the unit via get_repo_root())"
+  description = "Non-empty enables the destroy-time teardown cleanup script. Only checked for non-emptiness — the script itself is resolved at run time via the checkout's own `git rev-parse --show-toplevel`, not this value, so a worktree's different absolute path can't force a spurious null_resource replace. Kept as a path-shaped string for unit-wiring compatibility (units still pass get_repo_root())."
   type        = string
   default     = ""
 }

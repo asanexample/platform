@@ -84,10 +84,13 @@ over **Tailscale**, never the public endpoint, for routine ops. The only excepti
 from-scratch teardown/rebuild, where `platctl` bootstraps/locks down the public endpoint automatically.
 
 **⚠️ NEVER run `terragrunt apply`/`plan` from a git worktree** — always apply from the main checkout.
-The crossplane unit's orphan-sweep `null_resource`s (`infra/modules/crossplane/main.tf`) trigger off
-absolute script paths; a worktree's different absolute path makes Terraform see a changed trigger,
-replace the resource, and fire its `when = destroy` provisioner — force-deleting live environment IAM
-roles + ECR repos on what looks like a routine apply.
+Several teardown/drain `null_resource`s (crossplane's orphan-sweeps, plus the namespace-drain/CNPG-cleanup
+resources in backstage/keycloak/platform-directory/tailscale/observability) used to bake an absolute
+`scripts/*.sh` path into their `triggers`; a worktree's different absolute path made Terraform see a
+changed trigger, replace the resource, and fire its `when = destroy` provisioner — force-deleting live
+environment IAM roles + ECR repos on what looks like a routine apply. That specific mechanism is fixed
+(the script path is now resolved at run time via `git rev-parse --show-toplevel`, never baked into
+`triggers`) — but the rule stays until the fix has proven out across real applies from a worktree.
 
 ## Key Commands
 

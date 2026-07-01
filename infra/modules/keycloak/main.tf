@@ -170,11 +170,15 @@ resource "kubernetes_manifest" "db" {
 # namespace => reverse-order destroy) and force-deletes the CNPG Cluster (clearing its finalizer so the operator
 # stops reconciling instances), then the pods (releasing pvc-protection), then the PVCs — so the namespace
 # finalizes cleanly. Best-effort + self-authenticating (scripts/k8s-finalizer-clear.sh); a missing kind no-ops.
+#
+# The script path is resolved at RUN TIME via `git rev-parse --show-toplevel`, not baked into `triggers` as
+# an absolute path — a worktree's checkout lives at a different absolute path than the main checkout, which
+# would otherwise make a worktree apply look like a changed trigger and force a replace (firing this
+# `when = destroy` provisioner outside of an actual teardown).
 resource "null_resource" "cnpg_finalizer_cleanup" {
   count = local.create && local.in_cluster_db && var.finalizer_clear_script != "" ? 1 : 0
 
   triggers = {
-    script    = var.finalizer_clear_script
     cluster   = var.cluster_name
     region    = var.region
     role_arn  = var.deployer_role_arn
@@ -186,7 +190,7 @@ resource "null_resource" "cnpg_finalizer_cleanup" {
 
   provisioner "local-exec" {
     when    = destroy
-    command = "bash ${self.triggers.script} --delete ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} ${self.triggers.namespace} ${self.triggers.refs}"
+    command = "bash \"$(git rev-parse --show-toplevel)/scripts/k8s-finalizer-clear.sh\" --delete ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} ${self.triggers.namespace} ${self.triggers.refs}"
   }
 
   depends_on = [kubernetes_namespace_v1.keycloak]
