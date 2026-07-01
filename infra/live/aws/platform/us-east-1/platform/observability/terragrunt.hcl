@@ -99,11 +99,7 @@ inputs = {
   cluster_label = include.base.locals.env
 
   helm_chart_version = include.base.locals.helm_versions.kube_prometheus_stack
-  # TEMPORARY false for the Grafana Deployment->StatefulSet + PVC migration (#1070/useStatefulSet) —
-  # same emptyDir->PVC deadlock as Prometheus/Alertmanager's original migration (PR #147): the operator/
-  # chart recreates the workload out-of-band and helm --wait can't reconcile. Revert to true once the
-  # StatefulSet is confirmed Running with a Bound PVC.
-  helm_wait = false
+  helm_wait          = true
 
   # Sizing follows cost_profile (dev = single-replica; prod = HA, needs >=3 nodes / 2-3 AZs).
   high_availability = include.base.locals.high_availability
