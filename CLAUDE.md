@@ -128,6 +128,13 @@ cd infra/tests/aws/<module> && go test -v -timeout 30m
 git config core.hooksPath .githooks
 ```
 
+## Git Workflow
+
+Branches are kebab-case with a short type or domain prefix, e.g. `docs-`, `feat-`, `fix-`, or a
+domain word like `cost-`/`adr-`/`govreg-` (check `gh pr list --state merged --json headRefName`
+for precedent if unsure). `EnterWorktree`'s auto-generated `worktree-*` branch name doesn't follow
+this — rename it (`git branch -m`) before opening a PR.
+
 ## Module Code Style & Testing
 
 Full house style: the **`terraform-style`** skill. In brief — organize `main.tf` with `# ---`
