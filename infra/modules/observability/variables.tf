@@ -104,13 +104,13 @@ variable "prometheus_retention" {
 }
 
 variable "use_persistent_storage" {
-  description = "Back Prometheus/Alertmanager with PVCs (needs a default StorageClass). false = emptyDir (acceptable for the interim P1 local Prometheus; Mimir is durable from P2)."
+  description = "Back Prometheus/Alertmanager/Grafana with PVCs (needs a default StorageClass). false = emptyDir/ephemeral (acceptable for the interim P1 local Prometheus; Mimir is durable from P2; Grafana's SQLite state — service accounts, API tokens, UI-created alert rules — is wiped on every pod restart without this, #1070)."
   type        = bool
   default     = false
 }
 
 variable "storage_class" {
-  description = "StorageClass for Prometheus/Alertmanager PVCs when use_persistent_storage = true."
+  description = "StorageClass for Prometheus/Alertmanager/Grafana PVCs when use_persistent_storage = true."
   type        = string
   default     = ""
 }

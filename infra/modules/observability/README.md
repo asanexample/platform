@@ -46,7 +46,7 @@ module "observability" {
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `high_availability` | `false` | Prom×2 / AM×3 / Grafana×2 + anti-affinity + PDBs. Needs ≥3 nodes / 2–3 AZs. |
-| `use_persistent_storage` / `storage_class` | `false` / `""` | Back Prometheus + Alertmanager with PVCs. `false` = emptyDir (interim). |
+| `use_persistent_storage` / `storage_class` | `false` / `""` | Back Prometheus + Alertmanager + Grafana with PVCs. `false` = emptyDir/ephemeral (interim) — Grafana's SQLite state (service accounts, API tokens, UI alert rules) is wiped on every pod restart until this is `true` (#1070). |
 | `prometheus_retention` | `"15d"` | Local retention — short by design (Mimir is the durable store). |
 | `alerts_topic_arn` | `""` | Set ⇒ Alertmanager SNS-publish role via EKS Pod Identity + `sns_configs` receiver (incl. `kms:GenerateDataKey*` for the SSE-KMS topic). |
 | `mimir_remote_write_url` / `mimir_tenant_id` | `""` / `"platform"` | When set: Prometheus `remoteWrite` + `externalLabels{cluster}`, and the bundled Prometheus datasource is no longer Grafana's default. |
@@ -70,6 +70,10 @@ module "observability" {
 - `serviceMonitorSelectorNilUsesHelmValues=false` ⇒ Prometheus scrapes **all** ServiceMonitors cluster-wide.
 - **emptyDir → PVC is an in-place StatefulSet recreation** (operator-driven, immutable volumeClaimTemplates).
   It deadlocks `helm --wait`; do that migration with `helm_wait=false`. See the troubleshooting runbook.
+- **Grafana persistence** (`use_persistent_storage`) sets `useStatefulSet=true` on the Grafana subchart —
+  required once `high_availability` gives it >1 replica, since the chart's default Deployment mode would
+  otherwise mount one shared `ReadWriteOnce` PVC into every replica pod. A per-replica volumeClaimTemplate
+  (StatefulSet) avoids that regardless of replica count.
 - Dashboards are provisioned as code from `dashboards/*.json` (Grafana sidecar ConfigMaps).
 - **Alerting receivers (SNS / Slack / PagerDuty / triage).** Beyond the SNS receiver, Alertmanager can
   also fan out to **Slack** (`slack_webhook_secret_name` / `slack_channel`), **PagerDuty**
@@ -175,10 +179,10 @@ No modules.
 | <a name="input_secret_store_name"></a> [secret\_store\_name](#input\_secret\_store\_name) | Name of the External Secrets ClusterSecretStore (AWS Secrets Manager). | `string` | `"aws-secrets-manager"` | no |
 | <a name="input_slack_channel"></a> [slack\_channel](#input\_slack\_channel) | Slack channel for alerts (the incoming webhook is bound to its own channel; this is informational/override). | `string` | `"#platform-alerts"` | no |
 | <a name="input_slack_webhook_secret_name"></a> [slack\_webhook\_secret\_name](#input\_slack\_webhook\_secret\_name) | AWS Secrets Manager secret name holding the Slack incoming-webhook URL (JSON property 'url'). Empty disables the Slack receiver (SNS-only). Synced to Alertmanager via External Secrets — never enters Terraform state or helm values. | `string` | `""` | no |
-| <a name="input_storage_class"></a> [storage\_class](#input\_storage\_class) | StorageClass for Prometheus/Alertmanager PVCs when use\_persistent\_storage = true. | `string` | `""` | no |
+| <a name="input_storage_class"></a> [storage\_class](#input\_storage\_class) | StorageClass for Prometheus/Alertmanager/Grafana PVCs when use\_persistent\_storage = true. | `string` | `""` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags/labels to apply (sanitized to RFC-1123 for K8s labels). | `map(string)` | `{}` | no |
 | <a name="input_triage_webhook_url"></a> [triage\_webhook\_url](#input\_triage\_webhook\_url) | ADR-082: the triage agent's in-cluster webhook URL (e.g. http://triage-copilot-server.platform-agent-triage-copilot.svc.cluster.local/webhook). When set, a curated alert subset (critical) is fanned to the agent ADDITIVELY (continue=true, the alert still reaches SNS/Slack). Empty disables the triage receiver/route. | `string` | `""` | no |
-| <a name="input_use_persistent_storage"></a> [use\_persistent\_storage](#input\_use\_persistent\_storage) | Back Prometheus/Alertmanager with PVCs (needs a default StorageClass). false = emptyDir (acceptable for the interim P1 local Prometheus; Mimir is durable from P2). | `bool` | `false` | no |
+| <a name="input_use_persistent_storage"></a> [use\_persistent\_storage](#input\_use\_persistent\_storage) | Back Prometheus/Alertmanager/Grafana with PVCs (needs a default StorageClass). false = emptyDir/ephemeral (acceptable for the interim P1 local Prometheus; Mimir is durable from P2; Grafana's SQLite state — service accounts, API tokens, UI-created alert rules — is wiped on every pod restart without this, #1070). | `bool` | `false` | no |
 
 ## Outputs
 

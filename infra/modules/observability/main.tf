@@ -37,6 +37,18 @@ locals {
     }
   } : null
 
+  # Grafana's SQLite state (service accounts, API tokens, org/user settings, UI-created alert rules) lives on
+  # the pod filesystem unless persistence is wired (#1070). useStatefulSet turns the chart's persistence PVC
+  # into a per-replica volumeClaimTemplate — required once replicas > 1, since a plain Deployment would mount
+  # one ReadWriteOnce PVC into every replica pod.
+  grafana_persistence = {
+    enabled          = var.use_persistent_storage
+    type             = "pvc"
+    storageClassName = var.storage_class
+    accessModes      = ["ReadWriteOnce"]
+    size             = "5Gi"
+  }
+
   # Prometheus -> Mimir remote_write (durable multi-tenant store, #102 P2). Empty url = off (P1 behaviour);
   # the X-Scope-OrgID header stamps the hub's own metrics into the tenant.
   prometheus_remote_write = var.mimir_remote_write_url != "" ? [{
@@ -299,7 +311,9 @@ locals {
 
     # --- Grafana (hardened; admin via the TF-managed secret; SSO is a fast-follow) ---
     grafana = {
-      replicas = var.high_availability ? 2 : 1
+      replicas       = var.high_availability ? 2 : 1
+      useStatefulSet = var.use_persistent_storage
+      persistence    = local.grafana_persistence
       admin = {
         existingSecret = local.grafana_admin_secret
         userKey        = "admin-user"
