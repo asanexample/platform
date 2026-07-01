@@ -72,6 +72,15 @@ spec:
                   description: >-
                     Reference to a platform hardening profile (isolation FLOOR + recovery + availability).
                     Effective isolation = max(tier-floor, spec.isolation.compute).
+                preview:
+                  type: boolean
+                  default: false
+                  description: >-
+                    Opt into PR-preview delivery (ADR-032) for this Product — gates the per-product
+                    pullRequest-generator ApplicationSet (argocd-apps' pr-preview.tf), which deploys the PR's
+                    own head-SHA-tagged signed image into this Environment's namespace on PR-open and tears it
+                    down on PR-close (no Release record, bypasses the promotion ladder). Read from the
+                    Product's `dev` Environment claim only — meaningless on any other stage.
                 isolation:
                   type: object
                   description: The graduated isolation dial (ADR-067 §5). Defaults from Customer/Product/tier; floored by tier.

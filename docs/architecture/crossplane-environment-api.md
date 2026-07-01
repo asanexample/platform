@@ -44,6 +44,7 @@ spec is the environment-facing contract — no infra constants leak into it:
 | `stage` | yes | `dev`/`test`/`uat`/`staging`/`prod` — the deployment stage of this environment |
 | `customer` | — (per-customer prod/uat only) | Customer key; appended to the namespace for per-customer isolation |
 | `tier` | — (default `standard`) | `standard`/`elevated`/`pci`/`hipaa` — the hardening profile (isolation floor + recovery + availability) |
+| `preview` | — (default `false`) | Opt into PR-preview delivery (ADR-032) — gates the per-product PR-generator ApplicationSet (`pr-preview.tf`). Read from the Product's `dev` Environment claim only |
 | `isolation.compute` | — (resolved from Product/tier) | The graduated compute dial: `shared-namespace`/`dedicated-namespace`/`dedicated-nodes`/`dedicated-cluster`/`dedicated-account` |
 | `residency.allowedLocations` | — (default `["*"]`) | Jurisdiction or `cloud:region`; must be ⊆ the Team's allowed locations |
 | `quota` | — (defaults match the old environment module) | `cpu`/`memory`/`pods`/`services`/`loadbalancers`/`pvcs`/`storage` |
