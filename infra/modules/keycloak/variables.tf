@@ -174,7 +174,7 @@ variable "tags" {
 # ---------------------------------------------------------------------------
 
 variable "finalizer_clear_script" {
-  description = "Path to scripts/k8s-finalizer-clear.sh. When set (and the in-cluster DB is used), a destroy-time provisioner force-deletes the CNPG Cluster + its pods/PVCs so the namespace can finalize. Empty disables it."
+  description = "Non-empty (and the in-cluster DB is used) enables a destroy-time provisioner that force-deletes the CNPG Cluster + its pods/PVCs so the namespace can finalize. Only checked for non-emptiness — the script itself is resolved at run time via the checkout's own `git rev-parse --show-toplevel`, not this value, so a worktree's different absolute path can't force a spurious null_resource replace. Kept as a path-shaped string for unit-wiring compatibility."
   type        = string
   default     = ""
 }

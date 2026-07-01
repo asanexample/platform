@@ -36,7 +36,7 @@ variable "deployer_role_arn" {
 }
 
 variable "finalizer_clear_script" {
-  description = "Absolute path to scripts/k8s-finalizer-clear.sh (passed from the unit via get_repo_root())"
+  description = "Non-empty enables the destroy-time teardown cleanup script. Only checked for non-emptiness — the script itself is resolved at run time via the checkout's own `git rev-parse --show-toplevel`, not this value, so a worktree's different absolute path can't force a spurious null_resource replace. Kept as a path-shaped string for unit-wiring compatibility (units still pass get_repo_root())."
   type        = string
   default     = ""
 }
@@ -104,13 +104,13 @@ variable "prometheus_retention" {
 }
 
 variable "use_persistent_storage" {
-  description = "Back Prometheus/Alertmanager with PVCs (needs a default StorageClass). false = emptyDir (acceptable for the interim P1 local Prometheus; Mimir is durable from P2)."
+  description = "Back Prometheus/Alertmanager/Grafana with PVCs (needs a default StorageClass). false = emptyDir/ephemeral (acceptable for the interim P1 local Prometheus; Mimir is durable from P2; Grafana's SQLite state — service accounts, API tokens, UI-created alert rules — is wiped on every pod restart without this, #1070)."
   type        = bool
   default     = false
 }
 
 variable "storage_class" {
-  description = "StorageClass for Prometheus/Alertmanager PVCs when use_persistent_storage = true."
+  description = "StorageClass for Prometheus/Alertmanager/Grafana PVCs when use_persistent_storage = true."
   type        = string
   default     = ""
 }

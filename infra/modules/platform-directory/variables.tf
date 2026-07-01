@@ -61,7 +61,7 @@ variable "tags" {
 # Teardown finalizer-cleanup (mirrors the keycloak module) — clears CNPG finalizers so the namespace destroys
 # cleanly (the pvc-protection finalizer otherwise hangs the destroy under node pressure).
 variable "finalizer_clear_script" {
-  description = "Path to scripts/k8s-finalizer-clear.sh (empty disables the teardown cleanup)."
+  description = "Non-empty enables the destroy-time teardown cleanup script. Only checked for non-emptiness — the script itself is resolved at run time via the checkout's own `git rev-parse --show-toplevel`, not this value, so a worktree's different absolute path can't force a spurious null_resource replace. Kept as a path-shaped string for unit-wiring compatibility."
   type        = string
   default     = ""
 }

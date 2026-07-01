@@ -349,11 +349,17 @@ resource "helm_release" "crossplane_agent_policies" {
 # finalizer strip then forces removal regardless of the controller. The cluster is being torn down, so orphaned
 # in-cluster packages don't matter — the goal is letting the helm uninstalls find the CRs already drained.
 # Best-effort + self-authenticating (scripts/k8s-finalizer-clear.sh); a missing CRD is a no-op.
+#
+# The script path is resolved at RUN TIME via `git rev-parse --show-toplevel`, not baked into `triggers` as
+# an absolute path — a worktree's checkout lives at a different absolute path than the main checkout, and a
+# destroy-time provisioner can only reference `self`/`count.index`/`each.key` (verified — OpenTofu rejects a
+# direct `var.x` reference there), so the path can't just be read fresh from `var.finalizer_clear_script`
+# either. Baking the absolute path into `triggers` previously made a worktree apply look like a changed
+# trigger, forcing a replace that fired this `when = destroy` provisioner outside of an actual teardown.
 resource "null_resource" "crd_finalizer_cleanup" {
-  count = local.create ? 1 : 0
+  count = local.create && var.finalizer_clear_script != "" ? 1 : 0
 
   triggers = {
-    script   = var.finalizer_clear_script
     cluster  = var.cluster_name
     region   = var.region
     role_arn = var.deployer_role_arn
@@ -399,13 +405,13 @@ resource "null_resource" "crd_finalizer_cleanup" {
   # Pass 1 — helm-owned CRs: clear finalizers only (helm uninstall deletes the objects).
   provisioner "local-exec" {
     when    = destroy
-    command = "bash ${self.triggers.script} ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} - ${self.triggers.refs_helm_owned}"
+    command = "bash \"$(git rev-parse --show-toplevel)/scripts/k8s-finalizer-clear.sh\" ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} - ${self.triggers.refs_helm_owned}"
   }
 
   # Pass 2 — orphan CRs: delete + clear finalizers (nothing else removes them).
   provisioner "local-exec" {
     when    = destroy
-    command = "bash ${self.triggers.script} --delete ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} - ${self.triggers.refs_orphan}"
+    command = "bash \"$(git rev-parse --show-toplevel)/scripts/k8s-finalizer-clear.sh\" --delete ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} - ${self.triggers.refs_orphan}"
   }
 
   depends_on = [
@@ -432,18 +438,18 @@ resource "null_resource" "crd_finalizer_cleanup" {
 # provisioner runs BEFORE the boundary is deleted (reverse-order destroy). The script always exits 0 — best-effort,
 # never blocks destroy. Reuses the scripts/ dir of finalizer_clear_script so no extra unit wiring is needed.
 resource "null_resource" "environment_iam_orphan_sweep" {
-  count = local.enable_environment_provisioning ? 1 : 0
+  count = local.enable_environment_provisioning && var.finalizer_clear_script != "" ? 1 : 0
 
   triggers = {
-    script       = "${dirname(var.finalizer_clear_script)}/environment-iam-orphan-sweep.sh"
     boundary_arn = aws_iam_policy.environment_boundary[0].arn
     region       = var.region
     role_arn     = var.deployer_role_arn
   }
 
+  # Script path resolved at run time (see crd_finalizer_cleanup above) — not baked into `triggers`.
   provisioner "local-exec" {
     when    = destroy
-    command = "bash ${self.triggers.script} ${self.triggers.boundary_arn} ${self.triggers.region} ${self.triggers.role_arn}"
+    command = "bash \"$(git rev-parse --show-toplevel)/scripts/environment-iam-orphan-sweep.sh\" ${self.triggers.boundary_arn} ${self.triggers.region} ${self.triggers.role_arn}"
   }
 }
 
@@ -453,17 +459,17 @@ resource "null_resource" "environment_iam_orphan_sweep" {
 # sweep role being provided (the platform PlatformDeployer — the in-account ecr-provisioner role is NOT
 # assumable by the teardown profile, only via the provider's assumeRoleChain). Best-effort; never blocks destroy.
 resource "null_resource" "environment_ecr_orphan_sweep" {
-  count = local.enable_environment_provisioning && var.ecr_orphan_sweep_role_arn != "" ? 1 : 0
+  count = local.enable_environment_provisioning && var.ecr_orphan_sweep_role_arn != "" && var.finalizer_clear_script != "" ? 1 : 0
 
   triggers = {
-    script   = "${dirname(var.finalizer_clear_script)}/environment-ecr-orphan-sweep.sh"
     role_arn = var.ecr_orphan_sweep_role_arn
     region   = var.region
   }
 
+  # Script path resolved at run time (see crd_finalizer_cleanup above) — not baked into `triggers`.
   provisioner "local-exec" {
     when    = destroy
-    command = "bash ${self.triggers.script} ${self.triggers.role_arn} ${self.triggers.region}"
+    command = "bash \"$(git rev-parse --show-toplevel)/scripts/environment-ecr-orphan-sweep.sh\" ${self.triggers.role_arn} ${self.triggers.region}"
   }
 }
 
