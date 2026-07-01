@@ -66,7 +66,7 @@ platctl validate            # post-apply health checks
 ```
 
 Deployment ordering (Cilium-before-nodes, eks-addons after CNI, etc.) is documented in
-[CLAUDE.md](../../CLAUDE.md#deployment-ordering-aws). State is per-unit in S3; the apply role chain is
+[AGENTS.md](../../AGENTS.md#deployment-ordering--applydestroy-aws). State is per-unit in S3; the apply role chain is
 described in [Security Architecture](09-security-architecture.md).
 
 ### Promotion

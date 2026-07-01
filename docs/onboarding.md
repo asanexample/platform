@@ -220,7 +220,7 @@ point. The self-service flow ([ADR-046](adrs/046-back-stack-for-developer-self-s
    SLSA provenance, and pins the deploy manifest to the signed digest. **Kyverno verifies it at admission.**
 
 Workloads in environment namespaces must be policy-compliant or they're rejected at admission — the rules are
-summarized in [CLAUDE.md](../CLAUDE.md#authoring-policy-compliant-workloads-kyverno). Details:
+summarized in [AGENTS.md](../AGENTS.md#authoring-policy-compliant-workloads-kyverno). Details:
 [Deploy App to Preprod](runbooks/deploy-app-preprod.md) · [Environment Onboarding](runbooks/environment-onboarding.md).
 
 ---

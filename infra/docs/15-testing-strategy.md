@@ -6,7 +6,7 @@ The platform standardizes on **Terratest (Go)** for module testing — full
 apply/destroy cycles with AWS SDK-based assertions where post-apply state must
 be validated, and **plan-only** Terratest for modules that cannot be safely
 apply/destroyed in CI. Terraform native tests (`.tftest.hcl`) are **not** used
-(see [Testing Conventions](../../CLAUDE.md#testing-conventions)). Only AWS is
+(see [Module Code Style & Testing](../../AGENTS.md#module-code-style--testing)). Only AWS is
 deployed today; Azure/GCP module tests will follow the same Terratest approach
 when those clouds land. CI runs static checks (format, validate, lint, policy)
 on every PR; integration tests run on a weekly schedule.
