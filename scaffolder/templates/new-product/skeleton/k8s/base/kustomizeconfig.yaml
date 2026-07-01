@@ -6,3 +6,19 @@ replicas:
     create: true
     group: argoproj.io
     kind: Rollout
+
+# Teach kustomize's `commonLabels` transformer about Rollout's selector + pod template too (ADR-032 PR
+# previews): by default it only patches metadata.labels for unrecognized kinds (Deployment/StatefulSet/etc.
+# get selector+template patched automatically; Rollout, a CRD, does not). Without this, the ApplicationSet's
+# namePrefix/commonLabels preview isolation (ADR-032) patches the Service selector to require
+# app.kubernetes.io/instance=pr-<N>, but the Rollout's pods never get that label — zero Service endpoints,
+# "no healthy upstream" at the Gateway. Found live verifying the first PR preview (asanexample/alpha-shop#14).
+commonLabels:
+  - path: spec/selector/matchLabels
+    create: false
+    group: argoproj.io
+    kind: Rollout
+  - path: spec/template/metadata/labels
+    create: true
+    group: argoproj.io
+    kind: Rollout
