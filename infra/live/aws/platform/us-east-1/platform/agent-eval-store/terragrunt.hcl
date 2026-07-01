@@ -24,6 +24,12 @@ inputs = {
   # Deterministic so the ARN is known at agent-claim-authoring time for the identity-based write grant.
   bucket_name = "platform-agent-eval-corpus"
 
+  # Encryption follows the cost profile (ADR-092 shift-left FinOps): dev/cost → SSE-S3 (no dedicated-key cost,
+  # matching the LGTM buckets); prod/regulated → a dedicated CMK (key-level access control + audit) for this
+  # sensitive, kept-forever, LLM-replayed corpus. Flip via cost_profile (common.hcl) or an explicit
+  # high_availability override. Metadata-first capture is the primary data control in either mode.
+  use_kms_cmk = include.base.locals.high_availability
+
   # No cross-account CI replay/grader role exists yet (ADR-080 D6 follow-up in the app repo); the read
   # seam stays empty until it does. Object Lock / WORM likewise deferred to the graduation slice.
 

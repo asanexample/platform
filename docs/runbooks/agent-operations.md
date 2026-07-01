@@ -95,9 +95,10 @@ the `production-shadow` source that feeds the `shadow → proven → promoted` g
 ([ADR-086](../adrs/086-autonomous-agent-access.md)).
 
 - **Store:** the `agent-eval-store` unit provisions a durable, keep-forever S3 bucket **`platform-agent-eval-corpus`**
-  (platform account) — dedicated CMK (SSE-KMS), TLS-only, versioned, write-once (the agent has `PutObject`/`GetObject`
-  but **no `DeleteObject`**), and `teardown_skip` so it survives a rebuild (like the state backend). Provisioned
-  independently of any agent version.
+  (platform account) — TLS-only, versioned, write-once (the agent has `PutObject`/`GetObject` but **no
+  `DeleteObject`**), and `teardown_skip` so it survives a rebuild (like the state backend). **Encryption is
+  cost-profile-toggled** (`use_kms_cmk`): SSE-S3 in dev/cost, a dedicated CMK (SSE-KMS, key-level access control
+  - audit) in prod/regulated. Provisioned independently of any agent version.
 - **Write access:** identity-based on the agent's Pod-Identity role, declared in `gitops/agents/triage-copilot.yaml`
   (`awsPermissions.policyStatements`: S3 object write + KMS use). No cross-account read role exists yet (the module's
   `reader_role_arns` seam is empty until a CI replay/grader lands, ADR-080 D6 — an app-repo follow-up).

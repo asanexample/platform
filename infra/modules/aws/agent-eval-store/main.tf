@@ -5,13 +5,14 @@
 # fixtures ({alert-group, telemetry snapshot, structured label, rubric}). The
 # corpus must be built FORWARD — telemetry retention is short, so an incident
 # not captured when it happens is lost — and it later feeds the shadow→proven→
-# promoted graduation signal that gates agent autonomy. Because it holds
-# potentially-sensitive telemetry forever AND is replayed into an LLM, it is
-# hardened beyond the SSE-S3 default the other buckets use: a dedicated CMK (the
-# "regulated-tier upgrade" the LGTM/cost-export buckets defer to), strict TLS-only
-# access, and integrity controls (the writer gets no DeleteObject; Object Lock is
-# a seam). The agent's WRITE grant is identity-based (its XAgent claim), not here,
-# to avoid a chicken-and-egg on the Composition-minted role ARN.
+# promoted graduation signal that gates agent autonomy. It holds potentially-
+# sensitive telemetry forever AND is replayed into an LLM, so it is hardened:
+# TLS-only access, full public-access block, versioning, and integrity controls
+# (the writer gets no DeleteObject; Object Lock is a seam). Encryption is SSE-S3
+# by default (the house baseline) and upgradable to a dedicated CMK via
+# `use_kms_cmk` (the "regulated-tier upgrade") — wired to the cost profile at the
+# unit. The agent's WRITE grant is identity-based (its XAgent claim), not here, to
+# avoid a chicken-and-egg on the Composition-minted role ARN.
 
 data "aws_caller_identity" "current" {}
 
@@ -20,11 +21,11 @@ locals {
 }
 
 # ---------------------------------------------------------------------------
-# KMS — corpus envelope-encryption CMK
+# KMS — corpus envelope-encryption CMK (only when use_kms_cmk; else SSE-S3)
 # ---------------------------------------------------------------------------
 
 resource "aws_kms_key" "corpus" {
-  count = local.create ? 1 : 0
+  count = local.create && var.use_kms_cmk ? 1 : 0
 
   description             = "Envelope encryption for the agent-eval corpus (${var.bucket_name})"
   enable_key_rotation     = true
@@ -35,17 +36,17 @@ resource "aws_kms_key" "corpus" {
 }
 
 resource "aws_kms_alias" "corpus" {
-  count = local.create ? 1 : 0
+  count = local.create && var.use_kms_cmk ? 1 : 0
 
   name          = "alias/${var.bucket_name}"
   target_key_id = aws_kms_key.corpus[0].key_id
 }
 
 data "aws_iam_policy_document" "kms" {
-  count = local.create ? 1 : 0
+  count = local.create && var.use_kms_cmk ? 1 : 0
 
-  # Root-enable: lets account IAM policies (the agent's claim grant, below)
-  # delegate key use in-account, the standard CMK key-policy baseline.
+  # Root-enable: lets account IAM policies (the agent's claim grant) delegate key
+  # use in-account, the standard CMK key-policy baseline.
   statement {
     sid       = "EnableIAMUserPermissions"
     effect    = "Allow"
@@ -128,10 +129,10 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "corpus" {
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm     = "aws:kms"
-      kms_master_key_id = aws_kms_key.corpus[0].arn
+      sse_algorithm     = var.use_kms_cmk ? "aws:kms" : "AES256"
+      kms_master_key_id = one(aws_kms_key.corpus[*].arn)
     }
-    bucket_key_enabled = true
+    bucket_key_enabled = var.use_kms_cmk
   }
 }
 

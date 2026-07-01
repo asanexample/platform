@@ -20,7 +20,8 @@ spec:
     # Forward-capture write to the durable eval corpus (ADR-080 D6 / agent-eval-store unit). The bucket
     # name is deterministic; the CMK ARN is not (generated key id), so KMS actions use resources ["*"] —
     # doubly-gated: this identity grant is only effective for keys whose OWN key policy enables IAM
-    # delegation, and only the corpus CMK does. No s3:DeleteObject (write-once corpus integrity).
+    # delegation, and only the corpus CMK does. Inert when the corpus uses SSE-S3 (dev profile), active
+    # under a CMK (prod/regulated). No s3:DeleteObject (write-once corpus integrity).
     policyStatements:
       - sid: WriteEvalCorpus
         actions:

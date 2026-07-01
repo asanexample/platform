@@ -8,6 +8,11 @@ variable "bucket_name" {
   default = "test-agent-eval-corpus"
 }
 
+variable "use_kms_cmk" {
+  type    = bool
+  default = false
+}
+
 variable "reader_role_arns" {
   type    = list(string)
   default = []
@@ -28,6 +33,7 @@ module "agent_eval_store" {
 
   create                = var.create
   bucket_name           = var.bucket_name
+  use_kms_cmk           = var.use_kms_cmk
   reader_role_arns      = var.reader_role_arns
   transition_to_ia_days = var.transition_to_ia_days
   force_destroy         = true

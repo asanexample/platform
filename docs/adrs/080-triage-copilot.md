@@ -446,8 +446,9 @@ Built and live on the hub as `XAgent` #1 ([ADR-082](082-platform-agent-runtime-x
   CNP (the Composition) was widened to `*.slack.com` for it (ADR-082's egress posture).
 
 **Now wired — the capture substrate (D6, the ADR-086 prerequisite):** the **production-shadow** corpus source is built
-forward. The `agent-eval-store` unit provisions a durable, keep-forever S3 corpus (`platform-agent-eval-corpus` — dedicated
-CMK, TLS-only, versioned, write-once/no-delete, `teardown_skip` so it survives a rebuild); the agent writes
+forward. The `agent-eval-store` unit provisions a durable, keep-forever S3 corpus (`platform-agent-eval-corpus` — TLS-only,
+versioned, write-once/no-delete, cost-profile-toggled encryption [SSE-S3 default / a dedicated CMK for prod/regulated],
+`teardown_skip` so it survives a rebuild); the agent writes
 `{alert-group, telemetry snapshot, structured label, rubric}` fixtures at triage time with a **late-binding label** (back-filled
 from the accept/reject signal + RCA); a trigger-layer capture-health alert flags if the agent stops receiving criticals; and the
 `synthetic="true"` alert-isolation convention is documented for the injection slice. So the corpus **accrues from day one** — it

@@ -18,8 +18,20 @@ variable "bucket_name" {
   }
 }
 
+variable "use_kms_cmk" {
+  description = <<-EOT
+    Encrypt the corpus with a dedicated KMS CMK (SSE-KMS) — key-level access control + CloudTrail audit +
+    revocable-by-key-policy, the "regulated-tier upgrade" (a flat ~$1/mo for the key). When false (default),
+    SSE-S3 (AES256): encrypted at rest with no dedicated-key cost, matching the LGTM / cost-export buckets.
+    Wired to the cost profile at the unit (dev/cost → SSE-S3; prod/regulated → CMK). Metadata-first capture
+    (no raw sensitive content) is the primary data control in either mode.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "kms_deletion_window_days" {
-  description = "Waiting period (days) before the corpus CMK is deleted after scheduling."
+  description = "Waiting period (days) before the corpus CMK is deleted after scheduling (only when use_kms_cmk)."
   type        = number
   default     = 30
 }

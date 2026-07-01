@@ -47,10 +47,8 @@ func TestAgentEvalStore_Plan(t *testing.T) {
 	opts.PlanFilePath = tmpDir + "/plan.out"
 	planStruct := terraform.InitAndPlanAndShowWithStruct(t, opts)
 
-	// The full hardened bucket + dedicated CMK.
+	// Default profile = SSE-S3: the full hardened bucket, no dedicated CMK.
 	expectedResources := []string{
-		"module.agent_eval_store.aws_kms_key.corpus[0]",
-		"module.agent_eval_store.aws_kms_alias.corpus[0]",
 		"module.agent_eval_store.aws_s3_bucket.corpus[0]",
 		"module.agent_eval_store.aws_s3_bucket_ownership_controls.corpus[0]",
 		"module.agent_eval_store.aws_s3_bucket_public_access_block.corpus[0]",
@@ -63,10 +61,40 @@ func TestAgentEvalStore_Plan(t *testing.T) {
 			"plan should include %s", resource)
 	}
 
+	// SSE-S3 by default — no dedicated CMK (the cost-clean baseline).
+	assert.NotContains(t, planStruct.ResourcePlannedValuesMap,
+		"module.agent_eval_store.aws_kms_key.corpus[0]",
+		"no CMK should be planned when use_kms_cmk=false (SSE-S3)")
+
 	// Optional tiering is off by default — no lifecycle rule.
 	assert.NotContains(t, planStruct.ResourcePlannedValuesMap,
 		"module.agent_eval_store.aws_s3_bucket_lifecycle_configuration.corpus[0]",
 		"lifecycle tiering should be absent when transition_to_ia_days=0")
+}
+
+func TestAgentEvalStore_CMK(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := copyFixtureToTemp(t)
+
+	// The regulated-tier upgrade (prod profile): a dedicated CMK + alias.
+	vars := map[string]interface{}{
+		"create":      true,
+		"bucket_name": "test-agent-eval-corpus",
+		"use_kms_cmk": true,
+	}
+
+	opts := newTerraformOptions(t, tmpDir, vars)
+	opts.PlanFilePath = tmpDir + "/plan.out"
+	planStruct := terraform.InitAndPlanAndShowWithStruct(t, opts)
+
+	for _, resource := range []string{
+		"module.agent_eval_store.aws_kms_key.corpus[0]",
+		"module.agent_eval_store.aws_kms_alias.corpus[0]",
+	} {
+		assert.Contains(t, planStruct.ResourcePlannedValuesMap, resource,
+			"plan with use_kms_cmk=true should include %s", resource)
+	}
 }
 
 func TestAgentEvalStore_LifecycleTiering(t *testing.T) {

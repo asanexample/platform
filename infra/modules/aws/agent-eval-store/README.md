@@ -8,16 +8,24 @@ the `shadow → proven → promoted` graduation signal that gates agent autonomy
 
 ## Why this bucket is hardened beyond the other buckets
 
-Unlike the LGTM / cost-export buckets (deliberately SSE-S3), this store holds **potentially-sensitive
-telemetry forever** *and* is later replayed into an LLM (Bedrock). It is therefore the "regulated-tier
-upgrade" those modules defer to:
+This store holds **potentially-sensitive telemetry forever** *and* is later replayed into an LLM (Bedrock),
+so it always carries these controls:
 
-- **SSE-KMS with a dedicated CMK** (`alias/<bucket_name>`) — key-level access control + CloudTrail audit +
-  revocable-by-key-policy.
 - **TLS-only** bucket policy; full public-access block; `BucketOwnerEnforced`.
 - **Versioning on**; the writer (agent) is granted `PutObject`/`GetObject` but **no `DeleteObject`** (corpus
   integrity). S3 Object Lock / WORM is a seam (`object_lock_enabled`, default off), adopted in the graduation
   slice when the corpus actually gates power.
+- **Encryption at rest** in every mode.
+
+**Encryption is cost-profile-toggled** via `use_kms_cmk`:
+
+- **`false` (default)** — SSE-S3 (AES256), matching the LGTM / cost-export buckets. Encrypted at rest, no
+  dedicated-key cost.
+- **`true`** — the "regulated-tier upgrade": a dedicated **CMK** (`alias/<bucket_name>`) with key-level access
+  control + CloudTrail audit + revocable-by-key-policy (a flat ~$1/mo).
+
+The live unit wires it to the cost profile (dev/cost → SSE-S3; prod/regulated → CMK). Regardless of mode, the
+**metadata-first capture contract** below is the primary data control.
 
 ## Data-classification contract (metadata-first)
 
@@ -39,6 +47,7 @@ the technical controls (encryption, no-public, TLS-only); the redaction posture 
 | Variable | Default | Purpose |
 |---|---|---|
 | `bucket_name` | — | Deterministic name (e.g. `platform-agent-eval-corpus`) so the ARN is known at claim-authoring time |
+| `use_kms_cmk` | `false` | `true` = dedicated CMK (SSE-KMS, ~$1/mo); `false` = SSE-S3. Wired to the cost profile at the unit |
 | `object_lock_enabled` | `false` | WORM seam (graduation slice) — forces replacement, set at creation |
 | `reader_role_arns` | `[]` | Future cross-account CI read grant (S3 + KMS Decrypt) |
 | `transition_to_ia_days` | `0` | Optional aged-fixture tiering to Standard-IA; 0 = off |
