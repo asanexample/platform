@@ -16,7 +16,7 @@ On the **platform** cluster, in the **`observability`** namespace:
 
 | Component | What | Version | Notes |
 |-----------|------|---------|-------|
-| **kube-prometheus-stack** | Prometheus + Grafana + Alertmanager + node-exporter + kube-state-metrics + prometheus-operator | chart `86.1.0` | P1 hub — always on |
+| **kube-prometheus-stack** | Prometheus + Grafana + Alertmanager + node-exporter + kube-state-metrics + prometheus-operator | chart `87.5.0` | P1 hub — always on |
 | **Grafana Loki** | Logs store (single-binary), S3-backed, **Pod Identity** | chart `loki 7.0.0` | P3a — `enable_loki` |
 | **Grafana Alloy** | Log-collector DaemonSet (node-local pod logs → Loki) | chart `alloy 1.10.0` | P3a — `enable_log_pipeline` |
 | **K8s events → Loki** | Alloy singleton watching cluster Events → Loki | chart `alloy 1.10.0` | P3b — `enable_log_pipeline` |
@@ -26,7 +26,7 @@ On the **platform** cluster, in the **`observability`** namespace:
 | **Notifications** | `warning`→Slack · `critical`→SNS+Slack+PagerDuty · inhibition | — | P4; secrets via ESO |
 | **gp3 StorageClass** | cluster-default EBS storage (EBS CSI) | — | in the `eks-addons` unit |
 | **Grafana Mimir** | Durable, multi-tenant, S3-backed metrics store | chart `mimir-distributed 6.0.6` | P2 — **ON** on the platform hub (`enable_mimir=true`); Prometheus `remote_write`s here; the hub-and-spoke store |
-| **Prometheus agent (preprod spoke)** | kube-prometheus-stack agent mode (+ KSM + node-exporter) on **preprod**, `remote_write`s to the hub Mimir under tenant `preprod` | chart `kube-prometheus-stack 86.1.0` | P10 — `infra/modules/observability-prometheus-agent` |
+| **Prometheus agent (preprod spoke)** | kube-prometheus-stack agent mode (+ KSM + node-exporter) on **preprod**, `remote_write`s to the hub Mimir under tenant `preprod` | chart `kube-prometheus-stack 87.5.0` | P10 — `infra/modules/observability-prometheus-agent` |
 
 > **cost_profile (`common.hcl`/`_base.hcl`):** `dev` (default) = single-replica + durable stores **off**. The
 > platform cluster overrides `enable_mimir` / `enable_loki` / `enable_log_pipeline` / `enable_tempo` /

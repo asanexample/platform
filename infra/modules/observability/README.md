@@ -21,7 +21,7 @@ module "observability" {
   cluster_name = "platform-use1-eks"
   aws_region   = "us-east-1"
 
-  helm_chart_version = "86.1.0"
+  helm_chart_version = "87.5.0"
   high_availability  = false # single-replica reference cluster; true => Prom x2 / AM x3 / Grafana x2 + PDBs
 
   # Durable storage (needs a default StorageClass, e.g. gp3 from the eks-addons unit)
@@ -162,7 +162,7 @@ No modules.
 | <a name="input_grafana_oidc_role_attribute_path"></a> [grafana\_oidc\_role\_attribute\_path](#input\_grafana\_oidc\_role\_attribute\_path) | Grafana role mapping (JMESPath over the token's `groups` claim). Default: platform-admins → Admin, any other authenticated user → Viewer. Per-team Editor scoping is P13 (#590). | `string` | `"contains(groups[*], 'platform-admins') && 'Admin' || 'Viewer'"` | no |
 | <a name="input_grafana_oidc_secret_manager_key"></a> [grafana\_oidc\_secret\_manager\_key](#input\_grafana\_oidc\_secret\_manager\_key) | AWS Secrets Manager key holding the Grafana OIDC client secret (keycloak-config writes platform/keycloak/grafana-oidc, JSON property `client-secret`). Synced to a K8s secret via ExternalSecret, injected as GF\_AUTH\_GENERIC\_OAUTH\_CLIENT\_SECRET. | `string` | `""` | no |
 | <a name="input_helm_chart"></a> [helm\_chart](#input\_helm\_chart) | Chart name. | `string` | `"kube-prometheus-stack"` | no |
-| <a name="input_helm_chart_version"></a> [helm\_chart\_version](#input\_helm\_chart\_version) | kube-prometheus-stack chart version (latest GA — resolve at apply time). | `string` | `"86.1.0"` | no |
+| <a name="input_helm_chart_version"></a> [helm\_chart\_version](#input\_helm\_chart\_version) | kube-prometheus-stack chart version (latest GA — resolve at apply time). | `string` | `"87.5.0"` | no |
 | <a name="input_helm_release_name"></a> [helm\_release\_name](#input\_helm\_release\_name) | Helm release name. Pinned so the Grafana Service (<release>-grafana) and the Alertmanager ServiceAccount (<release>-alertmanager) names are deterministic for the gateway route and the Pod Identity association (ADR-047). | `string` | `"kube-prometheus-stack"` | no |
 | <a name="input_helm_repository"></a> [helm\_repository](#input\_helm\_repository) | kube-prometheus-stack chart repository. | `string` | `"https://prometheus-community.github.io/helm-charts"` | no |
 | <a name="input_helm_timeout"></a> [helm\_timeout](#input\_helm\_timeout) | Timeout for Helm operations in seconds. | `number` | `900` | no |

@@ -325,7 +325,7 @@ helm_versions = {
   argocd                = "9.5.14"
   external_secrets      = "0.14.3"
   kyverno               = "3.8.1"
-  kube_prometheus_stack = "86.1.0"
+  kube_prometheus_stack = "87.5.0"
   mimir                 = "6.0.6"
   # ... etc.
 }

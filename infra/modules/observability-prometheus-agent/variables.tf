@@ -62,7 +62,7 @@ variable "helm_chart" {
 variable "helm_chart_version" {
   description = "kube-prometheus-stack chart version (pin from _versions.hcl; reuses the hub's pin)."
   type        = string
-  default     = "86.1.0"
+  default     = "87.5.0"
 }
 
 variable "helm_timeout" {
