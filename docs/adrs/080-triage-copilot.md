@@ -445,7 +445,18 @@ Built and live on the hub as `XAgent` #1 ([ADR-082](082-platform-agent-runtime-x
   a WebSocket; only an app-level token is needed and the card update rides the interaction's `response_url`. The agent's egress
   CNP (the Composition) was widened to `*.slack.com` for it (ADR-082's egress posture).
 
-**Remaining (deliberately deferred):** the eval harness (fault-injection corpus + grader, D6) still lives in the spike —
-wiring it as a CI **regression gate** (forks on model-in-CI: deterministic fixture-replay vs live Bedrock) is the next quality
-lever; ADR-076 content-capture (the tiered prompt/response on the trace) is partial (the chat span already carries
-model/tokens/provider).
+**Now wired — the capture substrate (D6, the ADR-086 prerequisite):** the **production-shadow** corpus source is built
+forward. The `agent-eval-store` unit provisions a durable, keep-forever S3 corpus (`platform-agent-eval-corpus` — TLS-only,
+versioned, write-once/no-delete, cost-profile-toggled encryption [SSE-S3 default / a dedicated CMK for prod/regulated],
+`teardown_skip` so it survives a rebuild); the agent writes
+`{alert-group, telemetry snapshot, structured label, rubric}` fixtures at triage time with a **late-binding label** (back-filled
+from the accept/reject signal + RCA); a trigger-layer capture-health alert flags if the agent stops receiving criticals; and the
+`synthetic="true"` alert-isolation convention is documented for the injection slice. So the corpus **accrues from day one** — it
+can't be backfilled (retention is short) — while the grader/gate follow. Content-capture is **metadata-first** here (structured
+values, not raw content) until ADR-076's redaction lands.
+
+**Remaining (deliberately deferred):** the eval **grader** (fault-injection corpus + `pass^k` scoring, D6) still lives in the
+spike, **in the app repo** — wiring it as a CI **regression gate** (forks on model-in-CI: deterministic fixture-replay vs live
+Bedrock) is the next quality lever; the autonomous fault-injection **runner** and the cross-account CI **read role** (the
+`reader_role_arns` seam) likewise follow. ADR-076 content-capture (the tiered prompt/response on the trace) is partial (the chat
+span already carries model/tokens/provider).

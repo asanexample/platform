@@ -320,3 +320,22 @@ groups:
           summary: "Transit Gateway is blackholing packets ({{ $labels.dimension_TransitGateway }})"
           description: "A Transit Gateway has dropped packets to a blackhole route for 15m — cross-account traffic (platform hub ↔ preprod spoke) is hitting a missing or misconfigured TGW route. Check the TGW route tables and VPC attachments."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cloud-resources"
+  # ---------------------------------------------------------------------------
+  # Agent-eval capture substrate (ADR-080 D6). Capture-health backstop: if the corpus silently stops
+  # growing, the "ready-for-scale" premise quietly fails. Today only the TRIGGER layer is observable — if
+  # Alertmanager can't deliver criticals to the triage agent's webhook, the agent receives nothing to triage
+  # or capture. The fuller "fixtures captured == 0 while criticals fired" alert lands once the agent emits an
+  # agent_eval_fixtures_captured_total counter on the ADR-076 metrics path (see docs/runbooks/agent-operations.md).
+  # alertmanager_notifications_* is a kube-prometheus-stack default; confirm present in live Prometheus at
+  # rollout (triage is currently the only integration="webhook" receiver).
+  - name: agent-eval.rules
+    rules:
+      - alert: AgentTriageWebhookDeliveryFailing
+        expr: increase(alertmanager_notifications_failed_total{integration="webhook"}[15m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alertmanager can't deliver to the triage agent webhook"
+          description: "Alertmanager webhook notifications have failed over the last 15m — the triage copilot is not receiving critical alerts, so it can neither triage nor forward-capture eval fixtures (the corpus silently stops growing). Check the triage-copilot-server Service/pod and the observability→agent NetworkPolicy."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/agent-operations.md#capture-health"

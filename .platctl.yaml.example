@@ -42,6 +42,13 @@ overrides:
       profile: preprod
     teardown_skip: true
 
+  platform/agent-eval-store:
+    # The agent-eval corpus is durable, built-forward, keep-forever data (ADR-080 D6): an incident not captured
+    # when it fires is lost (can't backfill), and the corpus accrues the shadow→proven→promoted signal that
+    # gates agent autonomy. Like the state backend and iam-roles, teardown leaves it alone so it survives a
+    # rebuild (the bucket's force_destroy=false is the second guard against accidental deletion).
+    teardown_skip: true
+
   platform/tailscale-admin:
     implicit_deps: ["preprod/iam-roles"]
     hook: secret_cleanup
