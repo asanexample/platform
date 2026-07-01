@@ -177,6 +177,17 @@ a `cluster` multi-select, so panels break out per cluster. Per-team scoping of t
 > sidesteps this by deriving values from `kube_node_info` (KSM — real clusters only), so the UI is clean;
 > relabeling the self-metrics so `externalLabels.cluster` is authoritative is tracked in #630.
 
+### Dashboard template-variable convention (#151)
+
+Every dashboard carries a `$cluster` variable (`cluster=~"$cluster"` on every panel) — the label is on
+every series regardless of what the dashboard is about (Prometheus `externalLabels`, ADR-043/044).
+Tenant/namespace-scoped dashboards (workload health, cost, APM) additionally carry `$namespace`/`$team`;
+cluster/node-level dashboards (Platform Health, Cilium) don't, since there's nothing tenant-scoped to
+filter. The vendored **ArgoCD** dashboard shipped its own `cluster` variable meaning something else
+entirely (the ArgoCD-**target** server apps deploy *to*, `label_values(argocd_cluster_info, server)`) —
+renamed to `dest_cluster` so `$cluster` means the same thing on every dashboard. Authoring detail: the
+`observability-authoring` skill's "Add a dashboard" section.
+
 ### Multi-tenancy & the security boundary (read this)
 
 Mimir runs with `multitenancy_enabled: true`. The tenant is the **`X-Scope-OrgID`** header; the hub's own

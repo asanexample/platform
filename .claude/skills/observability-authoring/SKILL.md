@@ -42,7 +42,19 @@ label cluster-wide).
    datasource UIDs with the provisioned name/variable (e.g. `Mimir`, `Loki`, `Tempo`, or
    `"uid": "${datasource}"`). Commit to `dashboards/`.
 2. **Custom**: author JSON, query the datasource variable.
-3. `terragrunt apply` the observability unit → the ConfigMap is created and the sidecar
+3. **Template variables (#151 convention)**: every dashboard needs a `$cluster` variable
+   (`label_values(<any metric this dashboard queries>, cluster)`) filtering panels with
+   `cluster=~"$cluster"` — every series carries this label (Prometheus `externalLabels`,
+   ADR-043/044), so it's always available regardless of what the dashboard is about.
+   Tenant/namespace-scoped dashboards (workload health, cost, APM) additionally need a
+   `$namespace`/`$team` variable (`label_values(..., namespace)`, filtered to `team-*`
+   where relevant) with `namespace=~"$namespace"`. Cluster/node-level dashboards (health,
+   Cilium) skip the namespace variable — there's nothing tenant-scoped to filter. If a
+   vendored dashboard already ships its own same-named variable for an unrelated concept
+   (e.g. the ArgoCD dashboard's `cluster` = the ArgoCD-target `dest_server`, not our
+   source-cluster label), rename the vendored one (e.g. `dest_cluster`) rather than
+   overload `$cluster` with two meanings — see `dashboards/argocd.json`.
+4. `terragrunt apply` the observability unit → the ConfigMap is created and the sidecar
    picks it up within seconds.
 
 ## Add an alert
