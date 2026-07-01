@@ -15,7 +15,8 @@ git generator fans out over the Product's **Release records** (`gitops/releases/
 creating **one `Application` per Release** and injecting the signed digest as a kustomize image override. This
 **release-keyed** form replaced an earlier `pullRequest`/merge generator (which collided on a null merge key).
 See [Promotion & Release](architecture/promotion-and-release.md). *(PR-preview **delivery** — an ephemeral
-`Application` per open PR, [ADR-032](adrs/032-pr-preview-environments.md) — is **not yet wired** in v3.)*
+`Application` per open PR, [ADR-032](adrs/032-pr-preview-environments.md) — is a separate, product-scoped
+`pullRequest`-generator ApplicationSet, not this release-keyed one; code landed, pending live verification.)*
 
 **BACK stack** — **B**ackstage + **A**rgoCD + **C**rossplane + **K**ubernetes: the chosen architecture for
 developer self-service. ArgoCD delivers, Crossplane provisions environments, Backstage is the portal.
@@ -57,7 +58,8 @@ See [Crossplane Environment API](architecture/crossplane-environment-api.md#comp
 
 **Generated host** — The system-canonical hostname `<product>-<team>-<stage>.<baseDomain>` derived from
 `(product, team, stage)` and injected into the Service's HTTPRoute by the per-Product ApplicationSet — never
-hardcoded in the repo. Previews use `<product>-<team>-pr-<n>`. See [Hostname Convention (ADR-060)](adrs/060-tenant-app-hostname-convention.md).
+hardcoded in the repo. Previews use `<product>-<team>-dev-pr-<n>` (always the `dev` stage — previews deploy
+into the existing `dev` namespace, not a dedicated environment). See [Hostname Convention (ADR-060)](adrs/060-tenant-app-hostname-convention.md).
 
 **IdP of record** — In the realized default (scenario B), Keycloak owns users and memberships in the
 `platform` realm (`upstream = null`); upstream federation is opt-in.
@@ -86,10 +88,11 @@ boilerplate; works with `automountServiceAccountToken: false`.
 See [Pod Identity for Tenant Workloads (ADR-041)](adrs/041-pod-identity-for-tenant-workloads.md) and the
 [Pod Identity runbook](runbooks/environment-aws-access-pod-identity.md).
 
-**PR preview** — The intended ephemeral per-PR deployment (`<product>-<team>-pr-<n>.<baseDomain>`) for Services
-with `preview = true`. **Status (v3): partial** — the app skeleton's `preview.yml` builds + signs a PR image, but
-preview *delivery* (the ephemeral `Application`) is **not yet wired** (the delivery ApplicationSet is
-release-keyed). See [PR Preview Environments (ADR-032)](adrs/032-pr-preview-environments.md) and the
+**PR preview** — The ephemeral per-PR deployment (`<product>-<team>-dev-pr-<n>.<baseDomain>`, into the
+existing `dev` namespace) for Products whose `dev` `XEnvironment` claim has `spec.preview: true`.
+**Status (v3): code landed, pending live verification** — a dedicated `pullRequest`-generator
+ApplicationSet (separate from the release-keyed per-Product one) delivers it, reusing the GitHub App
+already used for repo-creds. See [PR Preview Environments (ADR-032)](adrs/032-pr-preview-environments.md) and the
 [Delivery Pipeline](architecture/delivery-pipeline.md) cross-cutting note.
 
 **Product** — A deployable app/system owned by exactly one Team, declared at

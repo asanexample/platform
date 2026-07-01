@@ -186,12 +186,14 @@ These are first-class but already have deep docs — linked here, not re-explain
   ([ADR-070](../adrs/070-tenant-app-config-and-secrets.md)) is **Proposed, not yet built** — the
   Composition emits no `ExternalSecret` and the scaffolder skeleton uses plain `env:`. Today an app wires its own
   `ExternalSecret` against the platform ClusterSecretStore.
-- **PR preview environments** ([ADR-032](../adrs/032-pr-preview-environments.md)) — **partially built.** The
-  app skeleton's [`preview.yml`](../../scaffolder/templates/new-product/skeleton/.github/workflows/preview.yml)
-  **builds + signs + attests a PR image**, so a preview *would* satisfy Kyverno's verify-images/attestations
-  checks. But **PR-preview *delivery* is not wired in v3**: the per-Product ApplicationSet is release-keyed (not a
-  `pullRequest` generator). Ephemeral per-PR environments are a
-  **known future enhancement**, not a live capability.
+- **PR preview environments** ([ADR-032](../adrs/032-pr-preview-environments.md)) — **code landed, pending
+  live verification.** The app skeleton's
+  [`preview.yml`](../../scaffolder/templates/new-product/skeleton/.github/workflows/preview.yml) builds +
+  signs + attests a PR image, satisfying Kyverno's verify-images/attestations checks. Delivery is a
+  separate, product-scoped `pullRequest`-generator `ApplicationSet`
+  (`infra/modules/argocd-apps/pr-preview.tf`, distinct from the release-keyed per-Product one), gated
+  per-product on `spec.preview: true` and reusing the GitHub App already used for repo-creds. Pending a
+  manual GitHub App permission check and the unit apply before it's confirmed live.
 
 ---
 
