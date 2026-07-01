@@ -88,17 +88,17 @@ template:
   `:placeholder` until CI pins the digest — a long retry would hammer a doomed revision
   for 45 min).
 
-## PR preview environments (ADR-032) — code landed, pending live verification
+## PR preview environments (ADR-032) — live, proven end-to-end
 
-> **Verify against code/cluster before relying on this.** `pr-preview.tf` adds a separate,
-> product-scoped `pullRequest`-generator ApplicationSet, gated per-product on
-> `products[*].preview` (from `spec.preview` on the product's `dev` XEnvironment claim). It's
-> new — pending a manual GitHub App permission check (see below) and a live end-to-end test
-> before treating it as proven.
+`pr-preview.tf` adds a separate, product-scoped `pullRequest`-generator ApplicationSet, gated
+per-product on `products[*].preview` (from `spec.preview` on the product's `dev` XEnvironment
+claim). Verified against a real PR (`asanexample/alpha-shop#14`): image build/sign, ArgoCD
+generating and syncing the preview, HTTPS reachability at the designed hostname, isolation from
+the stable deployment, and cleanup on PR close all confirmed.
 
 `var.preview_domain` still does double duty: it's both the base domain the standard
 per-Product delivery ApplicationSet rewrites per-stage hosts to (`<product>-<team>-<stage>.<preview_domain>`,
-`delivery.tf`) AND the base domain the new PR-preview ApplicationSet uses
+`delivery.tf`) AND the base domain the PR-preview ApplicationSet uses
 (`<product>-<team>-dev-pr-<N>.<preview_domain>`, `pr-preview.tf`) — two different mechanisms,
 same variable.
 
@@ -106,14 +106,25 @@ The PR-preview ApplicationSet deploys into the **existing `dev` namespace** (no 
 per PR — too slow/heavy to provision via Crossplane on every PR open), isolated by kustomize
 `namePrefix: pr-<N>-` + `commonLabels`. It reuses the **GitHub App ArgoCD already authenticates
 repo-creds with** (TD2-02b, `github_app_secret_name` → `appSecretName`) rather than a separate
-token — that App's installation needs **Pull requests: Read-only** in addition to its existing
-Contents/Metadata scope, a manual one-time addition, not a new App. Images are the PR's own
-head-SHA-tagged, cosign-signed build (`preview.yml`, already scaffolded per product) — no
-Release record, no digest promotion; previews intentionally bypass the gitops-Gate ladder. The
-preview hostname pattern is already unconditionally allow-listed by the Crossplane
-Composition's `restrict-route-hostnames-<ns>` (a wildcard `-pr-*` entry) — no per-PR admission
-wiring needed. The app-repo `k8s/base/name-reference.yaml` (also already scaffolded) rewrites
-Gateway-API HTTPRoute `backendRefs` under the `pr-<n>-` prefix.
+token — that App's installation carries **Pull requests: Read-only** alongside its existing
+Contents/Metadata scope. Images are the PR's own head-SHA-tagged, cosign-signed build
+(`preview.yml`, already scaffolded per product) — no Release record, no digest promotion;
+previews intentionally bypass the gitops-Gate ladder. The preview hostname pattern is already
+unconditionally allow-listed by the Crossplane Composition's `restrict-route-hostnames-<ns>` (a
+wildcard `-pr-*` entry) — no per-PR admission wiring needed. The app-repo `k8s/base/name-reference.yaml`
+(also already scaffolded) rewrites Gateway-API HTTPRoute `backendRefs` under the `pr-<n>-` prefix.
+
+**Gotcha found live (fixed in `alpha-shop` and the scaffolder template):** kustomize's
+`commonLabels` transformer only auto-patches selector + pod-template paths for well-known
+built-in types — `Rollout` (a CRD, what every workload here actually is, ADR-056) only got its
+top-level `metadata.labels` patched, not `spec.selector.matchLabels` or
+`spec.template.metadata.labels`. Since preview isolation depends on `commonLabels` reaching both
+the Service selector and the Rollout's pod template, this left every first preview with zero
+Service endpoints ("no healthy upstream" at the Gateway). Fixed via a `commonLabels` FieldSpec
+extension in each app's `k8s/base/kustomizeconfig.yaml`, mirroring the pattern that file already
+uses for the `replicas:` transformer on the same CRD. Not retrofitted onto existing products
+without preview enabled (`alpha-checkout`, `alpha-conformance`) — they'd need the same fix by
+hand if/when they opt in.
 
 ## Platform-service vs tenant delivery (ADR-081)
 

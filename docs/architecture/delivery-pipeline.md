@@ -186,14 +186,15 @@ These are first-class but already have deep docs — linked here, not re-explain
   ([ADR-070](../adrs/070-tenant-app-config-and-secrets.md)) is **Proposed, not yet built** — the
   Composition emits no `ExternalSecret` and the scaffolder skeleton uses plain `env:`. Today an app wires its own
   `ExternalSecret` against the platform ClusterSecretStore.
-- **PR preview environments** ([ADR-032](../adrs/032-pr-preview-environments.md)) — **code landed, pending
-  live verification.** The app skeleton's
+- **PR preview environments** ([ADR-032](../adrs/032-pr-preview-environments.md)) — **live, proven
+  end-to-end.** The app skeleton's
   [`preview.yml`](../../scaffolder/templates/new-product/skeleton/.github/workflows/preview.yml) builds +
   signs + attests a PR image, satisfying Kyverno's verify-images/attestations checks. Delivery is a
   separate, product-scoped `pullRequest`-generator `ApplicationSet`
   (`infra/modules/argocd-apps/pr-preview.tf`, distinct from the release-keyed per-Product one), gated
-  per-product on `spec.preview: true` and reusing the GitHub App already used for repo-creds. Pending a
-  manual GitHub App permission check and the unit apply before it's confirmed live.
+  per-product on `spec.preview: true` and reusing the GitHub App already used for repo-creds. Verified
+  against a real PR (`asanexample/alpha-shop#14`): build, deploy, isolation, HTTPS reachability, and
+  cleanup on close all confirmed.
 
 ---
 

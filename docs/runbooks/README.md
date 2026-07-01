@@ -28,6 +28,7 @@ live in [`../architecture/`](../architecture/README.md); decisions in [`../adrs/
 | [Backstage ArgoCD Plugin Token](backstage-argocd.md) | Read-only ArgoCD API token for the Backstage ArgoCD plugin (sync/health/history) |
 | [GitHub Ownership App](github-ownership-app.md) | App the `github-teams` unit authenticates as to manage org Teams + repo ownership (ADR-072) |
 | [Promote GitHub App](promote-github-app.md) | Write-capable App app CI uses to open release digest-bump PRs against the protected platform repo |
+| [ArgoCD GitHub App](argocd-github-app.md) | Read-only App ArgoCD uses for repo-creds and the PR-preview `pullRequest` generator (ADR-032) |
 
 ## Supply chain
 
