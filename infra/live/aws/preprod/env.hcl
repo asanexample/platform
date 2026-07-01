@@ -18,6 +18,10 @@ locals {
   # cost dashboard's federated `mimir-all` datasource renders them. (Cost overrides the dev profile's default.)
   enable_cost_metrics = true
 
+  # Policy reporting (P12, #93): tenant environments (Kyverno Enforce) live here — the PolicyReport/
+  # ClusterPolicyReport volume that actually matters is on preprod, not the platform hub.
+  enable_policy_reporting = true
+
   tags = {
     Environment        = local.environment
     ManagedBy          = "Terragrunt"
