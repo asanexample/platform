@@ -87,7 +87,7 @@ the SCP. See [incident-scp-blocking](../../docs/runbooks/incident-scp-blocking.m
 
 Kyverno `verify-images` / `verify-attestations` (Enforce) reject images that aren't
 cosign-signed by the team's own workflow or missing SBOM/SLSA provenance attestations. See
-[Authoring Policy-Compliant Workloads](../../CLAUDE.md#authoring-policy-compliant-workloads-kyverno)
+[Authoring Policy-Compliant Workloads](../../AGENTS.md#authoring-policy-compliant-workloads-kyverno)
 and [supply-chain-incidents](../../docs/runbooks/supply-chain-incidents.md).
 
 ## First-pass diagnostics

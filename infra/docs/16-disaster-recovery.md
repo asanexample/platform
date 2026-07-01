@@ -32,7 +32,7 @@ State is the one piece that cannot be regenerated from code. It is hardened in
 
 Every module and environment is code. A lost cluster, VPC, or account-level resource is recovered by
 re-running the apply for that unit (or `terragrunt run --all apply` / `platctl bootstrap` for a whole
-environment), honoring the documented [deployment ordering](../../CLAUDE.md#deployment-ordering-aws).
+environment), honoring the documented [deployment ordering](../../AGENTS.md#deployment-ordering--applydestroy-aws).
 Module sources are pinned via `_versions.hcl`, so a rebuild reproduces the exact code that was live.
 
 ### Application workloads

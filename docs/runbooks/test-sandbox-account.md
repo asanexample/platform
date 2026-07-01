@@ -3,7 +3,7 @@
 How the **Test** AWS account is set up, how to get access, and how its IaC is applied. The Test account
 runs **Terratest** (Go integration tests in `infra/tests/aws/`) on a schedule + on demand, creating and
 destroying real AWS resources blast-radius-isolated from platform/preprod/prod. Companion to the
-[IAM roles](../../CLAUDE.md#iam-roles) and [GitHub OIDC](../adrs/036-github-actions-oidc-federation.md)
+[IAM roles](../../AGENTS.md#iam-roles) and [GitHub OIDC](../adrs/036-github-actions-oidc-federation.md)
 docs.
 
 ---

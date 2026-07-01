@@ -69,7 +69,7 @@ Subnets are computed with `cidrsubnet()` — only `vpc_cidr` and `azs` are hand-
    no change, but check anything region-specific (AZ-derived subnet selectors, etc.).
 5. **Plan before apply** — `terragrunt run --all plan` from the new region's workload
    directory; `_base.hcl` safety checks (below) catch misplacements at parse time.
-6. **Apply** in dependency order (see [CLAUDE.md](../../CLAUDE.md#deployment-ordering-aws)).
+6. **Apply** in dependency order (see [AGENTS.md](../../AGENTS.md#deployment-ordering--applydestroy-aws)).
 
 ## Safety validations
 
