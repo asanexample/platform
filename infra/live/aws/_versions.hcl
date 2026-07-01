@@ -114,7 +114,7 @@ locals {
     kyverno               = "3.8.1"
     tailscale_operator    = "1.96.5"
     falco                 = "9.0.0"
-    kube_prometheus_stack = "86.1.0"
+    kube_prometheus_stack = "87.5.0" # latest stable, re-resolved 2026-07-01 (app v0.92.1; #595)
     mimir                 = "6.0.6"
     loki                  = "7.0.0"   # grafana/loki — P3a logs store (latest stable, resolved 2026-06-19)
     alloy                 = "1.10.0"  # grafana/alloy — P3a log-collector DaemonSet

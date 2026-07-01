@@ -72,7 +72,7 @@ variable "helm_chart" {
 variable "helm_chart_version" {
   description = "kube-prometheus-stack chart version (latest GA — resolve at apply time)."
   type        = string
-  default     = "86.1.0"
+  default     = "87.5.0"
 }
 
 variable "helm_timeout" {

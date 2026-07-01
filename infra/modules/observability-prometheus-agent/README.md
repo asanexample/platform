@@ -88,7 +88,7 @@ No modules.
 | <a name="input_create"></a> [create](#input\_create) | Controls whether resources are created. | `bool` | `true` | no |
 | <a name="input_enable_team_budget_metric"></a> [enable\_team\_budget\_metric](#input\_enable\_team\_budget\_metric) | Configure kube-state-metrics CustomResourceState to emit team\_budget\_monthly\_usd{team} from the Team CR (ADR-091). Enable only on the spoke that runs the env-API Team CRD (preprod). | `bool` | `false` | no |
 | <a name="input_helm_chart"></a> [helm\_chart](#input\_helm\_chart) | Helm chart name. kube-prometheus-stack in agent mode — same chart as the hub, so metric names/labels match and the hub dashboards work for this spoke. | `string` | `"kube-prometheus-stack"` | no |
-| <a name="input_helm_chart_version"></a> [helm\_chart\_version](#input\_helm\_chart\_version) | kube-prometheus-stack chart version (pin from \_versions.hcl; reuses the hub's pin). | `string` | `"86.1.0"` | no |
+| <a name="input_helm_chart_version"></a> [helm\_chart\_version](#input\_helm\_chart\_version) | kube-prometheus-stack chart version (pin from \_versions.hcl; reuses the hub's pin). | `string` | `"87.5.0"` | no |
 | <a name="input_helm_release_name"></a> [helm\_release\_name](#input\_helm\_release\_name) | Helm release name (also the chart fullname prefix). | `string` | `"prometheus-agent"` | no |
 | <a name="input_helm_repository"></a> [helm\_repository](#input\_helm\_repository) | Helm repository URL. | `string` | `"https://prometheus-community.github.io/helm-charts"` | no |
 | <a name="input_helm_timeout"></a> [helm\_timeout](#input\_helm\_timeout) | Helm operation timeout (seconds). Generous: the Prometheus StatefulSet binds a WaitForFirstConsumer WAL PVC on first schedule. | `number` | `900` | no |

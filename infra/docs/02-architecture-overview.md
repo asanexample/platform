@@ -176,7 +176,7 @@ graph LR
 | external-secrets | 0.14.3 | Secrets from AWS Secrets Manager + SSM Parameter Store |
 | Kyverno | 3.8.1 | Policy engine — `validate` + `mutate` + cosign image/attestation verification (Enforce) above the PSA baseline floor |
 | Tailscale Operator | 1.96.5 | Mesh VPN subnet router for private cluster access |
-| kube-prometheus-stack | 86.1.0 | Observability hub: Prometheus + Grafana + Alertmanager (platform) |
+| kube-prometheus-stack | 87.5.0 | Observability hub: Prometheus + Grafana + Alertmanager (platform) |
 | Grafana mimir | 6.0.6 | Durable, S3-backed, multi-tenant metrics store (platform) |
 | Falco | 9.0.0 | Runtime threat detection (preprod) |
 

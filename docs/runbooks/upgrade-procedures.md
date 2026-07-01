@@ -41,7 +41,7 @@ Current versions:
 | external-secrets | 0.14.3 | `_versions.hcl` → `helm_versions.external_secrets` |
 | Kyverno | 3.8.1 | `_versions.hcl` → `helm_versions.kyverno` |
 | Tailscale Operator | 1.96.5 | `_versions.hcl` → `helm_versions.tailscale_operator` |
-| kube-prometheus-stack | 86.1.0 | `_versions.hcl` → `helm_versions.kube_prometheus_stack` (platform hub; the same pin also drives the preprod prometheus-agent spoke) |
+| kube-prometheus-stack | 87.5.0 | `_versions.hcl` → `helm_versions.kube_prometheus_stack` (platform hub; the same pin also drives the preprod prometheus-agent spoke) |
 | Grafana Mimir | 6.0.6 | `_versions.hcl` → `helm_versions.mimir` (platform only) |
 | Falco | 9.0.0 | `_versions.hcl` → `helm_versions.falco` (preprod only) |
 | vCluster | 0.34.1 | `infra/modules/vcluster/variables.tf` (deferred, ADR-033) |
