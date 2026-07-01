@@ -190,4 +190,13 @@ resource "null_resource" "cnpg_finalizer_cleanup" {
     command = "bash \"$(git rev-parse --show-toplevel)/scripts/k8s-finalizer-clear.sh\" --delete ${self.triggers.cluster} ${self.triggers.region} ${self.triggers.role_arn} ${self.triggers.namespace} ${self.triggers.refs}"
   }
   depends_on = [kubernetes_namespace_v1.this]
+
+  # The `script` key is gone from `triggers` (see above) — pin its old value via ignore_changes so
+  # existing state (which still has it) doesn't see that as a removed key and force a replace, which
+  # would fire the destroy provisioner for real on a live cluster (verified: removing a `triggers` key
+  # always forces replacement). A genuine change to cluster/region/role_arn/namespace/refs still
+  # replaces normally.
+  lifecycle {
+    ignore_changes = [triggers["script"]]
+  }
 }
