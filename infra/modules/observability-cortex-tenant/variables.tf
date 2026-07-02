@@ -16,9 +16,9 @@ variable "mimir_push_url" {
 }
 
 variable "routing_label" {
-  description = "The series label cortex-tenant reads to pick the tenant (config.tenant.label). A platform-controlled relabel on the Prometheus/agent write path sets this to the team-from-namespace; cortex-tenant routes on it and strips it (label_remove) so it is never stored. Must be a NORMAL label (not `__`-prefixed — Prometheus drops meta-labels before remote_write, so cortex-tenant would never see it)."
+  description = "The series label cortex-tenant reads to pick the tenant (config.tenant.label). A platform-controlled relabel on the Prometheus/agent write path sets this to the team-from-namespace; cortex-tenant routes on it and strips it (label_remove) so it is never stored. Must be a NORMAL label (not `__`-prefixed — Prometheus drops meta-labels before remote_write). Deliberately NOT `tenant`: Mimir/Loki emit their own meaningful `tenant` label on per-tenant self-metrics, and routing on that name clobbers it (the forced relabel would overwrite + strip it). `route_tenant` is collision-free."
   type        = string
-  default     = "tenant"
+  default     = "route_tenant"
 }
 
 variable "default_tenant" {
