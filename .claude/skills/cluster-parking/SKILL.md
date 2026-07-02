@@ -99,6 +99,31 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-02 (later, ~noon) — SECOND full PARK + UNPARK on both clusters, to validate the two fixes shipped
+  after the afternoon cycle: the `platctl up` DB-client recovery (#1105) and the descheduler (#1106). ✅ BOTH
+  fixes PROVEN working automatically end-to-end — unpark is now materially more hands-off.** PARK: clean on both
+  (preprod threw the usual slow-drain warnings but was cost-safe — `desiredSize=0`, zero running instances).
+  UNPARK: both Karpenter gates passed on the FIRST check; reconnect clean.
+  **✅ Fix #1 — DB-client recovery (the backstage-before-its-DB trap) auto-healed, NO manual pod-delete this
+  time.** `platctl up` on platform printed `checking for workloads stuck on a database that wasn't Ready at their
+  startup...` → `restarted backstage/backstage-… (came up before its database was Ready)` → `restarted 1
+  workload(s)`. Backstage came back `1/1 Ready` on its own. (Preprod's recovery ran too and found nothing stuck —
+  no backstage-like victim there.) Last cycle I fixed this by hand; now `platctl up` does it.
+  **✅ Fix #3 — descheduler auto-rebalanced the post-unpark imbalance; NO meltdown.** Same pile-up formed
+  (preprod one node 59 pods, other 14; platform 60/49/13) — BUT this time Karpenter stayed `1/1 Running, 0
+  restarts` on the hot node (vs the prior cycle's crash-loop → autoscaling deadlock), because the node didn't get
+  starved to death. The descheduler CronJobs fired on schedule (preprod `*/10`, platform `*/15`): preprod's run
+  logged `totalEvicted=33` and rebalanced **59/14 → 45/30**, which finally let the previously-stuck **falco**
+  schedule (both pods `2/2 Running` — the residual the manual band-aid couldn't fix last cycle, now automatic).
+  Platform's descheduler ran with `totalEvicted=0` (already balanced enough — its 60/49 aren't over-threshold).
+  **Final health tally:** preprod **0 not-ready**; platform only the pre-existing broken `triage-demo/checkout`
+  demo (`dial tcp payments-db:5432: connection refused` — its DB was never deployed; standing, NOT a regression,
+  NOT ours). Nodegroups restored (platform system=2, preprod=1), both bastions running, both clusters NodePool +
+  EC2NodeClass `Ready=True`. **Takeaway: the two durable fixes from the afternoon cycle now hold — backstage and
+  the node-imbalance both self-heal on unpark with zero manual intervention. Manually triggering a descheduler
+  run to verify sooner (don't wait for the cron): `kubectl create job --from=cronjob/descheduler <name> -n
+  kube-system`.**
+
 - **2026-07-02 (afternoon) — full PARK + UNPARK on both clusters to VALIDATE the refactored `platctl`
   binary (the code-quality-pass PR #1103, built from the merged `main`). ✅ Both cycled cleanly — the refactor
   introduced ZERO regressions — and the cycle surfaced one NEW class of post-unpark stuck workload, now fixed
