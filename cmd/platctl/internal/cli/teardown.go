@@ -14,6 +14,7 @@ import (
 	"github.com/asanexample/platform/cmd/platctl/internal/cloud"
 	"github.com/asanexample/platform/cmd/platctl/internal/config"
 	"github.com/asanexample/platform/cmd/platctl/internal/engine"
+	"github.com/asanexample/platform/cmd/platctl/internal/hooks"
 )
 
 // NewTeardownCmd creates the teardown subcommand.
@@ -124,7 +125,7 @@ to target a single environment.`,
 			}
 
 			awsClient := &cloud.AWS{}
-			hooks := make(map[string]engine.Hook)
+			hookMap := make(map[string]engine.Hook)
 			for name, override := range cfg.Overrides {
 				if override.Hook == "" {
 					continue
@@ -132,14 +133,14 @@ to target a single environment.`,
 				if g.Unit(name) == nil {
 					continue
 				}
-				h := config.ResolveHook(override, awsClient, !yes)
+				h := hooks.ResolveHook(override, awsClient, !yes)
 				if h != nil {
-					hooks[name] = h
+					hookMap[name] = h
 				}
 			}
 
 			eng := engine.NewEngine(runner, store, g, statePath, engine.WithConcurrency(concurrency))
-			eng.Hooks = hooks
+			eng.Hooks = hookMap
 			eng.Logger = logger
 
 			if resume {
@@ -266,22 +267,7 @@ func unitHasState(unit *engine.Unit, binary string) bool {
 	}
 	cmd := exec.CommandContext(context.Background(), binary, "state", "list")
 	cmd.Dir = unit.Path
-	env := os.Environ()
-	if profile, ok := unit.Auth["profile"]; ok {
-		found := false
-		prefix := "AWS_PROFILE="
-		for i, e := range env {
-			if len(e) > len(prefix) && e[:len(prefix)] == prefix {
-				env[i] = prefix + profile
-				found = true
-				break
-			}
-		}
-		if !found {
-			env = append(env, prefix+profile)
-		}
-	}
-	cmd.Env = env
+	cmd.Env = engine.EnvWithAWSProfile(os.Environ(), unit.Auth)
 	out, err := cmd.Output()
 	if err != nil {
 		return false

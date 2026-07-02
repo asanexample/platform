@@ -131,6 +131,32 @@ func TestSetEnv_Append(t *testing.T) {
 	}
 }
 
+func TestEnvWithAWSProfile(t *testing.T) {
+	// No profile in auth → env returned unchanged.
+	base := []string{"HOME=/home/user", "PATH=/usr/bin"}
+	if got := EnvWithAWSProfile(base, map[string]string{}); len(got) != 2 {
+		t.Fatalf("empty auth should leave env unchanged, got %v", got)
+	}
+	if got := EnvWithAWSProfile(base, map[string]string{"region": "us-east-1"}); len(got) != 2 {
+		t.Fatalf("auth without profile should leave env unchanged, got %v", got)
+	}
+
+	// AWS_PROFILE absent → appended.
+	got := EnvWithAWSProfile([]string{"HOME=/x"}, map[string]string{"profile": "mgmt"})
+	if len(got) != 2 || got[1] != "AWS_PROFILE=mgmt" {
+		t.Fatalf("expected appended AWS_PROFILE=mgmt, got %v", got)
+	}
+
+	// AWS_PROFILE present → replaced (not duplicated).
+	got = EnvWithAWSProfile([]string{"AWS_PROFILE=old", "PATH=/usr/bin"}, map[string]string{"profile": "new"})
+	if len(got) != 2 {
+		t.Fatalf("expected replace-in-place (2 entries), got %v", got)
+	}
+	if got[0] != "AWS_PROFILE=new" {
+		t.Fatalf("expected AWS_PROFILE=new, got %v", got)
+	}
+}
+
 func TestBuildEnv_AWS(t *testing.T) {
 	runner := &TerragruntRunner{}
 	unit := &Unit{

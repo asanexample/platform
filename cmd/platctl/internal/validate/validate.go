@@ -19,9 +19,11 @@ type CheckResult struct {
 	Elapsed time.Duration
 }
 
-// Checker runs a single health check and returns the result.
+// Checker runs a single health check and returns the result. CheckName is the check's stable display name
+// (used for --check prefix filtering and skip messages); every concrete check already exposes it.
 type Checker interface {
 	Check(ctx context.Context) CheckResult
+	CheckName() string
 }
 
 // CommandRunner executes an external command and returns its combined output.
@@ -92,13 +94,8 @@ func RunValidation(ctx context.Context, iamChecks []Checker, otherChecks []Check
 		// Skip all remaining checks
 		skipped := make([]CheckResult, len(otherChecks))
 		for i, c := range otherChecks {
-			// Extract name from the checker if possible; fall back to index
-			name := fmt.Sprintf("check-%d", i)
-			if nc, ok := c.(interface{ CheckName() string }); ok {
-				name = nc.CheckName()
-			}
 			skipped[i] = CheckResult{
-				Name:    name,
+				Name:    c.CheckName(),
 				Status:  "skipped",
 				Message: "skipped (fix IAM/credentials first)",
 			}
@@ -119,10 +116,7 @@ func FilterCheckers(checks []Checker, prefixes []string) []Checker {
 	}
 	var filtered []Checker
 	for _, c := range checks {
-		name := ""
-		if nc, ok := c.(interface{ CheckName() string }); ok {
-			name = nc.CheckName()
-		}
+		name := c.CheckName()
 		for _, p := range prefixes {
 			if strings.HasPrefix(name, p) {
 				filtered = append(filtered, c)
