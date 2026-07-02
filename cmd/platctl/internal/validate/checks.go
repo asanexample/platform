@@ -144,7 +144,7 @@ func (e *EKSClusterCheck) Check(ctx context.Context) CheckResult {
 		return CheckResult{
 			Name:    e.Name,
 			Status:  "ok",
-			Message: fmt.Sprintf("ACTIVE (node check skipped — no kubecontext)"),
+			Message: "ACTIVE (node check skipped — no kubecontext)",
 			Elapsed: time.Since(start),
 		}
 	}

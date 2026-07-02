@@ -42,11 +42,7 @@ func resolveGoldenFor(t *testing.T) []string {
 
 	var sig []string
 	for _, c := range checks {
-		name := ""
-		if nc, ok := c.(interface{ CheckName() string }); ok {
-			name = nc.CheckName()
-		}
-		sig = append(sig, fmt.Sprintf("%s -> %T", name, c))
+		sig = append(sig, fmt.Sprintf("%s -> %T", c.CheckName(), c))
 	}
 	sort.Strings(sig)
 	return sig

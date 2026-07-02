@@ -178,7 +178,7 @@ func (d *DNSDelegationCheck) Check(ctx context.Context) CheckResult {
 			"NS delegation does not match Route53. The domain registrar or upstream DNS (e.g., Cloudflare) may have stale NS records.",
 			"Check your domain registrar's NS settings and update them to match the Route53 hosted zone NS records.",
 			fmt.Sprintf("Run: dig NS %s @8.8.8.8", d.Zone),
-			fmt.Sprintf("Run: aws route53 get-hosted-zone --id <zone-id> --query DelegationSet.NameServers"),
+			"Run: aws route53 get-hosted-zone --id <zone-id> --query DelegationSet.NameServers",
 		)
 		return CheckResult{
 			Name:    d.Name,

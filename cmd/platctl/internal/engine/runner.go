@@ -121,7 +121,8 @@ func (r *TerragruntRunner) Run(ctx context.Context, unit *Unit, action Action, a
 	}
 
 	exitCode := 1
-	if exitErr, ok := err.(*exec.ExitError); ok {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
 		exitCode = exitErr.ExitCode()
 	}
 
