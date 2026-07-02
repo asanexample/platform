@@ -94,6 +94,7 @@ locals {
     observability_pyroscope_ebpf  = "${local.source_base}/observability-pyroscope-ebpf"
     observability_policy_reporter = "${local.source_base}/observability-policy-reporter"
     observability_cortex_tenant   = "${local.source_base}/observability-cortex-tenant"
+    observability_tenant_proxy    = "${local.source_base}/observability-tenant-proxy"
     crossplane                    = "${local.source_base}/crossplane"
     activation_operator           = "${local.source_base}/activation-operator"
     cloudnative_pg                = "${local.source_base}/cloudnative-pg"
