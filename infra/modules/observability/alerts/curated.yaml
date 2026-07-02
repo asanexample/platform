@@ -101,6 +101,41 @@ groups:
           description: "Kyverno's circuit breaker is dropping work — the controller is overloaded or degraded."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#kyverno"
   # ---------------------------------------------------------------------------
+  - name: policy-reporter.rules
+    rules:
+      - alert: PolicyReporterDown
+        expr: up{job="policy-reporter"} == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: policy-reporter is down
+          description: "policy-reporter (P12, #93) has been down for 15m — PolicyReport/ClusterPolicyReport violation metrics and dashboards will be stale."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#policy-reporter"
+      # policy_report_result / cluster_policy_report_result are GAUGES (current report state, re-emitted
+      # each processing cycle) — a level check, not increase(), is the correct form. Enforce-mode Kyverno
+      # blocks bad resources at admission, so a fail/error surfacing in a PolicyReport means either an
+      # Audit-mode policy caught something or a background scan found drift; either way it's compliance
+      # evidence worth paging on (ADR-013/037).
+      - alert: PolicyReportNewViolation
+        expr: sum(policy_report_result{status=~"fail|error"}) by (cluster, exported_namespace, policy, severity, source) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PolicyReport violation ({{ $labels.policy }} in {{ $labels.exported_namespace }})"
+          description: "{{ $labels.cluster }}/{{ $labels.exported_namespace }}: policy {{ $labels.policy }} ({{ $labels.source }}, severity {{ $labels.severity }}) has had a fail/error PolicyReport result for 15m."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#policy-reporter"
+      - alert: ClusterPolicyReportNewViolation
+        expr: sum(cluster_policy_report_result{status=~"fail|error"}) by (cluster, policy, severity, source) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ClusterPolicyReport violation ({{ $labels.policy }})"
+          description: "{{ $labels.cluster }}: cluster-scoped policy {{ $labels.policy }} ({{ $labels.source }}, severity {{ $labels.severity }}) has had a fail/error PolicyReport result for 15m."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#policy-reporter"
+  # ---------------------------------------------------------------------------
   - name: argocd.rules
     rules:
       - alert: ArgoCDComponentDown

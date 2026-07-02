@@ -36,6 +36,22 @@ Namespace `kyverno`. Guards the admission path (policy enforcement).
 - **KyvernoCircuitBreakerTripping** — the controller is shedding load; check resource pressure / request
   volume.
 
+## policy-reporter
+
+Namespace `observability` (P12, #93). Watches Kyverno's `PolicyReport`/`ClusterPolicyReport` CRs and
+exposes them as `policy_report_result`/`cluster_policy_report_result` — both **gauges** (current report
+state, re-emitted each processing cycle), so these are level checks, not `increase()`. Enforce-mode
+Kyverno blocks bad resources at admission, so a fail/error surfacing here means either an Audit-mode
+policy caught something or a background scan found drift — compliance evidence (ADR-013/037).
+
+- **PolicyReporterDown** — the watcher itself is down; violation metrics and dashboards go stale. Check
+  the `policy-reporter` pod/logs in `observability`.
+- **PolicyReportNewViolation** / **ClusterPolicyReportNewViolation** — a fail/error PolicyReport result
+  has persisted for 15m. `kubectl get policyreport -A` / `kubectl get clusterpolicyreport` for the
+  underlying object (`{{ $labels.policy }}` / `{{ $labels.exported_namespace }}`); the Grafana **Policy
+  Reporter** dashboard folder (Overview / PolicyReport details / ClusterPolicyReport details) has the
+  full breakdown by tenant/policy/severity/source.
+
 ## argocd
 
 Namespace `argocd`. GitOps reconciliation.
