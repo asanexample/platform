@@ -24,7 +24,7 @@ locals {
     MONTH_FILTER = "CAST(bill_billing_period_start_date AS DATE) = DATE_TRUNC('month', CURRENT_DATE)"
 
     QUERIES = {
-        "team":    f"SELECT COALESCE(resource_tags_user_team, 'untagged') AS label, SUM(line_item_unblended_cost) AS cost FROM {DATABASE}.{TABLE} WHERE {MONTH_FILTER} GROUP BY 1",
+        "team":    f"SELECT COALESCE(NULLIF(resource_tags_user_team, ''), 'untagged') AS label, SUM(line_item_unblended_cost) AS cost FROM {DATABASE}.{TABLE} WHERE {MONTH_FILTER} GROUP BY 1",
         "service": f"SELECT product_servicecode AS label, SUM(line_item_unblended_cost) AS cost FROM {DATABASE}.{TABLE} WHERE {MONTH_FILTER} GROUP BY 1 HAVING SUM(line_item_unblended_cost) > 0.01",
         "account": f"SELECT line_item_usage_account_id AS label, SUM(line_item_unblended_cost) AS cost FROM {DATABASE}.{TABLE} WHERE {MONTH_FILTER} GROUP BY 1",
     }
