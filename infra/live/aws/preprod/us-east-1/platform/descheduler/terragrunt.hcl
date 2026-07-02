@@ -50,5 +50,16 @@ inputs = {
   helm_chart_version = include.base.locals.helm_versions.descheduler
   helm_wait          = true
 
+  # preprod is small (1-2 t4g.large) and the most imbalance-prone: aggressive WhenEmptyOrUnderutilized
+  # consolidation + staggered post-unpark node bring-up. Two adjustments off the module defaults:
+  #  - Raise the DESTINATION (underutilized) threshold to 50%. LowNodeUtilization only rebalances if some node
+  #    is below ALL thresholds; the 2026-07-02 incident's cool node sat at 39% CPU — one percent under the 40%
+  #    default. 50% gives the emptier of two small nodes reliable headroom to qualify as a rebalance target.
+  #  - Faster cadence (10 min): churn is cheap on non-prod, and this is where a hot node melts down.
+  # Overutilized stays 70% — catches the ~99% incident with wide margin, well under the kubelet-degradation zone.
+  schedule                 = "*/10 * * * *"
+  underutilized_thresholds = { cpu = 50, memory = 50, pods = 50 }
+  overutilized_thresholds  = { cpu = 70, memory = 70, pods = 70 }
+
   tags = include.base.locals.tags
 }

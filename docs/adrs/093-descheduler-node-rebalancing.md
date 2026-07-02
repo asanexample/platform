@@ -35,8 +35,14 @@ periodic **CronJob** running the **`LowNodeUtilization`** strategy: evict pods f
 
 - New shared module `infra/modules/descheduler` (Helm-based, house conventions), deployed per-cluster as a
   Terragrunt unit; chart version pinned in `_versions.hcl`.
-- Default thresholds: underutilized `{cpu,memory,pods}=40%`, overutilized `=70%`, on a ~15-minute schedule.
-  Both are per-cluster tunable.
+- Thresholds are per-cluster, because `LowNodeUtilization` only rebalances when some node is *below* the
+  underutilized threshold (a destination to move pods to):
+  - **platform (hub):** the calm module defaults — underutilized `40%` / overutilized `70%`, every 15 min. It
+    has more/bigger nodes and conservative `WhenEmpty` consolidation (rarely imbalanced), and runs stateful
+    services where fewer evictions is better (PDBs bound the churn anyway).
+  - **preprod:** underutilized raised to `50%` and cadence to 10 min. It's small (1–2 `t4g.large`) and the most
+    imbalance-prone; the incident's cool node sat at 39% — one point under the 40% default — so 50% gives the
+    emptier of two small nodes reliable headroom to qualify as a rebalance target. Overutilized stays `70%`.
 
 Every eviction goes through the `DefaultEvictor` with conservative settings so rebalancing is safe:
 

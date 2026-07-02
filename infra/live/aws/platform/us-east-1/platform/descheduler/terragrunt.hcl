@@ -50,5 +50,11 @@ inputs = {
   helm_chart_version = include.base.locals.helm_versions.descheduler
   helm_wait          = true
 
+  # platform (hub) keeps the calm module defaults — underutilized 40% / overutilized 70%, every 15 min. It has
+  # more and bigger nodes with conservative WhenEmpty consolidation (only reclaims empty nodes), so it's far
+  # less imbalance-prone than preprod; and it runs stateful services (CNPG DBs, keycloak, backstage) where fewer
+  # evictions is better (PDBs bound the churn regardless). Left explicit-by-omission; tune here if the hub grows
+  # imbalance-prone.
+
   tags = include.base.locals.tags
 }
