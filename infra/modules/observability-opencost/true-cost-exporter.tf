@@ -218,9 +218,12 @@ resource "kubernetes_deployment_v1" "true_cost_exporter" {
         }
 
         container {
-          name    = "exporter"
-          image   = var.true_cost_exporter_image
-          command = ["python3", "/app/exporter.py"]
+          name  = "exporter"
+          image = var.true_cost_exporter_image
+          # -u: unbuffered stdout — without it, python3's stdout is fully block-buffered when not a tty
+          # (confirmed live, #668: refresh()'s print()s never appeared in `kubectl logs` even though the
+          # exporter was working correctly — only visible by exec-ing into the container).
+          command = ["python3", "-u", "/app/exporter.py"]
 
           security_context {
             allow_privilege_escalation = false
