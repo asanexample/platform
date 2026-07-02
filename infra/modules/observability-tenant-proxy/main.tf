@@ -1,6 +1,8 @@
 locals {
-  create   = var.create
-  labels   = merge(var.tags, { "app.kubernetes.io/name" = "tenant-proxy", "app.kubernetes.io/part-of" = "observability" })
+  create = var.create
+  # k8s LABEL values only — NOT var.tags (AWS tag values like "Multi-Cloud Platform" contain spaces, which
+  # k8s label values reject). var.tags is not applied to k8s objects.
+  labels   = { "app.kubernetes.io/name" = "tenant-proxy", "app.kubernetes.io/part-of" = "observability", "app.kubernetes.io/managed-by" = "terraform" }
   selector = { app = "tenant-proxy" }
 }
 
