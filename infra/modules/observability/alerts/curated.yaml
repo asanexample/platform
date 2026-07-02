@@ -187,13 +187,29 @@ groups:
           description: "ArgoCD application {{ $labels.name }} has been OutOfSync for 15m — a manual change or a failing auto-sync."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#argocd"
       - alert: ArgoCDRepoServerGitErrors
+        # CRITICAL (was warning): a repo the repo-server can't read blinds the WHOLE delivery plane for that
+        # repo — manifests can't be generated, so apps silently stop deploying (a 6-day outage 2026-07-02 was
+        # exactly this, but warning-severity ⇒ it never paged). See #1120/#1124.
         expr: increase(argocd_git_lsremote_fail_total[15m]) > 0
         for: 15m
         labels:
-          severity: warning
+          severity: critical
         annotations:
           summary: "ArgoCD git ls-remote failures ({{ $labels.repo }})"
-          description: "ArgoCD repo-server is failing git ls-remote against {{ $labels.repo }} — repo connectivity/credentials issue."
+          description: "ArgoCD repo-server is failing git ls-remote against {{ $labels.repo }} — repo connectivity/credentials issue. Manifest generation for apps sourcing this repo is BROKEN; they will not deploy until fixed."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#argocd"
+      - alert: ArgoCDAppSyncUnknown
+        # The blind spot that hid the 2026-07-02 outage: an app stuck sync=Unknown (a ComparisonError — repo
+        # unreadable / manifest gen failing) is NEITHER Synced NOR OutOfSync, so ArgoCDAppOutOfSync misses it,
+        # and its live state can stay Healthy so ArgoCDAppDegraded misses it too. for=1h filters the brief
+        # Unknown during a normal sync. See #1121/#1124.
+        expr: argocd_app_info{sync_status="Unknown"} > 0
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "ArgoCD app {{ $labels.name }} sync status Unknown"
+          description: "ArgoCD application {{ $labels.name }} (project {{ $labels.project }}) has been sync=Unknown for 1h — ArgoCD cannot compare against git (a ComparisonError: unreadable repo, failing manifest generation, or a plugin error), so it is NOT deploying new revisions even while the running pods look Healthy."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#argocd"
   # ---------------------------------------------------------------------------
   - name: loki.rules
