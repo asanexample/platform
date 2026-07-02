@@ -45,12 +45,14 @@ Understanding this is essential to grading difficulty correctly. An adopter *alr
 **The single hardest item. Treat as a coordinated re-domaining project, not a variable extraction.**
 
 `refplat.org` is used two ways that are *not* hostnames:
+
 1. **The Kubernetes API group** of every custom CRD/XRD (`XEnvironment`, `XAgent`, `Team`, `Product`, `Release`, `AccessGrant`, `Person`, `WorkforceRole`) — `group: platform.refplat.org`, `apiVersion: platform.refplat.org/v1beta1`.
 2. **The label/annotation key prefix** — `platform.refplat.org/team|product|stage|runtime|otel-export`, finalizer `platform.refplat.org/activation-teardown`, annotation `cost.refplat.org/budget-override`.
 
 These form a **coupling contract**: the Crossplane Composition *writes* these label keys onto namespaces/IAM/quotas; Kyverno policies and RBAC *select on them*. A partial rename silently breaks admission and reconciliation — the worst failure mode (looks fine, quietly wrong).
 
 Where it's embedded (~40 files, ~463 occ.):
+
 - **CRD/XRD `group:`** — `infra/modules/crossplane/charts/{environment-api,agent-api,governance-registry}/templates/*-{xrd,crd}.yaml` (hardcoded literals, **not** Helm-templated). CRD-base **filenames** encode it too: `operators/activation/config/crd/bases/platform.refplat.org_*.yaml`.
 - **Composition label-writer** — `crossplane/charts/environment-api/files/composition.yaml` (~32 hits), `agent-api/files/composition.yaml` (8).
 - **Kyverno selectors** — `crossplane/charts/environment-policies/templates/*`, `policy/policies-chart/templates/{verify-images,verify-attestations,pod-hardening,namespace-governance,cost-budget-enforce}.yaml`.
