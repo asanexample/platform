@@ -40,6 +40,14 @@ inputs = {
       tag_mutability = "IMMUTABLE_WITH_EXCLUSION" # image tags immutable; cosign sha256-* tags exempt
       tags           = { Service = "activation-operator" }
     }
+    # The P13 per-team read-isolation proxy image (#590): the fail-closed front door that scopes Grafana
+    # datasource queries to the caller's team tenant. Built + cosign-signed + SBOM-attested by this repo's
+    # tenant-proxy-image.yml from services/tenant-proxy/, pulled by the tenant-proxy Terragrunt add-on
+    # (digest-pinned) on the platform cluster.
+    "platform/tenant-proxy" = {
+      tag_mutability = "IMMUTABLE_WITH_EXCLUSION" # image tags immutable; cosign sha256-* tags exempt
+      tags           = { Service = "tenant-proxy" }
+    }
   }
 
   # Accounts granted cross-account image pull access

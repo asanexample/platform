@@ -198,6 +198,40 @@ inputs = {
         ]
       })
     }
+    # The P13 tenant-proxy image-build role (#590). Trusts ONLY the asanexample/platform repo on main; can
+    # push ONLY to platform/tenant-proxy. Separate least-privilege role (mirrors the activation-operator one).
+    "github-actions-ecr-push-tenant-proxy" = {
+      repos    = ["platform"]
+      branches = ["main"]
+      events   = [] # main only — the image rebuilds on merge (no PR preview builds)
+      tags     = { Service = "tenant-proxy" }
+
+      inline_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [
+          {
+            Sid      = "ECRAuth"
+            Effect   = "Allow"
+            Action   = ["ecr:GetAuthorizationToken"]
+            Resource = "*"
+          },
+          {
+            Sid    = "ECRPush"
+            Effect = "Allow"
+            Action = [
+              "ecr:BatchCheckLayerAvailability",
+              "ecr:GetDownloadUrlForLayer",
+              "ecr:BatchGetImage",
+              "ecr:PutImage",
+              "ecr:InitiateLayerUpload",
+              "ecr:UploadLayerPart",
+              "ecr:CompleteLayerUpload",
+            ]
+            Resource = [dependency.ecr.outputs.repository_arns["platform/tenant-proxy"]]
+          },
+        ]
+      })
+    }
   }, local.product_roles) # per-Product roles (ADR-069 §5) — derived from the Product registry
 
   tags = include.base.locals.tags
