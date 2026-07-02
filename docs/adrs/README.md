@@ -142,6 +142,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-077: Application Instrumentation Strategy](077-application-instrumentation-strategy.md) | Accepted |
 | [ADR-078: Cluster Elasticity — Karpenter + Workload Autoscaling](078-cluster-elasticity-karpenter.md) | Accepted |
 | [ADR-091: Cost Guardrails — per-team budgets, attribution, and phased enforcement](091-cost-guardrails.md) | Accepted (A+B+C live) |
+| [ADR-093: Descheduler for Node Rebalancing](093-descheduler-node-rebalancing.md) | Proposed |
 | [ADR-092: Platform FinOps Practice — adopting the FinOps Framework for the platform's own spend](092-platform-finops-practice.md) | Proposed |
 | [ADR-085: Workload Availability — Graceful Draining & Disruption-Tolerance Defaults](085-workload-availability-graceful-disruption-defaults.md) | Accepted (built + live both clusters; replica-floor Enforce 2026-06-27) |
 | [ADR-079: Cloud-Resource Monitoring Scope — Query-Time-First in Grafana](079-cloud-resource-monitoring-scope.md) | Accepted |
