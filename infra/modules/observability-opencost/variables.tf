@@ -93,3 +93,73 @@ variable "budget_enforcer_image" {
   type        = string
   default     = "alpine/k8s:1.31.1"
 }
+
+# ---------------------------------------------------------------------------
+# True cloud cost — CUR via Athena, cross-account (#668 Phase 2a/3)
+# ---------------------------------------------------------------------------
+
+variable "cluster_name" {
+  description = "EKS cluster name — required when enable_cloud_cost (Pod Identity association target)."
+  type        = string
+  default     = ""
+}
+
+variable "enable_cloud_cost" {
+  description = "Wire OpenCost's cloudCost pipeline (in-app only — its data isn't Prometheus-scrapeable, see the true-cost-exporter below) plus the true-cost-exporter to the mgmt-account CUR via Athena, cross-account AssumeRole + Pod Identity. #668 Phase 2a/3. Opt-in, default off."
+  type        = bool
+  default     = false
+}
+
+variable "cost_reader_role_arn" {
+  description = "ARN of the mgmt-account cost_reader role (aws/cost-export module) this module's Pod-Identity roles assume cross-account for Athena/Glue/S3 CUR read access. Required when enable_cloud_cost."
+  type        = string
+  default     = ""
+}
+
+variable "cur_athena_results_bucket" {
+  description = "S3 URI (s3://bucket/prefix/) Athena writes QUERY RESULTS to — not the CUR data bucket itself (that's implicit in the Glue table). Required when enable_cloud_cost."
+  type        = string
+  default     = ""
+}
+
+variable "cur_athena_region" {
+  description = "AWS region the CUR Glue database/Athena workgroup live in (CUR is us-east-1 only)."
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "cur_athena_database" {
+  description = "Glue database holding the crawled CUR table. Required when enable_cloud_cost."
+  type        = string
+  default     = ""
+}
+
+variable "cur_athena_table" {
+  description = "Glue table name for the crawled CUR data. Crawler-discovered, not Terraform-managed — confirm once via the Glue catalog (docs/runbooks/cost-true-spend.md) and set explicitly. Required when enable_cloud_cost."
+  type        = string
+  default     = ""
+}
+
+variable "cur_athena_workgroup" {
+  description = "Athena workgroup for CUR queries. Required when enable_cloud_cost."
+  type        = string
+  default     = ""
+}
+
+variable "cur_account_id" {
+  description = "AWS account ID the CUR covers (the payer/mgmt account) — OpenCost's AthenaConfiguration.account field. Required when enable_cloud_cost."
+  type        = string
+  default     = ""
+}
+
+variable "true_cost_exporter_image" {
+  description = "Image for the true-cost-exporter (needs python3 + pip; boto3 is installed at container start via an init container). #668 Phase 3."
+  type        = string
+  default     = "python:3.12-alpine"
+}
+
+variable "true_cost_exporter_refresh_seconds" {
+  description = "How often the true-cost-exporter re-queries Athena. CUR data itself has ~24h lag, so this doesn't need to be frequent."
+  type        = number
+  default     = 21600 # 6h
+}

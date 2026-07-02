@@ -22,12 +22,14 @@ On the **platform** cluster, in the **`observability`** namespace:
 | **K8s events → Loki** | Alloy singleton watching cluster Events → Loki | chart `alloy 1.10.0` | P3b — `enable_log_pipeline` |
 | **Grafana Tempo** | Traces store (`tempo-distributed`, minimized), S3-backed, **Pod Identity** | chart `tempo-distributed 2.25.5` (app 2.10.7, **grafana-community**) | P3b — `enable_tempo` |
 | **OpenTelemetry Collector** | Trace gateway (OTLP in → Tempo) | chart `opentelemetry-collector 0.158.2` | P3b — `enable_trace_pipeline` |
-| **Curated alerts** | 31 `PrometheusRule`s across 8 components (+ bundled mixins) | — | P4 |
+| **Curated alerts** | 38 `PrometheusRule`s across 11 components (+ bundled mixins) | — | P4 |
 | **Notifications** | `warning`→Slack · `critical`→SNS+Slack+PagerDuty · inhibition | — | P4; secrets via ESO |
 | **gp3 StorageClass** | cluster-default EBS storage (EBS CSI) | — | in the `eks-addons` unit |
 | **Grafana Mimir** | Durable, multi-tenant, S3-backed metrics store | chart `mimir-distributed 6.0.6` | P2 — **ON** on the platform hub (`enable_mimir=true`); Prometheus `remote_write`s here; the hub-and-spoke store |
 | **Prometheus agent (preprod spoke)** | kube-prometheus-stack agent mode (+ KSM + node-exporter) on **preprod**, `remote_write`s to the hub Mimir under tenant `preprod` | chart `kube-prometheus-stack 87.5.0` | P10 — `infra/modules/observability-prometheus-agent` |
 | **policy-reporter** | Watches Kyverno's PolicyReport/ClusterPolicyReport CRs → metrics + bundled Grafana dashboards (Overview/PolicyReport/ClusterPolicyReport, `$cluster` filter). Hub renders dashboards; the preprod spoke only emits metrics for the hub's federated view | chart `policy-reporter 3.7.4` | P12 — `enable_policy_reporting`, closes #93; on both platform + preprod |
+| **OpenCost** | In-cluster cost allocation (namespace/workload) from node/pod usage × AWS pricing API; own metrics scraped back into Prometheus | chart `opencost 2.5.23` | P11 — `enable_cost_metrics` |
+| **true-cost-exporter** | Real AWS spend (CUR via Athena, cross-account) by team/service/account, reconciled against OpenCost's estimate — OpenCost's own `cloudCost` isn't Prometheus-scrapeable, so this is the Grafana-visible path | custom exporter, `infra/modules/observability-opencost/true-cost-exporter.tf` | P11 pt2 — `enable_cloud_cost`, closes #668; platform hub only (CUR is org-wide) |
 
 > **cost_profile (`common.hcl`/`_base.hcl`):** `dev` (default) = single-replica + durable stores **off**. The
 > platform cluster overrides `enable_mimir` / `enable_loki` / `enable_log_pipeline` / `enable_tempo` /
