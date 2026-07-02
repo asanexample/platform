@@ -420,7 +420,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "platform_true_cost_monthly_usd_total"
+          "expr": "max(platform_true_cost_monthly_usd_total)"
         }
       ]
     },
@@ -469,7 +469,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "time() - platform_true_cost_exporter_last_success_timestamp_seconds"
+          "expr": "time() - max(platform_true_cost_exporter_last_success_timestamp_seconds)"
         }
       ]
     },
@@ -511,7 +511,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sort_desc(sum by (label) (platform_true_cost_monthly_usd{breakdown=\"team\"}))",
+          "expr": "sort_desc(max by (label) (platform_true_cost_monthly_usd{breakdown=\"team\"}))",
           "legendFormat": "{{label}}"
         }
       ]
@@ -553,7 +553,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "topk(10, sum by (label) (platform_true_cost_monthly_usd{breakdown=\"service\"}))",
+          "expr": "topk(10, max by (label) (platform_true_cost_monthly_usd{breakdown=\"service\"}))",
           "legendFormat": "{{label}}"
         }
       ]
@@ -599,7 +599,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sort_desc(sum by (label) (platform_true_cost_monthly_usd{breakdown=\"account\"}))",
+          "expr": "sort_desc(max by (label) (platform_true_cost_monthly_usd{breakdown=\"account\"}))",
           "legendFormat": "{{label}}"
         }
       ],
@@ -663,7 +663,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "platform_true_cost_compute_monthly_usd_total",
+          "expr": "max(platform_true_cost_compute_monthly_usd_total)",
           "legendFormat": "CUR actual (EC2, post-discount)"
         }
       ]
