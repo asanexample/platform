@@ -43,23 +43,7 @@ func (s *StateCheck) Check(ctx context.Context) CheckResult {
 
 	cmd := exec.CommandContext(ctx, binary, "state", "list")
 	cmd.Dir = s.Unit.Path
-
-	env := os.Environ()
-	if profile, ok := s.Unit.Auth["profile"]; ok {
-		found := false
-		prefix := "AWS_PROFILE="
-		for i, e := range env {
-			if strings.HasPrefix(e, prefix) {
-				env[i] = prefix + profile
-				found = true
-				break
-			}
-		}
-		if !found {
-			env = append(env, prefix+profile)
-		}
-	}
-	cmd.Env = env
+	cmd.Env = engine.EnvWithAWSProfile(os.Environ(), s.Unit.Auth)
 
 	out, err := cmd.Output()
 	elapsed := time.Since(start)

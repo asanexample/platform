@@ -266,22 +266,7 @@ func unitHasState(unit *engine.Unit, binary string) bool {
 	}
 	cmd := exec.CommandContext(context.Background(), binary, "state", "list")
 	cmd.Dir = unit.Path
-	env := os.Environ()
-	if profile, ok := unit.Auth["profile"]; ok {
-		found := false
-		prefix := "AWS_PROFILE="
-		for i, e := range env {
-			if len(e) > len(prefix) && e[:len(prefix)] == prefix {
-				env[i] = prefix + profile
-				found = true
-				break
-			}
-		}
-		if !found {
-			env = append(env, prefix+profile)
-		}
-	}
-	cmd.Env = env
+	cmd.Env = engine.EnvWithAWSProfile(os.Environ(), unit.Auth)
 	out, err := cmd.Output()
 	if err != nil {
 		return false

@@ -189,6 +189,18 @@ func setEnv(env []string, key, value string) []string {
 	return append(env, prefix+value)
 }
 
+// EnvWithAWSProfile returns env with AWS_PROFILE set from auth["profile"] when present (replacing an
+// existing entry, else appending); env is returned unchanged when no profile is set. It is the shared
+// primitive for the subprocess call sites that need a unit's AWS profile applied to os.Environ(). This is
+// the narrow, provider-UNGATED form — unlike buildEnv, which sets AWS_PROFILE only for Provider=="aws";
+// the call sites that use this always operate on AWS units and must set the profile regardless of provider.
+func EnvWithAWSProfile(env []string, auth map[string]string) []string {
+	if profile, ok := auth["profile"]; ok {
+		return setEnv(env, "AWS_PROFILE", profile)
+	}
+	return env
+}
+
 // DryRunner implements Runner but only prints what would be executed.
 type DryRunner struct {
 	Binary string

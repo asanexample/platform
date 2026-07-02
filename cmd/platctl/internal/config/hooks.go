@@ -148,22 +148,7 @@ func (h *StatePurgeHook) terragrunt(ctx context.Context, unit *engine.Unit, args
 	}
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = unit.Path
-	env := os.Environ()
-	if profile, ok := unit.Auth["profile"]; ok {
-		const prefix = "AWS_PROFILE="
-		replaced := false
-		for i, e := range env {
-			if strings.HasPrefix(e, prefix) {
-				env[i] = prefix + profile
-				replaced = true
-				break
-			}
-		}
-		if !replaced {
-			env = append(env, prefix+profile)
-		}
-	}
-	cmd.Env = env
+	cmd.Env = engine.EnvWithAWSProfile(os.Environ(), unit.Auth)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }
