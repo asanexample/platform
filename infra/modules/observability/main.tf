@@ -58,18 +58,17 @@ locals {
   #     can't spoof it, then override to the team for env namespaces), and cortex-tenant sets X-Scope-OrgID
   #     per-series from that label. No request header (cortex-tenant owns it). On the hub, which has no env
   #     namespaces, every series resolves to `platform` — behaviourally identical, but it proves the path.
-  prometheus_remote_write = var.mimir_remote_write_url == "" ? [] : (
-    var.cortex_tenant_write_url != "" ? [{
-      url = var.cortex_tenant_write_url
-      writeRelabelConfigs = [
-        { sourceLabels = ["namespace"], regex = ".*", targetLabel = "tenant", replacement = "platform" },
-        { sourceLabels = ["namespace"], regex = "([a-z0-9]+)-[a-z0-9-]+-(dev|test|uat|staging|prod)", targetLabel = "tenant", replacement = "$1" },
-      ]
-      }] : [{
-      url     = var.mimir_remote_write_url
-      headers = { "X-Scope-OrgID" = var.mimir_tenant_id }
-    }]
-  )
+  # Both branches must yield the same object type (Terraform ?: rule), so `headers` and
+  # `writeRelabelConfigs` are always present — empty (no-op) in the mode that doesn't use them.
+  _per_team_write = var.cortex_tenant_write_url != ""
+  prometheus_remote_write = var.mimir_remote_write_url == "" ? [] : [{
+    url     = local._per_team_write ? var.cortex_tenant_write_url : var.mimir_remote_write_url
+    headers = local._per_team_write ? {} : { "X-Scope-OrgID" = var.mimir_tenant_id }
+    writeRelabelConfigs = local._per_team_write ? [
+      { sourceLabels = ["namespace"], regex = ".*", targetLabel = "tenant", replacement = "platform" },
+      { sourceLabels = ["namespace"], regex = "([a-z0-9]+)-[a-z0-9-]+-(dev|test|uat|staging|prod)", targetLabel = "tenant", replacement = "$1" },
+    ] : []
+  }]
 
   # Slack/PagerDuty receivers wired when their secret names are provided (synced via External Secrets).
   slack_enabled = var.slack_webhook_secret_name != ""
