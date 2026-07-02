@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -204,4 +205,165 @@ func TestNodePoolsAllReady(t *testing.T) {
 			t.Errorf("%s: nodePoolsAllReady(%v) = %t, want %t", c.name, c.statuses, got, c.want)
 		}
 	}
+}
+
+func TestCheckAWSCredentialsForEnv(t *testing.T) {
+	cfg := &config.Config{
+		Environments: map[string]config.EnvConfig{
+			"platform": {Auth: map[string]string{"profile": "management"}},
+			"preprod":  {Auth: map[string]string{"profile": "preprod"}},
+		},
+	}
+	kcPlatform := config.KubeconfigEntry{Profile: "platform", Region: "us-east-1"}
+	kcPreprod := config.KubeconfigEntry{Profile: "preprod", Region: "us-east-1"}
+
+	stub := func(t *testing.T, fn func(profile, region string) error) {
+		t.Helper()
+		orig := checkAWSCredentialsFn
+		checkAWSCredentialsFn = fn
+		t.Cleanup(func() { checkAWSCredentialsFn = orig })
+	}
+
+	t.Run("down: checks only the kubeconfig profile", func(t *testing.T) {
+		var checked []string
+		stub(t, func(profile, _ string) error { checked = append(checked, profile); return nil })
+
+		if err := checkAWSCredentialsForEnv(cfg, "platform", kcPlatform, false); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(checked) != 1 || checked[0] != "platform" {
+			t.Errorf("checked = %v, want [platform]", checked)
+		}
+	})
+
+	t.Run("up: also checks the distinct terragrunt auth profile", func(t *testing.T) {
+		var checked []string
+		stub(t, func(profile, _ string) error { checked = append(checked, profile); return nil })
+
+		if err := checkAWSCredentialsForEnv(cfg, "platform", kcPlatform, true); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(checked) != 2 || checked[0] != "platform" || checked[1] != "management" {
+			t.Errorf("checked = %v, want [platform management]", checked)
+		}
+	})
+
+	t.Run("up: dedupes when the kubeconfig and terragrunt profiles are the same", func(t *testing.T) {
+		var checked []string
+		stub(t, func(profile, _ string) error { checked = append(checked, profile); return nil })
+
+		if err := checkAWSCredentialsForEnv(cfg, "preprod", kcPreprod, true); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(checked) != 1 || checked[0] != "preprod" {
+			t.Errorf("checked = %v, want [preprod] (deduped)", checked)
+		}
+	})
+
+	t.Run("propagates the first failing profile's error", func(t *testing.T) {
+		stub(t, func(profile, _ string) error {
+			if profile == "platform" {
+				return fmt.Errorf("boom")
+			}
+			return nil
+		})
+
+		err := checkAWSCredentialsForEnv(cfg, "platform", kcPlatform, true)
+		if err == nil || !strings.Contains(err.Error(), "boom") {
+			t.Errorf("expected the platform-profile error to propagate, got %v", err)
+		}
+	})
+}
+
+func TestDrainKarpenterOrFail(t *testing.T) {
+	kc := config.KubeconfigEntry{Alias: "platform", Cluster: "platform-use1-eks", Profile: "platform"}
+
+	t.Run("propagates a real drain failure as a fatal, actionable error", func(t *testing.T) {
+		orig := drainKarpenterNodesFn
+		drainKarpenterNodesFn = func(context.Context, config.KubeconfigEntry) error {
+			return fmt.Errorf("kubectl delete nodepool: exit status 1: ExpiredToken")
+		}
+		defer func() { drainKarpenterNodesFn = orig }()
+
+		err := drainKarpenterOrFail(context.Background(), kc)
+		if err == nil {
+			t.Fatal("expected an error")
+		}
+		if !strings.Contains(err.Error(), "ExpiredToken") {
+			t.Errorf("error should wrap the underlying cause, got %q", err.Error())
+		}
+		if !strings.Contains(err.Error(), "platform-use1-eks") || !strings.Contains(err.Error(), "platctl down") {
+			t.Errorf("error should name the cluster and the re-run command, got %q", err.Error())
+		}
+	})
+
+	t.Run("nil on success", func(t *testing.T) {
+		orig := drainKarpenterNodesFn
+		drainKarpenterNodesFn = func(context.Context, config.KubeconfigEntry) error { return nil }
+		defer func() { drainKarpenterNodesFn = orig }()
+
+		if err := drainKarpenterOrFail(context.Background(), kc); err != nil {
+			t.Errorf("expected nil, got %v", err)
+		}
+	})
+}
+
+func TestPollKarpenterReady(t *testing.T) {
+	t.Run("ready immediately — does not sleep", func(t *testing.T) {
+		sleeps := 0
+		ready, nc, st := pollKarpenterReady(func() (string, []string) {
+			return "ec2nodeclass.karpenter.k8s.aws/default", []string{"True"}
+		}, 5, func() { sleeps++ })
+		if !ready || nc == "" || len(st) != 1 || st[0] != "True" {
+			t.Fatalf("ready=%v nc=%q st=%v", ready, nc, st)
+		}
+		if sleeps != 0 {
+			t.Errorf("sleeps = %d, want 0", sleeps)
+		}
+	})
+
+	t.Run("never ready — exhausts attempts and reports the last state", func(t *testing.T) {
+		sleeps := 0
+		ready, nc, st := pollKarpenterReady(func() (string, []string) {
+			return "", nil
+		}, 3, func() { sleeps++ })
+		if ready {
+			t.Fatal("expected ready=false")
+		}
+		if nc != "" || st != nil {
+			t.Errorf("nc=%q st=%v, want empty (NodeClassNotFound)", nc, st)
+		}
+		if sleeps != 2 {
+			t.Errorf("sleeps = %d, want 2 (sleep between attempts, not after the last)", sleeps)
+		}
+	})
+
+	t.Run("becomes ready on a later attempt", func(t *testing.T) {
+		calls := 0
+		ready, _, _ := pollKarpenterReady(func() (string, []string) {
+			calls++
+			if calls < 3 {
+				return "ec2nodeclass.karpenter.k8s.aws/default", []string{"False"}
+			}
+			return "ec2nodeclass.karpenter.k8s.aws/default", []string{"True"}
+		}, 5, func() {})
+		if !ready || calls != 3 {
+			t.Errorf("ready=%v calls=%d, want ready=true calls=3", ready, calls)
+		}
+	})
+
+	t.Run("EC2NodeClass present but NodePool not Ready never reports ready", func(t *testing.T) {
+		ready, nc, st := pollKarpenterReady(func() (string, []string) {
+			return "ec2nodeclass.karpenter.k8s.aws/default", []string{"False"}
+		}, 2, func() {})
+		if ready {
+			t.Fatal("expected ready=false when the NodePool condition is False")
+		}
+		if nc == "" {
+			t.Error("expected the EC2NodeClass name to still be reported")
+		}
+		if len(st) != 1 || st[0] != "False" {
+			t.Errorf("statuses = %v, want [False]", st)
+		}
+	})
 }
