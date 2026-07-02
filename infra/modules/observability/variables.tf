@@ -208,6 +208,12 @@ variable "pagerduty_routing_key_secret_name" {
   default     = ""
 }
 
+variable "healthchecks_ping_url_secret_name" {
+  description = "Dead-man's switch (external heartbeat). AWS Secrets Manager secret name holding an external Healthchecks.io ping URL (JSON property 'pingUrl'). When set, the always-firing Watchdog alert is routed to that URL on a short repeat_interval; if Prometheus/Alertmanager dies the pings STOP and Healthchecks.io pages externally — the one failure the in-cluster pipeline can't alert on itself. Empty disables it (Watchdog → null). Synced via External Secrets — never enters state/helm values. ACTIVATION: create the Secrets Manager secret FIRST (else the ExternalSecret can't sync and Alertmanager fails to mount it), then set this."
+  type        = string
+  default     = ""
+}
+
 variable "secret_store_name" {
   description = "Name of the External Secrets ClusterSecretStore (AWS Secrets Manager)."
   type        = string

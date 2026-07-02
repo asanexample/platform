@@ -61,6 +61,10 @@ locals {
   # ADR-082: fan a curated alert subset to the triage agent's in-cluster webhook (empty url = off).
   triage_enabled    = var.triage_webhook_url != ""
   pagerduty_enabled = var.pagerduty_routing_key_secret_name != ""
+  # Dead-man's switch (external heartbeat): route the always-firing Watchdog to an EXTERNAL Healthchecks.io
+  # check; if the pings stop (Prometheus/Alertmanager dead) Healthchecks pages — the one failure the in-cluster
+  # pipeline can't alert on itself.
+  deadman_enabled = var.healthchecks_ping_url_secret_name != ""
 
   # Grafana SSO via Keycloak OIDC (#592). On when an issuer is provided; the client secret syncs via ESO and
   # is injected as the GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET env (so it never enters grafana.ini / state).
@@ -117,8 +121,17 @@ locals {
     send_resolved    = true
   }
 
+  # Dead-man's switch receiver: on every Watchdog notification, POST to the external Healthchecks.io ping URL.
+  # url_file reads the ping URL from the ES-synced secret so it never enters state/helm values (like Slack's
+  # api_url_file). Healthchecks pages EXTERNALLY if the pings stop — detecting a dead in-cluster pipeline.
+  deadman_config = {
+    url_file      = "/etc/alertmanager/secrets/alertmanager-healthchecks/pingUrl"
+    send_resolved = false
+  }
+
   # Alertmanager routing (P4): critical → SNS + Slack, warning → Slack (SNS fallback when Slack is off);
-  # info/others → dashboard-only (null); Watchdog → null (external heartbeat is a follow-up). A critical
+  # info/others → dashboard-only (null); Watchdog → the external dead-man's switch (Healthchecks) when
+  # configured, else null. A critical
   # inhibits a matching warning (same namespace+alertname) so one incident doesn't double-notify. Each
   # receiver carries only the channels actually wired (SNS needs the topic+IRSA; Slack needs the secret);
   # with neither, the receivers are no-ops (== null).
@@ -134,7 +147,11 @@ locals {
       # curated subset (critical) to the agent's webhook ADDITIVELY — `continue = true` so the same alert still
       # flows on to the critical receiver (SNS/Slack/PagerDuty). The agent's own storm controls (ADR-080 D9) bound it.
       routes = concat(
-        [{ receiver = "null", matchers = ["alertname = \"Watchdog\""] }],
+        # Watchdog → the external dead-man's switch when configured (pinged every ~5m; Healthchecks pages if
+        # they stop), else → null. Never reaches triage/critical/warning (no `continue`).
+        [local.deadman_enabled
+          ? { receiver = "deadmanswitch", matchers = ["alertname = \"Watchdog\""], group_wait = "0s", group_interval = "1m", repeat_interval = "5m" }
+        : { receiver = "null", matchers = ["alertname = \"Watchdog\""], group_wait = "0s", group_interval = "1m", repeat_interval = "5m" }],
         local.triage_enabled ? [{ receiver = "triage", matchers = ["severity = \"critical\""], continue = true }] : [],
         [
           { receiver = "critical", matchers = ["severity = \"critical\""], continue = false },
@@ -156,6 +173,10 @@ locals {
       local.triage_enabled ? [{
         name            = "triage"
         webhook_configs = [{ url = var.triage_webhook_url, send_resolved = false }]
+      }] : [],
+      local.deadman_enabled ? [{
+        name            = "deadmanswitch"
+        webhook_configs = [local.deadman_config]
       }] : [],
       [
         {
@@ -300,6 +321,7 @@ locals {
         secrets = concat(
           local.slack_enabled ? ["alertmanager-slack-webhook"] : [],
           local.pagerduty_enabled ? ["alertmanager-pagerduty"] : [],
+          local.deadman_enabled ? ["alertmanager-healthchecks"] : [],
         )
       }
       serviceAccount = {
@@ -800,6 +822,7 @@ resource "helm_release" "kube_prometheus_stack" {
     aws_iam_role_policy.alertmanager_sns,
     kubernetes_manifest.alertmanager_slack_webhook,
     kubernetes_manifest.alertmanager_pagerduty,
+    kubernetes_manifest.alertmanager_healthchecks,
     kubernetes_manifest.grafana_oidc_secret,
     aws_eks_pod_identity_association.grafana_cloudwatch,
     aws_eks_pod_identity_association.alertmanager,
@@ -860,6 +883,33 @@ resource "kubernetes_manifest" "alertmanager_pagerduty" {
       data = [{
         secretKey = "routingKey"
         remoteRef = { key = var.pagerduty_routing_key_secret_name, property = "routingKey" }
+      }]
+    }
+  }
+
+  depends_on = [kubernetes_namespace_v1.this]
+}
+
+# Dead-man's switch ping URL, synced from Secrets Manager. The SM secret MUST exist before this is enabled
+# (creationPolicy Owner + the Alertmanager mount) — else the ExternalSecret can't sync and Alertmanager fails
+# to start. See the healthchecks_ping_url_secret_name variable's activation note.
+resource "kubernetes_manifest" "alertmanager_healthchecks" {
+  count = local.deadman_enabled ? 1 : 0
+
+  manifest = {
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = "alertmanager-healthchecks"
+      namespace = var.namespace
+    }
+    spec = {
+      refreshInterval = "1h"
+      secretStoreRef  = { name = var.secret_store_name, kind = "ClusterSecretStore" }
+      target          = { name = "alertmanager-healthchecks", creationPolicy = "Owner" }
+      data = [{
+        secretKey = "pingUrl"
+        remoteRef = { key = var.healthchecks_ping_url_secret_name, property = "pingUrl" }
       }]
     }
   }
