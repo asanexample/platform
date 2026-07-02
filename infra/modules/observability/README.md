@@ -79,6 +79,10 @@ module "observability" {
   also fan out to **Slack** (`slack_webhook_secret_name` / `slack_channel`), **PagerDuty**
   (`pagerduty_routing_key_secret_name`), and the **triage-agent** webhook (`triage_webhook_url`, ADR-082)
   — all opt-in, wired only when their inputs are set.
+- **Dead-man's switch (external heartbeat).** Set `healthchecks_ping_url_secret_name` to route the
+  always-firing `Watchdog` to an external Healthchecks.io check (pinged ~every 5m); if the pings stop
+  because the in-cluster pipeline died, Healthchecks pages externally — the one failure Alertmanager
+  can't alert on itself. Off by default; activate the Secrets Manager secret first (see the input).
 - **Grafana SSO (Keycloak OIDC).** Set `grafana_oidc_issuer` / `grafana_oidc_client_id` /
   `grafana_oidc_secret_manager_key` (+ `grafana_oidc_role_attribute_path` for role mapping) to log into
   Grafana via Keycloak (#592); the client secret is projected from Secrets Manager. Admin-password auth
@@ -125,6 +129,7 @@ No modules.
 | [aws_secretsmanager_secret_version.grafana_admin](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [helm_release.kube_prometheus_stack](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
 | [kubernetes_config_map_v1.dashboards](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/config_map_v1) | resource |
+| [kubernetes_manifest.alertmanager_healthchecks](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.alertmanager_pagerduty](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.alertmanager_slack_webhook](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.allow_grafana_from_gateway](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
@@ -161,6 +166,7 @@ No modules.
 | <a name="input_grafana_oidc_issuer"></a> [grafana\_oidc\_issuer](#input\_grafana\_oidc\_issuer) | Keycloak OIDC issuer URL (e.g. https://keycloak.aws.refplat.org/realms/platform). Empty disables Grafana SSO (admin-password only). | `string` | `""` | no |
 | <a name="input_grafana_oidc_role_attribute_path"></a> [grafana\_oidc\_role\_attribute\_path](#input\_grafana\_oidc\_role\_attribute\_path) | Grafana role mapping (JMESPath over the token's `groups` claim). Default: platform-admins → Admin, any other authenticated user → Viewer. Per-team Editor scoping is P13 (#590). | `string` | `"contains(groups[*], 'platform-admins') && 'Admin' || 'Viewer'"` | no |
 | <a name="input_grafana_oidc_secret_manager_key"></a> [grafana\_oidc\_secret\_manager\_key](#input\_grafana\_oidc\_secret\_manager\_key) | AWS Secrets Manager key holding the Grafana OIDC client secret (keycloak-config writes platform/keycloak/grafana-oidc, JSON property `client-secret`). Synced to a K8s secret via ExternalSecret, injected as GF\_AUTH\_GENERIC\_OAUTH\_CLIENT\_SECRET. | `string` | `""` | no |
+| <a name="input_healthchecks_ping_url_secret_name"></a> [healthchecks\_ping\_url\_secret\_name](#input\_healthchecks\_ping\_url\_secret\_name) | Dead-man's switch (external heartbeat). AWS Secrets Manager secret name holding an external Healthchecks.io ping URL (JSON property 'pingUrl'). When set, the always-firing Watchdog alert is routed to that URL on a short repeat\_interval; if Prometheus/Alertmanager dies the pings STOP and Healthchecks.io pages externally — the one failure the in-cluster pipeline can't alert on itself. Empty disables it (Watchdog → null). Synced via External Secrets — never enters state/helm values. ACTIVATION: create the Secrets Manager secret FIRST (else the ExternalSecret can't sync and Alertmanager fails to mount it), then set this. | `string` | `""` | no |
 | <a name="input_helm_chart"></a> [helm\_chart](#input\_helm\_chart) | Chart name. | `string` | `"kube-prometheus-stack"` | no |
 | <a name="input_helm_chart_version"></a> [helm\_chart\_version](#input\_helm\_chart\_version) | kube-prometheus-stack chart version (latest GA — resolve at apply time). | `string` | `"87.5.0"` | no |
 | <a name="input_helm_release_name"></a> [helm\_release\_name](#input\_helm\_release\_name) | Helm release name. Pinned so the Grafana Service (<release>-grafana) and the Alertmanager ServiceAccount (<release>-alertmanager) names are deterministic for the gateway route and the Pod Identity association (ADR-047). | `string` | `"kube-prometheus-stack"` | no |
