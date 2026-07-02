@@ -1,0 +1,9 @@
+apiVersion: v2
+name: barman-cloud-plugin
+description: >-
+  Vendored CloudNativePG Barman Cloud CNPG-I plugin (release manifest, verbatim). Installs the plugin
+  Deployment + the objectstores.barmancloud.cnpg.io CRD + RBAC + its cert-manager-issued mTLS cert into
+  cnpg-system. Source: github.com/cloudnative-pg/plugin-barman-cloud releases/download/v0.13.0/manifest.yaml
+type: application
+version: 0.13.0
+appVersion: "0.13.0"

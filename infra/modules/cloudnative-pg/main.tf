@@ -48,3 +48,27 @@ resource "helm_release" "cloudnative_pg" {
 
   values = [yamlencode(local.cnpg_values)]
 }
+
+# ---------------------------------------------------------------------------
+# Barman Cloud CNPG-I plugin (backup engine — #1119)
+# ---------------------------------------------------------------------------
+# The plugin that gives CNPG clusters base-backup + WAL-archiving to S3 (the in-tree barmanObjectStore is
+# deprecated in CNPG 1.26+). Delivered as a VENDORED local chart of the upstream release manifest (v0.13.0):
+# the manifest ships a CRD (objectstores.barmancloud.cnpg.io) alongside the Deployment/RBAC/Service, and the
+# same-namespace CRD+workload install is exactly the case a local chart handles cleanly (mirrors the
+# crossplane module). It must live in the operator namespace and needs cert-manager (issues its mTLS cert to
+# the operator). Additive — installing the plugin does nothing to existing clusters until they declare
+# spec.plugins; the per-cluster ObjectStore + spec.plugins + ScheduledBackup land in the follow-up.
+# wait=false: the Deployment only goes Ready after cert-manager issues the cert, so don't block the apply on
+# it (verify with `kubectl rollout status deployment/barman-cloud-plugin -n cnpg-system`).
+resource "helm_release" "barman_cloud_plugin" {
+  count = local.create && var.enable_barman_plugin ? 1 : 0
+
+  name      = "barman-cloud-plugin"
+  chart     = "${path.module}/charts/barman-cloud-plugin"
+  namespace = var.namespace
+  timeout   = var.helm_timeout
+  wait      = false
+
+  depends_on = [helm_release.cloudnative_pg]
+}
