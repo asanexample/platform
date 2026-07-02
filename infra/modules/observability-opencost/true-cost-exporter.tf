@@ -28,7 +28,9 @@ locals {
         "service": f"SELECT product_servicecode AS label, SUM(line_item_unblended_cost) AS cost FROM {DATABASE}.{TABLE} WHERE {MONTH_FILTER} GROUP BY 1 HAVING SUM(line_item_unblended_cost) > 0.01",
         "account": f"SELECT line_item_usage_account_id AS label, SUM(line_item_unblended_cost) AS cost FROM {DATABASE}.{TABLE} WHERE {MONTH_FILTER} GROUP BY 1",
     }
-    COMPUTE_QUERY = f"SELECT SUM(line_item_unblended_cost) AS cost FROM {DATABASE}.{TABLE} WHERE {MONTH_FILTER} AND product_servicecode = 'AmazonEC2'"
+    # 2-column shape (label, cost) to match run_query()'s generic row parsing — a bare 1-column SELECT
+    # caused an IndexError live (#668): Athena returns only one field, but run_query always reads data[1].
+    COMPUTE_QUERY = f"SELECT 'compute' AS label, SUM(line_item_unblended_cost) AS cost FROM {DATABASE}.{TABLE} WHERE {MONTH_FILTER} AND product_servicecode = 'AmazonEC2'"
 
     def athena_client():
         sts = boto3.client("sts", region_name=REGION)
