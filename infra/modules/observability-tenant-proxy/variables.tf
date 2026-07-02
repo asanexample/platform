@@ -1,0 +1,82 @@
+variable "create" {
+  description = "Controls whether resources are created (the P13 read-isolation toggle — enable_per_team_tenants)."
+  type        = bool
+  default     = false
+}
+
+variable "namespace" {
+  description = "Namespace to deploy into (the shared observability namespace, next to Grafana + Mimir)."
+  type        = string
+  default     = "observability"
+}
+
+variable "image" {
+  description = "The signed tenant-proxy image, digest-pinned (registry/repo@sha256:…). Built by tenant-proxy-image.yml, ADR-071 digest-pin."
+  type        = string
+}
+
+variable "replicas" {
+  description = "tenant-proxy replicas. On the read path, so run >=2."
+  type        = number
+  default     = 2
+}
+
+variable "upstream_url" {
+  description = "The store query API the proxy reverse-proxies to (per-request X-Scope-OrgID). The in-cluster Mimir gateway /prometheus."
+  type        = string
+  default     = "http://mimir-gateway.observability.svc/prometheus"
+}
+
+variable "jwks_url" {
+  description = "Keycloak realm JWKS endpoint. Use the IN-CLUSTER keycloak service to avoid the in-cluster→internal-NLB hairpin — the token's `iss` (oidc_issuer) is still the public realm URL, checked independently of where the keys are fetched."
+  type        = string
+  default     = "http://keycloak-http.keycloak.svc/realms/platform/protocol/openid-connect/certs"
+}
+
+variable "oidc_issuer" {
+  description = "The exact `iss` the token must carry — the PUBLIC realm URL Keycloak stamps into tokens."
+  type        = string
+  default     = "https://keycloak.aws.refplat.org/realms/platform"
+}
+
+variable "oidc_audience" {
+  description = "The `aud` the token must contain — the Grafana OIDC client id."
+  type        = string
+  default     = "grafana"
+}
+
+variable "tenants" {
+  description = "Known team tenants the proxy may scope to (comma-joined into the proxy's TENANTS). A user's groups are intersected with this set; unknown groups can't widen access."
+  type        = list(string)
+  default     = ["alpha", "bravo", "platform"]
+}
+
+variable "admin_group" {
+  description = "The group granting the federated all-tenant read (platform-admins → sees every tenant)."
+  type        = string
+  default     = "platform-admins"
+}
+
+variable "create_datasource" {
+  description = "Create the per-team Grafana datasource ConfigMap (oauthPassThru → the proxy). True on the hub that runs Grafana."
+  type        = bool
+  default     = true
+}
+
+variable "datasource_name" {
+  description = "Display name of the per-team Grafana datasource."
+  type        = string
+  default     = "Mimir (my team)"
+}
+
+variable "create_service_monitor" {
+  description = "Scrape the proxy's own decision metrics (tenant_proxy_requests_total)."
+  type        = bool
+  default     = true
+}
+
+variable "tags" {
+  description = "Labels to apply."
+  type        = map(string)
+  default     = {}
+}
