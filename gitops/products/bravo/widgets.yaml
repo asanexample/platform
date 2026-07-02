@@ -1,0 +1,17 @@
+# Product "widgets" owned by Team bravo (ADR-067 / ADR-069). The git-native registry
+# entry — delivery (argocd-apps, github-oidc, policy) derives repo/domains from here; it is also projected as a
+# Product CR for admission (image-scope team-bravo/widgets-*, tenancy, owned domains).
+# One repo per product. Authored by the Backstage New Product template (ADR-062 self-service).
+apiVersion: platform.refplat.org/v1beta1
+kind: Product
+metadata:
+  name: bravo-widgets
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/part-of: environment-api
+spec:
+  team: bravo
+  repo: asanexample/bravo-widgets
+  tenancy: pooled
+  defaultIsolation: { compute: dedicated-namespace }
+  domains: []
