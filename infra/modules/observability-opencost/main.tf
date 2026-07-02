@@ -158,9 +158,13 @@ resource "aws_iam_role_policy" "cost_reader_assumer" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid      = "AssumeMgmtCostReader"
-        Effect   = "Allow"
-        Action   = "sts:AssumeRole"
+        Sid    = "AssumeMgmtCostReader"
+        Effect = "Allow"
+        # TagSession, not just AssumeRole: the Pod-Identity-issued session already carries transitive
+        # session tags (added by pods.eks.amazonaws.com), and AWS requires TagSession permission on the
+        # target role to propagate them through a further AssumeRole call — confirmed live (#668):
+        # AssumeRole-only produced "not authorized to perform: sts:TagSession on resource: cost_reader".
+        Action   = ["sts:AssumeRole", "sts:TagSession"]
         Resource = [var.cost_reader_role_arn]
       },
     ]
