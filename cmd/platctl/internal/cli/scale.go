@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -184,11 +185,20 @@ from the HCL — the inverse of 'platctl down'. Takes ~1-2 minutes.`,
 				fmt.Printf("  warning: post-unpark Kyverno recovery: %v\n", err)
 			}
 			// Repair the cross-environment path a park/restore can leave stale (e.g. platform→preprod cross-VPC
-			// DNS + the ArgoCD controller's cached connection). Idempotent; no-op when not configured.
+			// DNS + the ArgoCD controller's cached connection). Idempotent; no-op when not configured. Run this
+			// BEFORE the DB-client recovery below so its (potentially minutes-long) DB wait doesn't delay the
+			// cross-cluster reconnect that ArgoCD needs.
+			var reconnectErr error
 			if env.Reconnect != nil {
-				return runReconnect(ctx, cfg, repoRoot, envName, env.Reconnect, runner)
+				reconnectErr = runReconnect(ctx, cfg, repoRoot, envName, env.Reconnect, runner)
 			}
-			return nil
+			// Post-unpark workload recovery #2: a workload that opens its Postgres connection ONLY at startup
+			// (e.g. Backstage) can come up before its CNPG database is Ready, fail every DB-backed plugin, and
+			// stay not-Ready forever (it never retries). Restart such clients once their DB is Ready. Best-effort.
+			if err := recoverStartupOrderedDBClientsFn(ctx, kc); err != nil {
+				fmt.Printf("  warning: post-unpark DB-client recovery: %v\n", err)
+			}
+			return reconnectErr
 		},
 	}
 
@@ -518,6 +528,224 @@ func latestFailedCreate(k func(...string) ([]byte, error), ns string) string {
 		return msg
 	}
 	return "(no FailedCreate event found — run `kubectl describe rs` in the namespace for the admission error)"
+}
+
+// recoverStartupOrderedDBClientsFn is indirected so tests can stub the whole step.
+var recoverStartupOrderedDBClientsFn = recoverStartupOrderedDBClients
+
+const (
+	// The post-unpark DB-client recovery polls at this cadence for up to this many ticks (~8 min) — long
+	// enough for a CNPG cluster to restore from EBS and elect a primary, bounded so 'up' can't hang on it.
+	dbRecoveryTicks    = 32
+	dbRecoveryInterval = 15 * time.Second
+)
+
+// recoverStartupOrderedDBClients restarts workloads left not-Ready because they came up BEFORE their CNPG
+// Postgres database was Ready and never retried the connection — a post-unpark ordering trap. (2026-07-02:
+// Backstage started 17 min before backstage-db, failed every DB-backed plugin with ECONNREFUSED, and sat at
+// 503-readiness indefinitely; a pod delete once the DB was Ready fixed it.)
+//
+// It is deliberately conservative and best-effort: it only ever touches a pod that is scheduled, not Ready,
+// NOT a CNPG database pod, NOT a Job pod, lives in a namespace whose CNPG database is now Ready, AND started
+// before that database became Ready. So healthy pods, still-starting pods (they started after the DB), and
+// failures unrelated to database ordering (e.g. a client in a namespace with no CNPG DB) are never restarted.
+// Restart is a pod delete (the owning Deployment/StatefulSet recreates it) — a rollout-restart annotation
+// would be reverted by ArgoCD self-heal. Never fails 'up'.
+func recoverStartupOrderedDBClients(ctx context.Context, kc config.KubeconfigEntry) error {
+	path, cleanup, err := tempKubeconfig(ctx, kc, "platctl-dbclients")
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	k := func(args ...string) ([]byte, error) {
+		return exec.CommandContext(ctx, "kubectl", append([]string{"--kubeconfig", path}, args...)...).CombinedOutput()
+	}
+
+	pods, err := getPods(k)
+	if err != nil {
+		return err
+	}
+	if len(candidateClients(pods)) == 0 {
+		return nil // nothing not-Ready that could be an ordering victim — healthy
+	}
+
+	fmt.Println("  checking for workloads stuck on a database that wasn't Ready at their startup (post-unpark ordering)...")
+	restarted := map[string]bool{}
+	for i := 0; i < dbRecoveryTicks; i++ {
+		pods, err = getPods(k)
+		if err != nil {
+			return err
+		}
+		dbReady := cnpgDBReadyTimes(pods)
+		for _, p := range stuckDBClients(dbReady, pods) {
+			key := p.Namespace + "/" + p.Name
+			if restarted[key] {
+				continue
+			}
+			if _, derr := k("delete", "pod", "-n", p.Namespace, p.Name, "--ignore-not-found"); derr == nil {
+				restarted[key] = true
+				fmt.Printf("  restarted %s (came up before its database was Ready)\n", key)
+			}
+		}
+		// Stop once no candidate is still waiting on a database that isn't Ready yet — we've recovered all we
+		// can (either the DBs are Ready and stragglers were restarted, or the remaining not-Ready pods have no
+		// CNPG database to blame).
+		if !waitingOnDB(pods, dbReady) {
+			break
+		}
+		time.Sleep(dbRecoveryInterval)
+	}
+	if len(restarted) > 0 {
+		fmt.Printf("  restarted %d workload(s) that came up before their database.\n", len(restarted))
+	}
+	return nil
+}
+
+// podInfo is the minimal per-pod state the (pure) DB-client recovery logic reasons over.
+type podInfo struct {
+	Namespace string
+	Name      string
+	Ready     bool      // every container's Ready condition is true
+	Scheduled bool      // assigned to a node
+	IsCNPGDB  bool      // carries the cnpg.io/cluster label (a Postgres database pod)
+	IsJob     bool      // owned by a Job (a CronJob/Job run — not meant to stay Ready)
+	StartTime time.Time // .status.startTime (zero if unset)
+	ReadyTime time.Time // the Ready condition's lastTransitionTime (used only for CNPG DB pods)
+}
+
+// getPods lists all pods and projects them to []podInfo.
+func getPods(k func(...string) ([]byte, error)) ([]podInfo, error) {
+	out, err := k("get", "pods", "--all-namespaces", "-o", "json")
+	if err != nil {
+		return nil, fmt.Errorf("listing pods: %s", strings.TrimSpace(string(out)))
+	}
+	var list struct {
+		Items []struct {
+			Metadata struct {
+				Namespace       string            `json:"namespace"`
+				Name            string            `json:"name"`
+				Labels          map[string]string `json:"labels"`
+				OwnerReferences []struct {
+					Kind string `json:"kind"`
+				} `json:"ownerReferences"`
+			} `json:"metadata"`
+			Spec struct {
+				NodeName string `json:"nodeName"`
+			} `json:"spec"`
+			Status struct {
+				StartTime  string `json:"startTime"`
+				Conditions []struct {
+					Type               string `json:"type"`
+					Status             string `json:"status"`
+					LastTransitionTime string `json:"lastTransitionTime"`
+				} `json:"conditions"`
+			} `json:"status"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(out, &list); err != nil {
+		return nil, fmt.Errorf("parsing pod list: %w", err)
+	}
+	pods := make([]podInfo, 0, len(list.Items))
+	for _, it := range list.Items {
+		p := podInfo{
+			Namespace: it.Metadata.Namespace,
+			Name:      it.Metadata.Name,
+			Scheduled: it.Spec.NodeName != "",
+		}
+		if _, ok := it.Metadata.Labels["cnpg.io/cluster"]; ok {
+			p.IsCNPGDB = true
+		}
+		for _, o := range it.Metadata.OwnerReferences {
+			if o.Kind == "Job" {
+				p.IsJob = true
+			}
+		}
+		p.StartTime = parseK8sTime(it.Status.StartTime)
+		for _, c := range it.Status.Conditions {
+			if c.Type == "Ready" {
+				p.Ready = c.Status == "True"
+				p.ReadyTime = parseK8sTime(c.LastTransitionTime)
+				break
+			}
+		}
+		pods = append(pods, p)
+	}
+	return pods, nil
+}
+
+// parseK8sTime parses a Kubernetes RFC3339 timestamp, returning the zero time on empty/unparseable input.
+func parseK8sTime(s string) time.Time {
+	if s == "" {
+		return time.Time{}
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
+}
+
+// candidateClients returns the pods that could be startup-ordering victims: scheduled, not Ready, and neither
+// a CNPG database pod nor a Job pod. Used to decide whether there's anything worth waiting on.
+func candidateClients(pods []podInfo) []podInfo {
+	var out []podInfo
+	for _, p := range pods {
+		if p.Scheduled && !p.Ready && !p.IsCNPGDB && !p.IsJob {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// cnpgDBReadyTimes returns, per namespace, when its CNPG database became Ready — the latest Ready-condition
+// transition among Ready CNPG pods in that namespace (so a multi-instance cluster counts as Ready once its
+// last member is). Namespaces with no Ready CNPG pod are absent from the map.
+func cnpgDBReadyTimes(pods []podInfo) map[string]time.Time {
+	out := map[string]time.Time{}
+	for _, p := range pods {
+		if p.IsCNPGDB && p.Ready && !p.ReadyTime.IsZero() {
+			if cur, ok := out[p.Namespace]; !ok || p.ReadyTime.After(cur) {
+				out[p.Namespace] = p.ReadyTime
+			}
+		}
+	}
+	return out
+}
+
+// stuckDBClients returns the pods to restart: a candidate client (scheduled, not Ready, non-CNPG, non-Job)
+// in a namespace whose CNPG database is now Ready, that STARTED BEFORE the database became Ready. Pure so the
+// targeting logic is unit-tested without a cluster.
+func stuckDBClients(dbReadyByNS map[string]time.Time, pods []podInfo) []podInfo {
+	var out []podInfo
+	for _, p := range candidateClients(pods) {
+		dbReady, ok := dbReadyByNS[p.Namespace]
+		if !ok {
+			continue // no Ready CNPG database in this namespace
+		}
+		if p.StartTime.IsZero() || !p.StartTime.Before(dbReady) {
+			continue // started at/after the database was Ready — not an ordering victim
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+// waitingOnDB reports whether any candidate client sits in a namespace that HAS a CNPG database which is not
+// yet Ready — i.e. it's worth polling longer because that database might still come up. Once every such
+// namespace's database is Ready (or a candidate has no CNPG database at all), there is nothing more to wait for.
+func waitingOnDB(pods []podInfo, dbReadyByNS map[string]time.Time) bool {
+	cnpgNS := map[string]bool{}
+	for _, p := range pods {
+		if p.IsCNPGDB {
+			cnpgNS[p.Namespace] = true
+		}
+	}
+	for _, p := range candidateClients(pods) {
+		if _, ready := dbReadyByNS[p.Namespace]; cnpgNS[p.Namespace] && !ready {
+			return true
+		}
+	}
+	return false
 }
 
 // runReconnect runs the post-restore repair steps for an environment (see config.EnvConfig.Reconnect):
