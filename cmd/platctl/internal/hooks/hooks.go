@@ -1,4 +1,8 @@
-package config
+// Package hooks implements the pre/post-apply hook execution and manual-step checks that platctl runs around
+// Terragrunt units. The declarative shape (which unit gets which hook) is parsed by the config package; this
+// package owns the side-effecting execution (AWS CLI / kubectl / terragrunt subprocess calls). Hooks satisfy
+// engine.Hook so the engine can invoke them uniformly.
+package hooks
 
 import (
 	"bufio"
@@ -12,14 +16,9 @@ import (
 	"strings"
 
 	"github.com/asanexample/platform/cmd/platctl/internal/cloud"
+	"github.com/asanexample/platform/cmd/platctl/internal/config"
 	"github.com/asanexample/platform/cmd/platctl/internal/engine"
 )
-
-// Hook defines a pre-apply or multi-stage operation for a unit.
-// The args parameter carries bootstrap_args from the config so hooks can forward them.
-type Hook interface {
-	Execute(ctx context.Context, runner engine.Runner, unit *engine.Unit, action engine.Action, args ...string) error
-}
 
 // CRDTwoStageHook deploys a Helm release in two stages: first the operator
 // (to register CRDs), then the full apply. This avoids the chicken-and-egg
@@ -471,7 +470,7 @@ type ManualStepChecker struct {
 
 // Check evaluates a manual step's check condition.
 // Returns true if the prerequisite is satisfied.
-func (c *ManualStepChecker) Check(ctx context.Context, step ManualStep) (bool, error) {
+func (c *ManualStepChecker) Check(ctx context.Context, step config.ManualStep) (bool, error) {
 	switch step.Check.Type {
 	case "secret_exists":
 		if c.Client == nil {
@@ -497,8 +496,8 @@ func (c *ManualStepChecker) Check(ctx context.Context, step ManualStep) (bool, e
 	}
 }
 
-// ResolveHook creates a Hook implementation from config override settings.
-func ResolveHook(override UnitOverride, awsClient cloud.AWSClient, interactive bool) Hook {
+// ResolveHook creates an engine.Hook implementation from a unit's config override settings.
+func ResolveHook(override config.UnitOverride, awsClient cloud.AWSClient, interactive bool) engine.Hook {
 	switch override.Hook {
 	case "crd_two_stage":
 		return &CRDTwoStageHook{Target: override.HookTarget}

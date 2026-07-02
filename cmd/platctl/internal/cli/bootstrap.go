@@ -14,6 +14,7 @@ import (
 	"github.com/asanexample/platform/cmd/platctl/internal/cloud"
 	"github.com/asanexample/platform/cmd/platctl/internal/config"
 	"github.com/asanexample/platform/cmd/platctl/internal/engine"
+	"github.com/asanexample/platform/cmd/platctl/internal/hooks"
 )
 
 // NewBootstrapCmd creates the bootstrap subcommand.
@@ -192,7 +193,7 @@ func runBootstrap(cmd *cobra.Command, envFilter string, resume, yes bool, concur
 
 	// Resolve hooks from config overrides
 	awsClient := &cloud.AWS{}
-	hooks := make(map[string]engine.Hook)
+	hookMap := make(map[string]engine.Hook)
 	for name, override := range cfg.Overrides {
 		if override.Hook == "" {
 			continue
@@ -200,14 +201,14 @@ func runBootstrap(cmd *cobra.Command, envFilter string, resume, yes bool, concur
 		if g.Unit(name) == nil {
 			continue
 		}
-		h := config.ResolveHook(override, awsClient, !yes)
+		h := hooks.ResolveHook(override, awsClient, !yes)
 		if h != nil {
-			hooks[name] = h
+			hookMap[name] = h
 		}
 	}
 
 	eng := engine.NewEngine(runner, store, g, statePath, engine.WithConcurrency(concurrency))
-	eng.Hooks = hooks
+	eng.Hooks = hookMap
 	eng.Logger = logger
 
 	if resume {
@@ -247,7 +248,7 @@ func runBootstrap(cmd *cobra.Command, envFilter string, resume, yes bool, concur
 
 	// Pre-flight: check manual step prerequisites
 	if len(cfg.ManualSteps) > 0 && !resume {
-		checker := &config.ManualStepChecker{Client: awsClient, RepoRoot: repoRoot}
+		checker := &hooks.ManualStepChecker{Client: awsClient, RepoRoot: repoRoot}
 		for _, step := range cfg.ManualSteps {
 			if g.Unit(step.Before) == nil {
 				continue
