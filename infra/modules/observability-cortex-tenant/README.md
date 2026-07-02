@@ -25,19 +25,28 @@ because it reroutes the pipeline feeding every dashboard. The remaining wiring:
 1. **Relabel** on the hub Prometheus + preprod agent write path — set `tenant` from the namespace:
 
    ```yaml
-   # writeRelabelConfigs (Prometheus remote_write / agent):
-   # team-owned environment namespaces are <team>-<product>-<stage> → tenant = <team>;
-   # everything else (kube-system, observability, …) falls through to cortex-tenant's default.
+   # writeRelabelConfigs (Prometheus remote_write / agent). TWO steps — the first is load-bearing:
+   # 1) FORCE tenant=platform for EVERY series, clobbering any `tenant` label a pod may have exposed.
+   #    (Without this, a pod in an infra ns exposing tenant="alpha" would route itself into alpha —
+   #    a spoof. The unconditional clobber is the anti-spoof; a single team-match rule is NOT enough.)
+   - source_labels: [namespace]
+     regex: '.*'
+     target_label: tenant
+     replacement: platform
+   # 2) Override to the team for environment namespaces (<team>-<product>-<stage>). Infra namespaces
+   #    (kube-system, observability, …) don't match → stay on the platform tenant from step 1.
    - source_labels: [namespace]
      regex: '([a-z0-9]+)-[a-z0-9-]+-(dev|test|uat|staging|prod)'
      target_label: tenant
      replacement: '$1'
    ```
 
-   The relabel runs in the **platform-controlled** collector (hub Prometheus / spoke agent), so a
-   tenant workload cannot spoof its own tenant — the label is derived from the k8s namespace, not
-   from anything the pod sets. This is the anti-spoof property that lets the spoke Gateway edge stop
-   force-stamping (Phase 4).
+   The relabel runs in the **platform-controlled** collector (hub Prometheus / spoke agent) and is
+   derived from the k8s namespace, **overwriting** anything the pod sets — so a tenant workload cannot
+   spoof its tenant on the normal scrape path. This is the anti-spoof property that lets the spoke
+   Gateway edge stop force-stamping (Phase 4). NB: it only covers series that flow *through* the
+   collector; a pod POSTing remote_write directly to the ingest edge bypasses it, which is why Phase 4
+   also needs the egress NetworkPolicy + mTLS write-auth (see the #590 Phase-4 design comment).
 
 2. **Reroute** `remote_write` from the Mimir gateway to this module's `write_url` output.
 
