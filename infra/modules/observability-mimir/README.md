@@ -47,7 +47,7 @@ module "mimir" {
 | `datasource_is_default` | `false` | Mark the provisioned Mimir Grafana datasource the default. |
 | `max_global_series_per_user` / `ingestion_rate` / `ingestion_burst_size` | 1.5M / 100k / 200k | Per-tenant limits (a noisy-neighbor security control). |
 
-## Outputs
+## Key outputs
 
 `blocks_bucket_name`, `mimir_role_arn`, `push_endpoint`
 (`http://mimir-gateway.observability.svc/api/v1/push`), `query_endpoint` (`.../prometheus`).
