@@ -123,6 +123,9 @@ inputs = {
   # Now the IaC-owned platform-team routing key from the `pagerduty` unit (platform/pagerduty/<team>-routing-key)
   # instead of the old hand-made platform/observability/pagerduty-routing-key (now dead).
   pagerduty_routing_key_secret_name = "platform/pagerduty/platform-routing-key"
+  # Dead-man's switch: Watchdog → external Healthchecks.io check (pings ~every 5m); if pings stop, Healthchecks
+  # pages externally — the one failure the in-cluster pipeline can't alert on itself (#1118).
+  healthchecks_ping_url_secret_name = "platform/healthchecks/deadman-ping-url"
 
   # ADR-082: fan critical alerts to the triage agent's in-cluster webhook (additively — the alert still pages
   # Slack/SNS). The agent triages + posts a card; its own storm controls (ADR-080 D9) bound the fan-out.
