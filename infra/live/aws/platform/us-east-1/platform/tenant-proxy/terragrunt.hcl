@@ -63,8 +63,10 @@ inputs = {
   namespace = dependency.observability.outputs.namespace
 
   # Digest-pinned signed image (built + cosign-signed by tenant-proxy-image.yml → platform ECR). Bump this
-  # digest to the build output and re-apply (ADR-071 digest-pin). Current: first build 2026-07-02.
-  image = "829808296602.dkr.ecr.us-east-1.amazonaws.com/platform/tenant-proxy@sha256:9958c776c6ede1456e3340b356e1144934207884d49c7656edbd0d38f70584f0"
+  # digest to the build output and re-apply (ADR-071 digest-pin). MUST be the INDEX digest (the one the
+  # workflow's `steps.build.outputs.digest` reports, tagged with the git sha) — NOT the `.att`/`.sig`
+  # single-manifests, which are unrunnable (empty config → "no command specified"). Current: first build.
+  image = "829808296602.dkr.ecr.us-east-1.amazonaws.com/platform/tenant-proxy@sha256:99d8c3698315bf2833f1169f64b56536d59a8ea65484a78c8da7663ddb0ba953"
 
   # The per-team tenants populated by the cortex-tenant write side; admin (platform-admins) sees all.
   tenants     = ["alpha", "bravo", "platform"]
