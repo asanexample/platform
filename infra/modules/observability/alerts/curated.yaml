@@ -284,19 +284,24 @@ groups:
   - name: external-secrets.rules
     rules:
       - alert: ExternalSecretNotReady
+        # CRITICAL (was warning): a not-Ready ExternalSecret means a K8s Secret has stopped syncing from
+        # the backend store — dependent workloads break on the next restart/rotation (auth, DB creds, tokens).
+        # Silent-as-warning is how a credential outage hides. See #1120/#1124.
         expr: externalsecret_status_condition{condition="Ready",status="False"} == 1
         for: 15m
         labels:
-          severity: warning
+          severity: critical
         annotations:
           summary: "ExternalSecret {{ $labels.namespace }}/{{ $labels.name }} not Ready"
           description: "ExternalSecret {{ $labels.namespace }}/{{ $labels.name }} has been Ready=False for 15m — the Secrets Manager → K8s sync is failing (downstream secrets go stale)."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#external-secrets"
       - alert: ClusterSecretStoreNotReady
+        # CRITICAL (was warning): the store is the source for EVERY ExternalSecret — if it's not Ready, ALL
+        # secret syncing is broken cluster-wide, so this is broader than a single ExternalSecret. See #1120/#1124.
         expr: clustersecretstore_status_condition{condition="Ready",status="False"} == 1
         for: 15m
         labels:
-          severity: warning
+          severity: critical
         annotations:
           summary: "ClusterSecretStore {{ $labels.name }} not Ready"
           description: "ClusterSecretStore {{ $labels.name }} has been Ready=False for 15m — everything that syncs secrets through it is affected."
