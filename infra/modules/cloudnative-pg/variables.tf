@@ -51,6 +51,12 @@ variable "replica_count" {
   default     = 1
 }
 
+variable "enable_barman_plugin" {
+  description = "Install the Barman Cloud CNPG-I plugin (v0.13.0, vendored local chart) into the operator namespace — the backup engine for base backups + WAL archiving to S3 (#1119). Requires cert-manager (issues the plugin's mTLS cert). Additive: installs the plugin + its ObjectStore CRD; clusters only use it once they declare spec.plugins."
+  type        = bool
+  default     = true
+}
+
 variable "webhook_host_network" {
   description = "Run the operator (admission webhook server) on hostNetwork so the EKS managed control plane can reach the webhook on the node VPC IP (required on the Cilium overlay / cluster-pool datapath). Moves the webhook to host port 9446 (off kyverno's 9443/9444)."
   type        = bool

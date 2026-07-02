@@ -123,3 +123,13 @@ misconfigurations:
       Customer-managed CMK is tracked in #118, consistent with the cloudtrail
       (AWS-0015) and state-bucket (AWS-0132) encryption choice; deferred to avoid
       the publisher key-policy complexity for now.
+
+  - id: KSV-0041
+    paths:
+      - "cloudnative-pg/charts/barman-cloud-plugin/templates/plugin.yaml"
+    statement: >-
+      Vendored upstream Barman Cloud plugin release manifest (v0.13.0, verbatim).
+      The plugin's ClusterRole legitimately manages Secrets — it reads each
+      ObjectStore's S3 credentials and manages backup-related secrets on behalf of
+      the CNPG operator. This is the plugin's required, upstream-defined RBAC; we
+      vendor the release manifest unmodified and can't narrow it without forking. #1119.
