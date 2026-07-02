@@ -31,6 +31,7 @@ locals {
     s3               = "${local.source_base}/aws//s3"
     sops_kms         = "${local.source_base}/aws//sops-kms"         # SOPS config-encryption key (ADR-066)
     agent_eval_store = "${local.source_base}/aws//agent-eval-store" # durable forward-capture eval corpus (ADR-080 D6)
+    cnpg_backups     = "${local.source_base}/aws//cnpg-backups"     # CNPG Postgres backup bucket + per-cluster IAM (#1119)
 
     # Notifications
     sns_notifications = "${local.source_base}/aws//sns-notifications"
