@@ -204,6 +204,16 @@ variable "spoke_ingest" {
     gateway_namespace = string
     tenants           = map(string)               # hostname-prefix => X-Scope-OrgID tenant
     query_tenants     = optional(set(string), []) # prefixes that ALSO get a read (/prometheus) route (W8c)
+    # P13 per-team re-tenant (#590): an ADDITIONAL write route at `<hostname_prefix>.<domain>` that forwards
+    # to cortex-tenant (no force-stamp — it strips any inbound X-Scope-OrgID and lets cortex-tenant derive the
+    # tenant per-series from the agent-set `route_tenant` label). Used for the additive DUAL-WRITE: the spoke
+    # keeps its existing force-stamped `<prefix>-mimir` route (the `preprod` tenant, unchanged) AND writes a
+    # second copy here → per-team tenants. Null = off.
+    cortex_tenant_route = optional(object({
+      hostname_prefix = string # e.g. "preprod-tenant" → preprod-tenant.<domain>
+      service_name    = string # the cortex-tenant Service (e.g. "cortex-tenant")
+      service_port    = number # e.g. 8080
+    }))
   })
   default = {
     domain            = ""

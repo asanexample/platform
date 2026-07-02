@@ -434,6 +434,58 @@ resource "kubernetes_manifest" "spoke_ingest_from_gateway" {
   }
 }
 
+# P13 per-team dual-write ingest (#590) — an ADDITIONAL write route to cortex-tenant. Unlike the force-stamped
+# spoke route above, this STRIPS any inbound X-Scope-OrgID and forwards to cortex-tenant, which derives the
+# tenant per-series from the agent-set `route_tenant` label and splits into per-team tenants. Additive: the
+# spoke keeps its force-stamped `<prefix>-mimir` route, so the `preprod` tenant + all its consumers are
+# unchanged; this second route just lands a per-team copy. Plus the Cilium allow (the ns default-denies).
+resource "kubernetes_manifest" "cortex_tenant_ingest_route" {
+  count = local.create && var.spoke_ingest.cortex_tenant_route != null ? 1 : 0
+
+  manifest = {
+    apiVersion = "gateway.networking.k8s.io/v1"
+    kind       = "HTTPRoute"
+    metadata = {
+      name      = "${var.helm_release_name}-cortex-tenant-ingest"
+      namespace = var.namespace
+    }
+    spec = {
+      parentRefs = [{
+        name        = var.spoke_ingest.gateway_name
+        namespace   = var.spoke_ingest.gateway_namespace
+        sectionName = "https"
+      }]
+      hostnames = ["${var.spoke_ingest.cortex_tenant_route.hostname_prefix}.${var.spoke_ingest.domain}"]
+      rules = [{
+        matches = [{ path = { type = "PathPrefix", value = "/push" } }]
+        # Strip any inbound X-Scope-OrgID — the tenant comes from the per-series route_tenant label, NOT a
+        # client header (anti-spoof: a spoke can't pick its own tenant header; cortex-tenant owns assignment).
+        filters     = [{ type = "RequestHeaderModifier", requestHeaderModifier = { remove = ["X-Scope-OrgID"] } }]
+        backendRefs = [{ name = var.spoke_ingest.cortex_tenant_route.service_name, port = var.spoke_ingest.cortex_tenant_route.service_port }]
+      }]
+    }
+  }
+}
+
+resource "kubernetes_manifest" "cortex_tenant_ingest_from_gateway" {
+  count = local.create && var.spoke_ingest.cortex_tenant_route != null ? 1 : 0
+
+  manifest = {
+    apiVersion = "cilium.io/v2"
+    kind       = "CiliumNetworkPolicy"
+    metadata = {
+      name      = "${var.helm_release_name}-cortex-tenant-ingest-from-gateway"
+      namespace = var.namespace
+    }
+    spec = {
+      endpointSelector = {
+        matchLabels = { "app.kubernetes.io/name" = var.spoke_ingest.cortex_tenant_route.service_name }
+      }
+      ingress = [{ fromEntities = ["ingress"] }]
+    }
+  }
+}
+
 # Direct in-cluster query consumers (ADR-091 A3): admit named namespaces (e.g. backstage's Cost tab) to the
 # Mimir gateway's query API. The ns default-denies ingress, so this Cilium allow is what lets them query.
 resource "kubernetes_manifest" "query_from_namespaces" {
