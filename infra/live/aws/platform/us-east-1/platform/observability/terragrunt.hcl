@@ -40,17 +40,6 @@ dependency "sns_notifications" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
-# P13 (#590): the write-path re-tenant router. Prometheus reroutes to it only when enable_per_team_tenants
-# is set; this dependency also enforces the safe ordering (cortex-tenant applied + healthy before the reroute).
-dependency "cortex_tenant" {
-  config_path = "../cortex-tenant"
-
-  mock_outputs = {
-    write_url = "http://cortex-tenant.observability.svc:8080/push"
-  }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
-}
-
 # Grafana SSO (#592): the OIDC client + its secret (platform/keycloak/grafana-oidc) are provisioned by
 # keycloak-config, so Grafana's SSO applies after it (same ordering as ArgoCD/Backstage). The grafana-oidc
 # ExternalSecret needs the SM secret to already exist for ESO to sync it before the Grafana pod starts.
@@ -124,9 +113,11 @@ inputs = {
   mimir_remote_write_url = include.base.locals.enable_mimir ? "http://mimir-gateway.observability.svc/api/v1/push" : ""
 
   # P13 per-team re-tenant (#590): when enabled, reroute remote_write through cortex-tenant (which splits
-  # by the forced namespace→team `tenant` relabel) instead of a single static tenant header. Gated so the
-  # cortex-tenant unit must be applied + healthy first; empty = direct single-tenant write (unchanged).
-  cortex_tenant_write_url = include.base.locals.enable_per_team_tenants ? dependency.cortex_tenant.outputs.write_url : ""
+  # by the forced namespace→team `tenant` relabel) instead of a single static tenant header. The URL is the
+  # deterministic in-cluster Service address (NOT a dependency — cortex-tenant depends on THIS unit for its
+  # namespace, so a reverse dependency would be a cycle). Apply cortex-tenant + confirm healthy BEFORE
+  # flipping this on. Empty = direct single-tenant write (unchanged).
+  cortex_tenant_write_url = include.base.locals.enable_per_team_tenants ? "http://cortex-tenant.observability.svc:8080/push" : ""
 
   # Alertmanager → SNS (critical alerts → email)
   # Alertmanager SNS publish uses EKS Pod Identity (ADR-047, #594) — no OIDC/IRSA inputs needed.
