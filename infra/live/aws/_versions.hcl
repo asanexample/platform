@@ -73,6 +73,7 @@ locals {
     tailscale                     = "${local.source_base}/tailscale"
     tailscale_admin               = "${local.source_base}/tailscale-admin"
     falco                         = "${local.source_base}/falco"
+    descheduler                   = "${local.source_base}/descheduler"
     observability                 = "${local.source_base}/observability"
     observability_mimir           = "${local.source_base}/observability-mimir"
     observability_loki            = "${local.source_base}/observability-loki"
@@ -115,6 +116,7 @@ locals {
     kyverno               = "3.8.1"
     tailscale_operator    = "1.96.5"
     falco                 = "9.0.0"
+    descheduler           = "0.35.1" # kubernetes-sigs/descheduler — node rebalancer (ADR-093). Pinned to the v0.35 line = k8s 1.35 (official compat matrix); bump with the cluster's k8s minor.
     kube_prometheus_stack = "87.5.0" # latest stable, re-resolved 2026-07-01 (app v0.92.1; #595)
     mimir                 = "6.0.6"
     loki                  = "7.0.0"   # grafana/loki — P3a logs store (latest stable, resolved 2026-06-19)
