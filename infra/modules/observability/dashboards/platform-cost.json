@@ -562,6 +562,7 @@
       "id": 12,
       "type": "table",
       "title": "True cost by account ($/mo, CUR actual)",
+      "description": "Account ID is a 12-digit string, not a dollar amount — only the $/mo column carries a currency unit.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -574,10 +575,17 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyUSD",
-          "decimals": 0
+          "unit": "string"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "$/mo" },
+            "properties": [
+              { "id": "unit", "value": "currencyUSD" },
+              { "id": "decimals", "value": 0 }
+            ]
+          }
+        ]
       },
       "options": {
         "showHeader": true
@@ -593,6 +601,15 @@
           },
           "expr": "sort_desc(sum by (label) (platform_true_cost_monthly_usd{breakdown=\"account\"}))",
           "legendFormat": "{{label}}"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "renameByName": { "label": "Account", "Value": "$/mo" }
+          }
         }
       ]
     },
