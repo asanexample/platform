@@ -99,6 +99,39 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-02 (afternoon) — full PARK + UNPARK on both clusters to VALIDATE the refactored `platctl`
+  binary (the code-quality-pass PR #1103, built from the merged `main`). ✅ Both cycled cleanly — the refactor
+  introduced ZERO regressions — and the cycle surfaced one NEW class of post-unpark stuck workload, now fixed
+  in `up`.** PARK: `platctl down --env <env> --yes` each. Platform pristine ("Karpenter nodes drained and
+  terminated" + "EC2NodeClass deleted"). Preprod threw the familiar slow-drain warnings ("NodeClaims still
+  present after 6m", "EC2NodeClass still present after 90s") but was **cost-safe** — verified via the AWS API:
+  the one lingering Karpenter instance was `shutting-down`, and zero running/pending cluster instances. UNPARK:
+  `platctl up --env <env>` each (from the MAIN checkout — `up` runs terragrunt applies). **Both Karpenter gates
+  passed on the FIRST check** ("Karpenter ready: EC2NodeClass present, NodePool(s) Ready=True") — no self-heal
+  needed, no repeat of the morning's stuck-NodeClass incident (clean because `down` deleted the NodeClass
+  symmetrically, so `up` recreated both from scratch). Preprod reconnect (cross-vpc-dns + argocd restart) clean.
+  **THE NEW FINDING (the reason to actually check pod readiness, not just node/nodegroup state): `backstage` sat
+  `0/1 Running` for 33 min post-unpark** — liveness OK, readiness a steady `503`. Root cause: backstage started
+  ~17 min BEFORE its CNPG database (`backstage-db`) was Ready, failed every DB-backed plugin with `connect
+  ECONNREFUSED …:5432`, and **never retries the DB** → stuck at 503 forever. A `kubectl delete pod` (once the DB
+  was Ready) fixed it instantly. This is a DISTINCT post-unpark trap from the Kyverno/admission one `up` already
+  handles (that's "0 pods created"; this is "pod created, stuck not-Ready on a DB that wasn't up yet"). **Fixed
+  at the source:** `platctl up` now runs `recoverStartupOrderedDBClients` (PR #1105) — waits (bounded) for CNPG
+  DBs to be Ready, then restarts any pod that's scheduled, not-Ready, non-CNPG, non-Job, in a namespace whose DB
+  is now Ready, AND started before the DB became Ready. So future unparks self-heal this. **Other post-unpark
+  observations (all pre-existing / self-resolving, NOT regressions):** `argo-rollouts` + `prometheus-operator`
+  (preprod) briefly `0/1` — they hit Cilium CNI `429 putEndpointIdTooManyRequests` during the fresh-node
+  bring-up storm and self-recovered after a restart within ~1-2 min (post-unpark node-storm transient; don't
+  chase). `triage-demo/checkout` CrashLoopBackOff — `dial tcp payments-db:5432: connection refused`, but there
+  is **no `payments-db` deployed** in that namespace (broken demo, 6d old; NOT a DB-ordering victim — it has no
+  CNPG DB, so the new recovery correctly ignores it). preprod `falco` DaemonSet `1/2` — a 100m pod can't fit on
+  preprod's CPU-packed small `t4g.large` nodes (18d standing capacity issue). **Gotcha reinforced:** the stale
+  static `AWS_ACCESS_KEY_ID/…SECRET…/…SESSION_TOKEN` env vars bit a verification `kubectl` again (I forgot the
+  `unset` on one command → `ExpiredToken`); the guard is: `unset` all three in the SAME shell command as any
+  `aws`/`kubectl` call. **Verify-pod-readiness lesson:** judging unpark health by node/nodegroup/Karpenter state
+  alone MISSES stuck workloads — always sweep for pods that are `Running` but `0/1` Ready (not just non-Running),
+  and distinguish live gaps from finished Job pods (`Completed`/`Error` on a CronJob pod ≠ a live problem).
+
 - **2026-06-27 (same unpark) — the hub Mimir QUERY PATH was silently degraded: ALL queries via the mimir
   gateway returned EMPTY (raw metrics + recording rules), while the mimir-querier served them fine directly.**
   Found while debugging per-app SLOs (chased a phantom "ruler write-back" bug — the recording rules were actually

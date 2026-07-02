@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/asanexample/platform/cmd/platctl/internal/config"
 	"github.com/asanexample/platform/cmd/platctl/internal/engine"
@@ -364,6 +365,100 @@ func TestPollKarpenterReady(t *testing.T) {
 		}
 		if len(st) != 1 || st[0] != "False" {
 			t.Errorf("statuses = %v, want [False]", st)
+		}
+	})
+}
+
+// --- post-unpark DB-client recovery (startup-ordering) ---
+
+func TestStuckDBClients(t *testing.T) {
+	t0 := time.Date(2026, 7, 2, 9, 0, 0, 0, time.UTC)   // app start (early)
+	dbReady := t0.Add(10 * time.Minute)                 // DB became Ready later
+	afterDB := dbReady.Add(5 * time.Minute)             // started after the DB
+	ready := map[string]time.Time{"backstage": dbReady} // backstage ns has a Ready DB
+
+	pods := []podInfo{
+		// the victim: started before its DB was Ready, not Ready, scheduled, a normal client
+		{Namespace: "backstage", Name: "backstage-victim", Scheduled: true, StartTime: t0},
+		// started AFTER the DB was Ready — healthy ordering, leave it
+		{Namespace: "backstage", Name: "started-after", Scheduled: true, StartTime: afterDB},
+		// already Ready — leave it
+		{Namespace: "backstage", Name: "already-ready", Ready: true, Scheduled: true, StartTime: t0},
+		// Pending (unscheduled) — a restart won't help
+		{Namespace: "backstage", Name: "pending", Scheduled: false, StartTime: t0},
+		// the CNPG database pod itself — never restart
+		{Namespace: "backstage", Name: "backstage-db-1", IsCNPGDB: true, Scheduled: true, StartTime: t0},
+		// a Job/CronJob pod — not meant to be Ready
+		{Namespace: "backstage", Name: "cron-xyz", IsJob: true, Scheduled: true, StartTime: t0},
+		// no CNPG DB in this namespace (e.g. checkout↔payments-db that doesn't exist) — out of scope
+		{Namespace: "triage-demo", Name: "checkout", Scheduled: true, StartTime: t0},
+		// unknown start time — can't prove it predates the DB, so leave it
+		{Namespace: "backstage", Name: "no-starttime", Scheduled: true},
+	}
+
+	got := stuckDBClients(ready, pods)
+	if len(got) != 1 || got[0].Name != "backstage-victim" {
+		names := make([]string, len(got))
+		for i, p := range got {
+			names[i] = p.Name
+		}
+		t.Fatalf("stuckDBClients = %v, want [backstage-victim]", names)
+	}
+}
+
+func TestCNPGDBReadyTimes(t *testing.T) {
+	base := time.Date(2026, 7, 2, 9, 0, 0, 0, time.UTC)
+	pods := []podInfo{
+		{Namespace: "backstage", Name: "db-1", IsCNPGDB: true, Ready: true, ReadyTime: base.Add(2 * time.Minute)},
+		{Namespace: "keycloak", Name: "db-a", IsCNPGDB: true, Ready: true, ReadyTime: base.Add(1 * time.Minute)},
+		{Namespace: "keycloak", Name: "db-b", IsCNPGDB: true, Ready: true, ReadyTime: base.Add(3 * time.Minute)},  // later replica → ns Ready time = max
+		{Namespace: "keycloak", Name: "db-c", IsCNPGDB: true, Ready: false, ReadyTime: base.Add(9 * time.Minute)}, // not Ready → ignored
+		{Namespace: "app", Name: "web", Ready: true, ReadyTime: base},                                             // not a CNPG pod → ignored
+	}
+	got := cnpgDBReadyTimes(pods)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 namespaces with Ready DBs, got %v", got)
+	}
+	if !got["backstage"].Equal(base.Add(2 * time.Minute)) {
+		t.Errorf("backstage ready time = %v", got["backstage"])
+	}
+	if !got["keycloak"].Equal(base.Add(3 * time.Minute)) {
+		t.Errorf("keycloak ready time = %v, want the max (3m)", got["keycloak"])
+	}
+	if _, ok := got["app"]; ok {
+		t.Error("non-CNPG namespace must not appear")
+	}
+}
+
+func TestWaitingOnDB(t *testing.T) {
+	base := time.Date(2026, 7, 2, 9, 0, 0, 0, time.UTC)
+
+	t.Run("candidate waiting on a not-yet-Ready DB → true", func(t *testing.T) {
+		pods := []podInfo{
+			{Namespace: "backstage", Name: "db-1", IsCNPGDB: true, Ready: false}, // DB present, not Ready
+			{Namespace: "backstage", Name: "backstage", Scheduled: true},         // candidate, not Ready
+		}
+		if !waitingOnDB(pods, cnpgDBReadyTimes(pods)) {
+			t.Error("expected waitingOnDB=true (DB exists but not Ready yet)")
+		}
+	})
+
+	t.Run("DB already Ready → false", func(t *testing.T) {
+		pods := []podInfo{
+			{Namespace: "backstage", Name: "db-1", IsCNPGDB: true, Ready: true, ReadyTime: base},
+			{Namespace: "backstage", Name: "backstage", Scheduled: true},
+		}
+		if waitingOnDB(pods, cnpgDBReadyTimes(pods)) {
+			t.Error("expected waitingOnDB=false (DB is Ready)")
+		}
+	})
+
+	t.Run("candidate in a namespace with no CNPG DB → false", func(t *testing.T) {
+		pods := []podInfo{
+			{Namespace: "triage-demo", Name: "checkout", Scheduled: true}, // no CNPG DB here
+		}
+		if waitingOnDB(pods, cnpgDBReadyTimes(pods)) {
+			t.Error("expected waitingOnDB=false (nothing to wait for)")
 		}
 	})
 }
