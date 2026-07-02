@@ -136,6 +136,27 @@ groups:
           description: "{{ $labels.cluster }}: cluster-scoped policy {{ $labels.policy }} ({{ $labels.source }}, severity {{ $labels.severity }}) has had a fail/error PolicyReport result for 15m."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#policy-reporter"
   # ---------------------------------------------------------------------------
+  - name: true-cost.rules
+    rules:
+      - alert: TrueCostExporterDown
+        expr: up{job="true-cost-exporter"} == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: true-cost-exporter is down
+          description: "true-cost-exporter (#668) has been down for 15m — true-cloud-cost (CUR/Athena) metrics and dashboard panels will be stale."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#true-cost-exporter"
+      - alert: TrueCostExporterStale
+        expr: time() - platform_true_cost_exporter_last_success_timestamp_seconds > 32400
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: true-cost-exporter data is stale
+          description: "true-cost-exporter's last successful Athena refresh was over 9h ago (it refreshes every 6h) — likely a cross-account AssumeRole or Athena query failure. Check exporter logs."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#true-cost-exporter"
+  # ---------------------------------------------------------------------------
   - name: argocd.rules
     rules:
       - alert: ArgoCDComponentDown

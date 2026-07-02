@@ -1,5 +1,6 @@
 locals {
-  create = var.create
+  create            = var.create
+  enable_cloud_cost = local.create && var.enable_cloud_cost
 
   # On a spoke (no in-cluster queryable Prometheus) point OpenCost at an EXTERNAL Prometheus-compatible
   # endpoint — the hub Mimir's query API via its external ingress (which injects the tenant by hostname).
@@ -20,6 +21,29 @@ locals {
       namespaceName = var.prometheus_namespace
       port          = var.prometheus_port
     }
+  }
+
+  # cloud-integration.json (#668 Phase 2a). No static keys: AWSServiceAccount uses the default AWS SDK
+  # credential chain (Pod Identity), wrapped in AWSAssumeRole to cross into the mgmt-account cost_reader
+  # role. NOTE: OpenCost's cloudCost pipeline is NOT Prometheus-scrapeable (only its own /cloudCost REST
+  # API) — this wiring feeds OpenCost's own UI/API only. Grafana visibility is the separate
+  # true-cost-exporter below, which queries Athena directly.
+  cloud_integration = {
+    aws = [{
+      bucket    = var.cur_athena_results_bucket
+      region    = var.cur_athena_region
+      database  = var.cur_athena_database
+      table     = var.cur_athena_table
+      workgroup = var.cur_athena_workgroup
+      account   = var.cur_account_id
+      authorizer = {
+        type    = "AWSAssumeRole"
+        roleARN = var.cost_reader_role_arn
+        authorizer = {
+          type = "AWSServiceAccount"
+        }
+      }
+    }]
   }
 
   helm_values = {
@@ -44,9 +68,10 @@ locals {
           limits   = { memory = "256Mi" }
         }
       }
-      # No AWS creds: OpenCost uses the public AWS pricing API for on-demand node pricing (cluster-cost
-      # allocation). Cloud-cost (CUR/Athena) is a separate, heavier follow-on (#102 P11 part 2).
-      cloudCost = { enabled = false }
+      # Node pricing (in-cluster allocation) uses the public AWS pricing API — no creds needed for that.
+      # cloudCost (CUR/Athena, #668) is opt-in and cross-account; see cloud_integration above.
+      cloudCost            = { enabled = local.enable_cloud_cost }
+      cloudIntegrationJSON = local.enable_cloud_cost ? jsonencode(local.cloud_integration) : ""
     }
   }
 }
@@ -95,4 +120,69 @@ resource "kubernetes_config_map_v1" "cost_dashboard" {
       "__COST_DS_UID__", var.dashboard_datasource_uid
     )
   }
+}
+
+# ---------------------------------------------------------------------------
+# Cross-account Athena/Glue/S3 read (#668 Phase 2a/3) — Pod Identity (ADR-047), no static keys. Shared by
+# OpenCost's own cloudCost pipeline and the true-cost-exporter (both assume the same mgmt cost_reader role;
+# the mgmt-side trust (aws/cost-export module) is already scoped to the whole platform account, so this
+# role is the actual least-privilege boundary on this side).
+# ---------------------------------------------------------------------------
+data "aws_iam_policy_document" "cost_reader_assumer_trust" {
+  count = local.enable_cloud_cost ? 1 : 0
+
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole", "sts:TagSession"]
+    principals {
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "cost_reader_assumer" {
+  count = local.enable_cloud_cost ? 1 : 0
+
+  name_prefix        = "${var.cluster_name}-cost-ro-"
+  assume_role_policy = data.aws_iam_policy_document.cost_reader_assumer_trust[0].json
+  tags               = var.tags
+}
+
+resource "aws_iam_role_policy" "cost_reader_assumer" {
+  count = local.enable_cloud_cost ? 1 : 0
+
+  name = "assume-mgmt-cost-reader"
+  role = aws_iam_role.cost_reader_assumer[0].id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "AssumeMgmtCostReader"
+        Effect   = "Allow"
+        Action   = "sts:AssumeRole"
+        Resource = [var.cost_reader_role_arn]
+      },
+    ]
+  })
+}
+
+resource "aws_eks_pod_identity_association" "opencost_cost_reader" {
+  count = local.enable_cloud_cost ? 1 : 0
+
+  cluster_name    = var.cluster_name
+  namespace       = var.namespace
+  service_account = "opencost" # chart's serviceAccountName defaults to the release name
+  role_arn        = aws_iam_role.cost_reader_assumer[0].arn
+  tags            = var.tags
+}
+
+resource "aws_eks_pod_identity_association" "true_cost_exporter" {
+  count = local.enable_cloud_cost ? 1 : 0
+
+  cluster_name    = var.cluster_name
+  namespace       = var.namespace
+  service_account = "true-cost-exporter"
+  role_arn        = aws_iam_role.cost_reader_assumer[0].arn
+  tags            = var.tags
 }

@@ -52,6 +52,23 @@ policy caught something or a background scan found drift — compliance evidence
   Reporter** dashboard folder (Overview / PolicyReport details / ClusterPolicyReport details) has the
   full breakdown by tenant/policy/severity/source.
 
+## true-cost-exporter
+
+Namespace `observability`, platform hub only (#668). A small long-running exporter that queries the
+mgmt-account CUR via Athena directly (cross-account AssumeRole → the `cost_reader` role, no static keys)
+and serves the results as Prometheus metrics — OpenCost's own `cloudCost` pipeline is wired for its own
+REST API but is **not** Prometheus-scrapeable, so this is the actual Grafana-visible true-cost path.
+Refreshes every 6h (CUR itself has ~24h lag); metrics: `platform_true_cost_monthly_usd{breakdown="team|service|account",label=...}`,
+`platform_true_cost_monthly_usd_total`, `platform_true_cost_compute_monthly_usd_total` (EC2-only, for
+reconciling against OpenCost's in-cluster node-price estimate), `platform_true_cost_exporter_last_success_timestamp_seconds`.
+
+- **TrueCostExporterDown** — the exporter pod itself is down. `kubectl get pods -n observability -l app=true-cost-exporter`.
+- **TrueCostExporterStale** — last successful Athena refresh was over 9h ago (missed a cycle). Check
+  `kubectl logs -n observability -l app=true-cost-exporter` — the two likely causes are the cross-account
+  AssumeRole failing (mgmt `cost_reader` trust policy, or this side's IAM role/Pod-Identity association)
+  or the Athena query itself failing (Glue table/workgroup name drift — the table name is
+  crawler-discovered, not Terraform-managed, and could change if the crawler re-classifies the data).
+
 ## argocd
 
 Namespace `argocd`. GitOps reconciliation.
