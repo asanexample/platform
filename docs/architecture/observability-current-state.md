@@ -22,11 +22,12 @@ On the **platform** cluster, in the **`observability`** namespace:
 | **K8s events → Loki** | Alloy singleton watching cluster Events → Loki | chart `alloy 1.10.0` | P3b — `enable_log_pipeline` |
 | **Grafana Tempo** | Traces store (`tempo-distributed`, minimized), S3-backed, **Pod Identity** | chart `tempo-distributed 2.25.5` (app 2.10.7, **grafana-community**) | P3b — `enable_tempo` |
 | **OpenTelemetry Collector** | Trace gateway (OTLP in → Tempo) | chart `opentelemetry-collector 0.158.2` | P3b — `enable_trace_pipeline` |
-| **Curated alerts** | 28 `PrometheusRule`s across 7 components (+ bundled mixins) | — | P4 |
+| **Curated alerts** | 31 `PrometheusRule`s across 8 components (+ bundled mixins) | — | P4 |
 | **Notifications** | `warning`→Slack · `critical`→SNS+Slack+PagerDuty · inhibition | — | P4; secrets via ESO |
 | **gp3 StorageClass** | cluster-default EBS storage (EBS CSI) | — | in the `eks-addons` unit |
 | **Grafana Mimir** | Durable, multi-tenant, S3-backed metrics store | chart `mimir-distributed 6.0.6` | P2 — **ON** on the platform hub (`enable_mimir=true`); Prometheus `remote_write`s here; the hub-and-spoke store |
 | **Prometheus agent (preprod spoke)** | kube-prometheus-stack agent mode (+ KSM + node-exporter) on **preprod**, `remote_write`s to the hub Mimir under tenant `preprod` | chart `kube-prometheus-stack 87.5.0` | P10 — `infra/modules/observability-prometheus-agent` |
+| **policy-reporter** | Watches Kyverno's PolicyReport/ClusterPolicyReport CRs → metrics + bundled Grafana dashboards (Overview/PolicyReport/ClusterPolicyReport, `$cluster` filter). Hub renders dashboards; the preprod spoke only emits metrics for the hub's federated view | chart `policy-reporter 3.7.4` | P12 — `enable_policy_reporting`, closes #93; on both platform + preprod |
 
 > **cost_profile (`common.hcl`/`_base.hcl`):** `dev` (default) = single-replica + durable stores **off**. The
 > platform cluster overrides `enable_mimir` / `enable_loki` / `enable_log_pipeline` / `enable_tempo` /
@@ -217,8 +218,8 @@ metrics use tenant **`platform`**. When spokes onboard (P10), each writes under 
 
 Bundled Prometheus mixin rules are on; **EKS-inaccurate groups are disabled** (`kubeScheduler`,
 `kubeControllerManager`, `kubeEtcd`, `kubeProxy`) — the managed control plane is unscrapeable and Cilium
-replaces kube-proxy. On top of the mixins, **28 curated `PrometheusRule`s** cover 7 components —
-cert-manager, kyverno, ArgoCD, Loki, Tempo, External Secrets, Cilium (+ Hubble) — each grounded in
+replaces kube-proxy. On top of the mixins, **31 curated `PrometheusRule`s** cover 8 components —
+cert-manager, kyverno, policy-reporter, ArgoCD, Loki, Tempo, External Secrets, Cilium (+ Hubble) — each grounded in
 live-verified metrics with a `runbook_url` → [`observability-alerts.md`](../runbooks/observability-alerts.md).
 Component metrics are scraped via the chart's `additionalServiceMonitors`/`additionalPodMonitors` (the
 Cilium/ESO chart ServiceMonitors are off or capability-gated, so we define them on the observability side —
@@ -304,7 +305,7 @@ gp3 is the cluster-**default** StorageClass (encrypted, expandable, WaitForFirst
 
 - **P3 (logs + traces) and P4 (alerting + notifications) are applied and live** on the platform cluster
   (PRs #596–#612): logs queryable in Grafana (Loki + Alloy + K8s events), traces flowing (Tempo + OTel
-  collector, with trace↔logs correlation), and 28 curated alerts routing to SNS / Slack / PagerDuty.
+  collector, with trace↔logs correlation), and 31 curated alerts routing to SNS / Slack / PagerDuty.
 - **Metrics run through Mimir on the platform hub** — `enable_mimir=true`, so Prometheus `remote_write`s to
   Mimir and **Mimir is Grafana's default metrics datasource** (full history on S3); the Prometheus datasource
   stays selectable for recent/local queries. The P2 Mimir path merged as PR #147. Known wrinkle when first
