@@ -12,11 +12,29 @@ locals {
 
   # Remote-write to the hub Mimir spoke-ingest edge. The hub Gateway force-sets X-Scope-OrgID per-hostname,
   # so we send NO tenant header here (any value would be overwritten at the edge). Empty url = off.
-  remote_write = var.remote_write_url != "" ? [{
+  _rw_cluster = var.remote_write_url != "" ? [{
     url = var.remote_write_url
     # Snappy-compressed by default; modest queue so a hub outage buffers in the WAL rather than dropping.
     queueConfig = { capacity = 10000, maxSamplesPerSend = 2000, maxShards = 10 }
+    # Uniform object shape (Terraform ?: rule): the per-team entry below carries writeRelabelConfigs, so this
+    # one carries an empty (no-op) list.
+    writeRelabelConfigs = []
   }] : []
+
+  # P13 per-team DUAL-WRITE (#590): a SECOND remote_write to cortex-tenant (via its own edge hostname), with a
+  # forced 2-step relabel that derives `route_tenant` from the namespace (unconditional `platform`, so a pod
+  # can't spoof it, then override to the team for env namespaces). cortex-tenant splits by route_tenant into
+  # per-team tenants. Additive: the cluster write above (the `preprod` tenant + all its consumers) is untouched.
+  _rw_per_team = var.per_team_write_url != "" ? [{
+    url         = var.per_team_write_url
+    queueConfig = { capacity = 10000, maxSamplesPerSend = 2000, maxShards = 10 }
+    writeRelabelConfigs = [
+      { sourceLabels = ["namespace"], regex = ".*", targetLabel = "route_tenant", replacement = "platform" },
+      { sourceLabels = ["namespace"], regex = "([a-z0-9]+)-[a-z0-9-]+-(dev|test|uat|staging|prod)", targetLabel = "route_tenant", replacement = "$1" },
+    ]
+  }] : []
+
+  remote_write = concat(local._rw_cluster, local._rw_per_team)
 
   # kube-state-metrics CustomResourceState (ADR-091): emit team_budget_monthly_usd{team} from the Team CR's
   # spec.envelope.budget.monthlyUSD — the single source — so the cost dashboard/alerts compare spend vs budget.
