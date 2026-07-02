@@ -58,8 +58,8 @@ locals {
   # One switch (cost_profile) sets the bundle; an explicit per-knob override wins over the preset.
   cost_profile = try(local.all_vars.cost_profile, "dev")
   _cost_profiles = {
-    dev  = { high_availability = false, single_az_nodes = true, enable_mimir = false, enable_loki = false, enable_log_pipeline = false, enable_tempo = false, enable_trace_pipeline = false, enable_cloud_metrics = false, enable_cost_metrics = false, enable_instrumentation = false, enable_pyroscope = false, enable_karpenter = true, enable_policy_reporting = false }
-    prod = { high_availability = true, single_az_nodes = false, enable_mimir = true, enable_loki = true, enable_log_pipeline = true, enable_tempo = true, enable_trace_pipeline = true, enable_cloud_metrics = true, enable_cost_metrics = true, enable_instrumentation = true, enable_pyroscope = true, enable_karpenter = true, enable_policy_reporting = true }
+    dev  = { high_availability = false, single_az_nodes = true, enable_mimir = false, enable_loki = false, enable_log_pipeline = false, enable_tempo = false, enable_trace_pipeline = false, enable_cloud_metrics = false, enable_cost_metrics = false, enable_instrumentation = false, enable_pyroscope = false, enable_karpenter = true, enable_policy_reporting = false, enable_per_team_tenants = false }
+    prod = { high_availability = true, single_az_nodes = false, enable_mimir = true, enable_loki = true, enable_log_pipeline = true, enable_tempo = true, enable_trace_pipeline = true, enable_cloud_metrics = true, enable_cost_metrics = true, enable_instrumentation = true, enable_pyroscope = true, enable_karpenter = true, enable_policy_reporting = true, enable_per_team_tenants = false }
   }
   _profile = local._cost_profiles[local.cost_profile]
 
@@ -76,6 +76,7 @@ locals {
   enable_cost_metrics     = try(local.all_vars.enable_cost_metrics, local._profile.enable_cost_metrics)
   enable_instrumentation  = try(local.all_vars.enable_instrumentation, local._profile.enable_instrumentation)
   enable_policy_reporting = try(local.all_vars.enable_policy_reporting, local._profile.enable_policy_reporting)
+  enable_per_team_tenants = try(local.all_vars.enable_per_team_tenants, local._profile.enable_per_team_tenants)
   node_arch               = try(local.all_vars.node_arch, "arm64")
 
   # EKS control-plane log types vended to CloudWatch. Defaults to [] (OFF) — the `audit`/`api` streams are billed

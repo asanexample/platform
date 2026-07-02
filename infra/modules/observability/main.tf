@@ -49,12 +49,27 @@ locals {
     size             = "5Gi"
   }
 
-  # Prometheus -> Mimir remote_write (durable multi-tenant store, #102 P2). Empty url = off (P1 behaviour);
-  # the X-Scope-OrgID header stamps the hub's own metrics into the tenant.
-  prometheus_remote_write = var.mimir_remote_write_url != "" ? [{
-    url     = var.mimir_remote_write_url
-    headers = { "X-Scope-OrgID" = var.mimir_tenant_id }
-  }] : []
+  # Prometheus -> Mimir remote_write (durable multi-tenant store, #102 P2). Empty url = off (P1 behaviour).
+  #
+  # Two modes:
+  #   • Direct (default): one static X-Scope-OrgID header stamps ALL hub metrics into `mimir_tenant_id`.
+  #   • Per-team (P13, #590): when cortex_tenant_write_url is set, write to cortex-tenant instead — a forced
+  #     2-step relabel derives a `tenant` label from the namespace (unconditional `platform` first, so a pod
+  #     can't spoof it, then override to the team for env namespaces), and cortex-tenant sets X-Scope-OrgID
+  #     per-series from that label. No request header (cortex-tenant owns it). On the hub, which has no env
+  #     namespaces, every series resolves to `platform` — behaviourally identical, but it proves the path.
+  prometheus_remote_write = var.mimir_remote_write_url == "" ? [] : (
+    var.cortex_tenant_write_url != "" ? [{
+      url = var.cortex_tenant_write_url
+      writeRelabelConfigs = [
+        { sourceLabels = ["namespace"], regex = ".*", targetLabel = "tenant", replacement = "platform" },
+        { sourceLabels = ["namespace"], regex = "([a-z0-9]+)-[a-z0-9-]+-(dev|test|uat|staging|prod)", targetLabel = "tenant", replacement = "$1" },
+      ]
+      }] : [{
+      url     = var.mimir_remote_write_url
+      headers = { "X-Scope-OrgID" = var.mimir_tenant_id }
+    }]
+  )
 
   # Slack/PagerDuty receivers wired when their secret names are provided (synced via External Secrets).
   slack_enabled = var.slack_webhook_secret_name != ""
