@@ -99,6 +99,30 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-02 — overnight PARK (platform + preprod), one `platctl down --env <env> --yes` each. ✅ Both
+  parked (node group `desiredSize=0`, bastion stopped/stopping, no lingering Karpenter EC2 capacity) — but a
+  stale-credential trap and a real Karpenter-drain warning surfaced. ⚠️ **NEW GOTCHA: stale static AWS creds
+  shadow `--profile` and survive a fresh `aws sso login`.** The shell environment had `AWS_ACCESS_KEY_ID` /
+  `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` exported from some prior session (not present in any dotfile
+  checked — `.zshrc`/`.zshenv`/`.zprofile` — so likely `launchctl setenv` or an inherited terminal-app env;
+  origin not tracked down). The AWS CLI/SDK prioritize these env vars over `--profile`/`AWS_PROFILE`, so every
+  `aws`/`kubectl`(exec-plugin) call hit `ExpiredTokenException` even immediately after a successful interactive
+  `aws sso login --profile management`. **Fix/workaround: `unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+  AWS_SESSION_TOKEN` in the SAME shell command as the `aws`/`kubectl`/`platctl` call** — each Bash tool
+  invocation is a fresh shell (no persisted state between calls), so the unset must be repeated per-command, not
+  once. This bit the **platform** park mid-run: the "delete NodePool" kubectl step failed with `ExpiredToken`
+  before the credentials were fixed, so the NodePool/EC2NodeClass CRs likely were **not** cleanly deleted (kubectl
+  went fully unreachable — confirmed via timeout, not just an error — once the system node group hit 0, so it
+  couldn't be verified or retried same-night). End state still looked healthy (EKS API: `system` nodegroup
+  desiredSize=0; zero `karpenter.sh/nodepool`-tagged EC2 instances running), but **next `platform` `up` should
+  explicitly check for the known NodeClass-survives-NodePool-recreation asymmetry** (see the 2026-06-27 entry
+  below) since this park may have left stale/partial CRs instead of a clean delete. **preprod** ran with creds
+  already fixed (backgrounded, no credential errors) but `platctl` itself surfaced two drain warnings: "Karpenter
+  NodeClaims still present after 6m" and "EC2NodeClass still present after 90s (finalizer stuck?)" — by the time
+  it was checked, the one lingering Karpenter instance was cleanly `shutting-down` (not stuck running) and the
+  bastion was `stopping`, so this looks like normal drain latency rather than a stuck finalizer, but **watch
+  `preprod` `up` for the same NodeClass-recreation asymmetry** as a precaution.
+
 - **2026-06-27 (same unpark) — the hub Mimir QUERY PATH was silently degraded: ALL queries via the mimir
   gateway returned EMPTY (raw metrics + recording rules), while the mimir-querier served them fine directly.**
   Found while debugging per-app SLOs (chased a phantom "ruler write-back" bug — the recording rules were actually
