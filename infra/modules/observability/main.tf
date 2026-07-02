@@ -64,9 +64,13 @@ locals {
   prometheus_remote_write = var.mimir_remote_write_url == "" ? [] : [{
     url     = local._per_team_write ? var.cortex_tenant_write_url : var.mimir_remote_write_url
     headers = local._per_team_write ? {} : { "X-Scope-OrgID" = var.mimir_tenant_id }
+    # Target label MUST match observability-cortex-tenant's routing_label (`route_tenant`) — deliberately
+    # NOT `tenant`, which Mimir/Loki already emit as a meaningful per-tenant self-metric dimension (routing
+    # on that name would clobber + strip it). cortex-tenant strips route_tenant after routing, so it is
+    # never stored; the native `tenant` label is left untouched.
     writeRelabelConfigs = local._per_team_write ? [
-      { sourceLabels = ["namespace"], regex = ".*", targetLabel = "tenant", replacement = "platform" },
-      { sourceLabels = ["namespace"], regex = "([a-z0-9]+)-[a-z0-9-]+-(dev|test|uat|staging|prod)", targetLabel = "tenant", replacement = "$1" },
+      { sourceLabels = ["namespace"], regex = ".*", targetLabel = "route_tenant", replacement = "platform" },
+      { sourceLabels = ["namespace"], regex = "([a-z0-9]+)-[a-z0-9-]+-(dev|test|uat|staging|prod)", targetLabel = "route_tenant", replacement = "$1" },
     ] : []
   }]
 

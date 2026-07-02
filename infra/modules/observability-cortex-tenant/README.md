@@ -8,13 +8,15 @@ what actually lands each team's metrics in its own Mimir tenant so there is some
 
 ```text
 Prometheus / spoke agent ──remote_write──▶ cortex-tenant ──┬─X-Scope-OrgID: alpha──▶ Mimir
-  (relabel sets `tenant`=team-from-ns)                     ├─X-Scope-OrgID: bravo──▶ Mimir
+  (relabel sets `route_tenant`=team-from-ns)                     ├─X-Scope-OrgID: bravo──▶ Mimir
                                                            └─X-Scope-OrgID: platform▶ Mimir (default: infra)
 ```
 
-cortex-tenant reads the `tenant` label off each series, forwards the series to Mimir with the
+cortex-tenant reads the `route_tenant` label off each series, forwards the series to Mimir with the
 matching `X-Scope-OrgID`, and **strips the label** (`label_remove`) so it is never stored. Series
-with no `tenant` label go to `default_tenant` (`platform`) rather than being dropped.
+with no `route_tenant` label go to `default_tenant` (`platform`) rather than being dropped. (The
+routing label is `route_tenant`, NOT `tenant` — Mimir/Loki emit their own meaningful `tenant` label
+on per-tenant self-metrics, which this leaves untouched.)
 
 ## Status — built, not yet wired (default OFF)
 
@@ -22,22 +24,22 @@ with no `tenant` label go to `default_tenant` (`platform`) rather than being dro
 changes no live behaviour. The write-path cut-over is deliberately a separate, monitored step
 because it reroutes the pipeline feeding every dashboard. The remaining wiring:
 
-1. **Relabel** on the hub Prometheus + preprod agent write path — set `tenant` from the namespace:
+1. **Relabel** on the hub Prometheus + preprod agent write path — set `route_tenant` from the namespace:
 
    ```yaml
    # writeRelabelConfigs (Prometheus remote_write / agent). TWO steps — the first is load-bearing:
-   # 1) FORCE tenant=platform for EVERY series, clobbering any `tenant` label a pod may have exposed.
-   #    (Without this, a pod in an infra ns exposing tenant="alpha" would route itself into alpha —
-   #    a spoof. The unconditional clobber is the anti-spoof; a single team-match rule is NOT enough.)
+   # 1) FORCE route_tenant=platform for EVERY series, clobbering any route_tenant a pod may have exposed.
+   #    (Without this, a pod exposing route_tenant="alpha" would route itself into alpha — a spoof. The
+   #    unconditional clobber is the anti-spoof; a single team-match rule is NOT enough.)
    - source_labels: [namespace]
      regex: '.*'
-     target_label: tenant
+     target_label: route_tenant
      replacement: platform
    # 2) Override to the team for environment namespaces (<team>-<product>-<stage>). Infra namespaces
    #    (kube-system, observability, …) don't match → stay on the platform tenant from step 1.
    - source_labels: [namespace]
      regex: '([a-z0-9]+)-[a-z0-9-]+-(dev|test|uat|staging|prod)'
-     target_label: tenant
+     target_label: route_tenant
      replacement: '$1'
    ```
 
@@ -109,7 +111,7 @@ No modules.
 | <a name="input_helm_timeout"></a> [helm\_timeout](#input\_helm\_timeout) | Timeout for Helm operations in seconds. | `number` | `600` | no |
 | <a name="input_namespace"></a> [namespace](#input\_namespace) | Namespace to deploy into (the shared observability namespace). | `string` | `"observability"` | no |
 | <a name="input_replicas"></a> [replicas](#input\_replicas) | cortex-tenant replicas. It is on the metrics write path, so run at least 2 for availability. | `number` | `2` | no |
-| <a name="input_routing_label"></a> [routing\_label](#input\_routing\_label) | The series label cortex-tenant reads to pick the tenant (config.tenant.label). A platform-controlled relabel on the Prometheus/agent write path sets this to the team-from-namespace; cortex-tenant routes on it and strips it (label\_remove) so it is never stored. Must be a NORMAL label (not `__`-prefixed — Prometheus drops meta-labels before remote\_write, so cortex-tenant would never see it). | `string` | `"tenant"` | no |
+| <a name="input_routing_label"></a> [routing\_label](#input\_routing\_label) | The series label cortex-tenant reads to pick the tenant (config.tenant.label). A platform-controlled relabel on the Prometheus/agent write path sets this to the team-from-namespace; cortex-tenant routes on it and strips it (label\_remove) so it is never stored. Must be a NORMAL label (not `__`-prefixed — Prometheus drops meta-labels before remote\_write). Deliberately NOT `tenant`: Mimir/Loki emit their own meaningful `tenant` label on per-tenant self-metrics, and routing on that name clobbers it (the forced relabel would overwrite + strip it). `route_tenant` is collision-free. | `string` | `"route_tenant"` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags/labels to apply. | `map(string)` | `{}` | no |
 
 ## Outputs
