@@ -25,6 +25,15 @@ dependency "eks" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+# Order after node groups — which itself follows Cilium (BYOCNI: CNI before nodes) — so the cluster can
+# actually schedule the descheduler pod and Cilium can hand it an IP before the helm wait. Ordering-only.
+dependency "node_groups" {
+  config_path = "../node-groups"
+
+  mock_outputs                            = {}
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
 generate "helm_provider" {
   path      = "helm-provider.tf"
   if_exists = "overwrite_terragrunt"
