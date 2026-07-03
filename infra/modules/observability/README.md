@@ -129,6 +129,7 @@ No modules.
 | [aws_secretsmanager_secret_version.grafana_admin](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [helm_release.kube_prometheus_stack](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
 | [kubernetes_config_map_v1.dashboards](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/config_map_v1) | resource |
+| [kubernetes_config_map_v1.team_dashboards](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/config_map_v1) | resource |
 | [kubernetes_manifest.alertmanager_healthchecks](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.alertmanager_pagerduty](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.alertmanager_slack_webhook](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
@@ -188,6 +189,7 @@ No modules.
 | <a name="input_slack_webhook_secret_name"></a> [slack\_webhook\_secret\_name](#input\_slack\_webhook\_secret\_name) | AWS Secrets Manager secret name holding the Slack incoming-webhook URL (JSON property 'url'). Empty disables the Slack receiver (SNS-only). Synced to Alertmanager via External Secrets — never enters Terraform state or helm values. | `string` | `""` | no |
 | <a name="input_storage_class"></a> [storage\_class](#input\_storage\_class) | StorageClass for Prometheus/Alertmanager/Grafana PVCs when use\_persistent\_storage = true. | `string` | `""` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags/labels to apply (sanitized to RFC-1123 for K8s labels). | `map(string)` | `{}` | no |
+| <a name="input_team_overview_teams"></a> [team\_overview\_teams](#input\_team\_overview\_teams) | Teams to render a pre-filtered `Team Overview — <team>` dashboard for (Teams folder). Each shows only that team's environment namespaces (<team>-*) — the lightweight default-view-per-team need. Empty = none. | `list(string)` | `[]` | no |
 | <a name="input_triage_webhook_url"></a> [triage\_webhook\_url](#input\_triage\_webhook\_url) | ADR-082: the triage agent's in-cluster webhook URL (e.g. http://triage-copilot-server.platform-agent-triage-copilot.svc.cluster.local/webhook). When set, a curated alert subset (critical) is fanned to the agent ADDITIVELY (continue=true, the alert still reaches SNS/Slack). Empty disables the triage receiver/route. | `string` | `""` | no |
 | <a name="input_use_persistent_storage"></a> [use\_persistent\_storage](#input\_use\_persistent\_storage) | Back Prometheus/Alertmanager/Grafana with PVCs (needs a default StorageClass). false = emptyDir/ephemeral (acceptable for the interim P1 local Prometheus; Mimir is durable from P2; Grafana's SQLite state — service accounts, API tokens, UI-created alert rules — is wiped on every pod restart without this, #1070). | `bool` | `false` | no |
 

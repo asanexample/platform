@@ -1,0 +1,101 @@
+{
+  "uid": "team-overview-__TEAM__",
+  "title": "Team Overview — __TEAM__",
+  "tags": ["team", "__TEAM__", "overview"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "editable": true,
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "1m",
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "label": "Datasource",
+        "query": "prometheus",
+        "regex": "/Mimir.*/",
+        "refresh": 1,
+        "hide": 0,
+        "current": { "text": "Mimir (all clusters)", "value": "mimir-all", "selected": true }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Running pods",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "decimals": 0 }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "expr": "count(kube_pod_status_phase{namespace=~\"__TEAM__-.*\", phase=\"Running\"} == 1)" } ]
+    },
+    {
+      "id": 2, "type": "stat", "title": "Environments",
+      "description": "Distinct namespaces (Environments) this team runs.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": { "defaults": { "decimals": 0 }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "expr": "count(count by (namespace) (kube_pod_info{namespace=~\"__TEAM__-.*\"}))" } ]
+    },
+    {
+      "id": 3, "type": "stat", "title": "Pod restarts (1h)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "decimals": 0, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 5 } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=~\"__TEAM__-.*\"}[1h]))" } ]
+    },
+    {
+      "id": 4, "type": "stat", "title": "Est. cost ($/mo)",
+      "description": "In-cluster compute cost for this team's environments (OpenCost allocation × node price).",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 0 }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "expr": "sum( (container_cpu_allocation{namespace=~\"__TEAM__-.*\"} * on(node) group_left() node_cpu_hourly_cost) + ((container_memory_allocation_bytes{namespace=~\"__TEAM__-.*\"} / 1024^3) * on(node) group_left() node_ram_hourly_cost) ) * 730" } ]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Request rate by environment (req/s)",
+      "description": "Beyla RED (http_server_request_duration). Empty if the team's services aren't HTTP or aren't instrumented yet.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 15 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "lastNotNull"] }, "tooltip": { "mode": "multi" } },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "expr": "sum by (namespace) (rate(http_server_request_duration_seconds_count{namespace=~\"__TEAM__-.*\"}[5m]))", "legendFormat": "{{namespace}}" } ]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "5xx error ratio by environment",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "custom": { "drawStyle": "line", "fillOpacity": 15 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi" } },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "expr": "sum by (namespace) (rate(http_server_request_duration_seconds_count{namespace=~\"__TEAM__-.*\", http_response_status_code=~\"5..\"}[5m])) / clamp_min(sum by (namespace) (rate(http_server_request_duration_seconds_count{namespace=~\"__TEAM__-.*\"}[5m])), 1)", "legendFormat": "{{namespace}}" } ]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "CPU usage by environment (cores)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 15, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean"] }, "tooltip": { "mode": "multi" } },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "expr": "sum by (namespace) (rate(container_cpu_usage_seconds_total{namespace=~\"__TEAM__-.*\", container!=\"\"}[5m]))", "legendFormat": "{{namespace}}" } ]
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "Memory usage by environment",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "drawStyle": "line", "fillOpacity": 15, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean"] }, "tooltip": { "mode": "multi" } },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "expr": "sum by (namespace) (container_memory_working_set_bytes{namespace=~\"__TEAM__-.*\", container!=\"\"})", "legendFormat": "{{namespace}}" } ]
+    }
+  ]
+}
