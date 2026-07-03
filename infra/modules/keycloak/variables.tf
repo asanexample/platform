@@ -128,8 +128,20 @@ variable "database" {
     mode         = optional(string, "in-cluster")
     instances    = optional(number, 1)
     storage_size = optional(string, "8Gi")
+    # Barman Cloud backups (#1119). enable_backups attaches the WAL archiver + creates the ObjectStore and a
+    # daily ScheduledBackup (rolls the instance once). destination_path = bucket ROOT (barman appends the
+    # server name = cluster) and must match the cluster's Pod-Identity role prefix scope.
+    enable_backups   = optional(bool, false)
+    destination_path = optional(string, "")
+    retention        = optional(string, "30d")
   })
   default = {}
+}
+
+variable "backup_schedule" {
+  description = "ScheduledBackup cron (CNPG 6-field, includes seconds). Top-level (not in the database object) so the cron renders in backticks — a cron inside a terraform-docs object-type block trips markdownlint MD037. Stagger across clusters to avoid simultaneous base backups."
+  type        = string
+  default     = "0 0 3 * * *"
 }
 
 variable "db_cluster_name" {

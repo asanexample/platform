@@ -128,6 +128,19 @@ inputs = {
   region                 = include.base.locals.region
   deployer_role_arn      = include.base.locals.deployer_role_arn
 
+  # Barman Cloud backups (#1119) — Keycloak's DB is the platform's identity source of truth (the highest-stakes
+  # to back up). destination_path = bucket ROOT (barman appends the cluster name → writes under keycloak-db/,
+  # this cluster's Pod-Identity role prefix). Staggered at 03:30 to avoid coinciding with the directory (03:00)
+  # and backstage (03:15) base backups.
+  database = {
+    mode             = "in-cluster"
+    instances        = 1
+    storage_size     = "8Gi"
+    enable_backups   = true
+    destination_path = "s3://platform-cnpg-backups"
+  }
+  backup_schedule = "0 30 3 * * *"
+
   # Seal the bootstrap-admin secret (ADR-087): only these three roles may read platform/keycloak/admin —
   # the deployer (Terraform reads it on apply), the External Secrets Operator role (syncs it into the cluster),
   # and OrganizationAccountAccessRole (break-glass). Everyone else — incl. AdministratorAccess — is denied.
