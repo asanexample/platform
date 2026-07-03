@@ -97,6 +97,12 @@ variable "database" {
   }
 }
 
+variable "backup_schedule" {
+  description = "ScheduledBackup cron (CNPG 6-field, includes seconds). Top-level (not in the database object) so the cron renders in backticks — a cron inside a terraform-docs object-type block trips markdownlint MD037. Stagger across clusters to avoid simultaneous base backups."
+  type        = string
+  default     = "0 0 3 * * *"
+}
+
 variable "db_cluster_name" {
   description = "Name of the CloudNativePG Cluster (in-cluster mode). CNPG creates <name>-rw Service + <name>-app Secret."
   type        = string

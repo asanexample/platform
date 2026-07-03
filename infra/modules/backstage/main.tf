@@ -380,7 +380,7 @@ resource "kubernetes_manifest" "scheduled_backup" {
     kind       = "ScheduledBackup"
     metadata   = { name = "${var.db_cluster_name}-daily", namespace = var.namespace }
     spec = {
-      schedule             = "0 0 3 * * *" # daily 03:00 (CNPG 6-field cron; hardcoded to keep the cron out of the terraform-docs table)
+      schedule             = var.backup_schedule
       backupOwnerReference = "self"
       cluster              = { name = var.db_cluster_name }
       method               = "plugin"
