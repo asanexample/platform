@@ -167,10 +167,11 @@ resource "kubernetes_manifest" "db_ingress" {
           # The CNPG operator manages the instance: status (8000, it polls /pg/status), metrics (9187), and
           # postgres (5432, operator-side management). The operator runs on hostNetwork (webhook_host_network),
           # so its traffic carries Cilium's `host`/`remote-node` identity (the node IP) — NOT the cnpg-system
-          # pod-namespace identity. Both entities are needed (operator may be co-located with the instance =
-          # host, or on another node = remote-node). fromEndpoints keeps a non-hostNetwork operator working too.
-          fromEntities  = ["host", "remote-node"]
-          fromEndpoints = [{ matchLabels = { "k8s:io.kubernetes.pod.namespace" = "cnpg-system" } }]
+          # pod-namespace identity. Both entities are needed (co-located with the instance = host, or another
+          # node = remote-node). NOTE: Cilium forbids combining fromEntities + fromEndpoints in ONE rule, and
+          # the operator is hostNetwork, so this is entities-only (a non-hostNetwork operator would need a
+          # separate fromEndpoints rule).
+          fromEntities = ["host", "remote-node"]
           toPorts = [{ ports = [
             { port = "8000", protocol = "TCP" },
             { port = "9187", protocol = "TCP" },
