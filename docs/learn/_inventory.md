@@ -60,9 +60,9 @@ module or deep dive, decided then.*
 
 | Module | Covers | Status |
 | --- | --- | --- |
-| **Delivery pipeline** | ArgoCD GitOps, registry-sync apps, per-Product ApplicationSets, cross-account cluster registration | ⏳ |
-| **Progressive delivery** | Argo Rollouts, canary / blue-green, metric-gated auto-rollback, error-budget freeze (ADR-056) | ⏳ |
-| **Promotion & release** | promote-by-digest, `Release` records, the auto ≤ staging / gated-prod ladder (ADR-071) | ⏳ |
+| **[Delivery](delivery/)** | built as *one combined module* — ArgoCD GitOps + per-Product ApplicationSets, the health-gated promotion ladder, and progressive (canary) rollout | ✅ |
+| **Progressive delivery** | Argo Rollouts, canary, weighted HTTPRoutes, metric-gated analysis (ADR-056) — *covered in the Delivery module; may split to its own deep dive* | ✅ |
+| **Promotion & release** | promote-by-digest, `Release` records, the auto ≤ staging / gated-prod ladder (ADR-071) — *covered in the Delivery module* | ✅ |
 | **Zero-downtime** | graceful drain, PDBs, topology spread, replica floor (ADR-085) — *a guide already exists* | ⏳ |
 
 ## 4 · Policy, supply chain & runtime security

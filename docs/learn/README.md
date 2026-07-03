@@ -25,7 +25,7 @@ Each subsystem is a short course: an **Orientation** (a guided journey you read 
 | --- | --- |
 | **[Domain model](domain-model/)** — Team / Product / Service / Environment: the shared vocabulary (**start here**) | ✅ available |
 | **[Environment API](environment-api/)** — how environments get provisioned (Crossplane) | ✅ available |
-| Delivery pipeline — git push → signed image in prod (ArgoCD, Rollouts) | ⏳ planned |
+| **[Delivery](delivery/)** — git → running across stages, safely (ArgoCD, the promotion ladder, Rollouts) | ✅ available |
 | Observability — the LGTM+P stack | ⏳ planned |
 | Policy & admission — Kyverno guardrails | ⏳ planned |
 | Identity & access — Keycloak, Pod Identity, temporary power | ⏳ planned |
