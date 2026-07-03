@@ -10,6 +10,17 @@ locals {
 
   in_cluster_db = var.database.mode == "in-cluster"
 
+  # Barman Cloud backups (#1119) for the in-cluster DB. backup_spec is merged into the Cluster spec so the
+  # WAL-archiver plugin is absent (no reconcile churn) unless backups are on.
+  db_backups_enabled = local.in_cluster_db && var.database.enable_backups
+  backup_spec = local.db_backups_enabled ? {
+    plugins = [{
+      name          = "barman-cloud.cloudnative-pg.io"
+      isWALArchiver = true
+      parameters    = { barmanObjectName = "${var.db_cluster_name}-backup" }
+    }]
+  } : {}
+
   # Postgres connection. in-cluster: CloudNativePG creates the `<cluster>-rw` Service (read-write primary)
   # and the `<cluster>-app` Secret (owner user/password/dbname). rds: host + a Secrets-Manager-backed
   # Secret (the unit wires an ExternalSecret) supply the creds.
@@ -304,7 +315,7 @@ resource "kubernetes_manifest" "db" {
       name      = var.db_cluster_name
       namespace = var.namespace
     }
-    spec = {
+    spec = merge({
       # imageName omitted → CNPG uses its default operand Postgres image for the operator version.
       instances = var.database.instances
       storage   = { size = var.database.storage_size }
@@ -333,10 +344,50 @@ resource "kubernetes_manifest" "db" {
           passwordSecret = { name = "${var.db_cluster_name}-app" }
         }]
       }
-    }
+    }, local.backup_spec)
   }
 
   depends_on = [kubernetes_namespace_v1.backstage]
+}
+
+# Barman Cloud backups (#1119): ObjectStore (S3 destination + retention; auth = inheritFromIAMRole via the
+# cluster's Pod-Identity backup role) + a daily ScheduledBackup. encryption AES256 → barman sends the SSE
+# header the org enforce-encryption SCP requires. destination_path is the bucket ROOT (barman appends the
+# server name = cluster).
+resource "kubernetes_manifest" "backup_object_store" {
+  count = local.create && local.db_backups_enabled ? 1 : 0
+  manifest = {
+    apiVersion = "barmancloud.cnpg.io/v1"
+    kind       = "ObjectStore"
+    metadata   = { name = "${var.db_cluster_name}-backup", namespace = var.namespace }
+    spec = {
+      retentionPolicy = var.database.retention
+      configuration = {
+        destinationPath = var.database.destination_path
+        s3Credentials   = { inheritFromIAMRole = true }
+        wal             = { compression = "gzip", encryption = "AES256" }
+        data            = { compression = "gzip", encryption = "AES256" }
+      }
+    }
+  }
+  depends_on = [kubernetes_namespace_v1.backstage]
+}
+
+resource "kubernetes_manifest" "scheduled_backup" {
+  count = local.create && local.db_backups_enabled ? 1 : 0
+  manifest = {
+    apiVersion = "postgresql.cnpg.io/v1"
+    kind       = "ScheduledBackup"
+    metadata   = { name = "${var.db_cluster_name}-daily", namespace = var.namespace }
+    spec = {
+      schedule             = var.database.schedule
+      backupOwnerReference = "self"
+      cluster              = { name = var.db_cluster_name }
+      method               = "plugin"
+      pluginConfiguration  = { name = "barman-cloud.cloudnative-pg.io" }
+    }
+  }
+  depends_on = [kubernetes_manifest.db, kubernetes_manifest.backup_object_store]
 }
 
 # ---------------------------------------------------------------------------

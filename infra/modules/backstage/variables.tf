@@ -82,6 +82,13 @@ variable "database" {
     mode         = optional(string, "in-cluster")
     instances    = optional(number, 1)
     storage_size = optional(string, "5Gi")
+    # Barman Cloud backups (#1119) for the in-cluster CNPG DB. enable_backups attaches the WAL archiver +
+    # creates the ObjectStore and a daily ScheduledBackup (rolls the instance once). destination_path must be
+    # the BUCKET ROOT (barman appends the server name = cluster) and match the cluster's Pod-Identity role scope.
+    enable_backups   = optional(bool, false)
+    destination_path = optional(string, "")
+    retention        = optional(string, "30d")
+    schedule         = optional(string, "0 0 3 * * *")
   })
   default = {}
 
