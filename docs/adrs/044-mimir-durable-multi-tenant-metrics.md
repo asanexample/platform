@@ -32,7 +32,10 @@ OSS.
 **sidecar per Prometheus** + store-gateway + querier federation — more moving parts to glue for a hub, and
 multi-tenancy is bolted on (per-tenant via external labels / receive) rather than first-class. Mimir's
 `X-Scope-OrgID` tenancy and single horizontally-scaled ingest path fit the hub-and-spoke + per-team goal more
-directly. Defensible either way; we optimized for native tenancy + a clean scale path.
+directly. Where Thanos *would* win: its Sidecar model queries existing Prometheis **in place** (no central
+remote-write/ingest tier to run), and it stays lean for a **single-tenant** fleet layered over an existing
+Prometheus — neither applies here, since we deliberately centralize writes and multi-tenancy is the point.
+Defensible either way; we optimized for native tenancy + a clean scale path.
 
 **3. Cortex (rejected).** Mimir *is* the Grafana fork of Cortex and is where the development happens;
 choosing Cortex would be choosing the less-maintained upstream.
