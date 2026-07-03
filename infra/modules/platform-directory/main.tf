@@ -117,8 +117,11 @@ resource "kubernetes_manifest" "backup_object_store" {
       configuration = {
         destinationPath = var.backup_destination_path
         s3Credentials   = { inheritFromIAMRole = true }
-        wal             = { compression = "gzip" }
-        data            = { compression = "gzip" }
+        # encryption AES256 → barman sends the x-amz-server-side-encryption header, which the org
+        # `enforce-encryption` SCP (DenyUnencryptedS3Uploads) requires (a Null test — the header must be
+        # present; bucket-default SSE does NOT satisfy it). Matches the bucket's SSE-S3.
+        wal  = { compression = "gzip", encryption = "AES256" }
+        data = { compression = "gzip", encryption = "AES256" }
       }
     }
   }
