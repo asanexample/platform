@@ -54,8 +54,9 @@ Secondary: **paved-road data & messaging services** (#9/#10, [#106]/[#107]) — 
 pattern proven for S3 in #64 is being generalized into a **self-service resource catalog** (S3/SQS/SNS/
 DynamoDB via curated Crossplane Compositions + derived least-privilege IAM, ADR-073, in progress). The
 **security-depth** items (#12, [#108]) have largely shipped — SBOM (cosign CycloneDX attest), **SLSA Build
-L3** (isolated provenance, ADR-042), runtime detection (Falco, ADR-045), and SAST (Semgrep in CI) —
-leaving SCA/cost-of-ownership depth as the tail.
+L3** (isolated provenance, ADR-042), runtime detection (Falco, ADR-045), SAST (Semgrep in CI), and
+**secret scanning** (gitleaks in CI over full history + pre-commit, #1148) — leaving SCA/cost-of-ownership
+depth as the tail.
 
 ## Beyond the CNCF lens — enterprise readiness
 
