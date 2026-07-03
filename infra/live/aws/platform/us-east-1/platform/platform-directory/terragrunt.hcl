@@ -79,5 +79,10 @@ inputs = {
   region                 = include.base.locals.region
   deployer_role_arn      = include.base.locals.deployer_role_arn
 
+  # Barman Cloud backups (#1119) — the activation_audit table (ADR-088) is durable, non-rebuildable governance
+  # data. Destination prefix must match the cluster's Pod-Identity backup role scope (cnpg-backups module).
+  enable_backups          = true
+  backup_destination_path = "s3://platform-cnpg-backups/triage-copilot-db"
+
   tags = include.base.locals.tags
 }

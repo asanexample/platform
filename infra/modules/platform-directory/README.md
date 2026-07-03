@@ -101,8 +101,10 @@ No modules.
 | [aws_secretsmanager_secret.db](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret_version.audit_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.db](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
+| [kubernetes_manifest.backup_object_store](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.db](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.db_ingress](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
+| [kubernetes_manifest.scheduled_backup](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_namespace_v1.this](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/namespace_v1) | resource |
 | [kubernetes_secret_v1.audit_role](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/secret_v1) | resource |
 | [kubernetes_secret_v1.db_role](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/secret_v1) | resource |
@@ -116,12 +118,16 @@ No modules.
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_audit_reader_secret_name"></a> [audit\_reader\_secret\_name](#input\_audit\_reader\_secret\_name) | Secrets Manager id for the activation-audit READER connection (Backstage; SELECT-only on activation\_audit). ADR-088 §3.6. | `string` | `"platform/backstage/audit-reader-db"` | no |
 | <a name="input_audit_writer_secret_name"></a> [audit\_writer\_secret\_name](#input\_audit\_writer\_secret\_name) | Secrets Manager id for the activation-audit WRITER connection (the operator; INSERT-only on activation\_audit). ADR-088 §3.6. | `string` | `"platform/activation-operator/audit-writer-db"` | no |
+| <a name="input_backup_destination_path"></a> [backup\_destination\_path](#input\_backup\_destination\_path) | S3 destination for backups + WALs, e.g. s3://platform-cnpg-backups/triage-copilot-db. Must match the prefix the cluster's Pod-Identity backup role is scoped to. Required when enable\_backups. | `string` | `""` | no |
+| <a name="input_backup_retention"></a> [backup\_retention](#input\_backup\_retention) | Barman retention policy (form XXu, u in [dwm]) — how long base backups + WALs are kept. | `string` | `"30d"` | no |
+| <a name="input_backup_schedule"></a> [backup\_schedule](#input\_backup\_schedule) | ScheduledBackup cron (CNPG 6-field, includes seconds). Default 03:00 daily. | `string` | `"0 0 3 * * *"` | no |
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | EKS cluster name (for the teardown finalizer-cleanup). | `string` | `""` | no |
 | <a name="input_consumer_namespace"></a> [consumer\_namespace](#input\_consumer\_namespace) | The namespace allowed to reach the DB on 5432 (the triage agent's). | `string` | `"platform-agent-triage-copilot"` | no |
 | <a name="input_create"></a> [create](#input\_create) | Whether to provision the directory database. | `bool` | `true` | no |
 | <a name="input_db_cluster_name"></a> [db\_cluster\_name](#input\_db\_cluster\_name) | CloudNativePG Cluster name. | `string` | `"triage-copilot-db"` | no |
 | <a name="input_db_secret_name"></a> [db\_secret\_name](#input\_db\_secret\_name) | Secrets Manager name for the published connection string (uri). | `string` | `"platform/triage-copilot/directory-db"` | no |
 | <a name="input_deployer_role_arn"></a> [deployer\_role\_arn](#input\_deployer\_role\_arn) | Deployer role ARN (for the teardown finalizer-cleanup). | `string` | `""` | no |
+| <a name="input_enable_backups"></a> [enable\_backups](#input\_enable\_backups) | Enable Barman Cloud backups (#1119): attach the WAL-archiver plugin to the Cluster + create the ObjectStore and a daily ScheduledBackup. Requires the barman-cloud plugin installed (cnpg module) and the cluster's Pod-Identity backup role (cnpg-backups module). Enabling ATTACHES the WAL archiver, which rolls the instance once. | `bool` | `false` | no |
 | <a name="input_extra_consumer_namespaces"></a> [extra\_consumer\_namespaces](#input\_extra\_consumer\_namespaces) | Additional namespaces allowed to reach the DB on 5432 — e.g. the activation operator's, which writes the governance audit (ADR-088 §3.6). | `list(string)` | `[]` | no |
 | <a name="input_finalizer_clear_script"></a> [finalizer\_clear\_script](#input\_finalizer\_clear\_script) | Non-empty enables the destroy-time teardown cleanup script. Only checked for non-emptiness — the script itself is resolved at run time via the checkout's own `git rev-parse --show-toplevel`, not this value, so a worktree's different absolute path can't force a spurious null\_resource replace. Kept as a path-shaped string for unit-wiring compatibility. | `string` | `""` | no |
 | <a name="input_instances"></a> [instances](#input\_instances) | CNPG instance count (1 = single; a rebuildable projection needs no HA). | `number` | `1` | no |

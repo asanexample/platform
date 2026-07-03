@@ -4,10 +4,23 @@
 # triage agent connects cross-namespace via Secrets Manager creds; its own namespace keeps EVERY tenant policy
 # intact (ADR-084 D13 — the directory stays out of the agent sandbox, no posture change for agents).
 #
-# Rebuildable projection of Keycloak (D11): no backups configured — it rebuilds from source.
+# The identity projection is a rebuildable view of Keycloak (D11) — but this DB also holds the ADR-088
+# activation_audit table (durable break-glass governance audit, NOT rebuildable from source), so Barman Cloud
+# backups + continuous WAL archiving are enabled when var.enable_backups (#1119). The activation_audit table is
+# the thing that must survive a lost PVC.
 
 locals {
   create = var.create
+
+  # Barman Cloud WAL archiver (#1119) — attached to the Cluster only when backups are on. Empty otherwise so
+  # the spec.plugins key is absent (no reconcile churn for backup-less consumers).
+  backup_spec = var.enable_backups ? {
+    plugins = [{
+      name          = "barman-cloud.cloudnative-pg.io"
+      isWALArchiver = true
+      parameters    = { barmanObjectName = "${var.db_cluster_name}-backup" }
+    }]
+  } : {}
 
   # Scoped activation-audit Postgres roles (ADR-088 §3.6 least-privilege): the operator writes as
   # `activation_writer` (INSERT-only on activation_audit), Backstage reads as `activation_reader` (SELECT-only)
@@ -62,7 +75,7 @@ resource "kubernetes_manifest" "db" {
     apiVersion = "postgresql.cnpg.io/v1"
     kind       = "Cluster"
     metadata   = { name = var.db_cluster_name, namespace = var.namespace }
-    spec = {
+    spec = merge({
       instances = var.instances
       storage   = { size = var.storage_size }
       # Keep Karpenter from voluntarily disrupting the node a Postgres instance runs on.
@@ -86,9 +99,48 @@ resource "kubernetes_manifest" "db" {
         }])
       }
       enableSuperuserAccess = false
-    }
+    }, local.backup_spec)
   }
   depends_on = [kubernetes_namespace_v1.this, kubernetes_secret_v1.db_role, kubernetes_secret_v1.audit_role]
+}
+
+# Barman Cloud backups (#1119): the ObjectStore holds the S3 destination + retention; auth is inheritFromIAMRole
+# (the cluster's instance SA is bound to a prefix-scoped backup role via Pod Identity — cnpg-backups module).
+resource "kubernetes_manifest" "backup_object_store" {
+  count = local.create && var.enable_backups ? 1 : 0
+  manifest = {
+    apiVersion = "barmancloud.cnpg.io/v1"
+    kind       = "ObjectStore"
+    metadata   = { name = "${var.db_cluster_name}-backup", namespace = var.namespace }
+    spec = {
+      retentionPolicy = var.backup_retention
+      configuration = {
+        destinationPath = var.backup_destination_path
+        s3Credentials   = { inheritFromIAMRole = true }
+        wal             = { compression = "gzip" }
+        data            = { compression = "gzip" }
+      }
+    }
+  }
+  depends_on = [kubernetes_namespace_v1.this]
+}
+
+# Daily base backup (continuous WAL archiving is automatic once the archiver plugin is attached above).
+resource "kubernetes_manifest" "scheduled_backup" {
+  count = local.create && var.enable_backups ? 1 : 0
+  manifest = {
+    apiVersion = "postgresql.cnpg.io/v1"
+    kind       = "ScheduledBackup"
+    metadata   = { name = "${var.db_cluster_name}-daily", namespace = var.namespace }
+    spec = {
+      schedule             = var.backup_schedule
+      backupOwnerReference = "self"
+      cluster              = { name = var.db_cluster_name }
+      method               = "plugin"
+      pluginConfiguration  = { name = "barman-cloud.cloudnative-pg.io" }
+    }
+  }
+  depends_on = [kubernetes_manifest.db, kubernetes_manifest.backup_object_store]
 }
 
 # Default-deny posture: allow ONLY the agent's namespace to reach the DB on 5432.
