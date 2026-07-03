@@ -416,3 +416,33 @@ groups:
           summary: "Alertmanager can't deliver to the triage agent webhook"
           description: "Alertmanager webhook notifications have failed over the last 15m — the triage copilot is not receiving critical alerts, so it can neither triage nor forward-capture eval fixtures (the corpus silently stops growing). Check the triage-copilot-server Service/pod and the observability→agent NetworkPolicy."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/agent-operations.md#capture-health"
+
+  - name: cloudnativepg.rules
+    rules:
+      - alert: CNPGInstanceDown
+        expr: cnpg_collector_up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CloudNativePG instance {{ $labels.namespace }}/{{ $labels.pod }} is down"
+          description: "The CNPG instance {{ $labels.pod }} in {{ $labels.namespace }} has reported not-up for 5m. For a single-instance cluster (keycloak-db, backstage-db, triage-copilot-db) this is a database outage — Keycloak DB down blips SSO platform-wide."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cloudnativepg"
+      - alert: CNPGWALArchivingFailing
+        expr: cnpg_collector_pg_wal_archive_status{value="ready"} > 5
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CloudNativePG WAL archiving is failing for {{ $labels.namespace }}/{{ $labels.pod }}"
+          description: "More than 5 WAL segments have been waiting to archive for 15m on {{ $labels.pod }} ({{ $labels.namespace }}) — Barman WAL archiving to S3 is failing or falling behind, so continuous backups / point-in-time recovery are broken and pg_wal will keep growing. Check the plugin-barman-cloud sidecar logs (barman-cloud-wal-archive) for the S3/IAM/SCP error. (The base-backup freshness metric is unusable with the Barman plugin — this is the primary backup-health signal.)"
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cloudnativepg"
+      - alert: CNPGCollectorErrors
+        expr: cnpg_collector_last_collection_error > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CloudNativePG metrics collector is erroring for {{ $labels.namespace }}/{{ $labels.pod }}"
+          description: "The in-instance CNPG metrics collector on {{ $labels.pod }} ({{ $labels.namespace }}) has been failing its collection query for 15m — usually a sign the database is unhealthy or unreachable even if the pod looks up. Early warning ahead of a hard outage."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cloudnativepg"

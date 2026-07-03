@@ -126,6 +126,26 @@ Namespace `kube-system`. The CNI / network plane — start with `cilium status` 
   excluded as expected). Start with `cilium monitor --type drop` to see drop reasons/identities, then chase
   the datapath/connectivity cause. Threshold is tunable in `curated.yaml` if it's noisy on a busier cluster.
 
+## CloudNativePG
+
+The platform's Postgres databases (Keycloak, Backstage, the triage-copilot identity directory) run as
+single-instance CloudNativePG clusters with Barman Cloud plugin backups to `s3://platform-cnpg-backups`
+(#1119). Metrics come from the per-instance `:9187` endpoint (the `cnpg-instances` PodMonitor); the operator's
+own metrics stay off (hostNetwork host-port collision).
+
+- **CNPGInstanceDown** (critical) — `cnpg_collector_up == 0` for 5m: the instance `{{ $labels.pod }}` is down.
+  Single-instance, so this is a DB outage (Keycloak DB down blips SSO platform-wide). Check the CNPG Cluster
+  status (`kubectl get cluster.postgresql.cnpg.io -A`), the instance pod, and its node/PVC.
+- **CNPGWALArchivingFailing** (critical) — `>5` WAL segments waiting to archive for 15m: Barman WAL archiving
+  to S3 is failing/behind, so continuous backups + PITR are broken and `pg_wal` keeps growing. Read the real
+  error in the **`plugin-barman-cloud`** sidecar logs (`kubectl logs <pod> -c plugin-barman-cloud | grep
+  barman-cloud-wal-archive`) — common causes: the `enforce-encryption` SCP (needs `encryption: AES256` on the
+  ObjectStore), a missing Pod-Identity association, or a bad `destinationPath`. **This is the primary
+  backup-health signal** — the base-backup freshness metrics (`cnpg_collector_last_available_backup_timestamp`)
+  are always `0` with the Barman plugin and are NOT usable. Base-backup success monitoring is a follow-up.
+- **CNPGCollectorErrors** (warning) — the in-instance metrics collector is erroring for 15m: usually the DB is
+  unhealthy/unreachable even if the pod looks up. Early warning ahead of a hard outage.
+
 ## Cloud resources
 
 AWS-resource metrics via **YACE** (the `cloudwatch-exporter` Deployment in `observability`; CloudWatch →
