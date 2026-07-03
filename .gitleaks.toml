@@ -1,0 +1,56 @@
+# gitleaks configuration for the platform repo (#1148).
+#
+# gitleaks scans commits (CI job `gitleaks git`, full history) and staged files (the pre-commit hook,
+# `gitleaks git --staged`) for committed credentials — a scanner backstop over the SOPS discipline +
+# review that ADR-066 describes, to catch a secret committed by mistake in plaintext.
+#
+# `useDefault = true` LAYERS our allowlist on top of gitleaks' bundled ruleset (~150 rules) rather than
+# replacing it — bump the pinned version in .github/workflows/ci.yml to pull newer rules.
+#
+# Allowlist policy: keep it TIGHT (a security gate is only useful if it stays fail-closed). Every entry
+# below is a verified false positive — encrypted material, placeholder templates, a vendored upstream
+# chart, or HCL that names a secret KEY / references a Terraform variable (never a literal credential).
+# Do NOT broaden it to silence a real finding — remediate the secret and rotate it instead
+# (docs/runbooks/kyverno-break-glass.md is the model for "don't weaken a control to fit one case").
+
+title = "platform gitleaks config"
+
+[extend]
+# Layer on top of gitleaks' bundled default ruleset (do not replace it).
+useDefault = true
+
+[[allowlists]]
+description = "SOPS-encrypted committed secrets (ADR-066) — ciphertext is committed on purpose; not a leak"
+# `paths` regexes match the file path, so EVERY finding in an encrypted file is suppressed
+# (the whole file is high-entropy ciphertext that trips the generic/entropy rules).
+paths = [
+  # Any SOPS-encrypted YAML/JSON, anywhere in the tree (e.g. infra/live/aws/secrets.enc.yaml, *.enc.yaml).
+  '''(^|/)[^/]*\.enc\.ya?ml$''',
+  '''(^|/)[^/]*\.enc\.json$''',
+]
+
+[[allowlists]]
+description = "Example / template secret files — placeholders, not real credentials"
+paths = [
+  # `*.example` templates (e.g. infra/live/aws/secrets.hcl.example, .platctl.yaml.example).
+  '''(^|/)[^/]*\.example$''',
+]
+
+[[allowlists]]
+description = "Vendored upstream chart (CloudNativePG barman-cloud plugin, release manifest verbatim) — the base64 'Secret' is a container image ref, not a credential"
+paths = [
+  '''^infra/modules/cloudnative-pg/charts/barman-cloud-plugin/''',
+]
+
+[[allowlists]]
+description = "HCL that NAMES a secret key or REFERENCES a Terraform variable — no literal credential on the line"
+# Match against the whole source line (default target is the captured secret).
+regexTarget = "line"
+regexes = [
+  # RHS is a bare Terraform reference (var./local./data./module.) — a reference can't be a hardcoded leak.
+  # e.g. argocd/main.tf  `secretKey = var.oidc_k8s_secret_key`  (ExternalSecret destination-key mapping).
+  '''=\s*(var|local|data|module)\.[A-Za-z0-9_.\[\]"']+\s*$''',
+  # The value is a secret KEY NAME, not the secret. e.g. backstage/main.tf `db_pass_key = ... "password"`,
+  # observability/main.tf `passwordKey = "admin-password"` (Grafana admin-secret key name).
+  '''\b(db_pass_key|passwordKey|userKey)\b\s*=''',
+]

@@ -22,3 +22,8 @@ output "cost_reader_role_arn" {
   description = "ARN of the cross-account read role OpenCost assumes (null when no trust principals are given)."
   value       = try(aws_iam_role.cost_reader[0].arn, null)
 }
+
+output "athena_results_location" {
+  description = "s3:// URI Athena writes query RESULTS to (the workgroup's configured output_location) — NOT the CUR data location, which is implicit in the Glue table."
+  value       = try(aws_athena_workgroup.cur[0].configuration[0].result_configuration[0].output_location, null)
+}

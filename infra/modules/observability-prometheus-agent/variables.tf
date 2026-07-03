@@ -37,6 +37,12 @@ variable "remote_write_url" {
   default     = ""
 }
 
+variable "per_team_write_url" {
+  description = "P13 per-team re-tenant (#590): the cortex-tenant ingest edge endpoint, e.g. https://preprod-tenant.aws.refplat.org/push. When set, the agent ADDITIONALLY remote_writes here with a forced namespace→route_tenant relabel, so cortex-tenant splits the spoke's metrics into per-team tenants — WITHOUT disturbing the primary force-stamped write to remote_write_url (the `preprod` tenant stays intact for the ruler/canary/cost consumers). Empty = single-write (unchanged)."
+  type        = string
+  default     = ""
+}
+
 # ---------------------------------------------------------------------------
 # Helm
 # ---------------------------------------------------------------------------

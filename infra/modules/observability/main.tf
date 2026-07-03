@@ -49,18 +49,40 @@ locals {
     size             = "5Gi"
   }
 
-  # Prometheus -> Mimir remote_write (durable multi-tenant store, #102 P2). Empty url = off (P1 behaviour);
-  # the X-Scope-OrgID header stamps the hub's own metrics into the tenant.
-  prometheus_remote_write = var.mimir_remote_write_url != "" ? [{
-    url     = var.mimir_remote_write_url
-    headers = { "X-Scope-OrgID" = var.mimir_tenant_id }
-  }] : []
+  # Prometheus -> Mimir remote_write (durable multi-tenant store, #102 P2). Empty url = off (P1 behaviour).
+  #
+  # Two modes:
+  #   • Direct (default): one static X-Scope-OrgID header stamps ALL hub metrics into `mimir_tenant_id`.
+  #   • Per-team (P13, #590): when cortex_tenant_write_url is set, write to cortex-tenant instead — a forced
+  #     2-step relabel derives a `tenant` label from the namespace (unconditional `platform` first, so a pod
+  #     can't spoof it, then override to the team for env namespaces), and cortex-tenant sets X-Scope-OrgID
+  #     per-series from that label. No request header (cortex-tenant owns it). On the hub, which has no env
+  #     namespaces, every series resolves to `platform` — behaviourally identical, but it proves the path.
+  # Both branches must yield the same object type (Terraform ?: rule), so `headers` and
+  # `writeRelabelConfigs` are always present — empty (no-op) in the mode that doesn't use them.
+  _per_team_write = var.cortex_tenant_write_url != ""
+  prometheus_remote_write = var.mimir_remote_write_url == "" ? [] : [{
+    url     = local._per_team_write ? var.cortex_tenant_write_url : var.mimir_remote_write_url
+    headers = local._per_team_write ? {} : { "X-Scope-OrgID" = var.mimir_tenant_id }
+    # Target label MUST match observability-cortex-tenant's routing_label (`route_tenant`) — deliberately
+    # NOT `tenant`, which Mimir/Loki already emit as a meaningful per-tenant self-metric dimension (routing
+    # on that name would clobber + strip it). cortex-tenant strips route_tenant after routing, so it is
+    # never stored; the native `tenant` label is left untouched.
+    writeRelabelConfigs = local._per_team_write ? [
+      { sourceLabels = ["namespace"], regex = ".*", targetLabel = "route_tenant", replacement = "platform" },
+      { sourceLabels = ["namespace"], regex = "([a-z0-9]+)-[a-z0-9-]+-(dev|test|uat|staging|prod)", targetLabel = "route_tenant", replacement = "$1" },
+    ] : []
+  }]
 
   # Slack/PagerDuty receivers wired when their secret names are provided (synced via External Secrets).
   slack_enabled = var.slack_webhook_secret_name != ""
   # ADR-082: fan a curated alert subset to the triage agent's in-cluster webhook (empty url = off).
   triage_enabled    = var.triage_webhook_url != ""
   pagerduty_enabled = var.pagerduty_routing_key_secret_name != ""
+  # Dead-man's switch (external heartbeat): route the always-firing Watchdog to an EXTERNAL Healthchecks.io
+  # check; if the pings stop (Prometheus/Alertmanager dead) Healthchecks pages — the one failure the in-cluster
+  # pipeline can't alert on itself.
+  deadman_enabled = var.healthchecks_ping_url_secret_name != ""
 
   # Grafana SSO via Keycloak OIDC (#592). On when an issuer is provided; the client secret syncs via ESO and
   # is injected as the GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET env (so it never enters grafana.ini / state).
@@ -117,8 +139,17 @@ locals {
     send_resolved    = true
   }
 
+  # Dead-man's switch receiver: on every Watchdog notification, POST to the external Healthchecks.io ping URL.
+  # url_file reads the ping URL from the ES-synced secret so it never enters state/helm values (like Slack's
+  # api_url_file). Healthchecks pages EXTERNALLY if the pings stop — detecting a dead in-cluster pipeline.
+  deadman_config = {
+    url_file      = "/etc/alertmanager/secrets/alertmanager-healthchecks/pingUrl"
+    send_resolved = false
+  }
+
   # Alertmanager routing (P4): critical → SNS + Slack, warning → Slack (SNS fallback when Slack is off);
-  # info/others → dashboard-only (null); Watchdog → null (external heartbeat is a follow-up). A critical
+  # info/others → dashboard-only (null); Watchdog → the external dead-man's switch (Healthchecks) when
+  # configured, else null. A critical
   # inhibits a matching warning (same namespace+alertname) so one incident doesn't double-notify. Each
   # receiver carries only the channels actually wired (SNS needs the topic+IRSA; Slack needs the secret);
   # with neither, the receivers are no-ops (== null).
@@ -134,7 +165,11 @@ locals {
       # curated subset (critical) to the agent's webhook ADDITIVELY — `continue = true` so the same alert still
       # flows on to the critical receiver (SNS/Slack/PagerDuty). The agent's own storm controls (ADR-080 D9) bound it.
       routes = concat(
-        [{ receiver = "null", matchers = ["alertname = \"Watchdog\""] }],
+        # Watchdog → the external dead-man's switch when configured (pinged every ~5m; Healthchecks pages if
+        # they stop), else → null. Never reaches triage/critical/warning (no `continue`).
+        [local.deadman_enabled
+          ? { receiver = "deadmanswitch", matchers = ["alertname = \"Watchdog\""], group_wait = "0s", group_interval = "1m", repeat_interval = "5m" }
+        : { receiver = "null", matchers = ["alertname = \"Watchdog\""], group_wait = "0s", group_interval = "1m", repeat_interval = "5m" }],
         local.triage_enabled ? [{ receiver = "triage", matchers = ["severity = \"critical\""], continue = true }] : [],
         [
           { receiver = "critical", matchers = ["severity = \"critical\""], continue = false },
@@ -156,6 +191,10 @@ locals {
       local.triage_enabled ? [{
         name            = "triage"
         webhook_configs = [{ url = var.triage_webhook_url, send_resolved = false }]
+      }] : [],
+      local.deadman_enabled ? [{
+        name            = "deadmanswitch"
+        webhook_configs = [local.deadman_config]
       }] : [],
       [
         {
@@ -300,6 +339,7 @@ locals {
         secrets = concat(
           local.slack_enabled ? ["alertmanager-slack-webhook"] : [],
           local.pagerduty_enabled ? ["alertmanager-pagerduty"] : [],
+          local.deadman_enabled ? ["alertmanager-healthchecks"] : [],
         )
       }
       serviceAccount = {
@@ -622,6 +662,28 @@ resource "kubernetes_config_map_v1" "dashboards" {
   }
 }
 
+# Per-team overview dashboards (one per team in `team_overview_teams`) — each pre-filtered to that team's
+# environment namespaces (`<team>-*`), rendered from dashboards/team-overview.json.tmpl. A team opens its
+# own "Team Overview — <team>" (Teams folder) for a default view of only its workloads (soft: teams can
+# still open others). Team-specific dashboards, no per-user datasource gating (#590 read isolation is the
+# hard-enforcement variant; this is the lightweight default-view need).
+resource "kubernetes_config_map_v1" "team_dashboards" {
+  for_each = local.create ? toset(var.team_overview_teams) : toset([])
+
+  metadata {
+    name        = "obs-dashboard-team-overview-${each.value}"
+    namespace   = kubernetes_namespace_v1.this[0].metadata[0].name
+    labels      = merge(local.k8s_labels, { grafana_dashboard = "1" })
+    annotations = { grafana_folder = "Teams" }
+  }
+  data = {
+    "team-overview-${each.value}.json" = replace(
+      file("${path.module}/dashboards/team-overview.json.tmpl"),
+      "__TEAM__", each.value
+    )
+  }
+}
+
 # ---------------------------------------------------------------------------
 # Alertmanager → SNS publish; AWS identity via EKS Pod Identity (ADR-047)
 # ---------------------------------------------------------------------------
@@ -800,6 +862,7 @@ resource "helm_release" "kube_prometheus_stack" {
     aws_iam_role_policy.alertmanager_sns,
     kubernetes_manifest.alertmanager_slack_webhook,
     kubernetes_manifest.alertmanager_pagerduty,
+    kubernetes_manifest.alertmanager_healthchecks,
     kubernetes_manifest.grafana_oidc_secret,
     aws_eks_pod_identity_association.grafana_cloudwatch,
     aws_eks_pod_identity_association.alertmanager,
@@ -865,6 +928,64 @@ resource "kubernetes_manifest" "alertmanager_pagerduty" {
   }
 
   depends_on = [kubernetes_namespace_v1.this]
+}
+
+# Dead-man's switch ping URL, synced from Secrets Manager. The SM secret MUST exist before this is enabled
+# (creationPolicy Owner + the Alertmanager mount) — else the ExternalSecret can't sync and Alertmanager fails
+# to start. See the healthchecks_ping_url_secret_name variable's activation note.
+resource "kubernetes_manifest" "alertmanager_healthchecks" {
+  count = local.deadman_enabled ? 1 : 0
+
+  manifest = {
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = "alertmanager-healthchecks"
+      namespace = var.namespace
+    }
+    spec = {
+      refreshInterval = "1h"
+      secretStoreRef  = { name = var.secret_store_name, kind = "ClusterSecretStore" }
+      target          = { name = "alertmanager-healthchecks", creationPolicy = "Owner" }
+      data = [{
+        secretKey = "pingUrl"
+        remoteRef = { key = var.healthchecks_ping_url_secret_name, property = "pingUrl" }
+      }]
+    }
+  }
+
+  depends_on = [kubernetes_namespace_v1.this]
+}
+
+# ---------------------------------------------------------------------------
+# CloudNativePG instance metrics (#1119 PR4)
+# ---------------------------------------------------------------------------
+# Scrape the per-instance CNPG metrics endpoint (:9187, cnpg_collector_* — backup freshness, WAL archiving,
+# cluster health, connections) that the CNPG backup/health alerts need. The operator's own metrics stay off
+# (hostNetwork host-port collision). One PodMonitor for cnpg.io/podRole=instance pods in ALL namespaces (this
+# stack's podMonitorSelector/namespaceSelector are empty = select all). Lives here (not the cloudnative-pg
+# module) because that unit configures only the helm provider; kubernetes_manifest needs the kubernetes
+# provider this module has. A namespace that default-denies ingress to its DB must admit observability on 9187
+# (platform-directory does). CNPG serves :9187 on every instance, so no per-Cluster spec.monitoring change.
+resource "kubernetes_manifest" "cnpg_instance_pod_monitor" {
+  count = local.create && var.enable_cnpg_pod_monitor ? 1 : 0
+
+  manifest = {
+    apiVersion = "monitoring.coreos.com/v1"
+    kind       = "PodMonitor"
+    metadata = {
+      name      = "cnpg-instances"
+      namespace = var.namespace
+      labels    = local.k8s_labels
+    }
+    spec = {
+      namespaceSelector   = { any = true }
+      selector            = { matchLabels = { "cnpg.io/podRole" = "instance" } }
+      podMetricsEndpoints = [{ port = "metrics" }]
+    }
+  }
+
+  depends_on = [helm_release.kube_prometheus_stack]
 }
 
 # ---------------------------------------------------------------------------

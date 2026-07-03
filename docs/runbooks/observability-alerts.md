@@ -52,6 +52,23 @@ policy caught something or a background scan found drift — compliance evidence
   Reporter** dashboard folder (Overview / PolicyReport details / ClusterPolicyReport details) has the
   full breakdown by tenant/policy/severity/source.
 
+## true-cost-exporter
+
+Namespace `observability`, platform hub only (#668). A small long-running exporter that queries the
+mgmt-account CUR via Athena directly (cross-account AssumeRole → the `cost_reader` role, no static keys)
+and serves the results as Prometheus metrics — OpenCost's own `cloudCost` pipeline is wired for its own
+REST API but is **not** Prometheus-scrapeable, so this is the actual Grafana-visible true-cost path.
+Refreshes every 6h (CUR itself has ~24h lag); metrics: `platform_true_cost_monthly_usd{breakdown="team|service|account",label=...}`,
+`platform_true_cost_monthly_usd_total`, `platform_true_cost_compute_monthly_usd_total` (EC2-only, for
+reconciling against OpenCost's in-cluster node-price estimate), `platform_true_cost_exporter_last_success_timestamp_seconds`.
+
+- **TrueCostExporterDown** — the exporter pod itself is down. `kubectl get pods -n observability -l app=true-cost-exporter`.
+- **TrueCostExporterStale** — last successful Athena refresh was over 9h ago (missed a cycle). Check
+  `kubectl logs -n observability -l app=true-cost-exporter` — the two likely causes are the cross-account
+  AssumeRole failing (mgmt `cost_reader` trust policy, or this side's IAM role/Pod-Identity association)
+  or the Athena query itself failing (Glue table/workgroup name drift — the table name is
+  crawler-discovered, not Terraform-managed, and could change if the crawler re-classifies the data).
+
 ## argocd
 
 Namespace `argocd`. GitOps reconciliation.
@@ -89,7 +106,7 @@ Namespace `external-secrets`. The Secrets-Manager → Kubernetes sync path that 
   `SecretSyncError` reason (missing SM key, IAM/Pod-Identity perms, store unreachable).
 - **ClusterSecretStoreNotReady** — the `ClusterSecretStore` is `Ready=False`; the AWS provider can't auth
   or reach Secrets Manager. Check the store's status and the ESO controller's AWS credentials
-  (Pod Identity / IRSA).
+  (EKS Pod Identity, ADR-047 — not IRSA).
 
 ## Cilium
 
@@ -108,6 +125,26 @@ Namespace `kube-system`. The CNI / network plane — start with `cilium status` 
 - **CiliumHighDropRate** — sustained non-policy packet drops (>10/s for 15m; policy-denied drops are
   excluded as expected). Start with `cilium monitor --type drop` to see drop reasons/identities, then chase
   the datapath/connectivity cause. Threshold is tunable in `curated.yaml` if it's noisy on a busier cluster.
+
+## CloudNativePG
+
+The platform's Postgres databases (Keycloak, Backstage, the triage-copilot identity directory) run as
+single-instance CloudNativePG clusters with Barman Cloud plugin backups to `s3://platform-cnpg-backups`
+(#1119). Metrics come from the per-instance `:9187` endpoint (the `cnpg-instances` PodMonitor); the operator's
+own metrics stay off (hostNetwork host-port collision).
+
+- **CNPGInstanceDown** (critical) — `cnpg_collector_up == 0` for 5m: the instance `{{ $labels.pod }}` is down.
+  Single-instance, so this is a DB outage (Keycloak DB down blips SSO platform-wide). Check the CNPG Cluster
+  status (`kubectl get cluster.postgresql.cnpg.io -A`), the instance pod, and its node/PVC.
+- **CNPGWALArchivingFailing** (critical) — `>5` WAL segments waiting to archive for 15m: Barman WAL archiving
+  to S3 is failing/behind, so continuous backups + PITR are broken and `pg_wal` keeps growing. Read the real
+  error in the **`plugin-barman-cloud`** sidecar logs (`kubectl logs <pod> -c plugin-barman-cloud | grep
+  barman-cloud-wal-archive`) — common causes: the `enforce-encryption` SCP (needs `encryption: AES256` on the
+  ObjectStore), a missing Pod-Identity association, or a bad `destinationPath`. **This is the primary
+  backup-health signal** — the base-backup freshness metrics (`cnpg_collector_last_available_backup_timestamp`)
+  are always `0` with the Barman plugin and are NOT usable. Base-backup success monitoring is a follow-up.
+- **CNPGCollectorErrors** (warning) — the in-instance metrics collector is erroring for 15m: usually the DB is
+  unhealthy/unreachable even if the pod looks up. Early warning ahead of a hard outage.
 
 ## Cloud resources
 
@@ -159,7 +196,7 @@ Secrets Manager by **External Secrets**, mounted into Alertmanager (`alertmanage
 
 ### ⚠️ Secrets must live under the `platform/` prefix
 
-ESO's IRSA is scoped to `secret:platform/*` (the `external-secrets` unit sets `secret_path_prefix=platform`).
+ESO's Pod Identity role is scoped to `secret:platform/*` (the `external-secrets` unit sets `secret_path_prefix=platform`).
 **Any Secrets-Manager secret ESO syncs must be named `platform/…`** or the ExternalSecret fails with
 `AccessDenied` and the Alertmanager pod gets stuck mounting the missing K8s secret. Current secrets:
 

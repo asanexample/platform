@@ -137,10 +137,23 @@ Pod Identity agent.
 ### IMDS protection
 
 Environment pods are blocked from stealing the node IAM role via IMDS (`169.254.169.254`) by
-**IMDSv2 hop-limit = 1** on the node (`HttpPutResponseHopLimit=1` in the launch template).
-This holds under overlay: link-local is not masqueraded, so a pod's IMDSv2 token request
-is >1 hop and the token response never reaches it. (Validated: a `team-*` pod gets a `401`
-on a metadata GET but no IMDSv2 token.)
+**two independent controls** (defense-in-depth):
+
+1. **Explicit Cilium `egressDeny` (hard control).** The Environment Composition renders a
+   `deny-imds-egress` CiliumNetworkPolicy into every environment namespace that denies pod egress
+   to `169.254.169.254/32` (and the IPv6 IMDS `fd00:ec2::254/128`). A Cilium deny rule takes strict
+   precedence over every allow — including the `allow-pod-identity-egress` `toEntities: [host]:80`
+   rule, which would otherwise re-open IMDS since IMDS is a host-local address — and matches purely
+   by destination CIDR, so it holds regardless of masquerade/SNAT or hop-limit behaviour. The Pod
+   Identity agent (`169.254.170.23`) is a different link-local address, not in the deny set, so
+   workload credential fetch (ADR-041) is unaffected.
+2. **IMDSv2 hop-limit = 1 (node backstop).** `HttpPutResponseHopLimit=1` in the launch template.
+   Under overlay this holds because link-local is not masqueraded, so a pod's IMDSv2 token request
+   is >1 hop and the token response never reaches it. (Validated: a `team-*` pod gets a `401` on a
+   metadata GET but no IMDSv2 token.)
+
+The explicit deny (control 1) means IMDS protection no longer *depends* on the hop-limit +
+masquerade behaviour holding — see issue #160.
 
 ### Node Security Groups
 

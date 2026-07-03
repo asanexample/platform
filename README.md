@@ -248,7 +248,7 @@ cd infra/tests/aws/networking && go test -v -timeout 30m
 ```
 
 CI (GitHub Actions, via OIDC — no stored credentials) runs OpenTofu/Terragrunt fmt + validate, TFLint, Kyverno
-policy tests, and security scanning (Trivy IaC, Semgrep). Cluster-facing applies run on the in-VPC self-hosted
+policy tests, and security scanning (Trivy IaC, Semgrep SAST, gitleaks secret scanning). Cluster-facing applies run on the in-VPC self-hosted
 runners (ARC, [ADR-065](docs/adrs/065-self-hosted-github-actions-runners-arc.md)).
 
 ## Where it's heading

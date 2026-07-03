@@ -136,6 +136,27 @@ groups:
           description: "{{ $labels.cluster }}: cluster-scoped policy {{ $labels.policy }} ({{ $labels.source }}, severity {{ $labels.severity }}) has had a fail/error PolicyReport result for 15m."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#policy-reporter"
   # ---------------------------------------------------------------------------
+  - name: true-cost.rules
+    rules:
+      - alert: TrueCostExporterDown
+        expr: up{job="true-cost-exporter"} == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: true-cost-exporter is down
+          description: "true-cost-exporter (#668) has been down for 15m — true-cloud-cost (CUR/Athena) metrics and dashboard panels will be stale."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#true-cost-exporter"
+      - alert: TrueCostExporterStale
+        expr: time() - platform_true_cost_exporter_last_success_timestamp_seconds > 32400
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: true-cost-exporter data is stale
+          description: "true-cost-exporter's last successful Athena refresh was over 9h ago (it refreshes every 6h) — likely a cross-account AssumeRole or Athena query failure. Check exporter logs."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#true-cost-exporter"
+  # ---------------------------------------------------------------------------
   - name: argocd.rules
     rules:
       - alert: ArgoCDComponentDown
@@ -166,13 +187,29 @@ groups:
           description: "ArgoCD application {{ $labels.name }} has been OutOfSync for 15m — a manual change or a failing auto-sync."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#argocd"
       - alert: ArgoCDRepoServerGitErrors
+        # CRITICAL (was warning): a repo the repo-server can't read blinds the WHOLE delivery plane for that
+        # repo — manifests can't be generated, so apps silently stop deploying (a 6-day outage 2026-07-02 was
+        # exactly this, but warning-severity ⇒ it never paged). See #1120/#1124.
         expr: increase(argocd_git_lsremote_fail_total[15m]) > 0
         for: 15m
         labels:
-          severity: warning
+          severity: critical
         annotations:
           summary: "ArgoCD git ls-remote failures ({{ $labels.repo }})"
-          description: "ArgoCD repo-server is failing git ls-remote against {{ $labels.repo }} — repo connectivity/credentials issue."
+          description: "ArgoCD repo-server is failing git ls-remote against {{ $labels.repo }} — repo connectivity/credentials issue. Manifest generation for apps sourcing this repo is BROKEN; they will not deploy until fixed."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#argocd"
+      - alert: ArgoCDAppSyncUnknown
+        # The blind spot that hid the 2026-07-02 outage: an app stuck sync=Unknown (a ComparisonError — repo
+        # unreadable / manifest gen failing) is NEITHER Synced NOR OutOfSync, so ArgoCDAppOutOfSync misses it,
+        # and its live state can stay Healthy so ArgoCDAppDegraded misses it too. for=1h filters the brief
+        # Unknown during a normal sync. See #1121/#1124.
+        expr: argocd_app_info{sync_status="Unknown"} > 0
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "ArgoCD app {{ $labels.name }} sync status Unknown"
+          description: "ArgoCD application {{ $labels.name }} (project {{ $labels.project }}) has been sync=Unknown for 1h — ArgoCD cannot compare against git (a ComparisonError: unreadable repo, failing manifest generation, or a plugin error), so it is NOT deploying new revisions even while the running pods look Healthy."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#argocd"
   # ---------------------------------------------------------------------------
   - name: loki.rules
@@ -247,19 +284,24 @@ groups:
   - name: external-secrets.rules
     rules:
       - alert: ExternalSecretNotReady
+        # CRITICAL (was warning): a not-Ready ExternalSecret means a K8s Secret has stopped syncing from
+        # the backend store — dependent workloads break on the next restart/rotation (auth, DB creds, tokens).
+        # Silent-as-warning is how a credential outage hides. See #1120/#1124.
         expr: externalsecret_status_condition{condition="Ready",status="False"} == 1
         for: 15m
         labels:
-          severity: warning
+          severity: critical
         annotations:
           summary: "ExternalSecret {{ $labels.namespace }}/{{ $labels.name }} not Ready"
           description: "ExternalSecret {{ $labels.namespace }}/{{ $labels.name }} has been Ready=False for 15m — the Secrets Manager → K8s sync is failing (downstream secrets go stale)."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#external-secrets"
       - alert: ClusterSecretStoreNotReady
+        # CRITICAL (was warning): the store is the source for EVERY ExternalSecret — if it's not Ready, ALL
+        # secret syncing is broken cluster-wide, so this is broader than a single ExternalSecret. See #1120/#1124.
         expr: clustersecretstore_status_condition{condition="Ready",status="False"} == 1
         for: 15m
         labels:
-          severity: warning
+          severity: critical
         annotations:
           summary: "ClusterSecretStore {{ $labels.name }} not Ready"
           description: "ClusterSecretStore {{ $labels.name }} has been Ready=False for 15m — everything that syncs secrets through it is affected."
@@ -374,3 +416,33 @@ groups:
           summary: "Alertmanager can't deliver to the triage agent webhook"
           description: "Alertmanager webhook notifications have failed over the last 15m — the triage copilot is not receiving critical alerts, so it can neither triage nor forward-capture eval fixtures (the corpus silently stops growing). Check the triage-copilot-server Service/pod and the observability→agent NetworkPolicy."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/agent-operations.md#capture-health"
+
+  - name: cloudnativepg.rules
+    rules:
+      - alert: CNPGInstanceDown
+        expr: cnpg_collector_up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CloudNativePG instance {{ $labels.namespace }}/{{ $labels.pod }} is down"
+          description: "The CNPG instance {{ $labels.pod }} in {{ $labels.namespace }} has reported not-up for 5m. For a single-instance cluster (keycloak-db, backstage-db, triage-copilot-db) this is a database outage — Keycloak DB down blips SSO platform-wide."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cloudnativepg"
+      - alert: CNPGWALArchivingFailing
+        expr: cnpg_collector_pg_wal_archive_status{value="ready"} > 5
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CloudNativePG WAL archiving is failing for {{ $labels.namespace }}/{{ $labels.pod }}"
+          description: "More than 5 WAL segments have been waiting to archive for 15m on {{ $labels.pod }} ({{ $labels.namespace }}) — Barman WAL archiving to S3 is failing or falling behind, so continuous backups / point-in-time recovery are broken and pg_wal will keep growing. Check the plugin-barman-cloud sidecar logs (barman-cloud-wal-archive) for the S3/IAM/SCP error. (The base-backup freshness metric is unusable with the Barman plugin — this is the primary backup-health signal.)"
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cloudnativepg"
+      - alert: CNPGCollectorErrors
+        expr: cnpg_collector_last_collection_error > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CloudNativePG metrics collector is erroring for {{ $labels.namespace }}/{{ $labels.pod }}"
+          description: "The in-instance CNPG metrics collector on {{ $labels.pod }} ({{ $labels.namespace }}) has been failing its collection query for 15m — usually a sign the database is unhealthy or unreachable even if the pod looks up. Early warning ahead of a hard outage."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cloudnativepg"

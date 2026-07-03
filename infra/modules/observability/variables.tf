@@ -208,6 +208,12 @@ variable "pagerduty_routing_key_secret_name" {
   default     = ""
 }
 
+variable "healthchecks_ping_url_secret_name" {
+  description = "Dead-man's switch (external heartbeat). AWS Secrets Manager secret name holding an external Healthchecks.io ping URL (JSON property 'pingUrl'). When set, the always-firing Watchdog alert is routed to that URL on a short repeat_interval; if Prometheus/Alertmanager dies the pings STOP and Healthchecks.io pages externally — the one failure the in-cluster pipeline can't alert on itself. Empty disables it (Watchdog → null). Synced via External Secrets — never enters state/helm values. ACTIVATION: create the Secrets Manager secret FIRST (else the ExternalSecret can't sync and Alertmanager fails to mount it), then set this."
+  type        = string
+  default     = ""
+}
+
 variable "secret_store_name" {
   description = "Name of the External Secrets ClusterSecretStore (AWS Secrets Manager)."
   type        = string
@@ -268,4 +274,22 @@ variable "gateway_service_namespace" {
   description = "Namespace of the Cilium gateway Service."
   type        = string
   default     = "default"
+}
+
+variable "team_overview_teams" {
+  description = "Teams to render a pre-filtered `Team Overview — <team>` dashboard for (Teams folder). Each shows only that team's environment namespaces (<team>-*) — the lightweight default-view-per-team need. Empty = none."
+  type        = list(string)
+  default     = []
+}
+
+variable "cortex_tenant_write_url" {
+  description = "P13 per-team re-tenant (#590): when set, hub Prometheus remote_writes to cortex-tenant at this URL (with a forced namespace→`tenant` relabel) instead of directly to Mimir, so metrics are split into per-team tenants. Empty = direct single-tenant write (the mimir_tenant_id header). See observability-cortex-tenant."
+  type        = string
+  default     = ""
+}
+
+variable "enable_cnpg_pod_monitor" {
+  description = "Create a PodMonitor that scrapes CloudNativePG per-instance metrics (:9187, cnpg_collector_*) across all namespaces — feeds the CNPG backup/health alerts (#1119)."
+  type        = bool
+  default     = true
 }

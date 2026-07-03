@@ -359,7 +359,7 @@
       "id": 8,
       "type": "timeseries",
       "title": "Human verdicts",
-      "description": "Volume of human verdicts on triages over time (accept / correct / dismiss) — the online calibration signal.",
+      "description": "Volume of human verdicts on triages over time (accept / correct / dismiss) \u2014 the online calibration signal.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -408,7 +408,7 @@
       "id": 9,
       "type": "timeseries",
       "title": "Accept-rate by disposition",
-      "description": "Human-accept fraction per triage disposition (0–1) — the calibration signal. Of all human verdicts on triages of a given disposition (confident_lead / weak_leads / insufficient_evidence), the share that were 'accept'. Confident_leads should be accepted at a high rate; a low accept-rate there means the agent is over-confident.",
+      "description": "Human-accept fraction per triage disposition (0\u20131) \u2014 the calibration signal. Of all human verdicts on triages of a given disposition (confident_lead / weak_leads / insufficient_evidence), the share that were 'accept'. Confident_leads should be accepted at a high rate; a low accept-rate there means the agent is over-confident.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -452,6 +452,68 @@
           },
           "expr": "sum(rate(triage_feedback_total{verdict=\"accept\"}[6h])) by (triage_disposition) / sum(rate(triage_feedback_total[6h])) by (triage_disposition)",
           "legendFormat": "{{triage_disposition}}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Autonomy (ADR-086)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 30
+      },
+      "id": 10,
+      "panels": []
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Autonomy actions \u2014 shadow vs promoted (file-ticket)",
+      "description": "What each action-class WOULD do (mode=shadow) vs actually does (mode=promoted), by decision. The graduation-gate review signal \u2014 a class stays in shadow until proven.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(rate(agent_autonomy_actions_total[$__rate_interval])) by (class, mode, decision)",
+          "legendFormat": "{{class}} \u00b7 {{mode}} \u00b7 {{decision}}"
         }
       ]
     }

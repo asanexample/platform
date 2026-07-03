@@ -20,6 +20,7 @@ locals {
   enable_cost_metrics     = true # OpenCost → per-namespace/workload cost in Grafana (P11).
   enable_instrumentation  = true # Beyla eBPF zero-code instrumentation — RED + traces + service graph (P7a).
   enable_policy_reporting = true # policy-reporter → PolicyReport metrics + dashboards (P12, #93).
+  enable_per_team_tenants = true # cortex-tenant write-path re-tenant (P13, #590) — HUB flip first: hub metrics still resolve to the `platform` tenant (no env namespaces here), proving the path before the spoke.
 
   tags = {
     Environment        = local.environment

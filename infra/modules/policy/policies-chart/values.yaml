@@ -63,7 +63,8 @@ replicaFloorFailureAction: Audit
 # guarantees follow them; pod-level policies already cover Rollout pods via ReplicaSet autogen.
 enableRolloutKind: false
 
-# Deploy per-team verifyImages policies (cosign keyless). Requires signed images + Kyverno ECR IRSA.
+# Deploy per-team verifyImages policies (cosign keyless). Requires signed images + the Kyverno ECR
+# Pod Identity role (ADR-047 — not IRSA).
 enableImageVerification: false
 # verifyImages action/failurePolicy — independent so verification rolls Audit-first under Enforce.
 verifyFailureAction: Audit

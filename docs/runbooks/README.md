@@ -65,7 +65,7 @@ live in [`../architecture/`](../architecture/README.md); decisions in [`../adrs/
 | [Observability Access](observability-access.md) | Log into Grafana (Tailscale + creds), find dashboards, query metrics |
 | [Observability Alerts](observability-alerts.md) | First-response notes for each curated platform alert (epic 102, P4) |
 | [Instrumentation Verify](observability-instrumentation-verify.md) | Confirm zero-code Beyla RED metrics + traces appear with no app change (P7, ADR-077) |
-| [Observability Spoke Onboarding](observability-spoke-onboarding.md) | Ship a workload cluster's metrics to the central hub Mimir (hub-and-spoke, P10) |
+| [Observability Spoke Onboarding](observability-spoke-onboarding.md) | Ship a workload cluster's metrics, logs, and traces to the central hub (hub-and-spoke, P10) |
 | [Observability Troubleshooting](observability-troubleshooting.md) | Grafana/Prometheus/Alertmanager/Mimir diagnostics + the non-obvious deploy gotchas |
 
 ## AWS & org
@@ -91,6 +91,7 @@ live in [`../architecture/`](../architecture/README.md); decisions in [`../adrs/
 |---------|----------------|
 | [Platform Rebuild from Scratch](platform-rebuild-from-scratch.md) | Full teardown + rebuild of the AWS platform via `platctl` |
 | [Cluster Scale Down/Up](cluster-scale-down-up.md) | Park EKS node groups to zero overnight and restore them (cost), with the scale-up gotchas |
+| [Karpenter Operations](karpenter-operations.md) | Day-2 node autoscaling: NodePool/EC2NodeClass tuning, consolidation/disruption, interruption handling, debugging stuck-Pending pods |
 | [Upgrade Procedures](upgrade-procedures.md) | EKS, Cilium, Helm chart, and toolchain version upgrades |
 | [Kyverno Break-Glass](kyverno-break-glass.md) | Temporarily exempt a workload from a policy + the Audit→Enforce flip procedure |
 | [Platform-Agent Operations](agent-operations.md) | Day-2 ops for a live platform agent (`XAgent`): deploy, observe, suspend (kill-switch), reason about its autonomy envelope |

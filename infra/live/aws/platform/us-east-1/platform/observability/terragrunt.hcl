@@ -112,6 +112,17 @@ inputs = {
   # Empty when Mimir is disabled (cost-profile toggle) — Prometheus keeps local retention only.
   mimir_remote_write_url = include.base.locals.enable_mimir ? "http://mimir-gateway.observability.svc/api/v1/push" : ""
 
+  # P13 per-team re-tenant (#590): when enabled, reroute remote_write through cortex-tenant (which splits
+  # by the forced namespace→team `tenant` relabel) instead of a single static tenant header. The URL is the
+  # deterministic in-cluster Service address (NOT a dependency — cortex-tenant depends on THIS unit for its
+  # namespace, so a reverse dependency would be a cycle). Apply cortex-tenant + confirm healthy BEFORE
+  # flipping this on. Empty = direct single-tenant write (unchanged).
+  cortex_tenant_write_url = include.base.locals.enable_per_team_tenants ? "http://cortex-tenant.observability.svc:8080/push" : ""
+
+  # A pre-filtered "Team Overview — <team>" dashboard per Team (Teams folder), derived from the Team registry
+  # — a default view of only that team's environments. Registry-driven: add a Team → get its overview.
+  team_overview_teams = [for f in fileset("${get_repo_root()}/gitops/teams", "*.yaml") : trimsuffix(basename(f), ".yaml")]
+
   # Alertmanager → SNS (critical alerts → email)
   # Alertmanager SNS publish uses EKS Pod Identity (ADR-047, #594) — no OIDC/IRSA inputs needed.
   alerts_topic_arn = dependency.sns_notifications.outputs.topic_arn
@@ -123,6 +134,9 @@ inputs = {
   # Now the IaC-owned platform-team routing key from the `pagerduty` unit (platform/pagerduty/<team>-routing-key)
   # instead of the old hand-made platform/observability/pagerduty-routing-key (now dead).
   pagerduty_routing_key_secret_name = "platform/pagerduty/platform-routing-key"
+  # Dead-man's switch: Watchdog → external Healthchecks.io check (pings ~every 5m); if pings stop, Healthchecks
+  # pages externally — the one failure the in-cluster pipeline can't alert on itself (#1118).
+  healthchecks_ping_url_secret_name = "platform/healthchecks/deadman-ping-url"
 
   # ADR-082: fan critical alerts to the triage agent's in-cluster webhook (additively — the alert still pages
   # Slack/SNS). The agent triages + posts a card; its own storm controls (ADR-080 D9) bound the fan-out.

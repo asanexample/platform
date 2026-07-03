@@ -82,6 +82,12 @@ variable "database" {
     mode         = optional(string, "in-cluster")
     instances    = optional(number, 1)
     storage_size = optional(string, "5Gi")
+    # Barman Cloud backups (#1119) for the in-cluster CNPG DB. enable_backups attaches the WAL archiver +
+    # creates the ObjectStore and a daily ScheduledBackup (rolls the instance once). destination_path must be
+    # the BUCKET ROOT (barman appends the server name = cluster) and match the cluster's Pod-Identity role scope.
+    enable_backups   = optional(bool, false)
+    destination_path = optional(string, "")
+    retention        = optional(string, "30d")
   })
   default = {}
 
@@ -89,6 +95,12 @@ variable "database" {
     condition     = contains(["in-cluster", "rds"], var.database.mode)
     error_message = "database.mode must be 'in-cluster' or 'rds'."
   }
+}
+
+variable "backup_schedule" {
+  description = "ScheduledBackup cron (CNPG 6-field, includes seconds). Top-level (not in the database object) so the cron renders in backticks — a cron inside a terraform-docs object-type block trips markdownlint MD037. Stagger across clusters to avoid simultaneous base backups."
+  type        = string
+  default     = "0 0 3 * * *"
 }
 
 variable "db_cluster_name" {

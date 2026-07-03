@@ -150,7 +150,13 @@ inputs = {
     mode         = "in-cluster"
     instances    = 1
     storage_size = "5Gi"
+    # Barman Cloud backups (#1119). destination_path = bucket ROOT (barman appends the cluster name);
+    # writes land under <bucket>/backstage-db/, the prefix this cluster's Pod-Identity role is scoped to.
+    enable_backups   = true
+    destination_path = "s3://platform-cnpg-backups"
   }
+  # Staggered at 03:15 so the three base backups don't coincide (directory 03:00, backstage 03:15, keycloak 03:30).
+  backup_schedule = "0 15 3 * * *"
 
   # Kubernetes plugin (Phase 2.4a): read-only live view of this (platform) cluster via the pod's EKS Pod
   # Identity reader role, and of the preprod workload cluster by assuming the cross-account read-only

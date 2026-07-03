@@ -31,6 +31,7 @@ locals {
     s3               = "${local.source_base}/aws//s3"
     sops_kms         = "${local.source_base}/aws//sops-kms"         # SOPS config-encryption key (ADR-066)
     agent_eval_store = "${local.source_base}/aws//agent-eval-store" # durable forward-capture eval corpus (ADR-080 D6)
+    cnpg_backups     = "${local.source_base}/aws//cnpg-backups"     # CNPG Postgres backup bucket + per-cluster IAM (#1119)
 
     # Notifications
     sns_notifications = "${local.source_base}/aws//sns-notifications"
@@ -73,6 +74,8 @@ locals {
     tailscale                     = "${local.source_base}/tailscale"
     tailscale_admin               = "${local.source_base}/tailscale-admin"
     falco                         = "${local.source_base}/falco"
+    kube_bench                    = "${local.source_base}/kube-bench" # CIS EKS Benchmark scan (read-only CronJob, #1149)
+    descheduler                   = "${local.source_base}/descheduler"
     observability                 = "${local.source_base}/observability"
     observability_mimir           = "${local.source_base}/observability-mimir"
     observability_loki            = "${local.source_base}/observability-loki"
@@ -91,6 +94,8 @@ locals {
     observability_pyroscope       = "${local.source_base}/observability-pyroscope"
     observability_pyroscope_ebpf  = "${local.source_base}/observability-pyroscope-ebpf"
     observability_policy_reporter = "${local.source_base}/observability-policy-reporter"
+    observability_cortex_tenant   = "${local.source_base}/observability-cortex-tenant"
+    observability_tenant_proxy    = "${local.source_base}/observability-tenant-proxy"
     crossplane                    = "${local.source_base}/crossplane"
     activation_operator           = "${local.source_base}/activation-operator"
     cloudnative_pg                = "${local.source_base}/cloudnative-pg"
@@ -115,6 +120,7 @@ locals {
     kyverno               = "3.8.1"
     tailscale_operator    = "1.96.5"
     falco                 = "9.0.0"
+    descheduler           = "0.35.1" # kubernetes-sigs/descheduler — node rebalancer (ADR-093). Pinned to the v0.35 line = k8s 1.35 (official compat matrix); bump with the cluster's k8s minor.
     kube_prometheus_stack = "87.5.0" # latest stable, re-resolved 2026-07-01 (app v0.92.1; #595)
     mimir                 = "6.0.6"
     loki                  = "7.0.0"   # grafana/loki — P3a logs store (latest stable, resolved 2026-06-19)
@@ -129,6 +135,7 @@ locals {
     blackbox_exporter     = "11.13.0" # prometheus-community/prometheus-blackbox-exporter — P9b synthetics (app v0.28.0)
     pyroscope             = "2.1.0"   # grafana/pyroscope — P8 continuous profiling store (LGTM+P)
     policy_reporter       = "3.7.4"   # kyverno/policy-reporter — P12 PolicyReport metrics + dashboards (#93)
+    cortex_tenant         = "0.8.1"   # blind-oracle/cortex-tenant — P13 per-team write-path re-tenant (#590)
     karpenter             = "1.13.0"  # Karpenter node autoscaling (ADR-078) — chart + karpenter-crd, OCI public.ecr.aws
     crossplane            = "2.3.1"   # Crossplane v2 (ADR-046)
     cloudnative_pg        = "0.28.2"  # CNPG operator chart (app v1.29.1) — Backstage DB (ADR-051)

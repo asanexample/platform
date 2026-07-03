@@ -25,7 +25,12 @@ printf '%s' "$OUT" | grep -q 'external-name: Pod-alpha-demo-dev-web'  || { echo 
 printf '%s' "$OUT" | grep -q 'name: alpha-demo-dev:developers'        || { echo "::error::developer RoleBinding group wrong"; exit 1; }
 printf '%s' "$OUT" | grep -q 'team-alpha/demo-\*'                     || { echo "::error::restrict-images scope should be team-alpha/demo-*"; exit 1; }
 printf '%s' "$OUT" | grep -q 'demo-alpha-dev.preprod.aws.refplat.org' || { echo "::error::generated host demo-alpha-dev not in the allow-list"; exit 1; }
-echo "  ✓ demo-dev OK (ns alpha-demo-dev, ECR team-alpha/demo-web, role Pod-alpha-demo-dev-web, restrict-images team-alpha/demo-*)"
+# Explicit IMDS egress deny (#160): identity-independent eBPF drop of pod->169.254.169.254 so tenant IMDS
+# protection does not rest solely on the node IMDSv2 hop-limit. Must deny IMDS but NOT the Pod Identity agent.
+printf '%s' "$OUT" | grep -q 'name: deny-imds-egress'                 || { echo "::error::deny-imds-egress CiliumNetworkPolicy not rendered (#160)"; printf '%s\n' "$OUT"; exit 1; }
+printf '%s' "$OUT" | grep -q '169.254.169.254/32'                     || { echo "::error::IMDS egressDeny CIDR 169.254.169.254/32 missing (#160)"; exit 1; }
+printf '%s' "$OUT" | grep -q '169.254.170.23'                         && { echo "::error::Pod Identity agent 169.254.170.23 must NOT be in the deny set (#160)"; exit 1; } || true
+echo "  ✓ demo-dev OK (ns alpha-demo-dev, ECR team-alpha/demo-web, role Pod-alpha-demo-dev-web, restrict-images team-alpha/demo-*, deny-imds-egress)"
 
 echo "== render shop-bigbank-prod (per-customer pci prod, image + permissions) → customer-ns + RolePolicy =="
 OUT="$(render "${here}/environments/shop-bigbank-prod.yaml")"

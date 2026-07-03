@@ -69,6 +69,16 @@ misconfigurations:
 
   - id: AWS-0132
     paths:
+      - "aws/cnpg-backups/main.tf"
+    statement: >-
+      The CNPG backup bucket uses SSE-S3 (AES256), the house S3 baseline (same as
+      agent-eval-store / the LGTM + cost-export stores). A dedicated CMK trips the
+      Infracost gate (+$1/mo on module defaults) and adds key-policy complexity;
+      CMK is the regulated-tier upgrade (#118). Backups are already TLS-only,
+      versioned, PAB'd, and prefix-scoped by least-privilege IAM (#1119).
+
+  - id: AWS-0132
+    paths:
       - "observability-mimir/main.tf"
     statement: >-
       The Mimir blocks bucket uses SSE-S3 (AES256), not a CMK. AES256 is the right
@@ -113,3 +123,13 @@ misconfigurations:
       Customer-managed CMK is tracked in #118, consistent with the cloudtrail
       (AWS-0015) and state-bucket (AWS-0132) encryption choice; deferred to avoid
       the publisher key-policy complexity for now.
+
+  - id: KSV-0041
+    paths:
+      - "cloudnative-pg/charts/barman-cloud-plugin/templates/plugin.yaml"
+    statement: >-
+      Vendored upstream Barman Cloud plugin release manifest (v0.13.0, verbatim).
+      The plugin's ClusterRole legitimately manages Secrets — it reads each
+      ObjectStore's S3 credentials and manages backup-related secrets on behalf of
+      the CNPG operator. This is the plugin's required, upstream-defined RBAC; we
+      vendor the release manifest unmodified and can't narrow it without forking. #1119.

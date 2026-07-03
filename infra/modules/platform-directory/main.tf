@@ -4,10 +4,23 @@
 # triage agent connects cross-namespace via Secrets Manager creds; its own namespace keeps EVERY tenant policy
 # intact (ADR-084 D13 — the directory stays out of the agent sandbox, no posture change for agents).
 #
-# Rebuildable projection of Keycloak (D11): no backups configured — it rebuilds from source.
+# The identity projection is a rebuildable view of Keycloak (D11) — but this DB also holds the ADR-088
+# activation_audit table (durable break-glass governance audit, NOT rebuildable from source), so Barman Cloud
+# backups + continuous WAL archiving are enabled when var.enable_backups (#1119). The activation_audit table is
+# the thing that must survive a lost PVC.
 
 locals {
   create = var.create
+
+  # Barman Cloud WAL archiver (#1119) — attached to the Cluster only when backups are on. Empty otherwise so
+  # the spec.plugins key is absent (no reconcile churn for backup-less consumers).
+  backup_spec = var.enable_backups ? {
+    plugins = [{
+      name          = "barman-cloud.cloudnative-pg.io"
+      isWALArchiver = true
+      parameters    = { barmanObjectName = "${var.db_cluster_name}-backup" }
+    }]
+  } : {}
 
   # Scoped activation-audit Postgres roles (ADR-088 §3.6 least-privilege): the operator writes as
   # `activation_writer` (INSERT-only on activation_audit), Backstage reads as `activation_reader` (SELECT-only)
@@ -62,7 +75,7 @@ resource "kubernetes_manifest" "db" {
     apiVersion = "postgresql.cnpg.io/v1"
     kind       = "Cluster"
     metadata   = { name = var.db_cluster_name, namespace = var.namespace }
-    spec = {
+    spec = merge({
       instances = var.instances
       storage   = { size = var.storage_size }
       # Keep Karpenter from voluntarily disrupting the node a Postgres instance runs on.
@@ -86,12 +99,57 @@ resource "kubernetes_manifest" "db" {
         }])
       }
       enableSuperuserAccess = false
-    }
+    }, local.backup_spec)
   }
   depends_on = [kubernetes_namespace_v1.this, kubernetes_secret_v1.db_role, kubernetes_secret_v1.audit_role]
 }
 
-# Default-deny posture: allow ONLY the agent's namespace to reach the DB on 5432.
+# Barman Cloud backups (#1119): the ObjectStore holds the S3 destination + retention; auth is inheritFromIAMRole
+# (the cluster's instance SA is bound to a prefix-scoped backup role via Pod Identity — cnpg-backups module).
+resource "kubernetes_manifest" "backup_object_store" {
+  count = local.create && var.enable_backups ? 1 : 0
+  manifest = {
+    apiVersion = "barmancloud.cnpg.io/v1"
+    kind       = "ObjectStore"
+    metadata   = { name = "${var.db_cluster_name}-backup", namespace = var.namespace }
+    spec = {
+      retentionPolicy = var.backup_retention
+      configuration = {
+        destinationPath = var.backup_destination_path
+        s3Credentials   = { inheritFromIAMRole = true }
+        # encryption AES256 → barman sends the x-amz-server-side-encryption header, which the org
+        # `enforce-encryption` SCP (DenyUnencryptedS3Uploads) requires (a Null test — the header must be
+        # present; bucket-default SSE does NOT satisfy it). Matches the bucket's SSE-S3.
+        wal  = { compression = "gzip", encryption = "AES256" }
+        data = { compression = "gzip", encryption = "AES256" }
+      }
+    }
+  }
+  depends_on = [kubernetes_namespace_v1.this]
+}
+
+# Daily base backup (continuous WAL archiving is automatic once the archiver plugin is attached above).
+resource "kubernetes_manifest" "scheduled_backup" {
+  count = local.create && var.enable_backups ? 1 : 0
+  manifest = {
+    apiVersion = "postgresql.cnpg.io/v1"
+    kind       = "ScheduledBackup"
+    metadata   = { name = "${var.db_cluster_name}-daily", namespace = var.namespace }
+    spec = {
+      schedule             = var.backup_schedule
+      backupOwnerReference = "self"
+      cluster              = { name = var.db_cluster_name }
+      method               = "plugin"
+      pluginConfiguration  = { name = "barman-cloud.cloudnative-pg.io" }
+    }
+  }
+  depends_on = [kubernetes_manifest.db, kubernetes_manifest.backup_object_store]
+}
+
+# Default-deny posture: consumers reach the DB on 5432; the CNPG operator reaches the instance's management
+# ports. Selecting the pod with an endpointSelector makes this default-deny for all OTHER ingress, so the
+# operator MUST be admitted explicitly — otherwise it times out polling /pg/status and reports "Instance
+# Status Extraction Error: HTTP communication issue" and can't roll the instance to inject the backup sidecar.
 resource "kubernetes_manifest" "db_ingress" {
   count = local.create ? 1 : 0
   manifest = {
@@ -100,13 +158,36 @@ resource "kubernetes_manifest" "db_ingress" {
     metadata   = { name = "allow-consumer-to-db", namespace = var.namespace }
     spec = {
       endpointSelector = { matchLabels = { "cnpg.io/cluster" = var.db_cluster_name } }
-      ingress = [{
-        fromEndpoints = [
-          for ns in concat([var.consumer_namespace], var.extra_consumer_namespaces) :
-          { matchLabels = { "k8s:io.kubernetes.pod.namespace" = ns } }
-        ]
-        toPorts = [{ ports = [{ port = "5432", protocol = "TCP" }] }]
-      }]
+      ingress = [
+        {
+          fromEndpoints = [
+            for ns in concat([var.consumer_namespace], var.extra_consumer_namespaces) :
+            { matchLabels = { "k8s:io.kubernetes.pod.namespace" = ns } }
+          ]
+          toPorts = [{ ports = [{ port = "5432", protocol = "TCP" }] }]
+        },
+        {
+          # The CNPG operator manages the instance: status (8000, it polls /pg/status), metrics (9187), and
+          # postgres (5432, operator-side management). The operator runs on hostNetwork (webhook_host_network),
+          # so its traffic carries Cilium's `host`/`remote-node` identity (the node IP) — NOT the cnpg-system
+          # pod-namespace identity. Both entities are needed (co-located with the instance = host, or another
+          # node = remote-node). NOTE: Cilium forbids combining fromEntities + fromEndpoints in ONE rule, and
+          # the operator is hostNetwork, so this is entities-only (a non-hostNetwork operator would need a
+          # separate fromEndpoints rule).
+          fromEntities = ["host", "remote-node"]
+          toPorts = [{ ports = [
+            { port = "8000", protocol = "TCP" },
+            { port = "9187", protocol = "TCP" },
+            { port = "5432", protocol = "TCP" },
+          ] }]
+        },
+        {
+          # Prometheus (observability ns) scrapes the instance metrics endpoint (:9187). Separate rule because
+          # Cilium can't combine fromEndpoints with the fromEntities rule above. #1119 PR4.
+          fromEndpoints = [{ matchLabels = { "k8s:io.kubernetes.pod.namespace" = "observability" } }]
+          toPorts       = [{ ports = [{ port = "9187", protocol = "TCP" }] }]
+        },
+      ]
     }
   }
   depends_on = [kubernetes_namespace_v1.this]

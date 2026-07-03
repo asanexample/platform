@@ -86,6 +86,12 @@ inputs = {
   # per-hostname (write-only), so no tenant header is sent from here. Reached privately over the TGW.
   remote_write_url = "https://preprod-mimir.aws.refplat.org/api/v1/push"
 
+  # P13 per-team DUAL-WRITE (#590): additionally ship a second copy to cortex-tenant (the `/push` route on the
+  # same host), with a forced namespace→route_tenant relabel, so preprod's metrics ALSO land in per-team
+  # tenants (alpha/bravo/platform) — without disturbing the primary `preprod`-tenant write above. Gated on
+  # preprod's enable_per_team_tenants; empty = single-write (unchanged).
+  per_team_write_url = include.base.locals.enable_per_team_tenants ? "https://preprod-mimir.aws.refplat.org/push" : ""
+
   helm_chart_version = include.base.locals.helm_versions.kube_prometheus_stack
   helm_wait          = true
 

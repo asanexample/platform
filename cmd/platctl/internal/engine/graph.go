@@ -133,18 +133,7 @@ func (g *Graph) TopoSort() ([]*Unit, error) {
 	for name := range g.units {
 		inDegree[name] = 0
 	}
-	for _, u := range g.units {
-		for _, dep := range u.DependsOn {
-			_ = dep
-		}
-	}
-	// Count incoming edges
-	for _, u := range g.units {
-		inDegree[u.Name] += 0 // ensure entry exists
-		for _, dep := range u.DependsOn {
-			_ = dep
-		}
-	}
+	// Count incoming edges and build the dependents adjacency.
 	dependents := make(map[string][]string)
 	for _, u := range g.units {
 		for _, dep := range u.DependsOn {
@@ -188,7 +177,7 @@ func (g *Graph) TopoSort() ([]*Unit, error) {
 
 // Waves returns units grouped by parallel execution wave.
 // Units within the same wave have no dependency on each other and can run concurrently.
-func (g *Graph) Waves() ([][]* Unit, error) {
+func (g *Graph) Waves() ([][]*Unit, error) {
 	inDegree := make(map[string]int, len(g.units))
 	dependents := make(map[string][]string)
 	for name := range g.units {

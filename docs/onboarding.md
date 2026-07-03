@@ -194,7 +194,7 @@ Edit → plan → review → apply.
 cd infra/live/aws/platform/us-east-1/platform/<unit>
 AWS_PROFILE=management terragrunt plan          # scan for -, -/+ (destroy/replace), policy/IAM changes
 
-# 3. REVIEW — open a PR (CI runs fmt/validate/TFLint/Kyverno tests/Trivy/Semgrep). Paste the plan.
+# 3. REVIEW — open a PR (CI runs fmt/validate/TFLint/Kyverno tests/Trivy/Semgrep/gitleaks). Paste the plan.
 # 4. APPLY — after approval
 AWS_PROFILE=management terragrunt apply
 ```
@@ -202,7 +202,7 @@ AWS_PROFILE=management terragrunt apply
 For changes spanning many units, `terragrunt run --all plan` from a parent directory first, then
 `run --all apply` — **with caution** (note: it's `run --all`, the modern syntax, not the old `run-all`).
 Enable the pre-commit hooks (`git config core.hooksPath .githooks`) — they run `tofu fmt`, `terragrunt
-hclfmt`, and `tofu validate` on staged files.
+hclfmt`, `tofu validate`, and a `gitleaks` secret scan on staged files.
 
 ---
 

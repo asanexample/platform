@@ -1,4 +1,4 @@
-package config
+package hooks
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/asanexample/platform/cmd/platctl/internal/config"
 	"github.com/asanexample/platform/cmd/platctl/internal/engine"
 )
 
@@ -125,9 +126,9 @@ func TestManualStepChecker_SecretExists(t *testing.T) {
 	client := &mockAWSClient{secretExists: true}
 	checker := &ManualStepChecker{Client: client}
 
-	step := ManualStep{
+	step := config.ManualStep{
 		Name: "test-secret",
-		Check: StepCheck{
+		Check: config.StepCheck{
 			Type:     "secret_exists",
 			SecretID: "my/secret",
 			Profile:  "test",
@@ -147,9 +148,9 @@ func TestManualStepChecker_SecretMissing(t *testing.T) {
 	client := &mockAWSClient{secretExists: false}
 	checker := &ManualStepChecker{Client: client}
 
-	step := ManualStep{
+	step := config.ManualStep{
 		Name: "test-secret",
-		Check: StepCheck{
+		Check: config.StepCheck{
 			Type:     "secret_exists",
 			SecretID: "my/secret",
 			Profile:  "test",
@@ -172,9 +173,9 @@ func TestManualStepChecker_FileContains(t *testing.T) {
 
 	checker := &ManualStepChecker{RepoRoot: dir}
 
-	step := ManualStep{
+	step := config.ManualStep{
 		Name: "argocd-saml",
-		Check: StepCheck{
+		Check: config.StepCheck{
 			Type:    "file_contains",
 			File:    "common.hcl",
 			Pattern: "argocd_sso_url",
@@ -197,9 +198,9 @@ func TestManualStepChecker_FileNotContains(t *testing.T) {
 
 	checker := &ManualStepChecker{RepoRoot: dir}
 
-	step := ManualStep{
+	step := config.ManualStep{
 		Name: "argocd-saml",
-		Check: StepCheck{
+		Check: config.StepCheck{
 			Type:    "file_contains",
 			File:    "common.hcl",
 			Pattern: "argocd_sso_url",
@@ -216,7 +217,7 @@ func TestManualStepChecker_FileNotContains(t *testing.T) {
 }
 
 func TestResolveHook_CRDTwoStage(t *testing.T) {
-	override := UnitOverride{
+	override := config.UnitOverride{
 		Hook:       "crd_two_stage",
 		HookTarget: "helm_release.operator[0]",
 	}
@@ -230,7 +231,7 @@ func TestResolveHook_CRDTwoStage(t *testing.T) {
 }
 
 func TestResolveHook_ENIValidation(t *testing.T) {
-	override := UnitOverride{
+	override := config.UnitOverride{
 		Hook: "eni_ip_validation",
 		HookConfig: map[string]string{
 			"cluster_name": "test-cluster",
@@ -251,7 +252,7 @@ func TestResolveHook_ENIValidation(t *testing.T) {
 }
 
 func TestResolveHook_StatePurge(t *testing.T) {
-	override := UnitOverride{
+	override := config.UnitOverride{
 		Hook:       "state_purge",
 		HookConfig: map[string]string{"patterns": "keycloak_, foo_bar ,"},
 	}
@@ -365,7 +366,7 @@ func TestSecretCleanupHook_Destroy(t *testing.T) {
 }
 
 func TestResolveHook_SecretCleanup(t *testing.T) {
-	override := UnitOverride{
+	override := config.UnitOverride{
 		Hook: "secret_cleanup",
 		HookConfig: map[string]string{
 			"profile": "platform",
@@ -392,7 +393,7 @@ func TestResolveHook_SecretCleanup(t *testing.T) {
 }
 
 func TestResolveHook_SecretCleanupDefaultProfile(t *testing.T) {
-	override := UnitOverride{
+	override := config.UnitOverride{
 		Hook: "secret_cleanup",
 		HookConfig: map[string]string{
 			"profile": "default-profile",
@@ -407,7 +408,7 @@ func TestResolveHook_SecretCleanupDefaultProfile(t *testing.T) {
 }
 
 func TestResolveHook_Unknown(t *testing.T) {
-	override := UnitOverride{Hook: "nonexistent"}
+	override := config.UnitOverride{Hook: "nonexistent"}
 	hook := ResolveHook(override, nil, false)
 	if hook != nil {
 		t.Fatal("expected nil hook for unknown type")
@@ -470,7 +471,7 @@ func TestIsSafeAccountName(t *testing.T) {
 }
 
 func TestResolveArgoTokenHook(t *testing.T) {
-	h := ResolveHook(UnitOverride{
+	h := ResolveHook(config.UnitOverride{
 		Hook: "argocd_account_token",
 		HookConfig: map[string]string{
 			"cluster": "platform-use1-eks", "region": "us-east-1", "profile": "platform",

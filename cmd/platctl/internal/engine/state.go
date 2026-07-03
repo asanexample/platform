@@ -170,17 +170,6 @@ func (s *State) HasFailures() bool {
 	return false
 }
 
-// PendingCount returns the number of units that haven't started.
-func (s *State) PendingCount() int {
-	n := 0
-	for _, us := range s.Units {
-		if us.Status == StatusPending {
-			n++
-		}
-	}
-	return n
-}
-
 // PrepareForResume resets failed units to pending so they can be retried.
 func (s *State) PrepareForResume() {
 	for _, us := range s.Units {

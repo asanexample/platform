@@ -16,7 +16,7 @@ locals {
   admission_server_port = var.webhook_host_network ? 9445 : 9443
   cleanup_server_port   = var.webhook_host_network ? 9444 : 9443
 
-  # Kyverno needs ECR read (IRSA) to fetch cosign signatures for verifyImages (Phase 3).
+  # Kyverno needs ECR read (Pod Identity, ADR-047 — not IRSA) to fetch cosign signatures for verifyImages (Phase 3).
   create_image_role            = local.create && var.enable_image_verification # Kyverno ECR read (Pod Identity)
   kyverno_ecr_service_accounts = toset(["kyverno-admission-controller", "kyverno-reports-controller"])
 
@@ -51,9 +51,9 @@ locals {
       # node's VPC IP the API server can dial; ClusterFirstWithHostNet keeps cluster DNS working.
       hostNetwork = var.webhook_host_network
       dnsPolicy   = var.webhook_host_network ? "ClusterFirstWithHostNet" : "ClusterFirst"
-      # IRSA: lets the admission controller pull cosign signatures from ECR (the EKS pod-identity
-      # webhook injects AWS_REGION/creds from this annotation). Empty when verification is off.
-      # The chart nests the SA under rbac.serviceAccount.
+      # No SA annotation (this is Pod Identity, ADR-047, not IRSA) — the ECR-read role is bound to
+      # (namespace, ServiceAccount) below instead. Empty when verification is off. The chart nests
+      # the SA under rbac.serviceAccount.
       rbac = { serviceAccount = { annotations = {} } } # SA bound to the ECR role via Pod Identity (ADR-047)
       # Webhook server port off 9443 on hostNetwork (see local.admission_server_port) so it never collides
       # with provider-kubernetes' hardcoded :9443. The service's targetPort follows webhookServer.port, and

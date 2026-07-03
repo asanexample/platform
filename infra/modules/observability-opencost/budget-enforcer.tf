@@ -11,8 +11,12 @@
 locals {
   enforce_create = local.create && var.enable_budget_enforcer
   budget_cm_name = "cost-budget-status"
-  # spend ÷ budget × 100, per team (team derived from the env-namespace prefix); >= 100 = over budget.
-  budget_util_query = "100 * ( sum by (team) ( label_replace( sum by (namespace) ( (container_cpu_allocation * on(node) group_left() node_cpu_hourly_cost) + ((container_memory_allocation_bytes / 1024^3) * on(node) group_left() node_ram_hourly_cost) ) * 730, \"team\", \"$1\", \"namespace\", \"^([a-z0-9]+)-.*\" ) ) / on(team) group_left() max by (team) (team_budget_monthly_usd) )"
+  # spend ÷ budget × 100, per team; >= 100 = over budget. Team comes from the namespace's
+  # platform.refplat.org/team label (via kube_namespace_labels), NOT the name prefix — the prefix
+  # split turns every infra namespace (kube-system, external-dns, …) into a fake "team". Unlabelled
+  # namespaces are platform-owned shared infra → roll up to "platform". Teams with no
+  # team_budget_monthly_usd series drop out of the division (fail-open), same as before.
+  budget_util_query = "100 * ( sum by (team) ( label_replace( label_replace( ( sum by (namespace) ( (container_cpu_allocation * on(node) group_left() node_cpu_hourly_cost) + ((container_memory_allocation_bytes / 1024^3) * on(node) group_left() node_ram_hourly_cost) ) * 730 ) * on(namespace) group_left(label_platform_refplat_org_team) max by (namespace, label_platform_refplat_org_team) (kube_namespace_labels), \"team\", \"$1\", \"label_platform_refplat_org_team\", \"(.+)\" ), \"team\", \"platform\", \"team\", \"^$\" ) ) / on(team) group_left() max by (team) (team_budget_monthly_usd) )"
 }
 
 resource "kubernetes_service_account_v1" "budget_enforcer" {

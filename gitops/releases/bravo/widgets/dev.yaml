@@ -1,0 +1,9 @@
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata:
+  name: bravo-widgets-dev
+spec:
+  environmentRef: bravo-widgets-dev
+  services:
+    web:
+      digest: sha256:88b1ee29535ffe8c37d2b7e0adeabe10c0b0357cfcacd7e60ed8c66cce76777c

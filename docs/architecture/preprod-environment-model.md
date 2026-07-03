@@ -118,6 +118,7 @@ retired v2 `environment` module created the same set for `mode = "namespace"`):
 | `CiliumNetworkPolicy` | `allow-gateway-envoy` | Permit traffic from Cilium `ingress`, `remote-node`, and `host` entities |
 | `NetworkPolicy` | `allow-dns-egress` | Allow DNS (UDP/TCP 53) and internet egress, except the IMDS endpoint (169.254.169.254/32) |
 | `CiliumNetworkPolicy` | `allow-pod-identity-egress` | Permit egress to the EKS Pod Identity agent (`host` entity, `169.254.170.23:80`) so pods can fetch their workload AWS credentials (ADR-041) |
+| `CiliumNetworkPolicy` | `deny-imds-egress` | Explicit `egressDeny` of IMDS (`169.254.169.254/32` + IPv6 `fd00:ec2::254/128`) — identity-independent eBPF drop so tenant IMDS protection doesn't rest solely on the node IMDSv2 hop-limit (#160). Deny wins over the `allow-pod-identity-egress` `host` allow; the Pod Identity agent is a different address and stays reachable |
 | Namespace PSA labels | `enforce=baseline`, `warn`/`audit=restricted` | Block privileged/hostPath/hostNetwork pods (node-escape vectors) |
 | `RoleBinding` | `environment-developers` | Bind group `<team>-<product>-<stage>:developers` to the `environment-developer` ClusterRole (ADR-039) |
 
@@ -228,9 +229,11 @@ spec:
 Pod Identity agent so environment pods can fetch their workload AWS credentials
 (ADR-041). The agent serves credentials at the link-local `169.254.170.23:80`,
 which Cilium classifies as the `host` entity — a CIDR `toCIDR` rule cannot match it,
-so this needs `toEntities: [host]`. (IMDS at `169.254.169.254` is also `host` and thus
-reachable, but the node enforces IMDSv2 with `HttpPutResponseHopLimit=1`, so a pod —
-one hop from the node — still cannot steal the node role.)
+so this needs `toEntities: [host]`. IMDS at `169.254.169.254` is also `host` and would
+therefore be re-opened by this allow, so a companion **`deny-imds-egress`** CiliumNetworkPolicy
+(`egressDeny` on `169.254.169.254/32`) explicitly drops it — a Cilium deny wins over any allow
+and matches by destination CIDR, so IMDS stays blocked regardless of masquerade/hop-limit (#160).
+The node's IMDSv2 `HttpPutResponseHopLimit=1` remains as a second, independent backstop.
 
 ```yaml
 apiVersion: cilium.io/v2

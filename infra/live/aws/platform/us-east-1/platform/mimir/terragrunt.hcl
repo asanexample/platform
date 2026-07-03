@@ -148,6 +148,15 @@ inputs = {
     # Expose the read (/prometheus) path for preprod so its argo-rollouts controller can run metric-gated
     # canary AnalysisRuns against this hub Mimir (ADR-056 W8c). Force-set tenant ⇒ preprod reads only its own.
     query_tenants = ["preprod"]
+    # P13 per-team DUAL-WRITE (#590): an additional `/push` route on the SAME preprod-mimir hostname (reusing
+    # its DNS + TLS) that forwards to cortex-tenant instead of force-stamping. The preprod agent writes a second
+    # copy here → cortex-tenant splits by route_tenant into per-team tenants. The existing `/api/v1/push`
+    # force-stamp route (the `preprod` tenant + its ruler/canary/cost consumers) is untouched. Gated on the hub.
+    cortex_tenant_route = include.base.locals.enable_per_team_tenants ? {
+      hostname_prefix = "preprod-mimir"
+      service_name    = "cortex-tenant"
+      service_port    = 8080
+    } : null
   }
   extra_tenant_datasources = ["preprod"]
 

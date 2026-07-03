@@ -2,7 +2,9 @@ package cli
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -46,15 +48,20 @@ environment overnight. To release all cost (~$0), use 'platctl teardown --env <e
 			if err != nil {
 				return err
 			}
+			// Fail fast on a stale/expired AWS session BEFORE the confirmation prompt or any mutation — see
+			// checkAWSCredentials for why this matters (2026-07-02 incident).
+			if err := checkAWSCredentialsForEnv(cfg, envName, kc, false); err != nil {
+				return err
+			}
 			if !yes && !confirmDown(envName, kc.Cluster) {
 				fmt.Println("Aborted.")
 				return nil
 			}
 			// Drain Karpenter-managed nodes BEFORE the managed groups scale to zero — otherwise the controller
 			// (on the system group) dies mid-park and leaves orphaned EC2 instances. No-op without Karpenter.
-			fmt.Printf("Draining Karpenter-managed nodes on %s (delete NodePool; drains gracefully)...\n", kc.Cluster)
-			if err := drainKarpenterNodesFn(context.Background(), kc); err != nil {
-				fmt.Printf("  warning: %v (continuing — check for orphaned Karpenter instances)\n", err)
+			// A failed drain is FATAL (not a warning) — see drainKarpenterOrFail.
+			if err := drainKarpenterOrFail(context.Background(), kc); err != nil {
+				return err
 			}
 			if err := scaleNodeGroupsToZero(kc); err != nil {
 				return err
@@ -99,6 +106,20 @@ from the HCL — the inverse of 'platctl down'. Takes ~1-2 minutes.`,
 			if !ok {
 				return fmt.Errorf("environment %q is not defined in the config", envName)
 			}
+			// Resolve the kubeconfig entry once up front (used by the credential preflight below and every
+			// kubectl-touching step later) instead of the several best-effort re-resolutions this used to have —
+			// a missing kubeconfig entry for the env is a real config error, not something to silently skip past.
+			kc, err := kubeconfigForEnv(cfg, envName)
+			if err != nil {
+				return err
+			}
+			// Fail fast on a stale/expired AWS session BEFORE any mutation. 'up' uses TWO distinct profiles — the
+			// terragrunt auth profile (e.g. "management", for the node-groups/karpenter applies below) and kc.Profile
+			// (for the AWS CLI/kubectl calls in waitForClusterAPI/assertKarpenterReady/recoverKyverno) — so check
+			// both. See checkAWSCredentials for why this matters (2026-07-02 incident).
+			if err := checkAWSCredentialsForEnv(cfg, envName, kc, true); err != nil {
+				return err
+			}
 			unit := &engine.Unit{
 				Name:     envName + "/node-groups",
 				Path:     filepath.Join(repoRoot, env.Path, "node-groups"),
@@ -115,10 +136,8 @@ from the HCL — the inverse of 'platctl down'. Takes ~1-2 minutes.`,
 			}
 			// Start the SSM bastion that 'down' stopped (outside the node-group scope, so the apply above doesn't
 			// touch it). Best-effort + early, so SSM access is available while the rest of the cluster comes back.
-			if kc, kcErr := kubeconfigForEnv(cfg, envName); kcErr == nil {
-				if err := setBastionPowerFn(kc, true); err != nil {
-					fmt.Printf("  warning: starting SSM bastion: %v\n", err)
-				}
+			if err := setBastionPowerFn(kc, true); err != nil {
+				fmt.Printf("  warning: starting SSM bastion: %v\n", err)
 			}
 			// Restore the Karpenter NodePool that 'platctl down' deletes to drain Karpenter's nodes (so the
 			// cluster regains node autoscaling). No-op if this env has no karpenter unit.
@@ -130,10 +149,6 @@ from the HCL — the inverse of 'platctl down'. Takes ~1-2 minutes.`,
 				// helm releases orphaned from TF state (a "cannot re-use a name" trap needing manual import, #660).
 				// Gate the apply on API readiness; on timeout we skip it (node groups are already restored) and
 				// tell the operator to re-run, rather than apply into an unreachable API and corrupt state.
-				kc, kcErr := kubeconfigForEnv(cfg, envName)
-				if kcErr != nil {
-					return fmt.Errorf("restoring karpenter: %w", kcErr)
-				}
 				if err := waitForClusterAPI(ctx, kc); err != nil {
 					return err
 				}
@@ -156,6 +171,8 @@ from the HCL — the inverse of 'platctl down'. Takes ~1-2 minutes.`,
 				// silently strands every workload pod. (2026-06-27: 'down' deleted only the NodePool, leaving the
 				// EC2NodeClass for this force-replace to lose to a finalizer race → NodeClassReady=False. 'down'
 				// now deletes both for a clean recreate, but assert it actually took before declaring restored.)
+				// assertKarpenterReady attempts automated recovery itself before giving up (2026-07-02 incident);
+				// this only warns if THAT also failed.
 				if err := assertKarpenterReadyFn(ctx, kc); err != nil {
 					fmt.Printf("  ⚠️ %v\n", err)
 				}
@@ -164,22 +181,76 @@ from the HCL — the inverse of 'platctl down'. Takes ~1-2 minutes.`,
 			// failed sigstore TUF init while the network is still settling, blocking every policed workload pod
 			// (0 pods created) until Kyverno is restarted (#665). Best-effort — workloads otherwise recover only
 			// after the ReplicaSet backoff.
-			if kcK, kcErr := kubeconfigForEnv(cfg, envName); kcErr == nil {
-				if err := recoverKyverno(ctx, kcK); err != nil {
-					fmt.Printf("  warning: post-unpark Kyverno recovery: %v\n", err)
-				}
+			if err := recoverKyverno(ctx, kc); err != nil {
+				fmt.Printf("  warning: post-unpark Kyverno recovery: %v\n", err)
 			}
 			// Repair the cross-environment path a park/restore can leave stale (e.g. platform→preprod cross-VPC
-			// DNS + the ArgoCD controller's cached connection). Idempotent; no-op when not configured.
+			// DNS + the ArgoCD controller's cached connection). Idempotent; no-op when not configured. Run this
+			// BEFORE the DB-client recovery below so its (potentially minutes-long) DB wait doesn't delay the
+			// cross-cluster reconnect that ArgoCD needs.
+			var reconnectErr error
 			if env.Reconnect != nil {
-				return runReconnect(ctx, cfg, repoRoot, envName, env.Reconnect, runner)
+				reconnectErr = runReconnect(ctx, cfg, repoRoot, envName, env.Reconnect, runner)
 			}
-			return nil
+			// Post-unpark workload recovery #2: a workload that opens its Postgres connection ONLY at startup
+			// (e.g. Backstage) can come up before its CNPG database is Ready, fail every DB-backed plugin, and
+			// stay not-Ready forever (it never retries). Restart such clients once their DB is Ready. Best-effort.
+			if err := recoverStartupOrderedDBClientsFn(ctx, kc); err != nil {
+				fmt.Printf("  warning: post-unpark DB-client recovery: %v\n", err)
+			}
+			return reconnectErr
 		},
 	}
 
 	cmd.Flags().StringVar(&envName, "env", "", "Environment to restore (required)")
 	return cmd
+}
+
+// checkAWSCredentialsFn is indirected so tests can stub the aws CLI boundary.
+var checkAWSCredentialsFn = checkAWSCredentials
+
+// checkAWSCredentials verifies the given AWS profile has a live, non-expired session by making one cheap,
+// read-only STS call, so down/up can fail fast BEFORE running any mutating step.
+//
+// A stale static credential env var (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_SESSION_TOKEN) shadows
+// --profile in the AWS CLI/SDK's credential chain and SURVIVES a fresh `aws sso login` (the login refreshes the
+// SSO cache, not the already-exported env vars) — so without this check, a stale session degrades into a
+// mid-run ExpiredToken on whichever step happens to call `aws`/`kubectl` first. On 2026-07-02 this hit 'down'
+// mid-Karpenter-drain; the failure was swallowed as a printed warning and 'down' still reported the park as
+// successful, leaving a half-deleted EC2NodeClass that corrupted the next 'up' (see the cluster-parking skill's
+// Learnings log). Failing fast here, before any mutation, stops that class of incident at the source.
+func checkAWSCredentials(profile, region string) error {
+	out, err := exec.Command("aws", "sts", "get-caller-identity",
+		"--region", region, "--profile", profile, "--query", "Account", "--output", "text").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("AWS credentials for profile %q are not valid: %v\n%s\n"+
+			"Run `aws sso login --profile %s` and retry. If that doesn't fix it, a stale "+
+			"AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_SESSION_TOKEN in the shell environment is shadowing "+
+			"--profile and surviving the sso login refresh — `unset` those three and retry",
+			profile, err, strings.TrimSpace(string(out)), profile)
+	}
+	return nil
+}
+
+// checkAWSCredentialsForEnv validates every distinct AWS profile a down/up run for this environment will use:
+// always kc.Profile (the per-account profile behind every AWS CLI/kubectl call in this file), and — for 'up',
+// via includeTerragruntProfile — also the separate terragrunt auth profile (e.g. "management", which assumes
+// PlatformDeployer for the node-groups/karpenter applies; see .platctl.yaml.example). These commonly differ, and
+// a stale session on EITHER one degrades into a mid-run ExpiredToken, so both need checking. Deduplicates when
+// they're the same profile.
+func checkAWSCredentialsForEnv(cfg *config.Config, envName string, kc config.KubeconfigEntry, includeTerragruntProfile bool) error {
+	profiles := []string{kc.Profile}
+	if includeTerragruntProfile {
+		if p := cfg.AuthForUnit(envName, "node-groups")["profile"]; p != "" && p != kc.Profile {
+			profiles = append(profiles, p)
+		}
+	}
+	for _, p := range profiles {
+		if err := checkAWSCredentialsFn(p, kc.Region); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // waitForClusterAPI polls the cluster API until it answers, so 'up' doesn't apply the API-dependent karpenter
@@ -219,8 +290,17 @@ func doWaitForClusterAPI(ctx context.Context, kc config.KubeconfigEntry) error {
 var assertKarpenterReadyFn = assertKarpenterReady
 
 // assertKarpenterReady polls until the EC2NodeClass exists AND every NodePool reports Ready=True — i.e. workload
-// scheduling is genuinely restored — or returns an error after a timeout. A Ready=False NodePool (e.g. a missing
-// EC2NodeClass) provisions nothing and silently strands every workload pod, so this is the post-unpark gate.
+// scheduling is genuinely restored. A Ready=False NodePool (e.g. a missing EC2NodeClass) provisions nothing and
+// silently strands every workload pod, so this is the post-unpark gate.
+//
+// If it's not ready after the initial ~3m poll, it attempts the automated recovery proven live on 2026-07-02
+// before giving up: Karpenter's own termination reconciler can deadlock on a stuck NodeClaim (observed live: no
+// termination-controller activity for 10+ minutes even after the backing EC2 instance was confirmed terminated
+// in AWS) — restarting the controller pod unstuck it in under 30s. And a helm destroy+recreate race (the
+// NodePool release momentarily vanishing while a NodeClaim already existed under the old EC2NodeClass) can leave
+// the EC2NodeClass fully deleted with nothing recreating it — recreating it from the karpenter-nodepool release's
+// own rendered manifest (`helm get manifest | kubectl apply -f -`) fixes that, mirroring the 2026-06-27 manual
+// recovery. Only returns an error — with the same manual commands, for a human to run — if both attempts fail.
 func assertKarpenterReady(ctx context.Context, kc config.KubeconfigEntry) error {
 	path, cleanup, err := tempKubeconfig(ctx, kc, "platctl-karpenter")
 	if err != nil {
@@ -228,25 +308,111 @@ func assertKarpenterReady(ctx context.Context, kc config.KubeconfigEntry) error 
 	}
 	defer cleanup()
 	fmt.Println("  verifying Karpenter is ready (EC2NodeClass present + NodePool(s) Ready)...")
-	var nodeClasses string
-	var statuses []string
-	for i := 0; i < 18; i++ { // up to ~3 min for Karpenter to reconcile the recreated CRs
+
+	check := func() (string, []string) {
 		nc, _ := exec.CommandContext(ctx, "kubectl", "--kubeconfig", path, "get", "ec2nodeclass", "-o", "name").CombinedOutput()
 		np, _ := exec.CommandContext(ctx, "kubectl", "--kubeconfig", path, "get", "nodepool",
 			"-o", `jsonpath={range .items[*]}{.status.conditions[?(@.type=="Ready")].status} {end}`).CombinedOutput()
-		nodeClasses = strings.TrimSpace(string(nc))
-		statuses = strings.Fields(string(np))
-		if nodeClasses != "" && nodePoolsAllReady(statuses) {
-			fmt.Println("  Karpenter ready: EC2NodeClass present, NodePool(s) Ready=True.")
+		return strings.TrimSpace(string(nc)), strings.Fields(string(np))
+	}
+	sleep := func() { time.Sleep(10 * time.Second) }
+
+	if ready, _, _ := pollKarpenterReady(check, 18, sleep); ready { // up to ~3 min for Karpenter to reconcile the recreated CRs
+		fmt.Println("  Karpenter ready: EC2NodeClass present, NodePool(s) Ready=True.")
+		return nil
+	}
+
+	fmt.Println("  ⚠️ Karpenter not ready after ~3m — attempting automated recovery " +
+		"(restart the controller, reconcile the EC2NodeClass)...")
+	if rErr := restartKarpenterControllerFn(ctx, path); rErr != nil {
+		fmt.Printf("    warning: restarting the Karpenter controller: %v\n", rErr)
+	}
+	ready, nodeClasses, statuses := pollKarpenterReady(check, 12, sleep) // ~2 min for the fresh controller to reconcile
+	if ready {
+		fmt.Println("  Karpenter recovered after restarting its controller.")
+		return nil
+	}
+	if nodeClasses == "" { // the EC2NodeClass is fully gone (the 2026-07-02 asymmetry) — recreate it from the release
+		if mErr := reapplyKarpenterNodepoolManifestFn(ctx, path); mErr != nil {
+			fmt.Printf("    warning: reapplying the karpenter-nodepool manifest: %v\n", mErr)
+		} else if ready, nodeClasses, statuses = pollKarpenterReady(check, 12, sleep); ready {
+			fmt.Println("  Karpenter recovered after recreating its EC2NodeClass.")
 			return nil
 		}
-		time.Sleep(10 * time.Second)
 	}
-	return fmt.Errorf("Karpenter NOT ready after ~3m — workload pods will be stranded Pending "+
-		"(ec2nodeclass present=%t, nodepool Ready=%v). Recreate the release's CRs:\n"+
-		"     helm get manifest karpenter-nodepool -n karpenter | kubectl apply -f -\n"+
+
+	return fmt.Errorf("Karpenter NOT ready after automated recovery attempts — workload pods will be stranded "+
+		"Pending (ec2nodeclass present=%t, nodepool Ready=%v). Manual recovery:\n"+
+		"     kubectl delete pod -n karpenter -l app.kubernetes.io/name=karpenter   # restart the controller\n"+
+		"     helm get manifest karpenter-nodepool -n karpenter | kubectl apply -f -   # recreate the EC2NodeClass\n"+
 		"     (or `terragrunt apply -replace=helm_release.nodepool[0]` on the %s karpenter unit), then re-check",
 		nodeClasses != "", statuses, kc.Alias)
+}
+
+// pollKarpenterReady polls `check` up to `attempts` times (calling `sleep` between attempts, not after the
+// last) until it reports the EC2NodeClass present and every NodePool Ready=True, or the attempts are exhausted.
+// Returns the last-observed state either way, so the caller can decide what to try next. `check` and `sleep` are
+// injected so this retry/give-up logic is unit-testable without a real cluster.
+func pollKarpenterReady(check func() (nodeClasses string, readyStatuses []string), attempts int, sleep func()) (ready bool, nodeClasses string, statuses []string) {
+	for i := 0; i < attempts; i++ {
+		nodeClasses, statuses = check()
+		if nodeClasses != "" && nodePoolsAllReady(statuses) {
+			return true, nodeClasses, statuses
+		}
+		if i < attempts-1 {
+			sleep()
+		}
+	}
+	return false, nodeClasses, statuses
+}
+
+// restartKarpenterControllerFn is indirected so tests can stub the kubectl boundary.
+var restartKarpenterControllerFn = restartKarpenterController
+
+// restartKarpenterController deletes the Karpenter controller pod (its Deployment recreates it) and waits for
+// the replacement to become Ready. Unsticks a deadlocked reconciler — observed live on 2026-07-02, where the
+// termination controller stopped processing a NodeClaim/Node pair for 10+ minutes even after the backing EC2
+// instance was confirmed terminated in AWS; only the pods were live-touched, not any AWS/Terraform state, so
+// this is safe to attempt unconditionally as a first recovery step.
+func restartKarpenterController(ctx context.Context, kubeconfigPath string) error {
+	if out, err := exec.CommandContext(ctx, "kubectl", "--kubeconfig", kubeconfigPath,
+		"delete", "pod", "-n", "karpenter", "-l", "app.kubernetes.io/name=karpenter",
+		"--ignore-not-found").CombinedOutput(); err != nil {
+		return fmt.Errorf("kubectl delete pod -n karpenter: %v: %s", err, strings.TrimSpace(string(out)))
+	}
+	// Best-effort: give the replacement a moment to become Ready before the caller re-polls NodePool status.
+	// Not fatal on timeout — the caller's own poll loop will just see the not-yet-ready state and continue.
+	_, _ = exec.CommandContext(ctx, "kubectl", "--kubeconfig", kubeconfigPath,
+		"wait", "--for=condition=Ready", "pod", "-n", "karpenter", "-l", "app.kubernetes.io/name=karpenter",
+		"--timeout=60s").CombinedOutput()
+	return nil
+}
+
+// reapplyKarpenterNodepoolManifestFn is indirected so tests can stub the helm/kubectl boundary.
+var reapplyKarpenterNodepoolManifestFn = reapplyKarpenterNodepoolManifest
+
+// reapplyKarpenterNodepoolManifest recreates the EC2NodeClass (and reconciles the NodePool) by re-applying the
+// karpenter-nodepool helm release's OWN rendered manifest — no edits, just `helm get manifest | kubectl apply`.
+// This is the documented recovery for the case where the EC2NodeClass has been fully deleted with nothing
+// recreating it (a `terragrunt apply -replace=helm_release.nodepool[0]` destroy+recreate can lose a
+// still-referenced EC2NodeClass to a finalizer race, or — as observed live on 2026-07-02 — a stale EC2NodeClass
+// left over from an interrupted 'down' can fully terminate once its blocking NodeClaim clears, and nothing else
+// recreates it since the chart install merged into the still-terminating object instead of creating a fresh one).
+func reapplyKarpenterNodepoolManifest(ctx context.Context, kubeconfigPath string) error {
+	getCmd := exec.CommandContext(ctx, "helm", "--kubeconfig", kubeconfigPath, "get", "manifest",
+		"karpenter-nodepool", "-n", "karpenter")
+	var stderr bytes.Buffer
+	getCmd.Stderr = &stderr
+	manifest, err := getCmd.Output()
+	if err != nil {
+		return fmt.Errorf("helm get manifest karpenter-nodepool: %v: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	applyCmd := exec.CommandContext(ctx, "kubectl", "--kubeconfig", kubeconfigPath, "apply", "-f", "-")
+	applyCmd.Stdin = bytes.NewReader(manifest)
+	if out, err := applyCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("kubectl apply (recreating the EC2NodeClass): %v: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 // nodePoolsAllReady reports whether every NodePool's Ready condition is True (and there is at least one NodePool).
@@ -364,6 +530,224 @@ func latestFailedCreate(k func(...string) ([]byte, error), ns string) string {
 	return "(no FailedCreate event found — run `kubectl describe rs` in the namespace for the admission error)"
 }
 
+// recoverStartupOrderedDBClientsFn is indirected so tests can stub the whole step.
+var recoverStartupOrderedDBClientsFn = recoverStartupOrderedDBClients
+
+const (
+	// The post-unpark DB-client recovery polls at this cadence for up to this many ticks (~8 min) — long
+	// enough for a CNPG cluster to restore from EBS and elect a primary, bounded so 'up' can't hang on it.
+	dbRecoveryTicks    = 32
+	dbRecoveryInterval = 15 * time.Second
+)
+
+// recoverStartupOrderedDBClients restarts workloads left not-Ready because they came up BEFORE their CNPG
+// Postgres database was Ready and never retried the connection — a post-unpark ordering trap. (2026-07-02:
+// Backstage started 17 min before backstage-db, failed every DB-backed plugin with ECONNREFUSED, and sat at
+// 503-readiness indefinitely; a pod delete once the DB was Ready fixed it.)
+//
+// It is deliberately conservative and best-effort: it only ever touches a pod that is scheduled, not Ready,
+// NOT a CNPG database pod, NOT a Job pod, lives in a namespace whose CNPG database is now Ready, AND started
+// before that database became Ready. So healthy pods, still-starting pods (they started after the DB), and
+// failures unrelated to database ordering (e.g. a client in a namespace with no CNPG DB) are never restarted.
+// Restart is a pod delete (the owning Deployment/StatefulSet recreates it) — a rollout-restart annotation
+// would be reverted by ArgoCD self-heal. Never fails 'up'.
+func recoverStartupOrderedDBClients(ctx context.Context, kc config.KubeconfigEntry) error {
+	path, cleanup, err := tempKubeconfig(ctx, kc, "platctl-dbclients")
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	k := func(args ...string) ([]byte, error) {
+		return exec.CommandContext(ctx, "kubectl", append([]string{"--kubeconfig", path}, args...)...).CombinedOutput()
+	}
+
+	pods, err := getPods(k)
+	if err != nil {
+		return err
+	}
+	if len(candidateClients(pods)) == 0 {
+		return nil // nothing not-Ready that could be an ordering victim — healthy
+	}
+
+	fmt.Println("  checking for workloads stuck on a database that wasn't Ready at their startup (post-unpark ordering)...")
+	restarted := map[string]bool{}
+	for i := 0; i < dbRecoveryTicks; i++ {
+		pods, err = getPods(k)
+		if err != nil {
+			return err
+		}
+		dbReady := cnpgDBReadyTimes(pods)
+		for _, p := range stuckDBClients(dbReady, pods) {
+			key := p.Namespace + "/" + p.Name
+			if restarted[key] {
+				continue
+			}
+			if _, derr := k("delete", "pod", "-n", p.Namespace, p.Name, "--ignore-not-found"); derr == nil {
+				restarted[key] = true
+				fmt.Printf("  restarted %s (came up before its database was Ready)\n", key)
+			}
+		}
+		// Stop once no candidate is still waiting on a database that isn't Ready yet — we've recovered all we
+		// can (either the DBs are Ready and stragglers were restarted, or the remaining not-Ready pods have no
+		// CNPG database to blame).
+		if !waitingOnDB(pods, dbReady) {
+			break
+		}
+		time.Sleep(dbRecoveryInterval)
+	}
+	if len(restarted) > 0 {
+		fmt.Printf("  restarted %d workload(s) that came up before their database.\n", len(restarted))
+	}
+	return nil
+}
+
+// podInfo is the minimal per-pod state the (pure) DB-client recovery logic reasons over.
+type podInfo struct {
+	Namespace string
+	Name      string
+	Ready     bool      // every container's Ready condition is true
+	Scheduled bool      // assigned to a node
+	IsCNPGDB  bool      // carries the cnpg.io/cluster label (a Postgres database pod)
+	IsJob     bool      // owned by a Job (a CronJob/Job run — not meant to stay Ready)
+	StartTime time.Time // .status.startTime (zero if unset)
+	ReadyTime time.Time // the Ready condition's lastTransitionTime (used only for CNPG DB pods)
+}
+
+// getPods lists all pods and projects them to []podInfo.
+func getPods(k func(...string) ([]byte, error)) ([]podInfo, error) {
+	out, err := k("get", "pods", "--all-namespaces", "-o", "json")
+	if err != nil {
+		return nil, fmt.Errorf("listing pods: %s", strings.TrimSpace(string(out)))
+	}
+	var list struct {
+		Items []struct {
+			Metadata struct {
+				Namespace       string            `json:"namespace"`
+				Name            string            `json:"name"`
+				Labels          map[string]string `json:"labels"`
+				OwnerReferences []struct {
+					Kind string `json:"kind"`
+				} `json:"ownerReferences"`
+			} `json:"metadata"`
+			Spec struct {
+				NodeName string `json:"nodeName"`
+			} `json:"spec"`
+			Status struct {
+				StartTime  string `json:"startTime"`
+				Conditions []struct {
+					Type               string `json:"type"`
+					Status             string `json:"status"`
+					LastTransitionTime string `json:"lastTransitionTime"`
+				} `json:"conditions"`
+			} `json:"status"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(out, &list); err != nil {
+		return nil, fmt.Errorf("parsing pod list: %w", err)
+	}
+	pods := make([]podInfo, 0, len(list.Items))
+	for _, it := range list.Items {
+		p := podInfo{
+			Namespace: it.Metadata.Namespace,
+			Name:      it.Metadata.Name,
+			Scheduled: it.Spec.NodeName != "",
+		}
+		if _, ok := it.Metadata.Labels["cnpg.io/cluster"]; ok {
+			p.IsCNPGDB = true
+		}
+		for _, o := range it.Metadata.OwnerReferences {
+			if o.Kind == "Job" {
+				p.IsJob = true
+			}
+		}
+		p.StartTime = parseK8sTime(it.Status.StartTime)
+		for _, c := range it.Status.Conditions {
+			if c.Type == "Ready" {
+				p.Ready = c.Status == "True"
+				p.ReadyTime = parseK8sTime(c.LastTransitionTime)
+				break
+			}
+		}
+		pods = append(pods, p)
+	}
+	return pods, nil
+}
+
+// parseK8sTime parses a Kubernetes RFC3339 timestamp, returning the zero time on empty/unparseable input.
+func parseK8sTime(s string) time.Time {
+	if s == "" {
+		return time.Time{}
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
+}
+
+// candidateClients returns the pods that could be startup-ordering victims: scheduled, not Ready, and neither
+// a CNPG database pod nor a Job pod. Used to decide whether there's anything worth waiting on.
+func candidateClients(pods []podInfo) []podInfo {
+	var out []podInfo
+	for _, p := range pods {
+		if p.Scheduled && !p.Ready && !p.IsCNPGDB && !p.IsJob {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// cnpgDBReadyTimes returns, per namespace, when its CNPG database became Ready — the latest Ready-condition
+// transition among Ready CNPG pods in that namespace (so a multi-instance cluster counts as Ready once its
+// last member is). Namespaces with no Ready CNPG pod are absent from the map.
+func cnpgDBReadyTimes(pods []podInfo) map[string]time.Time {
+	out := map[string]time.Time{}
+	for _, p := range pods {
+		if p.IsCNPGDB && p.Ready && !p.ReadyTime.IsZero() {
+			if cur, ok := out[p.Namespace]; !ok || p.ReadyTime.After(cur) {
+				out[p.Namespace] = p.ReadyTime
+			}
+		}
+	}
+	return out
+}
+
+// stuckDBClients returns the pods to restart: a candidate client (scheduled, not Ready, non-CNPG, non-Job)
+// in a namespace whose CNPG database is now Ready, that STARTED BEFORE the database became Ready. Pure so the
+// targeting logic is unit-tested without a cluster.
+func stuckDBClients(dbReadyByNS map[string]time.Time, pods []podInfo) []podInfo {
+	var out []podInfo
+	for _, p := range candidateClients(pods) {
+		dbReady, ok := dbReadyByNS[p.Namespace]
+		if !ok {
+			continue // no Ready CNPG database in this namespace
+		}
+		if p.StartTime.IsZero() || !p.StartTime.Before(dbReady) {
+			continue // started at/after the database was Ready — not an ordering victim
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+// waitingOnDB reports whether any candidate client sits in a namespace that HAS a CNPG database which is not
+// yet Ready — i.e. it's worth polling longer because that database might still come up. Once every such
+// namespace's database is Ready (or a candidate has no CNPG database at all), there is nothing more to wait for.
+func waitingOnDB(pods []podInfo, dbReadyByNS map[string]time.Time) bool {
+	cnpgNS := map[string]bool{}
+	for _, p := range pods {
+		if p.IsCNPGDB {
+			cnpgNS[p.Namespace] = true
+		}
+	}
+	for _, p := range candidateClients(pods) {
+		if _, ready := dbReadyByNS[p.Namespace]; cnpgNS[p.Namespace] && !ready {
+			return true
+		}
+	}
+	return false
+}
+
 // runReconnect runs the post-restore repair steps for an environment (see config.EnvConfig.Reconnect):
 // re-apply idempotent units (e.g. platform/cross-vpc-dns — refreshes the private hosted zone to the restored
 // cluster's current API ENIs) and bounce stale cross-cluster connections (e.g. the platform ArgoCD controller).
@@ -468,6 +852,24 @@ func doRolloutRestart(ctx context.Context, kc config.KubeconfigEntry, namespace,
 
 // drainKarpenterNodesFn is indirected so tests can stub the kubectl boundary.
 var drainKarpenterNodesFn = doDrainKarpenterNodes
+
+// drainKarpenterOrFail runs the Karpenter drain and turns a genuine failure into a FATAL, actionable error
+// instead of a printed warning. A failed drain must NOT be followed by scaling the managed node groups to zero —
+// that kills the Karpenter controller (which runs on the system group) mid-drain and can leave its NodePool/
+// EC2NodeClass half-deleted. That exact swallowed-warning path masked a mid-drain `ExpiredToken` on 2026-07-02:
+// 'down' still scaled the node groups and reported "Parked ... " with exit 0, leaving a stale EC2NodeClass that
+// corrupted the next 'up' (see the cluster-parking skill's Learnings log for the full incident and recovery).
+func drainKarpenterOrFail(ctx context.Context, kc config.KubeconfigEntry) error {
+	fmt.Printf("Draining Karpenter-managed nodes on %s (delete NodePool; drains gracefully)...\n", kc.Cluster)
+	if err := drainKarpenterNodesFn(ctx, kc); err != nil {
+		return fmt.Errorf("draining Karpenter nodes on %s: %w — the managed node groups were NOT scaled down "+
+			"(doing so now would kill the Karpenter controller mid-drain and orphan EC2 instances); fix the "+
+			"underlying issue (e.g. `aws sso login --profile %s` for an expired/stale credential — note a stale "+
+			"AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_SESSION_TOKEN in the shell env shadows --profile and "+
+			"survives a fresh sso login) and re-run 'platctl down --env %s'", kc.Cluster, err, kc.Profile, kc.Alias)
+	}
+	return nil
+}
 
 // doDrainKarpenterNodes drains and terminates the Karpenter-managed nodes before the managed node groups
 // (incl. the system group the controller runs on) scale to zero, so the controller doesn't die mid-park and

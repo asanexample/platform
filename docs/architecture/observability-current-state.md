@@ -22,12 +22,14 @@ On the **platform** cluster, in the **`observability`** namespace:
 | **K8s events → Loki** | Alloy singleton watching cluster Events → Loki | chart `alloy 1.10.0` | P3b — `enable_log_pipeline` |
 | **Grafana Tempo** | Traces store (`tempo-distributed`, minimized), S3-backed, **Pod Identity** | chart `tempo-distributed 2.25.5` (app 2.10.7, **grafana-community**) | P3b — `enable_tempo` |
 | **OpenTelemetry Collector** | Trace gateway (OTLP in → Tempo) | chart `opentelemetry-collector 0.158.2` | P3b — `enable_trace_pipeline` |
-| **Curated alerts** | 31 `PrometheusRule`s across 8 components (+ bundled mixins) | — | P4 |
+| **Curated alerts** | 38 `PrometheusRule`s across 11 components (+ bundled mixins) | — | P4 |
 | **Notifications** | `warning`→Slack · `critical`→SNS+Slack+PagerDuty · inhibition | — | P4; secrets via ESO |
 | **gp3 StorageClass** | cluster-default EBS storage (EBS CSI) | — | in the `eks-addons` unit |
 | **Grafana Mimir** | Durable, multi-tenant, S3-backed metrics store | chart `mimir-distributed 6.0.6` | P2 — **ON** on the platform hub (`enable_mimir=true`); Prometheus `remote_write`s here; the hub-and-spoke store |
 | **Prometheus agent (preprod spoke)** | kube-prometheus-stack agent mode (+ KSM + node-exporter) on **preprod**, `remote_write`s to the hub Mimir under tenant `preprod` | chart `kube-prometheus-stack 87.5.0` | P10 — `infra/modules/observability-prometheus-agent` |
 | **policy-reporter** | Watches Kyverno's PolicyReport/ClusterPolicyReport CRs → metrics + bundled Grafana dashboards (Overview/PolicyReport/ClusterPolicyReport, `$cluster` filter). Hub renders dashboards; the preprod spoke only emits metrics for the hub's federated view | chart `policy-reporter 3.7.4` | P12 — `enable_policy_reporting`, closes #93; on both platform + preprod |
+| **OpenCost** | In-cluster cost allocation (namespace/workload) from node/pod usage × AWS pricing API; own metrics scraped back into Prometheus | chart `opencost 2.5.23` | P11 — `enable_cost_metrics` |
+| **true-cost-exporter** | Real AWS spend (CUR via Athena, cross-account) by team/service/account, reconciled against OpenCost's estimate — OpenCost's own `cloudCost` isn't Prometheus-scrapeable, so this is the Grafana-visible path | custom exporter, `infra/modules/observability-opencost/true-cost-exporter.tf` | P11 pt2 — `enable_cloud_cost`, closes #668; platform hub only (CUR is org-wide) |
 
 > **cost_profile (`common.hcl`/`_base.hcl`):** `dev` (default) = single-replica + durable stores **off**. The
 > platform cluster overrides `enable_mimir` / `enable_loki` / `enable_log_pipeline` / `enable_tempo` /
@@ -134,6 +136,26 @@ the SLO metrics (`slo:sli_error:*`, `slo:current_burn_rate:ratio`, …) remote-w
 **alerts route via the P4 Alertmanager** by severity (`pageAlert`=critical, `ticketAlert`=warning). First SLO:
 **API server request availability** (99.9%). The grafana.com **"High level Sloth SLOs"** dashboard (14643) is
 provisioned as code. `slo_engine` is the seam for a future Pyrra/Grafana-SLO swap.
+
+### Per-app SLOs (registry-derived, ADR-056 Phase 3 — distinct from Sloth above)
+
+A **second, separate** SLO mechanism covers application environments, live since ADR-056 Phase 3
+(#900/#882). Unlike the Sloth SLOs above (manually authored per platform service), an app SLO is
+**derived automatically** for every `prod` `XEnvironment` claim — the `mimir` unit's Terragrunt scans
+`gitops/environments/**/prod.yaml` (`fileset`+`yamldecode`) and generates one fixed **99.9%
+HTTP-success-rate** SLO per environment from Beyla's RED metrics
+(`http_server_request_duration_seconds_count{k8s_namespace_name="<env>"}`), rendered as multi-window
+burn-rate rules into an **`app-slos`** **Mimir ruler namespace** (synced by `mimirtool rules sync`, not
+Sloth's `PrometheusServiceLevel`→`PrometheusRule` path). There's no per-Product objective override
+today — the 99.9% target is a fixed template.
+
+**Consumer: the ADR-056 canary error-budget freeze gate.** Before any Rollout traffic shifts, a
+one-shot `AnalysisTemplate` queries `slo:current_burn_rate:ratio{sloth_id="<env>-availability"}` — if
+the environment is already burning ≥2× its 30-day error budget (an active incident), the deploy is
+**frozen** before it starts, rather than layering a risky deploy on top of an ongoing incident. This is
+distinct from the ADR-056 canary-gate `AnalysisStep` (which watches the *new* version's live success
+rate during rollout) — the freeze gate asks "is it safe to deploy at all," the canary gate asks "is
+this deploy working."
 
 ### Continuous profiling (P8)
 
@@ -289,7 +311,9 @@ gp3 is the cluster-**default** StorageClass (encrypted, expandable, WaitForFirst
 | Logs — store / collector | `infra/modules/observability-loki/` · `infra/modules/observability-alloy/` |
 | Events → Loki | `infra/modules/observability-events/` |
 | Traces — store / collector | `infra/modules/observability-tempo/` · `infra/modules/observability-otel-collector/` |
-| Metrics durable store (+ cross-cluster `spoke_ingest` edge) | `infra/modules/observability-mimir/` |
+| Metrics durable store (+ cross-cluster `spoke_ingest` edge + `app_slos` ruler namespace) | `infra/modules/observability-mimir/` |
+| Per-app SLO derivation (registry → `app_slos` input) | `infra/live/aws/platform/us-east-1/platform/mimir/terragrunt.hcl` |
+| Canary error-budget freeze gate (`AnalysisTemplate`) | `scaffolder/templates/new-product/skeleton/k8s/overlays/prod/progressive.yaml` |
 | Metrics spoke collector (preprod) | `infra/modules/observability-prometheus-agent/` · runbook `docs/runbooks/observability-spoke-onboarding.md` |
 | SNS topic | `infra/modules/aws/sns-notifications/` |
 | gp3 StorageClass | `infra/modules/aws/eks-addons/` (`create_default_storageclass`) |
