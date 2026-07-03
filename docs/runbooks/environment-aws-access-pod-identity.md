@@ -110,8 +110,10 @@ AWS_PROFILE=preprod aws eks list-pod-identity-associations --cluster-name prepro
   Cilium classifies the agent (`169.254.170.23:80`) as the **`host`** entity, which CIDR egress rules
   don't match; the Composition's `allow-pod-identity-egress` CiliumNetworkPolicy
   (`toEntities: ["host"]`, port 80) grants it. Confirm with `cilium monitor --type drop` on the node —
-  a `…->host: …169.254.170.23:80 … Policy denied` means that CNP is missing/not applied. (IMDS stays
-  blocked by the node's IMDSv2 hop-limit=1, not by this rule.)
+  a `…->host: …169.254.170.23:80 … Policy denied` means that CNP is missing/not applied. (IMDS
+  (`169.254.169.254`) stays blocked — by the explicit `deny-imds-egress` CiliumNetworkPolicy
+  (`egressDeny`, deny wins over this `host` allow) plus the node's IMDSv2 hop-limit=1 backstop — not
+  by this rule; #160.)
 - **Environment workload tried to set an `eks.amazonaws.com/role-arn` annotation** — denied by
   `disallow-irsa-annotation-cross-team` (by design — environment workloads use Pod Identity, not IRSA;
   IRSA is platform-only).

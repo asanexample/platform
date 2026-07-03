@@ -267,6 +267,42 @@ spec:
                               - port: "80"
                                 protocol: TCP
             ---
+            # Explicit, identity-independent eBPF deny of pod egress to the EC2 Instance Metadata Service
+            # (IMDS, 169.254.169.254) — issue #160. The sibling allow-pod-identity-egress above permits
+            # pod->host:80, which INCLUDES IMDS (a host-local address), re-opening it at the Cilium layer even
+            # though allow-dns-egress excludes it from the 0.0.0.0/0 allow. Tenant IMDS protection must NOT rest
+            # solely on the node's IMDSv2 HttpPutResponseHopLimit=1 (which overlay masquerade SNAT could, in
+            # principle, defeat by making pod->IMDS packets appear host-sourced / 0-hop). A Cilium egressDeny
+            # takes STRICT precedence over every allow (CNP, CCNP, and k8s NetworkPolicy) and matches purely by
+            # destination CIDR — so it holds regardless of hop-limit or masquerade behaviour, and regardless of
+            # source/destination identity. Scoped to THIS environment namespace only (endpointSelector: {} inside
+            # {{ $ns }}), so no kube-system / CNI / Karpenter / host-network component is affected — those are not
+            # tenant namespaces and legitimately reach IMDS. The Pod Identity agent (169.254.170.23) is a DIFFERENT
+            # link-local address, NOT in the deny set, so environment AWS credential fetch (ADR-041) keeps working.
+            # The IPv6 IMDS address (fd00:ec2::254) is included belt-and-suspenders; our nodes run IPv4-only pods
+            # with IMDS-over-IPv6 disabled by default, so it is inert today but future-proofs the control.
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: cnp-deny-imds-egress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: cilium.io/v2
+                  kind: CiliumNetworkPolicy
+                  metadata:
+                    name: deny-imds-egress
+                    namespace: {{ $ns }}
+                  spec:
+                    endpointSelector: {}
+                    egressDeny:
+                      - toCIDR:
+                          - "169.254.169.254/32"
+                          - "fd00:ec2::254/128"
+            ---
             apiVersion: kubernetes.crossplane.io/v1alpha2
             kind: Object
             metadata:
