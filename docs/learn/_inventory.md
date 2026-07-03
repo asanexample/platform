@@ -8,10 +8,11 @@
 > tiers — deep dive · tutorial · cheatsheet · troubleshooting — are added **only where a subsystem earns
 > them** (see [the mold](_mold.md)); a typical module is two files, not seven.
 >
-> **This is aspirational.** It's the full map, not a committed backlog — the realistic near-term is the
-> spine plus a handful, pulled in on demand (a real reader, a demo, interest). Granularity is a guess;
-> modules will split and merge as we build. **Audience** is decided *per module* at build time, not per
-> domain — most are platform-engineer-facing; the genuinely developer-facing ones are called out in the
+> **This is aspirational.** It's the full map, not a committed backlog. **The spine is complete** and **two
+> modules** (domain model, Environment API) are built; the near-term is the crosslink-debt modules
+> (Delivery, Policy, Identity), pulled in on demand (a real reader, a demo, interest). Granularity is a
+> guess; modules will split and merge as we build. **Audience** is decided *per module* at build time, not
+> per domain — most are platform-engineer-facing; the genuinely developer-facing ones are called out in the
 > notes.
 
 **Status:** ✅ built · 🔜 next · ⏳ planned
@@ -22,11 +23,11 @@ The docs that tie the per-module courses into a whole. Not subsystem modules —
 
 | Doc | What it covers | Status |
 | --- | --- | --- |
-| **The Life of a Deployment** | one `git push` traced end-to-end across every plane — the narrative onramp | 🔜 |
-| **The Life of a Request** *(candidate)* | one user request traced at runtime: edge → gateway → route → pod → signals; complements the deployment narrative | ⏳ |
-| **How the platform fits** | the control planes and how they hand off; the structural hub the map resolves into | 🔜 |
-| **The security model** | defense-in-depth across admission · runtime · supply-chain · identity · network · secrets — the unifying view no single domain gives (ADR-013/014/041/045/050/057/062) | ⏳ |
-| **Why this platform exists** | the North Star / platform-engineering thesis (the "big why") | ⏳ |
+| **[The Life of a Deployment](spine/life-of-a-deployment.md)** | one `git push` traced end-to-end across every plane — the narrative onramp (control plane) | ✅ |
+| **[The Life of a Request](spine/life-of-a-request.md)** | one user request traced at runtime: edge → gateway → route → pod → signals (data plane) | ✅ |
+| **[How the Platform Fits](spine/how-the-platform-fits.md)** | the control planes and how they hand off; the structural map (+ a "where this model comes from" canon) | ✅ |
+| **[The Security Model](spine/the-security-model.md)** | defense-in-depth across the 4 C's, with an honest gaps register | ✅ |
+| **[Why the Platform Exists](spine/why-the-platform-exists.md)** | the North Star / platform-engineering thesis (the "big why") | ✅ |
 | Portal hub · Glossary | the index + shared vocabulary | ✅ |
 
 ## 1 · Foundations — a sub-curriculum
@@ -167,10 +168,14 @@ docs for gaps), then thicken it as modules land.
 Rough order, and it's **debt-driven** — build what the *existing* docs already reference
 (see [`_crosslinks.md`](_crosslinks.md)):
 
-1. **Spine skeleton** — Life of a Deployment + How-the-platform-fits. Makes the two built modules cohere.
-2. **The crosslink-debt modules** — **Delivery**, **Policy & admission**, **Identity/access** (and
-   **Foundations**, which the multi-account reference also owes). These pay down real links from the built
-   docs and complete the provisioning → delivery → policy → identity loop.
+1. **Spine — ✅ DONE (all 5 docs).** Why-it-exists · Life-of-a-Deployment · Life-of-a-Request · How-it-Fits ·
+   the Security Model. These cohere the two built modules (domain model, Environment API) — *and* create the
+   crosslink debt the next modules pay down (every spine doc forward-refs "coming: Delivery / Policy /
+   Identity / Observability…").
+2. **← WE ARE HERE: the crosslink-debt modules** — **Delivery**, **Policy & admission**, **Identity/access**
+   (and **Foundations**, which the multi-account reference also owes). These pay down the real links the
+   spine + built docs already make, and complete the provisioning → delivery → policy → identity loop. Quick
+   adjacent win alongside them: **Self-service cloud resources** (extends the built Environment API module).
 3. **Breadth on demand** — Observability, Cost, the Agentic platform, Developer experience, Operations —
    pulled in as a real reader, a demo, or interest calls for them. No obligation to build all 24.
 
