@@ -229,7 +229,8 @@ model.)
 > digest getting merged into the platform repo's git. CI never calls ArgoCD — it just changes git, and
 > ArgoCD, always watching git, notices. Pure choreography.)*
 
-*Its own module, later: **Delivery pipeline** (ArgoCD, ApplicationSets, registry-sync — ADR-021/069).*
+*Its own module: **[Delivery](../delivery/orientation.md)** — ArgoCD, ApplicationSets, the promotion
+ladder, and Rollouts, in depth (ADR-021/069).*
 
 ## 6 · Kyverno admits it (policy)
 
@@ -460,8 +461,9 @@ control plane): [The Life of a Request](life-of-a-request.md).
   workload moved in *(built)*.
 - [The domain model](../domain-model/orientation.md) — what Team / Product / Service / Environment actually
   mean *(built)*.
-- Coming: Delivery (ArgoCD + Rollouts) · Policy (Kyverno) · Supply chain (signing + provenance) ·
-  Identity & access (Pod Identity) · Observability · Nodes & networking.
+- [Delivery](../delivery/orientation.md) (ArgoCD + the promotion ladder + Rollouts) *(built)*.
+- Coming: Policy (Kyverno) · Supply chain (signing + provenance) · Identity & access (Pod Identity) ·
+  Observability · Nodes & networking.
 
 **Source of truth (as-built):**
 [Promotion & Release](../../architecture/promotion-and-release.md) ·
