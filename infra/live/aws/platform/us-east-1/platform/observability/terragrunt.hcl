@@ -119,6 +119,10 @@ inputs = {
   # flipping this on. Empty = direct single-tenant write (unchanged).
   cortex_tenant_write_url = include.base.locals.enable_per_team_tenants ? "http://cortex-tenant.observability.svc:8080/push" : ""
 
+  # A pre-filtered "Team Overview — <team>" dashboard per Team (Teams folder), derived from the Team registry
+  # — a default view of only that team's environments. Registry-driven: add a Team → get its overview.
+  team_overview_teams = [for f in fileset("${get_repo_root()}/gitops/teams", "*.yaml") : trimsuffix(basename(f), ".yaml")]
+
   # Alertmanager → SNS (critical alerts → email)
   # Alertmanager SNS publish uses EKS Pod Identity (ADR-047, #594) — no OIDC/IRSA inputs needed.
   alerts_topic_arn = dependency.sns_notifications.outputs.topic_arn

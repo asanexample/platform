@@ -276,6 +276,12 @@ variable "gateway_service_namespace" {
   default     = "default"
 }
 
+variable "team_overview_teams" {
+  description = "Teams to render a pre-filtered `Team Overview — <team>` dashboard for (Teams folder). Each shows only that team's environment namespaces (<team>-*) — the lightweight default-view-per-team need. Empty = none."
+  type        = list(string)
+  default     = []
+}
+
 variable "cortex_tenant_write_url" {
   description = "P13 per-team re-tenant (#590): when set, hub Prometheus remote_writes to cortex-tenant at this URL (with a forced namespace→`tenant` relabel) instead of directly to Mimir, so metrics are split into per-team tenants. Empty = direct single-tenant write (the mimir_tenant_id header). See observability-cortex-tenant."
   type        = string
