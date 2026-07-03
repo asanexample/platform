@@ -99,6 +99,53 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-03 (end-of-day PARK #2) — second overnight park of both clusters, same day (after the morning
+  park→unpark cycle above). ✅ Clean, cost-zero, no new surprises — the pattern is now boringly repeatable.**
+  `AWS_PROFILE=management ./bin/platctl down --env <env> --yes` each, in parallel in the background. **Preprod**
+  again the cleaner ("Karpenter nodes drained and terminated" + "EC2NodeClass deleted", 1 node force-terminated).
+  **Platform** again threw the familiar slow-drain warnings ("NodeClaims still present after 6m", "EC2NodeClass
+  still present after 90s") — this platform>preprod drain-time asymmetry is now a RELIABLE pattern, not a defect —
+  then scaled `system`→0 and force-terminated 3 PDB-blocked nodes. Both bastions auto-stopped. **Cost-zero
+  verified (per explicit ask):** both `system` node groups `desiredSize=0`, **0 running/pending instances in BOTH
+  accounts**, and the two bastions `stopping`/`stopped` (checked by their known instance IDs — note the
+  `tag:Name=<env>-use1-eks-ssm-bastion` filter returned EMPTY, so the bastion Name tag is NOT that value; verify a
+  bastion by the instance ID printed in the `down` output, or don't rely on that tag). Nothing billable left.
+
+- **2026-07-03 (unpark, same cycle) — UNPARK both clusters, `AWS_PROFILE=management ./bin/platctl up --env <env>`
+  each (from the MAIN checkout — `up` runs terragrunt applies), run in parallel in the background. ✅ Both restored
+  cleanly and BOTH self-healing fixes fired automatically again — no manual intervention.** Node groups restored +
+  `ACTIVE` (platform `system` desired/min=2, preprod=1), bastions restarted by `up`, cluster API reachable once
+  nodes + the TS router returned. **Karpenter health gate passed on the FIRST check on both** ("Karpenter ready:
+  EC2NodeClass present, NodePool(s) Ready=True") — the down/up symmetry holds, no stuck-NodeClass. Preprod printed
+  "Reconnect complete — platform can reach the restored preprod cluster" (cross-vpc-dns re-apply was a no-op /
+  idempotent + argocd-application-controller bounced). **✅ DB-client recovery (#1105):** on PLATFORM it restarted
+  `backstage` AND `keycloak` ("came up before its database was Ready") — both self-healed, NO manual pod-delete
+  (preprod had no such victim). **Pod-readiness sweep (the lesson — don't judge by node state alone):** after ~2-3
+  min the only not-Ready pods were the KNOWN standing set, NOT regressions — platform `triage-demo/checkout`
+  CrashLoop (the 6d-old broken demo: `dial tcp payments-db:5432: connection refused`, and confirmed there is **no**
+  payments-db in the ns) + preprod `observability/alloy-profiles-<x>` DaemonSet pod `Pending` on `Insufficient cpu`
+  (the standing preprod small-node CPU-packing constraint, same class as the falco one — non-critical Pyroscope
+  agent, schedules as Karpenter adds capacity). `argo-rollouts` (both) + `alloy-profiles` briefly crashed/`0/1`
+  during the fresh-node bring-up storm and **self-recovered within ~1-2 min** (the Cilium-429 node-storm transient
+  — don't chase). **Takeaway: unpark is now genuinely hands-off — the two durable fixes (backstage/keycloak DB
+  recovery, descheduler) hold; budget a couple minutes for the node-storm transients to settle before declaring
+  anything broken; verify pod READINESS not just nodegroup status.**
+
+- **2026-07-03 — PARK (overnight) on both clusters. ✅ Clean, cost-zero, no surprises. (Unpark exercised same
+  cycle — see the entry above.)** `AWS_PROFILE=management ./bin/platctl down --env <env> --yes` each (on Tailscale — both subnet routers
+  active). **Platform** threw the by-now-familiar slow-drain warnings ("Karpenter NodeClaims still present after
+  6m", "EC2NodeClass still present after 90s (finalizer stuck?)") then scaled `system`→0 and **force-terminated 3**
+  PDB-blocked draining nodes; bastion `i-04ce…` stopped. **Preprod** was the cleaner of the two — "Karpenter nodes
+  drained and terminated" + "EC2NodeClass deleted" symmetrically, **no** lingering warnings, force-terminated **1**
+  node; bastion `i-094e…` stopped. (The platform-vs-preprod asymmetry in the drain warnings is just timing/PDB
+  luck, not a defect — both end cost-zero.) **Verified via the AWS EKS API + EC2 (kubectl is unreachable post-park
+  — TS router gone):** both `system` node groups `desiredSize=0`, and **0 running/pending instances in BOTH
+  accounts** → true cost-zero (platctl stopped the bastions itself, no manual `ec2 stop-instances`). The classifier
+  did NOT block this time — "let's park the cluster and pick up tomorrow" read as a clear-enough go. Reinforced
+  gotcha: `unset AWS_ACCESS_KEY_ID/SECRET/SESSION_TOKEN` in the SAME command as each `aws` verify call (stale static
+  env creds otherwise `ExpiredToken`). **Open watch-items for next `up`:** the two self-healing fixes proven
+  2026-07-02 (backstage DB-client recovery #1105, descheduler rebalance #1106) — confirm they still hold.
+
 - **2026-07-02 (later, ~noon) — SECOND full PARK + UNPARK on both clusters, to validate the two fixes shipped
   after the afternoon cycle: the `platctl up` DB-client recovery (#1105) and the descheduler (#1106). ✅ BOTH
   fixes PROVEN working automatically end-to-end — unpark is now materially more hands-off.** PARK: clean on both
