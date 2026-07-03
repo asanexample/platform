@@ -40,6 +40,30 @@ variable "storage_size" {
   default     = "5Gi"
 }
 
+variable "enable_backups" {
+  description = "Enable Barman Cloud backups (#1119): attach the WAL-archiver plugin to the Cluster + create the ObjectStore and a daily ScheduledBackup. Requires the barman-cloud plugin installed (cnpg module) and the cluster's Pod-Identity backup role (cnpg-backups module). Enabling ATTACHES the WAL archiver, which rolls the instance once."
+  type        = bool
+  default     = false
+}
+
+variable "backup_destination_path" {
+  description = "S3 destination for backups + WALs, e.g. s3://platform-cnpg-backups/triage-copilot-db. Must match the prefix the cluster's Pod-Identity backup role is scoped to. Required when enable_backups."
+  type        = string
+  default     = ""
+}
+
+variable "backup_retention" {
+  description = "Barman retention policy (form XXu, u in [dwm]) — how long base backups + WALs are kept."
+  type        = string
+  default     = "30d"
+}
+
+variable "backup_schedule" {
+  description = "ScheduledBackup cron (CNPG 6-field, includes seconds). Default 03:00 daily."
+  type        = string
+  default     = "0 0 3 * * *"
+}
+
 variable "db_secret_name" {
   description = "Secrets Manager name for the published connection string (uri)."
   type        = string
