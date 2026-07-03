@@ -17,6 +17,7 @@ configuration hierarchy that promotes consistency across environments.
 
 | Document | Description |
 |----------|-------------|
+| [Learn the Platform](learn/) | **Teaching layer** — guided, ground-up courses that build the mental model (vs. reference). First module: the Environment API; more to follow |
 | [Onboarding Guide](onboarding.md) | New team member quickstart: prerequisites, first deploy, daily workflows |
 | [Ship a Service](ship-a-service.md) | **Developer paved road**: New Product → signed image → promote → gated prod, via Backstage |
 | [User Guide](user-guide.md) | Complete reference for module configuration, deployments, and day-2 operations |
