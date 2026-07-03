@@ -99,8 +99,28 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
-- **2026-07-03 — PARK (overnight) on both clusters. ✅ Clean, cost-zero, no surprises. Unpark NOT exercised this
-  cycle.** `AWS_PROFILE=management ./bin/platctl down --env <env> --yes` each (on Tailscale — both subnet routers
+- **2026-07-03 (unpark, same cycle) — UNPARK both clusters, `AWS_PROFILE=management ./bin/platctl up --env <env>`
+  each (from the MAIN checkout — `up` runs terragrunt applies), run in parallel in the background. ✅ Both restored
+  cleanly and BOTH self-healing fixes fired automatically again — no manual intervention.** Node groups restored +
+  `ACTIVE` (platform `system` desired/min=2, preprod=1), bastions restarted by `up`, cluster API reachable once
+  nodes + the TS router returned. **Karpenter health gate passed on the FIRST check on both** ("Karpenter ready:
+  EC2NodeClass present, NodePool(s) Ready=True") — the down/up symmetry holds, no stuck-NodeClass. Preprod printed
+  "Reconnect complete — platform can reach the restored preprod cluster" (cross-vpc-dns re-apply was a no-op /
+  idempotent + argocd-application-controller bounced). **✅ DB-client recovery (#1105):** on PLATFORM it restarted
+  `backstage` AND `keycloak` ("came up before its database was Ready") — both self-healed, NO manual pod-delete
+  (preprod had no such victim). **Pod-readiness sweep (the lesson — don't judge by node state alone):** after ~2-3
+  min the only not-Ready pods were the KNOWN standing set, NOT regressions — platform `triage-demo/checkout`
+  CrashLoop (the 6d-old broken demo: `dial tcp payments-db:5432: connection refused`, and confirmed there is **no**
+  payments-db in the ns) + preprod `observability/alloy-profiles-<x>` DaemonSet pod `Pending` on `Insufficient cpu`
+  (the standing preprod small-node CPU-packing constraint, same class as the falco one — non-critical Pyroscope
+  agent, schedules as Karpenter adds capacity). `argo-rollouts` (both) + `alloy-profiles` briefly crashed/`0/1`
+  during the fresh-node bring-up storm and **self-recovered within ~1-2 min** (the Cilium-429 node-storm transient
+  — don't chase). **Takeaway: unpark is now genuinely hands-off — the two durable fixes (backstage/keycloak DB
+  recovery, descheduler) hold; budget a couple minutes for the node-storm transients to settle before declaring
+  anything broken; verify pod READINESS not just nodegroup status.**
+
+- **2026-07-03 — PARK (overnight) on both clusters. ✅ Clean, cost-zero, no surprises. (Unpark exercised same
+  cycle — see the entry above.)** `AWS_PROFILE=management ./bin/platctl down --env <env> --yes` each (on Tailscale — both subnet routers
   active). **Platform** threw the by-now-familiar slow-drain warnings ("Karpenter NodeClaims still present after
   6m", "EC2NodeClass still present after 90s (finalizer stuck?)") then scaled `system`→0 and **force-terminated 3**
   PDB-blocked draining nodes; bastion `i-04ce…` stopped. **Preprod** was the cleaner of the two — "Karpenter nodes
