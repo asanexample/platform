@@ -56,7 +56,17 @@ if [ -n "$MODULE_TF" ]; then
   fi
 fi
 
-# 5. tofu validate — check staged modules that changed
+# 5. gitleaks — scan STAGED changes for committed secrets (#1148). Soft-skip if gitleaks isn't
+#    installed (like markdownlint/terraform-docs above); CI enforces it unconditionally. The allowlist
+#    in .gitleaks.toml suppresses the SOPS ciphertext (*.enc.yaml, ADR-066) + .example templates.
+if command -v gitleaks > /dev/null 2>&1; then
+  if ! gitleaks git --staged --no-banner --redact -c .gitleaks.toml > /dev/null 2>&1; then
+    echo "gitleaks: potential secret in staged changes (run: gitleaks git --staged -v -c .gitleaks.toml)"
+    FAILED=1
+  fi
+fi
+
+# 6. tofu validate — check staged modules that changed
 if [ -n "$MODULE_TF" ]; then
   DIRS=$(echo "$MODULE_TF" | xargs -n1 dirname | sort -u)
   for dir in $DIRS; do

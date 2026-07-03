@@ -510,3 +510,47 @@ jobs:
         with:
           name: semgrep-sarif
           path: semgrep.sarif
+
+  # Secret scanning (#1148). gitleaks over the FULL git history — a scanner backstop over the SOPS
+  # discipline + review (ADR-066), to catch a credential committed in plaintext by mistake. Same posture
+  # as Trivy above: install the CLI at a PINNED version (download release binary + verify its SHA-256 —
+  # no `curl | sh`, no third-party Action), and ENFORCE (fail-closed on any finding). The allowlist in
+  # `.gitleaks.toml` suppresses the deliberately-committed SOPS ciphertext (`*.enc.yaml`, ADR-066) and
+  # `.example` templates so the scan is signal, not noise — the baseline (full history + working tree)
+  # was triaged clean before enforcing. SARIF is uploaded as an artifact (like Trivy/Semgrep) — these
+  # repos are private without GitHub Advanced Security, so the Security-tab SARIF integration is
+  # unavailable; findings surface in the job log + the artifact.
+  gitleaks:
+    name: gitleaks (secret scan)
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: "8.30.1" # pinned; bump deliberately to pull newer default rules
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0 # full history — `gitleaks git` scans every commit
+      - name: Install gitleaks CLI (download release binary + verify SHA-256)
+        run: |
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          asset="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          # keep the original asset name so `sha256sum -c` (which reads the name from the
+          # checksums line) can find the downloaded file.
+          curl -sfL "${base}/${asset}" -o "${asset}"
+          curl -sfL "${base}/gitleaks_${GITLEAKS_VERSION}_checksums.txt" -o gitleaks_checksums.txt
+          grep " ${asset}\$" gitleaks_checksums.txt | sha256sum -c -
+          tar xzf "${asset}" gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+          rm -f gitleaks "${asset}" gitleaks_checksums.txt
+          gitleaks version
+      - name: Scan full history for committed secrets
+        run: |
+          # For each scan: SARIF artifact (exit 0, always written) then the BLOCKING gate (exit 1) with
+          # verbose output, so findings are visible in the log when the gate fails (mirrors the Trivy job).
+          gl() { gitleaks git --config .gitleaks.toml --no-banner --redact "$@"; }
+          gl --report-format sarif --report-path gitleaks.sarif --exit-code 0
+          echo "::group::gitleaks findings"; gl --exit-code 1 --verbose; echo "::endgroup::"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: gitleaks-sarif
+          path: gitleaks.sarif
