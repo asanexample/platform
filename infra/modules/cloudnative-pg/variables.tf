@@ -51,6 +51,12 @@ variable "replica_count" {
   default     = 1
 }
 
+variable "enable_pod_monitor" {
+  description = "Create a PodMonitor that scrapes the CNPG per-instance metrics endpoint (:9187, cnpg_collector_*) across all namespaces — feeds the backup/health alerts (#1119). Requires the Prometheus-operator PodMonitor CRD (kube-prometheus-stack)."
+  type        = bool
+  default     = true
+}
+
 variable "enable_barman_plugin" {
   description = "Install the Barman Cloud CNPG-I plugin (v0.13.0, vendored local chart) into the operator namespace — the backup engine for base backups + WAL archiving to S3 (#1119). Requires cert-manager (issues the plugin's mTLS cert). Additive: installs the plugin + its ObjectStore CRD; clusters only use it once they declare spec.plugins."
   type        = bool

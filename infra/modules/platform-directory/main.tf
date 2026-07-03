@@ -181,6 +181,12 @@ resource "kubernetes_manifest" "db_ingress" {
             { port = "5432", protocol = "TCP" },
           ] }]
         },
+        {
+          # Prometheus (observability ns) scrapes the instance metrics endpoint (:9187). Separate rule because
+          # Cilium can't combine fromEndpoints with the fromEntities rule above. #1119 PR4.
+          fromEndpoints = [{ matchLabels = { "k8s:io.kubernetes.pod.namespace" = "observability" } }]
+          toPorts       = [{ ports = [{ port = "9187", protocol = "TCP" }] }]
+        },
       ]
     }
   }
