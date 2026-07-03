@@ -105,7 +105,9 @@ next refresh, not instantly). `creationPolicy: Owner` ties the k8s Secret's life
 Today **all** ESO secrets are **platform-scoped**. The `aws-secrets-manager` `ClusterSecretStore` runs on the
 platform and preprod clusters and reads `platform/<service>/<name>` from Secrets Manager via the single
 platform-scoped ESO Pod Identity role. Platform services — Keycloak, Tailscale, ArgoCD SSO — consume their
-secrets this way. (Dex and oauth2-proxy are retired and no longer consume secrets.)
+secrets this way. (Dex is retired and consumes no secrets. oauth2-proxy is **not** retired — the
+`rollouts-sso` unit re-introduced it to front the Argo Rollouts dashboard, and it consumes its OIDC
+client secret and cookie secret this same way.)
 
 **Environment workloads do not get AWS access through ESO.** Environment access to AWS *resources* (S3, etc.) is **EKS
 Pod Identity** (ADR-041/047): an association binds a named ServiceAccount to a per-service

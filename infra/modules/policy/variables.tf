@@ -31,7 +31,7 @@ variable "compliance_tier" {
 }
 
 variable "allowed_registries" {
-  description = "Container image registry prefixes admitted cluster-wide (e.g. the platform ECR host). The cluster-wide floor; per-environment scoping is layered on top via tenant_registry_map."
+  description = "Container image registry prefixes admitted cluster-wide (e.g. the platform ECR host). The cluster-wide floor; per-environment scoping (restrict-images) is derived from the Product registry and owned by the Crossplane Environment Composition (ADR-046)."
   type        = list(string)
   default     = []
 }
@@ -200,7 +200,7 @@ variable "replica_floor_failure_action" {
 # ---------------------------------------------------------------------------
 
 variable "enable_image_verification" {
-  description = "Deploy the per-team verifyImages policies (cosign keyless) and the Kyverno IRSA role granting ECR read (so Kyverno can fetch signatures). Requires app CI to sign images first (#74). Off by default."
+  description = "Deploy the per-team verifyImages policies (cosign keyless) and the Kyverno EKS Pod Identity role (ADR-047 — not IRSA) granting ECR read (so Kyverno can fetch signatures). Requires app CI to sign images first (#74). Off by default."
   type        = bool
   default     = false
 }
@@ -217,7 +217,7 @@ variable "verify_failure_action" {
 }
 
 variable "enable_attestation_verification" {
-  description = "Deploy the per-team verify-attestations policies requiring a cosign-signed SBOM (CycloneDX) AND SLSA provenance attestation, in addition to the image signature (#108/108d). Reuses verify_subjects + the Kyverno ECR-read IRSA, so it also requires enable_image_verification = true. Off by default."
+  description = "Deploy the per-team verify-attestations policies requiring a cosign-signed SBOM (CycloneDX) AND SLSA provenance attestation, in addition to the image signature (#108/108d). Reuses verify_subjects + the Kyverno ECR-read Pod Identity role, so it also requires enable_image_verification = true. Off by default."
   type        = bool
   default     = false
 }
@@ -257,7 +257,7 @@ variable "ecr_account_id" {
 }
 
 variable "ecr_region" {
-  description = "Region of the ECR repos (for the IRSA policy resource ARN)."
+  description = "Region of the ECR repos (for the Pod Identity role's policy resource ARN)."
   type        = string
   default     = "us-east-1"
 }

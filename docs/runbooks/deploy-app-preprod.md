@@ -822,8 +822,8 @@ kubectl rollout restart deployment -n external-dns external-dns
 shows `Ready: False`.
 
 **Cause:** cert-manager uses DNS-01 challenge via Route53. The
-ClusterIssuer's IRSA role must have permissions to modify the Route53
-hosted zone.
+ClusterIssuer's EKS Pod Identity role (ADR-047 — not IRSA) must have
+permissions to modify the Route53 hosted zone.
 
 **Fix:**
 
@@ -838,7 +838,7 @@ kubectl logs -n cert-manager -l app.kubernetes.io/name=cert-manager --tail=50
 kubectl get challenges -A
 
 # Common causes:
-# - Route53 permissions: cert-manager IRSA role cannot create TXT records
+# - Route53 permissions: cert-manager Pod Identity role cannot create TXT records
 # - Rate limiting: Let's Encrypt rate limits (5 certs per domain per week)
 # - DNS propagation: challenge TXT record not visible yet (wait and retry)
 ```

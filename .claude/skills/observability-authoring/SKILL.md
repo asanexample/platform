@@ -102,6 +102,37 @@ slos = [{
 it per burn-rate window. The Sloth dashboard is provisioned by the module. Burn-rate
 alerts route through the same Alertmanager (page = critical, ticket = warning).
 
+## Per-app SLOs (registry-derived, live — distinct from Sloth above)
+
+Every `prod` environment gets an SLO **automatically** — no authoring step, no `slos` input
+to edit. The `mimir` unit's Terragrunt scans every `gitops/environments/**/prod.yaml`
+(`fileset` + `yamldecode`, the repo's usual registry-derivation idiom) and derives one fixed
+**99.9% HTTP-success-rate** SLO per environment from Beyla's RED metrics
+(`http_server_request_duration_seconds_count{k8s_namespace_name="<env>"}`). There's no
+`Product`/`XEnvironment` field to set — the objective is a fixed template today (a
+per-Product/tier override is a possible future knob, not built). The rendered SLOs go into
+an `app-slos.yaml` Mimir **ruler** namespace (multi-window burn-rate rules, Google-SRE
+thresholds), synced by the module's `mimirtool rules sync` CronJob — a different delivery
+path than Sloth's `PrometheusServiceLevel` CRs above.
+
+**Structural contrast with Sloth:**
+
+| | Per-app SLOs (`app_slos`) | Sloth platform SLOs |
+|---|---|---|
+| Scope | Every prod environment (auto) | Platform services (manual) |
+| Source | `gitops/environments/**/prod.yaml`, registry-derived | Terragrunt `slos` input, hand-authored |
+| Objective | Fixed 99.9% (no override yet) | Per-SLO in the input |
+| Delivery | Rendered into a Mimir **ruler** namespace | `PrometheusServiceLevel` CR → Sloth controller → `PrometheusRule` |
+| Consumer | The ADR-056 canary **error-budget freeze gate** (pre-flight) | General platform alerting |
+
+**Where it's used:** an `AnalysisTemplate` runs once before any Rollout traffic shifts,
+querying `slo:current_burn_rate:ratio{sloth_id="<env>-availability"}` — if the service is
+already burning ≥2× its 30-day budget (an active incident), the deploy is **frozen** before
+it starts (ADR-056 Phase 3 / the W11 freeze gate). See
+`infra/modules/observability-mimir/variables.tf` (`app_slos` input),
+`infra/live/aws/platform/us-east-1/platform/mimir/terragrunt.hcl` (the derivation), and
+`scaffolder/templates/new-product/skeleton/k8s/overlays/prod/progressive.yaml` (the gate).
+
 ## Instrument a workload (ADR-077, three layers)
 
 - **Layer 0 — Beyla eBPF (automatic, zero code)**: a DaemonSet emits RED metrics
