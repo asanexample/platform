@@ -143,7 +143,10 @@ resource "kubernetes_manifest" "scheduled_backup" {
   depends_on = [kubernetes_manifest.db, kubernetes_manifest.backup_object_store]
 }
 
-# Default-deny posture: allow ONLY the agent's namespace to reach the DB on 5432.
+# Default-deny posture: consumers reach the DB on 5432; the CNPG operator reaches the instance's management
+# ports. Selecting the pod with an endpointSelector makes this default-deny for all OTHER ingress, so the
+# operator MUST be admitted explicitly — otherwise it times out polling /pg/status and reports "Instance
+# Status Extraction Error: HTTP communication issue" and can't roll the instance to inject the backup sidecar.
 resource "kubernetes_manifest" "db_ingress" {
   count = local.create ? 1 : 0
   manifest = {
@@ -152,13 +155,25 @@ resource "kubernetes_manifest" "db_ingress" {
     metadata   = { name = "allow-consumer-to-db", namespace = var.namespace }
     spec = {
       endpointSelector = { matchLabels = { "cnpg.io/cluster" = var.db_cluster_name } }
-      ingress = [{
-        fromEndpoints = [
-          for ns in concat([var.consumer_namespace], var.extra_consumer_namespaces) :
-          { matchLabels = { "k8s:io.kubernetes.pod.namespace" = ns } }
-        ]
-        toPorts = [{ ports = [{ port = "5432", protocol = "TCP" }] }]
-      }]
+      ingress = [
+        {
+          fromEndpoints = [
+            for ns in concat([var.consumer_namespace], var.extra_consumer_namespaces) :
+            { matchLabels = { "k8s:io.kubernetes.pod.namespace" = ns } }
+          ]
+          toPorts = [{ ports = [{ port = "5432", protocol = "TCP" }] }]
+        },
+        {
+          # The CNPG operator + Barman plugin (cnpg-system) manage the instance: status (8000, the operator
+          # polls /pg/status), metrics (9187), and postgres (5432, operator-side management). #1119.
+          fromEndpoints = [{ matchLabels = { "k8s:io.kubernetes.pod.namespace" = "cnpg-system" } }]
+          toPorts = [{ ports = [
+            { port = "8000", protocol = "TCP" },
+            { port = "9187", protocol = "TCP" },
+            { port = "5432", protocol = "TCP" },
+          ] }]
+        },
+      ]
     }
   }
   depends_on = [kubernetes_namespace_v1.this]
