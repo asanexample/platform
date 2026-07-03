@@ -88,7 +88,6 @@ variable "database" {
     enable_backups   = optional(bool, false)
     destination_path = optional(string, "")
     retention        = optional(string, "30d")
-    schedule         = optional(string, "0 0 3 * * *")
   })
   default = {}
 
