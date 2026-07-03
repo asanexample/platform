@@ -99,6 +99,18 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-03 (end-of-day PARK #2) — second overnight park of both clusters, same day (after the morning
+  park→unpark cycle above). ✅ Clean, cost-zero, no new surprises — the pattern is now boringly repeatable.**
+  `AWS_PROFILE=management ./bin/platctl down --env <env> --yes` each, in parallel in the background. **Preprod**
+  again the cleaner ("Karpenter nodes drained and terminated" + "EC2NodeClass deleted", 1 node force-terminated).
+  **Platform** again threw the familiar slow-drain warnings ("NodeClaims still present after 6m", "EC2NodeClass
+  still present after 90s") — this platform>preprod drain-time asymmetry is now a RELIABLE pattern, not a defect —
+  then scaled `system`→0 and force-terminated 3 PDB-blocked nodes. Both bastions auto-stopped. **Cost-zero
+  verified (per explicit ask):** both `system` node groups `desiredSize=0`, **0 running/pending instances in BOTH
+  accounts**, and the two bastions `stopping`/`stopped` (checked by their known instance IDs — note the
+  `tag:Name=<env>-use1-eks-ssm-bastion` filter returned EMPTY, so the bastion Name tag is NOT that value; verify a
+  bastion by the instance ID printed in the `down` output, or don't rely on that tag). Nothing billable left.
+
 - **2026-07-03 (unpark, same cycle) — UNPARK both clusters, `AWS_PROFILE=management ./bin/platctl up --env <env>`
   each (from the MAIN checkout — `up` runs terragrunt applies), run in parallel in the background. ✅ Both restored
   cleanly and BOTH self-healing fixes fired automatically again — no manual intervention.** Node groups restored +
