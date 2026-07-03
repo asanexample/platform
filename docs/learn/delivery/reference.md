@@ -42,6 +42,10 @@ spec:
   image override.
 - **Sync policy:** `automated { selfHeal = true, prune = true }` + **ServerSideApply**. Self-heal reverts
   drift; prune deletes what git no longer declares.
+- **Cross-account delivery:** one ArgoCD lives on the **hub** and delivers to the environment **spoke**
+  clusters (preprod, prod). It reaches them via labeled cluster `Secret`s carrying **AWS IAM auth** (the
+  application-controller does STS AssumeRole + EKS token per target) — `argocd-clusters`. One control plane,
+  many accounts.
 - **Agents deliver to the hub** via a separate platform-agent ApplicationSet (`agents.tf`, ADR-082), not to
   the environment spokes.
 
@@ -68,8 +72,13 @@ Three producers, one output (an `asanexample-promote[bot]` Release PR that the G
 - **Traffic shaping:** the Gateway-API traffic-router plugin (`argoproj-labs/gatewayAPI`) does **weighted
   HTTPRoute canary** on the Cilium Gateway — Rollouts edits the HTTPRoute weights, the data plane routes by
   weight (see [Life of a Request](../spine/life-of-a-request.md)).
-- **Admission awareness:** `Rollout` is a first-class pod controller the policy layer understands (D2) —
-  e.g. the graceful-drain / replica-floor mutations apply to it, not just to Deployments.
+- **Admission awareness (D2, ADR-056) — a real gotcha.** A `Rollout` isn't a `Deployment`, so the
+  *workload-level* availability policies (replica-floor, PDB-generate, topology-spread) only match it when
+  **`enable_rollout_kind = true`** is set per cluster (**default off** — a Kyverno rule can't name a CRD
+  that's absent, so it's enabled only *after* the `argo-rollouts` unit is applied there, #7839).
+  *Pod-level* policies (securityContext, preStop drain, cosign-verify) apply to Rollout pods automatically
+  via ReplicaSet autogen. So a Rollout is admission-aware — but the availability mutations are an explicit
+  opt-in, not free.
 - **Status — be precise:** weighted-canary shifting is **built + live**; lower stages **auto-promote**
   through the steps (dogfooding); the fully **metric-gated `AnalysisTemplate`** (query Mimir → auto-rollback
   on an SLO breach) is **proven in mechanics, a later phase** — not the enforced default on every service
@@ -79,7 +88,7 @@ Three producers, one output (an `asanexample-promote[bot]` Release PR that the G
 
 - **`OutOfSync` with an empty diff.** A server-side-applied `Rollout`/`HTTPRoute` carries two field managers
   (argocd-controller + the rollouts-controller); ArgoCD's default client-side diff mis-reads it as drift.
-  Fix with **server-side diff** (`controller.diff.server.side=true`, #925/#894) — `ignoreDifferences`
+  Fix with **server-side diff** (`controller.diff.server.side=true`, #925) — `ignoreDifferences`
   *can't* fix it.
 - **A stuck promotion is usually correct.** The auto-promoter won't advance a rung while the lower stage
   isn't `Synced + Healthy`. That's the health gate, not a bug — fix the unhealthy lower stage.
