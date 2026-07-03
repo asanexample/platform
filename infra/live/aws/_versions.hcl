@@ -74,6 +74,7 @@ locals {
     tailscale                     = "${local.source_base}/tailscale"
     tailscale_admin               = "${local.source_base}/tailscale-admin"
     falco                         = "${local.source_base}/falco"
+    kube_bench                    = "${local.source_base}/kube-bench" # CIS EKS Benchmark scan (read-only CronJob, #1149)
     descheduler                   = "${local.source_base}/descheduler"
     observability                 = "${local.source_base}/observability"
     observability_mimir           = "${local.source_base}/observability-mimir"
