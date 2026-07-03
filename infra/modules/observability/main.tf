@@ -958,6 +958,37 @@ resource "kubernetes_manifest" "alertmanager_healthchecks" {
 }
 
 # ---------------------------------------------------------------------------
+# CloudNativePG instance metrics (#1119 PR4)
+# ---------------------------------------------------------------------------
+# Scrape the per-instance CNPG metrics endpoint (:9187, cnpg_collector_* — backup freshness, WAL archiving,
+# cluster health, connections) that the CNPG backup/health alerts need. The operator's own metrics stay off
+# (hostNetwork host-port collision). One PodMonitor for cnpg.io/podRole=instance pods in ALL namespaces (this
+# stack's podMonitorSelector/namespaceSelector are empty = select all). Lives here (not the cloudnative-pg
+# module) because that unit configures only the helm provider; kubernetes_manifest needs the kubernetes
+# provider this module has. A namespace that default-denies ingress to its DB must admit observability on 9187
+# (platform-directory does). CNPG serves :9187 on every instance, so no per-Cluster spec.monitoring change.
+resource "kubernetes_manifest" "cnpg_instance_pod_monitor" {
+  count = local.create && var.enable_cnpg_pod_monitor ? 1 : 0
+
+  manifest = {
+    apiVersion = "monitoring.coreos.com/v1"
+    kind       = "PodMonitor"
+    metadata = {
+      name      = "cnpg-instances"
+      namespace = var.namespace
+      labels    = local.k8s_labels
+    }
+    spec = {
+      namespaceSelector   = { any = true }
+      selector            = { matchLabels = { "cnpg.io/podRole" = "instance" } }
+      podMetricsEndpoints = [{ port = "metrics" }]
+    }
+  }
+
+  depends_on = [helm_release.kube_prometheus_stack]
+}
+
+# ---------------------------------------------------------------------------
 # Grafana SSO (#592) — Keycloak OIDC client secret synced from AWS Secrets Manager, plus the gateway-ClusterIP
 # lookup backing the split-horizon host-alias. The secret (keycloak-config writes platform/keycloak/grafana-oidc)
 # syncs to the `grafana-oidc` K8s secret, injected as GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET. Mirrors ArgoCD/Backstage.

@@ -287,3 +287,9 @@ variable "cortex_tenant_write_url" {
   type        = string
   default     = ""
 }
+
+variable "enable_cnpg_pod_monitor" {
+  description = "Create a PodMonitor that scrapes CloudNativePG per-instance metrics (:9187, cnpg_collector_*) across all namespaces — feeds the CNPG backup/health alerts (#1119)."
+  type        = bool
+  default     = true
+}

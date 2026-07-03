@@ -72,34 +72,3 @@ resource "helm_release" "barman_cloud_plugin" {
 
   depends_on = [helm_release.cloudnative_pg]
 }
-
-# ---------------------------------------------------------------------------
-# CNPG instance metrics (#1119 PR4) — scrape the per-cluster instance metrics endpoint
-# ---------------------------------------------------------------------------
-# The operator's own metrics stay off (hostNetwork host-port collision — see cnpg_values above); this scrapes
-# the per-INSTANCE endpoint (:9187, cnpg_collector_* — backup freshness, WAL archiving, connections, cluster
-# health), which is what the backup/health alerts need. One PodMonitor for CNPG instances in ALL namespaces
-# (kube-prometheus-stack's podMonitorSelector/namespaceSelector are empty = select all). CNPG serves :9187 on
-# every instance regardless of spec.monitoring, so a plain PodMonitor suffices (no per-Cluster change). NOTE:
-# a namespace that default-denies ingress to its DB must admit the observability namespace on 9187 (the
-# platform-directory module does).
-resource "kubernetes_manifest" "instance_pod_monitor" {
-  count = local.create && var.enable_pod_monitor ? 1 : 0
-
-  manifest = {
-    apiVersion = "monitoring.coreos.com/v1"
-    kind       = "PodMonitor"
-    metadata = {
-      name      = "cnpg-instances"
-      namespace = var.namespace
-      labels    = local.k8s_labels
-    }
-    spec = {
-      namespaceSelector   = { any = true }
-      selector            = { matchLabels = { "cnpg.io/podRole" = "instance" } }
-      podMetricsEndpoints = [{ port = "metrics" }]
-    }
-  }
-
-  depends_on = [helm_release.cloudnative_pg]
-}
