@@ -81,6 +81,11 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 
 - **Temporary-power activation / JIT elevation ([ADR-088](docs/adrs/088-temporary-power-activation.md)).** Eligibility-in-git + timed activation + revocation for dangerous power (break-glass). Foundation merged — `platctl access list`/`access check <person> <role>` + break-glass eligibility (#943/#945/#946); remaining activation/revocation flow in flight.
 
+#### Documentation & Enablement
+
+- **Learning portal — a teaching layer for the platform (`docs/learn/`).** The corpus explains (reference for people who already hold the model) but doesn't *teach* it from the ground up. New: per-subsystem courses on a shared mold — **Orientation** (journey) + **Reference** (lookup) + optional **Deep dives** (one hard mechanism) + **Tutorials** (hands-on) + a portal **Glossary** — built one subsystem at a time, eventually served in Backstage TechDocs (wiring is #938). **Shipped — the domain model + the Environment API (Crossplane)** incl. the first deep dive (Composition rendering) and offline tutorial; proving the format before scaling to observability, delivery, policy, identity, supply-chain, cost, and a control-plane spine.
+- **Learning sandbox — the hands-on surface for tutorials (future enabler).** Tutorials run *offline* today (`crossplane render`, zero infra); the live "provision it for real, watch it self-heal" experience needs a safe sandbox. Design options: a scoped **"learning" Team on existing preprod** (tiny envelope + mandatory TTL + `$` budget cap — cheapest, reuses the env-api's own guardrails) vs. a **dedicated sandbox account** (harder blast-radius isolation; the Terratest Test account `157263244316` is precedent). Reuses ADR-091 cost caps, Cloud Custodian cleanup (#1058), and the ADR-032 ephemeral-env mechanism. Not built — tutorials are explicitly marked *provisional* until it lands.
+
 ### Next
 
 *Queued and build-now — near-term build order.*
@@ -141,11 +146,14 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 #### Governance & Supply-chain
 
 - **Kyverno policy backlog** — Rollup -> filter label:area/policy. Includes #77 CEL ValidatingPolicy, #78 PolicyException governance, #79 HIPAA/PCI packs, #80 kyverno-json, #81 multi-cluster distribution, #82 nodeSelector validation, #93 PolicyReport observability.
+- **Security posture gap register — epic [#1152](https://github.com/asanexample/platform/issues/1152).** The [Security Model spine doc](docs/learn/spine/the-security-model.md)'s honest, top-to-bottom **4 C's** gap register (Cloud/Cluster/Container/Code), with a proposed prioritization. **Tier 1 (next up):** EKS audit logging ([#816](https://github.com/asanexample/platform/issues/816)), secret-scanning in CI ([#1148](https://github.com/asanexample/platform/issues/1148)), WAF ([#1147](https://github.com/asanexample/platform/issues/1147)), secrets rotation ([#811](https://github.com/asanexample/platform/issues/811)). New gaps filed from the doc audit: WAF #1147, secret-scanning #1148, CIS/kube-bench #1149, SIEM #1150, pentest #1151.
 - **Security & hardening backlog** — Rollup -> filter label:security. Includes #59 _v1 rename, #70 prod least-privilege, #111 ArgoCD GitHub App, #118 customer KMS CMKs, #129 SCA/AppSec, #132 CSPM, #149 Falco, #152 state-bootstrap S3, #196 Backstage ns hardening, #213 token rotation, #242 EBS orphans, #243 chart-repo resilience, #273 CoreDNS.
 
 #### GitOps & Delivery
 
 - [#500](https://github.com/asanexample/platform/issues/500) P2.4 (ADR-056): progressive delivery for prod — Argo Rollouts. **Core SHIPPED** (see Shipped → GitOps & Delivery); #500 retained for residual prod-hardening only.
+- **Rollback resilience & database migrations** — Net-new, undecided. The GitOps "revert the commit" rollback is clean only for *stateless* change; a release that ran a schema migration can't be undone by reverting code (down-migrations are lossy/impossible), and the canary already runs two app versions against one DB — so schema backward-compatibility is a **latent, unenforced precondition of progressive delivery itself**, not just a rollback nicety. Needs an app **rollback-resilience contract** (additive expand/contract migrations, migrations decoupled from deploy, N-1 compatibility) and likely a managed tenant-database offering (self-service data is S3/SQS/DynamoDB today, ADR-073). Surfaced writing the *Life of a Deployment* spine doc.
+- **Versioning & compatibility contracts** — Net-new, undecided; vague across the platform today. Facets: (1) **service/release version identity** — deploys are digest-only, no human-facing semver/release name; (2) **platform-API versioning** — evolving the `platform.refplat.org` CRDs (XEnvironment/XAgent/Team/Product/Release) past `v1beta1` without breaking live objects (storage version, conversion webhooks, deprecation policy); (3) **provisioner versioning** — rolling Composition changes across all live Environments safely (the render-cascade hazard); (4) **compatibility/skew contracts** — N-1 app↔schema (see rollback resilience) and API↔consumer skew. Unifying theme with rollback resilience: **compatibility across versioned boundaries** — candidate for one strategy/ADR.
 
 #### Developer Portal
 

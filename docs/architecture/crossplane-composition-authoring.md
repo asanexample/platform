@@ -74,8 +74,10 @@ One inline Go template renders **every** composed resource. Two output classes s
 - **Composed (managed) resources** — each carries the annotation
   `gotemplating.fn.crossplane.io/composition-resource-name: <name>`. Kubernetes resources are
   `provider-kubernetes` `Object`s (`providerConfigRef.name: default`); AWS resources are provider-aws MRs
-  (`iam.aws.upbound.io/Role`+`RolePolicy`, `eks.aws.upbound.io/PodIdentityAssociation`+`AccessEntry`,
-  `ecr.aws.upbound.io/Repository`+`RepositoryPolicy`). External names are pinned with
+  (`iam.aws.upbound.io/Role`+`RolePolicy`, `eks.aws.upbound.io/PodIdentityAssociation`,
+  `ecr.aws.upbound.io/Repository`+`RepositoryPolicy`). Note: the live Composition renders **only**
+  `PodIdentityAssociation` for cluster identity — **no** `AccessEntry` / `DeveloperAccess-<team>` role yet
+  (#647); developer cluster access is the in-cluster `<ns>:developers` RoleBinding only. External names are pinned with
   `crossplane.io/external-name` where the AWS name must be deterministic (e.g.
   `Pod-<team>-<product>-[<customer>-]<stage>-<svc>`). Per-service resources (ECR, the Pod-Identity role +
   association) are rendered by ranging over `spec.services`.

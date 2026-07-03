@@ -48,9 +48,11 @@ spec is the environment-facing contract — no infra constants leak into it:
 | `isolation.compute` | — (resolved from Product/tier) | The graduated compute dial: `shared-namespace`/`dedicated-namespace`/`dedicated-nodes`/`dedicated-cluster`/`dedicated-account` |
 | `residency.allowedLocations` | — (default `["*"]`) | Jurisdiction or `cloud:region`; must be ⊆ the Team's allowed locations |
 | `quota` | — (defaults match the old environment module) | `cpu`/`memory`/`pods`/`services`/`loadbalancers`/`pvcs`/`storage` |
-| `domains` | — | Vanity/custom aliases (`[]` of `{ host, canonical?, dns? }`, ADR-061). Unioned with the implicit generated host into `restrict-route-hostnames`; the generated host is never declared |
+| `domains` | — | Vanity/custom aliases — an **array of plain host strings** (`[]string`, ADR-061); the XRD is authoritative here. Unioned with the implicit generated host into `restrict-route-hostnames`; the generated host is never declared |
 | `lifecycle.phase` | — (default `active`) | `active`/`suspended`/`decommissioning` — the reversible suspend zeroes the ResourceQuota (ADR-062) |
-| `services` | — | Map `<svc> → { serviceAccount, preview, image, permissions.aws.policyStatements }`; each service gets an ECR repo `team-<team>/<product>-<svc>` + a Pod-Identity role |
+| `services` | — | Map `<svc> → { serviceAccount, preview, image, repoPath, permissions.aws.policyStatements, resources }`; each service gets an ECR repo `team-<team>/<product>-<svc>` + a Pod-Identity role. `resources` = the self-service cloud dependencies below |
+| `platformTrust.clusterRoles` | — (default `[]`) | Extra platform ClusterRoles to bind in the namespace (each → a `platform-trust-<ns>-<role>` ClusterRoleBinding) |
+| `encryption.keyCustody` | — (default `platform-managed`) | `platform-managed`/`customer-managed`/`customer-hosted` |
 
 The namespace (and `metadata.name`) is `<team>-<product>-<stage>` (pooled) or
 `<team>-<product>-<customer>-<stage>` (per-customer), truncated-and-hashed on the 63-char limit. Live claims are
@@ -103,6 +105,17 @@ renders, from one claim:
 
 - `team-<team>/<product>-<svc>` ECR repo per service (`IMMUTABLE_WITH_EXCLUSION` for cosign `sha256-*` tags,
   scan-on-push) plus a cross-account RepositoryPolicy (pull for the preprod and prod account roots)
+
+**Self-service cloud resources** (ADR-073) — a service may declare `services.<svc>.resources.<name>` and the
+Composition renders the backing AWS resource plus its least-privilege access, in the workload account:
+
+- one of S3 `Bucket` (+ PublicAccessBlock/SSE/Versioning/OwnershipControls/BucketPolicy), SQS `Queue`, SNS
+  `Topic`, or DynamoDB `Table` — namespaced `*.aws.m.upbound.io` MRs, deterministically named
+  `<resourcePrefix><team>-<product>-<stage>-<name>-<hash>` (`resourcePrefix` default `refplat-`)
+- the derived least-privilege statements are merged onto the service's Pod role, and a `<svc>-resources`
+  ConfigMap is emitted with the resource's coordinates for the app to consume
+- gated by `provider_services` on the unit (preprod enables `s3,sqs,sns,dynamodb`); exercised end-to-end by
+  `gitops/environments/alpha/conformance/dev.yaml`
 
 **Not** provisioned by the claim — these stay platform-owned in the [`policy`](../../infra/modules/policy/)
 module for **all** products (an environment must not declare its own signature trust root): the cosign/SLSA
