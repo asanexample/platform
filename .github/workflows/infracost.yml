@@ -41,7 +41,7 @@ jobs:
 
       - name: Setup Infracost
         if: steps.gate.outputs.enabled == 'true'
-        uses: infracost/actions/setup@e9d6e6cd65e168e76b0de50ff9957d2fe8bb1832 # v3
+        uses: infracost/actions/setup@fb736a8f219195d6efdca58682069b16fe1bc280 # v4.2.0
         with:
           api-key: ${{ secrets.INFRACOST_API_KEY }}
 
