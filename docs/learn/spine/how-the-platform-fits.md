@@ -345,8 +345,8 @@ of this map, and you have a triage tree for the next incident.
 - The same layers read as *defenses*: [The Security Model](the-security-model.md) — defense in depth.
 - The layers as full courses: [the domain model](../domain-model/orientation.md) *(built)* ·
   [the Environment API](../environment-api/orientation.md) · [Delivery](../delivery/orientation.md) ·
-  [Policy](../policy/orientation.md) *(built)* · Identity, Observability, Foundations *(coming — see
-  [the inventory](../_inventory.md) for the whole plan)*.
+  [Policy](../policy/orientation.md) · [Identity & access](../identity/orientation.md) *(built)* ·
+  Observability, Foundations *(coming — see [the inventory](../_inventory.md) for the whole plan)*.
 - Why the topology is shaped this way:
   [ADR-048 federated per-cluster Crossplane](../../adrs/048-federated-per-cluster-crossplane.md) ·
   [ADR-081 one delivery road](../../adrs/081-platform-service-delivery.md).

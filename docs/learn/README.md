@@ -28,7 +28,7 @@ Each subsystem is a short course: an **Orientation** (a guided journey you read 
 | **[Delivery](delivery/)** — git → running across stages, safely (ArgoCD, the promotion ladder, Rollouts) | ✅ available |
 | Observability — the LGTM+P stack | ⏳ planned |
 | **[Policy & admission](policy/)** — the guardrail engine at the cluster door (Kyverno: validate · mutate · generate) | ✅ available |
-| Identity & access — Keycloak, Pod Identity, temporary power | ⏳ planned |
+| **[Identity & access](identity/)** — decide once, derive everywhere, borrow dangerous power (Keycloak, Pod Identity, temporary power) | ✅ available |
 | Supply chain — signing, provenance, verification | ⏳ planned |
 | The agentic platform — running governed AI agents | ⏳ planned |
 | Cost & FinOps | ⏳ planned |
