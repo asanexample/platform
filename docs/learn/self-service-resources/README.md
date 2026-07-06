@@ -19,6 +19,11 @@ ideally [Identity & Access](../identity/orientation.md) (Pod Identity).
 2. **[Reference](reference.md)** — the claim schema, the per-engine IAM tables, the safety floor, the naming,
    and the gotchas (`access` gates verbs; namespaced MRs hide from `get managed`).
 
+**Platform engineers — the producer side:** **[Extending: add a new resource engine](extending-add-an-engine.md)**
+is the how-to for adding a new engine (RDS, ElastiCache, …) to the catalog — the real touch-points and the
+gotchas from building the existing four. Using a resource is easy; *extending the catalog* is the higher-value
+skill.
+
 ## Then, to go deeper
 
 - The claim this extends: [The Environment API](../environment-api/orientation.md); where the derived IAM

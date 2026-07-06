@@ -191,6 +191,29 @@ disposable.
   can't yet.
 - **Optional, built on demand** where a safe path exists — same discipline as deep dives.
 
+## How-to / extending — the platform-engineer contribution tier
+
+The Orientation teaches how a subsystem *works*; but **extending** it — adding a resource engine, a policy,
+an environment feature, a front door — is a recurring, high-value platform-engineer job the portal must
+teach too. Using a capability is easy; *adding* one is the harder, more valuable skill, and it's usually
+undocumented tribal knowledge. That's the **how-to** quadrant (Diátaxis): task-oriented, for a *competent*
+engineer accomplishing a real change — not a beginner learning (that's the tutorial), not understanding a
+mechanism (that's a deep dive).
+
+- **Where extending is a common activity, the module owns a `how-to-<task>.md` / `extending-<task>.md`.**
+  Ask: "will a platform engineer routinely *add to* this subsystem?" If yes (resources → add an engine;
+  policy → add a policy; products → onboard a new kind), it earns a how-to. A fixed subsystem doesn't.
+- **Recipe shape, not prose.** Numbered steps, each naming the **real file / touch-point** and the existing
+  instance to copy — scannable and followable under deadline.
+- **The gotchas are the point.** The highest-value part is *"what bit us adding the last one"* — the
+  failures a fresh reading of the code won't reveal (provider-schema quirks, ordering traps, silent
+  no-applies). Include them, plus a **verification** path (offline → apply → e2e) and the **quality bar**
+  when the change touches security / the control plane.
+- **Grounded in a real prior extension.** The recipe is trustworthy because it's how the *existing*
+  instances were actually built (e.g. S3 → SQS → SNS → DynamoDB), gotchas and all — not a guess at the steps.
+- **Optional, built on demand** — but bias *toward* building it: "how do I add a capability here?" is one of
+  the most common real platform-engineer questions, and its answer is the moat this portal exists to capture.
+
 ## Screenshots / UI visuals
 
 Where the *system's own view* teaches (a portal/UI), include it. **Automate capture if the target is

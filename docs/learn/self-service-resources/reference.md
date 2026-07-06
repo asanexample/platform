@@ -79,6 +79,8 @@ form. **Designed (ADR-073 Phase B):** a natural-language agent. New front doors 
 
 ## Go deeper
 
+- **Extending the catalog** (platform engineers): [add a new resource engine](extending-add-an-engine.md) —
+  the producer-side recipe + gotchas.
 - [ADR-073 Self-Service Cloud Resources](../../adrs/073-self-service-cloud-resources.md) · the
   [Environment API](../environment-api/orientation.md) (the claim) · [Identity & Access](../identity/orientation.md)
   (where the IAM lands).

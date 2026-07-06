@@ -247,6 +247,10 @@ Versioning), a **`RolePolicy`** with the derived least-privilege statements appe
 Pod-Identity role, and the `<service>-resources` ConfigMap. Access → verbs is a lookup per engine; naming is
 `refplat-<team>-<product>-<stage>-<name>-<hash>`. It's exercised end-to-end by `alpha/conformance/dev`.
 
+**Adding a new engine** (RDS, ElastiCache, …) is a common platform-engineer task with its own recipe — the
+catalog is a floor, not a ceiling. That's the producer side of this module: the how-to
+[Extending: add a new resource engine](extending-add-an-engine.md).
+
 ## Go deeper
 
 - The full schema, engines, and gotchas: the [Reference](reference.md).
