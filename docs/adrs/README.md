@@ -57,6 +57,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-037: CloudTrail for Secrets Audit Logging](037-cloudtrail-audit-logging.md) | Accepted |
 | [ADR-066: SOPS-Encrypted Config Secrets in Git (KMS)](066-sops-encrypted-config-secrets.md) | Accepted |
 | [ADR-070: Tenant Application Config & Secrets](070-tenant-app-config-and-secrets.md) | Proposed |
+| [ADR-094: Secret Rotation Strategy](094-secret-rotation-strategy.md) | Proposed |
 
 ## Tenancy, Isolation & Policy
 
