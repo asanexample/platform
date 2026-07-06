@@ -71,7 +71,8 @@ Read what a developer *actually* wrote: a logical **name** (`blob`, `jobs`, …)
 (`objectstore`, `stream`, `keyvalue`), a concrete **engine**, and an **access** level. No ARNs. No IAM. No
 encryption settings. No bucket policy. That's the whole intent.
 
-And here's what's **live on preprod right now** — all four provisioned and *ready for 18 days*:
+And here's what's **live on preprod right now** — all four provisioned and *ready* (steady state, not a
+throwaway demo):
 
 ```console
 $ kubectl -n alpha-conformance-dev get bucket.s3 queue.sqs topic.sns table.dynamodb
@@ -157,6 +158,32 @@ IAM) — and the "how" is the part that's genuinely hard to get right, now impos
 > it in the pod's Pod-Identity role. Safer because a hand-written policy tends toward `s3:*` on `*` under
 > deadline pressure; a derived one is least-privilege by construction, every time.)*
 
+## Bounded self-service — the team envelope
+
+"Self-service" without a ceiling is how you wake up to 500 orphaned buckets and a surprise bill. So there's a
+governed **middle** to the model — between your intent and its realization: every **Team** declares an
+**envelope** (the ceiling on what its environments may ask for), and every claim is **validated against it**
+before a single resource is provisioned. Here's `alpha`'s:
+
+```yaml
+# gitops/teams/alpha.yaml
+envelope:
+  resources:
+    allowedEngines: [s3, sqs, sns, dynamodb]   # which engines this team may use at all
+    maxPerEnvironment: 10                        # cap on resources per environment
+    isolationFloor: shared                       # minimum isolation tier
+```
+
+The envelope is **default-deny**: a team that hasn't opted into an engine simply can't request it. And it's
+enforced *twice*, independently — the **gitops gate** checks the claim on the pull request, and **Kyverno**
+(`restrict-environment-envelope`) checks it again at admission — so a request for a disallowed engine, or an
+eleventh resource, is rejected *before* any AWS resource exists. (Same [policy](../policy/orientation.md)
+engine you've seen guard everything else — defense in depth.)
+
+So the full shape has three parts, not two: **intent above the claim → validated against your team's
+envelope in the middle → realized safely below.** Self-service, but inside guardrails your team lead set — a
+*governed* claim, not a blank check.
+
 ## Getting the coordinates to your app — the resources ConfigMap
 
 A bucket you can't find is useless, so the platform also injects a **`<service>-resources` ConfigMap** with
@@ -184,6 +211,9 @@ gets validated and realized the one safe way. New front doors are cheap; the saf
 
 ## When it breaks — the ones you'll actually hit
 
+- **"My claim was rejected — 'engine not allowed' or 'over cap'."** Your **Team envelope** bounds what you
+  can request (allowed engines, `maxPerEnvironment`). It's default-deny by design, not a bug — widening it is
+  a PR to `gitops/teams/<team>.yaml` by your team lead.
 - **"My pod gets `AccessDenied` on the bucket."** Check the **`access`** level in your claim — `read` can't
   `PutObject`. And confirm your pod uses the service's named **ServiceAccount** (the derived IAM lands on
   *that* Pod-Identity role); a different SA won't have the policy.
@@ -202,7 +232,9 @@ Try it cold: *how do you get a cloud resource here, safely?* If you can say —
 > below it**: the platform provisions the resource **safe-by-construction** (TLS-only, no public access,
 > encrypted) and **derives least-privilege IAM scoped to exactly that resource**, injected into my pod's
 > **Pod-Identity** role — I never write IAM. It hands me the coordinates in a **ConfigMap** (`$BLOB_BUCKET`).
-> Any front door — PR, Backstage, a future agent — works, because they all produce the same governed claim" —
+> Any front door — PR, Backstage, a future agent — works, because they all produce the same **governed
+> claim**, which is validated against my **team's envelope** (allowed engines, a per-env cap) before anything
+> is built" —
 
 — then you've got it, and "I need a bucket" is four lines and a merge, not a ticket and an IAM review.
 

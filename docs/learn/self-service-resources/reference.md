@@ -32,7 +32,7 @@ Generated from `access`, scoped to **that one resource's ARN**, appended to the 
 | **s3** | `GetObject`, `ListBucket`, `GetBucketLocation` | `PutObject`, `DeleteObject`, `AbortMultipartUpload` |
 | **sqs** | `ReceiveMessage`, `DeleteMessage`, `ChangeMessageVisibility`, `GetQueueAttributes`, `GetQueueUrl` | `SendMessage` |
 | **sns** | `GetTopicAttributes`, `Subscribe`, `ListSubscriptionsByTopic` | `Publish` |
-| **dynamodb** | (read set) | (write set) |
+| **dynamodb** | `GetItem`, `BatchGetItem`, `Query`, `Scan`, `DescribeTable`, `ConditionCheckItem` | `PutItem`, `UpdateItem`, `DeleteItem`, `BatchWriteItem` |
 
 ## The safety floor (below the claim, non-overridable)
 
