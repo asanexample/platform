@@ -24,6 +24,7 @@ Each subsystem is a short course: an **Orientation** (a guided journey you read 
 | Module | Status |
 | --- | --- |
 | **[Domain model](domain-model/)** — Team / Product / Service / Environment: the shared vocabulary (**start here**) | ✅ available |
+| **[Onboarding a Product](products/)** — put a new app on the platform: one registry entry → its whole per-product footprint derives | ✅ available |
 | **[Environment API](environment-api/)** — how environments get provisioned (Crossplane) | ✅ available |
 | **[Self-service cloud resources](self-service-resources/)** — an S3 bucket / queue / topic / table from your claim, with derived least-privilege IAM (developer-facing) | ✅ available |
 | **[Delivery](delivery/)** — git → running across stages, safely (ArgoCD, the promotion ladder, Rollouts) | ✅ available |

@@ -53,6 +53,7 @@ module or deep dive, decided then.*
 | Module | Covers | Status |
 | --- | --- | --- |
 | **Domain model** | Team / Product / Service / Environment / Customer; the shared vocabulary | ✅ |
+| **[Onboarding a Product](products/)** | the Product registry as single source of truth; three derivations (github-oidc/policy/argocd-apps); the paved road + onboarding how-to (ADR-069/067) | ✅ |
 | **Environment API** | Crossplane: one claim → the full footprint (namespace, ECR, IAM, policies) | ✅ |
 | **[Self-service cloud resources](self-service-resources/)** | S3 / SQS / SNS / DynamoDB via the claim; derived least-privilege IAM (ADR-073) | ✅ |
 

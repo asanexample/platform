@@ -268,7 +268,7 @@ The model isn't an abstraction living in someone's head — it's **files in git*
 file in a registry:
 
 - `gitops/teams/<team>.yaml` — the Team + its envelope
-- `gitops/products/<team>/<product>.yaml` — the Product (repo, tenancy, domains)
+- `gitops/products/<team>/<product>.yaml` — the Product (repo, tenancy, domains) → [Onboarding a Product](../products/orientation.md)
 - `gitops/environments/<team>/<product>/<stage>.yaml` — the Environment claim (what the
   [Environment API](../environment-api/orientation.md) turns into real infrastructure)
 
