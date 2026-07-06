@@ -2,8 +2,8 @@
 
 **Date:** 2026-05-31
 
-**Status:** Accepted — deployed on the **preprod** cluster (modern eBPF), platform #116 / PR #134.
-Complements admission-time policy ([ADR-014](014-kyverno-as-policy-engine.md)) and supply-chain verification
+**Status:** Accepted — deployed on the **preprod** (#116 / PR #134) and **platform** (2026-07-06, #149)
+clusters, modern eBPF (CO-RE). Complements admission-time policy ([ADR-014](014-kyverno-as-policy-engine.md)) and supply-chain verification
 ([ADR-042](042-isolated-build-provenance-slsa-l3.md)) with the runtime layer of defense in depth.
 
 ## Context
@@ -53,8 +53,9 @@ Rollout is deliberately staged:
 - **Next:** route falcosidekick → **SNS** (the shared `platform-alerts` topic — the `sns-notifications`
   module already names Falco as a publisher) and into the **observability** stack ([ADR-043](043-self-hosted-observability-stack.md) /
   #102), so detections become real alerts + dashboards.
-- **Later:** extend to the **platform** cluster; tune the ruleset to the platform's expected behavior to
-  control false positives.
+- **Done (platform, 2026-07-06 / #149):** extended to the **platform** cluster — same modern-eBPF unit,
+  detections to stdout, DaemonSet on every node. Ruleset tuning to each cluster's expected behavior (to
+  control false positives) remains a follow-up.
 
 `driver_kind` is a variable (`modern_ebpf` / `ebpf` / `kmod`) defaulting to modern eBPF for the current
 kernels.
@@ -73,8 +74,8 @@ kernels.
 
 ### Negative
 
-- **Preprod only today** — the **platform** cluster is not yet covered; runtime detection there is a gap
-  until the rollout extends.
+- **~~Preprod only~~ (resolved 2026-07-06, #149)** — the **platform** cluster is now covered too; the
+  runtime blind spot on the crown-jewel shared services is closed. Per-cluster ruleset tuning remains (below).
 - **Detection, not prevention (by default)** — Falco alerts; it does not block. Response/automation is a
   later concern.
 - **Alert routing not yet wired** — detections currently go to stdout; until falcosidekick → SNS/observability
