@@ -463,8 +463,8 @@ control plane): [The Life of a Request](life-of-a-request.md).
   mean *(built)*.
 - [Delivery](../delivery/orientation.md) (ArgoCD + the promotion ladder + Rollouts) *(built)*.
 - [Policy & admission](../policy/orientation.md) (Kyverno: validate/mutate/generate) *(built)*.
-- Coming: Supply chain (signing + provenance) · Identity & access (Pod Identity) · Observability ·
-  Nodes & networking.
+- [Identity & access](../identity/orientation.md) (Keycloak + Pod Identity + temporary power) *(built)*.
+- Coming: Supply chain (signing + provenance) · Observability · Nodes & networking.
 
 **Source of truth (as-built):**
 [Promotion & Release](../../architecture/promotion-and-release.md) ·

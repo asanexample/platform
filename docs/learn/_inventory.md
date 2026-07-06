@@ -8,9 +8,9 @@
 > tiers — deep dive · tutorial · cheatsheet · troubleshooting — are added **only where a subsystem earns
 > them** (see [the mold](_mold.md)); a typical module is two files, not seven.
 >
-> **This is aspirational.** It's the full map, not a committed backlog. **The spine is complete** and **two
-> modules** (domain model, Environment API) are built; the near-term is the crosslink-debt modules
-> (Delivery, Policy, Identity), pulled in on demand (a real reader, a demo, interest). Granularity is a
+> **This is aspirational.** It's the full map, not a committed backlog. **The spine is complete** and **five
+> modules** are built (domain model, Environment API, Delivery, Policy, Identity & access) — the crosslink-debt
+> trio is done; the near-term is now breadth on demand (a real reader, a demo, interest). Granularity is a
 > guess; modules will split and merge as we build. **Audience** is decided *per module* at build time, not
 > per domain — most are platform-engineer-facing; the genuinely developer-facing ones are called out in the
 > notes.
@@ -81,16 +81,18 @@ decided then.*
 
 ## 5 · Identity & access — a sub-curriculum
 
-Two axes: **who you are** (identity/SSO) and **what you may do** (access + governance). The second axis
-crams several distinct models, so it fans out:
+Two axes: **who you are** (identity/SSO) and **what you may do** (access + governance). ✅ **A combined
+[Identity & access](identity/) module is built** — it teaches all of the below at orientation depth
+(decide-once-derive-everywhere + temporary power); deeper per-topic cuts may split later. The second axis
+crams several distinct models:
 
 | Module | Covers | Status |
 | --- | --- | --- |
-| **Identity & SSO** | Keycloak as the IdP of record, OIDC for ArgoCD/Backstage/Grafana, oauth2-proxy, the pluggable seam, admin-plane hardening (ADR-053/059/087) | ⏳ |
-| **Workload identity** | EKS Pod Identity — how a pod gets AWS credentials via its ServiceAccount, no static keys (ADR-041/047) | ⏳ |
-| **Human access & RBAC** | per-team kubectl RBAC, the platform-engineer access model, product-scoped / cross-team access (ADR-039/040/068) | ⏳ |
-| **The governance registry** | people / roles / grants as one git-native source, projected per-cluster; the layer glossary (ADR-089/090) | ⏳ |
-| **Temporary power** | just-in-time elevation, the activation operator, emergency revocation (ADR-088) | ⏳ |
+| **Identity & SSO** | Keycloak as the IdP of record, OIDC for ArgoCD/Backstage/Grafana, oauth2-proxy, the pluggable seam, admin-plane hardening (ADR-053/059/087) | ✅ |
+| **Workload identity** | EKS Pod Identity — how a pod gets AWS credentials via its ServiceAccount, no static keys (ADR-041/047) | ✅ |
+| **Human access & RBAC** | per-team kubectl RBAC, the platform-engineer access model, product-scoped / cross-team access (ADR-039/040/068) | ✅ |
+| **The governance registry** | people / roles / grants as one git-native source, projected per-cluster; the layer glossary (ADR-089/090) | ✅ |
+| **Temporary power** | just-in-time elevation, the activation operator, emergency revocation (ADR-088) | ✅ |
 | **On-call & owner routing** | the identity directory, PagerDuty on-call, owner resolution (ADR-084) | ⏳ |
 
 ## 6 · Secrets & config
@@ -172,12 +174,13 @@ Rough order, and it's **debt-driven** — build what the *existing* docs already
    the Security Model. These cohere the two built modules (domain model, Environment API) — *and* create the
    crosslink debt the next modules pay down (every spine doc forward-refs "coming: Delivery / Policy /
    Identity / Observability…").
-2. **← WE ARE HERE: the crosslink-debt modules** — **Delivery**, **Policy & admission**, **Identity/access**
-   (and **Foundations**, which the multi-account reference also owes). These pay down the real links the
-   spine + built docs already make, and complete the provisioning → delivery → policy → identity loop. Quick
-   adjacent win alongside them: **Self-service cloud resources** (extends the built Environment API module).
-3. **Breadth on demand** — Observability, Cost, the Agentic platform, Developer experience, Operations —
-   pulled in as a real reader, a demo, or interest calls for them. No obligation to build all 24.
+2. **The crosslink-debt modules — ✅ DONE.** **Delivery**, **Policy & admission**, and **Identity & access**
+   are built — the provisioning → delivery → policy → identity loop the spine forward-referenced is closed.
+   (**Foundations** still owes the multi-account reference.)
+3. **← WE ARE HERE: breadth on demand** — Foundations, Observability, Cost, the Agentic platform, Developer
+   experience, Operations — plus the quick adjacent win **Self-service cloud resources** (extends the built
+   Environment API module). Pulled in as a real reader, a demo, or interest calls for them; no obligation to
+   build all 24.
 
 ## Notes
 
