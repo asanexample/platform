@@ -23,7 +23,7 @@ build → push to ECR → cosign sign (keyless) → SLSA provenance (isolated) �
 ```console
 $ cosign tree <platform-acct>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/shop-web@sha256:f6b37d…
 └── 🔐 Signatures …          # 1 signature
-└── 💾 Attestations …        # 2: SLSA provenance + SBOM
+└── 💾 Attestations …        # 2: SLSA provenance (v0.2) + CycloneDX SBOM
 
 $ cosign verify … team-alpha/shop-web@sha256:f6b37d…
 Issuer:  https://token.actions.githubusercontent.com          # keyless (GitHub Actions OIDC)
@@ -51,8 +51,9 @@ registry* scoping is separate — owned by the Environment Composition, ADR-046.
 ## Gotchas that teach
 
 - **Signed ≠ safe.** Signing + provenance prove **origin and integrity**, not that the code is free of bugs
-  or poisoned deps. A compromised upstream dependency is *legitimately* signed. Layer SBOM + vuln scanning
-  (Trivy) on top; treat signing as necessary, not sufficient.
+  or poisoned deps — a compromised upstream dependency is *legitimately* signed.
+  [SLSA's threat model](https://slsa.dev/spec/v1.0/threats) is explicit: it covers *build tampering*, not a
+  malicious author. Layer SBOM-driven vulnerability scanning on top; treat signing as necessary, not sufficient.
 - **Repo rename breaks trust.** Trust is keyed on the repo in the cert; renaming a Product's repo without
   updating `spec.repo` makes every new image fail verification. Update the registry with the rename.
 - **Signature and attestation are *separate* policies.** An image can be signed but missing attestations (or
@@ -77,6 +78,9 @@ registry* scoping is separate — owned by the Environment Composition, ADR-046.
   [ADR-036 GitHub OIDC federation](../../adrs/036-github-actions-oidc-federation.md).
 - Onboard an app: the `supply-chain-onboarding` skill. Enforce side:
   [Policy & Admission](../policy/orientation.md).
-- Substrate: [cosign / Sigstore](https://docs.sigstore.dev/cosign/signing/overview/) ·
-  [SLSA](https://slsa.dev/spec/v1.0/levels) · [in-toto attestations](https://slsa.dev/spec/v1.0/provenance) ·
-  [Rekor transparency log](https://docs.sigstore.dev/logging/overview/).
+- Substrate & explainers: [cosign](https://docs.sigstore.dev/cosign/signing/overview/) ·
+  [Sigstore's trust model](https://docs.sigstore.dev/about/security/) ·
+  [Rekor transparency log](https://docs.sigstore.dev/logging/overview/) ·
+  [SLSA levels](https://slsa.dev/spec/v1.0/levels) + [threat model](https://slsa.dev/spec/v1.0/threats)
+  ([gentle intro](https://edu.chainguard.dev/compliance/slsa/what-is-slsa/)) ·
+  [in-toto](https://in-toto.io/) · [CycloneDX SBOM](https://cyclonedx.org/specification/overview/).

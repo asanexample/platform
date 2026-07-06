@@ -62,14 +62,21 @@ Let's take each apart.
 
 ## Keyless signing — no key to steal
 
-Traditional signing has a fatal operational flaw: a **private key**. Wherever you keep it, it can be stolen,
-and then anyone can sign *anything* as you. So the platform uses **keyless** signing
-([cosign](https://docs.sigstore.dev/cosign/signing/overview/) / [Sigstore](https://www.sigstore.dev/)):
-instead of a long-lived key, the CI job proves *who it is* with a short-lived **OIDC identity** (the GitHub
-Actions token — "I am the `build-sign` workflow of this run"), a certificate authority (**Fulcio**) issues a
-**momentary** signing certificate bound to that identity, the artifact is signed, and the whole event is
-recorded in a public **transparency log** (**Rekor**). The certificate expires in minutes; there's no
-standing secret anywhere.
+Traditional signing has a fatal operational flaw: a **private key**. Wherever you keep it, it can be stolen —
+and then anyone can sign *anything* as you, and the forgeries are **indistinguishable** from the real thing.
+This isn't hypothetical. In the [SolarWinds attack](https://www.sonatype.com/blog/software-supply-chain-attacks-solarwind-how-developers-fortify-apps),
+the malicious updates were **properly signed** — attackers had compromised the build and were using the
+company's *own* signing key — so ~18,000 organizations installed a backdoor that verified perfectly. A stolen
+key doesn't just fail to help; **it makes the forgery *more* trusted.** That's the flaw keyless removes: if
+there's no long-lived key, there's nothing to steal.
+
+So the platform uses **keyless** signing ([cosign](https://docs.sigstore.dev/cosign/signing/overview/) /
+[Sigstore](https://www.sigstore.dev/)). Instead of a stored key, the CI job proves *who it is* with a
+short-lived **OIDC identity** (the GitHub Actions token — "I am the `build-sign` workflow of *this* run"), a
+certificate authority (**Fulcio**) issues a signing certificate with that identity baked in, the artifact is
+signed, and the event is recorded in a public **transparency log** (**Rekor**). The certificate lives about
+**ten minutes** — long enough to sign, too short to steal, and short enough that there's **no revocation to
+manage** (it's worthless before anyone could misuse it). No standing secret exists anywhere.
 
 Don't skip past that transparency log — it's what makes keyless trustworthy *at scale*. Because every
 signature is written to a public, append-only ledger, a signature can't be quietly forged or backdated after
@@ -99,8 +106,11 @@ A signature proves *who made it*. The **attestations** prove *how* and *from wha
   independent, tamper-resistant process attests it." ([SLSA](https://slsa.dev/spec/v1.0/levels) grades this
   on a ladder — L1 merely *has* provenance, L2 adds a signed hosted build, **L3 adds the isolation** that
   stops a build forging its own; L3 is the bar worth clearing.)
-- **SBOM** — a Software Bill of Materials: the ingredient list of what's *inside* the image, so a
-  "which of our images ship `log4j 2.14`?" question is a query, not a fire drill.
+- **SBOM** — a Software Bill of Materials (ours is [CycloneDX](https://cyclonedx.org/specification/overview/),
+  the OWASP *security-first* format whose package identifiers map straight to vulnerability databases): the
+  ingredient list of what's *inside* the image, so "which of our images ship `log4j 2.14`?" is a query, not
+  a fire drill. Both attestations are [in-toto](https://in-toto.io/) statements — a signed claim *about* an
+  artifact — stored beside the image and keyed to its digest.
 
 > If the signature is the tamper-evident seal, the provenance is the **notarized chain of custody** stapled
 > to the crate — *made in this workshop, from these materials, on this date, by this worker* — co-signed by a
@@ -149,7 +159,31 @@ the [Policy & Admission](../policy/orientation.md) module's job — supply chain
 *verifies* it. Two halves of one control.)
 
 So the full loop: **shared CI signs keylessly + attaches provenance/SBOM → ECR stores them → Kyverno
-verifies at admission against the product's repo → only then does it run.**
+verifies at admission against the product's repo → only then does it run.** Seen end to end:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant CI as Shared CI (build-sign.yml)
+    participant Fulcio
+    participant Rekor
+    participant ECR
+    participant Kyverno
+
+    Note over CI,ECR: SIGN — once, when the image is built
+    CI->>Fulcio: OIDC token — "I am build-sign.yml, run for alpha-shop"
+    Fulcio-->>CI: ~10-minute cert (identity + repo baked in)
+    CI->>ECR: push image + signature + SLSA provenance + CycloneDX SBOM
+    CI->>Rekor: record the signing event (public, append-only)
+
+    Note over ECR,Kyverno: VERIFY — every time, at admission
+    Kyverno->>ECR: fetch signature + attestations
+    Kyverno->>Kyverno: cert's repo == Product's spec.repo? signed + attested?
+    Kyverno-->>Kyverno: all checks pass → admit · else → REJECT
+```
+
+The signing half runs *once* per image; the verify half runs *every time* a pod is admitted — so a
+tampered or wrong-repo image is caught even if it somehow reached the registry.
 
 ## When it breaks — the ones you'll actually hit
 
@@ -159,8 +193,11 @@ verifies at admission against the product's repo → only then does it run.**
   separate from the signature policy.
 - **"I didn't sign anything and it still works."** Correct — you're a *thin caller*; the shared workflow
   signs for you. If it's *not* signed, you're probably not calling the shared workflow (or bypassing it).
-- **"Signing is green but the image is vulnerable."** Signing proves origin, not safety — that's what the
-  SBOM + vuln scanning (Trivy) are for, layered on top. A valid signature is necessary, not sufficient.
+- **"Signing is green but the image is vulnerable."** Signing proves origin, not safety — necessary, not
+  sufficient. [SLSA's own threat model](https://slsa.dev/spec/v1.0/threats) draws the boundary explicitly: it
+  defends against *tampering with the build*, **not** a malicious author or a poisoned upstream dependency —
+  both of which produce a *legitimately* signed image. Catching those is the job of the SBOM (feeding
+  vulnerability scanning) and runtime controls, layered on top.
 
 ## Recap — say it back
 
@@ -195,5 +232,18 @@ there isn't one.
 - Why it's shaped this way: [ADR-042 isolated provenance (SLSA L3)](../../adrs/042-isolated-build-provenance-slsa-l3.md) ·
   [ADR-050 shared build-sign](../../adrs/050-shared-build-sign-reusable-workflow.md) ·
   [ADR-036 GitHub OIDC](../../adrs/036-github-actions-oidc-federation.md).
-- Substrate: [cosign / Sigstore](https://docs.sigstore.dev/cosign/signing/overview/) ·
-  [SLSA](https://slsa.dev/) · [in-toto attestations](https://slsa.dev/spec/v1.0/provenance).
+- **The concepts, explained well** (none of this is obvious the first time — these are the on-ramps):
+  - [How Sigstore's keyless trust works](https://docs.sigstore.dev/about/security/) — the Fulcio + Rekor +
+    OIDC trust root, and why a ~10-minute cert needs no revocation.
+  - [The Rekor transparency log](https://docs.sigstore.dev/logging/overview/) — how a public append-only log
+    makes signing non-repudiable and mis-issuance detectable (the same idea as Certificate Transparency for
+    the web).
+  - [SLSA — what the levels mean](https://slsa.dev/spec/v1.0/levels), and crucially
+    [the SLSA threat model](https://slsa.dev/spec/v1.0/threats) — exactly which supply-chain attacks
+    provenance does and doesn't stop. Gentler on-ramp:
+    [Chainguard Academy's SLSA intro](https://edu.chainguard.dev/compliance/slsa/what-is-slsa/).
+  - [in-toto attestations](https://in-toto.io/) (the signed-claim framework) ·
+    [CycloneDX](https://cyclonedx.org/specification/overview/) (our SBOM format) ·
+    [cosign](https://docs.sigstore.dev/cosign/signing/overview/) (the tool).
+  - [The SolarWinds attack, for developers](https://www.sonatype.com/blog/software-supply-chain-attacks-solarwind-how-developers-fortify-apps)
+    — a stolen signing key is the whole reason keyless exists.
