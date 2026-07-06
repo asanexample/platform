@@ -11,7 +11,7 @@ sharing machinery, zero trust between them:
 | Plane | Who | Identity of record |
 | --- | --- | --- |
 | **Workforce** *(built)* | platform engineers, developers, viewers, auditors | Keycloak (IdP of record) |
-| **Machine** *(built)* | pods/agents needing AWS | EKS Pod Identity |
+| **Machine** *(built)* | workloads needing AWS (agents are a richer case — below) | EKS Pod Identity (+ delegation for agents) |
 | **Consumer / CIAM** *(deferred)* | end-users of hosted products | one isolated Keycloak realm per Product |
 
 ## The git source of truth
@@ -56,6 +56,13 @@ The platform *derives* native config from `(Person × Role)` because each tool d
 - **EKS Pod Identity** (ADR-041/047): a pod assumes a scoped IAM role via its ServiceAccount — short-lived,
   **no static keys**. Provisioned per-Service by [the Environment Composition](../environment-api/orientation.md)
   (e.g. `Pod-<team>-<product>-<stage>-<svc>`). The platform's own add-ons moved off IRSA to Pod Identity too.
+- **Agents — a richer machine subject** ([ADR-074](../../adrs/074-agentic-workloads-platform.md)): an agent
+  gets its own Pod Identity *plus* a **three-identity** authority model — its own identity, its tool/model
+  grant, and on-behalf-of-user delegation — where **effective authority = intersection(agent grant, human
+  scope)**, enforced by *trusted boundary code, never the agent*, and **attenuating** across chains. **One**
+  access model (agents are grant subjects, ADR-068 extended); bounded by **graduated autonomy**
+  ([ADR-086](../../adrs/086-autonomous-agent-access.md)). Largely *designed* today — full treatment is the
+  coming **Agentic platform** module.
 
 ## Keycloak — the pluggable seam
 

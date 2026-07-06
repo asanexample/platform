@@ -129,6 +129,19 @@ short-lived credentials at runtime, scoped to exactly what that service declared
 human side — *least privilege, nothing standing* — just for a different kind of subject. It's the "visitor
 badge, not a copied master key" from [the security model](../spine/the-security-model.md), made real.
 
+**A special machine subject worth flagging: agents.** An AI agent (like the triage copilot) gets its own
+least-privilege Pod Identity like any workload — but don't mistake it for a plain one, because its
+*authority* is richer. An agent often acts **on behalf of** a human or the platform, so the model keeps
+*three* identities separate: (1) the agent's own workload identity, (2) its tool/model grant, and (3) the
+on-behalf-of-user delegation. The governing rule is sharp: **effective authority = the *intersection* of the
+agent's grant and the calling human's scope** — enforced by *trusted code at the boundary, never by the
+agent itself* — and delegation only ever **attenuates** (each hop can narrow, never escalate). Crucially
+it's **not a parallel model**: agents are subjects in the *same* grant model (ADR-068, extended); delegation
+is just a grant. That, plus **graduated autonomy** (machine-enforced bounds on what an agent may do
+*unattended*), is the [Agentic platform](../_inventory.md)'s subject — the runtime + the copilot's base
+identity are live, the full delegation/autonomy machinery is largely *designed* (ADR-074/086). Flagged here
+so you don't file an agent under "plain workload."
+
 ## The best part — dangerous power you *borrow*, not *hold*
 
 Here's where the model earns its keep. Some roles are too dangerous to leave switched on: full admin,
