@@ -127,8 +127,8 @@ image was built* (which repo, which commit, which workflow).
 Nothing is deployed yet. This stage's only job is to turn your merge into a **trustworthy artifact** and
 its **digest** — a value we're about to lean on hard.
 
-*Its own module, later: **Supply chain** (signing, provenance, verification — ADR-042/050). For now:
-[cosign](https://docs.sigstore.dev/cosign/signing/overview/) · [SLSA](https://slsa.dev/).*
+*Its own module: **[Supply chain](../supply-chain/orientation.md)** — keyless signing, isolated SLSA
+provenance, the thin-caller model, verify-at-admission (ADR-042/050).*
 
 ## 3 · The digest is promoted — into a *different* repo
 
@@ -464,7 +464,8 @@ control plane): [The Life of a Request](life-of-a-request.md).
 - [Delivery](../delivery/orientation.md) (ArgoCD + the promotion ladder + Rollouts) *(built)*.
 - [Policy & admission](../policy/orientation.md) (Kyverno: validate/mutate/generate) *(built)*.
 - [Identity & access](../identity/orientation.md) (Keycloak + Pod Identity + temporary power) *(built)*.
-- Coming: Supply chain (signing + provenance) · Observability · Nodes & networking.
+- [Supply chain](../supply-chain/orientation.md) (signing + provenance + verify) *(built)*.
+- Coming: Observability · Nodes & networking.
 
 **Source of truth (as-built):**
 [Promotion & Release](../../architecture/promotion-and-release.md) ·

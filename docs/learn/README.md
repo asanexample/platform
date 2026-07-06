@@ -29,7 +29,7 @@ Each subsystem is a short course: an **Orientation** (a guided journey you read 
 | Observability — the LGTM+P stack | ⏳ planned |
 | **[Policy & admission](policy/)** — the guardrail engine at the cluster door (Kyverno: validate · mutate · generate) | ✅ available |
 | **[Identity & access](identity/)** — decide once, derive everywhere, borrow dangerous power (Keycloak, Pod Identity, temporary power) | ✅ available |
-| Supply chain — signing, provenance, verification | ⏳ planned |
+| **[Supply chain](supply-chain/)** — trust provenance, not names (keyless signing, SLSA, verify-at-admission) | ✅ available |
 | The agentic platform — running governed AI agents | ⏳ planned |
 | Cost & FinOps | ⏳ planned |
 | **[*Spine:* The Life of a Deployment](spine/life-of-a-deployment.md)** — one `git push` across every plane (control plane) | ✅ available |
