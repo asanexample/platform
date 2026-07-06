@@ -34,6 +34,8 @@ locals {
     var.egress_masquerade_interfaces != "" ? { egressMasqueradeInterfaces = var.egress_masquerade_interfaces } : {},
     var.routing_mode == "native" && var.native_routing_cidr != "" ? { ipv4NativeRoutingCIDR = var.native_routing_cidr } : {},
     var.mtu > 0 ? { MTU = var.mtu } : {},
+    # Transparent encryption (ADR-057 Phase 1) — WireGuard/IPsec on the wire between nodes.
+    var.encryption_enabled ? { encryption = { enabled = true, type = var.encryption_type, nodeEncryption = var.node_encryption } } : {},
   )
 
   # Irreducible per-cloud plumbing — NOT the datapath (that's variable-driven above).

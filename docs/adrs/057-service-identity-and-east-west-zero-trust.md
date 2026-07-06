@@ -9,6 +9,25 @@ identity ([ADR-041](041-pod-identity-for-tenant-workloads.md)/[ADR-047](047-pod-
 and human identity ([ADR-053](053-identity-and-cross-system-authorization-strategy.md)) planes. The mTLS posture
 becomes part of the tier's **network** isolation column ([ADR-049](049-tenant-model-team-tenant-zone.md)).
 
+> **Amendment (2026-07-06, #1193) — Phase 1 (transparent encryption) split out and built into the module.**
+> Decision #1's *encryption* half is concretized and made buildable now; the *mTLS / SPIFFE* half (decisions
+> #2–#4) stays Proposed and parked (regulated-tier only — no regulated tenant exists yet — and it still needs
+> the open Cilium-mTLS-vs-SPIRE spike).
+>
+> - **Backend: WireGuard** (`encryption.type=wireguard`) — in-kernel on the AL2023 6.x nodes (kernel 6.12, no
+>   key management) and simplest on the platform's **overlay datapath** (tunnel/VXLAN + cluster-pool IPAM),
+>   which sidesteps the WireGuard caveats that live in native-ENI mode. Cilium stacks it under the VXLAN
+>   tunnel and auto-adjusts MTU for the added overhead.
+> - **Open question resolved: fleet-default, not tier-gated.** Encryption-in-transit is a blanket good and
+>   decision #3 already puts it in the `standard` tier, so it is enabled cluster-wide rather than per-tier.
+> - **Scope: pod-to-pod only** — `node_encryption` (host-to-host) stays off for Phase 1 (it also covers host +
+>   health-check traffic and is a more invasive later step).
+> - **Delivered here:** gated module support in the `cilium` module (`encryption_enabled` / `encryption_type`
+>   / `node_encryption`, default off). **Enablement is a separate step:** flipping a unit's input triggers a
+>   **rolling Cilium restart** on the CNI — highest blast radius — so it rolls out **preprod-first**, in a
+>   maintenance window, from the main checkout, with a **perf-overhead measurement** before the platform
+>   cluster follows. Status flips to Accepted once applied + verified.
+
 ## Context
 
 North-south (ingress) is Gateway API + TLS. East-west is governed by Cilium **L3/L4 NetworkPolicy +
