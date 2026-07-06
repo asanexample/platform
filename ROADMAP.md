@@ -154,7 +154,7 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 
 - **Kyverno policy backlog** — Rollup -> filter label:area/policy. Includes #77 CEL ValidatingPolicy, #78 PolicyException governance, #79 HIPAA/PCI packs, #80 kyverno-json, #81 multi-cluster distribution, #82 nodeSelector validation, #93 PolicyReport observability.
 - **Security posture gap register — epic [#1152](https://github.com/asanexample/platform/issues/1152).** The [Security Model spine doc](docs/learn/spine/the-security-model.md)'s honest, top-to-bottom **4 C's** gap register (Cloud/Cluster/Container/Code), with a proposed prioritization. **Tier 1 (next up):** EKS audit logging ([#816](https://github.com/asanexample/platform/issues/816)), secret-scanning in CI ([#1148](https://github.com/asanexample/platform/issues/1148)), WAF ([#1147](https://github.com/asanexample/platform/issues/1147)), secrets rotation ([#811](https://github.com/asanexample/platform/issues/811) — **design drafted ([ADR-094](docs/adrs/094-secret-rotation-strategy.md)); Phase-1 primitives promoted to Now**). New gaps filed from the doc audit: WAF #1147, secret-scanning #1148, CIS/kube-bench #1149, SIEM #1150, pentest #1151.
-- **Security & hardening backlog** — Rollup -> filter label:security. Includes #59 _v1 rename, #70 prod least-privilege, #111 ArgoCD GitHub App, #118 customer KMS CMKs, #129 SCA/AppSec, #132 CSPM, #149 Falco, #152 state-bootstrap S3, #196 Backstage ns hardening, #213 token rotation, #242 EBS orphans, #243 chart-repo resilience, #273 CoreDNS.
+- **Security & hardening backlog** — Rollup -> filter label:security. Includes #59 _v1 rename, #70 prod least-privilege, #111 ArgoCD GitHub App, #118 customer KMS CMKs, #129 SCA/AppSec, #132 CSPM, #152 state-bootstrap S3, #196 Backstage ns hardening, #213 token rotation, #242 EBS orphans, #243 chart-repo resilience, #273 CoreDNS.
 
 #### GitOps & Delivery
 
@@ -261,7 +261,7 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 
 ### Observability
 
-- **Falco runtime threat detection (preprod)** — Shipped. Falco eBPF runtime threat detection on preprod. ADR-045. (Platform-cluster coverage still open — #149.)
+- **Falco runtime threat detection** — Shipped. Falco eBPF runtime threat detection on **preprod + platform** clusters. ADR-045. (#116, #149.)
 - **Prometheus/Grafana stack + Mimir durable metrics** — Shipped (P1+P2). kube-prometheus-stack + Grafana; Mimir S3-backed durable metrics via remote-write. ADR-043/044.
 - **Full LGTM+P data plane — multi-cluster, federated, correlated** — Shipped. Logs (Loki) + traces (Tempo) + profiles (Pyroscope) stores with preprod spokes shipping to the hub, uniform `cluster` label, APM correlation (service graph + exemplars), Beyla/OTel auto-instrumentation, and one federated Grafana across platform + preprod. #582–#630 / ADR-077.
 - **In-cluster + true cloud cost observability** — Shipped. OpenCost per-cluster → Mimir with per-team/per-environment dashboards + budgets, plus a CUR→Athena→Grafana true-spend pipeline reconciled against OpenCost. #589/#668 (delivered under the ADR-091 cost track).
