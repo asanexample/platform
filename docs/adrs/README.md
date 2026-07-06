@@ -29,6 +29,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-030: Route53 Subdomain Delegation for Environment DNS](030-route53-subdomain-delegation.md) | Accepted |
 | [ADR-034: Transit Gateway for Cross-Account VPC Connectivity](034-transit-gateway-cross-account-connectivity.md) | Accepted |
 | [ADR-035: Cross-VPC DNS Resolution for Private EKS Endpoints](035-cross-vpc-dns-resolution.md) | Accepted |
+| [ADR-096: Web Application Firewall — Edge-First via Cloudflare](096-web-application-firewall-edge-first.md) | Proposed (architecture agreed; implementation deferred — ADR-092 no-spend) |
 
 ## Cluster & Platform Runtime
 
