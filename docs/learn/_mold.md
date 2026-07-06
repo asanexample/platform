@@ -203,8 +203,21 @@ mechanism (that's a deep dive).
 - **Where extending is a common activity, the module owns a `how-to-<task>.md` / `extending-<task>.md`.**
   Ask: "will a platform engineer routinely *add to* this subsystem?" If yes (resources → add an engine;
   policy → add a policy; products → onboard a new kind), it earns a how-to. A fixed subsystem doesn't.
-- **Recipe shape, not prose.** Numbered steps, each naming the **real file / touch-point** and the existing
-  instance to copy — scannable and followable under deadline.
+- **A thorough, newcomer-followable *playbook* — not a terse recipe.** Assume the reader may never have used
+  the underlying tech. Open with a short "new to this stack?" orientation that names each technology in a
+  sentence and links where to learn it, then walk **numbered steps**, each naming the **real file**, showing
+  **concrete copy-pasteable code**, and carrying **one running worked example end-to-end** (add one real
+  thing, start to finish). Length is fine; a playbook someone can actually follow beats a memo an expert can
+  skim.
+- **Link generously to external docs.** A newcomer should be able to click any unfamiliar concept through to
+  its authoritative source (the tool's docs, the provider/API schema, the cloud service). Every link
+  curl-verified (link-rot rule); annotate what each teaches.
+- **AI-forward.** Most engineers now work *with* coding agents, so a how-to must serve them too: include a
+  **"doing this with an agent"** section — a ready-to-use prompt, the exact context/files to attach, the
+  **security invariants written as explicit agent guardrails**, and a **review checklist** (the agent does
+  the typing; the human owns correctness). Write the whole doc to double as agent context: explicit paths,
+  copy-pasteable code, unambiguous verification gates. The task an agent is *worst* at (here: knowing which
+  schema fields are real, what must never be user-controlled) is the thing to make loudest.
 - **The gotchas are the point.** The highest-value part is *"what bit us adding the last one"* — the
   failures a fresh reading of the code won't reveal (provider-schema quirks, ordering traps, silent
   no-applies). Include them, plus a **verification** path (offline → apply → e2e) and the **quality bar**
