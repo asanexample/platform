@@ -11,8 +11,10 @@ description: >-
   actually READ the result: capture output to a file instead of piping the only copy through a lossy
   grep, the `AWS_PROFILE=management` requirement (plan/apply assume PlatformDeployer; validate
   doesn't), and the "don't start a second run on the same unit / state-lock held by multiple users"
-  trap with long backgrounded applies. NOT for authoring a unit (terragrunt-units)
-  or module (terraform-style).
+  trap with long backgrounded applies. Also covers whether a change is already applied by CI on
+  merge (the `gitops/teams/**` and `gitops/products/**` apply-on-merge workflows) versus needing a
+  manual operator apply — check that BEFORE handing someone a manual apply. NOT for authoring a unit
+  (terragrunt-units) or module (terraform-style).
 ---
 
 # Applying & destroying infrastructure
@@ -21,6 +23,32 @@ OpenTofu (`tofu`) + Terragrunt **v1.x** (redesigned CLI). For full-platform oper
 **platctl** (DAG-aware, resumable, handles the EKS endpoint unlock/lockdown — see the platctl
 skill); use raw `terragrunt run --all` for ad-hoc multi-unit work. Source of truth:
 `docs/runbooks/platform-rebuild-from-scratch.md`, CLAUDE.md → Deployment Ordering / Apply-Destroy.
+
+## First check: is this change already applied by CI on merge?
+
+**Not every apply is a manual operator task** — don't reflexively hand someone a `terragrunt apply`
+recipe (or plan a manual apply) before checking this. A **limited, specific** set of units already
+**apply automatically on merge to `main`**, on the in-VPC `platform-infra` ARC runner (native
+private-API reach — **no Tailscale**; AWS via EKS Pod Identity, with `TG_FORCE_DEPLOYER=1`
+force-assuming PlatformDeployer since the runner is in-account). If the change touches one of these
+paths, the merge *is* the apply — nothing manual to do:
+
+- **`gitops/teams/**`** → `teams-apply.yml` applies the access-model units
+  (keycloak-config → argocd → argocd-apps → github-teams). #305 Phase 1 / ADR-053.
+- **`gitops/products/**`** → `registry-reconcile.yml` reconciles the per-Product derived units
+  (github-oidc → preprod/policy → argocd-apps → github-teams). ADR-071 Gap #2.
+
+Both serialize under the shared `terragrunt-apply` concurrency group (belt-and-suspenders with the
+DynamoDB state lock) and apply from the merged SHA. The apply logic lives in
+`.github/scripts/{teams,registry}/apply.sh`, **not inline** in the workflow YAML — so a plain
+`grep "terragrunt apply" .github/workflows` misses it and makes it *look* like nothing auto-applies.
+
+**This is NOT general apply-on-merge.** It covers only those two derived-unit sets. **Every other
+unit — a new module unit like `falco`, or `eks` / `networking` / etc. — is still applied by a
+human** (from the main checkout; see the manual flow below and the worktree rule in CLAUDE.md).
+Extending apply-on-merge to arbitrary units (general plan-on-PR / apply-on-merge) is the deferred
+"…then plan-on-PR/apply-on-merge" half of #305 (ADR-065) — **not built yet**. So: only reach for the
+manual apply flow after confirming the change isn't in one of the CI-applied paths above.
 
 ## Commands
 
@@ -117,10 +145,11 @@ then, on the cluster:
 
 ## Private-EKS caveat (don't enable the public endpoint)
 
-Routine apply/maintenance reaches the **private** API over Tailscale (see the cluster-access
-skill). The public endpoint is toggled **only** during a full from-scratch teardown/rebuild —
-because Tailscale itself is destroyed — and **platctl** does that automatically (unlock before
-destroy, lockdown after). Never enable it by hand for ordinary ops.
+Routine **operator** apply/maintenance reaches the **private** API over Tailscale (see the
+cluster-access skill). The in-VPC `platform-infra` CI runners (the apply-on-merge workflows above)
+reach it **natively — no Tailscale**. The public endpoint is toggled **only** during a full
+from-scratch teardown/rebuild — because Tailscale itself is destroyed — and **platctl** does that
+automatically (unlock before destroy, lockdown after). Never enable it by hand for ordinary ops.
 
 ## References
 

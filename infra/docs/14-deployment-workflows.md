@@ -5,7 +5,9 @@
 The platform has **two deployment tracks**, deliberately separated:
 
 1. **Infrastructure (this repo)** — OpenTofu/Terragrunt, applied by a human-gated
-   plan→review→apply flow (no auto-apply on merge). CI validates and security-scans every PR.
+   plan→review→apply flow for most units, **except** a specific set of registry-derived units that
+   **auto-apply on merge** on the in-VPC ARC runner (the `gitops/teams/**` and `gitops/products/**`
+   convergence workflows — see below). CI validates and security-scans every PR.
 2. **Application workloads (app repos, e.g. `app-alpha`)** — container images built in CI and
    delivered by **GitOps**: CI pins a signed image digest into the app's `k8s/` manifests, and
    **ArgoCD** syncs the cluster to match. Kyverno enforces supply-chain policy at admission.
@@ -42,9 +44,9 @@ Terratest (Go) for the heavyweight AWS modules (networking, EKS) runs **weekly**
 on `workflow_dispatch`, assuming `TEST_ROLE_ARN` in the **test** sandbox account via GitHub OIDC
 (`id-token: write`). See [Testing Strategy](15-testing-strategy.md).
 
-### Apply (human-gated, not in CI)
+### Apply
 
-There is **no auto-apply on merge** for infrastructure. Applies are run deliberately against a target
+Most units are **human-gated, not in CI**: applies are run deliberately against a target
 environment after reviewing the plan:
 
 ```bash
@@ -55,6 +57,20 @@ terragrunt apply
 # Or run the whole DAG for an environment
 terragrunt run --all apply
 ```
+
+**Exception — apply-on-merge for the registry-derived units.** A limited, specific set of units
+apply **automatically on merge to `main`**, on the in-VPC `platform-infra` ARC runner (native
+private-API reach; AWS via EKS Pod Identity → `TG_FORCE_DEPLOYER=1` force-assumes PlatformDeployer).
+The apply logic lives in `.github/scripts/{teams,registry}/apply.sh`:
+
+| Workflow | Trigger | Units converged |
+|----------|---------|-----------------|
+| `teams-apply.yml` | merge touching `gitops/teams/**` | keycloak-config → argocd → argocd-apps → github-teams (the access model — #305 Phase 1, ADR-053) |
+| `registry-reconcile.yml` | merge touching `gitops/products/**` | github-oidc → preprod/policy → argocd-apps → github-teams (per-Product plumbing — ADR-071 Gap #2) |
+
+Both serialize under a shared `terragrunt-apply` concurrency group and apply from the merged SHA.
+This is **not** general apply-on-merge — every other unit is still applied by a human. Extending it
+to arbitrary units (general plan-on-PR / apply-on-merge) is a deferred follow-up (#305, ADR-065).
 
 `platctl` (ADR-038) wraps full-environment bring-up/teardown with dependency ordering and dry-run:
 
