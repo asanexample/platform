@@ -20,6 +20,13 @@ const (
 )
 
 // State tracks the progress of a bootstrap or teardown operation.
+//
+// Concurrency: a *State is single-writer — it is owned by the orchestrator goroutine. Every mutation
+// (MarkRunning/MarkCompleted/MarkFailed/MarkSkipped/PrepareForResume) and every Store.Save happens on that one
+// goroutine (see engine.Run and the teardown command, whose worker goroutines only run terragrunt and post
+// results back over a channel — they never touch State). It is therefore intentionally NOT guarded by a mutex.
+// Do not mutate a *State from a worker goroutine, and do not Save it while another goroutine mutates it — either
+// would be a data race. FileStore, by contrast, IS safe for concurrent Save/Load (it holds its own lock).
 type State struct {
 	Operation string                `json:"operation"`
 	StartedAt time.Time             `json:"started_at"`

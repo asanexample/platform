@@ -175,37 +175,40 @@ func TestFileStore_AtomicWrite(t *testing.T) {
 	}
 }
 
+// TestFileStore_ConcurrentWrites exercises FileStore's actual concurrency contract: Save/Load may be called
+// concurrently on the same path, and the atomic temp-write+rename under fs.mu guarantees a reader never sees a
+// torn file and concurrent writers never corrupt it.
+//
+// NOTE: a *State is single-writer — it is owned by the orchestrator goroutine (see engine.Run / teardown, where
+// every Mark*/save happens on the main goroutine, never inside a worker). So each goroutine here builds and
+// saves its OWN State rather than mutating a shared one; that mirrors the real contract and keeps the test
+// race-free. (The earlier version mutated one shared *State while another goroutine marshalled it in Save — a
+// data race under -race that no production code path actually performs.)
 func TestFileStore_ConcurrentWrites(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state.json")
-
 	store := NewFileStore()
-	units := make([]*Unit, 10)
-	for i := range units {
-		units[i] = &Unit{Name: fmt.Sprintf("unit-%d", i)}
-	}
-	s := NewState("bootstrap", units)
 
-	if err := store.Save(path, s); err != nil {
-		t.Fatalf("initial save error: %v", err)
-	}
-
-	// Simulate concurrent state updates
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 20; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
 			name := fmt.Sprintf("unit-%d", idx)
+			s := NewState("bootstrap", []*Unit{{Name: name}})
 			s.MarkCompleted(name)
 			if err := store.Save(path, s); err != nil {
 				t.Errorf("concurrent save error: %v", err)
+			}
+			// Load races Save on the same path; fs.mu + atomic rename must keep it from ever seeing a torn file.
+			if _, err := store.Load(path); err != nil {
+				t.Errorf("concurrent load error: %v", err)
 			}
 		}(i)
 	}
 	wg.Wait()
 
-	// Verify the final state is valid
+	// The file survives the concurrent writers as a single valid state.
 	loaded, err := store.Load(path)
 	if err != nil {
 		t.Fatalf("load after concurrent writes: %v", err)
