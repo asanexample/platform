@@ -99,6 +99,38 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-06 — UNPARK both clusters after a weekend park (parked 2026-07-03 eve → restored Mon). ✅ Restored,
+  but the pod-readiness sweep did the real work: `up`'s DB-client recovery (#1105) DID NOT auto-restart backstage
+  this cycle — it was left stuck and I recovered it (plus a cascade of startup-ordering victims) by hand.** The
+  `platctl up` mechanics were clean on both: node groups restored + `ACTIVE` (platform `system` 2, preprod 1), all
+  nodes Ready, **Karpenter health gate passed first check on both**, preprod "Reconnect complete" (cross-vpc-dns +
+  argocd bounce). ⚠️ **THE FINDING — #1105 recovery silently no-op'd:** platform `up` printed `checking for
+  workloads stuck on a database that wasn't Ready at their startup...` as its **LAST line — no `restarted N` and no
+  `no workloads` summary** (contrast the 2026-07-03 AM run which printed "restarted backstage + keycloak"). Result:
+  **backstage sat `0/1 Running`, `r=0`, 7m46s, steady 503** — the exact victim #1105 exists to catch, uncaught.
+  Root-cause hypothesis (NOT yet confirmed in code): the recovery's bounded wait for CNPG DB-Ready expired before
+  `backstage-db` came up, so it skipped the restart AND didn't log why — a **silent** timeout. **Follow-up filed to
+  make the recovery either wait longer or SURFACE a skip/timeout instead of exiting mute** (don't let it look like
+  it ran clean when it punted). Manual fix that worked: confirm all CNPG DBs Ready (`kubectl get
+  cluster.postgresql.cnpg.io -A` → backstage/keycloak/triage-copilot all `READY=1`), then **`kubectl --context
+  <env>-deployer delete pod`** the victim (delete-pod, NOT rollout-restart — ArgoCD reverts the annotation).
+  **The full post-unpark victim list this cycle (all startup-ordering behind a dependency that wasn't up yet, all
+  cleared by a pod-delete once the dep was Ready):** (1) **backstage** 0/1 503 → DB-ordering, delete. (2)
+  **activation-operator** CrashLoop `refusing to start without the governance trail` — fail-safe-deny working as
+  designed; couldn't reach `triage-copilot-db-rw.platform-directory` (connection refused). Its DB was Ready, so the
+  delete cleared the crash-backoff and it came `1/1`. (3) **argo-rollouts** (BOTH clusters) CrashLoop — it's the
+  dashboard's **oauth2-proxy** failing **Keycloak OIDC discovery** (`503: no healthy upstream`) because Keycloak was
+  still initializing; delete once Keycloak is up. (4) **opencost** (preprod) CrashLoop `Failed to create Prometheus
+  data source: no running jobs on Prometheus` — Mimir was up but hadn't ingested yet; recovered on retry (delete to
+  speed it). **NON-victim to not chase:** **keycloak-0** looked stuck at `0/1` / "Keycloak Initialized: DOWN" for
+  ~7min but is NOT a victim — its `dbchecker` init-container gates it behind the DB, so it started clean and just
+  takes ~7min wall-clock; `Bootstrap completed in 18.9s` and it went `1/1` on its own. And the standing
+  `triage-demo/checkout` CrashLoop (no `payments-db`) is the usual 9-day-old broken demo, not ours. **Takeaways:**
+  (a) node/nodegroup/Karpenter state ALL green ≠ healthy — the readiness sweep caught 5 not-Ready pods behind it;
+  (b) after a LONGER (weekend) park, more deps race on unpark, so more startup-ordering victims surface — sweep and
+  restart deliberately in dependency order (DBs → their clients; Keycloak → its SSO clients); (c) #1105 can't be
+  fully trusted yet — always verify backstage/keycloak readiness by hand until the silent-skip follow-up lands.
+
 - **2026-07-03 (end-of-day PARK #2) — second overnight park of both clusters, same day (after the morning
   park→unpark cycle above). ✅ Clean, cost-zero, no new surprises — the pattern is now boringly repeatable.**
   `AWS_PROFILE=management ./bin/platctl down --env <env> --yes` each, in parallel in the background. **Preprod**
