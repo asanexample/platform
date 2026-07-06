@@ -64,6 +64,42 @@ because Terraform already owns both sides. The Keycloak OIDC client secrets are 
 same value to `platform/keycloak/<id>-oidc`, so regenerating the `random_password` rotates both
 atomically on the next apply.
 
+### Class B breakdown — automatable vs manual
+
+Class B splits more usefully than "auto vs manual." The real divide is **whether the provider
+exposes a programmatic rotate path** (an API or a Terraform provider resource) versus **console-only
+generation**. Crucially, several "external" secrets are already **Terraform-provider-managed**, which
+means they **collapse into the Class-A mechanism** (a `time_rotating` keeper + scheduled apply) rather
+than needing a bespoke Secrets Manager rotation Lambda.
+
+**Automatable — has an API / TF-provider rotate path (prefer the Class-A scheduled apply):**
+
+| Secret | Path | Rotate path | Notes |
+|--------|------|-------------|-------|
+| Cloudflare API token | `platform/cloudflare/api-token` | Cloudflare "roll token" API endpoint, or re-create via the `cloudflare_api_token` provider resource | The only one that could justify a native SM rotation Lambda (roll is in-place); otherwise fold into scheduled apply |
+| Tailscale OAuth client | `platform/tailscale/oauth` | `tailscale_oauth_client` provider resource — re-apply mints a new client + secret | Already in the runbook; no native two-secret overlap, so a brief operator restart |
+| PagerDuty routing keys | `platform/pagerduty/<team>-routing-key` | `pagerduty` provider recreates the service integration (new key) | Low sensitivity (write-only alert ingest); recreate-not-roll → short swap window |
+
+**Manual — console-only generation, no programmatic create:**
+
+| Secret | Path | Why manual | Approach |
+|--------|------|------------|----------|
+| GitHub App private keys (Backstage discovery, scaffolder, ARC) | `platform/backstage/github-app`, `…/scaffolder-github-app`, ARC app | GitHub has **no API to generate an App private key** — UI only (multiple keys can be active at once, so the swap itself is zero-downtime) | Scheduled-manual + expiry alerting |
+| GitHub PAT | `platform/github/argocd-pat` | PATs are UI-created; no rotation API | **Retire it** → GitHub App (Class C — delete the secret; the audit's own recommendation) |
+| GitHub OAuth App secret (Keycloak IdP) | `platform/keycloak/github-idp` | Client-secret reset is UI-only | Scheduled-manual + alerting; low frequency |
+| Slack app secret (Keycloak IdP) | `platform/keycloak/slack-idp` | UI-only | Scheduled-manual + alerting; low frequency |
+| Tailscale API key | `platform/tailscale/api-key` | 90-day expiry; it is the *bootstrap* credential (chicken-and-egg to mint its own successor) | Automatable in principle via the Tailscale keys API; currently manual with an 80-day reminder |
+
+So Class B mostly collapses: Tailscale OAuth / PagerDuty / Cloudflare fold into the Class-A "re-apply"
+path, and the residual truly-manual set is the **GitHub + Slack credentials + the Tailscale API key**
+— handled by scheduled-manual + the rotation-age alerting primitive, with the `argocd-pat` retired
+outright. Very little actually warrants a bespoke rotation Lambda.
+
+> **Verify at build time.** Provider rotation-API capabilities change. The specific claims above
+> (Cloudflare roll endpoint, the Tailscale / PagerDuty provider resources) must be re-confirmed
+> against current provider docs before wiring — treat this table as the design intent, not verified
+> ground truth.
+
 ### The three shared primitives
 
 1. **Reloader.** Deploy a Reloader (Stakater or equivalent) watching ESO-owned Secrets and issuing a
