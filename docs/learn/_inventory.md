@@ -54,7 +54,7 @@ module or deep dive, decided then.*
 | --- | --- | --- |
 | **Domain model** | Team / Product / Service / Environment / Customer; the shared vocabulary | ✅ |
 | **Environment API** | Crossplane: one claim → the full footprint (namespace, ECR, IAM, policies) | ✅ |
-| **Self-service cloud resources** | S3 / SQS / SNS / DynamoDB via the claim; derived least-privilege IAM (ADR-073) | ⏳ |
+| **[Self-service cloud resources](self-service-resources/)** | S3 / SQS / SNS / DynamoDB via the claim; derived least-privilege IAM (ADR-073) | ✅ |
 
 ## 3 · Delivery
 
@@ -178,8 +178,8 @@ Rough order, and it's **debt-driven** — build what the *existing* docs already
    are built — the provisioning → delivery → policy → identity loop the spine forward-referenced is closed.
    (**Foundations** still owes the multi-account reference.)
 3. **← WE ARE HERE: breadth on demand** — Foundations, Observability, Cost, the Agentic platform, Developer
-   experience, Operations — plus the quick adjacent win **Self-service cloud resources** (extends the built
-   Environment API module). Pulled in as a real reader, a demo, or interest calls for them; no obligation to
+   experience, Operations. (The quick adjacent win **Self-service cloud resources** — extending the
+   Environment API module — is now built.) Pulled in as a real reader, a demo, or interest calls for them; no obligation to
    build all 24.
 
 ## Notes

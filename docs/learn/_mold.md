@@ -191,6 +191,42 @@ disposable.
   can't yet.
 - **Optional, built on demand** where a safe path exists — same discipline as deep dives.
 
+## How-to / extending — the platform-engineer contribution tier
+
+The Orientation teaches how a subsystem *works*; but **extending** it — adding a resource engine, a policy,
+an environment feature, a front door — is a recurring, high-value platform-engineer job the portal must
+teach too. Using a capability is easy; *adding* one is the harder, more valuable skill, and it's usually
+undocumented tribal knowledge. That's the **how-to** quadrant (Diátaxis): task-oriented, for a *competent*
+engineer accomplishing a real change — not a beginner learning (that's the tutorial), not understanding a
+mechanism (that's a deep dive).
+
+- **Where extending is a common activity, the module owns a `how-to-<task>.md` / `extending-<task>.md`.**
+  Ask: "will a platform engineer routinely *add to* this subsystem?" If yes (resources → add an engine;
+  policy → add a policy; products → onboard a new kind), it earns a how-to. A fixed subsystem doesn't.
+- **A thorough, newcomer-followable *playbook* — not a terse recipe.** Assume the reader may never have used
+  the underlying tech. Open with a short "new to this stack?" orientation that names each technology in a
+  sentence and links where to learn it, then walk **numbered steps**, each naming the **real file**, showing
+  **concrete copy-pasteable code**, and carrying **one running worked example end-to-end** (add one real
+  thing, start to finish). Length is fine; a playbook someone can actually follow beats a memo an expert can
+  skim.
+- **Link generously to external docs.** A newcomer should be able to click any unfamiliar concept through to
+  its authoritative source (the tool's docs, the provider/API schema, the cloud service). Every link
+  curl-verified (link-rot rule); annotate what each teaches.
+- **AI-forward.** Most engineers now work *with* coding agents, so a how-to must serve them too: include a
+  **"doing this with an agent"** section — a ready-to-use prompt, the exact context/files to attach, the
+  **security invariants written as explicit agent guardrails**, and a **review checklist** (the agent does
+  the typing; the human owns correctness). Write the whole doc to double as agent context: explicit paths,
+  copy-pasteable code, unambiguous verification gates. The task an agent is *worst* at (here: knowing which
+  schema fields are real, what must never be user-controlled) is the thing to make loudest.
+- **The gotchas are the point.** The highest-value part is *"what bit us adding the last one"* — the
+  failures a fresh reading of the code won't reveal (provider-schema quirks, ordering traps, silent
+  no-applies). Include them, plus a **verification** path (offline → apply → e2e) and the **quality bar**
+  when the change touches security / the control plane.
+- **Grounded in a real prior extension.** The recipe is trustworthy because it's how the *existing*
+  instances were actually built (e.g. S3 → SQS → SNS → DynamoDB), gotchas and all — not a guess at the steps.
+- **Optional, built on demand** — but bias *toward* building it: "how do I add a capability here?" is one of
+  the most common real platform-engineer questions, and its answer is the moat this portal exists to capture.
+
 ## Screenshots / UI visuals
 
 Where the *system's own view* teaches (a portal/UI), include it. **Automate capture if the target is
