@@ -111,6 +111,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-056: Progressive Delivery & Safe Rollback](056-progressive-delivery-and-safe-rollback.md) | Accepted (Phase 1 built + applied, both clusters) |
 | [ADR-071: Image-Digest Promotion via the Control Plane (Protected-Main Delivery)](071-digest-promotion-via-control-plane.md) | Accepted |
 | [ADR-072: App-Repo Naming & Team Ownership](072-app-repo-naming-and-team-ownership.md) | Accepted |
+| [ADR-095: Dynamic Application Security Testing (DAST)](095-dast-dynamic-application-security-testing.md) | Proposed |
 
 ## Developer Portal & Experience
 
