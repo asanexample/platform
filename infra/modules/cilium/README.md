@@ -175,9 +175,9 @@ No modules.
 | <a name="input_kube_proxy_replacement"></a> [kube\_proxy\_replacement](#input\_kube\_proxy\_replacement) | KubeProxy replacement mode (false, 'strict', 'partial', 'probe') | `string` | `"false"` | no |
 | <a name="input_kubeconfig_path"></a> [kubeconfig\_path](#input\_kubeconfig\_path) | Path to a kubeconfig file for kubectl operations. If empty, uses the default kubeconfig. | `string` | `""` | no |
 | <a name="input_mtu"></a> [mtu](#input\_mtu) | Override the device MTU. 0 = auto-detect (Cilium subtracts tunnel overhead). Pin to 1500 if jumbo frames cause PMTU black-holing on egress. | `number` | `0` | no |
-| <a name="input_node_encryption"></a> [node\_encryption](#input\_node\_encryption) | Also encrypt node-to-node (host) traffic, not just pod-to-pod. Off for Phase 1 — node encryption also covers host + health-check traffic and is a later, more invasive step. | `bool` | `false` | no |
 | <a name="input_namespace"></a> [namespace](#input\_namespace) | Kubernetes namespace to install Cilium into | `string` | `"kube-system"` | no |
 | <a name="input_native_routing_cidr"></a> [native\_routing\_cidr](#input\_native\_routing\_cidr) | CIDR that Cilium treats as natively routable (no masquerade within it). Required when routing\_mode = native AND ipam\_mode != eni; ENI mode auto-derives it. | `string` | `""` | no |
+| <a name="input_node_encryption"></a> [node\_encryption](#input\_node\_encryption) | Also encrypt node-to-node (host) traffic, not just pod-to-pod. Off for Phase 1 — node encryption also covers host + health-check traffic and is a later, more invasive step. | `bool` | `false` | no |
 | <a name="input_node_port_enabled"></a> [node\_port\_enabled](#input\_node\_port\_enabled) | Enable NodePort service support | `bool` | `true` | no |
 | <a name="input_operator_prometheus_enabled"></a> [operator\_prometheus\_enabled](#input\_operator\_prometheus\_enabled) | Enable Prometheus metrics for Cilium operator | `bool` | `true` | no |
 | <a name="input_operator_resources_limits_cpu"></a> [operator\_resources\_limits\_cpu](#input\_operator\_resources\_limits\_cpu) | CPU limit for Cilium operator | `string` | `"500m"` | no |
