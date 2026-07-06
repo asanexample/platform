@@ -211,7 +211,8 @@ answerable from one place: git.
 ## The developer's 2-minute view
 
 Your access is **one line in your Person file** — a grant of a role, scoped to your team. You get AWS
-console + app + cluster access *derived* from it; you don't request permissions system-by-system. Need
+console + app access *derived* from it (per-team cluster access is landing — see the reference); you don't
+request permissions system-by-system. Need
 something more powerful (prod admin, break-glass)? You don't get it standing — you **activate** it
 just-in-time (a passkey step-up), use it, and it expires. To change *anyone's* access, it's a PR to
 `gitops/people` — reviewed, audited, and projected everywhere on merge. No console-clicking, no lingering

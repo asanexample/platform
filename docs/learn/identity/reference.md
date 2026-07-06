@@ -49,7 +49,9 @@ The platform *derives* native config from `(Person × Role)` because each tool d
   system until activated.
 - **Activate** = a step-up (re-prompt a **passkey**, the `acr.loa.map` seam) + a **TTL**; extend in windows,
   then re-borrow. **Auto-revoked** on expiry, loudly audited.
-- Phase 1 (eligibility + step-up seam) built; the activation *operator* (mint/expire) is the graduated build.
+- **Built + live** (ADR-088, 2026-06-30): the eligibility model, the passkey step-up seam, *and* the
+  activation **operator** (a Kubebuilder controller that mints the live grant and expires it on TTL), with a
+  Backstage front door.
 
 ## Workload identity
 
