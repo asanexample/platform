@@ -280,9 +280,8 @@ green-checkmark one.
 - The same layers as an *operating system*: [How the Platform Fits](how-the-platform-fits.md). The signing
   and admission walls in motion: [The Life of a Deployment](life-of-a-deployment.md).
 - As full modules: [Policy & admission](../policy/orientation.md) ·
-  [Identity & access](../identity/orientation.md) *(built)* ·
-  *(coming — [inventory](../_inventory.md))* Supply chain, and the honest **Compliance & regulated
-  workloads** placeholder.
+  [Identity & access](../identity/orientation.md) · [Supply chain](../supply-chain/orientation.md) *(built)* ·
+  *(coming — [inventory](../_inventory.md))* the honest **Compliance & regulated workloads** placeholder.
 - The canon:
   [4 C's / K8s security](https://kubernetes.io/docs/concepts/security/overview/) ·
   [CNCF Cloud Native Security](https://www.cncf.io/reports/cloud-native-security-whitepaper/) ·
