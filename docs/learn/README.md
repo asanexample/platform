@@ -27,7 +27,7 @@ Each subsystem is a short course: an **Orientation** (a guided journey you read 
 | **[Environment API](environment-api/)** — how environments get provisioned (Crossplane) | ✅ available |
 | **[Delivery](delivery/)** — git → running across stages, safely (ArgoCD, the promotion ladder, Rollouts) | ✅ available |
 | Observability — the LGTM+P stack | ⏳ planned |
-| Policy & admission — Kyverno guardrails | ⏳ planned |
+| **[Policy & admission](policy/)** — the guardrail engine at the cluster door (Kyverno: validate · mutate · generate) | ✅ available |
 | Identity & access — Keycloak, Pod Identity, temporary power | ⏳ planned |
 | Supply chain — signing, provenance, verification | ⏳ planned |
 | The agentic platform — running governed AI agents | ⏳ planned |

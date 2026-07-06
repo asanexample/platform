@@ -267,8 +267,8 @@ head, are executable and enforced identically every time, on every cluster.
 > at build time only helps if something verifies at deploy time; admission is where the seal is actually
 > inspected.)*
 
-*Its own module, later: **Policy & admission** (Kyverno, the catalog, audit→enforce — ADR-014). Full
-catalog: [the Kyverno policy catalog](../../architecture/kyverno-policy-catalog.md).*
+*Its own module: **[Policy & admission](../policy/orientation.md)** — Kyverno, the three verbs
+(validate/mutate/generate), the catalog, audit→enforce (ADR-014).*
 
 ## 7 · The Rollout canaries it (progressive delivery)
 
@@ -462,8 +462,9 @@ control plane): [The Life of a Request](life-of-a-request.md).
 - [The domain model](../domain-model/orientation.md) — what Team / Product / Service / Environment actually
   mean *(built)*.
 - [Delivery](../delivery/orientation.md) (ArgoCD + the promotion ladder + Rollouts) *(built)*.
-- Coming: Policy (Kyverno) · Supply chain (signing + provenance) · Identity & access (Pod Identity) ·
-  Observability · Nodes & networking.
+- [Policy & admission](../policy/orientation.md) (Kyverno: validate/mutate/generate) *(built)*.
+- Coming: Supply chain (signing + provenance) · Identity & access (Pod Identity) · Observability ·
+  Nodes & networking.
 
 **Source of truth (as-built):**
 [Promotion & Release](../../architecture/promotion-and-release.md) ·
