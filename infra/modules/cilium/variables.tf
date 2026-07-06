@@ -118,6 +118,38 @@ variable "mtu" {
   }
 }
 
+# ---------------------------------------------------------------------------
+# Transparent encryption (in-transit) — ADR-057 Phase 1 (east-west zero trust)
+#
+# Encrypts pod traffic on the wire between nodes. Off by default; opted into
+# per-unit. WireGuard is the platform default: in-kernel on the AL2023 6.x
+# nodes (no key management), and simplest on the overlay (tunnel/cluster-pool)
+# datapath — Cilium stacks it under the VXLAN tunnel and auto-adjusts MTU for
+# the added overhead. Enabling is a rolling Cilium restart; roll out per env.
+# ---------------------------------------------------------------------------
+
+variable "encryption_enabled" {
+  description = "Enable Cilium transparent encryption of pod traffic in transit between nodes (ADR-057 Phase 1). Off by default."
+  type        = bool
+  default     = false
+}
+
+variable "encryption_type" {
+  description = "Transparent-encryption backend when encryption_enabled = true. 'wireguard' (platform default — in-kernel, no key management) or 'ipsec'."
+  type        = string
+  default     = "wireguard"
+  validation {
+    condition     = contains(["wireguard", "ipsec"], var.encryption_type)
+    error_message = "encryption_type must be 'wireguard' or 'ipsec'."
+  }
+}
+
+variable "node_encryption" {
+  description = "Also encrypt node-to-node (host) traffic, not just pod-to-pod. Off for Phase 1 — node encryption also covers host + health-check traffic and is a later, more invasive step."
+  type        = bool
+  default     = false
+}
+
 variable "k8s_service_host" {
   description = "Kubernetes API server hostname (required for BYOCNI — in-cluster service IP unreachable before CNI exists)"
   type        = string

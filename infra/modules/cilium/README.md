@@ -13,6 +13,10 @@ Deploys Cilium CNI via Helm with a **configurable datapath** and cloud-specific 
 | `pod_cidr_mask_size` | `24` (256 IPs/node) | _(n/a)_ |
 | `egress_masquerade_interfaces` | `""` (all) | `"ens+"` |
 
+## Transparent encryption (in-transit)
+
+East-west zero trust ([ADR-057](../../../docs/adrs/057-service-identity-and-east-west-zero-trust.md) Phase 1). Set `encryption_enabled = true` to encrypt pod traffic on the wire between nodes; `encryption_type` defaults to **WireGuard** (in-kernel on the AL2023 6.x nodes, no key management, simplest on the overlay datapath — Cilium stacks it under the VXLAN tunnel and auto-adjusts MTU). `node_encryption` (host-to-host) stays off for Phase 1. Off by default; enabling is a **rolling Cilium restart**, so roll it out per environment (preprod first) and verify with `cilium status` (`Encryption: Wireguard`). Cryptographic workload identity (Cilium mTLS / SPIFFE) is ADR-057 Phase 2 — not in this module yet.
+
 **Overlay** decouples pod IPs from the VPC (pods draw from `pod_cidr`, encapsulated VXLAN between nodes) — pod density is bounded by `pod_cidr`, not the node subnet. **ENI native** gives pods routable VPC IPs (no encapsulation, VPC-level flow visibility) but density is bounded by the node subnet size and instance ENI limits. Per-cluster `pod_cidr`s must not overlap (keeps the design ClusterMesh-ready). See `infra/docs/08-kubernetes-network-design.md`.
 
 ## Usage
@@ -142,6 +146,8 @@ No modules.
 | <a name="input_debug"></a> [debug](#input\_debug) | Debug configuration for Cilium | `any` | <pre>{<br/>  "enabled": false<br/>}</pre> | no |
 | <a name="input_egress_masquerade_interfaces"></a> [egress\_masquerade\_interfaces](#input\_egress\_masquerade\_interfaces) | Interface glob to masquerade on (e.g. 'ens+' for ENI native). Empty = all interfaces (overlay default). Must be empty when bpf\_masquerade = true. | `string` | `""` | no |
 | <a name="input_enable_ipv4_masquerade"></a> [enable\_ipv4\_masquerade](#input\_enable\_ipv4\_masquerade) | Masquerade pod egress to the node IP for traffic leaving the cluster. | `bool` | `true` | no |
+| <a name="input_encryption_enabled"></a> [encryption\_enabled](#input\_encryption\_enabled) | Enable Cilium transparent encryption of pod traffic in transit between nodes (ADR-057 Phase 1). Off by default. | `bool` | `false` | no |
+| <a name="input_encryption_type"></a> [encryption\_type](#input\_encryption\_type) | Transparent-encryption backend when encryption\_enabled = true. 'wireguard' (platform default — in-kernel, no key management) or 'ipsec'. | `string` | `"wireguard"` | no |
 | <a name="input_environment"></a> [environment](#input\_environment) | Environment name (e.g., dev, test, prod) | `string` | `"dev"` | no |
 | <a name="input_external_ips_enabled"></a> [external\_ips\_enabled](#input\_external\_ips\_enabled) | Enable ExternalIPs service support | `bool` | `true` | no |
 | <a name="input_gateway_api_crd_version"></a> [gateway\_api\_crd\_version](#input\_gateway\_api\_crd\_version) | Gateway API CRD version to install (experimental channel). Set to empty string to skip CRD installation. | `string` | `"v1.3.0"` | no |
@@ -169,6 +175,7 @@ No modules.
 | <a name="input_kube_proxy_replacement"></a> [kube\_proxy\_replacement](#input\_kube\_proxy\_replacement) | KubeProxy replacement mode (false, 'strict', 'partial', 'probe') | `string` | `"false"` | no |
 | <a name="input_kubeconfig_path"></a> [kubeconfig\_path](#input\_kubeconfig\_path) | Path to a kubeconfig file for kubectl operations. If empty, uses the default kubeconfig. | `string` | `""` | no |
 | <a name="input_mtu"></a> [mtu](#input\_mtu) | Override the device MTU. 0 = auto-detect (Cilium subtracts tunnel overhead). Pin to 1500 if jumbo frames cause PMTU black-holing on egress. | `number` | `0` | no |
+| <a name="input_node_encryption"></a> [node\_encryption](#input\_node\_encryption) | Also encrypt node-to-node (host) traffic, not just pod-to-pod. Off for Phase 1 — node encryption also covers host + health-check traffic and is a later, more invasive step. | `bool` | `false` | no |
 | <a name="input_namespace"></a> [namespace](#input\_namespace) | Kubernetes namespace to install Cilium into | `string` | `"kube-system"` | no |
 | <a name="input_native_routing_cidr"></a> [native\_routing\_cidr](#input\_native\_routing\_cidr) | CIDR that Cilium treats as natively routable (no masquerade within it). Required when routing\_mode = native AND ipam\_mode != eni; ENI mode auto-derives it. | `string` | `""` | no |
 | <a name="input_node_port_enabled"></a> [node\_port\_enabled](#input\_node\_port\_enabled) | Enable NodePort service support | `bool` | `true` | no |
