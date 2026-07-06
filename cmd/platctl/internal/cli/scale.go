@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -534,9 +535,12 @@ func latestFailedCreate(k func(...string) ([]byte, error), ns string) string {
 var recoverStartupOrderedDBClientsFn = recoverStartupOrderedDBClients
 
 const (
-	// The post-unpark DB-client recovery polls at this cadence for up to this many ticks (~8 min) — long
-	// enough for a CNPG cluster to restore from EBS and elect a primary, bounded so 'up' can't hang on it.
-	dbRecoveryTicks    = 32
+	// The post-unpark DB-client recovery polls at this cadence for up to this many ticks (~12 min) — long
+	// enough for a CNPG cluster to restore from a COLD (weekend-parked) EBS volume and elect a primary,
+	// bounded so 'up' can't hang on it. Raised from 32 (~8 min) after a weekend unpark left backstage-db
+	// slow to reappear (2026-07-06); the step now also SURFACES anything still stuck at the deadline rather
+	// than exiting mute (see recoverStartupOrderedDBClients).
+	dbRecoveryTicks    = 48
 	dbRecoveryInterval = 15 * time.Second
 )
 
@@ -570,12 +574,26 @@ func recoverStartupOrderedDBClients(ctx context.Context, kc config.KubeconfigEnt
 	}
 
 	fmt.Println("  checking for workloads stuck on a database that wasn't Ready at their startup (post-unpark ordering)...")
+
+	// Namespaces EXPECTED to hold a CNPG database, from the Cluster CRs — which survive parking. This is the
+	// fix for the 2026-07-06 silent no-op: after a cold weekend park the CNPG operator hadn't yet recreated
+	// backstage-db's POD when this step ran, so pod-only detection saw "no database here", declared nothing to
+	// wait for, and broke on tick 0 — leaving backstage wedged at 503 while its DB came up moments later. The
+	// CR list tells us a database is coming even before its pod exists, so we keep waiting. Best-effort: if the
+	// CRD/list is unavailable we fall back to pod-derived detection (the pre-fix behavior).
+	cnpgFromCRs, cerr := cnpgClusterNamespacesFn(k)
+	if cerr != nil {
+		cnpgFromCRs = map[string]bool{}
+		fmt.Printf("  note: could not list CNPG clusters (%v) — database detection limited to running database pods\n", cerr)
+	}
+
 	restarted := map[string]bool{}
 	for i := 0; i < dbRecoveryTicks; i++ {
 		pods, err = getPods(k)
 		if err != nil {
 			return err
 		}
+		cnpgNS := unionCNPGNamespaces(cnpgFromCRs, pods)
 		dbReady := cnpgDBReadyTimes(pods)
 		for _, p := range stuckDBClients(dbReady, pods) {
 			key := p.Namespace + "/" + p.Name
@@ -589,8 +607,9 @@ func recoverStartupOrderedDBClients(ctx context.Context, kc config.KubeconfigEnt
 		}
 		// Stop once no candidate is still waiting on a database that isn't Ready yet — we've recovered all we
 		// can (either the DBs are Ready and stragglers were restarted, or the remaining not-Ready pods have no
-		// CNPG database to blame).
-		if !waitingOnDB(pods, dbReady) {
+		// CNPG database to blame). cnpgNS is CR-derived, so a database whose pod hasn't reappeared yet still
+		// counts as "worth waiting for" and does NOT let the loop exit early.
+		if !waitingOnDB(pods, dbReady, cnpgNS) {
 			break
 		}
 		time.Sleep(dbRecoveryInterval)
@@ -598,7 +617,85 @@ func recoverStartupOrderedDBClients(ctx context.Context, kc config.KubeconfigEnt
 	if len(restarted) > 0 {
 		fmt.Printf("  restarted %d workload(s) that came up before their database.\n", len(restarted))
 	}
+
+	// Never exit mute (the failure this fix targets). If any client is still not Ready behind a database that
+	// never came Ready within the budget, name it and tell the operator exactly how to finish the recovery by
+	// hand — rather than returning silently as if the step had done its job.
+	cnpgNS := unionCNPGNamespaces(cnpgFromCRs, pods)
+	if stragglers := unresolvedDBClients(cnpgDBReadyTimes(pods), cnpgNS, pods, restarted); len(stragglers) > 0 {
+		fmt.Printf("  ⚠️  %d workload(s) still not Ready behind a database that did not become Ready within ~%dm: %s\n",
+			len(stragglers), dbRecoveryBudget()/time.Minute, strings.Join(stragglers, ", "))
+		fmt.Println("      the database is likely still restoring from a cold EBS volume — finish the recovery once it is Ready:")
+		fmt.Println("        kubectl get cluster.postgresql.cnpg.io -A          # wait for READY=1")
+		fmt.Println("        kubectl delete pod -n <namespace> <pod>            # ArgoCD-safe; a rollout-restart is reverted by self-heal")
+	} else if len(restarted) == 0 {
+		fmt.Println("  no workloads were waiting on a database.")
+	}
 	return nil
+}
+
+// dbRecoveryBudget is the wall-clock the DB-client recovery loop can spend polling, used only for human-facing
+// messaging (the loop itself counts ticks).
+func dbRecoveryBudget() time.Duration {
+	return time.Duration(dbRecoveryTicks) * dbRecoveryInterval
+}
+
+// cnpgClusterNamespacesFn is indirected so tests can stub the CNPG Cluster CR lookup.
+var cnpgClusterNamespacesFn = getCNPGClusterNamespaces
+
+// getCNPGClusterNamespaces returns the set of namespaces that contain a CNPG Cluster CR. These CRs survive
+// parking (parking scales nodes, it does not delete CRs), so they tell us which namespaces are EXPECTED to have
+// a database even before the operator has recreated its pod post-unpark — closing the window where pod-only
+// detection wrongly concludes there is nothing to wait for.
+func getCNPGClusterNamespaces(k func(...string) ([]byte, error)) (map[string]bool, error) {
+	out, err := k("get", "clusters.postgresql.cnpg.io", "--all-namespaces",
+		"-o", "jsonpath={range .items[*]}{.metadata.namespace}{\"\\n\"}{end}")
+	if err != nil {
+		return nil, fmt.Errorf("listing CNPG clusters: %s", strings.TrimSpace(string(out)))
+	}
+	ns := map[string]bool{}
+	for _, line := range strings.Split(string(out), "\n") {
+		if s := strings.TrimSpace(line); s != "" {
+			ns[s] = true
+		}
+	}
+	return ns, nil
+}
+
+// unionCNPGNamespaces merges the CR-derived expected-database namespaces with any namespace that currently has
+// a CNPG database POD present — so detection is robust whether or not the Cluster CR list succeeded and whether
+// or not the operator has recreated the pod yet.
+func unionCNPGNamespaces(fromCRs map[string]bool, pods []podInfo) map[string]bool {
+	out := map[string]bool{}
+	for ns := range fromCRs {
+		out[ns] = true
+	}
+	for _, p := range pods {
+		if p.IsCNPGDB {
+			out[p.Namespace] = true
+		}
+	}
+	return out
+}
+
+// unresolvedDBClients returns "ns/pod" for candidate clients still not Ready, not already restarted, in a
+// namespace EXPECTED to have a CNPG database whose database is NOT yet Ready — i.e. ordering victims the loop
+// could not recover because the database never came Ready in time. This is the set the step surfaces so it
+// never exits silently having done nothing.
+func unresolvedDBClients(dbReadyByNS map[string]time.Time, cnpgNS map[string]bool, pods []podInfo, restarted map[string]bool) []string {
+	var out []string
+	for _, p := range candidateClients(pods) {
+		key := p.Namespace + "/" + p.Name
+		if restarted[key] || !cnpgNS[p.Namespace] {
+			continue
+		}
+		if _, ready := dbReadyByNS[p.Namespace]; ready {
+			continue // its database IS Ready — not a database-timeout straggler
+		}
+		out = append(out, key)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // podInfo is the minimal per-pod state the (pure) DB-client recovery logic reasons over.
@@ -730,16 +827,13 @@ func stuckDBClients(dbReadyByNS map[string]time.Time, pods []podInfo) []podInfo 
 	return out
 }
 
-// waitingOnDB reports whether any candidate client sits in a namespace that HAS a CNPG database which is not
-// yet Ready — i.e. it's worth polling longer because that database might still come up. Once every such
-// namespace's database is Ready (or a candidate has no CNPG database at all), there is nothing more to wait for.
-func waitingOnDB(pods []podInfo, dbReadyByNS map[string]time.Time) bool {
-	cnpgNS := map[string]bool{}
-	for _, p := range pods {
-		if p.IsCNPGDB {
-			cnpgNS[p.Namespace] = true
-		}
-	}
+// waitingOnDB reports whether any candidate client sits in a namespace EXPECTED to have a CNPG database (per
+// cnpgNS — derived from the Cluster CRs, so a database whose pod has not reappeared post-unpark still counts)
+// whose database is not yet Ready. While true, it's worth polling longer because that database might still come
+// up. Once every such namespace's database is Ready (or a candidate has no CNPG database at all), there is
+// nothing more to wait for. Taking cnpgNS as a parameter (rather than deriving it from database PODS here) is
+// what stops the loop from breaking on tick 0 before a cold DB's pod exists (2026-07-06 silent no-op).
+func waitingOnDB(pods []podInfo, dbReadyByNS map[string]time.Time, cnpgNS map[string]bool) bool {
 	for _, p := range candidateClients(pods) {
 		if _, ready := dbReadyByNS[p.Namespace]; cnpgNS[p.Namespace] && !ready {
 			return true

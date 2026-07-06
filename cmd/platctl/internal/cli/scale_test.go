@@ -438,7 +438,8 @@ func TestWaitingOnDB(t *testing.T) {
 			{Namespace: "backstage", Name: "db-1", IsCNPGDB: true, Ready: false}, // DB present, not Ready
 			{Namespace: "backstage", Name: "backstage", Scheduled: true},         // candidate, not Ready
 		}
-		if !waitingOnDB(pods, cnpgDBReadyTimes(pods)) {
+		cnpgNS := unionCNPGNamespaces(nil, pods)
+		if !waitingOnDB(pods, cnpgDBReadyTimes(pods), cnpgNS) {
 			t.Error("expected waitingOnDB=true (DB exists but not Ready yet)")
 		}
 	})
@@ -448,7 +449,8 @@ func TestWaitingOnDB(t *testing.T) {
 			{Namespace: "backstage", Name: "db-1", IsCNPGDB: true, Ready: true, ReadyTime: base},
 			{Namespace: "backstage", Name: "backstage", Scheduled: true},
 		}
-		if waitingOnDB(pods, cnpgDBReadyTimes(pods)) {
+		cnpgNS := unionCNPGNamespaces(nil, pods)
+		if waitingOnDB(pods, cnpgDBReadyTimes(pods), cnpgNS) {
 			t.Error("expected waitingOnDB=false (DB is Ready)")
 		}
 	})
@@ -457,8 +459,93 @@ func TestWaitingOnDB(t *testing.T) {
 		pods := []podInfo{
 			{Namespace: "triage-demo", Name: "checkout", Scheduled: true}, // no CNPG DB here
 		}
-		if waitingOnDB(pods, cnpgDBReadyTimes(pods)) {
+		cnpgNS := unionCNPGNamespaces(nil, pods)
+		if waitingOnDB(pods, cnpgDBReadyTimes(pods), cnpgNS) {
 			t.Error("expected waitingOnDB=false (nothing to wait for)")
+		}
+	})
+
+	// The 2026-07-06 regression: post-unpark the CNPG operator hadn't recreated the database POD yet, so
+	// pod-only detection saw no DB and the loop broke on tick 0. With cnpgNS sourced from the Cluster CRs, the
+	// expected-but-absent database still holds the loop open.
+	t.Run("candidate waiting on a DB whose POD is absent but CR namespace is known → true", func(t *testing.T) {
+		pods := []podInfo{
+			{Namespace: "backstage", Name: "backstage", Scheduled: true}, // candidate; NO db pod present yet
+		}
+		cnpgNS := unionCNPGNamespaces(map[string]bool{"backstage": true}, pods) // CR says a DB is expected here
+		if !waitingOnDB(pods, cnpgDBReadyTimes(pods), cnpgNS) {
+			t.Error("expected waitingOnDB=true (Cluster CR expects a DB here, even with no DB pod yet)")
+		}
+	})
+}
+
+func TestUnionCNPGNamespaces(t *testing.T) {
+	pods := []podInfo{
+		{Namespace: "keycloak", Name: "keycloak-db-1", IsCNPGDB: true}, // pod-derived
+		{Namespace: "app", Name: "web"},                                // not a DB pod
+	}
+	got := unionCNPGNamespaces(map[string]bool{"backstage": true}, pods) // CR-derived + pod-derived
+	for _, ns := range []string{"backstage", "keycloak"} {
+		if !got[ns] {
+			t.Errorf("expected namespace %q in union", ns)
+		}
+	}
+	if got["app"] {
+		t.Error("namespace with only a non-DB pod must not appear")
+	}
+	if len(got) != 2 {
+		t.Errorf("expected exactly {backstage, keycloak}, got %v", got)
+	}
+}
+
+func TestUnresolvedDBClients(t *testing.T) {
+	base := time.Date(2026, 7, 6, 9, 0, 0, 0, time.UTC)
+	dbReady := map[string]time.Time{"keycloak": base} // keycloak's DB is Ready; backstage's is NOT
+	cnpgNS := map[string]bool{"backstage": true, "keycloak": true}
+	pods := []podInfo{
+		// straggler: not Ready, in a CNPG ns whose DB never came Ready, not restarted → surfaced
+		{Namespace: "backstage", Name: "backstage-x", Scheduled: true, StartTime: base},
+		// its DB is Ready → not a database-timeout straggler
+		{Namespace: "keycloak", Name: "keycloak-x", Scheduled: true, StartTime: base},
+		// already restarted this run → don't re-surface
+		{Namespace: "backstage", Name: "backstage-restarted", Scheduled: true, StartTime: base},
+		// no CNPG DB expected in this namespace → out of scope (e.g. the broken checkout demo)
+		{Namespace: "triage-demo", Name: "checkout", Scheduled: true, StartTime: base},
+		// already Ready → not stuck
+		{Namespace: "backstage", Name: "healthy", Scheduled: true, Ready: true, StartTime: base},
+	}
+	restarted := map[string]bool{"backstage/backstage-restarted": true}
+	got := unresolvedDBClients(dbReady, cnpgNS, pods, restarted)
+	if len(got) != 1 || got[0] != "backstage/backstage-x" {
+		t.Fatalf("unresolvedDBClients = %v, want [backstage/backstage-x]", got)
+	}
+}
+
+func TestGetCNPGClusterNamespaces(t *testing.T) {
+	t.Run("parses namespaces from jsonpath output", func(t *testing.T) {
+		k := func(args ...string) ([]byte, error) {
+			return []byte("backstage\nkeycloak\nplatform-directory\n"), nil
+		}
+		got, err := getCNPGClusterNamespaces(k)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		for _, ns := range []string{"backstage", "keycloak", "platform-directory"} {
+			if !got[ns] {
+				t.Errorf("expected %q", ns)
+			}
+		}
+		if len(got) != 3 {
+			t.Errorf("expected 3 namespaces, got %v", got)
+		}
+	})
+
+	t.Run("surfaces the kubectl error (e.g. CRD absent)", func(t *testing.T) {
+		k := func(args ...string) ([]byte, error) {
+			return []byte(`error: the server doesn't have a resource type "clusters"`), fmt.Errorf("exit 1")
+		}
+		if _, err := getCNPGClusterNamespaces(k); err == nil {
+			t.Error("expected an error when the CNPG CRD/list is unavailable")
 		}
 	})
 }
