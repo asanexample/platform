@@ -64,7 +64,8 @@ service:
   scan-on-push, `deletionPolicy: Orphan`), a cross-account `RepositoryPolicy` (pull for preprod/prod),
   and a `LifecyclePolicy`.
 
-**Self-service cloud resources** (`services.<svc>.resources`, ADR-073):
+**Self-service cloud resources** (`services.<svc>.resources`, ADR-073 — its own
+[module](../self-service-resources/orientation.md)):
 [S3](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html) /
 [SQS](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html) /
 [SNS](https://docs.aws.amazon.com/sns/latest/dg/welcome.html) /
