@@ -94,5 +94,9 @@ inputs = {
   # Must not wait — Cilium deploys before node groups exist (BYOCNI ordering)
   helm_wait = false
 
+  # East-west transparent encryption (ADR-057 Phase 1): WireGuard, pod-to-pod, fleet-default.
+  # Enabled on preprod first (verified 2026-07-07), then here. node_encryption deferred.
+  encryption_enabled = true
+
   tags = include.base.locals.tags
 }
