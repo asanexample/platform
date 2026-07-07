@@ -99,6 +99,32 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-07 — UNPARK both clusters (overnight park). ✅ Clean — and the #1183 DB-recovery fix PROVED ITSELF
+  LIVE: `platctl up` AUTO-restarted backstage + keycloak with ZERO manual intervention.** This is the exact
+  failure that silently no-op'd on 2026-07-06; the fix (source expected-DB namespaces from the CNPG Cluster CRs
+  so the loop holds open until the DBs are Ready, + never exit mute) worked first try. Platform's recovery held
+  the poll loop open (`up` sat on "checking for workloads stuck..." for a couple min) then printed **"restarted
+  backstage/... (came up before its database was Ready)"** + **"restarted keycloak/... "** + "restarted 2
+  workload(s)...". No hand pod-delete for those two. Mechanics otherwise standard: node groups restored + `ACTIVE`
+  (platform 2, preprod 1), Karpenter health gate passed first check on both, preprod reconnect complete.
+  **✅ Confirmed the #1183 fallback path is benign: on PREPROD the CR list errored** — `up` printed `note: could
+  not list CNPG clusters (... the server doesn't have a resource type "clusters") — database detection limited to
+  running database pods` then `no workloads were waiting on a database`. **This is CORRECT, not a bug: preprod has
+  NO CNPG installed** (verified `kubectl api-resources --api-group=postgresql.cnpg.io` → empty; all the DB
+  workloads live on the platform hub), so the CRD legitimately doesn't exist there and the fallback + the new
+  never-exit-mute line both did their job. ⚠️ **Watch-item for a future cycle:** the CR-list is what makes the fix
+  robust, so if platform's API discovery is ever slow right when recovery runs, the CR list could transiently
+  error there too and silently degrade to the old pod-only behavior — this cycle platform's CR list SUCCEEDED (no
+  note printed), so it's only a theoretical tail. **Remaining post-unpark victims (all downstream of Keycloak/DBs
+  that were still coming up; cleared by a `delete pod` once the dep was Ready — same playbook as before):**
+  activation-operator (CrashLoop, fail-safe-deny behind `triage-copilot-db`), argo-rollouts oauth2-proxy (BOTH
+  clusters, behind Keycloak OIDC — note keycloak-0 was itself the pod #1183 had just restarted, so its dependents
+  briefly crash until it bootstraps; it did so in **5.8s** this time). **Non-issues to NOT chase:** the
+  observability `Error` pods (`k6-synthetics`, `mimir-ruler-rules-sync-preprod` ×3) + `kube-bench` are all
+  **Job/CronJob** pods that fired during the API/DNS gap and simply re-run on schedule — always check
+  `ownerReferences[0].kind == Job` before treating an `Error`/`0/1` pod as a live workload problem. Plus the
+  standing `triage-demo/checkout` (no `payments-db`) broken demo.
+
 - **2026-07-06 (end-of-day PARK) — overnight park of both clusters after the Monday unpark + the two platctl
   fixes that came out of it landed (DB-recovery #1183, race-test #1186). ✅ Clean, cost-zero, unremarkable.**
   Rebuilt `./bin/platctl` from freshly-pulled `main` FIRST (so the park ran the current binary), then
