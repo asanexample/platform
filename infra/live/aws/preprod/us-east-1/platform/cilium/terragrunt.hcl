@@ -98,5 +98,9 @@ inputs = {
   # Preprod-first rollout; platform follows after verify. node_encryption deferred.
   encryption_enabled = true
 
+  # Service-to-service mutual authentication (ADR-057 Phase 2): SPIFFE identity via the embedded SPIRE.
+  # Persistent datastore on the cluster-default encrypted gp3 SC. Inert until a CNP requires auth.
+  mutual_auth_enabled = true
+
   tags = include.base.locals.tags
 }

@@ -150,6 +150,40 @@ variable "node_encryption" {
   default     = false
 }
 
+# ---------------------------------------------------------------------------
+# Service-to-service mutual authentication — ADR-057 Phase 2 (SPIFFE identity)
+#
+# Cilium mutual auth authenticates WORKLOADS (SPIFFE SVIDs via the embedded
+# SPIRE); the data-plane encryption stays transparent encryption (Phase 1,
+# above). Enabling stands up the machinery cluster-wide but is INERT until a
+# CiliumNetworkPolicy opts in with `authentication.mode: required`. Off by
+# default. (Upstream-beta on 1.19 — validated via spike on preprod 2026-07-07.)
+# ---------------------------------------------------------------------------
+
+variable "mutual_auth_enabled" {
+  description = "Enable Cilium service-to-service mutual authentication (SPIFFE identity). Sets authentication.enabled = true (REQUIRED — else auth-required policies deny) + authentication.mutual.spire.enabled. Off by default; enforcement applies only to CNPs that opt in with authentication.mode: required."
+  type        = bool
+  default     = false
+}
+
+variable "spire_install" {
+  description = "Install Cilium's embedded SPIRE server/agent (namespace cilium-spire) as the SPIFFE identity source when mutual_auth_enabled = true. Set false to point at an external/standalone SPIRE."
+  type        = bool
+  default     = true
+}
+
+variable "spire_persistence" {
+  description = "Persist the embedded SPIRE server datastore to a PVC (recommended). Needs a StorageClass — where an SCP enforces EBS encryption, an ENCRYPTED class (spire_storage_class or the cluster default). Set false for an in-memory datastore (ephemeral registrations; fine for spikes)."
+  type        = bool
+  default     = true
+}
+
+variable "spire_storage_class" {
+  description = "StorageClass for the embedded SPIRE server's data PVC when spire_persistence = true. null = the cluster's default StorageClass (encrypted gp3 here). Set explicitly to override."
+  type        = string
+  default     = null
+}
+
 variable "k8s_service_host" {
   description = "Kubernetes API server hostname (required for BYOCNI — in-cluster service IP unreachable before CNI exists)"
   type        = string
