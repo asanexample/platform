@@ -2,8 +2,10 @@
 
 **Date:** 2026-06-04
 
-**Status:** **Phase 1 (transparent encryption): Accepted — built + live on preprod + platform, 2026-07-07.**
-Phase 2 (Cilium mTLS + SPIFFE workload identity) remains **Proposed** (strategy). Completes the *east-west*
+**Status:** **Phase 1 (transparent encryption): Accepted — live on preprod + platform, 2026-07-07.**
+**Phase 2 (Cilium mTLS + SPIFFE workload identity): Accepted — showcase built + live on preprod, 2026-07-07**
+(mutual auth + embedded SPIRE; the `alpha-shop → alpha-checkout` path is SPIRE-authenticated, cross-team
+impostor denied). Fleet-wide/tier-gated enforcement remains a follow-up. Completes the *east-west*
 (service-to-service) half of the
 security model, alongside the existing north-south ingress ([ADR-017](017-gateway-api-over-ingress.md)) and the
 Cilium CNI ([ADR-008](008-cilium-as-cross-cloud-cni.md)). Aligns in-cluster workload identity with the cloud
@@ -51,6 +53,39 @@ mesh. Auto-triggering this roll on an encryption-config change is a sensible mod
 unnecessary on these dev clusters — the rolling agent restart is a brief per-node blip (shared services and
 tenant apps stayed healthy), and the apply ran cleanly from a worktree (the cilium unit's only
 `null_resource` uses a `version` trigger, not a path, so it is not the worktree footgun other units carry).
+
+## Implementation notes (as-built) — Phase 2 (mutual auth / SPIFFE), 2026-07-07
+
+Cilium **mutual authentication** with the **embedded SPIRE** is live on **preprod** as a showcase, securing
+the real `alpha-shop → alpha-checkout` east-west call (the #1204 demo). Module support:
+[#1209](https://github.com/asanexample/platform/pull/1209) (gated `mutual_auth_enabled` / `spire_install` /
+`spire_persistence` / `spire_storage_class`); the auth-required policy is `alpha-checkout`'s
+`CiliumNetworkPolicy` with `authentication.mode: required`.
+
+**Proven end-to-end:** `alpha-shop`'s call to checkout succeeds AND is SPIRE-mutually-authenticated
+(`cilium-dbg bpf auth list` → `AUTH TYPE: spire` for the shop↔checkout identity pair); a cross-team impostor
+in another namespace is **DROPPED** at checkout's ingress. SPIRE server runs **persistent** (PVC on the
+encrypted-gp3 default StorageClass — the earlier preprod StorageClass fix, #1202/#1203).
+
+**Decision resolved (was open above): use Cilium's embedded SPIRE, not a standalone SPIRE.** The embedded
+SPIRE attests workloads via k8s PSAT and issues SVIDs cleanly on the overlay + WireGuard stack; a standalone
+SPIRE is unnecessary for this (revisit only if identities are needed beyond Cilium — app-level mTLS,
+cross-cluster federation).
+
+**Gotchas (bake into a fleet rollout):**
+
+1. **`authentication.enabled: true` (top-level) is mandatory** — the chart *denies* auth-required traffic if
+   it is off, rather than bypassing.
+2. **Enabling needs a rolling Cilium restart** (auth read at agent startup, like WireGuard).
+3. **Cross-namespace pod-to-pod needs BOTH netpol halves** — env namespaces default-deny egress as well as
+   ingress, and a k8s `ipBlock` allow does not cover in-cluster identities; the auth requirement replaces the
+   *ingress* half (a plain allow would bypass auth, since Cilium unions allows).
+4. **The delivery AppProject had to permit tenant `(Cilium)NetworkPolicy`** ([#1207]) so tenants can author
+   their own east-west + auth posture.
+
+**Scope: showcase only** — preprod, one service pair. Fleet-wide/tier-gated enforcement (wiring auth-required
+policies into the Crossplane Composition per compliance tier, which already has `$tier` in scope) remains the
+follow-up when a regulated tenant exists.
 
 ## Context
 
