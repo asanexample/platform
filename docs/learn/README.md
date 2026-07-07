@@ -32,6 +32,7 @@ Each subsystem is a short course: an **Orientation** (a guided journey you read 
 | **[Policy & admission](policy/)** — the guardrail engine at the cluster door (Kyverno: validate · mutate · generate) | ✅ available |
 | **[Identity & access](identity/)** — decide once, derive everywhere, borrow dangerous power (Keycloak, Pod Identity, temporary power) | ✅ available |
 | **[Supply chain](supply-chain/)** — trust provenance, not names (keyless signing, SLSA, verify-at-admission) | ✅ available |
+| **[Foundations](foundations/)** — the substrate everything runs on: AWS accounts & SCPs, IaC, networking, the private cluster & Cilium, compute, access (a sub-curriculum) | ✅ available |
 | The agentic platform — running governed AI agents | ⏳ planned |
 | Cost & FinOps | ⏳ planned |
 | **[*Spine:* The Life of a Deployment](spine/life-of-a-deployment.md)** — one `git push` across every plane (control plane) | ✅ available |
