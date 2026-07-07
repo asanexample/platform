@@ -178,6 +178,30 @@ locals {
 
     # Labels from tags
     podLabels = local.k8s_labels
+
+    # Service-to-service mutual authentication (ADR-057 Phase 2) — SPIFFE identity via the embedded SPIRE.
+    # `enabled` MUST be true for auth requests to be processed (else auth-required policies deny). SPIRE is
+    # only installed when spire.enabled is true, so this block is inert when mutual_auth_enabled = false
+    # (matches chart defaults). Enforcement applies only to CNPs that opt in with authentication.mode: required.
+    authentication = {
+      enabled = var.mutual_auth_enabled
+      mutual = {
+        spire = {
+          enabled = var.mutual_auth_enabled
+          install = {
+            enabled = var.spire_install
+            # SPIRE server datastore. Persistent needs a PVC + (where an SCP enforces EBS encryption) an
+            # encrypted StorageClass; null = the cluster default (encrypted gp3). enabled=false = in-memory.
+            server = {
+              dataStorage = {
+                enabled      = var.spire_persistence
+                storageClass = var.spire_storage_class
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }
 
