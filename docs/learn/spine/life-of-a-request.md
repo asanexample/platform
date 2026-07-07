@@ -95,8 +95,11 @@ kube-proxy here) — load-balances the connection to one *healthy* pod of whiche
 thing: renders the page. If it needs AWS along the way — read its S3 bucket, enqueue a job — it uses the
 credentials it got from **Pod Identity** (short-lived, scoped, no static keys). If it needs *another
 service* — say it calls a `checkout` API — that's an **east-west** hop, allowed (or denied) by Cilium
-network policy between pods. *(Today that hop is authorized by network policy; cryptographic service
-identity — mTLS — is the [designed-not-built](the-security-model.md) part.)*
+network policy between pods, **encrypted on the wire** (WireGuard) and, where a policy sets
+`authentication.mode: required`, **mutually authenticated** so the two services cryptographically prove who
+they are (SPIFFE identity via SPIRE). *(This is the live `alpha-shop → alpha-checkout` showcase —
+[ADR-057](../../adrs/057-service-identity-and-east-west-zero-trust.md); fleet-wide enforcement is the
+remaining step.)*
 
 **8 · Observability — the CCTV and the logbook.** The entire time, the request is being *watched* without
 anyone instrumenting it by hand: **[OpenTelemetry](https://opentelemetry.io/docs/)** / eBPF auto-
