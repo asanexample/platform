@@ -102,7 +102,8 @@ Around Beyla sits a fleet of purpose-built collectors, each specialized for one 
 [collection deep dive](deep-dive-collection-and-instrumentation.md) covers them all): **Alloy** DaemonSets
 tail each node's logs → Loki and eBPF-profile every process → Pyroscope; the **OpenTelemetry Collector**
 receives OTLP traces → Tempo; **Prometheus** scrapes metrics → Mimir; a **CloudWatch exporter** pulls
-AWS-side metrics (NAT, NLB, Transit Gateway) into the same pane. Your workload does *nothing* for three of the
+AWS-side metrics (NAT, NLB, Transit Gateway) into the same pane; and **Cilium + Hubble** add the adjacent
+*network* plane — packet drops and L3–L7 flow metrics (with Hubble's own UI for live flow forensics). Your workload does *nothing* for three of the
 four signals — metrics, traces, and profiles come from Beyla and the eBPF profiler; for the fourth, logs, its
 only job is the oldest rule in the book — *log to stdout* — and even that's optional.
 

@@ -249,6 +249,20 @@ sense — it watches Kyverno's `PolicyReport`/`ClusterPolicyReport` CRs and turn
 clusters, but only the **hub** renders the dashboards; the spoke just emits metrics for the hub's federated
 Mimir view.
 
+**Cilium + Hubble — the network plane.** The four signals watch the *application*; the CNI watches the
+*network underneath* it. Cilium (the eBPF CNI — see [Foundations](../foundations/deep-dive-the-cluster.md))
+and its **Hubble** layer expose Prometheus metrics, scraped into Mimir by a dedicated `hubble` + `cilium-agent`
+`ServiceMonitor` in the observability module (the Cilium chart's *own* ServiceMonitors are deliberately off —
+Cilium installs *before* the Prometheus operator exists, so nothing would be there to honor them). Live in
+Mimir today: `cilium_drop_count_total` (packet drops **by reason and identity**), `hubble_flows_processed_total`
+(L3–L7 flow counts), plus agent/operator health. Those feed real alerts — `CiliumHighDropRate`, `HubbleDown`,
+`CiliumAgentDown`/`CiliumOperatorDown`, `CiliumUnreachableNodes` — which is what turns the house debug habit
+(*"monitor drops first"*) into a *paging* signal rather than a manual `cilium monitor` session. Hubble's own
+**UI** (`hubble-relay` + `hubble-ui`) runs for live L3–L7 flow visualization + a service map — a *standalone*
+pane, not folded into Grafana. **Honest status:** the flow *metrics* + the UI are live; the detailed per-flow
+**log** export into Loki (#161) and dedicated Cilium/Hubble Grafana dashboards are designed-not-built — so
+today the network plane is *counted and alerted*, and you drop to the Hubble UI for per-flow forensics.
+
 ## End-to-end flow, per signal
 
 Draw this from memory and you own the pipeline:
@@ -261,6 +275,7 @@ Draw this from memory and you own the pipeline:
 | **Metrics** (infra) | Prometheus (hub) / agent (spoke) | scrape → `remote_write` | Mimir |
 | **Metrics** (AWS) | cloudwatch-exporter / YACE (singleton) | scrape (5m) | Mimir |
 | **Metrics** (synthetic) | blackbox `Probe` + k6 CronJob | scrape / `prometheus-rw` | Mimir |
+| **Network flows** | Cilium + Hubble (`ServiceMonitor`) | scrape → Prometheus | Mimir (+ Hubble UI) |
 | **Traces** | **Beyla** (push) + apps (OTLP) | OTLP → OTel Collector | Tempo |
 | **Profiles** | Alloy `alloy-profiles` (privileged eBPF DaemonSet) | `pyroscope.ebpf` push | Pyroscope |
 

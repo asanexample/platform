@@ -60,6 +60,7 @@ in namespace `observability` (backends on the hub; OTel Operator in `opentelemet
 | App traces (opt-in) | OTel Collector (gateway) ← SDK | Tempo |
 | AWS metrics | cloudwatch-exporter (YACE, tag-discovery) | Mimir |
 | Synthetic | blackbox (`Probe` CR) · k6 (CronJob) | Mimir |
+| Network flows | Cilium + Hubble (`ServiceMonitor`; chart's own off) | Mimir (+ standalone Hubble UI) |
 
 **Ladder:** L0 **Beyla eBPF** (zero-code RED/traces/service-graph, every workload — **LIVE**) → L1 **OTel SDK
 inject** (annotation `instrumentation.opentelemetry.io/inject-<lang>` → operator injects SDK + OTLP endpoint;
@@ -107,12 +108,14 @@ TGW to the hub's write-only ingest edge. **preprod spoke LIVE for all four signa
 
 - **LIVE + exercised:** data plane (all backends), P10 **preprod spoke** (all signals), real instrumented
   preprod apps, P4 alerting + owner-routing, P5 cloud-resource, P6 APM/correlation, P8 profiling, P9 SLOs, P11
-  cost, P12 policy-reporter, **agent-obs (ADR-076)**, per-team overview dashboards (#1157), per-team **write**
-  split (real alpha/bravo tenants).
+  cost, P12 policy-reporter, network-flow metrics + alerts (Cilium/Hubble: `cilium_drop_count_total`,
+  `hubble_flows_processed_total`) + the standalone Hubble UI, **agent-obs (ADR-076)**, per-team overview
+  dashboards (#1157), per-team **write** split (real alpha/bravo tenants).
 - **Built-but-inert:** per-team **read** isolation (tenant-proxy — deployed, fail-closed, but nothing consumes
   it); a leftover `p13-spike-echo` Grafana datasource (cleanup debt).
 - **Designed/not built:** P14 self-service golden path (auto per-team dashboards/alerts/SLOs + Backstage);
-  mTLS on the cross-cluster ingest path; Hubble flow export; prod spoke.
+  mTLS on the cross-cluster ingest path; Hubble flow-**log** export (#161) + dedicated Cilium/Hubble
+  dashboards; prod spoke.
 
 ## Gotchas
 
