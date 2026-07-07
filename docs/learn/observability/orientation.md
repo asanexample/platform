@@ -85,7 +85,7 @@ with zero code, zero manifest change, zero redeploy.**
 > speed and route from the outside — so a Go binary, a Python service, and a vendored appliance you can't even
 > recompile all light up identically, with nothing added. **Where it breaks:** a traffic camera sees the road,
 > not the inside of the car — Beyla sees request boundaries, not your in-process function spans or custom
-> attributes. That gap is exactly what the opt-in SDK layer fills (Stop 2b).
+> attributes. That gap is exactly what the opt-in SDK layer fills (Layer 1, below).
 
 That gives an **instrumentation ladder** you climb only as far as you need:
 
@@ -94,16 +94,17 @@ That gives an **instrumentation ladder** you climb only as far as you need:
 - **Layer 1 — the OpenTelemetry SDK, opt-in.** Want code-level spans and custom attributes? Add *one
   annotation* (`instrumentation.opentelemetry.io/inject-<lang>`) and the OTel Operator injects the SDK and the
   platform's OTLP endpoint at admission — no rebuild. *Honest status:* the operator is **live**, but no
-  workload is wired to it yet (that's the golden-path rollout, P14 — still outstanding), so **today every app
-  gets the Beyla baseline and no one has opted into Layer 1.*
+  workload is wired to it yet (that's the golden-path rollout, P14 — still outstanding), so today every app
+  gets the Beyla baseline and no one has opted into Layer 1.
 - **Layer 2 — agent observability**, for AI agents (Stop 6).
 
 Around Beyla sits a fleet of purpose-built collectors, each specialized for one signal (the
 [collection deep dive](deep-dive-collection-and-instrumentation.md) covers them all): **Alloy** DaemonSets
 tail each node's logs → Loki and eBPF-profile every process → Pyroscope; the **OpenTelemetry Collector**
 receives OTLP traces → Tempo; **Prometheus** scrapes metrics → Mimir; a **CloudWatch exporter** pulls
-AWS-side metrics (NAT, NLB, Transit Gateway) into the same pane. Your workload's only job for three of the
-four signals is the oldest rule in the book — *log to stdout* — and even that's optional.
+AWS-side metrics (NAT, NLB, Transit Gateway) into the same pane. Your workload does *nothing* for three of the
+four signals — metrics, traces, and profiles come from Beyla and the eBPF profiler; for the fourth, logs, its
+only job is the oldest rule in the book — *log to stdout* — and even that's optional.
 
 ---
 
@@ -133,7 +134,7 @@ how the hub keeps clusters' data separate. But here's the crucial security fact:
 apartment number written on an envelope. So the *real* isolation boundary isn't the header, it's the
 **network**: the `observability` namespace is default-deny, and the stores are ClusterIP-only — never on the
 Gateway — so no tenant workload can even reach Mimir. (There's also a *per-team* tenant split, which is where
-the honest-status caveat lives — Stop 5.)
+the honest-status caveat lives — see 'The honest status' below.)
 
 **Topology: hub and spoke.** The `platform` cluster is the **hub** — it runs the collectors *and* the
 backends. `preprod` is a **spoke** — it runs only lightweight collectors that ship their signals to the hub
@@ -147,7 +148,7 @@ Beyla and observable on the hub.
 
 ## Stop 4 — correlation: the jump
 
-This is the *reason* to run five stores under one Grafana instead of five separate vendor tools: you can walk
+This is the *reason* to run four stores under one Grafana instead of four separate vendor tools: you can walk
 from a symptom to its root cause **without leaving the pane**. That walk is wired into the datasources:
 
 1. A **metric** spike on a dashboard carries an **exemplar** — a clickable dot linking to
@@ -158,7 +159,7 @@ from a symptom to its root cause **without leaving the pane**. That walk is wire
    trace `service.name` and the eBPF profiler's `service_name` are deliberately aligned).
 
 > *It's the hyperlinks in a detective's case file.* Each clue links to the next — the vitals blip → the ECG
-> strip → the lab result → the tissue sample — four stores, one click each, never re-typing a query into a
+> strip → the lab result → the tissue sample — four stores, each a click from the last, never re-typing a query into a
 > different tool. **This is the payoff of one correlated stack**, and it's live: RED spike → exemplar trace →
 > its logs → its flame graph.
 
@@ -181,7 +182,7 @@ platform SLO on the API server, and — nicely — a **99.9% SLO is auto-derived
 from its Environment claim, off its Beyla RED metrics.
 
 **Alerts that page the *right* person.** ~40 curated alerts fire through Alertmanager, routed by severity
-(critical → PagerDuty + Slack + SNS; warning → Slack; a always-firing *dead-man's switch* pages an external
+(critical → PagerDuty + Slack + SNS; warning → Slack; an always-firing *dead-man's switch* pages an external
 service if the whole pipeline goes silent). But Alertmanager only knows *severity*, not *ownership* — so the
 **triage agent** ([ADR-084](../../adrs/084-platform-identity-directory-and-owner-resolution.md)) resolves the
 culprit's **team** from the git registries and pages *that team's on-call*, @-mentioning the commit author in
@@ -211,7 +212,7 @@ deliberately deferred. It's the same four-signal machine, pointed at a new kind 
 
 ## The honest status — what's live, and the one over-build
 
-Because this is a portal that refuses to oversell (and because the audit will check): **almost all of it is
+Because this is a portal that refuses to oversell: **almost all of it is
 live.** The full data plane, the preprod spoke across all four signals, real instrumented apps, SLOs,
 alerting + owner-routing, cost, and agent observability are all running and exercised.
 
