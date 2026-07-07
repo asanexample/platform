@@ -107,11 +107,15 @@ software we operate.
 - **Runtime detection — [Falco](https://falco.org/)** *(partial)* — watches syscalls on the environment
   clusters and alerts on suspicious behavior (a shell spawned in a container, a read of a sensitive path).
   Live on preprod; coverage and alert-tuning still maturing — and it's *detection*, not prevention.
-- **Gaps** — **east-west mTLS** is designed, not built
-  ([ADR-057](../../adrs/057-service-identity-and-east-west-zero-trust.md)): pods are restricted by *policy*
-  but don't yet *cryptographically* prove identity to each other. **EKS API audit logging** isn't fully on
-  (a cost trade-off — the logs are CloudWatch-only and high-volume), leaving cluster forensics thin.
-  Hardened-AMI adoption and WireGuard pod-level encryption are backlog.
+- **East-west encryption + mutual auth — [Cilium](https://cilium.io/) WireGuard + SPIFFE/SPIRE** *(built)* —
+  the "east-west" (service-to-service) half of zero trust ([ADR-057](../../adrs/057-service-identity-and-east-west-zero-trust.md)).
+  Pod-to-pod traffic is transparently encrypted on the wire (**WireGuard**, live on *both* clusters — no app
+  changes), and Cilium **mutual authentication** with an embedded **SPIRE** issues a per-workload **SPIFFE**
+  identity so services *cryptographically prove who they are* to each other — not just "restricted by policy."
+  Live as a showcase on preprod: the `alpha-shop → alpha-checkout` call is SPIRE-mutually-authenticated
+  (`AUTH TYPE=spire`), a cross-team impostor is denied. *Fleet-wide, tier-gated enforcement is the remaining half.*
+- **Gaps** — **EKS API audit logging** isn't fully on (a cost trade-off — the logs are CloudWatch-only and
+  high-volume), leaving cluster forensics thin. Hardened-AMI adoption is backlog.
 
 > **Quick check:** Kyverno already enforces admission policy — so why *also* run Pod Security Admission
 > underneath it? *(Defense in depth at a single layer: PSA is a native backstop, so a Kyverno outage or
@@ -228,7 +232,7 @@ The most important section. A posture you can trust is one that names its own ho
 | --- | --- | --- |
 | **Cloud** | No **WAF** / managed DDoS | No edge inspection of requests for OWASP-class attack patterns |
 | **Cloud** | No **GuardDuty / Config / Security Hub / Inspector / Macie** | Isolation walls exist, but no cloud-level threat *detection* or continuous posture/CSPM (a cost trade-off) |
-| **Cluster** | **East-west mTLS** designed, not built ([ADR-057](../../adrs/057-service-identity-and-east-west-zero-trust.md)) | Pods restricted by policy but don't cryptographically verify each other |
+| **Cluster** | **East-west mutual auth not yet fleet-enforced** — encryption is fleet-wide; mutual auth (SPIFFE/SPIRE, [ADR-057](../../adrs/057-service-identity-and-east-west-zero-trust.md)) is a **preprod showcase** | Every service *can* be cryptographically authenticated (proven on alpha-shop↔alpha-checkout), but `authentication.mode: required` policies aren't yet applied fleet-wide per tier |
 | **Cluster** | **EKS API audit logging** not fully on | Thin cluster-API forensics after an incident (CloudWatch cost trade-off) |
 | **Cluster** | No **hardened-AMI** program; kube-bench findings not yet remediated | The CIS *scan* now runs, but node hardening isn't complete |
 | **Container** | No end-to-end **block-on-critical-CVE** gate; base-image currency partial | A known-vulnerable image can still deploy |
@@ -269,11 +273,12 @@ Try it cold: *what secures this platform, top to bottom — and what does it not
 
 > "**Defense in depth across the 4 C's** — **Cloud** (separate accounts, SCPs, least-privilege IAM with
 > permissions boundaries, KMS) → **Cluster** (private API, RBAC, PSA + Kyverno, Cilium network policy incl.
-> an IMDS deny, kube-bench, Falco) → **Container** (signed + scanned + hardened + digest-pinned) → **Code**
+> an IMDS deny, WireGuard east-west encryption + SPIFFE mutual auth, kube-bench, Falco) → **Container** (signed + scanned + hardened + digest-pinned) → **Code**
 > (SAST, SCA, secret-scanning, pinned CI, policy-shift-left) — and across **time** (shift-left → enforce at
 > admission → detect at runtime). No wall is perfect — a novel poisoned dependency passes signing — but the
-> walls are *independent*, so a breach is **contained**. And honestly, **WAF, GuardDuty/CSPM, east-west
-> mTLS, DAST, full audit logging, secrets rotation, a SIEM, and pentesting are gaps we *name*, not hide**" —
+> walls are *independent*, so a breach is **contained**. And honestly, **WAF, GuardDuty/CSPM, DAST, full
+> audit logging, secrets rotation, a SIEM, fleet-wide east-west mTLS enforcement, and pentesting are gaps we
+> *name*, not hide**" —
 
 — then you understand the platform's security *and* its maturity: the honest posture, not the
 green-checkmark one.

@@ -73,7 +73,7 @@ placement); the remaining rows are **designed** as strategy/direction ADRs — *
 | Resilience & business continuity | 📐 | Per-tier recovery/availability postures, backup/DR, cross-region state, single-region control plane w/ tested restore; **nothing built yet** | [054](../adrs/054-platform-resilience-and-business-continuity.md) |
 | Compliance assurance & evidence | 📐 | Control-catalog-as-code → SOC2/PCI/HIPAA, continuous scanning, retention-locked per-environment evidence; controls exist, *assurance* doesn't | [055](../adrs/055-compliance-assurance-and-continuous-control-evidence.md) |
 | Progressive delivery & safe rollback | 📐 | Argo Rollouts canary + metric gates, tier-keyed strategy, regulated approval gate; today plain ArgoCD sync | [056](../adrs/056-progressive-delivery-and-safe-rollback.md) |
-| Service identity & east-west zero trust | 📐 | Cilium transparent encryption + mTLS, SPIFFE workload identity; today L3/L4 NetworkPolicy only | [057](../adrs/057-service-identity-and-east-west-zero-trust.md) |
+| Service identity & east-west zero trust | 🟡 | WireGuard transparent encryption **live both clusters** (Phase 1); Cilium mutual auth + embedded SPIRE **live on preprod** (Phase 2 showcase — the alpha-shop↔alpha-checkout call is SPIRE-authenticated, impostor denied). Fleet-wide/tier-gated enforcement pending | [057](../adrs/057-service-identity-and-east-west-zero-trust.md) |
 
 > **📐 Designed ≠ built.** Each 📐 row is a strategy/direction ADR not yet implemented. The value
 > today is that the gaps are *named and routed*, not that they're closed.

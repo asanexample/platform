@@ -44,9 +44,15 @@ Azure/GCP deployment today.)
 
 - **Private EKS API endpoints** (ADR-010) — both clusters are private-only; access via **Tailscale**
   subnet routers (ADR-011) or the **SSM bastion** (ADR-020). No SSH, no public API.
-- **Cilium NetworkPolicies** (ADR-008) — eBPF-enforced. Environment namespaces are **default-deny ingress**
-  with explicit allows for the Gateway (`fromEntities: [ingress]`), DNS, and the Pod Identity agent;
-  egress to IMDS is blocked (node enforces IMDSv2 hop-limit=1).
+- **Cilium NetworkPolicies** (ADR-008) — eBPF-enforced. Environment namespaces are **default-deny both
+  directions** — ingress allowed only from the Gateway (`fromEntities: [ingress]`) + kube-system, egress
+  allowed to DNS + the world (except IMDS, an explicit `egressDeny`). A cross-namespace service-to-service
+  call therefore needs **both** an egress allow on the caller and an ingress allow on the callee.
+- **East-west encryption + mutual auth** (ADR-057) — Cilium **WireGuard** transparently encrypts pod-to-pod
+  traffic on the wire (fleet-default, live on **both clusters**). Cilium **mutual authentication** with an
+  embedded **SPIRE** issues per-workload **SPIFFE** identities; `authentication.mode: required` in a
+  `CiliumNetworkPolicy` makes services cryptographically verify each other. Showcase live on preprod
+  (alpha-shop ↔ alpha-checkout, verified `AUTH TYPE=spire`); fleet-wide/tier-gated enforcement pending.
 - **Gateway API ingress** (ADR-017/029) — Cilium Gateway with TLS (Let's Encrypt DNS-01). Platform uses
   an **internal** NLB (Tailscale-only); preprod uses a **public** NLB. `LoadBalancer`/`NodePort` Services
   are denied by Kyverno (Gateway-only ingress).
@@ -57,7 +63,8 @@ Azure/GCP deployment today.)
 
 - **Encryption at rest** — EKS secrets via **KMS** envelope encryption; CloudTrail S3 via KMS; environment/
   mimir S3 via SSE-S3 (AES256); EBS encrypted by default (SCP-enforced).
-- **Encryption in transit** — TLS everywhere (Gateway termination, Hubble TLS, service-to-service).
+- **Encryption in transit** — TLS at the edge (Gateway termination, Hubble TLS) **and WireGuard for all
+  pod-to-pod traffic on the wire** (Cilium transparent encryption, ADR-057 — both clusters).
 - **Secrets** (ADR-019/024/025/026) — AWS Secrets Manager as the source of truth; **External Secrets
   Operator** (IRSA) syncs to Kubernetes; per-account isolation (no cross-account reads by default);
   hierarchical naming; `PlatformAdmin` is **denied** `secretsmanager:GetSecretValue` (break-glass only).

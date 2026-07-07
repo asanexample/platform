@@ -173,6 +173,7 @@ The **Test** account (`157263244316`, Terratest sandbox) is a standard `Platform
 ## Architecture Decisions
 
 - **Cilium as CNI** (1.19.4) — BYOCNI on EKS, `kubeProxyReplacement = true`. Shared module uses `cloud_provider` variable.
+- **East-west zero trust (ADR-057)** — Cilium **WireGuard** transparent pod-to-pod encryption is fleet-default and live on **both clusters** (`encryption_enabled`); Cilium **mutual authentication** with an embedded **SPIRE** (SPIFFE workload identity — `mutual_auth_enabled`) is a **preprod showcase** securing the alpha-shop↔alpha-checkout call (`authentication.mode: required` CNP; `AUTH TYPE=spire`). Enabling either is a rolling Cilium restart; fleet-wide/tier-gated auth enforcement is a follow-up. Cross-namespace calls need **both** egress (caller) + ingress (callee) netpol halves.
 - **Cilium Gateway API** — external Envoy uses reserved `ingress` identity (8), not `host`. Environment CiliumNetworkPolicies must allow `fromEntities: ["ingress"]`. TLS secrets copied to `cilium-secrets` namespace.
 - **SSM Session Manager** — fallback for private cluster access when Tailscale is unavailable (no VPN needed); Tailscale is the primary path (ADR-010).
 - **Hubble TLS** uses `helm` method on AWS to avoid BYOCNI chicken-and-egg with post-install hooks.
