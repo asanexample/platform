@@ -42,10 +42,13 @@ spec:
   image override.
 - **Sync policy:** `automated { selfHeal = true, prune = true }` + **ServerSideApply**. Self-heal reverts
   drift; prune deletes what git no longer declares.
-- **Cross-account delivery:** one ArgoCD lives on the **hub** and delivers to the environment **spoke**
-  clusters (preprod, prod). It reaches them via labeled cluster `Secret`s carrying **AWS IAM auth** (the
-  application-controller does STS AssumeRole + EKS token per target) — `argocd-clusters`. One control plane,
-  many accounts.
+- **Cross-account delivery:** one ArgoCD on the **hub** delivers to environment **spoke** clusters across the
+  account boundary. **Design:** one spoke per account, with **prod in its own dedicated account/cluster**.
+  **Built today:** one spoke — `preprod` (`argocd-clusters` registers `{preprod}` only). The prod account
+  exists (networking only, no cluster), so *interim* every stage incl. `prod` lands as a namespace on the
+  preprod spoke; it moves to its own account when the prod spoke is built. Reaches each spoke via a labeled
+  cluster `Secret` carrying **AWS IAM auth** (the application-controller does STS AssumeRole + EKS token per
+  target). The mechanism is generic over registered spokes.
 - **Agents deliver to the hub** via a separate platform-agent ApplicationSet (`agents.tf`, ADR-082), not to
   the environment spokes.
 

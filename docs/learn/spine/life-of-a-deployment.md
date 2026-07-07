@@ -94,16 +94,17 @@ PR." Everything below is the machinery that makes that trade honest.
 ## 2 · CI builds, signs, and *attests* it (the supply chain)
 
 The moment your merge lands, your repo's CI wakes up. But notice what it is: your repo's workflow is a thin
-**caller** of a *shared* build-and-sign workflow the platform owns — you don't copy-paste a hundred lines
-of Docker-and-security YAML into every app; you call the platform's version and inherit its guarantees.
+**caller** of *shared* workflows the platform owns — you don't copy-paste a hundred lines
+of Docker-and-security YAML into every app; you call the platform's versions and inherit their guarantees.
 (This is the "paved road" idea: the safe path is the *easy* path.)
 
-That shared workflow does three things:
+Your CI thinly calls **two** shared workflows, which together do three things:
 
-1. **Builds** your code into a container image.
-2. **Pushes** it to the platform's registry as `team-alpha/shop-web@sha256:…`.
-3. **Signs and attests** it — and this is the part worth teaching, because it's the platform's answer to a
-   whole category of attack.
+1. **Builds** your code into a container image *(build-sign workflow)*.
+2. **Pushes** it to the platform's registry as `team-alpha/shop-web@sha256:…`, then **cosign-signs** it and
+   records a software bill of materials *(still the build-sign workflow)*.
+3. **Attests** it — a *separate, isolated* provenance workflow writes the SLSA build attestation from its own
+   identity. This is the part worth teaching, because it's the platform's answer to a whole category of attack.
 
 Here's the problem it solves. A container image is just a blob in a registry. How does the *cluster*, later,
 know that a given blob is really *your* code, built by *your* CI from *your* repo — and not something a
@@ -113,9 +114,10 @@ overwritten.
 So the workflow **cosign-signs** the image. [Cosign](https://docs.sigstore.dev/cosign/signing/overview/)
 does *keyless* signing: instead of a secret key someone could steal, it uses CI's own short-lived **OIDC
 identity** (the GitHub Actions run proving "I am the `build-sign` workflow of this repo") to produce a
-signature, and records it in a public transparency log. Then it writes a
+signature, and records it in a public transparency log. Then a *separate, isolated* provenance workflow writes a
 [**SLSA provenance**](https://slsa.dev/) attestation — a signed statement describing *how and where this
-image was built* (which repo, which commit, which workflow).
+image was built* (which repo, which commit, which workflow). Keeping provenance in its own workflow and identity
+is what earns the SLSA L3 "isolated builder" guarantee (ADR-042).
 
 > Think of it as a **tamper-evident wax seal plus a notarized receipt.** The signature is the seal: break
 > it — alter one byte of the image — and the seal doesn't match, visibly. The provenance is the notarized

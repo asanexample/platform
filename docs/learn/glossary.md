@@ -14,7 +14,7 @@ cross-cutting substrate and domain vocabulary.
 - **Environment** — a Product at a Stage (`= one namespace`); the unit of deployment.
 - **Customer** — an external consumer; a per-customer prod Environment is dedicated to one.
 - **Stage** — a promotion rung (`dev` / `test` / `staging` / `uat` / `prod`) — *not* a place.
-- **Envelope** — the bounds a Team declares (allowed tiers/stages, quota cap, budget), enforced at admission.
+- **Envelope** — the bounds a Team declares: allowed tiers/stages and quota cap enforced at admission; budget currently audit-only (ADR-091 Phase C, not yet flipped to Enforce).
 - **Tier** — the hardening/compliance level (`standard`, `pci`, `hipaa`, …); a *floor*, not a fixed level.
 
 ## Kubernetes
@@ -47,7 +47,7 @@ cross-cutting substrate and domain vocabulary.
 
 ## Platform tools
 
-- **Kyverno** — the policy engine that enforces the rules at admission. ([docs](https://kyverno.io/docs/)) *(policy module planned)*
-- **ArgoCD** — the GitOps engine that syncs cluster state from git. ([docs](https://argo-cd.readthedocs.io/en/stable/)) *(delivery module planned)*
+- **Kyverno** — the policy engine that enforces the rules at admission. ([docs](https://kyverno.io/docs/)) *taught in [Policy & admission](policy/orientation.md)*
+- **ArgoCD** — the GitOps engine that syncs cluster state from git. ([docs](https://argo-cd.readthedocs.io/en/stable/)) *taught in [Delivery](delivery/orientation.md)*
 - **Cilium** — the platform's CNI (pod networking + the gateway). ([docs](https://docs.cilium.io/en/stable/overview/intro/))
-- **cosign** — signs and verifies container images. ([docs](https://docs.sigstore.dev/cosign/signing/overview/)) *(supply-chain module planned)*
+- **cosign** — signs and verifies container images. ([docs](https://docs.sigstore.dev/cosign/signing/overview/)) *taught in [Supply chain](supply-chain/orientation.md)*

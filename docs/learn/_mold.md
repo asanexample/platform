@@ -10,6 +10,41 @@ The rest of the platform's docs (ADRs, runbooks, architecture) **explain** — t
 already holds the mental model. They don't **teach** — build that model in someone who lacks it. This
 portal is the teaching layer. The mold below is what makes a doc teach instead of explain.
 
+## The verification gate — every claim, or it doesn't ship
+
+**This is the first rule, and it overrides convenience.** Documentation is a **trust artifact**: a reader who
+finds *one* wrong claim stops trusting *all* of it — and stops trusting the platform. A plausible-sounding
+sentence that turns out to be false does more damage than a gap. So:
+
+> **Every factual claim, instruction, and example must be verified against a *primary source* before it
+> ships. If you can't verify it, you don't write it** — you verify it, mark it explicitly as
+> *designed-not-built* / *unverified*, or omit it. Never assert from plausibility, inference, memory, or "it
+> obviously works this way."
+
+- **Primary source = the code *and* the live environment.** The module source, the CRD/XRD schema, the
+  Composition, the Terragrunt unit, the workflow YAML, the scaffolder template — *and* the running truth:
+  `kubectl` on the cluster, `gh` on GitHub, the `aws` CLI, `cosign` on a real image. Read the thing that is
+  actually true.
+- **Secondary sources are leads, not proof.** ADRs, CLAUDE.md/AGENTS.md, runbooks, memory, and *this portal's
+  own other docs* may be stale or aspirational. They tell you where to look; they never substitute for
+  looking. (Verified counter-examples this rule was written from: a doc said "not built" when all four engines
+  were live; an ADR comment said "Phase A: S3 only" when SQS/SNS/Dynamo shipped; a `spec.validationFailureAction`
+  field read `Audit` while enforcement was real.)
+- **Behavioral claims about flows are the trap.** "Onboarding creates the repo," "the scaffolder wires CI,"
+  "this field drives that policy," "X is enforced" — these *feel* knowable from the mental model and are the
+  ones most often wrong. Trace each to the actual code path or run it. (This rule exists because "you bring
+  the repo" shipped — the scaffolder *creates* it.)
+- **Examples and commands must be run**, with output confirmed to match (don't hardcode drifting values —
+  ages, hashes). Numbers, names, ARNs, digests: copied from real output, redacted per the secret rules, never
+  invented.
+- **The ship checklist:** before opening the PR, walk the doc and for *every* claim ask "what did I verify
+  this against?" If the answer is "it seemed right," stop and verify or cut it. A doc is done when every
+  sentence has a source behind it, not when it reads well.
+
+This gate applies to **all** tiers — orientation, reference, how-to, cheatsheet, everything — and to edits,
+not just new docs. Same rule the platform applies to its own controls (verify intent-vs-effected): "it's
+written down" is a claim to confirm, not assume.
+
 ## The split
 
 Each subsystem is **two public documents** plus, for the core subsystems, **two private aids**.

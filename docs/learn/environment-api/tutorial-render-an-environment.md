@@ -50,7 +50,7 @@ crossplane render environments/demo-dev.yaml ../charts/environment-api/files/com
   render/functions.yaml --extra-resources render/environmentconfig.yaml | grep -c "composition-resource-name:"
 ```
 
-You should get **16**. That's the fixed set + one service's stack.
+You should get **17**. That's the fixed set + one service's stack.
 
 ## 3. Change the stage — watch the names move
 
@@ -89,8 +89,11 @@ crossplane render /tmp/my-env.yaml ../charts/environment-api/files/composition.y
   render/functions.yaml --extra-resources render/environmentconfig.yaml | grep -c "composition-resource-name:"
 ```
 
-Now you get **19** — up from 16. A whole new per-service stack appeared for `api` (its own ECR repo
-`team-alpha/demo-api`, IAM role, and Pod-Identity association), even with no image. That's the
+Now you get **20** — up from 17, a delta of **+3**. A new per-service stack appeared for `api` — but only
+its **ECR trio** (`Repository` + `RepositoryPolicy` + `LifecyclePolicy`), because `api: {}` declares no
+`serviceAccount`. The IAM role and Pod-Identity association render only when a service declares a
+`serviceAccount` (e.g. `api: { serviceAccount: demo-api }`), which would make it **+5 (→ 22)** instead of
++3 — the gate is the `serviceAccount`, not the image. That's the
 *fixed set + (per-service resources × services)* formula, live in front of you.
 
 ## What you did

@@ -152,8 +152,8 @@ blanket "any signed image is fine."
 ## Verify at the door — where the enforce side hooks in
 
 Producing the proof is half the story; *checking* it is the other. On admission, **Kyverno** fetches the
-signature + attestations from ECR and **enforces** them — `verify-images-product-<product>` (signed, correct
-repo) and `verify-attestations-product-<product>` (SBOM + SLSA present), both **Enforce on preprod**. An
+signature + attestations from ECR and **enforces** them — `verify-images-product-<team>-<product>` (signed, correct
+repo) and `verify-attestations-product-<team>-<product>` (SBOM + SLSA present), both **Enforce on preprod**. An
 image that isn't signed, isn't attested, or was signed from the wrong repo **never gets admitted**. (That's
 the [Policy & Admission](../policy/orientation.md) module's job — supply chain *produces* the proof; policy
 *verifies* it. Two halves of one control.)
@@ -165,6 +165,7 @@ verifies at admission against the product's repo → only then does it run.** Se
 sequenceDiagram
     autonumber
     participant CI as Shared CI (build-sign.yml)
+    participant SLSA as Isolated CI (slsa-provenance.yml)
     participant Fulcio
     participant Rekor
     participant ECR
@@ -173,7 +174,8 @@ sequenceDiagram
     Note over CI,ECR: SIGN — once, when the image is built
     CI->>Fulcio: OIDC token — "I am build-sign.yml, run for alpha-shop"
     Fulcio-->>CI: ~10-minute cert (identity + repo baked in)
-    CI->>ECR: push image + signature + SLSA provenance + CycloneDX SBOM
+    CI->>ECR: push image + signature + CycloneDX SBOM
+    SLSA->>ECR: push SLSA provenance (isolated workflow — the build can't forge it)
     CI->>Rekor: record the signing event (public, append-only)
 
     Note over ECR,Kyverno: VERIFY — every time, at admission

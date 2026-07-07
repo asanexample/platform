@@ -85,7 +85,9 @@ a single rung actually happen — there are three, and each is worth understandi
 ## Reconciler 1 — the auto-promoter: it climbs the ladder
 
 Something has to *move the digest up*. That's a cron job — `reconcile.sh`, running on an in-VPC runner that
-has ArgoCD API access (via Pod Identity) — and the interesting thing is *how carefully* it climbs.
+reads each ArgoCD `Application`'s status from the cluster (kubectl against the private EKS API), authenticating
+by assuming PlatformDeployer — the runner's Pod Identity is only the base credential it assumes from — and the
+interesting thing is *how carefully* it climbs.
 
 Each run, for every Product, it walks the **adjacent** stage pairs — `dev→test`, `test→uat`,
 `uat→staging` — and asks one sharp question before promoting a rung: **is the version below actually
@@ -203,11 +205,19 @@ Two honest details, because a mental model built on the aspirational version is 
 ## One more piece — delivering across accounts
 
 A quick but important structural note, because it's easy to picture ArgoCD sitting *inside* each environment.
-It doesn't. There's **one ArgoCD, on the platform hub**, and it delivers to the environment **spoke**
-clusters (preprod, prod) *across AWS accounts*. It reaches each one via a registered cluster `Secret` that
-carries **AWS IAM auth** — the ArgoCD controller does an STS AssumeRole into the target account and gets an
-EKS token per sync. One delivery control plane, many accounts — the hub-and-spoke shape from
-[How the Platform Fits](../spine/how-the-platform-fits.md), seen from the delivery side.
+It doesn't. There's **one ArgoCD, on the platform hub**, and it delivers to environment **spoke** clusters
+*across the AWS account boundary*. The **design** is one spoke per account, with **prod in its own dedicated
+account and cluster** — the same account isolation the [security model](../spine/the-security-model.md) leans
+on, so a compromise or outage in one account can't reach another.
+
+**Today, one spoke is built — preprod.** A dedicated **prod-account** spoke cluster is designed but *not yet
+stood up* (the prod account exists, with networking, but no cluster). So as an interim step, every stage —
+dev through **prod** — currently lands as its own namespace on the **preprod** spoke; the `prod`-stage
+Environment moves to its own account the day that spoke is built. It reaches each spoke via a registered
+cluster `Secret` that carries **AWS IAM auth** — the ArgoCD controller does an STS AssumeRole into the target
+account and gets an EKS token per sync. That cross-account mechanism is real and already generic over
+*registered* spokes; it picks up the prod spoke the moment one exists. One delivery control plane, hub and
+spokes — the shape from [How the Platform Fits](../spine/how-the-platform-fits.md), seen from delivery.
 
 ## Putting it together — one change, dev to prod
 
@@ -250,7 +260,7 @@ Close the tab and narrate it: *how does my merged code reach prod, and who decid
 > revertible. Three reconcilers converge it: an **auto-promoter** climbs the ladder *one rung per run*,
 > gated on the lower stage being ArgoCD `Synced + Healthy` (proof, not intent — so a change *bakes* at each
 > stage); a per-Product **ApplicationSet** mail-merges each Release into an ArgoCD **Application** that
-> injects the digest, self-heals drift, and delivers *cross-account* to the spoke clusters; and an **Argo
+> injects the digest, self-heals drift, and delivers *cross-account* to the spoke cluster; and an **Argo
 > Rollout** canaries the new version in via weighted HTTPRoutes. Everything auto-promotes up to
 > **staging**; **prod** waits on a human release-approver. I never deploy — I move a digest, and the loops
 > make it real" —

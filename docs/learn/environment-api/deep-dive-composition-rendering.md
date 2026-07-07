@@ -1,6 +1,6 @@
 # Deep dive: how the Composition renders
 
-> A **deep dive** — assumes [the orientation](orientation.md) (you know one claim becomes ~16 resources)
+> A **deep dive** — assumes [the orientation](orientation.md) (you know one claim becomes ~17 resources)
 > and ideally its `crossplane render` exercise. This opens the machine the orientation called "a recipe"
 > and shows, in real detail, how it turns one claim into the footprint. For platform engineers who
 > **operate or extend** the Environment Composition. Longer than the orientation on purpose — this is the
@@ -8,9 +8,9 @@
 
 ## The question this answers
 
-The orientation showed one claim → sixteen resources and called the Composition "the recipe." That's the
+The orientation showed one claim → seventeen resources and called the Composition "the recipe." That's the
 right *mental model*. But to change or debug it you need the guts: **how, mechanically, does the
-Composition render sixteen specific resources from your nine-line claim — and how do those become real
+Composition render seventeen specific resources from your compact claim — and how do those become real
 things in AWS and the cluster?** It's one idea, a three-step pipeline, and a lot of go-template.
 
 ## The one idea: rendered footprint = f(your claim, this cluster's constants)
@@ -185,15 +185,17 @@ spec:
 
 Two things make this the cross-account hop:
 
-1. **`providerConfigRef: platform-ecr`** — every *other* resource used `default` (Pod Identity in the
-   *workload* account); this one uses `platform-ecr`, a ProviderConfig that
+1. **`providerConfigRef: platform-ecr`** — every *non-ECR* resource uses `default` (Pod Identity in the
+   *workload* account); the three ECR resources (`Repository`, `RepositoryPolicy`, `LifecyclePolicy`) use
+   `platform-ecr`, a ProviderConfig that
    *assume-role-chains* (hops into a role in another account) into the **platform** account. So the repo is
    created *there*, centrally.
 2. **The `RepositoryPolicy`** grants pull to `$ecrPrincipals` — the `arn:aws:iam::<acct>:root` list we
    built from the EnvironmentConfig's `pullAccountIds` — so the workload accounts can pull the image back.
 
 Render the fixture and the `ecr-repo-web` resource shows the tell-tale pair — a product-scoped external
-name, and the `platform-ecr` ProviderConfig (every *other* resource in that render uses `default`):
+name, and the `platform-ecr` ProviderConfig (the three ECR resources use `platform-ecr`; every *non-ECR*
+resource in that render uses `default`):
 
 ```yaml
 # the ECR Repository, straight out of `crossplane render` of demo-dev:
@@ -209,7 +211,7 @@ spec:
 One template, reading one set of cluster constants, produces a resource in a *different* AWS account with a
 policy back to the workload accounts. That's the whole cross-account story, in ~15 lines of go-template.
 
-## Where "sixteen" comes from — a fixed set + the service loop
+## Where "seventeen" comes from — a fixed set + the service loop
 
 Some resources render **once** per environment (namespace, quota, limit-range, network policies,
 rolebinding, the two Kyverno policies). The rest render **per service**, inside that
@@ -224,8 +226,10 @@ renders a second stack of ECR + IAM + Pod-Identity resources.
 
 > **Try it — prove the formula.** Render `demo-dev`, then add a second service to the claim
 > (`services: { web: { … }, api: {} }`) and re-render. Count the resources: the fixed set is unchanged, and
-> a full per-service stack — ECR `Repository` + policies, IAM `Role`, `PodIdentityAssociation` — appears for
-> `api` (even with no image; a no-image service is *provisioned-but-not-yet-deployed*). Formula proven.
+> a per-service stack appears for `api` — but only its ECR trio (`Repository` + `RepositoryPolicy` +
+> `LifecyclePolicy`), because `api: {}` declares no `serviceAccount`. The IAM `Role` and
+> `PodIdentityAssociation` render only when a service declares a `serviceAccount` (e.g.
+> `api: { serviceAccount: demo-api }`) — the gate is the `serviceAccount`, not the image. Formula proven.
 
 ## The status write-back — one derivation, two outputs
 

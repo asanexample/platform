@@ -125,8 +125,9 @@ software we operate.
   [ADR-050](../../adrs/050-shared-build-sign-reusable-workflow.md)), and Kyverno **re-verifies at
   admission** — trust is checked at the moment of *use*, not taken on faith from the registry. This defeats
   image *substitution* (swapping a malicious blob under a trusted name).
-- **Vulnerability scanning** *(built)* — **Trivy** scans images and dependencies in CI, and **ECR
-  scan-on-push** re-scans in the registry, so a known-CVE dependency is flagged before *and* after it lands.
+- **Vulnerability scanning** *(built)* — **Trivy** scans dependencies and Dockerfile config in CI, and
+  **ECR scan-on-push** scans the built image in the registry, so a known CVE is flagged before *and* after
+  it lands.
 - **Hardened runtime context** *(built)* — Kyverno *mutates in* the safe defaults so developers can't forget
   them: drop all Linux capabilities, no privilege escalation, `seccomp: RuntimeDefault`, non-root where
   declared; regulated tiers additionally force `runAsNonRoot` + `readOnlyRootFilesystem`. The safe container
@@ -159,9 +160,10 @@ hand them strong shift-left tooling that runs automatically.
 - **CI/CD supply-chain hardening** *(built)* — GitHub Actions are **pinned to SHAs** and installed with
   checksum verification; **fail-closed governance gates** guard every registry/roles/people/teams change;
   `main` is protected, and changes are reviewed. The *pipeline itself* is a hardened surface.
-- **Policy shift-left** *(built)* — the *same* Kyverno policies that enforce at admission also run as a
-  **Kyverno CLI** check in CI, so a non-compliant manifest fails the *PR*, not the deploy. One rule, checked
-  early and enforced late.
+- **Policy shift-left** *(built)* — the app CI validates each overlay *builds* namespace- and host-agnostic
+  and product-scoped (a `kubectl kustomize` render plus checks for hardcoded namespaces, host placeholders,
+  and cross-product images), so obvious violations surface in the PR. Kyverno itself enforces at admission;
+  the Kyverno CLI runs in CI over the *policy module's own* test suite, keeping the rules honest.
 - **Gaps** — **no DAST** (dynamic/running-app testing), and — tying back to Cloud — **no WAF** to blunt
   OWASP-class attacks against *running* apps at the edge. App-layer *runtime* defense (as opposed to the
   strong shift-left tooling above) is the thinnest part of the model today.
@@ -234,10 +236,11 @@ The most important section. A posture you can trust is one that names its own ho
 | **Cross-cutting** | **Secrets rotation** not automated | Secrets are encrypted + isolated, but rotating them is manual |
 | **Cross-cutting** | No **SIEM** / central security-event aggregation | Signals exist (SARIF, CloudTrail, observability) but aren't correlated in one place |
 | **Cross-cutting** | No **pentest / red-team** program; **compliance evidence** aspirational ([ADR-055](../../adrs/055-compliance-assurance-and-continuous-control-evidence.md)) | Controls aren't adversarially validated or attested |
-| **Cross-cutting** | **Backup / DR** partial (CNPG no-backup, [ADR-054](../../adrs/054-platform-resilience-and-business-continuity.md)) | Ransomware/data-loss resilience incomplete |
+| **Cross-cutting** | **Backup / DR** partial — no tested restore/DR drills, no cross-region copy, RTO/RPO unvalidated ([ADR-054](../../adrs/054-platform-resilience-and-business-continuity.md)) | CNPG databases are backed up (WAL + PITR to S3), but recovery hasn't been rehearsed and non-CNPG data isn't covered |
 
 *Recently closed (were on this list): **secret scanning** (gitleaks now in CI), the **CIS benchmark scan**
-(kube-bench, preprod), and **explicit IMDS egress deny** (live in every environment namespace).*
+(kube-bench, preprod), **explicit IMDS egress deny** (live in every environment namespace), and **CNPG
+database backups** (WAL archiving + PITR to S3, live on all platform-hub clusters).*
 
 None of these are secrets — they're tracked and prioritized in
 [epic #1152](https://github.com/asanexample/platform/issues/1152), and naming them *is* the maturity signal.

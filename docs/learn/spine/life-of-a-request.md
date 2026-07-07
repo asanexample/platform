@@ -87,8 +87,9 @@ privilege connectivity, enforced on every packet.)
 
 **6 · Service to pod — the elevator dispatcher.** The Service is a `ClusterIP`, and Cilium — running
 **[kube-proxy replacement](https://docs.cilium.io/en/stable/overview/intro/) in eBPF** (there is no
-kube-proxy here) — load-balances the connection to one *healthy* `shop-web` pod, honoring the readiness
-gates and the canary split. *The dispatcher sends you to an available, staffed floor — never a dark one.*
+kube-proxy here) — load-balances the connection to one *healthy* pod of whichever `shop-web` Service
+(stable or canary) the weighted `HTTPRoute` already picked back in step 4, honoring the readiness gates.
+*The dispatcher sends you to an available, staffed floor — never a dark one.*
 
 **7 · The pod serves — the actual work.** Finally the request reaches your application code, and it does the
 thing: renders the page. If it needs AWS along the way — read its S3 bucket, enqueue a job — it uses the

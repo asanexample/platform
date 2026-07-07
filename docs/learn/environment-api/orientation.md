@@ -32,7 +32,7 @@ a registry themselves. Plenty of places do. Do it by hand, though, and four thin
 - **It drifts.** Hand-built things rot; reality and intent quietly diverge.
 
 The bet this platform makes: **make the safe, correct, compliant setup the *easy* one.** A team writes a
-nine-line request and gets a fully-wired, guardrailed environment in minutes — correct by default.
+compact request and gets a fully-wired, guardrailed environment in minutes — correct by default.
 Developers get autonomy without becoming infra experts; the org gets consistency and compliance *by
 construction*, not by everyone remembering; the platform team maintains one machine instead of fulfilling
 a thousand tickets.
@@ -93,7 +93,8 @@ it end to end.
 
 ### 1. The claim — what someone wrote
 
-This is the *entire* file that asks for the environment. It lives in git, at
+This is the meaningful spec of the file that asks for the environment (its header comments, the
+`requested-by` annotation, and a `preview: true` flag are elided for clarity). It lives in git, at
 [`gitops/environments/alpha/shop/dev.yaml`](https://github.com/asanexample/platform/blob/main/gitops/environments/alpha/shop/dev.yaml):
 
 ```yaml
@@ -151,7 +152,7 @@ alpha-shop-dev   True     True    environment   15d
 > `XEnvironment` synced and healthy — the "nothing is applied by hand" picture. Spec in
 > [_screenshots.md](_screenshots.md).
 
-### 3. The Composition fires — one claim becomes sixteen real things
+### 3. The Composition fires — one claim becomes seventeen real things
 
 The moment the claim lands, the **Composition** (the machine) reads it and creates the footprint. Every
 real thing it makes is a **managed resource** — an object Crossplane creates *and then watches*. Inspect the cluster and the footprint shows up as a tree — the claim at the root,
@@ -167,18 +168,18 @@ XEnvironment/alpha-shop-dev                 True    True   Available
 ├─ Role/alpha-shop-dev-…                    True    True   Available
 ├─ PodIdentityAssociation/alpha-shop-dev-…  True    True   Available
 ├─ Object/alpha-shop-dev-…                  True    True   Available
-│    …(11 Object rows total — the in-cluster resources)…
+│    …(12 Object rows total — the in-cluster resources)…
 └─ Object/alpha-shop-dev-…                  True    True   Available
 ```
 
 (That tree view is `crossplane resource trace`; the [reference](reference.md) has the exact command and a
 plain-`kubectl` way to list the same resources.)
 
-**You wrote nine lines of YAML. The platform created sixteen real things** across the Kubernetes cluster
+**You wrote a dozen lines of YAML. The platform created seventeen real things** across the Kubernetes cluster
 *and* two different AWS accounts — and every one of them still reads `True True` weeks later.
 Let's group them:
 
-**In the cluster** (the eleven `Object/…` rows):
+**In the cluster** (the twelve `Object/…` rows):
 
 - the [**Namespace**](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
   `alpha-shop-dev` itself,
@@ -192,8 +193,9 @@ Let's group them:
   because the CNI is [Cilium](https://docs.cilium.io/en/stable/overview/intro/): letting the gateway's
   [Envoy](https://www.envoyproxy.io/docs/envoy/latest/intro/what_is_envoy) reach your app (Cilium tags it
   with a reserved
-  `ingress` identity, not a pod or IP the standard policy could match) and the host egress that EKS Pod
-  Identity needs,
+  `ingress` identity, not a pod or IP the standard policy could match), the host egress that EKS Pod
+  Identity needs, and an egress *deny* (`deny-imds-egress`) that blocks pods from reaching the EC2
+  instance metadata service (IMDS, `169.254.169.254`) so they can't steal the node's credentials,
 - a [**RoleBinding**](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) granting the team's
   developers access in that namespace,
 - two **Kyverno ClusterPolicies** — the per-environment admission guardrails (more below).
@@ -259,13 +261,13 @@ crosses.
 
 > **See the code:** the machine you just watched is two files in the `crossplane` module — the
 > [Composition](https://github.com/asanexample/platform/blob/main/infra/modules/crossplane/charts/environment-api/files/composition.yaml)
-> (the recipe that renders those sixteen resources) and the
+> (the recipe that renders those seventeen resources) and the
 > [XRD](https://github.com/asanexample/platform/blob/main/infra/modules/crossplane/charts/environment-api/templates/xenvironment-xrd.yaml)
 > (the schema that defines what an `XEnvironment` may contain). Everything above is rendered by those two.
 
 <!-- -->
 
-> **Quick check:** you just watched sixteen real resources appear. Which *single action* created them
+> **Quick check:** you just watched seventeen real resources appear. Which *single action* created them
 > all — and, once they exist, what stops them from drifting out of sync? Hold your answer: the next
 > section is exactly the "what keeps them" part.
 
@@ -308,7 +310,7 @@ above still says `True True` weeks later.
 Two more terms and you have the whole vocabulary:
 
 - The **Composition** we keep naming is the *recipe* the control plane follows to turn one `XEnvironment`
-  into those sixteen resources. It runs as a small **pipeline** of three steps: load the cluster's
+  into those seventeen resources. It runs as a small **pipeline** of three steps: load the cluster's
   constants, render all the resources from your claim, then mark everything ready.
 - The cluster's constants — the account IDs, the registry URL, the base domain, the permissions boundary
   — are **not** in your claim (that's why the claim stayed clean). They're injected from a per-cluster
@@ -422,7 +424,7 @@ If you keep one page, keep this:
   the kitchen that builds it.
 - **The behavior (the important part):** *level-triggered reconciliation* — the loop keeps reality
   matching the claim, forever. It self-heals; a stuck resource is a gap being retried, not a dead one.
-- **What you get:** ~16 real resources across the cluster **and** two AWS accounts, from nine lines —
+- **What you get:** ~17 real resources across the cluster **and** two AWS accounts, from a dozen lines —
   still `True` weeks later.
 - **Where:** the **preprod** workload cluster (federated), with **ECR** as the one cross-account hop.
 - **The one command:** `kubectl --context preprod get xenvironment alpha-shop-dev`.
@@ -435,7 +437,7 @@ Close this doc and see if you can answer these. If you can, you've got it:
 2. When your service's namespace appears, *what* created it — ArgoCD, Crossplane, or the Composition?
    (Careful — it's a chain.)
 3. What does **reconcile** mean, and why does it mean the environment self-heals?
-4. Your claim is nine lines but the ECR repo needs an account ID and registry URL. Where do those come
+4. Your claim is a dozen lines but the ECR repo needs an account ID and registry URL. Where do those come
    from, if not the claim?
 5. Which cluster runs the Environment API, and why *not* the hub?
 

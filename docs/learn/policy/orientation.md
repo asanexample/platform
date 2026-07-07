@@ -115,7 +115,9 @@ Two mechanics make mutate work in practice, and both are worth knowing:
 - **Autogen.** You write a policy about *pods* — but your workload is a Deployment, which makes a ReplicaSet,
   which makes pods. Kyverno **auto-generates the controller variants** of a pod rule, so one pod policy
   covers Deployments, StatefulSets, Jobs (and Rollout pods) without you writing each variant. That's why the
-  rejection above showed `autogen-` prefixes — the pod rule, auto-applied at the Deployment level.
+  rejection above lists the *same* pod-policy names against a Deployment — autogen applies each pod rule at
+  the Deployment level under a renamed inner rule (e.g. `autogen-require-pod-probes`), which the trimmed `…`
+  lines here elide.
 - **The GitOps drift gotcha you *will* hit.** Because mutate rewrites your resource on the way in, the object
   in the cluster no longer matches the manifest in git — so ArgoCD sees the injected securityContext as
   *drift* and tries to revert it, and now the policy engine and the GitOps engine are fighting over the same
@@ -148,8 +150,10 @@ teams:
   applied everywhere.
 - **Per-product policies** are *derived*, not hand-written. `restrict-images-alpha-shop-dev` ("shop may only
   run shop's images") and `restrict-route-hostnames-…` ("shop may only claim its own hostnames") are
-  generated **per environment from the `Product` registry** — the platform reads each Product's declared
-  repo/domains and stamps out the scoping policy. The policy module itself contains *zero* team-specific
+  generated **per environment by the [Environment Composition](../environment-api/orientation.md)** — it
+  reads each `XEnvironment` claim's team/product (the ECR path and its allowed hostnames) and stamps out the
+  scoping policy. (The `Product`-registry `fileset`+`yamldecode` derivation applies to the platform-owned
+  `verify-images`/`verify-attestations` policies below.) The policy module itself contains *zero* team-specific
   values ([ADR-014](../../adrs/014-kyverno-as-policy-engine.md)); teams come and go by changing the registry,
   not the engine.
 - And there's an **ownership split** ([ADR-046](../../adrs/046-back-stack-for-developer-self-service.md)): the

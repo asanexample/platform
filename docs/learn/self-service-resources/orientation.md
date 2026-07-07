@@ -75,12 +75,16 @@ And here's what's **live on preprod right now** — all four provisioned and *re
 throwaway demo):
 
 ```console
-$ kubectl -n alpha-conformance-dev get bucket.s3 queue.sqs topic.sns table.dynamodb
-NAME                              READY   EXTERNAL-NAME
-alpha-conformance-dev-…(bucket)   True    refplat-alpha-conformance-dev-blob-7d258453
-alpha-conformance-dev-…(queue)    True    refplat-alpha-conformance-dev-jobs-d5c2d549
-alpha-conformance-dev-…(topic)    True    refplat-alpha-conformance-dev-events-51b1a7ce
-alpha-conformance-dev-…(table)    True    refplat-alpha-conformance-dev-sessions-982701e1
+# one comma-joined, fully-qualified arg — the short form (`bucket.s3`) makes kubectl
+# read the rest as resource *names* and fail; see the Reference for why.
+$ kubectl -n alpha-conformance-dev get \
+    bucket.s3.aws.m.upbound.io,queue.sqs.aws.m.upbound.io,topic.sns.aws.m.upbound.io,table.dynamodb.aws.m.upbound.io
+NAME                             SYNCED  READY  EXTERNAL-NAME
+…/alpha-conformance-dev-…(bucket)   True  True   refplat-alpha-conformance-dev-blob-7d258453
+…/alpha-conformance-dev-…(queue)    True  True   https://sqs.us-east-1.amazonaws.com/<workload-acct>/refplat-alpha-conformance-dev-jobs-d5c2d549
+…/alpha-conformance-dev-…(topic)    True  True   refplat-alpha-conformance-dev-events-51b1a7ce
+…/alpha-conformance-dev-…(table)    True  True   refplat-alpha-conformance-dev-sessions-982701e1
+# (kubectl prints one table per kind; collapsed here. A trailing AGE column is elided.)
 ```
 
 Four real AWS resources, from four lines of intent. But the resources are only half of it — the *reach* is
@@ -122,9 +126,10 @@ This is where "self-service" stops being scary. Everything below the claim is **
 non-overridable** — you *can't* get it wrong because you don't configure it at all:
 
 - **The resource is hardened by default.** For the S3 bucket: public access blocked, **TLS-only** (a bucket
-  policy denies any non-HTTPS request), versioning on, region pinned, and **encrypted** (standard tier uses
-  service-managed encryption — SSE-S3 / SSE-SQS / DynamoDB default; regulated tiers get a per-team KMS key
-  for cryptographic tenancy isolation). You didn't ask for any of that; you can't turn it off.
+  policy denies any non-HTTPS request), versioning on, region pinned, and **encrypted** — every engine uses
+  service-managed encryption (SSE-S3 / SSE-SQS / SNS `alias/aws/sns` / DynamoDB default). (Per-team KMS CMKs
+  for regulated tiers — cryptographic tenancy isolation — are *designed but not yet built*; the Composition
+  comments mark that path deferred.) You didn't ask for any of that; you can't turn it off.
 - **The IAM is *derived*, least-privilege, and resource-scoped.** This is the part that usually goes wrong by
   hand, and here you never touch it. From `access: readwrite`, the platform generates an IAM policy scoped to
   **exactly this one resource's ARN**, with exactly the verbs that level implies:
