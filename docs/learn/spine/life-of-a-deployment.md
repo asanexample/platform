@@ -467,7 +467,7 @@ control plane): [The Life of a Request](life-of-a-request.md).
 - [Policy & admission](../policy/orientation.md) (Kyverno: validate/mutate/generate) *(built)*.
 - [Identity & access](../identity/orientation.md) (Keycloak + Pod Identity + temporary power) *(built)*.
 - [Supply chain](../supply-chain/orientation.md) (signing + provenance + verify) *(built)*.
-- Coming: Observability · Nodes & networking.
+- [Foundations](../foundations/orientation.md) — the substrate (accounts · network · cluster · nodes · access) *(built)*. Coming: Observability.
 
 **Source of truth (as-built):**
 [Promotion & Release](../../architecture/promotion-and-release.md) ·

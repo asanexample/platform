@@ -32,18 +32,20 @@ The docs that tie the per-module courses into a whole. Not subsystem modules —
 
 ## 1 · Foundations — a sub-curriculum
 
-The substrate everything sits on — and, like observability, broad enough to be its own sub-curriculum. Two
-axes: the **AWS estate** (accounts · IaC · networking) and the **cluster** (CNI · nodes · ingress · access).
-The first cut:
+The substrate everything sits on — broad enough to be its own sub-curriculum. **✅ Built** as
+[Foundations](foundations/): an orientation *tour of the whole substrate* + five deep dives (the account
+model & SCPs · infrastructure-as-code · networking · the cluster & Cilium · nodes, scaling & access) covering
+all six areas below. Two axes: the **AWS estate** (accounts · IaC · networking) and the **cluster** (CNI ·
+nodes · ingress · access):
 
 | Module | Covers | Status |
 | --- | --- | --- |
-| **Accounts & IaC** | multi-account AWS (orgs, OUs, SCPs), the IAM role model, OpenTofu + Terragrunt, remote state, SOPS secrets, CloudTrail (ADR-001/003/004/005/007/016/066) | ⏳ |
-| **Networking** | VPCs, Transit Gateway hub-spoke, CIDR strategy, cross-VPC DNS, private connectivity (ADR-015/034/035) | ⏳ |
-| **The cluster & CNI** | EKS (private API), component separation, Cilium CNI + kube-proxy replacement (ADR-008/009/010) | ⏳ |
-| **Nodes & compute** | managed node groups, Karpenter, the descheduler, elasticity (ADR-023/078/093) | ⏳ |
-| **Ingress & traffic** | Gateway API + HTTPRoute, cert-manager, external-dns, the NLB, hostname convention, TLS (ADR-017/022/029/030/060/061) | ⏳ |
-| **Cluster access** | the private-only endpoint, Tailscale, SSM bastion (ADR-010/011/020) | ⏳ |
+| **Accounts & IaC** | multi-account AWS (orgs, OUs, SCPs), the IAM role model, OpenTofu + Terragrunt, remote state, SOPS secrets, CloudTrail (ADR-001/003/004/005/007/016/066) | ✅ |
+| **Networking** | VPCs, Transit Gateway hub-spoke, CIDR strategy, cross-VPC DNS, private connectivity (ADR-015/034/035) | ✅ |
+| **The cluster & CNI** | EKS (private API), component separation, Cilium CNI + kube-proxy replacement (ADR-008/009/010) | ✅ |
+| **Nodes & compute** | managed node groups, Karpenter, the descheduler, elasticity (ADR-023/078/093) | ✅ |
+| **Ingress & traffic** | Gateway API + HTTPRoute, cert-manager, external-dns, the NLB, hostname convention, TLS (ADR-017/022/029/030/060/061) | ✅ |
+| **Cluster access** | the private-only endpoint, Tailscale, SSM bastion (ADR-010/011/020) | ✅ |
 
 *Likely finer as built: **State bootstrap** (greenfield) and **DNS architecture** could stand alone —
 module or deep dive, decided then.*
@@ -177,8 +179,8 @@ Rough order, and it's **debt-driven** — build what the *existing* docs already
    Identity / Observability…").
 2. **The crosslink-debt modules — ✅ DONE.** **Delivery**, **Policy & admission**, and **Identity & access**
    are built — the provisioning → delivery → policy → identity loop the spine forward-referenced is closed.
-   (**Foundations** still owes the multi-account reference.)
-3. **← WE ARE HERE: breadth on demand** — Foundations, Observability, Cost, the Agentic platform, Developer
+   (**Foundations** is now built too — the whole substrate (orientation + 5 deep dives).)
+3. **← WE ARE HERE: breadth on demand** — Observability, Cost, the Agentic platform, Developer
    experience, Operations. (The quick adjacent win **Self-service cloud resources** — extending the
    Environment API module — is now built.) Pulled in as a real reader, a demo, or interest calls for them; no obligation to
    build all 24.
