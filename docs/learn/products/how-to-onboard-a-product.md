@@ -14,8 +14,10 @@ platform**; read the [orientation](orientation.md) first for the *why*.
 - **A Team to own the Product.** Products are owned by a Team (`gitops/teams/<team>.yaml`). If your team
   isn't in `gitops/teams/`, onboard it first (a Team is a similar small registry file). Check with
   `ls gitops/teams/`.
-- **A GitHub repo for the app**, in the `asanexample` org. One Product = one repo (it's the supply-chain
-  trust anchor). Multiple deployable Services can live in that one repo.
+- **A repo? Only if you're bringing your own.** The **scaffolder creates the repo for you** (Path A) — you do
+  *not* need one first; it seeds a new `<team>-<product>` repo from the golden starter. You only need an
+  existing repo for the manual Path B. Either way: **one Product = one repo** (the supply-chain trust anchor);
+  multiple Services live in that one repo.
 - **A name.** The Product's `metadata.name` is `<team>-<product>` (e.g. `alpha-shop`), lowercase-kebab.
 
 ## New to the platform? The 60-second model
@@ -33,18 +35,27 @@ You do not provision any of it by hand. Your whole job here is to write one good
 
 ---
 
-## Path A — the Backstage scaffolder (recommended)
+## Path A — the Backstage scaffolder (recommended): repo-on-demand
 
-The paved path is the **New Product** template in the developer portal (a Backstage
-[software template](https://backstage.io/docs/features/software-templates/)):
+The paved path is the **New Product**
+[software template](https://backstage.io/docs/features/software-templates/) — and it doesn't just write a
+registry file, it **creates your application**:
 
-1. In Backstage, go to **Create → New Product**.
-2. Fill the form (team, product name, repo, tenancy, isolation).
-3. It opens a **pull request** adding your registry file for you. Skip to
-   [What happens on merge](#what-happens-on-merge).
+1. In Backstage, **Create → New Product**.
+2. Fill the form: **team** (your membership is verified server-side — you can only create for your own team),
+   **product** name, first **service** (usually `web`), and **language** (Go / Java / Node / Python / Ruby /
+   Rust).
+3. The template then does the work for you:
+   - **creates a new GitHub repo `<team>-<product>`**, seeded from the platform **golden starter** — a working
+     app + Dockerfile in your language, the k8s manifests, and the **supply-chain CI already wired** to the
+     shared build-sign pipeline (your first push builds, signs, and attests with zero setup);
+   - assigns it to your GitHub **team** (the `<team>-` prefix is also the supply chain's unspoofable team
+     identity — [ADR-072](../../adrs/072-app-repo-naming-and-team-ownership.md));
+   - **opens a platform PR** with your `Product` registry file **and** a first **dev Environment claim**.
+4. Review + merge that PR → [What happens on merge](#what-happens-on-merge). Because the CI is pre-wired and a
+   dev Environment is claimed, you're moments from a running app — not just a registry entry.
 
-If the portal's handy, use it — it fills the schema in correctly. If you'd rather see exactly what it writes
-(or you're scripting it), do Path B.
+Want to see exactly what gets written, or bringing an existing repo? Use Path B.
 
 ## Path B — a direct registry PR (what the form writes)
 
@@ -104,12 +115,14 @@ come:
 
 ## Then what — from registered to running
 
-Registering the Product is day one. To actually ship:
+**Via the scaffolder (Path A), the first two below are already done for you** — the golden-starter repo ships
+with supply-chain CI wired, and the PR included a dev Environment claim. For a **bring-your-own repo (Path
+B)**, or to add more stages, do them explicitly:
 
-1. **Wire your app's CI** to the shared signing pipeline so its images are signed + attested (the push role
-   is ready; now produce trustworthy images). → the `supply-chain-onboarding` skill /
-   [Supply chain](../supply-chain/orientation.md).
-2. **Create an Environment** — a Product *at a stage* (`alpha-checkout-dev`) via an `XEnvironment` claim.
+1. **Wire your app's CI** to the shared signing pipeline so its images are signed + attested (Path A: already
+   wired). → the `supply-chain-onboarding` skill / [Supply chain](../supply-chain/orientation.md).
+2. **Create an Environment** — a Product *at a stage* (`alpha-checkout-dev`) via an `XEnvironment` claim
+   (Path A: a dev one was claimed for you; add test / staging / prod the same way).
    → the `environment-onboarding` skill / [Environment API](../environment-api/orientation.md).
 3. **Deploy + promote** across stages. → [Delivery](../delivery/orientation.md).
 

@@ -1,9 +1,9 @@
 # Learn: Onboarding a Product — orientation
 
-How a whole new application gets onto the platform — its container registry, its CI's permission to push, its
-supply-chain policies, and its continuous delivery — from **one file in git**, with nothing hand-wired per
-app. This is the "day one" paved road: the difference between onboarding an app in minutes and filing a week
-of tickets.
+How a whole new application gets onto the platform — the **repo itself** (created on demand, pre-wired for
+CI), its container registry, its supply-chain policies, and its continuous delivery — from a form (or one file
+in git), with nothing hand-wired per app. This is the "day one" paved road: the difference between onboarding
+an app in minutes and filing a week of tickets.
 
 **Audience:** platform engineers, and team leads onboarding a new product. It sits on top of
 [the domain model](../domain-model/orientation.md) (Team / Product / Service / Environment) — read that first
@@ -116,20 +116,29 @@ projects it outward.** Learn it once, and every subsystem is less surprising.
 > re-federates to the new repo, the verify policies re-anchor their trust, and delivery keeps flowing. The
 > whole point of a single source is that a change happens in exactly one place.)*
 
-## The paved road — how a Product actually gets registered
+## The paved road — repo-on-demand, not just a registry entry
 
-You don't hand-author that file from memory. The onboarding flow is a paved road:
+You don't hand-author anything from memory, and — this is the part worth dwelling on — you don't even bring a
+repo. The Backstage **New Product** scaffolder *creates the application for you*:
 
-1. **Author the registry entry** — via the Backstage **New Product** scaffolder (a form → a pull request) or
-   a direct PR adding `gitops/products/<team>/<product>.yaml`.
-2. **The gitops gate validates it** on the PR — the team exists, the schema is right, the repo/tenancy are
-   sane — *before* merge.
-3. **On merge, the reconciler applies the derivations** — `reconcile-on-product-merge.yml` runs the
-   `github-oidc`, `policy`, and `argocd-apps` units so the ECR repo, push role, policies, and delivery apps
-   come into being automatically. (No human runs a `terragrunt apply` for a routine onboarding.)
+1. **You fill a form** — team (membership verified server-side, so you can only create for your *own* team),
+   product name, first service, and **language** (Go, Java, Node, Python, Ruby, Rust).
+2. **It creates a new GitHub repo, `<team>-<product>`**, seeded from the platform's **golden starter** — a
+   working app skeleton + Dockerfile in your language, the Kubernetes manifests, and the **supply-chain CI
+   already wired** to the shared signing pipeline. The repo is assigned to your GitHub **team**, and that
+   `<team>-` name prefix *is* the unspoofable team identity the supply chain trusts
+   ([ADR-072](../../adrs/072-app-repo-naming-and-team-ownership.md)). This is **repo-on-demand**: you don't
+   wire up a repo, you get one that already builds, signs, and deploys.
+3. **It opens a platform PR** adding your `Product` registry file *and* a first **dev Environment claim** — so
+   registering the Product and standing up its first environment are one action.
+4. **The gitops gate validates** that PR (team exists, schema, repo/tenancy sane) *before* merge; **on merge**,
+   `reconcile-on-product-merge.yml` applies the [three derivations](#the-three-derivations--where-the-footprint-comes-from)
+   (the ECR repos, push role, policies, delivery apps) — no human runs a `terragrunt apply`.
 
-So the developer experience is: *fill a form (or open a small PR), get it reviewed, merge — and your product
-exists on the platform.* The safety (validation) is on the PR; the realization (derivation) is on merge.
+So the real day-one experience is: *fill a form → review a PR → merge → you have a repo that already
+builds+signs, a registered Product, and a running dev environment.* (Prefer to bring your own repo, or script
+it? A direct registry PR works too — see the [how-to](how-to-onboard-a-product.md); you then point `spec.repo`
+at your existing repo and wire its CI yourself.)
 
 ## Where a Product fits — the objects around it
 
