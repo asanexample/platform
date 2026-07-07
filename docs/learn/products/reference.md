@@ -19,7 +19,7 @@ Look-up, not a lesson. Build the model in the [orientation](orientation.md) firs
 The **Team** (`gitops/teams/<team>.yaml`) owns Products and sets the **envelope** (allowed stages, quota
 caps, self-service `allowedEngines`) that bounds them.
 
-## The three derivations (registry → footprint)
+## The derivations (registry → footprint)
 
 Each unit does `fileset` + `yamldecode` over `gitops/products/**` and derives per Product:
 
@@ -27,7 +27,8 @@ Each unit does `fileset` + `yamldecode` over `gitops/products/**` and derives pe
 | --- | --- | --- |
 | **`github-oidc`** | a CI push role (GitHub OIDC-federated, keyless) → push to the Product's ECR | `spec.repo` — the role trusts *only* that repo |
 | **`policy`** | `verify-images-product-<p>` + `verify-attestations-product-<p>` (signed + attested, from the repo) | `spec.repo` |
-| **`argocd-apps`** | one AppProject + ApplicationSet per Product → fans out an ArgoCD App per Environment | `metadata.name`, `spec.team`; reads `gitops/environments/**` |
+| **`argocd-apps`** | one AppProject + ApplicationSet per Product → fans out an ArgoCD App per Environment that has a Release | `metadata.name`, `spec.team`; the git-files generator fans out over `gitops/releases/<team>/<product>/*.yaml` (one App per Environment that has a Release) |
+| **`github-teams`** | the owning org-Team's `push` grant on the `<team>-<product>` repo (ADR-072) | `spec.repo` (bare repo name), `spec.team` |
 
 Per-**Service** ECR repos are `team-<team>/<product>-<svc>`. (The v2 `teams.hcl` these replaced is retired —
 ADR-069.)
@@ -38,7 +39,7 @@ ADR-069.)
 2. **Validate** — the **gitops gate** (`gitops-gate.yml`) checks team-exists / schema / repo / tenancy on the
    PR, before merge.
 3. **Reconcile** — on merge, `reconcile-on-product-merge.yml` waits for merge then dispatches
-   `registry-reconcile` (a privileged apply of `github-oidc` / `policy` / `argocd-apps`) — the derived units
+   `registry-reconcile` (a privileged apply of `github-oidc` / `policy` / `argocd-apps` / `github-teams`) — the derived units
    *don't exist* until this runs. No manual `terragrunt apply` for routine onboarding.
 
 ## Gotchas that teach

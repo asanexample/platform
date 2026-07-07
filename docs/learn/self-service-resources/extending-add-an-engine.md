@@ -216,9 +216,24 @@ provider_services = ["ecr", "iam", "eks", "s3", "sqs", "sns", "dynamodb", "kines
 
 ## Step 7 — show it in the developer portal
 
-The Backstage `platform-projection` provider turns each declared resource into a catalog `Resource` entity.
-Add your engine to its engine→type map (e.g. `kinesis → kinesis-stream`) so a developer sees their stream in
-the portal, `dependencyOf` their service. The projection is otherwise cloud-neutral — one line.
+Two edits, in two different repos:
+
+1. **Catalog entity (Backstage app image, *out of this repo*).** The `platform-projection` provider turns
+   each declared resource into a catalog `Resource` entity. Add your engine to its engine→type map (e.g.
+   `kinesis → kinesis-stream`) so a developer sees their stream in the portal, `dependencyOf` their service.
+   That map lives in the separate Backstage **app** image (the `asanexample/backstage` repo), not in this
+   infra repo — so it isn't an edit you make here.
+
+2. **Live MR status on the Kubernetes tab (*this* repo).** To surface the new MR's Ready/Syncing status on
+   the environment's catalog Kubernetes tab, add its group + plural to the hardcoded `customResources` list
+   in `infra/modules/backstage/main.tf` (today: buckets/queues/topics/tables only):
+
+   ```hcl
+   { group = "kinesis.aws.m.upbound.io", apiVersion = "v1beta1", plural = "streams" },
+   ```
+
+   Omit this and the resource provisions fine but never appears on the tab. The rest of the projection is
+   cloud-neutral.
 
 ## Step 8 — guard it with tests
 

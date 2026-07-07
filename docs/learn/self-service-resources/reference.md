@@ -38,9 +38,13 @@ Generated from `access`, scoped to **that one resource's ARN**, appended to the 
 
 - **S3:** PublicAccessBlock, **TLS-only** (`DenyInsecureTransport` bucket policy), Versioning,
   OwnershipControls, region-pinned, encrypted.
-- **All engines:** encrypted + `DenyInsecureTransport`. **Encryption tiered:** `standard` → service-managed
-  (SSE-S3 / SSE-SQS / DynamoDB default, zero key ops); `elevated`/`pci`/`hipaa` → **per-team KMS CMK**
-  (cryptographic tenancy isolation, key policy scoped to the team's roles).
+- **All engines:** encrypted + `DenyInsecureTransport`. Encryption today is **service-managed for every
+  engine** (SSE-S3 / SSE-SQS / SNS `alias/aws/sns` / DynamoDB default, zero key ops).
+
+> **Designed, not yet built:** per-tier encryption — `elevated`/`pci`/`hipaa` → a **per-team KMS CMK**
+> (cryptographic tenancy isolation, key policy scoped to the team's roles). The Composition currently uses
+> service-managed keys unconditionally; its comments mark the CMK path deferred, so this is not part of the
+> non-overridable floor yet.
 
 ## Consumption
 

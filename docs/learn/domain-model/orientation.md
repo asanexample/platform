@@ -93,7 +93,7 @@ Let's walk a real team down the tree and across the grid. Everything below is li
 
 ```console
 $ kubectl --context preprod get teams
-NAME       SSO GROUP   STAGES
+NAME       SSO GROUP   STAGES                                  ENVIRONMENTS
 alpha      Dev-alpha   ["dev","test","uat","staging","prod"]
 bravo      Dev-bravo   ["dev","test","uat","staging","prod"]
 platform   Platform    ["dev","prod"]
@@ -125,13 +125,13 @@ packaged, runnable build — a *container image*) is named per-product (we'll se
 **The Environments** — the grid. Each cell where a Product meets a Stage that actually exists:
 
 ```console
-$ kubectl --context preprod get xenvironment
-NAME                    SYNCED   READY   COMPOSITION   AGE
-alpha-checkout-dev      True     True    environment   16d
-alpha-conformance-dev   True     True    environment   15d
-alpha-shop-dev          True     True    environment   16d
-alpha-shop-prod         True     True    environment   5d19h
-bravo-widgets-dev       True     True    environment   6h
+$ kubectl --context preprod get xenvironment   # AGE column elided — it drifts
+NAME                    SYNCED   READY   COMPOSITION
+alpha-checkout-dev      True     True    environment
+alpha-conformance-dev   True     True    environment
+alpha-shop-dev          True     True    environment
+alpha-shop-prod         True     True    environment
+bravo-widgets-dev       True     True    environment
 ```
 
 There's the live list — the actual environments on the platform right now, across teams `alpha` and
@@ -272,7 +272,8 @@ file in a registry:
 - `gitops/environments/<team>/<product>/<stage>.yaml` — the Environment claim (what the
   [Environment API](../environment-api/orientation.md) turns into real infrastructure)
 
-A controller then **projects** each file onto every cluster — reads it and creates a matching read-only
+A controller then **projects** each file onto each cluster that runs the Environment API (today, the
+preprod workload cluster) — reads it and creates a matching read-only
 record called a [**custom resource**](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/)
 (a `Team`, a `Product`; Kubernetes lets the platform define its own kinds of record, and that's what you
 were listing with `kubectl get teams`). So the bouncer at the door

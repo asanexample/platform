@@ -58,7 +58,8 @@ Let's look at the record, then watch the three "vendors" derive from it.
 
 ## The record — a Product in the registry
 
-Here's `alpha`'s `shop`, the whole file (`gitops/products/alpha/shop.yaml`):
+Here's `alpha`'s `shop` (`gitops/products/alpha/shop.yaml`) — the essential spec, with the file's header
+comment and `metadata.labels` elided for clarity:
 
 ```yaml
 apiVersion: platform.refplat.org/v1beta1
@@ -100,6 +101,11 @@ flowchart TD
 - **`argocd-apps`** derives one **AppProject + ApplicationSet** per Product, which then fans out one ArgoCD
   Application per Environment (the delivery machinery from [Delivery](../delivery/orientation.md)).
 
+> A fourth unit, **`github-teams`**, also derives from this registry — it grants the owning org-Team `push` on
+> the `<team>-<product>` repo ([ADR-072](../../adrs/072-app-repo-naming-and-team-ownership.md)). We foreground
+> the three above because they're the per-product *footprint*; the enumerated triad elides `github-teams` (the
+> ownership grant) for clarity.
+
 All three are computed from the *same* `alpha-shop.yaml`. Change the registry, they re-derive. There's no
 second place where "the list of products" lives to drift out of sync — the classic single-source-of-truth
 win, applied to platform onboarding.
@@ -125,15 +131,19 @@ repo. The Backstage **New Product** scaffolder *creates the application for you*
    product name, first service, and **language** (Go, Java, Node, Python, Ruby, Rust).
 2. **It creates a new GitHub repo, `<team>-<product>`**, seeded from the platform's **golden starter** — a
    working app skeleton + Dockerfile in your language, the Kubernetes manifests, and the **supply-chain CI
-   already wired** to the shared signing pipeline. The repo is assigned to your GitHub **team**, and that
+   already wired** to the shared signing pipeline. The owning GitHub **team** is granted `push` on the repo
+   later — by the `github-teams` derived unit on reconcile, not at creation — and that
    `<team>-` name prefix *is* the unspoofable team identity the supply chain trusts
    ([ADR-072](../../adrs/072-app-repo-naming-and-team-ownership.md)). This is **repo-on-demand**: you don't
    wire up a repo, you get one that already builds, signs, and deploys.
 3. **It opens a platform PR** adding your `Product` registry file *and* a first **dev Environment claim** — so
    registering the Product and standing up its first environment are one action.
 4. **The gitops gate validates** that PR (team exists, schema, repo/tenancy sane) *before* merge; **on merge**,
-   `reconcile-on-product-merge.yml` applies the [three derivations](#the-three-derivations--where-the-footprint-comes-from)
-   (the ECR repos, push role, policies, delivery apps) — no human runs a `terragrunt apply`.
+   `reconcile-on-product-merge.yml` **dispatches** the `registry-reconcile` workflow, which runs the privileged
+   apply of the [derived units](#the-three-derivations--where-the-footprint-comes-from) (the push role, verify
+   policies, delivery apps, and the org-Team push grant) — no human runs a `terragrunt apply`. (The per-Service
+   ECR repos aren't part of that apply — they're provisioned by the Environment Composition when the environment
+   is claimed.)
 
 So the real day-one experience is: *fill a form → review a PR → merge → you have a repo that already
 builds+signs, a registered Product, and a running dev environment.* (Prefer to bring your own repo, or script

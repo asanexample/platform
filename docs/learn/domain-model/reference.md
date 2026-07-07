@@ -75,8 +75,10 @@ envelope:
 
 - **Stateless, hard-enforced at admission:** `tier ∈ allowedTiers`, `stage ∈ allowedStages`,
   `quota ≤ quotaCap`, `residency ⊆ allowedLocations`, image registry ⊆ the product scope.
-- **Aggregate, report-first:** sum of environment quotas ≤ cap, dedicated-isolation in use ≤
-  `maxDedicatedIsolation` — a rollup controller alerts; hard-enforced only if a team actually pushes a cap.
+- **Aggregate, report-first (designed, not yet built):** sum of environment quotas ≤ cap,
+  dedicated-isolation in use ≤ `maxDedicatedIsolation` — a rollup controller is *planned* to alert on
+  these (the stateless per-Environment checks above are live; the aggregate tier is not — nothing writes
+  `Team.status` today), and would hard-enforce only if a team actually pushes a cap.
 
 ## Tier is a floor, not a level
 

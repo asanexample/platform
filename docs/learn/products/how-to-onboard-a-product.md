@@ -49,7 +49,8 @@ registry file, it **creates your application**:
    - **creates a new GitHub repo `<team>-<product>`**, seeded from the platform **golden starter** — a working
      app + Dockerfile in your language, the k8s manifests, and the **supply-chain CI already wired** to the
      shared build-sign pipeline (your first push builds, signs, and attests with zero setup);
-   - assigns it to your GitHub **team** (the `<team>-` prefix is also the supply chain's unspoofable team
+   - the owning GitHub **team**'s `push` on the repo is granted later — by the `github-teams` derived unit on
+     reconcile, not at repo creation (the `<team>-` prefix is also the supply chain's unspoofable team
      identity — [ADR-072](../../adrs/072-app-repo-naming-and-team-ownership.md));
    - **opens a platform PR** with your `Product` registry file **and** a first **dev Environment claim**.
 4. Review + merge that PR → [What happens on merge](#what-happens-on-merge). Because the CI is pre-wired and a
@@ -101,17 +102,28 @@ merge, so mistakes never reach the cluster.
 
 ## What happens on merge
 
-You don't run `terragrunt apply`. On merge, `reconcile-on-product-merge.yml` waits for the merge, then
-dispatches the **`registry-reconcile`** workflow — a privileged apply of the three derived units. Out of it
-come:
+You don't run `terragrunt apply`. The **`registry-reconcile`** workflow does a privileged apply of the derived
+units for you — how it's triggered depends on the path:
 
-- an **ECR repository** per Service (`team-<team>/<product>-<svc>`),
+- **Path A (scaffolder):** `reconcile-on-product-merge.yml` waits for the bot's PR to merge, then **dispatches**
+  `registry-reconcile`.
+- **Path B (your own PR):** merging is an ordinary push under `gitops/products/**`, which fires
+  `registry-reconcile` **directly** (its `on: push` trigger) — the dispatcher above only handles the scaffolder
+  bot's PRs.
+
+Either way `registry-reconcile` runs, and out of it come:
+
 - a **keyless CI push role** federated to `spec.repo` (your pipeline can now push images, no stored keys),
 - the **`verify-images-product-<p>` / `verify-attestations-product-<p>`** Kyverno policies,
-- one **AppProject + ApplicationSet** ready to deliver your Environments.
+- one **AppProject + ApplicationSet** ready to deliver your Environments,
+- the owning **org-Team `push` grant** on the `<team>-<product>` repo (ADR-072).
 
-> ⚠️ **These don't exist until the reconcile runs** (not at merge instant). If the push role or policies seem
-> missing minutes after merge, check that `registry-reconcile` actually ran and succeeded.
+The per-Service **ECR repositories** (`team-<team>/<product>-<svc>`) aren't part of this apply — they're
+provisioned by the Crossplane Environment Composition when you *claim an Environment*, not by
+`registry-reconcile`.
+
+> ⚠️ **The derived units don't exist until the reconcile runs** (not at merge instant). If the push role or
+> policies seem missing minutes after merge, check that `registry-reconcile` actually ran and succeeded.
 
 ## Then what — from registered to running
 
@@ -130,7 +142,7 @@ B)**, or to add more stages, do them explicitly:
 
 - **The registry file is on `main`** and `registry-reconcile` succeeded (check the Actions run).
 - **The derived policies exist:** `kubectl --context preprod get clusterpolicy | grep <product>` shows
-  `verify-images-product-<product>`.
+  `verify-images-product-<team>-<product>`.
 - **The delivery app exists:** the `argocd-apps`/ApplicationSet has an entry for your Product.
 - **The push role exists:** an IAM role trusting `spec.repo` (visible once your CI runs an OIDC push).
 

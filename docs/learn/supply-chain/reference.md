@@ -41,8 +41,8 @@ image from the wrong repo is rejected.
 
 Kyverno fetches signature + attestations from ECR (via Pod Identity ECR-read) and enforces, **per product**:
 
-- `verify-images-product-<product>` — signed by the shared workflow, cert repo = the product's repo.
-- `verify-attestations-product-<product>` — SLSA provenance + SBOM present.
+- `verify-images-product-<team>-<product>` — signed by the shared workflow, cert repo = the product's repo.
+- `verify-attestations-product-<team>-<product>` — SLSA provenance + SBOM present.
 
 Both **Enforce on preprod** — unsigned / unattested / wrong-repo images never admit. (Platform-owned; the
 [Policy & Admission](../policy/orientation.md) module covers the admission mechanics. Per-product *image

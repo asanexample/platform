@@ -24,8 +24,8 @@ sharing machinery, zero trust between them:
 
 ### The role axes
 
-- **reach** — `team` (own team) → `platform` (org-wide).
-- **power** — `view` → `change` (deploy/operate) → `manage-access`.
+- **reach** — `team` (own team) → `platform` (org-wide) → `any` (broadest).
+- **power** — `look` (read) → `operate` → `change` (deploy) → `manage-access`.
 - **mode** — `standing` (everyday, always active) vs `on-demand` (borrowed, expires).
 - **riskTier** — `standard` … `apex` (break-glass).
 

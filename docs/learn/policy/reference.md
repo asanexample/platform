@@ -29,9 +29,10 @@ Look-up, not a lesson. Build the model in the [orientation](orientation.md) firs
   `…/team-<team>/<product>-*` images) and `restrict-route-hostnames-<…>` (only the Environment's hostnames).
   **Owned by the [Environment Composition](../environment-api/orientation.md)** (ADR-046) — rendered with the
   namespace.
-- **Supply chain (Phase 3, cosign keyless, Enforce):** `verify-images-product-<product>` (signed) +
-  `verify-attestations-product-<product>` (SBOM + SLSA provenance). Platform-owned, per product.
-- **Governance:** `restrict-environment-control-plane` (only the ArgoCD role may create `XEnvironment`s),
+- **Supply chain (Phase 3, cosign keyless, Enforce):** `verify-images-product-<team>-<product>` (signed) +
+  `verify-attestations-product-<team>-<product>` (SBOM + SLSA provenance). Platform-owned, per product.
+- **Governance:** `restrict-environment-control-plane` (only platform principals — GitOps/ArgoCD,
+  `crossplane-system`, and the deployer — may manage `XEnvironment`/`ProviderConfig`; environments cannot),
   `restrict-environment-envelope`, `restrict-over-budget-provisioning`.
 
 Full per-cluster catalog + status: [`kyverno-policy-catalog.md`](../../architecture/kyverno-policy-catalog.md).
