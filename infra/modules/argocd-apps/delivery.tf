@@ -56,6 +56,12 @@ resource "kubernetes_manifest" "product_appproject" {
         { group = "batch", kind = "CronJob" },
         { group = "gateway.networking.k8s.io", kind = "HTTPRoute" },
         { group = "external-secrets.io", kind = "ExternalSecret" },
+        # A service declares who may call it: tenants author their own east-west allow-rules (and, ADR-057
+        # Phase 2, mutual-auth CiliumNetworkPolicies). Namespaced + ADDITIVE — a tenant can only open ingress
+        # to its OWN pods; it cannot remove the Composition's default-deny or the IMDS egressDeny (a Cilium
+        # egressDeny takes strict precedence over every allow), and it cannot affect another namespace.
+        { group = "networking.k8s.io", kind = "NetworkPolicy" },
+        { group = "cilium.io", kind = "CiliumNetworkPolicy" },
       ]
     }
   }
