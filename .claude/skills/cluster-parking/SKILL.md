@@ -99,6 +99,17 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-06 (end-of-day PARK) — overnight park of both clusters after the Monday unpark + the two platctl
+  fixes that came out of it landed (DB-recovery #1183, race-test #1186). ✅ Clean, cost-zero, unremarkable.**
+  Rebuilt `./bin/platctl` from freshly-pulled `main` FIRST (so the park ran the current binary), then
+  `AWS_PROFILE=management ./bin/platctl down --env <env> --yes` each in parallel. Same reliable split as every
+  prior cycle: **preprod** clean ("Karpenter nodes drained and terminated" + "EC2NodeClass deleted", 1 node
+  force-terminated); **platform** the usual slow-drain warnings (NodeClaims 6m / EC2NodeClass 90s) then `system`→0
+  - 3 nodes force-terminated. Both bastions auto-stopped. **Cost-zero verified:** both `system` node groups
+  `desiredSize=0`, **0 running/pending instances in both accounts**, bastions `stopping`/`stopped`. NOTE: the
+  #1183 DB-recovery fix is a *down/up asymmetry* fix that only exercises on **unpark** — this park doesn't test
+  it; watch the NEXT `up` to confirm backstage self-heals (esp. if it's another cold/overnight gap).
+
 - **2026-07-06 — UNPARK both clusters after a weekend park (parked 2026-07-03 eve → restored Mon). ✅ Restored,
   but the pod-readiness sweep did the real work: `up`'s DB-client recovery (#1105) DID NOT auto-restart backstage
   this cycle — it was left stuck and I recovered it (plus a cascade of startup-ordering victims) by hand.** The
