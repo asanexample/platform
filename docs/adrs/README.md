@@ -151,4 +151,4 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-079: Cloud-Resource Monitoring Scope — Query-Time-First in Grafana](079-cloud-resource-monitoring-scope.md) | Accepted |
 | [ADR-054: Platform Resilience & Business Continuity](054-platform-resilience-and-business-continuity.md) | Proposed |
 | [ADR-055: Compliance Assurance & Continuous Control Evidence](055-compliance-assurance-and-continuous-control-evidence.md) | Proposed |
-| [ADR-057: Service Identity & East-West Zero Trust (mTLS)](057-service-identity-and-east-west-zero-trust.md) | Proposed |
+| [ADR-057: Service Identity & East-West Zero Trust (mTLS)](057-service-identity-and-east-west-zero-trust.md) | Accepted (Phase 1 encryption live both clusters; Phase 2 mutual-auth/SPIFFE showcase live preprod, 2026-07-07) |

@@ -35,6 +35,7 @@ configuration hierarchy that promotes consistency across environments.
 | [Identity & Access Strategy](architecture/identity-and-access-strategy.md) | **North Star** for workforce identity: where we're going (decide→derive→project) — the forward-looking companion to Identity & SSO |
 | [PagerDuty Identity Handoff](architecture/pagerduty-identity-handoff.md) | How the IaC `pagerduty` on-call structure connects to people owned by the identity workstream (ADR-084) |
 | [Gateway & Ingress](architecture/gateway-and-ingress.md) | Cilium Gateway → NLB → cert-manager → external-dns → Kyverno hostname guard (ADR-060/061) |
+| [East-West Zero Trust](architecture/east-west-zero-trust.md) | How service-to-service traffic is secured: Cilium WireGuard encryption + mutual auth (SPIFFE/SPIRE workload identity), authoring auth-required policies, verification, and the alpha-shop↔alpha-checkout demo (ADR-057) |
 | [Secrets & External Secrets](architecture/secrets-and-external-secrets.md) | Secrets Manager → ESO ClusterSecretStore → ExternalSecret → k8s Secret; platform vs environment |
 | [Platform Domain API](architecture/platform-domain-api.md) | **Normative schema** for the ADR-067 domain model — Team / Product / Service / Environment / Customer (v1beta1; supersedes the ADR-049 tenant-api-v2) |
 | [Crossplane Environment API](architecture/crossplane-environment-api.md) | The Environment API contract: the `XEnvironment` claim and what the Composition provisions from it |

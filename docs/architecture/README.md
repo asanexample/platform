@@ -47,6 +47,7 @@ domain. These describe the as-built (and forward-looking) architecture; the oper
 | Document | Summary |
 |----------|---------|
 | [Gateway & Ingress](gateway-and-ingress.md) | How an external request reaches an environment pod: shared Cilium Gateway → NLB → cert-manager → external-dns (ADR-060/061) |
+| [East-West Zero Trust](east-west-zero-trust.md) | How service-to-service traffic is secured: Cilium WireGuard encryption + mutual auth with SPIFFE/SPIRE workload identity, the auth-required policy, and the alpha-shop↔alpha-checkout demo (ADR-057) |
 | [Secrets & External Secrets](secrets-and-external-secrets.md) | How a Secrets Manager secret reaches a pod via ESO with no long-lived cluster credential |
 
 ## Foundation
