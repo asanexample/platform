@@ -418,7 +418,7 @@ If something feels off, it's probably one of these — the wrong models people m
 
 If you keep one page, keep this:
 
-- **What you write:** a ~9-line `XEnvironment` claim — team, product, stage, services. Desired state, no
+- **What you write:** a ~12-line `XEnvironment` claim — team, product, stage, services. Desired state, no
   plumbing.
 - **The three players:** **XRD** = the menu (what's allowed) · **claim** = your order · **Composition** =
   the kitchen that builds it.

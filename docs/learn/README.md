@@ -41,9 +41,9 @@ Each subsystem is a short course: an **Orientation** (a guided journey you read 
 | **[*Spine:* The Security Model](spine/the-security-model.md)** — the same layers as concentric defenses (defense in depth) | ✅ available |
 | **[*Spine:* Why the Platform Exists](spine/why-the-platform-exists.md)** — the North Star behind all the machinery | ✅ available |
 
-> The portal is being built **one subsystem at a time**, proving the format before scaling. The domain
-> model (the foundation) and the Environment API (the first worked subsystem) exist today; the planned
-> modules are listed so the shape of the whole is visible, not because they exist yet.
+> The portal is being built **one subsystem at a time**, proving the format before scaling. The modules
+> marked ✅ available exist today; those marked ⏳ planned are listed so the shape of the whole is visible,
+> not because they exist yet.
 
 ## Reference aids
 

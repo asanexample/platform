@@ -30,7 +30,7 @@ Here's the whole model, and it's the sentence ADR-073 is built around:
 > **Abstraction lives *above* the claim; safety lives *below* it.** You declare the resource you want as
 > **abstract intent** in your Environment claim — *what*, not *how*. The platform provisions it
 > **safe-by-construction** and **derives the exact least-privilege IAM** to reach it. You never write IAM;
-> you never harden a bucket; you never see an access key.**
+> you never harden a bucket; you never see an access key.
 
 That split is the trick. *Above* the claim, the front door can be anything — a Backstage form, a pull
 request, a natural-language agent — because they all just produce the same **governed claim**. *Below* the

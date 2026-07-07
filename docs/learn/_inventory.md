@@ -8,9 +8,9 @@
 > tiers — deep dive · tutorial · cheatsheet · troubleshooting — are added **only where a subsystem earns
 > them** (see [the mold](_mold.md)); a typical module is two files, not seven.
 >
-> **This is aspirational.** It's the full map, not a committed backlog. **The spine is complete** and **five
-> modules** are built (domain model, Environment API, Delivery, Policy, Identity & access) — the crosslink-debt
-> trio is done; the near-term is now breadth on demand (a real reader, a demo, interest). Granularity is a
+> **This is aspirational.** It's the full map, not a committed backlog. **The spine is complete** and **ten
+> modules** are built (domain model, Onboarding a Product, Environment API, Self-service resources, Delivery,
+> Policy, Identity & access, Supply chain, Foundations, Observability) — the near-term is now breadth on demand (a real reader, a demo, interest). Granularity is a
 > guess; modules will split and merge as we build. **Audience** is decided *per module* at build time, not
 > per domain — most are platform-engineer-facing; the genuinely developer-facing ones are called out in the
 > notes.
