@@ -148,7 +148,7 @@ What we steer by. Items link their tracking issue; see [GitHub Issues](https://g
 - [#365](https://github.com/asanexample/platform/issues/365) P4.4 (ADR-068): Fan-out — ArgoCD RBAC + Backstage permissions from product roles
 - [#367](https://github.com/asanexample/platform/issues/367) P4.6 (ADR-068): team-admin governance + grant lifecycle (request/TTL/re-attest)
 - [#368](https://github.com/asanexample/platform/issues/368) P4.7 (ADR-068): Two-plane grant enforcement (access-grant-gate CI + Kyverno)
-- **East-west zero-trust mTLS / service identity** — Decided (ADR-057), not yet built. Service identity + east-west mTLS zero-trust between workloads.
+- **East-west zero-trust (ADR-057)** — **Phase 1 (WireGuard transparent encryption): shipped + live on both clusters 2026-07-07** ([#162](https://github.com/asanexample/platform/issues/162); fleet-default, pod-to-pod; verified `Encryption: Wireguard` + end-to-end HTTP 200 through the encrypted mesh). **Phase 2 (Cilium mTLS + SPIFFE workload identity): decided, not yet built** — regulated-tier only, needs the Cilium-mTLS-vs-SPIRE spike.
 
 #### Governance & Supply-chain
 
