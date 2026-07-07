@@ -351,11 +351,11 @@ ADR-017/060).*
 
 The deploy "finished" — but the platform's attention doesn't move on. From its first breath, the pod emits
 **signals**: metrics (how many requests, how fast, how many errors), traces (the path of a request across
-services), and logs. A lot of this is collected *automatically*, without you hand-instrumenting much,
+services), logs, and profiles. A lot of this is collected *automatically*, without you hand-instrumenting much,
 because the platform's observability stack watches every workload. (The open standard underneath is
 [**OpenTelemetry**](https://opentelemetry.io/docs/).)
 
-Remember: this is the *same* stream of data the Rollout's canary analysis used two steps ago to decide the
+Remember: this is the *same* stream of data the Rollout's canary analysis used three steps ago to decide the
 new version was safe. Observability isn't a passive dashboard you check after the fact — it's the platform's
 *live nervous system*, feeding decisions in real time.
 
@@ -467,7 +467,7 @@ control plane): [The Life of a Request](life-of-a-request.md).
 - [Policy & admission](../policy/orientation.md) (Kyverno: validate/mutate/generate) *(built)*.
 - [Identity & access](../identity/orientation.md) (Keycloak + Pod Identity + temporary power) *(built)*.
 - [Supply chain](../supply-chain/orientation.md) (signing + provenance + verify) *(built)*.
-- [Foundations](../foundations/orientation.md) — the substrate (accounts · network · cluster · nodes · access) *(built)*. Coming: Observability.
+- [Foundations](../foundations/orientation.md) — the substrate (accounts · network · cluster · nodes · access) *(built)*. [Observability](../observability/orientation.md) *(built)*.
 
 **Source of truth (as-built):**
 [Promotion & Release](../../architecture/promotion-and-release.md) ·

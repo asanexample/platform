@@ -8,9 +8,9 @@
 > tiers — deep dive · tutorial · cheatsheet · troubleshooting — are added **only where a subsystem earns
 > them** (see [the mold](_mold.md)); a typical module is two files, not seven.
 >
-> **This is aspirational.** It's the full map, not a committed backlog. **The spine is complete** and **five
-> modules** are built (domain model, Environment API, Delivery, Policy, Identity & access) — the crosslink-debt
-> trio is done; the near-term is now breadth on demand (a real reader, a demo, interest). Granularity is a
+> **This is aspirational.** It's the full map, not a committed backlog. **The spine is complete** and **ten
+> modules** are built (domain model, Onboarding a Product, Environment API, Self-service resources, Delivery,
+> Policy, Identity & access, Supply chain, Foundations, Observability) — the near-term is now breadth on demand (a real reader, a demo, interest). Granularity is a
 > guess; modules will split and merge as we build. **Audience** is decided *per module* at build time, not
 > per domain — most are platform-engineer-facing; the genuinely developer-facing ones are called out in the
 > notes.
@@ -113,17 +113,19 @@ their own. The list below is the **first cut** — top-level models — and it's
 built: continuous profiling (eBPF/Pyroscope), the collection pipeline (Alloy/OTel), and dashboards &
 correlation are each deep enough to become their own **module or deep dive**. We don't pin the leaves now.
 
+✅ **Built** as [Observability](observability/): an orientation + five deep dives (the stack & storage · collection & instrumentation · correlation & the team experience · SLOs/alerting/cost · agent observability) covering all six areas below.
+
 Keep two of these sharply distinct or they'll bleed: **the stack** is *our architecture* (how we run the
 backends); **the four signals** is vendor-neutral *signal literacy* (when to reach for a trace vs. a log).
 
 | Module | Covers | Status |
 | --- | --- | --- |
-| **The observability stack** | LGTM+P storage + Grafana, hub-and-spoke topology, the collect→store→query data flow (ADR-043/044) | ⏳ |
-| **Multi-tenancy & isolation** | per-team signal isolation — cortex-tenant, tenant-proxy (the P13 work) | ⏳ |
-| **The four signals** | metrics · logs · traces · profiles — what each is, when to reach for it, how they correlate | ⏳ |
-| **Instrumenting a workload** | auto-instrumentation (Beyla / eBPF) + OpenTelemetry (operator/collector), RED metrics, free vs. add | ⏳ |
-| **SLOs, alerting & synthetics** | Sloth SLOs, burn-rate alerts, routing → on-call, black-box + k6 synthetics (ADR-077) | ⏳ |
-| **Agent / GenAI observability** | OTel + GenAI semconv, per-invocation agent traces (ADR-076) | ⏳ |
+| **The observability stack** | LGTM+P storage + Grafana, hub-and-spoke topology, the collect→store→query data flow (ADR-043/044) | ✅ |
+| **Multi-tenancy & isolation** | per-team signal isolation — cortex-tenant, tenant-proxy (the P13 work) | ✅ |
+| **The four signals** | metrics · logs · traces · profiles — what each is, when to reach for it, how they correlate | ✅ |
+| **Instrumenting a workload** | auto-instrumentation (Beyla / eBPF) + OpenTelemetry (operator/collector), RED metrics, free vs. add | ✅ |
+| **SLOs, alerting & synthetics** | Sloth SLOs, burn-rate alerts, routing → on-call, black-box + k6 synthetics (ADR-077) | ✅ |
+| **Agent / GenAI observability** | OTel + GenAI semconv, per-invocation agent traces (ADR-076) | ✅ |
 
 *Likely finer splits as it's built: **Continuous profiling** (eBPF/Pyroscope) · **The collection
 pipeline** (Alloy / OTel collector / prometheus-agent) · **Dashboards & correlation** (Grafana, exemplars,

@@ -28,7 +28,7 @@ Each subsystem is a short course: an **Orientation** (a guided journey you read 
 | **[Environment API](environment-api/)** — how environments get provisioned (Crossplane) | ✅ available |
 | **[Self-service cloud resources](self-service-resources/)** — an S3 bucket / queue / topic / table from your claim, with derived least-privilege IAM (developer-facing) | ✅ available |
 | **[Delivery](delivery/)** — git → running across stages, safely (ArgoCD, the promotion ladder, Rollouts) | ✅ available |
-| Observability — the LGTM+P stack | ⏳ planned |
+| **[Observability](observability/)** — the platform observes your workload *for* you (LGTM+P, eBPF zero-code, correlation, SLOs, agent-obs) | ✅ available |
 | **[Policy & admission](policy/)** — the guardrail engine at the cluster door (Kyverno: validate · mutate · generate) | ✅ available |
 | **[Identity & access](identity/)** — decide once, derive everywhere, borrow dangerous power (Keycloak, Pod Identity, temporary power) | ✅ available |
 | **[Supply chain](supply-chain/)** — trust provenance, not names (keyless signing, SLSA, verify-at-admission) | ✅ available |
@@ -41,9 +41,9 @@ Each subsystem is a short course: an **Orientation** (a guided journey you read 
 | **[*Spine:* The Security Model](spine/the-security-model.md)** — the same layers as concentric defenses (defense in depth) | ✅ available |
 | **[*Spine:* Why the Platform Exists](spine/why-the-platform-exists.md)** — the North Star behind all the machinery | ✅ available |
 
-> The portal is being built **one subsystem at a time**, proving the format before scaling. The domain
-> model (the foundation) and the Environment API (the first worked subsystem) exist today; the planned
-> modules are listed so the shape of the whole is visible, not because they exist yet.
+> The portal is being built **one subsystem at a time**, proving the format before scaling. The modules
+> marked ✅ available exist today; those marked ⏳ planned are listed so the shape of the whole is visible,
+> not because they exist yet.
 
 ## Reference aids
 

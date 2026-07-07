@@ -30,7 +30,7 @@ So: **where does a new application's identity live, and how does its entire per-
 
 Here's the model, and it's the platform's single-source-of-truth instinct applied to *onboarding*:
 
-> **A Product is one declarative file in a git **registry**. It declares the essentials — who owns it, its
+> **A Product is one declarative file in a git registry. It declares the essentials — who owns it, its
 > repo, its tenancy. The platform then **derives** its entire per-product footprint from that one file: the
 > CI push role, the supply-chain policies, the delivery apps. You register the Product; you never wire the
 > pieces.**
