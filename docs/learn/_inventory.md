@@ -133,9 +133,11 @@ trace↔logs) — module or deep dive, decided then.*
 
 ## 8 · Cost & FinOps
 
+✅ **Built** as [Cost & FinOps](cost/): an orientation (framed on FinOps' Inform → Optimize → Operate) + three deep dives (the two meters · the cost levers · guardrails & the practice) + reference.
+
 | Module | Covers | Status |
 | --- | --- | --- |
-| **Cost & FinOps** | CUR→Athena true-spend, per-team budgets/guardrails, OpenCost, the FinOps operating model (ADR-091/092) | ⏳ |
+| **[Cost & FinOps](cost/)** | CUR→Athena true-spend, per-team budgets/guardrails, OpenCost, the FinOps operating model (ADR-091/092) | ✅ |
 
 ## 9 · The agentic platform — a sub-curriculum
 

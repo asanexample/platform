@@ -34,7 +34,7 @@ Each subsystem is a short course: an **Orientation** (a guided journey you read 
 | **[Supply chain](supply-chain/)** — trust provenance, not names (keyless signing, SLSA, verify-at-admission) | ✅ available |
 | **[Foundations](foundations/)** — the substrate everything runs on: AWS accounts & SCPs, IaC, networking, the private cluster & Cilium, compute, access (a sub-curriculum) | ✅ available |
 | The agentic platform — running governed AI agents | ⏳ planned |
-| Cost & FinOps | ⏳ planned |
+| **[Cost & FinOps](cost/)** — cost as an engineering signal on a loop (Inform → Optimize → Operate: two meters, the levers, budget guardrails) | ✅ available |
 | **[*Spine:* The Life of a Deployment](spine/life-of-a-deployment.md)** — one `git push` across every plane (control plane) | ✅ available |
 | **[*Spine:* The Life of a Request](spine/life-of-a-request.md)** — one user request, edge to pod (data plane) | ✅ available |
 | **[*Spine:* How the Platform Fits](spine/how-the-platform-fits.md)** — the control-plane map (the same structure at rest) | ✅ available |
