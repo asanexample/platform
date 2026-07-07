@@ -34,7 +34,7 @@ Here's the thing to hold onto, because everything else is a consequence of it:
 <!-- -->
 
 > **The metaphor for the whole doc: a hospital's patient monitoring.** The moment a patient (your workload) is
-> admitted, they're wired to monitors — heart rate, oxygen, blood pressure (the four signals) — *without the
+> admitted, they're wired to monitors — heart rate, oxygen, blood pressure, temperature (the four signals) — *without the
 > patient doing anything*. Every monitor feeds one **central nurses' station** (Grafana), where a clinician
 > can glance from a vitals blip to the chart to the meds in one place (correlation). Alarms are tuned to page
 > the *right* doctor, not the whole ward (SLOs + owner-routing). And the hospital owns its own monitors and
