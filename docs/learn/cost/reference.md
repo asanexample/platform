@@ -86,13 +86,13 @@ estimate-vs-actual reconciliation panel.
 - **LIVE + exercised:** OpenCost (both clusters), true-cost/CUR odometer (hub, #668), per-team dashboards +
   budget-utilization, burn-rate alerts, **budget-enforcer** (preprod, audit-first, deny *proven*), Karpenter
   consolidation (both), cluster parking (repeatable), descheduler (both), cost-allocation tags, Infracost
-  shift-left, AWS Budgets + Anomaly (built; **email pending-confirm**, **Slack gated-off** #1063).
-- **Designed / not built:** Backstage cost tab (ADR-091 A3); AWS **Compute Optimizer** (#1055); **kube-green**
+  shift-left, the **Backstage cost tab** (ADR-091 A3, platform#1051), AWS Budgets + Anomaly (built; **email pending-confirm**, **Slack gated-off** #1063).
+- **Designed / not built:** AWS **Compute Optimizer** (#1055); **kube-green**
   off-hours (#1057); **Cloud Custodian** janitor (#1058); platform-shared cost bucket (#1053); FinOps
   cadence/forecasting (#1059); FinOps XAgent (D7).
 - **Deferred (budget) / rejected (principle):** **Savings Plans/RIs** + Infracost Cloud (deferred on budget);
   vended FinOps SaaS — CloudHealth/Cloudability/Vantage (rejected, second control plane).
-- **Doc-drift:** ADR-091 + ADR-092 still call **#668 "unbuilt"** — stale (it's built + closed).
+- **Doc-drift:** ADR-091 + ADR-092 still call **#668** and the **Backstage cost tab** (A3) "unbuilt/remaining" — stale (both are built).
 
 ## Tool verdicts (ADR-092)
 

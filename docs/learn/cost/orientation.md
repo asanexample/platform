@@ -159,9 +159,8 @@ Infracost shift-left are **built and running**.
 
 What's **named but not built** (and the docs say so): AWS **Compute Optimizer**, **kube-green** (per-namespace
 off-hours scaling), and **Cloud Custodian** (an account janitor) are *adopted in the framework but unbuilt*;
-**Savings Plans** are documented-but-unbought (above); the **Backstage cost tab** (cost in the dev portal) is
-designed, not built; and the **AWS alert Slack delivery** is wired but gated off pending a one-time manual
-workspace authorization (email works). The FinOps epic is deliberately mid-flight — Crawl→Walk, honestly.
+**Savings Plans** are documented-but-unbought (above); and the **AWS alert Slack delivery** is wired but gated
+off pending a one-time manual workspace authorization (email works). The FinOps epic is deliberately mid-flight — Crawl→Walk, honestly.
 
 ## When it breaks — the ones you'll actually hit
 

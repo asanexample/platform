@@ -265,10 +265,12 @@ Three surfaces, and one honest "not yet":
   ($/mo, reconciliation)"**, which plots `sum(node_total_hourly_cost) * 730` (list-price estimate) against
   `max(platform_true_cost_compute_monthly_usd_total)` (post-discount actual). A persistent gap between the
   lines *is* your discount — the reconciliation the orientation promised.
-- **The Backstage cost tab — designed, *not* built.** [ADR-091](../../adrs/091-cost-guardrails.md) lists a
-  developer-portal cost view as *remaining*, and ADR-092's capability table optimistically calls it "live" — but
-  a grep of the `backstage` module finds **no cost plugin**. Treat it as roadmap. (This is a live example of
-  the mold's rule: an ADR is a *lead*, the code is the *proof*.)
+- **The Backstage cost tab — built (verify in the *right* place).** A developer-portal "Cost" page renders
+  per-team spend-vs-budget from the hub Mimir (platform#1051, merged; the `mimir` unit admits `backstage` to the
+  query API via `query_consumer_namespaces`). Note the trap that nearly tripped these docs:
+  [ADR-091](../../adrs/091-cost-guardrails.md) still lists it as *remaining* (stale, like #668), and grepping the
+  **infra** `backstage` *module* finds no cost plugin — because a **Backstage plugin ships in the app image, not
+  the deployment module.** The mold's rule, sharpened: the code is the *proof*, but check the *right* code.
 
 ---
 
