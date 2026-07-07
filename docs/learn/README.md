@@ -28,7 +28,7 @@ Each subsystem is a short course: an **Orientation** (a guided journey you read 
 | **[Environment API](environment-api/)** — how environments get provisioned (Crossplane) | ✅ available |
 | **[Self-service cloud resources](self-service-resources/)** — an S3 bucket / queue / topic / table from your claim, with derived least-privilege IAM (developer-facing) | ✅ available |
 | **[Delivery](delivery/)** — git → running across stages, safely (ArgoCD, the promotion ladder, Rollouts) | ✅ available |
-| Observability — the LGTM+P stack | ⏳ planned |
+| **[Observability](observability/)** — the platform observes your workload *for* you (LGTM+P, eBPF zero-code, correlation, SLOs, agent-obs) | ✅ available |
 | **[Policy & admission](policy/)** — the guardrail engine at the cluster door (Kyverno: validate · mutate · generate) | ✅ available |
 | **[Identity & access](identity/)** — decide once, derive everywhere, borrow dangerous power (Keycloak, Pod Identity, temporary power) | ✅ available |
 | **[Supply chain](supply-chain/)** — trust provenance, not names (keyless signing, SLSA, verify-at-admission) | ✅ available |

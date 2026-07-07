@@ -178,8 +178,11 @@ it starts (ADR-056 Phase 3 / the W11 freeze gate). See
   `max_label_names_per_series=30` silently drops them — the hub raises it to 50.
 - **Manual `terragrunt apply` needs `AWS_PROFILE=management`** (bare shell assumes
   PlatformDeployer and 403s); reach the private API over Tailscale (ADR-010).
-- **Per-team read isolation (P13 / #590) is DESIGNED but PAUSED** — today everyone sees
-  all clusters via the federated datasource. Don't assume tenant read-scoping exists yet.
+- **Per-team read isolation (P13 / #590) is BUILT + RUNNING but UNEXERCISED** — `cortex-tenant` +
+  `tenant-proxy` are deployed (fail-closed), and the per-team *write* split produces real `alpha`/`bravo`
+  Mimir tenants — but nothing routes per-team *reads* through it. Per-team *visibility* actually ships via the
+  namespace-filtered Team Overview dashboards (#1157); the admin default stays the federated datasource.
+  Don't claim per-team read-scoping is *in use*.
 - Mimir is **off** in the dev cost_profile; enabling it just starts `remote_write`
   (additive, no migration).
 
