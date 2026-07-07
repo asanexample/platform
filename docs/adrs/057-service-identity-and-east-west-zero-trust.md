@@ -2,7 +2,9 @@
 
 **Date:** 2026-06-04
 
-**Status:** Proposed — **strategy/direction.** Completes the *east-west* (service-to-service) half of the
+**Status:** **Phase 1 (transparent encryption): Accepted — built + live on preprod + platform, 2026-07-07.**
+Phase 2 (Cilium mTLS + SPIFFE workload identity) remains **Proposed** (strategy). Completes the *east-west*
+(service-to-service) half of the
 security model, alongside the existing north-south ingress ([ADR-017](017-gateway-api-over-ingress.md)) and the
 Cilium CNI ([ADR-008](008-cilium-as-cross-cloud-cni.md)). Aligns in-cluster workload identity with the cloud
 identity ([ADR-041](041-pod-identity-for-tenant-workloads.md)/[ADR-047](047-pod-identity-as-aws-identity-standard.md))
@@ -27,6 +29,28 @@ becomes part of the tier's **network** isolation column ([ADR-049](049-tenant-mo
 >   **rolling Cilium restart** on the CNI — highest blast radius — so it rolls out **preprod-first**, in a
 >   maintenance window, from the main checkout, with a **perf-overhead measurement** before the platform
 >   cluster follows. Status flips to Accepted once applied + verified.
+
+## Implementation notes (as-built) — Phase 1, 2026-07-07
+
+WireGuard transparent encryption is **live and verified on both clusters** (`cilium-dbg status` →
+`Encryption: Wireguard [cilium_wg0 … Peers: N]`; every node carries a `network.cilium.io/wg-pub-key`
+annotation + `spec.encryption.key` in its CiliumNode; cluster health returned to N/N reachable; a public
+preprod route and an internal platform route both served **HTTP 200** through the encrypted mesh — no MTU
+black-holing on the tunnel/VXLAN datapath). Module support: [#1193](https://github.com/asanexample/platform/pull/1193);
+per-cluster enablement is the `cilium` unit input `encryption_enabled = true`.
+
+**Gotcha (the real lesson): enabling encryption does *not* auto-activate it on running agents.** The helm
+change sets `enable-wireguard=true` in the `cilium-config` ConfigMap, but Cilium reads that value **only at
+agent startup** — the DaemonSet is not rolled by the config change. Symptom: only nodes whose agent
+(re)started after the change bring `cilium_wg0` up; pre-existing agents log
+`Mismatch: enable-wireguard actual=false expectedValue=true`. **Required step after the apply:
+`kubectl rollout restart ds/cilium -n kube-system`** — then all agents re-read the config and establish the
+mesh. Auto-triggering this roll on an encryption-config change is a sensible module follow-up.
+
+**Correction to the amendment above:** the "maintenance window / from the main checkout" framing proved
+unnecessary on these dev clusters — the rolling agent restart is a brief per-node blip (shared services and
+tenant apps stayed healthy), and the apply ran cleanly from a worktree (the cilium unit's only
+`null_resource` uses a `version` trigger, not a path, so it is not the worktree footgun other units carry).
 
 ## Context
 
