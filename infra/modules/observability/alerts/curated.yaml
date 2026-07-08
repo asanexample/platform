@@ -588,3 +588,95 @@ groups:
           summary: "Crossplane core controller is down — provisioning is halted"
           description: "The Crossplane core controller (crossplane-system) has been unreachable for 5m — XEnvironment claims, Composition renders, and self-service cloud resources are no longer reconciling, so new environments/resources can't be provisioned (existing ones keep running). Check the crossplane deployment pod + logs. (Composition/provider reconcile ERRORS surface separately via ControllerReconcileErrors.)"
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#crossplane"
+  # ---------------------------------------------------------------------------
+  # Mimir (#1123) — the durable metrics store AND the ruler that evaluates alerting. Loki + Tempo already had
+  # groups; Mimir did not. The nginx `gateway` is excluded: it doesn't serve scrapeable /metrics (up==0 while
+  # perfectly healthy — the API is proxied through it); the real microservices below do.
+  - name: mimir.rules
+    rules:
+      - alert: MimirComponentDown
+        expr: up{pod=~"mimir-.*", job!="observability/gateway"} == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Mimir component {{ $labels.job }} is down"
+          description: "A Mimir microservice ({{ $labels.job }}, pod {{ $labels.pod }}) has been unreachable for 10m. Mimir is the durable long-range metrics store and the ruler that evaluates alert rules — an ingester/distributor outage risks metric loss and degrades alerting itself. Check the pod + logs (S3/IAM for store-gateway/compactor; memory for ingester)."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#mimir"
+      - alert: MimirRequestErrors
+        expr: |
+          sum(rate(cortex_request_duration_seconds_count{status_code=~"5.."}[5m]))
+            / clamp_min(sum(rate(cortex_request_duration_seconds_count[5m])), 1) > 0.05
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mimir is returning a high 5xx rate"
+          description: "Over 5% of Mimir requests have been 5xx for 15m — metric reads (Grafana + alerting) and/or writes (remote-write ingestion) are failing. Check the mimir component logs (ingester back-pressure, store-gateway/S3, or the distributor)."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#mimir"
+  # ---------------------------------------------------------------------------
+  # Tailscale (#1123) — the PRIMARY private cluster-access path (ADR-010). Not scraped for its own metrics, so
+  # these are kube-state-metrics availability signals. "Up but not advertising routes" needs Tailscale's own
+  # metrics (a follow-up); these catch the pod being down — the thing that silently loses kubectl access.
+  - name: tailscale.rules
+    rules:
+      - alert: TailscaleSubnetRouterDown
+        expr: kube_pod_status_ready{namespace="tailscale-system", pod=~"ts-.*subnet-router.*", condition="true"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Tailscale subnet router {{ $labels.pod }} not ready — private cluster access at risk"
+          description: "A Tailscale subnet router ({{ $labels.pod }}) has been not-Ready for 5m. It advertises the VPC CIDR to the tailnet, so private kubectl/EKS access over Tailscale (the routine ops path, ADR-010) is degraded or lost — SSM Session Manager is the fallback. Check the pod in tailscale-system + its Connector/ProxyClass."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#tailscale"
+      - alert: TailscaleOperatorDown
+        expr: kube_deployment_status_replicas_available{namespace="tailscale-system", deployment="operator"} == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tailscale operator is down"
+          description: "The Tailscale operator (tailscale-system) has had zero available replicas for 10m — it reconciles the subnet routers + tailnet device auth. Existing routes keep working, but changes/renewals stall. Check the operator deployment + its OAuth secret."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#tailscale"
+  # ---------------------------------------------------------------------------
+  # Platform-service breadth (#1123): control-plane components scraped but previously unalerted for their own
+  # up/down. cortex-tenant (per-team metric re-tenanting), argo-rollouts (progressive delivery), Beyla (the
+  # eBPF app-metric source the SLOs depend on), external-dns (DNS record sync — kube-state, not scraped).
+  - name: platform-services.rules
+    rules:
+      - alert: CortexTenantDown
+        expr: up{job="cortex-tenant"} == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cortex-tenant is down — per-team metric re-tenanting stopped"
+          description: "cortex-tenant (the P13 write-splitter that routes each series into its team's Mimir tenant) has been down for 10m. Per-team metric isolation degrades — new metrics stop being split by team. Check the pod in observability."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#platform-services"
+      - alert: ArgoRolloutsControllerDown
+        expr: up{job="argo-rollouts-metrics"} == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Argo Rollouts controller is down — progressive delivery halted"
+          description: "The Argo Rollouts controller has been down for 10m. Canary/blue-green Rollouts stop progressing and new deploys via a Rollout can't advance (running pods are unaffected). Check the controller pod + logs."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#platform-services"
+      - alert: BeylaDown
+        expr: up{job="beyla"} == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Beyla eBPF instrumentation is down — app RED metrics missing"
+          description: "Beyla ({{ $labels.pod }}) has been down for 15m. It auto-generates the RED (rate/errors/duration) metrics for workloads via eBPF — the SLOs and APM correlation depend on it, so those go stale. Check the beyla DaemonSet pod on the affected node."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#platform-services"
+      - alert: ExternalDnsUnavailable
+        expr: kube_deployment_status_replicas_available{namespace="external-dns", deployment="external-dns"} == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "external-dns is down — DNS records will drift"
+          description: "external-dns has had zero available replicas for 15m. It syncs Route53/Cloudflare records for Gateway hostnames + cert-manager DNS-01 — while down, new/changed hostnames won't resolve and ACME DNS-01 renewals can stall. Check the deployment + its IAM/Pod-Identity."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#platform-services"

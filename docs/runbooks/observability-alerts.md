@@ -221,6 +221,43 @@ cloud resource. Core-controller metrics scraped via the crossplane module's PodM
   separately via **ControllerReconcileErrors** (the crossplane controllers now report to
   `controller_runtime_reconcile_errors_total` once scraped).
 
+## mimir
+
+Namespace `observability`. The durable metrics store (Cortex-based) and the ruler that evaluates alert rules —
+Loki/Tempo had alerts; Mimir now does too. The nginx `gateway` is excluded (it proxies the API but serves no
+scrapeable `/metrics`, so it reads `up==0` while healthy).
+
+- **MimirComponentDown** (critical) — a Mimir microservice (`{{ $labels.job }}`) unreachable for 10m. Because
+  Mimir is both the long-range store and the rule evaluator, an outage risks metric loss and degrades alerting
+  itself (the dead-man's switch is the backstop for total failure). Triage by component: ingester = memory /
+  back-pressure; store-gateway / compactor = S3/IAM; distributor = ingest path.
+- **MimirRequestErrors** (warning) — >5% 5xx for 15m: reads (Grafana/alerting) or writes (remote-write) failing.
+
+## tailscale
+
+Namespace `tailscale-system` (ADR-010). The **primary** private cluster-access path. Not scraped for its own
+metrics, so these are kube-state availability signals; deep "up but not routing" detection needs Tailscale's
+own metrics (a follow-up).
+
+- **TailscaleSubnetRouterDown** (critical) — a `ts-*-subnet-router-*` pod not-Ready for 5m: it advertises the
+  VPC CIDR to the tailnet, so private kubectl/EKS access is degraded/lost. **Fall back to SSM Session Manager**
+  (`./scripts/eks-tunnel.sh`) to reach the cluster, then fix the router pod / Connector in `tailscale-system`.
+- **TailscaleOperatorDown** (warning) — the operator has 0 available replicas for 10m; existing routes hold but
+  reconciliation/renewals stall. Check the deployment + its OAuth secret.
+
+## platform-services
+
+Control-plane components whose own up/down was previously unalerted.
+
+- **CortexTenantDown** (warning) — the P13 per-team metric write-splitter is down; new metrics stop being split
+  by team (isolation degrades). Pod in `observability`.
+- **ArgoRolloutsControllerDown** (warning) — canary/blue-green Rollouts stop progressing; new Rollout deploys
+  can't advance (running pods unaffected). Controller pod in `argo-rollouts`.
+- **BeylaDown** (warning) — the eBPF RED-metrics source is down; SLOs + APM correlation go stale. DaemonSet pod
+  on the affected node.
+- **ExternalDnsUnavailable** (warning) — DNS record sync is down; new hostnames won't resolve and ACME DNS-01
+  renewals can stall. Deployment in `external-dns` + its IAM/Pod-Identity.
+
 ## Cloud resources
 
 AWS-resource metrics via **YACE** (the `cloudwatch-exporter` Deployment in `observability`; CloudWatch →
