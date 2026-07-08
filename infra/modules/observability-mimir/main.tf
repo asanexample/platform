@@ -599,6 +599,33 @@ resource "kubernetes_cron_job_v1" "ruler_rules_sync" {
               seccomp_profile { type = "RuntimeDefault" }
             }
 
+            # Wait for the ruler API before the (distroless, no-retry) mimirtool runs. Without this, a one-shot
+            # sync that lands in the post-unpark window — nodes back but the gateway/ruler still starting — gets
+            # `connection refused` and the whole job fails (the failures we saw). Poll the exact endpoint the
+            # sync uses, bounded to ~5m so a full park (API absent) fails fast instead of blocking the 15m schedule.
+            init_container {
+              name  = "wait-for-ruler-api"
+              image = "curlimages/curl:8.11.1"
+              command = ["sh", "-c", <<-SH
+                i=0
+                until curl -sf -H "X-Scope-OrgID: ${each.value}" "http://${var.helm_release_name}-gateway.${var.namespace}.svc/prometheus/config/v1/rules" -o /dev/null; do
+                  i=$((i + 1)); [ "$i" -ge 30 ] && echo "ruler API not ready after 5m; giving up" && exit 1
+                  echo "waiting for mimir ruler API ($i/30)..."; sleep 10
+                done
+                echo "mimir ruler API ready"
+              SH
+              ]
+              resources {
+                requests = { cpu = "10m", memory = "16Mi" }
+                limits   = { cpu = "100m", memory = "32Mi" }
+              }
+              security_context {
+                allow_privilege_escalation = false
+                read_only_root_filesystem  = true
+                capabilities { drop = ["ALL"] }
+              }
+            }
+
             container {
               name  = "mimirtool"
               image = "grafana/mimirtool:${var.mimirtool_version}"
