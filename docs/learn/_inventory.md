@@ -167,9 +167,11 @@ sub-curriculum, not here.)*
 
 ## 11 · Operations & lifecycle
 
+✅ **Built** as [Operations](operations/): an orientation ("the platform is a dependency graph you can replay" — build/park/rebuild/recover) + 2 deep dives (platctl & the DAG · parking & day-2 recovery) + reference. (CloudNativePG resilience/BC depth remains a future addition.)
+
 | Module | Covers | Status |
 | --- | --- | --- |
-| **platctl & lifecycle** | the orchestrator (bootstrap / teardown / validate), cluster parking, rebuild-from-scratch, resilience/BC, the platform's own stateful components (CloudNativePG) (ADR-038/054) | ⏳ |
+| **[platctl & lifecycle](operations/)** | the orchestrator (bootstrap / teardown / validate), cluster parking, rebuild-from-scratch, day-2 recovery + the durable-fix discipline (ADR-006/008/009/010/093) | ✅ |
 
 ## Build sequence
 
