@@ -128,6 +128,35 @@ inputs = {
         ]
       })
     }
+    # The learning-portal TechDocs publish role (#938, ADR-097). Trusts ONLY the asanexample/platform repo on
+    # main; can write ONLY to the platform-techdocs bucket. The techdocs.yml workflow builds the site (mkdocs +
+    # techdocs-cli) and publishes it here (builder: external); Backstage serves it read-only.
+    "github-actions-techdocs-publish" = {
+      repos    = ["platform"]
+      branches = ["main"]
+      events   = [] # main only — the site republishes on merges that touch docs/learn
+      tags     = { Service = "techdocs" }
+
+      inline_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [
+          {
+            Sid    = "TechDocsPublish"
+            Effect = "Allow"
+            Action = [
+              "s3:PutObject",
+              "s3:DeleteObject",
+              "s3:GetObject",
+              "s3:ListBucket",
+            ]
+            Resource = [
+              "arn:aws:s3:::platform-techdocs",
+              "arn:aws:s3:::platform-techdocs/*",
+            ]
+          },
+        ]
+      })
+    }
     # The self-hosted ARC runner image-build role (ADR-065 / #323). Trusts ONLY the asanexample/platform repo
     # on main; can push ONLY to platform/gha-runner. Deliberately a SEPARATE role from the repo's other trusts
     # (Terratest in the test account; the future deployer role) — least privilege, no shared blast radius.
