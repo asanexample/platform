@@ -41,6 +41,15 @@ variable "max_image_count" {
   default     = 50
 }
 
+variable "pull_through_cache_rules" {
+  description = "ECR pull-through cache rules that lazily mirror public registries into this account. Keys are the local repository prefix (e.g. 'docker-hub'); a first pull of `<acct>.dkr.ecr.<region>.amazonaws.com/<prefix>/<image>` caches the upstream image. credential_arn (optional) is a Secrets Manager secret ARN — its name MUST start with `ecr-pullthroughcache/` — required for authenticated upstreams like Docker Hub; anonymous upstreams (ghcr.io, quay.io, registry.k8s.io) omit it."
+  type = map(object({
+    upstream_registry_url = string
+    credential_arn        = optional(string)
+  }))
+  default = {}
+}
+
 variable "force_delete" {
   description = "Whether to allow deletion of non-empty repositories"
   type        = bool

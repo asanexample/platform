@@ -11,6 +11,13 @@ terraform {
   source = include.base.locals.module_source.ecr
 }
 
+locals {
+  # Docker Hub pull-through cache is gated on the credential existing. Populate a Secrets Manager secret named
+  # `ecr-pullthroughcache/docker-hub` ({username, accessToken}) and set this to its ARN to enable the mirror.
+  # Empty (default) keeps the anonymous mirrors (ghcr/quay/k8s) working without the secret. ADR-098 D2.
+  docker_hub_credential_arn = ""
+}
+
 inputs = {
   create = true
 
@@ -55,6 +62,25 @@ inputs = {
     include.base.locals.account_ids["preprod"], # Preprod
     include.base.locals.account_ids["prod"],    # Prod
   ]
+
+  # Pull-through cache: mirror public registries into this account on first pull so cluster/CI base-image
+  # pulls hit our own ECR (IAM auth, no rate limits) — ADR-098 D2. ghcr.io / quay.io / registry.k8s.io allow
+  # anonymous pulls (no credential). Docker Hub REQUIRES a credential: create a Secrets Manager secret named
+  # `ecr-pullthroughcache/docker-hub` ({username, accessToken}) and set docker_hub_credential_arn to enable it
+  # (left out until the secret exists — the anonymous mirrors work standalone).
+  pull_through_cache_rules = merge(
+    {
+      "ghcr" = { upstream_registry_url = "ghcr.io" }
+      "quay" = { upstream_registry_url = "quay.io" }
+      "k8s"  = { upstream_registry_url = "registry.k8s.io" }
+    },
+    local.docker_hub_credential_arn == "" ? {} : {
+      "docker-hub" = {
+        upstream_registry_url = "registry-1.docker.io"
+        credential_arn        = local.docker_hub_credential_arn
+      }
+    },
+  )
 
   tags = include.base.locals.tags
 }

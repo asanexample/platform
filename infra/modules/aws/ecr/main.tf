@@ -68,6 +68,22 @@ resource "aws_ecr_repository_policy" "cross_account_pull" {
 }
 
 # ---------------------------------------------------------------------------
+# Pull-Through Cache Rules
+# ---------------------------------------------------------------------------
+# Registry-level (not per-repo) rules that mirror public registries into this account on first pull, so
+# cluster/CI base-image pulls hit our own ECR (IAM auth, no Docker Hub rate limits) instead of the public
+# internet. The cache repo (`<prefix>/<image>`) is auto-created on first pull — the pulling principal needs
+# ecr:BatchImportUpstreamImage + ecr:CreateRepository. ADR-098 D2.
+
+resource "aws_ecr_pull_through_cache_rule" "this" {
+  for_each = local.create ? var.pull_through_cache_rules : {}
+
+  ecr_repository_prefix = each.key
+  upstream_registry_url = each.value.upstream_registry_url
+  credential_arn        = each.value.credential_arn
+}
+
+# ---------------------------------------------------------------------------
 # Lifecycle Policy
 # ---------------------------------------------------------------------------
 
