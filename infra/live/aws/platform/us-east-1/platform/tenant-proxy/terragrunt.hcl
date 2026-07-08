@@ -11,6 +11,36 @@ terraform {
   source = include.base.locals.module_source.observability_tenant_proxy
 }
 
+locals {
+  grants_dir = "${get_repo_root()}/gitops/grants"
+  envs_dir   = "${get_repo_root()}/gitops/environments"
+
+  # Cross-team observability read grants, DERIVED from the AccessGrant registry (ADR-068). An obs grant
+  # is projected at TEAM granularity — the tenant is per-team — so it exposes the owner team's ENTIRE
+  # telemetry tenant. Two guards flow from that:
+  #   1. Regulated exclusion (decision b): a team with ANY pci/hipaa environment is never a shareable
+  #      owner — one regulated environment taints the whole team tenant for cross-team reads.
+  #   2. Only `group:team-<X>` subjects are honored (no ad-hoc groups; matches the AccessGrant/Kyverno
+  #      contract), and the grantee key is the bare team group the proxy sees in the token's `groups`.
+  all_envs = [for f in fileset(local.envs_dir, "**/*.yaml") : yamldecode(file("${local.envs_dir}/${f}"))]
+  regulated_teams = toset([
+    for e in local.all_envs : e.spec.team if contains(["pci", "hipaa"], try(e.spec.tier, "standard"))
+  ])
+
+  access_grants = [for f in fileset(local.grants_dir, "**/*.yaml") : yamldecode(file("${local.grants_dir}/${f}"))]
+  team_grants = [
+    for g in local.access_grants : {
+      grantee = trimprefix(g.spec.subject, "group:team-")
+      owner   = g.spec.target.team
+    }
+    if startswith(try(g.spec.subject, ""), "group:team-") && !contains(local.regulated_teams, g.spec.target.team)
+  ]
+  obs_grants = {
+    for grantee in distinct([for tg in local.team_grants : tg.grantee]) :
+    grantee => distinct([for tg in local.team_grants : tg.owner if tg.grantee == grantee])
+  }
+}
+
 dependency "eks" {
   config_path = "../eks"
 
@@ -74,6 +104,10 @@ inputs = {
   # admin (platform-admins) federates over ALL of them, so an admin sees every cluster + team tenant.
   tenants     = ["alpha", "bravo", "platform", "preprod"]
   admin_group = "platform-admins"
+
+  # Cross-team read grants derived from gitops/grants (ADR-068 AccessGrant), regulated owners excluded.
+  # Empty today (no grants authored) ⇒ own-tenant-only; add an AccessGrant to open a cross-team read.
+  grants = local.obs_grants
 
   # The mimir unit now renders the enforced `mimir` + `mimir-all` datasources pointed at this proxy
   # (read_proxy_url), so the proxy's own redundant `Mimir (my team)` datasource is disabled — one canonical

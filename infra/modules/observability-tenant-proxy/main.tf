@@ -81,6 +81,11 @@ resource "kubernetes_deployment_v1" "tenant_proxy" {
             name  = "ADMIN_GROUP"
             value = var.admin_group
           }
+          # Cross-team read grants → GRANTS = "grantee:owner1,owner2;grantee2:owner3" (empty when none).
+          env {
+            name  = "GRANTS"
+            value = join(";", [for grantee, owners in var.grants : "${grantee}:${join(",", owners)}"])
+          }
 
           liveness_probe {
             http_get {

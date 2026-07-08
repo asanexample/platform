@@ -1,0 +1,17 @@
+# Demo cross-team access grant (ADR-068 AccessGrant). Team bravo may VIEW team alpha's `shop` product.
+# Beyond its product-access meaning, this is the FIRST consumer of AccessGrant projected into the
+# observability plane (P13, #590): the tenant-proxy derives it into a cross-team telemetry read grant —
+# group `bravo` may additionally read alpha's Mimir tenant (federated `X-Scope-OrgID: alpha|bravo`).
+#
+# Granularity note: obs tenancy is per-TEAM, so this exposes alpha's whole telemetry tenant (not just the
+# `shop` product) to bravo. The finer "just shop's dashboards" scoping is delivered by dashboard sharing,
+# not the raw-data grant. Regulated (pci/hipaa) owner teams are excluded from the obs projection entirely.
+apiVersion: platform.refplat.org/v1beta1
+kind: AccessGrant
+metadata:
+  name: bravo-reads-alpha-shop
+spec:
+  target: { team: alpha, product: shop }
+  subject: group:team-bravo
+  posture: view
+  expiresAt: "2026-12-31"

@@ -20,6 +20,7 @@ type Config struct {
 	Audience        string
 	Tenants         []string
 	AdminGroup      string
+	Grants          map[string][]string
 	UpstreamTimeout time.Duration
 }
 
@@ -33,6 +34,8 @@ type Config struct {
 //	OIDC_AUDIENCE      (required)       — expected token audience (Grafana client id)
 //	TENANTS            (required)       — comma-separated known team tenants (alpha,bravo,platform)
 //	ADMIN_GROUP        (required)       — group granting federated all-tenant reads
+//	GRANTS             (optional)       — cross-team read grants: `grantee:owner1,owner2;grantee2:owner3`
+//	                                      (e.g. "bravo:alpha" = group bravo may also read alpha's tenant)
 //	UPSTREAM_TIMEOUT   (default 30s)    — upstream request timeout
 func Load() (*Config, error) {
 	c := &Config{
@@ -80,6 +83,12 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("config: TENANTS resolved to an empty list")
 	}
 
+	grants, err := parseGrants(os.Getenv("GRANTS"))
+	if err != nil {
+		return nil, err
+	}
+	c.Grants = grants
+
 	if d := os.Getenv("UPSTREAM_TIMEOUT"); d != "" {
 		parsed, err := time.ParseDuration(d)
 		if err != nil {
@@ -89,6 +98,41 @@ func Load() (*Config, error) {
 	}
 
 	return c, nil
+}
+
+// parseGrants parses the GRANTS env into a grantee→owners map. Format:
+//
+//	grantee:owner1,owner2;grantee2:owner3
+//
+// Empty input → empty map (no grants). Malformed input is a hard error — a read front door must
+// refuse to start on a config it can't parse rather than silently drop grants (fail-closed on config).
+func parseGrants(raw string) (map[string][]string, error) {
+	out := map[string][]string{}
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return out, nil
+	}
+	for entry := range strings.SplitSeq(raw, ";") {
+		if strings.TrimSpace(entry) == "" {
+			continue
+		}
+		grantee, ownersRaw, ok := strings.Cut(entry, ":")
+		grantee = strings.TrimSpace(grantee)
+		if !ok || grantee == "" {
+			return nil, fmt.Errorf("config: GRANTS entry %q must be `grantee:owner1,owner2`", entry)
+		}
+		var owners []string
+		for o := range strings.SplitSeq(ownersRaw, ",") {
+			if o = strings.TrimSpace(o); o != "" {
+				owners = append(owners, o)
+			}
+		}
+		if len(owners) == 0 {
+			return nil, fmt.Errorf("config: GRANTS entry %q has no owner tenants", entry)
+		}
+		out[grantee] = append(out[grantee], owners...)
+	}
+	return out, nil
 }
 
 func envOr(key, def string) string {

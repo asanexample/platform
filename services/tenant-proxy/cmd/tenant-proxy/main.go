@@ -53,7 +53,7 @@ func run(log *slog.Logger) error {
 		return err
 	}
 
-	resolver, err := tenant.NewResolver(cfg.Tenants, cfg.AdminGroup)
+	resolver, err := tenant.NewResolver(cfg.Tenants, cfg.AdminGroup, cfg.Grants)
 	if err != nil {
 		return err
 	}
