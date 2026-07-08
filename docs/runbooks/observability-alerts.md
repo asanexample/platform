@@ -146,6 +146,24 @@ own metrics stay off (hostNetwork host-port collision).
 - **CNPGCollectorErrors** (warning) — the in-instance metrics collector is erroring for 15m: usually the DB is
   unhealthy/unreachable even if the pod looks up. Early warning ahead of a hard outage.
 
+## blackbox
+
+External reachability (#1122). The `blackbox-exporter` probes the public-facing endpoints
+(grafana/argocd/backstage/keycloak) from inside the cluster via the Gateway (a `hostAlias` points the
+hostnames at the Gateway Envoy ClusterIP, so TLS SNI + Host still verify the real public cert). This is the
+"is it up from *outside*" signal — independent of any in-cluster health metric.
+
+- **BlackboxProbeDown** (critical) — `probe_success == 0` for 5m: the endpoint `{{ $labels.instance }}` is
+  unreachable, its TLS is broken, or it returns an unexpected status. Cross-check the in-cluster health of that
+  service (its pods / HTTPRoute / the Gateway), then the public DNS + cert. Distinct from an in-cluster "down"
+  alert — this is what a real external user experiences.
+- **BlackboxProbeSlow** (warning) — `probe_duration_seconds > 5` for 15m: the endpoint still answers but slowly;
+  users see degraded latency. Check the backing service's own latency/saturation.
+- **BlackboxSslCertExpiringCritical / …Soon** (critical < 7d / warning < 21d) — the **public** TLS cert served
+  by `{{ $labels.instance }}` is near expiry. This is the cert external clients actually see (distinct from the
+  in-cluster cert-manager certs above); if it fires, Let's Encrypt renewal has stalled — check cert-manager for
+  that host's Certificate + the ACME order.
+
 ## Cloud resources
 
 AWS-resource metrics via **YACE** (the `cloudwatch-exporter` Deployment in `observability`; CloudWatch →

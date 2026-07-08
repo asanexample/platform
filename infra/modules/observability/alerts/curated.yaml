@@ -446,3 +446,47 @@ groups:
           summary: "CloudNativePG metrics collector is erroring for {{ $labels.namespace }}/{{ $labels.pod }}"
           description: "The in-instance CNPG metrics collector on {{ $labels.pod }} ({{ $labels.namespace }}) has been failing its collection query for 15m — usually a sign the database is unhealthy or unreachable even if the pod looks up. Early warning ahead of a hard outage."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#cloudnativepg"
+  # ---------------------------------------------------------------------------
+  # External reachability (alerting P1, #1122). The blackbox-exporter probes the public-facing endpoints
+  # (grafana/argocd/backstage/keycloak) from inside the cluster via the Gateway. `probe_success` is the
+  # synthetic "is it up from outside" signal — independent of in-cluster health — and
+  # `probe_ssl_earliest_cert_expiry` is the PUBLIC TLS cert clients actually see (distinct from the
+  # in-cluster cert-manager certs in cert-manager.rules above).
+  - name: blackbox.rules
+    rules:
+      - alert: BlackboxProbeDown
+        expr: probe_success == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "External endpoint {{ $labels.instance }} is unreachable"
+          description: "The blackbox synthetic probe of {{ $labels.instance }} has failed for 5m — the endpoint is down, its TLS is broken, or it is returning an unexpected status. This is user-facing external reachability, independent of any in-cluster health signal."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#blackbox"
+      - alert: BlackboxProbeSlow
+        expr: probe_duration_seconds > 5
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "External endpoint {{ $labels.instance }} is slow (> 5s)"
+          description: "The blackbox probe of {{ $labels.instance }} has taken over 5s for 15m — external users are seeing degraded latency even though the probe still succeeds."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#blackbox"
+      - alert: BlackboxSslCertExpiringCritical
+        expr: (probe_ssl_earliest_cert_expiry - time()) < 604800 and probe_ssl_earliest_cert_expiry > 0
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Public TLS cert for {{ $labels.instance }} expires in < 7d"
+          description: "The public-facing TLS certificate served by {{ $labels.instance }} expires in under 7 days. Unlike the in-cluster cert-manager certs, this is what external clients actually see — if Let's Encrypt renewal has stalled, users will get certificate errors."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#blackbox"
+      - alert: BlackboxSslCertExpiringSoon
+        expr: ((probe_ssl_earliest_cert_expiry - time()) < 1814400) and ((probe_ssl_earliest_cert_expiry - time()) >= 604800)
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Public TLS cert for {{ $labels.instance }} expires in < 21d"
+          description: "The public-facing TLS certificate served by {{ $labels.instance }} expires in under 21 days; automatic Let's Encrypt renewal should occur — investigate if it does not."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#blackbox"
