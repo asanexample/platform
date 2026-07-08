@@ -105,6 +105,38 @@ sequenceDiagram
   begins teardown; removing the YAML (a gated, decommission-first PR) prunes the `XEnvironment` and the
   Composition tears down every managed resource. ECR is retained (`Orphan`).
 
+The `phase` machine — reversible right up to the one-way exit:
+
+```mermaid
+stateDiagram-v2
+    [*] --> active: provisioned
+    active --> suspended: pause
+    suspended --> active: resume
+    active --> decommissioning: decommission
+    decommissioning --> active: reactivate
+    decommissioning --> purged: gated purge PR
+    purged --> [*]
+    note right of active
+        quota normal<br/>workloads run
+    end note
+    note right of suspended
+        quota zeroed<br/>reversible pause
+    end note
+    note right of decommissioning
+        quota zeroed reversible<br/>decommission-first before purge
+    end note
+    note right of purged
+        claim removed one-way<br/>admin-reviewed non-author<br/>ECR retained Orphan
+    end note
+```
+
+`suspended` and `decommissioning` are both **reversible** grace states — the Composition zeroes the
+`ResourceQuota` (cpu/memory/pods → `0`, so workloads drain) while everything else is retained; editing
+`phase` back to `active` restores it. Only **purge** — deleting the claim YAML — is one-way, and it's gated:
+decommission-first, and the gitops Gate demands a current-SHA
+admin approval that isn't the author (plus the release-approver for a `prod` bundle). ECR survives it
+(`deletionPolicy: Orphan`).
+
 ## Glossary
 
 *Shared substrate terms (namespace, Composition, admission, managed resource, …) live in the

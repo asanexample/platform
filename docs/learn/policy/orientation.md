@@ -50,6 +50,28 @@ native Pod Security Admission `baseline` floor, so *two* independent layers must
 privileged pod slips through. And it's the *same* declare-then-reconcile idea as everything else here: the
 rules are declared as code, and the engine enforces them on every request, continuously.
 
+Here's the whole admission path in one picture — **mutate** runs first, then **validate** decides
+admit-or-reject, and **generate** creates companions like the PDB only *after* the resource is stored:
+
+```mermaid
+sequenceDiagram
+    participant U as kubectl
+    participant API as kube-apiserver
+    participant M as Kyverno mutate
+    participant V as Kyverno validate
+    U->>API: apply a Deployment
+    API->>M: mutating admission webhook
+    M-->>API: inject securityContext + label + defaults
+    API->>V: validating admission webhook
+    alt violates a rule
+        V-->>API: DENY
+        API-->>U: rejected at admission
+    else compliant
+        V-->>API: admit and store
+        Note over API,V: post-admission - Kyverno generate makes the PDB
+    end
+```
+
 Let's watch all three verbs on a real workload — starting with the one you'll meet first when you get it
 wrong.
 

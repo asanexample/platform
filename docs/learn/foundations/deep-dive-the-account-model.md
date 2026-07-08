@@ -50,6 +50,26 @@ Five accounts, and each is a distinct role in the design ([ADR-004](../../adrs/0
 - **Test** — a Terratest sandbox, where CI creates and destroys *real* infrastructure without touching
   anything real.
 
+At a glance — the estate as a tree: the Org root, the accounts by role, the SCP ceiling over the
+*member* accounts (never the management account), and the role bridge an operator crosses:
+
+```mermaid
+flowchart TD
+    ROOT["AWS Org root"]
+    SCP["Org SCPs<br/>permission ceiling"]
+    ROOT --> MGMT["management<br/>governance state SOPS-KMS<br/>SCP-exempt"]
+    ROOT --> PLAT["platform<br/>shared services hub EKS"]
+    ROOT --> PRE["preprod<br/>workload cluster"]
+    ROOT --> PROD["prod<br/>future workload spoke"]
+    ROOT --> TEST["test<br/>Terratest sandbox"]
+    SCP -. ceiling .-> PLAT
+    SCP -. ceiling .-> PRE
+    SCP -. ceiling .-> PROD
+    SCP -. ceiling .-> TEST
+    MGMT -- assume PlatformDeployer / PlatformAdmin --> PLAT
+    MGMT -- assume PlatformDeployer / PlatformAdmin --> PRE
+```
+
 They hang off a deliberate two-branch tree ([ADR-005](../../adrs/005-ou-hierarchy-design.md)). Live:
 
 ```console

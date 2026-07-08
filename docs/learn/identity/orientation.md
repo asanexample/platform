@@ -113,6 +113,27 @@ and flags drift. "It's in git" is a claim to confirm, not assume — the same di
 > `robin × developer@platform` and renders the native config in each. The grant is intent; the projection is
 > the effect.)*
 
+That projected Keycloak group isn't just stored — an app *reads* it at every sign-in. Here's the
+direct-Keycloak OIDC flow when robin opens an app like Backstage or ArgoCD (Dex retired — the app talks
+straight to Keycloak):
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant APP as App
+    participant KC as Keycloak platform realm
+    B->>APP: open app no session
+    APP-->>B: redirect to Keycloak
+    B->>KC: authenticate password plus passkey
+    KC-->>B: auth code
+    B->>APP: return with auth code
+    APP->>KC: exchange code for id and access tokens
+    KC-->>APP: id and access tokens
+    APP->>APP: read groups claim for authz
+    Note over KC: IdP of record no upstream broker by default
+    APP-->>B: session established
+```
+
 ## The machine side — workload identity without keys
 
 Humans aren't the only subjects. Your `shop` pod needs to read its S3 bucket — so *it* needs an identity

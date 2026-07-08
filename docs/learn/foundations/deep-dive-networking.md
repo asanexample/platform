@@ -14,6 +14,27 @@ private cluster answers to its *internal room numbers* but not its *street addre
 module republishes those room numbers where the neighbours can read them.** Hold that image; every
 section below is one piece of it.
 
+Here is that shape at a glance — the hub in the platform account, one spoke VPC per account joined
+through it, and the DNS bridge that lets a name resolve across the corridor:
+
+```mermaid
+flowchart TD
+  subgraph PLAT["Platform account (hub)"]
+    PVPC["Platform VPC<br/>10.100.0.0/16"]
+    TGW["Transit Gateway<br/>hub"]
+    PHZ["cross-VPC DNS<br/>private hosted zone"]
+  end
+  subgraph PRE["PreProd account (spoke)"]
+    QVPC["PreProd VPC<br/>10.101.0.0/16"]
+    EKS["preprod EKS API<br/>private only"]
+  end
+  PVPC -->|"attach via transit /28 per AZ"| TGW
+  QVPC -->|"attach via RAM share"| TGW
+  TGW -->|"routes hub to spoke"| QVPC
+  PHZ -->|"resolves API name to ENI IPs"| EKS
+  TS["operator kubectl"] -.->|"Tailscale private path"| EKS
+```
+
 ---
 
 ## 1. One module, three topologies, two toggles

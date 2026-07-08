@@ -24,6 +24,32 @@ understand them all. Let's anchor on Mimir (metrics), then show the others as va
 
 ## The five backends, and what each one holds
 
+Before the per-store detail, here's the whole pipeline on one screen — who collects each signal, which store
+keeps it, how one Grafana fronts them all, and how a spoke ships its telemetry home:
+
+```mermaid
+flowchart LR
+  W["Workload pods"]
+  W --> AL["Alloy<br/>tails logs"]
+  W --> PR["Prometheus<br/>scrape + remote-write"]
+  W --> BO["Beyla eBPF + OTel<br/>gateway"]
+  W --> AE["Alloy eBPF<br/>profiler"]
+
+  AL --> LK["Loki<br/>logs"]
+  PR --> MI["Mimir<br/>metrics"]
+  BO --> TE["Tempo<br/>traces"]
+  AE --> PY["Pyroscope<br/>profiles"]
+
+  LK --> GR["Grafana<br/>one query UI"]
+  MI --> GR
+  TE --> GR
+  PY --> GR
+
+  SP["Preprod spoke<br/>collectors"] -. "X-Scope-OrgID tenant<br/>network-isolated over TGW" .-> MI
+  SP -. "X-Scope-OrgID tenant<br/>network-isolated over TGW" .-> LK
+  SP -. "X-Scope-OrgID tenant<br/>network-isolated over TGW" .-> TE
+```
+
 The stack is **LGTM+P** — and each letter is a separate database, pinned to a specific chart version in the
 repo's single source of truth, [`infra/live/aws/_versions.hcl`](https://github.com/asanexample/platform/blob/main/infra/live/aws/_versions.hcl):
 
