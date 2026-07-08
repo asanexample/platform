@@ -54,6 +54,13 @@ locals {
         secretKeyRef:
           name: ${local.admin_k8s_secret}
           key: password
+    # Expose Micrometer metrics + health on the management port (9000) so the hub Prometheus can scrape
+    # Keycloak (alerting P1, #1121 — SSO is the IdP for ArgoCD/Grafana/Backstage/the agent). KC_HEALTH is
+    # required alongside metrics for the management interface to serve them.
+    - name: KC_METRICS_ENABLED
+      value: "true"
+    - name: KC_HEALTH_ENABLED
+      value: "true"
   EOT
 
   keycloak_values = {
@@ -111,9 +118,11 @@ locals {
     resources = var.resources
     podLabels = local.k8s_labels
 
-    # Metrics exposed but no ServiceMonitor yet (observability hub doesn't scrape this cluster — parity with dex).
-    metrics        = { enabled = false }
-    serviceMonitor = { enabled = false }
+    # Scrape Keycloak's Micrometer metrics into the hub Prometheus (alerting P1, #1121). The hub Prometheus
+    # DOES scrape this (platform) cluster — the old "hub doesn't scrape this cluster / parity with dex" note
+    # was stale (Dex is retired, ADR-053/059). The chart exposes the management port + a ServiceMonitor.
+    metrics        = { enabled = true }
+    serviceMonitor = { enabled = true }
   }
 }
 
