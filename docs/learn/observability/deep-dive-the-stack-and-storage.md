@@ -296,7 +296,9 @@ Grafana-forwarded OIDC token against the Keycloak JWKS, maps the caller's `group
 group → all tenants; **unknown or empty → deny**), overwrites `X-Scope-OrgID`, and reverse-proxies to its
 store. They provision the `Mimir (my team)` / `Loki (my team)` datasources. Genuinely **fail-closed** — no
 valid token, no data — with the *enforcement* **proven live (2026-07-07)**: identity maps to exactly one tenant
-and unknown callers are denied, for metrics *and* logs.
+and unknown callers are denied, for metrics *and* logs. (The platform hub runs no team workloads, so its own
+metrics are the `platform` tenant; the real per-team tenants are populated by the **preprod spoke's dual-write**
+— preprod, where the team apps run, ships each namespace's series into its own tenant, additive to `preprod`.)
 *(Per-team **traces (Tempo)** and **profiles (Pyroscope)** isolation is deliberately deferred — metrics + logs
 are the two live data-plane signals.)*
 

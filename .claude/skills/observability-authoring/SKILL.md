@@ -181,9 +181,9 @@ it starts (ADR-056 Phase 3 / the W11 freeze gate). See
   `max_label_names_per_series=30` silently drops them — the hub raises it to 50.
 - **Manual `terragrunt apply` needs `AWS_PROFILE=management`** (bare shell assumes
   PlatformDeployer and 403s); reach the private API over Tailscale (ADR-010).
-- **Per-team read isolation (P13 / #590): the ENFORCEMENT is LIVE + PROVEN (2026-07-07)**, flipped hub-first —
-  the hub holds only the `platform` tenant with data today (`alpha`/`bravo` tenants are wired but empty until the
-  spoke ingests, #627), so what's proven is the *fencing*, not per-team data volume. The `tenant-proxy` is the
+- **Per-team read isolation (P13 / #590) is LIVE + PROVEN (2026-07-07)** — note the topology: the platform hub
+  runs no team workloads, so its *own* metrics are the `platform` tenant; the real per-team tenants are
+  populated by the **preprod spoke's live dual-write** (preprod runs the alpha/bravo apps). The `tenant-proxy` is the
   enforced fail-closed read front door for **metrics (Mimir)** AND **logs (Loki)**: it verifies the caller's `X-Id-Token`
   and stamps `X-Scope-OrgID` so a team sees only its own tenant. `cortex-tenant` write-splits per team, and
   **cross-team read AccessGrants** (ADR-068) federate the caller's own tenant ∪ its granted tenants (grants ARE

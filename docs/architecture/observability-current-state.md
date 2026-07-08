@@ -199,8 +199,8 @@ follows their spokes (#627/#628). Umbrella: #629.
 ### Per-team read isolation (P13, #590) — as built
 
 Beyond the admin cross-cluster lane above, **per-team read isolation is enforced** for the two live signals
-(flipped **hub-first** to prove the path — the hub holds only the `platform` tenant with data today; the
-`alpha`/`bravo` tenants are wired end-to-end but fill once the **spoke** ingests, #627):
+(the platform hub runs no team workloads, so its own metrics are the `platform` tenant; the real per-team
+tenants are populated by the **preprod spoke's live dual-write**, where the team apps run):
 
 - **`observability-tenant-proxy`** is the fail-closed read front door for **Mimir (metrics)** and **Loki
   (logs)**: it verifies the caller's `X-Id-Token` (Keycloak OIDC) and stamps the team's `X-Scope-OrgID`, so a
