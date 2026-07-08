@@ -1,0 +1,32 @@
+# Default workload autoscaler (ADR-078 Phase 2 — "elastic by construction", platform-injected, opt-OUT not
+# opt-in). Scales the Rollout on CPU; Karpenter then provisions nodes for the new pods and consolidates them
+# away when load drops — closing the elasticity loop. To opt a service out, delete this file and drop it from
+# kustomization.yaml. HPA owns spec.replicas at runtime (the per-Product ApplicationSet ignores it so ArgoCD
+# selfHeal doesn't fight the HPA). Argo Rollouts scales the stable ReplicaSet from the HPA and splits
+# stable/canary during a rollout.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: app-${{ values.team }}-${{ values.product }}
+  labels:
+    app.kubernetes.io/name: app-${{ values.team }}-${{ values.product }}
+spec:
+  scaleTargetRef:
+    apiVersion: argoproj.io/v1alpha1
+    kind: Rollout
+    name: app-${{ values.team }}-${{ values.product }}
+  # Lower stages are cost-first (min 1). The prod overlay patches minReplicas -> 2 so it satisfies the
+  # `require-prod-replica-floor` policy (ADR-085), which explicitly accepts an HPA with minReplicas >= 2.
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    # Scale up promptly, scale down conservatively — avoid thrashing (and needless Karpenter churn) on spiky load.
+    scaleDown:
+      stabilizationWindowSeconds: 300

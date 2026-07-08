@@ -13,3 +13,12 @@ nameReference:
     fieldSpecs:
       - kind: HTTPRoute
         path: spec/rules/backendRefs/name
+  # Same problem for the default HPA (ADR-078 Phase 2): its scaleTargetRef points at the Rollout (a CRD, not a
+  # built-in reference), so without this a PR-preview `namePrefix` renames the HPA but leaves scaleTargetRef.name
+  # on the un-prefixed (stable) Rollout — the preview's HPA would target the stable workload. Rewrite it too.
+  - kind: Rollout
+    group: argoproj.io
+    fieldSpecs:
+      - kind: HorizontalPodAutoscaler
+        group: autoscaling
+        path: spec/scaleTargetRef/name

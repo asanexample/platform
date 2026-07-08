@@ -13,6 +13,21 @@ replicas:
 # strategic-merge patch REPLACES the container/strategy wholesale (e.g. dropping the image). Targeted replaces
 # of specific subtrees are safe (ADR-056).
 patches:
+  # prod replica floor (ADR-085): the default HPA is min 1 (cost-first) for lower stages; in prod raise it to 2
+  # so a single replica can't drop traffic — this is what satisfies `require-prod-replica-floor` (which accepts
+  # HPA minReplicas >= 2). More headroom too.
+  - target:
+      group: autoscaling
+      version: v2
+      kind: HorizontalPodAutoscaler
+      name: app-${{ values.team }}-${{ values.product }}
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 2
+      - op: replace
+        path: /spec/maxReplicas
+        value: 20
   - target:
       group: argoproj.io
       version: v1alpha1

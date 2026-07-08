@@ -124,6 +124,8 @@ resource "helm_release" "product_pr_preview" {
           ignoreDifferences = [
             { group = "", kind = "Service", jqPathExpressions = [".spec.selector"] },
             { group = "gateway.networking.k8s.io", kind = "HTTPRoute", jqPathExpressions = [".spec.rules[].backendRefs[].weight"] },
+            # The default HPA (ADR-078 Phase 2) owns the Rollout replica count — ignore it so selfHeal doesn't fight it.
+            { group = "argoproj.io", kind = "Rollout", jqPathExpressions = [".spec.replicas"] },
             { group = "argoproj.io", kind = "Rollout", managedFieldsManagers = ["rollouts-controller"] },
             { group = "gateway.networking.k8s.io", kind = "HTTPRoute", managedFieldsManagers = ["cilium-operator-generic"] },
           ]
