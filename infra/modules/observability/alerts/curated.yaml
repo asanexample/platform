@@ -210,6 +210,20 @@ groups:
         annotations:
           summary: "ArgoCD app {{ $labels.name }} sync status Unknown"
           description: "ArgoCD application {{ $labels.name }} (project {{ $labels.project }}) has been sync=Unknown for 1h — ArgoCD cannot compare against git (a ComparisonError: unreadable repo, failing manifest generation, or a plugin error), so it is NOT deploying new revisions even while the running pods look Healthy."
+      - alert: ArgoCDReconciliationStalled
+        # Complements ArgoCDAppSyncUnknown (per-app) with a CONTROLLER-wide staleness signal: if the
+        # application-controller stops reconciling entirely (wedged / CPU-starved / a stuck work queue in a
+        # way the component-down check misses), NO app is compared against git even though nothing is
+        # "Unknown" yet. ArgoCD re-reconciles every app on a poll (~3m default), so a healthy controller
+        # always has a nonzero reconcile rate — flat for 30m = GitOps has silently stopped (#1115/#1121).
+        expr: sum(rate(argocd_app_reconcile_count[10m])) == 0
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ArgoCD has stopped reconciling applications"
+          description: "The ArgoCD application-controller has performed zero app reconciliations for 30m (argocd_app_reconcile_count is flat) — GitOps delivery is silently stalled: git changes are no longer applied even if every app still shows its last-known status. Check the application-controller pod (OOM/CPU-starved/wedged work queue) and its logs."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#argocd"
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#argocd"
   # ---------------------------------------------------------------------------
   - name: loki.rules
@@ -490,3 +504,43 @@ groups:
           summary: "Public TLS cert for {{ $labels.instance }} expires in < 21d"
           description: "The public-facing TLS certificate served by {{ $labels.instance }} expires in under 21 days; automatic Let's Encrypt renewal should occur — investigate if it does not."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#blackbox"
+  # ---------------------------------------------------------------------------
+  # Cluster elasticity (alerting P1, #1121). Karpenter provisions nodes on demand (ADR-078); when it can't,
+  # pods stay Pending and workloads can't scale — a control-plane failure that generic pod-crash checks miss.
+  - name: karpenter.rules
+    rules:
+      - alert: KarpenterCloudProviderErrors
+        # WARNING not critical: this counter also ticks on transient InsufficientCapacity that Karpenter
+        # recovers from by trying another instance type; only a SUSTAINED error stream is actionable.
+        expr: sum(rate(karpenter_cloudprovider_errors_total[10m])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Karpenter is failing EC2 cloud-provider calls"
+          description: "Karpenter has been erroring on EC2 API calls continuously for 15m (karpenter_cloudprovider_errors_total rising) — it may be unable to launch/terminate nodes, so pending pods won't get capacity. Check the karpenter controller logs for the AWS error (IAM/Pod-Identity, subnet/AZ capacity, SCP, or a launch-template problem)."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#karpenter"
+      - alert: KarpenterPodsPendingUnscheduled
+        expr: kube_pod_status_phase{phase="Pending"} == 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} stuck Pending for 15m"
+          description: "{{ $labels.namespace }}/{{ $labels.pod }} has been Pending for 15m and can't be scheduled — usually Karpenter hasn't (or can't) provision matching capacity. Check `kubectl describe pod` for the unschedulable reason, the Karpenter logs, and any NodePool limits/taints. Sustained pending = the elasticity loop is broken."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#karpenter"
+  # ---------------------------------------------------------------------------
+  # Operator reconcile health (alerting P1, #1121). Any controller-runtime operator — Karpenter, ESO, the
+  # ArgoCD ApplicationSet controller, the ADR-088 activation-operator — silently failing to reconcile is the
+  # failure mode behind stale desired-state that a pod-up check never sees.
+  - name: controllers.rules
+    rules:
+      - alert: ControllerReconcileErrors
+        expr: sum by (controller) (rate(controller_runtime_reconcile_errors_total[15m])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Operator controller {{ $labels.controller }} is failing reconciles"
+          description: "The `{{ $labels.controller }}` controller has returned reconcile errors continuously for 15m (controller_runtime_reconcile_errors_total rising) — its desired state isn't being applied (e.g. an activation grant not processed, an ExternalSecret not synced, a NodeClaim not created). Check that operator's pod logs for the underlying error."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#controllers"

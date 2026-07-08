@@ -80,6 +80,13 @@ Namespace `argocd`. GitOps reconciliation.
 - **ArgoCDAppOutOfSync** — an app has drifted `OutOfSync` for 15m (manual change or a failing auto-sync).
 - **ArgoCDRepoServerGitErrors** — repo-server can't `git ls-remote` (`{{ $labels.repo }}`); a repo
   connectivity or credentials problem.
+- **ArgoCDAppSyncUnknown** (critical) — an app is stuck `sync=Unknown` for 1h (a ComparisonError): ArgoCD
+  can't compare against git, so it isn't deploying — even while the pods look Healthy. Check the app's
+  Comparison error in the UI + the repo-server logs.
+- **ArgoCDReconciliationStalled** (critical) — the app-controller has done ZERO reconciles for 30m
+  (`argocd_app_reconcile_count` flat): GitOps has silently stopped for *every* app. Check the
+  application-controller pod (OOM/CPU-starved/wedged work queue) and its logs. This is the controller-wide
+  version of the 6-day-outage failure mode.
 
 ## Loki & Tempo stores
 
@@ -163,6 +170,29 @@ hostnames at the Gateway Envoy ClusterIP, so TLS SNI + Host still verify the rea
   by `{{ $labels.instance }}` is near expiry. This is the cert external clients actually see (distinct from the
   in-cluster cert-manager certs above); if it fires, Let's Encrypt renewal has stalled — check cert-manager for
   that host's Certificate + the ACME order.
+
+## karpenter
+
+Namespace `kube-system` (ADR-078). Karpenter is the node autoscaler — when it can't provision, pods stay
+Pending and workloads can't scale.
+
+- **KarpenterCloudProviderErrors** (warning) — Karpenter's EC2 API calls have been erroring continuously for
+  15m. Read the karpenter controller logs for the AWS error: IAM/Pod-Identity, an SCP, a launch-template
+  problem, or genuine capacity. (The counter also ticks on transient `InsufficientCapacity` that Karpenter
+  self-heals from — hence the sustained window; a brief blip is normal.)
+- **KarpenterPodsPendingUnscheduled** (warning) — a pod has been Pending 15m. `kubectl describe pod` for the
+  unschedulable reason; check NodePool limits/taints and the Karpenter logs. If many fire at once, the
+  elasticity loop is broken (Karpenter down, at a NodePool limit, or no matching capacity).
+
+## controllers
+
+Operator reconcile health (#1121). Any controller-runtime operator that silently stops applying desired state.
+
+- **ControllerReconcileErrors** (warning) — the `{{ $labels.controller }}` controller has been failing
+  reconciles for 15m. Map the controller to its operator (Karpenter `disruption`/`nodeclaim…`; ESO
+  `clusterexternalsecret`/`clustersecretstore`; ArgoCD `applicationset`; the ADR-088 activation-operator) and
+  read that pod's logs. The desired state (a grant, a synced secret, a node) isn't being realized even though
+  the pod is up.
 
 ## Cloud resources
 
