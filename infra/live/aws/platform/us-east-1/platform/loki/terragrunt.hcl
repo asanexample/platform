@@ -125,5 +125,11 @@ inputs = {
   extra_tenant_datasources    = ["preprod"]
   enable_federated_datasource = true
 
+  # P13 enforcement (#590), mirroring metrics: route the Grafana Loki datasources through the loki-tenant-proxy
+  # (identity-scoped) instead of direct headers, and let the spoke edge PASS THROUGH the per-team tenant the
+  # preprod Alloy stamps (instead of force-stamping `preprod`). Both gated on the per-team-tenants flag.
+  read_proxy_url           = include.base.locals.enable_per_team_tenants ? "http://loki-tenant-proxy.observability.svc:8080" : ""
+  spoke_ingest_passthrough = include.base.locals.enable_per_team_tenants
+
   tags = include.base.locals.tags
 }

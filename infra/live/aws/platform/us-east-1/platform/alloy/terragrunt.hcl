@@ -76,6 +76,11 @@ inputs = {
   namespace     = dependency.observability.outputs.namespace
   loki_push_url = dependency.loki.outputs.push_endpoint
 
+  # P13 per-team log isolation (#590): derive each stream's Loki tenant from the pod `team` label. On the hub
+  # there are no env namespaces, so everything falls back to the `platform` tenant (behaviour unchanged) —
+  # this flip just proves the re-tenant River is valid before the preprod spoke, mirroring the metrics rollout.
+  per_team_tenant = include.base.locals.enable_per_team_tenants
+
   helm_chart_version = include.base.locals.helm_versions.alloy
   # DaemonSet on a capacity-tight cost-effective cluster: a node can be too packed to fit one pod,
   # which would (with atomic) roll back the whole release. Don't gate the apply on full scheduling —

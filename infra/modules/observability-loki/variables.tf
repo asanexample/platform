@@ -111,6 +111,18 @@ variable "enable_federated_datasource" {
   default     = false
 }
 
+variable "read_proxy_url" {
+  description = "P13 read-isolation enforcement (#590), identical to the mimir module: when set, the Grafana Loki datasources point at the loki-tenant-proxy with `oauthPassThru` (SSO identity decides scope) instead of the gateway with a fixed `X-Scope-OrgID`, and the per-cluster bypass datasources are dropped (only `loki` + `loki-all` remain, both proxy-fronted). Empty = direct datasources (pre-P13)."
+  type        = string
+  default     = ""
+}
+
+variable "spoke_ingest_passthrough" {
+  description = "P13 per-team logs (#590): when true, the spoke ingest HTTPRoute STOPS force-setting `X-Scope-OrgID` and passes the spoke-supplied (per-team) tenant through to Loki. Required so preprod's per-team Alloy re-tenant survives the hub edge. Trades the cross-tenant write-spoofing guard for per-team writes — a deferred tradeoff hardened later by ingest mTLS (#590 Phase-4 D-2). Off = force-stamp (default, safe)."
+  type        = bool
+  default     = false
+}
+
 variable "spoke_ingest" {
   description = <<-EOT
     Cross-cluster spoke LOG ingest via the shared Cilium Gateway (hub-and-spoke, #627). When `tenants` is

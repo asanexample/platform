@@ -4,6 +4,12 @@ variable "create" {
   default     = false
 }
 
+variable "name" {
+  description = "Instance name (Deployment/Service/selector). One proxy per signal — `tenant-proxy` (metrics), `loki-tenant-proxy` (logs), `tempo-tenant-proxy` (traces), `pyroscope-tenant-proxy` (profiles) — each fronting its store via `upstream_url`. The resolver/grant logic is identical; only the upstream differs."
+  type        = string
+  default     = "tenant-proxy"
+}
+
 variable "namespace" {
   description = "Namespace to deploy into (the shared observability namespace, next to Grafana + Mimir)."
   type        = string

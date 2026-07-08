@@ -1,9 +1,10 @@
 locals {
   create = var.create
+  name   = var.name # one instance per signal (tenant-proxy / loki-tenant-proxy / …) — the store it fronts differs by upstream_url.
   # k8s LABEL values only — NOT var.tags (AWS tag values like "Multi-Cloud Platform" contain spaces, which
   # k8s label values reject). var.tags is not applied to k8s objects.
-  labels   = { "app.kubernetes.io/name" = "tenant-proxy", "app.kubernetes.io/part-of" = "observability", "app.kubernetes.io/managed-by" = "terraform" }
-  selector = { app = "tenant-proxy" }
+  labels   = { "app.kubernetes.io/name" = local.name, "app.kubernetes.io/part-of" = "observability", "app.kubernetes.io/managed-by" = "terraform" }
+  selector = { app = local.name }
 }
 
 # ---------------------------------------------------------------------------
@@ -14,7 +15,7 @@ resource "kubernetes_deployment_v1" "tenant_proxy" {
   count = local.create ? 1 : 0
 
   metadata {
-    name      = "tenant-proxy"
+    name      = local.name
     namespace = var.namespace
     labels    = local.labels
   }
@@ -113,7 +114,7 @@ resource "kubernetes_service_v1" "tenant_proxy" {
   count = local.create ? 1 : 0
 
   metadata {
-    name      = "tenant-proxy"
+    name      = local.name
     namespace = var.namespace
     labels    = local.labels
   }
@@ -140,7 +141,7 @@ resource "kubernetes_manifest" "tenant_proxy_service_monitor" {
     apiVersion = "monitoring.coreos.com/v1"
     kind       = "ServiceMonitor"
     metadata = {
-      name      = "tenant-proxy"
+      name      = local.name
       namespace = var.namespace
     }
     spec = {
@@ -161,7 +162,7 @@ resource "kubernetes_config_map_v1" "datasource" {
   count = local.create && var.create_datasource ? 1 : 0
 
   metadata {
-    name      = "tenant-proxy-datasource"
+    name      = "${local.name}-datasource"
     namespace = var.namespace
     labels    = merge(local.labels, { grafana_datasource = "1" })
   }

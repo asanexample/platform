@@ -132,9 +132,14 @@ locals {
   # `Loki (all clusters)` spanning every tenant (#626/#629). All query the same gateway; only the header differs.
   all_tenants = concat([var.default_tenant_id], var.extra_tenant_datasources)
 
+  # P13 enforcement (#590): identical to the mimir module — when read_proxy_url is set, datasources point at
+  # the loki-tenant-proxy with oauthPassThru (SSO identity decides scope) and the per-cluster bypass
+  # datasources are dropped, leaving only `loki` + `loki-all` (both proxy-fronted).
+  proxy_enforced = var.read_proxy_url != ""
+
   datasource_tenants = concat(
     [{ name = "Loki (${var.default_tenant_id})", uid = "loki", tenant = var.default_tenant_id }],
-    [for t in var.extra_tenant_datasources : { name = "Loki (${t})", uid = "loki-${t}", tenant = t }],
+    local.proxy_enforced ? [] : [for t in var.extra_tenant_datasources : { name = "Loki (${t})", uid = "loki-${t}", tenant = t }],
     var.enable_federated_datasource ? [{ name = "Loki (all clusters)", uid = "loki-all", tenant = join("|", local.all_tenants) }] : [],
   )
 
@@ -152,13 +157,16 @@ locals {
     # doesn't collide on uid and 500 the reload. Idempotent. See the mimir module for the full rationale.
     deleteDatasources = [{ name = "Loki", orgId = 1 }]
     datasources = [for ds in local.datasource_tenants : {
-      name           = ds.name
-      type           = "loki"
-      uid            = ds.uid
-      access         = "proxy"
-      url            = "http://${var.helm_release_name}-gateway.${var.namespace}.svc"
-      jsonData       = { httpHeaderName1 = "X-Scope-OrgID", derivedFields = local.loki_derived_fields }
-      secureJsonData = { httpHeaderValue1 = ds.tenant }
+      name   = ds.name
+      type   = "loki"
+      uid    = ds.uid
+      access = "proxy"
+      url    = local.proxy_enforced ? var.read_proxy_url : "http://${var.helm_release_name}-gateway.${var.namespace}.svc"
+      jsonData = merge(
+        { derivedFields = local.loki_derived_fields },
+        local.proxy_enforced ? { oauthPassThru = true } : { httpHeaderName1 = "X-Scope-OrgID" },
+      )
+      secureJsonData = local.proxy_enforced ? {} : { httpHeaderValue1 = ds.tenant }
     }]
   }
 
@@ -356,7 +364,10 @@ resource "kubernetes_manifest" "spoke_ingest_route" {
       rules = [{
         # Write-only: only the Loki push path is routed; everything else (incl. query APIs) 404s.
         matches = [{ path = { type = "PathPrefix", value = "/loki/api/v1/push" } }]
-        filters = [{
+        # Default: FORCE-SET the tenant (a spoke can't spoof another). P13 per-team logs need the spoke to
+        # set its own per-team tenant, so `spoke_ingest_passthrough` drops the force-set and passes the
+        # Alloy-supplied X-Scope-OrgID through — a write-integrity tradeoff hardened later by ingest mTLS.
+        filters = var.spoke_ingest_passthrough ? [] : [{
           type                  = "RequestHeaderModifier"
           requestHeaderModifier = { set = [{ name = "X-Scope-OrgID", value = each.value }] }
         }]
