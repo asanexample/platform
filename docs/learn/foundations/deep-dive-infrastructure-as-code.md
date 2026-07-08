@@ -1,16 +1,16 @@
 # Learn: Foundations — infrastructure as code (deep dive)
 
-> **Assumes the [Foundations orientation](orientation.md)** — specifically *Stop 2, "everything is code."*
-> There you met the idea in silhouette: two tools, a config cascade, secrets encrypted in the open. This
-> deep dive traces the *mechanism* — how a single leaf unit actually gets its settings, how the two safety
-> asserts fire, where state lives, and how a public repo carries its own secrets. One hard machine, followed
-> end to end. If you're already fluent in Terragrunt, the [Reference](reference.md) is the terse lookup.
+Two tools stand between this platform's code and the cloud: [OpenTofu](https://opentofu.org/docs/) provisions,
+[Terragrunt](https://terragrunt.gruntwork.io/docs/) orchestrates. This traces the mechanism — how a single
+leaf unit actually gets its settings, how the two safety asserts fire, where state lives, and how a public
+repo carries its own secrets. One hard machine, followed end to end. If you're already fluent in Terragrunt,
+the [Reference](reference.md) is the terse lookup.
 
 ## The oven and the sous-chef, precisely
 
-The orientation gave you the one-liner: [OpenTofu](https://opentofu.org/docs/) is the provisioning *engine*,
-[Terragrunt](https://terragrunt.gruntwork.io/docs/) is the *orchestrator* wrapped around it — *the oven and
-the sous-chef*. Now pin the versions, because they're the single source of truth the whole estate reads from:
+OpenTofu is the provisioning *engine*; Terragrunt is the *orchestrator* wrapped around it — the oven and the
+sous-chef. The versions both run at are pinned in one place, the single source of truth the whole estate reads
+from:
 
 ```text
 # /.tool-versions  (read by mise/asdf locally, by CI, and baked into the runner image)
@@ -25,21 +25,20 @@ awscli 2.35.1
 never HashiCorp Terraform ([ADR-016](../../adrs/016-opentofu-over-terraform.md)). Bump a version *here* and
 your laptop, CI, and the self-hosted runner can't drift apart. That's the whole point of a canonical pin.
 
-The sous-chef never cooks. Terragrunt generates the backend + provider config, wires units in dependency
-order, and — the subject of this doc — assembles each unit's inputs from a layered cascade so no fact is
-written twice.
+The sous-chef never cooks. Terragrunt generates the backend and provider config, wires units in dependency
+order, and assembles each unit's inputs from a layered cascade so no fact is written twice — the cascade the
+rest of this walks through.
 
 ## Class and instance: modules vs live units
 
-The code splits two ways, and the split is the *class-vs-instance* distinction from the orientation made
-literal:
+The code splits two ways, and the split is the class-vs-instance distinction made literal:
 
 - **`infra/modules/`** — reusable, environment-agnostic OpenTofu modules. *How to build an IAM role set, in
   the abstract.* The class.
 - **`infra/live/aws/`** — the specific instantiations. *The platform account's IAM roles in us-east-1.* The
   instance.
 
-A live unit never hardcodes a path to its module. Instead there's one layer of indirection through
+A live unit never hardcodes a path to its module. There's one layer of indirection through
 `infra/live/aws/_versions.hcl`, which maps a logical name to a source:
 
 ```hcl
@@ -64,8 +63,8 @@ one edit, not a grep across dozens of units.
 
 ## The cascade — each fact in exactly one layer
 
-Here is the mechanism the orientation drew as a CSS cascade. Configuration is layered by *scope*, broad to
-narrow, and **each fact lives in exactly one layer**:
+The mechanism, drawn as a CSS cascade: configuration layered by *scope*, broad to narrow, and **each fact
+lives in exactly one layer**.
 
 ```text
 root.hcl        remote state, provider generation, terraform_binary   (the whole estate)
@@ -90,8 +89,8 @@ flowchart TD
     BASE -. merges broad to narrow .-> UNIT
 ```
 
-The genius is *not* the nesting — it's the discipline that each value appears once. A concrete tour of the
-real files for the platform hub's `iam-roles` unit:
+What matters isn't the nesting — it's the discipline that each value appears once. A tour of the real files
+for the platform hub's `iam-roles` unit:
 
 ```hcl
 # region.hcl — a region fact, written once
@@ -109,7 +108,7 @@ env = "platform"
 account_id = local._secrets.account_ids["platform"]   # decrypted, not literal
 ```
 
-Change `vpc_cidr` in that one `network.hcl` and *every* unit in the region sees the new value — no
+Change `vpc_cidr` in that one `network.hcl` and every unit in the region sees the new value — no
 grep-and-replace across directories. That's the payoff of "each fact in one layer": there's exactly one place
 to change it, and exactly one place it can be wrong.
 
@@ -146,9 +145,9 @@ all_vars = merge(
 ```
 
 `merge()` is last-key-wins, and the arguments run broad→narrow, so an `env.hcl` value overrides a
-`common.hcl` default for the same key. This is exactly why `common.hcl` can set `cost_profile = "dev"` as a
+`common.hcl` default for the same key. That's why `common.hcl` can set `cost_profile = "dev"` as a
 cloud-wide default while the platform hub's `env.hcl` overrides individual knobs (`enable_mimir = true`,
-`enable_loki = true`) — the env layer wins. The tags follow the identical broad→narrow `merge` so a
+`enable_loki = true`) — the env layer wins. The tags follow the identical broad→narrow `merge`, so a
 workload's `Team` tag can override the platform default.
 
 ## How a unit *consumes* it
@@ -186,11 +185,10 @@ inputs = {
 }
 ```
 
-Read what's happening: `source` comes from the resolved `module_source` map; the trust-policy account numbers
-come from `include.base.locals.account_ids`, which chained all the way back through `common.hcl` to the
-*decrypted* SOPS file (next section); and `tags` is the four-layer composed map. The unit declares *intent* —
-"give PlatformAdmin these roles" — and inherits every environmental fact. Two `include` blocks and the whole
-cascade is present.
+`source` comes from the resolved `module_source` map. The trust-policy account numbers come from
+`include.base.locals.account_ids`, which chained all the way back through `common.hcl` to the *decrypted* SOPS
+file (next section). `tags` is the four-layer composed map. The unit declares *intent* — "give PlatformAdmin
+these roles" — and inherits every environmental fact. Two `include` blocks, and the whole cascade is present.
 
 ## The two SAFETY asserts — refusal by construction
 
@@ -222,8 +220,8 @@ with `platform`, which must equal `env.hcl`'s declared `env`. Assert 2 catches a
 `environment_account_map` (itself the decrypted `account_ids`) must agree with the `account_id` the env file
 resolved. Fail either and Terragrunt refuses to run, printing a `SAFETY:` error. A whole class of
 catastrophic copy-paste — the "I applied prod's config from the preprod folder" mistake — is impossible by
-construction, not by discipline. (If you ever *see* a `SAFETY:` error: that's the rail working. Fix the
-directory or the account map; never delete the assert.)
+construction, not by discipline. If you ever *see* a `SAFETY:` error, that's the rail working. Fix the
+directory or the account map; never delete the assert.
 
 ## Remote state — where the truth is kept
 
@@ -265,10 +263,10 @@ from ever rewriting another environment's state.
 
 ## SOPS — the locked glass case in the public square
 
-Now the trick the orientation flagged: this is a **public repository**, yet the account IDs, emails, SSO URLs,
-state-bucket name, and state-role ARN are committed *right in git*. They live in
-`infra/live/aws/secrets.enc.yaml`, encrypted per-value with [SOPS](https://github.com/getsops/sops) against a
-dedicated [AWS KMS](https://docs.aws.amazon.com/kms/latest/developerguide/overview.html) key
+The trick: this is a **public repository**, yet the account IDs, emails, SSO URLs, state-bucket name, and
+state-role ARN are committed *right in git*. They live in `infra/live/aws/secrets.enc.yaml`, encrypted
+per-value with [SOPS](https://github.com/getsops/sops) against a dedicated
+[AWS KMS](https://docs.aws.amazon.com/kms/latest/developerguide/overview.html) key
 ([ADR-066](../../adrs/066-sops-encrypted-config-secrets.md)). A raw line looks like this:
 
 ```yaml
@@ -316,10 +314,10 @@ weighed and rejected the tempting alternatives:
   *already has an AWS identity* — no key material to distribute (the exact problem `age` reintroduces).
   Revoking an operator is a policy edit.
 
-One nuance to internalize: `secrets.enc.yaml` holds **no actual credentials** — no passwords or tokens. Real
-runtime secrets live in AWS Secrets Manager and are pulled by External Secrets. This file holds only
-*environment-identifying* values that are merely sensitive-in-a-public-repo (account numbers, emails, SSO
-endpoints). It's an identity-config file, encrypted; not a vault.
+One nuance: `secrets.enc.yaml` holds **no actual credentials** — no passwords or tokens. Real runtime secrets
+live in AWS Secrets Manager and are pulled by External Secrets. This file holds only *environment-identifying*
+values that are merely sensitive-in-a-public-repo (account numbers, emails, SSO endpoints). It's an
+identity-config file, encrypted; not a vault.
 
 ## The bootstrap chicken-and-eggs
 

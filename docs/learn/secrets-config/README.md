@@ -1,7 +1,7 @@
 # Learn: Secrets & Config
 
-How the platform handles secrets and config — by *not having* long-lived secrets wherever it can (federation),
-and keeping the irreducible few on two clean planes: **config-in-git** (SOPS) and **runtime secrets**
+How the platform handles secrets and config: by *not having* long-lived secrets wherever it can (federation),
+and keeping the irreducible few on two clean planes — **config-in-git** (SOPS) and **runtime secrets**
 (External Secrets Operator + AWS Secrets Manager).
 
 **Audience:** platform engineers, and any developer wondering where a password actually comes from.
@@ -20,7 +20,7 @@ and keeping the irreducible few on two clean planes: **config-in-git** (SOPS) an
 ## Go deep
 
 - **[Config in git (SOPS)](deep-dive-config-in-git.md)** — the SOPS/KMS mechanism, the `platform-sops`
-  key-policy-as-ACL, the `TG_SOPS_BOOTSTRAP` escape, and the load-bearing SOPS-vs-ESO boundary.
+  key-policy-as-ACL, the `TG_SOPS_BOOTSTRAP` escape, and where the boundary between SOPS and ESO falls.
 - **[Runtime secrets (ESO + Secrets Manager)](deep-dive-runtime-secrets.md)** — the ClusterSecretStore +
   ExternalSecret mechanism, a live worked example, naming/scoping, keyless-first, and the *designed* tenant
   self-service road (ADR-070).

@@ -1,16 +1,16 @@
 # Learn: the domain model
 
 The shared vocabulary of the platform — **Team, Product, Service, Environment** (and **Customer**) — and
-how they relate. This is the foundation everything else is built on: provisioning, access, delivery, and
-cost all derive from these nouns. **Start here before any other module.**
+how they relate. Provisioning, access, delivery, and cost all derive from these nouns, so start here before
+any other module.
 
-**Audience:** everyone — developers (it's the model your code lives in) and platform engineers (it's what
-governance and automation hang off). No prior platform knowledge needed.
+**Audience:** everyone. For developers it's the model your code lives in; for platform engineers it's what
+governance and automation hang off. No prior platform knowledge needed.
 
 ## Read in this order
 
-1. **[Orientation](orientation.md)** — the teaching journey. Ownership is a tree, deployment is a grid;
-   walk a real team (`alpha`) down the tree and across the grid.
+1. **[Orientation](orientation.md)** — ownership is a tree, deployment is a grid. Walk a real team (`acme`)
+   down the tree and across the grid.
 2. **[Reference](reference.md)** — the terse lookup: the nouns as a schema, the relationships, the naming
    conventions, and the Team envelope.
 

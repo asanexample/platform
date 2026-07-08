@@ -1,8 +1,8 @@
 # Learn: The Agentic Platform — reference
 
-Look-up, not a lesson. Build the model in the [orientation](orientation.md) first. Verified against code +
-ADRs + git history (the hub cluster was parked at write time, so live-status rests on the ADR "built+live"
-headers, the committed claim, and the continuous promote commits — not a fresh `kubectl`).
+A lookup reference; the [orientation](orientation.md) builds the model from the ground up. Verified against
+code + ADRs + git history. The hub cluster was parked at write time, so live-status here rests on the ADR
+"built+live" headers, the committed claim, and the continuous promote commits — not a fresh `kubectl`.
 
 ## The ADR map
 
@@ -110,9 +110,9 @@ directory bug can't misfire a page.
 
 **Eval loop:** the triage card's **accept/correct/dismiss** buttons → `triage_feedback_total{verdict,disposition}`
 → accept-rate *by disposition* (calibration) + the eval corpus. **Observed:** the "Triage Agent (ADR-076)"
-dashboard — see the [Observability agent-obs deep dive](../observability/deep-dive-agent-observability.md)
-(don't re-teach). *Impl note:* the agent loop's Go source is in the app repo (`platform-triage-copilot`), not
-this infra repo — this repo defines the claim, runtime, directory backend, and observability.
+dashboard — see the [Observability agent-obs deep dive](../observability/deep-dive-agent-observability.md).
+*Impl note:* the agent loop's Go source is in the app repo (`platform-triage-copilot`), not this infra
+repo — this repo defines the claim, runtime, directory backend, and observability.
 
 ## Status ledger
 

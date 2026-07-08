@@ -1,11 +1,11 @@
 # Learn: Identity & Access — reference
 
-Look-up, not a lesson. Build the model in the [orientation](orientation.md) first. This is a *sub-curriculum*
-— the pieces in brief; each may earn its own module later.
+A reference for the identity and access model, in brief. For the full walkthrough, see the
+[orientation](orientation.md). Each piece here may earn its own module later.
 
 ## The shape
 
-**Decide once (git) → derive `(who) × (what)` → project into each system's native config.** Three planes,
+Decide once in git, derive `(who) × (what)`, then project it into each system's native config. Three planes,
 sharing machinery, zero trust between them:
 
 | Plane | Who | Identity of record |
@@ -34,7 +34,7 @@ Catalog today: `developer`, `team-admin`, `platform-operator`, `access-admin`, `
 
 ## Projection — where access lands
 
-The platform *derives* native config from `(Person × Role)` because each tool decides access internally
+Each tool decides access internally, so the platform derives its native config from `(Person × Role)`
 ([ADR-089](../../adrs/089-governance-registry-topology.md)/[ADR-090](../../adrs/090-governance-identity-model.md)):
 
 - **AWS** — Identity Center permission sets (console/CLI), per team.
@@ -59,12 +59,12 @@ The platform *derives* native config from `(Person × Role)` because each tool d
   **no static keys**. Provisioned per-Service by [the Environment Composition](../environment-api/orientation.md)
   (e.g. `Pod-<team>-<product>-<stage>-<svc>`). The platform's own add-ons moved off IRSA to Pod Identity too.
 - **Agents — a richer machine subject** ([ADR-074](../../adrs/074-agentic-workloads-platform.md)): an agent
-  gets its own Pod Identity *plus* a **three-identity** authority model — its own identity, its tool/model
-  grant, and on-behalf-of-user delegation — where **effective authority = intersection(agent grant, human
-  scope)**, enforced by *trusted boundary code, never the agent*, and **attenuating** across chains. **One**
-  access model (agents are grant subjects, ADR-068 extended); bounded by **graduated autonomy**
-  ([ADR-086](../../adrs/086-autonomous-agent-access.md)). Largely *designed* today — full treatment is the
-  coming **Agentic platform** module.
+  gets its own Pod Identity plus a three-identity authority model — its own identity, its tool/model grant,
+  and on-behalf-of-user delegation — where effective authority is the intersection of the agent grant and the
+  human's scope, enforced by trusted boundary code (never the agent) and attenuating across chains. It's the
+  same access model, with agents as grant subjects (ADR-068 extended), bounded by graduated autonomy
+  ([ADR-086](../../adrs/086-autonomous-agent-access.md)). Largely designed today; the full treatment is the
+  coming Agentic platform module.
 
 ## Keycloak — the pluggable seam
 
@@ -72,7 +72,7 @@ The platform *derives* native config from `(Person × Role)` because each tool d
   exists, so the platform never becomes the identity monopoly. Apps get **direct OIDC** to Keycloak (Dex
   retired). Admin plane hardened (passkey + sealed break-glass, ADR-087).
 
-## Gotchas that teach
+## Gotchas
 
 - **Declared ≠ effected.** A grant in git is *intent*; the projected native config is the *effect*. The
   honest model verifies intent-vs-effected + drift, because a system could be changed out-of-band. Don't

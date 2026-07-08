@@ -1,24 +1,18 @@
 # The Life of a Deployment
 
-> **A spine doc** — it doesn't teach one subsystem, it traces one *event* across all of them, and it's
-> **long on purpose**: this is the narrative that ties the whole platform together. Read it after
-> [the domain model](../domain-model/orientation.md) (so Team / Product / Service / Environment mean
-> something) and ideally [the Environment API](../environment-api/orientation.md) (so *reconciliation*
-> does too). It's the map the per-subsystem courses hang off — take your time.
-
 ## The question
 
-You're a developer on the `alpha` team. You fix a one-line bug in the `shop` product's `web` service, open
+You're a developer on the `acme` team. You fix a one-line bug in the `shop` product's `web` service, open
 a PR, and merge it. You go make coffee. By the time you're back, the fix is serving real users.
 
-**What actually happened in those few minutes?** Not the tidy arrows on an architecture slide — the *real*
-chain of machinery, plane by plane, and crucially *who did what and why*. Because the honest answer is
-surprising, and once you see it, the whole platform stops feeling like magic and starts feeling like a
-system you could reason about at 3 a.m. during an incident.
+What actually happened in those few minutes? Not the tidy arrows on an architecture slide — the real
+chain of machinery, plane by plane, and who did what and why. The honest answer is surprising, and once
+you see it the whole platform stops feeling like magic and starts feeling like a system you could reason
+about at 3 a.m. during an incident.
 
 This doc is that answer: one `git push`, followed all the way to a running pod, teaching each plane it
-touches as we go. It's the longest doc in the portal. That's the right length for the thing that connects
-everything else.
+touches as we go. It's long on purpose — that's the right length for the thing that connects everything
+else.
 
 ## The one idea: there is no conductor
 
@@ -30,24 +24,26 @@ Start by throwing away the mental model you almost certainly have. Most people p
 
 There is no belt. There is no robot. Nothing *pushes* your code anywhere.
 
-What's actually there is **a room full of thermostats.** You met one already, in
-[the Environment API](../environment-api/orientation.md): Crossplane, sitting there watching *desired
-state* versus *actual state* and quietly closing the gap whenever they drift — forever, without being
-asked. That wasn't a one-off. **That is how the entire platform is built.** A dozen different control
-planes, each one a thermostat for its own concern: each **watches one thing** (either the git repository,
-or the live cluster) and **reconciles its own slice** of your intent toward what you declared.
+What's actually there is **a room full of thermostats.** Take one — Crossplane, the control plane behind
+[the Environment API](../environment-api/orientation.md): it sits there watching desired state versus
+actual state and quietly closes the gap whenever they drift, forever, without being asked. That wasn't a
+one-off. That is how the entire platform is built. A dozen different control planes, each a thermostat for
+its own concern: each watches one thing — either the git repository or the live cluster — and reconciles
+its own slice of your intent toward what you declared.
+
+![The core primitive behind the whole platform: a control loop, drawn as a thermostat. It watches your declared desired state against the actual state and continuously reconciles the gap toward what you declared — no conductor, no push, just a loop that closes on its own.](images/there-is-no-conductor.svg)
 
 Your deployment is not a package riding a belt. It's what you *observe* when, one after another, each of
 these thermostats notices its cue and acts.
 
 And the thing they all watch — the shared source of truth that coordinates the whole dance without any of
 them talking to each other — is **git.** You never call these planes. You never trigger a pipeline. You
-change a file in git, and they *notice*, because noticing is the only thing they do. This pattern has a
+change a file in git, and they notice, because noticing is the only thing they do. This pattern has a
 name — [**GitOps**](https://opengitops.dev/): the desired state of the system lives in git, and automated
 agents continuously make reality match it.
 
-That's the whole idea, and it's worth saying plainly because everything below is just this idea playing out
-ten times:
+That's the whole idea, and it's worth saying plainly, because everything below is just this idea playing
+out ten times:
 
 > **The platform is choreography, not orchestration.** No central conductor pushes work through stages.
 > Independent control loops each react to a shared source of truth (git) and converge the world toward it.
@@ -61,63 +57,54 @@ ten times:
 > parallel**, all the time. The *order* you're about to walk through is simply the order in which each
 > plane's cue happens to arrive. Keep those two caveats and the metaphor will carry you the whole way.
 
-```mermaid
-flowchart LR
-    Dev["merge to<br/>app repo"] --> CI["CI: build ·<br/>sign · attest"]
-    CI --> Prom["promote →<br/>Release PR"]
-    Prom --> Gate["the Gate<br/>merges"]
-    Gate -.->|watches git| Argo["ArgoCD<br/>syncs"]
-    Argo --> Adm["Kyverno<br/>admits"]
-    Adm --> Roll["Rollout<br/>canaries"]
-    Roll -.->|watches pods| Node["Karpenter ·<br/>Cilium · Pod ID"]
-    Node --> GW["Gateway<br/>routes traffic"]
-    GW -.->|watches signals| Obs["Observability<br/>· on-call"]
-```
+![Ten control planes drawn as a column of thermostats — human merge, then CI build/sign/attest, promotion, the Gate, ArgoCD, Kyverno admission, Argo Rollouts canary, Karpenter/Cilium/Pod Identity, Gateway/cert-manager, and observability/on-call. Each watches one thing and reconciles its slice of the world toward the git-declared desired state. Nobody pushes; every plane pulls.](images/delivery-pipeline-vertical.svg)
 
-Ten planes. Let's walk each one — not just *what* it does, but *why it exists* and *what idea it's built
-on* — following the `web` service of `alpha`'s `shop` from your merge to live traffic.
+Ten planes. We'll walk each — what it does, why it exists, the idea it's built on — following the `web`
+service of `acme`'s `shop` from your merge to live traffic.
 
 ---
 
 ## 1 · You merge (your repo)
 
-Your PR lands on `main` in `asanexample/alpha-shop`. That's it. That is the **last thing a human does by
+Your PR lands on `main` in `asanexample/acme-shop`. That's it. That is the **last thing a human does by
 hand** in this entire story (well — until a human *chooses* to approve the production release near the end).
 Everything from here is a machine noticing that something changed.
 
-Sit with how unusual that is. You didn't run a deploy command. You didn't open a dashboard and click
-"ship." You didn't file a ticket for ops. You changed code and merged it — the same thing you'd do on a
-solo hobby project — and the platform took it from there. That's the *point* of a platform: turn "deploy to
-a compliant, observable, multi-account, progressively-delivered production environment" into "merge your
-PR." Everything below is the machinery that makes that trade honest.
+Notice how unusual that is. You didn't run a deploy command. You didn't open a dashboard and click "ship."
+You didn't file a ticket for ops. You changed code and merged it — the same thing you'd do on a solo hobby
+project — and the platform took it from there. That's the point of a platform: turn "deploy to a compliant,
+observable, multi-account, progressively-delivered production environment" into "merge your PR." Everything
+below is the machinery that makes that trade honest.
 
 ## 2 · CI builds, signs, and *attests* it (the supply chain)
 
 The moment your merge lands, your repo's CI wakes up. But notice what it is: your repo's workflow is a thin
-**caller** of *shared* workflows the platform owns — you don't copy-paste a hundred lines
-of Docker-and-security YAML into every app; you call the platform's versions and inherit their guarantees.
-(This is the "paved road" idea: the safe path is the *easy* path.)
+**caller** of *shared* workflows the platform owns — you don't copy-paste a hundred lines of
+Docker-and-security YAML into every app; you call the platform's versions and inherit their guarantees.
+(This is the paved-road idea: the safe path is the easy path.)
 
-Your CI thinly calls **two** shared workflows, which together do three things:
+Your CI thinly calls two shared workflows, which together do three things:
 
 1. **Builds** your code into a container image *(build-sign workflow)*.
-2. **Pushes** it to the platform's registry as `team-alpha/shop-web@sha256:…`, then **cosign-signs** it and
+2. **Pushes** it to the platform's registry as `team-acme/shop-web@sha256:…`, then **cosign-signs** it and
    records a software bill of materials *(still the build-sign workflow)*.
 3. **Attests** it — a *separate, isolated* provenance workflow writes the SLSA build attestation from its own
    identity. This is the part worth teaching, because it's the platform's answer to a whole category of attack.
 
-Here's the problem it solves. A container image is just a blob in a registry. How does the *cluster*, later,
-know that a given blob is really *your* code, built by *your* CI from *your* repo — and not something a
+The problem it solves: a container image is just a blob in a registry. How does the *cluster*, later, know
+that a given blob is really *your* code, built by *your* CI from *your* repo — and not something a
 compromised laptop or a poisoned dependency slipped in? You can't just trust the name; names can be
 overwritten.
 
 So the workflow **cosign-signs** the image. [Cosign](https://docs.sigstore.dev/cosign/signing/overview/)
-does *keyless* signing: instead of a secret key someone could steal, it uses CI's own short-lived **OIDC
-identity** (the GitHub Actions run proving "I am the `build-sign` workflow of this repo") to produce a
+does *keyless* signing: instead of a secret key someone could steal, it uses CI's own short-lived OIDC
+identity (the GitHub Actions run proving "I am the `build-sign` workflow of this repo") to produce a
 signature, and records it in a public transparency log. Then a *separate, isolated* provenance workflow writes a
 [**SLSA provenance**](https://slsa.dev/) attestation — a signed statement describing *how and where this
 image was built* (which repo, which commit, which workflow). Keeping provenance in its own workflow and identity
 is what earns the SLSA L3 "isolated builder" guarantee (ADR-042).
+
+![Supply-chain trust: the CI build emits a signed image and a SLSA provenance attestation, each bound to the build's own identity — the repo, the commit, the isolated workflow. The signature proves the image wasn't altered; the provenance proves exactly how and where it was built.](images/supply-chain-trust.svg)
 
 > Think of it as a **tamper-evident wax seal plus a notarized receipt.** The signature is the seal: break
 > it — alter one byte of the image — and the seal doesn't match, visibly. The provenance is the notarized
@@ -134,9 +121,9 @@ provenance, the thin-caller model, verify-at-admission (ADR-042/050).*
 
 ## 3 · The digest is promoted — into a *different* repo
 
-Now the clever part, and the first place this platform diverges from what you might expect.
+This is the first place the platform diverges from what you'd expect.
 
-First, *why a digest?* The image has a name (`team-alpha/shop-web`) and it could have a tag (`:latest`,
+First, *why a digest?* The image has a name (`team-acme/shop-web`) and it could have a tag (`:latest`,
 `:v1.2`). But tags are **mutable nicknames** — `:latest` can point at one image today and a different one
 tomorrow; two people saying "latest" can mean two different things. A **digest** (`sha256:f6b37d…`) is a
 **content fingerprint**: it's computed from the image's bytes, so it names *one exact image, forever*.
@@ -148,15 +135,17 @@ the platform repo** — a completely different repository — editing exactly on
 record for this stage.
 
 ```yaml
-# gitops/releases/alpha/shop/dev.yaml   (in the PLATFORM repo, not yours)
+# gitops/releases/acme/shop/dev.yaml   (in the PLATFORM repo, not yours)
 apiVersion: platform.refplat.org/v1beta1
 kind: Release
 spec:
-  environmentRef: alpha-shop-dev
+  environmentRef: acme-shop-dev
   services:
     web:
       digest: sha256:f6b37d…        # ← the freshly built, signed image
 ```
+
+![The two-repo hop: the app repo is blocked from declaring what runs in production; instead promotion opens a pull request into the platform repo's gitops/releases tree. The deployment intent lives in a repo the application itself can't write to.](images/two-repo-hop.svg)
 
 Why go to all that trouble to write a digest into a *foreign* repo? Two reasons, both about trust:
 
@@ -164,30 +153,21 @@ Why go to all that trouble to write a digest into a *foreign* repo? Two reasons,
   bots pushing to it. If deployment worked by having CI push a digest back into your repo, you'd have to
   *un*-protect the branch you most want protected. So the deployed digest lives elsewhere.
 - **One auditable source of truth for "what is running where."** That `Release` file *is* the record of the
-  deployed version of `alpha-shop`'s `web` in dev. Not a dashboard, not a log — a version-controlled file
+  deployed version of `acme-shop`'s `web` in dev. Not a dashboard, not a log — a version-controlled file
   with a full git history of every promotion. ([ADR-071](../../adrs/071-digest-promotion-via-control-plane.md)
   has the full rationale.)
-
-> **Quick check:** if the running digest isn't stored in your app repo, where *is* "what's deployed in dev"
-> actually written down — and why there? *(In the `Release` record in the platform repo — so your app's
-> `main` can stay protected, and so there's one auditable, history-carrying file that is the source of
-> truth for the deployed version.)*
 
 ## 4 · The Gate merges it (the promotion ladder)
 
 That Release PR doesn't merge itself blindly. A gitops **"Gate"** reviews it. And here the platform encodes
 a piece of hard-won operational wisdom: **not all environments deserve the same trust.**
 
-Up through staging, the Gate **auto-merges** the promotion once health checks pass — dev, test, uat,
-staging all flow automatically, because a bad change there hurts no real user. At **prod**, the Gate
-*stops* and waits for a human **release-approver** to sign off. Same image, the exact same signed digest,
-climbing rung by rung:
+Up through staging, the Gate auto-merges the promotion once health checks pass — dev, test, uat, staging
+all flow automatically, because a bad change there hurts no real user. At **prod**, the Gate stops and waits
+for a human **release-approver** to sign off. Same image, the exact same signed digest, climbing rung by
+rung:
 
-```mermaid
-flowchart LR
-    dev -->|auto| test -->|auto| uat -->|auto| staging
-    staging -->|"GATED · human approves"| prod
-```
+![The promotion ladder: the same signed digest climbs dev → test → uat → staging → prod, auto-promoted and health-gated on the lower rungs, with a human release-approver gating the last hop into prod.](../delivery/images/promotion-ladder-vertical.svg)
 
 Everything up to staging promotes automatically once health checks pass; only the last hop, into prod,
 waits for a human release-approver.
@@ -207,18 +187,18 @@ role. Source: [Promotion & Release](../../architecture/promotion-and-release.md)
 
 ## 5 · ArgoCD notices, and syncs (delivery)
 
-Nobody told [ArgoCD](https://argo-cd.readthedocs.io/en/stable/) to deploy anything. Let that land — it's
-the GitOps idea made concrete. ArgoCD's entire job is to **continuously compare the cluster to git** and
-fix any difference. The merged Release *is* a difference. So ArgoCD reconciles it, unprompted, the same way
-the thermostat in your hallway doesn't wait for permission to notice the room got cold.
+Nobody told [ArgoCD](https://argo-cd.readthedocs.io/en/stable/) to deploy anything — and that's the GitOps
+idea made concrete. ArgoCD's entire job is to **continuously compare the cluster to git** and fix any
+difference. The merged Release *is* a difference. So ArgoCD reconciles it, unprompted, the same way the
+thermostat in your hallway doesn't wait for permission to notice the room got cold.
 
 Mechanically: a per-Product **ApplicationSet** turns each `Release` record into one ArgoCD Application. That
 Application pulls your service's Kubernetes manifests from your app repo's `k8s/overlays/dev` folder — and
 **injects the promoted digest** over the `:placeholder` the overlay ships with. (So your overlay never has
 to contain a real digest either; the platform supplies it at sync time from the Release.) ArgoCD then
-applies the finished manifests to the `alpha-shop-dev` namespace on the preprod cluster.
+applies the finished manifests to the `acme-shop-dev` namespace on the preprod cluster.
 
-Pause on what was *already sitting there*, waiting for this workload to arrive: the `alpha-shop-dev`
+Look at what was *already sitting there*, waiting for this workload to arrive: the `acme-shop-dev`
 namespace, its dedicated image registry, its scoped AWS permissions, its network policies and resource
 quotas. None of that was created just now. **[The Environment API](../environment-api/orientation.md)
 provisioned it earlier** — when the *Environment* was first declared — using the very same reconcile-toward-
@@ -226,10 +206,7 @@ git pattern. This deploy isn't building a house; it's a tenant moving into a hou
 inspected, and furnished. (That's the whole "provision once, deploy many times" split from the domain
 model.)
 
-> **Quick check:** you merged code to your app repo, but ArgoCD watches the *platform* repo. So what is the
-> actual event that makes ArgoCD act — and does CI ever talk to ArgoCD directly? *(The event is the Release
-> digest getting merged into the platform repo's git. CI never calls ArgoCD — it just changes git, and
-> ArgoCD, always watching git, notices. Pure choreography.)*
+![Provision once, deploy many: the environment's namespace, image registry, scoped AWS permissions, network policies, and quotas were all provisioned earlier — when the Environment was first declared. This deploy just drops the workload into the already-built, furnished namespace.](images/provision-once-deploy-many.svg)
 
 *Its own module: **[Delivery](../delivery/orientation.md)** — ArgoCD, ApplicationSets, the promotion
 ladder, and Rollouts, in depth (ADR-021/069).*
@@ -249,25 +226,20 @@ built-in gate at the door of the API. The platform puts a policy engine,
 > **Where it breaks:** border control checks your *documents*, not whether you're a good person; Kyverno
 > checks that a workload is *compliant*, not that your app *works*.
 
-What it **rejects** your deploy for (a partial list): an image from another team's registry; an image
-that **isn't signed and attested** (yes — it re-verifies, at deploy time, the very signature CI made in
-step 2, because trust is checked at the moment of use, not taken on faith); missing resource limits or
-health probes; a hostname the Environment isn't allowed to claim; in prod, fewer than two replicas. Fail
-any of these and the workload *never runs* — it's stopped here, at the door, with a clear error, instead of
+What it rejects your deploy for (a partial list): an image from another team's registry; an image that
+isn't signed and attested (yes — it re-verifies, at deploy time, the very signature CI made in step 2,
+because trust is checked at the moment of use, not taken on faith); missing resource limits or health
+probes; a hostname the Environment isn't allowed to claim; in prod, fewer than two replicas. Fail any of
+these and the workload *never runs* — it's stopped here, at the door, with a clear error, instead of
 half-deploying and paging someone at midnight.
 
-What it quietly **adds** for you (so every workload is safe-by-default without every developer remembering
-every rule): a locked-down security context, a PodDisruptionBudget so it can't be drained to zero, topology
-spread so its replicas don't all land on one node. You write the *interesting* 80% of the manifest; the
-platform fills in the safety boilerplate.
+What it quietly adds for you (so every workload is safe-by-default without every developer remembering every
+rule): a locked-down security context, a PodDisruptionBudget so it can't be drained to zero, topology spread
+so its replicas don't all land on one node. You write the *interesting* 80% of the manifest; the platform
+fills in the safety boilerplate.
 
 This is **policy as code**: the rules that used to live in a wiki page nobody read, or in a reviewer's
 head, are executable and enforced identically every time, on every cluster.
-
-> **Quick check:** the image was cryptographically signed back in step 2. What re-checks that signature,
-> and at what moment? *(Kyverno, at admission — the instant before the workload is allowed to exist. Signing
-> at build time only helps if something verifies at deploy time; admission is where the seal is actually
-> inspected.)*
 
 *Its own module: **[Policy & admission](../policy/orientation.md)** — Kyverno, the three verbs
 (validate/mutate/generate), the catalog, audit→enforce (ADR-014).*
@@ -284,6 +256,8 @@ traffic to it — say 10%. Then it *watches the metrics* for that slice: error r
 service's SLO cares about. Healthy? It widens the slice — 25%, 50%, 100% — step by step. Unhealthy? It
 **automatically rolls back** to the old version, no human, no page.
 
+![Progressive delivery: the Rollout shifts a small slice of live traffic to the new version and watches the service's SLO — widening 25% → 50% → 100% when healthy, or taking the rollback escape to the old version when not. Built from the observability signals, and rehearsed on every stage.](images/progressive-delivery.svg)
+
 > This is, literally, the **canary in the coal mine.** Miners carried a canary underground because the
 > small bird succumbed to invisible gas *before* the humans did — an early, contained warning. Your canary
 > pod is the same: it takes a *little* real traffic so that if the new version is toxic, a *small* fraction
@@ -291,18 +265,18 @@ service's SLO cares about. Healthy? It widens the slice — 25%, 50%, 100% — s
 > canary was sacrificed; yours isn't. When the canary detects trouble, the Rollout *rolls it back* — the
 > whole point is that the early warning *prevents* the harm rather than just marking it.
 
-And notice the elegant loop closing here: the metrics the canary analysis uses to decide "healthy or not?"
-are the *same* signals we're about to see the observability plane collect in step 10. Progressive delivery
-isn't a separate safety system bolted on — it's *built out of* the observability the platform already has.
-Because a Rollout runs on every stage, by the time a change reaches prod its canary logic has already
-rehearsed at dev, test, uat, and staging. Prod is the *last* performance, never the dress rehearsal.
+Notice the loop closing here: the metrics the canary analysis uses to decide "healthy or not?" are the same
+signals we're about to see the observability plane collect in step 10. Progressive delivery isn't a separate
+safety system bolted on — it's *built out of* the observability the platform already has. And because a
+Rollout runs on every stage, by the time a change reaches prod its canary logic has already rehearsed at
+dev, test, uat, and staging. Prod is the *last* performance, never the dress rehearsal.
 
 *Its own module, later: **Progressive delivery** (Argo Rollouts, metric analysis, auto-rollback — ADR-056).*
 
 ## 8 · It gets a machine to run on (the substrate)
 
 The new pods need somewhere to actually execute, a network to speak on, and an identity to act as. Three
-more planes engage, each — say it with me — *watching for its own cue.*
+more planes engage, each watching for its own cue.
 
 - **A node to run on.** If the cluster has spare capacity, great. If not,
   [**Karpenter**](https://karpenter.sh/) — watching for *unschedulable pods* — provisions a right-sized EC2
@@ -331,7 +305,7 @@ ADR-008), **Workload identity** (Pod Identity — ADR-041).*
 The pods are running and healthy — but the internet can't reach them yet. That last hop is **ingress**, and
 the platform routes it through the [**Gateway API**](https://gateway-api.sigs.k8s.io/) (the modern
 successor to Kubernetes Ingress). A resource called an **HTTPRoute** maps the Environment's public
-hostname — `shop-alpha-dev.preprod.aws.refplat.org`, which the Environment API generated and which Kyverno
+hostname — `shop-acme-dev.preprod.aws.refplat.org`, which the Environment API generated and which Kyverno
 just confirmed this team is allowed to use — to your service.
 
 External requests arrive at the cluster's gateway (Cilium's built-in Envoy proxy), where TLS is terminated
@@ -340,7 +314,7 @@ using a certificate that [**cert-manager**](https://cert-manager.io/docs/) obtai
 pods.
 
 > Picture a **large office's front desk.** Visitors don't wander the building looking for the right room;
-> they arrive at reception, which knows the directory ("`shop-alpha-dev` → the `web` team's floor") and
+> they arrive at reception, which knows the directory ("`shop-acme-dev` → the `web` team's floor") and
 > sends them to the right place. TLS is the sealed courier envelope the message travels in so nobody can
 > read or tamper with it on the way. The HTTPRoute is the line in reception's directory; cert-manager keeps
 > the envelopes stocked.
@@ -358,9 +332,9 @@ services), logs, and profiles. A lot of this is collected *automatically*, witho
 because the platform's observability stack watches every workload. (The open standard underneath is
 [**OpenTelemetry**](https://opentelemetry.io/docs/).)
 
-Remember: this is the *same* stream of data the Rollout's canary analysis used three steps ago to decide the
-new version was safe. Observability isn't a passive dashboard you check after the fact — it's the platform's
-*live nervous system*, feeding decisions in real time.
+This is the *same* stream of data the Rollout's canary analysis used three steps ago to decide the new
+version was safe. Observability isn't a passive dashboard you check after the fact — it's the platform's
+live nervous system, feeding decisions in real time.
 
 > It's the **cockpit instruments** of the platform. You cannot fly a modern aircraft by looking out the
 > window; you fly it on instruments that tell you attitude, altitude, and airspeed continuously. The
@@ -369,7 +343,7 @@ new version was safe. Observability isn't a passive dashboard you check after th
 
 Which is the last loop: those signals feed **SLOs** (service-level objectives — an explicit target like
 "99.9% of requests succeed"). If a service starts *burning through* its error budget too fast, an alert
-fires and routes to `alpha`'s **on-call** — the platform knows *which team owns this workload* and pages
+fires and routes to `acme`'s **on-call** — the platform knows *which team owns this workload* and pages
 *them*, not a generic ops pager — and the triage copilot may post a first-pass diagnosis before a human
 even opens their laptop. ([SLO-based alerting](https://sre.google/workbook/alerting-on-slos/) is a whole
 discipline; the platform bakes it in.)
@@ -432,25 +406,6 @@ git-revert answer stretches to cover your data too.
 - **"Something orchestrates all this."** Nothing does. Independent loops share one git source of truth.
   Remove any single one and the others wouldn't even notice the "conductor" is gone — because there never
   was one.
-
-## Recap — say it back
-
-Close the tab and try to narrate it yourself: *I merge; what happens, and who does each part, and why does
-it flow without anyone pushing it?* If you can say something like —
-
-> "CI builds and *signs* an image and computes its **digest** → that digest gets *promoted* into a
-> **Release record in the platform repo** (not my app repo, so my `main` stays protected) → **ArgoCD**,
-> which is always watching git, *notices* and syncs it → **Kyverno** at admission *re-verifies the
-> signature* and enforces the rules → an **Argo Rollout** *canaries* it on real metrics and auto-rolls-back
-> if it's sick → **Karpenter, Cilium, and Pod Identity** give it a node, a network, and a scoped identity →
-> the **Gateway** routes encrypted traffic to it → **observability** watches forever and pages the owning
-> team if an SLO burns — and every one of those is an *independent control loop reacting to git or the
-> cluster, not a pipeline being pushed*" —
-
-— then you don't just know the steps. You've got the *shape* of the whole platform, and every module in
-the portal is now just a zoom-in on one of these planes.
-
-This was the map. The rest of the portal is the territory.
 
 ## Go deeper
 

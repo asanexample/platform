@@ -1,25 +1,23 @@
 # Learn: Foundations
 
 The ground the platform stands on — the AWS estate, how it's all defined as code, the network, the private
-cluster, the compute, and the two guarded doors. Everything else in this portal (the Environment API,
-Delivery, Policy, Identity) runs *on top of* this. A **sub-curriculum**: a whole-substrate tour plus focused
-deep dives.
+cluster, the compute, and the two guarded doors. Everything else (the Environment API, Delivery, Policy,
+Identity) runs on top of this.
 
 **Audience:** platform engineers who want a firm mental model of what's underneath. A developer never touches
-most of this. **Before you start:** the [domain model](../domain-model/orientation.md), and ideally
-[How the Platform Fits](../spine/how-the-platform-fits.md) — this is the *bottom* of that map. Know roughly
-what an AWS account, a VPC, and a Kubernetes cluster are.
+most of it. Start with the [domain model](../domain-model/orientation.md), and ideally
+[How the Platform Fits](../spine/how-the-platform-fits.md) — this is the bottom of that map. It helps to know
+roughly what an AWS account, a VPC, and a Kubernetes cluster are.
 
 ## Read in this order
 
-1. **[Orientation](orientation.md)** — *"A tour of the foundation."* The one idea (**nested boundaries,
-   private by default, all declared as code**) and a generous, metaphor-threaded walk from the outside in:
-   the Organization & accounts → everything-as-code → the network → the private cluster → the compute → the
-   two doors. This is the firm-grounding narrative — start here.
+1. **[Orientation](orientation.md)** — a tour of the foundation. One idea (nested boundaries, private by
+   default, all declared as code) and a metaphor-threaded walk from the outside in: the Organization and
+   accounts, everything-as-code, the network, the private cluster, the compute, the two doors. Start here.
 2. **[Reference](reference.md)** — the dense lookup: pinned versions, the accounts + SCPs + IAM table, the
    IaC cascade, networking, the cluster, compute, ingress/access, and the foundational gotchas.
 
-## Go deep (one firm grounding per layer)
+## Go deep (one layer at a time)
 
 - **[The account model & SCPs](deep-dive-the-account-model.md)** — the Organization, the five accounts, why
   an account is the *hard* isolation boundary, the eight org-wide guardrails, and the deploy/operate/state/

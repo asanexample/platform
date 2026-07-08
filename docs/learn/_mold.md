@@ -274,6 +274,23 @@ fallback is a **visible placeholder** + a capture spec in the module's `_screens
 - Capture → drop the PNG in `images/` → swap the blockquote for `![alt](images/<name>.png)`.
 - **Terminal output is a code block, not a screenshot** — greppable and it doesn't rot.
 
+## Diagrams
+
+Diagrams ride the same pipeline as screenshots — one convention for every visual:
+
+- Store the file in the module's `images/` dir; reference it **relatively**: `![alt](images/<name>.svg)`.
+- That single relative ref renders in all three targets — GitHub, mkdocs/**TechDocs**, and Astro/**Starlight** —
+  because it's a plain `<img>`. (The public-site `sync.mjs` copies the `images/` dirs, so Astro resolves the
+  same path the other two do.)
+- **Prefer SVG** for diagrams: vector-crisp at any zoom, tiny, and — the deciding reason — an `<img src="…svg">`
+  survives TechDocs' HTML sanitizer, whereas an `<iframe>`/embedded-HTML diagram gets stripped (the same wall
+  that made mermaid need a client-side addon). PNG is for screenshots.
+- The SVG must be **self-contained** — system fonts (or embedded), no external font/script/image refs — so it
+  renders in the isolated `<img>` context. Bake in `@media (prefers-color-scheme: dark)` for OS-theme response.
+- **Always write real `alt` text**: it's the accessibility text and the fallback if the image fails.
+- These Claude-designed SVGs are replacing the older inline **mermaid** blocks (they read better); mermaid still
+  works via the addon where a quick inline sketch suffices.
+
 ## Video (script-first, when built)
 
 Because the Orientation is written script-first, it maps to video directly — but follow the tested rules

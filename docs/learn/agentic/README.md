@@ -1,22 +1,23 @@
 # Learn: The Agentic Platform
 
-How the platform runs **AI agents** as first-class, *governed* workloads — bound so a compromised agent can't
-cause harm, and made to earn trust rather than be given it. The platform's most distinctive, most
-deliberately cautious area. A **sub-curriculum**: a whole-picture tour + focused deep dives.
+How the platform runs AI agents as governed workloads — bound so a compromised agent can't cause harm, and
+made to earn trust rather than be given it. This is the platform's most distinctive and most deliberately
+cautious area. What follows is a whole-picture tour plus focused deep dives.
 
-**Audience:** platform engineers, and anyone wary of letting an LLM near production. **Before you start:**
+**Audience:** platform engineers, and anyone wary of letting an LLM near production. It helps to have read
 [Environment API](../environment-api/orientation.md) (`XAgent` is its sibling), [Identity](../identity/orientation.md)
 (an agent is a subject in the same model), [Observability](../observability/orientation.md), and
-[Supply chain](../supply-chain/orientation.md) all help.
+[Supply chain](../supply-chain/orientation.md), but none is required.
 
 ## Read in this order
 
 1. **[Orientation](orientation.md)** — *"treat the agent like a powerful contractor you don't fully trust."*
-   The one idea, and a tour: what an agent *is* (an `XAgent` claim) → how it's *bounded* → how it could *earn*
-   more (the autonomy ladder) → the one real agent. With an honest "one agent, mostly early" status.
-2. **[Reference](reference.md)** — the dense lookup: the ADR map, the `XAgent` claim + Composition, the
+   The one idea, and a tour: what an agent is (an `XAgent` claim), how it's bounded, and how it could earn
+   more (the autonomy ladder), ending on the one real agent. Includes an honest "one agent, mostly early"
+   status.
+2. **[Reference](reference.md)** — the dense lookup: the ADR map, the `XAgent` claim and Composition, the
    GitOps control plane, the bounding machinery, the autonomy ladder, the triage copilot, the status ledger,
-   gotchas.
+   and gotchas.
 
 ## Go deep
 
@@ -33,4 +34,4 @@ deliberately cautious area. A **sub-curriculum**: a whole-picture tour + focused
 
 - The agent's telemetry: [Observability → agent observability](../observability/deep-dive-agent-observability.md).
   Its identity model: [Identity & access](../identity/orientation.md). Its provisioning sibling:
-  [Environment API](../environment-api/orientation.md). Author one: the `authoring-platform-agents` skill.
+  [Environment API](../environment-api/orientation.md). To author one, use the `authoring-platform-agents` skill.

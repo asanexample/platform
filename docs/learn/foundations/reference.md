@@ -1,7 +1,8 @@
 # Learn: Foundations — reference
 
-Look-up, not a lesson. Build the model in the [orientation](orientation.md) first; go deep in the linked
-deep dives. Everything here is verified against code + live (as of this writing).
+A lookup table for the foundations, not a walkthrough. The [orientation](orientation.md) builds the model;
+the deep dives at the bottom go layer by layer. Every fact here is checked against the code and the live
+clusters.
 
 ## Pinned versions (`/.tool-versions` + module pins)
 

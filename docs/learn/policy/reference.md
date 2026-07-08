@@ -1,14 +1,14 @@
 # Learn: Policy & Admission — reference
 
-Look-up, not a lesson. Build the model in the [orientation](orientation.md) first.
+A lookup page. The [orientation](orientation.md) covers the model behind it.
 
 ## The engine
 
-- **[Kyverno](https://kyverno.io/docs/) v1.18.1**, HA, on the cluster's **admission** webhook — evaluates
-  every resource create/update. Layered **above** the native **Pod Security Admission `baseline`** floor
-  (ADR-014): PSA is the backstop, Kyverno expresses what PSA can't (registry scoping, hostname allow-lists,
-  per-product rules).
-- The `policy` module holds **no team data**. Per-product values are derived from the **`Product` registry**
+- **[Kyverno](https://kyverno.io/docs/) v1.18.1**, HA, on the cluster's admission webhook — evaluates
+  every resource create/update. It layers above the native **Pod Security Admission `baseline`** floor
+  (ADR-014): PSA is the backstop, Kyverno expresses what PSA can't — registry scoping, hostname allow-lists,
+  per-product rules.
+- The `policy` module holds no team data. Per-product values are derived from the **`Product` registry**
   (`fileset` + `yamldecode`) at apply time.
 
 ## The three verbs
@@ -39,28 +39,28 @@ Full per-cluster catalog + status: [`kyverno-policy-catalog.md`](../../architect
 
 ## Audit-first → Enforce
 
-- **Audit:** violations recorded as **`PolicyReport`s**; resource **admitted**; webhook fail-**open**
-  (`failurePolicy: Ignore`). Observe what would break.
-- **Enforce:** violations **rejected**; webhook fail-**closed** (`Fail`) — the `validate.kyverno.svc-fail`
+- **Audit:** violations recorded as `PolicyReport`s; resource admitted; webhook fails open
+  (`failurePolicy: Ignore`). This is how you see what would break before it does.
+- **Enforce:** violations rejected; webhook fails closed (`Fail`) — the `validate.kyverno.svc-fail`
   you see in a rejection. The flip is a deliberate, per-policy step.
 
-## Gotchas that teach
+## Gotchas
 
-- **⚠️ Enforce/Audit lives in the *rule*, not the spec.** In v1.18 it's each rule's `validate.failureAction`.
-  The top-level `spec.validationFailureAction` is **deprecated** and defaults to `Audit` — so
-  `kubectl get clusterpolicy -o …spec.validationFailureAction` **lies** (shows `Audit` even where rules
-  Enforce). Read the per-rule field, or just test admission. (This asymmetry is a latent fail-open risk on a
-  security control — [#1184](https://github.com/asanexample/platform/issues/1184) tracks a guard.)
-- **A per-policy `matchConditions` doesn't skip the *aggregated* webhook.** Kyverno serves all policies
-  through one aggregated webhook; to make it ignore a resource you need a **global engine** matchCondition,
+- **⚠️ Enforce/Audit lives in the rule, not the spec.** In v1.18 it's each rule's `validate.failureAction`.
+  The top-level `spec.validationFailureAction` is deprecated and defaults to `Audit`, so
+  `kubectl get clusterpolicy -o …spec.validationFailureAction` lies — it shows `Audit` even where rules
+  Enforce. Read the per-rule field, or just test admission. This asymmetry is a latent fail-open risk on a
+  security control; [#1184](https://github.com/asanexample/platform/issues/1184) tracks a guard.
+- **A per-policy `matchConditions` doesn't skip the aggregated webhook.** Kyverno serves all policies
+  through one aggregated webhook. To make it ignore a resource you need a global engine matchCondition,
   not a per-policy one (#830).
 - **A `generate` rule's match is immutable.** You can't change an existing generate rule's match in place —
-  add a *new* rule (burned ADR-056 #856).
+  add a new rule (burned ADR-056 #856).
 - **Availability policies don't match `Rollout` by default.** `require-prod-replica-floor`,
-  `generate-workload-pdb`, `mutate-topology-spread` only match `argoproj.io/v1alpha1/Rollout` when
-  **`enable_rollout_kind = true`** (default off — a Kyverno rule can't name an absent CRD, #7839). Pod-level
-  policies cover Rollout pods automatically via ReplicaSet autogen. (See the
-  [Delivery reference](../delivery/reference.md).)
+  `generate-workload-pdb`, and `mutate-topology-spread` only match `argoproj.io/v1alpha1/Rollout` when
+  `enable_rollout_kind = true` (default off — a Kyverno rule can't name an absent CRD, #7839). Pod-level
+  policies cover Rollout pods automatically via ReplicaSet autogen. See the
+  [Delivery reference](../delivery/reference.md).
 - **The platform exempts itself.** System namespaces (kube-system, kyverno, argocd, karpenter, …) are
   excluded so admission can never block the platform's own components.
 

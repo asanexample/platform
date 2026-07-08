@@ -1,10 +1,10 @@
-# Portal glossary — the shared vocabulary
+# Glossary — the shared vocabulary
 
-A quick-lookup for the terms that recur across the [learning modules](README.md). This is **not** where
-they're taught — each module grounds its terms in context, just-in-time, which is what makes them stick.
-This is the place to *look one up later*, with a link to the canonical doc and (per section) the module
-that teaches it. Terms specific to one subsystem live in that module's own Reference; this covers the
-cross-cutting substrate and domain vocabulary.
+Quick lookup for the terms that recur across the [learning modules](README.md) — not where they're
+taught. Each module grounds its terms in context as they come up; this is where you look one up later,
+with a link to the canonical doc and, per section, the module that teaches it. Terms specific to one
+subsystem live in that module's own Reference; this covers the cross-cutting substrate and domain
+vocabulary.
 
 ## The domain model — *taught in [the domain model](domain-model/orientation.md)*
 
