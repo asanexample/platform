@@ -13,6 +13,7 @@ live in [`../architecture/`](../architecture/README.md); decisions in [`../adrs/
 | [SSO Troubleshooting](identity-sso-troubleshooting.md) | "Can't sign into ArgoCD/Backstage" or "logged in but no permissions" — master triage |
 | [Manage People (joiner/mover/leaver)](manage-people.md) | Add/change/remove a person's workforce access end-to-end through the git-native People registry (`gitops/people/`) |
 | [Keycloak Admin-Plane Break-Glass](keycloak-break-glass.md) | Recover admin control of Keycloak when passkey-MFA admin login is unavailable (ADR-087) |
+| [Backstage login / Keycloak workforce-user recovery](backstage-keycloak-auth-recovery.md) | Get a workforce user back into Backstage — reset a `platform`-realm password / clear a stale passkey / fix an SSO 503 (user-account recovery; admin control is keycloak-break-glass) |
 | [Keycloak SSO](keycloak-sso.md) | **Optional / federation only** — wiring Identity Center as a SAML upstream when Keycloak is not the IdP of record |
 | [Keycloak Upstream IdP](keycloak-upstream-idp.md) | Per-environment upstream IdP presets (SAML / OIDC) brokered behind the stable Keycloak seam (ADR-059) |
 | [ArgoCD SSO](argocd-sso.md) | ⚠️ **Legacy** — the original embedded-Dex/SAML setup; ArgoCD now logs in against Keycloak OIDC directly |
