@@ -257,5 +257,8 @@ curl -s -X POST http://localhost:9093/api/v2/alerts -H 'Content-Type: applicatio
        \"annotations\":{\"description\":\"test\"},\"startsAt\":\"$start\",\"endsAt\":\"$end\"}]"
 ```
 
-`severity=warning` → Slack only; `severity=critical` → SNS + Slack + PagerDuty (page). Alertmanager logs
-**only failed** notifications — silence after the POST means it sent. Confirm receipt in the channel.
+`severity=warning` → Slack + **PagerDuty at LOW urgency** (a tracked, non-paging incident — the watched
+home for warnings, #1120); `severity=critical` → SNS + Slack + PagerDuty **HIGH-urgency page**. The urgency
+split is enforced by the PD service's `severity_based` incident-urgency rule (Alertmanager sends the alert's
+severity as the Events-API severity). Alertmanager logs **only failed** notifications — silence after the
+POST means it sent. Confirm receipt in the channel / PD queue.

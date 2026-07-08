@@ -43,3 +43,52 @@ membership connector and the triage agent's on-call resolver **read** it. See
 - `teams` — `{ team => { escalation_policy_id, service_id, routing_key_secret_name } }`
   (the escalation-policy ids feed the ADR-084 Phase 2 on-call paging).
 - `oncall_user_id` — the bootstrap on-call user's PagerDuty id.
+
+<!-- BEGIN_TF_DOCS -->
+## Requirements
+
+| Name | Version |
+| ---- | ------- |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.6.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.0 |
+| <a name="requirement_pagerduty"></a> [pagerduty](#requirement\_pagerduty) | ~> 3.0 |
+
+## Providers
+
+| Name | Version |
+| ---- | ------- |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.0 |
+| <a name="provider_pagerduty"></a> [pagerduty](#provider\_pagerduty) | ~> 3.0 |
+
+## Modules
+
+No modules.
+
+## Resources
+
+| Name | Type |
+| ---- | ---- |
+| [aws_secretsmanager_secret.routing_key](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
+| [aws_secretsmanager_secret_version.routing_key](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
+| [pagerduty_escalation_policy.team](https://registry.terraform.io/providers/PagerDuty/pagerduty/latest/docs/resources/escalation_policy) | resource |
+| [pagerduty_schedule.team](https://registry.terraform.io/providers/PagerDuty/pagerduty/latest/docs/resources/schedule) | resource |
+| [pagerduty_service.team](https://registry.terraform.io/providers/PagerDuty/pagerduty/latest/docs/resources/service) | resource |
+| [pagerduty_service_integration.alertmanager](https://registry.terraform.io/providers/PagerDuty/pagerduty/latest/docs/resources/service_integration) | resource |
+| [pagerduty_user.oncall](https://registry.terraform.io/providers/PagerDuty/pagerduty/latest/docs/data-sources/user) | data source |
+| [pagerduty_vendor.prometheus](https://registry.terraform.io/providers/PagerDuty/pagerduty/latest/docs/data-sources/vendor) | data source |
+
+## Inputs
+
+| Name | Description | Type | Default | Required |
+| ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_bootstrap_oncall_email"></a> [bootstrap\_oncall\_email](#input\_bootstrap\_oncall\_email) | Email of the EXISTING PagerDuty user placed on every team's schedule during bootstrap. This user<br/>is referenced (data source), never created — no PagerDuty accounts are managed from git (no PII in<br/>git; accounts are owned by the person and one-click-linked via OAuth, per ADR-084). This is the<br/>BOOTSTRAP membership seam: it is replaced — with zero structural change — by roster + directory<br/>-derived per-team membership once the directory's external\_identity(provider='pagerduty') exists. | `string` | n/a | yes |
+| <a name="input_teams"></a> [teams](#input\_teams) | Teams to provision on-call structure for, keyed by team name (matches gitops/teams/<team>.yaml<br/>metadata.name). One schedule + escalation policy + service + Alertmanager integration is created<br/>per team. The value is intentionally minimal/empty today: team identity comes from the registry<br/>and there is nothing per-team to configure yet. It is a map (not a set) so that per-team knobs<br/>(e.g. an override time zone, or — once the directory lands — a derived roster) can be added later<br/>without a structural change at the call site. | `map(object({}))` | n/a | yes |
+| <a name="input_tags"></a> [tags](#input\_tags) | Tags applied to the AWS Secrets Manager routing-key secrets. | `map(string)` | `{}` | no |
+
+## Outputs
+
+| Name | Description |
+| ---- | ----------- |
+| <a name="output_oncall_user_id"></a> [oncall\_user\_id](#output\_oncall\_user\_id) | PagerDuty user id of the bootstrap on-call admin (the seeded schedule member). |
+| <a name="output_teams"></a> [teams](#output\_teams) | Per-team on-call objects, keyed by team name — the escalation-policy id (consumed by the ADR-084 Phase 2 triage agent's on-call paging), the service id, and the Secrets Manager secret name holding the Alertmanager routing key. |
+<!-- END_TF_DOCS -->

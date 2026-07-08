@@ -139,6 +139,11 @@ locals {
     send_resolved    = true
   }
 
+  # Warnings page at LOW urgency (alerting P1, #1120): the SAME PD integration, but with severity=warning so
+  # the service's `severity_based` urgency rule opens a LOW-urgency (non-paging) tracked incident. This gives
+  # warnings a watched home — a reviewed queue — instead of an unwatched Slack channel (the 6-day-outage lesson).
+  pagerduty_warning_config = merge(local.pagerduty_config, { severity = "warning" })
+
   # Dead-man's switch receiver: on every Watchdog notification, POST to the external Healthchecks.io ping URL.
   # url_file reads the ping URL from the ES-synced secret so it never enters state/helm values (like Slack's
   # api_url_file). Healthchecks pages EXTERNALLY if the pings stop — detecting a dead in-cluster pipeline.
@@ -147,7 +152,8 @@ locals {
     send_resolved = false
   }
 
-  # Alertmanager routing (P4): critical → SNS + Slack, warning → Slack (SNS fallback when Slack is off);
+  # Alertmanager routing (P4): critical → SNS + Slack + PagerDuty (HIGH-urgency page), warning → Slack
+  # (SNS fallback when Slack is off) + PagerDuty at LOW urgency (a watched, non-paging queue — #1120);
   # info/others → dashboard-only (null); Watchdog → the external dead-man's switch (Healthchecks) when
   # configured, else null. A critical
   # inhibits a matching warning (same namespace+alertname) so one incident doesn't double-notify. Each
@@ -207,7 +213,7 @@ locals {
           name              = "warning"
           sns_configs       = (!local.slack_enabled && local.create_sns) ? [local.sns_config] : []
           slack_configs     = local.slack_enabled ? [local.slack_config] : []
-          pagerduty_configs = [] # warnings notify Slack/SNS, they don't page
+          pagerduty_configs = local.pagerduty_enabled ? [local.pagerduty_warning_config] : [] # LOW-urgency tracked home (#1120)
         },
       ],
     )

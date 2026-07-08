@@ -85,6 +85,15 @@ resource "pagerduty_service" "team" {
   name              = "${each.key}-service"
   escalation_policy = pagerduty_escalation_policy.team[each.key].id
   alert_creation    = "create_alerts_and_incidents"
+
+  # Severity-driven urgency (alerting P1, #1120): the Events-API severity sets the incident urgency —
+  # `critical` → HIGH (pages on-call), `warning` → LOW (a tracked, non-paging incident). This gives
+  # warnings a *watched home* (a reviewed queue) instead of vanishing in an unwatched Slack channel —
+  # the failure mode the 6-day silent ArgoCD outage exposed.
+  incident_urgency_rule {
+    type    = "constant"
+    urgency = "severity_based"
+  }
 }
 
 # Events API v2 (Prometheus) integration, one per team's service. integration_key is the routing key
