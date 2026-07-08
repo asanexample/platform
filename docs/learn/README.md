@@ -35,6 +35,7 @@ Each subsystem is a short course: an **Orientation** (a guided journey you read 
 | **[Foundations](foundations/)** — the substrate everything runs on: AWS accounts & SCPs, IaC, networking, the private cluster & Cilium, compute, access (a sub-curriculum) | ✅ available |
 | **[The agentic platform](agentic/)** — running governed AI agents (the XAgent runtime, bounding an agent, the autonomy ladder, the triage copilot) | ✅ available |
 | **[Cost & FinOps](cost/)** — cost as an engineering signal on a loop (Inform → Optimize → Operate: two meters, the levers, budget guardrails) | ✅ available |
+| **[Secrets & config](secrets-config/)** — the best secret is one that doesn't exist (federation · SOPS config-in-git · ESO + Secrets Manager · rotation) | ✅ available |
 | **[*Spine:* The Life of a Deployment](spine/life-of-a-deployment.md)** — one `git push` across every plane (control plane) | ✅ available |
 | **[*Spine:* The Life of a Request](spine/life-of-a-request.md)** — one user request, edge to pod (data plane) | ✅ available |
 | **[*Spine:* How the Platform Fits](spine/how-the-platform-fits.md)** — the control-plane map (the same structure at rest) | ✅ available |

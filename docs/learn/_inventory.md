@@ -100,9 +100,11 @@ crams several distinct models:
 
 ## 6 · Secrets & config
 
+✅ **Built** as [Secrets & config](secrets-config/): an orientation ("the best secret is one that doesn't exist" + two planes) + three deep dives (config-in-git/SOPS · runtime secrets/ESO · rotation) + reference.
+
 | Module | Covers | Status |
 | --- | --- | --- |
-| **Secrets & config** | External Secrets Operator, Secrets Manager, SOPS config-in-git, the app config/secrets paved road (ADR-019/066/070) | ⏳ |
+| **[Secrets & config](secrets-config/)** | External Secrets Operator, Secrets Manager, SOPS config-in-git, the app config/secrets paved road (ADR-019/066/070) | ✅ |
 
 ## 7 · Observability — a sub-curriculum
 
