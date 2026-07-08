@@ -210,6 +210,17 @@ ServiceMonitor, scraped as `job=keycloak-http`.
 > Login-specific failure metrics (brute-force / credential-failure rate) need Keycloak's `user-event-metrics`
 > feature enabled — a follow-up; the signals above are HTTP/availability-level.
 
+## crossplane
+
+Namespace `crossplane-system`. The provisioner for every environment (XEnvironment claims) and self-service
+cloud resource. Core-controller metrics scraped via the crossplane module's PodMonitor (hub), `metrics.enabled`.
+
+- **CrossplaneDown** (critical) — `up{namespace="crossplane-system"} == 0` for 5m: the core controller is
+  down, so claims/Compositions/resources stop reconciling — new provisioning is halted (existing environments
+  keep running). Check the `crossplane` deployment pod + logs. Composition/provider reconcile *errors* surface
+  separately via **ControllerReconcileErrors** (the crossplane controllers now report to
+  `controller_runtime_reconcile_errors_total` once scraped).
+
 ## Cloud resources
 
 AWS-resource metrics via **YACE** (the `cloudwatch-exporter` Deployment in `observability`; CloudWatch →

@@ -571,3 +571,20 @@ groups:
           summary: "Keycloak is returning a high 5xx rate"
           description: "Over 10% of Keycloak HTTP requests have been 5xx for 10m — auth requests are failing even though the pod is up. Common causes: the database is unreachable/slow (check keycloak-db + the CloudNativePG alerts), or Keycloak is resource-starved. Read the keycloak-0 logs."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#keycloak"
+  # ---------------------------------------------------------------------------
+  # Crossplane (alerting P1, #1121). The provisioner for every environment + self-service cloud resource. Its
+  # core-controller metrics are scraped via the PodMonitor in the crossplane module (hub). Composition/provider
+  # reconcile ERRORS are covered by the generic controllers.rules once scraped; this catches the core being down.
+  - name: crossplane.rules
+    rules:
+      - alert: CrossplaneDown
+        # The PodMonitor scrapes only the core controller (app=crossplane) in crossplane-system, so this is a
+        # single up series — provisioning halted if it's 0.
+        expr: up{namespace="crossplane-system"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Crossplane core controller is down — provisioning is halted"
+          description: "The Crossplane core controller (crossplane-system) has been unreachable for 5m — XEnvironment claims, Composition renders, and self-service cloud resources are no longer reconciling, so new environments/resources can't be provisioned (existing ones keep running). Check the crossplane deployment pod + logs. (Composition/provider reconcile ERRORS surface separately via ControllerReconcileErrors.)"
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#crossplane"
