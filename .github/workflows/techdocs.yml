@@ -1,0 +1,65 @@
+name: TechDocs
+
+# Build the learning-portal TechDocs site with mkdocs + the techdocs-cli and publish it to S3
+# (#938, ADR-097). builder: external — Backstage serves the pre-built site from s3://refplat-platform-techdocs
+# for the `platform-learning-portal` catalog entity. Cross-tree links are rewritten to GitHub URLs by
+# techdocs-linkfix.sh on a build copy first, so the canonical docs keep their repo-relative links.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/learn/**"
+      - "mkdocs.yml"
+      - "catalog-info.yaml"
+      - ".github/scripts/docs/techdocs-linkfix.sh"
+      - ".github/workflows/techdocs.yml"
+  workflow_dispatch: {} # manual reseed
+
+permissions:
+  id-token: write # OIDC → the github-actions-techdocs-publish role
+  contents: read
+
+concurrency:
+  group: techdocs-publish
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Build + publish TechDocs
+    runs-on: ubuntu-latest
+    env:
+      ENTITY: default/component/platform-learning-portal
+      BUCKET: refplat-platform-techdocs
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Install mkdocs + the techdocs-cli
+        # Floating for the first working build; pin once a green run confirms the versions.
+        run: |
+          pip install --quiet mkdocs-techdocs-core
+          npm install -g @techdocs/cli
+
+      - name: Prepare build tree + rewrite cross-tree links
+        # Build against a COPY so the canonical docs/learn keeps its repo-relative links.
+        run: |
+          rm -rf build && mkdir -p build/docs
+          cp mkdocs.yml build/
+          cp -R docs/learn build/docs/learn
+          .github/scripts/docs/techdocs-linkfix.sh build/docs/learn
+
+      - name: Generate the site (mkdocs, local — no docker)
+        run: techdocs-cli generate --no-docker --source-dir build --output-dir build/site --verbose
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6.2.1
+        with:
+          role-to-assume: arn:aws:iam::829808296602:role/github-actions-techdocs-publish
+          aws-region: us-east-1
+
+      - name: Publish to S3
+        run: techdocs-cli publish --publisher-type awsS3 --storage-name "$BUCKET" --entity "$ENTITY" --directory build/site
