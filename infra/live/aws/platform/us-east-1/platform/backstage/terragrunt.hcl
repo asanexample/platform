@@ -200,7 +200,7 @@ inputs = {
   # Pod-Identity role. The docs catalog entity + location are registered in the app repo's
   # app-config.production.yaml (the frontend techdocs plugin ships in the same app-repo change).
   enable_techdocs = true
-  techdocs_bucket = "platform-techdocs"
+  techdocs_bucket = "refplat-platform-techdocs"
 
   # My Access view (ADR-088 §3.6): read borrow HISTORY from the ADR-084 directory Postgres. Projects the
   # connection (same SM secret the triage agent uses) into AUDIT_DB_DSN. platform-directory admits this
