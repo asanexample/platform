@@ -1,6 +1,6 @@
 # ADR-093: Descheduler for node rebalancing
 
-**Status:** Proposed
+**Status:** Accepted — deployed + proven on both clusters (platform `*/15`, preprod `*/10`; #1106)
 
 ## Context
 

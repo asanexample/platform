@@ -1,5 +1,5 @@
 locals {
   workload        = "platform"
-  compliance_tier = "high"
+  compliance_tier = "standard"
   workload_tags   = { Workload = local.workload, ComplianceTier = local.compliance_tier }
 }

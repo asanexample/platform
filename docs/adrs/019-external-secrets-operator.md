@@ -4,6 +4,12 @@
 
 **Status:** Accepted
 
+> **Amendment (ADR-047 / #594):** ESO's AWS authentication has since migrated from
+> **IRSA** to **EKS Pod Identity** — the platform-wide standard ([ADR-047](047-pod-identity-as-aws-identity-standard.md)).
+> The references to "IRSA (ADR-018)" below describe the original mechanism; the ESO controller now authenticates
+> via a Pod Identity association (no IRSA service-account annotation). The access model — read-only, scoped to
+> the secret prefix — is unchanged.
+
 ## Context
 
 Kubernetes workloads need access to secrets — API keys, database credentials, OAuth tokens, TLS
