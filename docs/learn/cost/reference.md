@@ -1,7 +1,8 @@
 # Learn: Cost & FinOps — reference
 
-Look-up, not a lesson. Build the model in the [orientation](orientation.md) first. Verified against code +
-live. Dollar figures, account IDs, and the personal alert address are intentionally omitted — mechanism only.
+A lookup of how cost and FinOps work on this platform, verified against code and the live clusters. Dollar
+figures, account IDs, and the personal alert address are left out on purpose — this is the mechanism, not the
+bill. The [orientation](orientation.md) builds the model behind it.
 
 ## The loop (FinOps Foundation Framework — [ADR-092](../../adrs/092-platform-finops-practice.md))
 
@@ -37,13 +38,13 @@ estimate-vs-actual reconciliation panel.
 ## Optimize — the levers ([deep dive](deep-dive-optimize-the-cost-levers.md))
 
 - **Karpenter** (`aws/karpenter`, [ADR-078](../../adrs/078-cluster-elasticity-karpenter.md)): JIT nodes sized
-  to pending pods + **consolidation** (bin-pack + terminate underutilized). Per-cluster: **hub =
-  on-demand-only + `WhenEmpty`** (stateful singletons — a spot reclaim would disrupt data); **preprod =
-  `["spot","on-demand"]` + `WhenEmptyOrUnderutilized`**. **"Spot retired" = only the static managed spot
-  *group*; spot capacity-type is live on preprod.** Gotchas: **min 8 GiB node floor** (`min_instance_memory_mib
-  = 6144`; DaemonSet slab ~3.2 GiB); **SCP exemption mandatory** (`<cluster>-eks-karpenter-*` — anchored
-  per-cluster, not a leading-wildcard — in `exempt_roles`, or DenyTeamTagTampering/require-tagging 403 every
-  launch); BYOCNI `node.cilium.io/agent-not-ready` startup taint.
+  to pending pods, plus consolidation (bin-pack + terminate underutilized). The two clusters differ: hub is
+  on-demand-only + `WhenEmpty` (its stateful singletons would be disrupted by a spot reclaim); preprod runs
+  `["spot","on-demand"]` + `WhenEmptyOrUnderutilized`. "Spot retired" means only the static managed spot
+  *group* — the spot capacity-type is live on preprod. Gotchas: a min 8 GiB node floor (`min_instance_memory_mib
+  = 6144`; the DaemonSet slab is ~3.2 GiB); an SCP exemption is mandatory (`<cluster>-eks-karpenter-*`, anchored
+  per-cluster, not a leading-wildcard, in `exempt_roles`) or DenyTeamTagTampering/require-tagging 403s every
+  launch; and the BYOCNI `node.cilium.io/agent-not-ready` startup taint.
 - **Cluster parking** (`platctl down/up`, `cluster-parking` skill): node groups → **`desiredSize=0`** overnight;
   **non-destructive** (control plane + EBS/CNPG preserved); reversible. Judge a park via the **EKS API, not
   kubectl** (parking drops the Tailscale router); unpark = fresh pod admission (exposes latent webhook/IAM
@@ -67,16 +68,17 @@ estimate-vs-actual reconciliation panel.
     `team_budget_monthly_usd` (single source).
   - **Surface** (live): per-team budget-utilization % panel. **Alert** (live): Mimir-ruler burn-rate rule in
     the **spoke tenant** → 80% warning / 100% critical → owner-routing.
-  - **Enforce** (live **preprod**, `Audit`): hourly `cost-budget-enforcer` CronJob computes spend÷budget →
-    writes `cost-budget-status` ConfigMap → Kyverno `restrict-over-budget-provisioning` **denies XEnvironment
-    CREATE** for `exceeded` teams (unless `cost.refplat.org/budget-override: "true"`). **Two fail-open layers**
-    (CronJob `curl … || exit 0`; Kyverno `failurePolicy: Ignore`). **Never touches running workloads.** On
-    preprod only — env-API `Team`/`XEnvironment` CRDs live there, not the hub (ADR-048).
+  - **Enforce** (live on **preprod**, `Audit`): an hourly `cost-budget-enforcer` CronJob computes spend÷budget,
+    writes a `cost-budget-status` ConfigMap, and Kyverno `restrict-over-budget-provisioning` then denies
+    XEnvironment CREATE for `exceeded` teams (unless `cost.refplat.org/budget-override: "true"`). Two fail-open
+    layers guard it (CronJob `curl … || exit 0`; Kyverno `failurePolicy: Ignore`), and it never touches running
+    workloads. Preprod only — the env-API `Team`/`XEnvironment` CRDs live there, not on the hub (ADR-048).
 - **AWS Budgets + Cost Anomaly Detection** (#1054, **mgmt/payer acct**, module `aws/cost-monitoring`): 2
-  Budgets tripwires (80% actual / 100% actual / 100% forecast) + 1 **dimensional SERVICE** anomaly monitor
-  (IMMEDIATE SNS) → SNS topic → Chatbot(Slack) + email. Gotchas: **only ONE dimensional monitor per account**
-  → subscribe to the auto-created `Default-Services-Monitor`, don't create a 2nd; **topic unencrypted by
-  design** (managed KMS key can't grant `budgets`/`costalerts` principals + Chatbot can't read a CMK topic).
+  Budgets tripwires (80% actual / 100% actual / 100% forecast) + 1 dimensional SERVICE anomaly monitor
+  (IMMEDIATE SNS) → SNS topic → Chatbot(Slack) + email. Gotchas: there's only one dimensional monitor per
+  account, so subscribe to the auto-created `Default-Services-Monitor` rather than making a second; and the
+  topic is unencrypted by design (the managed KMS key can't grant `budgets`/`costalerts` principals, and
+  Chatbot can't read a CMK topic).
 - **Infracost shift-left** (#1056, `.github/workflows/infracost.yml`): prices a Terraform change **in the PR**.
   Prices the shared **modules**, *not* live units (the Terragrunt evaluator can't parse `env.hcl`+SOPS).
 - **Cost-allocation tags** (#673): `Team`+`Environment` CUR tags — forward-only, ~24h activation, no backfill.

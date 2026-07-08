@@ -1,12 +1,13 @@
 # Learn: Runtime Security
 
-How the platform defends a workload *while it runs* — the **assume-breach** layer, after admission and signed
-images have already gated the door. Three runtime moves: **encrypt** the wire (WireGuard), **authenticate**
-each service (mTLS/SPIRE), and **detect** misbehavior (Falco).
+How the platform defends a workload *while it runs* — the assume-breach layer, after admission and signed
+images have already gated the door. Three runtime moves: encrypt the wire (WireGuard), authenticate each
+service (mTLS/SPIRE), and detect misbehavior (Falco).
 
-**Audience:** platform engineers. **Before you start:** [Policy & admission](../policy/orientation.md) and
-[Supply chain](../supply-chain/orientation.md) are the *gates* this complements;
-[Foundations → the cluster](../foundations/deep-dive-the-cluster.md) explains Cilium (the heavy lifter here).
+**Audience:** platform engineers. Read [Policy & admission](../policy/orientation.md) and
+[Supply chain](../supply-chain/orientation.md) first — those are the *gates* this complements —
+and [Foundations → the cluster](../foundations/deep-dive-the-cluster.md) for Cilium, which does most
+of the work here.
 
 ## Read in this order
 
@@ -22,7 +23,7 @@ each service (mTLS/SPIRE), and **detect** misbehavior (Falco).
   DaemonSet → rules, the Kyverno-vs-Falco complement, falcosidekick + the deferred routing, and the tuning
   burden (why detection ships before routing).
 - **[East-west zero-trust](deep-dive-east-west-zero-trust.md)** — Cilium WireGuard transparent encryption
-  (live both clusters) and the Cilium + embedded-SPIRE **mTLS** showcase (preprod, one pair), the mechanism,
+  (live both clusters) and the Cilium + embedded-SPIRE **mTLS** showcase (preprod, one pair): the mechanism,
   the gotchas, and the honest status.
 
 ## Then

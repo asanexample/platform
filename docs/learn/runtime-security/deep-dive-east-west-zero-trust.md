@@ -1,42 +1,39 @@
 # Learn: Runtime Security — East-west zero-trust (deep dive)
 
-> Assumes the [Runtime Security orientation](orientation.md) — the *assume-breach* frame and the
-> secure-building-past-the-front-door metaphor. This deep dive takes **one** of the three runtime
-> moves — the two *east-west* layers, encryption and identity — and teaches the mechanism, the
-> module knobs, and the gotchas properly. If you're fluent in Cilium already, the terse lookup is the
-> [Reference](reference.md).
+Runtime security is the assume-breach layer — what protects a service once something is already past
+the front door. It has three runtime moves; this page covers two of them, the *east-west* pair:
+encryption and cryptographic identity. The [Runtime Security orientation](orientation.md) sets up the
+full frame and metaphor. If you already know Cilium, the terse lookup is the [Reference](reference.md).
 
 ## East-west, and why the network floor isn't enough
 
-*North-south* is traffic crossing the cluster edge — a browser hitting your service through the
-Gateway ([ADR-017](../../adrs/017-gateway-api-over-ingress.md), TLS-terminated at the edge).
-*East-west* is the other, larger conversation: **service-to-service traffic inside the cluster** —
-`alpha-shop` calling `alpha-checkout`, pod to pod, node to node. It never touches the edge, so the
-edge's TLS does nothing for it.
+*North-south* traffic crosses the cluster edge — a browser reaching your service through the Gateway
+([ADR-017](../../adrs/017-gateway-api-over-ingress.md)), TLS-terminated there. *East-west* is the
+larger conversation happening inside the cluster: service to service, pod to pod, node to node —
+`acme-shop` calling `acme-checkout`. It never touches the edge, so the edge's TLS does nothing for it.
 
 The platform already has a strong east-west floor:
-[Cilium](https://docs.cilium.io/en/stable/) **L3/L4
+[Cilium](https://docs.cilium.io/en/stable/) L3/L4
 [NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/) +
-CiliumNetworkPolicy**, **default-deny**, identity-aware. But read that word carefully — it is
-**network identity**: who-may-talk-to-whom, decided by *label*, *namespace*, or *IP*. Two things it
-does **not** give you, and zero-trust wants both:
+CiliumNetworkPolicy, default-deny, identity-aware. But that identity is *network* identity:
+who-may-talk-to-whom, decided by label, namespace, or IP. Two things it doesn't give you, and
+zero-trust wants both:
 
-- **(a) Encryption in transit** — even inside the VPC the pod-to-pod bytes are plaintext on the wire;
-  a tap on the underlay reads them.
-- **(b) Cryptographic workload identity** — a policy admits a pod because it *wears the right label*.
-  A rogue pod in another namespace that satisfies the same selector is admitted too. Nothing forces a
+- **(a) Encryption in transit.** Even inside the VPC, pod-to-pod bytes are plaintext on the wire; a
+  tap on the underlay reads them.
+- **(b) Cryptographic workload identity.** A policy admits a pod because it wears the right label. A
+  rogue pod in another namespace that satisfies the same selector is admitted too. Nothing forces a
   service to *prove* who it is with an attestable credential.
 
-[ADR-057](../../adrs/057-service-identity-and-east-west-zero-trust.md) delivers both — and the
-load-bearing decision is **how**: **Cilium-native, no sidecar mesh.** The platform is already all-in
-on Cilium, and Cilium covers L3/L4 + encryption + mTLS without an Istio/Linkerd control plane and
-sidecar per pod. The one thing that *would* justify a mesh — **L7 east-west traffic management**
-(service-to-service canary, [ADR-056](../../adrs/056-progressive-delivery-and-safe-rollback.md)) —
-isn't in scope here, so the mesh's operational weight buys nothing. Two Cilium features do the whole
-job: **transparent encryption** (Layer A) and **mutual authentication** (Layer B).
+[ADR-057](../../adrs/057-service-identity-and-east-west-zero-trust.md) delivers both. The decision
+that matters is *how*: Cilium-native, no sidecar mesh. The platform is already all-in on Cilium, and
+Cilium covers L3/L4 + encryption + mTLS without an Istio/Linkerd control plane and a sidecar per pod.
+The one thing that *would* justify a mesh — L7 east-west traffic management, like service-to-service
+canary ([ADR-056](../../adrs/056-progressive-delivery-and-safe-rollback.md)) — isn't in scope here, so
+the mesh's operational weight buys nothing. Two Cilium features do the whole job: transparent
+encryption (Layer A) and mutual authentication (Layer B).
 
-Crucially they **stack**, they don't replace each other. Hold that — it's the single most-missed
-point in this doc.
+They **stack**; they don't replace each other. That's the point most people miss.
 
 ---
 
@@ -46,21 +43,21 @@ point in this doc.
 > ciphertext. **Where it breaks:** the tube doesn't check *who* sent the capsule — it makes the
 > channel private, it doesn't authenticate the sender. That's exactly why Layer B has to exist.
 
-Cilium **transparent encryption** with the **WireGuard** backend encrypts *all* pod-to-pod traffic
-between nodes, transparently, with **no application change**. "Transparent" is the whole pitch: the
-app opens a plain TCP socket and Cilium makes the bytes ciphertext underneath it.
+Cilium transparent encryption with the WireGuard backend encrypts all pod-to-pod traffic between
+nodes, with no application change. That's the whole pitch: the app opens a plain TCP socket and Cilium
+turns the bytes to ciphertext underneath it.
 
-The mechanism that makes this cheap here: **in-kernel [WireGuard](https://www.wireguard.com/).** The
-nodes run Amazon Linux 2023 on a 6.x kernel (6.12), which ships WireGuard in-tree — so there's no
-userspace daemon and **no key management** to run. Cilium creates a `cilium_wg0` device per node,
-and stacks the WireGuard layer **under the existing VXLAN overlay tunnel**, auto-adjusting the MTU
-for the added header overhead (this is why it's clean on the platform's tunnel/cluster-pool datapath
-and sidesteps the WireGuard caveats that bite in native-ENI mode).
+What makes it cheap here is in-kernel [WireGuard](https://www.wireguard.com/). The nodes run Amazon
+Linux 2023 on a 6.x kernel (6.12), which ships WireGuard in-tree — no userspace daemon, no key
+management to run. Cilium creates a `cilium_wg0` device per node and stacks the WireGuard layer under
+the existing VXLAN overlay tunnel, auto-adjusting the MTU for the added header overhead. That's why
+it's clean on the platform's tunnel/cluster-pool datapath and sidesteps the WireGuard caveats that
+bite in native-ENI mode.
 
-**Scope for Phase 1 is pod-to-pod only.** `node_encryption` (host-to-host — which also covers host
-and health-check traffic) stays **off**; it's a more invasive later step. And encryption is a
-**fleet default, not tier-gated** — encryption-in-transit is a blanket good, so it's on cluster-wide
-rather than switched per compliance tier.
+Phase 1 scope is pod-to-pod only. `node_encryption` (host-to-host — which also covers host and
+health-check traffic) stays off; it's a more invasive later step. And encryption is a fleet default,
+not tier-gated: encryption-in-transit is a blanket good, so it runs cluster-wide rather than switching
+per compliance tier.
 
 ### The module knobs
 
@@ -107,20 +104,20 @@ $ AWS_PROFILE=platform kubectl --context platform -n kube-system get cm cilium-c
 authoritative in-agent check is `cilium-dbg status` → `Encryption: Wireguard [cilium_wg0 …
 Peers: N]`, plus `spec.encryption.key` on each `CiliumNode`.
 
-### The gotcha that teaches — enabling ≠ activating
+### The gotcha: enabling ≠ activating
 
-Bake this one in, because it's the lesson ADR-057 flags as the *real* one:
+ADR-057 flags this as its real lesson.
 
 **Turning encryption on does not activate it on running agents.** The Helm change sets
-`enable-wireguard: "true"` in the `cilium-config` ConfigMap — but Cilium reads that value **only at
-agent startup**, and a ConfigMap change does *not* roll the DaemonSet. Symptom: only the nodes whose
+`enable-wireguard: "true"` in the `cilium-config` ConfigMap — but Cilium reads that value only at
+agent startup, and a ConfigMap change does *not* roll the DaemonSet. Symptom: only the nodes whose
 agent happened to (re)start after the change bring `cilium_wg0` up; every pre-existing agent logs
 
 ```text
 Mismatch: enable-wireguard actual=false expectedValue=true
 ```
 
-and keeps sending plaintext. **Required after the apply:**
+and keeps sending plaintext. Required after the apply:
 
 ```text
 kubectl rollout restart ds/cilium -n kube-system
@@ -141,34 +138,33 @@ Git trail: [#1193](https://github.com/asanexample/platform/pull/1193) added modu
 > **Where it breaks vs Layer A:** the badge proves *who*; it does nothing about *privacy on the
 > wire*. That's still Layer A's job — the two run together.
 
-Layer A made the wire private but answered nothing about *who is this, really?* Layer B is **Cilium
-mutual authentication** backed by an **embedded [SPIRE](https://spiffe.io/)** — the
+Layer A made the wire private but says nothing about who is actually talking. Layer B is Cilium mutual
+authentication backed by an embedded [SPIRE](https://spiffe.io/) — the
 [SPIFFE](https://spiffe.io/docs/latest/spiffe-about/overview/) identity system that issues each
 workload a signed, verifiable identity document (an **SVID**).
 
 The moving parts:
 
-1. **`authentication.enabled: true`** (top-level in the Helm values) turns on the mesh-auth
-   machinery cluster-wide.
-2. The **embedded SPIRE** server + agents run in the **`cilium-spire`** namespace. The agents attest
-   each workload via Kubernetes **PSAT** (Projected Service Account Tokens) and the server issues it
-   an SVID — a portable cryptographic identity, not a label.
-3. A workload **opts into enforcement per-path** with a `CiliumNetworkPolicy` carrying
-   **`authentication.mode: required`**. For a connection matched by that rule Cilium performs a
-   SPIRE-backed **identity handshake** before allowing it, and caches the result in a **BPF
-   auth-cache** — visible as `cilium-dbg bpf auth list` → `AUTH TYPE: spire` for the authenticated
-   identity pair.
+1. `authentication.enabled: true` (top-level in the Helm values) turns on the mesh-auth machinery
+   cluster-wide.
+2. The embedded SPIRE server + agents run in the `cilium-spire` namespace. The agents attest each
+   workload via Kubernetes PSAT (Projected Service Account Tokens) and the server issues it an SVID —
+   a portable cryptographic identity, not a label.
+3. A workload opts into enforcement per-path with a `CiliumNetworkPolicy` carrying
+   `authentication.mode: required`. For a connection matched by that rule, Cilium runs a SPIRE-backed
+   identity handshake before allowing it, and caches the result in a BPF auth-cache — visible as
+   `cilium-dbg bpf auth list` → `AUTH TYPE: spire` for the authenticated identity pair.
 
-Putting those parts in motion, here is the full handshake on the showcase `alpha-shop → alpha-checkout`
-path — and what happens to an impostor that wears the right label but holds no valid SVID:
+Here is the full handshake on the showcase `acme-shop → acme-checkout` path — and what happens to an
+impostor that wears the right label but holds no valid SVID:
 
 ```mermaid
 sequenceDiagram
-    participant Shop as alpha-shop pod
+    participant Shop as acme-shop pod
     participant Imp as impostor pod
     participant Cil as Cilium agent
     participant SP as SPIRE
-    participant Chk as alpha-checkout pod
+    participant Chk as acme-checkout pod
     Shop->>Cil: open TCP to checkout WireGuard-encrypted
     Cil->>Cil: match CNP auth-required rule
     Cil->>SP: verify shop and checkout SVIDs
@@ -183,9 +179,8 @@ sequenceDiagram
     Note over Shop,Chk: preprod one-pair showcase
 ```
 
-**The data-plane bytes are still WireGuard-encrypted (Layer A).** mTLS adds the *identity handshake*;
-it does **not** carry the payload or replace the encryption. Two layers, stacked — the point from the
-top of the doc, now concrete.
+The data-plane bytes are still WireGuard-encrypted — that's Layer A. mTLS adds the *identity
+handshake*; it does not carry the payload or replace the encryption. Two layers, stacked.
 
 ### The module knobs
 
@@ -200,8 +195,8 @@ Same `cilium` module, four more gated variables (all default-off):
 
 `main.tf` renders the `authentication.mutual.spire` block from these; when `mutual_auth_enabled` is
 false the whole block is inert (matching chart defaults). The deliberate scope shows up in the units:
-**preprod** sets `mutual_auth_enabled = true`; **platform has no such input at all** (WireGuard
-only) — that's the preprod-only showcase boundary, by design.
+preprod sets `mutual_auth_enabled = true`; platform has no such input at all (WireGuard only) — the
+preprod-only showcase boundary, by design.
 
 ### Verify the split is real
 
@@ -226,25 +221,25 @@ Error from server (NotFound): namespaces "cilium-spire" not found
 
 Platform's `cilium-config` reads `mesh-auth-enabled: "false"` — exactly the intended posture.
 
-### What it actually secures (the proof)
+### What it secures (the proof)
 
-The [#1204](https://github.com/asanexample/platform/issues/1204) demo (a tracking issue) is the payoff: the real
-`alpha-shop → alpha-checkout` east-west call **succeeds and is SPIRE-mutually-authenticated**
-(`cilium-dbg bpf auth list` shows `AUTH TYPE: spire` for the shop↔checkout identity pair), while a
-**cross-team impostor** pod in another namespace is **DROPPED at checkout's ingress** — even though,
-label-wise, a plain NetworkPolicy might have let it through. That is the whole zero-trust promise made
-concrete: label ≠ identity.
+The [#1204](https://github.com/asanexample/platform/issues/1204) demo (a tracking issue) is the
+payoff: the real `acme-shop → acme-checkout` east-west call succeeds and is
+SPIRE-mutually-authenticated (`cilium-dbg bpf auth list` shows `AUTH TYPE: spire` for the
+shop↔checkout identity pair), while a cross-team impostor pod in another namespace is dropped at
+checkout's ingress — even though, label-wise, a plain NetworkPolicy might have let it through. That is
+the zero-trust promise made concrete: label ≠ identity.
 
-One subtlety worth knowing: the `authentication.mode: required` `CiliumNetworkPolicy` lives in the
-**`alpha-shop` application repo** (external `asanexample/*`), *not* in this platform repo — so you
-won't find it under `gitops/`. Tenants author their own east-west + auth posture, which is why the
-delivery AppProject had to be widened to permit tenant `(Cilium)NetworkPolicy`
+One subtlety: the `authentication.mode: required` `CiliumNetworkPolicy` lives in the `acme-shop`
+application repo (external `asanexample/*`), *not* in this platform repo — so you won't find it under
+`gitops/`. Tenants author their own east-west + auth posture, which is why the delivery AppProject had
+to be widened to permit tenant `(Cilium)NetworkPolicy`
 ([#1207](https://github.com/asanexample/platform/pull/1207)).
 
 **Decision resolved — embedded SPIRE, not standalone.** Cilium's embedded SPIRE attests via k8s PSAT
 and issues SVIDs cleanly on the overlay + WireGuard stack; a standalone SPIRE deployment is
-unnecessary overhead here. Revisit it *only* if identities are ever needed **beyond Cilium** —
-app-level mTLS a service terminates itself, or cross-cluster SPIFFE federation. Git trail:
+unnecessary overhead here. Revisit it *only* if identities are ever needed beyond Cilium — app-level
+mTLS a service terminates itself, or cross-cluster SPIFFE federation. Git trail:
 [#1209](https://github.com/asanexample/platform/pull/1209) (module + enable-on-preprod) →
 [#1207](https://github.com/asanexample/platform/pull/1207) (AppProject).
 
@@ -252,8 +247,8 @@ app-level mTLS a service terminates itself, or cross-cluster SPIFFE federation. 
 
 ## The runtime-security ledger — where these two layers sit
 
-Defense-in-depth, in the order a packet/pod meets it. Each row is a *different* question; that's why
-you need all of them, not one:
+Defense-in-depth, in the order a packet/pod meets it. Each row answers a *different* question; that's
+why you need all of them, not one:
 
 | Layer | Question it answers | Mechanism | Status |
 | --- | --- | --- | --- |
@@ -263,27 +258,27 @@ you need all of them, not one:
 | **Cryptographic identity** | Is A *really* A? | **Cilium mTLS + embedded SPIRE** | **Live showcase (preprod, one pair)** |
 | Behavioral detection | Is a running pod misbehaving? | Falco (eBPF syscall monitoring) | Live detecting, routing deferred |
 
-The bottom row — **Falco** — is a different subject (it watches *behavior*, not the network); this
-deep dive doesn't re-teach it. See the [Falco deep dive](deep-dive-falco.md) and
+The bottom row — Falco — is a different subject: it watches *behavior*, not the network. This deep
+dive doesn't re-teach it. See the [Falco deep dive](deep-dive-falco.md) and
 [ADR-045](../../adrs/045-falco-runtime-threat-detection.md).
 
-Two more runtime-hardening facts worth holding, both owned by the [Policy](../policy/orientation.md)
-module, not this one: Kyverno **auto-injects `securityContext` defaults** on every pod
+Two more runtime-hardening facts, both owned by the [Policy](../policy/orientation.md) module rather
+than this one: Kyverno auto-injects `securityContext` defaults on every pod
 (`allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`, `seccompProfile: RuntimeDefault`,
-`automountServiceAccountToken: false`) — **live in Enforce**; and **regulated-tier pod hardening**
-(`runAsNonRoot`, `readOnlyRootFilesystem` for hipaa/pci) is **live for the tier but unexercised**,
-because no regulated tenant exists yet.
+`automountServiceAccountToken: false`) — live in Enforce; and regulated-tier pod hardening
+(`runAsNonRoot`, `readOnlyRootFilesystem` for hipaa/pci) is live for the tier but unexercised, because
+no regulated tenant exists yet.
 
-## Gotchas that teach
+## Gotchas
 
 1. **`authentication.enabled: true` is mandatory — off *denies*, it doesn't bypass.** With mesh-auth
    off, an `authentication.mode: required` policy causes the chart to **drop** the traffic rather
    than wave it through. You can't half-enable this.
 2. **Both layers are startup-read.** WireGuard *and* mesh-auth config are read only when a Cilium
-   agent boots — enabling either needs a **`kubectl rollout restart ds/cilium`** to take effect on
-   the running fleet (see the Layer A gotcha).
-3. **Cross-namespace calls need BOTH netpol halves.** Environment namespaces default-deny **egress**
-   as well as ingress, and a k8s `ipBlock` allow does **not** cover in-cluster identities. The
+   agent boots — enabling either needs a `kubectl rollout restart ds/cilium` to take effect on the
+   running fleet (see the Layer A gotcha).
+3. **Cross-namespace calls need BOTH netpol halves.** Environment namespaces default-deny egress as
+   well as ingress, and a k8s `ipBlock` allow does not cover in-cluster identities. The
    `authentication.mode: required` requirement replaces the *ingress* half specifically — you can't
    substitute a plain allow, because Cilium **unions** allows and a plain allow would *bypass* the
    auth requirement.
@@ -300,15 +295,15 @@ because no regulated tenant exists yet.
 
 ## Honest status — built vs designed
 
-- **WireGuard encryption: genuinely done.** Live fleet-wide on **both** clusters. Not a spike — the
-  real deployed posture.
+- **WireGuard encryption: genuinely done.** Live fleet-wide on both clusters. Not a spike — the real
+  deployed posture.
 - **mTLS identity: a live preprod showcase, not a spike, not torn down.** SPIRE is running, the
-  `alpha-shop → alpha-checkout` pair is mutually authenticated, and the impostor is dropped — proven
-  live. But it is **one service pair on preprod only**, *not* the platform cluster, *not* fleet-wide.
+  `acme-shop → acme-checkout` pair is mutually authenticated, and the impostor is dropped — proven
+  live. But it is one service pair on preprod only, *not* the platform cluster, *not* fleet-wide.
 - **Fleet-wide / tier-gated enforcement: designed, not built.** Wiring `authentication.mode: required`
-  into the Crossplane Environment Composition **per compliance tier** (the Composition already has
-  `$tier` in scope; `regulated` is the trigger per ADR-057 decision #3) is the follow-up — deliberately
-  **parked until a regulated tenant actually exists**, and none does today.
+  into the Crossplane Environment Composition per compliance tier (the Composition already has `$tier`
+  in scope; `regulated` is the trigger per ADR-057 decision #3) is the follow-up — deliberately parked
+  until a regulated tenant actually exists, and none does today.
 
 ## Go deeper
 

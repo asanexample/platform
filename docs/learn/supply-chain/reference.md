@@ -1,65 +1,65 @@
 # Learn: Supply Chain — reference
 
-Look-up, not a lesson. Build the model in the [orientation](orientation.md) first.
+Definitions, commands, and gotchas to look up. The [orientation](orientation.md) walks through how the pieces fit.
 
 ## The pipeline (produce the trustworthy artifact)
 
-One **shared, reusable** workflow the platform owns (`asanexample/trusted-ci/build-sign.yml`) does the whole
-backbone; each app's CI is a **thin caller** ([ADR-050](../../adrs/050-shared-build-sign-reusable-workflow.md)):
+One shared, reusable workflow the platform owns (`asanexample/trusted-ci/build-sign.yml`) does the whole
+backbone; each app's CI is a thin caller ([ADR-050](../../adrs/050-shared-build-sign-reusable-workflow.md)):
 
 ```text
 build → push to ECR → cosign sign (keyless) → SLSA provenance (isolated) → SBOM
 ```
 
 - **Keyless signing** — [cosign](https://docs.sigstore.dev/cosign/signing/overview/) / Sigstore: the CI's
-  GitHub Actions **OIDC** identity → **Fulcio** issues a short-lived cert → sign → logged in **Rekor**
+  GitHub Actions OIDC identity → Fulcio issues a short-lived cert → sign → logged in Rekor
   (public transparency log). No private key exists ([ADR-036](../../adrs/036-github-actions-oidc-federation.md)).
-- **SLSA Build L3 provenance** — generated in an **isolated** workflow the app team can't write, so the build
+- **SLSA Build L3 provenance** — generated in an isolated workflow the app team can't write, so the build
   can't forge its own ([ADR-042](../../adrs/042-isolated-build-provenance-slsa-l3.md)).
 - **SBOM** — the image's ingredient list (vuln queryability).
 
 ## Inspect it yourself (real commands)
 
 ```console
-$ cosign tree <platform-acct>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/shop-web@sha256:f6b37d…
+$ cosign tree <platform-acct>.dkr.ecr.us-east-1.amazonaws.com/team-acme/shop-web@sha256:f6b37d…
 └── 🔐 Signatures …          # 1 signature
 └── 💾 Attestations …        # 2: SLSA provenance (v0.2) + CycloneDX SBOM
 
-$ cosign verify … team-alpha/shop-web@sha256:f6b37d…
+$ cosign verify … team-acme/shop-web@sha256:f6b37d…
 Issuer:  https://token.actions.githubusercontent.com          # keyless (GitHub Actions OIDC)
 Subject: …/asanexample/trusted-ci/…/build-sign.yml@…          # the shared signer
-githubWorkflowRepository: asanexample/alpha-shop              # the caller repo = the trust anchor
+githubWorkflowRepository: asanexample/acme-shop              # the caller repo = the trust anchor
 ```
 
 ## The trust rule
 
-An image is trusted iff its signing cert's **`githubWorkflowRepository`** equals the **Product's declared
-`spec.repo`** (Product registry). Per-product, registry-derived — *not* "any signed image." A validly-signed
+An image is trusted iff its signing cert's `githubWorkflowRepository` equals the Product's declared
+`spec.repo` (Product registry). Per-product and registry-derived, not "any signed image." A validly-signed
 image from the wrong repo is rejected.
 
 ## Verify at admission (the enforce half)
 
-Kyverno fetches signature + attestations from ECR (via Pod Identity ECR-read) and enforces, **per product**:
+Kyverno fetches signature + attestations from ECR (via Pod Identity ECR-read) and enforces, per product:
 
 - `verify-images-product-<team>-<product>` — signed by the shared workflow, cert repo = the product's repo.
 - `verify-attestations-product-<team>-<product>` — SLSA provenance + SBOM present.
 
-Both **Enforce on preprod** — unsigned / unattested / wrong-repo images never admit. (Platform-owned; the
-[Policy & Admission](../policy/orientation.md) module covers the admission mechanics. Per-product *image
-registry* scoping is separate — owned by the Environment Composition, ADR-046.)
+Both Enforce on preprod — unsigned, unattested, or wrong-repo images never admit. (Platform-owned; the
+[Policy & Admission](../policy/orientation.md) module covers the admission mechanics. Per-product image
+registry scoping is separate — owned by the Environment Composition, ADR-046.)
 
-## Gotchas that teach
+## Gotchas
 
-- **Signed ≠ safe.** Signing + provenance prove **origin and integrity**, not that the code is free of bugs
-  or poisoned deps — a compromised upstream dependency is *legitimately* signed.
-  [SLSA's threat model](https://slsa.dev/spec/v1.0/threats) is explicit: it covers *build tampering*, not a
-  malicious author. Layer SBOM-driven vulnerability scanning on top; treat signing as necessary, not sufficient.
+- **Signed ≠ safe.** Signing and provenance prove origin and integrity, not that the code is free of bugs
+  or poisoned deps — a compromised upstream dependency is legitimately signed.
+  [SLSA's threat model](https://slsa.dev/spec/v1.0/threats) is explicit: it covers build tampering, not a
+  malicious author. Layer SBOM-driven vulnerability scanning on top; signing is necessary, not sufficient.
 - **Repo rename breaks trust.** Trust is keyed on the repo in the cert; renaming a Product's repo without
   updating `spec.repo` makes every new image fail verification. Update the registry with the rename.
-- **Signature and attestation are *separate* policies.** An image can be signed but missing attestations (or
+- **Signature and attestation are separate policies.** An image can be signed but missing attestations (or
   vice versa) — both must pass. `cosign tree` shows what's actually attached.
 - **Isolation is the point of L3.** Provenance the build could edit is L2 at best. The isolated
-  `trusted-ci` workflow (app-team-unwritable) is what makes it L3 — don't "helpfully" inline it into the app
+  `trusted-ci` workflow (app-team-unwritable) is what makes it L3 — don't inline it back into the app
   repo.
 
 ## Glossary

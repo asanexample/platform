@@ -1,6 +1,6 @@
 # Learn: Onboarding a Product — reference
 
-Look-up, not a lesson. Build the model in the [orientation](orientation.md) first.
+A lookup reference. For the model behind these fields, see the [orientation](orientation.md).
 
 ## The `Product` schema
 
@@ -10,14 +10,14 @@ Look-up, not a lesson. Build the model in the [orientation](orientation.md) firs
 | field | required | values / notes |
 | --- | --- | --- |
 | `spec.team` | ✅ | owning Team; an Environment's `team` must equal this (Kyverno-enforced). |
-| `spec.repo` | ✅ | the **one** owner/repo sourcing the Product's Service(s). The supply-chain **trust anchor**. |
+| `spec.repo` | ✅ | the single owner/repo sourcing the Product's Service(s); the supply-chain trust anchor. |
 | `spec.tenancy` | ✅ | `pooled` (customers logical) \| `per-customer` (a dedicated Environment per Customer at prod). |
 | `spec.defaultIsolation.compute` | | `shared-namespace` → `dedicated-namespace` → `dedicated-nodes` → `dedicated-cluster` → `dedicated-account` (floored by tier; an Environment may dial up). |
 | `spec.restrictWithinTeam` | | if true, even team members need an explicit AccessGrant (ADR-068); auto-true for pci/hipaa. |
 | `spec.domains[]` | | vanity hostnames the Product **owns** (the allow-set); each `{host, dns: managed\|external}`. An Environment binds a subset (ADR-061). |
 
-The **Team** (`gitops/teams/<team>.yaml`) owns Products and sets the **envelope** (allowed stages, quota
-caps, self-service `allowedEngines`) that bounds them.
+The Team (`gitops/teams/<team>.yaml`) owns Products and sets the envelope that bounds them — allowed
+stages, quota caps, and the self-service `allowedEngines`.
 
 ## The derivations (registry → footprint)
 
@@ -42,7 +42,7 @@ ADR-069.)
    `registry-reconcile` (a privileged apply of `github-oidc` / `policy` / `argocd-apps` / `github-teams`) — the derived units
    *don't exist* until this runs. No manual `terragrunt apply` for routine onboarding.
 
-## Gotchas that teach
+## Gotchas
 
 - **The derived units don't exist until the reconcile apply.** A freshly-merged Product's role/policies/apps
   materialize when `registry-reconcile` runs — not at merge time. If something's missing, check that

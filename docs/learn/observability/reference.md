@@ -1,7 +1,7 @@
 # Learn: Observability — reference
 
-Look-up, not a lesson. Build the model in the [orientation](orientation.md) first. Verified against code +
-live (as of this writing).
+A lookup page; the [orientation](orientation.md) builds the model. Verified against code + live (as of
+this writing).
 
 ## Pinned versions (`infra/live/aws/_versions.hcl`, `helm_versions.*`)
 
@@ -23,32 +23,33 @@ in namespace `observability` (backends on the hub; OTel Operator in `opentelemet
   shape; all share the storage pattern: small hot buffer on a gp3 PVC + durable blocks on **S3** (one bucket
   per signal, SSE-S3/AES256 explicit — the org SCP denies PutObject without the header; S3 via **Pod
   Identity**, ADR-047).
-- **Metrics = additive:** Prometheus is the *scraper* (~15d local); it **remote-writes every sample to Mimir**
-  (durable, S3). Grafana's default datasource is Mimir → rebuilding Prometheus loses nothing.
-- **Mimir over Thanos:** first-class `X-Scope-OrgID` multi-tenancy (the spine hub-and-spoke needs). Classic
+- **Metrics are additive:** Prometheus is the scraper (~15d local); it remote-writes every sample to Mimir
+  (durable, S3). Grafana's default datasource is Mimir, so rebuilding Prometheus loses nothing.
+- **Mimir over Thanos:** native `X-Scope-OrgID` multi-tenancy, which the hub-and-spoke layout needs. Classic
   microservices arch (distributor→ingester, RF1 on the reference cluster; `high_availability` toggles RF3).
-- **Grafana:** the single pane; **SSO via Keycloak OIDC** (`platform-admins`→Admin, else Viewer);
+- **Grafana:** the single pane; SSO via Keycloak OIDC (`platform-admins`→Admin, else Viewer);
   Tailscale-only (internal NLB); hardened (anon off, no signup). Datasources provisioned as code, named
-  `<Store> (<tenant>)`, incl. federated `<Store> (all clusters)` and `Mimir (my team)` (the tenant-proxy lane).
-- **Why self-hosted** (vs Datadog/Grafana Cloud/AMP-AMG): SaaS/managed pricing is per-host/series or
-  per-sample — grows with cardinality (what a multi-tenant platform generates); self-hosted = compute you
-  already run plus cheap S3, data stays in-account, dashboards-as-code, portable. Accepted trade: "we operate it."
+  `<Store> (<tenant>)`, including federated `<Store> (all clusters)` and `Mimir (my team)` (the tenant-proxy lane).
+- **Why self-hosted** (vs Datadog/Grafana Cloud/AMP-AMG): SaaS and managed pricing is per-host/series or
+  per-sample, so it grows with cardinality — what a multi-tenant platform generates. Self-hosted is compute you
+  already run plus cheap S3; data stays in-account, dashboards-as-code, portable. Accepted trade: we operate it.
 
 ## Tenancy — `X-Scope-OrgID`
 
-- The header names a **tenant**; the store trusts it (**not authentication** — ADR-044). **Real isolation =
-  network:** `observability` namespace is default-deny; stores are **ClusterIP-only**, never on the Gateway.
-- **Cluster tenants** (LIVE, carrying data): `platform`, `preprod`. Spokes remote-write over a **write-only**
-  Gateway HTTPRoute that **force-stamps** `X-Scope-OrgID` (a spoke can't spoof another tenant).
-- **Per-team tenants** (the P13 split): a **write-path** proxy (`cortex-tenant`) relabels series to
-  `<team>` for env namespaces → real `alpha`/`bravo` Mimir tenants (verified S3 blocks). **LIVE + exercised.**
-  **Read-path** proxies — `tenant-proxy` (Mimir) and `loki-tenant-proxy` (Loki) — verify the user's OIDC token,
-  map `groups`→tenant scope, fail-closed (unknown/empty → deny) → the `Mimir (my team)` / `Loki (my team)`
-  datasources. **Per-team read isolation LIVE + proven for metrics AND logs** (traces/profiles isolation is
-  deferred — see ledger). Cross-team read **sharing = `AccessGrant`** (ADR-068, `gitops/grants/`): a team grants
-  another read access; the proxy derives it into a federated read (`X-Scope-OrgID: alpha|bravo`) = own tenant ∪
-  grants, still fail-closed. Because OSS Grafana has no per-team RBAC, **a grant *is* the data/dashboard-sharing
-  mechanism**; namespace-filtered team dashboards remain the default self-view. (See status below.)
+- The header names a **tenant** and the store trusts it — that's not authentication (ADR-044). Real isolation
+  is the network: the `observability` namespace is default-deny, and stores are ClusterIP-only, never on the Gateway.
+- **Cluster tenants** (LIVE, carrying data): `platform`, `preprod`. Spokes remote-write over a write-only
+  Gateway HTTPRoute that force-stamps `X-Scope-OrgID`, so a spoke can't spoof another tenant.
+- **Per-team tenants** (the P13 split): a write-path proxy (`cortex-tenant`) relabels series to
+  `<team>` for env namespaces → real `acme`/`globex` Mimir tenants (verified S3 blocks). LIVE and exercised.
+  Read-path proxies — `tenant-proxy` (Mimir) and `loki-tenant-proxy` (Loki) — verify the user's OIDC token,
+  map `groups`→tenant scope, and fail closed (unknown or empty → deny) to serve the `Mimir (my team)` /
+  `Loki (my team)` datasources. Per-team read isolation is LIVE and proven for metrics and logs; traces/profiles
+  isolation is deferred (see ledger). Cross-team read sharing is an `AccessGrant` (ADR-068, `gitops/grants/`):
+  a team grants another read access, and the proxy derives it into a federated read (`X-Scope-OrgID: acme|globex`)
+  — own tenant ∪ grants, still fail-closed. OSS Grafana has no per-team RBAC, so a grant *is* the
+  data- and dashboard-sharing mechanism; namespace-filtered team dashboards stay the default self-view.
+  (See status below.)
 
 ## Collection & the instrumentation ladder ([ADR-077](../../adrs/077-application-instrumentation-strategy.md))
 
@@ -117,7 +118,7 @@ TGW to the hub's write-only ingest edge. **preprod spoke LIVE for all four signa
   preprod apps, P4 alerting + owner-routing, P5 cloud-resource, P6 APM/correlation, P8 profiling, P9 SLOs, P11
   cost, P12 policy-reporter, network-flow metrics + alerts (Cilium/Hubble: `cilium_drop_count_total`,
   `hubble_flows_processed_total`) + the standalone Hubble UI, **agent-obs (ADR-076)**, per-team overview
-  dashboards (#1157), per-team **write** split (real alpha/bravo tenants), **per-team read isolation for metrics
+  dashboards (#1157), per-team **write** split (real acme/globex tenants), **per-team read isolation for metrics
   AND logs** (tenant-proxy + loki-tenant-proxy, fail-closed; proven live 2026-07-07) + cross-team **AccessGrant**
   sharing (ADR-068).
 - **Built-but-inert:** a leftover `p13-spike-echo` Grafana datasource (cleanup debt).

@@ -1,7 +1,7 @@
 # Environment API — reference
 
-> Look-up, not a lesson. If you haven't read [the orientation](orientation.md) yet, start there — this
-> page assumes you already have the mental model.
+A field-by-field lookup for the `XEnvironment` claim, what the Composition builds from it, and the
+lifecycle it runs. For the mental model behind it, see [the orientation](orientation.md).
 
 ## The `XEnvironment` claim — spec fields
 
@@ -71,7 +71,7 @@ service:
 [SNS](https://docs.aws.amazon.com/sns/latest/dg/welcome.html) /
 [DynamoDB](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html) as
 namespaced `*.aws.m.upbound.io` managed resources, each with derived least-privilege IAM onto the Pod
-role and a `<svc>-resources` ConfigMap. Exercised by `gitops/environments/alpha/conformance/dev.yaml`.
+role and a `<svc>-resources` ConfigMap. Exercised by `gitops/environments/acme/conformance/dev.yaml`.
 
 ## Delivery, topology, lifecycle
 
@@ -161,7 +161,7 @@ admin approval that isn't the author (plus the release-approver for a `prod` bun
   AWS role via its [ServiceAccount](https://kubernetes.io/docs/concepts/security/service-accounts/), no
   static keys.
 
-## Gotchas that teach
+## Gotchas
 
 - **Cluster-scoped is a security boundary, not a detail.** Because an `XEnvironment` is cluster-scoped,
   creating one needs cluster RBAC — which developers don't have. Claims only reach the cluster through
@@ -190,11 +190,11 @@ admin approval that isn't the author (plus the release-approver for a `prod` bun
   label, `-l crossplane.io/composite=<name>`. Either way, target the **workload cluster** (`--context
   preprod`), not the hub — the Environment API doesn't run there, so the default context shows nothing.
 
-## Learn Crossplane itself (optional — you don't need it to follow the above)
+## Learn Crossplane itself (optional)
 
-These teach the *substrate*. They're for going deeper, not prerequisites. **We run Crossplane v2 with
-cluster-scoped XRs** — anything below that predates v2 will describe a v1 "claim vs XR / namespaced
-Claim" model that does **not** match this platform; read it for concepts, not for our shape.
+Background on the substrate, for going deeper — none of it is a prerequisite for the above. **We run
+Crossplane v2 with cluster-scoped XRs.** Anything older describes a v1 "claim vs XR / namespaced Claim"
+model that does **not** match this platform; read it for concepts, not for our shape.
 
 - **[Crossplane docs — Compositions](https://docs.crossplane.io/latest/composition/compositions/)** (official, ~30 min).
   Composite Resources, Compositions, managed resources, providers. The canonical mental model. Make sure
@@ -220,9 +220,9 @@ won't publish the `infra/`/`gitops/` trees. Doc-to-doc links stay relative.
   [Composition](https://github.com/asanexample/platform/blob/main/infra/modules/crossplane/charts/environment-api/files/composition.yaml),
   [EnvironmentConfig](https://github.com/asanexample/platform/blob/main/infra/modules/crossplane/charts/environment-api/templates/environmentconfig.yaml).
 - Which cluster enables it: [`…/preprod/…/crossplane/terragrunt.hcl`](https://github.com/asanexample/platform/blob/main/infra/live/aws/preprod/us-east-1/platform/crossplane/terragrunt.hcl).
-- Real examples: [`alpha/shop/dev.yaml`](https://github.com/asanexample/platform/blob/main/gitops/environments/alpha/shop/dev.yaml),
-  [`products/alpha/shop.yaml`](https://github.com/asanexample/platform/blob/main/gitops/products/alpha/shop.yaml),
-  [`alpha/conformance/dev.yaml`](https://github.com/asanexample/platform/blob/main/gitops/environments/alpha/conformance/dev.yaml)
+- Real examples: [`acme/shop/dev.yaml`](https://github.com/asanexample/platform/blob/main/gitops/environments/acme/shop/dev.yaml),
+  [`products/acme/shop.yaml`](https://github.com/asanexample/platform/blob/main/gitops/products/acme/shop.yaml),
+  [`acme/conformance/dev.yaml`](https://github.com/asanexample/platform/blob/main/gitops/environments/acme/conformance/dev.yaml)
   (self-service resources).
 - Authoring the Composition: the `crossplane-composition-authoring` skill. Onboarding an environment:
   the `environment-onboarding` skill + [runbook](../../runbooks/environment-onboarding.md).

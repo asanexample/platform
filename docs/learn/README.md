@@ -1,8 +1,8 @@
 # Learn the Platform
 
-A **teaching** layer for the platform. The ADRs record *why* we decided things; the runbooks tell you
-*how* to do a task; the architecture docs are *reference*. This is the missing fourth thing — docs whose
-job is to **build the mental model** in someone who doesn't have it yet, from the ground up.
+A teaching layer for the platform. The ADRs record *why* we decided things; the runbooks tell you
+*how* to do a task; the architecture docs are *reference*. These docs are the fourth kind — their job is
+to build the mental model in someone who doesn't have it yet, from the ground up.
 
 Each subsystem is a short course: an **Orientation** (a guided journey you read start to finish) and a
 **Reference** (look-up once you have the model) — plus, for the deeper subsystems, optional **deep dives**
@@ -46,7 +46,7 @@ Each subsystem is a short course: an **Orientation** (a guided journey you read 
 | **[*Spine:* The Security Model](spine/the-security-model.md)** — the same layers as concentric defenses (defense in depth) | ✅ available |
 | **[*Spine:* Why the Platform Exists](spine/why-the-platform-exists.md)** — the North Star behind all the machinery | ✅ available |
 
-> The portal is being built **one subsystem at a time**, proving the format before scaling. The modules
+> The portal is being built one subsystem at a time, proving the format before scaling. The modules
 > marked ✅ available exist today; those marked ⏳ planned are listed so the shape of the whole is visible,
 > not because they exist yet.
 
@@ -58,8 +58,8 @@ Each subsystem is a short course: an **Orientation** (a guided journey you read 
 
 ## For authors
 
-The **[inventory](_inventory.md)** is the master plan — every course the portal intends to cover, by
-domain, with a build sequence. New modules are written against **[the mold](_mold.md)** — the shared
-template + rules that keep the portal one consistent voice. Read both before adding a module. Finishing a
-module includes the **crosslink pass** and clearing any rows you satisfy in the
-**[crosslink backlog](_crosslinks.md)**.
+The [inventory](_inventory.md) is the master plan — every course the portal intends to cover, by
+domain, with a build sequence. New modules are written against [the mold](_mold.md), the shared
+template and rules that keep the portal in one consistent voice. Read both before adding a module.
+Finishing a module includes the crosslink pass and clearing any rows you satisfy in the
+[crosslink backlog](_crosslinks.md).

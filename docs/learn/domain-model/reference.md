@@ -1,8 +1,8 @@
 # Domain model — reference
 
-> Look-up, not a lesson. If you haven't read [the orientation](orientation.md), start there — this page
-> assumes you hold the tree-and-grid model. The **normative** schema (every field, type, default) is
-> [platform-domain-api.md](../../architecture/platform-domain-api.md); this is the working summary.
+A working summary of the domain model. [The orientation](orientation.md) walks through the tree-and-grid
+model — ownership is a tree, deployment is a grid — from scratch. The normative schema (every field, type,
+and default) is [platform-domain-api.md](../../architecture/platform-domain-api.md).
 
 ## The nouns
 
@@ -49,10 +49,10 @@ no stage/namespace grid. The reference agent is `triage-copilot` (`gitops/agents
 
 | Derived name | Pattern | Example |
 | --- | --- | --- |
-| Namespace / Environment name | `<team>-<product>-<stage>` (`…-<customer>-<stage>` per-customer) | `alpha-shop-dev` |
-| Image / [ECR](https://docs.aws.amazon.com/AmazonECR/latest/userguide/what-is-ecr.html) path | `team-<team>/<product>-<service>` | `team-alpha/shop-web` |
-| Generated host | `<product>-<team>-<stage>.<baseDomain>` | `shop-alpha-dev.preprod.aws.refplat.org` |
-| [Pod-Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html) role | `Pod-<team>-<product>-[<customer>-]<stage>-<service>` | `Pod-alpha-shop-dev-web` |
+| Namespace / Environment name | `<team>-<product>-<stage>` (`…-<customer>-<stage>` per-customer) | `acme-shop-dev` |
+| Image / [ECR](https://docs.aws.amazon.com/AmazonECR/latest/userguide/what-is-ecr.html) path | `team-<team>/<product>-<service>` | `team-acme/shop-web` |
+| Generated host | `<product>-<team>-<stage>.<baseDomain>` | `shop-acme-dev.preprod.aws.refplat.org` |
+| [Pod-Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html) role | `Pod-<team>-<product>-[<customer>-]<stage>-<service>` | `Pod-acme-shop-dev-web` |
 
 Any derived identifier that would exceed its length ceiling (namespace 63, IAM role 64) is
 truncate-and-hashed deterministically — friendly in the common case, always valid in the edge case.
@@ -61,7 +61,7 @@ truncate-and-hashed deterministically — friendly in the common case, always va
 
 The bound on every Product/Environment a Team may author — enforced at
 [admission](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/)
-([Kyverno](https://kyverno.io/docs/) on the projected `Team` CR). Team `alpha`'s, live:
+([Kyverno](https://kyverno.io/docs/) on the projected `Team` CR). Team `acme`'s, live:
 
 ```yaml
 envelope:
@@ -87,7 +87,7 @@ availability. It sets a **minimum** — a regulated tier *forces* stronger isola
 Effective isolation = `max(tier-floor, chosen)`. Recovery/availability are derived from the tier, never
 re-declared.
 
-## Gotchas that teach
+## Gotchas
 
 - **`team` is carried on the Environment, not just derived.** The `XEnvironment` claim repeats `team`
   (validated `== Product.team`) because the namespace, the Pod-Identity role, and the envelope policy all

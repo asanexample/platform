@@ -1,6 +1,6 @@
 # Learn: Self-Service Cloud Resources — reference
 
-Look-up, not a lesson. Build the model in the [orientation](orientation.md) first.
+A lookup page. The [orientation](orientation.md) covers the model.
 
 ## The claim
 
@@ -19,7 +19,7 @@ services:
 
 - **`kind`** is the abstract class; **`engine`** the concrete implementation; **`access`** your intent.
 - **Built + live today:** `s3` (objectstore), `sqs` + `sns` (stream), `dynamodb` (keyvalue) — all four
-  provisioned & ready on preprod (`alpha/conformance/dev`). *(The XRD carries a stale `Phase A: objectstore/s3`
+  provisioned & ready on preprod (`acme/conformance/dev`). *(The XRD carries a stale `Phase A: objectstore/s3`
   comment — all four engines actually ship; see #drift below.)*
 
 ## Derived least-privilege IAM (per engine)
@@ -61,7 +61,7 @@ Naming: `refplat-<team>-<product>-<stage>-<name>-<hash>` (deterministic, ≤63-c
 All produce the same governed claim → same validation → same realization. **Built:** PR-as-code, Backstage
 form. **Designed (ADR-073 Phase B):** a natural-language agent. New front doors never touch the safety floor.
 
-## Gotchas that teach
+## Gotchas
 
 - **`access` gates the verbs.** `read` can't write — no `PutObject`/`SendMessage`/`Publish`. Bump to
   `readwrite`.
