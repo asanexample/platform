@@ -194,6 +194,14 @@ inputs = {
   # (platform/argocd/backstage-token) → ARGOCD_AUTH_TOKEN. Components link via `argocd/app-selector`.
   enable_argocd_plugin = true
 
+  # TechDocs (#938, ADR-097): serve the learning portal (docs/learn) in-portal. builder=external — CI
+  # (.github/workflows/techdocs.yml) pre-builds the site with mkdocs and publishes it to the platform-techdocs
+  # bucket (via the github-actions-techdocs-publish OIDC role); Backstage serves it read-only through its
+  # Pod-Identity role. The docs catalog entity + location are registered in the app repo's
+  # app-config.production.yaml (the frontend techdocs plugin ships in the same app-repo change).
+  enable_techdocs = true
+  techdocs_bucket = "platform-techdocs"
+
   # My Access view (ADR-088 §3.6): read borrow HISTORY from the ADR-084 directory Postgres. Projects the
   # connection (same SM secret the triage agent uses) into AUDIT_DB_DSN. platform-directory admits this
   # namespace via extra_consumer_namespaces.

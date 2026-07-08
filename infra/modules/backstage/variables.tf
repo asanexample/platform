@@ -298,6 +298,18 @@ variable "enable_argocd_plugin" {
   default     = false
 }
 
+variable "enable_techdocs" {
+  description = "Serve the learning-portal docs via TechDocs (#938, ADR-097): overrides the image's techdocs config to builder=external + publisher=awsS3 (bucket `techdocs_bucket`) and grants the Backstage Pod-Identity role read on that bucket. CI pre-builds + publishes the site (builder=external). Requires enable_kubernetes_plugin (that is the Pod-Identity role Backstage reads S3 with)."
+  type        = bool
+  default     = false
+}
+
+variable "techdocs_bucket" {
+  description = "Name of the S3 bucket holding the pre-built TechDocs site (published by the techdocs CI workflow). Used when enable_techdocs = true."
+  type        = string
+  default     = ""
+}
+
 variable "argocd_instances" {
   description = "ArgoCD instances surfaced by the plugin (rendered into argocd.appLocatorMethods). `url` is the in-cluster API the BACKEND calls (e.g. http://argocd-server.argocd.svc); `frontend_url` is the browser-facing UI used for 'open in ArgoCD' links (e.g. https://argocd.aws.refplat.org). The read-only token is injected via ARGOCD_AUTH_TOKEN."
   type = list(object({
