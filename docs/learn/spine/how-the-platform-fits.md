@@ -181,7 +181,7 @@ Concretely:
 - **The hub is the `platform` account's cluster.** It runs the *shared* planes, provided once for everyone:
   a single ArgoCD that delivers to *every* cluster, the git-native Team/Product/Release registries,
   Keycloak, the observability hub, the Transit Gateway hub, and the
-  [XAgent](../../adrs/082-platform-agent-runtime-xagent.md) agent runtime (the triage copilot lives here).
+  [XAgent](../../adrs/082-platform-agent-runtime-xagent.md) agent runtime (the triage copilot lives here — see [The agentic platform](../agentic/orientation.md)).
   Build these once, not once-per-environment.
 - **The spokes are the environment clusters** — **preprod today; prod follows the identical pattern.** They
   run the actual workloads. And here's the subtle, important choice: the **Environment API is *federated* —
