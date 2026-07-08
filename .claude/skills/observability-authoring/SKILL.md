@@ -68,7 +68,10 @@ EKS-inaccurate groups are disabled.)
 - alert: MyComponentDown
   expr: up{job="my-component"} == 0
   for: 10m
-  labels: { severity: critical }     # critical→SNS+Slack+PagerDuty, warning→Slack, info→dashboard-only
+  labels: { severity: critical }     # critical→SNS+Slack+PagerDuty(*), warning→Slack, info→dashboard-only
+  # (*) PagerDuty is WIRED (the critical receiver has a real PD Events-API-v2 route), but paging is currently
+  # OFFLINE — the PD trial account lapsed (~2026-07-07), so criticals presently reach only SNS + Slack + the
+  # external dead-man's switch. Restore the PD account to re-enable paging; the wire itself needs no change.
   annotations:
     summary: "My component is down"
     description: "{{ $labels.instance }} unreachable for 10m."
@@ -178,11 +181,15 @@ it starts (ADR-056 Phase 3 / the W11 freeze gate). See
   `max_label_names_per_series=30` silently drops them — the hub raises it to 50.
 - **Manual `terragrunt apply` needs `AWS_PROFILE=management`** (bare shell assumes
   PlatformDeployer and 403s); reach the private API over Tailscale (ADR-010).
-- **Per-team read isolation (P13 / #590) is BUILT + RUNNING but UNEXERCISED** — `cortex-tenant` +
-  `tenant-proxy` are deployed (fail-closed), and the per-team *write* split produces real `alpha`/`bravo`
-  Mimir tenants — but nothing routes per-team *reads* through it. Per-team *visibility* actually ships via the
-  namespace-filtered Team Overview dashboards (#1157); the admin default stays the federated datasource.
-  Don't claim per-team read-scoping is *in use*.
+- **Per-team read isolation (P13 / #590): the ENFORCEMENT is LIVE + PROVEN (2026-07-07)**, flipped hub-first —
+  the hub holds only the `platform` tenant with data today (`alpha`/`bravo` tenants are wired but empty until the
+  spoke ingests, #627), so what's proven is the *fencing*, not per-team data volume. The `tenant-proxy` is the
+  enforced fail-closed read front door for **metrics (Mimir)** AND **logs (Loki)**: it verifies the caller's `X-Id-Token`
+  and stamps `X-Scope-OrgID` so a team sees only its own tenant. `cortex-tenant` write-splits per team, and
+  **cross-team read AccessGrants** (ADR-068) federate the caller's own tenant ∪ its granted tenants (grants ARE
+  the sharing mechanism — OSS Grafana has no per-team dashboard RBAC). The namespace-filtered Team Overview
+  dashboards (#1157) still exist as the admin-side per-team view. **Traces (Tempo) + profiles (Pyroscope)
+  per-team isolation are DEFERRED** (mechanical follow-ups — the pattern is proven on the two live signals).
 - Mimir is **off** in the dev cost_profile; enabling it just starts `remote_write`
   (additive, no migration).
 

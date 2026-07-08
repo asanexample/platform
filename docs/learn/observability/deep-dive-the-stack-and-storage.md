@@ -9,8 +9,9 @@
 The orientation gave you a one-line promise: *"stored together in one correlated stack on the platform's own
 storage."* That sentence hides five separate databases, a bucket per signal, an SSO login, a tenancy model
 that's really a network-security model in disguise, and a hub-and-spoke shape that lets a second cluster ship
-its telemetry home. This doc walks all of it — and, because this domain has a real *over-build* worth being
-honest about, it draws a sharp line between what's live-and-carrying-data and what's built-but-unexercised.
+its telemetry home. This doc walks all of it — and, because per-team isolation is the domain's subtlest
+claim, it draws a sharp line between what's live-and-carrying-data (metrics + logs isolation, plus
+grant-based cross-team sharing) and what's deferred (per-team traces + profiles isolation).
 
 ## The one idea for this doc
 
@@ -242,10 +243,10 @@ another tenant's data** — it can only ever land in its own. Authentication of 
 network isolation (the internal NLB is reachable only across the VPC/TGW); mTLS is a documented hardening
 follow-up, not yet in place.
 
-## Honest status: write-split is live, read-isolation is deployed-but-idle
+## Honest status: write-split and read-isolation are both live
 
-The orientation flagged an over-build; here's the precise version, because a trust artifact that oversells is
-worse than one with a gap.
+The orientation flagged per-team isolation as the place to be careful; here's the precise version, because a
+trust artifact that over- *or* under-sells is worse than one with an honest gap.
 
 **Per-team *write* split — LIVE, with real data.** Both environments set `enable_per_team_tenants = true`.
 The mechanism is `cortex-tenant` (chart **0.8.1**, running with 2 replicas on the hub): Prometheus/Alloy
@@ -262,16 +263,28 @@ tenant=bravo   distinct_metric_names=118
 
 Those are real, isolated `alpha` and `bravo` tenants — the write split is not a diagram, it's running.
 
-**Per-team *read* isolation — DEPLOYED and fail-closed, but unexercised.** The
+**Per-team *read* isolation — LIVE and fail-closed, for metrics *and* logs.** Two read proxies enforce it: the
 [`observability-tenant-proxy`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-tenant-proxy/main.tf)
-is live (2 replicas), and it's built correctly: it verifies the Grafana-forwarded OIDC token against the
-Keycloak JWKS, maps the caller's `groups` to a tenant scope (admin group → all tenants; **unknown or empty →
-deny**), overwrites `X-Scope-OrgID`, and reverse-proxies to Mimir. It even provisions its `Mimir (my team)`
-datasource. It is genuinely **fail-closed** — no valid token, no data. But in practice **nothing drives it**:
-per-team *visibility* is delivered the simpler way, through namespace-filtered overview dashboards
-(one per team, auto-generated), so the fail-closed read lane is a *superset* built ahead of a consumer that
-hasn't materialized. The write split is exercised daily; the read proxy is deployed and inert. Say that
-plainly rather than claiming a money-shot that isn't wired up.
+in front of Mimir and its `loki-tenant-proxy` sibling in front of Loki (each 2 replicas). Each verifies the
+Grafana-forwarded OIDC token against the Keycloak JWKS, maps the caller's `groups` to a tenant scope (admin
+group → all tenants; **unknown or empty → deny**), overwrites `X-Scope-OrgID`, and reverse-proxies to its
+store. They provision the `Mimir (my team)` / `Loki (my team)` datasources. Genuinely **fail-closed** — no
+valid token, no data — with the *enforcement* **proven live (2026-07-07)**: identity maps to exactly one tenant
+and unknown callers are denied, for metrics *and* logs. (The write-split was flipped **hub-first**: the hub
+holds only the `platform` tenant with data today, so the `alpha`/`bravo` tenants exist end-to-end but stay
+empty until the spoke ingests into them — the *fencing* is what's proven, ahead of per-team data volume.)
+*(Per-team **traces (Tempo)** and **profiles (Pyroscope)** isolation is deliberately deferred — metrics + logs
+are the two live data-plane signals.)*
+
+**Cross-team read sharing is an `AccessGrant`** ([ADR-068](../../adrs/068-product-scoped-and-cross-team-access-model.md);
+claims in `gitops/grants/`). A team grants another read access to its signals, and the read proxy derives that
+grant into a **federated** read — the caller queries its own tenant **∪** its granted tenants, e.g. `bravo`
+reading `alpha`'s `shop` becomes `X-Scope-OrgID: alpha|bravo` (Mimir's `tenant_federation` splitting the `|`
+on read), still fail-closed for anything ungranted. And because OSS Grafana has **no per-team dashboard RBAC**,
+this grant *is* the data-and-dashboard sharing mechanism — there is no other lane to share a tenant's signals
+across the team boundary. Alongside it, the namespace-filtered overview dashboards remain each team's everyday
+*default* self-view. Say it plainly: real per-team read isolation and real grant-based sharing, for metrics and
+logs — with traces/profiles still to come.
 
 ## Why self-host all of this at all?
 
@@ -308,9 +321,11 @@ cluster, switching to managed is a config change, not a rewrite.
 - **The Gateway needs a `CiliumNetworkPolicy`, not a NetworkPolicy.** Envoy's reserved `ingress` identity (8)
   is invisible to a standard `from:` clause. Every store that admits Gateway traffic uses `fromEntities:
   ["ingress"]`.
-- **Grafana Viewer-for-everyone is by design, and it's the ceiling.** With no per-team RBAC in Grafana, every
-  authenticated non-admin sees every cluster's data. The tenant-proxy exists to raise that ceiling; today it's
-  the namespace-filtered dashboards doing the softer version.
+- **Grafana Viewer-for-everyone is by design — per-team reads are fenced *below* Grafana.** Grafana itself has
+  no per-team RBAC (every authenticated non-admin is a Viewer). The per-team boundary is enforced at the
+  fail-closed **tenant-proxies** (Mimir + Loki, live): the `(my team)` datasources show a caller only its own
+  tenant ∪ any `AccessGrant`-ed tenants. The namespace-filtered overview dashboards are the convenient default
+  view on top of that.
 
 ## Go deeper
 

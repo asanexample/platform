@@ -134,7 +134,12 @@ and verified wired on the live hub:
   an external [Healthchecks.io](https://healthchecks.io) ping URL. If Prometheus or Alertmanager *dies*, the
   pings stop and Healthchecks pages you **from outside the cluster** — the one failure the in-cluster pipeline
   physically cannot alert on itself. Watchdog never reaches any other receiver (no `continue`).
-- **`severity: critical`** → the `critical` receiver: **SNS + Slack + PagerDuty** all three.
+- **`severity: critical`** → the `critical` receiver: **SNS + Slack + PagerDuty** all three. *(Status caveat:
+  the PagerDuty leg is a real Events-API-v2 wire, keyed by the `pagerduty` unit's routing key, and was live —
+  but the PagerDuty trial account lapsed (~2026-07-07), so the page half is momentarily offline: `critical`
+  today lands on SNS + Slack + the `Watchdog` dead-man's switch, not a human page. The routing design is
+  unchanged — critical→PagerDuty is the intended path; treat the PagerDuty leg as wired-but-dormant until the
+  account is restored.)*
 - **`severity: warning`** → the `warning` receiver: **Slack only** (SNS is a fallback used only when Slack is
   disabled), but *not* PagerDuty — warnings notify, they don't page.
 - **Inhibition:** a firing `critical` **inhibits** a matching `warning` (same `namespace` + `alertname`) so one
@@ -188,7 +193,9 @@ provisioned in IaC by the [`pagerduty`](https://github.com/asanexample/platform/
 module: one schedule + escalation policy + service per team, escalating (re-notify after 15 min, loop twice).
 It uses the **v1** `pagerduty_schedule` resource deliberately — the v3 "flexible schedules" (`schedulev2`) API
 is blocked on a provider bug (#1127) that returns invalid objects on create. So: real per-team on-call,
-seeded rosters, v1 schedules until the provider is fixed.
+seeded rosters, v1 schedules until the provider is fixed. *(One transient caveat: the PagerDuty **trial
+account** itself lapsed ~2026-07-07, so these schedules exist in IaC but can't actually page until it's
+restored — the wiring is intact, the subscription isn't.)*
 
 ---
 
@@ -274,8 +281,9 @@ observable signal.
   spoke tenant. Same math, different home.
 - **`continue = true` is the whole triage design.** The agent is fanned a *copy* of critical alerts; the
   original still pages humans. Flip it to `false` and the agent silently becomes a black hole for every page.
-- **Warnings don't page.** Only `critical` reaches PagerDuty. That's why the 6-day-outage fix was a *severity
-  upgrade*, not a new alert — the alerts existed, they just didn't page.
+- **Warnings don't page.** Only `critical` reaches PagerDuty (a severity-based design fact — though the
+  PagerDuty leg is dormant while the trial account is lapsed, see §2). That's why the 6-day-outage fix was a
+  *severity upgrade*, not a new alert — the alerts existed, they just didn't page.
 - **The dead-man's switch is inverted logic.** `Watchdog` firing is *healthy*; the alert is its *silence*.
   Don't "fix" Watchdog by silencing it — you'd be disabling the only thing that catches a dead pipeline.
 - **`max`, not `sum`, for true-cost panels.** The odometer re-emits a running total; summing it double-counts.

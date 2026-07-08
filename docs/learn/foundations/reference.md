@@ -96,6 +96,12 @@ Cross-account chain: `aws sso login` (mgmt) → assume **PlatformDeployer** in t
   vs `WhenEmptyOrUnderutilized` (preprod). Auth = Pod Identity. **Cilium-first startup taint**
   `node.cilium.io/agent-not-ready`. **≥8 GiB floor** (DaemonSet slab ~3.2 GiB). **SCP exemption mandatory**
   (per-cluster anchored `*-karpenter-*`).
+- **Workload autoscaling (HPA):** every scaffolded Service ships a **default HPA** (`k8s/base/hpa.yaml`,
+  `autoscaling/v2`, targets the Argo Rollout, CPU 70%; `min 1`/`max 10`, prod overlay `min 2`/`max 20` for
+  the ADR-085 floor; metrics-server the CPU source) — elastic by construction, opt out not in. **The closed
+  loop** (ADR-078 Phase 2, live): HPA adds pods → they go Pending → Karpenter provisions a right-sized node
+  → load drops → HPA scales pods down → Karpenter consolidates the idle node away. KEDA (event-driven)
+  deferred until first needed.
 - **Descheduler:** `LowNodeUtilization` CronJob (platform 40/70% q15m, preprod 50/70% q10m); `nodeFit: true`,
   respects PDBs, skips system-critical. Fixes post-unpark single-replica pile-up (ADR-093 is stale-marked
   *Proposed* but is **built + live**, #1106).

@@ -184,7 +184,11 @@ from its Environment claim, off its Beyla RED metrics.
 
 **Alerts that page the *right* person.** ~40 curated alerts fire through Alertmanager, routed by severity
 (critical → PagerDuty + Slack + SNS; warning → Slack; an always-firing *dead-man's switch* pages an external
-service if the whole pipeline goes silent). But Alertmanager only knows *severity*, not *ownership* — so the
+service if the whole pipeline goes silent). *(Status caveat: the critical→PagerDuty wire is real and was live
+— an Events-API-v2 receiver fed by the `pagerduty` unit's routing key — but the PagerDuty trial account lapsed
+(~2026-07-07), so paging is momentarily offline; `critical` alerts today still reach Slack + SNS + the
+external dead-man's switch, just not a human page. The design stands — critical→PagerDuty is the intended path
+— the account doesn't.)* But Alertmanager only knows *severity*, not *ownership* — so the
 **triage agent** ([ADR-084](../../adrs/084-platform-identity-directory-and-owner-resolution.md)) resolves the
 culprit's **team** from the git registries and pages *that team's on-call*, @-mentioning the commit author in
 their Slack. *The fire panel shows the zone; the dispatcher looks up whose apartment it is and calls them.*
@@ -211,20 +215,27 @@ deliberately deferred. It's the same four-signal machine, pointed at a new kind 
 
 ---
 
-## The honest status — what's live, and the one over-build
+## The honest status — what's live, and where the edges are
 
 Because this is a portal that refuses to oversell: **almost all of it is
 live.** The full data plane, the preprod spoke across all four signals, real instrumented apps, SLOs,
 alerting + owner-routing, cost, and agent observability are all running and exercised.
 
-The **one place to be careful** is *per-team* isolation. The per-team **write** split is real — metrics
-genuinely land in separate `alpha` and `bravo` Mimir tenants (you can see their blocks on S3). But per-team
-**read** isolation — a fail-closed proxy that would let `alpha` query *only* `alpha`'s data — is **deployed
-and fail-closed but not actually used**: nothing points at it, and per-team *visibility* is delivered the
-simpler way, through **namespace-filtered overview dashboards** (one dashboard per team, auto-generated from
-the team registry). That's the honest picture: the hard isolation is a *superset* of the visibility that was
-actually needed, built ahead of a consumer. The docs say so rather than claiming a "money shot" that isn't
-wired up.
+The **one place to be careful** is *per-team* isolation — the mechanism is live, but read the nuance. The
+per-team **write** split and **read** isolation are both real and **enforced**: `cortex-tenant` routes each
+team's series into its own Mimir tenant, and a **fail-closed** proxy maps SSO identity → that team's tenant so
+a caller reads *only* its own (unknown/empty identity → **deny**), for both **Mimir metrics** and **Loki logs**.
+The subtlety: this was flipped **hub-first to prove the path**, so the hub itself still holds only the
+`platform` tenant with data — the `alpha`/`bravo` tenants are wired end-to-end but stay empty until the
+**spoke** (where team workloads actually run) ingests into them (#627). So what's proven live is the
+*enforcement* — identity-scoped, fail-closed, metrics *and* logs; per-team data *volume* follows the spoke
+cutover. *(Traces (Tempo) and profiles (Pyroscope) per-team isolation is deferred, not built.)* Cross-team
+read *sharing* rides an **AccessGrant** model ([ADR-068](../../adrs/068-product-scoped-and-cross-team-access-model.md)):
+a team grants another read access to its signals and the read path federates the caller's own tenant ∪ its
+grants (still fail-closed — `bravo` reading `alpha` becomes `X-Scope-OrgID: alpha|bravo`). Because OSS Grafana
+has no per-team dashboard RBAC, **a grant *is* the dashboard/data-sharing mechanism**. Alongside it, each team
+still gets a **namespace-filtered overview dashboard** (auto-generated from the team registry) as its everyday
+default view. The docs say all this plainly rather than over- or under-selling any of it.
 
 ## When it breaks — the ones you'll actually hit
 
@@ -237,8 +248,10 @@ wired up.
 - **"The agent dashboard is empty."** Agent metrics are *zero-recording* instruments — they emit **no series
   until the agent's first action / first human verdict**. A cold agent shows only `target_info`. Not broken —
   just quiet.
-- **"I expected per-team data isolation and don't have it."** See the honest status above — per-team *read*
-  isolation is deployed but unexercised; use your team-overview dashboard.
+- **"I expected per-team data isolation and don't have it."** You have it — per-team *read* isolation is live
+  and fail-closed for **metrics and logs**, so you see only your team's data unless another team has granted
+  you access (an **AccessGrant**). (Traces/profiles isolation is deferred.) For a ready-made view, use your
+  team-overview dashboard.
 
 ## Recap — say it back
 
@@ -252,7 +265,8 @@ Try it cold: *how does the platform observe a workload, and what did the team ha
 > One **Grafana** **correlates** them — metric spike → exemplar **trace** → its **logs** → its **profile**,
 > one click each. Signals become action: **burn-rate SLOs** (incl. one auto-derived per prod app), alerts that
 > the **triage agent routes to the owning team**, and **cost** as a first-class signal. Even the AI **agents**
-> are observed (GenAI semconv). Almost all live; per-team *read* isolation is built but not yet wired" —
+> are observed (GenAI semconv). Almost all live; per-team *read* isolation is live for metrics + logs
+> (cross-team sharing via **AccessGrant**), with traces/profiles isolation deferred" —
 
 — then you hold the whole observability machine, and 3 a.m. is a series of clicks, not a mystery.
 

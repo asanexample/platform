@@ -83,6 +83,12 @@ the prod Rollout, ADR-056). Six steps run in order:
 6. `publish:github:pull-request` — opens a PR to `asanexample/platform` (branch
    `product/<team>-<product>`) adding them.
 
+The app scaffold it renders into `./app` (step 2) isn't just source + CI: its `k8s/base/` ships a
+**default HPA** (`k8s/base/hpa.yaml`, `autoscaling/v2`, targeting the Argo **Rollout**, CPU 70%
+utilization, `minReplicas: 1`/`maxReplicas: 10` — the prod overlay patches it to **min 2 / max 20** to
+satisfy the ADR-085 prod replica-floor policy; metrics-server, an EKS add-on, is the CPU source). Every
+new Service is **elastic by construction** — you opt *out* (delete the file), not in.
+
 The PR lands two files from
 [`new-product/platform-skeleton/`](https://github.com/asanexample/platform/blob/main/scaffolder/templates/new-product/platform-skeleton):
 a **`kind: Product`** (`spec.repo: asanexample/<team>-<product>`, `tenancy: pooled`, `domains: []`) and a

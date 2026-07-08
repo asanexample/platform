@@ -159,7 +159,7 @@ The agent's grounded tools (ADR-080 as-built notes) are all reads except one wri
 | `query_metrics` | Beyla RED (Mimir) | request rate/errors/latency |
 | `query_traces` | Tempo | the slow span |
 | `query_logs` | Loki | correlated log lines for the window |
-| **post triage card** | — (**write**) | the one write the model makes: a Slack message; the eval-corpus `PutObject` is the only other write (not a tool the model calls). Live on-call *paging* via PagerDuty is ADR-084 Phase 1/3 — designed, **not yet wired** (the Composition's egress allows no PagerDuty endpoint) |
+| **post triage card** | — (**write**) | the one write the model makes: a Slack message; the eval-corpus `PutObject` is the only other write (not a tool the model calls). The agent never pages PagerDuty *itself* (its egress has no PagerDuty endpoint) — paging is the platform Alertmanager's critical receiver, which **is** wired to PagerDuty (Events-API-v2, keyed by the `pagerduty` unit) and *was* live, but the PagerDuty **trial account lapsed (~2026-07-07) so paging is currently offline** — critical alerts reach Slack + SNS + the dead-man's switch meanwhile |
 
 The Slack surface is delivered over **Socket Mode** — a private agent (no inbound, ADR-010) can't host a
 public Slack Request URL, so it dials *out* over a WebSocket. That's why the Composition's egress is widened

@@ -4,7 +4,7 @@
 
 Multi-cloud IaC platform using OpenTofu (v1.12.1) + Terragrunt (v1.0.7). Currently targets AWS only (Azure/GCP removed). CLI tool versions (tofu, terragrunt, kubectl, helm, awscli) are pinned canonically in `/.tool-versions` — the single source of truth read by local dev (mise/asdf), CI, and the self-hosted runner image.
 
-- **Shared modules**: `infra/modules/` (`ls` for the current list) — includes the LGTM+P observability stack as `observability` + 16× `observability-*`
+- **Shared modules**: `infra/modules/` (`ls` for the current list) — includes the LGTM+P observability stack as `observability` + 19× `observability-*`
 - **AWS modules**: `infra/modules/aws/`
 - **Live configs**: `infra/live/aws/` -- environment-specific Terragrunt units
 
@@ -223,7 +223,7 @@ per-cluster catalog: `docs/architecture/kyverno-policy-catalog.md`. When writing
 - **No `eks.amazonaws.com/role-arn` annotation** on a ServiceAccount — IRSA is platform-only; an environment annotation is denied (`disallow-irsa-annotation-cross-team`). (Separately, environment AWS access is platform-managed **Pod Identity** (ADR-041): use a **named** ServiceAccount and declare access in the `XEnvironment` claim's deny-set-validated `policyStatements` — a Pod Identity requirement, *not* a Kyverno rejection. See the `environment-onboarding` skill.)
 - **Images must be cosign-signed + attested** (keyless; Enforce on preprod). Your app CI is a thin caller of the shared `trusted-ci` build-sign/provenance workflows; trust is registry-derived from `spec.repo`. See the `supply-chain-onboarding` skill.
 - **No** `cluster-admin` (Cluster)RoleBindings or wildcard (`*`) verbs/resources in Roles
-- **`replicas >= 2` in `*-prod` namespaces** (`require-prod-replica-floor`, ADR-085) — a single replica can't be zero-downtime; an HPA must set `minReplicas >= 2`. **Enforce on preprod + platform** (#934) — a single-replica `*-prod` workload is now rejected at admission; lower stages may stay at 1 for cost. Replicas are validated, never mutated.
+- **`replicas >= 2` in `*-prod` namespaces** (`require-prod-replica-floor`, ADR-085) — a single replica can't be zero-downtime; an HPA must set `minReplicas >= 2`. **Enforce on preprod + platform** (#934) — a single-replica `*-prod` workload is now rejected at admission; lower stages may stay at 1 for cost. Replicas are validated, never mutated. The New Product scaffolder **emits a default HPA by construction** (ADR-078 Phase 2, "elastic by construction") — its prod overlay sets `minReplicas: 2`, so a scaffolded prod service satisfies this floor without you authoring one; opt out by deleting `k8s/base/hpa.yaml`.
 
 Lower-stakes guidance that won't get a workload rejected — SIGTERM/drain handling (ADR-085), the
 recommended-but-not-enforced `app.kubernetes.io/name` label, and regulated-tier (hipaa/pci) extras

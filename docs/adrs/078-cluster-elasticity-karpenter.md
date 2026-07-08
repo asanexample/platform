@@ -1,8 +1,11 @@
 # ADR-078: Cluster Elasticity — Karpenter + Workload Autoscaling
 
 **Status:** Accepted — Phase 1 (Karpenter) implemented + live on both clusters, 2026-06-23 (#643). Phase 2
-(HPA/KEDA on the paved road) outstanding. Refines [ADR-023](023-managed-node-groups.md) (managed node groups
-now bootstrap only the `system` floor; Karpenter owns workload capacity).
+(HPA on the paved road) implemented + the full elasticity loop **proven live**, 2026-07-08 (#1240): the New
+Product skeleton emits a default HPA and a CPU-load test drove HPA 1→12 → a pod `Pending` → Karpenter
+provisioned a node → load removed → Karpenter consolidated it away. **KEDA** (event-driven) remains deferred
+until first needed. Refines [ADR-023](023-managed-node-groups.md) (managed node groups now bootstrap only the
+`system` floor; Karpenter owns workload capacity).
 
 ## Context
 
