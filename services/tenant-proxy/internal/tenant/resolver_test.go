@@ -20,7 +20,7 @@ func TestNewResolver_rejectsBadConfig(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if _, err := NewResolver(tc.tenants, tc.adminGroup); err == nil {
+			if _, err := NewResolver(tc.tenants, tc.adminGroup, nil); err == nil {
 				t.Fatalf("expected error for %s, got nil", tc.name)
 			}
 		})
@@ -104,9 +104,55 @@ func TestScope_orderIndependent(t *testing.T) {
 
 func mustResolver(t *testing.T) *Resolver {
 	t.Helper()
-	r, err := NewResolver([]string{"alpha", "bravo", "platform"}, "platform-admins")
+	r, err := NewResolver([]string{"alpha", "bravo", "platform"}, "platform-admins", nil)
 	if err != nil {
 		t.Fatalf("NewResolver: %v", err)
 	}
 	return r
+}
+
+// TestScope_grants covers cross-team read grants (ADR-068 AccessGrant projection): a grantee group
+// gets its OWN tenant plus any owner tenants granted to it, unioned into the federated scope.
+func TestScope_grants(t *testing.T) {
+	t.Parallel()
+	// bravo may also read alpha; charlie-team (not itself a tenant) may read alpha+bravo.
+	grants := map[string][]string{
+		"bravo":   {"alpha"},
+		"charlie": {"alpha", "bravo"},
+		"alpha":   {"gamma"}, // gamma is NOT a known tenant → must be dropped, never widens
+	}
+	r, err := NewResolver([]string{"alpha", "bravo", "platform"}, "platform-admins", grants)
+	if err != nil {
+		t.Fatalf("NewResolver: %v", err)
+	}
+	tests := []struct {
+		name   string
+		groups []string
+		want   string
+	}{
+		{"grantee gets own + granted", []string{"bravo"}, "alpha|bravo"},
+		{"grant is deterministic + sorted", []string{"bravo", "alpha"}, "alpha|bravo"},
+		{"multi-owner grant unions all", []string{"charlie"}, "alpha|bravo"},
+		{"grant to non-existent tenant is dropped", []string{"alpha"}, "alpha"},
+		{"grantee holding no own tenant still gets granted", []string{"charlie", "offline_access"}, "alpha|bravo"},
+		{"admin still federates over all, grants irrelevant", []string{"platform-admins", "bravo"}, "alpha|bravo|platform"},
+	}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := r.Scope(tc.groups)
+			if err != nil {
+				t.Fatalf("Scope(%v) unexpected error: %v", tc.groups, err)
+			}
+			if got != tc.want {
+				t.Errorf("Scope(%v) = %q; want %q", tc.groups, got, tc.want)
+			}
+		})
+	}
+
+	// A group with no own tenant and no grant must still be denied — grants don't relax fail-closed.
+	if got, err := r.Scope([]string{"gamma"}); !errors.Is(err, ErrNoTenant) || got != "" {
+		t.Errorf("Scope([gamma]) = %q, %v; want ErrNoTenant", got, err)
+	}
 }

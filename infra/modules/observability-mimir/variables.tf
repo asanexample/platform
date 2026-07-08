@@ -127,6 +127,12 @@ variable "enable_federated_datasource" {
   default     = false
 }
 
+variable "read_proxy_url" {
+  description = "P13 read-isolation enforcement (#590): when set, the Grafana datasources point HERE (the tenant-proxy) with `oauthPassThru` instead of the Mimir gateway with a fixed `X-Scope-OrgID` header — so the caller's SSO identity, not a baked-in tenant, decides the scope (admin → federated all; team → own tenant). This is what makes the proxy the ENFORCED front door: with it set, no datasource carries a static tenant header a user could pick to bypass isolation. Empty (default) = direct single/federated-tenant datasources (pre-P13 behaviour). Only the default (`mimir`) + federated (`mimir-all`) datasources are rendered when proxying — the per-cluster `extra_tenant_datasources` are dropped (they'd be un-proxied bypass paths, and the proxy federates for admins anyway). Set to the in-cluster proxy Service (e.g. http://tenant-proxy.observability.svc:8080)."
+  type        = string
+  default     = ""
+}
+
 variable "enable_ruler" {
   description = "Enable the Mimir ruler (P4) — evaluates alerting rules against EACH tenant's metrics (incl. the spokes' remote-written data) and sends fired alerts to ruler_alertmanager_url, so a spoke (e.g. preprod) failure produces an alert that reaches the hub Alertmanager → the triage agent (ADR-082). Rules are loaded per-tenant into ruler_storage via mimirtool/the ruler API (the rules-sync). Hub only. Off by default."
   type        = bool

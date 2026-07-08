@@ -57,6 +57,12 @@ variable "admin_group" {
   default     = "platform-admins"
 }
 
+variable "grants" {
+  description = "Cross-team read grants (ADR-068 AccessGrant projection): grantee team group → the owner tenants it may ADDITIONALLY read on top of its own. E.g. { bravo = [\"alpha\"] } lets group `bravo` read alpha's tenant (federated `X-Scope-OrgID: alpha|bravo`). Rendered into the proxy's GRANTS env; the proxy drops any owner that isn't a known tenant (a grant never invents a scope). Derived at the unit from gitops/grants, excluding regulated (pci/hipaa) targets. Empty = no cross-team sharing (own-tenant-only)."
+  type        = map(list(string))
+  default     = {}
+}
+
 variable "create_datasource" {
   description = "Create the per-team Grafana datasource ConfigMap (oauthPassThru → the proxy). True on the hub that runs Grafana."
   type        = bool

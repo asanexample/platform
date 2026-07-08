@@ -2,6 +2,7 @@ package config
 
 import (
 	"maps"
+	"slices"
 	"testing"
 )
 
@@ -53,10 +54,50 @@ func TestLoad(t *testing.T) {
 	})
 }
 
+func TestParseGrants(t *testing.T) {
+	t.Parallel()
+	t.Run("valid + empty", func(t *testing.T) {
+		t.Parallel()
+		cases := map[string]map[string][]string{
+			"":                          {},
+			"  ":                        {},
+			"bravo:alpha":               {"bravo": {"alpha"}},
+			"bravo:alpha,platform":      {"bravo": {"alpha", "platform"}},
+			"bravo:alpha; charlie:beta": {"bravo": {"alpha"}, "charlie": {"beta"}},
+			"bravo:alpha;;":             {"bravo": {"alpha"}}, // empty trailing entries ignored
+			" bravo : alpha , beta ":    {"bravo": {"alpha", "beta"}},
+		}
+		for in, want := range cases {
+			got, err := parseGrants(in)
+			if err != nil {
+				t.Errorf("parseGrants(%q) unexpected error: %v", in, err)
+				continue
+			}
+			if !maps.EqualFunc(got, want, slices.Equal) {
+				t.Errorf("parseGrants(%q) = %v; want %v", in, got, want)
+			}
+		}
+	})
+
+	t.Run("malformed is a hard error (fail-closed)", func(t *testing.T) {
+		t.Parallel()
+		for _, in := range []string{
+			"bravo",         // no colon
+			"bravo:",        // no owners
+			":alpha",        // no grantee
+			"bravo:alpha;x", // second entry malformed
+		} {
+			if _, err := parseGrants(in); err == nil {
+				t.Errorf("parseGrants(%q) succeeded; want error", in)
+			}
+		}
+	})
+}
+
 func setEnv(t *testing.T, m map[string]string) {
 	t.Helper()
 	// Clear everything this package reads, then set the provided subset.
-	for _, k := range []string{"UPSTREAM_URL", "JWKS_URL", "OIDC_ISSUER", "OIDC_AUDIENCE", "TENANTS", "ADMIN_GROUP", "LISTEN_ADDR", "METRICS_ADDR", "UPSTREAM_TIMEOUT"} {
+	for _, k := range []string{"UPSTREAM_URL", "JWKS_URL", "OIDC_ISSUER", "OIDC_AUDIENCE", "TENANTS", "ADMIN_GROUP", "GRANTS", "LISTEN_ADDR", "METRICS_ADDR", "UPSTREAM_TIMEOUT"} {
 		t.Setenv(k, "")
 	}
 	for k, v := range m {

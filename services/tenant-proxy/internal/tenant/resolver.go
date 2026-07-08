@@ -29,12 +29,18 @@ type Resolver struct {
 	ordered []string
 	// adminGroup, when present in a user's groups, grants the federated all-tenants scope.
 	adminGroup string
+	// grants maps a grantee group (a team group, e.g. "bravo") → the owner tenants that group may
+	// ADDITIONALLY read on top of its own (cross-team read grants, ADR-068 AccessGrant). Only owner
+	// tenants that are themselves known tenants are retained — a grant can never widen access to a
+	// tenant that does not exist. Derived from admission-validated AccessGrants; empty by default.
+	grants map[string][]string
 }
 
-// NewResolver builds a Resolver from the known team tenants and the admin group name.
+// NewResolver builds a Resolver from the known team tenants, the admin group name, and the set of
+// cross-team read grants (grantee group → owner tenants it may additionally read; nil for none).
 // It errors on an empty tenant set or empty admin group — a misconfigured resolver must fail to
 // start rather than silently deny (or worse, silently allow) at runtime.
-func NewResolver(tenants []string, adminGroup string) (*Resolver, error) {
+func NewResolver(tenants []string, adminGroup string, grants map[string][]string) (*Resolver, error) {
 	if adminGroup == "" {
 		return nil, errors.New("tenant: admin group must not be empty")
 	}
@@ -54,36 +60,64 @@ func NewResolver(tenants []string, adminGroup string) (*Resolver, error) {
 		ordered = append(ordered, t)
 	}
 	sort.Strings(ordered)
-	return &Resolver{tenants: set, ordered: ordered, adminGroup: adminGroup}, nil
+
+	// Normalise grants: trim, drop empty grantees, and keep only owner tenants that are KNOWN
+	// tenants (a grant must never invent a scope). Deterministic order per grantee.
+	normGrants := make(map[string][]string, len(grants))
+	for grantee, owners := range grants {
+		grantee = strings.TrimSpace(grantee)
+		if grantee == "" {
+			continue
+		}
+		seen := make(map[string]struct{}, len(owners))
+		kept := make([]string, 0, len(owners))
+		for _, o := range owners {
+			o = strings.TrimSpace(o)
+			if _, known := set[o]; !known {
+				continue // can't grant read of a tenant that does not exist
+			}
+			if _, dup := seen[o]; dup {
+				continue
+			}
+			seen[o] = struct{}{}
+			kept = append(kept, o)
+		}
+		if len(kept) > 0 {
+			sort.Strings(kept)
+			normGrants[grantee] = kept
+		}
+	}
+
+	return &Resolver{tenants: set, ordered: ordered, adminGroup: adminGroup, grants: normGrants}, nil
 }
 
 // Scope returns the X-Scope-OrgID value the given groups are permitted to read.
 //
 //   - If the admin group is present → the federated scope over ALL known tenants
 //     (Mimir reads `a|b|c` as a multi-tenant query).
-//   - Otherwise → the intersection of the user's groups with the known tenants, `|`-joined in a
-//     stable order. The result is deterministic regardless of input group order.
-//   - If the intersection is empty → ErrNoTenant (deny). An admin with the admin group set always
-//     wins even if they hold no team groups.
+//   - Otherwise → the union of (a) the intersection of the user's groups with the known tenants —
+//     their OWN tenants — and (b) any owner tenants GRANTED to a group the user holds (cross-team
+//     read grants). `|`-joined in a stable order; deterministic regardless of input group order.
+//   - If the union is empty → ErrNoTenant (deny). An admin with the admin group set always wins
+//     even if they hold no team groups.
 //
 // The returned scope is always non-empty on a nil error.
 func (r *Resolver) Scope(groups []string) (string, error) {
 	isAdmin := false
-	matched := make([]string, 0, len(groups))
-	seen := make(map[string]struct{}, len(groups))
+	matched := make(map[string]struct{}, len(groups))
 	for _, g := range groups {
 		if g == r.adminGroup {
 			isAdmin = true
 			continue
 		}
-		if _, ok := r.tenants[g]; !ok {
-			continue // group is not a known tenant — cannot widen access
+		if _, ok := r.tenants[g]; ok {
+			matched[g] = struct{}{} // the user's own team tenant
 		}
-		if _, dup := seen[g]; dup {
-			continue
+		// Cross-team grants: any owner tenant this group has been granted read on. Owners were
+		// already validated ⊆ known tenants at construction, so this can never widen to a non-tenant.
+		for _, owner := range r.grants[g] {
+			matched[owner] = struct{}{}
 		}
-		seen[g] = struct{}{}
-		matched = append(matched, g)
 	}
 
 	if isAdmin {
@@ -93,8 +127,12 @@ func (r *Resolver) Scope(groups []string) (string, error) {
 	if len(matched) == 0 {
 		return "", ErrNoTenant
 	}
-	sort.Strings(matched)
-	return strings.Join(matched, "|"), nil
+	out := make([]string, 0, len(matched))
+	for t := range matched {
+		out = append(out, t)
+	}
+	sort.Strings(out)
+	return strings.Join(out, "|"), nil
 }
 
 // Tenants returns the configured tenants (sorted). Exposed for logging/health only.

@@ -37,7 +37,7 @@ func (u *recordingUpstream) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func newHandler(t *testing.T, v auth.Verifier, up http.Handler) *Handler {
 	t.Helper()
-	r, err := tenant.NewResolver([]string{"alpha", "bravo", "platform"}, "platform-admins")
+	r, err := tenant.NewResolver([]string{"alpha", "bravo", "platform"}, "platform-admins", nil)
 	if err != nil {
 		t.Fatalf("resolver: %v", err)
 	}

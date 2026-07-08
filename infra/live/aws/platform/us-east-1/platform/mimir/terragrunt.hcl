@@ -164,6 +164,14 @@ inputs = {
   # datasource spanning platform|preprod. Platform-admin overview lane (per-team scoping = P13).
   enable_federated_datasource = true
 
+  # P13 enforcement (#590): when per-team tenants are on, point the Grafana metrics datasources at the
+  # tenant-proxy (identity-scoped) instead of the gateway with a fixed X-Scope-OrgID — so no datasource
+  # carries a static tenant a user could pick to bypass isolation. The proxy federates for platform-admins
+  # and scopes to the caller's team otherwise. Deterministic in-cluster Service address (NOT a dependency:
+  # tenant-proxy has no outputs we consume, and depending on it would risk a cycle via the shared namespace).
+  # Empty when the toggle is off ⇒ unchanged direct datasources.
+  read_proxy_url = include.base.locals.enable_per_team_tenants ? "http://tenant-proxy.observability.svc:8080" : ""
+
   # P4 / ADR-082: the ruler evaluates alerting rules against EACH tenant's metrics (incl. preprod's
   # remote-written data) and posts fired alerts to the hub Alertmanager → the triage agent. The rules-sync
   # CronJob loads the curated spoke ruleset into the ruler for each ruler_tenant (mimirtool rules sync).
