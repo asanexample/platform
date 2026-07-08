@@ -1,7 +1,7 @@
 name: TechDocs
 
 # Build the learning-portal TechDocs site with mkdocs + the techdocs-cli and publish it to S3
-# (#938, ADR-097). builder: external — Backstage serves the pre-built site from s3://platform-techdocs
+# (#938, ADR-097). builder: external — Backstage serves the pre-built site from s3://refplat-platform-techdocs
 # for the `platform-learning-portal` catalog entity. Cross-tree links are rewritten to GitHub URLs by
 # techdocs-linkfix.sh on a build copy first, so the canonical docs keep their repo-relative links.
 
@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ENTITY: default/component/platform-learning-portal
-      BUCKET: platform-techdocs
+      BUCKET: refplat-platform-techdocs
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
