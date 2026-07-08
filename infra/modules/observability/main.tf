@@ -988,6 +988,32 @@ resource "kubernetes_manifest" "cnpg_instance_pod_monitor" {
   depends_on = [helm_release.kube_prometheus_stack]
 }
 
+# Crossplane core-controller metrics (alerting P1, #1121) — lives here (not the crossplane module) for the same
+# reason as the CNPG PodMonitor: kubernetes_manifest needs the kubernetes provider this module has, and the
+# crossplane module deliberately avoids kubernetes_manifest (plan-time CRD/REST-client problem). The crossplane
+# module sets `metrics.enabled` to expose the named `metrics` port; this scrapes it → `up{namespace=
+# "crossplane-system"}` (CrossplaneDown) + the core's controller-runtime reconcile metrics (ControllerReconcileErrors).
+resource "kubernetes_manifest" "crossplane_pod_monitor" {
+  count = local.create && var.enable_crossplane_pod_monitor ? 1 : 0
+
+  manifest = {
+    apiVersion = "monitoring.coreos.com/v1"
+    kind       = "PodMonitor"
+    metadata = {
+      name      = "crossplane"
+      namespace = var.namespace
+      labels    = local.k8s_labels
+    }
+    spec = {
+      namespaceSelector   = { matchNames = ["crossplane-system"] }
+      selector            = { matchLabels = { app = "crossplane" } }
+      podMetricsEndpoints = [{ port = "metrics", path = "/metrics", interval = "30s" }]
+    }
+  }
+
+  depends_on = [helm_release.kube_prometheus_stack]
+}
+
 # ---------------------------------------------------------------------------
 # Grafana SSO (#592) — Keycloak OIDC client secret synced from AWS Secrets Manager, plus the gateway-ClusterIP
 # lookup backing the split-horizon host-alias. The secret (keycloak-config writes platform/keycloak/grafana-oidc)

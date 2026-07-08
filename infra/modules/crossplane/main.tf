@@ -101,6 +101,12 @@ resource "helm_release" "crossplane" {
   wait             = var.helm_wait
   atomic           = var.helm_wait
   cleanup_on_fail  = true
+
+  # Expose the core controller's Prometheus metrics on the named `metrics` port (8080) so the platform can
+  # alert on the provisioner being down / erroring (alerting P1, #1121). Harmless where unscraped; the hub
+  # scrapes it via a PodMonitor in the observability module (kubernetes_manifest needs the kubernetes provider
+  # that module has — this unit configures only helm; mirrors the CNPG PodMonitor placement).
+  values = [yamlencode({ metrics = { enabled = true } })]
 }
 
 # ---------------------------------------------------------------------------

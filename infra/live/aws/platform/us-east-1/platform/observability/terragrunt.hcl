@@ -160,5 +160,9 @@ inputs = {
   deployer_role_arn      = include.base.locals.deployer_role_arn
   finalizer_clear_script = "${get_repo_root()}/scripts/k8s-finalizer-clear.sh"
 
+  # Scrape the hub Crossplane core metrics (alerting P1, #1121) — crossplane + this stack co-reside here.
+  # Feeds CrossplaneDown (needs the crossplane unit's metrics.enabled applied first).
+  enable_crossplane_pod_monitor = true
+
   tags = include.base.locals.tags
 }

@@ -293,3 +293,9 @@ variable "enable_cnpg_pod_monitor" {
   type        = bool
   default     = true
 }
+
+variable "enable_crossplane_pod_monitor" {
+  description = "Create a PodMonitor scraping the Crossplane core controller (crossplane-system, app=crossplane, named `metrics` port) — feeds CrossplaneDown + the generic ControllerReconcileErrors coverage (#1121). Requires the crossplane module's `metrics.enabled`. Default off; enable where crossplane + this stack co-reside (the hub)."
+  type        = bool
+  default     = false
+}
