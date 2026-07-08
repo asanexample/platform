@@ -23,7 +23,7 @@ terraform {
 inputs = {
   create = true
   buckets = {
-    "platform-techdocs" = {
+    "refplat-platform-techdocs" = {
       # Same-account read/write is granted on the roles' own identity policies (no bucket policy needed).
       reader_role_arns = []
       writer_role_arns = []
