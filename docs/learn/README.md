@@ -38,6 +38,7 @@ Each subsystem is a short course: an **Orientation** (a guided journey you read 
 | **[Cost & FinOps](cost/)** — cost as an engineering signal on a loop (Inform → Optimize → Operate: two meters, the levers, budget guardrails) | ✅ available |
 | **[Secrets & config](secrets-config/)** — the best secret is one that doesn't exist (federation · SOPS config-in-git · ESO + Secrets Manager · rotation) | ✅ available |
 | **[Operations](operations/)** — run the platform: platctl walks the dependency graph to build · park · rebuild · recover (the DAG orchestrator, cluster parking, day-2 durable fixes) | ✅ available |
+| **[Developer experience](developer-experience/)** — Vercel-like DX over the machinery: a single pane of glass (Backstage) + golden paths (the scaffolder), every change a PR | ✅ available |
 | **[*Spine:* The Life of a Deployment](spine/life-of-a-deployment.md)** — one `git push` across every plane (control plane) | ✅ available |
 | **[*Spine:* The Life of a Request](spine/life-of-a-request.md)** — one user request, edge to pod (data plane) | ✅ available |
 | **[*Spine:* How the Platform Fits](spine/how-the-platform-fits.md)** — the control-plane map (the same structure at rest) | ✅ available |
