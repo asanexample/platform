@@ -41,6 +41,13 @@ linters:
       - linters:
           - lll
         path: api/*
+      # kubebuilder scaffolds groupversion_info.go with controller-runtime's scheme.Builder, which
+      # controller-runtime v0.24 deprecated (SA1019) while kubebuilder still emits it. Suppress the
+      # deprecation on that generated scaffolding only — a real SA1019 anywhere else still fails lint.
+      - linters:
+          - staticcheck
+        path: api/.*/groupversion_info\.go
+        text: "SA1019.*scheme\\.Builder"
       - linters:
           - dupl
           - lll
