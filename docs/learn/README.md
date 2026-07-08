@@ -32,6 +32,7 @@ Each subsystem is a short course: an **Orientation** (a guided journey you read 
 | **[Policy & admission](policy/)** — the guardrail engine at the cluster door (Kyverno: validate · mutate · generate) | ✅ available |
 | **[Identity & access](identity/)** — decide once, derive everywhere, borrow dangerous power (Keycloak, Pod Identity, temporary power) | ✅ available |
 | **[Supply chain](supply-chain/)** — trust provenance, not names (keyless signing, SLSA, verify-at-admission) | ✅ available |
+| **[Runtime security](runtime-security/)** — defend the running workload (assume-breach): Falco detection · WireGuard encryption · mTLS/SPIRE | ✅ available |
 | **[Foundations](foundations/)** — the substrate everything runs on: AWS accounts & SCPs, IaC, networking, the private cluster & Cilium, compute, access (a sub-curriculum) | ✅ available |
 | **[The agentic platform](agentic/)** — running governed AI agents (the XAgent runtime, bounding an agent, the autonomy ladder, the triage copilot) | ✅ available |
 | **[Cost & FinOps](cost/)** — cost as an engineering signal on a loop (Inform → Optimize → Operate: two meters, the levers, budget guardrails) | ✅ available |
