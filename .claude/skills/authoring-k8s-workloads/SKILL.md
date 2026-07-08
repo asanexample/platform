@@ -73,6 +73,12 @@ The platform makes deploys/disruptions *non-dropping*, but only if your app coop
   `minReplicas >= 2`. (The module DEFAULT stays Audit for fresh clusters; the live clusters flipped to
   Enforce.) Lower stages may stay at 1 for cost. (Don't expect to mutate replicas — it's validated,
   never injected, so it doesn't fight your HPA/overlay.)
+  - **You get a default HPA for free** (ADR-078 Phase 2, "elastic by construction"): the New Product
+    scaffolder emits `k8s/base/hpa.yaml` — an `autoscaling/v2` HPA targeting the Rollout (CPU 70%,
+    `minReplicas: 1` / `maxReplicas: 10`; the **prod overlay patches `minReplicas → 2`**, which is what
+    satisfies the floor above). So a scaffolded prod service is compliant *and* elastic without authoring
+    an HPA. Opt out by deleting the file + dropping it from `kustomization.yaml`. (The per-Product
+    ApplicationSet ignores the Rollout `.spec.replicas` so the HPA owns scaling and ArgoCD doesn't fight it.)
 - **Handle `SIGTERM`**: stop accepting new work, drain in-flight, exit. The injected `preStop` sleep
   only buys the window for the datapath to stop routing to you — it does **not** drain your
   in-flight requests; your process must. **Long-lived connections** (websockets, gRPC streams) need

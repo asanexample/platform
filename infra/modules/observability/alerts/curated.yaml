@@ -210,6 +210,7 @@ groups:
         annotations:
           summary: "ArgoCD app {{ $labels.name }} sync status Unknown"
           description: "ArgoCD application {{ $labels.name }} (project {{ $labels.project }}) has been sync=Unknown for 1h — ArgoCD cannot compare against git (a ComparisonError: unreadable repo, failing manifest generation, or a plugin error), so it is NOT deploying new revisions even while the running pods look Healthy."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#argocd"
       - alert: ArgoCDReconciliationStalled
         # Complements ArgoCDAppSyncUnknown (per-app) with a CONTROLLER-wide staleness signal: if the
         # application-controller stops reconciling entirely (wedged / CPU-starved / a stuck work queue in a

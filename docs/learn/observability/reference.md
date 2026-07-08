@@ -42,9 +42,13 @@ in namespace `observability` (backends on the hub; OTel Operator in `opentelemet
   Gateway HTTPRoute that **force-stamps** `X-Scope-OrgID` (a spoke can't spoof another tenant).
 - **Per-team tenants** (the P13 split): a **write-path** proxy (`cortex-tenant`) relabels series to
   `<team>` for env namespaces → real `alpha`/`bravo` Mimir tenants (verified S3 blocks). **LIVE + exercised.**
-  A **read-path** proxy (`tenant-proxy`) verifies the user's OIDC token, maps `groups`→tenant, fail-closed →
-  the `Mimir (my team)` datasource. **Deployed + fail-closed but UNEXERCISED** — nothing points at it; per-team
-  *visibility* is delivered by namespace-filtered dashboards instead. (See status below.)
+  **Read-path** proxies — `tenant-proxy` (Mimir) and `loki-tenant-proxy` (Loki) — verify the user's OIDC token,
+  map `groups`→tenant scope, fail-closed (unknown/empty → deny) → the `Mimir (my team)` / `Loki (my team)`
+  datasources. **Per-team read isolation LIVE + proven for metrics AND logs** (traces/profiles isolation is
+  deferred — see ledger). Cross-team read **sharing = `AccessGrant`** (ADR-068, `gitops/grants/`): a team grants
+  another read access; the proxy derives it into a federated read (`X-Scope-OrgID: alpha|bravo`) = own tenant ∪
+  grants, still fail-closed. Because OSS Grafana has no per-team RBAC, **a grant *is* the data/dashboard-sharing
+  mechanism**; namespace-filtered team dashboards remain the default self-view. (See status below.)
 
 ## Collection & the instrumentation ladder ([ADR-077](../../adrs/077-application-instrumentation-strategy.md))
 
@@ -81,7 +85,10 @@ Metric **exemplar** → **trace** (Tempo) → **logs** (Loki, via trace_id) → 
   freeze gate.
 - **Alerting:** ~40 curated PrometheusRules (`observability/alerts/curated.yaml`); Alertmanager routes by
   `severity` (critical → PagerDuty + Slack + SNS; warning → Slack; inhibit critical→warning); a **dead-man's
-  switch** (Healthchecks.io) pages if the pipeline goes silent. **Owner-routing** ([ADR-084](../../adrs/084-platform-identity-directory-and-owner-resolution.md)):
+  switch** (Healthchecks.io) pages if the pipeline goes silent. *PagerDuty status:* the critical→PagerDuty wire
+  (Events-API-v2 receiver, keyed by the `pagerduty` unit's routing key) is real and was live, but the trial
+  account lapsed (~2026-07-07) → paging **currently offline**; `critical` reaches Slack + SNS + the dead-man's
+  switch today, not a human page. Design unchanged. **Owner-routing** ([ADR-084](../../adrs/084-platform-identity-directory-and-owner-resolution.md)):
   the triage agent resolves the culprit's **team** from the git registries, pages that team's on-call,
   @-mentions the commit author in Slack.
 - **Cost** ([ADR-091](../../adrs/091-cost-guardrails.md)): **OpenCost** (in-cluster allocation per team/ns,
@@ -110,11 +117,13 @@ TGW to the hub's write-only ingest edge. **preprod spoke LIVE for all four signa
   preprod apps, P4 alerting + owner-routing, P5 cloud-resource, P6 APM/correlation, P8 profiling, P9 SLOs, P11
   cost, P12 policy-reporter, network-flow metrics + alerts (Cilium/Hubble: `cilium_drop_count_total`,
   `hubble_flows_processed_total`) + the standalone Hubble UI, **agent-obs (ADR-076)**, per-team overview
-  dashboards (#1157), per-team **write** split (real alpha/bravo tenants).
-- **Built-but-inert:** per-team **read** isolation (tenant-proxy — deployed, fail-closed, but nothing consumes
-  it); a leftover `p13-spike-echo` Grafana datasource (cleanup debt).
-- **Designed/not built:** P14 self-service golden path (auto per-team dashboards/alerts/SLOs + Backstage);
-  mTLS on the cross-cluster ingest path; Hubble flow-**log** export (#161) + dedicated Cilium/Hubble
+  dashboards (#1157), per-team **write** split (real alpha/bravo tenants), **per-team read isolation for metrics
+  AND logs** (tenant-proxy + loki-tenant-proxy, fail-closed; proven live 2026-07-07) + cross-team **AccessGrant**
+  sharing (ADR-068).
+- **Built-but-inert:** a leftover `p13-spike-echo` Grafana datasource (cleanup debt).
+- **Designed/not built:** per-team **traces (Tempo) + profiles (Pyroscope)** isolation (deferred — metrics +
+  logs are the two live signals); P14 self-service golden path (auto per-team dashboards/alerts/SLOs +
+  Backstage); mTLS on the cross-cluster ingest path; Hubble flow-**log** export (#161) + dedicated Cilium/Hubble
   dashboards; prod spoke.
 
 ## Gotchas

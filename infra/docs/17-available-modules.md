@@ -73,7 +73,7 @@ Deployed via Helm / the Kubernetes provider onto any cluster; reusable across cl
 | `crossplane` | Crossplane v2 control plane — hub ECR provisioning + the per-cluster `XEnvironment` XRD/Composition, shipping the `crossplane-environment-api` + `environment-policies` charts (ADR-046/048/067) |
 | `cluster-rbac` | `platform-operator` ClusterRole for the operate-not-author access model (ADR-040) |
 | `observability` | kube-prometheus-stack hub: Prometheus + Grafana + Alertmanager (ADR-043) |
-| `observability-*` (17 modules) | The LGTM+profiles stack: durable stores `-mimir`/`-loki`/`-tempo`/`-pyroscope` (ADR-044); collectors `-alloy`/`-beyla`/`-otel-collector`/`-otel-operator`/`-prometheus-agent`/`-pyroscope-ebpf`/`-events`; measurement `-slo`/`-blackbox`/`-k6`/`-opencost`/`-cloudwatch-exporter` (ADR-077) |
+| `observability-*` (19 modules) | The LGTM+profiles stack: durable stores `-mimir`/`-loki`/`-tempo`/`-pyroscope` (ADR-044); collectors `-alloy`/`-beyla`/`-otel-collector`/`-otel-operator`/`-prometheus-agent`/`-pyroscope-ebpf`/`-events`; measurement `-slo`/`-blackbox`/`-k6`/`-opencost`/`-cloudwatch-exporter` (ADR-077); per-team tenant isolation `-cortex-tenant` (write-splitter) + `-tenant-proxy` (fail-closed read front door) for P13 metrics/logs isolation + cross-team AccessGrants (ADR-068); policy reporting `-policy-reporter` |
 | `falco` | Runtime threat detection (modern eBPF) + falcosidekick (ADR-045) |
 | `pagerduty` | Per-team on-call schedules + escalation policies in IaC, derived from team ownership (ADR-084) |
 | `cloudflare/dns_delegation` | NS records in the Cloudflare parent zone delegating to Route53 (ADR-022) |

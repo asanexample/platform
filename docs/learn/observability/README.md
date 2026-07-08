@@ -13,7 +13,7 @@ help; know roughly what a metric, a log, and a trace are.
 1. **[Orientation](orientation.md)** — *"The platform observes your workload for you."* The one idea, and a
    tour: the four signals → zero-code collection (Beyla eBPF) → the self-hosted LGTM+P stack → correlation
    (the jump) → acting on signals (SLOs, pages, cost) → observing the agents. With an honest status of what's
-   live vs the one over-build.
+   live and what's still deferred (per-team isolation is enforced hub-first; traces/profiles isolation is deferred).
 2. **[Reference](reference.md)** — the dense lookup: versions, the stack, tenancy, the collectors, SLOs/alerts/
    cost, agent-obs, the status ledger, gotchas.
 

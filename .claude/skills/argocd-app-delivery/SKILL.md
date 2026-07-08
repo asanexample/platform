@@ -178,7 +178,9 @@ Composition (`crossplane/charts/agent-api/`), and their delivery is **hub-target
   metric-gated **canary** (or blue/green). The rollouts controller mutates two fields at runtime that ArgoCD
   `selfHeal` will otherwise revert mid-rollout — so the **tenant Application `ignoreDifferences`** the Service
   `.spec.selector` (the injected `rollouts-pod-template-hash`) **and** the HTTPRoute `backendRefs[].weight` (the
-  Gateway-API plugin's canary weights), in `delivery.tf`. **`ignoreDifferences` alone is NOT enough** — without
+  Gateway-API plugin's canary weights), in `delivery.tf`. It **also** ignores the Rollout `.spec.replicas` (both
+  `delivery.tf` and `pr-preview.tf`) so the **default HPA** (ADR-078 Phase 2) owns the replica count and `selfHeal`
+  doesn't revert the HPA's scaling to the manifest's initial value. **`ignoreDifferences` alone is NOT enough** — without
   **`RespectIgnoreDifferences=true`** in the Application `syncOptions`, a sync triggered by any *other* change
   still stomps those fields and fights the canary (found in prod; the offline spikes couldn't surface it). The
   per-stage canary shape lives in the app's `k8s/overlays/prod` (scaffolder `deployStrategy`), and the prod

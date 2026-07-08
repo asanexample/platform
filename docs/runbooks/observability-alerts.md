@@ -297,9 +297,15 @@ module's Alertmanager config):
 
 | severity | destinations |
 |----------|-------------|
-| `critical` | SNS (`platform-alerts` → email) + Slack (`#platform-alerts`) + PagerDuty (page) |
+| `critical` | SNS (`platform-alerts` → email) + Slack (`#platform-alerts`) + PagerDuty (page) — see the ⚠️ below |
 | `warning` | Slack |
 | `info` / `Watchdog` / else | dashboard-only |
+
+> ⚠️ **PagerDuty paging is currently OFFLINE (as of ~2026-07-07).** The critical receiver is wired to page via
+> PagerDuty (Events API v2), but the PD trial account lapsed — so today a `critical` alert reaches **SNS + Slack +
+> the external dead-man's switch only**, not a human page. Restore the PD account (routing key still synced via
+> ESO from the `pagerduty` unit) to re-enable paging; no config change is needed. Until then, treat `#platform-alerts`
+> as the primary critical channel.
 
 A `critical` inhibits a matching `warning` (same `namespace`+`alertname`) so one incident doesn't
 double-notify. SNS auth is EKS Pod Identity (ADR-047) + sigv4. The **Slack webhook** and **PagerDuty routing key** are pulled from
@@ -351,5 +357,6 @@ curl -s -X POST http://localhost:9093/api/v2/alerts -H 'Content-Type: applicatio
        \"annotations\":{\"description\":\"test\"},\"startsAt\":\"$start\",\"endsAt\":\"$end\"}]"
 ```
 
-`severity=warning` → Slack only; `severity=critical` → SNS + Slack + PagerDuty (page). Alertmanager logs
-**only failed** notifications — silence after the POST means it sent. Confirm receipt in the channel.
+`severity=warning` → Slack only; `severity=critical` → SNS + Slack + PagerDuty (page — **currently offline**,
+see the ⚠️ above; criticals reach SNS + Slack + the dead-man's switch today). Alertmanager logs **only failed**
+notifications — silence after the POST means it sent. Confirm receipt in the channel.

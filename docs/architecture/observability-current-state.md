@@ -22,8 +22,8 @@ On the **platform** cluster, in the **`observability`** namespace:
 | **K8s events → Loki** | Alloy singleton watching cluster Events → Loki | chart `alloy 1.10.0` | P3b — `enable_log_pipeline` |
 | **Grafana Tempo** | Traces store (`tempo-distributed`, minimized), S3-backed, **Pod Identity** | chart `tempo-distributed 2.25.5` (app 2.10.7, **grafana-community**) | P3b — `enable_tempo` |
 | **OpenTelemetry Collector** | Trace gateway (OTLP in → Tempo) | chart `opentelemetry-collector 0.158.2` | P3b — `enable_trace_pipeline` |
-| **Curated alerts** | 38 `PrometheusRule`s across 11 components (+ bundled mixins) | — | P4 |
-| **Notifications** | `warning`→Slack · `critical`→SNS+Slack+PagerDuty · inhibition | — | P4; secrets via ESO |
+| **Curated alerts** | curated rules across 20 groups (+ bundled mixins) — broad control-plane/store/access coverage after the #1124 alerting epic | — | P4 |
+| **Notifications** | `warning`→Slack · `critical`→SNS+Slack+PagerDuty\* · inhibition | — | P4; secrets via ESO. \***PD paging currently offline** (trial lapsed ~2026-07-07); criticals reach SNS+Slack+dead-man's today |
 | **gp3 StorageClass** | cluster-default EBS storage (EBS CSI) | — | in the `eks-addons` unit |
 | **Grafana Mimir** | Durable, multi-tenant, S3-backed metrics store | chart `mimir-distributed 6.0.6` | P2 — **ON** on the platform hub (`enable_mimir=true`); Prometheus `remote_write`s here; the hub-and-spoke store |
 | **Prometheus agent (preprod spoke)** | kube-prometheus-stack agent mode (+ KSM + node-exporter) on **preprod**, `remote_write`s to the hub Mimir under tenant `preprod` | chart `kube-prometheus-stack 87.5.0` | P10 — `infra/modules/observability-prometheus-agent` |
@@ -192,8 +192,26 @@ at once (`X-Scope-OrgID: platform|preprod`). The same applies to logs and traces
 pipe-separated header). Write-isolation is unaffected — each store's Gateway edge still force-stamps a single
 tenant per spoke. (Tempo runs `multitenancyEnabled`; the hub OTel collector stamps the hub's own Beyla traces
 as tenant `platform`.) The **Platform Health** dashboard defaults to this datasource and has
-a `cluster` multi-select, so panels break out per cluster. Per-team scoping of the federated lane is **P13**
-(#590); cross-cluster **logs/traces** federation follows their spokes (#627/#628). Umbrella: #629.
+a `cluster` multi-select, so panels break out per cluster. Per-team read scoping (**P13**, #590) is now **LIVE
+for metrics + logs** (2026-07-07) — see the P13 subsection below; cross-cluster **logs/traces** federation
+follows their spokes (#627/#628). Umbrella: #629.
+
+### Per-team read isolation (P13, #590) — as built
+
+Beyond the admin cross-cluster lane above, **per-team read isolation is enforced** for the two live signals
+(flipped **hub-first** to prove the path — the hub holds only the `platform` tenant with data today; the
+`alpha`/`bravo` tenants are wired end-to-end but fill once the **spoke** ingests, #627):
+
+- **`observability-tenant-proxy`** is the fail-closed read front door for **Mimir (metrics)** and **Loki
+  (logs)**: it verifies the caller's `X-Id-Token` (Keycloak OIDC) and stamps the team's `X-Scope-OrgID`, so a
+  team's Grafana queries return only its own tenant. This is real authentication in front of the trust-header
+  boundary described below — not a replacement for the NetworkPolicy, an authenticated layer on top of it.
+- **`observability-cortex-tenant`** write-splits incoming series into per-team tenants (Loki uses per-team
+  Alloy re-tenanting), so `alpha`/`bravo` are real, separate tenants end to end.
+- **Cross-team read sharing = AccessGrants** (ADR-068): a grant federates the caller's own tenant ∪ its granted
+  tenants (fail-closed). Because OSS Grafana has no per-team dashboard RBAC, a grant *is* the sharing mechanism.
+- **Traces (Tempo) + profiles (Pyroscope) per-team isolation are DEFERRED** — the pattern is proven on
+  metrics + logs; extending it is mechanical follow-up.
 
 > **Known wrinkle (data layer only):** the Loki/Mimir charts stamp their own `cluster` label on self-metrics
 > (`cluster=loki`/`cluster=mimir`), polluting the raw `cluster` dimension. The dashboard's `cluster` dropdown

@@ -308,7 +308,10 @@ more planes engage, each — say it with me — *watching for its own cue.*
   [**Karpenter**](https://karpenter.sh/) — watching for *unschedulable pods* — provisions a right-sized EC2
   node in seconds, just for them, and removes it later when it's idle. *Think of it as a restaurant that
   doesn't keep a hall full of empty tables heated all night — it sets a table the moment a party arrives,
-  and clears it when they leave.* Just-in-time capacity instead of a standing, costly reservation.
+  and clears it when they leave.* Just-in-time capacity instead of a standing, costly reservation. (What
+  *made* the pods unschedulable? Often the service's **default HPA** scaling replicas up under load — more
+  pods than the current nodes can hold. When load falls the HPA scales them back down, and Karpenter
+  consolidates the now-idle node away: the same loop run in reverse — ADR-078 Phase 2.)
 - **A network to speak on.** [**Cilium**](https://docs.cilium.io/en/stable/overview/intro/), the cluster's
   CNI (Container Network Interface), wires the new pod into the pod network — assigns it an address, and
   enforces which other pods it's allowed to talk to. *It's the switchboard: it connects your pod's line

@@ -91,7 +91,10 @@ reducing spend ([deep dive](deep-dive-optimize-the-cost-levers.md)):
   provisions **just-in-time nodes sized to the actual pending pods**, and — the cost part — **consolidation**
   continuously bin-packs workloads and **terminates underutilized nodes**. *It's a valet who re-parks the
   whole lot continuously, picks the right-sized space for each car, and closes empty aisles* — versus the old
-  autoscaler that could only use pre-marked, fixed-size spaces.
+  autoscaler that could only use pre-marked, fixed-size spaces. What *lets* it consolidate is upstream: every
+  new service ships a **default HPA** that scales its pods *down* as load falls (ADR-078 Phase 2) — fewer
+  pods free up node capacity, which is exactly what Karpenter then reclaims. The two layers compose — the HPA
+  right-sizes the *pods*, Karpenter right-sizes the *nodes*.
 - **Cluster parking — lights off overnight** (the biggest *non-prod* lever). `platctl down` scales the node
   groups to **zero overnight**, dropping nearly all compute cost, and it's **non-destructive**: the control
   plane and every database volume are preserved, so `up` brings everything back. Proven boringly repeatable.

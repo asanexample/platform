@@ -3,8 +3,9 @@
 > **Purpose:** day-2 operations for Karpenter node autoscaling (ADR-078) — tuning the
 > NodePool/EC2NodeClass, understanding consolidation/disruption, interruption handling, and
 > debugging "pods stuck Pending, no nodes provisioned." Karpenter is live on **both**
-> clusters, **Phase 1 only** (just-in-time node provisioning + consolidation; Phase 2
-> HPA/KEDA workload autoscaling is still outstanding).
+> clusters. **Phase 2 (workload autoscaling) is now live too**: the paved road emits a default
+> HPA and the full loop is proven — HPA scales pods → Karpenter provisions nodes → consolidation
+> reclaims them on load drop (ADR-078 Phase 2, #1240). Only KEDA (event-driven) remains deferred.
 >
 > **Related ADR:** [078-cluster-elasticity-karpenter](../adrs/078-cluster-elasticity-karpenter.md),
 > [085-workload-availability-graceful-disruption-defaults](../adrs/085-workload-availability-graceful-disruption-defaults.md)

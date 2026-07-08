@@ -296,7 +296,12 @@ split is the interesting part ([ADR-078](../../adrs/078-cluster-elasticity-karpe
 - **Karpenter** — elastic workload capacity. When pods are pending, Karpenter looks at exactly what they need
   and provisions *right-sized* nodes in seconds, **bin-packing** them onto the cheapest node that fits; when
   load drops and a node goes empty, it **consolidates** — removes it. Nodes appear and disappear to match
-  demand, which is the decisive cost lever on a cluster that's parked when idle.
+  demand, which is the decisive cost lever on a cluster that's parked when idle. And what *makes* pods pending
+  in the first place is usually the workload layer's own autoscaler: every scaffolded Service ships a default
+  **Horizontal Pod Autoscaler** that adds replicas as CPU load climbs — so rising load drives the HPA to add
+  pods, pending pods drive Karpenter to add a node, and when load falls the HPA removes pods and Karpenter
+  consolidates the now-idle node away. The two autoscalers compose into one closed loop (ADR-078 Phase 2,
+  proven live).
 
 > *The system group is the always-on generator; Karpenter is renting extra generators by the hour.* You keep
 > one running for the lights that can never go out (Karpenter itself can't provision the node it runs on);

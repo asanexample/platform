@@ -65,7 +65,7 @@ Templates in `scaffolder/templates/` (registered via `location.yaml`, CODEOWNERS
 
 | Template | Does | Lands PR at | Gate |
 | --- | --- | --- | --- |
-| **new-product** | app repo from starter + Product entry + first `dev` env | new repo + `gitops/products/…` + `…/environments/…/dev.yaml` | reviewer |
+| **new-product** | app repo from starter (+ a default HPA, elastic by construction) + Product entry + first `dev` env | new repo + `gitops/products/…` + `…/environments/…/dev.yaml` | reviewer |
 | **new-environment** | an Environment (Product × Stage) | `gitops/environments/<team>/<product>/<stage>.yaml` | reviewer |
 | **new-resource** | self-service S3/SQS/SNS/DynamoDB (ADR-073) | edits the env claim's `services.<svc>.resources` | **auto** — env-claim edit; the prod gate keys on prod *Releases*, not env claims |
 | **request-promotion** | dev→…→prod ladder (#377); same digest up | `gitops/releases/<team>/<product>/<stem>.yaml` | ≤staging **auto** / **prod gated** |

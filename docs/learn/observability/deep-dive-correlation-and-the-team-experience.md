@@ -175,7 +175,7 @@ Correlation is what an *engineer mid-incident* does. The other consuming questio
 political: **when a team opens Grafana, what do they see, and can they see *only* their own stuff?**
 
 This is where the orientation drew its one careful line, and it's worth getting exactly right — because
-there are **two separate efforts** here, one live-and-used and one built-but-idle, and conflating them is
+there are **two separate efforts** here — a *default view* and a *hard boundary* — and conflating them is
 the mistake the docs exist to prevent.
 
 ### Effort 1 (the soft need, LIVE and actually used): per-team overview dashboards
@@ -248,11 +248,12 @@ brings us to the honest part.
 > all-clusters datasource, which can see every tenant. It's the convenient lane, not a wall. That
 > distinction is the whole point of Effort 2.
 
-### Effort 2 (the hard variant, DEPLOYED + RUNNING but UNEXERCISED): P13 per-team read isolation
+### Effort 2 (the hard boundary, LIVE + PROVEN): P13 per-team read isolation + AccessGrant sharing
 
-The *harder* thing — the one that would make `alpha` **unable** to query `bravo`'s data even if they
-tried — is P13 (#590), a fail-closed **tenant-proxy**. The orientation's honest-status paragraph is about
-this, and it's worth seeing why it's "built but not the default lane."
+The *harder* thing — the one that makes `alpha` **unable** to query `bravo`'s data unless `bravo` has
+granted it — is P13 (#590): a pair of fail-closed **tenant-proxies** (one for Mimir, one for Loki). This is
+the mechanism the orientation's honest-status paragraph points at, and it's now **live and proven** for both
+metrics and logs — worth seeing exactly how it fences, and how a team opts to *share*.
 
 The design (from [`observability-tenant-proxy/README.md`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-tenant-proxy/README.md)):
 
@@ -263,9 +264,10 @@ user → Grafana ──(query + OIDC token, oauthPassThru)──▶ tenant-proxy
 The proxy verifies the Grafana-forwarded Keycloak token against the realm JWKS, maps the `groups` claim
 to a tenant scope (`platform-admins` → all tenants; **unknown/empty → deny**), *overwrites*
 `X-Scope-OrgID` with the caller's own team, and reverse-proxies to Mimir. It's **fail-closed**: no valid
-token, no data. It surfaces as a `Mimir (my team)` datasource users would pick. And it's genuinely
-running — two replicas, alongside the `cortex-tenant` write-side that splits each team's metrics into its
-own Mimir tenant in the first place:
+token, no data. It surfaces as a `Mimir (my team)` datasource users pick. The **same shape runs in front of
+Loki** (`loki-tenant-proxy`), fencing logs the identical way behind a `Loki (my team)` datasource — so the
+boundary covers both live data-plane signals. And it's genuinely running — two replicas, alongside the
+`cortex-tenant` write-side that splits each team's metrics into its own Mimir tenant in the first place:
 
 ```text
 $ kubectl --context platform -n observability get pods | grep -E 'tenant-proxy|cortex'
@@ -275,47 +277,59 @@ tenant-proxy-…    1/1   Running
 tenant-proxy-…    1/1   Running
 ```
 
-So why does the orientation call it *unexercised*? Two reasons, and both are structural:
+So who's it isolating, and how does a team *share*? Two things make this real rather than a diagram:
 
-1. **Nothing points at it.** The `Mimir (my team)` datasource exists (`tenant-proxy-datasource`
-   ConfigMap is live), but the thing teams actually open — the Team Overview dashboard above — defaults to
-   `Mimir (all clusters)`. No default lane routes a real user through the proxy.
-2. **Hub-flip-first means there's no per-team data to isolate *on the hub*.** The write-side re-tenant
-   was turned on hub-first, and the [platform `env.hcl`](https://github.com/asanexample/platform/blob/main/infra/live/aws/platform/env.hcl)
-   says exactly why:
+1. **The write-split produces per-team tenants, and the proxy fences by identity — fail-closed.** The
+   `cortex-tenant` write-side is configured to split each environment namespace's series into its own Mimir
+   tenant (Loki does the same for logs), and the proxy maps SSO identity → that team's `X-Scope-OrgID` and
+   overwrites it — so a caller can only reach its own tenant (unknown/empty identity → **deny**). This was
+   flipped **hub-first to prove the path**: the hub itself runs no environment namespaces, so today it holds
+   only the `platform` tenant with data (`alpha`/`bravo` tenants exist in the config but are empty until the
+   **spoke** — where the team workloads actually run — ingests into them, #627). So what's *proven live*
+   (2026-07-07) is the enforcement mechanism end-to-end — identity-scoped, fail-closed, for metrics *and* logs
+   — with real per-team data volume following the spoke cutover. (Per-team **traces** (Tempo) and **profiles**
+   (Pyroscope) isolation is deferred — metrics + logs are the two live signals.)
+2. **Cross-team sharing is an explicit grant, not an open door.** Because the proxy is fail-closed, `bravo`
+   *can't* see `alpha`'s signals by default. Sharing is a deliberate act: an **`AccessGrant`**
+   ([ADR-068](../../adrs/068-product-scoped-and-cross-team-access-model.md); claims in `gitops/grants/`, e.g.
+   `bravo-reads-alpha-shop`) in which `alpha` grants `bravo` read access to its `shop` product. The proxy
+   derives that grant into a **federated** read — `bravo`'s queries become `X-Scope-OrgID: alpha|bravo`, i.e.
+   its own tenant **∪** its grants — still fail-closed for anything ungranted. And because OSS Grafana has
+   **no per-team dashboard RBAC**, that grant *is* the data-and-dashboard sharing mechanism: there's no other
+   lane to hand another team your signals.
 
-   ```hcl
-   enable_per_team_tenants = true # …HUB flip first: hub metrics still resolve to the `platform`
-   # tenant (no env namespaces here), proving the path before the spoke.
-   ```
+An architectural footnote worth keeping: the write-split was flipped **hub-first** — the [platform
+`env.hcl`](https://github.com/asanexample/platform/blob/main/infra/live/aws/platform/env.hcl) says so:
 
-   The re-tenant splits metrics by *environment namespace* → team. But the **hub cluster has no
-   environment namespaces** — tenant workloads run on **preprod**, the spoke. So on the hub, everything
-   still lands in the `platform` tenant; there are no `alpha`/`bravo` tenants *with data* for the proxy to
-   fence off. The genuinely per-team tenants only arise from the preprod path — and preprod's tenant
-   workloads are currently parked. The machine is assembled and powered; there's just nothing flowing
-   through the part it isolates.
+```hcl
+enable_per_team_tenants = true # …HUB flip first: hub metrics still resolve to the `platform`
+# tenant (no env namespaces here), proving the path before the spoke.
+```
 
-That's the precise, non-overselling picture: the **hard** read-isolation is a *superset* of the
-**visibility** teams actually needed, built ahead of a consumer, deployed and fail-closed and idle. (This
-is the observability epic's documented over-build — see the orientation's honest-status section.)
+The re-tenant splits metrics by *environment namespace* → team, and the **hub cluster has no environment
+namespaces** (tenant workloads run on **preprod**, the spoke), so the hub's *own* metrics still resolve to the
+`platform` tenant. The genuinely per-team `alpha`/`bravo` tenants are fed from the preprod path — which is now
+live and carrying data. That's exactly why the isolation is *proven*, not merely *plumbed*: there is real
+per-team data flowing through the part that isolates.
 
 ### Net for a team, today
 
-Open **your Team Overview dashboard** for a namespace-filtered RED/USE/cost view of your environments —
-that's the real, live experience, driven off the team registry. The **hard read-isolation exists and
-runs**, fail-closed, but it isn't the default lane and, on the hub, has no per-team data to fence yet.
-Don't claim per-team read isolation is "in use" — it's *ready*, waiting on a consumer and the spoke path.
+Open **your Team Overview dashboard** for a namespace-filtered RED/USE/cost view of your environments — the
+convenient default self-view, driven off the team registry. Underneath it, the **hard read-isolation is live
+and fail-closed** for metrics and logs: through the `(my team)` lane you see only your team's signals, and you
+see another team's only if they've handed you an **`AccessGrant`**. That's the honest, current picture — real
+per-team isolation and real grant-based sharing (metrics + logs), with traces/profiles still deferred.
 
 ### Quick check
 
 A teammate says "our Grafana is multi-tenant — `alpha` literally can't see `bravo`'s metrics." True or
-false, for a person opening their Team Overview dashboard today?
+false — and does it depend on *which datasource* they open?
 
-*(False, as the **default** experience. The Team Overview dashboard is a namespace-*filtered* view over
-the **all-clusters** datasource — a convenience, editable to show anyone's data. The fail-closed
-tenant-proxy that *would* make it a hard boundary is deployed but nothing routes through it, and hub
-metrics don't even split per-team yet. "Can't see" is the built-not-wired variant, not today's default.)*
+*(Both — it depends on the lane. Through the **`(my team)` lane** (the fail-closed tenant-proxies, live) it's
+**true**: `alpha` sees only `alpha`'s metrics and logs, and `bravo`'s only if `alpha` has granted it (an
+`AccessGrant`). But the **default Team Overview dashboard** rides the **all-clusters** datasource — a
+namespace-*filtered convenience*, editable to show anyone's data — so on *that* lane it's **false**. The
+isolation is real and live; it's the dashboard's default datasource, not the proxy, that's the open one.)*
 
 ---
 
@@ -351,13 +365,15 @@ than silently reshaping your panels. Same discipline as pinning a chart version.
   looks huge until you remember app-stamped span times and node-stamped log times never agree exactly; a
   zero-width window returns nothing and reads as "correlation is broken."
 - **"Namespace-filtered" ≠ "isolated."** The Team Overview filter is a baked-in default over the
-  *all-clusters* datasource — convenience, not a boundary. The actual boundary (tenant-proxy, fail-closed)
-  is a different, deployed-but-idle mechanism. Reading the filter as a security control is the exact
-  misconception this module exists to prevent.
-- **Hub-flip-first is why "per-team tenants: enabled" doesn't mean "per-team data on the hub."** The
-  re-tenant splits by environment namespace; the hub has none (tenants run on the preprod spoke), so hub
-  metrics still resolve to the `platform` tenant. A flag being `true` is a claim about *intent*, not
-  *effect* — verify against where the data actually lands.
+  *all-clusters* datasource — convenience, not a boundary. The actual boundary is a *different* mechanism: the
+  fail-closed tenant-proxies (Mimir + Loki, **live**), whose `(my team)` lane fences a caller to its own tenant
+  ∪ any `AccessGrant`-ed tenants. Reading the *filter* as the security control is the exact misconception this
+  module exists to prevent.
+- **A flag being `true` is a claim about *intent*, not *effect*.** `enable_per_team_tenants` was flipped
+  hub-first, but the hub has no environment namespaces (tenants run on the preprod spoke), so the hub's *own*
+  metrics still resolve to the `platform` tenant. The genuinely per-team `alpha`/`bravo` tenants are fed from
+  the preprod path — now live and carrying data, which is what makes the isolation *proven*. Verify per-team
+  isolation against where the data actually lands, not just the flag.
 - **A team appears the instant it's in the registry.** `team_overview_teams` is a `fileset` over
   `gitops/teams/*.yaml`, so onboarding a `Team` yields its overview dashboard on the next apply — and,
   conversely, a dashboard with no matching registry file can't exist. Registry is the source of truth for
