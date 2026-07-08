@@ -12,6 +12,47 @@ locals {
   # Render external_labels into River syntax (a block-level arg on loki.write). Empty => omitted entirely.
   external_labels_block = length(var.external_labels) > 0 ? "external_labels = { ${join(", ", [for k, v in var.external_labels : "\"${k}\" = \"${v}\""])} }" : ""
 
+  # P13 per-team log isolation (#590): when enabled, derive the Loki tenant from each pod's Kyverno-injected
+  # `team` label (present on env-namespace pods) and stamp it per stream; system pods with no team fall back to
+  # the cluster tenant. This is the WRITE half — the loki-tenant-proxy enforces per-team reads. Off = unchanged
+  # single-tenant behaviour. NB: for a spoke this requires the hub Loki ingest edge to PASS THROUGH the tenant
+  # (not force-stamp) — a deferred write-integrity tradeoff hardened later by ingest mTLS (#590 Phase-4 D-2).
+  # (heredocs kept out of the ternary — HCL rejects a heredoc directly in a `?:` true-branch.)
+  retenant_rules_raw = <<-RULES
+
+      // env-namespace pods carry `team` (Kyverno mutate) → per-team Loki tenant.
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_team"]
+        target_label  = "tenant"
+      }
+      // system pods (no team label) → the cluster tenant.
+      rule {
+        source_labels = ["tenant"]
+        regex         = "^$"
+        target_label  = "tenant"
+        replacement   = "${var.tenant_id}"
+      }
+  RULES
+
+  retenant_process_raw = <<-PROC
+
+    // Stamp X-Scope-OrgID from the per-stream `tenant` label, then drop it so it isn't indexed as a label.
+    loki.process "retenant" {
+      forward_to = [loki.write.platform.receiver]
+      stage.tenant {
+        label = "tenant"
+      }
+      stage.label_drop {
+        values = ["tenant"]
+      }
+    }
+  PROC
+
+  retenant_rules   = var.per_team_tenant ? local.retenant_rules_raw : ""
+  retenant_process = var.per_team_tenant ? local.retenant_process_raw : ""
+  # loki.source.file forwards to the re-tenant processor when enabled, else straight to the writer.
+  source_forward = var.per_team_tenant ? "loki.process.retenant.receiver" : "loki.write.platform.receiver"
+
   # ---- Alloy River config: tail this node's pod logs -> Loki (tenant _platform) ----
   # DaemonSet + file-tailing is the node-local pattern (each Alloy reads only its own node's
   # /var/log/pods, so no duplicate ingestion). discovery.kubernetes provides pod metadata only
@@ -53,7 +94,7 @@ locals {
         action        = "replace"
         replacement   = "/var/log/pods/*$1/*.log"
         target_label  = "__path__"
-      }
+      }${local.retenant_rules}
     }
 
     local.file_match "pod_logs" {
@@ -62,9 +103,9 @@ locals {
 
     loki.source.file "pod_logs" {
       targets    = local.file_match.pod_logs.targets
-      forward_to = [loki.write.platform.receiver]
+      forward_to = [${local.source_forward}]
     }
-
+    ${local.retenant_process}
     // Tenant stamped here (overwritten at the hub edge for spokes). external_labels stamp e.g. cluster=<spoke>.
     loki.write "platform" {
       endpoint {

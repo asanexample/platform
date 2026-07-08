@@ -78,6 +78,12 @@ inputs = {
   tenant_id       = "preprod"
   external_labels = { cluster = "preprod" }
 
+  # P13 per-team log isolation (#590): re-tenant env-namespace logs to their team (system pods → `preprod`).
+  # Requires the hub Loki spoke edge to pass the tenant through (spoke_ingest_passthrough) instead of
+  # force-stamping `preprod` — otherwise the edge would clobber the per-team tenant. Write-integrity for that
+  # pass-through is a deferred ingest-mTLS hardening (#590 Phase-4 D-2).
+  per_team_tenant = include.base.locals.enable_per_team_tenants
+
   helm_chart_version = include.base.locals.helm_versions.alloy
   # DaemonSet on capacity-tight nodes: don't gate the apply on full scheduling (verify readiness out-of-band).
   helm_wait = false
