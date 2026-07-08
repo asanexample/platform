@@ -157,12 +157,19 @@ locals {
   # All query the same in-cluster gateway; only the X-Scope-OrgID header differs.
   all_tenants = concat([var.default_tenant_id], var.extra_tenant_datasources)
 
+  # P13 enforcement (#590): when read_proxy_url is set, every datasource points at the tenant-proxy with
+  # oauthPassThru (the caller's SSO identity decides the scope) instead of the gateway with a fixed tenant
+  # header. We then render ONLY the default (`mimir`) + federated (`mimir-all`) uids — dashboards reference
+  # those and nothing else — and DROP the per-cluster `extra_tenant_datasources`, which would otherwise be
+  # un-proxied datasources a user could pick to bypass isolation (the proxy federates for admins anyway).
+  proxy_enforced = var.read_proxy_url != ""
+
   # The default datasource keeps its stable uid "mimir" (referenced by dashboards) but its DISPLAY name is
   # suffixed with the tenant — so the picker reads `Mimir (platform)` / `Mimir (preprod)` / `Mimir (all
   # clusters)` consistently, instead of a bare `Mimir` for the hub.
   datasource_tenants = concat(
     [{ name = "Mimir (${var.default_tenant_id})", uid = "mimir", tenant = var.default_tenant_id, is_default = var.datasource_is_default }],
-    [for t in var.extra_tenant_datasources : { name = "Mimir (${t})", uid = "mimir-${t}", tenant = t, is_default = false }],
+    local.proxy_enforced ? [] : [for t in var.extra_tenant_datasources : { name = "Mimir (${t})", uid = "mimir-${t}", tenant = t, is_default = false }],
     var.enable_federated_datasource ? [{ name = "Mimir (all clusters)", uid = "mimir-all", tenant = join("|", local.all_tenants), is_default = false }] : [],
   )
 
@@ -173,23 +180,31 @@ locals {
     # the whole reload. Idempotent — a no-op once the old name is gone.
     deleteDatasources = [{ name = "Mimir", orgId = 1 }]
     datasources = [for ds in local.datasource_tenants : {
-      name      = ds.name
-      type      = "prometheus"
-      uid       = ds.uid
-      access    = "proxy"
-      url       = "http://${var.helm_release_name}-gateway.${var.namespace}.svc/prometheus"
+      name   = ds.name
+      type   = "prometheus"
+      uid    = ds.uid
+      access = "proxy"
+      # Enforced: query through the tenant-proxy (identity-scoped). Unenforced: straight to the gateway.
+      url       = local.proxy_enforced ? var.read_proxy_url : "http://${var.helm_release_name}-gateway.${var.namespace}.svc/prometheus"
       isDefault = ds.is_default
       # exemplarTraceIdDestinations links an exemplar's trace_id to the matching Tempo tenant datasource
       # (mimir->tempo, mimir-preprod->tempo-preprod, …) — click a latency spike → open the trace (P6).
-      jsonData = {
-        httpHeaderName1 = "X-Scope-OrgID"
-        timeInterval    = "30s"
-        exemplarTraceIdDestinations = [{
-          name          = "traceID" # the exemplar label the Tempo metrics-generator emits (camelCase)
-          datasourceUid = replace(ds.uid, "mimir", "tempo")
-        }]
-      }
-      secureJsonData = { httpHeaderValue1 = ds.tenant }
+      jsonData = merge(
+        {
+          timeInterval = "30s"
+          exemplarTraceIdDestinations = [{
+            name          = "traceID" # the exemplar label the Tempo metrics-generator emits (camelCase)
+            datasourceUid = replace(ds.uid, "mimir", "tempo")
+          }]
+        },
+        # Enforced: forward the user's OIDC token to the proxy (X-Id-Token) and POST; the proxy stamps the
+        # scoped X-Scope-OrgID. Unenforced: stamp the fixed per-tenant header ourselves.
+        local.proxy_enforced
+        ? { oauthPassThru = true, httpMethod = "POST" }
+        : { httpHeaderName1 = "X-Scope-OrgID" }
+      )
+      # No baked-in tenant header when the proxy is the authority — the caller's identity decides scope.
+      secureJsonData = local.proxy_enforced ? {} : { httpHeaderValue1 = ds.tenant }
     }]
   }
 

@@ -68,9 +68,17 @@ inputs = {
   # single-manifests, which are unrunnable (empty config → "no command specified"). Current: first build.
   image = "829808296602.dkr.ecr.us-east-1.amazonaws.com/platform/tenant-proxy@sha256:99d8c3698315bf2833f1169f64b56536d59a8ea65484a78c8da7663ddb0ba953"
 
-  # The per-team tenants populated by the cortex-tenant write side; admin (platform-admins) sees all.
-  tenants     = ["alpha", "bravo", "platform"]
+  # Every tenant present on the hub Mimir: the per-team tenants populated by the cortex-tenant write side
+  # (alpha, bravo) + the two cluster tenants (`platform` = the hub's own metrics, `preprod` = the spoke's
+  # force-stamped copy). A user's groups are intersected with this set (a non-team group can't widen access);
+  # admin (platform-admins) federates over ALL of them, so an admin sees every cluster + team tenant.
+  tenants     = ["alpha", "bravo", "platform", "preprod"]
   admin_group = "platform-admins"
+
+  # The mimir unit now renders the enforced `mimir` + `mimir-all` datasources pointed at this proxy
+  # (read_proxy_url), so the proxy's own redundant `Mimir (my team)` datasource is disabled — one canonical
+  # set of proxy-fronted metrics datasources, nothing un-proxied for a user to pick.
+  create_datasource = false
 
   tags = include.base.locals.tags
 }
