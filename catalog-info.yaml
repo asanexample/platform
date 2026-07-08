@@ -1,0 +1,23 @@
+# The docs-bearing catalog entity for the platform's own Learning Portal (#938).
+# TechDocs renders the mkdocs.yml next to this file (dir:.) — docs_dir is docs/learn.
+# Registered into Backstage via a catalog.locations URL (injected by the backstage
+# module's app-config, or app-config.production.yaml). builder: external — the site
+# is pre-built + published to S3 by .github/workflows/techdocs.yml; Backstage serves it.
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: platform-learning-portal
+  title: Platform Learning Portal
+  description: >-
+    Teaching docs for the reference platform — a spine (5 system-level narratives)
+    plus 17 subsystem modules (orientation + reference + deep dives). Built in CI and
+    served through Backstage TechDocs.
+  tags:
+    - documentation
+    - platform
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: documentation
+  lifecycle: production
+  owner: group:default/platform

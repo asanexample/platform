@@ -1,0 +1,125 @@
+# TechDocs config for the platform Learning Portal (#938).
+# The canonical markdown lives in docs/learn/**; this file is rendered by the
+# techdocs-cli in CI (builder: external) and published to S3, then served by
+# Backstage on the `platform-learning-portal` catalog entity (see catalog-info.yaml).
+# Cross-tree links (../../adrs, ../../architecture, ...) are rewritten to absolute
+# GitHub URLs by .github/scripts/docs/techdocs-linkfix.sh before generation, so the
+# canonical docs keep their repo-relative links. Mermaid renders via the Backstage
+# frontend techdocs mermaid addon (no mkdocs mermaid plugin needed).
+site_name: Platform Learning Portal
+site_description: Teaching docs for the reference platform — spine + 17 subsystem modules.
+
+docs_dir: docs/learn
+
+plugins:
+  - techdocs-core
+
+nav:
+  - Home: README.md
+  - The Spine:
+      - spine/why-the-platform-exists.md
+      - spine/how-the-platform-fits.md
+      - spine/life-of-a-deployment.md
+      - spine/life-of-a-request.md
+      - spine/the-security-model.md
+  - Glossary: glossary.md
+  - Modules:
+      - Domain model:
+          - domain-model/README.md
+          - domain-model/orientation.md
+          - domain-model/reference.md
+      - Onboarding a Product:
+          - products/README.md
+          - products/orientation.md
+          - products/how-to-onboard-a-product.md
+          - products/reference.md
+      - Environment API:
+          - environment-api/README.md
+          - environment-api/orientation.md
+          - environment-api/deep-dive-composition-rendering.md
+          - environment-api/tutorial-render-an-environment.md
+          - environment-api/cheatsheet.md
+          - environment-api/reference.md
+      - Self-service cloud resources:
+          - self-service-resources/README.md
+          - self-service-resources/orientation.md
+          - self-service-resources/extending-add-an-engine.md
+          - self-service-resources/reference.md
+      - Delivery:
+          - delivery/README.md
+          - delivery/orientation.md
+          - delivery/reference.md
+      - Observability:
+          - observability/README.md
+          - observability/orientation.md
+          - observability/deep-dive-the-stack-and-storage.md
+          - observability/deep-dive-collection-and-instrumentation.md
+          - observability/deep-dive-correlation-and-the-team-experience.md
+          - observability/deep-dive-slos-alerting-and-cost.md
+          - observability/deep-dive-agent-observability.md
+          - observability/reference.md
+      - Policy & admission:
+          - policy/README.md
+          - policy/orientation.md
+          - policy/reference.md
+      - Identity & access:
+          - identity/README.md
+          - identity/orientation.md
+          - identity/reference.md
+      - Supply chain:
+          - supply-chain/README.md
+          - supply-chain/orientation.md
+          - supply-chain/reference.md
+      - Runtime security:
+          - runtime-security/README.md
+          - runtime-security/orientation.md
+          - runtime-security/deep-dive-falco.md
+          - runtime-security/deep-dive-east-west-zero-trust.md
+          - runtime-security/reference.md
+      - Foundations:
+          - foundations/README.md
+          - foundations/orientation.md
+          - foundations/deep-dive-the-account-model.md
+          - foundations/deep-dive-infrastructure-as-code.md
+          - foundations/deep-dive-networking.md
+          - foundations/deep-dive-the-cluster.md
+          - foundations/deep-dive-nodes-scaling-access.md
+          - foundations/reference.md
+      - The agentic platform:
+          - agentic/README.md
+          - agentic/orientation.md
+          - agentic/deep-dive-the-xagent-runtime.md
+          - agentic/deep-dive-bounding-the-agent.md
+          - agentic/deep-dive-autonomy-and-evaluation.md
+          - agentic/deep-dive-the-triage-copilot.md
+          - agentic/reference.md
+      - Cost & FinOps:
+          - cost/README.md
+          - cost/orientation.md
+          - cost/deep-dive-inform-the-two-meters.md
+          - cost/deep-dive-optimize-the-cost-levers.md
+          - cost/deep-dive-operate-guardrails-and-the-practice.md
+          - cost/reference.md
+      - Secrets & config:
+          - secrets-config/README.md
+          - secrets-config/orientation.md
+          - secrets-config/deep-dive-config-in-git.md
+          - secrets-config/deep-dive-runtime-secrets.md
+          - secrets-config/deep-dive-rotation.md
+          - secrets-config/reference.md
+      - Operations:
+          - operations/README.md
+          - operations/orientation.md
+          - operations/deep-dive-platctl-and-the-dag.md
+          - operations/deep-dive-parking-and-day2.md
+          - operations/reference.md
+      - Developer experience:
+          - developer-experience/README.md
+          - developer-experience/orientation.md
+          - developer-experience/deep-dive-the-backstage-portal.md
+          - developer-experience/deep-dive-the-scaffolder-golden-paths.md
+          - developer-experience/reference.md
+      - Compliance:
+          - compliance/README.md
+          - compliance/orientation.md
+          - compliance/reference.md
