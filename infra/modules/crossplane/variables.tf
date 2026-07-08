@@ -271,6 +271,12 @@ variable "ecr_registry" {
   default     = ""
 }
 
+variable "codeartifact_domain" {
+  description = "CodeArtifact domain (in the platform account, same account as the ECR registry) that holds the per-Product package repos (ADR-098). When non-empty, the Composition grants every service's Pod-Identity role baseline READ (cross-account) on this Product's consumer repo (refplat/<team>-<product>) so workloads can pull private + upstream-cached packages. Empty = grant nothing (renders identically to pre-ADR-098)."
+  type        = string
+  default     = ""
+}
+
 variable "base_domain" {
   description = "Per-cluster ingress domain for environment app hostnames (e.g. preprod.aws.refplat.org). The Composition derives each app's allowed route hostnames from it as <app>-<team>.<base_domain> + the <app>-<team>-pr-* preview wildcard (ADR-060). Empty = derive nothing (only explicit spec.hostnames are allowed)."
   type        = string

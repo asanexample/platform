@@ -33,6 +33,11 @@ locals {
   # and pushes only to its product-scoped ECR (team-<team>/<product>-*). ADR-069 §5.
   # ---------------------------------------------------------------------------
   products_dir = "${get_repo_root()}/gitops/products"
+
+  # CodeArtifact domain that holds the per-Product package repos (ADR-098; infra/live/.../platform/codeartifact).
+  # A Product's consumer repo is keyed by its metadata.name (== the product_roles key), same as the codeartifact unit.
+  codeartifact_domain = "refplat"
+
   products = {
     for f in fileset(local.products_dir, "**/*.yaml") :
     yamldecode(file("${local.products_dir}/${f}")).metadata.name => {
@@ -78,6 +83,31 @@ locals {
             Effect   = "Allow"
             Action   = ["secretsmanager:GetSecretValue"]
             Resource = ["arn:aws:secretsmanager:${include.base.locals.region}:${include.base.locals.account_id}:secret:platform/promote/github-app-*"]
+          },
+          # Publish packages to this Product's CodeArtifact repo (ADR-098 #1253). GetAuthorizationToken +
+          # GetServiceBearerToken mint the 12h token; publish/read is scoped to this Product's repo + packages only
+          # (refplat/<product>), never another Product's. The consumer repo is keyed by metadata.name (== key).
+          { Sid = "CodeArtifactAuth", Effect = "Allow", Action = ["codeartifact:GetAuthorizationToken"], Resource = ["arn:aws:codeartifact:${include.base.locals.region}:${include.base.locals.account_id}:domain/${local.codeartifact_domain}"] },
+          {
+            Sid      = "CodeArtifactServiceBearer"
+            Effect   = "Allow"
+            Action   = ["sts:GetServiceBearerToken"]
+            Resource = "*"
+            Condition = {
+              StringEquals = { "sts:AWSServiceName" = "codeartifact.amazonaws.com" }
+            }
+          },
+          {
+            Sid      = "CodeArtifactRepo"
+            Effect   = "Allow"
+            Action   = ["codeartifact:GetRepositoryEndpoint", "codeartifact:ReadFromRepository"]
+            Resource = ["arn:aws:codeartifact:${include.base.locals.region}:${include.base.locals.account_id}:repository/${local.codeartifact_domain}/${key}"]
+          },
+          {
+            Sid      = "CodeArtifactPublish"
+            Effect   = "Allow"
+            Action   = ["codeartifact:PublishPackageVersion", "codeartifact:PutPackageMetadata"]
+            Resource = ["arn:aws:codeartifact:${include.base.locals.region}:${include.base.locals.account_id}:package/${local.codeartifact_domain}/${key}/*"]
           },
         ]
       })

@@ -10,6 +10,7 @@ metadata:
   name: platform-cluster-config
 data:
   ecrRegistry: {{ .Values.environment.ecrRegistry | quote }}
+  codeArtifactDomain: {{ .Values.environment.codeArtifactDomain | default "" | quote }}
   baseDomain: {{ .Values.environment.baseDomain | default "" | quote }}
   region: {{ .Values.environment.region | quote }}
   workloadAccountId: {{ .Values.environment.workloadAccountId | quote }}

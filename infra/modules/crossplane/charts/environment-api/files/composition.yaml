@@ -478,6 +478,23 @@ spec:
                    (deny-set validated upstream) FIRST, then platform-DERIVED least-privilege for each declared
                    cloud resource. Resource ARNs + actions are 100% platform-computed — never author-supplied. */}}
             {{- $stmts := list }}
+            {{- /* Baseline CodeArtifact READ (ADR-098 #1253): every service Pod-Identity role can pull THIS
+                   Product's packages (private + upstream-cached public) from the platform-account CodeArtifact
+                   domain. Cross-account — the domain lives in the platform account (== the ECR registry's
+                   account, parsed from ecrRegistry); the domain + repo resource policies (codeartifact unit
+                   read_account_ids) grant this workload account. Scoped to this Product's consumer repo
+                   (<domain>/<team>-<product>), never another Product's. Gated on codeArtifactDomain so a cluster
+                   without CodeArtifact renders byte-identically to pre-ADR-098. */}}
+            {{- if and $cfg.codeArtifactDomain $cfg.ecrRegistry }}
+            {{- $caAcct := index (splitList "." $cfg.ecrRegistry) 0 }}
+            {{- $caRepo := printf "%s-%s" $team $product }}
+            {{- $caDomainArn := printf "arn:aws:codeartifact:%s:%s:domain/%s" $cfg.region $caAcct $cfg.codeArtifactDomain }}
+            {{- $caRepoArn := printf "arn:aws:codeartifact:%s:%s:repository/%s/%s" $cfg.region $caAcct $cfg.codeArtifactDomain $caRepo }}
+            {{- $caPkgArn := printf "arn:aws:codeartifact:%s:%s:package/%s/%s/*" $cfg.region $caAcct $cfg.codeArtifactDomain $caRepo }}
+            {{- $stmts = append $stmts (dict "Sid" "CodeArtifactAuth" "Effect" "Allow" "Action" (list "codeartifact:GetAuthorizationToken") "Resource" (list $caDomainArn)) }}
+            {{- $stmts = append $stmts (dict "Sid" "CodeArtifactServiceBearer" "Effect" "Allow" "Action" (list "sts:GetServiceBearerToken") "Resource" (list "*") "Condition" (dict "StringEquals" (dict "sts:AWSServiceName" "codeartifact.amazonaws.com"))) }}
+            {{- $stmts = append $stmts (dict "Sid" "CodeArtifactRead" "Effect" "Allow" "Action" (list "codeartifact:GetRepositoryEndpoint" "codeartifact:ReadFromRepository" "codeartifact:GetPackageVersionAsset" "codeartifact:GetPackageVersionReadme" "codeartifact:DescribePackageVersion" "codeartifact:DescribeRepository" "codeartifact:ListPackages" "codeartifact:ListPackageVersions" "codeartifact:ListPackageVersionAssets" "codeartifact:ListPackageVersionDependencies") "Resource" (list $caRepoArn $caPkgArn)) }}
+            {{- end }}
             {{- $awsPerms := (($svccfg.permissions | default dict).aws | default dict) }}
             {{- range $s := ($awsPerms.policyStatements | default list) }}
             {{- $st := dict "Effect" ($s.effect | default "Allow") "Action" $s.actions "Resource" $s.resources }}
