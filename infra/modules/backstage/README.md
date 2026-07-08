@@ -92,6 +92,7 @@ No modules.
 | [aws_eks_pod_identity_association.k8s_reader](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eks_pod_identity_association) | resource |
 | [aws_iam_role.k8s_reader](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role_policy.k8s_reader_remote](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
+| [aws_iam_role_policy.techdocs_read](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [helm_release.backstage](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
 | [kubernetes_manifest.argocd_token_external_secret](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.audit_db_external_secret](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
@@ -129,6 +130,7 @@ No modules.
 | <a name="input_enable_kubernetes_plugin"></a> [enable\_kubernetes\_plugin](#input\_enable\_kubernetes\_plugin) | Enable the Backstage Kubernetes plugin: create the EKS Pod Identity reader role + this-cluster access entry and inject the kubernetes app-config layer. | `bool` | `false` | no |
 | <a name="input_enable_oidc"></a> [enable\_oidc](#input\_enable\_oidc) | Wire OIDC SSO: sync the Keycloak `backstage` client secret into the namespace as OIDC\_CLIENT\_SECRET + generate the Backstage session-signing secret (AUTH\_SESSION\_SECRET). The image's app-config.production.yaml configures the direct-Keycloak `oidc` provider. | `bool` | `true` | no |
 | <a name="input_enable_scaffolder"></a> [enable\_scaffolder](#input\_enable\_scaffolder) | Sync the scaffolder's GitHub WRITE App credential (scaffolder\_github\_app\_secret\_name) into the namespace and inject it as SCAFFOLDER\_GITHUB\_APP\_ID/SCAFFOLDER\_GITHUB\_APP\_PRIVATE\_KEY. The image's app-config wires it as the second integrations.github.apps entry (the App is installed on asanexample/platform only). See docs/runbooks/backstage-scaffolder-github-app.md. | `bool` | `false` | no |
+| <a name="input_enable_techdocs"></a> [enable\_techdocs](#input\_enable\_techdocs) | Serve the learning-portal docs via TechDocs (#938, ADR-097): overrides the image's techdocs config to builder=external + publisher=awsS3 (bucket `techdocs_bucket`) and grants the Backstage Pod-Identity role read on that bucket. CI pre-builds + publishes the site (builder=external). Requires enable\_kubernetes\_plugin (that is the Pod-Identity role Backstage reads S3 with). | `bool` | `false` | no |
 | <a name="input_finalizer_clear_script"></a> [finalizer\_clear\_script](#input\_finalizer\_clear\_script) | Non-empty enables the destroy-time teardown cleanup script. Only checked for non-emptiness — the script itself is resolved at run time via the checkout's own `git rev-parse --show-toplevel`, not this value, so a worktree's different absolute path can't force a spurious null\_resource replace. Kept as a path-shaped string for unit-wiring compatibility (units still pass get\_repo\_root()). | `string` | `""` | no |
 | <a name="input_gateway_service_name"></a> [gateway\_service\_name](#input\_gateway\_service\_name) | Name of the Cilium gateway LoadBalancer Service whose ClusterIP backs oidc\_gateway\_alias\_host. | `string` | `"cilium-gateway-platform-gateway"` | no |
 | <a name="input_gateway_service_namespace"></a> [gateway\_service\_namespace](#input\_gateway\_service\_namespace) | Namespace of the Cilium gateway Service (the shared Gateway lives in `default`). | `string` | `"default"` | no |
@@ -156,6 +158,7 @@ No modules.
 | <a name="input_scaffolder_github_app_secret_name"></a> [scaffolder\_github\_app\_secret\_name](#input\_scaffolder\_github\_app\_secret\_name) | Secrets Manager path holding the scaffolder GitHub write App credential as JSON {appId, privateKey}. Created manually; see docs/runbooks/backstage-scaffolder-github-app.md. | `string` | `"platform/backstage/scaffolder-github-app"` | no |
 | <a name="input_secret_store_name"></a> [secret\_store\_name](#input\_secret\_store\_name) | Name of the ClusterSecretStore (External Secrets) to read Secrets Manager. | `string` | `"aws-secrets-manager"` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags (rendered as pod labels) | `map(string)` | `{}` | no |
+| <a name="input_techdocs_bucket"></a> [techdocs\_bucket](#input\_techdocs\_bucket) | Name of the S3 bucket holding the pre-built TechDocs site (published by the techdocs CI workflow). Used when enable\_techdocs = true. | `string` | `""` | no |
 
 ## Outputs
 

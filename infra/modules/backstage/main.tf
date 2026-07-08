@@ -165,7 +165,24 @@ locals {
   # = leave the image default.
   projection_app_config = var.projection_mode == "" ? {} : { platformProjection = { mode = var.projection_mode } }
 
-  extra_app_config = merge(local.oidc_app_config, local.kubernetes_app_config, local.argocd_app_config, local.projection_app_config)
+  # TechDocs (#938, ADR-097): flip the image's scaffold-default techdocs config (builder=local, publisher=local)
+  # to builder=external + publisher=awsS3, so Backstage SERVES the CI-published site from S3 — no runtime
+  # generation, no mkdocs in the image. This --config override is appended last, so it wins over the base.
+  enable_techdocs = var.create && var.enable_techdocs
+  techdocs_app_config = local.enable_techdocs ? {
+    techdocs = {
+      builder = "external"
+      publisher = {
+        type = "awsS3"
+        awsS3 = {
+          bucketName = var.techdocs_bucket
+          region     = var.region != "" ? var.region : "us-east-1"
+        }
+      }
+    }
+  } : {}
+
+  extra_app_config = merge(local.oidc_app_config, local.kubernetes_app_config, local.argocd_app_config, local.projection_app_config, local.techdocs_app_config)
 
   backstage_values = {
     # We bring our own Postgres (CNPG or RDS) — never the chart's bundled bitnami Postgres.
@@ -612,6 +629,29 @@ resource "aws_eks_pod_identity_association" "k8s_reader" {
   service_account = "backstage"
   role_arn        = aws_iam_role.k8s_reader[0].arn
   tags            = var.tags
+}
+
+# TechDocs S3 read (#938, ADR-097): the Backstage pod (via its k8s_reader Pod-Identity role) reads the
+# CI-published site from the techdocs bucket. Same-account, so an identity policy suffices (no bucket
+# policy). Attached to k8s_reader because that is the Backstage SA's Pod-Identity role — hence enable_techdocs
+# requires enable_kubernetes_plugin.
+resource "aws_iam_role_policy" "techdocs_read" {
+  count = local.enable_techdocs && local.enable_k8s ? 1 : 0
+
+  name = "techdocs-read"
+  role = aws_iam_role.k8s_reader[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = ["s3:GetObject", "s3:ListBucket"]
+      Resource = [
+        "arn:aws:s3:::${var.techdocs_bucket}",
+        "arn:aws:s3:::${var.techdocs_bucket}/*",
+      ]
+    }]
+  })
 }
 
 # Read-only access on the platform cluster itself (the workload clusters grant their own access entries).
