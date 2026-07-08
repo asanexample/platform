@@ -194,6 +194,22 @@ Operator reconcile health (#1121). Any controller-runtime operator that silently
   read that pod's logs. The desired state (a grant, a synced secret, a node) isn't being realized even though
   the pod is up.
 
+## keycloak
+
+Namespace `keycloak` (ADR-053). The IdP for **all** platform SSO — ArgoCD, Grafana, Backstage, the agents.
+Single `keycloak-0` pod on a CloudNativePG database (`keycloak-db`). Metrics: `KC_METRICS_ENABLED` +
+ServiceMonitor, scraped as `job=keycloak-http`.
+
+- **KeycloakDown** (critical) — `up{job="keycloak-http"} == 0` for 5m: SSO is unavailable platform-wide — no
+  one can log in to ArgoCD/Grafana/Backstage and agents can't get tokens. Check `keycloak-0` (single instance;
+  see `docs/runbooks/backstage-keycloak-auth-recovery.md` for the wedged-cache / DB-blip recovery) and the
+  `keycloak-db` CNPG cluster (a DB outage takes Keycloak down — cross-check `CNPGInstanceDown`).
+- **KeycloakHighErrorRate** (warning) — >10% of Keycloak HTTP requests 5xx for 10m: auth is failing though the
+  pod is up. Usually the database is unreachable/slow or Keycloak is resource-starved. Read `keycloak-0` logs.
+
+> Login-specific failure metrics (brute-force / credential-failure rate) need Keycloak's `user-event-metrics`
+> feature enabled — a follow-up; the signals above are HTTP/availability-level.
+
 ## Cloud resources
 
 AWS-resource metrics via **YACE** (the `cloudwatch-exporter` Deployment in `observability`; CloudWatch →

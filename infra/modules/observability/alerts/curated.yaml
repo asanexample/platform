@@ -544,3 +544,30 @@ groups:
           summary: "Operator controller {{ $labels.controller }} is failing reconciles"
           description: "The `{{ $labels.controller }}` controller has returned reconcile errors continuously for 15m (controller_runtime_reconcile_errors_total rising) — its desired state isn't being applied (e.g. an activation grant not processed, an ExternalSecret not synced, a NodeClaim not created). Check that operator's pod logs for the underlying error."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#controllers"
+  # ---------------------------------------------------------------------------
+  # Keycloak (alerting P1, #1121). The IdP for ArgoCD, Grafana, Backstage, and the platform agents — if it's
+  # down, SSO across the whole platform is down. Metrics are now scraped (keycloak KC_METRICS_ENABLED +
+  # ServiceMonitor, job=keycloak-http). Login-event metrics (failed-login rate) need KC's user-event-metrics
+  # feature — a follow-up; the availability + HTTP-error signals below are what's grounded today.
+  - name: keycloak.rules
+    rules:
+      - alert: KeycloakDown
+        expr: up{job="keycloak-http"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Keycloak is down — platform SSO is unavailable"
+          description: "The Keycloak IdP (job keycloak-http) has been unreachable for 5m — OIDC login for ArgoCD, Grafana, Backstage, and the platform agents is broken and new sessions can't authenticate. Check the single keycloak-0 pod and its CloudNativePG database (keycloak-db)."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#keycloak"
+      - alert: KeycloakHighErrorRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{job="keycloak-http",outcome="SERVER_ERROR"}[5m]))
+            / sum(rate(http_server_requests_seconds_count{job="keycloak-http"}[5m])) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Keycloak is returning a high 5xx rate"
+          description: "Over 10% of Keycloak HTTP requests have been 5xx for 10m — auth requests are failing even though the pod is up. Common causes: the database is unreachable/slow (check keycloak-db + the CloudNativePG alerts), or Keycloak is resource-starved. Read the keycloak-0 logs."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#keycloak"
