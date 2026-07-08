@@ -160,10 +160,12 @@ sub-curriculum, not here.)*
 
 ## 10 · Developer experience
 
+✅ **Built** as [Developer experience](developer-experience/): an orientation ("the paved road: intent in, a PR out, reconciled infra") + 2 deep dives (the Backstage portal · the scaffolder golden paths) + reference.
+
 | Module | Covers | Status |
 | --- | --- | --- |
-| **The paved road** | New Product scaffolding, the golden-path starters, "ship a service" end-to-end | ⏳ |
-| **Backstage portal** | the developer portal, catalog projection, plugins, auth (ADR-051/064) | ⏳ |
+| **[The scaffolder golden paths](developer-experience/deep-dive-the-scaffolder-golden-paths.md)** | New Product scaffolding, the golden-path templates, "ship a service" end-to-end | ✅ |
+| **[The Backstage portal](developer-experience/deep-dive-the-backstage-portal.md)** | the developer portal, catalog projection, plugins, direct-Keycloak-OIDC auth (ADR-046/051) | ✅ |
 
 ## 11 · Operations & lifecycle
 
