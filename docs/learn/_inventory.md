@@ -144,12 +144,14 @@ trace↔logs) — module or deep dive, decided then.*
 A novel, headline area — really its own small curriculum: the runtime, the governance model, building one,
 evaluating one.
 
+✅ **Built** as [The agentic platform](agentic/): an orientation (the "contractor you don't trust" frame) + four deep dives (the XAgent runtime · bounding the agent · autonomy & evaluation · the triage copilot) + reference.
+
 | Module | Covers | Status |
 | --- | --- | --- |
-| **The XAgent runtime** | the GitOps-native agent control plane — the claim, the envelope, the kill-switch (ADR-082) | ⏳ |
-| **Graduated autonomy & guardrails** | the autonomy ladder — per-action-class autonomy under machine-enforced guardrails (ADR-086) | ⏳ |
-| **Building & operating an agent** | the envelope in practice, with the triage copilot as the worked example (ADR-080/081) | ⏳ |
-| **Agent evaluation** | eval-as-a-service, the eval store — the gate the autonomy ladder waits on | ⏳ |
+| **The XAgent runtime** | the GitOps-native agent control plane — the claim, the envelope, the kill-switch (ADR-082) | ✅ |
+| **Graduated autonomy & guardrails** | the autonomy ladder — per-action-class autonomy under machine-enforced guardrails (ADR-086) | ✅ |
+| **Building & operating an agent** | the envelope in practice, with the triage copilot as the worked example (ADR-080/081) | ✅ |
+| **Agent evaluation** | eval-as-a-service, the eval store — the gate the autonomy ladder waits on | ✅ |
 
 *(Agent / GenAI observability lives in the [Observability](#7--observability--a-sub-curriculum)
 sub-curriculum, not here.)*
