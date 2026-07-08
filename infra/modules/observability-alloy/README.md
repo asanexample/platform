@@ -16,13 +16,16 @@ them to **Loki** (`docs/plans/102-observability-stack.md`). This is the collecto
 - Gated by **`enable_log_pipeline`** (cost_profile per-knob override); points at the `observability-loki`
   `push_endpoint`.
 
-## Inputs
+## Key inputs
 
 | Input | Default | Notes |
 |-------|---------|-------|
 | `loki_push_url` | loki-gateway push URL | wire to the `observability-loki` `push_endpoint` output |
-| `tenant_id` | `platform` | X-Scope-OrgID on platform logs |
+| `tenant_id` | `platform` | X-Scope-OrgID on platform logs (the fallback tenant when `per_team_tenant` is on) |
+| `per_team_tenant` | `false` | P13: re-tenant env-namespace logs per team (#590) |
 | `helm_chart_version` | `1.10.0` | pinned in `_versions.hcl` |
+
+(Full input reference is auto-generated below.)
 
 ## Verify
 
