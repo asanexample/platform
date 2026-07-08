@@ -159,6 +159,30 @@ The moving parts:
    auth-cache** — visible as `cilium-dbg bpf auth list` → `AUTH TYPE: spire` for the authenticated
    identity pair.
 
+Putting those parts in motion, here is the full handshake on the showcase `alpha-shop → alpha-checkout`
+path — and what happens to an impostor that wears the right label but holds no valid SVID:
+
+```mermaid
+sequenceDiagram
+    participant Shop as alpha-shop pod
+    participant Imp as impostor pod
+    participant Cil as Cilium agent
+    participant SP as SPIRE
+    participant Chk as alpha-checkout pod
+    Shop->>Cil: open TCP to checkout WireGuard-encrypted
+    Cil->>Cil: match CNP auth-required rule
+    Cil->>SP: verify shop and checkout SVIDs
+    SP-->>Cil: SVIDs issued by embedded SPIRE
+    alt identities verify
+        Cil->>Chk: allow connection
+        Chk-->>Shop: 200 OK bytes still encrypted
+    else impostor has no valid SVID
+        Imp->>Cil: open TCP to checkout
+        Cil-->>Imp: DROPPED at ingress<br/>no valid SVID
+    end
+    Note over Shop,Chk: preprod one-pair showcase
+```
+
 **The data-plane bytes are still WireGuard-encrypted (Layer A).** mTLS adds the *identity handshake*;
 it does **not** carry the payload or replace the encryption. Two layers, stacked — the point from the
 top of the doc, now concrete.

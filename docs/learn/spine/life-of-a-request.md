@@ -44,6 +44,32 @@ Let's walk the visitor in.
 
 Follow one HTTP GET to `shop`'s `web` service, from the customer's browser to the response.
 
+Here's the whole path at a glance — edge to pod and back — before we walk each hop:
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant CF as Cloudflare
+    participant R53 as Route53
+    participant NLB as NLB
+    participant GW as Gateway Envoy
+    participant POD as Pod
+    B->>CF: resolve shop host
+    Note over CF: holds only an NS delegation for aws.refplat.org
+    CF-->>B: NS referral to Route53
+    B->>R53: resolve shop host
+    Note over R53: external-dns published the NLB A record
+    R53-->>B: gateway NLB address
+    B->>NLB: HTTPS GET
+    NLB->>GW: forward to Envoy
+    Note over GW: TLS terminated here<br/>cert-manager Lets Encrypt cert<br/>Envoy runs as reserved ingress identity
+    GW->>POD: HTTPRoute match routes to pod
+    Note over POD: env namespace<br/>Cilium allows fromEntities ingress<br/>east-west to other pods is WireGuard encrypted
+    POD-->>GW: response
+    GW-->>NLB: response
+    NLB-->>B: page
+```
+
 **1 · DNS — finding the door.** The browser first has to turn `shop-alpha-dev.preprod.aws.refplat.org` into
 an IP address. That name exists because **external-dns** published a Route53 record for it when the
 `HTTPRoute` was created — pointing at the cluster's **shared** gateway load balancer (one gateway, with a

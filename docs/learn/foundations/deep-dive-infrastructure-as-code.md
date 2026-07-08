@@ -76,6 +76,20 @@ root.hcl        remote state, provider generation, terraform_binary   (the whole
                  └─ terragrunt.hcl   the module + its inputs            (one unit)
 ```
 
+The same layering as a tree — each arrow is one inheritance step, broad scope down to narrow, and `_base.hcl` is the reader that merges them for the leaf unit:
+
+```mermaid
+flowchart TD
+    ROOT["root.hcl<br/>remote state and providers"] --> COMMON
+    COMMON["common.hcl<br/>cloud defaults · SOPS secrets · tags"] --> ENV
+    ENV["env.hcl<br/>account id · env tags"] --> REGION
+    REGION["region.hcl + network.hcl<br/>region · CIDRs"] --> WORKLOAD
+    WORKLOAD["workload.hcl<br/>workload name · compliance tier"] --> UNIT
+    UNIT["terragrunt.hcl<br/>module · inputs · dependencies"]
+    BASE["_base.hcl<br/>loads every layer · exposes include.base.locals"]
+    BASE -. merges broad to narrow .-> UNIT
+```
+
 The genius is *not* the nesting — it's the discipline that each value appears once. A concrete tour of the
 real files for the platform hub's `iam-roles` unit:
 

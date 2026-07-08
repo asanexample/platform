@@ -55,6 +55,22 @@ violation **demotes** them. **Where it breaks:** a driver's license is a propert
 license is per-*maneuver*. You can be fully licensed to change lanes and still hold a learner's permit for
 the freeway, on the same trip, enforced separately each second.
 
+The ladder itself, for a *single* action-class — the floor is real today; every rung above it is design:
+
+```mermaid
+stateDiagram-v2
+    [*] --> ProposeOnly
+    ProposeOnly : Propose-only<br/>a human acts on every suggestion
+    Shadow : Shadow<br/>records the would-be action and grades it
+    Autonomous : Autonomous within bounds<br/>acts in-envelope and policy-authorized
+    ProposeOnly --> Shadow : reversibility-eligible class<br/>begin shadow eval
+    Shadow --> Autonomous : passes the eval suite<br/>promoted
+    Autonomous --> ProposeOnly : regression demote
+    Autonomous --> Suspended : kill-switch<br/>halts agent
+    Suspended : Suspended<br/>Pod Identity removed no Bedrock, Alertmanager route dropped no triggers
+    note right of ProposeOnly : the only rung built today
+```
+
 ### The five conditions — all must hold
 
 An agent may act autonomously on an action-class **only when every one** of these is true; miss any and the

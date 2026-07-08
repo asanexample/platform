@@ -180,6 +180,21 @@ A plain Deployment does a rolling update: swap old pods for new, all of them, an
 **weighted slice** of live traffic to it — say 10% — then, if that slice looks healthy, widens it (25%,
 50%, 100%) step by step. If it looks sick, it **rolls back** to the old version automatically.
 
+That widen-or-revert loop *is* the canary state machine the Rollout runs, step by step, from the first traffic slice to full promotion:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Progressing
+    Progressing --> Paused: shift traffic slice<br/>then bake
+    Paused --> Analysis: check success rate<br/>vs SLO
+    Analysis --> Progressing: pass<br/>widen canary
+    Analysis --> Aborted: SLO breach
+    Progressing --> Promoted: weight hits 100
+    Aborted --> Stable: auto rollback
+    Promoted --> [*]
+    Stable --> [*]
+```
+
 *How* does it move the traffic? It edits the **weights on the HTTPRoute** — through its Gateway-API plugin —
 and the data plane routes each request by whatever weight it finds there. (This is the exact same HTTPRoute
 a [user request](../spine/life-of-a-request.md) is routed by; the control plane sets the weight, the data

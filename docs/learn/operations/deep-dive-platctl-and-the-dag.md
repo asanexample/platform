@@ -106,6 +106,45 @@ its EKS is an earlier wave), everything independent at once (both clusters' `eks
 is a four-beat sequence: **pre-flight** → **`engine.Run(Apply)`** → **lockdown** → **kubeconfig**. The
 graph handles most ordering itself; a few constraints are load-bearing and worth understanding.
 
+The whole build is one DAG. Here is its load-bearing spine — the floor `platctl` never touches, the
+cluster chain (Cilium before nodes, add-ons after both), and the platform-services layer above it:
+
+```mermaid
+flowchart TD
+  FLOOR["state-bootstrap + sops-kms<br/>floor - below platctl"]
+  IAM["iam-roles"]
+  NET["networking"]
+  EKS["eks"]
+  CIL["cilium<br/>BYOCNI - first"]
+  NG["node-groups"]
+  ADD["eks-addons<br/>CoreDNS"]
+  KARP["karpenter"]
+  ESO["external-secrets"]
+  SS["secret-stores"]
+  KC["keycloak"]
+  KCC["keycloak-config"]
+  ARGO["argocd"]
+  POL["policy"]
+  XP["crossplane"]
+
+  FLOOR --> IAM
+  FLOOR --> NET
+  IAM --> EKS
+  NET --> EKS
+  EKS --> CIL
+  CIL -- CNI before node joins --> NG
+  CIL -- add-ons need CNI --> ADD
+  NG -- add-ons need nodes --> ADD
+  NG --> KARP
+  NG --> ESO
+  NG --> KC
+  NG --> POL
+  ESO --> SS
+  KC --> KCC
+  KCC --> ARGO
+  POL --> XP
+```
+
 **The floor is below `platctl` (ADR-006).** The S3 state backend can't be created *by* something that
 uses the S3 state backend — you can't store your state in a bucket that doesn't exist yet. So
 `state-bootstrap` uses a *local* backend for its first apply, creates the bucket + the `terraform-locks`

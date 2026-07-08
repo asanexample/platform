@@ -24,6 +24,32 @@ understand them all. Let's anchor on Mimir (metrics), then show the others as va
 
 ## The five backends, and what each one holds
 
+Before the per-store detail, here's the whole pipeline on one screen — who collects each signal, which store
+keeps it, how one Grafana fronts them all, and how a spoke ships its telemetry home:
+
+```mermaid
+flowchart LR
+  W["Workload pods"]
+  W --> AL["Alloy<br/>tails logs"]
+  W --> PR["Prometheus<br/>scrape + remote-write"]
+  W --> BO["Beyla eBPF + OTel<br/>gateway"]
+  W --> AE["Alloy eBPF<br/>profiler"]
+
+  AL --> LK["Loki<br/>logs"]
+  PR --> MI["Mimir<br/>metrics"]
+  BO --> TE["Tempo<br/>traces"]
+  AE --> PY["Pyroscope<br/>profiles"]
+
+  LK --> GR["Grafana<br/>one query UI"]
+  MI --> GR
+  TE --> GR
+  PY --> GR
+
+  SP["Preprod spoke<br/>collectors"] -. "X-Scope-OrgID tenant<br/>network-isolated over TGW" .-> MI
+  SP -. "X-Scope-OrgID tenant<br/>network-isolated over TGW" .-> LK
+  SP -. "X-Scope-OrgID tenant<br/>network-isolated over TGW" .-> TE
+```
+
 The stack is **LGTM+P** — and each letter is a separate database, pinned to a specific chart version in the
 repo's single source of truth, [`infra/live/aws/_versions.hcl`](https://github.com/asanexample/platform/blob/main/infra/live/aws/_versions.hcl):
 
@@ -270,9 +296,7 @@ Grafana-forwarded OIDC token against the Keycloak JWKS, maps the caller's `group
 group → all tenants; **unknown or empty → deny**), overwrites `X-Scope-OrgID`, and reverse-proxies to its
 store. They provision the `Mimir (my team)` / `Loki (my team)` datasources. Genuinely **fail-closed** — no
 valid token, no data — with the *enforcement* **proven live (2026-07-07)**: identity maps to exactly one tenant
-and unknown callers are denied, for metrics *and* logs. (The write-split was flipped **hub-first**: the hub
-holds only the `platform` tenant with data today, so the `alpha`/`bravo` tenants exist end-to-end but stay
-empty until the spoke ingests into them — the *fencing* is what's proven, ahead of per-team data volume.)
+and unknown callers are denied, for metrics *and* logs.
 *(Per-team **traces (Tempo)** and **profiles (Pyroscope)** isolation is deliberately deferred — metrics + logs
 are the two live data-plane signals.)*
 

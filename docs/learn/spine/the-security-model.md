@@ -26,6 +26,24 @@ account boundary that contains a *deployment's* blast radius also contains an *a
 separate "security system" — security **falls out of the layering**. Defense in depth means *many
 independent walls*, arranged so an attacker must defeat all of them in sequence.
 
+The walls, outermost to innermost — each one an independent slice a request or workload must clear
+before it can reach `alpha`'s data:
+
+```mermaid
+flowchart TD
+    REQ["Request or workload"] --> L1
+    L1["Cloud SCPs<br/>org-wide guardrails"] --> L2
+    L2["Network<br/>private EKS + default-deny netpol"] --> L3
+    L3["Admission gate<br/>Kyverno Enforce<br/>incl. cosign + SLSA verify"] --> L5
+    L5["Identity<br/>Pod Identity + deny-set IAM"] --> L6
+    L6["In-transit encryption<br/>WireGuard pod-to-pod<br/>built on both clusters"] --> CORE
+    L6 -.-> AUTH
+    AUTH["SPIFFE + SPIRE mutual auth<br/>preprod showcase<br/>not fleet-enforced"]
+    CORE["alpha data<br/>the asset"]
+    CORE -.-> FALCO
+    FALCO["Runtime detection<br/>Falco<br/>observes and alerts<br/>does not block"]
+```
+
 The industry's standard way to organize those walls is the **[4 C's of cloud-native security](https://kubernetes.io/docs/concepts/security/overview/)** —
 concentric layers, outermost first:
 
