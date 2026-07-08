@@ -182,6 +182,10 @@ resource "helm_release" "product_appset" {
           ignoreDifferences = [
             { group = "", kind = "Service", jqPathExpressions = [".spec.selector"] },
             { group = "gateway.networking.k8s.io", kind = "HTTPRoute", jqPathExpressions = [".spec.rules[].backendRefs[].weight"] },
+            # The default HPA (ADR-078 Phase 2) owns the Rollout's replica count at runtime — ignore it so
+            # selfHeal doesn't revert the HPA's scaling to the manifest's initial value (thrash). The
+            # manifest's replicas is only the initial; the HPA's min/max govern thereafter.
+            { group = "argoproj.io", kind = "Rollout", jqPathExpressions = [".spec.replicas"] },
             # #894: under ServerSideApply, foreign controllers co-own these via Update (rollouts-controller on the
             # Rollout, cilium-operator-generic on the HTTPRoute), producing an empty-diff-but-OutOfSync artifact.
             # Ignore the fields those trusted managers own so sync status reflects real drift only.

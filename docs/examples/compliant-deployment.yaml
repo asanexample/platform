@@ -71,3 +71,29 @@ spec:
 # terminationGracePeriodSeconds) and topologySpreadConstraints are mutate-injected, and a maxUnavailable=1
 # PodDisruptionBudget is generated per workload (selector derived from this Deployment, GC'd with it). Run
 # >=2 replicas for these to matter (required in *-prod), and handle SIGTERM in-app to actually drain in-flight.
+---
+# Default workload autoscaler (ADR-078 Phase 2 — "elastic by construction"). The New Product scaffolder emits
+# this against the Rollout; for a plain Deployment it targets the Deployment. The HPA scales on CPU and owns
+# the replica count at runtime (so, under GitOps, ignore /spec/replicas so a controller doesn't fight it), and
+# Karpenter provisions/reclaims nodes to match. In *-prod keep minReplicas >= 2 (satisfies the replica floor).
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: app-acme-store
+  labels:
+    app.kubernetes.io/name: app-acme-store
+    team: acme
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: app-acme-store
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
