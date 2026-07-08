@@ -4,9 +4,10 @@
 
 **Status:** Accepted — P2 implemented + live on the platform cluster; **P13 per-team read isolation now
 enforced** (2026-07-07): hard per-team `X-Scope-OrgID` isolation for metrics via the `observability-tenant-proxy`
-fail-closed front door, with cross-team read **AccessGrants** (ADR-068). Flipped hub-first — the hub holds only
-the `platform` tenant with data today, so the *enforcement* is proven ahead of per-team data volume (which
-follows the spoke, #627) — but the multi-tenancy this ADR chose Mimir for is now wired end-to-end. Extends [ADR-043](043-self-hosted-observability-stack.md) (the observability stack) with
+fail-closed front door, with cross-team read **AccessGrants** (ADR-068). The platform hub runs no team
+workloads, so its *own* metrics are the `platform` tenant; the real per-team tenants are populated by the
+**preprod spoke's live dual-write** (preprod runs the alpha/bravo apps, shipping each namespace's series into
+its own tenant) — so the multi-tenancy this ADR chose Mimir for is now wired end-to-end and enforced. Extends [ADR-043](043-self-hosted-observability-stack.md) (the observability stack) with
 the durable store. As-built in [observability-current-state](../architecture/observability-current-state.md).
 
 ## Context
