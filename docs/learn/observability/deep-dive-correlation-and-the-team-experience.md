@@ -282,13 +282,13 @@ So who's it isolating, and how does a team *share*? Two things make this real ra
 1. **The write-split produces per-team tenants, and the proxy fences by identity — fail-closed.** The
    `cortex-tenant` write-side is configured to split each environment namespace's series into its own Mimir
    tenant (Loki does the same for logs), and the proxy maps SSO identity → that team's `X-Scope-OrgID` and
-   overwrites it — so a caller can only reach its own tenant (unknown/empty identity → **deny**). This was
-   flipped **hub-first to prove the path**: the hub itself runs no environment namespaces, so today it holds
-   only the `platform` tenant with data (`alpha`/`bravo` tenants exist in the config but are empty until the
-   **spoke** — where the team workloads actually run — ingests into them, #627). So what's *proven live*
-   (2026-07-07) is the enforcement mechanism end-to-end — identity-scoped, fail-closed, for metrics *and* logs
-   — with real per-team data volume following the spoke cutover. (Per-team **traces** (Tempo) and **profiles**
-   (Pyroscope) isolation is deferred — metrics + logs are the two live signals.)
+   overwrites it — so a caller can only reach its own tenant (unknown/empty identity → **deny**). The platform
+   **hub** runs no environment namespaces, so its own metrics are the `platform` tenant; the real per-team
+   tenants (`alpha`, `bravo`, …) are populated by the **preprod spoke's dual-write** — preprod, where the team
+   apps run, ships each namespace's series into its own Mimir tenant (additive to the `preprod` tenant), and
+   Loki does the same for logs. So the enforcement is **live end-to-end** — identity-scoped, fail-closed, for
+   metrics *and* logs — proven 2026-07-07. (Per-team **traces** (Tempo) and **profiles** (Pyroscope) isolation
+   is deferred — metrics + logs are the two live signals.)
 2. **Cross-team sharing is an explicit grant, not an open door.** Because the proxy is fail-closed, `bravo`
    *can't* see `alpha`'s signals by default. Sharing is a deliberate act: an **`AccessGrant`**
    ([ADR-068](../../adrs/068-product-scoped-and-cross-team-access-model.md); claims in `gitops/grants/`, e.g.

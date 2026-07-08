@@ -225,11 +225,11 @@ The **one place to be careful** is *per-team* isolation — the mechanism is liv
 per-team **write** split and **read** isolation are both real and **enforced**: `cortex-tenant` routes each
 team's series into its own Mimir tenant, and a **fail-closed** proxy maps SSO identity → that team's tenant so
 a caller reads *only* its own (unknown/empty identity → **deny**), for both **Mimir metrics** and **Loki logs**.
-The subtlety: this was flipped **hub-first to prove the path**, so the hub itself still holds only the
-`platform` tenant with data — the `alpha`/`bravo` tenants are wired end-to-end but stay empty until the
-**spoke** (where team workloads actually run) ingests into them (#627). So what's proven live is the
-*enforcement* — identity-scoped, fail-closed, metrics *and* logs; per-team data *volume* follows the spoke
-cutover. *(Traces (Tempo) and profiles (Pyroscope) per-team isolation is deferred, not built.)* Cross-team
+The subtlety worth knowing: the platform **hub** runs no team workloads, so its own metrics are the `platform`
+tenant; the real per-team tenants (`alpha`, `bravo`, …) are populated by the **preprod spoke's dual-write** —
+preprod, where the team apps actually run, ships each namespace's series into its own tenant (additive to the
+`preprod` tenant). So the isolation is live and enforced end-to-end — identity-scoped, fail-closed, for metrics
+*and* logs. *(Traces (Tempo) and profiles (Pyroscope) per-team isolation is deferred, not built.)* Cross-team
 read *sharing* rides an **AccessGrant** model ([ADR-068](../../adrs/068-product-scoped-and-cross-team-access-model.md)):
 a team grants another read access to its signals and the read path federates the caller's own tenant ∪ its
 grants (still fail-closed — `bravo` reading `alpha` becomes `X-Scope-OrgID: alpha|bravo`). Because OSS Grafana
