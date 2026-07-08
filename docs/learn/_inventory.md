@@ -75,7 +75,7 @@ module or deep dive, decided then.*
 | **[Policy & admission](policy/)** | Kyverno — the guardrail engine (validate/mutate/generate); the per-cluster catalog; Audit→Enforce (ADR-014) | ✅ |
 | **[Supply chain](supply-chain/)** | cosign keyless signing, SLSA provenance, the shared build-sign workflow + self-hosted CI runners, verify-at-admission (ADR-042/050/065) | ✅ |
 | **[Runtime security](runtime-security/)** | Falco runtime threat detection + east-west zero-trust — WireGuard encryption + Cilium/SPIRE mTLS (ADR-045/057) | ✅ |
-| **Compliance & regulated workloads** *(placeholder — thin today)* | the *intent*: tiers as isolation/recovery floors, regulated-tier hardening, continuous control evidence, east-west zero-trust (ADR-013/055/057). **East-west zero-trust is now built** (WireGuard encryption fleet-wide + Cilium mutual-auth/SPIFFE showcase on preprod — ADR-057); tiers-as-isolation-floors and continuous control evidence remain more aspiration than implementation. | ⏳ |
+| **[Compliance & regulated workloads](compliance/)** | compliance-aware by design (a lens over the security modules + a declared `tier` dimension): tier + envelope validation built (Enforce preprod), regulated-tier hardening inert (both clusters `standard`, no regulated tenant), continuous control evidence aspirational (ADR-013 Accepted / ADR-055 Proposed) | ✅ |
 
 *Both **Policy** and **Supply chain** are **built** as single combined modules; each stays dense enough to
 fracture later — Policy into engine/admission · the catalog · mutate/generate · audit→enforce; Supply chain
