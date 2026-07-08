@@ -62,4 +62,4 @@ jobs:
           aws-region: us-east-1
 
       - name: Publish to S3
-        run: techdocs-cli publish --publisher-type awsS3 --storage-name "$BUCKET" --entity "$ENTITY" --directory build/site
+        run: techdocs-cli publish --publisher-type awsS3 --storage-name "$BUCKET" --entity "$ENTITY" --directory build/site --awsS3sse AES256
