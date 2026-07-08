@@ -129,7 +129,7 @@ inputs = {
       })
     }
     # The learning-portal TechDocs publish role (#938, ADR-097). Trusts ONLY the asanexample/platform repo on
-    # main; can write ONLY to the platform-techdocs bucket. The techdocs.yml workflow builds the site (mkdocs +
+    # main; can write ONLY to the refplat-platform-techdocs bucket. The techdocs.yml workflow builds the site (mkdocs +
     # techdocs-cli) and publishes it here (builder: external); Backstage serves it read-only.
     "github-actions-techdocs-publish" = {
       repos    = ["platform"]
@@ -150,8 +150,8 @@ inputs = {
               "s3:ListBucket",
             ]
             Resource = [
-              "arn:aws:s3:::platform-techdocs",
-              "arn:aws:s3:::platform-techdocs/*",
+              "arn:aws:s3:::refplat-platform-techdocs",
+              "arn:aws:s3:::refplat-platform-techdocs/*",
             ]
           },
         ]
