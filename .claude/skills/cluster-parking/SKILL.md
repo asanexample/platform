@@ -99,6 +99,15 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-08 (end-of-day PARK) — overnight park of both clusters. ✅ Clean, cost-zero, routine.** Rebuilt
+  `./bin/platctl` from freshly-pulled `main` first, then `AWS_PROFILE=management ./bin/platctl down --env <env>
+  --yes` each in parallel. Same reliable split as every cycle: **preprod** clean (Karpenter drained + EC2NodeClass
+  deleted symmetrically, 1 node force-terminated); **platform** the usual slow-drain warnings (NodeClaims 6m /
+  EC2NodeClass 90s) then `system`→0 (1 node force-terminated this time). Both bastions auto-stopped (both fully
+  `stopped` on verify). **Cost-zero confirmed:** both `system` node groups `desiredSize=0`, **0 running/pending
+  instances in both accounts**. Nothing to note — park is boringly repeatable now; the interesting half is unpark
+  (see the 2026-07-07 entry where #1183 proved out).
+
 - **2026-07-07 — UNPARK both clusters (overnight park). ✅ Clean — and the #1183 DB-recovery fix PROVED ITSELF
   LIVE: `platctl up` AUTO-restarted backstage + keycloak with ZERO manual intervention.** This is the exact
   failure that silently no-op'd on 2026-07-06; the fix (source expected-DB namespaces from the CNPG Cluster CRs
