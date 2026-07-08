@@ -121,6 +121,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 |-----|--------|
 | [ADR-051: Backstage as the Developer Portal](051-backstage-developer-portal.md) | Accepted |
 | [ADR-064: Backstage Provisioning Visibility & Developer Experience](064-backstage-provisioning-visibility.md) | Proposed |
+| [ADR-097: TechDocs for the Learning Portal](097-techdocs-for-the-learning-portal.md) | Accepted (implementing) |
 
 ## Self-Service Resources & Agentic Workloads
 
