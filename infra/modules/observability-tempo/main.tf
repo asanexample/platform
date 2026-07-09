@@ -81,7 +81,11 @@ locals {
       enabled = var.enable_metrics_generator
       config = {
         storage = {
-          remote_write = [{ url = var.mimir_remote_write_url }]
+          # send_exemplars attaches each span's trace ID as an exemplar on the RED span-metrics, so a metric
+          # spike in Grafana is click-through to the exemplar trace (metric → trace). Off by default upstream;
+          # Mimir already stores exemplars (max_global_exemplars_per_user) and the Mimir datasource already
+          # links them via exemplarTraceIdDestinations keyed on `traceID`. Without this the loop is dark.
+          remote_write = [{ url = var.mimir_remote_write_url, send_exemplars = true }]
         }
         registry = { external_labels = { source = "tempo" } }
         # local-blocks keeps recent traces in the generator so TraceQL *metrics* queries (rate/quantile over
