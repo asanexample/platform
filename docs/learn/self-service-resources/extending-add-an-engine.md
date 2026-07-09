@@ -44,17 +44,12 @@ engine (SQS) already does everything yours needs to, so you copy its block and c
 Every engine, given one `resources.<name>` entry in a claim, must produce exactly three outputs. Hold these
 three and the rest is plumbing:
 
-```mermaid
-flowchart LR
-    IN["claim entry:<br/>events: kind=stream, engine=kinesis, access=readwrite"]
-    IN --> E{your engine block}
-    E --> R["1. the hardened resource<br/>(Kinesis Stream, encrypted)"]
-    E --> I["2. derived least-privilege IAM<br/>(Put/Get on THIS stream ARN only)"]
-    E --> C["3. an output coordinate<br/>(EVENTS_STREAM_NAME → the ConfigMap)"]
-```
+![An engine turns one claim entry into three outputs — make the resource exist, grant reach to it, tell the app where it is — each landing in a different place](images/engine-slot-three-things.svg)
 
 Everything else — governance, the provider install, the catalog — is wiring you do once so those three
 outputs flow to the right places.
+
+![One engine spread across eight files, grouped by purpose: make it real, let teams ask for it, let the platform build it, show it and guard it](images/eight-step-wiring-map.svg)
 
 ---
 
@@ -271,12 +266,16 @@ playbook.
    `allowedEngines: [kinesis]` and uses it can't pass its own gate. Land it in two PRs: first the allowance
    (Steps 2–3), merged to `main`, then the realization plus a team opting in.
 
+![Land it in two PRs: the allowance to main first, then the realization — because the gate reads main, not your branch](images/two-pr-split.svg)
+
 ---
 
 ## Doing this with an AI agent
 
 Most of this work is disciplined pattern-matching, which is exactly what a coding agent is good at — if you
 give it the guardrails. Here's a working setup.
+
+![The agent does the broad mechanical spread, then hands you a PR; you own exactly two things — which fields are real and the security invariants](images/ai-agent-contract.svg)
 
 **Context to attach:** this playbook, `composition.yaml`, `team-crd.yaml`, `.github/scripts/teams/gate.sh`,
 `crossplane/main.tf`, the preprod crossplane `terragrunt.hcl`, and the Marketplace CRD page for your engine's
