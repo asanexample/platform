@@ -78,10 +78,10 @@ preprod and prod account principals, mirroring ECR's centralized-registry-with-c
 `infra/modules/aws/codeartifact/` module + a live unit alongside the `ecr` unit.
 
 **D2 — Docker pull-through cache is ECR-native, not a new registry.** Create ECR **pull-through cache rules**
-for `docker.io`, `ghcr.io`, `quay.io`, and `registry.k8s.io`. AWS supports **anonymous** pull-through only for
-`registry.k8s.io` (and `public.ecr.aws`); `docker.io`, `ghcr.io`, and `quay.io` each **require** an upstream
-credential in Secrets Manager (the secret name must start with `ecr-pullthroughcache/`) — so each is enabled as
-its credential is provisioned, while the `registry.k8s.io` mirror works standalone. Public base/tooling images
+for `docker.io`, `ghcr.io`, `quay.io`, and `registry.k8s.io`. AWS supports **anonymous** pull-through for
+`registry.k8s.io` and `quay.io` (and `public.ecr.aws`); `docker.io` and `ghcr.io` each **require** an upstream
+credential in Secrets Manager (the secret name must start with `ecr-pullthroughcache/`) — so each of those is
+enabled as its credential is provisioned, while the `registry.k8s.io` + `quay.io` mirrors work standalone. Public base/tooling images
 are then lazily mirrored into our account on first pull and served with the same IAM auth as our own images.
 This closes the "pull-through docker cache" need without adopting Harbor or a registry mirror.
 

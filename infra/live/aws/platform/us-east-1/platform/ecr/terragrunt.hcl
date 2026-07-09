@@ -12,13 +12,13 @@ terraform {
 }
 
 locals {
-  # ECR pull-through cache credentials. AWS REQUIRES authentication for docker.io / ghcr.io / quay.io — each is
+  # ECR pull-through cache credentials. registry.k8s.io and quay.io accept anonymous pull-through (verified live —
+  # both rules created without a credential), so they're always on. docker.io and ghcr.io REQUIRE authentication
+  # (AWS rejects the rule otherwise — the ghcr apply failed with UnsupportedUpstreamRegistryException), so each is
   # gated on its Secrets Manager credential (secret name must start with `ecr-pullthroughcache/`, value
-  # {username, accessToken}). Set the ARN to enable that mirror once the secret exists; empty (default) leaves it
-  # off. registry.k8s.io is the only credential-free upstream here, so it's always on. ADR-098 D2.
+  # {username, accessToken}). Set the ARN to enable that mirror once the secret exists. ADR-098 D2.
   docker_hub_credential_arn = ""
   ghcr_credential_arn       = ""
-  quay_credential_arn       = ""
 }
 
 inputs = {
@@ -67,22 +67,20 @@ inputs = {
   ]
 
   # Pull-through cache: mirror public registries into this account on first pull so cluster/CI base-image
-  # pulls hit our own ECR (IAM auth, no rate limits) — ADR-098 D2. Only registry.k8s.io supports anonymous
-  # pull-through; docker.io / ghcr.io / quay.io REQUIRE a credential (AWS rejects the rule otherwise). Each is
-  # gated on its Secrets Manager credential ARN (secret name must start with `ecr-pullthroughcache/`) — set the
-  # corresponding local above to enable that mirror once the secret exists; the k8s mirror works standalone.
+  # pulls hit our own ECR (IAM auth, no rate limits) — ADR-098 D2. registry.k8s.io + quay.io support anonymous
+  # pull-through (verified live); docker.io / ghcr.io REQUIRE a credential (AWS rejects the rule otherwise —
+  # ghcr failed with UnsupportedUpstreamRegistryException). Each gated one waits on its Secrets Manager credential
+  # ARN (secret name must start with `ecr-pullthroughcache/`) — set the corresponding local above to enable it.
   pull_through_cache_rules = merge(
     {
-      "k8s" = { upstream_registry_url = "registry.k8s.io" }
+      "k8s"  = { upstream_registry_url = "registry.k8s.io" }
+      "quay" = { upstream_registry_url = "quay.io" }
     },
     local.docker_hub_credential_arn == "" ? {} : {
       "docker-hub" = { upstream_registry_url = "registry-1.docker.io", credential_arn = local.docker_hub_credential_arn }
     },
     local.ghcr_credential_arn == "" ? {} : {
       "ghcr" = { upstream_registry_url = "ghcr.io", credential_arn = local.ghcr_credential_arn }
-    },
-    local.quay_credential_arn == "" ? {} : {
-      "quay" = { upstream_registry_url = "quay.io", credential_arn = local.quay_credential_arn }
     },
   )
 
