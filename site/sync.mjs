@@ -74,6 +74,10 @@ function transform(srcAbs, route, order) {
     if (!bang) {
       const abs = resolve(dirname(srcAbs), tgt.split('#')[0]);
       if (IMG_EXT.test(abs) && dirname(abs) === join(LEARN, 'images')) return `${label}(/${basename(abs)})`;
+      // Link to an internal authoring file (_-prefixed, excluded from publishing) -> UNLINK: keep the text,
+      // drop the link. The canonical README keeps the link for GitHub readers; the public site shouldn't
+      // surface the doc-authoring scaffolding (_mold/_inventory/_crosslinks) as dead-end GitHub blob links.
+      if ((abs === LEARN || abs.startsWith(LEARN + '/')) && /^_/.test(basename(abs))) return label.slice(1, -1);
     }
     return `${bang}${label}(${rewriteTarget(tgt, srcAbs)})`;
   });
