@@ -29,6 +29,7 @@ tasks and load automatically when relevant. Prefer them over re-deriving from th
 - **observability-authoring** — adding dashboards/alerts/SLOs + instrumenting workloads in the LGTM+P stack
 - **backstage-portal** — configuring the Backstage portal/plugins/auth/catalog from the infra `backstage` module
 - **maintaining-docs** — keeping docs current as code changes (the doc-impact map, grep-first for renames, the drift traps); use when finishing a feature / opening a PR
+- **learning-portal-diagrams** — placing/replacing/fixing/processing the SVG diagrams in `docs/learn/**` (single-source → TechDocs + Astro/Starlight; the `theme-svg.mjs` dark-bake + `xml:space` fix; the MANDATORY real-Chrome preview since rsvg font metrics lie; box/text overflow fix recipes; the `astro preview` restart gotcha; wide posters); use when working with a learn-portal diagram
 - **triaging-issues** — keeping the GitHub issue board current (verify status against primary sources not the roadmap/body, the origin/main-vs-worktree trap, close/keep-open/relabel rules); use when triaging issues, closing shipped work, or reconciling the board after merges
 - **authoring-platform-agents** — authoring/operating a platform agent (the `XAgent` claim, envelope, kill-switch; ADR-082)
 - **skill-self-correction** — durably fixing a house skill (under `.claude/skills/`) when it misleads you

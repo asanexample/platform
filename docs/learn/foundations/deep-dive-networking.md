@@ -10,23 +10,7 @@ peering, and why the DNS bridge has to exist at all.
 The shape at a glance — the hub in the platform account, one spoke VPC per account joined through it,
 and the DNS bridge that lets a name resolve across the corridor:
 
-```mermaid
-flowchart TD
-  subgraph PLAT["Platform account (hub)"]
-    PVPC["Platform VPC<br/>10.100.0.0/16"]
-    TGW["Transit Gateway<br/>hub"]
-    PHZ["cross-VPC DNS<br/>private hosted zone"]
-  end
-  subgraph PRE["PreProd account (spoke)"]
-    QVPC["PreProd VPC<br/>10.101.0.0/16"]
-    EKS["preprod EKS API<br/>private only"]
-  end
-  PVPC -->|"attach via transit /28 per AZ"| TGW
-  QVPC -->|"attach via RAM share"| TGW
-  TGW -->|"routes hub to spoke"| QVPC
-  PHZ -->|"resolves API name to ENI IPs"| EKS
-  TS["operator kubectl"] -.->|"Tailscale private path"| EKS
-```
+![The network topology at a glance. The platform account is the hub, holding the Platform VPC (10.100.0.0/16), the Transit Gateway, and the cross-VPC DNS private hosted zone. The PreProd account is a spoke, with its PreProd VPC (10.101.0.0/16) and its private-only preprod EKS API. Each spoke attaches to the single Transit Gateway (via a RAM share, over the transit /28 subnets per AZ) and routes through it; the DNS module resolves the API name to the cluster's live ENI IPs; and an operator reaches the private API over a Tailscale path.](images/network-topology.svg)
 
 ---
 
@@ -136,6 +120,8 @@ public       10.100.0.224/28    (newbits=4, netnum=14)
 transit      10.100.0.240/28    (newbits=4, netnum=15)
 ```
 
+![The CIDR strategy as nested math, not a spreadsheet: a /16 per environment is chopped by the inner `cidrsubnet` into a /24 per availability zone, and each /24 is carved by the outer call into tier subnets — kubernetes /26, endpoints /26, firewall /26, services /27, public /28, transit /28 — packed with no overlap and no waste. Change one `vpc_cidr` and every subnet moves together.](images/cidr-strategy.svg)
+
 Change the `vpc_cidr` in one file and all 18 subnets move together, still non-overlapping. Add a region:
 one new `network.hcl`. No spreadsheet, no manual subtraction, no "which /26 is free again?"
 
@@ -216,6 +202,8 @@ account can reach the preprod cluster's API.
   entries and manual cross-account acceptance on *both* sides. A hub grows **linearly** — a new spoke is
   one RAM principal on the hub and one spoke-mode deployment. Nothing existing gets reconfigured.
 
+![Hub versus peering. Connecting N VPCs by peering every pair needs N×(N−1)/2 tunnels — a mesh that grows quadratically, is non-transitive (platform can't reach prod *through* preprod), and needs cross-account acceptance on both sides of every pair. A Transit Gateway is one hub every VPC attaches to once: connectivity is transitive, and it grows linearly — a new spoke is a single attachment, with nothing existing reconfigured.](images/hub-vs-peering.svg)
+
 At the mechanism level: VPC peering digs a private tunnel between every pair of buildings — you can't
 cut through building B's tunnel to reach C, and the number of tunnels explodes as you add buildings. The
 Transit Gateway is a single roundabout every building connects to *once*; anyone can reach anyone, and
@@ -235,6 +223,8 @@ EKS and is invisible to the Route53 API** ([ADR-035](../../adrs/035-cross-vpc-dn
 another VPC. So ArgoCD in the platform account, resolving the preprod API hostname, gets the *public*
 DNS answer — which points at IPs it has no route to. The name resolves; the packet dies. The room has an
 internal number, but its address isn't in any directory the neighbour can read.
+
+![Cross-VPC DNS — the gap and the bridge. The preprod EKS API is private-only, and the Route53 zone that maps its name to the real private ENI IPs is managed internally by EKS and invisible to the Route53 API — so ArgoCD in the platform account resolves the public name and gets IPs it has no route to: the name resolves, the packet dies. The `cross-vpc-dns` module bridges it with its own private hosted zone in the platform VPC, whose A record IPs are re-discovered on every apply by assuming a role in the preprod account and querying EC2 for the cluster's live API ENIs.](images/cross-vpc-dns.svg)
 
 The [`cross-vpc-dns/`](https://github.com/asanexample/platform/blob/main/infra/modules/aws/cross-vpc-dns) module bridges exactly that, and it offers **three modes** behind one
 validated `dns_method` variable:

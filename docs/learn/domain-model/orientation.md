@@ -33,24 +33,11 @@ Two shapes, and the whole model is the interplay between them:
 - **Deployment is a grid:** picture a spreadsheet with Products down the side and Stages across the top
   (dev, test, staging, prod). Every filled-in cell is an Environment — one product at one stage.
 
-The ownership tree:
+Both shapes at once — the ownership tree (a Team owns Products, each owning Services), the deployment grid
+(products down the side, stages across the top, every filled cell an Environment), and the Service that runs
+inside each Environment cell, which is what ties the two together:
 
-```mermaid
-flowchart TB
-    T[Team: acme] --> P1[Product: shop]
-    T --> P2[Product: checkout]
-    T --> P3[Product: conformance]
-    P1 --> S1[Service: web]
-```
-
-And the deployment grid — products down the side, stages across the top. A product promotes up the ladder
-(dev → test → staging → prod), filling a cell at each stage; every filled cell is an Environment:
-
-| Product ↓ · Stage → | dev | test | staging | prod |
-| --- | --- | --- | --- | --- |
-| **shop** | `acme-shop-dev` | `acme-shop-test` | `acme-shop-staging` | `acme-shop-prod` |
-| **checkout** | `acme-checkout-dev` | `acme-checkout-test` | `acme-checkout-staging` | `acme-checkout-prod` |
-| **conformance** | `acme-conformance-dev` | `acme-conformance-test` | — | — |
+![Two shapes in one picture. Ownership is a tree: Team acme owns Products (shop, checkout, conformance), and each Product owns Services. Deployment is a grid: products down the side, stages across the top (dev, test, staging, prod), and every filled cell is an Environment — one product at one stage. A Service runs inside each Environment cell, which is what connects the tree to the grid; a product promotes up the ladder, filling a cell at each stage.](images/tree-and-grid.svg)
 
 The cells tell an illustrative story. Say `shop` calls `checkout` — then the two must promote *together*,
 since you wouldn't run `shop` in prod without the `checkout` it depends on. A standalone product promotes on
@@ -179,6 +166,8 @@ envelope:
   quotaCap: { cpu: "8", memory: 16Gi, pods: 40 }
   budget: { monthlyUSD: 2000 }
 ```
+
+![The Team as an envelope. The acme envelope sets the bounds — allowed tiers, allowed stages, a quota cap, and a monthly budget. Four submitted environments are checked against it: the ones whose tier, stage, and size fall inside the bounds are accepted (✓); one that steps outside — a disallowed tier or an over-quota request — is rejected at admission (✗).](images/team-envelope.svg)
 
 A couple of terms in there: a tier is the hardening/compliance level an environment runs at — `standard` for
 ordinary apps; regulated ones like `pci` (payment-card data) or `hipaa` (health data) force stronger

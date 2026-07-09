@@ -9,7 +9,7 @@
 > them** (see [the mold](_mold.md)); a typical module is two files, not seven.
 >
 > **This is aspirational.** It's the full map, not a committed backlog. **The spine is complete** and **ten
-> modules** are built (domain model, Onboarding a Product, Environment API, Self-service resources, Delivery,
+> modules** are built (domain model, Teams, Onboarding a Product, Environment API, Self-service resources, Delivery,
 > Policy, Identity & access, Supply chain, Foundations, Observability) — the near-term is now breadth on demand (a real reader, a demo, interest). Granularity is a
 > guess; modules will split and merge as we build. **Audience** is decided *per module* at build time, not
 > per domain — most are platform-engineer-facing; the genuinely developer-facing ones are called out in the
@@ -55,6 +55,7 @@ module or deep dive, decided then.*
 | Module | Covers | Status |
 | --- | --- | --- |
 | **Domain model** | Team / Product / Service / Environment / Customer; the shared vocabulary | ✅ |
+| **[Teams](teams/)** | the git-native Team registry + envelope; how to onboard a team (scaffolder / hand-authored PR) and what its bounds govern (ADR-063/072) | ✅ |
 | **[Onboarding a Product](products/)** | the Product registry as single source of truth; three derivations (github-oidc/policy/argocd-apps); the paved road + onboarding how-to (ADR-069/067) | ✅ |
 | **Environment API** | Crossplane: one claim → the full footprint (namespace, ECR, IAM, policies) | ✅ |
 | **[Self-service cloud resources](self-service-resources/)** | S3 / SQS / SNS / DynamoDB via the claim; derived least-privilege IAM (ADR-073) | ✅ |

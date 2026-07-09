@@ -77,17 +77,7 @@ root.hcl        remote state, provider generation, terraform_binary   (the whole
 
 The same layering as a tree — each arrow is one inheritance step, broad scope down to narrow, and `_base.hcl` is the reader that merges them for the leaf unit:
 
-```mermaid
-flowchart TD
-    ROOT["root.hcl<br/>remote state and providers"] --> COMMON
-    COMMON["common.hcl<br/>cloud defaults · SOPS secrets · tags"] --> ENV
-    ENV["env.hcl<br/>account id · env tags"] --> REGION
-    REGION["region.hcl + network.hcl<br/>region · CIDRs"] --> WORKLOAD
-    WORKLOAD["workload.hcl<br/>workload name · compliance tier"] --> UNIT
-    UNIT["terragrunt.hcl<br/>module · inputs · dependencies"]
-    BASE["_base.hcl<br/>loads every layer · exposes include.base.locals"]
-    BASE -. merges broad to narrow .-> UNIT
-```
+![The six config layers as an inheritance tree, broadest to narrowest: `root.hcl` (remote state and providers) → `common.hcl` (cloud defaults, SOPS secrets, tags) → `env.hcl` (account id, env tags) → `region.hcl` + `network.hcl` (region, CIDRs) → `workload.hcl` (workload name, compliance tier) → `terragrunt.hcl` (module, inputs, dependencies). Each arrow is one inheritance step. Off to the side, `_base.hcl` is the reader that loads every layer and merges them broad → narrow for the leaf unit.](images/cascade-tree.svg)
 
 What matters isn't the nesting — it's the discipline that each value appears once. A tour of the real files
 for the platform hub's `iam-roles` unit:
@@ -113,6 +103,8 @@ grep-and-replace across directories. That's the payoff of "each fact in one laye
 to change it, and exactly one place it can be wrong.
 
 ## How `_base.hcl` *loads* the cascade
+
+![How `_base.hcl` loads the cascade in two includes. Step 1 — climb: from the unit's directory, `find_in_parent_folders` walks up until each layer file turns up (env, region, network, workload, common, versions), so where the unit sits decides which env it resolves. Step 2 — merge: the layers merge broad to narrow (common → env → region → network → workload) and the last key wins, so a narrower layer overrides a broader default. Step 3 — expose: the unit includes `_base` with `expose = true` and reads the assembled values off `include.base.locals.*`.](images/base-loads-cascade.svg)
 
 The reader that walks the tree is `infra/live/aws/_base.hcl`. It doesn't rely on being told where the layers
 are — it *searches upward* for each one with `find_in_parent_folders`, then reads it with
@@ -223,6 +215,8 @@ catastrophic copy-paste — the "I applied prod's config from the preprod folder
 construction, not by discipline. If you ever *see* a `SAFETY:` error, that's the rail working. Fix the
 directory or the account map; never delete the assert.
 
+![The two SAFETY asserts — refusal by construction. On every plan, `_base.hcl` runs two checks before touching AWS: assert 1 — the folder you're standing in must equal the env that `env.hcl` declares; assert 2 — the account the map expects for that env must equal the `account_id` it resolved. Both pass and the plan proceeds; fail either and Terragrunt refuses to run (no plan, no apply), printing a `SAFETY:` error. Applying the wrong account's config from the wrong folder is impossible by construction, not by discipline.](images/safety-asserts.svg)
+
 ## Remote state — where the truth is kept
 
 Every unit's state is stored remotely, configured once in `root.hcl` and generated into each unit as a
@@ -284,6 +278,8 @@ _secrets = get_env("TG_SOPS_BOOTSTRAP", "") == "1"
   : yamldecode(sops_decrypt_file("${get_repo_root()}/infra/live/aws/secrets.enc.yaml"))
 ```
 
+![SOPS as a locked glass case in a public square. The repo is public, yet account IDs, emails, and SSO URLs are committed right in git — in `secrets.enc.yaml`, encrypted per-value with SOPS against a KMS key. Anyone can clone the ciphertext (key-less, useless); only a trusted principal's ambient AWS identity can decrypt it, and every decrypt is logged to CloudTrail. `common.hcl` decrypts it inline, in memory, at config-eval time, and it's never written to disk. It's identity-config, not a vault — real runtime credentials live in Secrets Manager.](images/sops-glass-case.svg)
+
 Which KMS key is pinned by `.sops.yaml` at the repo root (account ID and key UUID redacted here):
 
 ```yaml
@@ -324,6 +320,8 @@ identity-config file, encrypted; not a vault.
 Both pillars above have the same circularity, and it's the thing that most surprises people. *Every* unit's
 config load now (a) writes state to the S3 bucket and (b) decrypts `secrets.enc.yaml` with the KMS key. So how
 do you create the bucket and the key, when creating them would itself require… the bucket and the key?
+
+![The bootstrap chicken-and-egg. Every unit's config load writes state to the S3 bucket and decrypts secrets with the KMS key — so creating the bucket and key can't itself go through the normal flow that needs them. Two escape hatches break the deadlock: the `state-bootstrap` unit overrides the S3 backend with local state (it can't store state in the bucket it's creating), and `TG_SOPS_BOOTSTRAP=1` flips secrets to a plaintext gitignored file so KMS is never called before the key exists. After bootstrap, the bucket and key are standing prerequisites — foundations poured before the walls.](images/bootstrap-chicken-egg.svg)
 
 You can't — from a normal unit. So both are **bootstrap-tier**: created once, outside the secrets-reading
 flow, before anything else exists ([ADR-006](../../adrs/006-state-bootstrap-pattern.md) for state; ADR-066 §6

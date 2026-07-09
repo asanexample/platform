@@ -32,6 +32,8 @@ The whole foundation fits in a sentence, and the rest is that sentence at six di
 > internet unless something deliberately opens a door), and the entire stack is **declared as code**, so it
 > could be rebuilt from zero.
 
+![Nested boundaries, private by default: the Organization contains an account, which contains a network (VPC), which contains a cluster, which contains a node, which contains a pod — each carved out of the one above it, like nested rings. Nothing is reachable from the internet unless a door is deliberately opened, and the whole stack is declared as code.](images/nested-boundaries.svg)
+
 Two properties run through every layer:
 
 - **Private by default.** At each layer the closed option is the default and exposure is a deliberate, visible
@@ -100,6 +102,8 @@ An **AWS account is a hard boundary** — a *separate security and billing princ
 > is a well-guarded bridge: a cross-account IAM role assumption, logged every time it's used. This is why the
 > [security model](../spine/the-security-model.md) calls the account boundary the strongest wall it has.
 
+![Hard versus soft boundaries: namespaces are locked rooms in one house — the homeowner (a cluster admin) holds every key, so the isolation is a soft, in-cluster convention. Accounts are separate buildings on separate plots — even the superintendent can't walk into the building next door; the only way across is a well-guarded, logged bridge (a cross-account IAM role assumption). The account boundary is enforced by AWS itself, which is what makes it hard.](images/hard-vs-soft-boundary.svg)
+
 ### SCPs — the zoning laws above the account
 
 One more thing operates *above* the accounts: **Service Control Policies**
@@ -161,14 +165,7 @@ VPC in us-east-1, CIDR `10.100.0.0/16`* (the instance). One definition, many ins
 How a live unit gets its settings is the clever part, and worth a firm grounding. Configuration is layered by
 *scope*, broad to narrow, and **each fact lives in exactly one layer**:
 
-```text
-root.hcl        — remote state, providers            (the whole estate)
- └─ common.hcl  — cloud-wide defaults, SOPS secrets   (all of AWS)
-     └─ env.hcl        — which account, env tags       (one account)
-         └─ region.hcl / network.hcl — region, CIDRs   (one region)
-             └─ workload.hcl — workload name, tier      (one workload)
-                 └─ terragrunt.hcl — the module + inputs (one unit)
-```
+![The config cascade: root.hcl sets remote state and providers for the whole estate; common.hcl adds cloud-wide defaults and SOPS secrets for all of AWS; env.hcl picks the account and env tags; region.hcl / network.hcl set the region and CIDRs; workload.hcl sets the workload name and tier; and the leaf terragrunt.hcl declares the module and its inputs for one unit. Each layer narrows the scope, and each fact lives in exactly one layer.](images/config-cascade.svg)
 
 A file called `_base.hcl` walks *up* the directory tree (`find_in_parent_folders`), reads every layer, merges
 them (narrowest wins), and re-exposes the result so a unit can read `include.base.locals.account_ids` or

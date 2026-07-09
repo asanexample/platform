@@ -50,22 +50,7 @@ Five accounts, and each is a distinct role in the design ([ADR-004](../../adrs/0
 The estate as a tree: the Org root, the accounts by role, the SCP ceiling over the *member* accounts
 (never the management account), and the role bridge an operator crosses:
 
-```mermaid
-flowchart TD
-    ROOT["AWS Org root"]
-    SCP["Org SCPs<br/>permission ceiling"]
-    ROOT --> MGMT["management<br/>governance state SOPS-KMS<br/>SCP-exempt"]
-    ROOT --> PLAT["platform<br/>shared services hub EKS"]
-    ROOT --> PRE["preprod<br/>workload cluster"]
-    ROOT --> PROD["prod<br/>future workload spoke"]
-    ROOT --> TEST["test<br/>Terratest sandbox"]
-    SCP -. ceiling .-> PLAT
-    SCP -. ceiling .-> PRE
-    SCP -. ceiling .-> PROD
-    SCP -. ceiling .-> TEST
-    MGMT -- assume PlatformDeployer / PlatformAdmin --> PLAT
-    MGMT -- assume PlatformDeployer / PlatformAdmin --> PRE
-```
+![The account estate: the AWS Org root branches into a Platform OU (platform hub, test sandbox) and a Workloads OU (preprod, prod, empty regulated). Org SCPs form a permission ceiling over the member accounts; the management account sits apart, SCP-exempt, holding governance and state. The only way across a wall is a logged assume of PlatformDeployer / PlatformAdmin.](images/account-estate-tree.svg)
 
 The accounts hang off a deliberate two-branch tree ([ADR-005](../../adrs/005-ou-hierarchy-design.md)). Live:
 
@@ -115,6 +100,8 @@ the opposite in three ways ([ADR-003](../../adrs/003-scp-design-philosophy.md)):
 3. **Your effective permission is the intersection** of every SCP in the chain from root to your account
    *and* your IAM policy. Every layer can only subtract. This is why SCPs are "deny-only in practice":
    there is no allow-override lower down.
+
+![Effective permission is an intersection built by subtraction: FullAWSAccess is the maximum AWS attaches everywhere; the SCP ceiling carves denies out of it from above the account (even root can't escape); the IAM grant narrows it further from inside the account (admins can rewrite it); and what's left is your effective permission. Every layer can only subtract — there is no allow-override lower down.](images/scp-iam-intersection.svg)
 
 Here is one real statement, verbatim from
 [`scps.tf`](https://github.com/asanexample/platform/blob/main/infra/modules/aws/organizations/scps.tf), the
