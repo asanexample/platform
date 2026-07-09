@@ -130,6 +130,11 @@ inputs = {
   ecr_registry                 = "${include.base.locals.account_ids["platform"]}.dkr.ecr.${include.base.locals.region}.amazonaws.com"
   environment_pull_account_ids = [include.base.locals.account_ids["preprod"], include.base.locals.account_ids["prod"]]
 
+  # CodeArtifact domain (platform account, ADR-098) — grants every service Pod-Identity role baseline READ of its
+  # Product's package repo (refplat/<team>-<product>). The domain + repo resource policies grant this workload
+  # account (codeartifact unit read_account_ids = preprod, prod).
+  codeartifact_domain = "refplat"
+
   # Environment app ingress domain — the Composition derives each app's allowed route hostnames as
   # <app>-<team>.<base_domain> + the <app>-<team>-pr-* preview wildcard (ADR-060). Matches the argocd-apps
   # preview_domain (which injects the actual route hostnames from the same convention).
