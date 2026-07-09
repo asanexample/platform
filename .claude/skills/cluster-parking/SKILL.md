@@ -99,6 +99,17 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-08 (UNPARK, morning + second end-of-day PARK) — one combined entry, both routine. ✅** UNPARK:
+  clean repeat of 2026-07-07 — **#1183 auto-restarted backstage + keycloak again (2nd consecutive cycle, now
+  reliable)**, keycloak-0 bootstrapped in 5.6s, preprod fully clean (benign CNPG-not-installed fallback note as
+  always). Only the usual hand-cleared downstream stragglers (activation-operator behind `triage-copilot-db`,
+  argo-rollouts oauth2-proxy behind Keycloak) + the standing broken `checkout` demo. PARK (bedtime): standard —
+  preprod clean, platform the usual slow-drain warnings then `system`→0 (3 nodes force-terminated); both bastions
+  stopped; cost-zero verified (both node groups `desiredSize=0`, 0 running/pending instances both accounts).
+  **Cadence note:** park+unpark is now boringly stable — I'm consolidating routine cycles into one entry rather
+  than logging each identical park/unpark separately; will still write a FULL standalone entry the moment anything
+  deviates (new stuck workload, a fix regressing, a timing change).
+
 - **2026-07-08 (end-of-day PARK) — overnight park of both clusters. ✅ Clean, cost-zero, routine.** Rebuilt
   `./bin/platctl` from freshly-pulled `main` first, then `AWS_PROFILE=management ./bin/platctl down --env <env>
   --yes` each in parallel. Same reliable split as every cycle: **preprod** clean (Karpenter drained + EC2NodeClass
