@@ -143,12 +143,16 @@ locals {
     var.enable_federated_datasource ? [{ name = "Loki (all clusters)", uid = "loki-all", tenant = join("|", local.all_tenants) }] : [],
   )
 
-  # A trace_id in a log line links straight to the Tempo trace (trace→logs↔logs→trace) — on every datasource.
+  # A trace_id in a log line links straight to the Tempo trace (log → trace). Points at the CROSS-CLUSTER
+  # Tempo datasource (tempo-all, X-Scope-OrgID `platform|preprod`) not the single-cluster `tempo`: a log can
+  # come from any cluster and its trace lands in that cluster's Tempo tenant, so the link must span tenants
+  # (Tempo tenant-federation honours the `a|b` OrgID — verified). Without this a preprod app's log links to
+  # the platform tenant and the trace is "not found".
   loki_derived_fields = [{
     name          = "trace_id"
     matcherRegex  = "trace_?[iI][dD]\"?[:=]\\s*\"?([0-9a-fA-F]+)"
     url           = "$${__value.raw}"
-    datasourceUid = "tempo"
+    datasourceUid = "tempo-all"
   }]
 
   grafana_datasource = {
