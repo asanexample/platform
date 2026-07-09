@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-08
 
-**Status:** Proposed
+**Status:** Accepted — built + live 2026-07-09 ([#1249](https://github.com/asanexample/platform/issues/1249))
 
 ## Context
 
@@ -138,6 +138,16 @@ the Crossplane-CLI-in-CI note). This ADR does not commit to Go module hosting.
   and folding CodeArtifact into the FinOps guardrails (ADR-091/092).
 - **New-account onboarding drift.** Like ECR's `pull_account_ids`, the domain permissions policy must be
   updated when a new account is added — add it to the new-account onboarding checklist.
+
+## Implementation notes (as-built)
+
+Built and applied across four units on 2026-07-09 (epic [#1249](https://github.com/asanexample/platform/issues/1249); PRs #1255 module + live unit + PTC, #1257 auth wiring, #1260 client bootstrap, #1261 the PTC fix below). All applied from the main checkout with `0 to destroy`. Verified live: domain `refplat` Active with 9 repositories (5 per-Product consumer + 4 store), `alpha-shop` upstreamed to all four store repos, the 5 per-Product OIDC roles carrying publish, and the **baseline read reconciled onto a live preprod Pod-Identity role** (`Pod-alpha-shop-dev-web` — a service with no declared permissions — now reads `refplat/alpha-shop` cross-account).
+
+**Correction to D2 — ECR pull-through cache anonymous upstreams.** D2 originally implied all four upstreams could be created uniformly. In practice AWS accepts an **anonymous** pull-through rule only for `registry.k8s.io` and `quay.io` (and `public.ecr.aws`); `docker.io` and `ghcr.io` **require** a Secrets Manager credential (`ecr-pullthroughcache/<name>`) or `CreatePullThroughCacheRule` fails with `UnsupportedUpstreamRegistryException`. The first apply proved this: `k8s` + `quay` were created credential-free, `ghcr` failed. So the live rules are `k8s` + `quay`; `docker.io`/`ghcr.io` are wired but gated on their credentials (PR #1261). The D2 text above reflects the corrected behaviour.
+
+**Refinements.** Runtime read is granted as a **baseline for every service** (not per-claim) via a new `codeArtifactDomain` EnvironmentConfig field on the Composition — empty renders byte-identically to pre-ADR-098, so clusters without CodeArtifact are unaffected. The platform-account domain owner is parsed from `ecrRegistry` (no new config plumbing).
+
+**Follow-ups.** Populate the `docker-hub` / `ghcr` pull-through credentials to enable those two mirrors; the shared `trusted-ci` build workflows do not run `codeartifact login` by default (apps add it when they need private/cached packages); Go modules remain unserved (D5).
 
 ## Related
 
