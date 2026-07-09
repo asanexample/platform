@@ -17,14 +17,7 @@ It reads both and emits a set of desired resources. Same recipe, different ingre
 plus this cluster's constants gives preprod-flavoured resources on preprod, prod-flavoured on prod. Everything
 below is how it reads the ingredients and what it emits.
 
-```mermaid
-flowchart LR
-    Claim["XEnvironment claim<br/>(your spec)"] --> GT
-    Cfg["EnvironmentConfig<br/>(cluster constants)"] -->|"loaded into .context by<br/>function-environment-configs"| GT
-    GT["function-go-templating<br/>one big go-template"] --> Desired["Desired resources:<br/>Objects (K8s) + AWS MRs<br/>+ a status write-back"]
-    Desired -->|"function-auto-ready"| Ready["XEnvironment → Ready"]
-    Desired -.->|"Crossplane reconciles<br/>desired vs. observed, forever"| Real["Real K8s + AWS<br/>(via the providers)"]
-```
+![The composition render pipeline: your XEnvironment claim and the cluster's EnvironmentConfig constants (loaded into `.context` by function-environment-configs) both feed one big go-template (function-go-templating), which emits the desired resources — Kubernetes Objects, AWS managed resources, and a status write-back. function-auto-ready marks the XEnvironment Ready, and Crossplane reconciles desired versus observed against real K8s and AWS, forever.](images/render-pipeline.svg)
 
 ## The pipeline: three functions
 
@@ -207,6 +200,8 @@ loop — for each service, an ECR `Repository`, its `RepositoryPolicy` and `Life
 
 > footprint size = the fixed set + (per-service resources × number of services)
 
+![Where "seventeen" comes from: a fixed set of per-environment resources, plus a per-service stack — an ECR repository with its repository and lifecycle policies, an IAM role, a Pod Identity association, and any declared self-service resources — multiplied by the number of services. A one-service product renders the fixed set plus one stack; a two-service product renders a second.](images/footprint-formula.svg)
+
 `shop` has one service (`web`), which is exactly why its footprint is the size it is; a two-service product
 renders a second stack of ECR + IAM + Pod-Identity resources.
 
@@ -233,6 +228,8 @@ status:
       state: Active
       reason: GeneratedHost
 ```
+
+![One derivation, two outputs: the composition computes the environment's host list once, in a single pass, and feeds it to two consumers — the XEnvironment's `status.domains` (what you read) and the Kyverno `restrict-route-hostnames` policy's allow-list (the guardrail that enforces it). Because both come from the same variable in the same render, the status you see and the rule that enforces it can't drift apart.](images/one-derivation-two-outputs.svg)
 
 That same host list feeds two outputs — the `status.domains` above and the Kyverno `restrict-route-hostnames`
 policy's allow-list (rendered right after, from the same `$allowed` variable). One derivation, two consumers:

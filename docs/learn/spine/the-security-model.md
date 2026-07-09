@@ -26,24 +26,7 @@ attacker's. We never built a separate "security system" — security falls out o
 depth means many independent walls, arranged so an attacker must defeat all of them in sequence.
 
 The walls, outermost to innermost — each an independent slice a request or workload must clear before it
-can reach `acme`'s data:
-
-```mermaid
-flowchart TD
-    REQ["Request or workload"] --> L1
-    L1["Cloud SCPs<br/>org-wide guardrails"] --> L2
-    L2["Network<br/>private EKS + default-deny netpol"] --> L3
-    L3["Admission gate<br/>Kyverno Enforce<br/>incl. cosign + SLSA verify"] --> L5
-    L5["Identity<br/>Pod Identity + deny-set IAM"] --> L6
-    L6["In-transit encryption<br/>WireGuard pod-to-pod<br/>built on both clusters"] --> CORE
-    L6 -.-> AUTH
-    AUTH["SPIFFE + SPIRE mutual auth<br/>preprod showcase<br/>not fleet-enforced"]
-    CORE["acme data<br/>the asset"]
-    CORE -.-> FALCO
-    FALCO["Runtime detection<br/>Falco<br/>observes and alerts<br/>does not block"]
-```
-
-The standard way to organize those walls is the
+can reach `acme`'s data. The standard way to organize them is the
 **[4 C's of cloud-native security](https://kubernetes.io/docs/concepts/security/overview/)** — concentric
 layers, outermost first:
 
@@ -53,6 +36,8 @@ layers, outermost first:
 There's a second axis, orthogonal to the first: time. The same concern is defended at three moments —
 **shift-left** (caught in CI, before it exists), **at admission** (blocked at the cluster door), and **at
 runtime** (detected while running). Depth and time — a grid, not a line.
+
+![Defense in depth as a grid, not a line: the independent walls — cloud SCPs, network, the admission gate (Kyverno, incl. cosign/SLSA verify), identity, in-transit encryption (WireGuard), runtime detection (Falco) — on one axis, and the three moments each concern is defended — shift-left in CI, at admission, at runtime — on the other. To reach the data, an attacker has to get past a wall at every intersection.](images/defense-in-depth-grid.svg)
 
 > The mental model for why independent layers matter is the **Swiss cheese model** (James Reason, safety
 > engineering): each layer is a slice with holes — no control is perfect — but the holes sit in different
@@ -179,8 +164,8 @@ hand them strong shift-left tooling that runs automatically.
 
 ## Security across time — shift-left, enforce, detect
 
-Step back from the layers and look along the timeline. The platform defends the same concerns at three
-moments, and the earlier it catches something, the cheaper the fix:
+Step back from the layers and look along the timeline — the time axis of the grid above. The platform
+defends the same concerns at three moments, and the earlier it catches something, the cheaper the fix:
 
 - **Shift-left (in CI, before it exists):** Semgrep, Trivy, gitleaks, the Kyverno CLI, TFLint, `tofu
   validate` — a problem caught here never reaches a cluster.
@@ -197,6 +182,8 @@ thinnest.
 
 Walk a real one. An attacker **compromises a dependency** `shop` pulls in — malicious code in a library
 `shop`'s own devs merge unknowingly.
+
+![The Swiss-cheese model applied to the poisoned-dependency walk: each layer is a slice with holes (no control is perfect), but the holes sit in different places. The novel payload slips through the CI slice and the admission slice — two holes align — but the later, independent walls (least-privilege identity, network policy, runtime detection) don't line up with them, so the breach is contained rather than total.](images/swiss-cheese-threat.svg)
 
 1. **Code / CI — a partial catch.** If the poisoned dependency has a *known* CVE, **Trivy** flags it in CI
    and the PR fails — caught, shift-left. But if it's a novel or deliberately-hidden payload, Trivy,

@@ -29,6 +29,8 @@ Two `t4g.xlarge` nodes labelled `node-role=system`, and one `r6g.medium` with no
 `karpenter.sh/nodepool=default` label — that third one is a rented generator, and we'll get to it in
 Part B. The two system nodes are the always-on floor.
 
+![Two layers of compute: a fixed always-on system node group (2× t4g.xlarge) is the floor holding everything cluster-critical — Karpenter itself, CoreDNS, the Cilium operator, the standing stack, node-pinned DaemonSets — while Karpenter rents right-sized nodes just-in-time above it and consolidates them when empty. The floor can't be Karpenter, because Karpenter is a pod and a pod needs a node.](images/two-layer-compute.svg)
+
 The system group is defined in
 [`node-groups/terragrunt.hcl`](https://github.com/asanexample/platform/blob/main/infra/live/aws/platform/us-east-1/platform/node-groups/terragrunt.hcl):
 a single `t4g.xlarge` instance type (4 vCPU / 16 GiB, **Graviton** arm64), `desired_size = 2`,
@@ -233,6 +235,8 @@ consequences cascaded. The overloaded node's kubelet degraded to `NodeStatusUnkn
 crash-looped — including Karpenter's own controller. The one component that could have added relief
 capacity was itself starved on the very node it would have relieved. Autoscaling deadlocked.
 
+![The descheduler fills the gap the scheduler and Karpenter both leave. On 2026-07-02 after an unpark, one node held 59 pods at ~99% CPU while another sat at 14 pods/~40%; the overloaded kubelet went NodeStatusUnknown and pods crash-looped. A LowNodeUtilization CronJob evicts from the hot node onto the cool one, rebalancing to ~69% each — bounded by nodeFit, PodDisruptionBudgets, and never evicting system-critical pods.](images/descheduler-rebalance.svg)
+
 Why does everything pile onto one node? After a staggered unpark, the "emptiest node" — the one
 the scheduler prefers — is the first node up, and a dozen independent single-replica controllers
 (argo-rollouts, external-dns, kube-state-metrics, …) each independently pick it. `topologySpreadConstraints`
@@ -315,6 +319,8 @@ answers with private IPs inside the VPC, via the VPC's own resolver. So the modu
 DNS**: queries for `us-east-1.eks.amazonaws.com` and `aws.refplat.org` are routed to `10.100.0.2` — the
 in-VPC Amazon-provided resolver, which always sits at VPC CIDR + 2. Now `aws eks update-kubeconfig`
 followed by a plain `kubectl` just works, no tunnel, no public endpoint.
+
+![Reaching the private-only EKS API: an operator on the tailnet reaches a Tailscale subnet router pod that advertises the VPC CIDR (10.100.0.0/16), and split-DNS resolves the API name to the in-VPC resolver at 10.100.0.2. It runs in userspace mode so WireGuard stays off the kernel routing table Cilium's eBPF owns. An SSM-through-a-bastion tunnel is the fallback when the cluster itself is down.](images/tailscale-staff-door.svg)
 
 ### The userspace-mode detail — two drivers, one steering wheel
 

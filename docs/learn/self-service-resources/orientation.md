@@ -40,6 +40,8 @@ pipeline validates and realizes it. Make the front door as magical as you like; 
 > this one also validates the ticket against a safety floor and refuses anything unsafe — you can't order
 > "raw chicken with root access."
 
+![The self-service model as a vertical spine. Above the claim: you declare abstract intent (kind, engine, access) — what, not how — from any front door. The claim is the governed boundary. In the middle: the team envelope, default-deny, validated twice (gitops gate on the PR, Kyverno at admission). Below the claim: the platform derives a hardened resource and least-privilege IAM, non-overridable.](images/claim-boundary-spine.svg)
+
 Here it is on a real service.
 
 ## The worked example — four resources, one claim
@@ -86,17 +88,7 @@ NAME                             SYNCED  READY  EXTERNAL-NAME
 Four real AWS resources, from four lines of intent. But the resources are only half of it — the reach is the
 other half. Here's the fan-out from that one claim:
 
-```mermaid
-flowchart TD
-    C["claim: resources.blob = objectstore / s3 / readwrite"]
-    C -->|the governed boundary| P[Environment Composition]
-    P --> R["S3 bucket<br/>(hardened: TLS-only, no public access,<br/>encrypted, versioned)"]
-    P --> I["derived least-privilege IAM<br/>Get/List + Put/Delete on THIS bucket ARN only<br/>→ injected into the pod's Pod-Identity role"]
-    P --> M["web-resources ConfigMap<br/>BLOB_BUCKET=refplat-acme-conformance-dev-blob-…"]
-    R --- I
-    I --> APP["your pod: reads $BLOB_BUCKET,<br/>calls S3 with its Pod-Identity creds"]
-    M --> APP
-```
+![From one claim line — `blob: objectstore / s3 / readwrite` — the Environment Composition (the governed boundary) derives three things: a hardened S3 bucket (TLS-only, no public access, encrypted, versioned); a least-privilege IAM policy scoped to this bucket's ARN, injected into the pod's Pod-Identity role; and a resources ConfigMap carrying `BLOB_BUCKET`. The pod reads `$BLOB_BUCKET` and reaches only its own bucket.](images/claim-fan-out.svg)
 
 One line of intent became a hardened resource, an IAM policy scoped to exactly it, and the wiring for your app
 to find it — all derived, none hand-written.

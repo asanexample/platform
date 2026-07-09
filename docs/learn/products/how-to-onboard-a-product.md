@@ -12,7 +12,7 @@ the [orientation](orientation.md) first for the *why*.
 ## What you'll need first
 
 - **A Team to own the Product.** Products are owned by a Team (`gitops/teams/<team>.yaml`). If your team
-  isn't in `gitops/teams/`, onboard it first — a Team is a similar small registry file. Check with
+  isn't in `gitops/teams/`, [onboard it first](../teams/how-to-onboard-a-team.md) — a Team is a similar small registry file. Check with
   `ls gitops/teams/`.
 - **A repo, only if you're bringing your own.** The scaffolder creates the repo for you (Path A); you don't
   need one first. It seeds a new `<team>-<product>` repo from the golden starter. You only need an existing
@@ -102,6 +102,8 @@ the team exists, the schema is valid, the name, repo, and tenancy are sane. Fix 
 
 ## What happens on merge
 
+![One Product registry file fans out on merge: the `registry-reconcile` workflow reads it and derives the product's units — the github-oidc ECR-push role, the Kyverno image-scope policy, and the ArgoCD ApplicationSet. The ECR repositories are the distinct exception (⚠️): they materialize when an Environment claim reconciles, not on the Product merge.](images/product-derivation.svg)
+
 You don't run `terragrunt apply`. The `registry-reconcile` workflow does a privileged apply of the derived
 units for you. How it's triggered depends on the path:
 
@@ -181,7 +183,7 @@ it's getting the *identity* fields wrong. A typo'd `repo` breaks the trust ancho
 
 ## Gotchas
 
-- **The Team must exist first.** Onboard the Team (its own registry file) before its first Product.
+- **The Team must exist first.** [Onboard the Team](../teams/how-to-onboard-a-team.md) (its own registry file) before its first Product.
 - **Derived infra materializes on reconcile, not merge.** Give it the workflow run; don't hand-create the role.
 - **One repo per Product.** Splitting an app across two repos means two Products, or rethinking the split.
 - **Don't edit derived files.** If the push role or a policy is wrong, fix `spec.repo` in the registry and

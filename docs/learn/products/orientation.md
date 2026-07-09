@@ -81,13 +81,7 @@ role federates to it, and the verify policies only trust images signed from it (
 Three platform units read the registry (`fileset` + `yamldecode` over `gitops/products/**`) and each derives
 its slice per Product. This is the heart of it:
 
-```mermaid
-flowchart TD
-    P["gitops/products/acme/shop.yaml<br/>(the one record)"]
-    P --> G["github-oidc → a CI push role<br/>OIDC-federated, trusts ONLY asanexample/acme-shop"]
-    P --> POL["policy → verify-images / verify-attestations<br/>-product-acme-shop (signed, from shop's repo)"]
-    P --> A["argocd-apps → one AppProject + ApplicationSet<br/>fans out per Environment"]
-```
+![One Product record fans out on merge into its derived footprint: the `github-oidc` CI push role (OIDC-federated, trusting only the product's repo), the per-product Kyverno verify-images / verify-attestations policies, the `argocd-apps` AppProject + ApplicationSet, and the `github-teams` ownership grant. The ECR repositories are the exception — they materialize when an Environment claim reconciles, not on the Product merge.](images/product-derivation.svg)
 
 - **`github-oidc`** derives a CI role that lets `acme-shop`'s pipeline push to its ECR repo — federated by
   [GitHub OIDC](../supply-chain/orientation.md) so it needs no stored keys, and scoped so the role trusts only
@@ -111,6 +105,8 @@ This declare-once-then-derive shape is the platform's signature move, not a one-
 least-privilege IAM; here you declare a Product and derive its footprint. Once you see it, the whole platform
 reads the same way: a small governed declaration in git, and deterministic code that projects it outward. Learn
 it once, and every subsystem is less surprising.
+
+![The declare-once-then-derive pattern recurring across the platform: in Identity you declare people and roles and derive access into every system; in self-service resources you declare abstract intent and derive the least-privilege IAM; and here — the highlighted row — you declare a Product and derive its footprint. One shape, three subsystems.](images/declare-then-derive.svg)
 
 ## The paved road — repo-on-demand, not just a registry entry
 

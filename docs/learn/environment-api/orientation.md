@@ -63,12 +63,7 @@ toward a *dial* you turn. A control plane reconciles *many* resources toward a w
 the "setting" is a file describing desired state, not a temperature. What carries over is the *loop* (never
 finishes, always closing the gap); what doesn't is "one dial, one number."
 
-```mermaid
-flowchart LR
-    C["Claim<br/>(what you want)"] --> M["Composition<br/>(the machine)"]
-    M --> R["Real resources<br/>(namespace, registry, IAM…)"]
-    R -. "reconcile loop:<br/>keep reality == the claim" .-> M
-```
+![The one idea: a Claim (what you want) is read by the Composition (the machine), which creates the real resources — a namespace, an image registry, IAM, and more. A reconcile loop runs continuously, keeping reality equal to the claim — the part that makes this different from a one-shot script.](images/claim-composition-loop.svg)
 
 Hold onto that picture. Now watch a real one get built.
 
@@ -150,6 +145,8 @@ The moment the claim lands, the **Composition** (the machine) reads it and creat
 real thing it makes is a **managed resource** — an object Crossplane creates *and then watches*. Inspect
 the cluster and the footprint shows up as a tree — the claim at the root, everything it created hanging off
 it:
+
+![The footprint a single Environment claim creates, drawn as a tree: the XEnvironment claim at the root, with everything the Composition provisioned hanging off it — the ECR repository and its policies, the IAM role and Pod Identity association in the workload account, and the in-cluster objects (namespace, quota, network policy, RoleBinding, Kyverno). The console trace below is the literal proof of the same tree.](images/seventeen-real-things.svg)
 
 ```console
 $ crossplane resource trace xenvironment acme-shop-dev --context preprod
@@ -234,18 +231,7 @@ says "you may only run your own images." The footprint includes its own guardrai
 
 ### 4. The whole flow, in one picture
 
-```mermaid
-flowchart TD
-    A["Edit gitops/environments/acme/shop/dev.yaml"] -->|"PR + merge"| B["git (source of truth)"]
-    B -->|"ArgoCD syncs"| C["XEnvironment 'acme-shop-dev'<br/>on the preprod cluster"]
-    C -->|"Composition reconciles"| D["Composition 'environment'"]
-    D --> E["Cluster objects<br/>ns, quota, netpol, rolebinding, kyverno"]
-    D --> F["AWS · workload account<br/>IAM role + Pod Identity"]
-    D --> G["AWS · platform account<br/>ECR repo (the one cross-account hop)"]
-    E -.->|"watched forever"| D
-    F -.->|"watched forever"| D
-    G -.->|"watched forever"| D
-```
+![The whole flow in one picture: you edit `gitops/environments/acme/shop/dev.yaml` and merge a PR into git (the source of truth); ArgoCD syncs it to the preprod cluster as the XEnvironment `acme-shop-dev`; the Composition reconciles it into cluster objects (namespace, quota, netpol, RoleBinding, Kyverno), an IAM role plus Pod Identity in the workload account, and an ECR repo in the platform account — the one cross-account hop. Every branch is watched forever.](images/environment-build-flow.svg)
 
 One thing to notice: the ECR repo lives in a **different AWS account** (the platform account) from
 everything else (the workload account). That single cross-account reach is deliberate — image registries

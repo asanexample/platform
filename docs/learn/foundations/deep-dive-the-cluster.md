@@ -45,6 +45,8 @@ door on the street to pick" — the building-with-no-street-entrance idea. It's 
 lets the platform claim HIPAA/PCI-tier network isolation: "the control plane is not reachable from the
 internet" stops being a policy you enforce and becomes a fact of the topology.
 
+![Two API-endpoint postures side by side. Public + IP allowlist is one gate — valid IAM credentials — over a network open to the world. Private-only is a double gate: a network path into the VPC (via Tailscale) AND SigV4 IAM credentials, with the public internet having no route at all. The default is `endpoint_public_access = false`.](images/private-only-endpoint.svg)
+
 And the default is *closed*. The module's `endpoint_public_access` variable defaults to `false`:
 
 ```hcl
@@ -104,6 +106,8 @@ The order isn't arbitrary — each layer physically needs the one before it:
 | `node-groups` | Managed node groups, node IAM role | Nodes with no CNI can't configure pod networking |
 | `eks-addons` | CoreDNS, EBS CSI driver, the gp3 StorageClass | These are **pods** — they need a CNI *and* a node to land on |
 
+![The four ordered Terragrunt units — eks, cilium, node-groups, eks-addons — each needing the one before it, since the cluster ships no CNI. Notes: cilium sets `helm_wait=false` because no nodes exist yet; CoreDNS must come last because it is a pod; and destroying the cilium unit alone rips out the CNI cluster-wide.](images/byocni-four-layer-build.svg)
+
 The CoreDNS chicken-and-egg is the cleanest illustration of the whole rule. CoreDNS is the cluster's DNS
 server — but it's a Deployment, so it needs a pod IP, so it needs Cilium, so it *cannot* be a
 cluster-creation add-on. It has to come dead last, in `eks-addons`, after both a CNI and nodes exist. Try
@@ -143,8 +147,10 @@ hardcodes:
 cloud_plumbing = {
   aws = merge(
     {
-      kubeProxyReplacement = true                                     # Required: EKS BYOCNI deploys no kube-proxy DaemonSet
-      hubble               = { tls = { auto = { method = "helm" } } } # Avoids BYOCNI post-install hook chicken-and-egg
+      # Required: EKS BYOCNI deploys no kube-proxy DaemonSet
+      kubeProxyReplacement = true
+      # Avoids the BYOCNI post-install hook chicken-and-egg
+      hubble = { tls = { auto = { method = "helm" } } }
     },
     # ...
   )
@@ -193,17 +199,12 @@ every time a pod is added or removed, the ruleset is rewritten. On a small clust
 cluster with thousands of Services and endpoints, the chains grow into the tens of thousands of rules,
 per-packet latency climbs, and a single endpoint change can stall the datapath while iptables reprograms.
 
+![Comparison: iptables does an O(n) chain-walk, rewrites the whole ruleset on any change, and runs as a static netfilter engine; Cilium's eBPF does an O(1) hash-map read, updates one entry in place, and runs as verified programs at the kernel packet hook.](images/ebpf-vs-iptables.svg)
+
 Cilium does the identical job with **eBPF programs** — small, verified programs the kernel runs at the
 network hooks — backed by eBPF hash maps. A Service lookup becomes a hash-map read: effectively **O(1)**,
 constant-time regardless of how many Services exist, and updated *in place* (change one map entry) rather
 than by rewriting a linear ruleset.
-
-> **iptables is a paper phone directory you read cover to cover to find one number; eBPF is the
-> hash-indexed contacts app on your phone.** Both map a name to a number. The directory's lookup time grows
-> with the book and it has to be reprinted whenever a number changes; the app is one tap no matter how many
-> contacts you have. **Where the metaphor breaks:** a contacts app is a userspace convenience — eBPF runs
-> *in the kernel*, at the packet hook, with no context switch to userspace at all, which is a second, orthogonal
-> reason it's fast that the analogy doesn't carry.
 
 That's the whole "eBPF beats iptables" claim, grounded: constant-time hash lookups plus in-place updates
 plus in-kernel execution, versus linear chain-walks plus full reprograms.
@@ -235,6 +236,8 @@ CiliumNetworkPolicy to protect an environment namespace and you allow traffic by
 Cilium's ipcache, and identity-based matching takes precedence over the CIDR rule. The connection is
 dropped, DNS and TLS look perfectly healthy, and you get an `upstream connect error` with no obvious cause.
 The fix is to allow the identity, not the address:
+
+![Gateway traffic path: request to cilium-envoy to the backend pod, where Cilium stamps the packet with reserved identity no. 8, named "ingress". A CiliumNetworkPolicy using `fromCIDR` silently drops it because identity match beats CIDR; using `fromEntities: [ingress]` matches and admits it. The symptom of getting it wrong: an upstream connect error with healthy DNS and TLS.](images/gateway-ingress-identity.svg)
 
 ```yaml
 # CiliumNetworkPolicy ingress rule — allow gateway traffic by IDENTITY, not CIDR
