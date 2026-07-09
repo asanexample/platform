@@ -66,6 +66,22 @@ Pod-Identity role, and publishes the coordinates into a `${{ values.service }}-r
 rollout: `UPLOADS_BUCKET`, `JOBS_QUEUE_URL`, `EVENTS_TOPIC_ARN`, `SESSIONS_TABLE`. Your Team must allow the
 engine in its envelope (platform-team-owned); the gate validates the request on the PR.
 
+## Private packages (CodeArtifact)
+
+This Product has a CodeArtifact package repository, `${{ values.team }}-${{ values.product }}`, in the platform
+`refplat` domain (ADR-098) — for private **npm / PyPI / Maven / NuGet** packages, and it proxies + caches public
+dependencies so builds don't hit npmjs/PyPI directly. Auth is IAM (a short-lived token), no separate login:
+
+```bash
+# npm (also: --tool pip | dotnet). <platform-acct> = the platform account ID (your ECR registry's account).
+aws codeartifact login --tool npm --region us-east-1 \
+  --domain refplat --domain-owner <platform-acct> --repository ${{ values.team }}-${{ values.product }}
+```
+
+Your CI OIDC role already has **publish + read** on this repo, and every running pod has **baseline read** via
+Pod Identity. Full per-tool guide (Maven `settings.xml`, publishing, CI wiring): `docs/runbooks/package-registry-codeartifact.md`
+in the platform repo. Go modules are not served (ADR-098 D5) — use `GOPROXY`.
+
 **Using the resources from your app** — credentials come from EKS Pod Identity (ambient; just use the AWS SDK's
 default config). Two gotchas the platform enforces:
 
