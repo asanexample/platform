@@ -22,10 +22,16 @@ compliance-aware, multi-tenant substrate, without exposing them to (or trusting 
 
 ## The paved road: intent in, a PR out, reconciled infra
 
+![The developer states intent; the portal turns it into a pull request; the GitOps path — Gate then ArgoCD then Crossplane then Kubernetes — reconciles it into governed infrastructure.](images/paved-road.svg)
+
 The developer states intent — a form in a portal, or a git push — and the platform turns it into a pull
 request to the git registries. The normal GitOps path (Gate → ArgoCD → Crossplane) reconciles that PR into
 real infrastructure. The developer names *what*: team, product, stage, a bucket. The platform derives
-everything security-sensitive: IAM, ECR, namespace, Kyverno scope, routing. Two surfaces make it work —
+everything security-sensitive: IAM, ECR, namespace, Kyverno scope, routing.
+
+![You name intent — team, product, stage, an access level; the platform derives the security-sensitive parts — IAM, ECR, namespace, Kyverno scope, and routing.](images/name-vs-derive.svg)
+
+Two surfaces make it work —
 Backstage, a single pane of glass to see everything, and the scaffolder, golden-path templates to create
 things. And one rule ties them together: the portal never writes to anything directly. Every change is a PR.
 
@@ -33,6 +39,8 @@ This is the BACK stack (ADR-046): Backstage (the form) → ArgoCD (delivery) →
 Kubernetes. The order is the whole philosophy. The control plane was built first, and Backstage is a thin
 portal over real, reconciled APIs — never a button that fires an imperative pipeline. The portal makes the
 platform visible and orderable; it doesn't become the platform.
+
+![The BACK stack: Backstage over ArgoCD, Crossplane, and Kubernetes — built control-plane-first, so the portal is a thin layer over real reconciled APIs, never an imperative pipeline.](images/back-stack.svg)
 
 Think of it as a storefront over a warehouse. The warehouse — the git registries plus the cluster — holds the
 real inventory; Backstage is the storefront that makes it browsable and orderable. Every order is a mail-order
@@ -57,6 +65,8 @@ App and projects them:
 - `gitops/teams/<team>.yaml` (a `Team`) → a catalog **Group**
 - `gitops/products/<team>/<product>.yaml` (a `Product`) → a **System**
 - `gitops/environments/<team>/<product>/<stage>.yaml` (an `XEnvironment` claim) → an **Environment**
+
+![The catalog is a read-only projection of the git registries: Team becomes a Group, Product a System, and an XEnvironment claim an Environment — with scoped read-only plugins layered on top.](images/catalog-projection.svg)
 
 So the browse experience is a direct rendering of the [domain model](../domain-model/orientation.md)
 (Team → Product → Service → Environment). Because git is the source of truth, the catalog stays correct with no
@@ -100,12 +110,16 @@ projects it and Crossplane provisions the namespace, quota, network policy, and 
 [Environment API](../environment-api/orientation.md) takes it from there. You named a stage; you got a governed
 environment.
 
+![Every scaffolder template is the same shape: a form renders a YAML skeleton and opens a PR, and on merge the platform projects and provisions it — new-environment traced end to end.](images/scaffolder-golden-path.svg)
+
 The [scaffolder deep dive](deep-dive-the-scaffolder-golden-paths.md) traces new-product, new-environment, and
 request-promotion end to end, and covers the custom actions like `platform:verify-team-membership`.
 
 ---
 
 ## Stop 3 — self-service with guardrails: why every change is a PR
+
+![Self-service with guardrails: the schema constrains the ask, the PR keeps a gate in the loop, and the platform derives the dangerous parts — backed by four independent enforcement layers.](images/self-service-guardrails.svg)
 
 Vercel-like DX with none of Vercel's blast radius. The trick is that self-service here is self-service with
 guardrails, and there are three of them:
@@ -119,6 +133,9 @@ guardrails, and there are three of them:
    high-stakes actions need named approval — a prod promotion goes to a release-approver with author ≠
    approver; a product purge goes to an admin. The Gate is the toll booth: most traffic waved through, the
    on-ramps to prod and to deletion staffed.
+
+   ![The Gate is one toll booth calibrated to blast radius: low-risk proven changes auto-merge, privilege grants are reviewer-merged, and irreversible actions need named approval.](images/gate-blast-radius.svg)
+
 3. **The platform derives the dangerous parts, so you never touch them.** You name intent — team, product,
    stage, an access level like `read`/`readwrite`. The platform derives the ECR repo, the namespace, the
    Kyverno image-scope, and, critically, the IAM: least-privilege, deny-set-validated. This is
@@ -133,6 +150,8 @@ That's why a developer can be handed real power safely — the guardrails aren't
 ---
 
 ## The honest status — live vs designed
+
+![The honest status: the pane of glass and the golden paths are live and exercised, while the known gaps and designed-not-wired items are friction, not the model.](images/live-vs-designed.svg)
 
 - **Live:** Backstage Phase 2 at `backstage.aws.refplat.org` (verified running) — direct Keycloak OIDC,
   catalog projection (v3), and the Kubernetes / ArgoCD / Cost plugins. The scaffolder is enabled — team
