@@ -99,6 +99,27 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-09 (UNPARK) — mostly routine, but a NEW post-unpark victim class surfaced on preprod:
+  `cilium-spire/spire-agent` stuck in `Init:Error`. Logging standalone per the deviation rule.** Routine half:
+  node groups restored + `ACTIVE` (platform 2, preprod 1), Karpenter gates passed first check on both, preprod
+  reconnect complete, benign preprod CNPG-fallback note as always, and **#1183 auto-restarted backstage + keycloak
+  a 3rd consecutive cycle** (rock-solid now). Platform's usual downstream stragglers (activation-operator,
+  argo-rollouts) **self-recovered this cycle with NO manual clear** — timing-dependent; they cleared their own
+  crash-backoff before I got to them (so the hand pod-delete is a speed-up, not always required).
+  **⚠️ THE NEW ONE — cilium-spire SPIRE agent init-ordering (preprod):** `cilium-spire/spire-agent` is a DaemonSet
+  whose **init container blocks on "Waiting for spire server to be reachable"**. Post-unpark, `spire-server-0`
+  itself took **3 restarts** (~8m) to reach `2/2 Running`; the agent pod that landed on a node BEFORE the server
+  was reachable **timed out its init and got stuck in `Init:Error` backoff** (`4` restarts, wouldn't clear on its
+  own in a useful window), while the agent that started later came up `1/1` fine. **Fix (same shape as every
+  post-unpark startup-ordering victim): confirm the dependency is up — `kubectl get pod -n cilium-spire
+  spire-server-0` is `2/2` — then `kubectl --context <env>-deployer delete pod -n cilium-spire <stuck-agent>`;**
+  the DaemonSet recreates it and the init succeeds immediately against the now-reachable server. (SPIRE backs
+  Cilium's SPIFFE mutual-auth; a down agent on one node only matters if mutual auth is in play, but restore it
+  regardless.) ⚠️ Watch whether spire-server's own 3-restart cold-start is chronic — if it keeps needing several
+  restarts to come up post-unpark, that's the deeper thing to fix (its readiness/deps), not the agent. **Sweep
+  lesson reinforced: an `Init:Error` DaemonSet pod is easy to miss — include init-container failures + DaemonSet
+  owners in the not-Ready sweep, not just Deployment/StatefulSet.**
+
 - **2026-07-08 (UNPARK, morning + second end-of-day PARK) — one combined entry, both routine. ✅** UNPARK:
   clean repeat of 2026-07-07 — **#1183 auto-restarted backstage + keycloak again (2nd consecutive cycle, now
   reliable)**, keycloak-0 bootstrapped in 5.6s, preprod fully clean (benign CNPG-not-installed fallback note as
