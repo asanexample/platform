@@ -28,6 +28,7 @@ locals {
 
     # Storage & secrets
     ecr              = "${local.source_base}/aws//ecr"
+    codeartifact     = "${local.source_base}/aws//codeartifact" # language-package registry (ADR-098)
     s3               = "${local.source_base}/aws//s3"
     sops_kms         = "${local.source_base}/aws//sops-kms"         # SOPS config-encryption key (ADR-066)
     agent_eval_store = "${local.source_base}/aws//agent-eval-store" # durable forward-capture eval corpus (ADR-080 D6)
