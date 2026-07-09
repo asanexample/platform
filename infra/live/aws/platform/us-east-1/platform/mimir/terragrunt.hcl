@@ -172,6 +172,14 @@ inputs = {
   # Empty when the toggle is off ⇒ unchanged direct datasources.
   read_proxy_url = include.base.locals.enable_per_team_tenants ? "http://tenant-proxy.observability.svc:8080" : ""
 
+  # Break-glass admin datasource (#1269): a `Mimir (admin — all tenants)` datasource pointed DIRECTLY at the
+  # gateway with a static federated X-Scope-OrgID, bypassing the proxy. The proxy is the intended front door,
+  # but it depends on Grafana forwarding the caller's OIDC token (X-Id-Token) — a fragile path that broke and
+  # left admins with no metrics. This un-proxied lane keeps platform-admins working regardless. Federates the
+  # full tenant set (matches the tenant-proxy `tenants`). Only rendered while the proxy is enforced.
+  enable_admin_all_datasource  = include.base.locals.enable_per_team_tenants
+  admin_all_datasource_tenants = ["alpha", "bravo", "platform", "preprod"]
+
   # P4 / ADR-082: the ruler evaluates alerting rules against EACH tenant's metrics (incl. preprod's
   # remote-written data) and posts fired alerts to the hub Alertmanager → the triage agent. The rules-sync
   # CronJob loads the curated spoke ruleset into the ruler for each ruler_tenant (mimirtool rules sync).

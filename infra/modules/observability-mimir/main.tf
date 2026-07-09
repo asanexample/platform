@@ -173,13 +173,36 @@ locals {
     var.enable_federated_datasource ? [{ name = "Mimir (all clusters)", uid = "mimir-all", tenant = join("|", local.all_tenants), is_default = false }] : [],
   )
 
+  # Admin all-tenants direct datasource (#1269). When the proxy is enforced, every normal datasource depends on
+  # Grafana forwarding the caller's OIDC token to the proxy (X-Id-Token). That path is fragile (Grafana-side
+  # oauthPassThru id-token forwarding); when it breaks, admins lose all metrics. This is a break-glass datasource
+  # for platform-admins: it points STRAIGHT at the gateway with a static federated X-Scope-OrgID over the full
+  # tenant set (incl. per-team tenants the cluster-based `all_tenants` doesn't list), bypassing the proxy.
+  # Deliberately un-proxied — it re-widens the metrics bypass, so it's opt-in (enable_admin_all_datasource) and
+  # only meaningful with tenant_federation on. Falls back to all_tenants if no explicit set is given.
+  admin_all_tenants = length(var.admin_all_datasource_tenants) > 0 ? var.admin_all_datasource_tenants : local.all_tenants
+  admin_all_datasources = (local.proxy_enforced && var.enable_admin_all_datasource && var.enable_federated_datasource) ? [{
+    name      = "Mimir (admin — all tenants)"
+    type      = "prometheus"
+    uid       = "mimir-admin-all"
+    access    = "proxy"
+    url       = "http://${var.helm_release_name}-gateway.${var.namespace}.svc/prometheus"
+    isDefault = false
+    jsonData = {
+      timeInterval    = "30s"
+      httpMethod      = "POST"
+      httpHeaderName1 = "X-Scope-OrgID"
+    }
+    secureJsonData = { httpHeaderValue1 = join("|", local.admin_all_tenants) }
+  }] : []
+
   grafana_datasource = {
     apiVersion = 1
     # Rename migration: the default datasource was bare "Mimir"; it's now "Mimir (platform)" (same uid). Grafana
     # provisioning keys on name, so without deleting the old name first the new one collides on uid and 500s
     # the whole reload. Idempotent — a no-op once the old name is gone.
     deleteDatasources = [{ name = "Mimir", orgId = 1 }]
-    datasources = [for ds in local.datasource_tenants : {
+    datasources = concat([for ds in local.datasource_tenants : {
       name   = ds.name
       type   = "prometheus"
       uid    = ds.uid
@@ -205,7 +228,7 @@ locals {
       )
       # No baked-in tenant header when the proxy is the authority — the caller's identity decides scope.
       secureJsonData = local.proxy_enforced ? {} : { httpHeaderValue1 = ds.tenant }
-    }]
+    }], local.admin_all_datasources)
   }
 
   # Spoke ingest edge is created only when tenants are declared (and the store itself is enabled).
