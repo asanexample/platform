@@ -133,6 +133,18 @@ variable "read_proxy_url" {
   default     = ""
 }
 
+variable "enable_admin_all_datasource" {
+  description = "Break-glass admin datasource (#1269): when the read proxy is enforced (read_proxy_url set), also provision a `Mimir (admin — all tenants)` datasource that queries the gateway DIRECTLY with a static federated `X-Scope-OrgID`, bypassing the proxy. Needed because the proxy relies on Grafana forwarding the caller's OIDC token (X-Id-Token), a fragile path — when it breaks, admins lose all metrics. Deliberately un-proxied (re-widens the metrics bypass), so opt-in and only meaningful with enable_federated_datasource. Off by default."
+  type        = bool
+  default     = false
+}
+
+variable "admin_all_datasource_tenants" {
+  description = "Tenants the admin all-tenants datasource (enable_admin_all_datasource) federates over, `|`-joined into its static X-Scope-OrgID. Set to the FULL tenant set including per-team tenants (e.g. [\"alpha\",\"bravo\",\"platform\",\"preprod\"]) — the cluster-based all_tenants (default + extras) omits team tenants. Empty falls back to all_tenants."
+  type        = list(string)
+  default     = []
+}
+
 variable "enable_ruler" {
   description = "Enable the Mimir ruler (P4) — evaluates alerting rules against EACH tenant's metrics (incl. the spokes' remote-written data) and sends fired alerts to ruler_alertmanager_url, so a spoke (e.g. preprod) failure produces an alert that reaches the hub Alertmanager → the triage agent (ADR-082). Rules are loaded per-tenant into ruler_storage via mimirtool/the ruler API (the rules-sync). Hub only. Off by default."
   type        = bool
