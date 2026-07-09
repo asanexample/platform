@@ -71,6 +71,8 @@ Two things to carry into the rest of this doc: promotion up to staging is automa
 is the one rung a human must approve. Three reconcilers make a single rung actually happen. Each is worth
 understanding on its own.
 
+![Three reconcilers make one rung happen: the auto-promoter climbs the ladder, ArgoCD makes the cluster match git, and Argo Rollouts lands the new version without dropping traffic.](images/three-reconcilers.svg)
+
 ## Reconciler 1 — the auto-promoter: it climbs the ladder
 
 Something has to move the digest up. That's a cron job — `reconcile.sh`, running on an in-VPC runner that reads
@@ -87,6 +89,8 @@ That distinction — intent versus reality — is the whole point. Merging a Rel
 like test to run this digest." `Synced + Healthy` is proof: "dev is actually running this digest, and it's up."
 If the promoter advanced on intent alone, a version that was broken in dev would happily march up the entire
 ladder before anyone noticed. Gating on reality is what stops that.
+
+![A rung promotes on reality, not intent: a merged Release PR only records intent, while Synced plus Healthy is proof the version is actually running — and only that proof opens the next rung.](images/health-gate-intent-vs-reality.svg)
 
 Two consequences fall out, and they're the heart of the model:
 
@@ -133,6 +137,8 @@ overlay. Your app repo's overlay never contains a real digest (just `:placeholde
 a bot committing image tags into it; and the deployed version is one auditable file in the platform repo. Two
 concerns, cleanly split.
 
+![Version lives in the Release file, shape lives in the app repo's overlay; the ApplicationSet mail-merges one Application per Release, injecting the promoted digest over the overlay's placeholder.](images/release-overlay-split.svg)
+
 ArgoCD's sync policy here is automated, self-healing, and pruning. Automated: it syncs on its own when git
 changes. Self-healing: hand-edit a live resource and it's reverted to match git — the thermostat won't let the
 room drift from the set-point. Pruning: delete a resource that git still declares and it's recreated; remove
@@ -153,18 +159,7 @@ step. If it looks sick, it rolls back to the old version automatically.
 That widen-or-revert loop *is* the canary state machine the Rollout runs, step by step, from the first traffic
 slice to full promotion:
 
-```mermaid
-stateDiagram-v2
-    [*] --> Progressing
-    Progressing --> Paused: shift traffic slice<br/>then bake
-    Paused --> Analysis: check success rate<br/>vs SLO
-    Analysis --> Progressing: pass<br/>widen canary
-    Analysis --> Aborted: SLO breach
-    Progressing --> Promoted: weight hits 100
-    Aborted --> Stable: auto rollback
-    Promoted --> [*]
-    Stable --> [*]
-```
+![The canary state machine: from Progressing it shifts a traffic slice and Pauses, runs Analysis against the SLO, and on pass widens the canary and loops — or on an SLO breach aborts and auto-rolls-back to Stable; when weight hits 100 it is Promoted.](images/canary-state-machine.svg)
 
 How does it move the traffic? It edits the weights on the HTTPRoute — through its Gateway-API plugin — and the
 data plane routes each request by whatever weight it finds there. (This is the exact same HTTPRoute a
@@ -195,6 +190,8 @@ account, with prod in its own dedicated account and cluster — the same account
 [security model](../spine/the-security-model.md) leans on, so a compromise or outage in one account can't reach
 another.
 
+![One ArgoCD on the platform hub delivers across the AWS account boundary to environment spoke clusters; today one preprod spoke holds every stage as a namespace, while the dedicated prod-account spoke is designed but not yet built.](images/hub-and-spokes.svg)
+
 Today, one spoke is built — preprod. A dedicated prod-account spoke cluster is designed but not yet stood up
 (the prod account exists, with networking, but no cluster). So as an interim step, every stage — dev through
 prod — currently lands as its own namespace on the preprod spoke; the `prod`-stage Environment moves to its own
@@ -205,6 +202,8 @@ moment one exists. One delivery control plane, hub and spokes — the shape from
 [How the Platform Fits](../spine/how-the-platform-fits.md), seen from delivery.
 
 ## Putting it together — one change, dev to prod
+
+![One change, dev to prod: CI signs the image, then ArgoCD and the Rollout land it in dev; the auto-promoter bumps test once dev is healthy, climbing one rung per run up to staging, and a human release-approver gates the final step to prod.](images/one-change-dev-to-prod.svg)
 
 Watch all three reconcilers cooperate on `shop`'s `web` fix (`f6b37d…`):
 
