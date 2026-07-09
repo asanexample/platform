@@ -114,6 +114,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-071: Image-Digest Promotion via the Control Plane (Protected-Main Delivery)](071-digest-promotion-via-control-plane.md) | Accepted |
 | [ADR-072: App-Repo Naming & Team Ownership](072-app-repo-naming-and-team-ownership.md) | Accepted |
 | [ADR-095: Dynamic Application Security Testing (DAST)](095-dast-dynamic-application-security-testing.md) | Proposed |
+| [ADR-098: Package Registry — AWS CodeArtifact (+ ECR Pull-Through Cache)](098-package-registry-codeartifact.md) | Proposed |
 
 ## Developer Portal & Experience
 
