@@ -90,7 +90,7 @@ No modules.
 - Image tag immutability defaults to `IMMUTABLE`; override per repository by setting `tag_mutability = "MUTABLE"` in the repository map value.
 - Cross-account pull policies are applied only when `pull_account_ids` is non-empty.
 - Set `force_delete = true` to allow deletion of repositories that still contain images (useful for teardowns).
-- **Pull-through cache** (`pull_through_cache_rules`) mirrors public registries into this account on first pull (ADR-098 D2). ghcr.io / quay.io / registry.k8s.io need no credential; Docker Hub requires a Secrets Manager secret whose name starts with `ecr-pullthroughcache/`. The pulling principal needs `ecr:BatchImportUpstreamImage` + `ecr:CreateRepository`.
+- **Pull-through cache** (`pull_through_cache_rules`) mirrors public registries into this account on first pull (ADR-098 D2). Only `registry.k8s.io` supports anonymous pull-through; Docker Hub, `ghcr.io`, and `quay.io` each **require** a Secrets Manager credential whose name starts with `ecr-pullthroughcache/` (AWS rejects the rule otherwise). The pulling principal needs `ecr:BatchImportUpstreamImage` + `ecr:CreateRepository`.
 
 ## Related ADRs
 

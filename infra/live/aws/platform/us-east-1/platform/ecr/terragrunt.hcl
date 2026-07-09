@@ -12,10 +12,13 @@ terraform {
 }
 
 locals {
-  # Docker Hub pull-through cache is gated on the credential existing. Populate a Secrets Manager secret named
-  # `ecr-pullthroughcache/docker-hub` ({username, accessToken}) and set this to its ARN to enable the mirror.
-  # Empty (default) keeps the anonymous mirrors (ghcr/quay/k8s) working without the secret. ADR-098 D2.
+  # ECR pull-through cache credentials. AWS REQUIRES authentication for docker.io / ghcr.io / quay.io — each is
+  # gated on its Secrets Manager credential (secret name must start with `ecr-pullthroughcache/`, value
+  # {username, accessToken}). Set the ARN to enable that mirror once the secret exists; empty (default) leaves it
+  # off. registry.k8s.io is the only credential-free upstream here, so it's always on. ADR-098 D2.
   docker_hub_credential_arn = ""
+  ghcr_credential_arn       = ""
+  quay_credential_arn       = ""
 }
 
 inputs = {
@@ -64,21 +67,22 @@ inputs = {
   ]
 
   # Pull-through cache: mirror public registries into this account on first pull so cluster/CI base-image
-  # pulls hit our own ECR (IAM auth, no rate limits) — ADR-098 D2. ghcr.io / quay.io / registry.k8s.io allow
-  # anonymous pulls (no credential). Docker Hub REQUIRES a credential: create a Secrets Manager secret named
-  # `ecr-pullthroughcache/docker-hub` ({username, accessToken}) and set docker_hub_credential_arn to enable it
-  # (left out until the secret exists — the anonymous mirrors work standalone).
+  # pulls hit our own ECR (IAM auth, no rate limits) — ADR-098 D2. Only registry.k8s.io supports anonymous
+  # pull-through; docker.io / ghcr.io / quay.io REQUIRE a credential (AWS rejects the rule otherwise). Each is
+  # gated on its Secrets Manager credential ARN (secret name must start with `ecr-pullthroughcache/`) — set the
+  # corresponding local above to enable that mirror once the secret exists; the k8s mirror works standalone.
   pull_through_cache_rules = merge(
     {
-      "ghcr" = { upstream_registry_url = "ghcr.io" }
-      "quay" = { upstream_registry_url = "quay.io" }
-      "k8s"  = { upstream_registry_url = "registry.k8s.io" }
+      "k8s" = { upstream_registry_url = "registry.k8s.io" }
     },
     local.docker_hub_credential_arn == "" ? {} : {
-      "docker-hub" = {
-        upstream_registry_url = "registry-1.docker.io"
-        credential_arn        = local.docker_hub_credential_arn
-      }
+      "docker-hub" = { upstream_registry_url = "registry-1.docker.io", credential_arn = local.docker_hub_credential_arn }
+    },
+    local.ghcr_credential_arn == "" ? {} : {
+      "ghcr" = { upstream_registry_url = "ghcr.io", credential_arn = local.ghcr_credential_arn }
+    },
+    local.quay_credential_arn == "" ? {} : {
+      "quay" = { upstream_registry_url = "quay.io", credential_arn = local.quay_credential_arn }
     },
   )
 
