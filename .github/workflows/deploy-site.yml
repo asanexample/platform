@@ -1,0 +1,47 @@
+name: Deploy Site
+
+# Publish the refplat.org docs site to Railway. Content is single-sourced from docs/learn + docs/adrs
+# (copied in by site/sync.mjs at build time), so this fires on any change to the docs or the site itself.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/learn/**'
+      - 'docs/adrs/**'
+      - 'site/**'
+      - '.github/workflows/deploy-site.yml'
+
+# One deploy at a time; a newer push supersedes an in-flight one.
+concurrency:
+  group: deploy-site
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build & deploy to Railway
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      # Regenerate the site content from the canonical docs. sync.mjs derives the repo root from its own
+      # location and uses only Node built-ins, so no install is needed for this step.
+      - name: Sync canonical docs -> site content
+        working-directory: site
+        run: node sync.mjs
+
+      # railway up uploads site/ and Railway rebuilds via Nixpacks (npm ci -> astro build -> serve dist).
+      # --no-gitignore so the freshly-synced (git-ignored) content is uploaded; .railwayignore still
+      # excludes node_modules/dist/.astro. RAILWAY_TOKEN is a project token scoped to refplat-site.
+      - name: Deploy to Railway
+        working-directory: site
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          npm i -g @railway/cli
+          railway up --ci --no-gitignore --service refplat-site
