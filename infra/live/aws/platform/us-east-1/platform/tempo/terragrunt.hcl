@@ -118,11 +118,6 @@ inputs = {
   extra_tenant_datasources    = ["preprod"]
   enable_federated_datasource = true
 
-  # Trace -> logs link target (#1269): the FEDERATED `loki-all` datasource, not the single-tenant `loki`
-  # (platform). App logs are split into per-team Loki tenants by the spoke passthrough, so only the federated
-  # datasource (needs Loki tenant_federation, enabled in the loki module) finds a preprod trace's `alpha` logs.
-  loki_datasource_uid = "loki-all"
-
   # Trace -> profile link (P8b): a span jumps to its CPU flame graph in Pyroscope. On when the profiles store is.
   enable_traces_to_profiles = include.base.locals.enable_pyroscope
 
