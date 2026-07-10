@@ -99,8 +99,11 @@ locals {
 
   spoke_ingest_create = local.create && length(var.spoke_ingest.tenants) > 0
 
-  # Pyroscope's push endpoint (the Connect PusherService the Alloy `pyroscope.write` client posts to).
-  pyroscope_push_path = "/push.v1.PusherService"
+  # Pyroscope's two write paths (both routed on the spoke-ingest edge, both write-only):
+  #  - `/push.v1.PusherService` — the Connect PusherService the Alloy `pyroscope.write` client (eBPF) posts to.
+  #  - `/ingest` — the legacy HTTP push path the pyroscope-go SDK posts to (app span profiles, #1269). App SDKs
+  #    push here (not push.v1), so the app-level trace→profiles pipeline needs this path matched too.
+  pyroscope_push_paths = ["/push.v1.PusherService", "/ingest"]
 }
 
 # ---------------------------------------------------------------------------
@@ -292,8 +295,9 @@ resource "kubernetes_manifest" "spoke_ingest_route" {
       }]
       hostnames = ["${each.key}-profiles.${var.spoke_ingest.domain}"]
       rules = [{
-        # Write-only: only the Pyroscope push path is routed; query APIs are never exposed.
-        matches = [{ path = { type = "PathPrefix", value = local.pyroscope_push_path } }]
+        # Write-only: only the Pyroscope push paths are routed (push.v1 for Alloy/eBPF, /ingest for app SDKs);
+        # query APIs are never exposed. Multiple matches are OR-ed by the Gateway.
+        matches = [for p in local.pyroscope_push_paths : { path = { type = "PathPrefix", value = p } }]
         filters = [{
           type                  = "RequestHeaderModifier"
           requestHeaderModifier = { set = [{ name = "X-Scope-OrgID", value = each.value }] }
