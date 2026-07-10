@@ -154,8 +154,10 @@ locals {
       url    = "http://${var.helm_release_name}-query-frontend.${var.namespace}.svc:3200"
       # serviceMap points at the matching Mimir tenant datasource so Grafana renders the node graph from the
       # generator's `traces_service_graph_*` metrics (tempo->mimir, tempo-preprod->mimir-preprod, …).
-      # tracesToProfilesV2 (P8b) links a span -> its CPU flame graph in the matching Pyroscope tenant datasource
-      # (tempo->pyroscope), matching the span's service.name to the profile's service_name label.
+      # tracesToProfiles (P8b) links a span -> its CPU flame graph in the matching Pyroscope tenant datasource
+      # (tempo->pyroscope), matching the span's service.name to the profile's service_name label. NOTE the field
+      # is `tracesToProfiles` (NOT `…V2`) — unlike logs, there is no V2 variant; the V2 name was silently ignored
+      # by Grafana so the "Related profiles" link never rendered (#1269, confirmed against the Grafana docs).
       jsonData = merge({
         httpHeaderName1 = "X-Scope-OrgID"
         tracesToLogsV2  = local.tempo_traces_to_logs
@@ -175,7 +177,7 @@ locals {
           ]
         }
         }, var.enable_traces_to_profiles ? {
-        tracesToProfilesV2 = {
+        tracesToProfiles = {
           # Profiles are per-CLUSTER (Pyroscope has no federated `-all` datasource, unlike Mimir/Tempo). The
           # federated `tempo-all` therefore can't name a `pyroscope-all`; point it at the spoke that runs the
           # instrumented apps (pyroscope-preprod, verified to hold app-* profiles). Single-cluster tempo datasources
