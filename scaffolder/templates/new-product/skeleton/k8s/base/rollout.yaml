@@ -96,6 +96,25 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            # OpenTelemetry (ADR-077 Layer 1 / P14): the OTel SDK exports request traces to the platform
+            # collector, so the app's trace_id in each log line links to its trace in Tempo (log → trace).
+            # Egress to the collector is opened by the allow-egress-to-otel-collector netpol (k8s/base).
+            # The Go starter is instrumented out of the box; other-language starters set the endpoint here
+            # for when you add your language's OTel SDK.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector.observability.svc.cluster.local:4318
+            - name: OTEL_SERVICE_NAME
+              value: app-${{ values.team }}-${{ values.product }}
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: service.namespace=${{ values.team }}-${{ values.product }}
+            # Pyroscope (ADR-077 / P8b): the Go starter's Pyroscope SDK PUSHES continuous profiles to the
+            # platform Pyroscope via the shared Gateway edge — the full Go profile suite + per-span flame graphs
+            # (trace→profiles). Egress is opened by the allow-egress-to-pyroscope netpol (k8s/base). The endpoint
+            # is the PREPROD spoke, where dev/scaffolded apps run; a prod stage on another cluster overrides both
+            # this value and the netpol FQDN in its overlay. Other-language starters set it for when they add
+            # their language's Pyroscope SDK.
+            - name: PYROSCOPE_SERVER_ADDRESS
+              value: https://preprod-profiles.aws.refplat.org
           securityContext:
             allowPrivilegeEscalation: false
             # Immutable container filesystem — writes go to the emptyDir /tmp below. Regulated-tier ready.
