@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 800" width="760" height="800" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#ffffff"]{fill:#141414}[stroke="#ffffff"]{stroke:#141414}[fill="#d9d9d2"]{fill:#2c2c27}[stroke="#d9d9d2"]{stroke:#2c2c27}[fill="#f9f0da"]{fill:#584619}[stroke="#f9f0da"]{stroke:#584619}[fill="#e8d4a0"]{fill:#e5cc8a}[stroke="#e8d4a0"]{stroke:#e5cc8a}[fill="#b0790f"]{fill:#f2ad29}[stroke="#b0790f"]{stroke:#f2ad29}[fill="#9a6a0a"]{fill:#f6b022}[stroke="#9a6a0a"]{stroke:#f6b022}[fill="#5c4a1c"]{fill:#cda84c}[stroke="#5c4a1c"]{stroke:#cda84c}[fill="#e0cd9c"]{fill:#dfc990}[stroke="#e0cd9c"]{stroke:#dfc990}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#bfe0cc"]{fill:#2d5e41}[stroke="#bfe0cc"]{stroke:#2d5e41}[fill="#1f8a5b"]{fill:#40d996}[stroke="#1f8a5b"]{stroke:#40d996}[fill="#e2e2dd"]{fill:#262622}[stroke="#e2e2dd"]{stroke:#262622}[fill="#fae9e6"]{fill:#532118}[stroke="#fae9e6"]{stroke:#532118}[fill="#ecc3bc"]{fill:#68291e}[stroke="#ecc3bc"]{stroke:#68291e}[fill="#b83a2c"]{fill:#dd6f63}[stroke="#b83a2c"]{stroke:#dd6f63}[fill="#33333a"]{fill:#dedee2}[stroke="#33333a"]{stroke:#dedee2}[fill="#8a8a91"]{fill:#898990}[stroke="#8a8a91"]{stroke:#898990}[fill="#2c4a3a"]{fill:#6eab8a}[stroke="#2c4a3a"]{stroke:#6eab8a}[fill="#4a4a52"]{fill:#dfdfe2}[stroke="#4a4a52"]{stroke:#dfdfe2}[fill="#f1f1ec"]{fill:#1e1e1b}[stroke="#f1f1ec"]{stroke:#1e1e1b}[fill="#5f5f66"]{fill:#8c8c94}[stroke="#5f5f66"]{stroke:#8c8c94}}</style>
+<rect class="bg" x="0" y="0" width="760" height="800" fill="#f6f6f3"></rect>
+
+
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.9px">POLICY &amp; ADMISSION · SHIPPING A RULE SAFELY</text>
+<text class="text" x="40" y="90" font-size="27" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">Observe first. Then let it bite.</text>
+<text class="muted" x="40" y="118" font-size="15" fill="#6c6c73">You never flip a new cluster-wide rule straight to <tspan class="text" fill="#1c1c22" font-style="italic">reject</tspan> — that would break</text>
+<text class="muted" x="40" y="138" font-size="15" fill="#6c6c73">every workload that already violates a rule nobody was enforcing yet. So a</text>
+<text class="muted" x="40" y="158" font-size="15" fill="#6c6c73">policy rolls out in two phases, the same instinct as a canary.</text>
+
+
+<text class="muted mono" x="112" y="200" font-size="11" fill="#6c6c73" letter-spacing="0.5px">SAME VIOLATING WORKLOAD →</text>
+<rect class="panel panel-bd" x="298" y="185" width="212" height="26" rx="7" fill="#ffffff" stroke="#d9d9d2" stroke-width="1"></rect>
+<text class="text mono" x="404" y="202" font-size="12.5" fill="#1c1c22" text-anchor="middle">Deployment · nginx:latest</text>
+<text class="muted mono" x="524" y="200" font-size="11" fill="#6c6c73">two phases, two outcomes</text>
+
+
+<rect class="bg-amber bd-amber" x="40" y="232" width="286" height="372" rx="13" fill="#f9f0da" stroke="#e8d4a0" stroke-width="1"></rect>
+<line class="ac-amber" x1="56" y1="233.5" x2="310" y2="233.5" stroke="#b0790f" stroke-width="3"></line>
+<text class="t-amber mono" x="56" y="266" font-size="13" fill="#9a6a0a">①</text>
+<text class="text" x="76" y="266" font-size="18" fill="#1c1c22" font-weight="600">Audit</text>
+<text class="t-amber mono" x="132" y="266" font-size="11" fill="#9a6a0a">observe</text>
+<text class="text" x="56" y="286" font-size="12.5" fill="#5c4a1c">Turn the control on in a mode that</text>
+<text class="text" x="56" y="303" font-size="12.5" fill="#5c4a1c">can&#39;t hurt anyone.</text>
+<line class="bd-amber" x1="56" y1="318" x2="310" y2="318" stroke="#e0cd9c" stroke-width="1"></line>
+
+
+<rect class="bg-green bd-green" x="56" y="330" width="254" height="46" rx="9" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1" stroke-dasharray="4 3"></rect>
+<text class="t-green" x="72" y="358" font-size="14" fill="#1f8a5b">✓</text>
+<text class="text" x="90" y="351" font-size="13" fill="#1c1c22" font-weight="600">Still admitted</text>
+<text class="muted" x="90" y="367" font-size="11.5" fill="#6c6c73">the resource runs — for now</text>
+
+
+<rect class="panel panel-bd" x="56" y="388" width="254" height="86" rx="9" fill="#ffffff" stroke="#e2e2dd" stroke-width="1"></rect>
+<text class="muted mono" x="70" y="408" font-size="10" fill="#6c6c73" letter-spacing="0.5px">RECORDED AS</text>
+<text class="text mono" x="70" y="427" font-size="12.5" fill="#1c1c22">PolicyReport</text>
+<rect class="bg-rose bd-rose" x="162" y="416" width="34" height="16" rx="5" fill="#fae9e6" stroke="#ecc3bc" stroke-width="1"></rect>
+<text class="t-rose mono" x="179" y="428" font-size="10.5" fill="#b83a2c" text-anchor="middle">fail</text>
+<text class="muted" x="70" y="447" font-size="11.5" fill="#6c6c73">Queryable, pass/fail per resource.</text>
+<text class="muted" x="70" y="463" font-size="11.5" fill="#6c6c73">You see what <tspan font-style="italic">would</tspan> break.</text>
+
+
+<text class="muted mono" x="56" y="506" font-size="10" fill="#6c6c73" letter-spacing="0.5px">WEBHOOK</text>
+<text class="t-amber mono" x="56" y="525" font-size="11.5" fill="#9a6a0a">failurePolicy: Ignore</text>
+<text class="text" x="56" y="545" font-size="11.5" fill="#33333a"><tspan font-weight="600" class="t-amber" fill="#9a6a0a">Fail-open</tspan> — if the engine itself</text>
+<text class="text" x="56" y="561" font-size="11.5" fill="#33333a">hiccups, admission proceeds rather</text>
+<text class="text" x="56" y="577" font-size="11.5" fill="#33333a">than blocking the cluster.</text>
+
+
+<text class="muted mono" x="380" y="404" font-size="10" fill="#6c6c73" text-anchor="middle">reports clean</text>
+<line class="arrow" x1="340" y1="420" x2="416" y2="420" stroke="#8a8a91" stroke-width="2"></line>
+<path class="arrow" d="M416 415 L424 420 L416 425 Z" fill="#8a8a91"></path>
+<text class="t-green mono" x="380" y="442" font-size="9.5" fill="#1f8a5b" text-anchor="middle">set</text>
+<text class="t-green mono" x="380" y="454" font-size="9.5" fill="#1f8a5b" text-anchor="middle">failureAction:</text>
+<text class="t-green mono" x="380" y="466" font-size="9.5" fill="#1f8a5b" text-anchor="middle">Enforce</text>
+
+
+<rect class="bg-green bd-green" x="434" y="232" width="286" height="372" rx="13" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<line class="ac-green" x1="450" y1="233.5" x2="704" y2="233.5" stroke="#1f8a5b" stroke-width="3"></line>
+<text class="t-green mono" x="450" y="266" font-size="13" fill="#1f8a5b">②</text>
+<text class="text" x="470" y="266" font-size="18" fill="#1c1c22" font-weight="600">Enforce</text>
+<text class="t-green mono" x="542" y="266" font-size="11" fill="#1f8a5b">bite</text>
+<text class="text" x="450" y="286" font-size="12.5" fill="#2c4a3a">Confirm it&#39;s right, then make the</text>
+<text class="text" x="450" y="303" font-size="12.5" fill="#2c4a3a">control bite.</text>
+<line class="bd-green" x1="450" y1="318" x2="704" y2="318" stroke="#bfe0cc" stroke-width="1"></line>
+
+
+<rect class="bg-rose bd-rose" x="450" y="330" width="254" height="46" rx="9" fill="#fae9e6" stroke="#ecc3bc" stroke-width="1"></rect>
+<text class="t-rose" x="466" y="358" font-size="14" fill="#b83a2c">✗</text>
+<text class="text" x="484" y="351" font-size="13" fill="#1c1c22" font-weight="600">Rejected at the door</text>
+<text class="muted" x="484" y="367" font-size="11.5" fill="#6c6c73">violations no longer admitted</text>
+
+
+<rect class="panel panel-bd" x="450" y="388" width="254" height="86" rx="9" fill="#ffffff" stroke="#e2e2dd" stroke-width="1"></rect>
+<text class="muted mono" x="464" y="408" font-size="10" fill="#6c6c73" letter-spacing="0.5px">NOW ENFORCING</text>
+<text class="muted" x="464" y="427" font-size="11.5" fill="#4a4a52">The same reports still record —</text>
+<text class="muted" x="464" y="443" font-size="11.5" fill="#4a4a52">but a fail now stops the request</text>
+<text class="muted" x="464" y="459" font-size="11.5" fill="#4a4a52">instead of just logging it.</text>
+
+
+<text class="muted mono" x="450" y="506" font-size="10" fill="#6c6c73" letter-spacing="0.5px">WEBHOOK</text>
+<text class="t-rose mono" x="450" y="525" font-size="11.5" fill="#b83a2c">validate.kyverno.svc-fail</text>
+<text class="text" x="450" y="545" font-size="11.5" fill="#33333a"><tspan font-weight="600" class="t-rose" fill="#b83a2c">Fail-closed</tspan> — the &#34;fail&#34; you see</text>
+<text class="text" x="450" y="561" font-size="11.5" fill="#33333a">in a rejection. Enforcement, on.</text>
+
+
+<rect class="panel panel-bd" x="40" y="626" width="680" height="88" rx="12" fill="#f1f1ec" stroke="#e2e2dd" stroke-width="1"></rect>
+<circle class="bg-amber bd-amber" cx="66" cy="652" r="12" fill="#f9f0da" stroke="#e0cd9c" stroke-width="1"></circle>
+<text class="t-amber" x="66" y="657" font-size="13" fill="#9a6a0a" text-anchor="middle" font-weight="600">!</text>
+<text class="text" x="90" y="648" font-size="12.5" fill="#1c1c22"><tspan font-weight="600">An honest wrinkle.</tspan> The enforce/audit state lives in each rule&#39;s <tspan class="t-amber mono" fill="#9a6a0a">validate.failureAction</tspan>.</text>
+<text class="muted" x="90" y="668" font-size="12.5" fill="#5f5f66">The deprecated top-level <tspan class="mono" fill="#5f5f66">spec.validationFailureAction</tspan> shows a misleading default of <tspan class="mono" fill="#5f5f66">Audit</tspan> even</text>
+<text class="muted" x="90" y="688" font-size="12.5" fill="#5f5f66">where rules enforce — so <tspan class="mono" fill="#5f5f66">kubectl</tspan> output can lie. Read the per-rule field, or just test</text>
+<text class="muted" x="90" y="708" font-size="12.5" fill="#5f5f66">admission — the dry-run never does.</text>
+
+
+<text class="muted" x="40" y="748" font-size="14" fill="#6c6c73">Same &#34;observe before you enforce&#34; instinct as a canary: turn the control on where it can&#39;t</text>
+<text class="muted" x="40" y="768" font-size="14" fill="#6c6c73">hurt anyone, confirm it&#39;s right, <tspan class="text" fill="#1c1c22" font-weight="500">then</tspan> make it bite.</text>
+</svg>

@@ -49,24 +49,7 @@ as code, and the engine enforces them on every request, continuously.
 Here's the whole admission path in one picture — mutate runs first, then validate decides admit-or-reject,
 and generate creates companions like the PDB only *after* the resource is stored:
 
-```mermaid
-sequenceDiagram
-    participant U as kubectl
-    participant API as kube-apiserver
-    participant M as Kyverno mutate
-    participant V as Kyverno validate
-    U->>API: apply a Deployment
-    API->>M: mutating admission webhook
-    M-->>API: inject securityContext + label + defaults
-    API->>V: validating admission webhook
-    alt violates a rule
-        V-->>API: DENY
-        API-->>U: rejected at admission
-    else compliant
-        V-->>API: admit and store
-        Note over API,V: post-admission - Kyverno generate makes the PDB
-    end
-```
+![The admission checkpoint: one door, three jobs — mutate injects defaults, validate admits or rejects, and generate creates companions like the PDB only after the resource is stored.](images/admission-checkpoint.svg)
 
 Watch all three verbs on a real workload, starting with the one you meet first when you get it wrong.
 
@@ -149,6 +132,8 @@ you'd otherwise forget — all at admission, all as code.
 You saw two layers in the rejection. Here's the structure, because it's how one cluster safely serves many
 teams:
 
+![Where policies come from: the platform module (written once, no team data) and each XEnvironment claim (derived by the Environment Composition) converge into one enforced set — baseline, supply-chain, and per-product scoping — colored by owner per ADR-046.](images/rule-provenance.svg)
+
 - **Baseline policies** are platform-wide and hold no team data — `disallow-latest-tag`,
   `require-requests-limits`, `restrict-image-registries`, the securityContext backstops. Written once,
   applied everywhere.
@@ -175,6 +160,8 @@ defense-in-depth from [the security model](../spine/the-security-model.md).
 
 You don't flip a new cluster-wide rule straight to "reject." That would break every workload that happened
 to violate a rule nobody was enforcing yet. So policies roll out **Audit-first**:
+
+![Audit-first then Enforce: the same violating workload is admitted and recorded as a failing PolicyReport under fail-open Audit, then rejected under fail-closed Enforce once the reports are clean.](images/audit-then-enforce.svg)
 
 - **Audit** — a violation is recorded as a **`PolicyReport`** (queryable: pass/fail per resource) but the
   resource is still admitted, and the webhook is fail-*open* (`failurePolicy: Ignore` — if the engine itself

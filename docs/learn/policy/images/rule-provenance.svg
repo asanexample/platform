@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 1006" width="760" height="1006" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#bfe0cc"]{fill:#2d5e41}[stroke="#bfe0cc"]{stroke:#2d5e41}[fill="#1f8a5b"]{fill:#40d996}[stroke="#1f8a5b"]{stroke:#40d996}[fill="#5f7d6c"]{fill:#81988b}[stroke="#5f7d6c"]{stroke:#81988b}[fill="#1c7a4f"]{fill:#41d893}[stroke="#1c7a4f"]{stroke:#41d893}[fill="#eaf1fb"]{fill:#172f51}[stroke="#eaf1fb"]{stroke:#172f51}[fill="#c4d8f4"]{fill:#1d3a62}[stroke="#c4d8f4"]{stroke:#1d3a62}[fill="#2c66c4"]{fill:#6b98e1}[stroke="#2c66c4"]{stroke:#6b98e1}[fill="#5a6b83"]{fill:#8999b0}[stroke="#5a6b83"]{stroke:#8999b0}[fill="#3d6fc0"]{fill:#7fa2d9}[stroke="#3d6fc0"]{stroke:#7fa2d9}[fill="#9cc7ac"]{fill:#a3ccb2}[stroke="#9cc7ac"]{stroke:#a3ccb2}[fill="#8a8a91"]{fill:#898990}[stroke="#8a8a91"]{stroke:#898990}[fill="#f9f0da"]{fill:#584619}[stroke="#f9f0da"]{stroke:#584619}[fill="#e8d4a0"]{fill:#e5cc8a}[stroke="#e8d4a0"]{stroke:#e5cc8a}[fill="#b0790f"]{fill:#f2ad29}[stroke="#b0790f"]{stroke:#f2ad29}[fill="#9a6a0a"]{fill:#f6b022}[stroke="#9a6a0a"]{stroke:#f6b022}[fill="#5c4a1c"]{fill:#cda84c}[stroke="#5c4a1c"]{stroke:#cda84c}[fill="#fbfbf9"]{fill:#181816}[stroke="#fbfbf9"]{stroke:#181816}[fill="#d9d9d2"]{fill:#2c2c27}[stroke="#d9d9d2"]{stroke:#2c2c27}[fill="#efefe9"]{fill:#20201c}[stroke="#efefe9"]{stroke:#20201c}[fill="#2c7a56"]{fill:#54c591}[stroke="#2c7a56"]{stroke:#54c591}[fill="#33333a"]{fill:#dedee2}[stroke="#33333a"]{stroke:#dedee2}[fill="#3060b0"]{fill:#648fd8}[stroke="#3060b0"]{stroke:#648fd8}[fill="#9a9aa1"]{fill:#888890}[stroke="#9a9aa1"]{stroke:#888890}}</style><defs><clipPath id="abar0"><rect x="57.0" y="667.0" width="9.0" height="58.0"/></clipPath><clipPath id="abar1"><rect x="57.0" y="731.0" width="9.0" height="58.0"/></clipPath><clipPath id="abar2"><rect x="57.0" y="795.0" width="9.0" height="58.0"/></clipPath></defs>
+<rect class="bg" x="0" y="0" width="760" height="1006" fill="#f6f6f3"></rect>
+
+
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.9px">POLICY &amp; ADMISSION · WHERE THE RULES COME FROM</text>
+<text class="text" x="40" y="90" font-size="26" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">Written once, or derived per product.</text>
+<text class="muted" x="40" y="118" font-size="15" fill="#6c6c73">One cluster safely serves many teams because the rules split by <tspan class="text" fill="#1c1c22" font-style="italic">origin</tspan>. Some</text>
+<text class="muted" x="40" y="138" font-size="15" fill="#6c6c73">are written once and hold no team data. The rest are <tspan class="text" fill="#1c1c22" font-style="italic">derived</tspan> — stamped out</text>
+<text class="muted" x="40" y="158" font-size="15" fill="#6c6c73">from each environment&#39;s own claim, never hand-typed.</text>
+
+
+<rect class="bg-green bd-green" x="40" y="196" width="333" height="222" rx="12" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<rect class="ac-green" x="44" y="206" width="4" height="202" rx="2" fill="#1f8a5b"></rect>
+<text class="t-green mono" x="62" y="222" font-size="10" fill="#1f8a5b" letter-spacing="0.6px">PLATFORM POLICY MODULE</text>
+<text class="text" x="62" y="244" font-size="16" fill="#1c1c22" font-weight="600">Written once</text>
+<text class="muted" x="62" y="262" font-size="12" fill="#5f7d6c">holds zero team-specific values · applied everywhere</text>
+<line class="bd-green" x1="62" y1="278" x2="351" y2="278" stroke="#bfe0cc" stroke-width="1"></line>
+<text class="t-green mono" x="62" y="300" font-size="11.5" fill="#1c7a4f">disallow-latest-tag</text>
+<text class="t-green mono" x="62" y="320" font-size="11.5" fill="#1c7a4f">require-requests-limits</text>
+<text class="t-green mono" x="62" y="340" font-size="11.5" fill="#1c7a4f">restrict-image-registries</text>
+<text class="t-green mono" x="62" y="360" font-size="11.5" fill="#1c7a4f">verify-images · verify-attestations</text>
+<text class="muted mono" x="62" y="404" font-size="10" fill="#6c6c73">ADR-014 · policy-as-code</text>
+
+
+<rect class="bg-blue bd-blue" x="387" y="196" width="333" height="222" rx="12" fill="#eaf1fb" stroke="#c4d8f4" stroke-width="1"></rect>
+<rect class="ac-blue" x="391" y="206" width="4" height="202" rx="2" fill="#2c66c4"></rect>
+<text class="t-blue mono" x="409" y="222" font-size="10" fill="#2c66c4" letter-spacing="0.6px">PER-ENVIRONMENT CLAIM</text>
+<text class="text" x="409" y="245" font-size="16" fill="#1c1c22" font-weight="600">One <tspan class="t-blue mono" fill="#2c66c4" font-size="14">XEnvironment</tspan></text>
+<text class="muted" x="409" y="262" font-size="12" fill="#5a6b83">carries only the team&#39;s own facts</text>
+<line class="bd-blue" x1="409" y1="278" x2="698" y2="278" stroke="#c4d8f4" stroke-width="1"></line>
+<text class="muted mono" x="409" y="301" font-size="11" fill="#6c6c73">team</text>
+<text class="t-blue mono" x="470" y="301" font-size="11.5" fill="#2c66c4">acme</text>
+<text class="muted mono" x="409" y="321" font-size="11" fill="#6c6c73">product</text>
+<text class="t-blue mono" x="470" y="321" font-size="11.5" fill="#2c66c4">shop</text>
+<text class="muted mono" x="409" y="341" font-size="11" fill="#6c6c73">→ ECR</text>
+<text class="t-blue mono" x="470" y="341" font-size="11" fill="#3d6fc0">…/team-acme/shop-*</text>
+<text class="muted mono" x="409" y="361" font-size="11" fill="#6c6c73">→ hosts</text>
+<text class="t-blue mono" x="470" y="361" font-size="11" fill="#3d6fc0">the names it owns</text>
+<text class="muted mono" x="409" y="404" font-size="10" fill="#6c6c73">one per environment</text>
+
+
+<line class="softln-g" x1="206" y1="424" x2="206" y2="586" stroke="#9cc7ac" stroke-width="2" stroke-dasharray="3 3"></line>
+<path class="ac-green" d="M200 586 L212 586 L206 594 Z" fill="#1f8a5b"></path>
+<line class="arrow" x1="553" y1="424" x2="553" y2="436" stroke="#8a8a91" stroke-width="2"></line>
+<path class="arrow" d="M547 436 L559 436 L553 444 Z" fill="#8a8a91"></path>
+
+
+<rect class="bg-amber bd-amber" x="387" y="452" width="333" height="96" rx="12" fill="#f9f0da" stroke="#e8d4a0" stroke-width="1"></rect>
+<rect class="ac-amber" x="391" y="462" width="4" height="76" rx="2" fill="#b0790f"></rect>
+<text class="t-amber mono" x="409" y="476" font-size="10" fill="#9a6a0a" letter-spacing="0.5px">ENVIRONMENT COMPOSITION · derives</text>
+<text class="text" x="409" y="497" font-size="12.5" fill="#5c4a1c">Reads the claim and stamps out scoping policies</text>
+<text class="text" x="409" y="515" font-size="12.5" fill="#5c4a1c">— rendered alongside the namespace, so a new</text>
+<text class="text" x="409" y="533" font-size="12.5" fill="#5c4a1c">environment gets its guardrails atomically.</text>
+
+
+<line class="softln-b" x1="553" y1="548" x2="553" y2="586" stroke="#8a8a91" stroke-width="2"></line>
+<path class="arrow" d="M547 586 L559 586 L553 594 Z" fill="#8a8a91"></path>
+
+
+<rect class="door door-bd" x="40" y="600" width="680" height="266" rx="16" fill="#fbfbf9" stroke="#d9d9d2" stroke-width="1.5"></rect>
+<path class="head head-bd" d="M40 616 A16 16 0 0 1 56 600 L704 600 A16 16 0 0 1 720 616 L720 654 L40 654 Z" fill="#efefe9" stroke="#d9d9d2" stroke-width="1"></path>
+<line class="head-bd" x1="40" y1="654" x2="720" y2="654" stroke="#d9d9d2" stroke-width="1"></line>
+<text class="muted mono" x="58" y="622" font-size="10" fill="#6c6c73" letter-spacing="0.8px">CLUSTERPOLICIES · IN THE CLUSTER</text>
+<text class="text" x="58" y="643" font-size="15" fill="#1c1c22" font-weight="600">One set, evaluated identically for every request</text>
+
+
+<rect class="bg-green bd-green" x="58" y="668" width="644" height="56" rx="10" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<rect x="59.3" y="669.3" width="641.5" height="53.5" rx="8.8" fill="none" stroke="#1f8a5b" stroke-width="2.5" clip-path="url(#abar0)"></rect>
+<circle class="ac-green" cx="80" cy="690" r="4" fill="#1f8a5b"></circle>
+<text class="text" x="92" y="694" font-size="13.5" fill="#1c1c22" font-weight="600">Baseline</text>
+<text class="t-green mono" x="74" y="712" font-size="10.5" fill="#2c7a56">platform-wide</text>
+<text class="text" x="234" y="691" font-size="12.5" fill="#33333a">Every namespace, no exceptions. <tspan class="muted" fill="#6c6c73">Written once — applied everywhere.</tspan></text>
+
+
+<rect class="bg-green bd-green" x="58" y="732" width="644" height="56" rx="10" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<rect x="59.3" y="733.3" width="641.5" height="53.5" rx="8.8" fill="none" stroke="#1f8a5b" stroke-width="2.5" clip-path="url(#abar1)"></rect>
+<circle class="ac-green" cx="80" cy="754" r="4" fill="#1f8a5b"></circle>
+<text class="text" x="92" y="758" font-size="13.5" fill="#1c1c22" font-weight="600">Supply-chain</text>
+<text class="t-green mono" x="74" y="776" font-size="10.5" fill="#2c7a56">per product</text>
+<text class="text" x="234" y="755" font-size="12.5" fill="#33333a"><tspan class="t-green mono" fill="#1c7a4f">verify-images · verify-attestations</tspan> — from the product registry.</text>
+
+
+<rect class="bg-blue bd-blue" x="58" y="796" width="644" height="56" rx="10" fill="#eaf1fb" stroke="#c4d8f4" stroke-width="1"></rect>
+<rect x="59.3" y="797.3" width="641.5" height="53.5" rx="8.8" fill="none" stroke="#2c66c4" stroke-width="2.5" clip-path="url(#abar2)"></rect>
+<circle class="ac-blue" cx="80" cy="818" r="4" fill="#2c66c4"></circle>
+<text class="text" x="92" y="822" font-size="13.5" fill="#1c1c22" font-weight="600">Per-product scoping</text>
+<text class="t-blue mono" x="74" y="840" font-size="10.5" fill="#3060b0">derived per env</text>
+<text class="t-blue mono" x="234" y="820" font-size="11.5" fill="#2c66c4">restrict-images-acme-shop · restrict-route-hostnames-…</text>
+
+
+<text class="dim mono" x="40" y="896" font-size="10" fill="#9a9aa1" letter-spacing="0.8px">OWNED BY (ADR-046)</text>
+<circle class="ac-green" cx="196" cy="892" r="4.5" fill="#1f8a5b"></circle>
+<text class="muted mono" x="208" y="896" font-size="11.5" fill="#6c6c73">platform policy module</text>
+<circle class="ac-blue" cx="404" cy="892" r="4.5" fill="#2c66c4"></circle>
+<text class="muted mono" x="416" y="896" font-size="11.5" fill="#6c6c73">Environment Composition</text>
+
+
+<text class="muted" x="40" y="936" font-size="14" fill="#6c6c73">Teams come and go by changing the <tspan class="text" fill="#1c1c22" font-weight="500">registry</tspan>, not the <tspan class="text" fill="#1c1c22" font-weight="500">engine</tspan>. The policy module holds</text>
+<text class="muted" x="40" y="956" font-size="14" fill="#6c6c73">zero team-specific values — the per-product rules are a <tspan class="t-blue" fill="#2c66c4" font-weight="500">projection of each claim</tspan>, so</text>
+<text class="muted" x="40" y="976" font-size="14" fill="#6c6c73">onboarding a team adds data, never a new policy to hand-write.</text>
+</svg>
