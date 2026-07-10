@@ -10,6 +10,7 @@ resources:
   - hpa.yaml
   - service.yaml
   - httproute.yaml
+  - netpol-egress-otel.yaml # egress to observability/otel-collector for OTLP trace export (P14 log→trace)
 # Rewrite HTTPRoute backendRefs when a namePrefix is applied (PR previews, see name-reference.yaml); and teach
 # the replicas transformer to target the Argo Rollout (kustomizeconfig.yaml, ADR-056).
 configurations:

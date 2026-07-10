@@ -1,9 +1,9 @@
 FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS build
 
 WORKDIR /src
-# Stdlib-only: go.mod has no requires, so there is no go.sum to copy. `go mod download` is a no-op but
-# kept so the layer caches dependency resolution once this app grows deps (add go.sum to the COPY then).
-COPY go.mod ./
+# go.mod + go.sum first so the module-download layer caches independently of source changes. go.sum is
+# required because the starter ships with the OpenTelemetry SDK (observability by construction).
+COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY cmd/ cmd/
 

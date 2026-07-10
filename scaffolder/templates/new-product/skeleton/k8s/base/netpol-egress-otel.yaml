@@ -1,0 +1,22 @@
+# Allow egress from this service to the platform OTLP collector (observability/otel-collector:4318) so the
+# OpenTelemetry SDK can export request traces — the half that makes log → trace work (P14 / ADR-077).
+#
+# Environment namespaces default-deny EGRESS; NetworkPolicies are additive, so this unions an egress allow to
+# the collector. The collector's namespace admits it via `allow-otlp-from-environments` (keyed on the
+# `platform.refplat.org/otel-export=true` label the Environment Composition stamps on this namespace).
+# Lives in base (every stage) — the in-cluster collector DNS is the same on each cluster.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-to-otel-collector
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+      ports:
+        - port: 4318
+          protocol: TCP
