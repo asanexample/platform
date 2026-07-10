@@ -158,26 +158,30 @@ inputs = {
       service_port    = 8080
     } : null
   }
-  extra_tenant_datasources = ["preprod"]
+  # Surface every tenant as its own direct Grafana datasource + fold them into the federated `mimir-all`
+  # view: the two cluster tenants (preprod spoke; platform is the default below) and the two per-team app
+  # tenants cortex-tenant splits out (alpha, bravo). This replaces the break-glass admin datasource — with
+  # the read proxy retired (see read_proxy_url), these direct datasources are the reliable read path.
+  extra_tenant_datasources = ["preprod", "alpha", "bravo"]
 
   # Multi-cluster single pane (#626): enable read-path tenant federation + a `Mimir (all clusters)`
   # datasource spanning platform|preprod. Platform-admin overview lane (per-team scoping = P13).
   enable_federated_datasource = true
 
-  # P13 enforcement (#590): when per-team tenants are on, point the Grafana metrics datasources at the
-  # tenant-proxy (identity-scoped) instead of the gateway with a fixed X-Scope-OrgID — so no datasource
-  # carries a static tenant a user could pick to bypass isolation. The proxy federates for platform-admins
-  # and scopes to the caller's team otherwise. Deterministic in-cluster Service address (NOT a dependency:
-  # tenant-proxy has no outputs we consume, and depending on it would risk a cycle via the shared namespace).
-  # Empty when the toggle is off ⇒ unchanged direct datasources.
-  read_proxy_url = include.base.locals.enable_per_team_tenants ? "http://tenant-proxy.observability.svc:8080" : ""
+  # P13 read-proxy RETIRED (#1269). This was `enable_per_team_tenants ? "http://tenant-proxy…" : ""` — every
+  # Grafana metrics datasource routed through the tenant-proxy, which scoped the query from the caller's SSO
+  # identity forwarded by Grafana as X-Id-Token. That forwarding is fundamentally unreliable in OSS Grafana
+  # (oauthPassThru drops the token; even a fresh Keycloak login forwarded nothing), so every dashboard query
+  # failed closed `no_token` and admins lost all metrics. Per-team read isolation moves to the soft model that
+  # was the actual need: dashboard folder permissions + the namespace-filtered per-team dashboards (#1157).
+  # Empty ⇒ the datasources above point straight at the gateway with a static per-tenant X-Scope-OrgID
+  # (reliable, no token dependency). The write-side per-team tenant split (cortex-tenant) is untouched.
+  read_proxy_url = ""
 
-  # Break-glass admin datasource (#1269): a `Mimir (admin — all tenants)` datasource pointed DIRECTLY at the
-  # gateway with a static federated X-Scope-OrgID, bypassing the proxy. The proxy is the intended front door,
-  # but it depends on Grafana forwarding the caller's OIDC token (X-Id-Token) — a fragile path that broke and
-  # left admins with no metrics. This un-proxied lane keeps platform-admins working regardless. Federates the
-  # full tenant set (matches the tenant-proxy `tenants`). Only rendered while the proxy is enforced.
-  enable_admin_all_datasource  = include.base.locals.enable_per_team_tenants
+  # Admin break-glass datasource is now redundant — with the proxy retired, the direct `mimir-all` datasource
+  # already federates the full tenant set. Only ever rendered while the proxy was enforced (a no-op now); kept
+  # false-by-effect so re-enabling the proxy would also restore it.
+  enable_admin_all_datasource  = false
   admin_all_datasource_tenants = ["alpha", "bravo", "platform", "preprod"]
 
   # P4 / ADR-082: the ruler evaluates alerting rules against EACH tenant's metrics (incl. preprod's
