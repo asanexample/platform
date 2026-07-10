@@ -99,6 +99,14 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-09 (end-of-day PARK) — routine, cost-zero.** `AWS_PROFILE=management ./bin/platctl down --env <env>
+  --yes` each. Small positive deviation: **platform drained CLEANLY this cycle** — "Karpenter nodes drained and
+  terminated" + "EC2NodeClass deleted", NO "NodeClaims still present after 6m" / "EC2NodeClass after 90s" warnings
+  for once (2 nodes force-terminated). So the platform slow-drain warnings are intermittent, not guaranteed —
+  their absence is fine, not suspicious. preprod clean as always; both node groups `desiredSize=0`, 0
+  running/pending instances both accounts, both bastions stopped. Pre-park `git status` was clean (the 2026-07-09
+  "Applied autostash" on pull left nothing behind).
+
 - **2026-07-09 (UNPARK) — mostly routine, but a NEW post-unpark victim class surfaced on preprod:
   `cilium-spire/spire-agent` stuck in `Init:Error`. Logging standalone per the deviation rule.** Routine half:
   node groups restored + `ACTIVE` (platform 2, preprod 1), Karpenter gates passed first check on both, preprod

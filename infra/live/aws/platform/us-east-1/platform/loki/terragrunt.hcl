@@ -122,13 +122,19 @@ inputs = {
     gateway_namespace = dependency.gateway.outputs.gateway_namespace
     tenants           = { preprod = "preprod" }
   }
-  extra_tenant_datasources    = ["preprod"]
+  # Surface each cluster + per-team tenant as its own direct Grafana datasource (Loki's own tenant
+  # federation isn't enabled, so the per-tenant datasources — not `loki-all` — are the working read path).
+  extra_tenant_datasources    = ["preprod", "alpha", "bravo"]
   enable_federated_datasource = true
 
-  # P13 enforcement (#590), mirroring metrics: route the Grafana Loki datasources through the loki-tenant-proxy
-  # (identity-scoped) instead of direct headers, and let the spoke edge PASS THROUGH the per-team tenant the
-  # preprod Alloy stamps (instead of force-stamping `preprod`). Both gated on the per-team-tenants flag.
-  read_proxy_url           = include.base.locals.enable_per_team_tenants ? "http://loki-tenant-proxy.observability.svc:8080" : ""
+  # P13 read-proxy RETIRED (#1269), mirroring metrics. Was `enable_per_team_tenants ? "http://loki-tenant-proxy…"
+  # : ""` — Loki datasources routed through the loki-tenant-proxy, which scoped from the SSO identity Grafana
+  # forwards as X-Id-Token. That forwarding is unreliable in OSS Grafana (see the mimir unit), so proxied
+  # log queries failed closed `no_token`. Empty ⇒ the per-tenant datasources above hit the gateway directly
+  # with a static X-Scope-OrgID; per-team isolation is the soft model (folder perms + per-team dashboards).
+  # spoke_ingest_passthrough stays on: preprod Alloy keeps stamping the per-team tenant, now read via the
+  # direct loki-<team> datasources instead of the proxy.
+  read_proxy_url           = ""
   spoke_ingest_passthrough = include.base.locals.enable_per_team_tenants
 
   tags = include.base.locals.tags

@@ -87,16 +87,20 @@ generate "kubernetes_provider" {
 }
 
 inputs = {
-  # P13 read-isolation toggle (enable_per_team_tenants) — on for the platform hub (env.hcl), where Grafana runs.
-  create = include.base.locals.enable_per_team_tenants
+  # RETIRED (#1269): the P13 read-proxy is decommissioned — OSS Grafana's oauthPassThru identity forwarding
+  # is unreliable, so the mimir/loki datasources went back to direct-with-static-tenant-header and this proxy
+  # is unused (see the mimir unit's read_proxy_url). Kept in git (not deleted) so re-enabling is a one-line
+  # flip if forwarding is ever fixed. `create = false` tears down the now-inert Deployment/Service/ServiceMonitor.
+  create = false
 
   namespace = dependency.observability.outputs.namespace
 
   # Digest-pinned signed image (built + cosign-signed by tenant-proxy-image.yml → platform ECR). Bump this
   # digest to the build output and re-apply (ADR-071 digest-pin). MUST be the INDEX digest (the one the
   # workflow's `steps.build.outputs.digest` reports, tagged with the git sha) — NOT the `.att`/`.sig`
-  # single-manifests, which are unrunnable (empty config → "no command specified"). Current: first build.
-  image = "829808296602.dkr.ecr.us-east-1.amazonaws.com/platform/tenant-proxy@sha256:7a534ca942f9075bd89ebfe44ca3bbf6e6e52e9f0ad5ce2888a949323c8c3661"
+  # single-manifests, which are unrunnable (empty config → "no command specified"). Current: the
+  # multi-source identity build (X-Id-Token → Authorization Bearer→/userinfo fallback, #1269).
+  image = "829808296602.dkr.ecr.us-east-1.amazonaws.com/platform/tenant-proxy@sha256:61534662a2913bf69c57d85225d5189c5efe905358de9b567daf535e1dc6c13c"
 
   # Every tenant present on the hub Mimir: the per-team tenants populated by the cortex-tenant write side
   # (alpha, bravo) + the two cluster tenants (`platform` = the hub's own metrics, `preprod` = the spoke's

@@ -79,6 +79,12 @@ variable "enable_traces_to_profiles" {
   default     = false
 }
 
+variable "federated_profiles_cluster" {
+  description = "Which cluster's Pyroscope datasource the FEDERATED `tempo-all` datasource links profiles to. Pyroscope has no federated `-all` datasource (unlike Mimir/Tempo), so the all-clusters trace view must point at one cluster's profiles store — the spoke that runs the instrumented apps. Yields `pyroscope-<value>`."
+  type        = string
+  default     = "preprod"
+}
+
 variable "spoke_ingest" {
   description = <<-EOT
     Cross-cluster spoke TRACE ingest via the shared Cilium Gateway (#628). When `tenants` is non-empty this

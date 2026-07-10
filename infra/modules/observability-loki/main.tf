@@ -82,6 +82,19 @@ locals {
         retention_enabled    = true
         delete_request_store = "s3"
       }
+
+      # Multi-tenant read federation (#1269): a query carrying `X-Scope-OrgID: a|b|c` spans all listed
+      # tenants (like Mimir/Tempo), which is what makes the federated `Loki (all clusters)` datasource work —
+      # the ONLY datasource that finds an app's logs, since the spoke passthrough splits them into per-team
+      # tenants (a preprod trace's logs live in the `alpha` tenant, not `preprod`). The field is
+      # `querier.multi_tenant_queries_enabled` (validated against the loki 3.6.7 flag registry —
+      # `-querier.multi-tenant-queries-enabled`). NOT `tenant_federation`, which is not a Loki config field.
+      # Injected via structuredConfig (deep-merged) because the chart doesn't template `loki.querier`.
+      structuredConfig = {
+        querier = {
+          multi_tenant_queries_enabled = true
+        }
+      }
     }
 
     # Karpenter must not voluntarily disrupt (consolidate/drift/expire) the nodes Loki's stateful pods run
@@ -148,18 +161,29 @@ locals {
   # come from any cluster and its trace lands in that cluster's Tempo tenant, so the link must span tenants
   # (Tempo tenant-federation honours the `a|b` OrgID — verified). Without this a preprod app's log links to
   # the platform tenant and the trace is "not found".
+  # `${__value.raw}` is Grafana's derived-field value placeholder, evaluated at QUERY time. But Grafana also
+  # does ENV-VAR substitution on provisioning files, and an unknown `${__value.raw}` gets blanked to "" — so
+  # the trace link fired with no trace id and returned "No data" (root-caused via the Grafana datasource API,
+  # #1269). The provisioning file must contain the escaped form `$${__value.raw}` (Grafana `$$`→`$`). Getting
+  # `$${` onto disk needs `$$${` in HCL (HCL collapses one `$${`→`${`, leaving the leading `$`). Verified with
+  # `tofu console` and the live datasource API before/after.
   loki_derived_fields = [{
     name          = "trace_id"
     matcherRegex  = "trace_?[iI][dD]\"?[:=]\\s*\"?([0-9a-fA-F]+)"
-    url           = "$${__value.raw}"
+    url           = "$$${__value.raw}"
     datasourceUid = "tempo-all"
   }]
 
   grafana_datasource = {
     apiVersion = 1
-    # Rename migration (bare "Loki" -> "Loki (platform)", same uid): delete the old name first so provisioning
-    # doesn't collide on uid and 500 the reload. Idempotent. See the mimir module for the full rationale.
-    deleteDatasources = [{ name = "Loki", orgId = 1 }]
+    # Prune removed datasources (idempotent; see the mimir module for the full rationale):
+    #  - "Loki": renamed to "Loki (platform)" (same uid) — delete the old name so provisioning doesn't collide.
+    #  - "Loki (admin — alpha)": a hand-applied break-glass datasource from the #1269 incident, retired with the
+    #    read-proxy now that the direct "Loki (alpha)" datasource exists. (Its stray CM is deleted separately.)
+    deleteDatasources = [
+      { name = "Loki", orgId = 1 },
+      { name = "Loki (admin — alpha)", orgId = 1 },
+    ]
     datasources = [for ds in local.datasource_tenants : {
       name   = ds.name
       type   = "loki"

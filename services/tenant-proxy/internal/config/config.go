@@ -12,16 +12,18 @@ import (
 
 // Config is the fully-validated runtime configuration.
 type Config struct {
-	ListenAddr      string
-	MetricsAddr     string
-	UpstreamURL     *url.URL
-	JWKSURL         string
-	Issuer          string
-	Audience        string
-	Tenants         []string
-	AdminGroup      string
-	Grants          map[string][]string
-	UpstreamTimeout time.Duration
+	ListenAddr       string
+	MetricsAddr      string
+	UpstreamURL      *url.URL
+	JWKSURL          string
+	Issuer           string
+	Audience         string
+	Tenants          []string
+	AdminGroup       string
+	Grants           map[string][]string
+	UpstreamTimeout  time.Duration
+	UserInfoURL      string
+	UserInfoCacheTTL time.Duration
 }
 
 // Load reads and validates configuration from the environment.
@@ -37,6 +39,12 @@ type Config struct {
 //	GRANTS             (optional)       — cross-team read grants: `grantee:owner1,owner2;grantee2:owner3`
 //	                                      (e.g. "bravo:alpha" = group bravo may also read alpha's tenant)
 //	UPSTREAM_TIMEOUT   (default 30s)    — upstream request timeout
+//	USERINFO_URL       (optional)       — OIDC userinfo endpoint (…/protocol/openid-connect/userinfo).
+//	                                      When set, enables the robust fallback: a request without a
+//	                                      usable X-Id-Token is authenticated via its Authorization
+//	                                      Bearer access token, resolved to groups through userinfo.
+//	                                      Unset → id_token-only (the fallback is disabled).
+//	USERINFO_CACHE_TTL (default 30s)    — how long a userinfo result is reused per access token
 func Load() (*Config, error) {
 	c := &Config{
 		ListenAddr:      envOr("LISTEN_ADDR", ":8080"),
@@ -45,6 +53,7 @@ func Load() (*Config, error) {
 		Issuer:          os.Getenv("OIDC_ISSUER"),
 		Audience:        os.Getenv("OIDC_AUDIENCE"),
 		AdminGroup:      os.Getenv("ADMIN_GROUP"),
+		UserInfoURL:     strings.TrimSpace(os.Getenv("USERINFO_URL")),
 		UpstreamTimeout: 30 * time.Second,
 	}
 
@@ -95,6 +104,29 @@ func Load() (*Config, error) {
 			return nil, fmt.Errorf("config: UPSTREAM_TIMEOUT: %w", err)
 		}
 		c.UpstreamTimeout = parsed
+	}
+
+	// Optional userinfo fallback. If configured it must be an absolute URL — a half-set fallback would
+	// silently disable the robustness path, so validate rather than ignore a malformed value.
+	if c.UserInfoURL != "" {
+		u, err := url.Parse(c.UserInfoURL)
+		if err != nil {
+			return nil, fmt.Errorf("config: USERINFO_URL: %w", err)
+		}
+		if u.Scheme == "" || u.Host == "" {
+			return nil, fmt.Errorf("config: USERINFO_URL must be absolute (scheme+host), got %q", u.String())
+		}
+	}
+	c.UserInfoCacheTTL = 30 * time.Second
+	if d := os.Getenv("USERINFO_CACHE_TTL"); d != "" {
+		parsed, err := time.ParseDuration(d)
+		if err != nil {
+			return nil, fmt.Errorf("config: USERINFO_CACHE_TTL: %w", err)
+		}
+		if parsed <= 0 {
+			return nil, fmt.Errorf("config: USERINFO_CACHE_TTL must be positive, got %s", d)
+		}
+		c.UserInfoCacheTTL = parsed
 	}
 
 	return c, nil

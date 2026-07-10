@@ -51,6 +51,18 @@ variable "oidc_audience" {
   default     = "grafana"
 }
 
+variable "userinfo_url" {
+  description = "Keycloak realm userinfo endpoint. Enables the robust identity fallback: when Grafana's oauthPassThru drops the X-Id-Token (a Grafana 13 regression), the proxy resolves the caller's groups from this endpoint using the still-forwarded Authorization Bearer access token. Same in-cluster keycloak service as jwks_url (same egress path, no netpol change). Set to \"\" to disable the fallback (id_token-only)."
+  type        = string
+  default     = "http://keycloak-http.keycloak.svc/realms/platform/protocol/openid-connect/userinfo"
+}
+
+variable "userinfo_cache_ttl" {
+  description = "How long a userinfo lookup is cached per access token (Go duration, e.g. \"30s\"). Empty → the proxy's built-in default (30s). Keep short so a revoked token stops working quickly."
+  type        = string
+  default     = ""
+}
+
 variable "tenants" {
   description = "Known team tenants the proxy may scope to (comma-joined into the proxy's TENANTS). A user's groups are intersected with this set; unknown groups can't widen access."
   type        = list(string)
