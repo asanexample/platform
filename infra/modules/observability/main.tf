@@ -387,6 +387,11 @@ locals {
         security         = { cookie_secure = true, cookie_samesite = "strict", content_security_policy = true, disable_gravatar = true }
         plugins          = { allow_loading_unsigned_plugins = "" }
         analytics        = { reporting_enabled = false, check_for_updates = false }
+        # Trace -> profiles span link (P8b, #1269): unlike trace->logs/metrics (GA), the Tempo datasource's
+        # `tracesToProfiles` "Related profiles" link is still gated behind this feature toggle in Grafana 13 —
+        # without it the link is silently omitted from a span's Links menu even with a valid config. Confirmed
+        # ABSENT via /api/frontend/settings before enabling.
+        feature_toggles = { enable = "traceToProfiles" }
       }, local.grafana_oauth_ini)
 
       # Inject the OIDC client secret from the ESO-synced K8s secret (never in grafana.ini / state).
