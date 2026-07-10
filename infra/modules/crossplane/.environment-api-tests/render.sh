@@ -34,7 +34,11 @@ printf '%s' "$OUT" | grep -q 'codeartifact:GetAuthorizationToken'     || { echo 
 printf '%s' "$OUT" | grep -q 'repository/refplat/alpha-demo'          || { echo "::error::CodeArtifact read must be scoped to this Product's repo refplat/alpha-demo"; exit 1; }
 printf '%s' "$OUT" | grep -q '169.254.169.254/32'                     || { echo "::error::IMDS egressDeny CIDR 169.254.169.254/32 missing (#160)"; exit 1; }
 printf '%s' "$OUT" | grep -q '169.254.170.23'                         && { echo "::error::Pod Identity agent 169.254.170.23 must NOT be in the deny set (#160)"; exit 1; } || true
-echo "  ✓ demo-dev OK (ns alpha-demo-dev, ECR team-alpha/demo-web, role Pod-alpha-demo-dev-web, restrict-images team-alpha/demo-*, deny-imds-egress)"
+# P14 platform-injected OTLP endpoint (ADR-077 D2): a per-namespace Instrumentation CR the OTel Operator
+# reads to inject OTEL_EXPORTER_OTLP_ENDPOINT into inject-sdk-annotated pods (endpoint never hardcoded).
+printf '%s' "$OUT" | grep -q 'kind: Instrumentation'                  || { echo "::error::P14 Instrumentation CR not rendered (ADR-077 D2)"; printf '%s\n' "$OUT"; exit 1; }
+printf '%s' "$OUT" | grep -q 'endpoint: http://otel-collector.observability.svc.cluster.local:4318' || { echo "::error::Instrumentation exporter endpoint must target the in-cluster otel-collector"; exit 1; }
+echo "  ✓ demo-dev OK (ns alpha-demo-dev, ECR team-alpha/demo-web, role Pod-alpha-demo-dev-web, restrict-images team-alpha/demo-*, deny-imds-egress, Instrumentation CR)"
 
 echo "== render shop-bigbank-prod (per-customer pci prod, image + permissions) → customer-ns + RolePolicy =="
 OUT="$(render "${here}/environments/shop-bigbank-prod.yaml")"

@@ -331,6 +331,43 @@ spec:
                     - kind: Group
                       name: {{ $ns }}:developers
                       apiGroup: rbac.authorization.k8s.io
+            ---
+            {{- /* P14 platform-injected OTLP endpoint (ADR-077 D2). The per-cluster OTel Operator injects
+                   OTEL_EXPORTER_OTLP_ENDPOINT (+ propagators/sampler) into pods that carry the
+                   `instrumentation.opentelemetry.io/inject-sdk: "true"` annotation, sourcing it from THIS
+                   namespace-scoped Instrumentation CR — so the endpoint is never hardcoded in the app. The
+                   collector lives in `observability` (in-cluster DNS resolves on whichever cluster the ns is
+                   on); egress is opened app-side by the allow-egress-to-otel-collector netpol, and the
+                   collector's ingress netpol admits this ns via its `platform.refplat.org/otel-export` label
+                   (set on the Namespace above). Requires the OTel Operator CRD on the env-API cluster
+                   (preprod — deployed). Inert until a workload opts in via the annotation; apps that still set
+                   the endpoint themselves are unaffected (the operator does not override an existing env var). */}}
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: instrumentation
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: opentelemetry.io/v1alpha1
+                  kind: Instrumentation
+                  metadata:
+                    name: platform
+                    namespace: {{ $ns }}
+                  spec:
+                    exporter:
+                      endpoint: http://otel-collector.observability.svc.cluster.local:4318
+                    propagators:
+                      - tracecontext
+                      - baggage
+                    sampler:
+                      type: parentbased_traceidratio
+                      argument: "1.0"
+                    resource:
+                      addK8sUIDAttributes: true
             {{- /* Platform-trust cluster-scoped RBAC (ADR-081). Only platform-OWNED Teams may request these; Kyverno
                    (platformtrust-clusterroles-within-envelope) validates spec.platformTrust.clusterRoles ⊆ the Team's
                    allowlist BEFORE admission, so anything that reaches here is already authorized. Binds each
