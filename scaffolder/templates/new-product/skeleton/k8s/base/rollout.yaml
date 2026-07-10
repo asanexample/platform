@@ -32,6 +32,12 @@ spec:
         - setWeight: 100
   template:
     metadata:
+      annotations:
+        # P14 (ADR-077 D2): opt into the platform OTel Operator's SDK-config injection — the operator sets
+        # OTEL_EXPORTER_OTLP_ENDPOINT (+ propagators/sampler) from the namespace's `platform` Instrumentation
+        # CR, so the collector endpoint is platform-managed, never hardcoded here. (No-op until you add your
+        # language's OTel SDK; the Go starter is instrumented out of the box.)
+        instrumentation.opentelemetry.io/inject-sdk: "platform"
       labels:
         app: app-${{ values.team }}-${{ values.product }}
         app.kubernetes.io/name: app-${{ values.team }}-${{ values.product }}
@@ -98,11 +104,11 @@ spec:
                   fieldPath: metadata.namespace
             # OpenTelemetry (ADR-077 Layer 1 / P14): the OTel SDK exports request traces to the platform
             # collector, so the app's trace_id in each log line links to its trace in Tempo (log → trace).
-            # Egress to the collector is opened by the allow-egress-to-otel-collector netpol (k8s/base).
-            # The Go starter is instrumented out of the box; other-language starters set the endpoint here
-            # for when you add your language's OTel SDK.
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: http://otel-collector.observability.svc.cluster.local:4318
+            # OTEL_EXPORTER_OTLP_ENDPOINT is injected by the platform OTel Operator (via the inject-sdk
+            # annotation above) from the namespace's `platform` Instrumentation CR — not hardcoded here. Egress
+            # to the collector is opened by the allow-egress-to-otel-collector netpol (k8s/base). The Go starter
+            # is instrumented out of the box; other-language starters read the injected endpoint once you add
+            # your language's OTel SDK.
             - name: OTEL_SERVICE_NAME
               value: app-${{ values.team }}-${{ values.product }}
             - name: OTEL_RESOURCE_ATTRIBUTES
