@@ -67,7 +67,7 @@ jobs:
     env:
       # IAM deny-set for Service policyStatements (mirrors the policy's iamSensitiveServices / #387).
       IAM_SENSITIVE: "iam sts organizations account"
-      CROSSPLANE_VERSION: "v2.2.1" # crank CLI (built from the Go module proxy — see install step)
+      CROSSPLANE_VERSION: "v2.2.3" # crank CLI (built from the Go module proxy — see install step). Newest that still ships cmd/crank; removed from the main module at v2.3.0.
       SCAFFOLDER_APP_LOGIN: "asanexample-backstage-scaffolder[bot]"
       # The promote App (ADR-071) authors release digest-bump PRs (gitops/releases/**) from app CI; it is
       # least-privilege (contents+pull_requests write on THIS repo only — no repo-create). Its release-only,
