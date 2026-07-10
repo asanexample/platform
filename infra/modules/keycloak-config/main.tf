@@ -307,6 +307,15 @@ resource "keycloak_openid_group_membership_protocol_mapper" "groups" {
   name            = "groups"
   claim_name      = "groups"
   full_path       = false
+
+  # Emit `groups` into ALL THREE token surfaces. These match the provider defaults (true) — set
+  # explicitly because they are now load-bearing: the tenant-proxy read front door (P13) resolves a
+  # caller's groups from the OIDC /userinfo response when Grafana's oauthPassThru drops the id_token,
+  # so `add_to_userinfo` MUST stay true or that fallback dead-ends at no_tenant. See
+  # services/tenant-proxy (USERINFO_URL).
+  add_to_id_token     = true
+  add_to_access_token = true
+  add_to_userinfo     = true
 }
 
 # Assign the groups scope to every confidential client. EXHAUSTIVE (the resource manages a client's COMPLETE

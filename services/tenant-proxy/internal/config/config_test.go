@@ -52,6 +52,52 @@ func TestLoad(t *testing.T) {
 			t.Error("Load accepted a relative UPSTREAM_URL; want error")
 		}
 	})
+
+	t.Run("userinfo fallback is optional and defaults off", func(t *testing.T) {
+		setEnv(t, base)
+		c, err := Load()
+		if err != nil {
+			t.Fatalf("Load: %v", err)
+		}
+		if c.UserInfoURL != "" {
+			t.Errorf("UserInfoURL = %q; want empty (fallback off by default)", c.UserInfoURL)
+		}
+		if c.UserInfoCacheTTL <= 0 {
+			t.Errorf("UserInfoCacheTTL = %s; want a positive default", c.UserInfoCacheTTL)
+		}
+	})
+
+	t.Run("valid userinfo url + ttl parse", func(t *testing.T) {
+		m := clone(base)
+		m["USERINFO_URL"] = "https://kc.test/realms/platform/protocol/openid-connect/userinfo"
+		m["USERINFO_CACHE_TTL"] = "45s"
+		setEnv(t, m)
+		c, err := Load()
+		if err != nil {
+			t.Fatalf("Load: %v", err)
+		}
+		if c.UserInfoURL != m["USERINFO_URL"] {
+			t.Errorf("UserInfoURL = %q; want %q", c.UserInfoURL, m["USERINFO_URL"])
+		}
+		if c.UserInfoCacheTTL.String() != "45s" {
+			t.Errorf("UserInfoCacheTTL = %s; want 45s", c.UserInfoCacheTTL)
+		}
+	})
+
+	t.Run("malformed userinfo config rejected", func(t *testing.T) {
+		for name, mut := range map[string]func(m map[string]string){
+			"relative url": func(m map[string]string) { m["USERINFO_URL"] = "kc.test/userinfo" },
+			"bad ttl":      func(m map[string]string) { m["USERINFO_URL"] = "https://kc/u"; m["USERINFO_CACHE_TTL"] = "soon" },
+			"negative ttl": func(m map[string]string) { m["USERINFO_URL"] = "https://kc/u"; m["USERINFO_CACHE_TTL"] = "-5s" },
+		} {
+			m := clone(base)
+			mut(m)
+			setEnv(t, m)
+			if _, err := Load(); err == nil {
+				t.Errorf("Load accepted %s; want error", name)
+			}
+		}
+	})
 }
 
 func TestParseGrants(t *testing.T) {
@@ -97,7 +143,7 @@ func TestParseGrants(t *testing.T) {
 func setEnv(t *testing.T, m map[string]string) {
 	t.Helper()
 	// Clear everything this package reads, then set the provided subset.
-	for _, k := range []string{"UPSTREAM_URL", "JWKS_URL", "OIDC_ISSUER", "OIDC_AUDIENCE", "TENANTS", "ADMIN_GROUP", "GRANTS", "LISTEN_ADDR", "METRICS_ADDR", "UPSTREAM_TIMEOUT"} {
+	for _, k := range []string{"UPSTREAM_URL", "JWKS_URL", "OIDC_ISSUER", "OIDC_AUDIENCE", "TENANTS", "ADMIN_GROUP", "GRANTS", "LISTEN_ADDR", "METRICS_ADDR", "UPSTREAM_TIMEOUT", "USERINFO_URL", "USERINFO_CACHE_TTL"} {
 		t.Setenv(k, "")
 	}
 	for k, v := range m {

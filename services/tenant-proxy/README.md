@@ -9,27 +9,37 @@ that something.
 ## Why it exists
 
 Grafana forwards the logged-in user's Keycloak OIDC token to a datasource when `oauthPassThru` is
-enabled — as the **`X-Id-Token`** header (confirmed live in the P13 spike, #590). This proxy sits
-between Grafana and the store:
+enabled — as the **`X-Id-Token`** header (the id_token) and the **`Authorization: Bearer`** header
+(the access token). This proxy sits between Grafana and the store:
 
 ```text
-Grafana ──(query + X-Id-Token)──▶ tenant-proxy ──(query + X-Scope-OrgID=<team[s]>)──▶ Mimir/Loki/Tempo
+Grafana ──(query + X-Id-Token / Authorization)──▶ tenant-proxy ──(query + X-Scope-OrgID=<team[s]>)──▶ Mimir/Loki/Tempo
 ```
 
-For each request it:
+For each request it authenticates from **two identity sources, in fail-closed order**, then scopes:
 
-1. Reads `X-Id-Token`. Missing → **401** (fail closed).
-2. Verifies the JWT via the realm JWKS — signature, issuer, audience, expiry (coreos/go-oidc, with
-   JWKS caching + rotation). Invalid → **401**.
-3. Resolves the caller's `groups` claim to a tenant scope (`internal/tenant`):
+1. **`X-Id-Token`** (preferred): verify the JWT via the realm JWKS — signature, issuer, audience,
+   expiry (coreos/go-oidc, JWKS-cached with rotation) — and read its `groups` claim.
+2. **`Authorization: Bearer` access token** (fallback, if `USERINFO_URL` is set): when the id_token
+   is absent *or* present-but-invalid, resolve the caller's `groups` by calling the OIDC provider's
+   `/userinfo` with the access token. `/userinfo` is authoritative — the provider validates the token
+   (401 on expired/invalid) and returns the claims; a non-2xx is a hard deny. Results are cached per
+   token (SHA-256 key) for a short TTL. This exists because Grafana 13's `oauthPassThru`
+   intermittently drops the id_token but reliably keeps forwarding the access token, so an
+   id_token-only proxy fails open-loop (every request `no_token`) after that happens.
+3. No usable identity from either source → **401**. Then resolve the `groups` to a tenant scope
+   (`internal/tenant`):
    - the **admin group** → the federated scope over all tenants (`alpha|bravo|platform`);
    - otherwise the intersection of the user's groups with the known team tenants, `|`-joined;
    - no match → **403**. A group that is not a known tenant can never widen access.
 4. **Overwrites** `X-Scope-OrgID` with the resolved scope (any inbound value is a spoof and is
-   discarded), **strips** `X-Id-Token`, and reverse-proxies upstream.
+   discarded), **strips both** `X-Id-Token` and `Authorization` (the user's tokens are never leaked
+   upstream), and reverse-proxies upstream.
 
 Team groups are named exactly as the team identifier (`alpha`, `bravo`, `platform`, …), so no
-mapping table is needed — the spike confirmed this.
+mapping table is needed — the spike confirmed this. The fallback requires the provider's group
+mapper to include `groups` in the **userinfo** response, not just the id_token (Keycloak: the grafana
+client's group-membership mapper with *Add to userinfo* enabled).
 
 ## Fail-closed by construction
 
@@ -49,6 +59,9 @@ always overwritten; the user token is never forwarded upstream.
 | `OIDC_AUDIENCE` | ✓ | | expected `aud` (the Grafana OIDC client id) |
 | `TENANTS` | ✓ | | comma-separated known team tenants (`alpha,bravo,platform`) |
 | `ADMIN_GROUP` | ✓ | | group granting federated all-tenant reads (`platform-admins`) |
+| `GRANTS` | | | cross-team read grants: `grantee:owner1,owner2;grantee2:owner3` (ADR-068) |
+| `USERINFO_URL` | | | OIDC userinfo endpoint (`…/protocol/openid-connect/userinfo`); **set → enables the access-token fallback**, unset → id_token-only |
+| `USERINFO_CACHE_TTL` | | `30s` | how long a userinfo result is reused per access token |
 | `LISTEN_ADDR` | | `:8080` | proxy listen address |
 | `METRICS_ADDR` | | `:9090` | `/metrics` + `/healthz` address (separate port) |
 | `UPSTREAM_TIMEOUT` | | `30s` | upstream response-header timeout |

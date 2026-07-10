@@ -53,6 +53,19 @@ func run(log *slog.Logger) error {
 		return err
 	}
 
+	// Optional access-token fallback (robustness for Grafana's intermittently-dropped id_token). Only
+	// built when USERINFO_URL is configured; otherwise the proxy stays id_token-only.
+	var userinfo auth.UserInfoResolver
+	if cfg.UserInfoURL != "" {
+		userinfo, err = auth.NewUserInfoResolver(auth.UserInfoConfig{
+			URL:      cfg.UserInfoURL,
+			CacheTTL: cfg.UserInfoCacheTTL,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
 	resolver, err := tenant.NewResolver(cfg.Tenants, cfg.AdminGroup, cfg.Grants)
 	if err != nil {
 		return err
@@ -60,13 +73,14 @@ func run(log *slog.Logger) error {
 
 	metrics := newMetrics()
 	upstream := newReverseProxy(cfg, log)
-	handler := proxy.New(verifier, resolver, upstream, metrics, log)
+	handler := proxy.New(verifier, userinfo, resolver, upstream, metrics, log)
 
 	log.Info("starting tenant-proxy",
 		slog.String("listen", cfg.ListenAddr),
 		slog.String("metrics", cfg.MetricsAddr),
 		slog.String("upstream", cfg.UpstreamURL.String()),
 		slog.String("issuer", cfg.Issuer),
+		slog.Bool("userinfo_fallback", userinfo != nil),
 		slog.String("resolver", resolver.String()))
 
 	proxySrv := &http.Server{Addr: cfg.ListenAddr, Handler: handler, ReadHeaderTimeout: 10 * time.Second}

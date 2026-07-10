@@ -74,6 +74,16 @@ resource "kubernetes_deployment_v1" "tenant_proxy" {
             name  = "OIDC_AUDIENCE"
             value = var.oidc_audience
           }
+          # Access-token fallback (robustness for Grafana's intermittently-dropped X-Id-Token). Empty
+          # USERINFO_URL leaves the proxy id_token-only; USERINFO_CACHE_TTL="" uses the proxy's default.
+          env {
+            name  = "USERINFO_URL"
+            value = var.userinfo_url
+          }
+          env {
+            name  = "USERINFO_CACHE_TTL"
+            value = var.userinfo_cache_ttl
+          }
           env {
             name  = "TENANTS"
             value = join(",", var.tenants)
