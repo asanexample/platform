@@ -124,3 +124,7 @@ bin/
 .specify/
 # Infracost local cache (shift-left cost-in-PR; CI uses a fresh checkout)
 .infracost/
+
+# Compiled Go binary from building the scaffolder Go skeleton locally (accidentally committed once).
+# Scoped to this repo only — NOT a template file, so it won't leak into generated projects.
+/scaffolder/templates/new-product/skeleton-go/server
