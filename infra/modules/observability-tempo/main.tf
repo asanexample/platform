@@ -160,9 +160,27 @@ locals {
         httpHeaderName1 = "X-Scope-OrgID"
         tracesToLogsV2  = local.tempo_traces_to_logs
         serviceMap      = { datasourceUid = replace(ds.uid, "tempo", "mimir") }
+        # Trace -> metrics (span -> the service's Beyla RED metrics in the matching Mimir tenant). `$$__tags`
+        # expands to the mapped span tag (service.name -> the metric's service_name label) at query time; the
+        # `$$` escapes Grafana's provisioning env-var substitution (see the loki module's derivedField, #1269).
+        tracesToMetrics = {
+          datasourceUid      = replace(ds.uid, "tempo", "mimir")
+          spanStartTimeShift = "-1h"
+          spanEndTimeShift   = "1h"
+          tags               = [{ key = "service.name", value = "service_name" }]
+          queries = [
+            { name = "Request rate (req/s)", query = "sum(rate(http_server_request_duration_seconds_count{$$__tags}[5m]))" },
+            { name = "Error rate (5xx req/s)", query = "sum(rate(http_server_request_duration_seconds_count{$$__tags,http_response_status_code=~\"5..\"}[5m]))" },
+            { name = "Duration p95 (s)", query = "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{$$__tags}[5m])))" },
+          ]
+        }
         }, var.enable_traces_to_profiles ? {
         tracesToProfilesV2 = {
-          datasourceUid = replace(ds.uid, "tempo", "pyroscope")
+          # Profiles are per-CLUSTER (Pyroscope has no federated `-all` datasource, unlike Mimir/Tempo). The
+          # federated `tempo-all` therefore can't name a `pyroscope-all`; point it at the spoke that runs the
+          # instrumented apps (pyroscope-preprod, verified to hold app-* profiles). Single-cluster tempo datasources
+          # resolve normally (tempo -> pyroscope, tempo-preprod -> pyroscope-preprod).
+          datasourceUid = ds.uid == "tempo-all" ? "pyroscope-${var.federated_profiles_cluster}" : replace(ds.uid, "tempo", "pyroscope")
           profileTypeId = "process_cpu:cpu:nanoseconds:cpu:nanoseconds"
           tags          = [{ key = "service.name", value = "service_name" }]
         }
