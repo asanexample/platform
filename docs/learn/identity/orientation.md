@@ -23,6 +23,8 @@ The whole model fits in a sentence, and it's the same declarative instinct as th
 > **derives** and **projects** it into every system automatically. Dangerous power isn't held; it's
 > borrowed, briefly.
 
+![Access is declared once in git as who-you-are times what-you're-granted, then derived, projected into every system automatically, and verified against drift.](images/identity-decide-derive-project-verify.svg)
+
 You don't create a user in AWS, then again in Keycloak, then again in GitHub. You add a person to a git
 registry with a grant, and controllers reconcile that into each system's native config. Access is a
 computed thing — `(who you are) × (what you're granted)` — projected outward, not hand-maintained in five
@@ -56,6 +58,8 @@ Two kinds of subject travel this model, and it's worth separating them:
 
 A third, *consumer*/CIAM plane — the end-users of products we host — is deliberately deferred, with its own
 isolated per-Product realms. Same machinery, zero trust between planes.
+
+![Three sealed identity planes — workforce (Keycloak), machine (Pod Identity), and consumer/CIAM (deferred) — separated by barrier walls, so no trust crosses between them.](images/identity-planes.svg)
 
 ## The source of truth — a roster and a catalog, in git
 
@@ -103,22 +107,7 @@ That projected Keycloak group isn't just stored — an app reads it at every sig
 direct-Keycloak OIDC flow when robin opens an app like Backstage or ArgoCD (Dex retired — the app talks
 straight to Keycloak):
 
-```mermaid
-sequenceDiagram
-    participant B as Browser
-    participant APP as App
-    participant KC as Keycloak platform realm
-    B->>APP: open app no session
-    APP-->>B: redirect to Keycloak
-    B->>KC: authenticate password plus passkey
-    KC-->>B: auth code
-    B->>APP: return with auth code
-    APP->>KC: exchange code for id and access tokens
-    KC-->>APP: id and access tokens
-    APP->>APP: read groups claim for authz
-    Note over KC: IdP of record no upstream broker by default
-    APP-->>B: session established
-```
+![OIDC sign-in: the browser and app talk straight to Keycloak — authenticate (password plus passkey), exchange the auth code for id and access tokens, and read the groups claim for authorization.](images/identity-keycloak-signin-sequence.svg)
 
 ## The machine side — workload identity without keys
 
@@ -142,7 +131,11 @@ is richer. An agent often acts on behalf of a human or the platform, so the mode
 separate: the agent's own workload identity, its tool/model grant, and the on-behalf-of-user delegation. The
 governing rule is sharp: effective authority is the *intersection* of the agent's grant and the calling
 human's scope — enforced by trusted code at the boundary, never by the agent itself — and delegation only
-ever attenuates (each hop can narrow, never escalate). It's not a parallel model: agents are subjects in the
+ever attenuates (each hop can narrow, never escalate).
+
+![An agent's effective authority is the intersection of the agent's own grant and the calling human's scope; delegation only ever attenuates, never escalates.](images/identity-agent-authority-intersection.svg)
+
+It's not a parallel model: agents are subjects in the
 *same* grant model (ADR-068, extended), and delegation is just a grant. That, plus graduated autonomy
 (machine-enforced bounds on what an agent may do unattended), is the [Agentic platform](../_inventory.md)'s
 subject — the runtime and the copilot's base identity are live, the full delegation/autonomy machinery is
@@ -173,6 +166,8 @@ generators deliberately exclude on-demand grants from the standing config
 does not exist in any system until you activate it — a step-up (re-prompt a passkey), a TTL, and loud audit.
 When the clock runs out, it's auto-revoked. Nobody walks around holding apex power; they borrow it, use it,
 and it evaporates.
+
+![Break-glass power over time: inert while you are merely eligible, activated just-in-time with a passkey step-up, time-boxed while in use, then auto-revoked.](images/identity-on-demand-power-timeline.svg)
 
 > That's the literal break-glass panel — behind glass, off by default, and breaking it sets off an alarm.
 > You don't carry the fire axe; it's on the wall, and grabbing it is a loud, logged, temporary act.
