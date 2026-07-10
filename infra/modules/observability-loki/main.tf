@@ -148,10 +148,16 @@ locals {
   # come from any cluster and its trace lands in that cluster's Tempo tenant, so the link must span tenants
   # (Tempo tenant-federation honours the `a|b` OrgID — verified). Without this a preprod app's log links to
   # the platform tenant and the trace is "not found".
+  # `${__value.raw}` is Grafana's derived-field value placeholder, evaluated at QUERY time. But Grafana also
+  # does ENV-VAR substitution on provisioning files, and an unknown `${__value.raw}` gets blanked to "" — so
+  # the trace link fired with no trace id and returned "No data" (root-caused via the Grafana datasource API,
+  # #1269). The provisioning file must contain the escaped form `$${__value.raw}` (Grafana `$$`→`$`). Getting
+  # `$${` onto disk needs `$$${` in HCL (HCL collapses one `$${`→`${`, leaving the leading `$`). Verified with
+  # `tofu console` and the live datasource API before/after.
   loki_derived_fields = [{
     name          = "trace_id"
     matcherRegex  = "trace_?[iI][dD]\"?[:=]\\s*\"?([0-9a-fA-F]+)"
-    url           = "$${__value.raw}"
+    url           = "$$${__value.raw}"
     datasourceUid = "tempo-all"
   }]
 
