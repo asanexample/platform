@@ -82,8 +82,9 @@ generate "kubernetes_provider" {
 }
 
 inputs = {
-  # P13 read-isolation toggle — on for the hub (where Grafana runs), same gate as the metrics proxy.
-  create = include.base.locals.enable_per_team_tenants
+  # RETIRED (#1269), same as the metrics tenant-proxy — the loki datasources went back to direct read, so this
+  # is inert. `create = false` tears it down; re-enable by restoring the loki unit's read_proxy_url + this gate.
+  create = false
 
   # A per-signal instance of the SAME grant-aware proxy image, fronting Loki instead of Mimir.
   name      = "loki-tenant-proxy"

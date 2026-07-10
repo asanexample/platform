@@ -198,10 +198,15 @@ locals {
 
   grafana_datasource = {
     apiVersion = 1
-    # Rename migration: the default datasource was bare "Mimir"; it's now "Mimir (platform)" (same uid). Grafana
-    # provisioning keys on name, so without deleting the old name first the new one collides on uid and 500s
-    # the whole reload. Idempotent — a no-op once the old name is gone.
-    deleteDatasources = [{ name = "Mimir", orgId = 1 }]
+    # Prune datasources removed over time (idempotent — a no-op once each is gone). Grafana provisioning keys on
+    # name, so a removed datasource must be listed here or it lingers in the DB:
+    #  - "Mimir": renamed to "Mimir (platform)" (same uid) — without deleting the old name the new one collides.
+    #  - "Mimir (admin — all tenants)": the #1270 break-glass datasource, retired with the read-proxy (#1269) now
+    #    that the direct "Mimir (all clusters)" federates the full tenant set.
+    deleteDatasources = [
+      { name = "Mimir", orgId = 1 },
+      { name = "Mimir (admin — all tenants)", orgId = 1 },
+    ]
     datasources = concat([for ds in local.datasource_tenants : {
       name   = ds.name
       type   = "prometheus"

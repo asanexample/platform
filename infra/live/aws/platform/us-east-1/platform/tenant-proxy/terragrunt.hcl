@@ -87,8 +87,11 @@ generate "kubernetes_provider" {
 }
 
 inputs = {
-  # P13 read-isolation toggle (enable_per_team_tenants) — on for the platform hub (env.hcl), where Grafana runs.
-  create = include.base.locals.enable_per_team_tenants
+  # RETIRED (#1269): the P13 read-proxy is decommissioned — OSS Grafana's oauthPassThru identity forwarding
+  # is unreliable, so the mimir/loki datasources went back to direct-with-static-tenant-header and this proxy
+  # is unused (see the mimir unit's read_proxy_url). Kept in git (not deleted) so re-enabling is a one-line
+  # flip if forwarding is ever fixed. `create = false` tears down the now-inert Deployment/Service/ServiceMonitor.
+  create = false
 
   namespace = dependency.observability.outputs.namespace
 

@@ -157,9 +157,14 @@ locals {
 
   grafana_datasource = {
     apiVersion = 1
-    # Rename migration (bare "Loki" -> "Loki (platform)", same uid): delete the old name first so provisioning
-    # doesn't collide on uid and 500 the reload. Idempotent. See the mimir module for the full rationale.
-    deleteDatasources = [{ name = "Loki", orgId = 1 }]
+    # Prune removed datasources (idempotent; see the mimir module for the full rationale):
+    #  - "Loki": renamed to "Loki (platform)" (same uid) — delete the old name so provisioning doesn't collide.
+    #  - "Loki (admin — alpha)": a hand-applied break-glass datasource from the #1269 incident, retired with the
+    #    read-proxy now that the direct "Loki (alpha)" datasource exists. (Its stray CM is deleted separately.)
+    deleteDatasources = [
+      { name = "Loki", orgId = 1 },
+      { name = "Loki (admin — alpha)", orgId = 1 },
+    ]
     datasources = [for ds in local.datasource_tenants : {
       name   = ds.name
       type   = "loki"
