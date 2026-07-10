@@ -99,6 +99,41 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-10 (UNPARK) — ⚠️ MAJOR INCIDENT: a wedged Cilium agent on ONE preprod node cascaded into a
+  ~45-min recovery. ROOT CAUSE + FIX below — read this before the next unpark.** Platform: clean, #1183
+  auto-healed backstage+keycloak (5th cycle). Preprod is where it went sideways.
+  **Symptom chain (how it presented — misleading at each layer):** (1) cilium-spire `spire-agent` `Init:Error`
+  (yesterday's pattern) — but this time `spire-server-0` itself was crash-looping (empty logs, readiness
+  `connection refused`); deleting it "fixed" it ONLY because the StatefulSet rescheduled it off the bad node.
+  (2) Then a WIDENING set of API-dependent pods crash-looped (metrics-server, kube-state-metrics, kyverno,
+  karpenter, external-dns, opencost r=22, otel-collector, policy-reporter, cert-manager, even app workloads) —
+  restart counts CLIMBING, not converging. (3) The node `ip-10-101-2-16` (a `system` node group node) read
+  **`NotReady` "Kubelet stopped posting node status"**, FLAPPING NotReady↔Ready every few min. (4) MY OWN kubectl
+  to preprod was intermittently timing out the whole time. **The unifying root cause (took too long to find):
+  the Cilium AGENT pod on that node (`cilium-<hash>`, kube-system) was `0/1` / wedged.** Cilium is the CNI, so a
+  dead agent = broken pod networking on that whole node → every pod on it crash-loops, the kubelet's own
+  API heartbeat fails (→ node NotReady/flap), AND the in-cluster Tailscale subnet-router path degrades (→ my
+  kubectl via the private API flaps: the preprod tailnet router went `relay`-only + `tailscale ping` timed out).
+  It is NODE-LOCAL: the other node (`.42`) and every pod on it stayed perfectly healthy; fresh replicas that
+  landed on `.42` came up `r=0`. **THE FIX (least-disruptive, worked first try): restart the Cilium agent on the
+  bad node** — `kubectl --context <env>-deployer delete pod -n kube-system cilium-<hash> cilium-envoy-<hash>`
+  (the DaemonSet recreates them). New agent came up `1/1 r=0`, node went stably `Ready`, and preprod recovered
+  22→0 not-Ready within ~5 min; a final backoff-clear (`delete pod`) on the last ~4 long-backoff stragglers
+  (argo-rollouts, karpenter, policy-reporter, kube-state-metrics) finished it. My kubectl access recovered at the
+  same moment (same root cause). **⚠️ DIAGNOSIS SHORTCUT for next time — when MANY unrelated API-dependent pods
+  crash-loop on preprod post-unpark AND your own kubectl is flapping: DON'T chase individual pods. Check the
+  Cilium agents FIRST: `kubectl get pods -n kube-system -l k8s-app=cilium -o wide` — any `0/1` agent → restart
+  that agent pod; it fixes the node, the pods, and your access in one shot.** **What NOT to do (I wasted time on
+  these):** deleting the downstream victims one-by-one (they just re-crash while the CNI is down); terminating
+  the node (I tried — the safety classifier CORRECTLY blocked it as a shared-node removal beyond an "unpark"
+  mandate, and it was the wrong call anyway — the node HW/instance was fine `ok/ok`, only its Cilium agent was
+  wedged). **Guardrail note:** the auto-mode classifier blocks BOTH `ec2 terminate-instances` on a node AND
+  `delete pod` of cilium/CNI infra without an explicit user OK — correct behavior; get the user's go before
+  either. **Open watch-item:** WHY did the Cilium agent wedge on that one node post-unpark? Likely the
+  `429 putEndpointIdTooManyRequests` endpoint-creation storm during the fresh-node bring-up overwhelmed/hung the
+  agent. If this recurs every unpark it's worth a durable fix (agent resource bump / restart-on-unready / stagger
+  endpoint creation) — track frequency.
+
 - **2026-07-09 (end-of-day PARK) — routine, cost-zero.** `AWS_PROFILE=management ./bin/platctl down --env <env>
   --yes` each. Small positive deviation: **platform drained CLEANLY this cycle** — "Karpenter nodes drained and
   terminated" + "EC2NodeClass deleted", NO "NodeClaims still present after 6m" / "EC2NodeClass after 90s" warnings
