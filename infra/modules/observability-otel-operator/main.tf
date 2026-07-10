@@ -21,6 +21,12 @@ resource "helm_release" "operator" {
   atomic  = true
 
   values = [yamlencode({
+    # The EKS-managed control plane cannot dial a webhook on a Cilium OVERLAY pod IP (BYOCNI — the pod CIDR
+    # isn't routed to the control-plane ENIs); the apiserver rejects it with "Address is not allowed", so the
+    # mutating webhook (minstrumentation.kb.io) is unreachable and NO Instrumentation CR can be admitted. Run
+    # the manager on hostNetwork so its webhook endpoint is a VPC-native NODE IP the control plane can reach —
+    # the same pattern every other apiserver-facing webhook here uses (Kyverno admission, cert-manager).
+    hostNetwork = true
     manager = {
       resources = {
         requests = { cpu = "50m", memory = "128Mi" }
@@ -29,6 +35,12 @@ resource "helm_release" "operator" {
       # Pin the default sidecar collector image (used for OpenTelemetryCollector CRs, not the SDK inject).
       collectorImage = {
         repository = "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s"
+      }
+      # With hostNetwork these bind on the NODE — offset off the chart defaults so they can't collide with
+      # another hostNetwork webhook on a shared node (Kyverno admission also serves on 9443).
+      ports = {
+        webhookPort = 9444
+        healthzPort = 8082
       }
     }
     # Webhook serving cert from cert-manager (ADR-018 — present cluster-wide).
