@@ -82,6 +82,19 @@ locals {
         retention_enabled    = true
         delete_request_store = "s3"
       }
+
+      # Multi-tenant read federation (#1269): a query carrying `X-Scope-OrgID: a|b|c` spans all listed
+      # tenants (like Mimir/Tempo), which is what makes the federated `Loki (all clusters)` datasource work —
+      # the ONLY datasource that finds an app's logs, since the spoke passthrough splits them into per-team
+      # tenants (a preprod trace's logs live in the `alpha` tenant, not `preprod`). The field is
+      # `querier.multi_tenant_queries_enabled` (validated against the loki 3.6.7 flag registry —
+      # `-querier.multi-tenant-queries-enabled`). NOT `tenant_federation`, which is not a Loki config field.
+      # Injected via structuredConfig (deep-merged) because the chart doesn't template `loki.querier`.
+      structuredConfig = {
+        querier = {
+          multi_tenant_queries_enabled = true
+        }
+      }
     }
 
     # Karpenter must not voluntarily disrupt (consolidate/drift/expire) the nodes Loki's stateful pods run
