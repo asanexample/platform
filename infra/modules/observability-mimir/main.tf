@@ -203,9 +203,13 @@ locals {
     #  - "Mimir": renamed to "Mimir (platform)" (same uid) — without deleting the old name the new one collides.
     #  - "Mimir (admin — all tenants)": the #1270 break-glass datasource, retired with the read-proxy (#1269) now
     #    that the direct "Mimir (all clusters)" federates the full tenant set.
+    #  - "P13 Spike Echo (TEMPORARY - delete me)": a leftover prometheus datasource from an early P13 spike whose
+    #    source CM was deleted, leaving it as an orphaned read-only entry the Grafana API refuses to delete —
+    #    deleteDatasources is the only way to prune it.
     deleteDatasources = [
       { name = "Mimir", orgId = 1 },
       { name = "Mimir (admin — all tenants)", orgId = 1 },
+      { name = "P13 Spike Echo (TEMPORARY - delete me)", orgId = 1 },
     ]
     datasources = concat([for ds in local.datasource_tenants : {
       name   = ds.name
