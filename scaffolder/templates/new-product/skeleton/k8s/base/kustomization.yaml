@@ -11,6 +11,7 @@ resources:
   - service.yaml
   - httproute.yaml
   - netpol-egress-otel.yaml # egress to observability/otel-collector for OTLP trace export (P14 log→trace)
+  - netpol-egress-pyroscope.yaml # egress (Cilium FQDN) to the Pyroscope ingest edge for SDK profile push (trace→profiles)
 # Rewrite HTTPRoute backendRefs when a namePrefix is applied (PR previews, see name-reference.yaml); and teach
 # the replicas transformer to target the Argo Rollout (kustomizeconfig.yaml, ADR-056).
 configurations:
