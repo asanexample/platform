@@ -179,6 +179,45 @@ resource "kubernetes_network_policy_v1" "allow_intra_namespace" {
   }
 }
 
+# OTLP ingress to the OTel collector for TENANT apps that emit telemetry (P14 log→trace / ADR-077 Layer 1).
+# default-deny-ingress otherwise drops cross-namespace OTLP, so an SDK-instrumented environment's export times
+# out. Scoped like the hub's `allow-otlp-from-platform-telemetry`: only the collector pod, only the OTLP ports
+# (4317 gRPC / 4318 HTTP), only from namespaces labeled `platform.refplat.org/otel-export = "true"` (the
+# Crossplane Environment Composition stamps that label on environment namespaces). Opt-in per spoke.
+resource "kubernetes_network_policy_v1" "allow_otlp_from_environments" {
+  count = local.create && var.enable_otlp_ingress ? 1 : 0
+
+  metadata {
+    name      = "allow-otlp-from-environments"
+    namespace = kubernetes_namespace_v1.this[0].metadata[0].name
+  }
+  spec {
+    pod_selector {
+      match_labels = {
+        "app.kubernetes.io/name" = "opentelemetry-collector"
+      }
+    }
+    policy_types = ["Ingress"]
+    ingress {
+      from {
+        namespace_selector {
+          match_labels = {
+            "platform.refplat.org/otel-export" = "true"
+          }
+        }
+      }
+      ports {
+        protocol = "TCP"
+        port     = "4317"
+      }
+      ports {
+        protocol = "TCP"
+        port     = "4318"
+      }
+    }
+  }
+}
+
 # ---------------------------------------------------------------------------
 # Helm release — kube-prometheus-stack (agent mode)
 # ---------------------------------------------------------------------------

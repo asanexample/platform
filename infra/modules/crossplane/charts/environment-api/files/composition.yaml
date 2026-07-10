@@ -92,6 +92,11 @@ spec:
                       {{- end }}
                       platform.refplat.org/tier: {{ $tier }}
                       platform.refplat.org/mode: namespace
+                      # P14 log→trace (ADR-077 Layer 1): lets an SDK-instrumented workload export OTLP to the
+                      # OTel collector — the collector's `allow-otlp-from-environments` netpol admits ingress
+                      # only from namespaces carrying this label. Safe by construction: the only path it opens
+                      # is telemetry egress to the collector (a sink), never inbound to the app.
+                      platform.refplat.org/otel-export: "true"
                       pod-security.kubernetes.io/enforce: baseline
                       pod-security.kubernetes.io/warn: restricted
                       pod-security.kubernetes.io/audit: restricted

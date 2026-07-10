@@ -112,3 +112,9 @@ variable "enable_team_budget_metric" {
   type        = bool
   default     = false
 }
+
+variable "enable_otlp_ingress" {
+  description = "Add an ingress NetworkPolicy allowing OTLP (4317/4318) to the OTel collector from namespaces labeled platform.refplat.org/otel-export=true. Enable on spokes where tenant apps export traces via the OTel SDK (P14 log→trace). Off by default; the collector namespace otherwise default-denies cross-namespace ingress."
+  type        = bool
+  default     = false
+}

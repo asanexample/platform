@@ -104,5 +104,10 @@ inputs = {
   # WAL on emptyDir (module default): preprod has no gp3 StorageClass, and an ephemeral WAL is fine for a
   # lightweight spoke (the agent re-scrapes on restart). Set to an existing class for a durable WAL.
 
+  # P14 log→trace: allow OTLP (4317/4318) to the OTel collector from environment namespaces labeled
+  # platform.refplat.org/otel-export=true (the Composition stamps it), so SDK-instrumented tenant apps
+  # (ADR-077 Layer 1) can export traces. The collector ns otherwise default-denies cross-namespace ingress.
+  enable_otlp_ingress = true
+
   tags = include.base.locals.tags
 }

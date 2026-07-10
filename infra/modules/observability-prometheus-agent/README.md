@@ -76,6 +76,7 @@ No modules.
 | [helm_release.agent](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
 | [kubernetes_namespace_v1.this](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/namespace_v1) | resource |
 | [kubernetes_network_policy_v1.allow_intra_namespace](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/network_policy_v1) | resource |
+| [kubernetes_network_policy_v1.allow_otlp_from_environments](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/network_policy_v1) | resource |
 | [kubernetes_network_policy_v1.default_deny_ingress](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/network_policy_v1) | resource |
 
 ## Inputs
@@ -86,6 +87,7 @@ No modules.
 | <a name="input_aws_region"></a> [aws\_region](#input\_aws\_region) | AWS region (informational; the agent holds no AWS creds — it only scrapes + remote\_writes). | `string` | `"us-east-1"` | no |
 | <a name="input_cluster_label"></a> [cluster\_label](#input\_cluster\_label) | Value of the `cluster` external label stamped on every series (so the hub can isolate this spoke, e.g. `up{cluster="preprod"}`). Falls back to cluster\_name when empty. | `string` | `""` | no |
 | <a name="input_create"></a> [create](#input\_create) | Controls whether resources are created. | `bool` | `true` | no |
+| <a name="input_enable_otlp_ingress"></a> [enable\_otlp\_ingress](#input\_enable\_otlp\_ingress) | Add an ingress NetworkPolicy allowing OTLP (4317/4318) to the OTel collector from namespaces labeled platform.refplat.org/otel-export=true. Enable on spokes where tenant apps export traces via the OTel SDK (P14 log→trace). Off by default; the collector namespace otherwise default-denies cross-namespace ingress. | `bool` | `false` | no |
 | <a name="input_enable_team_budget_metric"></a> [enable\_team\_budget\_metric](#input\_enable\_team\_budget\_metric) | Configure kube-state-metrics CustomResourceState to emit team\_budget\_monthly\_usd{team} from the Team CR (ADR-091). Enable only on the spoke that runs the env-API Team CRD (preprod). | `bool` | `false` | no |
 | <a name="input_helm_chart"></a> [helm\_chart](#input\_helm\_chart) | Helm chart name. kube-prometheus-stack in agent mode — same chart as the hub, so metric names/labels match and the hub dashboards work for this spoke. | `string` | `"kube-prometheus-stack"` | no |
 | <a name="input_helm_chart_version"></a> [helm\_chart\_version](#input\_helm\_chart\_version) | kube-prometheus-stack chart version (pin from \_versions.hcl; reuses the hub's pin). | `string` | `"87.5.0"` | no |
