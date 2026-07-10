@@ -90,7 +90,7 @@ inputs = {
   namespace = dependency.observability.outputs.namespace
 
   # Same digest-pinned signed image as the metrics tenant-proxy (signal-agnostic; only the upstream differs).
-  image = "829808296602.dkr.ecr.us-east-1.amazonaws.com/platform/tenant-proxy@sha256:7a534ca942f9075bd89ebfe44ca3bbf6e6e52e9f0ad5ce2888a949323c8c3661"
+  image = "829808296602.dkr.ecr.us-east-1.amazonaws.com/platform/tenant-proxy@sha256:61534662a2913bf69c57d85225d5189c5efe905358de9b567daf535e1dc6c13c"
 
   # The Loki query gateway (Grafana's Loki datasource appends /loki/api/v1/...). Identity-scoped X-Scope-OrgID.
   upstream_url = "http://loki-gateway.observability.svc"
