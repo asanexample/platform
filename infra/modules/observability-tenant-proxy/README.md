@@ -82,6 +82,8 @@ No modules.
 | <a name="input_tags"></a> [tags](#input\_tags) | Labels to apply. | `map(string)` | `{}` | no |
 | <a name="input_tenants"></a> [tenants](#input\_tenants) | Known team tenants the proxy may scope to (comma-joined into the proxy's TENANTS). A user's groups are intersected with this set; unknown groups can't widen access. | `list(string)` | <pre>[<br/>  "alpha",<br/>  "bravo",<br/>  "platform"<br/>]</pre> | no |
 | <a name="input_upstream_url"></a> [upstream\_url](#input\_upstream\_url) | The store query API the proxy reverse-proxies to (per-request X-Scope-OrgID). The in-cluster Mimir gateway /prometheus. | `string` | `"http://mimir-gateway.observability.svc/prometheus"` | no |
+| <a name="input_userinfo_cache_ttl"></a> [userinfo\_cache\_ttl](#input\_userinfo\_cache\_ttl) | How long a userinfo lookup is cached per access token (Go duration, e.g. "30s"). Empty → the proxy's built-in default (30s). Keep short so a revoked token stops working quickly. | `string` | `""` | no |
+| <a name="input_userinfo_url"></a> [userinfo\_url](#input\_userinfo\_url) | Keycloak realm userinfo endpoint. Enables the robust identity fallback: when Grafana's oauthPassThru drops the X-Id-Token (a Grafana 13 regression), the proxy resolves the caller's groups from this endpoint using the still-forwarded Authorization Bearer access token. Same in-cluster keycloak service as jwks\_url (same egress path, no netpol change). Set to "" to disable the fallback (id\_token-only). | `string` | `"http://keycloak-http.keycloak.svc/realms/platform/protocol/openid-connect/userinfo"` | no |
 
 ## Outputs
 
