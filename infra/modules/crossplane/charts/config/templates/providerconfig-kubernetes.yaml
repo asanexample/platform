@@ -51,6 +51,13 @@ rules:
   - apiGroups: ["kyverno.io"]
     resources: ["clusterpolicies"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Per-namespace OTel Instrumentation CR (P14 / ADR-077 D2): the Composition writes a `platform`
+  # Instrumentation into the Environment namespace (the platform-injected OTLP endpoint the OTel Operator
+  # reads). The CRD is installed by the otel-operator unit; without this grant provider-kubernetes cannot
+  # observe/apply the composed Object and the XR never goes Ready.
+  - apiGroups: ["opentelemetry.io"]
+    resources: ["instrumentations"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # Per-Service resource-output ConfigMaps (ADR-073): the Composition writes <svc>-resources into the
   # Environment namespace (bucket names, etc.) via a provider-kubernetes Object; the workload consumes it via
   # envFrom. Namespaced, non-secret outputs only (credentialed engines use a Secret/ESO path, not this).
