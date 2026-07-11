@@ -1,0 +1,16 @@
+# Product "flagship" owned by Team platform (ADR-081/099) — the platform feature-flag service. The git-native
+# registry entry; delivery (argocd-apps, github-oidc, policy) derives repo/image-scope from here exactly as for
+# a tenant Product. Image scope: team-platform/flagship-*.
+apiVersion: platform.refplat.org/v1beta1
+kind: Product
+metadata:
+  name: platform-flagship
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/part-of: environment-api
+spec:
+  team: platform
+  repo: asanexample/flagship
+  tenancy: pooled
+  defaultIsolation: { compute: dedicated-namespace }
+  domains: []
