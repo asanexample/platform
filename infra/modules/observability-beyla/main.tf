@@ -27,6 +27,17 @@ locals {
           instrument = [
             { k8s_namespace = var.instrument_namespaces },
           ]
+          # Never double-instrument a workload that already runs its own OpenTelemetry SDK. For Go,
+          # Beyla's eBPF context propagation (bpf_probe_write_user) is automatic and OVERWRITES the SDK's
+          # W3C `traceparent` on egress, so a downstream service adopts Beyla's trace context and the SDK
+          # spans never share a trace id — the distributed trace fragments (0 merged shop->checkout traces;
+          # postmortem 2026-07-10). Excluding by the OTel Operator's inject annotation (glob-matched, any
+          # value) is per-workload, not per-namespace: Beyla stays the zero-code floor for every
+          # *un-instrumented* workload in the namespace (any language), while SDK'd services own their own
+          # tracing (RED + service-graph then come from the merged SDK traces via Tempo's metrics-generator).
+          exclude_instrument = [
+            { k8s_pod_annotations = { "instrumentation.opentelemetry.io/inject-sdk" = "*" } },
+          ]
         }
         # Traces → the OpenTelemetry Collector gateway (P3b) → Tempo.
         otel_traces_export = {
