@@ -1,0 +1,9 @@
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata:
+  name: alpha-shop-dev
+spec:
+  environmentRef: alpha-shop-dev
+  services:
+    catalog:
+      digest: sha256:7c6694ef3efe5e30dfb2c84124770ecda1bc79f9d79b40e420ad2eb3d9f66249
