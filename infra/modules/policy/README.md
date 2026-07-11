@@ -111,6 +111,24 @@ policies (securityContext, preStop, image/cosign) already cover Rollout pods via
 need no change. **Default `false`**: a Kyverno rule naming a kind whose CRD is absent fails to create
 (Kyverno #7839), so enable this **per cluster only after the `argo-rollouts` unit (CRDs) is applied** there.
 
+### Platform services: cross-namespace DB secret sync (`enable_db_secret_sync`, default false)
+
+A stateful platform Product ([ADR-081](../../../docs/adrs/081-platform-service-delivery.md)) runs its app in
+an Environment namespace but its CNPG database — and the generated `<cluster>-app` credential Secret — in a
+dedicated platform-database namespace (a database does not belong in the tenant sandbox). Kubernetes
+`secretKeyRef` can't cross namespaces, so the `sync-platform-db-secret` policy clones that Secret into the app
+namespace, `synchronize: true` (propagates CNPG password rotation) + `generateExisting: true` (back-fills the
+already-provisioned database). Namespace pairs are declared per binding at the unit (`db_secret_sync_bindings`),
+so the module carries no product-specific data. First consumer: Flagship
+([ADR-099](../../../docs/adrs/099-feature-flags-platform-service.md)).
+
+RBAC splits READ from WRITE. READ (`get/list/watch` on Secrets) is cluster-wide via a ClusterRole bound to
+both Kyverno controllers with an explicit ClusterRoleBinding — forced, because `generateExisting` enumerates
+triggers with a *cluster-scoped* list, and read-only (Kyverno's admission webhooks already observe every
+Secret). WRITE stays namespace-scoped: a Role in each target namespace (`create/update/patch/delete`) and a
+`resourceNames`-pinned Role in each source namespace (`update/patch`, so `synchronize` can label the source to
+watch it for rotation) — so Kyverno can only materialise the clone where a binding declares it.
+
 ## Usage
 
 ```hcl
@@ -165,6 +183,8 @@ If a policy blocks legitimate admission, patch the generated webhook configurati
 | `replica_count` | Admission controller replicas (HA=3) | `number` | `3` |
 | `helm_chart_version` | Kyverno chart version | `string` | `"3.8.1"` |
 | `additional_policies` | Raw ClusterPolicy YAML (ADR-014 escape hatch) | `map(string)` | `{}` |
+| `enable_db_secret_sync` | Clone a CNPG DB Secret from a platform-database namespace into a platform Product's Environment namespace (ADR-099) | `bool` | `false` |
+| `db_secret_sync_bindings` | Namespace pairs for `enable_db_secret_sync` (`{name, sourceNamespace, secretName, targetNamespace}`) | `list(object)` | `[]` |
 | `tags` | Tags/labels | `map(string)` | `{}` |
 
 ## Outputs
