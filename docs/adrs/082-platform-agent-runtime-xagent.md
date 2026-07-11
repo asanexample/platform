@@ -160,6 +160,14 @@ non-agent platform apps/services — backstage et al.) is a cheap follow-on: the
 **not built now** — there is no non-agent consumer, and building it speculatively is the over-engineering ADR-074's "pulled by
 the second real agent" principle warns against. Existing Terragrunt-deployed platform apps stay as-is until one wants the lane.
 
+> **Note (2026-07-11, [ADR-081 amendment](081-platform-service-delivery.md#amendment-2026-07-11-platform-service-placement--realizing-d2d3d6)).**
+> The deferred `XPlatformService` is **not** built as a new kind. When a non-agent consumer arrived (the feature-flag service,
+> [ADR-099](099-feature-flags-platform-service.md)), it proved to be *Environment-shaped* (stages, promotion, self-service AWS),
+> so the non-agent lane is the **`XEnvironment`** itself — a platform-owned Team's Environment gets a fail-safe image-sandbox
+> exemption ([#1315](https://github.com/asanexample/platform/pull/1315)), not a lean new composite. Note the "reusable partial"
+> anticipated here was never actually built — the agent-api and environment-api compositions are independent copies — which is
+> itself why a second composition was rejected in favor of a conditional; the *separate-kind vehicle* is superseded.
+
 ### D10 — Consistency with ADR-048
 
 ADR-048 keeps the hub free of the **tenant Environment** Composition (to avoid multi-cluster tenant orchestration + fragile
