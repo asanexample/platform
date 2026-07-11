@@ -99,6 +99,36 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-10 (PM, same node still biting — ⚠️ I MADE IT WORSE by draining; read this WITH the morning
+  entry below).** Hours after the morning recovery, doing unrelated work (deploying the OTel operator on
+  preprod), the SAME node `ip-10-101-2-16` was still poisoning pods that had started on it during the
+  morning wedge. **Symptom:** `terragrunt apply` and every write failed with `failed calling webhook
+  "validate.kyverno.svc-fail": no endpoints available for service "kyverno-svc"` — i.e. **Kyverno admission
+  was fail-closed with ZERO endpoints**, so it rejected ALL cluster writes. Root cause: the
+  `kyverno-admission-controller` pod (and later the `opentelemetry-operator`) were `0/1`/crash-looping with
+  health-probe timeouts to their own `:9445`/`:8081`. **THE TELL (faster than reading logs): `kubectl get pod
+  -o wide` → the pod's IP is the NODE IP (`10.101.2.x`) instead of a Cilium overlay IP (`10.241.x`)** = a dead
+  network sandbox it got when Cilium wasn't ready. Container restarts keep the same broken sandbox, so it
+  flaps forever. **CORRECT FIX (cheap, per the morning entry): `kubectl delete pod` the wedged pod** — it
+  reschedules with a fresh sandbox onto a healthy node (Kyverno admission recovered instantly this way, first
+  try). **WHAT I DID WRONG:** instead of `delete pod`, I escalated to **`kubectl drain ip-10-101-2-16`** to
+  clear all the stragglers at once. Two things went bad: (1) **the drain evicted `tailscale-system/
+  ts-...-subnet-router-...` — MY OWN kubectl path into the private cluster** — so the API connection reset
+  mid-drain (`read: connection reset by peer`) and the drain errored half-done; and (2) it triggered a
+  **Karpenter node-churn storm** (nodes `-12`/`-54` replaced by `-31`/`-55` within minutes) that kept
+  rescheduling provider-kubernetes and the operator, so the one dependent reconcile (a Composition-emitted
+  Instrumentation CR) never completed while the cluster thrashed. Net: a 30-second `delete pod` turned into a
+  much longer, scarier recovery. **DURABLE LESSONS:** (a) for a wedged-sandbox pod, `delete pod` (or restart
+  the node's Cilium agent per the morning entry) — **do NOT `drain` the node**; drain is a sledgehammer that
+  evicts things you depend on and provokes Karpenter churn. (b) **NEVER drain the node hosting the Tailscale
+  subnet router** (`tailscale-system/ts-*-subnet-router-*`) — it's your access path; evicting it cuts kubectl
+  mid-operation (it does come back ~1min after it reschedules, but you're blind until then). Check which node
+  it's on FIRST. (c) A single wedged `kyverno-admission-controller` = fail-closed webhook with no endpoints =
+  **every** apply/create cluster-wide is rejected; fix that pod before anything else. (d) After you cordon a
+  node, the wedged control-plane pods that DIDN'T get evicted (e.g. the operator whose webhook the apply needs)
+  are still on it — `delete pod` those individually so they reschedule off the cordoned node. Node `-16` left
+  cordoned for later termination; the dependent CR reconcile was left to finish once Karpenter settled.
+
 - **2026-07-10 (UNPARK) — ⚠️ MAJOR INCIDENT: a wedged Cilium agent on ONE preprod node cascaded into a
   ~45-min recovery. ROOT CAUSE + FIX below — read this before the next unpark.** Platform: clean, #1183
   auto-healed backstage+keycloak (5th cycle). Preprod is where it went sideways.
