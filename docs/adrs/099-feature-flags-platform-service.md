@@ -129,6 +129,7 @@ most of these, so the door stays open without a redesign.
 ## Consequences
 
 ### Positive
+
 - A real, owned platform primitive — no per-MAU tax, inside our identity/tenancy/observability boundary.
 - Standards-based: mature multi-language SDKs for free; apps are never locked to our implementation.
 - **Bounded build** — the *eval engine and SDKs are upstream*; we build only the control plane + sync
@@ -137,6 +138,7 @@ most of these, so the door stays open without a redesign.
 - Decouples *release* (deploy) from *exposure* (flag): kill switches, ring rollouts, entitlements.
 
 ### Negative
+
 - **The control plane is the bulk of the work, and it is real product engineering** — a management API,
   a targeting-**rule-builder UI** (flagd rules are JsonLogic, so the UI must compile *to* JsonLogic, not
   render a form), RBAC, an audit view, the multi-tenant sync source + per-cluster relays, and a
@@ -147,6 +149,7 @@ most of these, so the door stays open without a redesign.
   cost per workload.
 
 ### Risks
+
 - **Cross-cluster delivery (D5) is the load-bearing subsystem** — the relay topology, the
   Environment-scoped stream authz, reconnection, and the cold-start-to-code-defaults path all have to be
   right, or we either leak flags across tenants or vary/block caller latency. Treat D5 as the risky
@@ -160,6 +163,7 @@ most of these, so the door stays open without a redesign.
   bounded (D7).
 
 ## Alternatives considered
+
 - **flagd Kubernetes operator + `FeatureFlag` CRDs in git** — *the most on-brand option, and the one a
   sharp reviewer raises first.* Flags become git-native CRs like every other registry here
   (`Team/Product/Environment`), audited by `git log`, delivered by Argo, evaluated by flagd. It is
@@ -185,6 +189,7 @@ most of these, so the door stays open without a redesign.
   makes SDK maintenance across three languages a permanent tax.
 
 ## Related
+
 - [ADR-081](081-platform-service-delivery.md) — the platform-service delivery road this rides.
 - [ADR-056](056-progressive-delivery-and-safe-rollback.md) — flags complement metric-gated rollouts.
 - [ADR-067](067-idp-domain-model.md) — the `Team/Product/Environment` tenancy the flag model reuses.
