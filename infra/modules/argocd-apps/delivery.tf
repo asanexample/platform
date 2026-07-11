@@ -62,6 +62,12 @@ resource "kubernetes_manifest" "product_appproject" {
         # egressDeny takes strict precedence over every allow), and it cannot affect another namespace.
         { group = "networking.k8s.io", kind = "NetworkPolicy" },
         { group = "cilium.io", kind = "CiliumNetworkPolicy" },
+        # CNPG database (ADR-099 / ADR-081 amendment): a platform-trust service co-locates its Postgres as a
+        # postgresql.cnpg.io Cluster (the CNPG operator provisions the rest — Pods/PVCs/Secrets — which ArgoCD
+        # does not manage). Namespaced + additive; a TENANT product could declare one too, but its CNPG pods are
+        # still rejected by the environment image floor (only a platform-trust namespace is exempt, ADR-081
+        # amendment), so the kind is inert outside a platform-trust Environment.
+        { group = "postgresql.cnpg.io", kind = "Cluster" },
       ]
     }
   }
