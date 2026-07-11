@@ -46,6 +46,17 @@ spec:
             {{- $product := $spec.product }}
             {{- $stage := $spec.stage }}
             {{- $customer := $spec.customer | default "" }}
+            {{- /* Platform-trust runtime (ADR-081 amendment 2026-07-11). A platform-OWNED Team's Environment runs
+                   this SAME composition but is exempt from the tenant IMAGE sandbox that assumes an untrusted
+                   tenant — the per-product restrict-images below (which would reject an infra image like a
+                   co-located CNPG Postgres) is not emitted, and the namespace is marked so the environment-floor
+                   restrict-image-registries can exclude it too. Governed instead by CODEOWNERS + cosign signing
+                   (unchanged — verify-images-product is image-glob-scoped and still applies to the service's own
+                   image). FAIL-SAFE: default (any team not explicitly listed) = full sandbox; only a platform-trust
+                   team relaxes. Single-team today; the list generalizes to the platformTrust envelope (ADR-081 D6)
+                   when a second platform Team appears. */}}
+            {{- $platformTrustTeams := list "platform" }}
+            {{- $isPlatformTrust := has $team $platformTrustTeams }}
             {{- /* Namespace <team>-<product>-<stage>[-<customer>]; truncate-and-hash if it would exceed the
                    63-char DNS-1123 limit (ADR-070 / platform-domain-api open-gap #10). Friendly when short. */}}
             {{- $nsRaw := printf "%s-%s-%s" $team $product $stage }}
@@ -92,6 +103,14 @@ spec:
                       {{- end }}
                       platform.refplat.org/tier: {{ $tier }}
                       platform.refplat.org/mode: namespace
+                      {{- if $isPlatformTrust }}
+                      # Platform-trust marker (ADR-081 amendment 2026-07-11): the environment image FLOOR
+                      # (restrict-image-registries) EXCLUDES namespaces carrying this, so a platform service may
+                      # co-locate an infra image (e.g. CNPG Postgres) not under the platform ECR. Only the
+                      # composition sets it, and only for a platform-trust Team — a tenant cannot acquire it
+                      # (the Namespace is a cluster object, composition-reconciled; tenant RBAC is namespaced).
+                      platform.refplat.org/trust: platform
+                      {{- end }}
                       # P14 log→trace (ADR-077 Layer 1): lets an SDK-instrumented workload export OTLP to the
                       # OTel collector — the collector's `allow-otlp-from-environments` netpol admits ingress
                       # only from namespaces carrying this label. Safe by construction: the only path it opens
@@ -903,8 +922,11 @@ spec:
             {{- end }}
             {{- end }}
             {{- /* Per-PRODUCT image-registry guard (ADR-014/067): workloads in this namespace may run only images
-                   under the product's ECR scope team-<team>/<product>-* (all the product's services). */}}
-            {{- if $cfg.ecrRegistry }}
+                   under the product's ECR scope team-<team>/<product>-* (all the product's services). NOT emitted
+                   for a platform-trust Environment (ADR-081 amendment 2026-07-11) — a platform service co-locates
+                   infra images (e.g. CNPG Postgres) this per-product scope would reject; it is trusted via
+                   CODEOWNERS + signing, and its own image is still cosign-verified by verify-images-product. */}}
+            {{- if and $cfg.ecrRegistry (not $isPlatformTrust) }}
             ---
             apiVersion: kubernetes.crossplane.io/v1alpha2
             kind: Object

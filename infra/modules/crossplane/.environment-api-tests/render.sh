@@ -133,6 +133,17 @@ OUT="$(render "${here}/environments/triage-copilot-prod.yaml")"
 printf '%s' "$OUT" | grep -q 'kind: ClusterRoleBinding'                                  || { echo "::error::platform-trust ClusterRoleBinding not rendered"; printf '%s\n' "$OUT"; exit 1; }
 printf '%s' "$OUT" | grep -q 'name: platform-trust-observability-reader'                 || { echo "::error::ClusterRoleBinding must reference the requested ClusterRole"; exit 1; }
 printf '%s' "$OUT" | grep -q 'name: system:serviceaccounts:platform-triage-copilot-prod' || { echo "::error::ClusterRoleBinding must bind the env-namespace ServiceAccounts"; exit 1; }
-echo "  ✓ triage-copilot-prod OK (cluster-read ClusterRoleBinding → platform-trust-observability-reader, env SAs)"
+# Platform-trust IMAGE exemption (ADR-081 amendment 2026-07-11): a platform-team Environment carries the
+# trust marker (so the environment image FLOOR excludes it) and does NOT emit the per-product restrict-images
+# (so a co-located infra image like CNPG Postgres is admitted) — while KEEPING the rest of the footprint.
+printf '%s' "$OUT" | grep -q 'platform.refplat.org/trust: platform'                       || { echo "::error::platform-trust namespace marker not rendered"; printf '%s\n' "$OUT"; exit 1; }
+printf '%s' "$OUT" | grep -q 'restrict-images-'                                           && { echo "::error::restrict-images must NOT be emitted for a platform-trust Environment"; exit 1; } || true
+printf '%s' "$OUT" | grep -q 'name: environment-quota'                                    || { echo "::error::quota must still render for a platform-trust Environment"; exit 1; }
+printf '%s' "$OUT" | grep -q 'kind: PodIdentityAssociation'                               || { echo "::error::per-service Pod Identity must still render for a platform-trust Environment"; exit 1; }
+echo "  ✓ triage-copilot-prod OK (cluster-read RB; +trust marker, restrict-images omitted, quota/Pod-Identity kept)"
+
+# Guard the FAIL-SAFE default: a TENANT Environment must NOT get the trust marker (only team-in-allowlist does).
+printf '%s' "$(render "${here}/environments/demo-dev.yaml")" | grep -q 'platform.refplat.org/trust: platform' && { echo "::error::FAIL-SAFE VIOLATION: tenant Environment got the platform-trust marker"; exit 1; } || true
+echo "  ✓ fail-safe OK (tenant demo-dev has NO trust marker + keeps restrict-images)"
 
 echo "Environment Composition render checks passed (L2a — product-scoped footprint + identity; ADR-073 — S3/SQS/SNS/DynamoDB resources; ADR-081 — platform-trust cluster RBAC)."
