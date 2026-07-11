@@ -335,3 +335,20 @@ variable "cost_budget_failure_policy" {
   type        = string
   default     = "Ignore"
 }
+
+variable "enable_db_secret_sync" {
+  description = "Enable the Kyverno policy that clones a CNPG-generated DB credential Secret from a platform-database namespace into the app's Environment namespace (ADR-099 flagship; ADR-081). Needed because a stateful platform Product runs its app in an Environment namespace but its database in a separate platform namespace, and secretKeyRef cannot cross namespaces. Namespace pairs are declared in db_secret_sync_bindings."
+  type        = bool
+  default     = false
+}
+
+variable "db_secret_sync_bindings" {
+  description = "Namespace pairs for enable_db_secret_sync. Each entry clones secret `secret_name` from `source_namespace` (a platform-database namespace) into `target_namespace` (the app's Environment namespace), kept in sync on rotation. RBAC is namespace-scoped to exactly these pairs — the background controller never gets cluster-wide secret access. `name` is a short stable identifier used in the rule/RBAC object names."
+  type = list(object({
+    name            = string
+    sourceNamespace = string
+    secretName      = string
+    targetNamespace = string
+  }))
+  default = []
+}

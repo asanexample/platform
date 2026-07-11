@@ -97,12 +97,12 @@ ArgoCD is told to ignore the mutated sub-fields (`argocd_cm_extra` →
 
 ## Generate policies (ADR-085 availability)
 
-`generate` policies create and keep-in-sync a companion resource per matching workload. Gated by
-`enable_pdb_generate`.
+`generate` policies create and keep-in-sync a companion resource.
 
-| Policy | Generates | Scope |
-| ------ | --------- | ----- |
-| `generate-workload-pdb` | A `PodDisruptionBudget` (`<workload>-pdb`, `maxUnavailable: 1`, selector derived from the workload) for every environment Deployment/StatefulSet (+ Rollout when `enableRolloutKind`) — created, kept in sync, and GC'd with the workload; drain-safe, only meaningful at `>= 2` replicas (ADR-085) | environment |
+| Policy | Generates | Scope | Gate |
+| ------ | --------- | ----- | ---- |
+| `generate-workload-pdb` | A `PodDisruptionBudget` (`<workload>-pdb`, `maxUnavailable: 1`, selector derived from the workload) for every environment Deployment/StatefulSet (+ Rollout when `enableRolloutKind`) — created, kept in sync, and GC'd with the workload; drain-safe, only meaningful at `>= 2` replicas (ADR-085) | environment | `enable_pdb_generate` |
+| `sync-platform-db-secret` | Clones a CNPG `<cluster>-app` credential Secret from a platform-database namespace into a stateful platform Product's Environment namespace (secretKeyRef can't cross namespaces), `synchronize` + `generateExisting` (ADR-099 Flagship; ADR-081). RBAC splits cluster-wide READ (forced by the generateExisting cluster-scoped list) from namespace-scoped WRITE. Namespace pairs declared per binding at the unit | per-binding namespace pair | `enable_db_secret_sync` |
 
 Together with the `mutate-topology-spread` / graceful-drain mutations and the `require-prod-replica-floor`
 validate above, this is the ADR-085 zero-downtime suite — applied live on both clusters.

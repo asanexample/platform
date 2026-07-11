@@ -177,6 +177,13 @@ locals {
     costBudgetStatusNamespace   = var.cost_budget_status_namespace
     costBudgetFailureAction     = var.cost_budget_failure_action
     costBudgetFailurePolicy     = var.cost_budget_failure_policy
+
+    # Cross-namespace DB credential sync (ADR-099 flagship; ADR-081) — clone the CNPG app secret from a
+    # platform-database namespace into the app's Environment namespace. kyvernoNamespace is where the
+    # background-controller SA lives (the namespaced RBAC binds it).
+    enableDbSecretSync   = var.enable_db_secret_sync
+    dbSecretSyncBindings = var.db_secret_sync_bindings
+    kyvernoNamespace     = var.namespace
   }
 }
 
