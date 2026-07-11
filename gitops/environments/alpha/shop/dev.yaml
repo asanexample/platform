@@ -14,6 +14,11 @@ spec:
   stage: dev
   tier: standard
   preview: true # ADR-032: opt into PR-preview delivery (pr-preview.tf) — alpha-shop is the reference product for its first live verification
+  # One Product, many services (ADR-067): the bike shop is storefront (edge — SPA + BFF, the only service with
+  # an HTTPRoute) + catalog (internal, ClusterIP, reached east-west from the storefront). Both share the named
+  # app-alpha SA; no AWS access yet (browse is stateless — cart/orders + self-service DynamoDB/SQS/S3 are P2).
   services:
-    web:
-      serviceAccount: app-alpha # Pod Identity binds this named SA; the app repo's serviceaccount.yaml creates it
+    storefront:
+      serviceAccount: app-alpha
+    catalog:
+      serviceAccount: app-alpha
