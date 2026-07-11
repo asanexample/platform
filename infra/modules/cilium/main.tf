@@ -193,6 +193,16 @@ locals {
             # SPIRE server datastore. Persistent needs a PVC + (where an SCP enforces EBS encryption) an
             # encrypted StorageClass; null = the cluster default (encrypted gp3). enabled=false = in-memory.
             server = {
+              # The SPIRE server mints its CA with rsa-4096 keys — CPU-heavy. With no request it runs
+              # BestEffort, and when scheduled onto a small/contended node the keygen starves past the
+              # KeyManager deadline ("Unable to rotate X509 CA: keymanager(disk): context deadline
+              # exceeded"), crash-looping the server and wedging fleet-wide mutual auth. Guarantee CPU and
+              # allow a burst to a full core for keygen so it schedules with headroom and rotates the CA
+              # reliably (esp. post-unpark, when it may land on a saturated 1-vCPU node). Postmortem 2026-07-10.
+              resources = {
+                requests = { cpu = "250m", memory = "128Mi" }
+                limits   = { cpu = "1", memory = "512Mi" }
+              }
               dataStorage = {
                 enabled      = var.spire_persistence
                 storageClass = var.spire_storage_class
