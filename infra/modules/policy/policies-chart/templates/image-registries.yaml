@@ -24,6 +24,19 @@ spec:
               kinds:
                 - Pod
               {{- include "kpp.environmentNamespaceSelector" . | nindent 14 }}
+      {{- if .Values.platformTrustNamespaceLabel }}
+      # Platform-trust exemption (ADR-081 amendment 2026-07-11): a platform-OWNED Team's Environment is exempt
+      # from the platform-ECR-only floor so it may co-locate an infra image (e.g. CNPG Postgres). The marker is
+      # set ONLY by the Environment Composition and ONLY for a platform-trust Team, so a tenant cannot acquire
+      # it. Inert unless a namespace actually carries the label — no tenant namespace ever does.
+      exclude:
+        any:
+          - resources:
+              namespaceSelector:
+                matchExpressions:
+                  - key: {{ .Values.platformTrustNamespaceLabel }}
+                    operator: Exists
+      {{- end }}
       validate:
         failureAction: {{ .Values.validationFailureAction }}
         message: >-

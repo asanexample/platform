@@ -36,6 +36,13 @@ excludePrincipals:
 # Namespace label marking environment namespaces. Environment-targeted policies match on its presence.
 environmentNamespaceLabel: platform.refplat.org/team
 
+# Namespace label marking a platform-TRUST Environment (ADR-081 amendment 2026-07-11). The environment
+# image FLOOR (restrict-image-registries) excludes namespaces carrying it, so a platform-owned service may
+# co-locate an infra image (e.g. CNPG Postgres) not under the platform ECR. Set ONLY by the Environment
+# Composition, ONLY for a platform-trust Team — a tenant namespace never carries it, so the exemption is
+# inert for tenants. Empty disables the exemption entirely (the pre-amendment floor, applied to all).
+platformTrustNamespaceLabel: platform.refplat.org/trust
+
 # Labels every environment workload must carry (team identity + cost allocation).
 requiredWorkloadLabels:
   - app.kubernetes.io/name
