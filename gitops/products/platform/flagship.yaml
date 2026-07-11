@@ -10,7 +10,7 @@ metadata:
     app.kubernetes.io/part-of: environment-api
 spec:
   team: platform
-  repo: asanexample/flagship
+  repo: asanexample/platform-flagship
   tenancy: pooled
   defaultIsolation: { compute: dedicated-namespace }
   domains: []
