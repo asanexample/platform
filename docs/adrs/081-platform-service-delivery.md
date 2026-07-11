@@ -19,10 +19,10 @@
 > **Amendment (2026-07-11).** ADR-082 forked *agents* off D2/D3; this finishes the branch the 2026-06-25 amendment
 > left open — **non-agent platform services** (a control plane, a UI, an internal API; the feature-flag service
 > [ADR-099](099-feature-flags-platform-service.md) is the reference). It **realizes D2/D3/D6 with no new kinds** —
-> platform services stay `Product` + `Environment` + `XEnvironment` — plus two refinements shipping [ADR-099](099-feature-flags-platform-service.md)
-> onto the tenant road taught: placement is **resolved** from `(trust, stage)`, not hand-authored, and the composition
-> is **selected** by the platform-trust envelope, not conditionally generalized inside the tenant-critical path. Full
-> design in [Amendment (2026-07-11): platform-service placement](#amendment-2026-07-11-platform-service-placement--realizing-d2d3d6)
+> platform services stay `Product` + `Environment` + `XEnvironment`. The realized fork is a **fail-safe image-sandbox
+> exemption** for platform-owned Teams (so a service can co-locate a database like CNPG Postgres); the
+> `(trust, stage) → cluster` placement resolver is the target model but **not yet built** (dev already lands on
+> preprod). Full design + as-built notes in [Amendment (2026-07-11): platform-service placement](#amendment-2026-07-11-platform-service-placement--realizing-d2d3d6)
 > below; it supersedes the exploratory `XPlatformService`/`XPlatformProduct` direction (a new kind reinvents placement,
 > the trust envelope, and self-service AWS this model already has).
 
@@ -126,29 +126,44 @@ feature-flag service ([ADR-099](099-feature-flags-platform-service.md)) there ex
 wrong and what the finished design is.
 
 **What broke, and the correct read.** Flagship's Environment used the tenant Composition on a workload cluster
-(default placement → preprod), landing in a tenant namespace whose per-product `restrict-images` admits only
-`team-platform/flagship-*`. Its CNPG Postgres — an upstream `ghcr.io/cloudnative-pg` image — is rejected at
-admission, so the service is stuck in-memory. **The blocker was the tenant image *sandbox*, not the preprod
-*cluster*.** Run through the *platform* composition — which relies on the cluster-wide `restrict-image-registries`
-allow-list, exactly as the hub already does for `backstage-db`/`keycloak-db`/`triage-copilot-db` — CNPG runs
-fine on *either* cluster. That reframing decouples two axes D2/D3 had entangled:
+(default placement → preprod), landing in a tenant namespace governed by **two** environment image policies — the
+per-product `restrict-images` (Composition-emitted) *and* the environment image *floor* `restrict-image-registries`
+(platform-ECR-only, scoped to any env namespace). Its CNPG Postgres — an upstream `ghcr.io/cloudnative-pg` image —
+is rejected by **both**, so the service is stuck in-memory. **The blocker was the tenant image *sandbox*, not the
+preprod *cluster*.** (Verified: the same CNPG image runs on the hub for `backstage-db`/`keycloak-db`/`triage-copilot-db`
+— those are *non-environment* namespaces the floor never watches.) The fix is to make a **platform-owned** Team's
+Environment exempt from that image sandbox. That decouples two axes D2/D3 had entangled:
 
-### A1 — Composition variant ← trust (the owning Team's envelope)
+### A1 — Image-sandbox exemption ← trust (a fail-safe conditional, not a second composition)
 
-A platform-Team Product is provisioned by a **platform composition variant** (`environment-platform`),
-**selected** by the platform-trust envelope (D6) — *not* a `{{ if platform }}` branch inside the tenant-critical
-composition, so the relaxed-image rendering never sits in the path that guards real tenants. It differs from the
-tenant composition by: relaxing per-product image-scoping to the cluster-wide registry allow-list (so co-located
-CNPG runs), honoring the broader trust envelope, and dropping tenant-only sandbox bits (quota tiers, developer
-RBAC, hostname allow-lists) — while **keeping** per-Service Pod Identity, the self-service AWS resources the
-tenant model already provisions ([ADR-073](073-self-service-cloud-resources.md)), and the full supply-chain
-verify (D5). Selection is keyed on the Team envelope, which is admission-gated and admin-only — a tenant cannot
-acquire it, so a tenant cannot escape image-scoping.
+> **As built ([#1315](https://github.com/asanexample/platform/pull/1315)).** The design first reached for a *second*
+> Composition (`environment-platform`) selected by a `platformTrust` label. Two build facts overruled that: the
+> Environment Composition is a **single monolithic raw go-template** (shipped via `.Files.Get`, opaque to Helm — no
+> shared partial exists; ADR-082 D9's "reusable partial" turned out aspirational), so a second Composition would
+> **duplicate ~1000 lines of security-critical netpol/IAM**; and there is **no composition-selection hook** on the
+> XRD or the hand-authored claims to pick between two Compositions. So the exemption is a **fail-safe conditional in
+> the one Composition**, gated on `$isPlatformTrust` (an explicit team allow-list — `["platform"]` — today).
 
-### A2 — Cluster ← resolved from `(trust, stage)`, not hand-authored
+A platform-trust Environment is exempt from the tenant image *sandbox*, and **only** that:
 
-D2 originally had the Environment *author* `spec.cluster`. This refines it to a **resolved** coordinate (matching
-the XRD's own "placement coordinates resolved, never authored"):
+- The Composition does **not** emit the per-product `restrict-images` ClusterPolicy, and marks the namespace
+  `platform.refplat.org/trust: platform`.
+- The environment floor `restrict-image-registries` **excludes** namespaces carrying that marker (a new, fail-safe
+  policy exemption — inert unless the marker is present).
+
+Everything else is **kept**, because it is compatible with a platform service (verified against Flagship by render
+test): the ResourceQuota, per-Service Pod Identity, self-service AWS ([ADR-073](073-self-service-cloud-resources.md)),
+cluster-read RBAC, the route-hostname allow-list, and the full cosign supply-chain verify (D5 —
+`verify-images-product` is image-glob-scoped to `team-platform/<product>-*`, so the service's own image is still
+verified; the co-located CNPG image is admitted by being *unmatched*). **Fail-safe by construction:** default (any
+team not in the allow-list) = the full tenant sandbox; only the Composition sets the marker, only for a platform-trust
+Team, so a tenant cannot acquire it. The allow-list is the pragmatic v1 signal for the (now-removed, ADR-082)
+**platformTrust envelope** (D6), which is re-added when a *second* platform Team needs the lane.
+
+### A2 — Cluster ← resolved from `(trust, stage)` — the target model, not yet built
+
+The intended placement is a **resolved** coordinate (matching the XRD's "placement coordinates resolved, never
+authored"):
 
 ```text
 cluster = platformTrust
@@ -156,54 +171,54 @@ cluster = platformTrust
             : (stage == prod ? prod : preprod)  # tenant:   prod → prod, else preprod
 ```
 
-So **the hub *is* the platform's prod cluster** — platform-prod services join the platform's own production
-control planes (Backstage/Keycloak/ArgoCD/Crossplane) there — while **non-prod platform services co-locate with
-tenants on preprod**. That co-location is deliberate **dogfooding**: a platform change that breaks tenant
-workloads on preprod breaks the platform's own preprod services too — same blast radius, early signal. A
-`pinToHub` escape covers the rare service that must *read* cross-cluster hub state (the ADR-082 "blindness"
-case); a plain service only *produces* telemetry, which reaches the stack regardless of cluster, so co-location
-costs it nothing.
+So **the hub *is* the platform's prod cluster**, while **non-prod platform services co-locate with tenants on
+preprod** — deliberate **dogfooding** (a platform change that breaks tenant workloads on preprod breaks the
+platform's own preprod services too). A `pinToHub` escape covers the rare service that must *read* cross-cluster hub
+state (the ADR-082 "blindness" case); a plain service only *produces* telemetry, so co-location costs it nothing.
 
-### A3 — No new kinds; only the variant and the cluster fork
+**Not built yet, and not needed for the first consumer.** There is no `(trust, stage) → cluster` resolver today —
+destinations are static per-unit Terraform variables (`cluster_server`/`hub_cluster_server`) and claims are
+hand-authored. Flagship *dev* already lands on preprod via the existing default, so the resolver is deferred until a
+platform **prod** Environment first needs the hub — the same "built when a real consumer needs it" discipline
+ADR-082 D9 used.
+
+### A3 — No new kinds; the sandbox exemption is the only realized fork
 
 Platform services remain `Product` + `Environment` + `XEnvironment` — the same registry, promotion ladder, CI
-trust, cosign policy, and self-service AWS as tenants (which is what "treat them the same" actually requires).
-Only the composition **variant** (A1) and the destination **cluster** (A2) fork, both driven by signals the model
-already carries — the trust envelope and the stage. This is why a parallel `XPlatformProduct`/`XPlatformService`
-domain is the wrong shape: it would *split* a shared registry and *duplicate* placement, the trust envelope, and
-self-service AWS that already exist. It also **supersedes [ADR-082](082-platform-agent-runtime-xagent.md) D9's
-deferred `XPlatformService`**: the non-agent lane is not a new lean kind but the placement-aware `XEnvironment` —
-though D9's reusable ns/SA/Pod-Identity partial is still reused, now by the `environment-platform` composition
-(A1/A4) rather than a new composite.
+trust, cosign policy, and self-service AWS as tenants (what "treat them the same" actually requires). Today the
+**only** realized fork is the image-sandbox exemption (A1); the cluster fork (A2) is deferred. A parallel
+`XPlatformProduct`/`XPlatformService` domain is the wrong shape — it would *split* a shared registry and *duplicate*
+placement, the trust envelope, and self-service AWS that already exist. This also **supersedes
+[ADR-082](082-platform-agent-runtime-xagent.md) D9's deferred `XPlatformService`**: the non-agent lane is the
+`XEnvironment`, not a new lean kind.
 
 ### A4 — Topology: federated per-cluster, in-cluster (consistent with ADR-048)
 
-Placing a platform Environment on the hub does **not** reintroduce what [ADR-048](048-federated-per-cluster-crossplane.md)
-rejected (a hub Crossplane reaching *across* clusters with remote creds). It follows ADR-048's federated model
-exactly: `environment-platform` is deployed **per-cluster as an add-on** and provisions **in-cluster** via
-`InjectedIdentity` provider-kubernetes + own-account Pod Identity — no cross-cluster reach, no remote creds, no
-provisioning SPOF. A platform service's Environment claim is delivered by GitOps to its **resolved** cluster (A2),
-and *that* cluster's local Crossplane reconciles it. This is the same move ADR-048's 2026-06-25 note already
-blessed for `XAgent` — the hub gains *another* different, hub-local composition; "agents are simply more [hub
-platform infra]," and platform services now are too. Per cluster: the **hub** installs the `XEnvironment` XRD +
-`environment-platform` only (no tenant composition — no tenant claims land there); **preprod** installs the tenant
-`environment` composition **and** `environment-platform` (co-located platform non-prod); a future **prod** cluster
-installs the tenant composition. Composition-selection (A1) picks the right one per claim.
+A platform Environment is provisioned by the **same per-cluster, in-cluster** Crossplane every Environment uses
+([ADR-048](048-federated-per-cluster-crossplane.md)) — `InjectedIdentity` provider-kubernetes, own-account Pod
+Identity, no cross-cluster reach, no remote creds, no SPOF. The claim is GitOps-delivered to the cluster it lands
+on, and *that* cluster's local Crossplane reconciles it. Putting one on the hub (for platform *prod*) is "more
+hub-local platform infra," exactly as ADR-048's 2026-06-25 note blessed for `XAgent`. Today platform services land
+on **preprod**, which already runs the Environment control plane; the hub gains it if/when a platform-prod
+Environment is placed there (A2). **One prerequisite the build surfaced:** the **CNPG operator was hub-only**, so a
+co-located database on preprod needs the operator there — [#1315](https://github.com/asanexample/platform/pull/1315)
+adds a preprod `cloudnative-pg` unit.
 
-### A5 — Reference service, and one build note
+### A5 — Reference service + what shipped
 
 The feature-flag service ([ADR-099](099-feature-flags-platform-service.md)) is to platform *services* what the
-triage copilot is to platform *agents* — the first consumer and reference instance. Its dev Environment resolves
-to preprod (co-located, CNPG via the platform composition); its prod Environment resolves to the hub. **Build
-note:** no CNPG runs on the preprod cluster today, so its cluster-wide `restrict-image-registries` must add
-`ghcr.io/cloudnative-pg/*` before the platform composition can host a database there (a one-line policy change).
+triage copilot is to platform *agents* — the first consumer and reference instance; its dev Environment stays on
+preprod. Shipped in [#1315](https://github.com/asanexample/platform/pull/1315): the fail-safe Composition exemption
+(A1), the floor policy exemption, the preprod `cloudnative-pg` unit, and render tests asserting the platform-trust
+path *and* the fail-safe tenant default. Remaining: Flagship's CNPG `Cluster` + `DATABASE_URL` bundle, and the gated
+preprod applies (`cloudnative-pg` → `policy` → `crossplane` → Flagship).
 
 ## Alternatives considered
 
 - **A parallel platform-services road** (this ADR's earlier draft; and the later `XPlatform*`-kinds sketch).
   Rejected — duplication, and it re-creates the platform-vs-tenant split. The 2026-07-11 amendment shows the
-  faithful "treat them the same" is the *shared* `Product`/`Environment` model with a resolved placement + a
-  selected composition variant, not a parallel domain.
+  faithful "treat them the same" is the *shared* `Product`/`Environment` model with a fail-safe image-sandbox
+  exemption for platform-owned Teams (and, later, resolved placement), not a parallel domain.
 - **Unify governance/delivery but keep platform-specific provisioning units.** Rejected — the moment a platform product
   targets preprod/prod it needs provisioning *there*, which is exactly what the Composition already does; platform units
   quietly re-introduce the split.
