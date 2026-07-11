@@ -1,0 +1,9 @@
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata:
+  name: platform-flagship-dev
+spec:
+  environmentRef: platform-flagship-dev
+  services:
+    server:
+      digest: sha256:4b52bfb7ecc3c942c36beee8224c1892d94412485aa2685f8324d4595f1d752d
