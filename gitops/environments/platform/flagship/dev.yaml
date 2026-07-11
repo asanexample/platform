@@ -1,0 +1,21 @@
+# Environment (platform × flagship × dev) — the platform feature-flag service (ADR-099). Co-located on preprod
+# for Phase 1 (default placement) so the flagd sync path is in-cluster; hub placement + the cross-cluster sync
+# relay are Phase 3 (ADR-099 D5). Namespace platform-flagship-dev. Synced by ArgoCD (the `environments`
+# registry-sync app) and reconciled by the Crossplane Environment Composition (v3).
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata:
+  # CLUSTER-scoped XR → team-prefixed, globally unique (ADR-067).
+  name: platform-flagship-dev
+  annotations:
+    platform.refplat.org/requested-by: josh
+spec:
+  team: platform # validated == Product.team at the gate + admission (ADR-081 D1: platform is a first-class Team)
+  product: flagship
+  stage: dev
+  tier: standard
+  services:
+    server:
+      serviceAccount: app-platform # Pod Identity binds this named SA; the repo's serviceaccount.yaml creates it
+      # image omitted — declared but NOT yet deployed (first-deploy state). The per-Product ApplicationSet skips
+      # this (Environment × Service) pair until the first CI build promotes a signed digest.
