@@ -6,4 +6,4 @@ spec:
   environmentRef: platform-flagship-dev
   services:
     server:
-      digest: sha256:4b52bfb7ecc3c942c36beee8224c1892d94412485aa2685f8324d4595f1d752d
+      digest: sha256:06af87cd260448ff2f18c130638ea6007de0c92d6ccdbe79f3fcd84391181715
