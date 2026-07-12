@@ -91,7 +91,7 @@ in datasource config (`exemplarTraceIdDestinations`, `tracesToLogsV2`, `tracesTo
   (99.9% HTTP success off `http_server_request_duration_seconds_count` — Beyla-emitted or, per ADR-100,
   OTLP-emitted and converged to the same name/labels at Mimir ingest), evaluated in the Mimir ruler — feeds
   the ADR-056 canary error-budget freeze gate.
-- **Alerting:** ~40 curated PrometheusRules (`observability/alerts/curated.yaml`); Alertmanager routes by
+- **Alerting:** ~60 curated alert rules across 20 groups (`observability/alerts/curated.yaml`); Alertmanager routes by
   `severity` (critical → PagerDuty + Slack + SNS; warning → Slack; inhibit critical→warning); a **dead-man's
   switch** (Healthchecks.io) pages if the pipeline goes silent. *PagerDuty status:* the critical→PagerDuty wire
   (Events-API-v2 receiver, keyed by the `pagerduty` unit's routing key) is provisioned in IaC and unchanged;
