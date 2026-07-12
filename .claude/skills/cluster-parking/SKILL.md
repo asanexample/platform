@@ -99,6 +99,24 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-12 (end-of-day PARK) — cost-zero OK, but ⚠️ preprod's EC2NodeClass delete TIMED OUT on the flaky
+  API — watch for a stuck-NodeClass on next unpark.** Both parked cost-zero (node groups `desiredSize=0`, 0
+  running/pending instances both accounts, bastions stopped) — the node scaling is via the reliable AWS EKS API so
+  the PARK succeeded regardless. Platform drained clean. **Preprod threw `warning: deleting EC2NodeClass: Unable to
+  connect to the server: dial tcp 10.101.0.25:443: i/o timeout`** — i.e. `down` could NOT delete the Karpenter
+  EC2NodeClass because the preprod private API was unreachable mid-park (the SAME Tailscale/API flakiness from the
+  2026-07-10 Cilium-wedge incident and its aftermath — preprod's control-plane path has been intermittently flaky
+  for days). Consequence: the down/up symmetry the `platctl` fix relies on (down deletes BOTH NodePool + NodeClass
+  so up recreates them clean) is **broken this cycle** — the NodeClass is likely orphaned. **⚠️ NEXT UNPARK: watch
+  for the "NodePool back but EC2NodeClass stuck Terminating / zero workload capacity" failure mode (documented in
+  the gotchas above). If `up`'s Karpenter health gate fails or workload pods stay Pending, the unblock is
+  `helm get manifest karpenter-nodepool -n karpenter | kubectl apply -f -` (recreates the NodeClass), NOT another
+  -replace.** Also: an in-flight P14/OTel apply from another session was mid-reconcile at park — that's fine, park
+  is non-destructive (etcd + EBS preserved), it resumes on unpark. **Bigger picture: preprod's flaky private-API
+  access keeps compounding park/unpark ops (this timeout, the incident, my degraded kubectl). Root of that is
+  likely the preprod Tailscale subnet router running RELAY-only (not direct) since the 07-10 unpark — worth a
+  durable look: why can't the preprod router hole-punch a direct path? That one fix would de-flake a lot.**
+
 - **2026-07-10 (UNPARK) — ⚠️ MAJOR INCIDENT: a wedged Cilium agent on ONE preprod node cascaded into a
   ~45-min recovery. ROOT CAUSE + FIX below — read this before the next unpark.** Platform: clean, #1183
   auto-healed backstage+keycloak (5th cycle). Preprod is where it went sideways.
