@@ -17,7 +17,11 @@
 apiVersion: apiextensions.crossplane.io/v2
 kind: CompositeResourceDefinition
 metadata:
-  name: xservicegrants.platform.refplat.org
+  # Must equal spec.names.plural + "." + spec.group exactly — Crossplane v2 rejects the derived CRD otherwise
+  # (verified live: EstablishComposite error "metadata.name ... must be spec.names.plural+\".\"+spec.group"
+  # when this carried a leftover "x" prefix copied from xenvironment-xrd.yaml's Kind: XEnvironment convention;
+  # this XRD deliberately does NOT use an X-prefixed kind, so its name has none either).
+  name: servicegrants.platform.refplat.org
 spec:
   scope: Cluster
   group: platform.refplat.org
