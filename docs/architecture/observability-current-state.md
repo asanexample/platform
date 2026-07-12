@@ -114,7 +114,8 @@ Apps send **OTLP** to a deployment-mode **OpenTelemetry Collector** (`otelcol-k8
 `otlp → memory_limiter → batch → otlp/tempo`), which forwards to **Tempo**'s distributor. Tempo uses the
 `tempo-distributed` chart **minimized for dev** (each component 1 replica, RF1, caches/gateway off;
 `prod` scales it via `high_availability`); durable blocks on **S3 via Pod Identity**. The Grafana
-**Tempo** datasource links **traces↔logs** (`tracesToLogsV2` → Loki; Loki's `trace_id` derivedField → Tempo).
+**Tempo** datasource links **traces↔logs** (`tracesToLogsV2` → Loki; Loki's `trace_id` derived field → Tempo,
+`matcherType: label` — see below).
 
 ### APM correlation: metrics-generator + exemplars (P6)
 
@@ -124,8 +125,12 @@ The Tempo **metrics-generator** is **on** — it derives **RED span-metrics** (`
 Grafana renders the **node graph** (e.g. `user → app-alpha-shop`). **Exemplars** close the metric → trace loop:
 the generator's remote_write sets `send_exemplars` so each span-metric point carries the span's `traceID`, Mimir
 stores them (`max_global_exemplars_per_user`), and the Mimir datasource's `exemplarTraceIdDestinations` link a
-latency spike → the **trace** → (tracesToLogs) → **logs**. (Log → trace is the remaining gap: app logs don't yet
-carry a `trace_id` — the Loki derived field is wired but dark until the P14 SDK-inject golden path lands.) The
+latency spike → the **trace** → (tracesToLogs) → **logs**. **Log → trace is closed the other direction too**
+(ADR-100): the per-team Alloy pipeline (`observability-alloy`, the `retenant` process) promotes each SDK'd app's
+`trace_id`/`span_id` out of the JSON log body into **Loki structured metadata**, and the Loki datasource's
+derived field links on that field directly (`matcherType: label`) rather than regex-scraping the line — a log
+line jumps straight to its trace. (Only SDK-instrumented services carry these fields; Beyla-only workloads still
+rely on trace↔metrics/service-graph correlation, not log↔trace.) The
 generator also runs the **`local-blocks`** processor, which powers
 Grafana's **Traces Drilldown** (TraceQL *metrics* queries — `rate()`/`quantile_over_time()` over spans).
 

@@ -11,8 +11,12 @@ Beyla** (eBPF). Covers the hub (platform) and the preprod spoke.
 | **platform** | `{backstage,keycloak,argocd,observability}` | Beyla → hub OTel collector → Tempo (tenant `platform`) | Beyla `/metrics` → ServiceMonitor → Prometheus → Mimir (`platform`) |
 | **preprod** | `{alpha-*}` (the demo apps) | Beyla → preprod traces-spoke collector → hub Tempo edge → Tempo (tenant `preprod`, `cluster=preprod`) | Beyla `/metrics` → ServiceMonitor → preprod metrics agent → Mimir (`preprod`) |
 
-Gated by `enable_instrumentation` (platform + preprod `env.hcl`). The **SDK opt-in** layer (OTel Operator
-`Instrumentation` CR, annotation-driven) is **deferred to P14** — only the zero-code eBPF baseline is active.
+Gated by `enable_instrumentation` (platform + preprod `env.hcl`). This runbook covers the **zero-code Beyla
+path only** — the golden-path alternative, an app's own OTel SDK (traces + metrics + Pyroscope profiles +
+trace-stamped structured logs, ADR-100), is live for SDK'd services (e.g. alpha-shop) and is **not** covered
+here; see `docs/architecture/observability-current-state.md` and the app's own `internal/telemetry` package.
+Per ADR-100, a workload runs **one or the other, never both** — Beyla's eBPF context-propagation fights an
+SDK's `traceparent`, fragmenting traces.
 
 ## Verify — Beyla is running
 
@@ -44,7 +48,9 @@ kubectl --context <platform|preprod> -n observability get pods -l app.kubernetes
   ```
 
 - **Trace ↔ logs**: a span's `service.name` links to its pod's logs (the Tempo datasource `tracesToLogsV2` →
-  Loki), and a `trace_id` in a log line links back (the Loki `derivedField`).
+  Loki). The reverse jump (a `trace_id` in a log line → its trace) needs the SDK path — Beyla doesn't stamp
+  `trace_id` into the app's own log lines, so the Loki `derivedField` (which matches on Loki **structured
+  metadata**, not a line regex — ADR-100) only resolves for SDK-instrumented services.
 
 ## Troubleshooting
 

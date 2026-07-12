@@ -146,6 +146,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-045: Falco for Runtime Threat Detection](045-falco-runtime-threat-detection.md) | Accepted |
 | [ADR-076: Agent / GenAI Observability](076-agent-observability.md) | Accepted (corrected 2026-06-27) |
 | [ADR-077: Application Instrumentation Strategy](077-application-instrumentation-strategy.md) | Accepted |
+| [ADR-100: Observability Instrumentation Golden Path + OTLP↔Prometheus Convention](100-observability-instrumentation-and-otlp-convention.md) | Accepted |
 | [ADR-078: Cluster Elasticity — Karpenter + Workload Autoscaling](078-cluster-elasticity-karpenter.md) | Accepted |
 | [ADR-091: Cost Guardrails — per-team budgets, attribution, and phased enforcement](091-cost-guardrails.md) | Accepted (A+B+C live) |
 | [ADR-093: Descheduler for Node Rebalancing](093-descheduler-node-rebalancing.md) | Proposed |
