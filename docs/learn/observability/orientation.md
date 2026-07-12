@@ -157,7 +157,7 @@ Every signal carries an **`X-Scope-OrgID`** header naming a *tenant*, and the st
 `multitenancy_enabled` — they deliver to whatever tenant the header names. But hold onto the security fact:
 **`X-Scope-OrgID` is a trust header, not authentication.** Anything that can reach a store and set the header
 could name any tenant — like an apartment number written on an envelope. So the header is *routing*, not a
-lock. Isolation is built from three real layers on top of it:
+lock. Isolation is layered on top of it:
 
 - **The network is the floor.** The `observability` namespace is **default-deny ingress** and every store is
   **ClusterIP-only** — never on the Gateway. No tenant workload can even *reach* Mimir or Loki to try naming a
@@ -165,28 +165,28 @@ lock. Isolation is built from three real layers on top of it:
 - **Writes are split per team.** `cortex-tenant` re-tenants each incoming series into its own Mimir tenant
   (Loki does the same via per-team Alloy re-tenanting), so `acme` and `globex` are *real, separate tenants*
   end to end — not one bucket with a label.
-- **Reads are authenticated and fail-closed.** The `tenant-proxy` is the front door for **metrics (Mimir)** and
-  **logs (Loki)**: it verifies the caller's Keycloak **`X-Id-Token`** and stamps *that team's* `X-Scope-OrgID`,
-  so a query returns only the caller's own tenant. Unknown or empty identity → **deny**. This is real auth in
-  front of the trust-header boundary — an authenticated layer on top of the NetworkPolicy, not a replacement
-  for it. (Per-team isolation is **live and proven for metrics + logs** since 2026-07-07, P13/#590; traces and
-  profiles isolation is a mechanical follow-up, deferred.)
+- **Reads are scoped by Grafana, softly.** Each team gets a datasource pinned to its own tenant
+  (`Mimir (<team>)`, a static `X-Scope-OrgID`), and per-team read isolation is enforced by **Grafana
+  dashboard-folder permissions** plus the **namespace-filtered per-team dashboards**
+  ([#1157](https://github.com/asanexample/platform/issues/1157)) — an RBAC-level boundary, not a data-layer
+  gate. (Traces and profiles per-team read scoping is a follow-up.)
 
-Sharing is deliberate, not a hole: cross-team read access rides an **AccessGrant**
-([ADR-068](../../adrs/068-product-scoped-and-cross-team-access-model.md)). A grant federates the caller's own
-tenant *plus* its granted tenants (still fail-closed — `globex` reading `acme` becomes
-`X-Scope-OrgID: acme|globex`). Because OSS Grafana has no per-team dashboard RBAC, the grant *is* the sharing
-mechanism. And a subtlety worth holding: the platform hub runs *no* team workloads, so its own metrics are the
-`platform` tenant — the real per-team tenants are populated by the **preprod spoke's live dual-write**, where
-the team apps actually run.
+There's an honest story in that last bullet. The platform first built the *hard* version — a fail-closed proxy
+(`tenant-proxy`) that authenticated each caller's SSO token and stamped their tenant, denying anything
+unauthenticated — and then **retired it**
+([#1269](https://github.com/asanexample/platform/issues/1269)): OSS Grafana couldn't reliably forward the SSO
+token to the proxy (`oauthPassThru` dropped it), so the proxy fail-closed and *broke every dashboard*. The
+soft model was the actual need, so the platform reverted to it — a useful lesson in not building an isolation
+boundary the tooling can't hold up. (One subtlety regardless: the platform hub runs *no* team workloads, so
+its own metrics are the `platform` tenant — the real per-team tenants come from the **preprod spoke's live
+dual-write**, where the team apps actually run.)
 
 > It's a shared apartment building with a locked mailroom. The `X-Scope-OrgID` on each envelope is just the
 > unit number — anyone could *write* one. What keeps your mail yours is that the mailroom door is locked
-> (network default-deny), the postal worker checks your ID before handing you your box (the fail-closed
-> proxy), and the boxes are physically separate (per-tenant stores). A neighbor sees your mail only if you
-> file a forwarding grant. **Where it breaks:** cross-*cluster* spoke ingest today rests on network isolation
-> (Tailscale/TGW) rather than mTLS — the header is overwritten at the edge, but full mutual auth between
-> clusters is a planned hardening.
+> (network default-deny), the boxes are physically separate (per-team tenants), and your key opens only your
+> own box (Grafana folder permissions). **Where it breaks:** that last lock is a *soft* one — building policy,
+> not a bank vault — because the hard version (an ID-checking clerk at the door) turned people away by mistake
+> and had to be pulled. Cross-*cluster* ingest likewise rests on network isolation rather than mTLS today.
 
 ---
 
@@ -280,9 +280,10 @@ Almost all of it is live and exercised. The full LGTM+P data plane, the preprod 
 auto-instrumented apps, the correlation walk end to end, both SLO systems, alerting with owner-routing, cost
 (OpenCost + true-cost), and agent observability are all running. The edges worth knowing:
 
-- **Per-team isolation is live for metrics + logs, deferred for traces + profiles.** The `tenant-proxy`
-  fail-closed read path and `cortex-tenant` write-split are proven end to end for Mimir and Loki (2026-07-07);
-  extending the same pattern to Tempo and Pyroscope is mechanical follow-up, not built.
+- **Per-team isolation: write-split is real; reads are soft.** `cortex-tenant` splits each team's metrics/logs
+  into its own real Mimir/Loki tenant (live). Read isolation is Grafana folder permissions + per-team
+  dashboards — the hard fail-closed read proxy was built and then **retired** (#1269) as unreliable in OSS
+  Grafana. Traces/profiles per-team read scoping is a follow-up.
 - **The OTel SDK golden path is real but not fleet-wide.** The operator, the inject annotation, and the
   log↔trace correlation for SDK'd services are live (ADR-100); most workloads still ride the Beyla Layer-0
   baseline, and rolling the SDK across the fleet is the ongoing golden-path work.
@@ -306,10 +307,10 @@ auto-instrumented apps, the correlation walk end to end, both SLO systems, alert
 - **"The agent dashboard is empty."** Agent metrics are *zero-recording* instruments — they emit **no series
   until the agent's first action / first human verdict**. A cold agent shows only `target_info`. Not broken —
   just quiet.
-- **"I expected per-team data isolation and don't have it."** You have it — per-team *read* isolation is live
-  and fail-closed for **metrics and logs**, so you see only your team's data unless another team filed an
-  **AccessGrant**. (Traces/profiles isolation is deferred.) For a ready-made view, use your team-overview
-  dashboard.
+- **"Per-team data isolation — how strong is it?"** Your writes land in a *real* separate tenant, but your
+  reads are scoped *softly* — by Grafana folder permissions and your team-overview dashboard, not a fail-closed
+  gate (the hard read-proxy was retired as unreliable, #1269). Treat it as an organizational boundary, not a
+  security wall — and use your team-overview dashboard as the ready-made view.
 
 ## Go deeper
 
