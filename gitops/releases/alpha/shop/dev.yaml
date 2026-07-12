@@ -10,7 +10,7 @@ spec:
     catalog:
       digest: sha256:4090b885bed8d6f8b94e42d547c5ac616b20320c8a04e1cb63734455f25e921f
     cart:
-      digest: sha256:59539cb11661a70b1a40c6e37acae56de48293c0597a2c1fbec237b2942d4526
+      digest: sha256:7d7f60fba4756ebe38a5cb1eb4e0c9ff099fbe09638d34308b8d7ccbf5171f83
     orders:
       digest: sha256:08161877adb3636e5f17d661fc508fbb81912876ef1ffad3e3ab939af71234fb
     payment:
