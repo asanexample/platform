@@ -99,6 +99,33 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-12 (UNPARK) — ⚠️ NEW failure mode: `platctl up` Karpenter apply died on a STALE PROVIDER CACHE
+  (`Required plugins are not installed`). Otherwise the healthiest unpark in days — Cilium clean, no cascade.**
+  Preprod `up` **failed exit 1** at "Restoring Karpenter NodePool": `Error: Required plugins are not installed —
+  there is no package for registry.opentofu.org/hashicorp/aws 6.51.0 cached in .terraform/providers`. CAUSE:
+  `platctl up`'s Karpenter step runs `tofu apply -replace=helm_release.nodepool[0]` **directly, without an
+  `init` first**, so it relies on a pre-populated provider cache — and this unit's `.terragrunt-cache` provider
+  binary was missing/evicted. (Node-group scaling had already succeeded — system→1 ACTIVE — so only the Karpenter
+  sub-step failed; `up` is resumable.) **FIX (clean, ~15s): `cd infra/live/aws/preprod/us-east-1/platform/karpenter
+  && AWS_PROFILE=management terragrunt init` (downloads aws 6.51.0 to the shared cache), then re-run `platctl up
+  --env preprod`** — it resumed, Karpenter gate passed, reconnect completed. ⚠️ **This is a likely-recurring
+  `platctl` gap — the Karpenter apply should `init` (or `terragrunt run` which auto-inits) before the `-replace`
+  apply; worth a durable platctl fix so a cold/evicted provider cache doesn't fail the unpark.** **The GOOD news
+  (contrast 07-10): the two things I feared did NOT happen** — (1) the 07-12-park orphaned EC2NodeClass caused NO
+  stuck-NodeClass; the `-replace` rebuilt it clean and the Karpenter health gate passed first check. (2) NO
+  Cilium-wedge cascade — all agents `1/1 r=0`, all nodes Ready, no flapping, my kubectl was stable throughout.
+  #1183 auto-healed backstage+keycloak (6th cycle). **Applied the P14 lesson — verified WEBHOOK/ADMISSION health,
+  not just pod counts:** kyverno-svc had endpoints on both clusters + a server-side-dry-run `create` passed the
+  full admission chain on both → admission genuinely accepting writes. **Standard downstream victims cleared**
+  (activation-operator, argo-rollouts ×2, and preprod's NEW `platform-flagship` app which was DB-ordering-blocked
+  on its now-Ready `flagship-db` CNPG cluster — the other session's P14 work; recovered `1/1` after a backoff
+  clear). **Only residual not-Ready = two STANDING issues, NOT unpark regressions:** platform `triage-demo/checkout`
+  (broken demo, no payments-db) and preprod `falco` + `alloy-profiles` DaemonSet pods `Pending / Insufficient cpu`
+  (the small-t4g-node CPU-packing constraint — DaemonSet pods don't trigger Karpenter scale-up, so they stay
+  Pending until node headroom exists; needs bigger preprod nodes, a config change out of unpark scope). NB preprod
+  now HAS CNPG (flagship-db) so future preprod unparks CAN have real DB-ordering victims — the "preprod has no
+  CNPG" assumption from earlier entries is now STALE.
+
 - **2026-07-12 (end-of-day PARK) — cost-zero OK, but ⚠️ preprod's EC2NodeClass delete TIMED OUT on the flaky
   API — watch for a stuck-NodeClass on next unpark.** Both parked cost-zero (node groups `desiredSize=0`, 0
   running/pending instances both accounts, bastions stopped) — the node scaling is via the reliable AWS EKS API so
