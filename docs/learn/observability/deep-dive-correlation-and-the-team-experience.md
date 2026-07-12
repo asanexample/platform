@@ -163,6 +163,10 @@ Every deploy draws a vertical line across the time series. So "latency spiked at
 under "…because of the 02:58 deploy of `storefront`" — the metric blip and its likely cause on one axis.
 (`kube_deployment_metadata_generation` bumps on every spec change; `changes() > 0` marks the moment.)
 
+![A real distributed trace in Tempo — a POST /api/checkout spanning 7 services over 2.59s, crossing from alpha-shop into bravo-dispatch.](images/screenshot-crossteam-trace.png)
+
+*A real `POST /api/checkout` in Tempo (preprod), 2026-07-12 — 7 services, 2.59s, the exact structure the four clicks above walk. Watch it **cross the team boundary**: `alpha-shop` (storefront → cart → orders → payment) calls into `bravo-dispatch` (intake → shipments → dispatch-worker) at the ServiceGrant-governed hop (ADR-101) — one trace spanning two teams.*
+
 ![The Grafana correlation web as a tenant×store grid — each jump between Mimir, Tempo, Loki, and Pyroscope is a replace(uid,…) string-swap rule that stays within a tenant column and replicates identically across the platform/preprod/all tenants; an off-convention datasource name links nowhere.](images/correlation-web.svg)
 
 ---

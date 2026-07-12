@@ -179,6 +179,10 @@ more only where you need depth.
 | **L1 — OTel SDK auto-inject** | code-level spans, metrics, profiles, trace-stamped logs | Wire the SDK + add one annotation | **Live** — `alpha-shop`, `alpha-checkout` (preprod), both opted in |
 | **L2 — agent observability** | GenAI semconv for AI agents | (agent-side instrumentation) | Live for the triage agent — see the agent-observability dive |
 
+![Alpha Shop product dashboard under load — OTLP RED metrics (request rate, 5xx, p95), storefront HPA autoscaling 2→4, and progressive-delivery rollout phases.](images/screenshot-alpha-shop-overview.png)
+
+*The `alpha-shop` L1 (OTLP SDK) RED under a real load test (2026-07-12, ~3,264 requests / 901 checkouts / 0 errors): request rate ~50 req/s, p95 ~400ms on `orders`, zero 5xx — and, because it's the same dashboard, the storefront HPA scaling 2→4 on CPU (ADR-078) and the progressive-delivery rollout phases. The "About these panels" note is the ADR-100 OTLP→Prometheus convergence, live.*
+
 L1 went live this cycle ([ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md)),
 correcting ADR-077's original "still outstanding" status. The [OpenTelemetry
 Operator](https://opentelemetry.io/docs/kubernetes/operator/automatic/) (`observability-otel-operator`,
