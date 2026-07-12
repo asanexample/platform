@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 992" width="760" height="992" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#1f8fb0"]{fill:#48c0e3}[stroke="#1f8fb0"]{stroke:#48c0e3}[fill="#9a9aa1"]{fill:#888890}[stroke="#9a9aa1"]{stroke:#888890}[fill="#2c66c4"]{fill:#6b98e1}[stroke="#2c66c4"]{stroke:#6b98e1}[fill="#1f8a5b"]{fill:#40d996}[stroke="#1f8a5b"]{stroke:#40d996}[fill="#b0790f"]{fill:#f2ad29}[stroke="#b0790f"]{stroke:#f2ad29}[fill="#8a4fc4"]{fill:#b892dd}[stroke="#8a4fc4"]{stroke:#b892dd}[fill="#efefe9"]{fill:#20201c}[stroke="#efefe9"]{stroke:#20201c}[fill="#dcdcd5"]{fill:#2a2a25}[stroke="#dcdcd5"]{stroke:#2a2a25}[fill="#e4f3f8"]{fill:#184554}[stroke="#e4f3f8"]{stroke:#184554}[fill="#bce0ec"]{fill:#1e5668}[stroke="#bce0ec"]{stroke:#1e5668}[fill="#0f7f9e"]{fill:#29c5f0}[stroke="#0f7f9e"]{stroke:#29c5f0}[fill="#0f8ab0"]{fill:#29c2f2}[stroke="#0f8ab0"]{stroke:#29c2f2}[fill="#3a8ba6"]{fill:#6db6cf}[stroke="#3a8ba6"]{stroke:#6db6cf}[fill="#33333a"]{fill:#dedee2}[stroke="#33333a"]{stroke:#dedee2}[fill="#eaf1fb"]{fill:#172f51}[stroke="#eaf1fb"]{stroke:#172f51}[fill="#c4d8f4"]{fill:#1d3a62}[stroke="#c4d8f4"]{stroke:#1d3a62}[fill="#5a6b83"]{fill:#8999b0}[stroke="#5a6b83"]{stroke:#8999b0}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#bfe0cc"]{fill:#2d5e41}[stroke="#bfe0cc"]{stroke:#2d5e41}[fill="#4f7a63"]{fill:#7aab91}[stroke="#4f7a63"]{stroke:#7aab91}[fill="#f9f0da"]{fill:#584619}[stroke="#f9f0da"]{stroke:#584619}[fill="#e8d4a0"]{fill:#e5cc8a}[stroke="#e8d4a0"]{stroke:#e5cc8a}[fill="#7a6a3f"]{fill:#b39e66}[stroke="#7a6a3f"]{stroke:#b39e66}[fill="#9a6a0a"]{fill:#f6b022}[stroke="#9a6a0a"]{stroke:#f6b022}[fill="#f2eafb"]{fill:#321751}[stroke="#f2eafb"]{stroke:#321751}[fill="#d9c4f0"]{fill:#3f1d64}[stroke="#d9c4f0"]{stroke:#3f1d64}[fill="#6f5a86"]{fill:#9d8ab2}[stroke="#6f5a86"]{stroke:#9d8ab2}[fill="#8a8a91"]{fill:#898990}[stroke="#8a8a91"]{stroke:#898990}[fill="#fbfbf9"]{fill:#181816}[stroke="#fbfbf9"]{stroke:#181816}[fill="#d9d9d2"]{fill:#2c2c27}[stroke="#d9d9d2"]{stroke:#2c2c27}[fill="#edf5f8"]{fill:#1d3f4b}[stroke="#edf5f8"]{stroke:#1d3f4b}[fill="#e0eff4"]{fill:#1e4653}[stroke="#e0eff4"]{stroke:#1e4653}[fill="#e8823a"]{fill:#f3ad7c}[stroke="#e8823a"]{stroke:#f3ad7c}[fill="#ffffff"]{fill:#141414}[stroke="#ffffff"]{stroke:#141414}[fill="#dbe6ea"]{fill:#2c444c}[stroke="#dbe6ea"]{stroke:#2c444c}[fill="#5f5f66"]{fill:#8c8c94}[stroke="#5f5f66"]{stroke:#8c8c94}[fill="#b83a2c"]{fill:#dd6f63}[stroke="#b83a2c"]{stroke:#dd6f63}}</style><defs><clipPath id="abar0"><rect x="39.0" y="425.0" width="163.0" height="9.0"/></clipPath><clipPath id="abar1"><rect x="212.0" y="425.0" width="163.0" height="9.0"/></clipPath><clipPath id="abar2"><rect x="385.0" y="425.0" width="163.0" height="9.0"/></clipPath><clipPath id="abar3"><rect x="558.0" y="425.0" width="163.0" height="9.0"/></clipPath></defs>
+<rect class="bg" x="0" y="0" width="760" height="992" fill="#f6f6f3"></rect>
+
+
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.9px">OBSERVABILITY · THE ONE IDEA</text>
+<text class="text" x="40" y="90" font-size="27" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">The platform observes your workload <tspan fill="#1f8fb0" font-style="italic">for</tspan> you.</text>
+<text class="muted" x="40" y="118" font-size="14.5" fill="#6c6c73">Observability is a property of the platform, not a chore for the app. Watched from the moment it</text>
+<text class="muted" x="40" y="137" font-size="14.5" fill="#6c6c73">runs — four signals, collected mostly <tspan class="text" fill="#1c1c22">zero-code from below the process</tspan>, stored in one</text>
+<text class="muted" x="40" y="156" font-size="14.5" fill="#6c6c73">correlated stack on your own storage, <tspan class="text" fill="#1c1c22" font-weight="600">isolated per team</tspan>, turned into action. You write almost no</text>
+<text class="muted" x="40" y="175" font-size="14.5" fill="#6c6c73">telemetry config; the platform injects it.</text>
+
+
+<text class="dim mono" x="40" y="205" font-size="10" fill="#9a9aa1" letter-spacing="0.8px">FOUR SIGNALS →</text>
+<rect class="ac-blue" x="150" y="197" width="10" height="10" rx="3" fill="#2c66c4"></rect>
+<text class="muted mono" x="166" y="206" font-size="11.5" fill="#6c6c73">metrics</text>
+<rect class="ac-green" x="240" y="197" width="10" height="10" rx="3" fill="#1f8a5b"></rect>
+<text class="muted mono" x="256" y="206" font-size="11.5" fill="#6c6c73">logs</text>
+<rect class="ac-amber" x="312" y="197" width="10" height="10" rx="3" fill="#b0790f"></rect>
+<text class="muted mono" x="328" y="206" font-size="11.5" fill="#6c6c73">traces</text>
+<rect class="ac-violet" x="396" y="197" width="10" height="10" rx="3" fill="#8a4fc4"></rect>
+<text class="muted mono" x="412" y="206" font-size="11.5" fill="#6c6c73">profiles</text>
+
+
+<rect class="panel panel-bd" x="40" y="226" width="680" height="60" rx="12" fill="#efefe9" stroke="#dcdcd5" stroke-width="1"></rect>
+<text class="muted mono" x="58" y="250" font-size="10" fill="#6c6c73" letter-spacing="0.6px">YOUR WORKLOAD · the patient</text>
+<text class="text" x="58" y="270" font-size="15" fill="#1c1c22" font-weight="600">Runs as usual — writes almost no telemetry config</text>
+<text class="t-green mono" x="702" y="261" font-size="11" fill="#1f8a5b" text-anchor="end">only job: log to stdout</text>
+
+
+<rect class="chip-cyan" x="40" y="306" width="70" height="20" rx="6" fill="#e4f3f8" stroke="#bce0ec" stroke-width="1"></rect>
+<text class="t-cyan mono" x="75" y="320" font-size="11" fill="#0f7f9e" text-anchor="middle">COLLECT</text>
+<text class="text" x="120" y="320" font-size="14" fill="#1c1c22" font-weight="600">watched from below — eBPF, for free</text>
+<line class="divln" x1="392" y1="316" x2="720" y2="316" stroke="#dcdcd5" stroke-width="1"></line>
+
+
+<rect class="bg-cyan bd-cyan" x="40" y="334" width="680" height="80" rx="12" fill="#e4f3f8" stroke="#bce0ec" stroke-width="1"></rect>
+<rect class="ac-cyan" x="44" y="344" width="4" height="60" rx="2" fill="#0f8ab0"></rect>
+<text class="t-cyan mono" x="62" y="362" font-size="13" fill="#0f7f9e" font-weight="500">Beyla · eBPF</text>
+<text class="t-cyan mono" x="62" y="380" font-size="10.5" fill="#3a8ba6">DaemonSet · every node</text>
+<text class="text" x="210" y="358" font-size="13" fill="#33333a">Runs <tspan class="text" fill="#1c1c22" font-style="italic">inside the kernel</tspan>, below your process — hooks the HTTP/gRPC/SQL paths at the</text>
+<text class="text" x="210" y="376" font-size="13" fill="#33333a">syscall level. Any language, zero code, zero redeploy. Three of four signals come from</text>
+<text class="text" x="210" y="394" font-size="13" fill="#33333a">here; a matching fleet of collectors ships each to its store.</text>
+
+
+<rect class="bg-blue" x="40" y="426" width="161" height="66" rx="10" fill="#eaf1fb" stroke="#c4d8f4" stroke-width="1"></rect>
+<rect x="41.3" y="427.3" width="158.5" height="63.5" rx="8.8" fill="none" stroke="#2c66c4" stroke-width="2.5" clip-path="url(#abar0)"></rect>
+<text class="text" x="54" y="450" font-size="13.5" fill="#1c1c22" font-weight="600">Metrics</text>
+<text class="muted" x="54" y="467" font-size="11" fill="#5a6b83">numbers over time —</text>
+<text class="t-blue" x="54" y="482" font-size="11" fill="#2c66c4">something&#39;s wrong &amp; where</text>
+
+<rect class="bg-green" x="213" y="426" width="161" height="66" rx="10" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<rect x="214.3" y="427.3" width="158.5" height="63.5" rx="8.8" fill="none" stroke="#1f8a5b" stroke-width="2.5" clip-path="url(#abar1)"></rect>
+<text class="text" x="227" y="450" font-size="13.5" fill="#1c1c22" font-weight="600">Logs</text>
+<text class="muted" x="227" y="467" font-size="11" fill="#4f7a63">events with detail —</text>
+<text class="t-green" x="227" y="482" font-size="11" fill="#1f8a5b">what exactly happened</text>
+
+<rect class="bg-amber" x="386" y="426" width="161" height="66" rx="10" fill="#f9f0da" stroke="#e8d4a0" stroke-width="1"></rect>
+<rect x="387.3" y="427.3" width="158.5" height="63.5" rx="8.8" fill="none" stroke="#b0790f" stroke-width="2.5" clip-path="url(#abar2)"></rect>
+<text class="text" x="400" y="450" font-size="13.5" fill="#1c1c22" font-weight="600">Traces</text>
+<text class="muted" x="400" y="467" font-size="11" fill="#7a6a3f">one request&#39;s path —</text>
+<text class="t-amber" x="400" y="482" font-size="11" fill="#9a6a0a">which hop was slow</text>
+
+<rect class="bg-violet" x="559" y="426" width="161" height="66" rx="10" fill="#f2eafb" stroke="#d9c4f0" stroke-width="1"></rect>
+<rect x="560.3" y="427.3" width="158.5" height="63.5" rx="8.8" fill="none" stroke="#8a4fc4" stroke-width="2.5" clip-path="url(#abar3)"></rect>
+<text class="text" x="573" y="450" font-size="13.5" fill="#1c1c22" font-weight="600">Profiles</text>
+<text class="muted" x="573" y="467" font-size="11" fill="#6f5a86">where code spent time —</text>
+<text class="t-violet" x="573" y="482" font-size="11" fill="#8a4fc4">which line burned CPU</text>
+
+
+<line class="arrow" x1="380" y1="500" x2="380" y2="514" stroke="#8a8a91" stroke-width="2"></line>
+<path class="arrow" d="M374 514 L386 514 L380 522 Z" fill="#8a8a91"></path>
+
+
+<rect class="chip-cyan" x="40" y="532" width="56" height="20" rx="6" fill="#e4f3f8" stroke="#bce0ec" stroke-width="1"></rect>
+<text class="t-cyan mono" x="68" y="546" font-size="11" fill="#0f7f9e" text-anchor="middle">STORE</text>
+<text class="text" x="106" y="546" font-size="14" fill="#1c1c22" font-weight="600">one correlated stack — self-hosted on your own S3</text>
+<line class="divln" x1="486" y1="542" x2="720" y2="542" stroke="#dcdcd5" stroke-width="1"></line>
+
+
+<rect class="door door-bd" x="40" y="560" width="680" height="96" rx="14" fill="#fbfbf9" stroke="#d9d9d2" stroke-width="1.5"></rect>
+<path class="head head-bd" d="M40 574 A14 14 0 0 1 54 560 L706 560 A14 14 0 0 1 720 574 L720 592 L40 592 Z" fill="#efefe9" stroke="#d9d9d2" stroke-width="1"></path>
+<line class="head-bd" x1="40" y1="592" x2="720" y2="592" stroke="#d9d9d2" stroke-width="1"></line>
+<text class="text" x="58" y="581" font-size="13.5" fill="#1c1c22" font-weight="600">LGTM+P · one store per signal</text>
+<text class="muted mono" x="702" y="581" font-size="10.5" fill="#6c6c73" text-anchor="end">durable blocks on S3 · Mimir, not Prometheus, is the truth</text>
+
+<rect class="bg-green" x="58" y="604" width="150" height="42" rx="9" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<text class="t-green mono" x="70" y="623" font-size="12.5" fill="#1f8a5b" font-weight="500">Loki</text>
+<text class="muted" x="70" y="638" font-size="10.5" fill="#4f7a63">logs</text>
+<rect class="bg-amber" x="217" y="604" width="150" height="42" rx="9" fill="#f9f0da" stroke="#e8d4a0" stroke-width="1"></rect>
+<text class="t-amber mono" x="229" y="623" font-size="12.5" fill="#9a6a0a" font-weight="500">Tempo</text>
+<text class="muted" x="229" y="638" font-size="10.5" fill="#7a6a3f">traces</text>
+<rect class="bg-blue" x="376" y="604" width="150" height="42" rx="9" fill="#eaf1fb" stroke="#c4d8f4" stroke-width="1"></rect>
+<text class="t-blue mono" x="388" y="623" font-size="12.5" fill="#2c66c4" font-weight="500">Mimir</text>
+<text class="muted" x="388" y="638" font-size="10.5" fill="#5a6b83">metrics</text>
+<rect class="bg-violet" x="535" y="604" width="167" height="42" rx="9" fill="#f2eafb" stroke="#d9c4f0" stroke-width="1"></rect>
+<text class="t-violet mono" x="547" y="623" font-size="12.5" fill="#8a4fc4" font-weight="500">Pyroscope</text>
+<text class="muted" x="547" y="638" font-size="10.5" fill="#6f5a86">profiles</text>
+
+
+<line class="arrow" x1="380" y1="664" x2="380" y2="678" stroke="#8a8a91" stroke-width="2"></line>
+<path class="arrow" d="M374 678 L386 678 L380 686 Z" fill="#8a8a91"></path>
+
+
+
+<rect class="chip-cyan" x="40" y="700" width="52" height="20" rx="6" fill="#e4f3f8" stroke="#bce0ec" stroke-width="1"></rect>
+<text class="t-cyan mono" x="66" y="714" font-size="11" fill="#0f7f9e" text-anchor="middle">VIEW</text>
+<text class="text" x="102" y="714" font-size="14" fill="#1c1c22" font-weight="600">one Grafana — the nurses&#39; station</text>
+<line class="divln" x1="336" y1="710" x2="720" y2="710" stroke="#dcdcd5" stroke-width="1"></line>
+
+
+<rect class="gpane gpane-bd" x="40" y="728" width="680" height="182" rx="14" fill="#edf5f8" stroke="#bce0ec" stroke-width="1.5"></rect>
+<path class="ghead ghead-bd" d="M40 742 A14 14 0 0 1 54 728 L706 728 A14 14 0 0 1 720 742 L720 770 L40 770 Z" fill="#e0eff4" stroke="#bce0ec" stroke-width="1"></path>
+<line class="ghead-bd" x1="40" y1="770" x2="720" y2="770" stroke="#bce0ec" stroke-width="1"></line>
+<circle cx="62" cy="749" r="5" fill="#e8823a"></circle>
+<text class="text" x="76" y="754" font-size="14.5" fill="#1c1c22" font-weight="600">Grafana · one pane over all four stores</text>
+<text class="dim mono" x="510" y="753" font-size="10" fill="#8a8a91">reads →</text>
+<rect x="554" y="745" width="9" height="9" rx="2" fill="#1f8a5b"></rect>
+<rect x="567" y="745" width="9" height="9" rx="2" fill="#b0790f"></rect>
+<rect x="580" y="745" width="9" height="9" rx="2" fill="#2c66c4"></rect>
+<rect x="593" y="745" width="9" height="9" rx="2" fill="#8a4fc4"></rect>
+<text class="t-cyan mono" x="610" y="753" font-size="10" fill="#0f7f9e">the &#34;G&#34; in LGTM+P</text>
+
+
+<rect class="panel panel-bd" x="58" y="784" width="330" height="110" rx="11" fill="#ffffff" stroke="#dbe6ea" stroke-width="1"></rect>
+<rect class="chip-cyan" x="74" y="796" width="76" height="18" rx="5" fill="#e4f3f8" stroke="#bce0ec" stroke-width="1"></rect>
+<text class="t-cyan mono" x="112" y="809" font-size="10" fill="#0f7f9e" text-anchor="middle">CORRELATE</text>
+<text class="text" x="160" y="810" font-size="13.5" fill="#1c1c22" font-weight="600">walk, don&#39;t re-query</text>
+<text class="mono" x="74" y="836" font-size="11" fill="#2c66c4">metric <tspan fill="#8a8a91">→</tspan> <tspan fill="#9a6a0a">trace</tspan> <tspan fill="#8a8a91">→</tspan> <tspan fill="#1f8a5b">logs</tspan> <tspan fill="#8a8a91">→</tspan> <tspan fill="#8a4fc4">profile</tspan></text>
+<text class="muted" x="74" y="858" font-size="11.5" fill="#6c6c73">A spike&#39;s exemplar → the slow request&#39;s trace →</text>
+<text class="muted" x="74" y="874" font-size="11.5" fill="#6c6c73">its logs (trace ID) → its flame graph. Each store</text>
+<text class="muted" x="74" y="890" font-size="11.5" fill="#6c6c73">one click from the last — inside this pane.</text>
+
+
+<rect class="panel panel-bd" x="402" y="784" width="300" height="110" rx="11" fill="#ffffff" stroke="#dbe6ea" stroke-width="1"></rect>
+<rect class="chip-cyan" x="418" y="796" width="42" height="18" rx="5" fill="#e4f3f8" stroke="#bce0ec" stroke-width="1"></rect>
+<text class="t-cyan mono" x="439" y="809" font-size="10" fill="#0f7f9e" text-anchor="middle">ACT</text>
+<text class="text" x="470" y="810" font-size="13.5" fill="#1c1c22" font-weight="600">signals become action</text>
+<text class="t-amber mono" x="418" y="840" font-size="11.5" fill="#9a6a0a">SLOs</text>
+<text class="muted" x="470" y="840" font-size="12" fill="#5f5f66">page on burn rate, not thresholds</text>
+<text class="t-rose mono" x="418" y="863" font-size="11.5" fill="#b83a2c">pages</text>
+<text class="muted" x="470" y="863" font-size="12" fill="#5f5f66">routed to the <tspan class="text" fill="#1c1c22" font-style="italic">right</tspan> team&#39;s on-call</text>
+<text class="t-green mono" x="418" y="886" font-size="11.5" fill="#1f8a5b">cost</text>
+<text class="muted" x="470" y="886" font-size="12" fill="#5f5f66">per team — dashboard, alert, enforce</text>
+
+
+<text class="muted" x="40" y="946" font-size="14" fill="#6c6c73">The same paved-road move as the rest of the platform: the payoff — SLOs, a 3 a.m. page to the right</text>
+<text class="muted" x="40" y="966" font-size="14" fill="#6c6c73">person, cost attribution — arrives <tspan class="text" fill="#1c1c22" font-weight="500">without the plumbing</tspan>. You ship the app; the platform wires the monitors.</text>
+</svg>

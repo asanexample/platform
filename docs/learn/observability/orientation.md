@@ -33,6 +33,8 @@ Everything else is a consequence of this:
 > attribution. You write almost no telemetry config; the platform injects it, the way it injects your
 > securityContext and your AWS credentials.
 
+![The platform observes your workload for you: watched from below by eBPF, four signals land in one self-hosted LGTM+P stack on your own S3, converge into one Grafana pane, and become correlation, SLOs, pages, and cost — all without app plumbing](images/observe-for-you.svg)
+
 The metaphor for the whole doc is a hospital's patient monitoring.
 
 > The moment a patient (your workload) is admitted, they're wired to monitors — heart rate, oxygen, blood
