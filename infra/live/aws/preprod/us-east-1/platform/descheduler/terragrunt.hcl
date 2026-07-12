@@ -60,15 +60,25 @@ inputs = {
   helm_wait          = true
 
   # preprod is small (1-2 t4g.large) and the most imbalance-prone: aggressive WhenEmptyOrUnderutilized
-  # consolidation + staggered post-unpark node bring-up. Two adjustments off the module defaults:
-  #  - Raise the DESTINATION (underutilized) threshold to 50%. LowNodeUtilization only rebalances if some node
-  #    is below ALL thresholds; the 2026-07-02 incident's cool node sat at 39% CPU — one percent under the 40%
-  #    default. 50% gives the emptier of two small nodes reliable headroom to qualify as a rebalance target.
+  # consolidation + staggered post-unpark node bring-up. On a near-capacity 2-node cluster the emptier node is
+  # still too "full" to qualify as a rebalance target under tight thresholds, so both CPU thresholds are widened
+  # well off the module defaults (only cpu — memory/pods are not the constraint here):
+  #  - DESTINATION (underutilized) CPU = 78%. LowNodeUtilization only rebalances if some node is below ALL
+  #    thresholds. 2026-07-02 the cool node sat at 39% (1% under the 40% default) → we raised it to 50%.
+  #    2026-07-12 the cool node sat at ~68% while the hot node was at 98% and its falco/alloy-profiles DaemonSet
+  #    pods were stuck Pending (Insufficient cpu); 68% is above the 50% underutil line, so NO node qualified as a
+  #    target and the descheduler no-op'd ("no node is underutilized, nothing to do here"). 78% lets a ~68% node
+  #    receive evicted pods, freeing >210m on the hot node (falco 100m + alloy-profiles 110m) so the pinned
+  #    DaemonSet pods can finally schedule (an evicted 100m pod can't land back on the full node, so it moves).
+  #  - SOURCE (overutilized) CPU = 85%. Above this 2-node cluster's ~81% balanced steady state (so it does not
+  #    churn at balance) yet low enough to shed the ~98% hot node. Keeps a gap over underutilized; requests are
+  #    static so there's no fluctuation-driven ping-pong.
   #  - Faster cadence (10 min): churn is cheap on non-prod, and this is where a hot node melts down.
-  # Overutilized stays 70% — catches the ~99% incident with wide margin, well under the kubelet-degradation zone.
+  # NOTE: this only rebalances EXISTING capacity (~350m of slack once balanced). If preprod grows past that, the
+  # durable fix is bigger nodes, NOT tighter thresholds.
   schedule                 = "*/10 * * * *"
-  underutilized_thresholds = { cpu = 50, memory = 50, pods = 50 }
-  overutilized_thresholds  = { cpu = 70, memory = 70, pods = 70 }
+  underutilized_thresholds = { cpu = 78, memory = 50, pods = 50 }
+  overutilized_thresholds  = { cpu = 85, memory = 70, pods = 70 }
 
   tags = include.base.locals.tags
 }
