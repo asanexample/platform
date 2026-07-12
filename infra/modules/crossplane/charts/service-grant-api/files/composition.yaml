@@ -13,7 +13,7 @@ kind: Composition
 metadata:
   name: service-grant
   labels:
-    crossplane.io/xrd: xservicegrants.platform.refplat.org
+    crossplane.io/xrd: servicegrants.platform.refplat.org
 spec:
   compositeTypeRef:
     apiVersion: platform.refplat.org/v1beta1
