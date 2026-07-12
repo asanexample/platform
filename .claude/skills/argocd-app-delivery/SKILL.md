@@ -185,6 +185,25 @@ Composition (`crossplane/charts/agent-api/`), and their delivery is **hub-target
   still stomps those fields and fights the canary (found in prod; the offline spikes couldn't surface it). The
   per-stage canary shape lives in the app's `k8s/overlays/prod` (scaffolder `deployStrategy`), and the prod
   metric gate queries the hub Mimir via the spoke read route — see ADR-056's as-built section.
+- **Canary first-run stall: `ignoreDifferences` on the weight field can mask a missing second `backendRef`.**
+  If a Rollout's canary strategy references a `canaryService` (Gateway-API plugin) but the HTTPRoute's
+  `backendRefs` only lists the stable service on the **first** sync (the canary entry not yet present), the
+  `backendRefs[].weight` `ignoreDifferences` above hides that *structural* diff from ArgoCD's own reconcile —
+  it only ever diffed the weight, not the missing list entry — so the sync reports clean while the Rollout
+  controller stalls forever retrying `failed to set weight via plugin: backendRef was not found in httpRoute`
+  (0% progress, no obvious ArgoCD-side error). Fix: confirm the HTTPRoute actually carries BOTH backendRefs
+  before triggering a canary on a service for the first time (`kubectl get httproute <svc> -o
+  jsonpath='{.spec.rules[0].backendRefs}'`) — a stale/incomplete initial sync is the usual cause.
+- **Per-Product AppProject `namespaceResourceWhitelist` gaps fail the WHOLE overlay, not just the missing
+  kind.** This is a separate authorization gate from Kyverno — `delivery.tf`'s per-Product `AppProject`
+  explicitly enumerates every kind a tenant Application may sync (`ConfigMap`, `Rollout`,
+  `AnalysisTemplate`/`AnalysisRun`, `HTTPRoute`, `NetworkPolicy`, `CiliumNetworkPolicy`, …). A kind that's
+  scaffolded/emitted but **not** in that list gets rejected outright ("resource not permitted in project") —
+  and because an ArgoCD sync is **atomic**, that one rejection fails the sync for every OTHER resource in the
+  same commit too (e.g. a co-committed canary rollout blocked by an unrelated missing HPA whitelist entry,
+  #1342 — `autoscaling/HorizontalPodAutoscaler` was missing, silently breaking ADR-078's golden-path HPA for
+  every tenant Product until fixed). If a scaffolded/new resource kind "exists in git but never syncs" with no
+  helpful error on the resource itself, check the Application's sync result for a whitelist rejection first.
 - **Backstage ArgoCD token 401**: a Helm apply can drop the minted backstage account
   token from `argocd-cm`; re-mint and update Secrets Manager (`docs/runbooks/backstage-argocd.md`).
 - **No offline test for the delivery ApplicationSet generator** — first draft of a

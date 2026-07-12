@@ -142,11 +142,18 @@ it starts (ADR-056 Phase 3 / the W11 freeze gate). See
   (`http_server_request_duration_seconds_*`) + service graph + request traces for
   workloads in the scoped `discovery.instrument` namespaces. No app change, all
   languages. Verify per `docs/runbooks/observability-instrumentation-verify.md`.
-- **Layer 1 — OTel Operator SDK inject (opt-in)**: annotate the workload
-  `instrumentation.opentelemetry.io/inject-<lang>: "observability/platform"`; the
-  operator injects the SDK + the platform-provided OTLP endpoint (never hardcode it) and
-  adds code-level spans on top of Beyla. The per-namespace `Instrumentation` CR rollout
-  is the P14 golden path.
+- **Layer 1 — OTel SDK, the golden path (ADR-100)**: annotate the workload
+  `instrumentation.opentelemetry.io/inject-<lang>: "observability/platform"` (Go apps: see
+  `alpha-shop`'s `internal/telemetry` package for the reference shape) — the operator injects
+  the SDK + the platform-provided OTLP endpoint (never hardcode it), giving traces + metrics +
+  Pyroscope profiles + trace-stamped structured logs. **Run this OR Beyla on a service, never
+  both** — Beyla's eBPF context-propagation overwrites the SDK's `traceparent`, fragmenting
+  traces. **For metrics specifically: a `MeterProvider` must be created and set globally
+  (`otel.SetMeterProvider`) alongside the `TracerProvider`** — `otelhttp` middleware silently
+  emits no RED metrics without it (tracing alone doesn't need this, which is why it's easy to
+  forget). To rule out app-side bugs before chasing the collector/Mimir: write a small local
+  test against a mock OTLP HTTP endpoint (or an SDK `ManualReader`) asserting the expected
+  metric/span actually gets recorded/exported — much faster than debugging in-cluster.
 - **Layer 2 — Agent/GenAI obs (ADR-076)**: agents emit OTel GenAI semconv
   (`gen_ai.*`), one correlated trace per invocation → audit/eval/cost/debug; content
   capture is gated per compliance tier. Deferred to the tier-0 agent build.
@@ -179,6 +186,15 @@ it starts (ADR-056 Phase 3 / the W11 freeze gate). See
   apply the storage flip with `helm_wait=false`, then flip back.
 - **Beyla label cardinality**: it stamps ~35 k8s attributes; Mimir's default
   `max_label_names_per_series=30` silently drops them — the hub raises it to 50.
+- **Mimir OTLP config: verify every key/type against the running `/config`, never guess (ADR-100).**
+  `promote_otel_resource_attributes` (note: **promote_otel**, not otel_promote) takes a **CSV
+  string**, not a YAML/HCL list — the wrong shape doesn't error at plan time, it **crashloops every
+  Mimir component** on apply (config parse failure). If that happens: `helm rollback mimir <last-good-rev>`
+  immediately, then fix the config against `curl .../config` on a *working* Mimir. Also: even with
+  `otel_keep_identifying_resource_attributes` + promoting `service.name`, OTLP-ingested series still
+  break out per-service by **`job`** (`<team>-<product>/<svc>`) — Mimir does not surface `service_name`
+  as a label for OTLP metrics the way it does for Beyla/remote-write ones. Query/dashboard/SLO/canary
+  authors: group by `job`, not `service_name`, for an SDK-instrumented tenant service.
 - **Manual `terragrunt apply` needs `AWS_PROFILE=management`** (bare shell assumes
   PlatformDeployer and 403s); reach the private API over Tailscale (ADR-010).
 - **Per-team read isolation (P13 / #590) is LIVE + PROVEN (2026-07-07)** — note the topology: the platform hub
