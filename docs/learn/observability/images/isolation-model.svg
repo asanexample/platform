@@ -32,10 +32,10 @@
 <text class="muted" x="72" y="401" font-size="11" fill="#5f7d6c">write-splits each series by team</text>
 <path d="M202 412 L196 406 L208 406 Z" fill="#3c9a6c"></path>
 <rect x="58" y="422" width="143" height="42" rx="8" fill="#d0ecdb" stroke="#a8d8bd" stroke-width="1"></rect>
-<text class="t-green mono" x="129" y="440" font-size="12.5" fill="#1c7a4f" text-anchor="middle" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">acme</text>
+<text class="t-green mono" x="129" y="440" font-size="12.5" fill="#1c7a4f" text-anchor="middle" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">alpha</text>
 <text class="muted mono" x="129" y="454" font-size="9.5" fill="#5f7d6c" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">tenant</text>
 <rect x="213" y="422" width="143" height="42" rx="8" fill="#d0ecdb" stroke="#a8d8bd" stroke-width="1"></rect>
-<text class="t-green mono" x="284" y="440" font-size="12.5" fill="#1c7a4f" text-anchor="middle" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">globex</text>
+<text class="t-green mono" x="284" y="440" font-size="12.5" fill="#1c7a4f" text-anchor="middle" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">bravo</text>
 <text class="muted mono" x="284" y="454" font-size="9.5" fill="#5f7d6c" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">tenant</text>
 <text class="text" x="58" y="492" font-size="12" fill="#25402f">Each team&#39;s series <tspan font-style="italic" fill="#123">physically separated</tspan></text>
 <text class="text" x="58" y="509" font-size="12" fill="#25402f">into its own tenant — real, end-to-end.</text>

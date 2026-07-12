@@ -14,7 +14,7 @@ plumbing. Understanding the machine is what makes you fast in an incident. It he
 
 ## The question
 
-It's 3 a.m. `acme`'s `shop-web` is slow. A user complained. You have a laptop and a login. What can you
+It's 3 a.m. `alpha`'s `shop-web` is slow. A user complained. You have a laptop and a login. What can you
 actually find out — and what did the `shop` team have to do, ahead of time, to make it findable?
 
 That second half is the surprising part. On most platforms the answer is "a lot": the team had to pick a
@@ -149,7 +149,7 @@ neighborhood post office that bundles its outgoing mail and ships it in. Crucial
 stores only through a **write-only Gateway route that force-stamps the tenant** at the edge — the spoke sends
 no tenant header and no credential, and it *cannot* spoof another tenant or read anything back. The preprod
 spoke is live for metrics, logs, and traces (plus profiles), and the real preprod apps
-(`acme-shop`, `acme-checkout`, `globex-widgets`, …) are auto-instrumented and observable on the hub.
+(`alpha-shop`, `alpha-checkout`, `bravo-dispatch`, …) are auto-instrumented and observable on the hub.
 
 ![Hub-and-spoke topology: the platform hub runs the collectors, the LGTM+P stores on S3, and the one Grafana; a lightweight preprod spoke ships its signals in over a write-only, tenant-force-stamped Transit Gateway route it can't read back through.](images/hub-and-spoke.svg)
 
@@ -157,7 +157,7 @@ spoke is live for metrics, logs, and traces (plus profiles), and the real prepro
 
 ## Tenancy — how one stack safely holds every team
 
-One Grafana, one set of stores, many teams — so the interesting question is *why can't `globex` read `acme`'s
+One Grafana, one set of stores, many teams — so the interesting question is *why can't `bravo` read `alpha`'s
 metrics?* This is the most sophisticated part of the system, and it's a layered answer, because the obvious
 mechanism isn't the real boundary.
 
@@ -173,7 +173,7 @@ lock. Isolation is layered on top of it:
   **ClusterIP-only** — never on the Gateway. No tenant workload can even *reach* Mimir or Loki to try naming a
   tenant. This is the boundary that actually holds; everything else is defense in depth above it.
 - **Writes are split per team.** `cortex-tenant` re-tenants each incoming series into its own Mimir tenant
-  (Loki does the same via per-team Alloy re-tenanting), so `acme` and `globex` are *real, separate tenants*
+  (Loki does the same via per-team Alloy re-tenanting), so `alpha` and `bravo` are *real, separate tenants*
   end to end — not one bucket with a label.
 - **Reads are scoped by Grafana, softly.** Each team gets a datasource pinned to its own tenant
   (`Mimir (<team>)`, a static `X-Scope-OrgID`), and per-team read isolation is enforced by **Grafana
@@ -209,7 +209,7 @@ copy-paste:
 
 ![The 3 a.m. correlation walk: a metric spike's exemplar opens the slow request's trace; the slow span jumps to that request's logs and to its CPU flame graph — four stores, each one click from the last.](images/correlation-walk.svg)
 
-1. **Metric → trace.** On `acme`'s workload-health dashboard, the `shop-web` p99 latency line jumps. The spike
+1. **Metric → trace.** On `alpha`'s workload-health dashboard, the `shop-web` p99 latency line jumps. The spike
    isn't just a number — it carries an **exemplar**, a clickable dot that Mimir stored alongside the
    span-metric (Tempo's metrics-generator sets `send_exemplars`, so each RED point remembers a representative
    request's `traceID`). You click the dot.

@@ -25,7 +25,7 @@
 <rect class="ac-blue" x="44" y="210" width="4" height="68" rx="2" fill="#2c66c4"></rect>
 <text class="text" x="62" y="228" font-size="13" fill="#2c66c4" font-weight="600"><tspan class="mono" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#6f86b0">01</tspan>  <tspan fill="#1c1c22" font-size="16">Metric</tspan></text>
 <text class="t-blue mono" x="62" y="246" font-size="10.5" fill="#3d6fc0">Mimir · dashboard</text>
-<text class="text" x="188" y="224" font-size="13" fill="#243a5c">On <tspan class="mono" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2c66c4">acme</tspan>&#39;s health dashboard, the <tspan class="mono" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2c66c4">shop-web</tspan> p99 latency line jumps. The spike carries</text>
+<text class="text" x="188" y="224" font-size="13" fill="#243a5c">On <tspan class="mono" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2c66c4">alpha</tspan>&#39;s health dashboard, the <tspan class="mono" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2c66c4">shop-web</tspan> p99 latency line jumps. The spike carries</text>
 <text class="text" x="188" y="242" font-size="13" fill="#243a5c">an <tspan font-style="italic" fill="#123">exemplar</tspan> — a clickable dot Mimir stored beside the point, remembering one real</text>
 <text class="text" x="188" y="260" font-size="13" fill="#243a5c">request&#39;s trace ID.</text>
 <text class="muted" x="188" y="279" font-size="12.5" fill="#5f5f66"><tspan fill="#8a8a91">learn:</tspan> <tspan font-style="italic" fill="#123">something&#39;s wrong, roughly where.</tspan></text>
