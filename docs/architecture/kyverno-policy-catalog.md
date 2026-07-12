@@ -23,8 +23,8 @@ emergency disable / the Audit↔Enforce flip.
   `verify-images-product-<team>-<product>` and `verify-attestations-product-<team>-<product>` render from the
   **Product registry** (`gitops/products/`) in the `policy` unit; the per-environment `restrict-images-<team>-<product>-<stage>` and
   `restrict-route-hostnames-<team>-<product>-<stage>` are owned by the Crossplane Environment Composition (one per environment namespace).
-  The registry currently holds **four** products (`alpha-shop`, `alpha-checkout`, `alpha-conformance`,
-  `platform-triage-copilot`), and preprod reads `gitops/products/` unfiltered, so each verify-* family
+  The registry currently holds **five** products (`alpha-shop`, `alpha-checkout`, `bravo-dispatch`,
+  `platform-flagship`, `platform-triage-copilot`), and preprod reads `gitops/products/` unfiltered, so each verify-* family
   contributes one policy per product. The **platform cluster is not "common policies only"**: it runs a
   platform-owned workload — the `triage-copilot` XAgent on the hub (ADR-082) — and enables image **and**
   attestation verification in **Enforce**, so it too renders `verify-images-product-*` /
@@ -49,7 +49,7 @@ emergency disable / the Audit↔Enforce flip.
 | Policy | Target kind(s) | Enforces | Scope | Tier | Clusters |
 | ------ | -------------- | -------- | ----- | ---- | -------- |
 | `restrict-image-registries` | Pod | Images only from approved registries (the platform ECR) | environment | all | preprod, platform |
-| `restrict-images-<team>-<product>-<stage>` | Pod | A product's environment namespace may only run `…/team-<team>/<product>-*` images (one per environment namespace, owned by the Environment Composition) | environment (per-namespace) | all | preprod (one per live env: alpha-shop/dev, alpha-shop/prod, alpha-checkout/dev, alpha-conformance/dev) |
+| `restrict-images-<team>-<product>-<stage>` | Pod | A product's environment namespace may only run `…/team-<team>/<product>-*` images (one per environment namespace, owned by the Environment Composition) | environment (per-namespace) | all | preprod (one per live env: alpha-shop/dev, alpha-shop/prod, alpha-checkout/dev, bravo-dispatch/dev, platform-flagship/dev) |
 | `disallow-latest-tag` | Pod | Explicit, non-`latest` image tag required | environment | all | preprod, platform |
 | `require-requests-limits` | Pod | CPU + memory requests **and** limits on every container | environment | all | preprod, platform |
 | `require-pod-probes` | Pod | Liveness + readiness probes on every container | environment | all | preprod, platform |
@@ -64,7 +64,7 @@ emergency disable / the Audit↔Enforce flip.
 | `disallow-default-namespace` | Pod, Deployment, StatefulSet, DaemonSet, ReplicaSet, Job, CronJob | No workloads in `default` | cluster | all | preprod, platform |
 | `disallow-privilege-escalation` | Pod | Deny `securityContext.allowPrivilegeEscalation: true` (backstops the mutate default) | environment | all | preprod, platform |
 | `require-seccomp` | Pod | Deny `seccompProfile.type: Unconfined` (backstops the mutate default) | environment | all | preprod, platform |
-| `restrict-route-hostnames-<team>-<product>-<stage>` | HTTPRoute, GRPCRoute, TLSRoute | Per-environment route hostnames must be in the product's allow-list (from `spec.domains`, owned by the Environment Composition, one per environment namespace); deny cross-product/platform hostnames + empty hostname lists (anti-squatting, ADR-029) | environment (per-namespace) | all | preprod (one per live env: alpha-shop/dev, alpha-shop/prod, alpha-checkout/dev, alpha-conformance/dev) |
+| `restrict-route-hostnames-<team>-<product>-<stage>` | HTTPRoute, GRPCRoute, TLSRoute | Per-environment route hostnames must be in the product's allow-list (from `spec.domains`, owned by the Environment Composition, one per environment namespace); deny cross-product/platform hostnames + empty hostname lists (anti-squatting, ADR-029) | environment (per-namespace) | all | preprod (one per live env: alpha-shop/dev, alpha-shop/prod, alpha-checkout/dev, bravo-dispatch/dev, platform-flagship/dev) |
 | `require-pod-security-restricted` | Pod | Full Restricted Pod Security Standard | environment | **hipaa/pci only** | _(none yet — standard tier)_ |
 | `require-ro-rootfs` | Pod | `readOnlyRootFilesystem: true` | environment | **hipaa/pci only** | _(none yet — standard tier)_ |
 

@@ -123,7 +123,7 @@ the Service selector and the Rollout's pod template, this left every first previ
 Service endpoints ("no healthy upstream" at the Gateway). Fixed via a `commonLabels` FieldSpec
 extension in each app's `k8s/base/kustomizeconfig.yaml`, mirroring the pattern that file already
 uses for the `replicas:` transformer on the same CRD. Not retrofitted onto existing products
-without preview enabled (`alpha-checkout`, `alpha-conformance`) — they'd need the same fix by
+without preview enabled (`alpha-checkout`, `bravo-dispatch`) — they'd need the same fix by
 hand if/when they opt in.
 
 ## Platform-service vs tenant delivery (ADR-081)

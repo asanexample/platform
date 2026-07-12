@@ -115,7 +115,9 @@ Composition renders the backing AWS resource plus its least-privilege access, in
 - the derived least-privilege statements are merged onto the service's Pod role, and a `<svc>-resources`
   ConfigMap is emitted with the resource's coordinates for the app to consume
 - gated by `provider_services` on the unit (preprod enables `s3,sqs,sns,dynamodb`); exercised end-to-end by
-  `gitops/environments/alpha/conformance/dev.yaml`
+  `gitops/environments/bravo/dispatch/dev.yaml` — `shipments` (DynamoDB) and `dispatch-worker` (its own SQS
+  queue *and* SNS topic — each resource is always owned by exactly one service; there's no way for two
+  services to share the same physical queue/topic through this schema)
 
 **Not** provisioned by the claim — these stay platform-owned in the [`policy`](../../infra/modules/policy/)
 module for **all** products (an environment must not declare its own signature trust root): the cosign/SLSA
