@@ -84,17 +84,23 @@ zero manifest change, zero redeploy.
 > speed and route from the outside — so a Go binary, a Python service, and a vendored appliance you can't even
 > recompile all light up identically, with nothing added. **Where it breaks:** a traffic camera sees the road,
 > not the inside of the car — Beyla sees request boundaries, not your in-process function spans or custom
-> attributes. That gap is exactly what the opt-in SDK layer fills (Layer 1, below).
+> attributes. That gap is exactly what the opt-in SDK layer fills (Layer 1, below) — for the workloads that
+> want it. Everyone else stays on the camera.
 
 That gives an instrumentation ladder you climb only as far as you need:
 
 - **Layer 0 — Beyla (eBPF), free and automatic.** RED metrics + traces + service graph for everything.
   Live across both clusters.
-- **Layer 1 — the OpenTelemetry SDK, opt-in.** Want code-level spans and custom attributes? Add one
-  annotation (`instrumentation.opentelemetry.io/inject-<lang>`) and the OTel Operator injects the SDK and the
-  platform's OTLP endpoint at admission — no rebuild. *Honest status:* the operator is live, but no workload
-  is wired to it yet (that's the golden-path rollout, P14 — still outstanding), so today every app gets the
-  Beyla baseline and no one has opted into Layer 1.
+- **Layer 1 — the OpenTelemetry SDK, opt-in.** Want code-level spans, custom attributes, and
+  trace-stamped logs? Wire the SDK into your app and add the
+  `instrumentation.opentelemetry.io/inject-sdk` annotation; the OTel Operator injects the platform's OTLP
+  endpoint at admission — the app never hardcodes a collector address. *Status:* live on preprod —
+  `alpha-shop` and `alpha-checkout` run it today. (The operator's live on the hub too, but the hub runs
+  platform services, not SDK'd tenant apps, so it has zero `Instrumentation` CRs.) Per [ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md),
+  a workload runs Beyla *or* the SDK, **never both**: Beyla's eBPF context-propagation overwrites the SDK's
+  `traceparent` and fragments the trace, so the platform auto-excludes any SDK-annotated pod from Beyla's
+  instrumentation. Most workloads still ride Layer 0 for free — Layer 1 is for the teams that want
+  code-level depth.
 - **Layer 2 — agent observability**, for AI agents (Stop 6).
 
 Around Beyla sits a fleet of purpose-built collectors, each specialized for one signal (the
@@ -141,8 +147,8 @@ backends. `preprod` is a **spoke** — it runs only lightweight collectors that 
 over the Transit Gateway, through a write-only Gateway route that force-stamps the tenant (a spoke can't spoof
 another). The hub is a regional mail-sorting facility; a spoke is a neighborhood post office that bundles its
 outgoing mail and ships it to the hub for storage. The preprod spoke is live for all four signals — real
-preprod apps (`acme-shop`, `acme-checkout`, `globex-widgets`, …) are auto-instrumented by Beyla and observable
-on the hub.
+preprod apps (`acme-shop`, `acme-checkout`, `globex-widgets`, …) are observable on the hub, most on the
+Layer 0 Beyla baseline, `acme-shop`/`acme-checkout` on the opt-in Layer 1 SDK.
 
 ---
 
