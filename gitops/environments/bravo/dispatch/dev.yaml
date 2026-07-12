@@ -1,9 +1,13 @@
 # Environment (bravo × dispatch × dev) — Bravo Dispatch, a last-mile parcel-tracking demo replacing the
-# bravo-widgets placeholder (ADR-067 v3). P1 (this file): tracker (edge — SPA + BFF, the only HTTPRoute) +
-# shipments (internal, DynamoDB-backed shipment records). P2 (intake + dispatch-worker, SQS/SNS) and P3
-# (notify, Node/TS riding the Beyla-only baseline, + proof-of-delivery via S3 on shipments) land in
-# follow-on passes and will add services/resources here. Namespace bravo-dispatch-dev. Synced by ArgoCD
-# (the `environments` registry-sync app) and reconciled by the Crossplane Environment Composition (v3).
+# bravo-widgets placeholder (ADR-067 v3). P1: tracker (edge — SPA + BFF, the only HTTPRoute) + shipments
+# (internal, DynamoDB-backed shipment records). P2+P3 (this update): intake (internal orchestrator, no AWS
+# resources — validates + calls shipments/dispatch-worker over HTTP) + dispatch-worker (owns its OWN SQS queue
+# AND SNS topic — this platform's self-service resources are always single-service-owned, so
+# producer+consumer of the async work queue live in ONE service rather than split across two; the SNS publish
+# is a proof-of-capability, not consumed by anything yet) + notify (Node/TS, deliberately NO OTel SDK — rides
+# the Beyla eBPF baseline, called directly over HTTP by dispatch-worker, no AWS resources). Namespace
+# bravo-dispatch-dev. Synced by ArgoCD (the `environments` registry-sync app) and reconciled by the Crossplane
+# Environment Composition (v3).
 apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata:
@@ -29,3 +33,22 @@ spec:
       resources:
         shipments: { kind: keyvalue, engine: dynamodb, access: readwrite }
       # image omitted — same first-deploy state as tracker above.
+    intake:
+      # Pure HTTP orchestrator (calls shipments to create, calls dispatch-worker to kick off routing) — owns
+      # no self-service AWS data, so it shares app-bravo like tracker.
+      serviceAccount: app-bravo
+      # image omitted — first-deploy state.
+    dispatch-worker:
+      # Owns BOTH its own SQS queue (producer: POST /dispatch handler; consumer: background goroutine — same
+      # service, since the Composition scopes one resource to exactly one owning service) and its own SNS
+      # topic (publish-only proof-of-capability). Needs its OWN SA for Pod Identity.
+      serviceAccount: app-bravo-dispatch-worker
+      resources:
+        requests: { kind: stream, engine: sqs, access: readwrite }
+        events: { kind: stream, engine: sns, access: readwrite }
+      # image omitted — first-deploy state.
+    notify:
+      # Node/TS, deliberately un-instrumented (rides the Beyla eBPF baseline, ADR-100 L0) — owns no AWS
+      # resources (dispatch-worker calls it directly over HTTP), shares app-bravo.
+      serviceAccount: app-bravo
+      # image omitted — first-deploy state.
