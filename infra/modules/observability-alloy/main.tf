@@ -39,6 +39,23 @@ locals {
     // Stamp X-Scope-OrgID from the per-stream `tenant` label, then drop it so it isn't indexed as a label.
     loki.process "retenant" {
       forward_to = [loki.write.platform.receiver]
+      // Promote the app's OTel trace_id/span_id (in the JSON body) to Loki STRUCTURED METADATA (Loki 3.x) so the
+      // log->trace jump is first-class instead of a query-time derived-field regex on the Grafana side. Extract
+      // with a quote-free regex (the line is CRI-wrapped JSON; [^0-9a-f]+ spans the `":"` between key and value)
+      // so no fragile escaping in this heredoc. Non-request logs simply don't match and carry no such metadata.
+      // Additive + cheap: no line rewrite, and structured metadata (unlike index labels) doesn't add cardinality.
+      stage.regex {
+        expression = "trace_id[^0-9a-f]+(?P<trace_id>[0-9a-f]{32})"
+      }
+      stage.regex {
+        expression = "span_id[^0-9a-f]+(?P<span_id>[0-9a-f]{16})"
+      }
+      stage.structured_metadata {
+        values = {
+          trace_id = "",
+          span_id  = "",
+        }
+      }
       stage.tenant {
         label = "tenant"
       }
