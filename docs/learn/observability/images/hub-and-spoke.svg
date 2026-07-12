@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 638" width="760" height="638" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#1f8a5b"]{fill:#40d996}[stroke="#1f8a5b"]{stroke:#40d996}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#bfe0cc"]{fill:#2d5e41}[stroke="#bfe0cc"]{stroke:#2d5e41}[fill="#2c7a56"]{fill:#54c591}[stroke="#2c7a56"]{stroke:#54c591}[fill="#dcefe3"]{fill:#255035}[stroke="#dcefe3"]{stroke:#255035}[fill="#5f7d6c"]{fill:#81988b}[stroke="#5f7d6c"]{stroke:#81988b}[fill="#1c7a4f"]{fill:#41d893}[stroke="#1c7a4f"]{stroke:#41d893}[fill="#fbf0dd"]{fill:#564019}[stroke="#fbf0dd"]{stroke:#564019}[fill="#ecd9b0"]{fill:#6d5520}[stroke="#ecd9b0"]{stroke:#6d5520}[fill="#e8823a"]{fill:#f3ad7c}[stroke="#e8823a"]{stroke:#f3ad7c}[fill="#7a6a4f"]{fill:#ab997a}[stroke="#7a6a4f"]{stroke:#ab997a}[fill="#3c7a5c"]{fill:#63b58e}[stroke="#3c7a5c"]{stroke:#63b58e}[fill="#3a7f96"]{fill:#65aec7}[stroke="#3a7f96"]{stroke:#65aec7}[fill="#4a90a8"]{fill:#83b8cb}[stroke="#4a90a8"]{stroke:#83b8cb}[fill="#9a6a0a"]{fill:#f6b022}[stroke="#9a6a0a"]{stroke:#f6b022}[fill="#efefe9"]{fill:#20201c}[stroke="#efefe9"]{stroke:#20201c}[fill="#dcdcd5"]{fill:#2a2a25}[stroke="#dcdcd5"]{stroke:#2a2a25}[fill="#f4f4ef"]{fill:#1d1d1a}[stroke="#f4f4ef"]{stroke:#1d1d1a}[fill="#5f5f66"]{fill:#8c8c94}[stroke="#5f5f66"]{stroke:#8c8c94}[fill="#4a4a52"]{fill:#dfdfe2}[stroke="#4a4a52"]{stroke:#dfdfe2}[fill="#c0392b"]{fill:#e07266}[stroke="#c0392b"]{stroke:#e07266}}</style>
+<rect class="bg" x="0" y="0" width="760" height="638" fill="#f6f6f3"></rect>
+
+
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.9px">OBSERVABILITY · STORAGE · TOPOLOGY</text>
+<text class="text" x="40" y="90" font-size="27" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">One hub, lightweight spokes.</text>
+<text class="muted" x="40" y="118" font-size="14.5" fill="#6c6c73">The <tspan class="mono" fill="#1f8a5b" font-family="ui-monospace,Menlo,Consolas,monospace">platform</tspan> cluster is the hub — it runs the collectors, the stores, and the one Grafana. A</text>
+<text class="muted" x="40" y="137" font-size="14.5" fill="#6c6c73">spoke runs <tspan class="text" fill="#1c1c22" font-style="italic">only</tspan> lightweight collectors and ships its signals in. A hub is a regional mail-sorting</text>
+<text class="muted" x="40" y="156" font-size="14.5" fill="#6c6c73">facility; a spoke is a neighborhood post office that bundles its outgoing mail.</text>
+
+
+<rect class="bg-green bd-green" x="40" y="182" width="384" height="352" rx="13" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<rect class="ac-green" x="44" y="192" width="4" height="332" rx="2" fill="#1f8a5b"></rect>
+<text class="text" x="62" y="212" font-size="18" fill="#1c1c22" font-weight="600">Platform · the hub</text>
+<text class="t-green mono" x="406" y="212" font-size="10.5" fill="#2c7a56" text-anchor="end">collectors + stores + view</text>
+
+<rect x="62" y="228" width="344" height="48" rx="9" fill="#dcefe3" stroke="#bfe0cc" stroke-width="1"></rect>
+<text class="text" x="76" y="248" font-size="13" fill="#1c1c22" font-weight="600">Collectors</text>
+<text class="muted" x="76" y="265" font-size="11.5" fill="#5f7d6c">Beyla · Alloy · OTel Collector · Prometheus</text>
+
+<rect x="62" y="284" width="344" height="52" rx="9" fill="#dcefe3" stroke="#bfe0cc" stroke-width="1"></rect>
+<text class="text" x="76" y="304" font-size="13" fill="#1c1c22" font-weight="600">LGTM+P stores <tspan class="mono" fill="#2c7a56" font-weight="400" font-size="10.5" font-family="ui-monospace,Menlo,Consolas,monospace">· on S3</tspan></text>
+<text class="t-green mono" x="76" y="323" font-size="11.5" fill="#1c7a4f" font-family="ui-monospace,Menlo,Consolas,monospace">Mimir · Loki · Tempo · Pyroscope</text>
+
+<rect x="62" y="344" width="344" height="52" rx="9" fill="#fbf0dd" stroke="#ecd9b0" stroke-width="1"></rect>
+<circle cx="80" cy="370" r="5" fill="#e8823a"></circle>
+<text class="text" x="94" y="366" font-size="13" fill="#1c1c22" font-weight="600">the one Grafana</text>
+<text class="muted" x="94" y="383" font-size="11.5" fill="#7a6a4f">the single pane for every cluster&#39;s data</text>
+
+<text class="t-green mono" x="62" y="424" font-size="10.5" fill="#3c7a5c">the hub monitors itself — its own metrics are the platform tenant</text>
+
+
+<text class="t-cyan mono" x="500" y="330" font-size="10" fill="#3a7f96" text-anchor="middle">Transit Gateway</text>
+<line x1="452" y1="348" x2="548" y2="348" stroke="#4a90a8" stroke-width="2"></line>
+<path d="M452 348 L461 343 L461 353 Z" fill="#4a90a8"></path>
+<text class="t-amber mono" x="500" y="368" font-size="9.5" fill="#9a6a0a" text-anchor="middle">write-only ·</text>
+<text class="t-amber mono" x="500" y="381" font-size="9.5" fill="#9a6a0a" text-anchor="middle">tenant force-stamped</text>
+<text class="t-amber mono" x="500" y="394" font-size="9.5" fill="#9a6a0a" text-anchor="middle">at the edge</text>
+
+
+<rect class="panel panel-bd" x="552" y="182" width="168" height="352" rx="13" fill="#efefe9" stroke="#dcdcd5" stroke-width="1"></rect>
+<text class="text" x="570" y="210" font-size="17" fill="#1c1c22" font-weight="600">preprod</text>
+<text class="text" x="570" y="230" font-size="17" fill="#1c1c22" font-weight="600">· a spoke</text>
+<text class="muted mono" x="570" y="248" font-size="10" fill="#6c6c73">lightweight</text>
+<text class="muted mono" x="570" y="261" font-size="10" fill="#6c6c73">collectors only</text>
+
+<rect x="570" y="276" width="134" height="120" rx="9" fill="#f4f4ef" stroke="#dcdcd5" stroke-width="1" stroke-dasharray="4 3"></rect>
+<text class="text" x="582" y="296" font-size="12.5" fill="#1c1c22" font-weight="600">no stores here</text>
+<text class="muted" x="582" y="314" font-size="11" fill="#5f5f66">real team apps run</text>
+<text class="muted" x="582" y="329" font-size="11" fill="#5f5f66">here — <tspan class="mono" fill="#4a4a52" font-family="ui-monospace,Menlo,Consolas,monospace">acme-shop</tspan>,</text>
+<text class="mono" x="582" y="344" font-size="11" fill="#4a4a52" font-family="ui-monospace,Menlo,Consolas,monospace">globex-widgets</text>
+<text class="muted" x="582" y="359" font-size="11" fill="#5f5f66">— auto-instrumented,</text>
+<text class="muted" x="582" y="374" font-size="11" fill="#5f5f66">observable on the</text>
+<text class="muted" x="582" y="389" font-size="11" fill="#5f5f66">hub</text>
+
+<text class="t-rose" x="570" y="424" font-size="12" fill="#c0392b">✕</text>
+<text class="muted" x="586" y="424" font-size="11.5" fill="#5f5f66">sends no tenant header</text>
+<text class="t-rose" x="570" y="448" font-size="12" fill="#c0392b">✕</text>
+<text class="muted" x="586" y="448" font-size="11.5" fill="#5f5f66">sends no credential</text>
+<text class="t-rose" x="570" y="472" font-size="12" fill="#c0392b">✕</text>
+<text class="muted" x="586" y="472" font-size="11.5" fill="#5f5f66">can&#39;t read back ·</text>
+<text class="muted" x="586" y="488" font-size="11.5" fill="#5f5f66">can&#39;t spoof another tenant</text>
+
+
+<text class="muted" x="40" y="568" font-size="14" fill="#6c6c73">Because the tenant is stamped at the hub&#39;s edge — not sent by the spoke — a spoke <tspan class="text" fill="#1c1c22" font-style="italic">cannot</tspan> name</text>
+<text class="muted" x="40" y="588" font-size="14" fill="#6c6c73">another cluster&#39;s data or read anything back. The write path is one-way by construction, which is what</text>
+<text class="muted" x="40" y="608" font-size="14" fill="#6c6c73">lets many clusters safely share one set of stores.</text>
+</svg>

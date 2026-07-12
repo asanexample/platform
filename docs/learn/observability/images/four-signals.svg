@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 628" width="760" height="628" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#eaf1fb"]{fill:#172f51}[stroke="#eaf1fb"]{stroke:#172f51}[fill="#c4d8f4"]{fill:#1d3a62}[stroke="#c4d8f4"]{stroke:#1d3a62}[fill="#2c66c4"]{fill:#6b98e1}[stroke="#2c66c4"]{stroke:#6b98e1}[fill="#3d6fc0"]{fill:#7fa2d9}[stroke="#3d6fc0"]{stroke:#7fa2d9}[fill="#243a5c"]{fill:#5881c1}[stroke="#243a5c"]{stroke:#5881c1}[fill="#7a7a80"]{fill:#89898f}[stroke="#7a7a80"]{stroke:#89898f}[fill="#e2ecf9"]{fill:#193355}[stroke="#e2ecf9"]{stroke:#193355}[fill="#9a9aa1"]{fill:#888890}[stroke="#9a9aa1"]{stroke:#888890}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#bfe0cc"]{fill:#2d5e41}[stroke="#bfe0cc"]{stroke:#2d5e41}[fill="#1f8a5b"]{fill:#40d996}[stroke="#1f8a5b"]{stroke:#40d996}[fill="#2c7a56"]{fill:#54c591}[stroke="#2c7a56"]{stroke:#54c591}[fill="#25402f"]{fill:#6cac84}[stroke="#25402f"]{stroke:#6cac84}[fill="#dcefe3"]{fill:#255035}[stroke="#dcefe3"]{stroke:#255035}[fill="#f9f0da"]{fill:#584619}[stroke="#f9f0da"]{stroke:#584619}[fill="#e8d4a0"]{fill:#e5cc8a}[stroke="#e8d4a0"]{stroke:#e5cc8a}[fill="#b0790f"]{fill:#f2ad29}[stroke="#b0790f"]{stroke:#f2ad29}[fill="#8a6410"]{fill:#ecb02d}[stroke="#8a6410"]{stroke:#ecb02d}[fill="#4a3c1c"]{fill:#c3a256}[stroke="#4a3c1c"]{stroke:#c3a256}[fill="#f2e7c8"]{fill:#614f1c}[stroke="#f2e7c8"]{stroke:#614f1c}[fill="#9a6a0a"]{fill:#f6b022}[stroke="#9a6a0a"]{stroke:#f6b022}[fill="#f2eafb"]{fill:#321751}[stroke="#f2eafb"]{stroke:#321751}[fill="#d9c4f0"]{fill:#3f1d64}[stroke="#d9c4f0"]{stroke:#3f1d64}[fill="#8a4fc4"]{fill:#b892dd}[stroke="#8a4fc4"]{stroke:#b892dd}[fill="#7a52a0"]{fill:#a889c5}[stroke="#7a52a0"]{stroke:#a889c5}[fill="#3a2f47"]{fill:#8a74a5}[stroke="#3a2f47"]{stroke:#8a74a5}[fill="#ebe0f7"]{fill:#361956}[stroke="#ebe0f7"]{stroke:#361956}[fill="#edf5f8"]{fill:#1d3f4b}[stroke="#edf5f8"]{stroke:#1d3f4b}[fill="#bce0ec"]{fill:#1e5668}[stroke="#bce0ec"]{stroke:#1e5668}[fill="#e8823a"]{fill:#f3ad7c}[stroke="#e8823a"]{stroke:#f3ad7c}[fill="#4a8098"]{fill:#7cacc2}[stroke="#4a8098"]{stroke:#7cacc2}[fill="#b5b5ad"]{fill:#929286}[stroke="#b5b5ad"]{stroke:#929286}[fill="#dcdcd5"]{fill:#2a2a25}[stroke="#dcdcd5"]{stroke:#2a2a25}[fill="#c07c1a"]{fill:#eba94b}[stroke="#c07c1a"]{stroke:#eba94b}}</style><defs><clipPath id="abar0"><rect x="39.0" y="163.0" width="163.0" height="10.0"/></clipPath><clipPath id="abar1"><rect x="212.0" y="163.0" width="163.0" height="10.0"/></clipPath><clipPath id="abar2"><rect x="385.0" y="163.0" width="163.0" height="10.0"/></clipPath><clipPath id="abar3"><rect x="558.0" y="163.0" width="163.0" height="10.0"/></clipPath></defs>
+<rect class="bg" x="0" y="0" width="760" height="628" fill="#f6f6f3"></rect>
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.9px">OBSERVABILITY · THE FOUR SIGNALS</text>
+<text class="text" x="40" y="90" font-size="27" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">Four questions, one pane.</text>
+<text class="muted" x="40" y="118" font-size="14.5" fill="#6c6c73">Each signal answers a different question, and each lands in its own store. The power isn&#39;t any one</text>
+<text class="muted" x="40" y="137" font-size="14.5" fill="#6c6c73">of them — it&#39;s having all four for the same moment, under one Grafana.</text>
+<rect x="40" y="164" width="161" height="176" rx="11" fill="#eaf1fb" stroke="#c4d8f4" stroke-width="1"></rect>
+<rect x="41.3" y="165.3" width="158.5" height="173.5" rx="9.8" fill="none" stroke="#2c66c4" stroke-width="2.5" clip-path="url(#abar0)"></rect>
+<text class="text" x="56" y="190" font-size="17" fill="#1c1c22" font-weight="600">Metrics</text>
+<text class="mono" x="56" y="207" font-size="10.5" fill="#3d6fc0" font-family="ui-monospace,Menlo,Consolas,monospace">numbers over time</text>
+<line x1="56" y1="220" x2="185" y2="220" stroke="#c4d8f4" stroke-width="1"></line>
+<text class="text" x="56" y="242" font-size="12.5" fill="#243a5c">Rate? Errors? p99</text>
+<text class="text" x="56" y="258" font-size="12.5" fill="#243a5c">latency? CPU?</text>
+<text class="muted" x="56" y="284" font-size="11" fill="#7a7a80">cheap, aggregate — bad</text>
+<text class="muted" x="56" y="299" font-size="11" fill="#7a7a80">at &#34;why this one request&#34;</text>
+<rect x="40" y="352" width="161" height="38" rx="9" fill="#e2ecf9" stroke="#c4d8f4" stroke-width="1"></rect>
+<text class="mono" x="54" y="376" font-size="13" fill="#2c66c4" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">Mimir</text>
+<text class="mono" x="187" y="375" font-size="10" fill="#9a9aa1" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">store</text>
+<path d="M115.5 400 L125.5 400 L120.5 408 Z" fill="#2c66c4"></path>
+<rect x="213" y="164" width="161" height="176" rx="11" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<rect x="214.3" y="165.3" width="158.5" height="173.5" rx="9.8" fill="none" stroke="#1f8a5b" stroke-width="2.5" clip-path="url(#abar1)"></rect>
+<text class="text" x="229" y="190" font-size="17" fill="#1c1c22" font-weight="600">Logs</text>
+<text class="mono" x="229" y="207" font-size="10.5" fill="#2c7a56" font-family="ui-monospace,Menlo,Consolas,monospace">events with detail</text>
+<line x1="229" y1="220" x2="358" y2="220" stroke="#bfe0cc" stroke-width="1"></line>
+<text class="text" x="229" y="242" font-size="12.5" fill="#25402f">What happened at</text>
+<text class="text" x="229" y="258" font-size="12.5" fill="#25402f">03:04:17 in this pod?</text>
+<text class="muted" x="229" y="284" font-size="11" fill="#7a7a80">rich, high-cardinality —</text>
+<text class="muted" x="229" y="299" font-size="11" fill="#7a7a80">the actual error message</text>
+<rect x="213" y="352" width="161" height="38" rx="9" fill="#dcefe3" stroke="#bfe0cc" stroke-width="1"></rect>
+<text class="mono" x="227" y="376" font-size="13" fill="#1f8a5b" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">Loki</text>
+<text class="mono" x="360" y="375" font-size="10" fill="#9a9aa1" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">store</text>
+<path d="M288.5 400 L298.5 400 L293.5 408 Z" fill="#1f8a5b"></path>
+<rect x="386" y="164" width="161" height="176" rx="11" fill="#f9f0da" stroke="#e8d4a0" stroke-width="1"></rect>
+<rect x="387.3" y="165.3" width="158.5" height="173.5" rx="9.8" fill="none" stroke="#b0790f" stroke-width="2.5" clip-path="url(#abar2)"></rect>
+<text class="text" x="402" y="190" font-size="17" fill="#1c1c22" font-weight="600">Traces</text>
+<text class="mono" x="402" y="207" font-size="10.5" fill="#8a6410" font-family="ui-monospace,Menlo,Consolas,monospace">one request&#39;s path</text>
+<line x1="402" y1="220" x2="531" y2="220" stroke="#e8d4a0" stroke-width="1"></line>
+<text class="text" x="402" y="242" font-size="12.5" fill="#4a3c1c">Which hop ate the</text>
+<text class="text" x="402" y="258" font-size="12.5" fill="#4a3c1c">900ms — app, DB, down?</text>
+<text class="muted" x="402" y="284" font-size="11" fill="#7a7a80">the waterfall of one</text>
+<text class="muted" x="402" y="299" font-size="11" fill="#7a7a80">request&#39;s journey</text>
+<rect x="386" y="352" width="161" height="38" rx="9" fill="#f2e7c8" stroke="#e8d4a0" stroke-width="1"></rect>
+<text class="mono" x="400" y="376" font-size="13" fill="#9a6a0a" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">Tempo</text>
+<text class="mono" x="533" y="375" font-size="10" fill="#9a9aa1" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">store</text>
+<path d="M461.5 400 L471.5 400 L466.5 408 Z" fill="#b0790f"></path>
+<rect x="559" y="164" width="161" height="176" rx="11" fill="#f2eafb" stroke="#d9c4f0" stroke-width="1"></rect>
+<rect x="560.3" y="165.3" width="158.5" height="173.5" rx="9.8" fill="none" stroke="#8a4fc4" stroke-width="2.5" clip-path="url(#abar3)"></rect>
+<text class="text" x="575" y="190" font-size="17" fill="#1c1c22" font-weight="600">Profiles</text>
+<text class="mono" x="575" y="207" font-size="10.5" fill="#7a52a0" font-family="ui-monospace,Menlo,Consolas,monospace">where code spent time</text>
+<line x1="575" y1="220" x2="704" y2="220" stroke="#d9c4f0" stroke-width="1"></line>
+<text class="text" x="575" y="242" font-size="12.5" fill="#3a2f47">Inside the slow</text>
+<text class="text" x="575" y="258" font-size="12.5" fill="#3a2f47">function, which line?</text>
+<text class="muted" x="575" y="284" font-size="11" fill="#7a7a80">a continuous flame</text>
+<text class="muted" x="575" y="299" font-size="11" fill="#7a7a80">graph of the process</text>
+<rect x="559" y="352" width="161" height="38" rx="9" fill="#ebe0f7" stroke="#d9c4f0" stroke-width="1"></rect>
+<text class="mono" x="573" y="376" font-size="13" fill="#8a4fc4" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">Pyroscope</text>
+<text class="mono" x="706" y="375" font-size="10" fill="#9a9aa1" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">store</text>
+<path d="M634.5 400 L644.5 400 L639.5 408 Z" fill="#8a4fc4"></path>
+<rect x="40" y="420" width="680" height="66" rx="13" fill="#edf5f8" stroke="#bce0ec" stroke-width="1.5"></rect>
+<circle cx="66" cy="447" r="5" fill="#e8823a"></circle>
+<text class="text" x="82" y="446" font-size="15" fill="#1c1c22" font-weight="600">Grafana · one pane over all four</text>
+<text class="mono" x="82" y="464" font-size="10.5" fill="#4a8098" font-family="ui-monospace,Menlo,Consolas,monospace">glance across the vitals, then walk between them</text>
+<rect x="636" y="442" width="10" height="10" rx="2" fill="#2c66c4"></rect>
+<rect x="650" y="442" width="10" height="10" rx="2" fill="#1f8a5b"></rect>
+<rect x="664" y="442" width="10" height="10" rx="2" fill="#b0790f"></rect>
+<rect x="678" y="442" width="10" height="10" rx="2" fill="#8a4fc4"></rect>
+<text x="40" y="520" font-size="13" fill="#6c6c73"><tspan fill="#2c66c4" font-weight="600">metrics</tspan> say something&#39;s wrong  <tspan fill="#b5b5ad">·</tspan>  <tspan fill="#9a6a0a" font-weight="600">traces</tspan> say which hop  <tspan fill="#b5b5ad">·</tspan>  <tspan fill="#1f8a5b" font-weight="600">logs</tspan> say what  <tspan fill="#b5b5ad">·</tspan>  <tspan fill="#8a4fc4" font-weight="600">profiles</tspan> say which line</text>
+<line x1="40" y1="548" x2="720" y2="548" stroke="#dcdcd5" stroke-width="1"></line>
+<text class="mono" x="40" y="572" font-size="12" fill="#6c6c73" font-family="ui-monospace,Menlo,Consolas,monospace">LGTM+P — <tspan fill="#1f8a5b">L</tspan>oki · <tspan fill="#c07c1a">G</tspan>rafana · <tspan fill="#9a6a0a">T</tspan>empo · <tspan fill="#2c66c4">M</tspan>imir + <tspan fill="#8a4fc4">P</tspan>yroscope</text>
+</svg>

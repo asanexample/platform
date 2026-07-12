@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 872" width="760" height="872" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#f9f0da"]{fill:#584619}[stroke="#f9f0da"]{stroke:#584619}[fill="#e8d4a0"]{fill:#e5cc8a}[stroke="#e8d4a0"]{stroke:#e5cc8a}[fill="#f3e6c4"]{fill:#634f1d}[stroke="#f3e6c4"]{stroke:#634f1d}[fill="#e0cd9c"]{fill:#dfc990}[stroke="#e0cd9c"]{stroke:#dfc990}[fill="#8a5c0a"]{fill:#f4aa24}[stroke="#8a5c0a"]{stroke:#f4aa24}[fill="#4a3c1c"]{fill:#c3a256}[stroke="#4a3c1c"]{stroke:#c3a256}[fill="#123"]{fill:#508cc8}[stroke="#123"]{stroke:#508cc8}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#bfe0cc"]{fill:#2d5e41}[stroke="#bfe0cc"]{stroke:#2d5e41}[fill="#1f8a5b"]{fill:#40d996}[stroke="#1f8a5b"]{stroke:#40d996}[fill="#eafcf1"]{fill:#17502e}[stroke="#eafcf1"]{stroke:#17502e}[fill="#2c7a56"]{fill:#54c591}[stroke="#2c7a56"]{stroke:#54c591}[fill="#dcefe3"]{fill:#255035}[stroke="#dcefe3"]{stroke:#255035}[fill="#5f7d6c"]{fill:#81988b}[stroke="#5f7d6c"]{stroke:#81988b}[fill="#3c9a6c"]{fill:#6ac89a}[stroke="#3c9a6c"]{stroke:#6ac89a}[fill="#1c7a4f"]{fill:#41d893}[stroke="#1c7a4f"]{stroke:#41d893}[fill="#d0ecdb"]{fill:#245939}[stroke="#d0ecdb"]{stroke:#245939}[fill="#a8d8bd"]{fill:#9bd4b4}[stroke="#a8d8bd"]{stroke:#9bd4b4}[fill="#25402f"]{fill:#6cac84}[stroke="#25402f"]{stroke:#6cac84}[fill="#b0790f"]{fill:#f2ad29}[stroke="#b0790f"]{stroke:#f2ad29}[fill="#fdf6e6"]{fill:#524018}[stroke="#fdf6e6"]{stroke:#524018}[fill="#8a6410"]{fill:#ecb02d}[stroke="#8a6410"]{stroke:#ecb02d}[fill="#f4ead0"]{fill:#5e4b1b}[stroke="#f4ead0"]{stroke:#5e4b1b}[fill="#e8823a"]{fill:#f3ad7c}[stroke="#e8823a"]{stroke:#f3ad7c}[fill="#7a6a4f"]{fill:#ab997a}[stroke="#7a6a4f"]{stroke:#ab997a}[fill="#b08a3a"]{fill:#d4b472}[stroke="#b08a3a"]{stroke:#d4b472}[fill="#f6ecd2"]{fill:#5c4a1b}[stroke="#f6ecd2"]{stroke:#5c4a1b}[fill="#eaeae4"]{fill:#22221e}[stroke="#eaeae4"]{stroke:#22221e}[fill="#c8c8c0"]{fill:#35352f}[stroke="#c8c8c0"]{stroke:#35352f}[fill="#5f5f66"]{fill:#8c8c94}[stroke="#5f5f66"]{stroke:#8c8c94}[fill="#33333a"]{fill:#dedee2}[stroke="#33333a"]{stroke:#dedee2}[fill="#fae9e6"]{fill:#532118}[stroke="#fae9e6"]{stroke:#532118}[fill="#ecc3bc"]{fill:#68291e}[stroke="#ecc3bc"]{stroke:#68291e}[fill="#f7ded9"]{fill:#59241a}[stroke="#f7ded9"]{stroke:#59241a}[fill="#e6b3aa"]{fill:#e09b8f}[stroke="#e6b3aa"]{stroke:#e09b8f}[fill="#a63527"]{fill:#da5e4f}[stroke="#a63527"]{stroke:#da5e4f}[fill="#5a201a"]{fill:#cf564a}[stroke="#5a201a"]{stroke:#cf564a}[fill="#7a2018"]{fill:#dd493b}[stroke="#7a2018"]{stroke:#dd493b}[fill="#6a4a44"]{fill:#a77a72}[stroke="#6a4a44"]{stroke:#a77a72}[fill="#9a6a0a"]{fill:#f6b022}[stroke="#9a6a0a"]{stroke:#f6b022}}</style><defs><clipPath id="abar0"><rect x="39.0" y="235.0" width="336.0" height="11.0"/></clipPath><clipPath id="abar1"><rect x="385.0" y="235.0" width="336.0" height="11.0"/></clipPath></defs>
+<rect class="bg" x="0" y="0" width="760" height="872" fill="#f6f6f3"></rect>
+
+
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.8px">OBSERVABILITY · TENANCY · PER-TEAM ISOLATION</text>
+<text class="text" x="40" y="90" font-size="27" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">Real write-split, soft read scoping.</text>
+<text class="muted" x="40" y="118" font-size="14.5" fill="#6c6c73">Be honest about what&#39;s hard and what&#39;s soft. <tspan class="text" fill="#1c1c22">Writes</tspan> are physically separated per team — real,</text>
+<text class="muted" x="40" y="137" font-size="14.5" fill="#6c6c73">live. <tspan class="text" fill="#1c1c22">Reads</tspan> are scoped by Grafana RBAC, not a data-layer gate. The one true boundary underneath</text>
+<text class="muted" x="40" y="156" font-size="14.5" fill="#6c6c73">both is the network.</text>
+
+
+<rect class="bg-amber bd-amber" x="40" y="178" width="680" height="42" rx="10" fill="#f9f0da" stroke="#e8d4a0" stroke-width="1"></rect>
+<rect class="chip-amber" x="54" y="189" width="112" height="20" rx="6" fill="#f3e6c4" stroke="#e0cd9c" stroke-width="1"></rect>
+<text class="t-amber mono" x="110" y="203" font-size="11" fill="#8a5c0a" text-anchor="middle">X-Scope-OrgID</text>
+<text class="text" x="180" y="204" font-size="13" fill="#4a3c1c">names a tenant, but anything that reaches a store could set it — <tspan font-style="italic" fill="#123">it&#39;s routing, not a lock.</tspan></text>
+
+
+<rect class="bg-green bd-green" x="40" y="236" width="334" height="298" rx="12" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<rect x="41.3" y="237.3" width="331.5" height="295.5" rx="10.8" fill="none" stroke="#1f8a5b" stroke-width="2.5" clip-path="url(#abar0)"></rect>
+<text class="text" x="58" y="266" font-size="16" fill="#1c1c22" font-weight="600">Write path</text>
+<rect x="286" y="252" width="72" height="18" rx="5" fill="#1f8a5b"></rect>
+<text class="mono" x="322" y="265" font-size="9.5" fill="#eafcf1" text-anchor="middle" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">REAL · LIVE</text>
+<text class="t-green mono" x="58" y="284" font-size="10.5" fill="#2c7a56">physical separation</text>
+<line x1="58" y1="298" x2="356" y2="298" stroke="#bfe0cc" stroke-width="1"></line>
+
+<rect x="58" y="310" width="298" height="42" rx="9" fill="#dcefe3" stroke="#bfe0cc" stroke-width="1"></rect>
+<text class="text" x="72" y="330" font-size="12.5" fill="#1c1c22" font-weight="600">ingest</text>
+<text class="muted" x="72" y="345" font-size="11" fill="#5f7d6c">Alloy · Prometheus remote-write</text>
+<path d="M202 356 L196 350 L208 350 Z" fill="#3c9a6c"></path>
+<rect x="58" y="366" width="298" height="42" rx="9" fill="#dcefe3" stroke="#bfe0cc" stroke-width="1"></rect>
+<text class="t-green mono" x="72" y="386" font-size="12.5" fill="#1c7a4f" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">cortex-tenant</text>
+<text class="muted" x="72" y="401" font-size="11" fill="#5f7d6c">write-splits each series by team</text>
+<path d="M202 412 L196 406 L208 406 Z" fill="#3c9a6c"></path>
+<rect x="58" y="422" width="143" height="42" rx="8" fill="#d0ecdb" stroke="#a8d8bd" stroke-width="1"></rect>
+<text class="t-green mono" x="129" y="440" font-size="12.5" fill="#1c7a4f" text-anchor="middle" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">acme</text>
+<text class="muted mono" x="129" y="454" font-size="9.5" fill="#5f7d6c" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">tenant</text>
+<rect x="213" y="422" width="143" height="42" rx="8" fill="#d0ecdb" stroke="#a8d8bd" stroke-width="1"></rect>
+<text class="t-green mono" x="284" y="440" font-size="12.5" fill="#1c7a4f" text-anchor="middle" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">globex</text>
+<text class="muted mono" x="284" y="454" font-size="9.5" fill="#5f7d6c" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">tenant</text>
+<text class="text" x="58" y="492" font-size="12" fill="#25402f">Each team&#39;s series <tspan font-style="italic" fill="#123">physically separated</tspan></text>
+<text class="text" x="58" y="509" font-size="12" fill="#25402f">into its own tenant — real, end-to-end.</text>
+
+
+<rect class="bg-amber bd-amber" x="386" y="236" width="334" height="298" rx="12" fill="#f9f0da" stroke="#e8d4a0" stroke-width="1"></rect>
+<rect x="387.3" y="237.3" width="331.5" height="295.5" rx="10.8" fill="none" stroke="#b0790f" stroke-width="2.5" clip-path="url(#abar1)"></rect>
+<text class="text" x="404" y="266" font-size="16" fill="#1c1c22" font-weight="600">Read path</text>
+<rect x="628" y="252" width="74" height="18" rx="5" fill="#b0790f"></rect>
+<text class="mono" x="665" y="265" font-size="9.5" fill="#fdf6e6" text-anchor="middle" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">SOFT · RBAC</text>
+<text class="t-amber mono" x="404" y="284" font-size="10.5" fill="#8a6410">organizational boundary</text>
+<line x1="404" y1="298" x2="702" y2="298" stroke="#e8d4a0" stroke-width="1"></line>
+
+<rect x="404" y="310" width="298" height="42" rx="9" fill="#f4ead0" stroke="#e8d4a0" stroke-width="1"></rect>
+<circle cx="420" cy="331" r="5" fill="#e8823a"></circle>
+<text class="text" x="434" y="327" font-size="12.5" fill="#1c1c22" font-weight="600">Grafana query</text>
+<text class="muted" x="434" y="343" font-size="11" fill="#7a6a4f">a team opens its dashboard</text>
+<path d="M548 356 L542 350 L554 350 Z" fill="#b08a3a"></path>
+<rect x="404" y="366" width="298" height="42" rx="9" fill="#f4ead0" stroke="#e8d4a0" stroke-width="1"></rect>
+<text class="t-amber mono" x="418" y="385" font-size="12" fill="#8a5c0a" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">Mimir (&lt;team&gt;)</text>
+<text class="muted" x="418" y="400" font-size="10.5" fill="#7a6a4f">per-tenant datasource · static <tspan class="mono" font-family="ui-monospace,Menlo,Consolas,monospace">X-Scope-OrgID</tspan></text>
+<path d="M548 412 L542 406 L554 406 Z" fill="#b08a3a"></path>
+<rect x="404" y="422" width="298" height="52" rx="9" fill="#f6ecd2" stroke="#e0cd9c" stroke-width="1" stroke-dasharray="4 3"></rect>
+<text class="text" x="418" y="439" font-size="12" fill="#4a3c1c" font-weight="600">enforced by Grafana</text>
+<text class="muted" x="418" y="455" font-size="10.5" fill="#7a6a4f">dashboard-folder permissions +</text>
+<text class="muted" x="418" y="469" font-size="10.5" fill="#7a6a4f">per-team dashboards <tspan class="mono" fill="#8a6410" font-family="ui-monospace,Menlo,Consolas,monospace">#1157</tspan></text>
+<text class="text" x="404" y="498" font-size="12" fill="#4a3c1c">An <tspan font-style="italic" fill="#123">organizational / RBAC</tspan> boundary —</text>
+<text class="text" x="404" y="515" font-size="12" fill="#4a3c1c">not a data-layer gate.</text>
+
+
+<rect class="floor floor-bd" x="40" y="546" width="680" height="60" rx="12" fill="#eaeae4" stroke="#c8c8c0" stroke-width="1.5"></rect>
+<text class="muted mono" x="58" y="571" font-size="10" fill="#5f5f66" letter-spacing="0.6px">THE FLOOR</text>
+<text class="text" x="58" y="590" font-size="14" fill="#1c1c22" font-weight="600">Network default-deny</text>
+<line x1="216" y1="560" x2="216" y2="592" stroke="#c8c8c0" stroke-width="1"></line>
+<text class="text" x="232" y="572" font-size="12.5" fill="#33333a">Stores are <tspan class="mono" fill="#1c1c22" font-family="ui-monospace,Menlo,Consolas,monospace">ClusterIP-only</tspan>; no tenant namespace can reach them. <tspan font-style="italic" fill="#123">The only true</tspan></text>
+<text class="text" x="232" y="590" font-size="12.5" fill="#33333a"><tspan font-style="italic" fill="#123">data-layer boundary</tspan> — both halves above rest on it.</text>
+
+
+<rect class="bg-rose bd-rose" x="40" y="622" width="680" height="72" rx="11" fill="#fae9e6" stroke="#ecc3bc" stroke-width="1"></rect>
+<rect x="56" y="638" width="98" height="20" rx="6" fill="#f7ded9" stroke="#e6b3aa" stroke-width="1"></rect>
+<text class="t-rose mono" x="105" y="652" font-size="9.5" fill="#a63527" text-anchor="middle" letter-spacing="0.4px">RETIRED · #1269</text>
+<text class="text" x="170" y="646" font-size="12.5" fill="#5a201a">The <tspan font-style="italic" fill="#7a2018">hard</tspan> version — a fail-closed proxy authenticating every query (<tspan class="mono" fill="#a63527" font-family="ui-monospace,Menlo,Consolas,monospace">X-Id-Token → tenant</tspan>)</text>
+<text class="muted" x="170" y="664" font-size="12.5" fill="#6a4a44">— was built, then retired: OSS Grafana couldn&#39;t reliably forward the SSO token, so it fail-closed and</text>
+<text class="muted" x="170" y="682" font-size="12.5" fill="#6a4a44">blanked dashboards. The RBAC model above replaced it.</text>
+
+
+<text class="muted" x="40" y="732" font-size="14" fill="#6c6c73">So the honest picture: <tspan fill="#1f8a5b" font-weight="600">write isolation is real</tspan> and physical; <tspan fill="#9a6a0a" font-weight="600">read isolation is</tspan></text>
+<text class="muted" x="40" y="752" font-size="14" fill="#6c6c73"><tspan fill="#9a6a0a" font-weight="600">organizational</tspan>, enforced in Grafana; and the only hard data-layer wall is the <tspan class="text" fill="#1c1c22" font-weight="500">network</tspan> beneath both.</text>
+</svg>

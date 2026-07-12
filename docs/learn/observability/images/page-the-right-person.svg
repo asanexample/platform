@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 768" width="760" height="768" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#eaf1fb"]{fill:#172f51}[stroke="#eaf1fb"]{stroke:#172f51}[fill="#c4d8f4"]{fill:#1d3a62}[stroke="#c4d8f4"]{stroke:#1d3a62}[fill="#2c66c4"]{fill:#6b98e1}[stroke="#2c66c4"]{stroke:#6b98e1}[fill="#6f86b0"]{fill:#a2b1cd}[stroke="#6f86b0"]{stroke:#a2b1cd}[fill="#3d6fc0"]{fill:#7fa2d9}[stroke="#3d6fc0"]{stroke:#7fa2d9}[fill="#243a5c"]{fill:#5881c1}[stroke="#243a5c"]{stroke:#5881c1}[fill="#123"]{fill:#508cc8}[stroke="#123"]{stroke:#508cc8}[fill="#fae9e6"]{fill:#532118}[stroke="#fae9e6"]{stroke:#532118}[fill="#ecc3bc"]{fill:#68291e}[stroke="#ecc3bc"]{stroke:#68291e}[fill="#a63527"]{fill:#da5e4f}[stroke="#a63527"]{stroke:#da5e4f}[fill="#b83a2c"]{fill:#dd6f63}[stroke="#b83a2c"]{stroke:#dd6f63}[fill="#f9f0da"]{fill:#584619}[stroke="#f9f0da"]{stroke:#584619}[fill="#e8d4a0"]{fill:#e5cc8a}[stroke="#e8d4a0"]{stroke:#e5cc8a}[fill="#8a6410"]{fill:#ecb02d}[stroke="#8a6410"]{stroke:#ecb02d}[fill="#8a8a91"]{fill:#898990}[stroke="#8a8a91"]{stroke:#898990}[fill="#b0790f"]{fill:#f2ad29}[stroke="#b0790f"]{stroke:#f2ad29}[fill="#b08a3a"]{fill:#d4b472}[stroke="#b08a3a"]{stroke:#d4b472}[fill="#33333a"]{fill:#dedee2}[stroke="#33333a"]{stroke:#dedee2}[fill="#9a6a0a"]{fill:#f6b022}[stroke="#9a6a0a"]{stroke:#f6b022}[fill="#3a7f96"]{fill:#65aec7}[stroke="#3a7f96"]{stroke:#65aec7}[fill="#f6ecd2"]{fill:#5c4a1b}[stroke="#f6ecd2"]{stroke:#5c4a1b}[fill="#e0cd9c"]{fill:#dfc990}[stroke="#e0cd9c"]{stroke:#dfc990}[fill="#f0e0b8"]{fill:#68531e}[stroke="#f0e0b8"]{stroke:#68531e}[fill="#8a5c0a"]{fill:#f4aa24}[stroke="#8a5c0a"]{stroke:#f4aa24}[fill="#5f5f66"]{fill:#8c8c94}[stroke="#5f5f66"]{stroke:#8c8c94}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#bfe0cc"]{fill:#2d5e41}[stroke="#bfe0cc"]{stroke:#2d5e41}[fill="#1f8a5b"]{fill:#40d996}[stroke="#1f8a5b"]{stroke:#40d996}[fill="#4f9a75"]{fill:#83c2a3}[stroke="#4f9a75"]{stroke:#83c2a3}[fill="#2c7a56"]{fill:#54c591}[stroke="#2c7a56"]{stroke:#54c591}[fill="#25402f"]{fill:#6cac84}[stroke="#25402f"]{stroke:#6cac84}[fill="#1c7a4f"]{fill:#41d893}[stroke="#1c7a4f"]{stroke:#41d893}[fill="#d8efe0"]{fill:#235534}[stroke="#d8efe0"]{stroke:#235534}[fill="#a8d8bd"]{fill:#9bd4b4}[stroke="#a8d8bd"]{stroke:#9bd4b4}[fill="#3c9a6c"]{fill:#6ac89a}[stroke="#3c9a6c"]{stroke:#6ac89a}[fill="#1e3a2c"]{fill:#66b38c}[stroke="#1e3a2c"]{stroke:#66b38c}}</style>
+<rect class="bg" x="0" y="0" width="760" height="768" fill="#f6f6f3"></rect>
+
+
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.8px">OBSERVABILITY · ACTING ON SIGNALS · ALERTING</text>
+<text class="text" x="40" y="90" font-size="27" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">Severity gets it out. Ownership routes it.</text>
+<text class="muted" x="40" y="118" font-size="14.5" fill="#6c6c73">A burning error budget becomes a page — but Alertmanager only knows <tspan class="text" fill="#1c1c22">severity</tspan>, not <tspan class="text" fill="#1c1c22">who owns</tspan></text>
+<text class="muted" x="40" y="137" font-size="14.5" fill="#6c6c73"><tspan class="text" fill="#1c1c22">the code</tspan>. A triage agent closes that gap: it resolves the team and pages the right on-call. The fire</text>
+<text class="muted" x="40" y="156" font-size="14.5" fill="#6c6c73">panel shows the zone; the dispatcher finds whose apartment it is.</text>
+
+
+<rect class="bg-blue bd-blue" x="40" y="182" width="680" height="76" rx="12" fill="#eaf1fb" stroke="#c4d8f4" stroke-width="1"></rect>
+<rect class="ac-blue" x="44" y="192" width="4" height="56" rx="2" fill="#2c66c4"></rect>
+<text class="t-blue mono" x="62" y="204" font-size="13" fill="#6f86b0">01</text>
+<text class="text" x="62" y="224" font-size="15" fill="#1c1c22" font-weight="600">Burn-rate SLO</text>
+<text class="t-blue mono" x="62" y="241" font-size="10" fill="#3d6fc0">fires</text>
+<text class="text" x="200" y="210" font-size="13" fill="#243a5c">Not a raw threshold — <tspan font-style="italic" fill="#123">how fast you&#39;re spending the error budget.</tspan></text>
+<rect class="bg-rose bd-rose" x="200" y="224" width="176" height="24" rx="6" fill="#fae9e6" stroke="#ecc3bc" stroke-width="1"></rect>
+<text class="t-rose" x="212" y="240" font-size="11.5" fill="#a63527">fast burn → <tspan font-weight="600" fill="#b83a2c">page now</tspan></text>
+<rect class="bg-amber bd-amber" x="384" y="224" width="150" height="24" rx="6" fill="#f9f0da" stroke="#e8d4a0" stroke-width="1"></rect>
+<text class="t-amber" x="396" y="240" font-size="11.5" fill="#8a6410">slow leak → a ticket</text>
+
+
+<line class="arrow" x1="380" y1="264" x2="380" y2="276" stroke="#8a8a91" stroke-width="2"></line>
+<path class="arrow" d="M374 276 L386 276 L380 284 Z" fill="#8a8a91"></path>
+
+
+<rect class="bg-amber bd-amber" x="40" y="292" width="680" height="128" rx="12" fill="#f9f0da" stroke="#e8d4a0" stroke-width="1"></rect>
+<rect class="ac-amber" x="44" y="302" width="4" height="108" rx="2" fill="#b0790f"></rect>
+<text class="t-amber mono" x="62" y="314" font-size="13" fill="#b08a3a">02</text>
+<text class="text" x="62" y="334" font-size="15" fill="#1c1c22" font-weight="600">Alertmanager</text>
+<text class="t-amber mono" x="62" y="351" font-size="10" fill="#8a6410">routes by</text>
+<text class="t-amber mono" x="62" y="363" font-size="10" fill="#8a6410">severity only</text>
+<text class="t-rose mono" x="200" y="314" font-size="11" fill="#b83a2c">critical</text>
+<text class="text" x="278" y="314" font-size="12" fill="#33333a">→ PagerDuty · SNS · Slack</text>
+<text class="t-amber mono" x="200" y="334" font-size="11" fill="#9a6a0a">warning</text>
+<text class="text" x="278" y="334" font-size="12" fill="#33333a">→ Slack</text>
+<text class="t-cyan mono" x="200" y="354" font-size="11" fill="#3a7f96">watchdog</text>
+<text class="text" x="278" y="354" font-size="12" fill="#33333a">always-on dead-man&#39;s switch → external pager if the pipeline goes silent</text>
+<rect x="200" y="372" width="504" height="32" rx="8" fill="#f6ecd2" stroke="#e0cd9c" stroke-width="1" stroke-dasharray="4 3"></rect>
+<rect class="chip-amber" x="212" y="380" width="58" height="16" rx="5" fill="#f0e0b8" stroke="#e0cd9c" stroke-width="1"></rect>
+<text class="t-amber mono" x="241" y="391" font-size="9.5" fill="#8a5c0a" text-anchor="middle">CAVEAT</text>
+<text class="muted" x="280" y="392" font-size="11.5" fill="#5f5f66">PagerDuty trial lapsed — the wire is intact; criticals still hit Slack + SNS + watchdog.</text>
+
+
+<line class="arrow" x1="380" y1="426" x2="380" y2="438" stroke="#8a8a91" stroke-width="2"></line>
+<path class="arrow" d="M374 438 L386 438 L380 446 Z" fill="#8a8a91"></path>
+
+
+<rect class="bg-green bd-green" x="40" y="454" width="680" height="72" rx="12" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<rect class="ac-green" x="44" y="464" width="4" height="52" rx="2" fill="#1f8a5b"></rect>
+<text class="t-green mono" x="62" y="476" font-size="13" fill="#4f9a75">03</text>
+<text class="text" x="62" y="496" font-size="15" fill="#1c1c22" font-weight="600">Triage agent</text>
+<text class="t-green mono" x="62" y="513" font-size="10" fill="#2c7a56">resolves ownership</text>
+<text class="text" x="200" y="484" font-size="13" fill="#25402f">Alertmanager knows severity, not <tspan font-style="italic" fill="#123">whose service this is.</tspan> The agent resolves the</text>
+<text class="text" x="200" y="502" font-size="13" fill="#25402f">culprit&#39;s team from the <tspan class="mono" fill="#1c7a4f" font-family="ui-monospace,Menlo,Consolas,monospace">git registries</tspan> — the missing owner lookup.</text>
+
+
+<line class="arrow" x1="380" y1="532" x2="380" y2="544" stroke="#8a8a91" stroke-width="2"></line>
+<path class="arrow" d="M374 544 L386 544 L380 552 Z" fill="#8a8a91"></path>
+
+
+<rect x="40" y="560" width="680" height="70" rx="12" fill="#d8efe0" stroke="#a8d8bd" stroke-width="1.5"></rect>
+<text class="t-green mono" x="62" y="586" font-size="13" fill="#3c9a6c">04</text>
+<text class="text" x="62" y="606" font-size="16" fill="#1c1c22" font-weight="600">The right on-call</text>
+<text class="text" x="220" y="588" font-size="13.5" fill="#1e3a2c">Pages <tspan font-style="italic" fill="#123">that team&#39;s</tspan> on-call — and @-mentions the commit author in Slack. The</text>
+<text class="text" x="220" y="608" font-size="13.5" fill="#1e3a2c">page lands on the person who can fix it, not the whole ward.</text>
+
+
+<text class="muted" x="40" y="666" font-size="14" fill="#6c6c73">Severity is enough to get an alert <tspan class="text" fill="#1c1c22" font-style="italic">out</tspan>; it&#39;s never enough to get it to the right <tspan class="text" fill="#1c1c22" font-style="italic">person</tspan>. The fire panel</text>
+<text class="muted" x="40" y="686" font-size="14" fill="#6c6c73">shows the zone; the dispatcher looks up whose apartment it is and calls them.</text>
+</svg>
