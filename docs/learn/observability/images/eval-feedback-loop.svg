@@ -1,76 +1,82 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 574" width="760" height="574" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#8a4fc4"]{fill:#b892dd}[stroke="#8a4fc4"]{stroke:#b892dd}[fill="#e6d4f4"]{fill:#3f1b5c}[stroke="#e6d4f4"]{stroke:#3f1b5c}[fill="#6a3fa0"]{fill:#9871ca}[stroke="#6a3fa0"]{stroke:#9871ca}[fill="#f2eafb"]{fill:#321751}[stroke="#f2eafb"]{stroke:#321751}[fill="#d9c4f0"]{fill:#3f1d64}[stroke="#d9c4f0"]{stroke:#3f1d64}[fill="#9a7cc0"]{fill:#b59dd2}[stroke="#9a7cc0"]{stroke:#b59dd2}[fill="#7a6a86"]{fill:#8e8198}[stroke="#7a6a86"]{stroke:#8e8198}[fill="#6fb08f"]{fill:#a2cdb7}[stroke="#6fb08f"]{stroke:#a2cdb7}[fill="#cfe8d9"]{fill:#29563b}[stroke="#cfe8d9"]{stroke:#29563b}[fill="#1c7a4f"]{fill:#41d893}[stroke="#1c7a4f"]{stroke:#41d893}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#a8d8bd"]{fill:#9bd4b4}[stroke="#a8d8bd"]{stroke:#9bd4b4}[fill="#d0ecdb"]{fill:#245939}[stroke="#d0ecdb"]{stroke:#245939}[fill="#5f5f66"]{fill:#8c8c94}[stroke="#5f5f66"]{stroke:#8c8c94}[fill="#5a97ab"]{fill:#96becb}[stroke="#5a97ab"]{stroke:#96becb}[fill="#d2e9ef"]{fill:#204e5a}[stroke="#d2e9ef"]{stroke:#204e5a}[fill="#0f6f8e"]{fill:#2bbeee}[stroke="#0f6f8e"]{stroke:#2bbeee}[fill="#e2eff2"]{fill:#23464e}[stroke="#e2eff2"]{stroke:#23464e}[fill="#b8dbe4"]{fill:#275966}[stroke="#b8dbe4"]{stroke:#275966}[fill="#0a2831"]{fill:#3db7dc}[stroke="#0a2831"]{stroke:#3db7dc}[fill="#3a5560"]{fill:#6f99aa}[stroke="#3a5560"]{stroke:#6f99aa}[fill="#eaf1fb"]{fill:#172f51}[stroke="#eaf1fb"]{stroke:#172f51}[fill="#c4d8f4"]{fill:#1d3a62}[stroke="#c4d8f4"]{stroke:#1d3a62}[fill="#2c66c4"]{fill:#6b98e1}[stroke="#2c66c4"]{stroke:#6b98e1}[fill="#4a5a73"]{fill:#7287a7}[stroke="#4a5a73"]{stroke:#7287a7}[fill="#fae9e6"]{fill:#532118}[stroke="#fae9e6"]{stroke:#532118}[fill="#ecc3bc"]{fill:#68291e}[stroke="#ecc3bc"]{stroke:#68291e}[fill="#c0392b"]{fill:#e07266}[stroke="#c0392b"]{stroke:#e07266}[fill="#a5342a"]{fill:#d75e54}[stroke="#a5342a"]{stroke:#d75e54}[fill="#6a4a44"]{fill:#a77a72}[stroke="#6a4a44"]{stroke:#a77a72}[fill="#7a2018"]{fill:#dd493b}[stroke="#7a2018"]{stroke:#dd493b}[fill="#f9f0da"]{fill:#584619}[stroke="#f9f0da"]{stroke:#584619}[fill="#e0cd9c"]{fill:#dfc990}[stroke="#e0cd9c"]{stroke:#dfc990}[fill="#8a5c0a"]{fill:#f4aa24}[stroke="#8a5c0a"]{stroke:#f4aa24}[fill="#6a5a3f"]{fill:#ab946e}[stroke="#6a5a3f"]{stroke:#ab946e}}</style><defs><clipPath id="abar0"><rect x="459.0" y="157.0" width="10.0" height="90.0"/></clipPath><clipPath id="abar1"><rect x="459.0" y="255.0" width="10.0" height="72.0"/></clipPath></defs>
-<rect class="bg" x="0" y="0" width="760" height="574" fill="#f6f6f3"></rect>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 566" width="760" height="566" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#0f6f8e"]{fill:#2bbeee}[stroke="#0f6f8e"]{stroke:#2bbeee}[fill="#ccccc4"]{fill:#33332d}[stroke="#ccccc4"]{stroke:#33332d}[fill="#7a8faa"]{fill:#a7b6c8}[stroke="#7a8faa"]{stroke:#a7b6c8}[fill="#1f8fb0"]{fill:#48c0e3}[stroke="#1f8fb0"]{stroke:#48c0e3}[fill="#d2e9ef"]{fill:#204e5a}[stroke="#d2e9ef"]{stroke:#204e5a}[fill="#8dc4d4"]{fill:#96cada}[stroke="#8dc4d4"]{stroke:#96cada}[fill="#0a4a5c"]{fill:#2bc3ed}[stroke="#0a4a5c"]{stroke:#2bc3ed}[fill="#efe6f9"]{fill:#341853}[stroke="#efe6f9"]{stroke:#341853}[fill="#cdb4e8"]{fill:#45216c}[stroke="#cdb4e8"]{stroke:#45216c}[fill="#8a4fc4"]{fill:#b892dd}[stroke="#8a4fc4"]{stroke:#b892dd}[fill="#fff"]{fill:#141414}[stroke="#fff"]{stroke:#141414}[fill="#7a52a0"]{fill:#a889c5}[stroke="#7a52a0"]{stroke:#a889c5}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#a8d8bd"]{fill:#9bd4b4}[stroke="#a8d8bd"]{stroke:#9bd4b4}[fill="#1c7a4f"]{fill:#41d893}[stroke="#1c7a4f"]{stroke:#41d893}[fill="#3c7a5c"]{fill:#63b58e}[stroke="#3c7a5c"]{stroke:#63b58e}[fill="#e2eff2"]{fill:#23464e}[stroke="#e2eff2"]{stroke:#23464e}[fill="#eaf1fb"]{fill:#172f51}[stroke="#eaf1fb"]{stroke:#172f51}[fill="#c4d8f4"]{fill:#1d3a62}[stroke="#c4d8f4"]{stroke:#1d3a62}[fill="#2c66c4"]{fill:#6b98e1}[stroke="#2c66c4"]{stroke:#6b98e1}[fill="#4a5a73"]{fill:#7287a7}[stroke="#4a5a73"]{stroke:#7287a7}[fill="#fae9e6"]{fill:#532118}[stroke="#fae9e6"]{stroke:#532118}[fill="#ecc3bc"]{fill:#68291e}[stroke="#ecc3bc"]{stroke:#68291e}[fill="#c0392b"]{fill:#e07266}[stroke="#c0392b"]{stroke:#e07266}[fill="#a5342a"]{fill:#d75e54}[stroke="#a5342a"]{stroke:#d75e54}[fill="#7a2018"]{fill:#dd493b}[stroke="#7a2018"]{stroke:#dd493b}[fill="#6a4a44"]{fill:#a77a72}[stroke="#6a4a44"]{stroke:#a77a72}[fill="#f9f0da"]{fill:#584619}[stroke="#f9f0da"]{stroke:#584619}[fill="#e8d4a0"]{fill:#e5cc8a}[stroke="#e8d4a0"]{stroke:#e5cc8a}[fill="#f0e0b8"]{fill:#68531e}[stroke="#f0e0b8"]{stroke:#68531e}[fill="#8a5c0a"]{fill:#f4aa24}[stroke="#8a5c0a"]{stroke:#f4aa24}[fill="#5f5f66"]{fill:#8c8c94}[stroke="#5f5f66"]{stroke:#8c8c94}}</style><defs><clipPath id="abar0"><rect x="23.0" y="149.0" width="9.0" height="106.0"/></clipPath><clipPath id="abar1"><rect x="547.0" y="149.0" width="9.0" height="106.0"/></clipPath></defs>
+<rect class="bg" x="0" y="0" width="760" height="566" fill="#f6f6f3"></rect>
 
 
-<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.8px">OBSERVABILITY · AGENT · THE FEEDBACK LOOP</text>
-<text class="text" x="40" y="89" font-size="25" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">The signal a service can&#39;t have: <tspan fill="#8a4fc4" font-style="italic">was it right?</tspan></text>
-<text class="muted" x="40" y="117" font-size="14.5" fill="#6c6c73">Observing an agent adds a consumer no normal workload has — a human verdict that closes the loop</text>
-<text class="muted" x="40" y="136" font-size="14.5" fill="#6c6c73">and tells you whether the agent is actually any good.</text>
+<text class="muted mono" x="40" y="50" font-size="12" fill="#6c6c73" letter-spacing="1.8px">OBSERVABILITY · AGENT · THE FEEDBACK LOOP</text>
+<text class="text" x="40" y="84" font-size="24" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">The signal a service can&#39;t have: <tspan fill="#0f6f8e" font-style="italic">was it right?</tspan></text>
+<text class="muted" x="40" y="110" font-size="13.5" fill="#6c6c73">Observing an agent adds a consumer no normal workload has — a human verdict that closes the loop and tells you</text>
+<text class="muted" x="40" y="127" font-size="13.5" fill="#6c6c73">whether the agent is actually any good.</text>
 
 
+<circle cx="380" cy="320" r="150" fill="none" stroke="#ccccc4" stroke-width="2"></circle>
+
+<path d="M474.6 203.3 L461.7 200.7 L468.2 191.8 Z" fill="#7a8faa"></path>
+<path d="M520.2 374.0 L518.7 360.8 L529.1 364.2 Z" fill="#7a8faa"></path>
+<path d="M372.0 470.0 L384.0 464.5 L384.0 475.5 Z" fill="#7a8faa"></path>
+<path d="M234.9 358.7 L243.8 368.5 L233.3 371.9 Z" fill="#7a8faa"></path>
+
+<path d="M250.1 245.0 A150 150 0 0 1 354.0 172.3" fill="none" stroke="#1f8fb0" stroke-width="3"></path>
+<path d="M361.8 170.9 L351.0 178.4 L349.1 167.6 Z" fill="#1f8fb0"></path>
 
 
-<circle cx="52" cy="171" r="12" fill="#e6d4f4"></circle>
-<text class="mono" x="52" y="175" font-size="11" fill="#6a3fa0" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">1</text>
-<rect x="74" y="158" width="366" height="28" rx="9" fill="#f2eafb" stroke="#d9c4f0" stroke-width="1"></rect>
-<text x="86" y="176" font-size="12.5" fill="#1c1c22">Triage agent runs → emits a <tspan class="mono" fill="#8a4fc4" font-family="ui-monospace,monospace" font-size="11">triage_disposition</tspan></text>
-<text x="52" y="199" font-size="13" fill="#9a7cc0" text-anchor="middle">↓</text>
-
-<circle cx="52" cy="217" r="12" fill="#e6d4f4"></circle>
-<text class="mono" x="52" y="221" font-size="11" fill="#6a3fa0" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">2</text>
-<rect x="74" y="204" width="366" height="28" rx="9" fill="#f2eafb" stroke="#d9c4f0" stroke-width="1"></rect>
-<text x="86" y="222" font-size="12.5" fill="#1c1c22">Slack card posted to the owning team <tspan fill="#7a6a86" font-size="11">(propose-only · ADR-080)</tspan></text>
-<text x="52" y="245" font-size="13" fill="#6fb08f" text-anchor="middle">↓</text>
-
-<circle cx="52" cy="263" r="12" fill="#cfe8d9"></circle>
-<text class="mono" x="52" y="267" font-size="11" fill="#1c7a4f" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">3</text>
-<rect x="74" y="250" width="366" height="28" rx="9" fill="#e7f4ec" stroke="#a8d8bd" stroke-width="1"></rect>
-<text x="86" y="268" font-size="12.5" fill="#1c1c22" font-weight="500">Human clicks</text>
-<rect x="176" y="257" width="52" height="15" rx="4" fill="#d0ecdb"></rect>
-<text class="mono" x="202" y="268" font-size="9" fill="#1c7a4f" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">Accept</text>
-<rect x="234" y="257" width="56" height="15" rx="4" fill="#d0ecdb"></rect>
-<text class="mono" x="262" y="268" font-size="9" fill="#1c7a4f" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">Correct</text>
-<rect x="296" y="257" width="56" height="15" rx="4" fill="#d0ecdb"></rect>
-<text class="mono" x="324" y="268" font-size="9" fill="#1c7a4f" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">Dismiss</text>
-<text x="52" y="291" font-size="13" fill="#6fb08f" text-anchor="middle">↓</text>
-
-<circle cx="52" cy="309" r="12" fill="#cfe8d9"></circle>
-<text class="mono" x="52" y="313" font-size="11" fill="#1c7a4f" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">4</text>
-<rect x="74" y="296" width="366" height="28" rx="9" fill="#e7f4ec" stroke="#a8d8bd" stroke-width="1"></rect>
-<text x="86" y="314" font-size="10.5" font-family="ui-monospace,Menlo,Consolas,monospace"><tspan fill="#1c7a4f">triage_feedback_total{verdict, disposition}</tspan> <tspan fill="#5f5f66" font-size="11.5">(durable)</tspan></text>
-<text x="52" y="337" font-size="13" fill="#5a97ab" text-anchor="middle">↓</text>
-
-<circle cx="52" cy="355" r="12" fill="#d2e9ef"></circle>
-<text class="mono" x="52" y="359" font-size="11" fill="#0f6f8e" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">5</text>
-<rect x="74" y="342" width="366" height="28" rx="9" fill="#e2eff2" stroke="#b8dbe4" stroke-width="1"></rect>
-<text x="86" y="360" font-size="12.5" fill="#0a2831"><tspan font-weight="600">Accept-rate BY disposition</tspan><tspan fill="#3a5560"> = accept ÷ all verdicts</tspan></text>
-
-<text x="52" y="392" font-size="14" fill="#5a97ab" text-anchor="middle">↺</text>
-<text x="74" y="392" font-size="12" fill="#3a5560" font-style="italic">back to 1 — is the agent calibrated?</text>
+<rect x="300" y="296" width="160" height="48" rx="11" fill="#d2e9ef" stroke="#8dc4d4" stroke-width="1.5"></rect>
+<text x="380" y="316" font-size="13.5" fill="#0a4a5c" font-weight="600" text-anchor="middle">Is the agent</text>
+<text x="380" y="333" font-size="13.5" fill="#0a4a5c" font-weight="600" text-anchor="middle">calibrated?</text>
 
 
-
-<rect x="460" y="158" width="260" height="88" rx="11" fill="#eaf1fb" stroke="#c4d8f4" stroke-width="1"></rect>
-<rect x="461.3" y="159.3" width="257.5" height="85.5" rx="9.8" fill="none" stroke="#2c66c4" stroke-width="2.5" clip-path="url(#abar0)"></rect>
-<text x="476" y="180" font-size="12.5" fill="#2c66c4" font-weight="600">Same four-signal machine</text>
-<text x="476" y="198" font-size="11.5" fill="#4a5a73">token metrics → Mimir ·</text>
-<text x="476" y="213" font-size="10" fill="#4a5a73" font-family="ui-monospace,Menlo,Consolas,monospace">invoke_agent→chat→execute_tool</text>
-<text x="476" y="227" font-size="11.5" fill="#4a5a73">spans → Tempo.</text>
-<text x="476" y="242" font-size="11.5" fill="#2c66c4">The verdict counter is the <tspan font-weight="600">new</tspan> part.</text>
-
-<rect x="460" y="256" width="260" height="70" rx="11" fill="#fae9e6" stroke="#ecc3bc" stroke-width="1"></rect>
-<rect x="461.3" y="257.3" width="257.5" height="67.5" rx="9.8" fill="none" stroke="#c0392b" stroke-width="2.5" clip-path="url(#abar1)"></rect>
-<text x="476" y="278" font-size="12.5" fill="#a5342a" font-weight="600">The failure metrics can&#39;t see</text>
-<text x="476" y="297" font-size="10" font-family="ui-monospace,Menlo,Consolas,monospace"><tspan fill="#a5342a">confident_lead</tspan><tspan fill="#6a4a44" font-family="system-ui" font-size="11.5"> with a </tspan><tspan fill="#7a2018" font-family="system-ui" font-size="11.5" font-style="italic">low</tspan><tspan fill="#6a4a44" font-family="system-ui" font-size="11.5"> accept-rate =</tspan></text>
-<text x="476" y="313" font-size="11.5" fill="#6a4a44">the agent is <tspan font-weight="600" fill="#a5342a">confidently wrong.</tspan></text>
-
-<rect x="460" y="336" width="260" height="64" rx="11" fill="#f9f0da" stroke="#e0cd9c" stroke-width="1" stroke-dasharray="5 3"></rect>
-<text class="mono" x="476" y="356" font-size="9" fill="#8a5c0a" letter-spacing="0.4px" font-family="ui-monospace,Menlo,Consolas,monospace">NOTE</text>
-<text x="476" y="372" font-size="11.5" fill="#6a5a3f">Cold agent = only <tspan class="mono" font-family="ui-monospace,monospace" font-size="10">target_info</tspan>;</text>
-<text x="476" y="387" font-size="11.5" fill="#6a5a3f">counters are zero-recording — no</text>
-<text x="476" y="402" font-size="11.5" fill="#6a5a3f">series until the first verdict.</text>
+<rect x="305" y="147" width="150" height="46" rx="9" fill="#efe6f9" stroke="#cdb4e8" stroke-width="1"></rect>
+<text x="380" y="167" font-size="12" fill="#1c1c22" font-weight="500" text-anchor="middle">Agent emits</text>
+<text x="380" y="182" font-size="10" fill="#8a4fc4" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">triage_disposition</text>
+<circle cx="313" cy="147" r="9" fill="#8a4fc4"></circle><text x="313" y="151" font-size="10" fill="#fff" text-anchor="middle" font-family="ui-monospace,monospace">1</text>
 
 
-<text class="muted" x="40" y="448" font-size="13.5" fill="#6c6c73">A service emits what it <tspan class="text" fill="#1c1c22" font-style="italic">did.</tspan> An agent also gets told whether it was <tspan class="text" fill="#1c1c22" font-style="italic">right</tspan> — and that loop is the</text>
-<text class="muted" x="40" y="467" font-size="13.5" fill="#6c6c73">whole point.</text>
+<rect x="448" y="251" width="150" height="46" rx="9" fill="#efe6f9" stroke="#cdb4e8" stroke-width="1"></rect>
+<text x="523" y="271" font-size="12" fill="#1c1c22" font-weight="500" text-anchor="middle">Slack proposal</text>
+<text x="523" y="286" font-size="10.5" fill="#7a52a0" text-anchor="middle">→ owning team</text>
+<circle cx="456" cy="251" r="9" fill="#8a4fc4"></circle><text x="456" y="255" font-size="10" fill="#fff" text-anchor="middle" font-family="ui-monospace,monospace">2</text>
+
+
+<rect x="393" y="418" width="150" height="46" rx="9" fill="#e7f4ec" stroke="#a8d8bd" stroke-width="1"></rect>
+<text x="468" y="438" font-size="12" fill="#1c1c22" font-weight="500" text-anchor="middle">Human verdict</text>
+<text x="468" y="453" font-size="9.5" fill="#1c7a4f" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">Accept·Correct·Dismiss</text>
+<circle cx="401" cy="418" r="9" fill="#1c7a4f"></circle><text x="401" y="422" font-size="10" fill="#fff" text-anchor="middle" font-family="ui-monospace,monospace">3</text>
+
+
+<rect x="217" y="418" width="150" height="46" rx="9" fill="#e7f4ec" stroke="#a8d8bd" stroke-width="1"></rect>
+<text x="292" y="437" font-size="9.5" fill="#1c7a4f" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">triage_feedback_total</text>
+<text x="292" y="453" font-size="10.5" fill="#3c7a5c" text-anchor="middle">counter · durable</text>
+<circle cx="225" cy="418" r="9" fill="#1c7a4f"></circle><text x="225" y="422" font-size="10" fill="#fff" text-anchor="middle" font-family="ui-monospace,monospace">4</text>
+
+
+<rect x="162" y="251" width="150" height="46" rx="9" fill="#e2eff2" stroke="#8dc4d4" stroke-width="1"></rect>
+<text x="237" y="271" font-size="12" fill="#1c1c22" font-weight="500" text-anchor="middle">Accept-rate</text>
+<text x="237" y="286" font-size="10.5" fill="#0f6f8e" text-anchor="middle">by disposition</text>
+<circle cx="170" cy="251" r="9" fill="#0f6f8e"></circle><text x="170" y="255" font-size="10" fill="#fff" text-anchor="middle" font-family="ui-monospace,monospace">5</text>
+
+
+<rect x="24" y="150" width="188" height="104" rx="10" fill="#eaf1fb" stroke="#c4d8f4" stroke-width="1"></rect>
+<rect x="25.3" y="151.3" width="185.5" height="101.5" rx="8.8" fill="none" stroke="#2c66c4" stroke-width="2.5" clip-path="url(#abar0)"></rect>
+<text x="38" y="172" font-size="12" fill="#2c66c4" font-weight="600">Same four-signal machine</text>
+<text x="38" y="190" font-size="10.5" fill="#4a5a73">token metrics → Mimir;</text>
+<text x="38" y="205" font-size="9.5" fill="#4a5a73" font-family="ui-monospace,Menlo,Consolas,monospace">invoke_agent→chat→execute_tool</text>
+<text x="38" y="220" font-size="10.5" fill="#4a5a73">spans → Tempo. The verdict</text>
+<text x="38" y="235" font-size="10.5" fill="#4a5a73">counter is the <tspan fill="#2c66c4" font-weight="600">new</tspan> part.</text>
+
+
+<rect x="548" y="150" width="188" height="104" rx="10" fill="#fae9e6" stroke="#ecc3bc" stroke-width="1"></rect>
+<rect x="549.3" y="151.3" width="185.5" height="101.5" rx="8.8" fill="none" stroke="#c0392b" stroke-width="2.5" clip-path="url(#abar1)"></rect>
+<text x="562" y="172" font-size="12" fill="#a5342a" font-weight="600">Confidently wrong</text>
+<text x="562" y="191" font-size="9.5" fill="#7a2018" font-family="ui-monospace,Menlo,Consolas,monospace">confident_lead</text>
+<text x="562" y="206" font-size="10.5" fill="#6a4a44">+ a <tspan font-style="italic" fill="#7a2018">low</tspan> accept-rate = the</text>
+<text x="562" y="221" font-size="10.5" fill="#6a4a44">agent is wrong — the failure</text>
+<text x="562" y="236" font-size="10.5" fill="#6a4a44">metrics alone can&#39;t see it.</text>
+
+
+<rect x="40" y="486" width="680" height="40" rx="10" fill="#f9f0da" stroke="#e8d4a0" stroke-width="1"></rect>
+<rect x="52" y="497" width="46" height="18" rx="5" fill="#f0e0b8"></rect>
+<text x="75" y="510" font-size="9" fill="#8a5c0a" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">COLD</text>
+<text x="112" y="511" font-size="11.5" fill="#5f5f66">Cold agent = only <tspan font-family="ui-monospace,Menlo,Consolas,monospace" font-size="10.5">target_info</tspan>; counters are zero-recording — no series until the first verdict.</text>
+
+
+<text class="muted" x="40" y="550" font-size="13" fill="#6c6c73">A service emits what it <tspan fill="#1c1c22" font-style="italic">did.</tspan> An agent also gets told whether it was <tspan fill="#1c1c22" font-style="italic">right</tspan> — and that loop is the whole point.</text>
 </svg>
