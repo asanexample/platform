@@ -544,7 +544,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "RED metrics from the shop's OpenTelemetry SDK, delivered via the preprod OTLP metrics spoke (mimir `/otlp/v1/metrics`). **OTLP-ingest naming:** Mimir maps `service.namespace/service.name` to the `job` label (`alpha-shop/shop-<svc>`) and keeps OTLP metric names without a unit suffix (`http_server_request_duration`, not `_seconds`) \u2014 distinct from the Beyla/remote-write RED metrics used elsewhere. Panels below query that convention. Autoscaling + progressive-delivery panels above use kube-state-metrics / Argo Rollouts (remote-write; `namespace`/`exported_namespace`)."
+        "content": "RED metrics from the shop's OpenTelemetry SDK via the OTLP spoke. Since ADR-100, Mimir translates OTLP metrics to the Prometheus convention on ingest, so they carry `http_server_request_duration_seconds*` + `k8s_namespace_name` \u2014 identical to Beyla/remote-write \u2014 and one query works regardless of delivery path. Per-service breakdown is the `job` label (`alpha-shop/shop-<svc>`; OTLP's service identifier). Autoscaling + progressive-delivery panels above use kube-state-metrics / Argo Rollouts (`namespace`/`exported_namespace`)."
       }
     },
     {
@@ -579,7 +579,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (job)(rate(http_server_request_duration_count{job=~\"alpha-shop/.*\"}[5m]))",
+          "expr": "sum by (job)(rate(http_server_request_duration_seconds_count{k8s_namespace_name=\"$namespace\"}[5m]))",
           "legendFormat": "{{job}}"
         }
       ]
@@ -617,7 +617,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (job)(rate(http_server_request_duration_count{job=~\"alpha-shop/.*\",http_response_status_code=~\"5..\"}[5m])) / sum by (job)(rate(http_server_request_duration_count{job=~\"alpha-shop/.*\"}[5m]))",
+          "expr": "sum by (job)(rate(http_server_request_duration_seconds_count{k8s_namespace_name=\"$namespace\",http_response_status_code=~\"5..\"}[5m])) / sum by (job)(rate(http_server_request_duration_seconds_count{k8s_namespace_name=\"$namespace\"}[5m]))",
           "legendFormat": "{{job}}"
         }
       ]
@@ -654,7 +654,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum by (le, job)(rate(http_server_request_duration_bucket{job=~\"alpha-shop/.*\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le, job)(rate(http_server_request_duration_seconds_bucket{k8s_namespace_name=\"$namespace\"}[5m])))",
           "legendFormat": "{{job}}"
         }
       ]
