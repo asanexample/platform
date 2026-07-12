@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 642" width="760" height="642" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#f2eafb"]{fill:#321751}[stroke="#f2eafb"]{stroke:#321751}[fill="#d9c4f0"]{fill:#3f1d64}[stroke="#d9c4f0"]{stroke:#3f1d64}[fill="#8a4fc4"]{fill:#b892dd}[stroke="#8a4fc4"]{stroke:#b892dd}[fill="#7a52a0"]{fill:#a889c5}[stroke="#7a52a0"]{stroke:#a889c5}[fill="#6f5a86"]{fill:#9d8ab2}[stroke="#6f5a86"]{stroke:#9d8ab2}[fill="#8a8a91"]{fill:#898990}[stroke="#8a8a91"]{stroke:#898990}[fill="#ececec"]{fill:#1e1e1e}[stroke="#ececec"]{stroke:#1e1e1e}[fill="#c4c4bd"]{fill:#373731}[stroke="#c4c4bd"]{stroke:#373731}[fill="#4a4a52"]{fill:#dfdfe2}[stroke="#4a4a52"]{stroke:#dfdfe2}[fill="#eaf1fb"]{fill:#172f51}[stroke="#eaf1fb"]{stroke:#172f51}[fill="#c4d8f4"]{fill:#1d3a62}[stroke="#c4d8f4"]{stroke:#1d3a62}[fill="#2c66c4"]{fill:#6b98e1}[stroke="#2c66c4"]{stroke:#6b98e1}[fill="#5a6b83"]{fill:#8999b0}[stroke="#5a6b83"]{stroke:#8999b0}[fill="#f9f0da"]{fill:#584619}[stroke="#f9f0da"]{stroke:#584619}[fill="#e8d4a0"]{fill:#e5cc8a}[stroke="#e8d4a0"]{stroke:#e5cc8a}[fill="#b0790f"]{fill:#f2ad29}[stroke="#b0790f"]{stroke:#f2ad29}[fill="#9a6a0a"]{fill:#f6b022}[stroke="#9a6a0a"]{stroke:#f6b022}[fill="#8a6410"]{fill:#ecb02d}[stroke="#8a6410"]{stroke:#ecb02d}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#bfe0cc"]{fill:#2d5e41}[stroke="#bfe0cc"]{stroke:#2d5e41}[fill="#1f8a5b"]{fill:#40d996}[stroke="#1f8a5b"]{stroke:#40d996}[fill="#4f7a63"]{fill:#7aab91}[stroke="#4f7a63"]{stroke:#7aab91}[fill="#d6ecdd"]{fill:#275335}[stroke="#d6ecdd"]{stroke:#275335}[fill="#1c7a4f"]{fill:#41d893}[stroke="#1c7a4f"]{stroke:#41d893}[fill="#9a9aa1"]{fill:#888890}[stroke="#9a9aa1"]{stroke:#888890}[fill="#33333a"]{fill:#dedee2}[stroke="#33333a"]{stroke:#dedee2}[fill="#b5b5ad"]{fill:#929286}[stroke="#b5b5ad"]{stroke:#929286}[fill="#e2eff2"]{fill:#23464e}[stroke="#e2eff2"]{stroke:#23464e}[fill="#b8dbe4"]{fill:#275966}[stroke="#b8dbe4"]{stroke:#275966}[fill="#1f8fb0"]{fill:#48c0e3}[stroke="#1f8fb0"]{stroke:#48c0e3}[fill="#d2e9ef"]{fill:#204e5a}[stroke="#d2e9ef"]{stroke:#204e5a}[fill="#0f6f8e"]{fill:#2bbeee}[stroke="#0f6f8e"]{stroke:#2bbeee}[fill="#1c3a44"]{fill:#5aa5be}[stroke="#1c3a44"]{stroke:#5aa5be}[fill="#3a5560"]{fill:#6f99aa}[stroke="#3a5560"]{stroke:#6f99aa}[fill="#efefec"]{fill:#1f1f1b}[stroke="#efefec"]{stroke:#1f1f1b}[fill="#d2d2cb"]{fill:#2f2f2a}[stroke="#d2d2cb"]{stroke:#2f2f2a}[fill="#e8e8e2"]{fill:#23231f}[stroke="#e8e8e2"]{stroke:#23231f}[fill="#5f5f66"]{fill:#8c8c94}[stroke="#5f5f66"]{stroke:#8c8c94}}</style><defs><clipPath id="abar0"><rect x="39.0" y="195.0" width="11.0" height="98.0"/></clipPath><clipPath id="abar1"><rect x="445.0" y="139.0" width="9.0" height="48.0"/></clipPath><clipPath id="abar2"><rect x="445.0" y="220.0" width="9.0" height="48.0"/></clipPath><clipPath id="abar3"><rect x="445.0" y="301.0" width="9.0" height="54.0"/></clipPath><clipPath id="abar4"><rect x="39.0" y="409.0" width="10.0" height="60.0"/></clipPath></defs>
+<rect class="bg" x="0" y="0" width="760" height="642" fill="#f6f6f3"></rect>
+
+
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.8px">OBSERVABILITY · AGENT OBSERVABILITY · ADR-076</text>
+<text class="text" x="40" y="90" font-size="27" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">One seam out, three signals in.</text>
+<text class="muted" x="40" y="118" font-size="14.5" fill="#6c6c73">The platform&#39;s AI agents are just another workload — instrumented <tspan class="text" fill="#1c1c22" font-style="italic">once</tspan> with OpenTelemetry&#39;s</text>
+<text class="muted" x="40" y="137" font-size="14.5" fill="#6c6c73">GenAI semantic conventions, fanned out to the same LGTM+P machine.</text>
+
+
+<rect class="bg-violet bd-violet" x="40" y="196" width="150" height="96" rx="12" fill="#f2eafb" stroke="#d9c4f0" stroke-width="1"></rect>
+<rect x="41.3" y="197.3" width="147.5" height="93.5" rx="10.8" fill="none" stroke="#8a4fc4" stroke-width="2.5" clip-path="url(#abar0)"></rect>
+<text class="text" x="56" y="222" font-size="15" fill="#1c1c22" font-weight="600">Triage copilot</text>
+<text class="t-violet mono" x="56" y="240" font-size="10" fill="#7a52a0">an AI agent</text>
+<line x1="56" y1="252" x2="174" y2="252" stroke="#d9c4f0" stroke-width="1"></line>
+<text class="muted" x="56" y="272" font-size="11.5" fill="#6f5a86">one invocation</text>
+
+
+<line x1="190" y1="244" x2="220" y2="244" stroke="#8a8a91" stroke-width="2"></line>
+<path d="M220 244 L228 239 L228 249 Z" fill="#8a8a91"></path>
+
+
+<rect x="230" y="204" width="156" height="80" rx="12" fill="#ececec" stroke="#c4c4bd" stroke-width="1.5"></rect>
+<text class="muted mono" x="308" y="228" font-size="10" fill="#6c6c73" text-anchor="middle" letter-spacing="0.5px">ONE SEAM</text>
+<text class="text" x="308" y="248" font-size="13.5" fill="#1c1c22" font-weight="600" text-anchor="middle">OTel GenAI semconv</text>
+<text class="mono" x="308" y="266" font-size="11" fill="#4a4a52" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">gen_ai.* attributes</text>
+
+
+<line x1="386" y1="244" x2="416" y2="244" stroke="#8a8a91" stroke-width="2"></line>
+<path d="M416 244 L424 239 L424 249 Z" fill="#8a8a91"></path>
+<line x1="424" y1="244" x2="424" y2="163" stroke="#c4c4bd" stroke-width="1.5"></line>
+<line x1="424" y1="244" x2="424" y2="325" stroke="#c4c4bd" stroke-width="1.5"></line>
+<line x1="424" y1="163" x2="440" y2="163" stroke="#c4c4bd" stroke-width="1.5"></line>
+<line x1="424" y1="244" x2="440" y2="244" stroke="#c4c4bd" stroke-width="1.5"></line>
+<line x1="424" y1="325" x2="440" y2="325" stroke="#c4c4bd" stroke-width="1.5"></line>
+
+
+<rect class="bg-blue bd-blue" x="446" y="140" width="274" height="46" rx="10" fill="#eaf1fb" stroke="#c4d8f4" stroke-width="1"></rect>
+<rect x="447.3" y="141.3" width="271.5" height="43.5" rx="8.8" fill="none" stroke="#2c66c4" stroke-width="2.5" clip-path="url(#abar1)"></rect>
+<text class="text" x="462" y="160" font-size="13" fill="#1c1c22" font-weight="600">Metrics</text>
+<text class="t-blue mono" x="704" y="160" font-size="10.5" fill="#2c66c4" text-anchor="end">→ Mimir</text>
+<text class="muted" x="462" y="177" font-size="11" fill="#5a6b83">token usage · operation latency · dispositions</text>
+
+
+<rect class="bg-amber bd-amber" x="446" y="221" width="274" height="46" rx="10" fill="#f9f0da" stroke="#e8d4a0" stroke-width="1"></rect>
+<rect x="447.3" y="222.3" width="271.5" height="43.5" rx="8.8" fill="none" stroke="#b0790f" stroke-width="2.5" clip-path="url(#abar2)"></rect>
+<text class="text" x="462" y="241" font-size="13" fill="#1c1c22" font-weight="600">Traces</text>
+<text class="t-amber mono" x="704" y="241" font-size="10.5" fill="#9a6a0a" text-anchor="end">→ Tempo</text>
+<text class="t-amber mono" x="462" y="258" font-size="10.5" fill="#8a6410" font-family="ui-monospace,Menlo,Consolas,monospace">invoke_agent → chat → execute_tool</text>
+
+
+<rect class="bg-green bd-green" x="446" y="302" width="274" height="52" rx="10" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<rect x="447.3" y="303.3" width="271.5" height="49.5" rx="8.8" fill="none" stroke="#1f8a5b" stroke-width="2.5" clip-path="url(#abar3)"></rect>
+<text class="text" x="462" y="321" font-size="13" fill="#1c1c22" font-weight="600">Eval <tspan font-size="11" font-weight="400" fill="#4f7a63">· the novel one</tspan></text>
+<text class="t-green mono" x="704" y="321" font-size="10.5" fill="#1f8a5b" text-anchor="end">→ counter</text>
+<rect x="462" y="330" width="52" height="17" rx="5" fill="#d6ecdd"></rect>
+<text class="t-green mono" x="488" y="342" font-size="9.5" fill="#1c7a4f" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">Accept</text>
+<rect x="520" y="330" width="56" height="17" rx="5" fill="#d6ecdd"></rect>
+<text class="t-green mono" x="548" y="342" font-size="9.5" fill="#1c7a4f" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">Correct</text>
+<rect x="582" y="330" width="56" height="17" rx="5" fill="#d6ecdd"></rect>
+<text class="t-green mono" x="610" y="342" font-size="9.5" fill="#1c7a4f" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">Dismiss</text>
+
+
+<text class="dim mono" x="270" y="384" font-size="10" fill="#9a9aa1">└ derived</text>
+<text class="text" x="330" y="384" font-size="12" fill="#33333a"><tspan font-weight="500" fill="#1c1c22">Cost</tspan> = tokens × model price  <tspan fill="#b5b5ad">·</tspan>  <tspan font-weight="500" fill="#1c1c22">Eval</tspan> answers: is the agent any good?</text>
+
+
+<rect x="40" y="410" width="680" height="58" rx="11" fill="#e2eff2" stroke="#b8dbe4" stroke-width="1"></rect>
+<rect x="41.3" y="411.3" width="677.5" height="55.5" rx="9.8" fill="none" stroke="#1f8fb0" stroke-width="2.5" clip-path="url(#abar4)"></rect>
+<rect x="58" y="428" width="118" height="20" rx="6" fill="#d2e9ef" stroke="#b8dbe4" stroke-width="1"></rect>
+<text class="mono" x="117" y="442" font-size="9.5" fill="#0f6f8e" text-anchor="middle" letter-spacing="0.4px" font-family="ui-monospace,Menlo,Consolas,monospace">SAME MACHINE</text>
+<text class="text" x="192" y="435" font-size="13" fill="#1c3a44">The same four-signal machine — <tspan class="mono" fill="#0f6f8e" font-family="ui-monospace,Menlo,Consolas,monospace">Mimir · Tempo · Grafana</tspan> — pointed at a new kind of</text>
+<text class="muted" x="192" y="453" font-size="13" fill="#3a5560">workload. No new stack.</text>
+
+
+<rect x="40" y="482" width="680" height="52" rx="11" fill="#efefec" stroke="#d2d2cb" stroke-width="1" stroke-dasharray="5 3"></rect>
+<rect x="58" y="497" width="80" height="20" rx="6" fill="#e8e8e2" stroke="#d2d2cb" stroke-width="1" stroke-dasharray="4 2"></rect>
+<text class="dim mono" x="98" y="511" font-size="9.5" fill="#8a8a91" text-anchor="middle" letter-spacing="0.4px">DEFERRED</text>
+<text class="muted" x="154" y="505" font-size="12.5" fill="#5f5f66">Content capture + a dedicated LLM lens (Langfuse). <tspan fill="#1f8a5b">Live today:</tspan> real token counts, spans, and</text>
+<text class="muted" x="154" y="523" font-size="12.5" fill="#5f5f66">verdict counters.</text>
+
+
+<text class="muted" x="40" y="572" font-size="13.5" fill="#6c6c73">The observers get observed — <tspan class="text" fill="#1c1c22" font-weight="500">audit, cost, and an eval signal</tspan> from the same seam.</text>
+</svg>

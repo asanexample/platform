@@ -288,6 +288,8 @@ attributes) into Tempo; and a durable **eval** signal — the human's Accept/Cor
 — real token counts flow today; content-capture and a dedicated LLM lens (Langfuse) are deliberately deferred.
 It's the same four-signal machine, pointed at a new kind of workload.
 
+![Agent observability fan-out: one OTel GenAI-semconv seam on an AI agent fans out to three consumers — token/latency metrics into Mimir (with derived cost), invoke_agent→chat→execute_tool traces into Tempo, and a durable Accept/Correct/Dismiss human-verdict eval counter. The same four-signal machine, pointed at a new workload; content-capture and Langfuse deferred.](images/agent-observability-fanout.svg)
+
 ---
 
 ## The honest status — what's live, and where the edges are
