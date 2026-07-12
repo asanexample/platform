@@ -7,6 +7,14 @@
 # AND products must be readable (bit the v2 rebuild's first environment sync; the missing `products` grant was a v3
 # cutover gap surfaced by the .kyverno-tests behavioral suite).
 #
+# servicegrants (ADR-101): restrict-environment-dependencies' ktp.serviceGrantsContext fetches ServiceGrant
+# objects the same way. Missing this grant does NOT silently resolve like teams/products above — the apiCall
+# error instead breaks JMESPath variable substitution in the deny condition, which Kyverno surfaces as a hard
+# ComparisonError on the whole XEnvironment resource (confirmed live: this blocked ArgoCD's `environments` app
+# from syncing AT ALL the moment the first real spec.dependencies entry — alpha-shop-dev's — landed, not just a
+# silently-wrong policy decision). Same aggregated ClusterRoles fix it, so it's added here rather than as a
+# separate object.
+#
 # Kyverno aggregates ClusterRoles by label: aggregate-to-admission-controller (webhook-time apiCalls) and
 # aggregate-to-reports-controller (background: true re-evaluation). Ships with this chart so the grant exists
 # wherever the envelope policy exists.
@@ -20,5 +28,5 @@ metadata:
     {{- include "ktp.labels" . | nindent 4 }}
 rules:
   - apiGroups: ["platform.refplat.org"]
-    resources: ["teams", "products"]
+    resources: ["teams", "products", "servicegrants"]
     verbs: ["get", "list", "watch"]
