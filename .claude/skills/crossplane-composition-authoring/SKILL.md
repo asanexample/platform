@@ -78,6 +78,18 @@ ResourceQuota (ADR-062 reversible suspend).
 > module). And **#647**: the `DeveloperAccess-<team>` IAM role + EKS access entry are
 > NOT yet emitted — only the in-cluster `<ns>:developers` RoleBinding is.
 
+**⚠️ The emitted egress allow does NOT cover cross-namespace in-cluster traffic.** On Cilium (BYOCNI),
+pod-to-pod traffic is **identity-matched**, not CIDR-matched — the `allow-dns` / broad egress the Composition
+emits is scoped to AWS/internet (a `0.0.0.0/0` `ipBlock` egress). A service consuming ANOTHER namespace's
+Service in-cluster (a different Product, or a platform service like flagship) needs an **explicit,
+identity-matched `CiliumNetworkPolicy` on BOTH sides** that the Composition does not and cannot author (it
+doesn't know the callee): an egress CNP on the caller (`toEndpoints: {k8s:io.kubernetes.pod.namespace:
+<callee-ns>, <callee-selector>}`) **and** an ingress CNP on the callee admitting the caller's namespace — the
+callee's own `default-deny-ingress` only opens the gateway by default. **Symptom when one half is missing:
+total silence** — no error on either side's logs, the caller's client just times out or falls back to
+defaults (bit a demo app's flag-sync client this way). Debug by checking the netpols on both namespaces
+FIRST, not the app logs. See `docs/architecture/east-west-zero-trust.md` for the pattern in more depth.
+
 ## The status.domains state machine (ADR-061)
 
 The Composition writes the XR's own status to gate route admission. **Critical
