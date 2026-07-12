@@ -13,9 +13,12 @@
 #
 # Image: unlike the bootstrap wait-Job (registry.k8s.io/kubectl, deliberately shell-less — it only ever
 # invokes `kubectl wait` with static args), this sweep needs actual comparison logic (list, per-item date
-# check, conditional delete), which needs a real shell. bitnami/kubectl carries both kubectl and bash, so it's
-# the minimal image that can express this without a bespoke binary — pinned to the same kubectl minor as this
-# platform's clusters (v1.35.x, see .tool-versions) so `kubectl get/delete` speaks the same API version.
+# check, conditional delete), which needs a real shell. alpine/k8s:1.35.6 carries kubectl AND /bin/bash
+# (verified: `docker run --rm alpine/k8s:1.35.6 sh -c 'which bash; kubectl version --client'` — not assumed),
+# pinned to the exact kubectl patch version this platform's clusters run (v1.35.6, confirmed against a live
+# node) so `kubectl get/delete` speaks the same API version. (bitnami/kubectl was considered first but its
+# only currently-resolvable tag is the floating `latest` — its registry has been mid-migration to
+# attestation-only tag listings — so it was rejected as unpinnable.)
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -76,7 +79,7 @@ spec:
               emptyDir: {}
           containers:
             - name: sweep
-              image: {{ .Values.expirySweepImage | default "bitnami/kubectl:1.35" }}
+              image: {{ .Values.expirySweepImage | default "alpine/k8s:1.35.6" }}
               env: [{ name: HOME, value: /tmp }]
               volumeMounts: [{ name: home, mountPath: /tmp }]
               securityContext:
