@@ -1,0 +1,106 @@
+# ADR-101 D6: expiresAt is meaningless if nothing reads it. Neither the ServiceGrant Composition nor
+# restrict-environment-dependencies ever DELETES a ServiceGrant when its expiresAt passes — the Kyverno
+# check only stops a NEW/changed XEnvironment claim from depending on an expired grant; the two live CNPs an
+# already-admitted dependency created stay up. This CronJob is the piece that actually enforces the TTL: it
+# lists ServiceGrants past expiresAt and deletes them; Crossplane's ownership-based GC then removes both CNP
+# halves for free (no separate teardown logic needed — see the Composition's owner-reference wiring).
+#
+# Hourly (not daily): bounds the window an expired grant's network access can remain live-but-unenforced to
+# at most ~1h — document THIS number as the accepted staleness window, not an accident of a default schedule.
+#
+# RBAC is exactly list+delete on servicegrants — nothing else. This ServiceAccount cannot read/write any other
+# resource, cluster-scoped or namespaced.
+#
+# Image: unlike the bootstrap wait-Job (registry.k8s.io/kubectl, deliberately shell-less — it only ever
+# invokes `kubectl wait` with static args), this sweep needs actual comparison logic (list, per-item date
+# check, conditional delete), which needs a real shell. bitnami/kubectl carries both kubectl and bash, so it's
+# the minimal image that can express this without a bespoke binary — pinned to the same kubectl minor as this
+# platform's clusters (v1.35.x, see .tool-versions) so `kubectl get/delete` speaks the same API version.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: service-grant-expiry-sweep
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: service-grant-expiry-sweep
+rules:
+  - apiGroups: ["platform.refplat.org"]
+    resources: ["servicegrants"]
+    verbs: ["list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: service-grant-expiry-sweep
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: service-grant-expiry-sweep
+subjects:
+  - kind: ServiceAccount
+    name: service-grant-expiry-sweep
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: service-grant-expiry-sweep
+  namespace: {{ .Release.Namespace }}
+spec:
+  schedule: {{ .Values.expirySweepSchedule | default "0 * * * *" | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 180
+      template:
+        metadata:
+          annotations:
+            sidecar.istio.io/inject: "false"
+        spec:
+          serviceAccountName: service-grant-expiry-sweep
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            seccompProfile:
+              type: RuntimeDefault
+          volumes:
+            - name: home
+              emptyDir: {}
+          containers:
+            - name: sweep
+              image: {{ .Values.expirySweepImage | default "bitnami/kubectl:1.35" }}
+              env: [{ name: HOME, value: /tmp }]
+              volumeMounts: [{ name: home, mountPath: /tmp }]
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: ["ALL"] }
+              resources:
+                requests: { cpu: 25m, memory: 64Mi }
+                limits: { cpu: 100m, memory: 128Mi }
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                  echo "expiry sweep: now=${now}"
+                  deleted=0
+                  # go-template output avoids needing jq (not guaranteed present); tab-delimited name+expiresAt,
+                  # one line per ServiceGrant, empty second field when expiresAt is unset (never swept).
+                  while IFS=$'\t' read -r name expires; do
+                    [ -n "${expires}" ] || continue
+                    if [[ "${expires}" < "${now}" ]]; then
+                      echo "deleting expired ServiceGrant ${name} (expiresAt=${expires})"
+                      kubectl delete servicegrants.platform.refplat.org "${name}"
+                      deleted=$((deleted + 1))
+                    fi
+                  done < <(kubectl get servicegrants.platform.refplat.org -o go-template='{{ range .items }}{{ .metadata.name }}{{ "\t" }}{{ if .spec.expiresAt }}{{ .spec.expiresAt }}{{ end }}{{ "\n" }}{{ end }}')
+                  echo "expiry sweep complete: ${deleted} deleted"
