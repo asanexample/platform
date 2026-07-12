@@ -167,3 +167,23 @@ Things the design didn't anticipate, learned applying it live (module `infra/mod
   (destroy-then-create; the module's `create_before_destroy` is only on the launch template + the group name is
   fixed) → a ~3-min hub blip, during which the in-cluster Tailscale subnet router is evicted so the private EKS
   API is briefly unreachable. Plan such changes as a deliberate, monitored step.
+
+## Implementation notes (as-built, Phase 2 — proven on a real tenant Product)
+
+The 2026-07-08 proof (#1240) drove the golden-path HPA on the synthetic **New Product skeleton**. On
+2026-07-11 the same Phase 2 mechanics were proven on a **real tenant Product** for the first time — alpha-shop's
+storefront — alongside its ADR-056 metric-gated canary running in the same overlay. That combination surfaced
+a real gap this ADR's Phase 1/2 proofs hadn't hit:
+
+- **The per-Product ArgoCD AppProject `namespaceResourceWhitelist` was missing `HorizontalPodAutoscaler`**
+  (`infra/modules/argocd-apps/delivery.tf`). D6 has the golden path emit an `autoscaling/v2` HPA by construction,
+  but the AppProject — a separate authorization gate from anything in this ADR or Kyverno — never listed the
+  `autoscaling` API group. ArgoCD rejected the HPA outright ("resource not permitted in project"), and because
+  an ArgoCD sync is **atomic**, that single rejection failed the *entire* overlay's sync — including the
+  unrelated canary rollout committed in the same change. Fixed by adding `{ group = "autoscaling", kind =
+  "HorizontalPodAutoscaler" }` to the whitelist (#1342). Any tenant Product's HPA was silently inert until this
+  landed; check `namespaceResourceWhitelist` first if a scaffolded HPA "exists" in git but never syncs.
+- With that fixed, a k6 load driver reproduced the same 2026-07-08 loop on the tenant service: CPU
+  4%→166% drove the storefront's HPA 2→6 replicas (capped at `maxReplicas`); Karpenter needed no new node this
+  time (the small per-pod requests fit the existing capacity) — a reminder that "HPA scaled" and "Karpenter
+  added a node" are two separate, independently-verifiable claims, and a given load test may only exercise one.
