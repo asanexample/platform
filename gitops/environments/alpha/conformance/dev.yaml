@@ -1,3 +1,12 @@
+# DECOMMISSIONING (2026-07-12): superseded by bravo-dispatch (asanexample/bravo-dispatch) — that product now
+# exercises all 4 self-service engines (s3/sqs/sns/dynamodb) with real narrative purpose across its services,
+# so this bare conformance stub (all 4 engines on one no-op `web` service, referenced only in docs as the
+# "opted into every engine" example) is redundant. Reversible: the Composition zeroes the ResourceQuota only;
+# namespace/IAM/ECR/policies are retained. Hard-delete follows in a separate PR after the gitops Gate's
+# decommission-first requirement is satisfied (docs/runbooks/environment-deprovisioning.md). Doc references to
+# repoint: docs/runbooks/backstage-github-app.md, docs/architecture/kyverno-policy-catalog.md,
+# docs/learn/observability/deep-dive-collection-and-instrumentation.md,
+# .claude/skills/argocd-app-delivery/SKILL.md, docs/architecture/crossplane-environment-api.md.
 apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata:
@@ -9,6 +18,8 @@ spec:
   product: conformance
   stage: dev
   tier: standard
+  lifecycle:
+    phase: decommissioning
   services:
     web:
       serviceAccount: app-alpha
