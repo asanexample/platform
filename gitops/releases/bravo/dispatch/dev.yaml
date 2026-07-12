@@ -5,5 +5,7 @@ metadata:
 spec:
   environmentRef: bravo-dispatch-dev
   services:
+    shipments:
+      digest: sha256:06fda15973db299d0f183b4994d3a4c59e2439d6cf30a4aad5b544960708af8d
     tracker:
       digest: sha256:1ce274493ec1208516a62fc153c06a731083451fe713a681dd011ba2e11020e7
