@@ -149,6 +149,10 @@ you need may have been dropped or aged out. Audit needs a complete, durable path
 
 ADR-076's build order shipped as three slices, all live.
 
+![The live Triage Agent (ADR-076) Grafana dashboard — token rate by type, operation latency p50/p95, tool calls, and disposition mix, from real triages over a week.](images/screenshot-agent-triage.png)
+
+*The real **Triage Agent (ADR-076)** dashboard: token rate, operation latency (p50/p95 ≈ 2.5s/7.7s), tool calls, and disposition mix from actual triages. The eval/calibration panels below (not shown) stay empty until a human renders the first Accept/Correct/Dismiss verdict — the cold-start state described later.*
+
 **Slice 1 — the meter + the "Triage Agent (ADR-076)" dashboard.** Before this there was no agent meter at
 all. Slice 1 added the token/latency/disposition/tool counters and the Grafana dashboard
 (`agent-triage.json`, uid `agent-triage`) that renders them (see the go-deeper links for the source). Real

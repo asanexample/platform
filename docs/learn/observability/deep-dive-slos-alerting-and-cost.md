@@ -19,6 +19,10 @@ An **SLO** (Service Level Objective) is three things bolted together:
   window. The budget is the whole point: it turns "be reliable" into a quantity you can spend, chart, and
   alert on.
 
+![Platform Services (APM / RED) dashboard under a load test — inbound request rate, 5xx ratio, and p95 latency per service, both teams' services side by side.](images/screenshot-platform-apm.png)
+
+*The raw RED those SLIs are computed from, live under a load test (2026-07-12): request rate, 5xx ratio, and p95 latency across every service by `job` — both teams side by side, `alpha-shop/shop-*` and `bravo-dispatch/dispatch-*` (33.8 req/s aggregate, p95 328ms, 0 errors).*
+
 ### Why burn-rate, not a threshold
 
 A threshold alert is a smoke detector that shrieks at burnt toast; a burn-rate alert is a fuel gauge with a
