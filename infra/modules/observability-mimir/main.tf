@@ -100,6 +100,23 @@ locals {
           # Store exemplars (default 0 = off) so span-metric/RED samples keep their trace_id — the APM
           # metric→trace link (P6).
           max_global_exemplars_per_user = var.max_global_exemplars_per_user
+
+          # OTLP → Prometheus naming (P10/P14 spoke): tenant app-SDK metrics arrive via the distributor's OTLP
+          # ingest, which by DEFAULT keeps raw OTLP names (no unit suffix) and only synthesises job/instance from
+          # service.*. That makes them incompatible with the platform's Prometheus-convention dashboards + the
+          # ADR-056 canary AnalysisTemplates (which query `http_server_request_duration_seconds_count` filtered by
+          # `k8s_namespace_name`/`service_name`, the shape Beyla + remote-write produce). Translate on ingest so
+          # OTLP metrics are indistinguishable from the rest — one PromQL works regardless of delivery path:
+          #  - suffixes: http_server_request_duration -> http_server_request_duration_seconds (+ _total on counters)
+          #  - keep identifying attrs: service.name/namespace/instance.id -> service_name / service_namespace / service_instance_id
+          #  - promote k8s.* resource attrs -> k8s_namespace_name / k8s_pod_name / k8s_deployment_name / k8s_node_name
+          # Only affects OTLP-ingested series (Beyla/kube-state via remote_write are untouched); the extra labels
+          # stay within max_label_names_per_series (already raised for Beyla).
+          otel_metric_suffixes_enabled              = true
+          otel_keep_identifying_resource_attributes = true
+          otel_promote_resource_attributes = [
+            "k8s.namespace.name", "k8s.pod.name", "k8s.deployment.name", "k8s.node.name", "k8s.container.name",
+          ]
         }
       }
     }
