@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 706" width="760" height="706" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#f2eafb"]{fill:#321751}[stroke="#f2eafb"]{stroke:#321751}[fill="#d9c4f0"]{fill:#3f1d64}[stroke="#d9c4f0"]{stroke:#3f1d64}[fill="#8a4fc4"]{fill:#b892dd}[stroke="#8a4fc4"]{stroke:#b892dd}[fill="#7a52a0"]{fill:#a889c5}[stroke="#7a52a0"]{stroke:#a889c5}[fill="#3a2f47"]{fill:#8a74a5}[stroke="#3a2f47"]{stroke:#8a74a5}[fill="#7a3fb0"]{fill:#a779d2}[stroke="#7a3fb0"]{stroke:#a779d2}[fill="#c4c4bd"]{fill:#373731}[stroke="#c4c4bd"]{stroke:#373731}[fill="#f9f0da"]{fill:#584619}[stroke="#f9f0da"]{stroke:#584619}[fill="#e8d4a0"]{fill:#e5cc8a}[stroke="#e8d4a0"]{stroke:#e5cc8a}[fill="#b0790f"]{fill:#f2ad29}[stroke="#b0790f"]{stroke:#f2ad29}[fill="#9a6a0a"]{fill:#f6b022}[stroke="#9a6a0a"]{stroke:#f6b022}[fill="#8a6410"]{fill:#ecb02d}[stroke="#8a6410"]{stroke:#ecb02d}[fill="#4a3c1c"]{fill:#c3a256}[stroke="#4a3c1c"]{stroke:#c3a256}[fill="#f3e6c4"]{fill:#634f1d}[stroke="#f3e6c4"]{stroke:#634f1d}[fill="#e0cd9c"]{fill:#dfc990}[stroke="#e0cd9c"]{stroke:#dfc990}[fill="#8a5c0a"]{fill:#f4aa24}[stroke="#8a5c0a"]{stroke:#f4aa24}[fill="#7a6a3f"]{fill:#b39e66}[stroke="#7a6a3f"]{stroke:#b39e66}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#bfe0cc"]{fill:#2d5e41}[stroke="#bfe0cc"]{stroke:#2d5e41}[fill="#1f8a5b"]{fill:#40d996}[stroke="#1f8a5b"]{stroke:#40d996}[fill="#2c7a56"]{fill:#54c591}[stroke="#2c7a56"]{stroke:#54c591}[fill="#25402f"]{fill:#6cac84}[stroke="#25402f"]{stroke:#6cac84}[fill="#123"]{fill:#508cc8}[stroke="#123"]{stroke:#508cc8}[fill="#d6ecdd"]{fill:#275335}[stroke="#d6ecdd"]{stroke:#275335}[fill="#1c7a4f"]{fill:#41d893}[stroke="#1c7a4f"]{stroke:#41d893}[fill="#4f7a63"]{fill:#7aab91}[stroke="#4f7a63"]{stroke:#7aab91}[fill="#9a9aa1"]{fill:#888890}[stroke="#9a9aa1"]{stroke:#888890}[fill="#d9d9d2"]{fill:#2c2c27}[stroke="#d9d9d2"]{stroke:#2c2c27}[fill="#efefe9"]{fill:#20201c}[stroke="#efefe9"]{stroke:#20201c}[fill="#dcdcd5"]{fill:#2a2a25}[stroke="#dcdcd5"]{stroke:#2a2a25}[fill="#c0392b"]{fill:#e07266}[stroke="#c0392b"]{stroke:#e07266}[fill="#b83a2c"]{fill:#dd6f63}[stroke="#b83a2c"]{stroke:#dd6f63}[fill="#5f5f66"]{fill:#8c8c94}[stroke="#5f5f66"]{stroke:#8c8c94}}</style>
+<rect class="bg" x="0" y="0" width="760" height="706" fill="#f6f6f3"></rect>
+
+
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.9px">OBSERVABILITY · COLLECTION · ADR-077</text>
+<text class="text" x="40" y="90" font-size="27" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">Climb only as far as you need.</text>
+<text class="muted" x="40" y="118" font-size="14.5" fill="#6c6c73">Instrumentation is a ladder, not a switch. Every workload stands on the free eBPF floor with zero</text>
+<text class="muted" x="40" y="137" font-size="14.5" fill="#6c6c73">code. Add an annotation to climb to code-level depth — and AI agents get a rung of their own. You</text>
+<text class="muted" x="40" y="156" font-size="14.5" fill="#6c6c73">opt <tspan class="text" fill="#1c1c22" font-style="italic">up</tspan>, never in.</text>
+
+
+<rect class="bg-violet bd-violet" x="136" y="182" width="584" height="82" rx="12" fill="#f2eafb" stroke="#d9c4f0" stroke-width="1"></rect>
+<rect class="ac-violet" x="140" y="192" width="4" height="62" rx="2" fill="#8a4fc4"></rect>
+<text class="t-violet mono" x="158" y="208" font-size="10" fill="#8a4fc4" letter-spacing="0.6px">LAYER 2</text>
+<text class="text" x="158" y="230" font-size="16" fill="#1c1c22" font-weight="600">Agents</text>
+<text class="t-violet mono" x="158" y="248" font-size="10.5" fill="#7a52a0">its own section</text>
+<text class="text" x="286" y="208" font-size="13" fill="#3a2f47">AI agents observed with GenAI semantic conventions — token</text>
+<text x="286" y="227" font-size="13" fill="#3a2f47">usage, <tspan class="t-violet mono" fill="#7a3fb0" font-family="ui-monospace,Menlo,Consolas,monospace">invoke_agent → chat → execute_tool</tspan> spans, plus a</text>
+<text class="text" x="286" y="246" font-size="13" fill="#3a2f47">human-verdict eval signal. The same machine, a new workload.</text>
+
+
+<rect class="rail" x="177" y="264" width="2" height="20" fill="#c4c4bd"></rect>
+
+
+<rect class="bg-amber bd-amber" x="88" y="286" width="632" height="112" rx="12" fill="#f9f0da" stroke="#e8d4a0" stroke-width="1"></rect>
+<rect class="ac-amber" x="92" y="296" width="4" height="92" rx="2" fill="#b0790f"></rect>
+<text class="t-amber mono" x="110" y="312" font-size="10" fill="#9a6a0a" letter-spacing="0.6px">LAYER 1 · opt-in</text>
+<text class="text" x="110" y="334" font-size="16" fill="#1c1c22" font-weight="600">OTel SDK</text>
+<text class="t-amber mono" x="110" y="352" font-size="10.5" fill="#8a6410">the golden path</text>
+<text class="text" x="248" y="312" font-size="13" fill="#4a3c1c">Want code-level spans, custom attributes, app-defined RED? Add one</text>
+<text class="text" x="248" y="330" font-size="13" fill="#4a3c1c">annotation — the OTel Operator injects the SDK + the OTLP endpoint at</text>
+<text class="text" x="248" y="348" font-size="13" fill="#4a3c1c">admission. No rebuild; you never hardcode where telemetry goes.</text>
+<rect class="chip-amber" x="110" y="364" width="322" height="22" rx="6" fill="#f3e6c4" stroke="#e0cd9c" stroke-width="1"></rect>
+<text class="t-amber mono" x="122" y="379" font-size="11.5" fill="#8a5c0a">instrumentation.opentelemetry.io/inject-&lt;lang&gt;</text>
+<text class="muted" x="446" y="379" font-size="12" fill="#7a6a3f">＋ trace-stamped logs → the log↔trace jump</text>
+
+
+<rect class="rail" x="177" y="398" width="2" height="20" fill="#c4c4bd"></rect>
+
+
+<rect class="bg-green bd-green" x="40" y="420" width="680" height="106" rx="12" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<rect class="ac-green" x="44" y="430" width="4" height="86" rx="2" fill="#1f8a5b"></rect>
+<text class="t-green mono" x="62" y="446" font-size="10" fill="#1f8a5b" letter-spacing="0.6px">LAYER 0 · the floor</text>
+<text class="text" x="62" y="468" font-size="16" fill="#1c1c22" font-weight="600">Beyla · eBPF</text>
+<text class="t-green mono" x="62" y="486" font-size="10.5" fill="#2c7a56">free · automatic</text>
+<text class="text" x="200" y="446" font-size="13" fill="#25402f">RED metrics + traces + a service graph for <tspan font-style="italic" fill="#123">everything</tspan> — any</text>
+<text class="text" x="200" y="464" font-size="13" fill="#25402f">language, existing or future, zero code, zero redeploy. Live across</text>
+<text class="text" x="200" y="482" font-size="13" fill="#25402f">both clusters. Every workload starts here, for free.</text>
+<rect class="chip-green" x="200" y="496" width="118" height="22" rx="6" fill="#d6ecdd" stroke="#bfe0cc" stroke-width="1"></rect>
+<text class="t-green mono" x="212" y="511" font-size="11.5" fill="#1c7a4f">nothing to add</text>
+<text class="muted" x="332" y="511" font-size="12" fill="#4f7a63">runs in the kernel — most workloads never leave this rung</text>
+
+
+<text class="dim mono" x="42" y="547" font-size="10" fill="#9a9aa1">FLOOR · all workloads</text>
+<line class="softln" x1="180" y1="543" x2="600" y2="543" stroke="#d9d9d2" stroke-width="1" stroke-dasharray="3 3"></line>
+<text class="dim mono" x="718" y="547" font-size="10" fill="#9a9aa1" text-anchor="end">fewer, deeper ↑</text>
+
+
+<rect class="panel panel-bd" x="40" y="566" width="680" height="72" rx="12" fill="#efefe9" stroke="#dcdcd5" stroke-width="1"></rect>
+<text class="mono" x="58" y="596" font-size="11" fill="#1f8a5b">Beyla <tspan fill="#c0392b">✕</tspan> <tspan fill="#9a6a0a">SDK</tspan></text>
+<text class="t-rose mono" x="58" y="614" font-size="10" fill="#b83a2c" letter-spacing="0.5px">NEVER BOTH</text>
+<line class="divln" x1="164" y1="578" x2="164" y2="626" stroke="#dcdcd5" stroke-width="1"></line>
+<text class="text" x="182" y="592" font-size="12.5" fill="#1c1c22"><tspan font-weight="600">One or the other per service.</tspan> Beyla&#39;s eBPF context-propagation would overwrite the SDK&#39;s</text>
+<text class="muted" x="182" y="610" font-size="12.5" fill="#5f5f66">trace IDs and fragment the trace — so a service on the SDK is auto-excluded from Beyla. Climbing</text>
+<text class="muted" x="182" y="628" font-size="12.5" fill="#5f5f66">to Layer 1 <tspan class="text" fill="#1c1c22" font-style="italic">replaces</tspan> the floor for that service; it doesn&#39;t stack.</text>
+
+
+<text class="muted" x="40" y="668" font-size="14" fill="#6c6c73">The point of a ladder is that the first rung costs nothing and covers <tspan class="text" fill="#1c1c22" font-style="italic">everyone</tspan>. Most workloads ride the</text>
+<text class="muted" x="40" y="688" font-size="14" fill="#6c6c73">Beyla baseline for free; Layer 1 is one annotation away the day a team wants code-level depth.</text>
+</svg>

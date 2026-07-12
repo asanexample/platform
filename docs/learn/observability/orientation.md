@@ -71,6 +71,8 @@ moment and being able to walk between them (the correlation section). This platf
 one store per signal, all self-hosted: **L**oki (logs), **G**rafana (the view), **T**empo (traces),
 **M**imir (metrics), **+ P**yroscope (profiles).
 
+![The four observability signals — metrics, logs, traces, profiles — each answering a different question and landing in its own store (Mimir, Loki, Tempo, Pyroscope), all under one Grafana: the LGTM+P stack.](images/four-signals.svg)
+
 ---
 
 ## Collection — watched from below, for free
@@ -94,6 +96,8 @@ zero manifest change, zero redeploy.
 
 That gives an **instrumentation ladder** you climb only as far as you need
 ([ADR-077](../../adrs/077-application-instrumentation-strategy.md)):
+
+![The instrumentation ladder: Layer 0, Beyla eBPF, is the free automatic floor for every workload; Layer 1, the opt-in OpenTelemetry SDK, adds code-level depth; Layer 2 is agent observability — run one or the other on a service, never both.](images/instrumentation-ladder.svg)
 
 - **Layer 0 — Beyla (eBPF), free and automatic.** RED metrics + traces + service graph for everything, live
   across both clusters, no app change. This is the floor every workload stands on.
@@ -145,6 +149,8 @@ no tenant header and no credential, and it *cannot* spoof another tenant or read
 spoke is live for metrics, logs, and traces (plus profiles), and the real preprod apps
 (`acme-shop`, `acme-checkout`, `globex-widgets`, …) are auto-instrumented and observable on the hub.
 
+![Hub-and-spoke topology: the platform hub runs the collectors, the LGTM+P stores on S3, and the one Grafana; a lightweight preprod spoke ships its signals in over a write-only, tenant-force-stamped Transit Gateway route it can't read back through.](images/hub-and-spoke.svg)
+
 ---
 
 ## Tenancy — how one stack safely holds every team
@@ -152,6 +158,8 @@ spoke is live for metrics, logs, and traces (plus profiles), and the real prepro
 One Grafana, one set of stores, many teams — so the interesting question is *why can't `globex` read `acme`'s
 metrics?* This is the most sophisticated part of the system, and it's a layered answer, because the obvious
 mechanism isn't the real boundary.
+
+![Per-team isolation, honest about hard vs soft: writes are physically split into per-team tenants by cortex-tenant (real); reads are scoped by Grafana folder permissions and per-tenant datasources (organizational, not a data-layer gate); the only true data-layer boundary is network default-deny. The fail-closed auth proxy was built, then retired (#1269).](images/isolation-model.svg)
 
 Every signal carries an **`X-Scope-OrgID`** header naming a *tenant*, and the stores run
 `multitenancy_enabled` — they deliver to whatever tenant the header names. But hold onto the security fact:
@@ -196,6 +204,8 @@ This is the *reason* to run four stores under one Grafana instead of four vendor
 symptom to its root cause without leaving the pane or re-typing a query. Here's the 3 a.m. incident from the
 top, walked all the way down — every arrow below is a click wired into the Grafana datasources, not a
 copy-paste:
+
+![The 3 a.m. correlation walk: a metric spike's exemplar opens the slow request's trace; the slow span jumps to that request's logs and to its CPU flame graph — four stores, each one click from the last.](images/correlation-walk.svg)
 
 1. **Metric → trace.** On `acme`'s workload-health dashboard, the `shop-web` p99 latency line jumps. The spike
    isn't just a number — it carries an **exemplar**, a clickable dot that Mimir stored alongside the
@@ -251,6 +261,8 @@ account doesn't.)* But Alertmanager only knows *severity*, not *ownership* — s
 ([ADR-084](../../adrs/084-platform-identity-directory-and-owner-resolution.md)) resolves the culprit's team
 from the git registries and routes the alert to *that team's* on-call, @-mentioning the commit author in
 Slack. The fire panel shows the zone; the dispatcher looks up whose apartment it is and calls *them*.
+
+![From signal to the right person: a burn-rate SLO fires, Alertmanager routes by severity only, and the triage agent resolves the owning team from the git registries to page that team's on-call and @-mention the commit author.](images/page-the-right-person.svg)
 
 **Cost as an observable signal.** Cost is just another signal here — attributed per team in near-real-time and
 reconciled against the *actual* AWS bill, so it's a metric you can dashboard, alert on, and even **enforce**:

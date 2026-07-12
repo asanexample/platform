@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 788" width="760" height="788" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#2c66c4"]{fill:#6b98e1}[stroke="#2c66c4"]{stroke:#6b98e1}[fill="#eaf1fb"]{fill:#172f51}[stroke="#eaf1fb"]{stroke:#172f51}[fill="#c4d8f4"]{fill:#1d3a62}[stroke="#c4d8f4"]{stroke:#1d3a62}[fill="#8a8a91"]{fill:#898990}[stroke="#8a8a91"]{stroke:#898990}[fill="#f9f0da"]{fill:#584619}[stroke="#f9f0da"]{stroke:#584619}[fill="#e8d4a0"]{fill:#e5cc8a}[stroke="#e8d4a0"]{stroke:#e5cc8a}[fill="#9a6a0a"]{fill:#f6b022}[stroke="#9a6a0a"]{stroke:#f6b022}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#bfe0cc"]{fill:#2d5e41}[stroke="#bfe0cc"]{stroke:#2d5e41}[fill="#1f8a5b"]{fill:#40d996}[stroke="#1f8a5b"]{stroke:#40d996}[fill="#f2eafb"]{fill:#321751}[stroke="#f2eafb"]{stroke:#321751}[fill="#d9c4f0"]{fill:#3f1d64}[stroke="#d9c4f0"]{stroke:#3f1d64}[fill="#8a4fc4"]{fill:#b892dd}[stroke="#8a4fc4"]{stroke:#b892dd}[fill="#6f86b0"]{fill:#a2b1cd}[stroke="#6f86b0"]{stroke:#a2b1cd}[fill="#3d6fc0"]{fill:#7fa2d9}[stroke="#3d6fc0"]{stroke:#7fa2d9}[fill="#243a5c"]{fill:#5881c1}[stroke="#243a5c"]{stroke:#5881c1}[fill="#123"]{fill:#508cc8}[stroke="#123"]{stroke:#508cc8}[fill="#5f5f66"]{fill:#8c8c94}[stroke="#5f5f66"]{stroke:#8c8c94}[fill="#9a9aa1"]{fill:#888890}[stroke="#9a9aa1"]{stroke:#888890}[fill="#b0790f"]{fill:#f2ad29}[stroke="#b0790f"]{stroke:#f2ad29}[fill="#b08a3a"]{fill:#d4b472}[stroke="#b08a3a"]{stroke:#d4b472}[fill="#8a6410"]{fill:#ecb02d}[stroke="#8a6410"]{stroke:#ecb02d}[fill="#4a3c1c"]{fill:#c3a256}[stroke="#4a3c1c"]{stroke:#c3a256}[fill="#7a6a3f"]{fill:#b39e66}[stroke="#7a6a3f"]{stroke:#b39e66}[fill="#c89b52"]{fill:#dec191}[stroke="#c89b52"]{stroke:#dec191}[fill="#d0654e"]{fill:#e39b8c}[stroke="#d0654e"]{stroke:#e39b8c}[fill="#b83a2c"]{fill:#dd6f63}[stroke="#b83a2c"]{stroke:#dd6f63}[fill="#2c9a68"]{fill:#51d197}[stroke="#2c9a68"]{stroke:#51d197}[fill="#9a5fc4"]{fill:#bd95da}[stroke="#9a5fc4"]{stroke:#bd95da}[fill="#4f9a75"]{fill:#83c2a3}[stroke="#4f9a75"]{stroke:#83c2a3}[fill="#2c7a56"]{fill:#54c591}[stroke="#2c7a56"]{stroke:#54c591}[fill="#25402f"]{fill:#6cac84}[stroke="#25402f"]{stroke:#6cac84}[fill="#a578c8"]{fill:#bc98d7}[stroke="#a578c8"]{stroke:#bc98d7}[fill="#7a52a0"]{fill:#a889c5}[stroke="#7a52a0"]{stroke:#a889c5}[fill="#3a2f47"]{fill:#8a74a5}[stroke="#3a2f47"]{stroke:#8a74a5}[fill="#efefe9"]{fill:#20201c}[stroke="#efefe9"]{stroke:#20201c}[fill="#dcdcd5"]{fill:#2a2a25}[stroke="#dcdcd5"]{stroke:#2a2a25}[fill="#e4f3f8"]{fill:#184554}[stroke="#e4f3f8"]{stroke:#184554}[fill="#bce0ec"]{fill:#1e5668}[stroke="#bce0ec"]{stroke:#1e5668}[fill="#0f7f9e"]{fill:#29c5f0}[stroke="#0f7f9e"]{stroke:#29c5f0}[fill="#33333a"]{fill:#dedee2}[stroke="#33333a"]{stroke:#dedee2}}</style>
+<rect class="bg" x="0" y="0" width="760" height="788" fill="#f6f6f3"></rect>
+
+
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.9px">OBSERVABILITY · CORRELATION · THE 3 A.M. WALK</text>
+<text class="text" x="40" y="90" font-size="27" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">Symptom to root cause, without re-typing.</text>
+<text class="muted" x="40" y="118" font-size="14.5" fill="#6c6c73">One Grafana over four stores means you <tspan class="text" fill="#1c1c22" font-style="italic">walk</tspan> the incident instead of re-querying it. <tspan class="mono" fill="#2c66c4" font-family="ui-monospace,Menlo,Consolas,monospace">shop-web</tspan></text>
+<text class="muted" x="40" y="137" font-size="14.5" fill="#6c6c73">is slow. Every arrow below is one click, wired into the datasources — never a copy-pasted query.</text>
+
+
+<rect class="bg-blue bd-blue" x="40" y="158" width="152" height="22" rx="6" fill="#eaf1fb" stroke="#c4d8f4" stroke-width="1"></rect>
+<text class="t-blue mono" x="52" y="173" font-size="11" fill="#2c66c4">metric · roughly where</text>
+<text class="arrow" x="200" y="173" font-size="12" fill="#8a8a91">→</text>
+<rect class="bg-amber bd-amber" x="216" y="158" width="118" height="22" rx="6" fill="#f9f0da" stroke="#e8d4a0" stroke-width="1"></rect>
+<text class="t-amber mono" x="228" y="173" font-size="11" fill="#9a6a0a">trace · which hop</text>
+<text class="arrow" x="342" y="173" font-size="12" fill="#8a8a91">→</text>
+<rect class="bg-green bd-green" x="358" y="158" width="82" height="22" rx="6" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<text class="t-green mono" x="370" y="173" font-size="11" fill="#1f8a5b">logs · what</text>
+<text class="arrow" x="448" y="173" font-size="12" fill="#8a8a91">→</text>
+<rect class="bg-violet bd-violet" x="464" y="158" width="118" height="22" rx="6" fill="#f2eafb" stroke="#d9c4f0" stroke-width="1"></rect>
+<text class="t-violet mono" x="476" y="173" font-size="11" fill="#8a4fc4">profile · which line</text>
+
+
+<rect class="bg-blue bd-blue" x="40" y="200" width="680" height="88" rx="12" fill="#eaf1fb" stroke="#c4d8f4" stroke-width="1"></rect>
+<rect class="ac-blue" x="44" y="210" width="4" height="68" rx="2" fill="#2c66c4"></rect>
+<text class="text" x="62" y="228" font-size="13" fill="#2c66c4" font-weight="600"><tspan class="mono" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#6f86b0">01</tspan>  <tspan fill="#1c1c22" font-size="16">Metric</tspan></text>
+<text class="t-blue mono" x="62" y="246" font-size="10.5" fill="#3d6fc0">Mimir · dashboard</text>
+<text class="text" x="188" y="224" font-size="13" fill="#243a5c">On <tspan class="mono" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2c66c4">acme</tspan>&#39;s health dashboard, the <tspan class="mono" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2c66c4">shop-web</tspan> p99 latency line jumps. The spike carries</text>
+<text class="text" x="188" y="242" font-size="13" fill="#243a5c">an <tspan font-style="italic" fill="#123">exemplar</tspan> — a clickable dot Mimir stored beside the point, remembering one real</text>
+<text class="text" x="188" y="260" font-size="13" fill="#243a5c">request&#39;s trace ID.</text>
+<text class="muted" x="188" y="279" font-size="12.5" fill="#5f5f66"><tspan fill="#8a8a91">learn:</tspan> <tspan font-style="italic" fill="#123">something&#39;s wrong, roughly where.</tspan></text>
+
+
+<line class="arrow" x1="80" y1="296" x2="80" y2="310" stroke="#3d6fc0" stroke-width="2"></line>
+<path class="arrow" d="M74 310 L86 310 L80 318 Z" fill="#3d6fc0"></path>
+<text class="t-blue mono" x="100" y="308" font-size="11" fill="#3d6fc0">click the exemplar dot</text>
+<text class="dim mono" x="256" y="308" font-size="10" fill="#9a9aa1">send_exemplars</text>
+
+
+<rect class="bg-amber bd-amber" x="40" y="326" width="680" height="112" rx="12" fill="#f9f0da" stroke="#e8d4a0" stroke-width="1"></rect>
+<rect class="ac-amber" x="44" y="336" width="4" height="92" rx="2" fill="#b0790f"></rect>
+<text class="text" x="62" y="354" font-size="13" fill="#9a6a0a" font-weight="600"><tspan class="mono" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#b08a3a">02</tspan>  <tspan fill="#1c1c22" font-size="16">Trace</tspan></text>
+<text class="t-amber mono" x="62" y="372" font-size="10.5" fill="#8a6410">Tempo · waterfall</text>
+<text class="text" x="188" y="350" font-size="13" fill="#4a3c1c">Grafana opens <tspan font-style="italic" fill="#123">that request&#39;s</tspan> trace — the waterfall across services.</text>
+
+<text class="mono" x="188" y="379" font-size="10.5" fill="#7a6a3f" font-family="ui-monospace,Menlo,Consolas,monospace">shop-web</text>
+<rect x="262" y="370" width="42" height="11" rx="3" fill="#c89b52"></rect>
+<text class="mono" x="312" y="379" font-size="10.5" fill="#6c6c73" font-family="ui-monospace,Menlo,Consolas,monospace">18ms · fine</text>
+<text class="mono" x="188" y="399" font-size="10.5" fill="#9a6a0a" font-family="ui-monospace,Menlo,Consolas,monospace">checkout</text>
+<rect x="262" y="390" width="210" height="11" rx="3" fill="#d0654e"></rect>
+<text class="mono" x="480" y="399" font-size="10.5" fill="#b83a2c" font-family="ui-monospace,Menlo,Consolas,monospace">880ms · slow</text>
+<text class="muted" x="188" y="422" font-size="12.5" fill="#5f5f66"><tspan fill="#8a8a91">learn:</tspan> not the front-end — the <tspan font-style="italic" fill="#123">downstream checkout hop.</tspan></text>
+
+
+<line class="arrow" x1="80" y1="446" x2="80" y2="460" stroke="#2c9a68" stroke-width="2"></line>
+<path class="arrow" d="M74 460 L86 460 L80 468 Z" fill="#2c9a68"></path>
+<text class="t-green mono" x="100" y="454" font-size="11" fill="#2c9a68">slow span → logs</text>
+<text class="dim mono" x="100" y="467" font-size="10" fill="#9a9aa1">tracesToLogsV2 · trace ID</text>
+<line class="arrow" x1="400" y1="446" x2="400" y2="460" stroke="#9a5fc4" stroke-width="2"></line>
+<path class="arrow" d="M394 460 L406 460 L400 468 Z" fill="#9a5fc4"></path>
+<text class="t-violet mono" x="420" y="454" font-size="11" fill="#9a5fc4">same span → profile</text>
+<text class="dim mono" x="420" y="467" font-size="10" fill="#9a9aa1">tracesToProfilesV2 · service.name</text>
+
+
+<rect class="bg-green bd-green" x="40" y="478" width="334" height="118" rx="12" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<rect class="ac-green" x="44" y="488" width="4" height="98" rx="2" fill="#1f8a5b"></rect>
+<text class="text" x="62" y="506" font-size="13" fill="#1f8a5b" font-weight="600"><tspan class="mono" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#4f9a75">03</tspan>  <tspan fill="#1c1c22" font-size="16">Logs</tspan></text>
+<text class="t-green mono" x="62" y="524" font-size="10.5" fill="#2c7a56">Loki · that request</text>
+<text class="text" x="62" y="548" font-size="12.5" fill="#25402f">The trace ID ties the lines together. You</text>
+<text class="text" x="62" y="565" font-size="12.5" fill="#25402f">read it: a <tspan font-style="italic" fill="#123">retry storm</tspan> against a connection</text>
+<text class="text" x="62" y="582" font-size="12.5" fill="#25402f">pool at its ceiling.</text>
+<text class="muted" x="200" y="524" font-size="12.5" fill="#5f5f66"><tspan fill="#8a8a91">learn:</tspan></text>
+<text class="text" x="200" y="524" font-size="12.5" fill="#123" font-style="italic"><tspan x="238">what went wrong.</tspan></text>
+
+
+<rect class="bg-violet bd-violet" x="386" y="478" width="334" height="118" rx="12" fill="#f2eafb" stroke="#d9c4f0" stroke-width="1"></rect>
+<rect class="ac-violet" x="390" y="488" width="4" height="98" rx="2" fill="#8a4fc4"></rect>
+<text class="text" x="408" y="506" font-size="13" fill="#8a4fc4" font-weight="600"><tspan class="mono" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#a578c8">04</tspan>  <tspan fill="#1c1c22" font-size="16">Profile</tspan></text>
+<text class="t-violet mono" x="408" y="524" font-size="10.5" fill="#7a52a0">Pyroscope · flame graph</text>
+<text class="text" x="408" y="548" font-size="12.5" fill="#3a2f47">Aligned <tspan class="mono" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#8a4fc4">service.name</tspan> lines the two up.</text>
+<text class="text" x="408" y="565" font-size="12.5" fill="#3a2f47">The flame graph shows <tspan font-style="italic" fill="#123">which function</tspan></text>
+<text class="text" x="408" y="582" font-size="12.5" fill="#3a2f47">burned CPU while the pool thrashed.</text>
+<text class="muted" x="546" y="524" font-size="12.5" fill="#5f5f66"><tspan fill="#8a8a91">learn:</tspan></text>
+<text class="text" x="584" y="524" font-size="12.5" fill="#123" font-style="italic">which line.</text>
+
+
+<rect class="panel panel-bd" x="40" y="612" width="680" height="66" rx="12" fill="#efefe9" stroke="#dcdcd5" stroke-width="1"></rect>
+<rect class="chip-cyan" x="58" y="628" width="132" height="22" rx="6" fill="#e4f3f8" stroke="#bce0ec" stroke-width="1"></rect>
+<text class="t-cyan mono" x="124" y="643" font-size="10" fill="#0f7f9e" text-anchor="middle" letter-spacing="0.5px">DEPLOY ANNOTATION</text>
+<text class="text" x="206" y="638" font-size="12.5" fill="#33333a">Rollouts overlay every graph — so <tspan font-style="italic" fill="#123">&#34;it got slow at 03:00&#34;</tspan> ties straight to <tspan font-style="italic" fill="#123">&#34;…because</tspan></text>
+<text class="muted" x="206" y="658" font-size="12.5" fill="#5f5f66"><tspan font-style="italic" fill="#123">of the 02:58 deploy&#34;</tspan> — the most common root cause, handed to you before you open a trace.</text>
+
+
+<text class="muted" x="40" y="708" font-size="14" fill="#6c6c73">The hyperlinks in a detective&#39;s case file: vitals blip → ECG strip → lab result → tissue sample. Four</text>
+<text class="muted" x="40" y="728" font-size="14" fill="#6c6c73">stores, each a single click from the last. This whole walk is live — <tspan class="text" fill="#1c1c22" font-weight="500">you didn&#39;t type a query after the</tspan></text>
+<text class="text" x="40" y="748" font-size="14" fill="#1c1c22" font-weight="500">first dashboard.</text>
+</svg>
