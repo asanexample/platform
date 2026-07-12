@@ -51,6 +51,8 @@ Jira for a lazy leak, without a human tuning thresholds.
 
 The platform generates these rules two ways, and they live on different tenants.
 
+![The two SLO delivery pipelines side by side — hand-authored PrometheusServiceLevel CRs through Sloth to a hub PrometheusRule consumed by humans, versus registry-derived per-app SLOs through a mimirtool CronJob to the Mimir ruler consumed by the canary freeze gate — both converging on the same multi-window burn-rate rules.](images/two-slo-pipelines.svg)
+
 |  | **Path A — Sloth** (platform services) | **Path B — auto-derived** (every prod app) |
 |--|--|--|
 | **Who authors it** | A human hand-writes a `PrometheusServiceLevel` CR (objective + two queries) | No one — `fileset`+`yamldecode` over `gitops/environments/**/prod.yaml` synthesizes it |

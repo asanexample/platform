@@ -261,6 +261,8 @@ follow-up, not yet in place.
 
 ## Honest status: the write-split is live; read isolation is soft (the hard proxy was retired)
 
+![Per-team isolation in three bands — a soft read plane (per-tenant datasources + Grafana folder permissions), a struck-through retired fail-closed read proxy (#1269), and a hard write plane where cortex-tenant splits namespaces into real alpha/bravo/platform tenants — all resting on a network default-deny, ClusterIP-only floor.](images/isolation-status.svg)
+
 Per-team isolation is the place to be careful, so here's the precise version — a trust artifact that
 over- or under-sells is worse than one with an honest gap.
 

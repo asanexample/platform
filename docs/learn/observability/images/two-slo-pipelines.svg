@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 734" width="760" height="734" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#eaf1fb"]{fill:#172f51}[stroke="#eaf1fb"]{stroke:#172f51}[fill="#c4d8f4"]{fill:#1d3a62}[stroke="#c4d8f4"]{stroke:#1d3a62}[fill="#2c66c4"]{fill:#6b98e1}[stroke="#2c66c4"]{stroke:#6b98e1}[fill="#3d6fc0"]{fill:#7fa2d9}[stroke="#3d6fc0"]{stroke:#7fa2d9}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#bfe0cc"]{fill:#2d5e41}[stroke="#bfe0cc"]{stroke:#2d5e41}[fill="#1f8a5b"]{fill:#40d996}[stroke="#1f8a5b"]{stroke:#40d996}[fill="#2c7a56"]{fill:#54c591}[stroke="#2c7a56"]{stroke:#54c591}[fill="#f3f7fd"]{fill:#162c4d}[stroke="#f3f7fd"]{stroke:#162c4d}[fill="#7a9fd0"]{fill:#94b3db}[stroke="#7a9fd0"]{stroke:#94b3db}[fill="#f0f8f3"]{fill:#21462f}[stroke="#f0f8f3"]{stroke:#21462f}[fill="#1c7a4f"]{fill:#41d893}[stroke="#1c7a4f"]{stroke:#41d893}[fill="#6fb08f"]{fill:#a2cdb7}[stroke="#6fb08f"]{stroke:#a2cdb7}[fill="#8a8a8f"]{fill:#8a8a8f}[stroke="#8a8a8f"]{stroke:#8a8a8f}[fill="#c8a44a"]{fill:#dfc88e}[stroke="#c8a44a"]{stroke:#dfc88e}[fill="#8a6410"]{fill:#ecb02d}[stroke="#8a6410"]{stroke:#ecb02d}[fill="#f9f0da"]{fill:#584619}[stroke="#f9f0da"]{stroke:#584619}[fill="#e8d4a0"]{fill:#e5cc8a}[stroke="#e8d4a0"]{stroke:#e5cc8a}[fill="#9a6a0a"]{fill:#f6b022}[stroke="#9a6a0a"]{stroke:#f6b022}[fill="#5a97ab"]{fill:#96becb}[stroke="#5a97ab"]{stroke:#96becb}[fill="#e2eff2"]{fill:#23464e}[stroke="#e2eff2"]{stroke:#23464e}[fill="#b8dbe4"]{fill:#275966}[stroke="#b8dbe4"]{stroke:#275966}[fill="#d2e9ef"]{fill:#204e5a}[stroke="#d2e9ef"]{stroke:#204e5a}[fill="#0f6f8e"]{fill:#2bbeee}[stroke="#0f6f8e"]{stroke:#2bbeee}[fill="#0a2831"]{fill:#3db7dc}[stroke="#0a2831"]{stroke:#3db7dc}[fill="#fae9e6"]{fill:#532118}[stroke="#fae9e6"]{stroke:#532118}[fill="#ecc3bc"]{fill:#68291e}[stroke="#ecc3bc"]{stroke:#68291e}[fill="#b83a2c"]{fill:#dd6f63}[stroke="#b83a2c"]{stroke:#dd6f63}[fill="#5f5f66"]{fill:#8c8c94}[stroke="#5f5f66"]{stroke:#8c8c94}[fill="#3a5560"]{fill:#6f99aa}[stroke="#3a5560"]{stroke:#6f99aa}[fill="#f0e0b8"]{fill:#68531e}[stroke="#f0e0b8"]{stroke:#68531e}[fill="#e0cd9c"]{fill:#dfc990}[stroke="#e0cd9c"]{stroke:#dfc990}[fill="#8a5c0a"]{fill:#f4aa24}[stroke="#8a5c0a"]{stroke:#f4aa24}}</style><defs><clipPath id="abar0"><rect x="39.0" y="161.0" width="336.0" height="11.0"/></clipPath><clipPath id="abar1"><rect x="385.0" y="161.0" width="336.0" height="11.0"/></clipPath></defs>
+<rect class="bg" x="0" y="0" width="760" height="734" fill="#f6f6f3"></rect>
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.8px">OBSERVABILITY · SLOs · TWO PIPELINES</text>
+<text class="text" x="40" y="89" font-size="26" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">Two generators, one shape.</text>
+<text class="muted" x="40" y="117" font-size="14.5" fill="#6c6c73">The platform runs SLOs two ways — hand-authored for platform services, auto-derived for every prod</text>
+<text class="muted" x="40" y="136" font-size="14.5" fill="#6c6c73">app. Different author, home, and consumer; identical burn-rate math.</text>
+<rect x="40" y="162" width="334" height="328" rx="12" fill="#eaf1fb" stroke="#c4d8f4" stroke-width="1"></rect>
+<rect x="41.3" y="163.3" width="331.5" height="325.5" rx="10.8" fill="none" stroke="#2c66c4" stroke-width="2.5" clip-path="url(#abar0)"></rect>
+<text class="text" x="56" y="188" font-size="14.5" fill="#1c1c22" font-weight="600">Platform services</text>
+<text class="mono" x="56" y="205" font-size="10.5" fill="#3d6fc0" font-family="ui-monospace,Menlo,Consolas,monospace">hand-authored</text>
+<line x1="56" y1="216" x2="358" y2="216" stroke="#c4d8f4" stroke-width="1"></line>
+<rect x="386" y="162" width="334" height="328" rx="12" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<rect x="387.3" y="163.3" width="331.5" height="325.5" rx="10.8" fill="none" stroke="#1f8a5b" stroke-width="2.5" clip-path="url(#abar1)"></rect>
+<text class="text" x="402" y="188" font-size="14.5" fill="#1c1c22" font-weight="600">Every prod app</text>
+<text class="mono" x="402" y="205" font-size="10.5" fill="#2c7a56" font-family="ui-monospace,Menlo,Consolas,monospace">auto-derived</text>
+<line x1="402" y1="216" x2="704" y2="216" stroke="#bfe0cc" stroke-width="1"></line>
+<text class="mono" x="56" y="234" font-size="9.5" fill="#3d6fc0" font-family="ui-monospace,Menlo,Consolas,monospace">AUTHOR</text>
+<rect x="56" y="240" width="302" height="34" rx="8" fill="#f3f7fd" stroke="#c4d8f4" stroke-width="1"></rect>
+<text x="68" y="261" font-size="12" fill="#1c1c22">a human writes a <tspan class="mono" fill="#2c66c4" font-family="ui-monospace,monospace" font-size="10.5">PrometheusServiceLevel</tspan> CR</text>
+<path d="M203 277 L211 277 L207 283 Z" fill="#7a9fd0"></path>
+<text class="mono" x="56" y="285" font-size="9.5" fill="#3d6fc0" font-family="ui-monospace,Menlo,Consolas,monospace">ENGINE</text>
+<rect x="56" y="291" width="302" height="32" rx="8" fill="#f3f7fd" stroke="#c4d8f4" stroke-width="1"></rect>
+<text x="68" y="311" font-size="12" fill="#1c1c22"><tspan class="mono" fill="#2c66c4" font-family="ui-monospace,monospace" font-size="11">Sloth</tspan> controller</text>
+<path d="M203 326 L211 326 L207 332 Z" fill="#7a9fd0"></path>
+<text class="mono" x="56" y="334" font-size="9.5" fill="#3d6fc0" font-family="ui-monospace,Menlo,Consolas,monospace">HOME</text>
+<rect x="56" y="340" width="302" height="32" rx="8" fill="#f3f7fd" stroke="#c4d8f4" stroke-width="1"></rect>
+<text x="68" y="360" font-size="12" fill="#1c1c22"><tspan class="mono" fill="#2c66c4" font-family="ui-monospace,monospace" font-size="11">PrometheusRule</tspan> on the hub</text>
+<path d="M203 375 L211 375 L207 381 Z" fill="#7a9fd0"></path>
+<text class="mono" x="56" y="383" font-size="9.5" fill="#3d6fc0" font-family="ui-monospace,Menlo,Consolas,monospace">CONSUMER</text>
+<rect x="56" y="389" width="302" height="32" rx="8" fill="#eaf1fb" stroke="#c4d8f4" stroke-width="1"></rect>
+<text x="68" y="409" font-size="12" fill="#1c1c22">human dashboards + alerting</text>
+<text class="mono" x="56" y="443" font-size="10" fill="#3d6fc0" font-family="ui-monospace,Menlo,Consolas,monospace">e.g. kubernetes-apiserver · 99.9%</text>
+<text class="mono" x="402" y="234" font-size="9.5" fill="#2c7a56" font-family="ui-monospace,Menlo,Consolas,monospace">AUTHOR</text>
+<rect x="402" y="240" width="302" height="34" rx="8" fill="#f0f8f3" stroke="#bfe0cc" stroke-width="1"></rect>
+<text x="414" y="261" font-size="12" fill="#1c1c22"><tspan class="mono" fill="#1c7a4f" font-family="ui-monospace,monospace" font-size="10">environments/**/prod.yaml</tspan> registry</text>
+<path d="M549 277 L557 277 L553 283 Z" fill="#6fb08f"></path>
+<text class="mono" x="402" y="285" font-size="9.5" fill="#2c7a56" font-family="ui-monospace,Menlo,Consolas,monospace">ENGINE</text>
+<rect x="402" y="291" width="302" height="46" rx="8" fill="#f0f8f3" stroke="#bfe0cc" stroke-width="1"></rect>
+<text x="414" y="309" font-size="11.5" fill="#1c1c22">Terragrunt <tspan class="mono" fill="#1c7a4f" font-family="ui-monospace,monospace" font-size="10">fileset+yamldecode</tspan> →</text>
+<text x="414" y="325" font-size="11.5" fill="#1c1c22"><tspan class="mono" fill="#1c7a4f" font-family="ui-monospace,monospace" font-size="10">mimirtool rules sync</tspan> CronJob</text>
+<path d="M549 340 L557 340 L553 346 Z" fill="#6fb08f"></path>
+<text class="mono" x="402" y="348" font-size="9.5" fill="#2c7a56" font-family="ui-monospace,Menlo,Consolas,monospace">HOME</text>
+<rect x="402" y="354" width="302" height="32" rx="8" fill="#f0f8f3" stroke="#bfe0cc" stroke-width="1"></rect>
+<text x="414" y="374" font-size="12" fill="#1c1c22">Mimir <tspan class="mono" fill="#1c7a4f" font-family="ui-monospace,monospace" font-size="11">ruler</tspan> <tspan fill="#8a8a8f" font-size="10.5">(preprod tenant)</tspan></text>
+<path d="M549 389 L557 389 L553 395 Z" fill="#c8a44a"></path>
+<text class="mono" x="402" y="397" font-size="9.5" fill="#8a6410" font-family="ui-monospace,Menlo,Consolas,monospace">CONSUMER · non-human</text>
+<rect x="402" y="403" width="302" height="44" rx="8" fill="#f9f0da" stroke="#e8d4a0" stroke-width="1"></rect>
+<text x="414" y="421" font-size="12" fill="#1c1c22">the canary <tspan font-weight="600" fill="#9a6a0a">freeze gate</tspan> — a</text>
+<text x="414" y="437" font-size="12" fill="#1c1c22">pre-flight AnalysisTemplate</text>
+<text class="mono" x="402" y="469" font-size="10" fill="#2c7a56" font-family="ui-monospace,Menlo,Consolas,monospace">e.g. alpha-shop-prod · 99.9% (auto)</text>
+<path d="M201 498 L213 498 L207 507 Z" fill="#5a97ab"></path>
+<path d="M547 498 L559 498 L553 507 Z" fill="#5a97ab"></path>
+<rect x="40" y="514" width="680" height="112" rx="12" fill="#e2eff2" stroke="#b8dbe4" stroke-width="1"></rect>
+<rect x="58" y="528" width="98" height="20" rx="6" fill="#d2e9ef" stroke="#b8dbe4" stroke-width="1"></rect>
+<text class="mono" x="107" y="542" font-size="9.5" fill="#0f6f8e" text-anchor="middle" letter-spacing="0.4px" font-family="ui-monospace,Menlo,Consolas,monospace">SAME SHAPE</text>
+<text class="text" x="168" y="543" font-size="14" fill="#0a2831" font-weight="600">both emit the same multi-window, multi-burn-rate rules</text>
+<rect x="58" y="558" width="320" height="30" rx="8" fill="#fae9e6" stroke="#ecc3bc" stroke-width="1"></rect>
+<text x="70" y="577" font-size="10.5" font-family="ui-monospace,Menlo,Consolas,monospace"><tspan fill="#b83a2c" font-weight="600">FAST</tspan> <tspan fill="#5f5f66">14.4×(5m∧1h) / 6×(30m∧6h)</tspan> <tspan fill="#b83a2c">→ PAGE</tspan></text>
+<rect x="386" y="558" width="320" height="30" rx="8" fill="#f9f0da" stroke="#e8d4a0" stroke-width="1"></rect>
+<text x="398" y="577" font-size="10.5" font-family="ui-monospace,Menlo,Consolas,monospace"><tspan fill="#9a6a0a" font-weight="600">SLOW</tspan> <tspan fill="#5f5f66">3×(2h∧1d) / 1×(6h∧3d)</tspan> <tspan fill="#9a6a0a">→ TICKET</tspan></text>
+<text class="muted" x="58" y="610" font-size="12" fill="#3a5560">Same 99.9%, different home.</text>
+<rect x="40" y="638" width="680" height="44" rx="10" fill="#f9f0da" stroke="#e8d4a0" stroke-width="1" stroke-dasharray="5 3"></rect>
+<rect x="56" y="650" width="46" height="20" rx="5" fill="#f0e0b8" stroke="#e0cd9c" stroke-width="1"></rect>
+<text class="mono" x="79" y="664" font-size="9" fill="#8a5c0a" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">NOTE</text>
+<text class="muted" x="116" y="658" font-size="12" fill="#5f5f66">The freeze gate reads the service&#39;s <tspan fill="#1c1c22" font-style="italic">current</tspan> burn and freezes a rollout only if it&#39;s <tspan fill="#1c1c22" font-style="italic">already</tspan></text>
+<text class="muted" x="116" y="674" font-size="12" fill="#5f5f66">≥2× budget — it never blocks a first deploy.</text>
+<text class="muted" x="40" y="708" font-size="13.5" fill="#6c6c73">One SLO grammar; who authors it and who consumes it is what differs.</text>
+</svg>

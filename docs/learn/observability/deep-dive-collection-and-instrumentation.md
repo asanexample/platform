@@ -289,6 +289,8 @@ per-flow forensics.
 
 Draw this from memory and you own the pipeline:
 
+![Per-signal collection pipelines as swimlanes — metrics (RED via Beyla, infra via Prometheus, AWS via YACE), logs and events (Alloy), traces (OTel Collector), profiles (eBPF Alloy), and synthetics each travel source → collector → transport → store into the LGTM+P stack; network flows shown as an adjacent plane.](images/pipeline-swimlanes.svg)
+
 | Signal | Collector (topology) | Transport | Store |
 | --- | --- | --- | --- |
 | **Logs** (pod) | Alloy `alloy` (DaemonSet, node-local) | file-tail → `loki.write` | Loki |

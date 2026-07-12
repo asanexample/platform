@@ -196,6 +196,8 @@ disposition. The point is in that ratio. If the agent's `confident_lead` triages
 rate, the agent is over-confident — its confidence isn't calibrated to reality. No token count or latency
 graph can tell you that; only the loop back to a human can.
 
+![The agent-observability feedback loop — a triage agent's disposition posts a Slack proposal, a human's Accept/Correct/Dismiss verdict lands in the triage_feedback_total counter, and accept-rate-by-disposition closes the loop back to "is the agent calibrated?" with a confidently-wrong failure branch; the rest is the same Mimir/Tempo machine.](images/eval-feedback-loop.svg)
+
 **One invocation, end to end.** Put the three slices on a single timeline and every number on this page comes
 from one real triage. A critical alert fires; the agent wakes and opens an `invoke_agent` span over the whole
 triage. Inside it, a `chat` turn burns **6667 input / 259 output tokens** deciding what to look at, then four

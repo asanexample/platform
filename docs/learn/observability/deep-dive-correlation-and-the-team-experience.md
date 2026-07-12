@@ -161,6 +161,8 @@ Every deploy draws a vertical line across the time series. So "latency spiked at
 under "…because of the 02:58 deploy of `storefront`" — the metric blip and its likely cause on one axis.
 (`kube_deployment_metadata_generation` bumps on every spec change; `changes() > 0` marks the moment.)
 
+![The Grafana correlation web as a tenant×store grid — each jump between Mimir, Tempo, Loki, and Pyroscope is a replace(uid,…) string-swap rule that stays within a tenant column and replicates identically across the platform/preprod/all tenants; an off-convention datasource name links nowhere.](images/correlation-web.svg)
+
 ---
 
 ## Part 2 — the per-team experience

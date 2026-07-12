@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 648" width="760" height="648" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#9a9aa1"]{fill:#888890}[stroke="#9a9aa1"]{stroke:#888890}[fill="#eaf1fb"]{fill:#172f51}[stroke="#eaf1fb"]{stroke:#172f51}[fill="#2c66c4"]{fill:#6b98e1}[stroke="#2c66c4"]{stroke:#6b98e1}[fill="#3d6fc0"]{fill:#7fa2d9}[stroke="#3d6fc0"]{stroke:#7fa2d9}[fill="#f3f7fd"]{fill:#162c4d}[stroke="#f3f7fd"]{stroke:#162c4d}[fill="#8a8a8f"]{fill:#8a8a8f}[stroke="#8a8a8f"]{stroke:#8a8a8f}[fill="#dce8fa"]{fill:#193257}[stroke="#dce8fa"]{stroke:#193257}[fill="#a05a1a"]{fill:#e38835}[stroke="#a05a1a"]{stroke:#e38835}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#1f8a5b"]{fill:#40d996}[stroke="#1f8a5b"]{stroke:#40d996}[fill="#2c7a56"]{fill:#54c591}[stroke="#2c7a56"]{stroke:#54c591}[fill="#f0f8f3"]{fill:#21462f}[stroke="#f0f8f3"]{stroke:#21462f}[fill="#d6ecdd"]{fill:#275335}[stroke="#d6ecdd"]{stroke:#275335}[fill="#f9f0da"]{fill:#584619}[stroke="#f9f0da"]{stroke:#584619}[fill="#b0790f"]{fill:#f2ad29}[stroke="#b0790f"]{stroke:#f2ad29}[fill="#8a6410"]{fill:#ecb02d}[stroke="#8a6410"]{stroke:#ecb02d}[fill="#fbf6e8"]{fill:#524218}[stroke="#fbf6e8"]{stroke:#524218}[fill="#f2e7c8"]{fill:#614f1c}[stroke="#f2e7c8"]{stroke:#614f1c}[fill="#9a6a0a"]{fill:#f6b022}[stroke="#9a6a0a"]{stroke:#f6b022}[fill="#f2eafb"]{fill:#321751}[stroke="#f2eafb"]{stroke:#321751}[fill="#8a4fc4"]{fill:#b892dd}[stroke="#8a4fc4"]{stroke:#b892dd}[fill="#7a52a0"]{fill:#a889c5}[stroke="#7a52a0"]{stroke:#a889c5}[fill="#f8f3fc"]{fill:#35164d}[stroke="#f8f3fc"]{stroke:#35164d}[fill="#ebe0f7"]{fill:#361956}[stroke="#ebe0f7"]{stroke:#361956}[fill="#d2d2cb"]{fill:#2f2f2a}[stroke="#d2d2cb"]{stroke:#2f2f2a}[fill="#ececea"]{fill:#20201d}[stroke="#ececea"]{stroke:#20201d}[fill="#d2d2ce"]{fill:#2e2e2a}[stroke="#d2d2ce"]{stroke:#2e2e2a}[fill="#8a8a86"]{fill:#8e8e8a}[stroke="#8a8a86"]{stroke:#8e8e8a}[fill="#f2f2f0"]{fill:#1d1d1a}[stroke="#f2f2f0"]{stroke:#1d1d1a}[fill="#33333a"]{fill:#dedee2}[stroke="#33333a"]{stroke:#dedee2}[fill="#e2e2de"]{fill:#262622}[stroke="#e2e2de"]{stroke:#262622}}</style><defs><clipPath id="abar0"><rect x="39.0" y="213.0" width="7.0" height="36.0"/></clipPath><clipPath id="abar1"><rect x="39.0" y="253.0" width="7.0" height="36.0"/></clipPath><clipPath id="abar2"><rect x="39.0" y="293.0" width="7.0" height="36.0"/></clipPath><clipPath id="abar3"><rect x="39.0" y="333.0" width="7.0" height="36.0"/></clipPath><clipPath id="abar4"><rect x="39.0" y="373.0" width="7.0" height="36.0"/></clipPath><clipPath id="abar5"><rect x="39.0" y="413.0" width="7.0" height="36.0"/></clipPath><clipPath id="abar6"><rect x="39.0" y="453.0" width="7.0" height="36.0"/></clipPath><clipPath id="abar7"><rect x="39.0" y="493.0" width="7.0" height="36.0"/></clipPath><clipPath id="abar8"><rect x="39.0" y="553.0" width="7.0" height="36.0"/></clipPath></defs>
+<rect class="bg" x="0" y="0" width="760" height="648" fill="#f6f6f3"></rect>
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.8px">OBSERVABILITY · COLLECTION · KERNEL TO STORE</text>
+<text class="text" x="40" y="89" font-size="26" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">Draw the whole pipeline from memory.</text>
+<text class="muted" x="40" y="117" font-size="14.5" fill="#6c6c73">Every signal takes the same journey — collected below the process, shipped by a collector shaped for its</text>
+<text class="muted" x="40" y="136" font-size="14.5" fill="#6c6c73">job, landing in its own store. Different lanes, one grammar.</text>
+<text class="dim mono" x="40" y="178" font-size="10" fill="#9a9aa1" letter-spacing="0.5px">SOURCE</text>
+<text class="dim mono" x="196" y="178" font-size="10" fill="#9a9aa1" letter-spacing="0.5px">COLLECTOR · topology</text>
+<text class="dim mono" x="524" y="178" font-size="10" fill="#9a9aa1" letter-spacing="0.5px">TRANSPORT</text>
+<text class="dim mono" x="648" y="178" font-size="10" fill="#9a9aa1" letter-spacing="0.5px">STORE</text>
+<rect x="40" y="214" width="136" height="34" rx="8" fill="#eaf1fb" stroke="#2c66c4" stroke-opacity="0.25" stroke-width="1"></rect>
+<rect x="41.3" y="215.3" width="133.5" height="31.5" rx="6.8" fill="none" stroke="#2c66c4" stroke-width="2.5" clip-path="url(#abar0)"></rect>
+<text x="54" y="229" font-size="11.5" fill="#1c1c22" font-weight="500">app requests</text>
+<text class="mono" x="54" y="242" font-size="9.5" fill="#3d6fc0" font-family="ui-monospace,monospace">zero-code</text>
+<text x="188" y="234" font-size="11" fill="#2c66c4" text-anchor="middle">›</text>
+<rect x="196" y="214" width="304" height="34" rx="8" fill="#f3f7fd" stroke="#2c66c4" stroke-opacity="0.3" stroke-width="1"></rect>
+<text x="218" y="234.5" font-size="9" fill="#2c66c4" font-family="ui-monospace,monospace" letter-spacing="1px">▤▤▤</text>
+<text x="240" y="230" font-size="11.5" fill="#1c1c22">Beyla · eBPF DaemonSet</text>
+<text x="414.6" y="230" font-size="10" fill="#8a8a8f">(per node)</text>
+<text x="516" y="234" font-size="11" fill="#2c66c4" text-anchor="middle">›</text>
+<text class="mono" x="524" y="234.5" font-size="10" fill="#3d6fc0" font-family="ui-monospace,monospace">scrape :9090</text>
+<text x="640" y="234" font-size="11" fill="#2c66c4" text-anchor="middle">›</text>
+<rect x="648" y="214" width="72" height="34" rx="8" fill="#dce8fa"></rect>
+<text x="684" y="235" font-size="11" fill="#2c66c4" font-weight="500" text-anchor="middle" font-family="ui-monospace,monospace">Mimir</text>
+<rect x="40" y="254" width="136" height="34" rx="8" fill="#eaf1fb" stroke="#2c66c4" stroke-opacity="0.25" stroke-width="1"></rect>
+<rect x="41.3" y="255.3" width="133.5" height="31.5" rx="6.8" fill="none" stroke="#2c66c4" stroke-width="2.5" clip-path="url(#abar1)"></rect>
+<text x="54" y="269" font-size="11.5" fill="#1c1c22" font-weight="500">kubelet/cAdvisor</text>
+<text class="mono" x="54" y="282" font-size="9.5" fill="#3d6fc0" font-family="ui-monospace,monospace">+ kube-state</text>
+<text x="188" y="274" font-size="11" fill="#2c66c4" text-anchor="middle">›</text>
+<rect x="196" y="254" width="304" height="34" rx="8" fill="#f3f7fd" stroke="#2c66c4" stroke-opacity="0.3" stroke-width="1"></rect>
+<text x="210" y="270" font-size="11.5" fill="#1c1c22">Prometheus</text>
+<text x="279" y="270" font-size="10" fill="#8a8a8f">(agent-mode)</text>
+<text x="516" y="274" font-size="11" fill="#2c66c4" text-anchor="middle">›</text>
+<text class="mono" x="524" y="274.5" font-size="10" fill="#3d6fc0" font-family="ui-monospace,monospace">remote_write</text>
+<text x="640" y="274" font-size="11" fill="#2c66c4" text-anchor="middle">›</text>
+<rect x="648" y="254" width="72" height="34" rx="8" fill="#dce8fa"></rect>
+<text x="684" y="275" font-size="11" fill="#2c66c4" font-weight="500" text-anchor="middle" font-family="ui-monospace,monospace">Mimir</text>
+<rect x="40" y="294" width="136" height="34" rx="8" fill="#eaf1fb" stroke="#2c66c4" stroke-opacity="0.25" stroke-width="1"></rect>
+<rect x="41.3" y="295.3" width="133.5" height="31.5" rx="6.8" fill="none" stroke="#2c66c4" stroke-width="2.5" clip-path="url(#abar2)"></rect>
+<text x="54" y="309" font-size="11.5" fill="#1c1c22" font-weight="500">CloudWatch API</text>
+<text class="mono" x="54" y="322" font-size="9.5" fill="#3d6fc0" font-family="ui-monospace,monospace">AWS-side</text>
+<text x="188" y="314" font-size="11" fill="#2c66c4" text-anchor="middle">›</text>
+<rect x="196" y="294" width="304" height="34" rx="8" fill="#f3f7fd" stroke="#2c66c4" stroke-opacity="0.3" stroke-width="1"></rect>
+<text x="210" y="310" font-size="11.5" fill="#1c1c22">YACE</text>
+<text x="241.2" y="310" font-size="10" fill="#3d6fc0" font-family="ui-monospace,monospace">×1 singleton</text>
+<text x="210" y="322" font-size="9" fill="#a05a1a" font-family="ui-monospace,monospace">a 2nd double-counts</text>
+<text x="516" y="314" font-size="11" fill="#2c66c4" text-anchor="middle">›</text>
+<text class="mono" x="524" y="314.5" font-size="10" fill="#3d6fc0" font-family="ui-monospace,monospace">scrape</text>
+<text x="640" y="314" font-size="11" fill="#2c66c4" text-anchor="middle">›</text>
+<rect x="648" y="294" width="72" height="34" rx="8" fill="#dce8fa"></rect>
+<text x="684" y="315" font-size="11" fill="#2c66c4" font-weight="500" text-anchor="middle" font-family="ui-monospace,monospace">Mimir</text>
+<rect x="40" y="334" width="136" height="34" rx="8" fill="#e7f4ec" stroke="#1f8a5b" stroke-opacity="0.25" stroke-width="1"></rect>
+<rect x="41.3" y="335.3" width="133.5" height="31.5" rx="6.8" fill="none" stroke="#1f8a5b" stroke-width="2.5" clip-path="url(#abar3)"></rect>
+<text x="54" y="349" font-size="11.5" fill="#1c1c22" font-weight="500">app → stdout</text>
+<text class="mono" x="54" y="362" font-size="9.5" fill="#2c7a56" font-family="ui-monospace,monospace">logs</text>
+<text x="188" y="354" font-size="11" fill="#1f8a5b" text-anchor="middle">›</text>
+<rect x="196" y="334" width="304" height="34" rx="8" fill="#f0f8f3" stroke="#1f8a5b" stroke-opacity="0.3" stroke-width="1"></rect>
+<text x="218" y="354.5" font-size="9" fill="#1f8a5b" font-family="ui-monospace,monospace" letter-spacing="1px">▤▤▤</text>
+<text x="240" y="350" font-size="11.5" fill="#1c1c22">Alloy log DaemonSet</text>
+<text x="395.7" y="350" font-size="10" fill="#8a8a8f">(per node)</text>
+<text x="516" y="354" font-size="11" fill="#1f8a5b" text-anchor="middle">›</text>
+<text class="mono" x="524" y="354.5" font-size="10" fill="#2c7a56" font-family="ui-monospace,monospace">push + re-tenant</text>
+<text x="640" y="354" font-size="11" fill="#1f8a5b" text-anchor="middle">›</text>
+<rect x="648" y="334" width="72" height="34" rx="8" fill="#d6ecdd"></rect>
+<text x="684" y="355" font-size="11" fill="#1f8a5b" font-weight="500" text-anchor="middle" font-family="ui-monospace,monospace">Loki</text>
+<rect x="40" y="374" width="136" height="34" rx="8" fill="#e7f4ec" stroke="#1f8a5b" stroke-opacity="0.25" stroke-width="1"></rect>
+<rect x="41.3" y="375.3" width="133.5" height="31.5" rx="6.8" fill="none" stroke="#1f8a5b" stroke-width="2.5" clip-path="url(#abar4)"></rect>
+<text x="54" y="389" font-size="11.5" fill="#1c1c22" font-weight="500">k8s API events</text>
+<text class="mono" x="54" y="402" font-size="9.5" fill="#2c7a56" font-family="ui-monospace,monospace">events</text>
+<text x="188" y="394" font-size="11" fill="#1f8a5b" text-anchor="middle">›</text>
+<rect x="196" y="374" width="304" height="34" rx="8" fill="#f0f8f3" stroke="#1f8a5b" stroke-opacity="0.3" stroke-width="1"></rect>
+<text x="210" y="390" font-size="11.5" fill="#1c1c22">Alloy events</text>
+<text x="291.6" y="390" font-size="10" fill="#2c7a56" font-family="ui-monospace,monospace">×1 singleton</text>
+<text x="210" y="402" font-size="9" fill="#a05a1a" font-family="ui-monospace,monospace">a 2nd double-counts</text>
+<text x="516" y="394" font-size="11" fill="#1f8a5b" text-anchor="middle">›</text>
+<text class="mono" x="524" y="394.5" font-size="10" fill="#2c7a56" font-family="ui-monospace,monospace">push</text>
+<text x="640" y="394" font-size="11" fill="#1f8a5b" text-anchor="middle">›</text>
+<rect x="648" y="374" width="72" height="34" rx="8" fill="#d6ecdd"></rect>
+<text x="684" y="395" font-size="11" fill="#1f8a5b" font-weight="500" text-anchor="middle" font-family="ui-monospace,monospace">Loki</text>
+<rect x="40" y="414" width="136" height="34" rx="8" fill="#f9f0da" stroke="#b0790f" stroke-opacity="0.25" stroke-width="1"></rect>
+<rect x="41.3" y="415.3" width="133.5" height="31.5" rx="6.8" fill="none" stroke="#b0790f" stroke-width="2.5" clip-path="url(#abar5)"></rect>
+<text x="54" y="429" font-size="11.5" fill="#1c1c22" font-weight="500">Beyla / OTel SDK</text>
+<text class="mono" x="54" y="442" font-size="9.5" fill="#8a6410" font-family="ui-monospace,monospace">traces</text>
+<text x="188" y="434" font-size="11" fill="#b0790f" text-anchor="middle">›</text>
+<rect x="196" y="414" width="304" height="34" rx="8" fill="#fbf6e8" stroke="#b0790f" stroke-opacity="0.3" stroke-width="1"></rect>
+<text x="210" y="430" font-size="11.5" fill="#1c1c22">OTel Collector gateway</text>
+<text x="354.6" y="430" font-size="10" fill="#8a6410" font-family="ui-monospace,monospace">×1 singleton</text>
+<text x="210" y="442" font-size="9" fill="#a05a1a" font-family="ui-monospace,monospace">a 2nd double-counts</text>
+<text x="516" y="434" font-size="11" fill="#b0790f" text-anchor="middle">›</text>
+<text class="mono" x="524" y="434.5" font-size="10" fill="#8a6410" font-family="ui-monospace,monospace">OTLP push</text>
+<text x="640" y="434" font-size="11" fill="#b0790f" text-anchor="middle">›</text>
+<rect x="648" y="414" width="72" height="34" rx="8" fill="#f2e7c8"></rect>
+<text x="684" y="435" font-size="11" fill="#9a6a0a" font-weight="500" text-anchor="middle" font-family="ui-monospace,monospace">Tempo</text>
+<rect x="40" y="454" width="136" height="34" rx="8" fill="#f2eafb" stroke="#8a4fc4" stroke-opacity="0.25" stroke-width="1"></rect>
+<rect x="41.3" y="455.3" width="133.5" height="31.5" rx="6.8" fill="none" stroke="#8a4fc4" stroke-width="2.5" clip-path="url(#abar6)"></rect>
+<text x="54" y="469" font-size="11.5" fill="#1c1c22" font-weight="500">process CPU</text>
+<text class="mono" x="54" y="482" font-size="9.5" fill="#7a52a0" font-family="ui-monospace,monospace">zero-code</text>
+<text x="188" y="474" font-size="11" fill="#8a4fc4" text-anchor="middle">›</text>
+<rect x="196" y="454" width="304" height="34" rx="8" fill="#f8f3fc" stroke="#8a4fc4" stroke-opacity="0.3" stroke-width="1"></rect>
+<text x="218" y="474.5" font-size="9" fill="#8a4fc4" font-family="ui-monospace,monospace" letter-spacing="1px">▤▤▤</text>
+<text x="240" y="470" font-size="11.5" fill="#1c1c22">Alloy pyroscope.ebpf</text>
+<text x="402" y="470" font-size="10" fill="#8a8a8f">(privileged)</text>
+<text x="516" y="474" font-size="11" fill="#8a4fc4" text-anchor="middle">›</text>
+<text class="mono" x="524" y="474.5" font-size="10" fill="#7a52a0" font-family="ui-monospace,monospace">push</text>
+<text x="640" y="474" font-size="11" fill="#8a4fc4" text-anchor="middle">›</text>
+<rect x="648" y="454" width="72" height="34" rx="8" fill="#ebe0f7"></rect>
+<text x="684" y="475" font-size="10" fill="#8a4fc4" font-weight="500" text-anchor="middle" font-family="ui-monospace,monospace">Pyroscope</text>
+<rect x="40" y="494" width="136" height="34" rx="8" fill="#eaf1fb" stroke-dasharray="4 3" stroke="#2c66c4" stroke-opacity="0.25" stroke-width="1"></rect>
+<rect x="41.3" y="495.3" width="133.5" height="31.5" rx="6.8" fill="none" stroke="#2c66c4" stroke-width="2.5" clip-path="url(#abar7)"></rect>
+<text x="54" y="509" font-size="11.5" fill="#1c1c22" font-weight="500">blackbox / k6</text>
+<text class="mono" x="54" y="522" font-size="9.5" fill="#3d6fc0" font-family="ui-monospace,monospace">synthetics</text>
+<text x="188" y="514" font-size="11" fill="#2c66c4" text-anchor="middle">›</text>
+<rect x="196" y="494" width="304" height="34" rx="8" fill="#f3f7fd" stroke-dasharray="4 3" stroke="#2c66c4" stroke-opacity="0.3" stroke-width="1"></rect>
+<text x="210" y="510" font-size="11.5" fill="#1c1c22">Probe CR / CronJob</text>
+<text x="329.4" y="510" font-size="10" fill="#3d6fc0">⏱</text>
+<text x="516" y="514" font-size="11" fill="#2c66c4" text-anchor="middle">›</text>
+<text class="mono" x="524" y="514.5" font-size="10" fill="#3d6fc0" font-family="ui-monospace,monospace">scrape</text>
+<text x="640" y="514" font-size="11" fill="#2c66c4" text-anchor="middle">›</text>
+<rect x="648" y="494" width="72" height="34" rx="8" fill="#dce8fa"></rect>
+<text x="684" y="515" font-size="11" fill="#2c66c4" font-weight="500" text-anchor="middle" font-family="ui-monospace,monospace">Mimir</text>
+<line x1="40" y1="540" x2="330" y2="540" stroke="#d2d2cb" stroke-width="1" stroke-dasharray="3 3"></line>
+<text class="dim mono" x="380" y="544" font-size="9.5" fill="#9a9aa1" text-anchor="middle" letter-spacing="0.5px">ADJACENT PLANE</text>
+<line x1="430" y1="540" x2="720" y2="540" stroke="#d2d2cb" stroke-width="1" stroke-dasharray="3 3"></line>
+<rect x="40" y="554" width="136" height="34" rx="8" fill="#ececea" stroke="#d2d2ce" stroke-width="1"></rect>
+<rect x="41.3" y="555.3" width="133.5" height="31.5" rx="6.8" fill="none" stroke="#8a8a86" stroke-width="2.5" clip-path="url(#abar8)"></rect>
+<text x="54" y="569" font-size="11.5" fill="#1c1c22" font-weight="500">Cilium / Hubble</text>
+<text class="mono" x="54" y="582" font-size="9.5" fill="#6c6c73" font-family="ui-monospace,monospace">network flows</text>
+<text x="188" y="574" font-size="11" fill="#8a8a86" text-anchor="middle">›</text>
+<rect x="196" y="554" width="304" height="34" rx="8" fill="#f2f2f0" stroke="#d2d2ce" stroke-width="1"></rect>
+<text x="210" y="575" font-size="11.5" fill="#33333a">Hubble</text>
+<text x="488" y="575" font-size="10.5" fill="#8a8a8f" text-anchor="end">not one of the four signals</text>
+<text x="516" y="574" font-size="11" fill="#8a8a86" text-anchor="middle">›</text>
+<text class="mono" x="524" y="574.5" font-size="10" fill="#6c6c73" font-family="ui-monospace,monospace">scrape</text>
+<text x="640" y="574" font-size="11" fill="#8a8a86" text-anchor="middle">›</text>
+<rect x="648" y="554" width="72" height="34" rx="8" fill="#e2e2de"></rect>
+<text x="684" y="575" font-size="11" fill="#6c6c73" font-weight="500" text-anchor="middle" font-family="ui-monospace,monospace">Mimir</text>
+<text class="muted" x="40" y="614" font-size="13.5" fill="#6c6c73">Push vs pull, per-node vs singleton, is a property of the <tspan class="text" fill="#1c1c22" font-style="italic">signal</tspan> — but every lane ends in LGTM+P.</text>
+<text class="muted" x="40" y="633" font-size="13.5" fill="#6c6c73">Learn the grammar once.</text>
+</svg>
