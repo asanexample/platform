@@ -59,7 +59,7 @@
 <line class="arrow" x1="400" y1="446" x2="400" y2="460" stroke="#9a5fc4" stroke-width="2"></line>
 <path class="arrow" d="M394 460 L406 460 L400 468 Z" fill="#9a5fc4"></path>
 <text class="t-violet mono" x="420" y="454" font-size="11" fill="#9a5fc4">same span → profile</text>
-<text class="dim mono" x="420" y="467" font-size="10" fill="#9a9aa1">tracesToProfilesV2 · service.name</text>
+<text class="dim mono" x="420" y="467" font-size="10" fill="#9a9aa1">tracesToProfiles · service.name</text>
 
 
 <rect class="bg-green bd-green" x="40" y="478" width="334" height="118" rx="12" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>

@@ -165,13 +165,16 @@ The naming is deliberate, because it's how tenancy surfaces to a human. Every da
 
 - `Mimir (platform)` — the hub's own metrics (the default datasource, `uid = mimir`).
 - `Mimir (preprod)` — a read-only view of the preprod spoke's metrics.
-- `Mimir (all clusters)` — a *federated* datasource whose header is `platform|preprod`, so one panel spans
-  both clusters (Mimir's `tenant_federation` splits the `|`-joined header across tenants on read).
-- `Mimir (my team)` — the per-team lane through the read proxy (see the honest-status section).
+- `Mimir (all clusters)` — a *federated* datasource whose header is `platform|preprod|alpha|bravo`, so one
+  panel spans every tenant (Mimir's `tenant_federation` splits the `|`-joined header across tenants on read).
+- `Mimir (alpha)` / `Mimir (bravo)` — a per-team datasource pinned to that tenant via a static
+  `X-Scope-OrgID`, direct to the gateway (the read proxy that once fronted this was retired — see the
+  honest-status section).
 
 Loki, Tempo, and Pyroscope follow the identical `(tenant)` scheme. The datasources are wired to each
 other for the **correlation jump**: the Mimir datasource carries `exemplarTraceIdDestinations` pointing
-`mimir → tempo` (click a latency exemplar, land on the trace), and the Loki datasource carries a
+`mimir → tempo` (click a latency exemplar — a sampled data point on the histogram carrying one real
+request's `trace_id` — and land on the trace), and the Loki datasource carries a
 `derivedFields` regex that turns a `trace_id` in a log line into a link to the same Tempo trace. (The
 jumps themselves are the [collection & correlation](reference.md) story; here just note that the plumbing
 is datasource config, provisioned as code.)
@@ -256,7 +259,7 @@ another tenant's data — it can only ever land in its own. Authentication of th
 network isolation (the internal NLB is reachable only across the VPC/TGW); mTLS is a documented hardening
 follow-up, not yet in place.
 
-## Honest status: write-split and read-isolation are both live
+## Honest status: the write-split is live; read isolation is soft (the hard proxy was retired)
 
 Per-team isolation is the place to be careful, so here's the precise version — a trust artifact that
 over- or under-sells is worse than one with an honest gap.
@@ -270,11 +273,11 @@ the team for environment namespaces matching `<team>-<product>-<stage>`. cortex-
 Mimir has genuinely separate per-team tenants carrying data:
 
 ```text
-tenant=acme   distinct_metric_names=136
-tenant=globex   distinct_metric_names=118
+tenant=alpha   distinct_metric_names=136
+tenant=bravo   distinct_metric_names=118
 ```
 
-Those are real, isolated `acme` and `globex` tenants — the write split is running, not a diagram.
+Those are real, isolated `alpha` and `bravo` tenants — the write split is running, not a diagram.
 
 **Per-team *read* isolation — the soft model, after the hard one was retired.** The write split gives you real
 separate tenants; the read side went a different way than planned, and the story is worth telling honestly. The
@@ -298,7 +301,7 @@ scoping is likewise a follow-up.
 Cross-team *sharing* is a soft act too — share the dashboard or grant folder access. The `AccessGrant` model
 ([ADR-068](../../adrs/068-product-scoped-and-cross-team-access-model.md), `gitops/grants/`) still governs
 cross-team access in general, but its enforcement as a **fail-closed observability read federation**
-(`X-Scope-OrgID: acme|globex`) went with the retired proxy.
+(`X-Scope-OrgID: alpha|bravo`) went with the retired proxy.
 
 ## Why self-host all of this at all?
 
@@ -335,11 +338,14 @@ cluster, switching to managed is a config change, not a rewrite.
 - **The Gateway needs a `CiliumNetworkPolicy`, not a NetworkPolicy.** Envoy's reserved `ingress` identity (8)
   is invisible to a standard `from:` clause. Every store that admits Gateway traffic uses `fromEntities:
   ["ingress"]`.
-- **Grafana Viewer-for-everyone is by design — per-team reads are fenced *below* Grafana.** Grafana itself has
-  no per-team RBAC (every authenticated non-admin is a Viewer). The per-team boundary is enforced at the
-  fail-closed **tenant-proxies** (Mimir + Loki, live): the `(my team)` datasources show a caller only its own
-  tenant ∪ any `AccessGrant`-ed tenants. The namespace-filtered overview dashboards are the convenient default
-  view on top of that.
+- **Grafana Viewer-for-everyone is by design — per-team reads are fenced *organizationally*, not by a data
+  gate.** Grafana itself has no per-team RBAC (every authenticated non-admin is a Viewer). The per-team read
+  boundary is **Grafana dashboard-folder permissions** plus the **namespace-filtered per-team overview
+  dashboards** ([#1157](https://github.com/asanexample/platform/issues/1157)) — an organizational separation,
+  **not** a fail-closed data gate. The hard version — fail-closed tenant-proxies in front of Mimir + Loki —
+  was built and then **retired** ([#1269](https://github.com/asanexample/platform/issues/1269),
+  `read_proxy_url=""`, inert), and the `AccessGrant` read-federation went with it. The real data-plane
+  boundary underneath is the **network** (default-deny + ClusterIP-only stores).
 
 ## Go deeper
 

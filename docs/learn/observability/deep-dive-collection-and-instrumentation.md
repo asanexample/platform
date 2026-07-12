@@ -2,7 +2,7 @@
 
 This picks up where the [orientation](orientation.md) left off. There, the headline was that
 observability here is **platform-injected**: your workload is watched from the moment it runs — four
-signals, mostly zero-code — and the `shop` team did almost nothing to make its 3 a.m. slowdown
+signals, mostly zero-code — and the `alpha` team did almost nothing to make its `shop` product's 3 a.m. slowdown
 findable. This deep dive is the machinery behind that claim: the fleet of collectors that do the
 watching, how each one is wired, and the instrumentation ladder you climb only as far as you need. It
 assumes the orientation's mental model — the four signals, LGTM+P, hub-and-spoke, `X-Scope-OrgID` as a
@@ -30,11 +30,12 @@ ADR-077 makes three commitments, and the rest of this doc is just those three in
 The first is the surprising one, and it gets the most attention below.
 
 > **Since ADR-077: one refinement (ADR-100).** ADR-077 originally framed the SDK layer as sitting "on
-> top of" Beyla — additive enrichment. In practice Beyla's eBPF context-propagation and an app's SDK
-> `traceparent` **fight each other** (Beyla overwrites the SDK's trace context on egress, fragmenting
-> the trace — a real incident, not a theoretical risk). [ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md)
-> corrects this: it's **one or the other per workload**, never both. A pod that opts into the SDK
-> (carries the `inject-sdk` annotation) is auto-excluded from Beyla. The floor/opt-in shape below is
+> top of" Beyla — additive enrichment. That framing is wrong in practice: it's **one or the other per
+> workload**, never both, because Beyla's eBPF context-propagation and an app's SDK `traceparent` fight
+> each other (Beyla overwrites the SDK's trace context on egress, fragmenting the trace — a real
+> incident, not a theoretical risk). [ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md)
+> corrects this; the full mechanism (how a pod that opts into the SDK is auto-excluded from Beyla) is the
+> **L0/L1 landmine** in [Gotchas that teach](#gotchas-that-teach) below. The floor/opt-in shape below is
 > otherwise unchanged.
 
 ## The collector fleet — every one, verified running
@@ -94,8 +95,9 @@ discovery.kubernetes "pods" {
 }
 ```
 
-`NODE_NAME` comes from the Downward API (`spec.nodeName`), so each of the three pods sees a disjoint
-third of the cluster's logs. The profiles Alloy uses the same DaemonSet pattern but with
+`NODE_NAME` comes from the Downward API — Kubernetes' mechanism for surfacing a pod's own metadata (here
+its scheduled node name, `spec.nodeName`) into the container as an env var — so each of the three pods
+sees a disjoint third of the cluster's logs. The profiles Alloy uses the same DaemonSet pattern but with
 [`pyroscope.ebpf`](https://grafana.com/docs/alloy/latest/reference/components/pyroscope/pyroscope.ebpf/)
 instead of file-tailing.
 
@@ -134,7 +136,7 @@ dogfood-first (ADR-077 D4):
 | Cluster | `instrument_namespaces` | Meaning |
 | --- | --- | --- |
 | **platform** (hub) | `{backstage,keycloak,argocd,observability}` | The human-facing platform HTTP services — real traffic → a non-empty service graph immediately, before any tenant app exists. |
-| **preprod** (spoke) | `{acme-*}` | The tenant app namespaces (`acme-shop`, `acme-checkout`, …) — the real workloads. |
+| **preprod** (spoke) | `{alpha-*}` | The tenant app namespaces (`alpha-shop-dev`, `alpha-checkout-dev`, …) — the real workloads. |
 
 Beyla tags every span/metric with Kubernetes metadata (`attributes.kubernetes.enable = true`), and —
 this is the correlation seam — its trace `service.name` is deliberately aligned with the eBPF profiler's
@@ -143,6 +145,10 @@ alignment is why the orientation's "span → flame graph" jump resolves; it's se
 in Grafana.
 
 ### Beyla vs the Tempo metrics-generator (D5) — the honest version
+
+**The takeaway first:** Beyla is the RED source the per-app SLOs read; the Tempo metrics-generator *also*
+runs now — for Grafana's Traces Drilldown — but nobody consumes its RED. The rest of this section is the
+drift-nuance behind that one line.
 
 ADR-077 **D5** decided Beyla is the RED source, replacing Tempo's metrics-generator for that job: the
 generator derives RED from ingested spans, which is useless while nothing emits spans, whereas Beyla
@@ -179,6 +185,13 @@ chart `0.116.0`) runs as `opentelemetry-operator` in the `opentelemetry-operator
 annotate a pod `instrumentation.opentelemetry.io/inject-sdk` and the operator injects the
 platform-managed OTLP endpoint at admission — the app still links its own OTel SDK (that's what makes
 this L1, not L0), but never hardcodes a collector address.
+
+> **One pod, walked end to end.** `storefront` in `alpha-shop-dev` carries
+> `instrumentation.opentelemetry.io/inject-sdk`. At admission the OTel operator's webhook injects the
+> platform OTLP endpoint (read from that namespace's `Instrumentation` CR); *the same* annotation trips
+> Beyla's `exclude_instrument` predicate, so Beyla skips the pod. `storefront`'s own SDK then emits the
+> traces, which land in Tempo under job `alpha-shop/storefront`. One annotation flips that pod from L0 to
+> L1 *and* keeps the two collectors from fighting over its `traceparent`.
 
 The endpoint config lives in a namespace-scoped `Instrumentation` **CR**, and today five exist — one per
 environment namespace, verified live:
@@ -290,6 +303,9 @@ Draw this from memory and you own the pipeline:
 
 Two collectors, Beyla and the eBPF profiler, are the zero-code pillars — everything a developer sees for
 free traces back to those two DaemonSets and the `service.name`/`service_name` alignment between them.
+Two rows here — **network flows** (Cilium/Hubble) and **synthetics** (blackbox/k6) — are *adjacent
+planes, not part of the four signals*: they watch the network underneath the app and the service from
+outside, respectively, rather than the app's own logs/metrics/traces/profiles.
 
 ## Hub vs spoke — what moves, what's cut
 
@@ -301,7 +317,7 @@ from the two clusters:
 | Beyla, log Alloy, events Alloy, profiles Alloy, OTel collector, policy-reporter | ✅ | ✅ (log/traces via spoke edges) |
 | Prometheus | full `kube-prometheus-stack` (query + rules + Alertmanager) | **agent mode** (WAL + remote_write only) |
 | cloudwatch-exporter, blackbox, k6, Alertmanager, Grafana, Sloth | ✅ | ❌ (hub-only) |
-| OTel **operator** + `Instrumentation` CRD | ✅ (CRD present, 0 CRs) | ❌ (`no resource type "instrumentation"`) |
+| OTel **operator** + `Instrumentation` CRD | ✅ (CRD present, 0 CRs — no env namespaces on the hub) | ✅ (operator + CRD live; 5 CRs) |
 | Where signals land | local stores (tenant `platform`) | shipped to hub over TGW, tenant `preprod` (edge force-stamps) |
 
 The rule: a spoke collects and ships; it never stores, queries, or alerts. That's the whole weight
@@ -315,7 +331,12 @@ difference.
   merging them breaks one of the three.
 - **Beyla feeds two pipelines with two different transports.** RED/service-graph metrics are pulled
   (Prometheus scrapes Beyla's `/metrics`); traces are pushed (OTLP to the collector). Both `service = {
-  enabled }` *and* `serviceMonitor = { enabled }` must be on, or the metrics half silently isn't scraped.
+  enabled }` *and* `serviceMonitor = { enabled }` must be on — `service` creates the `/metrics` Service,
+  `serviceMonitor` the object the operator discovers — or the metrics half silently isn't scraped. The
+  hub Prometheus then honors it because it runs with `serviceMonitorSelectorNilUsesHelmValues = false` —
+  a kube-prometheus-stack knob that (left at its default `true`) would make the operator ignore any
+  ServiceMonitor not stamped with its own Helm-release label; set `false`, it scrapes all ServiceMonitors
+  cluster-wide.
 - **D5 has drifted from the ADR text.** "Beyla is the RED source the SLOs read" is true and verified
   (they read Beyla's `http_server_*`, not the generator's `traces_spanmetrics_*`). But the generator *is*
   running again — with all three processors, so it still emits its own span-metrics + service graph into
@@ -323,10 +344,12 @@ difference.
   Read the live cluster, not just D5's "we do not enable the generator."
 - **L1 and L0 are mutually exclusive per workload, not layered (ADR-100).** Beyla's eBPF
   context-propagation overwrites an SDK's `traceparent` on egress if both run on the same pod — that's
-  a real incident (fragmented shop→checkout traces), not a theoretical risk. The fix is exclusion, not
-  coordination: any pod carrying `instrumentation.opentelemetry.io/inject-sdk` is dropped from Beyla's
-  `instrument_namespaces` glob. Don't tell a developer "SDK spans add detail on top of Beyla" — for
-  their workload, SDK spans *replace* Beyla's.
+  a real incident (fragmented `storefront`→`alpha-checkout` traces), not a theoretical risk. The fix is
+  exclusion, not coordination: a *separate* Beyla `exclude_instrument` annotation predicate matches any
+  pod carrying `instrumentation.opentelemetry.io/inject-sdk` and **skips** it. Note the mechanism — the
+  pod's namespace *stays* in the `instrument_namespaces` glob; that one pod is simply skipped and left to
+  its SDK, not dropped from the namespace set. Don't tell a developer "SDK spans add detail on top of
+  Beyla" — for their workload, SDK spans *replace* Beyla's.
 - **`service.name` == `service_name` is a collection-time contract.** The span→flame-graph jump only
   works because Beyla and the eBPF profiler both derive their identity from `app.kubernetes.io/name`. Set
   that label on your workload or you fragment your own correlation — Grafana can't fix a mismatch made at

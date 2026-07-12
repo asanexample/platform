@@ -222,7 +222,7 @@ copy-paste:
    field jumps straight back, no regex). You read the line — say, a retry storm against a connection pool at
    its ceiling. Now you know *what*.
 4. **Span → profile.** And from the same span you jump to the **CPU flame graph** in Pyroscope
-   (`tracesToProfilesV2`) — because the eBPF profiler labels each process with the same `service.name` Beyla
+   (`tracesToProfiles`) — because the eBPF profiler labels each process with the same `service.name` Beyla
    stamps on traces, the two line up. The flame graph shows *which function* burned the CPU while the pool
    thrashed. Now you know *which line*.
 

@@ -16,8 +16,9 @@ running one Grafana over five backends instead of five vendor consoles.
 
 Those hyperlinks aren't a Grafana feature you turn on — they're config you write into each
 datasource. Grafana correlation is a set of directed links: on *this* datasource, a value shaped
-like *that* opens *this other* datasource. The platform wires four of them. Here's the 4-click
-investigation, and the exact wiring behind each click.
+like *that* opens *this other* datasource. Here's the 4-click investigation, and the exact wiring
+behind each click — four of the jumps we'll walk; the module wires a couple more
+(`tracesToMetrics`, the service graph) we'll note in passing.
 
 ### Click 1: a RED spike → the exact trace (metric → trace, via exemplars)
 
@@ -86,34 +87,42 @@ loki_derived_fields = [{
   name          = "trace_id"
   matcherType   = "label"     # matches structured metadata, not the log line's text
   matcherRegex  = "trace_id"  # the FIELD NAME now, not a pattern
-  url           = "$${__value.raw}"
+  url           = "$$${__value.raw}" # THREE `$`: Grafana blanks `${...}` during provisioning env-var substitution, so the sequence must be escaped (#1269)
   datasourceUid = "tempo-all"
 }]
 ```
 
-The `trace_id` value has to *get into* structured metadata before this can match anything — that's
-`observability-alloy`'s per-team pipeline, which promotes `trace_id`/`span_id` out of the JSON log body
-into Loki structured metadata for SDK'd apps. So this jump only resolves for **SDK-instrumented services**
-(alpha-shop, alpha-checkout — see [collection & instrumentation](deep-dive-collection-and-instrumentation.md)):
-Beyla doesn't stamp a `trace_id` into an app's own log lines, so a Beyla-only workload has no field to
-promote and the derived field never lights up for it — you still get metric→trace and trace→logs
-(`tracesToLogsV2`) for those, just not the reverse jump. Metric→trace→logs→trace is a *loop* for the
-workloads that opted into L1, a one-way street otherwise.
+**Metric→trace→logs→trace is a *loop* for the workloads that opted into L1, a one-way street otherwise** —
+and that asymmetry is exactly what this jump adds. The `trace_id` value has to *get into* structured
+metadata before this can match anything — that's `observability-alloy`'s per-team pipeline, which promotes
+`trace_id`/`span_id` out of the JSON log body into Loki structured metadata for SDK'd apps. So this jump
+only resolves for **SDK-instrumented services** (alpha-shop, alpha-checkout — see
+[collection & instrumentation](deep-dive-collection-and-instrumentation.md)): Beyla doesn't stamp a
+`trace_id` into an app's own log lines, so a Beyla-only workload has no field to promote and the derived
+field never lights up for it — you still get metric→trace and trace→logs (`tracesToLogsV2`) for those,
+just not the reverse jump.
 
-### Click 3: that span → its flame graph (trace → profile, `tracesToProfilesV2`)
+### Click 3: that span → its flame graph (trace → profile, `tracesToProfiles`)
 
 The span is slow *inside the process* — not waiting on a downstream call, just burning CPU. You want to
 know *which function*. The Tempo datasource links to Pyroscope:
 
 ```hcl
-tracesToProfilesV2 = {
-  datasourceUid = replace(ds.uid, "tempo", "pyroscope")
+# gated on var.enable_traces_to_profiles
+tracesToProfiles = {
+  # tempo→pyroscope, but Pyroscope has no `-all`: special-case `tempo-all`
+  # → `pyroscope-<federated_profiles_cluster>` (the plain replace would point nowhere)
+  datasourceUid = ds.uid == "tempo-all" ? "pyroscope-${var.federated_profiles_cluster}" : replace(ds.uid, "tempo", "pyroscope")
   profileTypeId = "process_cpu:cpu:nanoseconds:cpu:nanoseconds"
   tags          = [{ key = "service.name", value = "service_name" }]
 }
 ```
 
-Same `replace` convention (`tempo`→`pyroscope`), same `service.name`→`service_name` tag mapping. And here
+The field name is the gotcha that teaches: it's `tracesToProfiles`, **not** `tracesToProfilesV2` — unlike
+logs (which really does have a `tracesToLogsV2`) there is no V2 variant for profiles, and Grafana silently
+ignores the V2 name, so the "Related profiles" link just never renders (the module comment cites
+[#1269](https://github.com/asanexample/platform/issues/1269)). Same `replace` convention (`tempo`→`pyroscope`),
+same `service.name`→`service_name` tag mapping. And here
 is the subtle thing that makes this jump possible at all: the trace and the profile have to agree on the
 service's name, and nobody set that name by hand. Beyla labels a trace's `service.name` from the
 workload's `app.kubernetes.io/name` label (falling back to namespace); the eBPF profiler (an Alloy
@@ -135,7 +144,7 @@ Two more pieces aren't "clicks" but frame the whole investigation.
 The **service graph** answers "which hop" *before* you open a single trace. Tempo's metrics-generator
 also emits `traces_service_graph_*` metrics (request counts and latencies *between* services), and the
 Tempo datasource's `serviceMap = { datasourceUid = replace(ds.uid, "tempo", "mimir") }` tells Grafana to
-render them as a node graph — `user → acme-shop-web → …`. Same swap convention, pointed back at Mimir
+render them as a node graph — `storefront → alpha-checkout → …`. Same swap convention, pointed back at Mimir
 because the graph *is* metrics.
 
 **Deploy annotations** answer "…and it got slow *because of what?*" The APM dashboard
@@ -149,7 +158,7 @@ carries a dashboard-level annotation query:
 ```
 
 Every deploy draws a vertical line across the time series. So "latency spiked at 03:00" sits directly
-under "…because of the 02:58 deploy of `shop-web`" — the metric blip and its likely cause on one axis.
+under "…because of the 02:58 deploy of `storefront`" — the metric blip and its likely cause on one axis.
 (`kube_deployment_metadata_generation` bumps on every spec change; `changes() > 0` marks the moment.)
 
 ---
@@ -201,18 +210,18 @@ ever. Live today, one per registered team:
 
 ```text
 $ kubectl --context platform -n observability get cm | grep team-overview
-obs-dashboard-team-overview-acme        1   …
-obs-dashboard-team-overview-globex      1   …
+obs-dashboard-team-overview-alpha       1   …
+obs-dashboard-team-overview-bravo       1   …
 obs-dashboard-team-overview-platform    1   …
 ```
 
-Those three match the three files in `gitops/teams/` (`acme`, `globex`, `platform`) exactly — the
-`fileset` in action.
+Those three match the three files in `gitops/teams/` (`alpha.yaml`, `bravo.yaml`, `platform.yaml`) exactly
+— the `fileset` in action.
 
 What's *on* the dashboard, and where the numbers come from — it's a RED + USE view scoped to the team:
 
 - **Pre-filtered by namespace.** Every panel query carries `namespace=~"__TEAM__-.*"` — the platform's
-  environment-namespace convention (`<team>-<product>-<stage>`, e.g. `acme-demo-dev`) means a single
+  environment-namespace convention (`<team>-<product>-<stage>`, e.g. `alpha-shop-dev`) means a single
   regex captures *all* of a team's environments and nothing else.
 - **RED**, from Beyla — request rate and 5xx ratio per environment off
   `http_server_request_duration_seconds_count` (the same zero-code Beyla metric the SLOs use;
@@ -225,18 +234,20 @@ What's *on* the dashboard, and where the numbers come from — it's a RED + USE 
 Crucially, it **queries the federated `Mimir (all clusters)` datasource** (uid `mimir-all`), not a
 per-team-isolated one — the template's default datasource is literally `"Mimir (all clusters)"`.
 
-> **This filter is a *default view*, not a boundary.** `namespace=~"acme-.*"` is baked into the panels,
-> but nothing *stops* an `acme` engineer from editing the query to `globex-.*` — the dashboard reads the
+> **This filter is a *default view*, not a boundary.** `namespace=~"alpha-.*"` is baked into the panels,
+> but nothing *stops* an `alpha` engineer from editing the query to `bravo-.*` — the dashboard reads the
 > all-clusters datasource, which can see every tenant. It's the convenient lane, not a wall. That
 > distinction is the whole point of Effort 2.
 
 ### Effort 2 — the hard boundary the platform built, then pulled
 
-The *harder* goal — making `acme` genuinely **unable** to query `globex`'s data — is P13 (#590), and it has an
+The *harder* goal — making `alpha` genuinely **unable** to query `bravo`'s data — is P13 (#590), and it has an
 honest arc: the write side landed and stayed; the read side was built, shipped, then **retired**. What's live
-is the **write-split into real per-team tenants** — `cortex-tenant` splits each environment namespace's series
-into its own Mimir tenant (Loki the same for logs), so `acme` and `globex` are real, separate tenants, not one
-bucket with a label. What was *designed* on the read side (from the `observability-tenant-proxy` README):
+is the **write-split into real per-team tenants** — `cortex-tenant` (a write-path router in front of Mimir
+ingest that reads the namespace label and stamps the per-team `X-Scope-OrgID`) splits each environment
+namespace's series into its own Mimir tenant (Loki the same for logs), so `alpha` and `bravo` are real,
+separate tenants, not one bucket with a label. What was *designed* on the read side (from the
+`observability-tenant-proxy` README):
 
 ```text
 user → Grafana ──(query + OIDC token, oauthPassThru)──▶ tenant-proxy ──(X-Scope-OrgID=<team>)──▶ Mimir
@@ -259,17 +270,17 @@ cortex-tenant-…   1/1   Running
 So what isolates a team's *reads* today, with the proxy gone? The **soft model** — which was the actual need:
 
 1. **Real per-team tenants underneath (write-side, live).** The `cortex-tenant` write-split gives each team its
-   own Mimir/Loki tenant. The platform **hub** runs no environment namespaces, so its own metrics are the
-   `platform` tenant; the real per-team tenants (`acme`, `globex`, …) are populated by the **preprod spoke's
+   own Mimir/Loki tenant. The real per-team tenants (`alpha`, `bravo`, …) are populated by the **preprod spoke's
    dual-write** — preprod, where the team apps run, ships each namespace's series into its own tenant (additive
-   to `preprod`). So the *separation of the data* is real and live end-to-end.
+   to `preprod`; the hub carries no environment namespaces, so its own metrics stay the `platform` tenant — see
+   the footnote below). So the *separation of the data* is real and live end-to-end.
 2. **Soft read scoping on top (Grafana-side, live).** Each team reads through a `Mimir (<team>)` / `Loki
    (<team>)` datasource pinned to its tenant, and per-team isolation is enforced by **Grafana dashboard-folder
    permissions** plus the **namespace-filtered per-team overview dashboards** (#1157) — an organizational
    boundary, not a fail-closed data gate. Cross-team *sharing* is soft too: share the dashboard or grant folder
    access. (The `AccessGrant` model — [ADR-068](../../adrs/068-product-scoped-and-cross-team-access-model.md),
    `gitops/grants/` — still governs cross-team access in general, but its enforcement as a *fail-closed
-   observability read-federation* (`X-Scope-OrgID: acme|globex`) went with the retired proxy.) Per-team
+   observability read-federation* (`X-Scope-OrgID: alpha|bravo`) went with the retired proxy.) Per-team
    **traces**/**profiles** read scoping is a follow-up.
 
 An architectural footnote worth keeping: the write-split was flipped **hub-first** — the [platform
@@ -282,7 +293,7 @@ enable_per_team_tenants = true # …HUB flip first: hub metrics still resolve to
 
 The re-tenant splits metrics by *environment namespace* → team, and the **hub cluster has no environment
 namespaces** (tenant workloads run on **preprod**, the spoke), so the hub's *own* metrics still resolve to the
-`platform` tenant. The genuinely per-team `acme`/`globex` tenants are fed from the preprod path — now live and
+`platform` tenant. The genuinely per-team `alpha`/`bravo` tenants are fed from the preprod path — now live and
 carrying data. That's exactly why the write-split is *proven*, not merely *plumbed*: real per-team data flows
 through the part that separates it.
 
@@ -335,10 +346,9 @@ than silently reshaping your panels. Same discipline as pinning a chart version.
   built and then **retired** (#1269) as unreliable. So don't read the filter, or the soft read scoping, as a
   security control.
 - **A flag being `true` is a claim about *intent*, not *effect*.** `enable_per_team_tenants` was flipped
-  hub-first, but the hub has no environment namespaces (tenants run on the preprod spoke), so the hub's *own*
-  metrics still resolve to the `platform` tenant. The genuinely per-team `acme`/`globex` tenants are fed from
-  the preprod path — now live and carrying data, which is what makes the write-split *proven*. Verify per-team
-  data separation against where the data actually lands, not just the flag.
+  hub-first — but the hub carries no environment namespaces, so its own metrics still resolve to `platform`,
+  and the genuinely per-team tenants are proven only where the data lands (the preprod spoke, now live and
+  carrying data). Verify per-team data separation against where the data actually lands, not just the flag.
 - **A team appears the instant it's in the registry.** `team_overview_teams` is a `fileset` over
   `gitops/teams/*.yaml`, so onboarding a `Team` yields its overview dashboard on the next apply — and,
   conversely, a dashboard with no matching registry file can't exist. Registry is the source of truth for
@@ -355,7 +365,7 @@ than silently reshaping your panels. Same discipline as pinning a chart version.
   (the same Beyla RED metrics feed the SLOs and the team dashboards).
 - **Code:** [`observability-mimir`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-mimir/main.tf)
   (exemplar destinations) · [`observability-tempo`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-tempo/main.tf)
-  (`tracesToLogsV2` / `tracesToProfilesV2` / `serviceMap`) · [`observability-loki`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-loki/main.tf)
+  (`tracesToLogsV2` / `tracesToProfiles` / `serviceMap`) · [`observability-loki`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-loki/main.tf)
   (the `trace_id` derived field) · [`observability-tenant-proxy`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-tenant-proxy/README.md)
   (P13 read isolation — built, then retired #1269) · [`team-overview.json.tmpl`](https://github.com/asanexample/platform/blob/main/infra/modules/observability/dashboards/team-overview.json.tmpl).
 - **House skill:** `observability-authoring` — the dashboards-as-code ConfigMap pattern and the vendored-
