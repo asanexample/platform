@@ -167,9 +167,14 @@ locals {
   # #1269). The provisioning file must contain the escaped form `$${__value.raw}` (Grafana `$$`→`$`). Getting
   # `$${` onto disk needs `$$${` in HCL (HCL collapses one `$${`→`${`, leaving the leading `$`). Verified with
   # `tofu console` and the live datasource API before/after.
+  # matcherType "label" links off the `trace_id` STRUCTURED METADATA field (promoted in the observability-alloy
+  # per-team pipeline, #1354) rather than regex-scraping every log line at query time — first-class + robust,
+  # and matcherRegex now holds the FIELD NAME, not a pattern. `${__value.raw}` is still the field's value, so the
+  # `$$${…}` provisioning-escape gotcha above is unchanged.
   loki_derived_fields = [{
     name          = "trace_id"
-    matcherRegex  = "trace_?[iI][dD]\"?[:=]\\s*\"?([0-9a-fA-F]+)"
+    matcherType   = "label"
+    matcherRegex  = "trace_id"
     url           = "$$${__value.raw}"
     datasourceUid = "tempo-all"
   }]
