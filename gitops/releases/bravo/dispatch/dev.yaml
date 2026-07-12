@@ -1,0 +1,9 @@
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata:
+  name: bravo-dispatch-dev
+spec:
+  environmentRef: bravo-dispatch-dev
+  services:
+    shipments:
+      digest: sha256:06fda15973db299d0f183b4994d3a4c59e2439d6cf30a4aad5b544960708af8d
