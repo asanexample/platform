@@ -77,21 +77,28 @@ Each field earns its place:
 
 The case-file hyperlinks run *both* directions. If you started in the logs — grepping an error, no trace
 in hand — a `trace_id` in the log line is itself clickable back to the trace. That's a Loki **derived
-field**, a regex that extracts a value from raw log text and turns it into a link. From
+field**. It used to be a regex that scraped raw log text; since [ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md)
+it matches on **Loki structured metadata** instead — first-class and robust, not a text scan. From
 [`observability-loki/main.tf`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-loki/main.tf):
 
 ```hcl
 loki_derived_fields = [{
   name          = "trace_id"
-  matcherRegex  = "trace_?[iI][dD]\"?[:=]\\s*\"?([0-9a-fA-F]+)"
+  matcherType   = "label"     # matches structured metadata, not the log line's text
+  matcherRegex  = "trace_id"  # the FIELD NAME now, not a pattern
   url           = "$${__value.raw}"
-  datasourceUid = "tempo"
+  datasourceUid = "tempo-all"
 }]
 ```
 
-The forgiving regex (`trace_?[iI][dD]`, optional quotes, `:` or `=`) is deliberate: it catches
-`traceId=…`, `"trace_id": "…"`, `trace-id = …` and other shapes apps emit, because the platform doesn't
-control every app's log format. Metric→trace→logs→trace is a *loop*, not a one-way street.
+The `trace_id` value has to *get into* structured metadata before this can match anything — that's
+`observability-alloy`'s per-team pipeline, which promotes `trace_id`/`span_id` out of the JSON log body
+into Loki structured metadata for SDK'd apps. So this jump only resolves for **SDK-instrumented services**
+(alpha-shop, alpha-checkout — see [collection & instrumentation](deep-dive-collection-and-instrumentation.md)):
+Beyla doesn't stamp a `trace_id` into an app's own log lines, so a Beyla-only workload has no field to
+promote and the derived field never lights up for it — you still get metric→trace and trace→logs
+(`tracesToLogsV2`) for those, just not the reverse jump. Metric→trace→logs→trace is a *loop* for the
+workloads that opted into L1, a one-way street otherwise.
 
 ### Click 3: that span → its flame graph (trace → profile, `tracesToProfilesV2`)
 

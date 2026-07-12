@@ -51,7 +51,7 @@ in namespace `observability` (backends on the hub; OTel Operator in `opentelemet
   data- and dashboard-sharing mechanism; namespace-filtered team dashboards stay the default self-view.
   (See status below.)
 
-## Collection & the instrumentation ladder ([ADR-077](../../adrs/077-application-instrumentation-strategy.md))
+## Collection & the instrumentation ladder ([ADR-077](../../adrs/077-application-instrumentation-strategy.md), [ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md))
 
 **Platform-injected** — apps carry no telemetry config; the platform stands up collectors + instruments.
 
@@ -62,28 +62,33 @@ in namespace `observability` (backends on the hub; OTel Operator in `opentelemet
 | Profiles | Alloy eBPF DaemonSet (privileged, CPU sampler) | Pyroscope |
 | **RED metrics + traces** | **Beyla** eBPF DaemonSet (kernel uprobes) | Mimir (scrape) + Tempo (OTLP) |
 | Cluster/infra metrics | Prometheus (hub full / spoke **agent-mode**) + KSM + node-exporter | Mimir (remote-write) |
-| App traces (opt-in) | OTel Collector (gateway) ← SDK | Tempo |
+| App traces + metrics + profiles + logs (opt-in SDK, ADR-100) | OTel Collector (gateway) ← app SDK | Tempo / Mimir / Pyroscope / Loki |
 | AWS metrics | cloudwatch-exporter (YACE, tag-discovery) | Mimir |
 | Synthetic | blackbox (`Probe` CR) · k6 (CronJob) | Mimir |
 | Network flows | Cilium + Hubble (`ServiceMonitor`; chart's own off) | Mimir (+ standalone Hubble UI) |
 
-**Ladder:** L0 **Beyla eBPF** (zero-code RED/traces/service-graph, every workload — **LIVE**) → L1 **OTel SDK
-inject** (annotation `instrumentation.opentelemetry.io/inject-<lang>` → operator injects SDK + OTLP endpoint;
-operator **LIVE** but **no `Instrumentation` CR wired to a workload yet**, P14) → L2 **agent-obs** (below).
-Beyla replaces Tempo's metrics-generator as the RED source (ADR-077 D5).
+**Ladder:** L0 **Beyla eBPF** (zero-code RED/traces/service-graph, every workload — **LIVE**) → L1 **OTel SDK**
+(app wires the SDK, annotation `instrumentation.opentelemetry.io/inject-sdk` → operator injects the OTLP
+endpoint; **LIVE**, 6 `Instrumentation` CRs across preprod, `alpha-shop`+`alpha-checkout` opted in) → L2
+**agent-obs** (below). Per [ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md), a
+workload runs L0 *or* L1, never both (SDK-annotated pods are excluded from Beyla). Beyla replaces Tempo's
+metrics-generator as the RED source for un-instrumented workloads (ADR-077 D5).
 
-## Correlation (all live)
+## Correlation (all live for L0; log↔trace needs L1)
 
-Metric **exemplar** → **trace** (Tempo) → **logs** (Loki, via trace_id) → **profile** (Pyroscope, via aligned
-`service.name`) — one click each. Plus service-graph + deploy annotations. Wired in datasource config
-(`exemplarTraceIdDestinations`, `tracesToLogsV2`, `tracesToProfilesV2`).
+Metric **exemplar** → **trace** (Tempo) → **logs** (Loki, `tracesToLogsV2`) → **profile** (Pyroscope, via
+aligned `service.name`) — one click each, for any workload. The reverse jump, **logs → trace** (Loki
+`derivedField`, `matcherType: label` against structured metadata — ADR-100), only resolves for L1 SDK'd
+services; Beyla doesn't stamp `trace_id` into app log lines. Plus service-graph + deploy annotations. Wired
+in datasource config (`exemplarTraceIdDestinations`, `tracesToLogsV2`, `tracesToProfilesV2`).
 
 ## Act: SLOs · alerting · cost
 
 - **SLOs:** **Sloth** (`PrometheusServiceLevel` → SLI recording rules + **multi-window burn-rate** alerts).
   Live: an API-server 99.9% SLO. **Per-prod-app SLOs auto-derived** from `gitops/environments/**/prod.yaml`
-  (99.9% HTTP success off Beyla RED), evaluated in the Mimir ruler — feeds the ADR-056 canary error-budget
-  freeze gate.
+  (99.9% HTTP success off `http_server_request_duration_seconds_count` — Beyla-emitted or, per ADR-100,
+  OTLP-emitted and converged to the same name/labels at Mimir ingest), evaluated in the Mimir ruler — feeds
+  the ADR-056 canary error-budget freeze gate.
 - **Alerting:** ~40 curated PrometheusRules (`observability/alerts/curated.yaml`); Alertmanager routes by
   `severity` (critical → PagerDuty + Slack + SNS; warning → Slack; inhibit critical→warning); a **dead-man's
   switch** (Healthchecks.io) pages if the pipeline goes silent. *PagerDuty status:* the critical→PagerDuty wire

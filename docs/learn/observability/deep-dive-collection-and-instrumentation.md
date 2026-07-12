@@ -25,9 +25,17 @@ ADR-077 makes three commitments, and the rest of this doc is just those three in
    traces for every workload, any language, no manifest change.
 2. **The OTLP endpoint is platform-managed, never app-wired** — an app never knows the collector's
    address, so the platform can move it without touching a single app.
-3. **SDK-level detail is opt-in enrichment**, layered on top of Beyla, never required.
+3. **SDK-level detail is opt-in enrichment** for workloads that want it.
 
 The first is the surprising one, and it gets the most attention below.
+
+> **Since ADR-077: one refinement (ADR-100).** ADR-077 originally framed the SDK layer as sitting "on
+> top of" Beyla — additive enrichment. In practice Beyla's eBPF context-propagation and an app's SDK
+> `traceparent` **fight each other** (Beyla overwrites the SDK's trace context on egress, fragmenting
+> the trace — a real incident, not a theoretical risk). [ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md)
+> corrects this: it's **one or the other per workload**, never both. A pod that opts into the SDK
+> (carries the `inject-sdk` annotation) is auto-excluded from Beyla. The floor/opt-in shape below is
+> otherwise unchanged.
 
 ## The collector fleet — every one, verified running
 
@@ -160,31 +168,38 @@ more only where you need depth.
 | Layer | What you get | What you do | Status (verified) |
 | --- | --- | --- | --- |
 | **L0 — Beyla eBPF** | RED metrics + service graph + request traces | **Nothing** | **Live**, both clusters (3 hub / 2 preprod DaemonSet pods) |
-| **L1 — OTel SDK auto-inject** | code-level spans + custom attributes | Add one annotation | Operator **live**; **no workload wired** (P14 outstanding) |
+| **L1 — OTel SDK auto-inject** | code-level spans, metrics, profiles, trace-stamped logs | Wire the SDK + add one annotation | **Live** — `alpha-shop`, `alpha-checkout` (preprod), both opted in |
 | **L2 — agent observability** | GenAI semconv for AI agents | (agent-side instrumentation) | Live for the triage agent — see the agent-observability dive |
 
-L1 is the one to be honest about. The [OpenTelemetry
+L1 went live this cycle ([ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md)),
+correcting ADR-077's original "still outstanding" status. The [OpenTelemetry
 Operator](https://opentelemetry.io/docs/kubernetes/operator/automatic/) (`observability-otel-operator`,
-chart `0.116.0`) is genuinely deployed — verified running as `opentelemetry-operator` in the
-`opentelemetry-operator-system` namespace, and it did install its `Instrumentation` CRD (created
-`2026-06-22`, matching the ADR). The mechanism is a mutating admission webhook: annotate a pod
-`instrumentation.opentelemetry.io/inject-<lang>` and the operator injects the language SDK + the
-platform-managed OTLP endpoint at admission — no rebuild.
+chart `0.116.0`) runs as `opentelemetry-operator` in the `opentelemetry-operator-system` namespace on
+**both** clusters now — the CRD is no longer hub-only. The mechanism is a mutating admission webhook:
+annotate a pod `instrumentation.opentelemetry.io/inject-sdk` and the operator injects the
+platform-managed OTLP endpoint at admission — the app still links its own OTel SDK (that's what makes
+this L1, not L0), but never hardcodes a collector address.
 
-But the endpoint config lives in a namespace-scoped `Instrumentation` **CR**, and none exist yet:
+The endpoint config lives in a namespace-scoped `Instrumentation` **CR**, and today six exist — one per
+environment namespace, verified live:
 
 ```text
-$ kubectl get instrumentation.opentelemetry.io -A     # platform (hub)
-No resources found
 $ kubectl --context preprod get instrumentation.opentelemetry.io -A
-error: the server doesn't have a resource type "instrumentation"   # operator is hub-only
+NAMESPACE               NAME       ENDPOINT
+alpha-checkout-dev      platform   http://otel-collector.observability.svc.cluster.local:4318
+alpha-conformance-dev   platform   http://otel-collector.observability.svc.cluster.local:4318
+alpha-shop-dev          platform   http://otel-collector.observability.svc.cluster.local:4318
+alpha-shop-prod         platform   http://otel-collector.observability.svc.cluster.local:4318
+bravo-widgets-dev       platform   http://otel-collector.observability.svc.cluster.local:4318
+platform-flagship-dev   platform   http://otel-collector.observability.svc.cluster.local:4318
 ```
 
-So the accurate picture: the mechanism is live, but no app has climbed to L1. Per-namespace
-`Instrumentation` CRs are the golden-path scaffolder's job (P14), still outstanding — the operator
-module's own code says so, pointing the per-namespace CR at the Composition/scaffolder rather than a
-central CR. Today every workload gets the L0 Beyla baseline and no one is on L1. This is the domain's one
-"built ahead of a consumer" seam, and the docs don't oversell it.
+The CR existing per namespace doesn't mean every pod in it climbed the ladder, though — the CR just
+*makes L1 available*; a pod still has to carry the `inject-sdk` annotation to use it. Spot-checked:
+`alpha-shop`'s services (`cart`, `catalog`, `orders`, `payment`, `storefront`) and `alpha-checkout` carry
+the annotation and are SDK'd; `bravo-widgets`, `alpha-conformance`, and `platform-flagship` don't — they
+ride the L0 Beyla baseline like everyone else. That's the ladder working as designed: opt-in, per
+workload, not all-or-nothing per namespace.
 
 ## The rest of the fleet — traces, metrics, cloud, synthetics
 
@@ -306,10 +321,12 @@ difference.
   running again — with all three processors, so it still emits its own span-metrics + service graph into
   Mimir and powers Traces Drilldown via `local-blocks`; it's just not what the SLOs/dashboards consume.
   Read the live cluster, not just D5's "we do not enable the generator."
-- **L1 is a loaded gun with no round chambered.** The OTel operator + webhook + CRD are live, but zero
-  `Instrumentation` CRs exist, so no app gets SDK spans today (P14). The operator is hub-only — preprod
-  doesn't even have the CRD. Don't tell a developer to "just add the inject annotation" until P14 wires
-  the per-namespace CR.
+- **L1 and L0 are mutually exclusive per workload, not layered (ADR-100).** Beyla's eBPF
+  context-propagation overwrites an SDK's `traceparent` on egress if both run on the same pod — that's
+  a real incident (fragmented shop→checkout traces), not a theoretical risk. The fix is exclusion, not
+  coordination: any pod carrying `instrumentation.opentelemetry.io/inject-sdk` is dropped from Beyla's
+  `instrument_namespaces` glob. Don't tell a developer "SDK spans add detail on top of Beyla" — for
+  their workload, SDK spans *replace* Beyla's.
 - **`service.name` == `service_name` is a collection-time contract.** The span→flame-graph jump only
   works because Beyla and the eBPF profiler both derive their identity from `app.kubernetes.io/name`. Set
   that label on your workload or you fragment your own correlation — Grafana can't fix a mismatch made at
@@ -327,6 +344,9 @@ difference.
   S3, tenancy).
 - [ADR-077](../../adrs/077-application-instrumentation-strategy.md) — the platform-injection instrumentation
   strategy (D1–D6, the ladder, D5's metrics-generator decision).
+- [ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md) — the SDK-first golden
+  path + Beyla-fallback correction to ADR-077's "layered" framing, and the OTLP↔Prometheus metric
+  convergence at Mimir ingest.
 - [ADR-079](../../adrs/079-cloud-resource-monitoring-scope.md) — the cloud-resource (YACE) monitoring scope.
 - [ADR-047](../../adrs/047-pod-identity-as-aws-identity-standard.md) — Pod Identity, how YACE gets AWS creds
   with no static keys.

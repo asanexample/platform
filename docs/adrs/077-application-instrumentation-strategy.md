@@ -1,6 +1,10 @@
 # ADR-077: Application Instrumentation Strategy
 
-**Status:** Accepted — Beyla eBPF baseline (P7a) + OTel Operator auto-inject (P7b) implemented + live; SDK / golden-path templates (P14) outstanding (2026-06-22)
+**Status:** Accepted — Beyla eBPF baseline (P7a) + OTel Operator auto-inject (P7b) implemented + live (2026-06-22).
+**Update (2026-07-12):** the SDK opt-in described in D3 is now live for `alpha-shop`/`alpha-checkout` (hand-wired
+`internal/telemetry`, not the scaffolder-template path originally envisioned) — see
+[ADR-100](100-observability-instrumentation-and-otlp-convention.md), which also corrects D3's "additive over
+Beyla" framing: SDK'd workloads are excluded from Beyla, not layered on top of it.
 
 ## Context
 
@@ -63,6 +67,11 @@ Services wanting code-level spans/attributes opt in with the OTel Operator annot
 sets that annotation (and any minimal SDK wiring) for the chosen language. This is the *only* place templates
 gain instrumentation support, and it is additive over Beyla — an un-annotated or non-template app still gets
 the full Beyla baseline. (This template work is golden-path scope — P14.)
+
+> **Correction (ADR-100, 2026-07-12):** "additive over Beyla" turned out wrong in practice — Beyla's eBPF
+> context-propagation overwrites the SDK's `traceparent` on egress if both run on one pod, fragmenting the
+> trace. The as-built rule is **exclusion, not layering**: an SDK-annotated pod is dropped from Beyla's
+> `instrument_namespaces` glob. An un-annotated app still gets the full Beyla baseline, unchanged.
 
 ### D4 — Dogfood on the platform cluster first
 

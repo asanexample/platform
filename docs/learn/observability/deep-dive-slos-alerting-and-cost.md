@@ -71,10 +71,15 @@ One CR in, three rule groups out (recordings, metadata, alerts) — the controll
 
 **Path B — the Mimir ruler, for per-app SLOs.** Every product's **prod** environment gets a 99.9%
 HTTP-success SLO *auto-derived* — no one writes it. The `mimir` Terragrunt unit `fileset`s over
-`gitops/environments/**/prod.yaml`, and for each prod claim it synthesizes an SLO whose SLI is that app's
-**Beyla RED metrics** filtered to its namespace (`http_server_request_duration_seconds_count`). This is
-registries-as-source (the same ADR-067 pattern the whole platform runs on): add a prod environment, get an SLO
-free.
+`gitops/environments/**/prod.yaml`, and for each prod claim it synthesizes an SLO whose SLI is
+`http_server_request_duration_seconds_count` filtered to the app's namespace (`k8s_namespace_name`). The
+query doesn't care whether that metric came from **Beyla** (native Prometheus naming) or an app's **OTel
+SDK** — since [ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md), Mimir's
+OTLP ingest translates SDK metrics to the same `..._seconds` naming and promotes `k8s.namespace.name` to
+the same label (`otel_metric_suffixes_enabled` + `promote_otel_resource_attributes`), so one query works
+for both delivery paths — a Beyla-only app and an SDK'd app (e.g. alpha-shop) get the identical SLO
+mechanism for free. This is registries-as-source (the same ADR-067 pattern the whole platform runs on):
+add a prod environment, get an SLO free.
 
 Two things differ from Path A. First, these rules are rendered from a template into a Mimir **ruler**
 namespace and evaluated *in the Mimir ruler against the `preprod` tenant* — because that's where the app
