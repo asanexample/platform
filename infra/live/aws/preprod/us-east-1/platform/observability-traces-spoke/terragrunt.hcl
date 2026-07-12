@@ -79,6 +79,13 @@ inputs = {
   tenant_id             = "preprod" # belt-and-suspenders; the edge overwrites it
   resource_attributes   = { cluster = "preprod" }
 
+  # Metrics spoke (P10/P14): forward tenant app-SDK OTLP metrics to the hub Mimir's OTLP ingest over the TGW,
+  # via the same `preprod-mimir` gateway edge (which force-sets X-Scope-OrgID=preprod, write-only). Without
+  # this the collector's metrics pipeline exports to `debug` (dropped) and tenant RED metrics never reach
+  # Mimir — the ADR-056 canary metric-gate and the per-Product shop dashboards then have no data. The hub's
+  # /otlp/v1/metrics spoke route is added in the platform `mimir` unit.
+  mimir_endpoint = "https://preprod-mimir.aws.refplat.org/otlp/v1/metrics"
+
   helm_chart_version = include.base.locals.helm_versions.otel_collector
   helm_wait          = true
 

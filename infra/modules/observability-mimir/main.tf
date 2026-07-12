@@ -441,6 +441,14 @@ resource "kubernetes_manifest" "spoke_ingest_route" {
           matches     = [{ path = { type = "PathPrefix", value = "/api/v1/push" } }]
           filters     = [{ type = "RequestHeaderModifier", requestHeaderModifier = { set = [{ name = "X-Scope-OrgID", value = each.value }] } }]
           backendRefs = [{ name = "${var.helm_release_name}-gateway", port = 80 }]
+          }, {
+          # OTLP metrics write path (P10 / P14) — Mimir's native OTLP ingest, which the gateway nginx already
+          # proxies to the distributor (`/otlp/v1/metrics`). Lets a spoke's OTel collector push app-SDK metrics
+          # (otlphttp exporter) with the tenant force-set, exactly like the Prometheus /api/v1/push path — so a
+          # tenant workload's RED metrics (http_server_request_duration_*) land in this spoke's own Mimir tenant.
+          matches     = [{ path = { type = "PathPrefix", value = "/otlp/v1/metrics" } }]
+          filters     = [{ type = "RequestHeaderModifier", requestHeaderModifier = { set = [{ name = "X-Scope-OrgID", value = each.value }] } }]
+          backendRefs = [{ name = "${var.helm_release_name}-gateway", port = 80 }]
         }],
         contains(var.spoke_ingest.query_tenants, each.key) ? [{
           # Read path — Mimir's Prometheus query API (/prometheus/api/v1/{query,query_range,series,labels,...}).
