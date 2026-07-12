@@ -42,7 +42,7 @@ the hub; OTel Operator in `opentelemetry-operator-system`).
 - **Cluster tenants** (LIVE, carrying data): `platform`, `preprod`. Spokes remote-write over a write-only
   Gateway HTTPRoute that force-stamps `X-Scope-OrgID`, so a spoke can't spoof another tenant.
 - **Per-team tenants** (the P13 split): a write-path proxy (`cortex-tenant`) relabels series to
-  `<team>` for env namespaces → real `acme`/`globex` Mimir tenants (verified S3 blocks). LIVE and exercised.
+  `<team>` for env namespaces → real `alpha`/`bravo` Mimir tenants (verified S3 blocks). LIVE and exercised.
   Read-path per-team isolation went the other way. Fail-closed read proxies (`tenant-proxy` for Mimir,
   `loki-tenant-proxy` for Loki) were built to authenticate each query and fence it to the caller's tenant, then
   **retired** (#1269): OSS Grafana's `oauthPassThru` can't reliably forward the SSO token, so the proxy
@@ -82,7 +82,7 @@ Metric **exemplar** → **trace** (Tempo) → **logs** (Loki, `tracesToLogsV2`) 
 aligned `service.name`) — one click each, for any workload. The reverse jump, **logs → trace** (Loki
 `derivedField`, `matcherType: label` against structured metadata — ADR-100), only resolves for L1 SDK'd
 services; Beyla doesn't stamp `trace_id` into app log lines. Plus service-graph + deploy annotations. Wired
-in datasource config (`exemplarTraceIdDestinations`, `tracesToLogsV2`, `tracesToProfilesV2`).
+in datasource config (`exemplarTraceIdDestinations`, `tracesToLogsV2`, `tracesToProfiles`).
 
 ## Act: SLOs · alerting · cost
 
@@ -91,12 +91,14 @@ in datasource config (`exemplarTraceIdDestinations`, `tracesToLogsV2`, `tracesTo
   (99.9% HTTP success off `http_server_request_duration_seconds_count` — Beyla-emitted or, per ADR-100,
   OTLP-emitted and converged to the same name/labels at Mimir ingest), evaluated in the Mimir ruler — feeds
   the ADR-056 canary error-budget freeze gate.
-- **Alerting:** ~40 curated PrometheusRules (`observability/alerts/curated.yaml`); Alertmanager routes by
+- **Alerting:** ~60 curated alert rules across 20 groups (`observability/alerts/curated.yaml`); Alertmanager routes by
   `severity` (critical → PagerDuty + Slack + SNS; warning → Slack; inhibit critical→warning); a **dead-man's
   switch** (Healthchecks.io) pages if the pipeline goes silent. *PagerDuty status:* the critical→PagerDuty wire
-  (Events-API-v2 receiver, keyed by the `pagerduty` unit's routing key) is real and was live, but the trial
-  account lapsed (~2026-07-07) → paging **currently offline**; `critical` reaches Slack + SNS + the dead-man's
-  switch today, not a human page. Design unchanged. **Owner-routing** ([ADR-084](../../adrs/084-platform-identity-directory-and-owner-resolution.md)):
+  (Events-API-v2 receiver, keyed by the `pagerduty` unit's routing key) is provisioned in IaC and unchanged;
+  the *delivery* leg depends on a live PagerDuty account, which is **currently offline**, so `critical`
+  reaches Slack + SNS + the dead-man's switch today, not a human page. (The IaC is the durable fact; whether a
+  page actually lands is an account/subscription state — confirm against the live `pagerduty` unit + Alertmanager
+  before relying on it, don't trust this line's snapshot.) **Owner-routing** ([ADR-084](../../adrs/084-platform-identity-directory-and-owner-resolution.md)):
   the triage agent resolves the culprit's **team** from the git registries, pages that team's on-call,
   @-mentions the commit author in Slack.
 - **Cost** ([ADR-091](../../adrs/091-cost-guardrails.md)): **OpenCost** (in-cluster allocation per team/ns,
@@ -125,7 +127,7 @@ TGW to the hub's write-only ingest edge. **preprod spoke LIVE for all four signa
   preprod apps, P4 alerting + owner-routing, P5 cloud-resource, P6 APM/correlation, P8 profiling, P9 SLOs, P11
   cost, P12 policy-reporter, network-flow metrics + alerts (Cilium/Hubble: `cilium_drop_count_total`,
   `hubble_flows_processed_total`) + the standalone Hubble UI, **agent-obs (ADR-076)**, per-team overview
-  dashboards (#1157), per-team **write** split (real acme/globex tenants) + **soft** per-team read scoping
+  dashboards (#1157), per-team **write** split (real alpha/bravo tenants) + **soft** per-team read scoping
   (Grafana dashboard-folder permissions + per-team dashboards; the hard fail-closed read-proxy was built then
   **retired**, #1269).
 - **Built-but-inert:** a leftover `p13-spike-echo` Grafana datasource (cleanup debt).

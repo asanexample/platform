@@ -47,8 +47,8 @@
 <rect x="570" y="276" width="134" height="120" rx="9" fill="#f4f4ef" stroke="#dcdcd5" stroke-width="1" stroke-dasharray="4 3"></rect>
 <text class="text" x="582" y="296" font-size="12.5" fill="#1c1c22" font-weight="600">no stores here</text>
 <text class="muted" x="582" y="314" font-size="11" fill="#5f5f66">real team apps run</text>
-<text class="muted" x="582" y="329" font-size="11" fill="#5f5f66">here — <tspan class="mono" fill="#4a4a52" font-family="ui-monospace,Menlo,Consolas,monospace">acme-shop</tspan>,</text>
-<text class="mono" x="582" y="344" font-size="11" fill="#4a4a52" font-family="ui-monospace,Menlo,Consolas,monospace">globex-widgets</text>
+<text class="muted" x="582" y="329" font-size="11" fill="#5f5f66">here — <tspan class="mono" fill="#4a4a52" font-family="ui-monospace,Menlo,Consolas,monospace">alpha-shop</tspan>,</text>
+<text class="mono" x="582" y="344" font-size="11" fill="#4a4a52" font-family="ui-monospace,Menlo,Consolas,monospace">bravo-dispatch</text>
 <text class="muted" x="582" y="359" font-size="11" fill="#5f5f66">— auto-instrumented,</text>
 <text class="muted" x="582" y="374" font-size="11" fill="#5f5f66">observable on the</text>
 <text class="muted" x="582" y="389" font-size="11" fill="#5f5f66">hub</text>

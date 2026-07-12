@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" width="760" height="470" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#5a6a86"]{fill:#8a98b2}[stroke="#5a6a86"]{stroke:#8a98b2}[fill="#2c7a56"]{fill:#54c591}[stroke="#2c7a56"]{stroke:#54c591}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#bfe0cc"]{fill:#2d5e41}[stroke="#bfe0cc"]{stroke:#2d5e41}[fill="#1c7a4f"]{fill:#41d893}[stroke="#1c7a4f"]{stroke:#41d893}[fill="#7a8faa"]{fill:#a7b6c8}[stroke="#7a8faa"]{stroke:#a7b6c8}[fill="#1f9a63"]{fill:#3cdc95}[stroke="#1f9a63"]{stroke:#3cdc95}[fill="#dce8fa"]{fill:#193257}[stroke="#dce8fa"]{stroke:#193257}[fill="#9fbce8"]{fill:#8aaee6}[stroke="#9fbce8"]{stroke:#8aaee6}[fill="#2c66c4"]{fill:#6b98e1}[stroke="#2c66c4"]{stroke:#6b98e1}[fill="#f7efd8"]{fill:#59491a}[stroke="#f7efd8"]{stroke:#59491a}[fill="#e0cd9c"]{fill:#dfc990}[stroke="#e0cd9c"]{stroke:#dfc990}[fill="#9a6a0a"]{fill:#f6b022}[stroke="#9a6a0a"]{stroke:#f6b022}[fill="#dcefe3"]{fill:#255035}[stroke="#dcefe3"]{stroke:#255035}[fill="#a8d8bd"]{fill:#9bd4b4}[stroke="#a8d8bd"]{stroke:#9bd4b4}[fill="#efe6f9"]{fill:#341853}[stroke="#efe6f9"]{stroke:#341853}[fill="#cdb4e8"]{fill:#45216c}[stroke="#cdb4e8"]{stroke:#45216c}[fill="#8a4fc4"]{fill:#b892dd}[stroke="#8a4fc4"]{stroke:#b892dd}[fill="#3c7a5c"]{fill:#63b58e}[stroke="#3c7a5c"]{stroke:#63b58e}[fill="#fae9e6"]{fill:#532118}[stroke="#fae9e6"]{stroke:#532118}[fill="#ecc3bc"]{fill:#68291e}[stroke="#ecc3bc"]{stroke:#68291e}[fill="#a5342a"]{fill:#d75e54}[stroke="#a5342a"]{stroke:#d75e54}[fill="#cf5a48"]{fill:#e3978c}[stroke="#cf5a48"]{stroke:#e3978c}[fill="#c0392b"]{fill:#e07266}[stroke="#c0392b"]{stroke:#e07266}[fill="#7a5a54"]{fill:#a98780}[stroke="#7a5a54"]{stroke:#a98780}}</style>
+<rect class="bg" x="0" y="0" width="760" height="470" fill="#f6f6f3"></rect>
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.8px">OBSERVABILITY · CORRELATION · THE RETURN JUMP</text>
+<text class="text" x="40" y="88" font-size="24" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">A loop for the instrumented, a one-way street for the rest.</text>
+<text class="muted" x="40" y="116" font-size="14.5" fill="#6c6c73">The forward walk — <tspan class="mono" fill="#5a6a86" font-family="ui-monospace,Menlo,Consolas,monospace">metric → trace → logs / profile</tspan> — works for everyone. Only the return</text>
+<text class="muted" x="40" y="135" font-size="14.5" fill="#6c6c73">jump <tspan class="mono" fill="#2c7a56" font-family="ui-monospace,Menlo,Consolas,monospace">logs → trace</tspan> depends on the SDK.</text>
+<rect x="40" y="158" width="334" height="230" rx="12" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<text class="text" x="58" y="184" font-size="14" fill="#1c1c22" font-weight="600">SDK / L1</text>
+<text class="mono" x="132" y="184" font-size="10" fill="#1c7a4f" font-family="ui-monospace,Menlo,Consolas,monospace">closed loop</text>
+<line x1="120" y1="227" x2="166" y2="227" stroke="#7a8faa" stroke-width="1.5"></line>
+<path d="M165 223 L165 231 L172 227 Z" fill="#7a8faa"></path>
+<line x1="229" y1="227" x2="275" y2="227" stroke="#7a8faa" stroke-width="1.5"></line>
+<path d="M274 223 L274 231 L281 227 Z" fill="#7a8faa"></path>
+<line x1="197" y1="240" x2="197" y2="297" stroke="#7a8faa" stroke-width="1.5"></line>
+<path d="M193 297 L201 297 L197 304 Z" fill="#7a8faa"></path>
+<path d="M308 240 C318 292 220 294 214 244" fill="none" stroke="#1f9a63" stroke-width="2.5"></path>
+<path d="M209 251 L214 241 L219 251 Z" fill="#1f9a63"></path>
+<rect x="58" y="214" width="62" height="26" rx="8" fill="#dce8fa" stroke="#9fbce8" stroke-width="1"></rect><text x="89" y="231" font-size="12" fill="#2c66c4" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">metric</text>
+<rect x="171" y="214" width="58" height="26" rx="8" fill="#f7efd8" stroke="#e0cd9c" stroke-width="1"></rect><text x="200" y="231" font-size="12" fill="#9a6a0a" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">trace</text>
+<rect x="280" y="214" width="56" height="26" rx="8" fill="#dcefe3" stroke="#a8d8bd" stroke-width="1"></rect><text x="308" y="231" font-size="12" fill="#1c7a4f" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">logs</text>
+<rect x="168" y="300" width="64" height="26" rx="8" fill="#efe6f9" stroke="#cdb4e8" stroke-width="1"></rect><text x="200" y="317" font-size="12" fill="#8a4fc4" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">profile</text>
+<rect x="58" y="360" width="14" height="3" rx="1.5" fill="#1f9a63"></rect>
+<text class="muted" x="80" y="357" font-size="11.5" fill="#3c7a5c">log lines carry <tspan class="mono" font-family="ui-monospace,monospace" font-size="10">trace_id</tspan> in Loki structured</text>
+<text class="muted" x="80" y="372" font-size="11.5" fill="#3c7a5c">metadata (Alloy promotes it) — a log clicks back to its trace.</text>
+<rect x="386" y="158" width="334" height="230" rx="12" fill="#fae9e6" stroke="#ecc3bc" stroke-width="1"></rect>
+<text class="text" x="404" y="184" font-size="14" fill="#1c1c22" font-weight="600">Beyla-only / L0</text>
+<text class="mono" x="516" y="184" font-size="10" fill="#a5342a" font-family="ui-monospace,Menlo,Consolas,monospace">one-way</text>
+<line x1="466" y1="227" x2="512" y2="227" stroke="#7a8faa" stroke-width="1.5"></line>
+<path d="M511 223 L511 231 L518 227 Z" fill="#7a8faa"></path>
+<line x1="575" y1="227" x2="621" y2="227" stroke="#7a8faa" stroke-width="1.5"></line>
+<path d="M620 223 L620 231 L627 227 Z" fill="#7a8faa"></path>
+<line x1="543" y1="240" x2="543" y2="297" stroke="#7a8faa" stroke-width="1.5"></line>
+<path d="M539 297 L547 297 L543 304 Z" fill="#7a8faa"></path>
+<path d="M654 240 C664 292 566 294 560 244" fill="none" stroke="#cf5a48" stroke-width="2" stroke-dasharray="5 5"></path>
+<text x="612" y="284" font-size="16" fill="#c0392b" text-anchor="middle">✕</text>
+<rect x="404" y="214" width="62" height="26" rx="8" fill="#dce8fa" stroke="#9fbce8" stroke-width="1"></rect><text x="435" y="231" font-size="12" fill="#2c66c4" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">metric</text>
+<rect x="517" y="214" width="58" height="26" rx="8" fill="#f7efd8" stroke="#e0cd9c" stroke-width="1"></rect><text x="546" y="231" font-size="12" fill="#9a6a0a" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">trace</text>
+<rect x="626" y="214" width="56" height="26" rx="8" fill="#dcefe3" stroke="#a8d8bd" stroke-width="1"></rect><text x="654" y="231" font-size="12" fill="#1c7a4f" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">logs</text>
+<rect x="514" y="300" width="64" height="26" rx="8" fill="#efe6f9" stroke="#cdb4e8" stroke-width="1"></rect><text x="546" y="317" font-size="12" fill="#8a4fc4" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">profile</text>
+<line x1="404" y1="361" x2="418" y2="361" stroke="#cf5a48" stroke-width="2" stroke-dasharray="4 3"></line>
+<text class="muted" x="426" y="357" font-size="11.5" fill="#7a5a54">Beyla never stamps <tspan class="mono" font-family="ui-monospace,monospace" font-size="10">trace_id</tspan> into the</text>
+<text class="muted" x="426" y="372" font-size="11.5" fill="#7a5a54">app&#39;s own logs — the return jump never lights up.</text>
+<text class="muted" x="40" y="424" font-size="13.5" fill="#6c6c73">The forward walk works for everyone. Only L1 gets the round trip.</text>
+</svg>

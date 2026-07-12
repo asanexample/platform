@@ -49,12 +49,7 @@ wrapper decides what OTel calls that this month.
 An agent's work is a tree of nested operations, and OTel's three GenAI operation names map onto that tree
 exactly:
 
-```mermaid
-graph TD
-  A["invoke_agent {agent.name}<br/>the whole triage"] --> B["chat {model}<br/>a model turn — tokens in/out"]
-  A --> C["execute_tool {tool.name}<br/>query_logs, get_recent_changes, …"]
-  A --> D["chat {model}<br/>another turn, given tool results"]
-```
+![One triage agent invocation as a nested span tree — invoke_agent → chat (6667/259 tokens, bedrock sonnet) → four execute_tool spans → disposition, with gen_ai.* attribute chips on each span and cost derived from tokens.](images/triage-span-tree.svg)
 
 `invoke_agent` is the parent span over the whole invocation; `chat` spans are the individual model turns,
 each carrying its token counts; `execute_tool` spans are the tool calls the model decided to make. This
@@ -104,10 +99,16 @@ PromQL, pricing Sonnet 4.6 at $3 / $15 / $0.30 per million input / output / cach
 The kernel of ADR-076 (as corrected by its 2026-06-27 amendment): instrument the agent once, then fan the
 signal out to consumers that each want a *different substrate*. An early draft said "one trace serves all
 four consumers"; operating a live agent proved that wrong, and the amendment split it into three real paths.
+Four consumers collapse to three substrates because two of them — audit and eval — both want the same thing,
+a complete and durable record, so they share the single write-once S3 path; metrics and traces keep their own
+stores. And this is the reassuring part: none of those stores are new. It's the *same four-signal machine*
+from the rest of this stack, pointed at a new kind of workload — not a second observability system.
 
 **Path 1 — metrics, by Prometheus scrape (not OTLP push).** The agent exposes a `/metrics` endpoint and is
 a plain scrape target — a Kubernetes `Service` on port `http` (container port 8080) plus a `ServiceMonitor`
-the platform's Prometheus picks up. Verified live:
+the platform's Prometheus picks up. The `ServiceMonitor` itself ships from the app repo's manifests and is
+delivered by the per-agent ArgoCD ApplicationSet (declared as a managed kind — see the go-deeper links); its
+exact name and port aren't sourced from this repo, but the scrape-via-`ServiceMonitor` shape is:
 
 ```text
 $ kubectl -n platform-agent-triage-copilot get servicemonitor triage-copilot-server -o yaml
@@ -124,19 +125,22 @@ spec:
 Why scrape rather than push the metrics through the OTLP trace pipeline? To isolate the two. Metrics are
 cheap, aggregatable, and want to keep flowing even if the trace collector is saturated or down; pulling
 them on a separate scrape path means a metrics spike never rides — or stalls behind — the trace gateway.
-From here they land in Mimir like every other metric.
+From here they land in the *same* Mimir every other metric on the platform does — agent metrics are just a
+new kind of series in the store the reader already met.
 
 **Path 2 — traces, by OTLP → OTel Collector → Tempo.** The `invoke_agent`/`chat`/`execute_tool` span tree,
 enriched with the `gen_ai.*` attributes, flows over OTLP to the platform's OpenTelemetry Collector and into
-Tempo — the debug consumer, where you open one triage and read its whole reasoning waterfall.
+the *same* Tempo that holds every other workload's traces — the debug consumer, where you open one triage
+and read its whole reasoning waterfall.
 
 **Path 3 — durable eval / audit, by structured log → S3.** This is the sharp correction. The original ADR
 claimed the sampled Tempo trace could double as the audit record. The amendment withdraws that: a sampled,
 retention-bounded trace is not an audit record — you cannot audit on evidence that may have been dropped or
-expired. So audit/eval gets its own always-on, durable, write-once path — structured records to an S3
-corpus (`platform-agent-eval-corpus`), which the agent's own
-[XAgent claim](../../adrs/082-platform-agent-runtime-xagent.md) grants it `s3:PutObject`/`GetObject` on but
-no `s3:DeleteObject` (write-once integrity).
+expired. So audit/eval gets its own durable, write-once path — provisioned as a write-once S3 corpus
+(`platform-agent-eval-corpus`), where the agent writes forward-capture eval records. The bucket and its
+write-once IAM are provisioned by the agent's own
+[XAgent claim](../../adrs/082-platform-agent-runtime-xagent.md), which grants it `s3:PutObject`/`GetObject`
+but no `s3:DeleteObject` (write-once integrity); the record-writing itself lives in the agent's app code.
 
 The reason the Tempo trace can't be the audit record: traces are sampled and retention-bounded, so the one
 you need may have been dropped or aged out. Audit needs a complete, durable path.
@@ -187,6 +191,17 @@ disposition. The point is in that ratio. If the agent's `confident_lead` triages
 rate, the agent is over-confident — its confidence isn't calibrated to reality. No token count or latency
 graph can tell you that; only the loop back to a human can.
 
+![The agent-observability feedback loop — a triage agent's disposition posts a Slack proposal, a human's Accept/Correct/Dismiss verdict lands in the triage_feedback_total counter, and accept-rate-by-disposition closes the loop back to "is the agent calibrated?" with a confidently-wrong failure branch; the rest is the same Mimir/Tempo machine.](images/eval-feedback-loop.svg)
+
+**One invocation, end to end.** Put the three slices on a single timeline and every number on this page comes
+from one real triage. A critical alert fires; the agent wakes and opens an `invoke_agent` span over the whole
+triage. Inside it, a `chat` turn burns **6667 input / 259 output tokens** deciding what to look at, then four
+`execute_tool` spans run — `query_logs`, `get_recent_changes`, `get_change_detail`, `workload_status` — each
+gathering evidence. The model weighs what came back, finds it thin, and records a disposition of
+`insufficient_evidence` (the value in `triage_disposition_total`). Later a human reads the proposal in Slack
+and clicks a verdict, which lands in `triage_feedback_total`. Tokens (Slice 1), the span tree (Slice 2), and
+the verdict (Slice 3) are the same thread seen through three lenses — not three separate agents.
+
 ## When it looks broken but isn't: the cold agent
 
 Here's a failure mode you'll hit, and it teaches the whole model. Open the agent dashboard right after a
@@ -217,6 +232,8 @@ has actually run a triage since the last scrape reset, before you suspect the Se
 ## What's deliberately deferred — the honest edges
 
 This area is easy to oversell, so here's what isn't built.
+
+![Content capture is tier-gated and deferred — metadata (tokens, latency, disposition) is always captured, prompt/response content would route through a redaction gate, and regulated (hipaa/pci) tiers stay metadata-only permanently.](images/content-capture-tiers.svg)
 
 - **Content capture with per-tier redaction** — *deferred; metadata-only today.* Prompts/responses would
   only ever be stored behind a per-compliance-tier redaction gate and never shipped to a SaaS backend. And

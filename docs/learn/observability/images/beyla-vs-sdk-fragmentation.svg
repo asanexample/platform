@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 512" width="760" height="512" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#9a6a0a"]{fill:#f6b022}[stroke="#9a6a0a"]{stroke:#f6b022}[fill="#fae9e6"]{fill:#532118}[stroke="#fae9e6"]{stroke:#532118}[fill="#ecc3bc"]{fill:#68291e}[stroke="#ecc3bc"]{stroke:#68291e}[fill="#c0392b"]{fill:#e07266}[stroke="#c0392b"]{stroke:#e07266}[fill="#a5342a"]{fill:#d75e54}[stroke="#a5342a"]{stroke:#d75e54}[fill="#f5ddd8"]{fill:#5a251a}[stroke="#f5ddd8"]{stroke:#5a251a}[fill="#e6b3aa"]{fill:#e09b8f}[stroke="#e6b3aa"]{stroke:#e09b8f}[fill="#7a2018"]{fill:#dd493b}[stroke="#7a2018"]{stroke:#dd493b}[fill="#a05545"]{fill:#c88779}[stroke="#a05545"]{stroke:#c88779}[fill="#5a201a"]{fill:#cf564a}[stroke="#5a201a"]{stroke:#cf564a}[fill="#f4ded9"]{fill:#5a261a}[stroke="#f4ded9"]{stroke:#5a261a}[fill="#cf6a58"]{fill:#e19b8e}[stroke="#cf6a58"]{stroke:#e19b8e}[fill="#e0b0a6"]{fill:#dca093}[stroke="#e0b0a6"]{stroke:#dca093}[fill="#7a5a54"]{fill:#a98780}[stroke="#7a5a54"]{stroke:#a98780}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#bfe0cc"]{fill:#2d5e41}[stroke="#bfe0cc"]{stroke:#2d5e41}[fill="#1f9a63"]{fill:#3cdc95}[stroke="#1f9a63"]{stroke:#3cdc95}[fill="#1c7a4f"]{fill:#41d893}[stroke="#1c7a4f"]{stroke:#41d893}[fill="#f7efd8"]{fill:#59491a}[stroke="#f7efd8"]{stroke:#59491a}[fill="#e0cd9c"]{fill:#dfc990}[stroke="#e0cd9c"]{stroke:#dfc990}[fill="#8a5c0a"]{fill:#f4aa24}[stroke="#8a5c0a"]{stroke:#f4aa24}[fill="#eaf6ee"]{fill:#204b2e}[stroke="#eaf6ee"]{stroke:#204b2e}[fill="#5f7d6c"]{fill:#81988b}[stroke="#5f7d6c"]{stroke:#81988b}[fill="#25402f"]{fill:#6cac84}[stroke="#25402f"]{stroke:#6cac84}[fill="#dbf0e3"]{fill:#235335}[stroke="#dbf0e3"]{stroke:#235335}[fill="#2c7a56"]{fill:#54c591}[stroke="#2c7a56"]{stroke:#54c591}[fill="#3ba06e"]{fill:#6bcc9c}[stroke="#3ba06e"]{stroke:#6bcc9c}[fill="#54b382"]{fill:#92d1b0}[stroke="#54b382"]{stroke:#92d1b0}}</style>
+<rect class="bg" x="0" y="0" width="760" height="512" fill="#f6f6f3"></rect>
+
+
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.8px">OBSERVABILITY · COLLECTION · L0 vs L1</text>
+<text class="text" x="40" y="89" font-size="26" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">Run one. Never both.</text>
+<text class="muted" x="40" y="117" font-size="14.5" fill="#6c6c73">Beyla&#39;s eBPF and the OTel SDK both write a request&#39;s <tspan class="mono" fill="#9a6a0a" font-family="ui-monospace,Menlo,Consolas,monospace">traceparent</tspan>. Turn both on for one</text>
+<text class="muted" x="40" y="136" font-size="14.5" fill="#6c6c73">service and the trace splits in half.</text>
+
+
+<rect x="40" y="158" width="334" height="252" rx="12" fill="#fae9e6" stroke="#ecc3bc" stroke-width="1"></rect>
+<text x="58" y="184" font-size="15" fill="#c0392b">✕</text>
+<text class="text" x="78" y="185" font-size="14" fill="#a5342a" font-weight="600">Both on = broken</text>
+
+<rect x="58" y="200" width="112" height="26" rx="6" fill="#f5ddd8" stroke="#e6b3aa" stroke-width="1"></rect>
+<text class="mono" x="114" y="217" font-size="10" fill="#7a2018" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">alpha-shop-dev</text>
+<text x="178" y="217" font-size="11" fill="#a05545">→</text>
+<rect x="192" y="200" width="116" height="26" rx="6" fill="#f5ddd8" stroke="#e6b3aa" stroke-width="1"></rect>
+<text class="mono" x="250" y="217" font-size="10" fill="#7a2018" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">alpha-checkout</text>
+<text class="text" x="58" y="248" font-size="11.5" fill="#5a201a">Beyla&#39;s eBPF rewrites <tspan class="mono" font-family="ui-monospace,monospace" font-size="10">traceparent</tspan> mid-flight —</text>
+<text class="text" x="58" y="263" font-size="11.5" fill="#5a201a">the trace splits into <tspan font-style="italic" fill="#7a2018">two</tspan> IDs.</text>
+
+<rect x="58" y="274" width="298" height="86" rx="8" fill="#f4ded9"></rect>
+<text class="mono" x="72" y="292" font-size="8.5" fill="#a05545" font-family="ui-monospace,Menlo,Consolas,monospace">trace A · 4f2a…</text>
+<rect x="72" y="298" width="170" height="8" rx="2" fill="#cf6a58"></rect>
+<line x1="72" y1="318" x2="342" y2="318" stroke="#e0b0a6" stroke-width="1" stroke-dasharray="4 3"></line>
+<text class="mono" x="72" y="336" font-size="8.5" fill="#a05545" font-family="ui-monospace,Menlo,Consolas,monospace">trace B · 9c81…</text>
+<rect x="190" y="342" width="120" height="8" rx="2" fill="#cf6a58"></rect>
+<text class="muted" x="58" y="382" font-size="11" fill="#7a5a54">Looks like two unrelated requests.</text>
+
+
+<rect x="386" y="158" width="334" height="252" rx="12" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<text x="404" y="185" font-size="15" fill="#1f9a63">✓</text>
+<text class="text" x="424" y="185" font-size="14" fill="#1c7a4f" font-weight="600">The fix — one owns it</text>
+
+<rect x="404" y="200" width="298" height="26" rx="6" fill="#f7efd8" stroke="#e0cd9c" stroke-width="1"></rect>
+<text class="mono" x="416" y="217" font-size="10" fill="#8a5c0a" font-family="ui-monospace,Menlo,Consolas,monospace">instrumentation.opentelemetry.io/inject-sdk</text>
+
+<rect x="404" y="234" width="298" height="46" rx="8" fill="#eaf6ee" stroke="#bfe0cc" stroke-width="1"></rect>
+<text x="416" y="252" font-size="11.5" fill="#1c7a4f" font-weight="600">Beyla <tspan class="mono" font-family="ui-monospace,monospace" font-size="10" fill="#9a6a0a">exclude_instrument</tspan></text>
+<text class="muted" x="416" y="268" font-size="10.5" fill="#5f7d6c">annotation predicate — namespace stays in glob, <tspan fill="#25402f" font-style="italic">this pod</tspan> skipped</text>
+
+<rect x="404" y="288" width="298" height="60" rx="8" fill="#dbf0e3"></rect>
+<text class="mono" x="418" y="306" font-size="8.5" fill="#2c7a56" font-family="ui-monospace,Menlo,Consolas,monospace">trace · 4f2a… (one)</text>
+<rect x="418" y="312" width="268" height="8" rx="2" fill="#3ba06e"></rect>
+<rect x="500" y="326" width="150" height="8" rx="2" fill="#54b382"></rect>
+<text class="muted" x="404" y="370" font-size="11" fill="#5f7d6c">One continuous trace across both hops.</text>
+
+
+<text class="muted" x="40" y="446" font-size="13.5" fill="#6c6c73">The exclusion is <tspan class="text" fill="#1c1c22" font-style="italic">per-pod</tspan> annotation, not per-namespace. SDK claims the service; Beyla lets go of it.</text>
+</svg>

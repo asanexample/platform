@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 552" width="760" height="552" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#eaf1fb"]{fill:#172f51}[stroke="#eaf1fb"]{stroke:#172f51}[fill="#c4d8f4"]{fill:#1d3a62}[stroke="#c4d8f4"]{stroke:#1d3a62}[fill="#2c66c4"]{fill:#6b98e1}[stroke="#2c66c4"]{stroke:#6b98e1}[fill="#4a5a73"]{fill:#7287a7}[stroke="#4a5a73"]{stroke:#7287a7}[fill="#3d6fc0"]{fill:#7fa2d9}[stroke="#3d6fc0"]{stroke:#7fa2d9}[fill="#7a9fd0"]{fill:#94b3db}[stroke="#7a9fd0"]{stroke:#94b3db}[fill="#8a8a91"]{fill:#898990}[stroke="#8a8a91"]{stroke:#898990}[fill="#eeeeea"]{fill:#20201c}[stroke="#eeeeea"]{stroke:#20201c}[fill="#d2d2cb"]{fill:#2f2f2a}[stroke="#d2d2cb"]{stroke:#2f2f2a}[fill="#dce8fa"]{fill:#193257}[stroke="#dce8fa"]{stroke:#193257}[fill="#9fbce8"]{fill:#8aaee6}[stroke="#9fbce8"]{stroke:#8aaee6}[fill="#9a9aa1"]{fill:#888890}[stroke="#9a9aa1"]{stroke:#888890}[fill="#e2eff2"]{fill:#23464e}[stroke="#e2eff2"]{stroke:#23464e}[fill="#8dc4d4"]{fill:#96cada}[stroke="#8dc4d4"]{stroke:#96cada}[fill="#bfe0ea"]{fill:#215565}[stroke="#bfe0ea"]{stroke:#215565}[fill="#5aa3ba"]{fill:#99c8d6}[stroke="#5aa3ba"]{stroke:#99c8d6}[fill="#0f6f8e"]{fill:#2bbeee}[stroke="#0f6f8e"]{stroke:#2bbeee}[fill="#3a5560"]{fill:#6f99aa}[stroke="#3a5560"]{stroke:#6f99aa}[fill="#0a2831"]{fill:#3db7dc}[stroke="#0a2831"]{stroke:#3db7dc}[fill="#b8dbe4"]{fill:#275966}[stroke="#b8dbe4"]{stroke:#275966}[fill="#cfe4ec"]{fill:#244b5a}[stroke="#cfe4ec"]{stroke:#244b5a}[fill="#c4dde7"]{fill:#274f5f}[stroke="#c4dde7"]{stroke:#274f5f}[fill="#b8d6e2"]{fill:#295465}[stroke="#b8d6e2"]{stroke:#295465}[fill="#7ab8cc"]{fill:#96c9d9}[stroke="#7ab8cc"]{stroke:#96c9d9}[fill="#a8ccdb"]{fill:#99c4d7}[stroke="#a8ccdb"]{stroke:#99c4d7}[fill="#1c3a44"]{fill:#5aa5be}[stroke="#1c3a44"]{stroke:#5aa5be}}</style>
+<rect class="bg" x="0" y="0" width="760" height="552" fill="#f6f6f3"></rect>
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.8px">OBSERVABILITY · STORAGE · THE REPEATING SHAPE</text>
+<text class="text" x="40" y="89" font-size="26" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">The database is cattle. S3 is the herd.</text>
+<text class="muted" x="40" y="117" font-size="14.5" fill="#6c6c73">Every store has the same body — a tiny hot working set on disk you can lose, in front of a big cheap</text>
+<text class="muted" x="40" y="136" font-size="14.5" fill="#6c6c73">durable tail on your own S3.</text>
+<rect x="40" y="190" width="158" height="72" rx="10" fill="#eaf1fb" stroke="#c4d8f4" stroke-width="1"></rect>
+<text class="mono" x="56" y="210" font-size="12" fill="#2c66c4" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">Prometheus</text>
+<text class="muted" x="56" y="228" font-size="11" fill="#4a5a73">15d scraper. Lose it,</text>
+<text class="muted" x="56" y="243" font-size="11" fill="#4a5a73">rebuild it — history is</text>
+<text class="muted" x="56" y="258" font-size="11" fill="#4a5a73">safe in S3.</text>
+<text class="mono" x="40" y="284" font-size="9.5" fill="#3d6fc0" font-family="ui-monospace,Menlo,Consolas,monospace">remote_write</text>
+<line x1="120" y1="290" x2="192" y2="290" stroke="#7a9fd0" stroke-width="2"></line>
+<path d="M192 290 L184 286 L184 294 Z" fill="#7a9fd0"></path>
+<text class="muted" x="40" y="304" font-size="10" fill="#8a8a91">every sample → the hot buffer</text>
+<rect x="218" y="180" width="502" height="222" rx="14" fill="#eeeeea" stroke="#d2d2cb" stroke-width="1.5"></rect>
+<text class="text" x="236" y="204" font-size="14" fill="#1c1c22" font-weight="600">Mimir <tspan class="mono" font-size="11" font-weight="400" fill="#8a8a91" font-family="ui-monospace,Menlo,Consolas,monospace">· cross-section</tspan></text>
+<text class="mono" x="236" y="226" font-size="10" fill="#3d6fc0" font-family="ui-monospace,Menlo,Consolas,monospace">HOT · gp3, disposable <tspan fill="#8a8a91">— wipe = lose ~15m recent, not history</tspan></text>
+<rect x="236" y="236" width="146" height="40" rx="8" fill="#dce8fa" stroke="#9fbce8" stroke-width="1"></rect>
+<text x="309" y="254" font-size="11.5" fill="#1c1c22" font-weight="500" text-anchor="middle">ingester WAL</text>
+<text class="mono" x="309" y="269" font-size="10" fill="#2c66c4" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">10Gi</text>
+<rect x="396" y="236" width="146" height="40" rx="8" fill="#dce8fa" stroke="#9fbce8" stroke-width="1"></rect>
+<text x="469" y="254" font-size="11.5" fill="#1c1c22" font-weight="500" text-anchor="middle">index cache</text>
+<text class="mono" x="469" y="269" font-size="10" fill="#2c66c4" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">10Gi</text>
+<rect x="556" y="236" width="146" height="40" rx="8" fill="#dce8fa" stroke="#9fbce8" stroke-width="1"></rect>
+<text x="629" y="254" font-size="11.5" fill="#1c1c22" font-weight="500" text-anchor="middle">compactor</text>
+<text class="mono" x="629" y="269" font-size="10" fill="#2c66c4" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">20Gi scratch</text>
+<line x1="340" y1="282" x2="340" y2="296" stroke="#9a9aa1" stroke-width="2"></line><path d="M336 296 L344 296 L340 302 Z" fill="#9a9aa1"></path>
+<line x1="560" y1="282" x2="560" y2="296" stroke="#9a9aa1" stroke-width="2"></line><path d="M556 296 L564 296 L560 302 Z" fill="#9a9aa1"></path>
+<text class="mono" x="484" y="300" font-size="9.5" fill="#8a8a91" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">flush</text>
+<rect x="236" y="312" width="466" height="74" rx="10" fill="#e2eff2" stroke="#8dc4d4" stroke-width="1.5"></rect>
+<path d="M256 332 a17 6 0 0 1 34 0 v34 a17 6 0 0 1 -34 0 Z" fill="#bfe0ea" stroke="#5aa3ba" stroke-width="1.2"></path><ellipse cx="273" cy="332" rx="17" ry="6" fill="#bfe0ea" stroke="#5aa3ba" stroke-width="1.2"></ellipse>
+<text class="mono" x="308" y="342" font-size="11.5" fill="#0f6f8e" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">&lt;cluster&gt;-mimir-blocks-…</text>
+<text class="muted" x="308" y="359" font-size="11.5" fill="#3a5560">durable blocks · SSE-S3 (AES256, no KMS) ·</text>
+<text x="308" y="375" font-size="11.5" fill="#0a2831" font-style="italic">the source of truth</text>
+<rect x="40" y="416" width="680" height="52" rx="11" fill="#e2eff2" stroke="#b8dbe4" stroke-width="1"></rect>
+<path d="M58 434 a13 6 0 0 1 26 0 v18 a13 6 0 0 1 -26 0 Z" fill="#cfe4ec" stroke="#8dc4d4" stroke-width="1.2"></path><ellipse cx="71" cy="434" rx="13" ry="6" fill="#cfe4ec" stroke="#8dc4d4" stroke-width="1.2"></ellipse>
+<path d="M74 434 a13 6 0 0 1 26 0 v18 a13 6 0 0 1 -26 0 Z" fill="#c4dde7" stroke="#8dc4d4" stroke-width="1.2"></path><ellipse cx="87" cy="434" rx="13" ry="6" fill="#c4dde7" stroke="#8dc4d4" stroke-width="1.2"></ellipse>
+<path d="M90 434 a13 6 0 0 1 26 0 v18 a13 6 0 0 1 -26 0 Z" fill="#b8d6e2" stroke="#7ab8cc" stroke-width="1.2"></path><ellipse cx="103" cy="434" rx="13" ry="6" fill="#b8d6e2" stroke="#7ab8cc" stroke-width="1.2"></ellipse>
+<path d="M106 434 a13 6 0 0 1 26 0 v18 a13 6 0 0 1 -26 0 Z" fill="#a8ccdb" stroke="#5aa3ba" stroke-width="1.2"></path><ellipse cx="119" cy="434" rx="13" ry="6" fill="#a8ccdb" stroke="#5aa3ba" stroke-width="1.2"></ellipse>
+<text class="mono" x="150" y="440" font-size="11" fill="#0f6f8e" font-family="ui-monospace,Menlo,Consolas,monospace">×1 per signal</text>
+<text x="256" y="440" font-size="12.5" fill="#1c3a44">— Loki, Tempo, Pyroscope buckets, <tspan font-style="italic" fill="#0a2831">same shape.</tspan></text>
+<text class="muted" x="150" y="458" font-size="11" fill="#3a5560">same disposable-hot / durable-S3 body</text>
+<text class="muted" x="40" y="504" font-size="13.5" fill="#6c6c73">Own the generator, not the meter: cheap S3 + compute you already run, data never leaves your account.</text>
+</svg>

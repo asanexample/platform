@@ -25,7 +25,9 @@ A threshold alert is a smoke detector that shrieks at burnt toast; a burn-rate a
 trip-computer. A naive alert fires when the error ratio crosses, say, 1% right now — so a 30-second blip
 pages you, and a slow 0.2% leak that will blow your whole monthly budget by Friday *never* pages you. Burn
 rate reframes it: **how fast am I spending the budget relative to the window?** A burn rate of `1` spends the
-entire 30-day budget in exactly 30 days; a burn rate of `14.4` empties it in ~50 hours.
+entire 30-day budget in exactly 30 days; a burn rate of `14.4` empties it in ~50 hours. To make that
+concrete as an error rate a responder can eyeball: at a 99.9% objective the budget is 0.1%, so a 14.4× burn
+is ≈ a 1.44% error rate sustained over the 5-minute window — that's what trips the page.
 
 What kills the false positives is **multi-window, multi-burn-rate** (the [Google SRE
 workbook](https://sre.google/workbook/alerting-on-slos/) pattern): require a *short* window AND a *long*
@@ -48,6 +50,14 @@ Jira for a lazy leak, without a human tuning thresholds.
 ### Two generators, one shape
 
 The platform generates these rules two ways, and they live on different tenants.
+
+![The two SLO delivery pipelines side by side — hand-authored PrometheusServiceLevel CRs through Sloth to a hub PrometheusRule consumed by humans, versus registry-derived per-app SLOs through a mimirtool CronJob to the Mimir ruler consumed by the canary freeze gate — both converging on the same multi-window burn-rate rules.](images/two-slo-pipelines.svg)
+
+|  | **Path A — Sloth** (platform services) | **Path B — auto-derived** (every prod app) |
+|--|--|--|
+| **Who authors it** | A human hand-writes a `PrometheusServiceLevel` CR (objective + two queries) | No one — `fileset`+`yamldecode` over `gitops/environments/**/prod.yaml` synthesizes it |
+| **Where it's evaluated** | The Sloth controller renders a `PrometheusRule`, evaluated on the **hub** | A template → `mimirtool rules sync` CronJob → the **Mimir ruler** against the **`preprod` tenant** |
+| **Who consumes it** | Human dashboards + alerting (live: kubernetes-apiserver @ 99.9%) | The ADR-056 canary **freeze gate** (fixed 99.9%; live: alpha-shop-prod) |
 
 **Path A — the Sloth controller, for platform SLOs.** [Sloth](https://sloth.dev/) (chart `0.16.0`) is a
 controller that watches a `PrometheusServiceLevel` custom resource and *generates* the SLI recording rules +
@@ -86,8 +96,11 @@ namespace and evaluated *in the Mimir ruler against the `preprod` tenant* — be
 metrics actually live (preprod is a spoke that remote-writes to the hub). Second, the consumer is not a human
 at all: the rules emit `slo:current_burn_rate:ratio` per app, and **that metric is what the [ADR-056
 progressive-delivery](../../adrs/056-progressive-delivery-and-safe-rollback.md) canary freeze gate queries**
-— a canary that would burn the error budget too fast is automatically blocked from promoting. The SLO stops
-being a dashboard and becomes a deploy gate.
+— a one-shot **pre-flight** check (an AnalysisTemplate with `count: 1`) that runs before the rollout and
+**freezes it if the service is *already* burning its budget faster than 2×** (successCondition
+`len(result) == 0 || result[0] < 2`). It does *not* predict the canary's own burn, and it can *never* block a
+first deploy (with no prior series there's nothing to be burning). The SLO stops being a dashboard and
+becomes a deploy gate.
 
 The same 99.9% objective comes from a controller in one case and a templated ruler rule in the other because
 the data lives on different tenants: apiserver metrics are the hub's own; app metrics belong to the `preprod`
@@ -95,12 +108,13 @@ tenant, which the Mimir ruler evaluates.
 
 ---
 
-## 2. Alerting — ~40 curated rules and a routing tree
+## 2. Alerting — ~60 curated rules and a routing tree
 
 Below the SLOs sits the everyday alert layer:
 [`observability/alerts/curated.yaml`](https://github.com/asanexample/platform/blob/main/infra/modules/observability/alerts/curated.yaml)
-— **42 alerts across 12 groups** (cert-manager, kyverno, argocd, loki, tempo, external-secrets, cilium,
-cloudwatch, cloudnativepg, true-cost, policy-reporter, agent-eval), one group per subsystem. Every rule
+— **61 alerts across 20 groups** (e.g. cert-manager, kyverno, policy-reporter, true-cost, argocd, loki,
+tempo, external-secrets, cilium, cloudwatch, agent-eval, cloudnativepg, blackbox, karpenter, controllers,
+keycloak, crossplane, mimir, tailscale, platform-services), one group per subsystem. Every rule
 carries two things that make it actionable rather than just noisy: a `severity` label (which is what routes
 it) and a `runbook_url` annotation (which is where the responder goes). A rule without a runbook is a rule
 that pages you into a void.
@@ -123,6 +137,8 @@ Severity is a claim about impact, and the audit gate applies to it like any othe
 warning" is exactly the assumption that hid a six-day outage.
 
 ### The routing tree
+
+![The Alertmanager routing tree — an always-firing watchdog to an external dead-man's switch, a continue=true triage-agent tap evaluated before the critical receiver (SNS + Slack + dormant PagerDuty), warning to Slack, and a critical⊣warning inhibition edge.](images/alert-routing-tree.svg)
 
 [Alertmanager](https://prometheus.io/docs/alerting/latest/configuration/) routes purely by the `severity`
 label — it knows nothing about ownership (that's §3). The tree, built in
@@ -201,10 +217,12 @@ Cost is just another metric here, and one metaphor explains *why there are two e
 speedometer; the true-cost exporter is an odometer. You need both, and confusing them is the classic FinOps
 mistake.
 
+![Two cost exporters, two aggregations — OpenCost (in-cluster usage × list price, instant, a speedometer) vs the true-cost exporter (cross-account CUR/Athena unblended, ~24h lag, an odometer); summing a rate double-counts, reading a month-to-date gauge with max does not.](images/opencost-vs-cur.svg)
+
 **[OpenCost](https://www.opencost.io/docs/) — the speedometer (in-cluster allocation).** It reads pod/node
 resource usage from the cluster and multiplies by **AWS list prices** (public pricing API, no credentials) to
 attribute compute cost per **team**, derived from the namespace's `platform.refplat.org/team` label. It's
-*instantaneous and granular* — "you're burning $X/hour right now, and it's `acme`'s doing" — but it's an
+*instantaneous and granular* — "you're burning $X/hour right now, and it's `alpha`'s doing" — but it's an
 *estimate at list price*: it knows nothing about your Savings Plans, Reserved Instances, or committed-use
 discounts.
 

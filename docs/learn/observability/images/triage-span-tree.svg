@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 596" width="760" height="596" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#8a4fc4"]{fill:#b892dd}[stroke="#8a4fc4"]{stroke:#b892dd}[fill="#f2eafb"]{fill:#321751}[stroke="#f2eafb"]{stroke:#321751}[fill="#d9c4f0"]{fill:#3f1d64}[stroke="#d9c4f0"]{stroke:#3f1d64}[fill="#7a52a0"]{fill:#a889c5}[stroke="#7a52a0"]{stroke:#a889c5}[fill="#e6d4f4"]{fill:#3f1b5c}[stroke="#e6d4f4"]{stroke:#3f1b5c}[fill="#6a3fa0"]{fill:#9871ca}[stroke="#6a3fa0"]{stroke:#9871ca}[fill="#e2eff2"]{fill:#23464e}[stroke="#e2eff2"]{stroke:#23464e}[fill="#b8dbe4"]{fill:#275966}[stroke="#b8dbe4"]{stroke:#275966}[fill="#1f8fb0"]{fill:#48c0e3}[stroke="#1f8fb0"]{stroke:#48c0e3}[fill="#0f6f8e"]{fill:#2bbeee}[stroke="#0f6f8e"]{stroke:#2bbeee}[fill="#3a5560"]{fill:#6f99aa}[stroke="#3a5560"]{stroke:#6f99aa}[fill="#0a2831"]{fill:#3db7dc}[stroke="#0a2831"]{stroke:#3db7dc}[fill="#d3bceb"]{fill:#431f68}[stroke="#d3bceb"]{stroke:#431f68}[fill="#7a45b0"]{fill:#a881d0}[stroke="#7a45b0"]{stroke:#a881d0}[fill="#dce8fa"]{fill:#193257}[stroke="#dce8fa"]{stroke:#193257}[fill="#2c66c4"]{fill:#6b98e1}[stroke="#2c66c4"]{stroke:#6b98e1}[fill="#efe6f9"]{fill:#341853}[stroke="#efe6f9"]{stroke:#341853}[fill="#9a6ac0"]{fill:#bb99d6}[stroke="#9a6ac0"]{stroke:#bb99d6}[fill="#1f8a5b"]{fill:#40d996}[stroke="#1f8a5b"]{stroke:#40d996}[fill="#e0a52a"]{fill:#efc877}[stroke="#e0a52a"]{stroke:#efc877}[fill="#4a3208"]{fill:#eda72b}[stroke="#4a3208"]{stroke:#eda72b}}</style><defs><clipPath id="abar0"><rect x="39.0" y="157.0" width="8.0" height="56.0"/></clipPath><clipPath id="abar1"><rect x="511.0" y="157.0" width="10.0" height="72.0"/></clipPath><clipPath id="abar2"><rect x="61.0" y="219.0" width="8.0" height="56.0"/></clipPath></defs>
+<rect class="bg" x="0" y="0" width="760" height="596" fill="#f6f6f3"></rect>
+
+
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.8px">OBSERVABILITY · AGENT · ONE TRIAGE, END TO END</text>
+<text class="text" x="40" y="89" font-size="26" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">Inside a single agent trace.</text>
+<text class="muted" x="40" y="117" font-size="14.5" fill="#6c6c73">One triage is one trace — a nested span tree carrying <tspan class="mono" fill="#8a4fc4" font-family="ui-monospace,Menlo,Consolas,monospace">gen_ai.*</tspan> attributes at each level. Here&#39;s a</text>
+<text class="muted" x="40" y="136" font-size="14.5" fill="#6c6c73">real one, alert to disposition.</text>
+
+
+<rect x="40" y="158" width="456" height="54" rx="9" fill="#f2eafb" stroke="#d9c4f0" stroke-width="1"></rect>
+<rect x="41.3" y="159.3" width="453.5" height="51.5" rx="7.8" fill="none" stroke="#8a4fc4" stroke-width="2.5" clip-path="url(#abar0)"></rect>
+<text class="mono" x="56" y="178" font-size="12.5" fill="#8a4fc4" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">invoke_agent</text>
+<text x="160" y="178" font-size="11" fill="#7a52a0">{triage}</text>
+<rect x="56" y="188" width="94" height="16" rx="4" fill="#e6d4f4"></rect>
+<text class="mono" x="103" y="200" font-size="9.5" fill="#6a3fa0" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">conversation.id</text>
+<rect x="156" y="188" width="90" height="16" rx="4" fill="#e6d4f4"></rect>
+<text class="mono" x="201" y="200" font-size="9.5" fill="#6a3fa0" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">finish_reasons</text>
+
+
+<rect x="512" y="158" width="208" height="70" rx="11" fill="#e2eff2" stroke="#b8dbe4" stroke-width="1"></rect>
+<rect x="513.3" y="159.3" width="205.5" height="67.5" rx="9.8" fill="none" stroke="#1f8fb0" stroke-width="2.5" clip-path="url(#abar1)"></rect>
+<text class="text" x="528" y="180" font-size="12.5" fill="#0f6f8e" font-weight="600">Cost isn&#39;t measured</text>
+<text class="muted" x="528" y="198" font-size="11.5" fill="#3a5560">it&#39;s <tspan fill="#0a2831" font-style="italic">derived</tspan>:</text>
+<text class="mono" x="528" y="216" font-size="11" fill="#0f6f8e" font-family="ui-monospace,Menlo,Consolas,monospace">tokens × model price</text>
+
+
+<rect x="62" y="220" width="434" height="54" rx="9" fill="#f2eafb" stroke="#d3bceb" stroke-width="1"></rect>
+<rect x="63.3" y="221.3" width="431.5" height="51.5" rx="7.8" fill="none" stroke="#7a45b0" stroke-width="2.5" clip-path="url(#abar2)"></rect>
+<text class="mono" x="78" y="240" font-size="12" fill="#8a4fc4" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">chat</text>
+<text x="112" y="240" font-size="11" fill="#7a52a0">{claude-sonnet-4-6}</text>
+<rect x="78" y="250" width="168" height="16" rx="4" fill="#e6d4f4"></rect>
+<text class="mono" x="82" y="262" font-size="9.5" fill="#6a3fa0" font-family="ui-monospace,Menlo,Consolas,monospace">provider.name=aws.bedrock</text>
+<rect x="252" y="250" width="126" height="16" rx="4" fill="#dce8fa"></rect>
+<text class="mono" x="258" y="262" font-size="9.5" fill="#2c66c4" font-family="ui-monospace,Menlo,Consolas,monospace">6667 in / 259 out tok</text>
+<rect x="384" y="250" width="108" height="16" rx="4" fill="#e6d4f4"></rect>
+<text class="mono" x="390" y="262" font-size="9" fill="#6a3fa0" font-family="ui-monospace,Menlo,Consolas,monospace">cache_read.input</text>
+
+
+<rect x="84" y="282" width="412" height="28" rx="8" fill="#efe6f9" stroke="#d9c4f0" stroke-width="1"></rect>
+<rect x="84" y="282" width="3" height="28" rx="1.5" fill="#9a6ac0"></rect>
+<text class="mono" x="100" y="300" font-size="11" fill="#8a4fc4" font-family="ui-monospace,Menlo,Consolas,monospace">execute_tool</text>
+<text class="mono" x="192" y="300" font-size="10.5" fill="#1c1c22" font-family="ui-monospace,Menlo,Consolas,monospace">query_logs</text>
+<text class="mono" x="480" y="300" font-size="9" fill="#1f8a5b" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">ok</text>
+<rect x="84" y="314" width="412" height="28" rx="8" fill="#efe6f9" stroke="#d9c4f0" stroke-width="1"></rect>
+<rect x="84" y="314" width="3" height="28" rx="1.5" fill="#9a6ac0"></rect>
+<text class="mono" x="100" y="332" font-size="11" fill="#8a4fc4" font-family="ui-monospace,Menlo,Consolas,monospace">execute_tool</text>
+<text class="mono" x="192" y="332" font-size="10.5" fill="#1c1c22" font-family="ui-monospace,Menlo,Consolas,monospace">get_recent_changes</text>
+<text class="mono" x="480" y="332" font-size="9" fill="#1f8a5b" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">ok</text>
+<rect x="84" y="346" width="412" height="28" rx="8" fill="#efe6f9" stroke="#d9c4f0" stroke-width="1"></rect>
+<rect x="84" y="346" width="3" height="28" rx="1.5" fill="#9a6ac0"></rect>
+<text class="mono" x="100" y="364" font-size="11" fill="#8a4fc4" font-family="ui-monospace,Menlo,Consolas,monospace">execute_tool</text>
+<text class="mono" x="192" y="364" font-size="10.5" fill="#1c1c22" font-family="ui-monospace,Menlo,Consolas,monospace">get_change_detail</text>
+<text class="mono" x="480" y="364" font-size="9" fill="#1f8a5b" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">ok</text>
+<rect x="84" y="378" width="412" height="28" rx="8" fill="#efe6f9" stroke="#d9c4f0" stroke-width="1"></rect>
+<rect x="84" y="378" width="3" height="28" rx="1.5" fill="#9a6ac0"></rect>
+<text class="mono" x="100" y="396" font-size="11" fill="#8a4fc4" font-family="ui-monospace,Menlo,Consolas,monospace">execute_tool</text>
+<text class="mono" x="192" y="396" font-size="10.5" fill="#1c1c22" font-family="ui-monospace,Menlo,Consolas,monospace">workload_status</text>
+<text class="mono" x="480" y="396" font-size="9" fill="#1f8a5b" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">ok</text>
+
+
+<text class="mono" x="62" y="432" font-size="11" fill="#7a52a0" font-family="ui-monospace,Menlo,Consolas,monospace">chat →</text>
+<rect x="118" y="420" width="168" height="22" rx="6" fill="#e0a52a"></rect>
+<text class="mono" x="202" y="435" font-size="11" fill="#4a3208" text-anchor="middle" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">insufficient_evidence</text>
+<text class="muted" x="296" y="435" font-size="10.5" fill="#6c6c73">the disposition</text>
+
+
+<text class="muted" x="40" y="482" font-size="13.5" fill="#6c6c73">Attributes hang on <tspan class="text" fill="#1c1c22" font-style="italic">spans</tspan>, not metrics — provider and model live here, on the trace, which is why you</text>
+<text class="muted" x="40" y="501" font-size="13.5" fill="#6c6c73">read one invocation as a tree.</text>
+</svg>
