@@ -82,7 +82,7 @@ rewriting it. This index is the canonical list; keep it in sync when adding an A
 | [ADR-063: Team as a First-Class Git-Native Object](063-team-as-first-class-git-object.md) | Accepted |
 | [ADR-067: IDP Domain Model — Team / Product / Service / Environment / Customer](067-idp-domain-model.md) | Accepted |
 | [ADR-069: Delivery Source-of-Truth — Product Registry + Environment Claims](069-delivery-source-of-truth-product-environment.md) | Accepted |
-| [ADR-101: `ServiceGrant` — A Governed Cross-Team Network Capability](101-service-grant-cross-team-network-capability.md) | Proposed (not rebuild-gated — buildable now) |
+| [ADR-101: `ServiceGrant` — A Governed Cross-Team Network Capability](101-service-grant-cross-team-network-capability.md) | Accepted |
 
 ## Workload & Human Identity
 

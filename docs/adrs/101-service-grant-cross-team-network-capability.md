@@ -2,10 +2,16 @@
 
 **Date:** 2026-07-12
 
-**Status:** Proposed — direction agreed, not yet built. **Not rebuild-gated**: the rebuild-gating on
-[ADR-068](068-product-scoped-and-cross-team-access-model.md) is specifically about the Keycloak/OIDC
-human-identity cutover, which this capability doesn't touch at all — it is pure Crossplane + Kyverno and
-independently buildable now. Flip to Accepted once built and the admission policies (Part 2) are enabled.
+**Status:** Accepted — built, enabled (Enforce), and proven live end-to-end on preprod (2026-07-12): the
+first real cross-team dependency (alpha-shop `orders` → bravo-dispatch `intake`, gitops/grants/bravo/
+allow-alpha-shop-orders-to-dispatch-intake.yaml) materialized both CNP halves automatically, a real checkout
+produced a real, trackable Bravo Dispatch shipment, and the L7 narrowing was confirmed to actually reject a
+disallowed method/path at the network layer (not just admit the granted one) — a temporary debug probe on
+`orders` got Envoy's own "Access denied" rejection for both a wrong-method and a wrong-path call against
+`intake`, including against `/healthz`, a route that genuinely exists and normally works. **Not rebuild-gated**:
+the rebuild-gating on [ADR-068](068-product-scoped-and-cross-team-access-model.md) is specifically about the
+Keycloak/OIDC human-identity cutover, which this capability doesn't touch at all — it is pure Crossplane +
+Kyverno.
 
 ## Context
 
