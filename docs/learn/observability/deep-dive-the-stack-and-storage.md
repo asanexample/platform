@@ -194,8 +194,8 @@ contains(groups[*], 'platform-admins') && 'Admin' || 'Viewer'
 
 A member of `platform-admins` gets Grafana **Admin**; every other authenticated user gets **Viewer**. Note
 the ceiling that sets: everyone-a-Viewer means everyone can see every dashboard and every cluster's data.
-That's fine for a platform team, and it's exactly the gap the per-team read isolation was built to close —
-which brings us to tenancy.
+That's fine for a platform team, but it's exactly why per-team read scoping matters — which brings us to
+tenancy, and an honest story about how far the platform took it.
 
 ## Tenancy: the apartment number is not a key
 
@@ -276,28 +276,29 @@ tenant=globex   distinct_metric_names=118
 
 Those are real, isolated `acme` and `globex` tenants — the write split is running, not a diagram.
 
-**Per-team *read* isolation — LIVE and fail-closed, for metrics *and* logs.** Two read proxies enforce it: the
-[`observability-tenant-proxy`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-tenant-proxy/main.tf)
-in front of Mimir and its `loki-tenant-proxy` sibling in front of Loki (each 2 replicas). Each verifies the
-Grafana-forwarded OIDC token against the Keycloak JWKS, maps the caller's `groups` to a tenant scope (admin
-group → all tenants; **unknown or empty → deny**), overwrites `X-Scope-OrgID`, and reverse-proxies to its
-store. They provision the `Mimir (my team)` / `Loki (my team)` datasources. Genuinely **fail-closed** — no
-valid token, no data — with the enforcement **proven live (2026-07-07)**: identity maps to exactly one tenant
-and unknown callers are denied, for metrics *and* logs. (The platform hub runs no team workloads, so its own
-metrics are the `platform` tenant; the real per-team tenants are populated by the **preprod spoke's dual-write**
-— preprod, where the team apps run, ships each namespace's series into its own tenant, additive to `preprod`.)
-Per-team **traces (Tempo)** and **profiles (Pyroscope)** isolation is deliberately deferred — metrics + logs
-are the two live data-plane signals.
+**Per-team *read* isolation — the soft model, after the hard one was retired.** The write split gives you real
+separate tenants; the read side went a different way than planned, and the story is worth telling honestly. The
+platform first built the *hard* version — a pair of fail-closed read proxies (`observability-tenant-proxy` in
+front of Mimir, `loki-tenant-proxy` in front of Loki) that verified the Grafana-forwarded OIDC token against
+Keycloak, mapped the caller's `groups` to a tenant, overwrote `X-Scope-OrgID`, and denied anything
+unauthenticated. It was **retired** ([#1269](https://github.com/asanexample/platform/issues/1269)): OSS
+Grafana's `oauthPassThru` can't reliably forward the SSO token to a downstream proxy, so the proxy fail-closed
+on `no_token` and *every dashboard went blank for admins*. The modules remain in the repo but inert
+(re-enableable if Grafana's token forwarding is ever fixed).
 
-**Cross-team read sharing is an `AccessGrant`** ([ADR-068](../../adrs/068-product-scoped-and-cross-team-access-model.md);
-claims in `gitops/grants/`). A team grants another read access to its signals, and the read proxy derives that
-grant into a **federated** read — the caller queries its own tenant **∪** its granted tenants, e.g. `globex`
-reading `acme`'s `shop` becomes `X-Scope-OrgID: acme|globex` (Mimir's `tenant_federation` splitting the `|`
-on read), still fail-closed for anything ungranted. And because OSS Grafana has **no per-team dashboard RBAC**,
-this grant *is* the data-and-dashboard sharing mechanism — there's no other lane to share a tenant's signals
-across the team boundary. Alongside it, the namespace-filtered overview dashboards remain each team's everyday
-default self-view. Plainly: real per-team read isolation and real grant-based sharing, for metrics and
-logs — with traces/profiles still to come.
+What's live instead is the **soft model** — which was the actual need. Each team gets a datasource pinned to its
+own tenant (`Mimir (<team>)` / `Loki (<team>)`, a static `X-Scope-OrgID`), and per-team read isolation is
+enforced by **Grafana dashboard-folder permissions** plus the **namespace-filtered per-team overview
+dashboards** ([#1157](https://github.com/asanexample/platform/issues/1157)). It's an RBAC-level boundary, not a
+fail-closed data gate — an organizational separation, not a security wall. (The platform hub runs no team
+workloads, so its own metrics are the `platform` tenant; the real per-team tenants come from the **preprod
+spoke's dual-write**, where the team apps run.) Per-team **traces (Tempo)** and **profiles (Pyroscope)** read
+scoping is likewise a follow-up.
+
+Cross-team *sharing* is a soft act too — share the dashboard or grant folder access. The `AccessGrant` model
+([ADR-068](../../adrs/068-product-scoped-and-cross-team-access-model.md), `gitops/grants/`) still governs
+cross-team access in general, but its enforcement as a **fail-closed observability read federation**
+(`X-Scope-OrgID: acme|globex`) went with the retired proxy.
 
 ## Why self-host all of this at all?
 

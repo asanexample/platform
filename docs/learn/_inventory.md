@@ -124,7 +124,7 @@ backends); **the four signals** is vendor-neutral *signal literacy* (when to rea
 | Module | Covers | Status |
 | --- | --- | --- |
 | **The observability stack** | LGTM+P storage + Grafana, hub-and-spoke topology, the collect→store→query data flow (ADR-043/044) | ✅ |
-| **Multi-tenancy & isolation** | per-team signal isolation — cortex-tenant, tenant-proxy (the P13 work) | ✅ |
+| **Multi-tenancy & isolation** | per-team write-split (cortex-tenant, live); read-proxy retired #1269 → soft read model (Grafana folder perms + per-team dashboards) | ✅ |
 | **The four signals** | metrics · logs · traces · profiles — what each is, when to reach for it, how they correlate | ✅ |
 | **Instrumenting a workload** | auto-instrumentation (Beyla / eBPF) + OpenTelemetry (operator/collector), RED metrics, free vs. add | ✅ |
 | **SLOs, alerting & synthetics** | Sloth SLOs, burn-rate alerts, routing → on-call, black-box + k6 synthetics (ADR-077) | ✅ |

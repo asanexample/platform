@@ -2,13 +2,17 @@
 
 **Date:** 2026-05-31
 
-**Status:** Accepted — P2 implemented + live on the platform cluster; **P13 per-team read isolation now
-enforced** (2026-07-07): hard per-team `X-Scope-OrgID` isolation for metrics via the `observability-tenant-proxy`
-fail-closed front door, with cross-team read **AccessGrants** (ADR-068). The platform hub runs no team
-workloads, so its *own* metrics are the `platform` tenant; the real per-team tenants are populated by the
-**preprod spoke's live dual-write** (preprod runs the alpha/bravo apps, shipping each namespace's series into
-its own tenant) — so the multi-tenancy this ADR chose Mimir for is now wired end-to-end and enforced. Extends [ADR-043](043-self-hosted-observability-stack.md) (the observability stack) with
-the durable store. As-built in [observability-current-state](../architecture/observability-current-state.md).
+**Status:** Accepted — P2 implemented + live on the platform cluster. Per-team **write** isolation is live:
+`cortex-tenant` splits each team's series into its own `X-Scope-OrgID` tenant (the platform hub runs no team
+workloads, so its own metrics are the `platform` tenant; the real per-team tenants come from the **preprod
+spoke's live dual-write**, where the alpha/bravo apps run). Per-team **read** isolation went soft: the hard
+fail-closed read-proxy (`observability-tenant-proxy`) was built (P13, 2026-07-07) and then **retired**
+([#1269](https://github.com/asanexample/platform/issues/1269)) — OSS Grafana's `oauthPassThru` couldn't
+reliably forward the SSO token, so it fail-closed and blanked dashboards; reads reverted to per-tenant
+datasources + Grafana dashboard-folder permissions + per-team dashboards (#1157), and the `AccessGrant`
+read-federation (ADR-068) went with the proxy. The multi-tenant *storage* this ADR chose Mimir for is wired
+end-to-end. Extends [ADR-043](043-self-hosted-observability-stack.md) (the observability stack) with the
+durable store. As-built in [observability-current-state](../architecture/observability-current-state.md).
 
 ## Context
 

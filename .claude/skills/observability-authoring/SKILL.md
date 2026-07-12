@@ -197,15 +197,20 @@ it starts (ADR-056 Phase 3 / the W11 freeze gate). See
   authors: group by `job`, not `service_name`, for an SDK-instrumented tenant service.
 - **Manual `terragrunt apply` needs `AWS_PROFILE=management`** (bare shell assumes
   PlatformDeployer and 403s); reach the private API over Tailscale (ADR-010).
-- **Per-team read isolation (P13 / #590) is LIVE + PROVEN (2026-07-07)** — note the topology: the platform hub
-  runs no team workloads, so its *own* metrics are the `platform` tenant; the real per-team tenants are
-  populated by the **preprod spoke's live dual-write** (preprod runs the alpha/bravo apps). The `tenant-proxy` is the
-  enforced fail-closed read front door for **metrics (Mimir)** AND **logs (Loki)**: it verifies the caller's `X-Id-Token`
-  and stamps `X-Scope-OrgID` so a team sees only its own tenant. `cortex-tenant` write-splits per team, and
-  **cross-team read AccessGrants** (ADR-068) federate the caller's own tenant ∪ its granted tenants (grants ARE
-  the sharing mechanism — OSS Grafana has no per-team dashboard RBAC). The namespace-filtered Team Overview
-  dashboards (#1157) still exist as the admin-side per-team view. **Traces (Tempo) + profiles (Pyroscope)
-  per-team isolation are DEFERRED** (mechanical follow-ups — the pattern is proven on the two live signals).
+- **Per-team isolation (P13 / #590): write-split LIVE, read-proxy RETIRED (#1269), reads now SOFT.** Topology:
+  the platform hub runs no team workloads, so its *own* metrics are the `platform` tenant; the real per-team
+  tenants come from the **preprod spoke's live dual-write** (preprod runs the alpha/bravo apps). **Writes:**
+  `cortex-tenant` write-splits each team's series into its own real Mimir/Loki tenant — LIVE. **Reads:** the
+  hard fail-closed `tenant-proxy` (Mimir + `loki-tenant-proxy` for Loki; verified the SSO `X-Id-Token`, stamped
+  `X-Scope-OrgID`, denied on missing token) was **built then retired (#1269)** — OSS Grafana's `oauthPassThru`
+  can't reliably forward the token to a downstream proxy, so it fail-closed on `no_token` and blanked every
+  dashboard. `read_proxy_url=""`; modules kept but inert, re-enableable if Grafana's token forwarding is fixed.
+  Live read model is **soft**: per-tenant datasources (`Mimir (<team>)`, static `X-Scope-OrgID`) + **Grafana
+  dashboard-folder permissions** + the namespace-filtered Team Overview dashboards (#1157). Cross-team sharing
+  is soft too (share the dashboard/folder); the `AccessGrant` model (ADR-068) still governs cross-team access
+  generally, but its fail-closed obs read-federation went with the proxy. **Traces (Tempo) + profiles
+  (Pyroscope) per-team read scoping DEFERRED.** *(This block was itself stale until #1269 was reconciled —
+  when in doubt on isolation status, check `read_proxy_url` in the live mimir/loki units, not this note.)*
 - Mimir is **off** in the dev cost_profile; enabling it just starts `remote_write`
   (additive, no migration).
 

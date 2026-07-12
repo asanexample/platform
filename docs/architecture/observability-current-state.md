@@ -199,26 +199,32 @@ at once (`X-Scope-OrgID: platform|preprod`). The same applies to logs and traces
 pipe-separated header). Write-isolation is unaffected — each store's Gateway edge still force-stamps a single
 tenant per spoke. (Tempo runs `multitenancyEnabled`; the hub OTel collector stamps the hub's own Beyla traces
 as tenant `platform`.) The **Platform Health** dashboard defaults to this datasource and has
-a `cluster` multi-select, so panels break out per cluster. Per-team read scoping (**P13**, #590) is now **LIVE
-for metrics + logs** (2026-07-07) — see the P13 subsection below; cross-cluster **logs/traces** federation
-follows their spokes (#627/#628). Umbrella: #629.
+a `cluster` multi-select, so panels break out per cluster. Per-team read scoping (**P13**, #590): the hard
+read-proxy was **retired** (#1269) — per-team *writes* split, *reads* went soft; see the P13 subsection below.
+Cross-cluster **logs/traces** federation follows their spokes (#627/#628). Umbrella: #629.
 
-### Per-team read isolation (P13, #590) — as built
+### Per-team read isolation (P13, #590) — as built (read-proxy retired, #1269)
 
-Beyond the admin cross-cluster lane above, **per-team read isolation is enforced** for the two live signals
-(the platform hub runs no team workloads, so its own metrics are the `platform` tenant; the real per-team
-tenants are populated by the **preprod spoke's live dual-write**, where the team apps run):
+Per-team **write** isolation is real and live; per-team **read** isolation went soft after the hard read-proxy
+was retired. (The platform hub runs no team workloads, so its own metrics are the `platform` tenant; the real
+per-team tenants are populated by the **preprod spoke's live dual-write**, where the team apps run.)
 
-- **`observability-tenant-proxy`** is the fail-closed read front door for **Mimir (metrics)** and **Loki
-  (logs)**: it verifies the caller's `X-Id-Token` (Keycloak OIDC) and stamps the team's `X-Scope-OrgID`, so a
-  team's Grafana queries return only its own tenant. This is real authentication in front of the trust-header
-  boundary described below — not a replacement for the NetworkPolicy, an authenticated layer on top of it.
-- **`observability-cortex-tenant`** write-splits incoming series into per-team tenants (Loki uses per-team
-  Alloy re-tenanting), so `alpha`/`bravo` are real, separate tenants end to end.
-- **Cross-team read sharing = AccessGrants** (ADR-068): a grant federates the caller's own tenant ∪ its granted
-  tenants (fail-closed). Because OSS Grafana has no per-team dashboard RBAC, a grant *is* the sharing mechanism.
-- **Traces (Tempo) + profiles (Pyroscope) per-team isolation are DEFERRED** — the pattern is proven on
-  metrics + logs; extending it is mechanical follow-up.
+- **`observability-cortex-tenant` write-splits incoming series into per-team tenants** (Loki uses per-team
+  Alloy re-tenanting), so `alpha`/`bravo` are real, separate tenants end to end. **Live.**
+- **Reads: the soft model.** Per-tenant Grafana datasources (`Mimir (<tenant>)`, static `X-Scope-OrgID`) +
+  **Grafana dashboard-folder permissions** + the namespace-filtered per-team overview dashboards (#1157) — an
+  RBAC-level boundary, not a fail-closed data gate.
+- **The hard read-proxy was RETIRED (#1269).** `observability-tenant-proxy` (Mimir) + `loki-tenant-proxy`
+  (Loki) were built as fail-closed front doors (verify the SSO `X-Id-Token`, stamp the team's `X-Scope-OrgID`,
+  deny on missing token) — but OSS Grafana's `oauthPassThru` can't reliably forward the token to a downstream
+  proxy, so the proxy fail-closed on `no_token` and **blanked every dashboard for admins**. The datasources
+  reverted to direct read (`read_proxy_url=""`); the modules stay in the repo but inert, re-enableable if
+  Grafana's token forwarding is ever fixed.
+- **Cross-team sharing is now soft** (share the dashboard/folder). The `AccessGrant` model (ADR-068,
+  `gitops/grants/`) still governs cross-team access, but its fail-closed observability read-federation
+  (`X-Scope-OrgID: acme|globex`) went with the proxy.
+- **Traces (Tempo) + profiles (Pyroscope) per-team read scoping are DEFERRED** — the write-split is proven on
+  metrics + logs; read scoping there is a follow-up.
 
 > **Known wrinkle (data layer only):** the Loki/Mimir charts stamp their own `cluster` label on self-metrics
 > (`cluster=loki`/`cluster=mimir`), polluting the raw `cluster` dimension. The dashboard's `cluster` dropdown

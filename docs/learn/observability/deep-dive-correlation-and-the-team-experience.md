@@ -230,54 +230,47 @@ per-team-isolated one — the template's default datasource is literally `"Mimir
 > all-clusters datasource, which can see every tenant. It's the convenient lane, not a wall. That
 > distinction is the whole point of Effort 2.
 
-### Effort 2 (the hard boundary, LIVE + PROVEN): P13 per-team read isolation + AccessGrant sharing
+### Effort 2 — the hard boundary the platform built, then pulled
 
-The *harder* thing — making `acme` **unable** to query `globex`'s data unless `globex` has granted it —
-is P13 (#590): a pair of fail-closed **tenant-proxies** (one for Mimir, one for Loki). It's now **live and
-proven** for both metrics and logs — worth seeing exactly how it fences, and how a team opts to *share*.
-
-The design (from [`observability-tenant-proxy/README.md`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-tenant-proxy/README.md)):
+The *harder* goal — making `acme` genuinely **unable** to query `globex`'s data — is P13 (#590), and it has an
+honest arc: the write side landed and stayed; the read side was built, shipped, then **retired**. What's live
+is the **write-split into real per-team tenants** — `cortex-tenant` splits each environment namespace's series
+into its own Mimir tenant (Loki the same for logs), so `acme` and `globex` are real, separate tenants, not one
+bucket with a label. What was *designed* on the read side (from the `observability-tenant-proxy` README):
 
 ```text
 user → Grafana ──(query + OIDC token, oauthPassThru)──▶ tenant-proxy ──(X-Scope-OrgID=<team>)──▶ Mimir
 ```
 
-The proxy verifies the Grafana-forwarded Keycloak token against the realm JWKS, maps the `groups` claim
-to a tenant scope (`platform-admins` → all tenants; **unknown/empty → deny**), *overwrites*
-`X-Scope-OrgID` with the caller's own team, and reverse-proxies to Mimir. It's **fail-closed**: no valid
-token, no data. It surfaces as a `Mimir (my team)` datasource users pick. The **same shape runs in front of
-Loki** (`loki-tenant-proxy`), fencing logs the identical way behind a `Loki (my team)` datasource — so the
-boundary covers both live data-plane signals. And it's genuinely running — two replicas, alongside the
-`cortex-tenant` write-side that splits each team's metrics into its own Mimir tenant in the first place:
+— would verify the Grafana-forwarded Keycloak token, map the `groups` claim to a tenant, *overwrite*
+`X-Scope-OrgID` with the caller's own team, and deny anything unauthenticated (fail-closed: no valid token, no
+data), surfacing as a `Mimir (my team)` datasource. It was built and shipped — then **retired**
+([#1269](https://github.com/asanexample/platform/issues/1269)): OSS Grafana's `oauthPassThru` can't reliably
+forward the SSO token to a downstream proxy, so the proxy fail-closed on `no_token` and *every dashboard went
+blank for admins*. The modules stay in the repo but inert (`read_proxy_url = ""`), re-enableable if Grafana's
+token forwarding is ever fixed. The write-split, though, is genuinely running:
 
 ```text
-$ kubectl --context platform -n observability get pods | grep -E 'tenant-proxy|cortex'
+$ kubectl --context platform -n observability get pods | grep cortex
 cortex-tenant-…   1/1   Running
 cortex-tenant-…   1/1   Running
-tenant-proxy-…    1/1   Running
-tenant-proxy-…    1/1   Running
 ```
 
-So who's it isolating, and how does a team *share*? Two things make this real rather than a diagram:
+So what isolates a team's *reads* today, with the proxy gone? The **soft model** — which was the actual need:
 
-1. **The write-split produces per-team tenants, and the proxy fences by identity — fail-closed.** The
-   `cortex-tenant` write-side is configured to split each environment namespace's series into its own Mimir
-   tenant (Loki does the same for logs), and the proxy maps SSO identity → that team's `X-Scope-OrgID` and
-   overwrites it — so a caller can only reach its own tenant (unknown/empty identity → **deny**). The platform
-   **hub** runs no environment namespaces, so its own metrics are the `platform` tenant; the real per-team
-   tenants (`acme`, `globex`, …) are populated by the **preprod spoke's dual-write** — preprod, where the team
-   apps run, ships each namespace's series into its own Mimir tenant (additive to the `preprod` tenant), and
-   Loki does the same for logs. So the enforcement is **live end-to-end** — identity-scoped, fail-closed, for
-   metrics *and* logs — proven 2026-07-07. (Per-team **traces** (Tempo) and **profiles** (Pyroscope) isolation
-   is deferred — metrics + logs are the two live signals.)
-2. **Cross-team sharing is an explicit grant, not an open door.** Because the proxy is fail-closed, `globex`
-   *can't* see `acme`'s signals by default. Sharing is a deliberate act: an **`AccessGrant`**
-   ([ADR-068](../../adrs/068-product-scoped-and-cross-team-access-model.md); claims in `gitops/grants/`, e.g.
-   `globex-reads-acme-shop`) in which `acme` grants `globex` read access to its `shop` product. The proxy
-   derives that grant into a **federated** read — `globex`'s queries become `X-Scope-OrgID: acme|globex`, i.e.
-   its own tenant **∪** its grants — still fail-closed for anything ungranted. And because OSS Grafana has
-   **no per-team dashboard RBAC**, that grant *is* the data-and-dashboard sharing mechanism: there's no other
-   lane to hand another team your signals.
+1. **Real per-team tenants underneath (write-side, live).** The `cortex-tenant` write-split gives each team its
+   own Mimir/Loki tenant. The platform **hub** runs no environment namespaces, so its own metrics are the
+   `platform` tenant; the real per-team tenants (`acme`, `globex`, …) are populated by the **preprod spoke's
+   dual-write** — preprod, where the team apps run, ships each namespace's series into its own tenant (additive
+   to `preprod`). So the *separation of the data* is real and live end-to-end.
+2. **Soft read scoping on top (Grafana-side, live).** Each team reads through a `Mimir (<team>)` / `Loki
+   (<team>)` datasource pinned to its tenant, and per-team isolation is enforced by **Grafana dashboard-folder
+   permissions** plus the **namespace-filtered per-team overview dashboards** (#1157) — an organizational
+   boundary, not a fail-closed data gate. Cross-team *sharing* is soft too: share the dashboard or grant folder
+   access. (The `AccessGrant` model — [ADR-068](../../adrs/068-product-scoped-and-cross-team-access-model.md),
+   `gitops/grants/` — still governs cross-team access in general, but its enforcement as a *fail-closed
+   observability read-federation* (`X-Scope-OrgID: acme|globex`) went with the retired proxy.) Per-team
+   **traces**/**profiles** read scoping is a follow-up.
 
 An architectural footnote worth keeping: the write-split was flipped **hub-first** — the [platform
 `env.hcl`](https://github.com/asanexample/platform/blob/main/infra/live/aws/platform/env.hcl) says so:
@@ -290,16 +283,17 @@ enable_per_team_tenants = true # …HUB flip first: hub metrics still resolve to
 The re-tenant splits metrics by *environment namespace* → team, and the **hub cluster has no environment
 namespaces** (tenant workloads run on **preprod**, the spoke), so the hub's *own* metrics still resolve to the
 `platform` tenant. The genuinely per-team `acme`/`globex` tenants are fed from the preprod path — now live and
-carrying data. That's exactly why the isolation is *proven*, not merely *plumbed*: there is real per-team data
-flowing through the part that isolates.
+carrying data. That's exactly why the write-split is *proven*, not merely *plumbed*: real per-team data flows
+through the part that separates it.
 
 ### Net for a team, today
 
 Open **your Team Overview dashboard** for a namespace-filtered RED/USE/cost view of your environments — the
-convenient default self-view, driven off the team registry. Underneath it, the **hard read-isolation is live
-and fail-closed** for metrics and logs: through the `(my team)` lane you see only your team's signals, and you
-see another team's only if they've handed you an **`AccessGrant`**. That's the honest, current picture — real
-per-team isolation and real grant-based sharing (metrics + logs), with traces/profiles still deferred.
+convenient default self-view, driven off the team registry. Underneath it, per-team separation is **soft**:
+your writes land in a real separate tenant, but your reads are scoped by Grafana folder permissions, not a
+fail-closed gate — the hard read-proxy was built and then **retired** (#1269) as unreliable in OSS Grafana.
+That's the honest, current picture: real per-team *data* separation, soft per-team *read* scoping, with
+traces/profiles read scoping still deferred.
 
 ---
 
@@ -334,16 +328,17 @@ than silently reshaping your panels. Same discipline as pinning a chart version.
 - **Time-shifts on trace→logs aren't sloppiness — they're clock-skew insurance.** `±1h` around a span
   looks huge until you remember app-stamped span times and node-stamped log times never agree exactly; a
   zero-width window returns nothing and reads as "correlation is broken."
-- **"Namespace-filtered" ≠ "isolated."** The Team Overview filter is a baked-in default over the
-  *all-clusters* datasource — convenience, not a boundary. The actual boundary is a *different* mechanism: the
-  fail-closed tenant-proxies (Mimir + Loki, **live**), whose `(my team)` lane fences a caller to its own tenant
-  ∪ any `AccessGrant`-ed tenants. Reading the *filter* as the security control is the exact misconception to
-  avoid.
+- **"Namespace-filtered" ≠ "isolated" — and neither is a hard boundary anymore.** The Team Overview filter is
+  a baked-in default over the *all-clusters* datasource — convenience, not a boundary. The real separation is
+  the **write-split** (each team's data in its own tenant); read scoping on top is **soft** (Grafana
+  dashboard-folder permissions + the per-tenant datasources), not a fail-closed gate — the hard read-proxy was
+  built and then **retired** (#1269) as unreliable. So don't read the filter, or the soft read scoping, as a
+  security control.
 - **A flag being `true` is a claim about *intent*, not *effect*.** `enable_per_team_tenants` was flipped
   hub-first, but the hub has no environment namespaces (tenants run on the preprod spoke), so the hub's *own*
   metrics still resolve to the `platform` tenant. The genuinely per-team `acme`/`globex` tenants are fed from
-  the preprod path — now live and carrying data, which is what makes the isolation *proven*. Verify per-team
-  isolation against where the data actually lands, not just the flag.
+  the preprod path — now live and carrying data, which is what makes the write-split *proven*. Verify per-team
+  data separation against where the data actually lands, not just the flag.
 - **A team appears the instant it's in the registry.** `team_overview_teams` is a `fileset` over
   `gitops/teams/*.yaml`, so onboarding a `Team` yields its overview dashboard on the next apply — and,
   conversely, a dashboard with no matching registry file can't exist. Registry is the source of truth for
@@ -362,7 +357,7 @@ than silently reshaping your panels. Same discipline as pinning a chart version.
   (exemplar destinations) · [`observability-tempo`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-tempo/main.tf)
   (`tracesToLogsV2` / `tracesToProfilesV2` / `serviceMap`) · [`observability-loki`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-loki/main.tf)
   (the `trace_id` derived field) · [`observability-tenant-proxy`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-tenant-proxy/README.md)
-  (P13 read isolation) · [`team-overview.json.tmpl`](https://github.com/asanexample/platform/blob/main/infra/modules/observability/dashboards/team-overview.json.tmpl).
+  (P13 read isolation — built, then retired #1269) · [`team-overview.json.tmpl`](https://github.com/asanexample/platform/blob/main/infra/modules/observability/dashboards/team-overview.json.tmpl).
 - **House skill:** `observability-authoring` — the dashboards-as-code ConfigMap pattern and the vendored-
   revision-pinning rule, for when you add one.
 - **External (verified, current Grafana):**
