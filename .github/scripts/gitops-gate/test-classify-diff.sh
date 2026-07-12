@@ -57,6 +57,15 @@ check "customer-prod release → prod_release set" "$(f gitops/releases/alpha/sh
 check "agent claim added" "$(f gitops/agents/triage-copilot.yaml added)" \
   agent_files=gitops/agents/triage-copilot.yaml any=true
 
+check "grant added (per-team directory, ADR-101 ServiceGrant convention)" "$(f gitops/grants/bravo/allow-shop-to-intake.yaml added)" \
+  grant_files=gitops/grants/bravo/allow-shop-to-intake.yaml any=true
+
+check "grant added (flat, pre-existing ADR-068 AccessGrant convention)" "$(f gitops/grants/bravo-reads-alpha-shop.yaml added)" \
+  grant_files=gitops/grants/bravo-reads-alpha-shop.yaml any=true
+
+check "grant README untouched (excluded, .md not .ya?ml)" "$(f gitops/grants/README.md modified)" \
+  grant_files= non_registry_changes=true any=false
+
 check "non-registry file" "$(f README.md modified)" \
   non_registry_changes=true any=false deletions=false
 

@@ -248,9 +248,12 @@ locals {
     # XEnvironment claims (cluster-scoped Crossplane XR) — synced after Teams (-1) and Products (-2) so the
     # envelope/team-matches-product admission inputs land first.
     environments = { wave = "0", kinds = [{ group = "platform.refplat.org", kind = "XEnvironment" }], path = "gitops/environments" }
-    # AccessGrant records (cross-team access, ADR-068) — projected for admission + Backstage soft-scoping. Synced
-    # after Products so the target Product/Environment exist.
-    grants = { wave = "0", kinds = [{ group = "platform.refplat.org", kind = "AccessGrant" }], path = "gitops/grants" }
+    # AccessGrant records (cross-team access, ADR-068) — projected for admission + Backstage soft-scoping — AND
+    # ServiceGrant claims (governed cross-team NETWORK capability, ADR-101), which share this same path/app
+    # (gitops/grants/<team>/<name>.yaml). Both kinds must be cluster-resource-whitelisted here or ArgoCD refuses
+    # to sync the one left out ("resource kind not permitted in project"). Synced after Products so the target
+    # Product/Environment exist.
+    grants = { wave = "0", kinds = [{ group = "platform.refplat.org", kind = "AccessGrant" }, { group = "platform.refplat.org", kind = "ServiceGrant" }], path = "gitops/grants" }
   }
 }
 

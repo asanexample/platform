@@ -296,6 +296,10 @@ jobs:
       - name: Render & test agent control-plane policies (crossplane, ADR-082)
         # restrict-agent-envelope / restrict-agent-control-plane (the XAgent admission gate).
         run: infra/modules/crossplane/.kyverno-tests/run-agents.sh
+      - name: Render & test ServiceGrant admission policy (crossplane, ADR-101)
+        # restrict-service-grant-admission (RBAC allow-list + the hipaa/pci regulated-tier exclusion). The
+        # sibling restrict-environment-dependencies test lives in run.sh above (same environment-policies chart).
+        run: infra/modules/crossplane/.kyverno-tests/run-service-grant-policies.sh
 
   # (The v2 "Kyverno Shift-Left (dogfood)" job was removed at the v3 cutover: the kyverno-validate composite
   # action it dogfooded is v2-coupled — it derived the route host from the now-deleted XTenant claim and rendered
@@ -353,6 +357,9 @@ jobs:
       - name: Validate Environment API example claims against the XRD
         if: steps.scope.outputs.run == 'true'
         run: infra/modules/crossplane/.environment-api-tests/run.sh
+      - name: Validate ServiceGrant API example claims against the XRD (ADR-101)
+        if: steps.scope.outputs.run == 'true'
+        run: infra/modules/crossplane/.service-grant-api-tests/run.sh
 
   # Offline `crossplane render` of the Environment Composition (delivery-plan A3). Runs the Pipeline functions
   # via Docker (pre-installed on the runner) and asserts the rendered footprint — no cluster. Separate from the
@@ -402,6 +409,9 @@ jobs:
       - name: Render the Agent Composition and assert the runtime slot (ADR-082)
         if: steps.scope.outputs.run == 'true'
         run: infra/modules/crossplane/.agent-api-tests/render.sh
+      - name: Render the ServiceGrant Composition and assert exactly 2 CiliumNetworkPolicy halves (ADR-101)
+        if: steps.scope.outputs.run == 'true'
+        run: infra/modules/crossplane/.service-grant-api-tests/render.sh
 
   tflint:
     name: TFLint

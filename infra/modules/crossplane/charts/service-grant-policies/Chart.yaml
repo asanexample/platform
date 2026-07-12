@@ -1,0 +1,12 @@
+apiVersion: v2
+name: crossplane-service-grant-policies
+description: >-
+  Kyverno admission policies for the ServiceGrant control plane (ADR-101) — the gate that makes a governed
+  cross-team network capability un-bypassable at admission. restrict-service-grant-admission: only the GitOps
+  controller identity may author/modify a ServiceGrant (the git gate alone is not trusted for something that
+  grants cross-team network access, the same reasoning restrict-agent-control-plane exists behind
+  gitops/agents/), and neither side (target or subject) may resolve to a hipaa/pci-tier Environment —
+  defense-in-depth behind validate-service-grants.sh.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

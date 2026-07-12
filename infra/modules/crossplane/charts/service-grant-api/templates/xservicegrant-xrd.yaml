@@ -1,0 +1,146 @@
+# The ServiceGrant platform primitive (ADR-101). Crossplane v2 XRD, Cluster-scoped: a ServiceGrant reconciles
+# BOTH CiliumNetworkPolicy halves of a governed cross-team network capability — one team's `target` service
+# admits traffic FROM another team's `subject` service — so app teams never hand-author a cross-namespace CNP.
+#
+# Authored by the PRODUCER (target.team) in their own git domain (gitops/grants/<target.team>/<name>.yaml) —
+# the grantor's consent. The CONSUMER separately declares intent on their own XEnvironment
+# (spec.dependencies, the xenvironment-xrd.yaml sibling field) — mutual consent; neither side alone can wire a
+# cross-team hop. restrict-environment-dependencies (environment-policies) checks a claimed dependency against
+# a matching, non-expired ServiceGrant at XEnvironment admission; restrict-service-grant-admission
+# (service-grant-policies, sibling chart) restricts who may author a ServiceGrant at all and excludes
+# hipaa/pci-tier teams/products — defense-in-depth behind the git gate (validate-service-grants.sh), the same
+# reasoning restrict-agent-control-plane exists behind gitops/agents/.
+#
+# Sibling of environment-api/agent-api, NOT a folder under either — a small, single-responsibility Composition
+# (render-resources -> ready only; no EnvironmentConfig, no cross-resource reads — a pure function of its own
+# spec) is easier to build/test/reason about than folding this into the environment Composition.
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xservicegrants.platform.refplat.org
+spec:
+  scope: Cluster
+  group: platform.refplat.org
+  names:
+    kind: ServiceGrant
+    plural: servicegrants
+  versions:
+    - name: v1beta1
+      served: true
+      referenceable: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - target
+                - subject
+                - capability
+              properties:
+                target:
+                  type: object
+                  description: >-
+                    The PRODUCER side — whose namespace ADMITS traffic (the ingress CNP). This ServiceGrant lives
+                    in target.team's git domain; target.team is the grantor and owns the PR (validate-service-
+                    grants.sh: directory team == spec.target.team).
+                  required:
+                    - team
+                    - product
+                    - stage
+                    - service
+                  properties:
+                    team:
+                      type: string
+                    product:
+                      type: string
+                    stage:
+                      type: string
+                      enum: ["dev", "test", "uat", "staging", "prod"]
+                    service:
+                      type: string
+                      description: >-
+                        The target Service's `app` label — namespace resolves to <team>-<product>-<stage>
+                        (hash-truncated past 63 chars, same as the environment Composition); the ingress CNP's
+                        endpointSelector.
+                subject:
+                  type: object
+                  description: >-
+                    The CONSUMER side — whose namespace GETS EGRESS (the egress CNP). Mirrored on the subject's
+                    own XEnvironment spec.dependencies — the consumer's declared intent, checked against this
+                    grant by restrict-environment-dependencies at XEnvironment admission.
+                  required:
+                    - team
+                    - product
+                    - stage
+                    - service
+                  properties:
+                    team:
+                      type: string
+                    product:
+                      type: string
+                    stage:
+                      type: string
+                      enum: ["dev", "test", "uat", "staging", "prod"]
+                    service:
+                      type: string
+                      description: The subject Service's `app` label — the egress CNP's endpointSelector.
+                capability:
+                  type: object
+                  description: The network capability actually granted — narrow to exactly what the subject needs.
+                  required:
+                    - network
+                  properties:
+                    network:
+                      type: object
+                      required:
+                        - ports
+                        - protocol
+                      properties:
+                        ports:
+                          type: array
+                          minItems: 1
+                          items:
+                            type: integer
+                        protocol:
+                          type: string
+                          enum: ["TCP", "UDP"]
+                        http:
+                          type: array
+                          description: >-
+                            OPTIONAL L7 narrowing (Cilium Envoy method/path matching) — omit for "any path/
+                            method" on the granted L4 ports. When set, BOTH CNP halves carry a
+                            toPorts[].rules.http block (method/path per entry); when absent, a flat L4-only
+                            toPorts (backward-compatible — existing grants render unchanged).
+                          x-kubernetes-list-type: atomic
+                          items:
+                            type: object
+                            required:
+                              - method
+                              - path
+                            properties:
+                              method:
+                                type: string
+                                description: 'e.g. POST'
+                              path:
+                                type: string
+                                description: 'e.g. /shipments'
+                expiresAt:
+                  type: string
+                  description: >-
+                    Optional TTL (RFC3339 date/time). The hourly expiry sweep deletes a ServiceGrant past
+                    expiresAt; Crossplane GC then removes both CNPs for free. restrict-environment-dependencies
+                    treats a past (or unresolvable) expiresAt as "no grant" — expiry is enforced at BOTH the
+                    admission check and the sweep, not just the sweep.
+      additionalPrinterColumns:
+        - name: Target
+          type: string
+          jsonPath: .spec.target.service
+        - name: Subject
+          type: string
+          jsonPath: .spec.subject.service
+        - name: Expires
+          type: string
+          jsonPath: .spec.expiresAt

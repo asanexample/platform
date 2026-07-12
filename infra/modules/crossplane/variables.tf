@@ -188,6 +188,12 @@ variable "agent_policy_values" {
   default     = {}
 }
 
+variable "service_grant_policy_values" {
+  description = "Overrides for the service-grant-policies Kyverno chart (restrict-service-grant-admission — ADR-101), merged over its values.yaml. Keys: validationFailureAction, failurePolicy, excludePrincipals, extraExcludePrincipals, commonLabels. Default {} keeps the chart defaults (Enforce from day one — this protects the grant object itself, not a pre-existing claim). Only applied when enable_environment_api."
+  type        = any
+  default     = {}
+}
+
 variable "wait_image" {
   description = "kubectl image for the post-install Job that blocks until providers are Healthy (so the aws.upbound.io ProviderConfig CRD — installed by the provider package, not the core chart — exists before ProviderConfig is applied)."
   type        = string

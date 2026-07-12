@@ -1,0 +1,13 @@
+# ADR-101: a non-empty spec.dependencies (schema-validation only — proves the field round-trips the XRD's
+# OpenAPI schema/CEL). The BEHAVIORAL check (that a dependency needs a matching ServiceGrant or is denied) is
+# restrict-environment-dependencies' job, exercised in .kyverno-tests, not here — this Composition does NOT
+# read spec.dependencies at all (schema-only field, ADR-101 Part 3), so there is nothing for render.sh to assert.
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata: { name: dependencies-dev }
+spec:
+  team: alpha
+  product: shop
+  stage: dev
+  dependencies:
+    - { team: bravo, product: dispatch, stage: dev, service: intake }

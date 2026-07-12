@@ -112,6 +112,7 @@ jobs:
             gitops/environments
             gitops/releases
             gitops/agents
+            gitops/grants
           sparse-checkout-cone-mode: true
           persist-credentials: false
 
@@ -166,6 +167,14 @@ jobs:
           HEAD_DIR: ${{ github.workspace }}/head
           AGENT_FILES: ${{ steps.classify.outputs.agent_files }}
         run: bash base/.github/scripts/gitops-gate/validate-agents.sh
+
+      - name: Validate Service Grants (ServiceGrant schema + directory-team + regulated-tier shift-left, ADR-101)
+        if: steps.classify.outputs.any == 'true' && steps.classify.outputs.grant_files != ''
+        env:
+          BASE_DIR: ${{ github.workspace }}/base
+          HEAD_DIR: ${{ github.workspace }}/head
+          GRANT_FILES: ${{ steps.classify.outputs.grant_files }}
+        run: bash base/.github/scripts/gitops-gate/validate-service-grants.sh
 
       # --- composition render: prove each Environment claim BUILDS against the Composition (the
       # Environment+Product join), catching schema/envelope-valid-but-render-breaking claims. Only when there

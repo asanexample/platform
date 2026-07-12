@@ -1,0 +1,12 @@
+# Flat L4-only grant (no capability.network.http) — the backward-compatible shape: BOTH rendered CNP halves
+# must carry a plain toPorts (ports + protocol only), no rules.http key at all.
+apiVersion: platform.refplat.org/v1beta1
+kind: ServiceGrant
+metadata: { name: allow-orders-to-intake }
+spec:
+  target: { team: bravo, product: dispatch, stage: dev, service: intake }
+  subject: { team: alpha, product: shop, stage: dev, service: orders }
+  capability:
+    network:
+      ports: [8080]
+      protocol: TCP

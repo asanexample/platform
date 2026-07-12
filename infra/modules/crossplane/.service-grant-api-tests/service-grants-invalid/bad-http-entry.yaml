@@ -1,0 +1,13 @@
+# MUST FAIL: an http entry missing the required `path`.
+apiVersion: platform.refplat.org/v1beta1
+kind: ServiceGrant
+metadata: { name: bad-http-entry }
+spec:
+  target: { team: bravo, product: dispatch, stage: dev, service: intake }
+  subject: { team: alpha, product: shop, stage: dev, service: orders }
+  capability:
+    network:
+      ports: [8080]
+      protocol: TCP
+      http:
+        - method: POST

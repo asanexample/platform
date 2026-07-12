@@ -1,0 +1,4 @@
+# ServiceGrant API chart values. This Composition takes no cluster-wide constants (no EnvironmentConfig, no
+# cross-resource reads — a pure function of its own spec), so unlike agent-api/environment-api there is no
+# per-cluster config block to Helm-template here. Present (rather than an empty file) so a future cluster
+# constant has an obvious home, and so `helm template`/lint don't need a values.yaml at all to still work.

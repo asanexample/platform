@@ -6,6 +6,10 @@ description: >-
   limits, NetworkPolicies, CiliumNetworkPolicies, developer RoleBinding) via provider-kubernetes, plus the
   projected Team / Product / AccessGrant CRDs. Federated per-cluster (ADR-048).
 type: application
+# 0.4.3: ADR-101 — add the schema-only `spec.dependencies` (the ServiceGrant consumer's declared cross-team
+# intent — team/product/stage/service of the depended-on service). NOT read by the Composition (documentary +
+# a restrict-environment-dependencies Kyverno-gate trigger only, environment-policies, additive/gated). Version
+# bump so the helm provider applies the schema change on upgrade.
 # 0.4.2: ADR-091 — add the optional cost `budget` (monthlyUSD) to the Team envelope (cost guardrails Phase A).
 # Governance metadata like quotaCap — surfaced/alerted/enforced by the cost system, not read by the Composition.
 # 0.4.1: ADR-090 — retire the hand-authored `spec.roles` (teamAdmin/releaseApprover) from the Team + Product
@@ -22,5 +26,5 @@ type: application
 # 0.3.0: v3 cutover (ADR-067) — XEnvironment is the sole composite; the v1alpha2 XTenant XRD + composition-v2 +
 # the v1alpha2 Team version are removed. (0.2.0: deprovisioning safety, ADR-062 #283 — lifecycle.phase zeroes the
 # ResourceQuota; ECR → deletionPolicy: Orphan.)
-version: 0.4.2
+version: 0.4.3
 appVersion: "1.0.0"
