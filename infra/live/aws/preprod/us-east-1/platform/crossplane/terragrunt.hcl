@@ -114,6 +114,24 @@ inputs = {
     # rejected at admission, not just audited. envelopeFailureAction governs only the envelope (the v2
     # restrict-environment-envelope was removed at the cutover).
     envelopeFailureAction = "Enforce"
+    # ADR-101: restrict-environment-dependencies — every spec.dependencies entry needs a matching, non-expired
+    # ServiceGrant. Enforce from the start (not Audit-first like the envelope rollout above): this is the FIRST
+    # dependency ever declared on this cluster (alpha-shop → bravo-dispatch/intake) and its ServiceGrant lands
+    # in the same change (gitops/grants/bravo/allow-alpha-shop-orders-to-dispatch-intake.yaml), so there is no
+    # pre-existing undeclared-dependency traffic this could retroactively break.
+    enableEnvironmentDependencies = true
+    dependenciesFailureAction     = "Enforce"
+  }
+
+  # ADR-101: ArgoCD's cross-account assumed-role identity also needs to be excluded from
+  # restrict-service-grant-admission (service-grant-policies chart) — it is the identity that actually creates
+  # ServiceGrant objects from gitops/grants/** (the `grants` registry-sync app), same as environment_policy_values
+  # above for XEnvironment. That chart is Enforce from day one (protects the grant object itself), so omitting
+  # this would deny ArgoCD's very first ServiceGrant sync.
+  service_grant_policy_values = {
+    extraExcludePrincipals = [
+      "arn:aws:sts::${include.base.locals.account_ids["preprod"]}:assumed-role/ArgoCD/*",
+    ]
   }
 
   # Environment provisioning identity (P2b): scoped IAM + EKS Pod Identity locally, plus assume the platform ECR

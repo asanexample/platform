@@ -1,0 +1,20 @@
+# First real ServiceGrant (ADR-101): team bravo consents to team alpha's `orders` service calling its
+# `intake` orchestrator to kick off a real shipment when a bike-shop order is placed. Scoped to the one
+# action orders actually needs — POST /shipments — not all of intake's surface (intake also fronts
+# dispatch-worker, but that's bravo-internal). Authored in bravo's own directory (the grantor/producer owns
+# the file — gitops/grants/<target.team>/), consumed by alpha's spec.dependencies on its own XEnvironment
+# claim (gitops/environments/alpha/shop/dev.yaml) — neither side alone can wire the hop.
+apiVersion: platform.refplat.org/v1beta1
+kind: ServiceGrant
+metadata:
+  name: allow-alpha-shop-orders-to-dispatch-intake
+spec:
+  target: { team: bravo, product: dispatch, stage: dev, service: intake }
+  subject: { team: alpha, product: shop, stage: dev, service: orders }
+  capability:
+    network:
+      ports: [8080]
+      protocol: TCP
+      http:
+        - method: POST
+          path: /shipments
