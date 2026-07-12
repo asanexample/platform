@@ -14,11 +14,25 @@ spec:
   stage: dev
   tier: standard
   preview: true # ADR-032: opt into PR-preview delivery (pr-preview.tf) — alpha-shop is the reference product for its first live verification
-  # One Product, many services (ADR-067): the bike shop is storefront (edge — SPA + BFF, the only service with
-  # an HTTPRoute) + catalog (internal, ClusterIP, reached east-west from the storefront). Both share the named
-  # app-alpha SA; no AWS access yet (browse is stateless — cart/orders + self-service DynamoDB/SQS/S3 are P2).
+  # One Product, many services (ADR-067). Browse: storefront (edge — SPA + BFF, the only HTTPRoute) + catalog
+  # (internal). Buy path (P2): cart + orders + payment (internal, east-west). cart/orders own self-service AWS
+  # data (ADR-073) so each needs its OWN SA (Pod Identity binds one role per SA); the Composition mints their
+  # least-privilege DynamoDB/SQS IAM and publishes the connection info into the <svc>-resources ConfigMap
+  # (ITEMS_TABLE / ORDERS_TABLE + EVENTS_QUEUE_URL). storefront/catalog/payment are stateless → share app-alpha.
+  # 3 resources total, within the alpha envelope (allowedEngines s3/sqs/sns/dynamodb, maxPerEnvironment 10).
   services:
     storefront:
       serviceAccount: app-alpha
     catalog:
       serviceAccount: app-alpha
+    payment:
+      serviceAccount: app-alpha
+    cart:
+      serviceAccount: app-alpha-cart
+      resources:
+        items: { kind: keyvalue, engine: dynamodb, access: readwrite }
+    orders:
+      serviceAccount: app-alpha-orders
+      resources:
+        orders: { kind: keyvalue, engine: dynamodb, access: readwrite }
+        events: { kind: stream, engine: sqs, access: readwrite }
