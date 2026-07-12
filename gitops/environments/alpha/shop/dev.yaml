@@ -14,6 +14,12 @@ spec:
   stage: dev
   tier: standard
   preview: true # ADR-032: opt into PR-preview delivery (pr-preview.tf) — alpha-shop is the reference product for its first live verification
+  # First real cross-team dependency (ADR-101): orders calls bravo's dispatch/intake to kick off a real
+  # shipment on checkout. Consented to by bravo's own ServiceGrant (gitops/grants/bravo/
+  # allow-alpha-shop-orders-to-dispatch-intake.yaml) — restrict-environment-dependencies admits this claim
+  # only because that grant exists; the Composition then materializes both CNP halves automatically.
+  dependencies:
+    - { team: bravo, product: dispatch, stage: dev, service: intake }
   # One Product, many services (ADR-067). Browse: storefront (edge — SPA + BFF, the only HTTPRoute) + catalog
   # (internal). Buy path (P2): cart + orders + payment (internal, east-west). cart/orders own self-service AWS
   # data (ADR-073) so each needs its OWN SA (Pod Identity binds one role per SA); the Composition mints their
