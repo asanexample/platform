@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 768" width="760" height="768" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#cfe8d9"]{fill:#29563b}[stroke="#cfe8d9"]{stroke:#29563b}[fill="#a8d8bd"]{fill:#9bd4b4}[stroke="#a8d8bd"]{stroke:#9bd4b4}[fill="#e79a8c"]{fill:#e99687}[stroke="#e79a8c"]{stroke:#e99687}[fill="#1c7a4f"]{fill:#41d893}[stroke="#1c7a4f"]{stroke:#41d893}[fill="#7a2018"]{fill:#dd493b}[stroke="#7a2018"]{stroke:#dd493b}[fill="#5f5f66"]{fill:#8c8c94}[stroke="#5f5f66"]{stroke:#8c8c94}[fill="#b83a2c"]{fill:#dd6f63}[stroke="#b83a2c"]{stroke:#dd6f63}[fill="#eeeee8"]{fill:#20201d}[stroke="#eeeee8"]{stroke:#20201d}[fill="#dcdcd5"]{fill:#2a2a25}[stroke="#dcdcd5"]{stroke:#2a2a25}[fill="#bcbcb4"]{fill:#3b3b35}[stroke="#bcbcb4"]{stroke:#3b3b35}[fill="#8a8a91"]{fill:#898990}[stroke="#8a8a91"]{stroke:#898990}[fill="#9a9aa1"]{fill:#888890}[stroke="#9a9aa1"]{stroke:#888890}[fill="#dca99e"]{fill:#dba194}[stroke="#dca99e"]{stroke:#dba194}[fill="#c0392b"]{fill:#e07266}[stroke="#c0392b"]{stroke:#e07266}[fill="#c88a1a"]{fill:#edb551}[stroke="#c88a1a"]{stroke:#edb551}[fill="#9a6a0a"]{fill:#f6b022}[stroke="#9a6a0a"]{stroke:#f6b022}[fill="#33333a"]{fill:#dedee2}[stroke="#33333a"]{stroke:#dedee2}[fill="#a05545"]{fill:#c88779}[stroke="#a05545"]{stroke:#c88779}[fill="#fdeae6"]{fill:#522218}[stroke="#fdeae6"]{stroke:#522218}[fill="#a5883a"]{fill:#cfb46c}[stroke="#a5883a"]{stroke:#cfb46c}[fill="#e0a52a"]{fill:#efc877}[stroke="#e0a52a"]{stroke:#efc877}[fill="#4a3208"]{fill:#eda72b}[stroke="#4a3208"]{stroke:#eda72b}[fill="#fae9e6"]{fill:#532118}[stroke="#fae9e6"]{stroke:#532118}[fill="#ecc3bc"]{fill:#68291e}[stroke="#ecc3bc"]{stroke:#68291e}[fill="#a5342a"]{fill:#d75e54}[stroke="#a5342a"]{stroke:#d75e54}[fill="#6a4a44"]{fill:#a77a72}[stroke="#6a4a44"]{stroke:#a77a72}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#bfe0cc"]{fill:#2d5e41}[stroke="#bfe0cc"]{stroke:#2d5e41}[fill="#5f7d6c"]{fill:#81988b}[stroke="#5f7d6c"]{stroke:#81988b}[fill="#e2eff2"]{fill:#23464e}[stroke="#e2eff2"]{stroke:#23464e}[fill="#b8dbe4"]{fill:#275966}[stroke="#b8dbe4"]{stroke:#275966}[fill="#1f8fb0"]{fill:#48c0e3}[stroke="#1f8fb0"]{stroke:#48c0e3}[fill="#d2e9ef"]{fill:#204e5a}[stroke="#d2e9ef"]{stroke:#204e5a}[fill="#0f6f8e"]{fill:#2bbeee}[stroke="#0f6f8e"]{stroke:#2bbeee}[fill="#1c3a44"]{fill:#5aa5be}[stroke="#1c3a44"]{stroke:#5aa5be}[fill="#0a2831"]{fill:#3db7dc}[stroke="#0a2831"]{stroke:#3db7dc}[fill="#3a5560"]{fill:#6f99aa}[stroke="#3a5560"]{stroke:#6f99aa}}</style><defs><clipPath id="abar0"><rect x="39.0" y="529.0" width="10.0" height="72.0"/></clipPath></defs>
+<rect class="bg" x="0" y="0" width="760" height="768" fill="#f6f6f3"></rect>
+
+
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.8px">OBSERVABILITY · ACTING ON SIGNALS · SLOs</text>
+<text class="text" x="40" y="89" font-size="26" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">A fuel gauge, not a smoke detector.</text>
+<text class="muted" x="40" y="117" font-size="14.5" fill="#6c6c73">An SLO isn&#39;t a threshold. It&#39;s an error <tspan class="text" fill="#1c1c22" font-style="italic">budget</tspan> — and the platform pages on how <tspan class="text" fill="#1c1c22" font-style="italic">fast</tspan> you&#39;re</text>
+<text class="muted" x="40" y="136" font-size="14.5" fill="#6c6c73">spending it, not on crossing a line.</text>
+
+
+<rect x="40" y="158" width="622" height="34" rx="8" fill="#cfe8d9" stroke="#a8d8bd" stroke-width="1"></rect>
+<rect x="662" y="158" width="58" height="34" rx="8" fill="#e79a8c"></rect>
+<rect x="662" y="158" width="12" height="34" fill="#e79a8c"></rect>
+<text class="mono" x="54" y="180" font-size="12" fill="#1c7a4f" font-family="ui-monospace,Menlo,Consolas,monospace">99.9% success — the target</text>
+<text class="mono" x="691" y="174" font-size="9" fill="#7a2018" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">0.1%</text>
+<text class="mono" x="691" y="185" font-size="9" fill="#7a2018" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">budget</text>
+<text class="muted" x="40" y="212" font-size="12.5" fill="#5f5f66"><tspan class="mono" fill="#b83a2c" font-family="ui-monospace,Menlo,Consolas,monospace">error budget</tspan> = the 0.1% you may spend. Auto-derived for every prod app from Beyla RED — no authoring step.</text>
+
+
+<rect x="40" y="230" width="404" height="200" rx="12" fill="#eeeee8" stroke="#dcdcd5" stroke-width="1"></rect>
+<text class="mono" x="58" y="252" font-size="10" fill="#6c6c73" letter-spacing="0.5px" font-family="ui-monospace,Menlo,Consolas,monospace">BUDGET REMAINING → OVER TIME</text>
+
+<line x1="86" y1="266" x2="86" y2="392" stroke="#bcbcb4" stroke-width="1"></line>
+<line x1="86" y1="392" x2="420" y2="392" stroke="#bcbcb4" stroke-width="1"></line>
+<text x="80" y="272" font-size="9" fill="#8a8a91" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">100%</text>
+<text x="80" y="395" font-size="9" fill="#8a8a91" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">0%</text>
+<text x="420" y="410" font-size="9" fill="#9a9aa1" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">time →</text>
+<line x1="86" y1="392" x2="420" y2="392" stroke="#dca99e" stroke-width="1" stroke-dasharray="3 3"></line>
+
+<polyline points="86,268 160,392" fill="none" stroke="#c0392b" stroke-width="2.5"></polyline>
+<circle cx="160" cy="392" r="3.5" fill="#c0392b"></circle>
+<text x="168" y="380" font-size="9.5" fill="#c0392b" font-family="ui-monospace,Menlo,Consolas,monospace">fast burn</text>
+
+<polyline points="86,268 420,332" fill="none" stroke="#c88a1a" stroke-width="2.5"></polyline>
+<circle cx="420" cy="332" r="3.5" fill="#c88a1a"></circle>
+<text x="350" y="320" font-size="9.5" fill="#9a6a0a" font-family="ui-monospace,Menlo,Consolas,monospace">slow leak</text>
+<text class="muted" x="58" y="420" font-size="11" fill="#6c6c73">Both empty the budget — the leak just <tspan fill="#33333a" font-style="italic">later</tspan>. Multi-window burn-rate.</text>
+
+
+<rect x="196" y="443" width="22" height="3" rx="1.5" fill="#c0392b"></rect>
+<text class="mono" x="464" y="290" font-size="11" fill="#b83a2c" font-family="ui-monospace,Menlo,Consolas,monospace">FAST BURN · gone in ~2 days</text>
+<text class="arrow" x="464" y="318" font-size="13" fill="#a05545">→</text>
+<rect x="480" y="304" width="200" height="26" rx="7" fill="#c0392b"></rect>
+<text class="mono" x="580" y="321" font-size="12" fill="#fdeae6" text-anchor="middle" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">PAGE NOW · critical</text>
+<text class="mono" x="464" y="360" font-size="11" fill="#9a6a0a" font-family="ui-monospace,Menlo,Consolas,monospace">SLOW LEAK · gone this week</text>
+<text class="arrow" x="464" y="388" font-size="13" fill="#a5883a">→</text>
+<rect x="480" y="374" width="210" height="26" rx="7" fill="#e0a52a"></rect>
+<text class="mono" x="585" y="391" font-size="12" fill="#4a3208" text-anchor="middle" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">FILE A TICKET · warning</text>
+
+
+<rect class="bg-rose bd-rose" x="40" y="450" width="334" height="66" rx="11" fill="#fae9e6" stroke="#ecc3bc" stroke-width="1"></rect>
+<text class="text" x="56" y="474" font-size="14" fill="#a5342a" font-weight="600">Threshold = a smoke detector</text>
+<text class="muted" x="56" y="492" font-size="12" fill="#6a4a44">Shrieks only once you&#39;re already over the line —</text>
+<text class="muted" x="56" y="508" font-size="12" fill="#6a4a44">at burnt toast. Too late, no lead time.</text>
+
+<rect class="bg-green bd-green" x="386" y="450" width="334" height="66" rx="11" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<text class="text" x="402" y="474" font-size="14" fill="#1c7a4f" font-weight="600">Burn-rate = a fuel gauge + trip computer</text>
+<text class="muted" x="402" y="492" font-size="12" fill="#5f7d6c">Warns when projected time-to-empty is short —</text>
+<text class="muted" x="402" y="508" font-size="12" fill="#5f7d6c">while you can still act.</text>
+
+
+<rect x="40" y="530" width="680" height="70" rx="11" fill="#e2eff2" stroke="#b8dbe4" stroke-width="1"></rect>
+<rect x="41.3" y="531.3" width="677.5" height="67.5" rx="9.8" fill="none" stroke="#1f8fb0" stroke-width="2.5" clip-path="url(#abar0)"></rect>
+<rect x="58" y="546" width="92" height="20" rx="6" fill="#d2e9ef" stroke="#b8dbe4" stroke-width="1"></rect>
+<text class="mono" x="104" y="560" font-size="9.5" fill="#0f6f8e" text-anchor="middle" letter-spacing="0.4px" font-family="ui-monospace,Menlo,Consolas,monospace">FREEZE GATE</text>
+<text class="text" x="166" y="556" font-size="12.5" fill="#1c3a44">The same burn rate gates deploys: before a canary shifts traffic, if the environment is <tspan font-style="italic" fill="#0a2831">already</tspan></text>
+<text class="muted" x="166" y="574" font-size="12.5" fill="#3a5560">burning ≥2× its budget, the deploy is frozen — the platform won&#39;t stack a risky deploy on a live</text>
+<text class="muted" x="166" y="592" font-size="12.5" fill="#3a5560">incident <tspan class="mono" fill="#0f6f8e" font-family="ui-monospace,Menlo,Consolas,monospace">ADR-056</tspan>.</text>
+
+
+<text class="muted" x="40" y="642" font-size="13.5" fill="#6c6c73">Every prod app gets a <tspan class="text" fill="#1c1c22" font-weight="500">99.9% SLO, auto-derived,</tspan> that does real work — alerting by burn speed and</text>
+<text class="muted" x="40" y="661" font-size="13.5" fill="#6c6c73">gating deploys.</text>
+</svg>
