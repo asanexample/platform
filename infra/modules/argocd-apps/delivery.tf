@@ -52,6 +52,12 @@ resource "kubernetes_manifest" "product_appproject" {
         { group = "argoproj.io", kind = "Rollout" },
         { group = "argoproj.io", kind = "AnalysisTemplate" },
         { group = "argoproj.io", kind = "AnalysisRun" },
+        # Autoscaling (ADR-078 Phase 2 — elastic by construction): the New Product scaffolder emits an HPA that
+        # targets the workload's Rollout, and delivery.tf already ignores the Rollout's runtime .spec.replicas so
+        # the HPA owns the count. Without this in the whitelist ArgoCD refuses to sync the HPA ("resource not
+        # permitted in project") and the whole app sync fails atomically. Namespaced + scoped to the tenant's
+        # own workloads.
+        { group = "autoscaling", kind = "HorizontalPodAutoscaler" },
         { group = "batch", kind = "Job" },
         { group = "batch", kind = "CronJob" },
         { group = "gateway.networking.k8s.io", kind = "HTTPRoute" },
