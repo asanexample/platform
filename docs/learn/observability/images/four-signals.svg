@@ -15,7 +15,7 @@
 <text class="muted" x="56" y="299" font-size="11" fill="#7a7a80">at &#34;why this one request&#34;</text>
 <rect x="40" y="352" width="161" height="38" rx="9" fill="#e2ecf9" stroke="#c4d8f4" stroke-width="1"></rect>
 <text class="mono" x="54" y="376" font-size="13" fill="#2c66c4" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">Mimir</text>
-<text class="mono" x="187" y="375" font-size="10" fill="#9a9aa1" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">store</text>
+<text class="mono" x="187" y="375" font-size="9.5" fill="#9a9aa1" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">via Prometheus</text>
 <path d="M115.5 400 L125.5 400 L120.5 408 Z" fill="#2c66c4"></path>
 <rect x="213" y="164" width="161" height="176" rx="11" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
 <rect x="214.3" y="165.3" width="158.5" height="173.5" rx="9.8" fill="none" stroke="#1f8a5b" stroke-width="2.5" clip-path="url(#abar1)"></rect>

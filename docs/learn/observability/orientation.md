@@ -253,6 +253,8 @@ budget, so the platform won't stack a risky deploy on top of a live incident
 ([ADR-056](../../adrs/056-progressive-delivery-and-safe-rollback.md)). (Platform services get hand-authored
 SLOs too; the [deep dive](deep-dive-slos-alerting-and-cost.md) has both mechanisms.)
 
+![Burn-rate SLOs: an error budget (the 0.1% beyond a 99.9% target) depletes over time; a fast burn empties it in ~2 days and pages now, a slow leak files a ticket — a fuel gauge with a trip computer, not a threshold smoke detector. Auto-derived per prod app from Beyla RED, and read by the canary freeze gate.](images/burn-rate-slo.svg)
+
 **Alerts that page the *right* person.** A curated alert set (the #1124 alerting epic) fires through
 Alertmanager, routed by severity: `critical` → SNS + Slack + PagerDuty; `warning` → Slack; and an
 always-firing **dead-man's switch** pages an external service if the whole pipeline ever goes silent.
