@@ -8,4 +8,4 @@ spec:
     catalog:
       digest: sha256:7c6694ef3efe5e30dfb2c84124770ecda1bc79f9d79b40e420ad2eb3d9f66249
     storefront:
-      digest: sha256:aef9095daa44f4fbafb662fa2d9509bec32d9f186ebceff9ddc8d7d21d26d79c
+      digest: sha256:f65697d42a2f678fc29203060aab75c5917b8d8e405a0e43a021c81d2a80e064
