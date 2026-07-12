@@ -70,6 +70,8 @@ periodic work. That per-topology split is deliberate, and the three Alloys are t
 but this platform runs it as three separate, deliberately narrow deployments rather than one fat agent.
 The reason is topology and privilege, not preference.
 
+![One Grafana Alloy binary in three topologies over a 3-node cluster — a log DaemonSet tailing each node's own pods, a single events watcher (a second replica would double-count), and a privileged eBPF profiler DaemonSet fenced off; merging any two breaks one.](images/three-alloys.svg)
+
 | Alloy instance | Module | Controller | Why *this* shape |
 | --- | --- | --- | --- |
 | **Logs** (`alloy`) | `observability-alloy` | **DaemonSet** | Each pod tails **only its own node's** `/var/log/pods` (a `spec.nodeName`-filtered `discovery.kubernetes`). Node-local = no duplicate ingestion. |
@@ -192,6 +194,8 @@ this L1, not L0), but never hardcodes a collector address.
 > Beyla's `exclude_instrument` predicate, so Beyla skips the pod. `storefront`'s own SDK then emits the
 > traces, which land in Tempo under job `alpha-shop/storefront`. One annotation flips that pod from L0 to
 > L1 *and* keeps the two collectors from fighting over its `traceparent`.
+
+![Beyla eBPF and the OTel SDK on the same service fragment a trace into two IDs; the fix is the inject-sdk annotation matched by Beyla's exclude_instrument predicate, moving the pod to the SDK-owned lane for one continuous storefront→alpha-checkout trace.](images/beyla-vs-sdk-fragmentation.svg)
 
 The endpoint config lives in a namespace-scoped `Instrumentation` **CR**, and today five exist — one per
 environment namespace, verified live:

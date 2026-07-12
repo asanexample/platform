@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 512" width="760" height="512" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#eaf1fb"]{fill:#172f51}[stroke="#eaf1fb"]{stroke:#172f51}[fill="#c4d8f4"]{fill:#1d3a62}[stroke="#c4d8f4"]{stroke:#1d3a62}[fill="#2c66c4"]{fill:#6b98e1}[stroke="#2c66c4"]{stroke:#6b98e1}[fill="#3d6fc0"]{fill:#7fa2d9}[stroke="#3d6fc0"]{stroke:#7fa2d9}[fill="#243a5c"]{fill:#5881c1}[stroke="#243a5c"]{stroke:#5881c1}[fill="#123"]{fill:#508cc8}[stroke="#123"]{stroke:#508cc8}[fill="#5a6b83"]{fill:#8999b0}[stroke="#5a6b83"]{stroke:#8999b0}[fill="#e2eff2"]{fill:#23464e}[stroke="#e2eff2"]{stroke:#23464e}[fill="#b8dbe4"]{fill:#275966}[stroke="#b8dbe4"]{stroke:#275966}[fill="#1f8fb0"]{fill:#48c0e3}[stroke="#1f8fb0"]{stroke:#48c0e3}[fill="#0f6f8e"]{fill:#2bbeee}[stroke="#0f6f8e"]{stroke:#2bbeee}[fill="#1c3a44"]{fill:#5aa5be}[stroke="#1c3a44"]{stroke:#5aa5be}[fill="#0a2831"]{fill:#3db7dc}[stroke="#0a2831"]{stroke:#3db7dc}[fill="#3a6070"]{fill:#669cb3}[stroke="#3a6070"]{stroke:#669cb3}[fill="#9a9aa1"]{fill:#888890}[stroke="#9a9aa1"]{stroke:#888890}[fill="#fae9e6"]{fill:#532118}[stroke="#fae9e6"]{stroke:#532118}[fill="#ecc3bc"]{fill:#68291e}[stroke="#ecc3bc"]{stroke:#68291e}[fill="#c0392b"]{fill:#e07266}[stroke="#c0392b"]{stroke:#e07266}[fill="#a5342a"]{fill:#d75e54}[stroke="#a5342a"]{stroke:#d75e54}[fill="#5a201a"]{fill:#cf564a}[stroke="#5a201a"]{stroke:#cf564a}[fill="#7a2018"]{fill:#dd493b}[stroke="#7a2018"]{stroke:#dd493b}[fill="#a05545"]{fill:#c88779}[stroke="#a05545"]{stroke:#c88779}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#bfe0cc"]{fill:#2d5e41}[stroke="#bfe0cc"]{stroke:#2d5e41}[fill="#1f9a63"]{fill:#3cdc95}[stroke="#1f9a63"]{stroke:#3cdc95}[fill="#1c7a4f"]{fill:#41d893}[stroke="#1c7a4f"]{stroke:#41d893}[fill="#25402f"]{fill:#6cac84}[stroke="#25402f"]{stroke:#6cac84}[fill="#3c7a5c"]{fill:#63b58e}[stroke="#3c7a5c"]{stroke:#63b58e}[fill="#b83a2c"]{fill:#dd6f63}[stroke="#b83a2c"]{stroke:#dd6f63}}</style><defs><clipPath id="abar0"><rect x="39.0" y="157.0" width="336.0" height="11.0"/></clipPath><clipPath id="abar1"><rect x="385.0" y="157.0" width="336.0" height="11.0"/></clipPath></defs>
+<rect class="bg" x="0" y="0" width="760" height="512" fill="#f6f6f3"></rect>
+
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.8px">OBSERVABILITY · COST · SPEEDOMETER &amp; ODOMETER</text>
+<text class="text" x="40" y="89" font-size="26" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">Two cost meters, one query trap.</text>
+<text class="muted" x="40" y="117" font-size="14.5" fill="#6c6c73">In-cluster usage now, the real AWS bill later — and one aggregation choice that quietly doubles your</text>
+<text class="muted" x="40" y="136" font-size="14.5" fill="#6c6c73">numbers.</text>
+
+
+<rect x="40" y="158" width="334" height="88" rx="12" fill="#eaf1fb" stroke="#c4d8f4" stroke-width="1"></rect>
+<rect x="41.3" y="159.3" width="331.5" height="85.5" rx="10.8" fill="none" stroke="#2c66c4" stroke-width="2.5" clip-path="url(#abar0)"></rect>
+<text class="text" x="56" y="184" font-size="15" fill="#1c1c22" font-weight="600">OpenCost</text>
+<text class="mono" x="358" y="183" font-size="10" fill="#3d6fc0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">the speedometer</text>
+<text class="text" x="56" y="205" font-size="12" fill="#243a5c">in-cluster usage × list price, per team/namespace.</text>
+<text class="text" x="56" y="221" font-size="12" fill="#243a5c"><tspan font-style="italic" fill="#123">Instant</tspan> — reads now.</text>
+<text class="mono" x="56" y="238" font-size="10" fill="#5a6b83" font-family="ui-monospace,Menlo,Consolas,monospace">list price · no discounts</text>
+
+
+<rect x="386" y="158" width="334" height="88" rx="12" fill="#e2eff2" stroke="#b8dbe4" stroke-width="1"></rect>
+<rect x="387.3" y="159.3" width="331.5" height="85.5" rx="10.8" fill="none" stroke="#1f8fb0" stroke-width="2.5" clip-path="url(#abar1)"></rect>
+<text class="text" x="402" y="184" font-size="15" fill="#1c1c22" font-weight="600">CUR + Athena</text>
+<text class="mono" x="704" y="183" font-size="10" fill="#0f6f8e" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">the odometer</text>
+<text class="text" x="402" y="205" font-size="12" fill="#1c3a44">cross-account Cost &amp; Usage Report, unblended.</text>
+<text class="text" x="402" y="221" font-size="12" fill="#1c3a44"><tspan font-style="italic" fill="#0a2831">~24h lag</tspan> — the real bill.</text>
+<text class="mono" x="402" y="238" font-size="10" fill="#3a6070" font-family="ui-monospace,Menlo,Consolas,monospace">actual $ · discounts + Savings Plans</text>
+
+
+<text class="dim mono" x="40" y="278" font-size="10" fill="#9a9aa1" letter-spacing="0.5px">HOW YOU AGGREGATE IT</text>
+
+
+<rect x="40" y="290" width="334" height="94" rx="11" fill="#fae9e6" stroke="#ecc3bc" stroke-width="1"></rect>
+<text x="58" y="314" font-size="14" fill="#c0392b">✕</text>
+<text class="mono" x="78" y="315" font-size="12.5" fill="#a5342a" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">sum(rate)</text>
+<text class="text" x="58" y="337" font-size="12" fill="#5a201a">summing a <tspan font-style="italic" fill="#7a2018">rate</tspan> across pods double-counts —</text>
+<text class="text" x="58" y="353" font-size="12" fill="#5a201a">inflated, meaningless dollars.</text>
+<text class="mono" x="58" y="374" font-size="10" fill="#a05545" font-family="ui-monospace,Menlo,Consolas,monospace">the trap</text>
+
+
+<rect x="386" y="290" width="334" height="94" rx="11" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
+<text x="404" y="314" font-size="14" fill="#1f9a63">✓</text>
+<text class="mono" x="424" y="315" font-size="12.5" fill="#1c7a4f" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">max(gauge)</text>
+<text class="text" x="404" y="337" font-size="12" fill="#25402f">take the <tspan font-style="italic" fill="#123">max</tspan> of a month-to-date gauge —</text>
+<text class="text" x="404" y="353" font-size="12" fill="#25402f">one honest running total.</text>
+<text class="mono" x="404" y="374" font-size="10" fill="#3c7a5c" font-family="ui-monospace,Menlo,Consolas,monospace">the right read</text>
+
+
+<text class="muted" x="40" y="424" font-size="13.5" fill="#6c6c73">Two meters answer different questions — <tspan class="text" fill="#1c1c22" font-style="italic">how fast</tspan> vs <tspan class="text" fill="#1c1c22" font-style="italic">how much</tspan> — but both lie if you <tspan class="mono" fill="#b83a2c" font-family="ui-monospace,Menlo,Consolas,monospace">sum</tspan> a rate.</text>
+</svg>

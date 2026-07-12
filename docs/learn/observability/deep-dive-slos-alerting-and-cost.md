@@ -138,6 +138,8 @@ warning" is exactly the assumption that hid a six-day outage.
 
 ### The routing tree
 
+![The Alertmanager routing tree — an always-firing watchdog to an external dead-man's switch, a continue=true triage-agent tap evaluated before the critical receiver (SNS + Slack + dormant PagerDuty), warning to Slack, and a critical⊣warning inhibition edge.](images/alert-routing-tree.svg)
+
 [Alertmanager](https://prometheus.io/docs/alerting/latest/configuration/) routes purely by the `severity`
 label — it knows nothing about ownership (that's §3). The tree, built in
 [`observability/main.tf`](https://github.com/asanexample/platform/blob/main/infra/modules/observability/main.tf)
@@ -214,6 +216,8 @@ restored — the wiring is intact, the subscription isn't.)*
 Cost is just another metric here, and one metaphor explains *why there are two exporters*: OpenCost is a
 speedometer; the true-cost exporter is an odometer. You need both, and confusing them is the classic FinOps
 mistake.
+
+![Two cost exporters, two aggregations — OpenCost (in-cluster usage × list price, instant, a speedometer) vs the true-cost exporter (cross-account CUR/Athena unblended, ~24h lag, an odometer); summing a rate double-counts, reading a month-to-date gauge with max does not.](images/opencost-vs-cur.svg)
 
 **[OpenCost](https://www.opencost.io/docs/) — the speedometer (in-cluster allocation).** It reads pod/node
 resource usage from the cluster and multiplies by **AWS list prices** (public pricing API, no credentials) to

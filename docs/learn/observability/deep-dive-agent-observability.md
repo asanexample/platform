@@ -49,12 +49,7 @@ wrapper decides what OTel calls that this month.
 An agent's work is a tree of nested operations, and OTel's three GenAI operation names map onto that tree
 exactly:
 
-```mermaid
-graph TD
-  A["invoke_agent {agent.name}<br/>the whole triage"] --> B["chat {model}<br/>a model turn — tokens in/out"]
-  A --> C["execute_tool {tool.name}<br/>query_logs, get_recent_changes, …"]
-  A --> D["chat {model}<br/>another turn, given tool results"]
-```
+![One triage agent invocation as a nested span tree — invoke_agent → chat (6667/259 tokens, bedrock sonnet) → four execute_tool spans → disposition, with gen_ai.* attribute chips on each span and cost derived from tokens.](images/triage-span-tree.svg)
 
 `invoke_agent` is the parent span over the whole invocation; `chat` spans are the individual model turns,
 each carrying its token counts; `execute_tool` spans are the tool calls the model decided to make. This
@@ -237,6 +232,8 @@ has actually run a triage since the last scrape reset, before you suspect the Se
 ## What's deliberately deferred — the honest edges
 
 This area is easy to oversell, so here's what isn't built.
+
+![Content capture is tier-gated and deferred — metadata (tokens, latency, disposition) is always captured, prompt/response content would route through a redaction gate, and regulated (hipaa/pci) tiers stay metadata-only permanently.](images/content-capture-tiers.svg)
 
 - **Content capture with per-tier redaction** — *deferred; metadata-only today.* Prompts/responses would
   only ever be stored behind a per-compliance-tier redaction gate and never shipped to a SaaS backend. And

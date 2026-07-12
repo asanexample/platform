@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 482" width="760" height="482" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#ececea"]{fill:#20201d}[stroke="#ececea"]{stroke:#20201d}[fill="#c8c8c0"]{fill:#35352f}[stroke="#c8c8c0"]{stroke:#35352f}[fill="#a8a8a2"]{fill:#909088}[stroke="#a8a8a2"]{stroke:#909088}[fill="#f9f0da"]{fill:#584619}[stroke="#f9f0da"]{stroke:#584619}[fill="#e8d4a0"]{fill:#e5cc8a}[stroke="#e8d4a0"]{stroke:#e5cc8a}[fill="#b0790f"]{fill:#f2ad29}[stroke="#b0790f"]{stroke:#f2ad29}[fill="#9a6a0a"]{fill:#f6b022}[stroke="#9a6a0a"]{stroke:#f6b022}[fill="#f2eafb"]{fill:#321751}[stroke="#f2eafb"]{stroke:#321751}[fill="#d9c4f0"]{fill:#3f1d64}[stroke="#d9c4f0"]{stroke:#3f1d64}[fill="#8a4fc4"]{fill:#b892dd}[stroke="#8a4fc4"]{stroke:#b892dd}[fill="#d0654e"]{fill:#e39b8c}[stroke="#d0654e"]{stroke:#e39b8c}[fill="#a5342a"]{fill:#d75e54}[stroke="#a5342a"]{stroke:#d75e54}[fill="#7a2018"]{fill:#dd493b}[stroke="#7a2018"]{stroke:#dd493b}[fill="#fae9e6"]{fill:#532118}[stroke="#fae9e6"]{stroke:#532118}[fill="#ecc3bc"]{fill:#68291e}[stroke="#ecc3bc"]{stroke:#68291e}[fill="#c0392b"]{fill:#e07266}[stroke="#c0392b"]{stroke:#e07266}[fill="#5a201a"]{fill:#cf564a}[stroke="#5a201a"]{stroke:#cf564a}[fill="#6a4a44"]{fill:#a77a72}[stroke="#6a4a44"]{stroke:#a77a72}}</style><defs><clipPath id="abar0"><rect x="265.0" y="183.0" width="9.0" height="48.0"/></clipPath><clipPath id="abar1"><rect x="265.0" y="277.0" width="9.0" height="48.0"/></clipPath><clipPath id="abar2"><rect x="39.0" y="355.0" width="10.0" height="54.0"/></clipPath></defs>
+<rect class="bg" x="0" y="0" width="760" height="482" fill="#f6f6f3"></rect>
+
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.8px">OBSERVABILITY · CORRELATION · GOTCHAS THAT TEACH</text>
+<text class="text" x="40" y="89" font-size="26" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">Agreement, not declaration.</text>
+<text class="muted" x="40" y="117" font-size="14.5" fill="#6c6c73">The trace→profile jump works because two systems independently derive the <tspan class="text" fill="#1c1c22">same</tspan> name from the</text>
+<text class="muted" x="40" y="136" font-size="14.5" fill="#6c6c73">same source — but no file binds them. Change the source and the seam silently splits.</text>
+
+
+<rect x="40" y="222" width="176" height="52" rx="10" fill="#ececea" stroke="#c8c8c0" stroke-width="1"></rect>
+<text class="mono" x="56" y="244" font-size="9.5" fill="#6c6c73" font-family="ui-monospace,Menlo,Consolas,monospace">SHARED SOURCE</text>
+<text class="mono" x="56" y="262" font-size="11" fill="#1c1c22" font-family="ui-monospace,Menlo,Consolas,monospace">app.kubernetes.io/name</text>
+
+
+<line x1="216" y1="248" x2="240" y2="248" stroke="#a8a8a2" stroke-width="2"></line>
+<path d="M240 248 L240 205 L266 205" fill="none" stroke="#a8a8a2" stroke-width="2"></path>
+<path d="M240 248 L240 300 L266 300" fill="none" stroke="#a8a8a2" stroke-width="2"></path>
+
+
+<rect x="266" y="184" width="290" height="46" rx="10" fill="#f9f0da" stroke="#e8d4a0" stroke-width="1"></rect>
+<rect x="267.3" y="185.3" width="287.5" height="43.5" rx="8.8" fill="none" stroke="#b0790f" stroke-width="2.5" clip-path="url(#abar0)"></rect>
+<text class="text" x="282" y="204" font-size="12.5" fill="#1c1c22" font-weight="600">Beyla → traces</text>
+<text class="mono" x="282" y="221" font-size="11" fill="#9a6a0a" font-family="ui-monospace,Menlo,Consolas,monospace">service.name</text>
+
+
+<rect x="266" y="278" width="290" height="46" rx="10" fill="#f2eafb" stroke="#d9c4f0" stroke-width="1"></rect>
+<rect x="267.3" y="279.3" width="287.5" height="43.5" rx="8.8" fill="none" stroke="#8a4fc4" stroke-width="2.5" clip-path="url(#abar1)"></rect>
+<text class="text" x="282" y="298" font-size="12.5" fill="#1c1c22" font-weight="600">eBPF profiler → profiles</text>
+<text class="mono" x="282" y="315" font-size="11" fill="#8a4fc4" font-family="ui-monospace,Menlo,Consolas,monospace">service_name</text>
+
+
+<line x1="600" y1="196" x2="600" y2="232" stroke="#d0654e" stroke-width="2" stroke-dasharray="3 5"></line>
+<line x1="632" y1="196" x2="632" y2="232" stroke="#d0654e" stroke-width="2" stroke-dasharray="3 5"></line>
+<text class="muted" x="616" y="258" font-size="11" fill="#a5342a" text-anchor="middle">joined only by <tspan font-style="italic" fill="#7a2018">agreement</tspan></text>
+<text class="muted" x="616" y="273" font-size="11" fill="#a5342a" text-anchor="middle">— no file binds these two</text>
+
+
+<rect x="40" y="356" width="680" height="52" rx="11" fill="#fae9e6" stroke="#ecc3bc" stroke-width="1"></rect>
+<rect x="41.3" y="357.3" width="677.5" height="49.5" rx="9.8" fill="none" stroke="#c0392b" stroke-width="2.5" clip-path="url(#abar2)"></rect>
+<text x="58" y="386" font-size="15" fill="#c0392b">⚠</text>
+<text class="text" x="80" y="378" font-size="12.5" fill="#5a201a">Change how <tspan font-style="italic" fill="#7a2018">either</tspan> side derives its name and the two stop matching — the trace→profile jump</text>
+<text class="muted" x="80" y="395" font-size="12.5" fill="#6a4a44">breaks with <tspan fill="#1c1c22">no error</tspan>, because nothing ever declared they must agree.</text>
+
+
+<text class="muted" x="40" y="448" font-size="13.5" fill="#6c6c73">A convention that works by coincidence is a seam waiting to split. The fix is to make the agreement explicit.</text>
+</svg>

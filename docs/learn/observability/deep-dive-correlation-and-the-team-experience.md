@@ -102,6 +102,8 @@ only resolves for **SDK-instrumented services** (alpha-shop, alpha-checkout — 
 field never lights up for it — you still get metric→trace and trace→logs (`tracesToLogsV2`) for those,
 just not the reverse jump.
 
+![Correlation as a directed graph — SDK-instrumented services close the metric→trace→logs→trace loop via Loki structured-metadata trace_id, while Beyla-only workloads have the logs→trace return edge missing.](images/loop-vs-oneway.svg)
+
 ### Click 3: that span → its flame graph (trace → profile, `tracesToProfiles`)
 
 The span is slow *inside the process* — not waiting on a downstream call, just burning CPU. You want to
@@ -338,6 +340,9 @@ than silently reshaping your panels. Same discipline as pinning a chart version.
   Beyla's `service.name` and the eBPF profiler's `service_name` independently derive from
   `app.kubernetes.io/name`. No file declares "these two must match." Rename one label source and the jump
   opens an empty flame graph with no error. Agreements are harder to keep than declarations.
+
+![The one correlation link with no config on both sides — Beyla's trace service.name and the eBPF profiler's service_name independently derive from app.kubernetes.io/name, joined only by convention; rename one and the trace→profile jump opens an empty flame graph.](images/fragile-seam.svg)
+
 - **Time-shifts on trace→logs aren't sloppiness — they're clock-skew insurance.** `±1h` around a span
   looks huge until you remember app-stamped span times and node-stamped log times never agree exactly; a
   zero-width window returns nothing and reads as "correlation is broken."

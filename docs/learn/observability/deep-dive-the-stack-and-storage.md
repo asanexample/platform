@@ -82,6 +82,8 @@ cattle; S3 is the herd.
 
 ## Storage: a small gp3 hot buffer, a big cheap S3 tail
 
+![The repeating store shape — a small disposable gp3 hot buffer (ingester WAL, store-gateway index cache, compactor scratch) flushing into a large durable S3 blocks bucket, with Prometheus remote-writing every sample; the same shape ×1 per signal for Loki/Tempo/Pyroscope.](images/storage-shape.svg)
+
 Take Mimir as the template. Its
 [`observability-mimir` module](https://github.com/asanexample/platform/blob/main/infra/modules/observability-mimir/main.tf)
 gives the stateful components — `ingester`, `store-gateway`, `compactor` — a **gp3 PersistentVolume** each
@@ -201,6 +203,8 @@ That's fine for a platform team, but it's exactly why per-team read scoping matt
 tenancy, and an honest story about how far the platform took it.
 
 ## Tenancy: the apartment number is not a key
+
+![Tenancy as a network boundary, not a header — the observability namespace is default-deny with ClusterIP-only stores behind a single Gateway-Envoy door (fromEntities: ingress); a tenant pod's attempt to reach a store is blocked, and X-Scope-OrgID is just a routing label, not a key.](images/network-perimeter.svg)
 
 This is the subtle part, and the most important security fact in the stack. Every store has
 multi-tenancy enabled (`multitenancy_enabled` on Mimir/Pyroscope, `auth_enabled = true` on Loki), and every
