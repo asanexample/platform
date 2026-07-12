@@ -208,7 +208,9 @@ variable "spoke_ingest" {
     Gateway at `<prefix>-mimir.<domain>` that:
       • force-SETS `X-Scope-OrgID` to the mapped tenant, overwriting any client value (the cross-tenant
         spoofing guard — a spoke physically cannot write to another tenant), and
-      • matches `/api/v1/push` (write), and — for any prefix in `query_tenants` — ALSO `/prometheus` (read,
+      • matches `/api/v1/push` (Prometheus remote-write) AND `/otlp/v1/metrics` (Mimir's native OTLP ingest —
+        ADR-100, always on for every tenant, lets a spoke's OTel collector forward app-SDK metrics alongside
+        the remote-write path), and — for any prefix in `query_tenants` — ALSO `/prometheus` (read,
         opt-in; powers spoke-side metric-gated canary, ADR-056 W8c). The read rule force-sets the SAME tenant
         header, so a spoke can only ever query ITS OWN tenant — never the hub's or another spoke's data,
     plus a CiliumNetworkPolicy admitting the Gateway Envoy's reserved `ingress` identity to the Mimir gateway
