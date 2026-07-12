@@ -11,3 +11,5 @@ spec:
       digest: sha256:1ce274493ec1208516a62fc153c06a731083451fe713a681dd011ba2e11020e7
     intake:
       digest: sha256:bba6185bcdf31b972d465e6df9b69cf906b4924395b22a678fcc8ea52cdfe438
+    notify:
+      digest: sha256:a8577ab746ee188a054075decc8b01d040df6cdbd7f66c2137f62880ec92b1dc
