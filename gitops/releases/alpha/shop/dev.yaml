@@ -16,4 +16,4 @@ spec:
     payment:
       digest: sha256:de9d5c7b59cc969a4ca3f0d2b4c42eff118127220db447a5bbae0b6f14e9022f
     cart:
-      digest: sha256:0b0625599db5dedc84b5d911fdcaff0fc92565562f517e04f2c2190ec97eb785
+      digest: sha256:a421b507220ff09a448da88e6d02d1a38ba67b8ddda2331779ccb738fe7297c6
