@@ -100,6 +100,21 @@ locals {
           # Store exemplars (default 0 = off) so span-metric/RED samples keep their trace_id — the APM
           # metric→trace link (P6).
           max_global_exemplars_per_user = var.max_global_exemplars_per_user
+
+          # OTLP -> Prometheus naming convergence (ADR-100). Tenant app-SDK metrics arrive via OTLP ingest; by
+          # DEFAULT Mimir keeps raw OTLP names (no unit suffix) + only synthesises job/instance. Translate on
+          # ingest so OTLP metrics are INDISTINGUISHABLE from Beyla/kube-state remote-write — one convention, so
+          # a single dashboard / SLO / canary / alert query works regardless of delivery path (the root cause of
+          # the alpha-shop dashboard+canary+SLO breakage). Only affects OTLP-ingested series; remote-write is
+          # untouched. Extra labels stay within the raised max_label_names_per_series.
+          #
+          # ⚠️ Field names + value TYPES verified against the RUNNING Mimir 3.0.4 `/config` (NOT guessed — an
+          # earlier guess `otel_promote_resource_attributes = [list]` crashlooped every component):
+          #  - the key is `promote_otel_resource_attributes` (promote_otel, not otel_promote), and its value is a
+          #    CSV STRING (a YAML list is rejected — /config renders the default as "" not []).
+          otel_metric_suffixes_enabled              = true                                                                # http_server_request_duration -> ..._seconds (+ _total)
+          otel_keep_identifying_resource_attributes = true                                                                # -> service_name / service_namespace / service_instance_id
+          promote_otel_resource_attributes          = "k8s.namespace.name,k8s.pod.name,k8s.deployment.name,k8s.node.name" # -> k8s_namespace_name / k8s_pod_name / ...
         }
       }
     }
