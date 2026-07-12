@@ -5,10 +5,14 @@ metadata:
 spec:
   environmentRef: alpha-shop-dev
   services:
+    storefront:
+      digest: sha256:f65697d42a2f678fc29203060aab75c5917b8d8e405a0e43a021c81d2a80e064
     catalog:
       digest: sha256:a1f48785b654970d559b4fc2569518965679d188e8c43de48cbab293b8b09081
-    storefront:
-      digest: sha256:aef9095daa44f4fbafb662fa2d9509bec32d9f186ebceff9ddc8d7d21d26d79c
+    cart:
+      digest: sha256:16ab9e64bd561509a52c9e0bf119f2071e59844572091006d35678fb419217cb
+    orders:
+      digest: sha256:127c2974320b8e8c9911b6f523ae7460ff55c3e777e568f58a0f95cae357f6c5
     payment:
       digest: sha256:11a6fbaa9f66e64edc38e10e1dbc7d269645194f1a3527fc89c3f5b7a1077f4e
     cart:
