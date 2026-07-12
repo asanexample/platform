@@ -224,12 +224,16 @@ Those three match the three files in `gitops/teams/` (`alpha.yaml`, `bravo.yaml`
 
 What's *on* the dashboard, and where the numbers come from — it's a RED + USE view scoped to the team:
 
-- **Pre-filtered by namespace.** Every panel query carries `namespace=~"__TEAM__-.*"` — the platform's
-  environment-namespace convention (`<team>-<product>-<stage>`, e.g. `alpha-shop-dev`) means a single
-  regex captures *all* of a team's environments and nothing else.
-- **RED**, from Beyla — request rate and 5xx ratio per environment off
-  `http_server_request_duration_seconds_count` (the same zero-code Beyla metric the SLOs use;
-  exemplars ride the metrics-generator's span-metrics, per Click 1).
+- **Pre-filtered to the team.** Each panel scopes to the team's environment namespaces
+  (`<team>-<product>-<stage>`, e.g. `alpha-shop-dev`) with a single regex — but on *two* labels, because the
+  metrics come from different producers: the RED panels filter `k8s_namespace_name=~"__TEAM__-.*"` (the label
+  the HTTP metric carries), the USE/cost panels filter `namespace=~"__TEAM__-.*"` (the label
+  cAdvisor/kube-state carry). Same intent, two labels.
+- **RED** — request rate and 5xx ratio per environment off `http_server_request_duration_seconds_count`,
+  the same metric the SLOs use. It's emitted by **Beyla** (zero-code) *or* an app's **OTel SDK**; since
+  [ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md) both converge on the same
+  name and `k8s_namespace_name` label, one query works regardless of delivery path. Exemplars ride the
+  metrics-generator's span-metrics, per Click 1.
 - **USE**, from cAdvisor/kube-state-metrics — CPU (`container_cpu_usage_seconds_total`), memory
   (`container_memory_working_set_bytes`), running pods, restarts.
 - **Cost**, from OpenCost — an estimated `$/mo` panel (`container_cpu_allocation × node_cpu_hourly_cost`,
@@ -238,7 +242,8 @@ What's *on* the dashboard, and where the numbers come from — it's a RED + USE 
 Crucially, it **queries the federated `Mimir (all clusters)` datasource** (uid `mimir-all`), not a
 per-team-isolated one — the template's default datasource is literally `"Mimir (all clusters)"`.
 
-> **This filter is a *default view*, not a boundary.** `namespace=~"alpha-.*"` is baked into the panels,
+> **This filter is a *default view*, not a boundary.** The team regex (`k8s_namespace_name=~"alpha-.*"` on the
+> RED panels, `namespace=~"alpha-.*"` on USE) is baked into the panels,
 > but nothing *stops* an `alpha` engineer from editing the query to `bravo-.*` — the dashboard reads the
 > all-clusters datasource, which can see every tenant. It's the convenient lane, not a wall. That
 > distinction is the whole point of Effort 2.
