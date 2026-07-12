@@ -112,9 +112,12 @@ locals {
           # earlier guess `otel_promote_resource_attributes = [list]` crashlooped every component):
           #  - the key is `promote_otel_resource_attributes` (promote_otel, not otel_promote), and its value is a
           #    CSV STRING (a YAML list is rejected — /config renders the default as "" not []).
-          otel_metric_suffixes_enabled              = true                                                                # http_server_request_duration -> ..._seconds (+ _total)
-          otel_keep_identifying_resource_attributes = true                                                                # -> service_name / service_namespace / service_instance_id
-          promote_otel_resource_attributes          = "k8s.namespace.name,k8s.pod.name,k8s.deployment.name,k8s.node.name" # -> k8s_namespace_name / k8s_pod_name / ...
+          otel_metric_suffixes_enabled              = true # http_server_request_duration -> ..._seconds (+ _total)
+          otel_keep_identifying_resource_attributes = true # -> service_name / service_namespace / service_instance_id
+          # service.name/service.namespace promoted explicitly — they're the identifying attrs used for job/instance,
+          # and keep_identifying alone did NOT surface them as labels in 3.0.4, so promote them to get
+          # service_name/service_namespace exactly like Beyla/remote-write (full convention parity). CSV string.
+          promote_otel_resource_attributes = "service.name,service.namespace,k8s.namespace.name,k8s.pod.name,k8s.deployment.name,k8s.node.name"
         }
       }
     }
