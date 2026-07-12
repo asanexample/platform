@@ -243,6 +243,10 @@ What's *on* the dashboard, and where the numbers come from — it's a RED + USE 
 - **Cost**, from OpenCost — an estimated `$/mo` panel (`container_cpu_allocation × node_cpu_hourly_cost`,
   plus the memory equivalent, × 730h).
 
+![The Team Overview — alpha dashboard under load — request rate per environment, 5xx ratio, and CPU/memory per environment.](images/screenshot-team-overview-alpha.png)
+
+*The real **Team Overview — alpha** dashboard during the 2026-07-12 load test: request rate per environment (`alpha-shop-dev` peaking ~100 req/s), the 5xx ratio (empty — the run had zero errors), and CPU/memory per environment. Note the two-label split in action — the RED panels filter `k8s_namespace_name` (the label the HTTP metric carries), the USE/cost panels filter `namespace`.*
+
 Crucially, it **queries the federated `Mimir (all clusters)` datasource** (uid `mimir-all`), not a
 per-team-isolated one — the template's default datasource is literally `"Mimir (all clusters)"`.
 
