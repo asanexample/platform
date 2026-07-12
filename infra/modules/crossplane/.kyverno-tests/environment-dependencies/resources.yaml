@@ -1,0 +1,39 @@
+# Exercises restrict-environment-dependencies (ADR-101) against a mocked `servicegrants` apiCall (values.yaml).
+# All claims are alpha/shop/dev so only the dependencies rule can flag any of them.
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata: { name: nodeps }
+spec: { team: alpha, product: shop, stage: dev }
+---
+# a dependency with a matching, non-expired ServiceGrant in the mock → admitted.
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata: { name: depsatisfied }
+spec:
+  team: alpha
+  product: shop
+  stage: dev
+  dependencies:
+    - { team: bravo, product: dispatch, stage: dev, service: intake }
+---
+# a dependency with NO matching ServiceGrant at all in the mock → denied.
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata: { name: depmissing }
+spec:
+  team: alpha
+  product: shop
+  stage: dev
+  dependencies:
+    - { team: bravo, product: dispatch, stage: dev, service: ghost-service }
+---
+# a dependency whose ONLY matching ServiceGrant in the mock is past expiresAt → treated as no grant → denied.
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata: { name: depexpired }
+spec:
+  team: alpha
+  product: shop
+  stage: dev
+  dependencies:
+    - { team: bravo, product: dispatch, stage: dev, service: expired-service }

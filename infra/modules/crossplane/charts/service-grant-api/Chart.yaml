@@ -1,0 +1,16 @@
+apiVersion: v2
+name: crossplane-service-grant-api
+description: >-
+  The ServiceGrant API (ADR-101): a Crossplane v2 CompositeResourceDefinition (ServiceGrant) + a
+  function-go-templating Composition that materializes the governed cross-team network capability — one
+  team's PRODUCER service admits traffic from another team's CONSUMER service — as exactly two
+  CiliumNetworkPolicy halves (egress in the subject's namespace, ingress in the target's), so app teams never
+  hand-author a cross-namespace CNP again. A small, single-responsibility sibling of environment-api/agent-api
+  (NOT a folder under either): no EnvironmentConfig, no cross-resource reads — a pure function of its own spec.
+  Subordinate only to the mutual-consent model it implements: the producer authors the grant in their own git
+  domain (gitops/grants/<team>/), the consumer separately declares intent on their own XEnvironment
+  (spec.dependencies) — neither side alone can wire a cross-team hop.
+type: application
+# 0.1.0: initial ServiceGrant control plane (ADR-101).
+version: 0.1.0
+appVersion: "1.0.0"

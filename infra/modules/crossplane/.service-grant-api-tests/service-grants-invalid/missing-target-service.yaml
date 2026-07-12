@@ -1,0 +1,8 @@
+# MUST FAIL: spec.target.service is required.
+apiVersion: platform.refplat.org/v1beta1
+kind: ServiceGrant
+metadata: { name: missing-target-service }
+spec:
+  target: { team: bravo, product: dispatch, stage: dev }
+  subject: { team: alpha, product: shop, stage: dev, service: orders }
+  capability: { network: { ports: [8080], protocol: TCP } }

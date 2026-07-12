@@ -9,6 +9,14 @@ validationFailureAction: Enforce
 envelopeFailureAction: Audit
 # v3 (ADR-067 #387): render restrict-environment-envelope (the XEnvironment envelope). Inert until the cutover.
 enableEnvironmentEnvelope: false
+# restrict-environment-dependencies action (ADR-101) — independent so it can roll Audit-first while the
+# ServiceGrant ecosystem is new (no real dependency has a grant yet); flip to Enforce once confirmed no live
+# undeclared cross-team dependency would retroactively break.
+dependenciesFailureAction: Audit
+# ADR-101: render restrict-environment-dependencies (XEnvironment.spec.dependencies requires a matching
+# ServiceGrant). Additive/gated the same way enableEnvironmentEnvelope was — default off until dependencies are
+# in real use.
+enableEnvironmentDependencies: false
 # Generated-webhook failure policy: Ignore (fail-open) or Fail (fail-closed). Fail under Enforce.
 failurePolicy: Fail
 

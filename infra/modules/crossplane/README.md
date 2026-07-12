@@ -166,6 +166,8 @@ No modules.
 | [helm_release.crossplane_environment_policies](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
 | [helm_release.crossplane_governance_registry](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
 | [helm_release.crossplane_runtime](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
+| [helm_release.crossplane_service_grant_api](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
+| [helm_release.crossplane_service_grant_policies](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
 | [null_resource.crd_finalizer_cleanup](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
 | [null_resource.environment_ecr_orphan_sweep](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
 | [null_resource.environment_iam_orphan_sweep](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
@@ -215,6 +217,7 @@ No modules.
 | <a name="input_provider_services"></a> [provider\_services](#input\_provider\_services) | AWS provider-family members to install (e.g. "ecr", "iam", "eks"). P1 installs only "ecr" — the<br/>smallest footprint that proves reconciliation + drift correction. Later phases extend this (and the<br/>provisioning IAM policy) as the Environment Composition needs IAM roles / Pod Identity associations. | `list(string)` | `[]` | no |
 | <a name="input_provider_version"></a> [provider\_version](#input\_provider\_version) | Version tag for the AWS provider packages (must be v2.x to run the Crossplane v2 API model and support the PodIdentity credential source). | `string` | `"v2.5.0"` | no |
 | <a name="input_providerconfig_name"></a> [providerconfig\_name](#input\_providerconfig\_name) | Name of the ProviderConfig managed resources reference. 'default' is used when an MR omits providerConfigRef. | `string` | `"default"` | no |
+| <a name="input_service_grant_policy_values"></a> [service\_grant\_policy\_values](#input\_service\_grant\_policy\_values) | Overrides for the service-grant-policies Kyverno chart (restrict-service-grant-admission — ADR-101), merged over its values.yaml. Keys: validationFailureAction, failurePolicy, excludePrincipals, extraExcludePrincipals, commonLabels. Default {} keeps the chart defaults (Enforce from day one — this protects the grant object itself, not a pre-existing claim). Only applied when enable\_environment\_api. | `any` | `{}` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags applied to AWS resources created by this module. | `map(string)` | `{}` | no |
 | <a name="input_wait_image"></a> [wait\_image](#input\_wait\_image) | kubectl image for the post-install Job that blocks until providers are Healthy (so the aws.upbound.io ProviderConfig CRD — installed by the provider package, not the core chart — exists before ProviderConfig is applied). | `string` | `"registry.k8s.io/kubectl:v1.35.0"` | no |
 

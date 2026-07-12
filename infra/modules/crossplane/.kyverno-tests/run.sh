@@ -100,3 +100,33 @@ must_flag  "$OUT" badengine "resources-count-within-cap"        # any count > 0
 must_admit "$OUT" norsrc                                         # still a no-op with no resources
 
 echo "environment-envelope policy checks passed (tier/stage/residency/quota/team-existence/team-product/customer/iam/resources)."
+
+# ---------------------------------------------------------------------------
+# restrict-environment-dependencies (ADR-101) — the XEnvironment.spec.dependencies gate. Reads the
+# ServiceGrants list via an apiCall (ktp.serviceGrantsContext), mocked the same way as team/product above.
+# Behavioral: a dependency with a matching, non-expired grant is admitted; one with no match (never authored,
+# OR the only match is expired) is denied; a claim with no dependencies at all is a no-op (precondition skips).
+# The apiCall-failure fail-closed path is simulated by re-running the SAME satisfied claim against an EMPTY
+# servicegrants mock (values-empty.yaml) — the same shape a real apiCall error produces (no `default` is set
+# on the context, so a genuine fetch failure leaves it unresolved/empty here, not a lenient fallback) — and
+# asserting it now denies rather than passing through.
+# ---------------------------------------------------------------------------
+echo "Testing environment-dependencies policy (ADR-101 — XEnvironment.spec.dependencies requires a ServiceGrant) ..."
+DEPPOL="$DIR/rendered/environment-dependencies.yaml"
+helm template ktp "$CHART" --set enableEnvironmentDependencies=true --show-only templates/environment-dependencies.yaml >"$DEPPOL"
+DD="$DIR/environment-dependencies"
+run_dep() { kyverno apply "$DEPPOL" --resource "$DD/resources.yaml" --values-file "$DD/$1" 2>&1 || true; }
+
+OUT="$(run_dep values.yaml)"
+must_admit "$OUT" nodeps         # no spec.dependencies → precondition skips the rule entirely
+must_admit "$OUT" depsatisfied   # dependency has a matching, non-expired ServiceGrant in the mock
+must_flag  "$OUT" depmissing "dependency-requires-service-grant"  # no matching grant at all
+must_flag  "$OUT" depexpired "dependency-requires-service-grant"  # the only matching grant is past expiresAt
+
+# FAIL-CLOSED simulation: the same depsatisfied claim, now against an EMPTY servicegrants mock — must flip
+# from admitted to denied (proving an unresolved/erroring apiCall does not silently pass an ungranted
+# dependency through).
+OUT="$(run_dep values-empty.yaml)"
+must_flag "$OUT" depsatisfied "dependency-requires-service-grant"
+
+echo "environment-dependencies policy checks passed (matching grant admits; missing/expired grant denies; empty/unresolved apiCall fails closed)."

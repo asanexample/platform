@@ -90,3 +90,28 @@ preconditions:
       operator: Equals
       value: ""
 {{- end -}}
+
+{{/*
+ADR-101: the LIST of every ServiceGrant on the cluster — used by restrict-environment-dependencies to check a
+claimed XEnvironment.spec.dependencies entry against a matching, non-expired grant. Unlike ktp.envContext's
+get-by-NAME lookups (default {} so a missing Team/Product just fails ITS OWN existence rule), this is a
+collection call filtered downstream by JMESPath, so it needs no by-name fallback.
+
+FAIL-CLOSED, deliberately: NO `default` is set. A `default` is Kyverno's explicit fail-OPEN knob — if the
+apiCall errors (apiserver hiccup, timing during rollout) and no default exists, Kyverno fails the rule
+evaluation, and with failurePolicy: Fail (below) the webhook itself denies the request. This matters here
+because a plain LIST call (unlike a by-name GET) does not itself error just because zero ServiceGrants exist —
+it returns `items: []` successfully — so omitting `default` only changes behavior on a REAL fetch failure, not
+on the ordinary "no grant authored yet" case. Belt-and-suspenders: even independent of that engine-error path,
+the rule's own logic is "deny unless a matching grant is found" — a legitimately empty (successful) list also
+denies correctly through that same logic, it is not a fail-open path. Two independent reasons this fails
+closed, not one relying solely on webhook plumbing.
+Usage (under a rule):  {{- include "ktp.serviceGrantsContext" . | nindent 6 }}
+*/}}
+{{- define "ktp.serviceGrantsContext" -}}
+context:
+  - name: servicegrants
+    apiCall:
+      urlPath: "/apis/platform.refplat.org/v1beta1/servicegrants"
+      jmesPath: "items"
+{{- end -}}

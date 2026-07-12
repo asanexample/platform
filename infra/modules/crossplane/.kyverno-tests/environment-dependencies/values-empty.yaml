@@ -1,0 +1,10 @@
+# Simulates the FAIL-CLOSED apiCall path: `servicegrants` resolves empty — the same shape a real apiCall
+# error produces (ktp.serviceGrantsContext sets no `default`, so a genuine fetch failure leaves the context
+# value absent/empty here, not a lenient fallback). Re-running depsatisfied (which passed against the populated
+# mock in values.yaml) against this EMPTY mock must now be DENIED — proving the rule fails closed rather than
+# silently waving an ungranted (or unverifiable) dependency through.
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Values
+metadata: { name: values }
+globalValues:
+  servicegrants: []

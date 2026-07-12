@@ -1,0 +1,27 @@
+# Exercises deny-regulated-tier-service-grant against a mocked `xenvironments` apiCall (values.yaml).
+# deny-non-platform-service-grant (userInfo-dependent) is NOT applied here — see run-service-grant-policies.sh
+# for why (kyverno apply cannot mock request.userInfo offline; it gets a render-validity check instead, same
+# as restrict-agent-control-plane).
+apiVersion: platform.refplat.org/v1beta1
+kind: ServiceGrant
+metadata: { name: clean }
+spec:
+  target: { team: bravo, product: dispatch, stage: dev, service: intake }
+  subject: { team: alpha, product: shop, stage: dev, service: orders }
+  capability: { network: { ports: [8080], protocol: TCP } }
+---
+apiVersion: platform.refplat.org/v1beta1
+kind: ServiceGrant
+metadata: { name: regulatedtarget }
+spec:
+  target: { team: bravo, product: dispatch, stage: prod, service: intake }
+  subject: { team: alpha, product: shop, stage: dev, service: orders }
+  capability: { network: { ports: [8080], protocol: TCP } }
+---
+apiVersion: platform.refplat.org/v1beta1
+kind: ServiceGrant
+metadata: { name: regulatedsubject }
+spec:
+  target: { team: bravo, product: dispatch, stage: dev, service: intake }
+  subject: { team: alpha, product: shop, stage: prod, service: orders }
+  capability: { network: { ports: [8080], protocol: TCP } }

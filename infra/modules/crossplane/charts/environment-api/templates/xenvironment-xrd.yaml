@@ -276,6 +276,37 @@ spec:
                       type: string
                       enum: ["platform-managed", "customer-managed", "customer-hosted"]
                       default: platform-managed
+                dependencies:
+                  type: array
+                  description: >-
+                    ADR-101: the OTHER teams' services this Environment calls cross-namespace — mutual consent
+                    with the depended-on service's ServiceGrant (gitops/grants/<team>/), the CONSUMER's declared
+                    intent. Checked at admission by restrict-environment-dependencies (environment-policies,
+                    additive/gated) against a matching, non-expired ServiceGrant; a bare declaration here with
+                    no matching grant does not, by itself, open any network path — the Composition does NOT
+                    read this field (schema-only, Part 3 of ADR-101), the ServiceGrant Composition alone renders
+                    the CiliumNetworkPolicy pair.
+                  default: []
+                  x-kubernetes-list-type: atomic
+                  items:
+                    type: object
+                    required:
+                      - team
+                      - product
+                      - stage
+                      - service
+                    properties:
+                      team:
+                        type: string
+                        description: The OWNING team of the depended-on service (the ServiceGrant's target.team).
+                      product:
+                        type: string
+                      stage:
+                        type: string
+                        enum: ["dev", "test", "uat", "staging", "prod"]
+                      service:
+                        type: string
+                        description: The depended-on service's `app` label (the ServiceGrant's target.service).
             status:
               type: object
               properties:

@@ -1,0 +1,81 @@
+# ADR-101: defense-in-depth on the ServiceGrant object itself — the git-level gate
+# (validate-service-grants.sh) is not sufficient on its own, the same reasoning restrict-agent-control-plane
+# exists behind gitops/agents/: a bypassed or misconfigured git gate must not be the ONLY thing standing
+# between "reviewed" and "live" for something that grants cross-team network access. Two rules, one policy
+# (both act on ServiceGrant CREATE/UPDATE): who may author one at all, and the regulated-tier exclusion.
+#
+# background: false for the WHOLE policy — required because deny-non-platform-service-grant reads
+# request.userInfo.username, which a background scan cannot evaluate (there is no "requester" outside a live
+# admission request). This means regulated-tier-exclusion also does not get a periodic background re-scan;
+# admission-time enforcement (both rules, Enforce from day one below) is unaffected.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-service-grant-admission
+  labels:
+    {{- include "ksp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Restrict ServiceGrant Admission
+    policies.kyverno.io/category: Security, Multi-Tenancy
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: ServiceGrant, XEnvironment
+    policies.kyverno.io/description: >-
+      ADR-101: only the GitOps controller identity may author/modify a ServiceGrant (mirrors
+      restrict-agent-control-plane), and neither target nor subject may resolve to a hipaa/pci-tier
+      Environment (mirrors the cross-team observability grants' regulated-tier exclusion) — both
+      defense-in-depth behind validate-service-grants.sh.
+spec:
+  background: false
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    - name: deny-non-platform-service-grant
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1beta1/ServiceGrant
+      {{- include "ksp.skipAllowedPrincipals" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.validationFailureAction }}
+        message: >-
+          ServiceGrant claims may only be managed by the GitOps controller identity, not ad-hoc — author the
+          grant in git (gitops/grants/<target.team>/<name>.yaml) instead.
+        deny: {}
+
+    - name: deny-regulated-tier-service-grant
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1beta1/ServiceGrant
+      {{- include "ksp.xenvironmentsContext" . | nindent 6 }}
+      validate:
+        failureAction: {{ .Values.validationFailureAction }}
+        message: >-
+          a ServiceGrant may not name a hipaa/pci-tier team/product on either side (target
+          {{`{{ request.object.spec.target.team }}`}}/{{`{{ request.object.spec.target.product }}`}}/
+          {{`{{ request.object.spec.target.stage }}`}}, subject
+          {{`{{ request.object.spec.subject.team }}`}}/{{`{{ request.object.spec.subject.product }}`}}/
+          {{`{{ request.object.spec.subject.stage }}`}}) — regulated data is excluded from cross-team network
+          capabilities by default (mirrors the cross-team observability grants). Revisit only if a real
+          regulated-tier cross-team need shows up.
+        # JMESPath filter-projection scoping gotcha (verified with `kyverno jp query`, not assumed): a
+        # `[?...]` filter re-scopes bare identifiers to the CURRENT array element — request.object is NOT
+        # reachable inside the filter (xenvironments[?spec.team == request...] silently matches nothing; there
+        # is no let-binding in this JMESPath dialect). So this does NOT filter xenvironments by
+        # request.object at all; instead it joins each hipaa/pci XEnvironment's team/product/stage into one
+        # '|'-delimited string (a plain per-element projection, which IS allowed to reference the element's
+        # own fields), joins the ServiceGrant's target/subject fields the SAME way at the top level (no filter
+        # involved, so request.object resolves fine), and checks membership with contains() — sidestepping the
+        # scoping wall entirely (same technique as restrict-environment-dependencies).
+        deny:
+          conditions:
+            any:
+              - key: >-
+                  {{`{{ contains(xenvironments[?spec.tier == 'hipaa' || spec.tier == 'pci'].join('|', [spec.team, spec.product, spec.stage]), join('|', [request.object.spec.target.team, request.object.spec.target.product, request.object.spec.target.stage])) }}`}}
+                operator: Equals
+                value: true
+              - key: >-
+                  {{`{{ contains(xenvironments[?spec.tier == 'hipaa' || spec.tier == 'pci'].join('|', [spec.team, spec.product, spec.stage]), join('|', [request.object.spec.subject.team, request.object.spec.subject.product, request.object.spec.subject.stage])) }}`}}
+                operator: Equals
+                value: true

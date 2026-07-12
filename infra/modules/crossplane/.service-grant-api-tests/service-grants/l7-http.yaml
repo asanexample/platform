@@ -1,0 +1,16 @@
+# L7-narrowed grant (capability.network.http set) — BOTH rendered CNP halves must carry a toPorts[].rules.http
+# block (method/path) alongside the L4 port, per ADR-101's Cilium Envoy narrowing.
+apiVersion: platform.refplat.org/v1beta1
+kind: ServiceGrant
+metadata: { name: allow-orders-to-intake-shipments }
+spec:
+  target: { team: bravo, product: dispatch, stage: dev, service: intake }
+  subject: { team: alpha, product: shop, stage: dev, service: orders }
+  capability:
+    network:
+      ports: [8080]
+      protocol: TCP
+      http:
+        - method: POST
+          path: /shipments
+  expiresAt: "2026-12-31T00:00:00Z"

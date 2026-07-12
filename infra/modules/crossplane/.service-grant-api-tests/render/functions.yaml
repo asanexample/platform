@@ -1,0 +1,16 @@
+# Composition Functions for `crossplane render` (offline). Versions pinned to match the live unit (same pins
+# as .environment-api-tests / .agent-api-tests). crossplane render pulls + runs these via Docker. Only the two
+# this Composition actually uses — no function-environment-configs (there is no load-config step, ADR-101 Part 1).
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: function-go-templating
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/function-go-templating:v0.12.1
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: function-auto-ready
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/function-auto-ready:v0.6.5

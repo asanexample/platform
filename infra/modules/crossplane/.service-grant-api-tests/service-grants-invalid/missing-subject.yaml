@@ -1,0 +1,7 @@
+# MUST FAIL: spec.subject is required.
+apiVersion: platform.refplat.org/v1beta1
+kind: ServiceGrant
+metadata: { name: missing-subject }
+spec:
+  target: { team: bravo, product: dispatch, stage: dev, service: intake }
+  capability: { network: { ports: [8080], protocol: TCP } }

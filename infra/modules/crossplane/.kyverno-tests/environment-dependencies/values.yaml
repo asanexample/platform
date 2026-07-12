@@ -1,0 +1,18 @@
+# Mocks the `servicegrants` apiCall context (ktp.serviceGrantsContext) — the fetched list of every ServiceGrant
+# on the cluster. Covers: a grant matching depsatisfied's dependency (non-expired — admits it), and a grant
+# matching depexpired's dependency but past expiresAt (must NOT count — the rule treats it as no grant).
+# depmissing's dependency has no entry here at all (neither team/product/stage/service matches any grant).
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Values
+metadata: { name: values }
+globalValues:
+  servicegrants:
+    - spec:
+        target: { team: bravo, product: dispatch, stage: dev, service: intake }
+        subject: { team: alpha, product: shop, stage: dev, service: orders }
+        capability: { network: { ports: [8080], protocol: TCP } }
+    - spec:
+        target: { team: bravo, product: dispatch, stage: dev, service: expired-service }
+        subject: { team: alpha, product: shop, stage: dev, service: orders }
+        capability: { network: { ports: [8080], protocol: TCP } }
+        expiresAt: "2020-01-01T00:00:00Z"

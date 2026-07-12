@@ -1,0 +1,12 @@
+# Mocks the `xenvironments` apiCall (ksp.xenvironmentsContext). bravo/dispatch/prod is hipaa (regulatedtarget's
+# target); alpha/shop/prod is pci (regulatedsubject's subject); bravo/dispatch/dev and alpha/shop/dev (clean's
+# target/subject) are standard.
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Values
+metadata: { name: values }
+globalValues:
+  xenvironments:
+    - spec: { team: bravo, product: dispatch, stage: dev, tier: standard }
+    - spec: { team: bravo, product: dispatch, stage: prod, tier: hipaa }
+    - spec: { team: alpha, product: shop, stage: dev, tier: standard }
+    - spec: { team: alpha, product: shop, stage: prod, tier: pci }

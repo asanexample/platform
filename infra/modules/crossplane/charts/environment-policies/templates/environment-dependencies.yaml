@@ -1,0 +1,80 @@
+{{- /*
+ADR-101: the admission gate behind XEnvironment.spec.dependencies (xenvironment-xrd.yaml). A claimed
+cross-team dependency is only real if the OWNING team of the depended-on service consented via a ServiceGrant
+(gitops/grants/<team>/) — this rule denies a dependency entry with no matching, non-expired grant, closing the
+gap where spec.dependencies would otherwise be pure, unenforced documentation.
+ADDITIVE + GATED (same posture as restrict-environment-envelope): renders only when
+enableEnvironmentDependencies is true — Audit-first while the field is new and no ServiceGrant yet exists for
+any real dependency, flip to Enforce once every live cross-team dependency is grant-covered (or it would
+retroactively break existing claims).
+*/ -}}
+{{- if .Values.enableEnvironmentDependencies }}
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-environment-dependencies
+  labels:
+    {{- include "ktp.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: Restrict Environment Dependencies
+    policies.kyverno.io/category: Security, Multi-Tenancy
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: XEnvironment, ServiceGrant
+    policies.kyverno.io/description: >-
+      ADR-101: every entry in an XEnvironment's spec.dependencies must have a matching, non-expired
+      ServiceGrant authored by the depended-on service's owning team — the mutual-consent half enforced at
+      claim admission (the ServiceGrant's own admission is separately gated by restrict-service-grant-admission,
+      the service-grant-policies chart).
+spec:
+  background: true
+  failurePolicy: {{ .Values.failurePolicy }}
+  rules:
+    - name: dependency-requires-service-grant
+      match:
+        any:
+          - resources:
+              kinds:
+                - platform.refplat.org/v1beta1/XEnvironment
+      {{- include "ktp.serviceGrantsContext" . | nindent 6 }}
+      preconditions:
+        all:
+          # only evaluate when spec.dependencies is non-empty
+          - key: "{{`{{ request.object.spec.dependencies[0] || '' }}`}}"
+            operator: NotEquals
+            value: ""
+          # skip a TERMINATING Environment — don't re-validate a resource that is already being deleted
+          - key: "{{`{{ request.object.metadata.deletionTimestamp || '' }}`}}"
+            operator: Equals
+            value: ""
+      validate:
+        failureAction: {{ .Values.dependenciesFailureAction }}
+        message: >-
+          a spec.dependencies entry has no matching, non-expired ServiceGrant. Ask the owning team of the
+          depended-on service to author gitops/grants/<team>/<name>.yaml with target = that dependency
+          {team, product, stage, service} and subject = {{`{{ request.object.spec.team }}`}}/
+          {{`{{ request.object.spec.product }}`}}/{{`{{ request.object.spec.stage }}`}}.
+        foreach:
+          - list: "request.object.spec.dependencies"
+            deny:
+              conditions:
+                all:
+                  # JMESPath filter-projection scoping gotcha (verified with `kyverno jp query`, not assumed):
+                  # a `[?...]` filter re-scopes bare identifiers to the CURRENT array element — `request`/
+                  # `element` are NOT reachable inside the filter (servicegrants[?request...] silently matches
+                  # nothing; there is no let-binding in this JMESPath dialect). So this does NOT filter
+                  # servicegrants by request/element at all; instead it joins each not-expired grant's
+                  # subject+target fields into one '|'-delimited string (a plain per-element projection, which
+                  # IS allowed to reference the element's own fields), joins THIS claim's
+                  # team/product/stage + the dependency element's fields the SAME way at the top level (no
+                  # filter involved, so request/element resolve fine), and checks membership with contains() —
+                  # sidestepping the scoping wall entirely. Also note `spec.expiresAt == null`, NOT `!spec.
+                  # expiresAt` — the latter does not treat an absent key as falsy in this JMESPath dialect
+                  # (verified: `!spec.expiresAt` on a grant with no expiresAt field returns false, not true).
+                  # Zero matches (whether nothing was ever authored, or the apiCall came back empty on a real
+                  # error — see ktp.serviceGrantsContext) denies: contains() is false on an empty haystack, so
+                  # this is fail-closed by construction, not by accident.
+                  - key: >-
+                      {{`{{ contains(servicegrants[?spec.expiresAt == null || time_before(time_now(), spec.expiresAt)].join('|', [spec.subject.team, spec.subject.product, spec.subject.stage, spec.target.team, spec.target.product, spec.target.stage, spec.target.service]), join('|', [request.object.spec.team, request.object.spec.product, request.object.spec.stage, element.team, element.product, element.stage, element.service])) }}`}}
+                    operator: Equals
+                    value: false
+{{- end }}

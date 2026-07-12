@@ -11,6 +11,8 @@
 #            environment_files  space-separated added/modified gitops/environments/**/*.yaml
 #            release_files      space-separated added/modified gitops/releases/**/*.yaml (ADR-071 digest bumps)
 #            agent_files        space-separated added/modified gitops/agents/*.yaml (ADR-082 XAgent claims)
+#            grant_files        space-separated added/modified gitops/grants/**/*.yaml (ADR-068 AccessGrant +
+#                               ADR-101 ServiceGrant — both kinds live here; validate-service-grants.sh sorts by kind)
 #            prod_release_files space-separated added/modified releases targeting the PROD stage
 #                               (<stem> = prod or <customer>-prod) — the gated-prod subset (#377 Phase 3)
 #            deletions          "true" if any registry file was removed or renamed-away
@@ -29,6 +31,12 @@ RELEASE_RE='^gitops/releases/[a-z0-9-]+/[a-z0-9-]+/[a-z0-9.-]+\.ya?ml$'
 PROD_RELEASE_RE='^gitops/releases/[a-z0-9-]+/[a-z0-9-]+/(prod|[a-z0-9-]+-prod)\.ya?ml$'
 # Platform-agent claims (ADR-082): gitops/agents/<name>.yaml (flat; README.md is excluded — .md, not .ya?ml).
 AGENT_RE='^gitops/agents/[a-z0-9.-]+\.ya?ml$'
+# Grants (ADR-068 AccessGrant + ADR-101 ServiceGrant): both the pre-existing flat convention
+# (gitops/grants/<name>.yaml) and the new per-team-directory convention (gitops/grants/<team>/<name>.yaml,
+# required for a ServiceGrant — see validate-service-grants.sh's directory-team check). classify-diff does not
+# read `kind:` (pure path-regex classification, no yq here); the validator itself sorts ServiceGrant from
+# AccessGrant and only checks the former.
+GRANT_RE='^gitops/grants/([a-z0-9-]+/)?[a-z0-9.-]+\.ya?ml$'
 
 files_json="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate --jq '[.[] | {filename, status, previous_filename}]')"
 
@@ -37,6 +45,7 @@ environment_files=()
 release_files=()
 prod_release_files=()
 agent_files=()
+grant_files=()
 deleted_files=()
 deletions=false
 non_registry_changes=false
@@ -52,9 +61,10 @@ add() {
       if [[ "$2" =~ $PROD_RELEASE_RE ]]; then prod_release_files+=("$2"); fi
       ;;
     agent) agent_files+=("$2") ;;
+    grant) grant_files+=("$2") ;;
   esac
 }
-match() { [[ "$1" =~ $PRODUCT_RE ]] && { echo product; return; }; [[ "$1" =~ $ENVIRON_RE ]] && { echo environment; return; }; [[ "$1" =~ $RELEASE_RE ]] && { echo release; return; }; [[ "$1" =~ $AGENT_RE ]] && { echo agent; return; }; echo ""; }
+match() { [[ "$1" =~ $PRODUCT_RE ]] && { echo product; return; }; [[ "$1" =~ $ENVIRON_RE ]] && { echo environment; return; }; [[ "$1" =~ $RELEASE_RE ]] && { echo release; return; }; [[ "$1" =~ $AGENT_RE ]] && { echo agent; return; }; [[ "$1" =~ $GRANT_RE ]] && { echo grant; return; }; echo ""; }
 
 while IFS=$'\t' read -r filename status previous; do
   kind="$(match "$filename")"
@@ -76,7 +86,7 @@ while IFS=$'\t' read -r filename status previous; do
 done < <(jq -r '.[] | [.filename, .status, (.previous_filename // "")] | @tsv' <<<"$files_json")
 
 any=false
-{ [ ${#product_files[@]} -gt 0 ] || [ ${#environment_files[@]} -gt 0 ] || [ ${#release_files[@]} -gt 0 ] || [ ${#agent_files[@]} -gt 0 ]; } && any=true
+{ [ ${#product_files[@]} -gt 0 ] || [ ${#environment_files[@]} -gt 0 ] || [ ${#release_files[@]} -gt 0 ] || [ ${#agent_files[@]} -gt 0 ] || [ ${#grant_files[@]} -gt 0 ]; } && any=true
 
 out="${GITHUB_OUTPUT:-/dev/stdout}"
 {
@@ -85,6 +95,7 @@ out="${GITHUB_OUTPUT:-/dev/stdout}"
   echo "release_files=${release_files[*]:-}"
   echo "prod_release_files=${prod_release_files[*]:-}"
   echo "agent_files=${agent_files[*]:-}"
+  echo "grant_files=${grant_files[*]:-}"
   echo "deletions=${deletions}"
   echo "deleted_files=${deleted_files[*]:-}"
   echo "non_registry_changes=${non_registry_changes}"

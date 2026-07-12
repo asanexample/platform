@@ -1,0 +1,149 @@
+# ServiceGrant Composition (Crossplane v2, Pipeline mode) — ADR-101, the reconciler behind the governed
+# cross-team network capability. Renders a ServiceGrant into EXACTLY two composed resources: an egress
+# CiliumNetworkPolicy in the SUBJECT's namespace (permits calling the target) + an ingress CiliumNetworkPolicy
+# in the TARGET's namespace (permits being called BY the subject — tighter than namespace-only, it also pins
+# the subject's `app` label). Deleting the ServiceGrant tears down both via normal Crossplane GC.
+#
+# Deliberately render-resources -> ready ONLY (no function-environment-configs / load-config step, no
+# cross-resource reads): this Composition needs no cluster-wide constants and is a pure function of its own
+# spec, unlike environment-api/agent-api. Shipped raw (.Files.Get) so Helm leaves the go-template delimiters
+# intact. Render-tested offline (crossplane render) by .service-grant-api-tests.
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: service-grant
+  labels:
+    crossplane.io/xrd: xservicegrants.platform.refplat.org
+spec:
+  compositeTypeRef:
+    apiVersion: platform.refplat.org/v1beta1
+    kind: ServiceGrant
+  mode: Pipeline
+  pipeline:
+    - step: render-resources
+      functionRef:
+        name: function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: |
+            {{- $spec := .observed.composite.resource.spec }}
+            {{- $target := $spec.target }}
+            {{- $subject := $spec.subject }}
+            {{- /* Namespaces <team>-<product>-<stage>; truncate-and-hash past the 63-char DNS-1123 limit —
+                   the formula copied verbatim from the environment Composition (the same naming contract), so
+                   a ServiceGrant's namespaces always agree with the Environment that actually owns them. */}}
+            {{- $targetNsRaw := printf "%s-%s-%s" $target.team $target.product $target.stage }}
+            {{- $targetNs := $targetNsRaw }}
+            {{- if gt (len $targetNsRaw) 63 }}{{- $targetNs = printf "%s-%s" (substr 0 56 $targetNsRaw) (substr 0 6 (sha256sum $targetNsRaw)) }}{{- end }}
+            {{- $subjectNsRaw := printf "%s-%s-%s" $subject.team $subject.product $subject.stage }}
+            {{- $subjectNs := $subjectNsRaw }}
+            {{- if gt (len $subjectNsRaw) 63 }}{{- $subjectNs = printf "%s-%s" (substr 0 56 $subjectNsRaw) (substr 0 6 (sha256sum $subjectNsRaw)) }}{{- end }}
+            {{- $net := $spec.capability.network }}
+            {{- $ports := $net.ports }}
+            {{- $protocol := $net.protocol }}
+            {{- $http := $net.http | default list }}
+            ---
+            # Egress half — lives in the SUBJECT's namespace: the subject's own pods (app: subject.service) may
+            # call the target's service. DNS-to-kube-dns block copied verbatim from alpha-shop's
+            # k8s/base/storefront/cnp-egress-eastwest.yaml (the house cross-namespace CNP precedent) — every
+            # environment default-denies egress, so DNS must be explicitly allowed alongside the real target.
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: cnp-egress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: cilium.io/v2
+                  kind: CiliumNetworkPolicy
+                  metadata:
+                    name: allow-{{ $target.service }}-{{ $target.team }}-egress
+                    namespace: {{ $subjectNs }}
+                  spec:
+                    endpointSelector:
+                      matchLabels:
+                        app: {{ $subject.service }}
+                    egress:
+                      - toEndpoints:
+                          - matchLabels:
+                              k8s:io.kubernetes.pod.namespace: kube-system
+                              k8s:k8s-app: kube-dns
+                        toPorts:
+                          - ports:
+                              - port: "53"
+                                protocol: UDP
+                              - port: "53"
+                                protocol: TCP
+                            rules:
+                              dns:
+                                - matchPattern: "*"
+                      - toEndpoints:
+                          - matchLabels:
+                              k8s:io.kubernetes.pod.namespace: {{ $targetNs }}
+                              app: {{ $target.service }}
+                        toPorts:
+                          - ports:
+            {{- range $p := $ports }}
+                              - port: "{{ $p }}"
+                                protocol: {{ $protocol }}
+            {{- end }}
+            {{- if $http }}
+                            rules:
+                              http:
+            {{- range $h := $http }}
+                                - method: {{ $h.method | quote }}
+                                  path: {{ $h.path | quote }}
+            {{- end }}
+            {{- end }}
+            ---
+            # Ingress half — lives in the TARGET's namespace: admits traffic ONLY from the subject's pods,
+            # matched by BOTH namespace AND app label — tighter than the flagship/allow-sync-ingress.yaml
+            # precedent (namespace-only), deliberately: it would be inconsistent to nail down the exact HTTP
+            # path/method the subject may call while leaving the door open to ANY other pod in its namespace.
+            apiVersion: kubernetes.crossplane.io/v1alpha2
+            kind: Object
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: cnp-ingress
+            spec:
+              providerConfigRef:
+                name: default
+              forProvider:
+                manifest:
+                  apiVersion: cilium.io/v2
+                  kind: CiliumNetworkPolicy
+                  metadata:
+                    name: allow-{{ $subject.service }}-{{ $subject.team }}-ingress
+                    namespace: {{ $targetNs }}
+                  spec:
+                    endpointSelector:
+                      matchLabels:
+                        app: {{ $target.service }}
+                    ingress:
+                      - fromEndpoints:
+                          - matchLabels:
+                              k8s:io.kubernetes.pod.namespace: {{ $subjectNs }}
+                              app: {{ $subject.service }}
+                        toPorts:
+                          - ports:
+            {{- range $p := $ports }}
+                              - port: "{{ $p }}"
+                                protocol: {{ $protocol }}
+            {{- end }}
+            {{- if $http }}
+                            rules:
+                              http:
+            {{- range $h := $http }}
+                                - method: {{ $h.method | quote }}
+                                  path: {{ $h.path | quote }}
+            {{- end }}
+            {{- end }}
+    - step: ready
+      functionRef:
+        name: function-auto-ready

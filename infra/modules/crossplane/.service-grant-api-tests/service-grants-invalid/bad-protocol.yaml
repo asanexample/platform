@@ -1,0 +1,8 @@
+# MUST FAIL: protocol outside the enum (TCP/UDP).
+apiVersion: platform.refplat.org/v1beta1
+kind: ServiceGrant
+metadata: { name: bad-protocol }
+spec:
+  target: { team: bravo, product: dispatch, stage: dev, service: intake }
+  subject: { team: alpha, product: shop, stage: dev, service: orders }
+  capability: { network: { ports: [8080], protocol: SCTP } }

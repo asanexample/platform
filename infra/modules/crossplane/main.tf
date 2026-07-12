@@ -75,7 +75,7 @@ locals {
   # change. Hash every file in the chart dir; the value is inert (charts don't read it) but its change forces
   # the in-place upgrade.
   chart_checksum = {
-    for c in ["runtime", "config", "environment-api", "environment-policies", "agent-api", "agent-policies", "governance-registry"] :
+    for c in ["runtime", "config", "environment-api", "environment-policies", "agent-api", "agent-policies", "governance-registry", "service-grant-api", "service-grant-policies"] :
     c => sha256(join(",", [for f in sort(tolist(fileset("${path.module}/charts/${c}", "**"))) : filesha256("${path.module}/charts/${c}/${f}")]))
   }
 }
@@ -346,6 +346,59 @@ resource "helm_release" "crossplane_agent_policies" {
 }
 
 # ---------------------------------------------------------------------------
+# ServiceGrant API (local chart): the ServiceGrant XRD + Composition (ADR-101)
+# ---------------------------------------------------------------------------
+# Materializes a governed cross-team network capability as exactly two CiliumNetworkPolicy halves (egress in
+# the subject's namespace, ingress in the target's) via provider-kubernetes. Gated on enable_environment_api
+# (reusing the existing flag, not a new one) — a ServiceGrant only makes sense where XEnvironments exist to be
+# the target/subject of one; both flags are true on the same workload clusters, so this never needs its own
+# variable threaded through every calling terragrunt.hcl. No EnvironmentConfig values block: this Composition
+# is a pure function of its own spec, unlike environment-api/agent-api — just chartChecksum.
+resource "helm_release" "crossplane_service_grant_api" {
+  count = local.create && var.enable_environment_api ? 1 : 0
+
+  name      = "crossplane-service-grant-api"
+  chart     = "${path.module}/charts/service-grant-api"
+  namespace = var.namespace
+  timeout   = var.helm_timeout
+  wait      = var.helm_wait
+  atomic    = var.helm_wait
+
+  values = [yamlencode({
+    chartChecksum = local.chart_checksum["service-grant-api"]
+  })]
+
+  depends_on = [helm_release.crossplane_config]
+}
+
+# ---------------------------------------------------------------------------
+# ServiceGrant control-plane Kyverno policies (local chart) — the ServiceGrant admission gate (ADR-101)
+# ---------------------------------------------------------------------------
+# Installed AFTER service-grant-api (which creates the ServiceGrant CRD) so admission registration is clean —
+# same reasoning as environment-policies/agent-policies. Gated on enable_environment_api: no ServiceGrant CRD →
+# nothing to guard. Greenfield → Enforce from day one (this protects the grant OBJECT itself, not a
+# pre-existing claim, so there's no "breaks existing traffic" risk to phase in — unlike environment-policies'
+# restrict-environment-dependencies, which stays Audit-first there).
+resource "helm_release" "crossplane_service_grant_policies" {
+  count = local.create && var.enable_environment_api ? 1 : 0
+
+  name      = "crossplane-service-grant-policies"
+  chart     = "${path.module}/charts/service-grant-policies"
+  namespace = var.namespace
+  timeout   = var.helm_timeout
+  wait      = var.helm_wait
+  # NOT atomic: ClusterPolicies are additive/idempotent (same reasoning as environment-policies/agent-policies).
+  atomic          = false
+  cleanup_on_fail = false
+
+  values = [yamlencode(merge(var.service_grant_policy_values, {
+    chartChecksum = local.chart_checksum["service-grant-policies"]
+  }))]
+
+  depends_on = [helm_release.crossplane_service_grant_api]
+}
+
+# ---------------------------------------------------------------------------
 # Teardown: drain Crossplane CR finalizers before the helm uninstalls
 # ---------------------------------------------------------------------------
 # Provider/ProviderRevision/Function/XRD/Composition/ProviderConfig/Usage CRs carry finalizers the package +
@@ -429,6 +482,8 @@ resource "null_resource" "crd_finalizer_cleanup" {
     helm_release.crossplane_environment_policies,
     helm_release.crossplane_agent_api,
     helm_release.crossplane_agent_policies,
+    helm_release.crossplane_service_grant_api,
+    helm_release.crossplane_service_grant_policies,
   ]
 
   # The `script` key is gone from `triggers` (see above) — pin its old value via ignore_changes so

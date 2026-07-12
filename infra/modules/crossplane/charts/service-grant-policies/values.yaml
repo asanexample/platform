@@ -1,0 +1,24 @@
+# Defaults overridden by the crossplane module (helm_release values). Present so `helm template` + the
+# .kyverno-tests harness work standalone. Greenfield (no migration, and this protects the grant OBJECT itself
+# rather than a pre-existing claim) → Enforce from day one, unlike environment-policies' Audit-first rollouts.
+
+# restrict-service-grant-admission action: who may author a ServiceGrant + the hipaa/pci exclusion. Enforce =
+# reject at admission.
+validationFailureAction: Enforce
+# Generated-webhook failure policy: Fail (fail-closed) under Enforce.
+failurePolicy: Fail
+
+# Principals allowed to author ServiceGrant control-plane resources (skipped by the RBAC rule). Same set as
+# environment-policies/agent-policies excludePrincipals — the GitOps writer + the composite controller.
+excludePrincipals:
+  - "system:serviceaccount:argocd:*"
+  - "system:serviceaccount:kube-system:*"
+  - "system:serviceaccount:crossplane-system:*"
+  - "system:nodes:*"
+  - "system:kube-controller-manager"
+# Appended to excludePrincipals (env-specific) — e.g. ArgoCD's cross-account assumed-role identity on a
+# workload cluster (arn:aws:sts::<acct>:assumed-role/ArgoCD/*), mirroring environment-policies.
+extraExcludePrincipals: []
+
+# Extra labels stamped on every ClusterPolicy.
+commonLabels: {}
