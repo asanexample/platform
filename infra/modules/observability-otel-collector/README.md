@@ -1,8 +1,10 @@
 # observability-otel-collector
 
 Observability **P3b (trace pipeline)** — an **OpenTelemetry Collector** (deployment-mode gateway) that receives
-**OTLP** from applications and forwards it to **Tempo**, completing P3b (`docs/plans/102-observability-stack.md`).
-This is the trace counterpart of the Alloy log pipeline; the traces store is `observability-tempo`.
+**OTLP** from applications and forwards **traces** to **Tempo**, completing P3b
+(`docs/plans/102-observability-stack.md`). Optionally (below) it also forwards **metrics** to **Mimir**. This is
+the trace/metrics counterpart of the Alloy log pipeline; the traces store is `observability-tempo`, the metrics
+store is `observability-mimir`.
 
 ## Key decisions
 
@@ -11,8 +13,14 @@ This is the trace counterpart of the Alloy log pipeline; the traces store is `ob
 - **`otelcol-k8s` distro** (`image: otel/opentelemetry-collector-k8s`) — carries the otlp receiver/exporter,
   `batch`, and `memory_limiter`. **No AWS identity** — the collector only forwards in-cluster to Tempo (never
   touches S3), so no Pod Identity and the encryption SCP doesn't apply.
-- **Pipeline**: `otlp → memory_limiter → batch → otlp/tempo` (`tls.insecure` — in-cluster plaintext). We override
-  only the traces pipeline + add the Tempo exporter; the chart's default otlp receiver + batch are reused.
+- **Traces pipeline**: `otlp → memory_limiter → batch → otlp/tempo` (`tls.insecure` — in-cluster plaintext). We
+  override only the traces pipeline + add the Tempo exporter; the chart's default otlp receiver + batch are reused.
+- **Metrics pipeline (opt-in via `mimir_endpoint`, ADR-100/P10)** — when set, an `otlphttp/mimir` exporter is
+  added and app-SDK OTLP metrics are forwarded to Mimir's native `/otlp/v1/metrics` ingest instead of being
+  dropped. `mimir_endpoint` is empty by default (a traces-only collector, e.g. a spoke with nothing to say about
+  metrics yet); the preprod `observability-traces-spoke` unit sets it to the hub Mimir's OTLP edge so tenant
+  app-SDK metrics reach Mimir alongside traces. Mimir translates the naming to the Prometheus convention on
+  ingest (see `observability-mimir`'s README) — this module just forwards the OTLP payload unchanged.
 - Sized by **`high_availability`** (1 replica dev / 2 prod). Gated by **`enable_trace_pipeline`** (cost_profile
   per-knob override); the Tempo OTLP endpoint comes from the `observability-tempo` module.
 - **Follow-ups**: `k8sattributes` enrichment (pod/namespace span tags + RBAC) and tail-sampling.

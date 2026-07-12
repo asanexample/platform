@@ -2,7 +2,11 @@
 
 Observability **P3a** — the multi-tenant **logs** store for the platform hub (`docs/plans/102-observability-stack.md`).
 Deploys `grafana/loki` into the `observability` namespace, S3-backed, and registers a Grafana **Loki** datasource
-(with a `trace_id` derived field that links a log line to its Tempo trace). Mirrors `observability-mimir` (P2); the
+with a `trace_id` derived field that links a log line to its Tempo trace. Since ADR-100 the derived field matches
+on **Loki structured metadata** (`matcherType: label`) rather than regex-scraping the raw log line — a hard
+dependency on `observability-alloy`'s `per_team_tenant` pipeline, which is what actually promotes `trace_id`/
+`span_id` out of the JSON body into structured metadata; this module only wires the datasource-side match. If
+Alloy's `per_team_tenant` isn't on, the field exists but never matches. Mirrors `observability-mimir` (P2); the
 only structural difference is **identity**.
 
 ## Key decisions
@@ -33,6 +37,9 @@ only structural difference is **identity**.
 
 - The chart **requires** a `loki.schemaConfig` (tsdb / schema v13) — omitting it fails the release. Provided here.
 - Collectors (Alloy) write to this store; they ship in the P3a log-pipeline unit, not here.
+- **Cross-module coupling (ADR-100):** the `trace_id` derived field silently does nothing unless
+  `observability-alloy`'s `per_team_tenant` is enabled — that's the only thing that puts `trace_id` into
+  structured metadata for the field to match on. Check Alloy's config first if the log→trace jump isn't working.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements

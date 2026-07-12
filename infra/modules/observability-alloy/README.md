@@ -12,6 +12,12 @@ them to **Loki** (`docs/plans/102-observability-stack.md`). This is the collecto
   only writes to the in-cluster Loki gateway, so it never touches S3 and sidesteps the encryption SCP).
 - **Tenant `_platform`** stamped on the write path (`loki.write … tenant_id`). Per-team derivation from the
   namespace is **P10**.
+- **Log→trace correlation (ADR-100)** — the per-team `retenant` process (gated on `per_team_tenant`) also
+  extracts each app's OTel `trace_id`/`span_id` out of the JSON log body via a quote-free regex and promotes
+  them to **Loki structured metadata** (not new index labels — no added cardinality), so `observability-loki`'s
+  derived field can link a log line straight to its trace by matching on that field (`matcherType: label`)
+  instead of re-scraping the raw line at query time. Only fires for SDK-instrumented services (the fields must
+  already be in the JSON body); non-request / non-SDK log lines simply carry no such metadata.
 - **No phone-home** (`enableReporting=false`); chart CRDs off (`crds.create=false` — we run a plain collector).
 - Gated by **`enable_log_pipeline`** (cost_profile per-knob override); points at the `observability-loki`
   `push_endpoint`.
@@ -22,7 +28,7 @@ them to **Loki** (`docs/plans/102-observability-stack.md`). This is the collecto
 |-------|---------|-------|
 | `loki_push_url` | loki-gateway push URL | wire to the `observability-loki` `push_endpoint` output |
 | `tenant_id` | `platform` | X-Scope-OrgID on platform logs (the fallback tenant when `per_team_tenant` is on) |
-| `per_team_tenant` | `false` | P13: re-tenant env-namespace logs per team (#590) |
+| `per_team_tenant` | `false` | P13: re-tenant env-namespace logs per team (#590); also gates the trace_id/span_id→structured-metadata promotion (ADR-100) — both live on platform + preprod |
 | `helm_chart_version` | `1.10.0` | pinned in `_versions.hcl` |
 
 (Full input reference is auto-generated below.)
