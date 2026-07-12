@@ -180,26 +180,26 @@ annotate a pod `instrumentation.opentelemetry.io/inject-sdk` and the operator in
 platform-managed OTLP endpoint at admission — the app still links its own OTel SDK (that's what makes
 this L1, not L0), but never hardcodes a collector address.
 
-The endpoint config lives in a namespace-scoped `Instrumentation` **CR**, and today six exist — one per
+The endpoint config lives in a namespace-scoped `Instrumentation` **CR**, and today five exist — one per
 environment namespace, verified live:
 
 ```text
 $ kubectl --context preprod get instrumentation.opentelemetry.io -A
 NAMESPACE               NAME       ENDPOINT
 alpha-checkout-dev      platform   http://otel-collector.observability.svc.cluster.local:4318
-alpha-conformance-dev   platform   http://otel-collector.observability.svc.cluster.local:4318
 alpha-shop-dev          platform   http://otel-collector.observability.svc.cluster.local:4318
 alpha-shop-prod         platform   http://otel-collector.observability.svc.cluster.local:4318
-bravo-widgets-dev       platform   http://otel-collector.observability.svc.cluster.local:4318
+bravo-dispatch-dev      platform   http://otel-collector.observability.svc.cluster.local:4318
 platform-flagship-dev   platform   http://otel-collector.observability.svc.cluster.local:4318
 ```
 
 The CR existing per namespace doesn't mean every pod in it climbed the ladder, though — the CR just
 *makes L1 available*; a pod still has to carry the `inject-sdk` annotation to use it. Spot-checked:
-`alpha-shop`'s services (`cart`, `catalog`, `orders`, `payment`, `storefront`) and `alpha-checkout` carry
-the annotation and are SDK'd; `bravo-widgets`, `alpha-conformance`, and `platform-flagship` don't — they
-ride the L0 Beyla baseline like everyone else. That's the ladder working as designed: opt-in, per
-workload, not all-or-nothing per namespace.
+`alpha-shop`'s services (`cart`, `catalog`, `orders`, `payment`, `storefront`), `alpha-checkout`, and
+`bravo-dispatch`'s `tracker`/`shipments`/`intake`/`dispatch-worker` carry the annotation and are SDK'd;
+`bravo-dispatch`'s `notify` (Node/TS, deliberately un-instrumented — the fleet's Beyla-only reference,
+ADR-100 L0) and `platform-flagship` don't — they ride the L0 Beyla baseline like everyone else. That's the
+ladder working as designed: opt-in, per workload, not all-or-nothing per namespace.
 
 ## The rest of the fleet — traces, metrics, cloud, synthetics
 

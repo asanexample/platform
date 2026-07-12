@@ -1,9 +1,0 @@
-apiVersion: platform.refplat.org/v1beta1
-kind: Release
-metadata:
-  name: alpha-conformance-dev
-spec:
-  environmentRef: alpha-conformance-dev
-  services:
-    web:
-      digest: sha256:6f0fede900fb280067a6c33404255d8bf4a2f81149755bb786198bd8c296eb4e

@@ -40,7 +40,7 @@ App/decision — never widen this one.
 
 App page → **Install App** → install into the `asanexample` org → **Only select repositories** →
 the app repos (`<team>-<product>`, derived from `gitops/products/` — currently **`alpha-shop`,
-`alpha-checkout`, `alpha-conformance`**) plus **`backstage`**. (NOT all
+`alpha-checkout`, `bravo-dispatch`**) plus **`backstage`**. (NOT all
 repos, NOT `platform` — discovery surface = install scope.
 `platform` was added in Phase 2.3 for the projection, then **removed again in Phase 3**: platform-repo reads
 now resolve to the scaffolder write App, whose installation must not be shadowed by this one — the two Apps'
@@ -79,7 +79,7 @@ kubectl --context platform logs -n backstage -l app.kubernetes.io/name=backstage
 ```
 
 Then in the catalog UI (`backstage.aws.refplat.org`) → **Components** → `alpha-shop`, `alpha-checkout`,
-`alpha-conformance`, `backstage` appear, each owned by its team Group, within the provider's schedule
+`bravo-dispatch`, `backstage` appear, each owned by its team Group, within the provider's schedule
 (~10 min) or after a manual refresh.
 
 ---
