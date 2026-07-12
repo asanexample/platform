@@ -8,7 +8,7 @@ spec:
     storefront:
       digest: sha256:9220583a969b6d5b382e6c78e3b150bd6c038fd3a191953377e92a6e4b05c10a
     catalog:
-      digest: sha256:8980ad20b758f0b49b1e75cd47e353e3c06bf10b391aa48c5b573c0425c0fb0f
+      digest: sha256:d73e3f3160a19cc54f26aa2e46b219c992ee486cdf33d2549f3a7cf8604385b0
     cart:
       digest: sha256:16ab9e64bd561509a52c9e0bf119f2071e59844572091006d35678fb419217cb
     orders:
