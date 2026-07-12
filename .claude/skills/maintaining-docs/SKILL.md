@@ -77,6 +77,14 @@ From the audit, the patterns that bite again and again:
   past that's no longer true.
 - **Skills go stale too.** If your change touches a domain a house skill covers, the skill is a doc
   — update it. (Use `skill-self-correction` when a skill misleads you.)
+- **Correction sweeps leave residue in the non-prose spots.** When you fix a stale claim across a doc
+  set, the prose body is the easy part — the old version survives in the **low-attention** places:
+  section **headers**, **gotchas/callouts**, **code-block field names**, **hard counts**, and
+  **"look, real output" blocks** (`kubectl`/`aws` snippets). Grep the whole file, and re-read those
+  spots specifically — they read as authoritative precisely because they aren't prose. (A 2026-07
+  tenant-proxy correction fixed every prose body but left a *false security guarantee* in a gotcha, a
+  broken Grafana field name (`tracesToProfilesV2`) in code blocks, and a wrong alert count in a
+  reference — each survived the first sweep.)
 - **terraform-docs not regenerated.** Any change to a module's variables/outputs/resources requires
   re-running terraform-docs on that module (CI enforces this on the modules you touched).
 
