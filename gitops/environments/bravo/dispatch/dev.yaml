@@ -1,0 +1,31 @@
+# Environment (bravo × dispatch × dev) — Bravo Dispatch, a last-mile parcel-tracking demo replacing the
+# bravo-widgets placeholder (ADR-067 v3). P1 (this file): tracker (edge — SPA + BFF, the only HTTPRoute) +
+# shipments (internal, DynamoDB-backed shipment records). P2 (intake + dispatch-worker, SQS/SNS) and P3
+# (notify, Node/TS riding the Beyla-only baseline, + proof-of-delivery via S3 on shipments) land in
+# follow-on passes and will add services/resources here. Namespace bravo-dispatch-dev. Synced by ArgoCD
+# (the `environments` registry-sync app) and reconciled by the Crossplane Environment Composition (v3).
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata:
+  # CLUSTER-scoped XR → team-prefixed, globally unique (ADR-067).
+  name: bravo-dispatch-dev
+  annotations:
+    platform.refplat.org/requested-by: josh
+spec:
+  team: bravo # validated == Product.team at the gate + admission
+  product: dispatch
+  stage: dev
+  tier: standard
+  services:
+    tracker:
+      serviceAccount: app-bravo # Pod Identity binds this named SA; the app repo's serviceaccount.yaml creates it
+      # image omitted — declared but NOT yet deployed (the first-deploy state). The per-Product ApplicationSet
+      # skips this (Environment × Service) pair until the first CI build promotes a digest into k8s/overlays/dev.
+    shipments:
+      # Owns its own self-service AWS data (ADR-073) — needs its OWN SA (Pod Identity binds one role per SA);
+      # the Composition mints least-privilege DynamoDB IAM and publishes connection info into the
+      # shipments-resources ConfigMap (SHIPMENTS_TABLE). tracker is stateless → shares app-bravo.
+      serviceAccount: app-bravo-shipments
+      resources:
+        shipments: { kind: keyvalue, engine: dynamodb, access: readwrite }
+      # image omitted — same first-deploy state as tracker above.
