@@ -1,0 +1,14 @@
+# L4 grant with SPIRE mutual-auth required (ADR-057 Phase 2) — the INGRESS half must carry
+# authentication.mode: required alongside fromEndpoints; the EGRESS half must not carry it at all.
+apiVersion: platform.refplat.org/v1beta1
+kind: ServiceGrant
+metadata: { name: allow-orders-to-intake-authenticated }
+spec:
+  target: { team: bravo, product: dispatch, stage: dev, service: intake }
+  subject: { team: alpha, product: shop, stage: dev, service: orders }
+  capability:
+    network:
+      ports: [8080]
+      protocol: TCP
+      authentication:
+        mode: required

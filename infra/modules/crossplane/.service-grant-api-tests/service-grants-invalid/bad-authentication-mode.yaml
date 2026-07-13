@@ -1,0 +1,8 @@
+# MUST FAIL: authentication.mode outside the enum (only "required" is defined).
+apiVersion: platform.refplat.org/v1beta1
+kind: ServiceGrant
+metadata: { name: bad-authentication-mode }
+spec:
+  target: { team: bravo, product: dispatch, stage: dev, service: intake }
+  subject: { team: alpha, product: shop, stage: dev, service: orders }
+  capability: { network: { ports: [8080], protocol: TCP, authentication: { mode: optional } } }

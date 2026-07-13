@@ -45,6 +45,7 @@ spec:
             {{- $ports := $net.ports }}
             {{- $protocol := $net.protocol }}
             {{- $http := $net.http | default list }}
+            {{- $auth := $net.authentication }}
             ---
             # Egress half — lives in the SUBJECT's namespace: the subject's own pods (app: subject.service) may
             # call the target's service. DNS-to-kube-dns block copied verbatim from alpha-shop's
@@ -130,6 +131,10 @@ spec:
                           - matchLabels:
                               k8s:io.kubernetes.pod.namespace: {{ $subjectNs }}
                               app: {{ $subject.service }}
+            {{- if $auth }}
+                        authentication:
+                          mode: {{ $auth.mode }}
+            {{- end }}
                         toPorts:
                           - ports:
             {{- range $p := $ports }}
