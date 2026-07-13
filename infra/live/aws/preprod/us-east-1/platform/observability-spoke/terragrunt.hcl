@@ -121,6 +121,11 @@ inputs = {
   # spoke's own PodMonitors, not just the hub's (#1422/#1423).
   enable_crossplane_pod_monitor          = true
   enable_crossplane_provider_pod_monitor = true
+  # The default 512Mi/1Gi OOM-killed the agent within ~30s of scraping crossplane core + 5 provider pods'
+  # controller-runtime metrics (11 CrashLoopBackOff restarts observed live) — bump headroom for the added
+  # scrape cardinality.
+  memory_request = "768Mi"
+  memory_limit   = "2Gi"
 
   tags = include.base.locals.tags
 }
