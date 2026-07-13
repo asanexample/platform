@@ -256,7 +256,7 @@ scrapeable `/metrics`, so it reads `up==0` while healthy).
 
 Hand-authored Sloth SLOs (`infra/live/aws/platform/us-east-1/platform/slo/terragrunt.hcl`'s `slos` input) —
 the Sloth controller renders each into SLI recording rules + multi-window burn-rate `PrometheusRule`s,
-evaluated by the hub's local Prometheus (all four SLOs below are on components that run on the hub, so no
+evaluated by the hub's local Prometheus (every SLO below is on a component that runs on the hub, so no
 Mimir-ruler round-trip is needed — contrast with `## app-slos`, which evaluates inside the preprod tenant
 because the app metrics live there). Same burn-rate math/severities as `## app-slos` below.
 
@@ -269,8 +269,28 @@ because the app metrics live there). Same burn-rate math/severities as `## app-s
   these give the SAME underlying failure an error-budget/burn-rate view instead of a flat threshold. If one
   of these is burning fast, triage the same way as the matching `Down`/`RequestErrors` alert above (check
   `kubectl -n observability get pods` for the store, then component-specific logs).
+- **`ArgoRolloutsReconcile`** — Argo Rollouts controller reconcile success rate, both clusters
+  (`rollout_reconcile_error` vs. `rollout_reconcile_count`). A burn here means the controller itself is
+  erroring while reconciling Rollouts (not a single Rollout being Degraded — that's a workload-level concern,
+  see the Argo Rollouts dashboard). Check the `argo-rollouts` controller pod/logs.
+- **`KyvernoAdmissionLatency`** — 99% of admission reviews should complete within 1s
+  (`kyverno_admission_review_duration_seconds_bucket{le="1.0"}`). A burn means admission is getting slow
+  enough to risk delaying deploys (every apply/kubectl-create goes through this webhook). Check Kyverno
+  admission-controller resource pressure (CPU throttling is the usual cause) and policy count/complexity.
+- **`JitActivationOutcome`** — combined mint+revoke success rate for JIT privilege activation
+  (`activation_mint_failures` + `activation_revoke_failures` vs. their duration-count totals). **Expect long
+  data gaps and occasional `NaN`/blank stretches on the dashboard** — this is break-glass-shaped traffic
+  (the last mint before this SLO shipped was 13 days prior), not a monitoring failure; 0 total operations in
+  a burn-rate window is normal, not itself alertable. A REAL burn here (a mint/revoke actually failing) is
+  worth immediate attention given the security sensitivity — check the `activation-operator` pod/logs and
+  the Grafana **Activation Operator** dashboard.
 - **`HighErrorBudgetBurn`** (page, `severity: critical`) / **`ErrorBudgetBurn`** (ticket, `severity:
   warning`) suffix each alert name — same Google SRE fast/slow-burn semantics as the app-slos below.
+- **Not here: Crossplane core reconcile.** Verified live that the platform hub's `crossplane` PodMonitor
+  (namespace `observability`) selects `port: metrics`, but the deployed crossplane pod exposes no port
+  named `metrics` (only `readyz`/`webhooks`) — zero scrape targets, despite
+  `enable_crossplane_pod_monitor=true`. Tracked as a follow-up issue rather than shipping a permanently-
+  absent SLO; `CrossplaneDown` (`## crossplane` above) is similarly silently dead until this is fixed.
 
 ## app-slos
 
