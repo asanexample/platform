@@ -47,6 +47,24 @@ locals {
   retenant_rules        = var.per_team_tenant ? local.retenant_rules_raw : ""
   retenant_tenant_stage = var.per_team_tenant ? local.retenant_tenant_stage_raw : ""
 
+  # Cosmetic level-emoji line prefix (opt-in). Reuses the `detected_level` value the retenant
+  # processor already extracts below (no redundant regex) — that value is uppercase (Go log/slog:
+  # INFO/ERROR/WARN/DEBUG; see the stage.regex comment below) since stage.template here has no
+  # ToLower/case-fold function, so match uppercase directly. Runs last so it rewrites the final
+  # line rather than the raw one the trace/span/level regexes below match against.
+  emoji_stage_raw = <<-EMOJI
+
+      stage.template {
+        source   = "emoji_line"
+        template = `{{ if eq .detected_level "ERROR" }}🔥 {{ .Entry }}{{ else if eq .detected_level "FATAL" }}💀 {{ .Entry }}{{ else if or (eq .detected_level "WARN") (eq .detected_level "WARNING") }}⚠️ {{ .Entry }}{{ else if eq .detected_level "DEBUG" }}🐛 {{ .Entry }}{{ else if eq .detected_level "INFO" }}ℹ️ {{ .Entry }}{{ else }}{{ .Entry }}{{ end }}`
+      }
+      stage.output {
+        source = "emoji_line"
+      }
+  EMOJI
+
+  emoji_stage = var.emoji_log_annotations ? local.emoji_stage_raw : ""
+
   # loki.process "retenant" always runs: it's the sole place trace_id/span_id/level are promoted to Loki
   # structured metadata (log->trace, and the Explore/Logs-panel level badge), independent of per-team tenanting.
   retenant_process = <<-PROC
@@ -81,6 +99,7 @@ locals {
         }
       }
       ${local.retenant_tenant_stage}
+      ${local.emoji_stage}
     }
   PROC
 
