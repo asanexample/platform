@@ -3,9 +3,11 @@
 **Date:** 2026-06-04
 
 **Status:** **Phase 1 (transparent encryption): Accepted — live on preprod + platform, 2026-07-07.**
-**Phase 2 (Cilium mTLS + SPIFFE workload identity): Accepted — showcase built + live on preprod, 2026-07-07**
-(mutual auth + embedded SPIRE; the `alpha-shop → alpha-checkout` path is SPIRE-authenticated, cross-team
-impostor denied). Fleet-wide/tier-gated enforcement remains a follow-up. Completes the *east-west*
+**Phase 2 (Cilium mTLS + SPIFFE workload identity): Accepted — showcase built + live on preprod, 2026-07-07,
+expanded 2026-07-13** (mutual auth + embedded SPIRE, now covering every hop inside alpha-shop —
+storefront→catalog/cart/orders/checkout/accounts, orders→payment — plus the real cross-team
+`orders → bravo-dispatch intake` call, ADR-101; impostor traffic from any other namespace is denied at each
+authenticated ingress). Fleet-wide/tier-gated enforcement remains a follow-up. Completes the *east-west*
 (service-to-service) half of the
 security model, alongside the existing north-south ingress ([ADR-017](017-gateway-api-over-ingress.md)) and the
 Cilium CNI ([ADR-008](008-cilium-as-cross-cloud-cni.md)). Aligns in-cluster workload identity with the cloud
@@ -86,6 +88,29 @@ cross-cluster federation).
 **Scope: showcase only** — preprod, one service pair. Fleet-wide/tier-gated enforcement (wiring auth-required
 policies into the Crossplane Composition per compliance tier, which already has `$tier` in scope) remains the
 follow-up when a regulated tenant exists.
+
+## Update (2026-07-13) — showcase moved from a standalone `alpha-checkout` Product to an in-shop service
+
+The pair described above (`alpha-shop → alpha-checkout`, two separate Products/namespaces under the same
+team) has been superseded: `checkout` was rebuilt as a **service inside `alpha-shop`** (its own mutual-auth
+CNP, matching every other intra-shop hop), and the standalone `alpha-checkout` Product — which never
+progressed past its Backstage scaffold's first-deploy state, no image ever promoted — is being decommissioned
+(`docs/runbooks/environment-deprovisioning.md`).
+
+This is a strictly bigger showcase than the one it replaces:
+
+- **Every intra-shop hop is mutual-auth'd**, not just one pair: `storefront → catalog/cart/orders/checkout/accounts`
+  and `orders → payment` all carry `authentication.mode: required` CNPs — six authenticated pairs in one
+  namespace instead of one.
+- **A genuinely cross-team pair is now also mutual-auth'd**: `orders → bravo-dispatch`'s `intake` (ADR-101),
+  authenticated via the `ServiceGrant` API's `capability.network.authentication.mode: required` field
+  (`gitops/grants/bravo/allow-alpha-shop-orders-to-dispatch-intake.yaml`) — the first ServiceGrant consumer of
+  that capability, and unlike the original pair, this one crosses a real team boundary (alpha ⇄ bravo), not
+  just a Product boundary inside the same team.
+
+`cilium-dbg bpf auth list` shows `AUTH TYPE: spire` for all of the pairs above; an impostor from any other
+namespace is dropped at each authenticated ingress, same zero-trust property as before, demonstrated on more
+of the fleet.
 
 ## Context
 
