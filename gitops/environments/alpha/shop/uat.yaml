@@ -1,19 +1,18 @@
-# Environment (alpha × shop × prod) — full-parity stage, mirroring dev's service shape exactly (ADR-067
-# v1beta1). Namespace alpha-shop-prod. Synced by ArgoCD (the `environments` registry-sync app) and reconciled
-# by the Crossplane Environment Composition (v3). Originally provisioned to validate the ADR-056 prod canary
-# with just storefront+catalog and parked for the bike-shop migration (P1 landed on dev first) — brought up to
-# full parity now that the realistic-demo feature set (accounts/cart/orders/payment/checkout) is proven on
-# dev/test/uat/staging. Digests reach here via a manual, release-approver-gated promotion (never auto-promoted).
+# Environment (alpha × shop × uat) — full-parity stage, mirroring dev's service shape exactly (ADR-067
+# v1beta1). Namespace alpha-shop-uat. Synced by ArgoCD (the `environments` registry-sync app) and reconciled
+# by the Crossplane Environment Composition (v3). Promoted digests land here via the auto-promote reconciler
+# (dev -> test -> uat -> staging), then a manual, release-approver-gated hop to prod.
 apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata:
-  name: alpha-shop-prod
+  # CLUSTER-scoped XR → team-prefixed, globally unique (ADR-067).
+  name: alpha-shop-uat
   annotations:
     platform.refplat.org/requested-by: user:default/dev-alpha
 spec:
-  team: alpha
+  team: alpha # validated == Product.team at the gate + admission
   product: shop
-  stage: prod
+  stage: uat
   tier: standard
   # One Product, many services (ADR-067) — same shape as dev. storefront/payment/checkout are stateless →
   # share app-alpha. catalog/cart/orders/accounts own self-service AWS data (ADR-073) so each needs its OWN SA
