@@ -12,14 +12,13 @@ One question to hold onto: for a given signal, what runs on the node, what did t
 where does the data go? By the end you should be able to draw the whole pipeline from kernel to store
 without looking.
 
-## Platform-injection: the contract (ADR-077)
+## Platform-injection: the contract
 
-Everything below follows from one decision
-([ADR-077](../../adrs/077-application-instrumentation-strategy.md)): **apps carry zero telemetry
+Everything below follows from one rule: **apps carry zero telemetry
 config.** The same paved-road rule that injects your `securityContext` (Kyverno `mutate`) and your AWS
 creds (Pod Identity) applies to telemetry — the platform stands up the collectors and instruments your
 workload; the app doesn't link a metrics library, wire a tracing SDK, or hardcode a collector address.
-ADR-077 makes three commitments, and the rest of this doc is just those three in detail:
+The platform makes three commitments, and the rest of this doc is just those three in detail:
 
 1. **Zero-code eBPF (Beyla) is the universal floor** — RED metrics, a service graph, and request-level
    traces for every workload, any language, no manifest change.
@@ -29,14 +28,11 @@ ADR-077 makes three commitments, and the rest of this doc is just those three in
 
 The first is the surprising one, and it gets the most attention below.
 
-> **Since ADR-077: one refinement (ADR-100).** ADR-077 originally framed the SDK layer as sitting "on
-> top of" Beyla — additive enrichment. That framing is wrong in practice: it's **one or the other per
-> workload**, never both, because Beyla's eBPF context-propagation and an app's SDK `traceparent` fight
-> each other (Beyla overwrites the SDK's trace context on egress, fragmenting the trace — a real
-> incident, not a theoretical risk). [ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md)
-> corrects this; the full mechanism (how a pod that opts into the SDK is auto-excluded from Beyla) is the
-> **L0/L1 landmine** in [Gotchas that teach](#gotchas-that-teach) below. The floor/opt-in shape below is
-> otherwise unchanged.
+> **L0 and L1 are mutually exclusive per workload.** Run Beyla (the L0 floor) *or* the OTel SDK (L1) on
+> a given workload, never both — their trace-context propagation fights: Beyla's eBPF context-propagation
+> overwrites the SDK's `traceparent` on egress and fragments the trace (a real incident, not a
+> theoretical risk). A pod that opts into the SDK is auto-excluded from Beyla; the full mechanism is the
+> **L0/L1 landmine** in [Gotchas that teach](#gotchas-that-teach) below.
 
 ## The collector fleet — every one, verified running
 
@@ -133,7 +129,7 @@ shows both:
   Tempo.
 
 What Beyla instruments is a config glob, and it differs hub vs spoke — the clearest illustration of
-dogfood-first (ADR-077 D4):
+dogfood-first:
 
 | Cluster | `instrument_namespaces` | Meaning |
 | --- | --- | --- |
@@ -146,27 +142,25 @@ this is the correlation seam — its trace `service.name` is deliberately aligne
 alignment is why the orientation's "span → flame graph" jump resolves; it's set here, in collection, not
 in Grafana.
 
-### Beyla vs the Tempo metrics-generator (D5) — the honest version
+### Beyla vs the Tempo metrics-generator — the honest version
 
 **The takeaway first:** Beyla is the RED source the per-app SLOs read; the Tempo metrics-generator *also*
-runs now — for Grafana's Traces Drilldown — but nobody consumes its RED. The rest of this section is the
-drift-nuance behind that one line.
+runs — for Grafana's Traces Drilldown — but nobody consumes its RED. The rest of this section is the
+nuance behind that one line.
 
-ADR-077 **D5** decided Beyla is the RED source, replacing Tempo's metrics-generator for that job: the
-generator derives RED from ingested spans, which is useless while nothing emits spans, whereas Beyla
-produces RED directly from live traffic. That decision holds and is verifiable — the per-app SLOs read
-Beyla's `http_server_request_duration_seconds_count`, not the generator's `traces_spanmetrics_*`.
+Beyla is the RED source, not Tempo's metrics-generator: the generator derives RED from ingested spans,
+which is useless while nothing emits spans, whereas Beyla produces RED directly from live traffic. This
+is verifiable — the per-app SLOs read Beyla's `http_server_request_duration_seconds_count`, not the
+generator's `traces_spanmetrics_*`.
 
-The nuance the ADR text (dated when the generator was off) doesn't capture: today a
-`tempo-metrics-generator` Deployment **is** running on the hub. Once Beyla started emitting traces into
-Tempo, the generator had input, and it was turned on — with all three processors (`service-graphs`,
-`span-metrics`, `local-blocks`). So it does emit its own RED span-metrics (`traces_spanmetrics_*`) and
-service-graph series into Mimir; the `local-blocks` processor is what powers Grafana's **Traces
-Drilldown** (TraceQL-metrics over spans). What D5 actually settled isn't that the generator is off, but
-that it isn't the RED source the platform *consumes*: the per-app SLOs and dashboards read Beyla, not
-the generator. "Beyla replaced the generator" is true for the meaning that matters — RED and SLOs come
-from Beyla — even though the generator is running and producing its own span-metrics alongside. If you
-read D5 literally as "the generator is disabled," check the live cluster; that part has drifted.
+The nuance: today a `tempo-metrics-generator` Deployment **is** running on the hub. Once Beyla started
+emitting traces into Tempo, the generator had input, and it was turned on — with all three processors
+(`service-graphs`, `span-metrics`, `local-blocks`). So it does emit its own RED span-metrics
+(`traces_spanmetrics_*`) and service-graph series into Mimir; the `local-blocks` processor is what powers
+Grafana's **Traces Drilldown** (TraceQL-metrics over spans). The distinction that matters: the generator
+isn't the RED source the platform *consumes* — the per-app SLOs and dashboards read Beyla, not the
+generator. RED and SLOs come from Beyla, even though the generator is running and producing its own
+span-metrics alongside.
 
 ## The instrumentation ladder — climb only as far as you need
 
@@ -181,13 +175,12 @@ more only where you need depth.
 
 ![Alpha Shop product dashboard under load — OTLP RED metrics (request rate, 5xx, p95), storefront HPA autoscaling 2→4, and progressive-delivery rollout phases.](images/screenshot-alpha-shop-overview.png)
 
-*The `alpha-shop` L1 (OTLP SDK) RED under a real load test (2026-07-12, ~3,264 requests / 901 checkouts / 0 errors): request rate ~50 req/s, p95 ~400ms on `orders`, zero 5xx — and, because it's the same dashboard, the storefront HPA scaling 2→4 on CPU (ADR-078) and the progressive-delivery rollout phases. The "About these panels" note is the ADR-100 OTLP→Prometheus convergence, live.*
+*The `alpha-shop` L1 (OTLP SDK) RED under a real load test (2026-07-12, ~3,264 requests / 901 checkouts / 0 errors): request rate ~50 req/s, p95 ~400ms on `orders`, zero 5xx — and, because it's the same dashboard, the storefront HPA scaling 2→4 on CPU and the progressive-delivery rollout phases. The "About these panels" note is the OTLP→Prometheus convergence, live.*
 
-L1 went live this cycle ([ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md)),
-correcting ADR-077's original "still outstanding" status. The [OpenTelemetry
+L1 is live. The [OpenTelemetry
 Operator](https://opentelemetry.io/docs/kubernetes/operator/automatic/) (`observability-otel-operator`,
 chart `0.116.0`) runs as `opentelemetry-operator` in the `opentelemetry-operator-system` namespace on
-**both** clusters now — the CRD is no longer hub-only. The mechanism is a mutating admission webhook:
+**both** clusters — the CRD is present on each, not hub-only. The mechanism is a mutating admission webhook:
 annotate a pod `instrumentation.opentelemetry.io/inject-sdk` and the operator injects the
 platform-managed OTLP endpoint at admission — the app still links its own OTel SDK (that's what makes
 this L1, not L0), but never hardcodes a collector address.
@@ -218,8 +211,8 @@ The CR existing per namespace doesn't mean every pod in it climbed the ladder, t
 *makes L1 available*; a pod still has to carry the `inject-sdk` annotation to use it. Spot-checked:
 `alpha-shop`'s services (`cart`, `catalog`, `orders`, `payment`, `storefront`), `alpha-checkout`, and
 `bravo-dispatch`'s `tracker`/`shipments`/`intake`/`dispatch-worker` carry the annotation and are SDK'd;
-`bravo-dispatch`'s `notify` (Node/TS, deliberately un-instrumented — the fleet's Beyla-only reference,
-ADR-100 L0) and `platform-flagship` don't — they ride the L0 Beyla baseline like everyone else. That's the
+`bravo-dispatch`'s `notify` (Node/TS, deliberately un-instrumented — the fleet's Beyla-only L0
+reference) and `platform-flagship` don't — they ride the L0 Beyla baseline like everyone else. That's the
 ladder working as designed: opt-in, per workload, not all-or-nothing per namespace.
 
 ## The rest of the fleet — traces, metrics, cloud, synthetics
@@ -249,7 +242,7 @@ four signals stop at the cluster edge; this reaches outside it. YACE does tag-ba
 (`tag:GetResources`) of the platform's always-on AWS network resources — **NLB** (`AWS/NetworkELB`),
 **NAT** (`AWS/NATGateway`), **Transit Gateway** (`AWS/TransitGateway`) — pulls their CloudWatch metrics
 on a 5-minute period, exports them as Prometheus series (with resource tags as labels), and the hub
-Prometheus scrapes them → Mimir. AWS creds come from **EKS Pod Identity** (ADR-047) — no static keys, no
+Prometheus scrapes them → Mimir. AWS creds come from **EKS Pod Identity** — no static keys, no
 IRSA annotation; the read role trusts `pods.eks.amazonaws.com` and grants
 `cloudwatch:GetMetricData`/`ListMetrics` + `tag:GetResources` at `Resource = "*"` (those APIs don't
 support resource scoping). It's a hub-only exporter — AWS metrics are account/region-wide, so one scraper
@@ -289,7 +282,7 @@ flow counts), plus agent/operator health. Those feed real alerts — `CiliumHigh
 habit ("monitor drops first") into a paging signal rather than a manual `cilium monitor` session.
 Hubble's own **UI** (`hubble-relay` + `hubble-ui`) runs for live L3–L7 flow visualization + a service
 map — a standalone pane, not folded into Grafana. Honest status: the flow metrics + the UI are live; the
-detailed per-flow log export into Loki (#161) and dedicated Cilium/Hubble Grafana dashboards are
+detailed per-flow log export into Loki and dedicated Cilium/Hubble Grafana dashboards are
 designed-not-built — so today the network plane is counted and alerted, and you drop to the Hubble UI for
 per-flow forensics.
 
@@ -347,12 +340,12 @@ difference.
   a kube-prometheus-stack knob that (left at its default `true`) would make the operator ignore any
   ServiceMonitor not stamped with its own Helm-release label; set `false`, it scrapes all ServiceMonitors
   cluster-wide.
-- **D5 has drifted from the ADR text.** "Beyla is the RED source the SLOs read" is true and verified
-  (they read Beyla's `http_server_*`, not the generator's `traces_spanmetrics_*`). But the generator *is*
-  running again — with all three processors, so it still emits its own span-metrics + service graph into
-  Mimir and powers Traces Drilldown via `local-blocks`; it's just not what the SLOs/dashboards consume.
-  Read the live cluster, not just D5's "we do not enable the generator."
-- **L1 and L0 are mutually exclusive per workload, not layered (ADR-100).** Beyla's eBPF
+- **Beyla is the RED source, not the metrics-generator.** "Beyla is the RED source the SLOs read" is
+  verified (they read Beyla's `http_server_*`, not the generator's `traces_spanmetrics_*`). But the
+  generator *is* running — with all three processors, so it still emits its own span-metrics + service
+  graph into Mimir and powers Traces Drilldown via `local-blocks`; it's just not what the SLOs/dashboards
+  consume.
+- **L1 and L0 are mutually exclusive per workload, not layered.** Beyla's eBPF
   context-propagation overwrites an SDK's `traceparent` on egress if both run on the same pod — that's
   a real incident (fragmented `storefront`→`alpha-checkout` traces), not a theoretical risk. The fix is
   exclusion, not coordination: a *separate* Beyla `exclude_instrument` annotation predicate matches any
@@ -376,10 +369,9 @@ difference.
 - [The stack & storage](deep-dive-the-stack-and-storage.md) — where these collectors' output lands (LGTM+P,
   S3, tenancy).
 - [ADR-077](../../adrs/077-application-instrumentation-strategy.md) — the platform-injection instrumentation
-  strategy (D1–D6, the ladder, D5's metrics-generator decision).
+  strategy and the ladder.
 - [ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md) — the SDK-first golden
-  path + Beyla-fallback correction to ADR-077's "layered" framing, and the OTLP↔Prometheus metric
-  convergence at Mimir ingest.
+  path, Beyla fallback, and the OTLP↔Prometheus metric convergence at Mimir ingest.
 - [ADR-079](../../adrs/079-cloud-resource-monitoring-scope.md) — the cloud-resource (YACE) monitoring scope.
 - [ADR-047](../../adrs/047-pod-identity-as-aws-identity-standard.md) — Pod Identity, how YACE gets AWS creds
   with no static keys.

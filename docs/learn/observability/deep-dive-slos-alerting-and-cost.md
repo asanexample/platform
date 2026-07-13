@@ -61,7 +61,7 @@ The platform generates these rules two ways, and they live on different tenants.
 |--|--|--|
 | **Who authors it** | A human hand-writes a `PrometheusServiceLevel` CR (objective + two queries) | No one — `fileset`+`yamldecode` over `gitops/environments/**/prod.yaml` synthesizes it |
 | **Where it's evaluated** | The Sloth controller renders a `PrometheusRule`, evaluated on the **hub** | A template → `mimirtool rules sync` CronJob → the **Mimir ruler** against the **`preprod` tenant** |
-| **Who consumes it** | Human dashboards + alerting (live: kubernetes-apiserver @ 99.9%) | The ADR-056 canary **freeze gate** (fixed 99.9%; live: alpha-shop-prod) |
+| **Who consumes it** | Human dashboards + alerting (live: kubernetes-apiserver @ 99.9%) | The canary **freeze gate** (fixed 99.9%; live: alpha-shop-prod) |
 
 **Path A — the Sloth controller, for platform SLOs.** [Sloth](https://sloth.dev/) (chart `0.16.0`) is a
 controller that watches a `PrometheusServiceLevel` custom resource and *generates* the SLI recording rules +
@@ -88,18 +88,17 @@ HTTP-success SLO *auto-derived* — no one writes it. The `mimir` Terragrunt uni
 `gitops/environments/**/prod.yaml`, and for each prod claim it synthesizes an SLO whose SLI is
 `http_server_request_duration_seconds_count` filtered to the app's namespace (`k8s_namespace_name`). The
 query doesn't care whether that metric came from **Beyla** (native Prometheus naming) or an app's **OTel
-SDK** — since [ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md), Mimir's
-OTLP ingest translates SDK metrics to the same `..._seconds` naming and promotes `k8s.namespace.name` to
-the same label (`otel_metric_suffixes_enabled` + `promote_otel_resource_attributes`), so one query works
-for both delivery paths — a Beyla-only app and an SDK'd app (e.g. alpha-shop) get the identical SLO
-mechanism for free. This is registries-as-source (the same ADR-067 pattern the whole platform runs on):
+SDK** — Mimir's OTLP ingest translates SDK metrics to the same `..._seconds` naming and promotes
+`k8s.namespace.name` to the same label (`otel_metric_suffixes_enabled` + `promote_otel_resource_attributes`),
+so one query works for both delivery paths — a Beyla-only app and an SDK'd app (e.g. alpha-shop) get the
+identical SLO mechanism for free. This is registries-as-source (the same pattern the whole platform runs on):
 add a prod environment, get an SLO free.
 
 Two things differ from Path A. First, these rules are rendered from a template into a Mimir **ruler**
 namespace and evaluated *in the Mimir ruler against the `preprod` tenant* — because that's where the app
 metrics actually live (preprod is a spoke that remote-writes to the hub). Second, the consumer is not a human
-at all: the rules emit `slo:current_burn_rate:ratio` per app, and **that metric is what the [ADR-056
-progressive-delivery](../../adrs/056-progressive-delivery-and-safe-rollback.md) canary freeze gate queries**
+at all: the rules emit `slo:current_burn_rate:ratio` per app, and **that metric is what the progressive-delivery
+canary freeze gate queries**
 — a one-shot **pre-flight** check (an AnalysisTemplate with `count: 1`) that runs before the rollout and
 **freezes it if the service is *already* burning its budget faster than 2×** (successCondition
 `len(result) == 0 || result[0] < 2`). It does *not* predict the canary's own burn, and it can *never* block a
@@ -172,14 +171,13 @@ agent and never reach SNS/Slack/PagerDuty — the agent would silently swallow e
 
 ---
 
-## 3. Owner-routing — from severity to a name (ADR-084)
+## 3. Owner-routing — from severity to a name
 
 Alertmanager routed by severity. But *who owns the broken thing?* That's a different lookup, and mixing it
 into Alertmanager would be a category error. Alertmanager is the fire panel — it lights up the zone.
 Owner-routing is the dispatcher who looks up whose apartment that is and calls *them*.
 
-The dispatcher is the **triage agent** consuming
-[ADR-084](../../adrs/084-platform-identity-directory-and-owner-resolution.md)'s identity directory. Two things
+The dispatcher is the **triage agent** consuming the platform's identity directory. Two things
 are worth understanding.
 
 **It reads git, not the cluster.** The directory is a CQRS **read model** — a cached projection of the git
@@ -203,12 +201,12 @@ from the *action* (mention) means the risky step — pinging a named human — i
 reason about in isolation: the operator-quality principle that a dangerous control-plane action gets its own
 gate.
 
-**Honest status.** ADR-084 is formally **Proposed**, even though Phase 0 (the owner-resolution read model) is
-**built and live** and has routed real pages. The paging structure it feeds — **per-team PagerDuty** — is
+**Honest status.** The owner-resolution read model is **built and live** and has routed real pages. The
+paging structure it feeds — **per-team PagerDuty** — is
 provisioned in IaC by the [`pagerduty`](https://github.com/asanexample/platform/blob/main/infra/modules/pagerduty/main.tf)
 module: one schedule + escalation policy + service per team, escalating (re-notify after 15 min, loop twice).
 It uses the **v1** `pagerduty_schedule` resource deliberately — the v3 "flexible schedules" (`schedulev2`) API
-is blocked on a provider bug (#1127) that returns invalid objects on create. So: real per-team on-call,
+is blocked on a provider bug that returns invalid objects on create. So: real per-team on-call,
 seeded rosters, v1 schedules until the provider is fixed. *(One transient caveat: the PagerDuty **trial
 account** itself lapsed ~2026-07-07, so these schedules exist in IaC but can't actually page until it's
 restored — the wiring is intact, the subscription isn't.)*
@@ -230,10 +228,9 @@ attribute compute cost per **team**, derived from the namespace's `platform.refp
 *estimate at list price*: it knows nothing about your Savings Plans, Reserved Instances, or committed-use
 discounts.
 
-**The true-cost exporter — the odometer (the real bill).** [#668](https://github.com/asanexample/platform/issues/668)
-added a small Python exporter
+**The true-cost exporter — the odometer (the real bill).** A small Python exporter
 ([`true-cost-exporter.tf`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-opencost/true-cost-exporter.tf))
-that queries the **Cost & Usage Report** via **Athena** — cross-account into the management/payer account via
+queries the **Cost & Usage Report** via **Athena** — cross-account into the management/payer account via
 an `AssumeRole` onto a read-only `cost_reader` role — and emits the **actual unblended monthly spend**
 (`platform_true_cost_monthly_usd{breakdown, label}`) broken down by team, service, and account. This is the
 *real* number, discounts and all, but it lags ~24h (CUR latency), so it refreshes every 6 hours, not per
@@ -245,7 +242,7 @@ opencost-…                  2/2   Running
 true-cost-exporter-…        1/1   Running
 ```
 
-> **The `max`-not-`sum` gotcha ([#668](https://github.com/asanexample/platform/issues/668)).** The exporter
+> **The `max`-not-`sum` gotcha.** The exporter
 > re-emits an **absolute month-to-date gauge** on every scrape. So a dashboard panel that does `sum()` over
 > time — the reflexive choice for a cost panel — **double-counts**: you're summing the same running total
 > across scrapes. The true-cost panels aggregate with **`max`** instead (the latest month-to-date value *is*
@@ -254,8 +251,7 @@ true-cost-exporter-…        1/1   Running
 ### The budget enforcer — cost that can say "no"
 
 The last mile turns cost from a dashboard into a guardrail
-([`budget-enforcer.tf`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-opencost/budget-enforcer.tf),
-ADR-091 Phase C):
+([`budget-enforcer.tf`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-opencost/budget-enforcer.tf)):
 
 1. an hourly **CronJob** queries Mimir for each team's spend ÷ budget;
 2. it writes the over-budget teams into a **`cost-budget-status` ConfigMap**;
@@ -267,13 +263,12 @@ missing or blank ConfigMap is treated as "everyone's fine", so an observability 
 provisioning (`failurePolicy: Ignore`), and there's an admin override annotation
 (`cost.refplat.org/budget-override`). It gates *new provisioning only* — it never touches running workloads.
 
-> **Honest status.** [ADR-091](../../adrs/091-cost-guardrails.md) is **Accepted** and records Phases A/B/C
-> built + live (2026-06-30). But the enforcer is **opt-in and off by default** (`enable_budget_enforcer =
+> **Honest status.** The cost guardrails — surface, alerting, and the enforcement bridge — are **built and
+> live** (2026-06-30). But the enforcer is **opt-in and off by default** (`enable_budget_enforcer =
 > false`), designed to run on the **preprod spoke** (where OpenCost + the team budgets sit) — so on the
-> `platform` hub I verified there is *no* enforcer CronJob and *no* `cost-budget-status` ConfigMap. The
-> surface + alerting (A/B) run on the hub; the enforcement bridge (C) is fully built and wired end-to-end in
-> code but is a spoke concern, not a hub one. [ADR-092](../../adrs/092-platform-finops-practice.md) (a formal
-> FinOps practice) is still **Proposed / not built.**
+> `platform` hub there is *no* enforcer CronJob and *no* `cost-budget-status` ConfigMap. The
+> surface + alerting run on the hub; the enforcement bridge is fully built and wired end-to-end in
+> code but is a spoke concern, not a hub one.
 
 ### Synthetic signals — pre-empting the page
 
@@ -305,7 +300,7 @@ observable signal.
 - **The dead-man's switch is inverted logic.** `Watchdog` firing is *healthy*; the alert is its *silence*.
   Don't "fix" Watchdog by silencing it — you'd be disabling the only thing that catches a dead pipeline.
 - **`max`, not `sum`, for true-cost panels.** The odometer re-emits a running total; summing it double-counts.
-  This one shipped as a real bug fix (#668).
+  This one shipped as a real bug fix.
 - **Fail-open is a feature, not a bug.** The budget enforcer and its Kyverno policy both default to *allow* on
   any doubt. A cost guardrail that blocked provisioning during an observability outage would be worse than the
   overspend it prevents.
@@ -314,30 +309,16 @@ observable signal.
 
 ## Go deeper
 
-- **ADRs (source of truth):** [ADR-056 progressive
-  delivery](../../adrs/056-progressive-delivery-and-safe-rollback.md) (the canary freeze gate that consumes
-  per-app burn rate) · [ADR-084 identity directory &
-  owner-resolution](../../adrs/084-platform-identity-directory-and-owner-resolution.md) ·
-  [ADR-091 cost guardrails](../../adrs/091-cost-guardrails.md) ·
-  [ADR-092 platform FinOps practice](../../adrs/092-platform-finops-practice.md) (Proposed).
-- **Runbooks:**
-  [observability-alerts.md](../../runbooks/observability-alerts.md) (the runbook every alert links to) ·
-  [cost-true-spend.md](../../runbooks/cost-true-spend.md) (the CUR/Athena path).
+- **ADRs:** [ADR-056 progressive delivery](../../adrs/056-progressive-delivery-and-safe-rollback.md) ·
+  [ADR-084 identity directory & owner-resolution](../../adrs/084-platform-identity-directory-and-owner-resolution.md) ·
+  [ADR-091 cost guardrails](../../adrs/091-cost-guardrails.md).
 - **The code:**
-  [`observability-slo/`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-slo/main.tf)
-  (Sloth) ·
-  [`observability-mimir` app-SLO template](https://github.com/asanexample/platform/blob/main/infra/modules/observability-mimir/templates/app-slo-rules.yaml.tftpl)
-  (the per-app burn-rate rules) ·
+  [`observability-slo/`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-slo/main.tf) (Sloth) ·
+  [`observability-mimir` app-SLO template](https://github.com/asanexample/platform/blob/main/infra/modules/observability-mimir/templates/app-slo-rules.yaml.tftpl) ·
   [`observability/alerts/curated.yaml`](https://github.com/asanexample/platform/blob/main/infra/modules/observability/alerts/curated.yaml) ·
   [`observability-opencost/`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-opencost/main.tf) ·
   [`pagerduty/`](https://github.com/asanexample/platform/blob/main/infra/modules/pagerduty/main.tf).
-- **External (verified July 2026):**
-  [Google SRE Workbook — Alerting on SLOs](https://sre.google/workbook/alerting-on-slos/) (the multi-window
-  multi-burn-rate source; ~20 min, the canonical reference) ·
-  [Sloth](https://sloth.dev/) (the SLO generator; skim) ·
-  [OpenCost docs](https://www.opencost.io/docs/) (the allocation model; CNCF) ·
-  [Prometheus Alertmanager configuration](https://prometheus.io/docs/alerting/latest/configuration/)
-  (routes, receivers, inhibition) ·
-  [k6](https://grafana.com/docs/k6/latest/) and
-  [blackbox_exporter](https://github.com/prometheus/blackbox_exporter) (the synthetic probes).
+- **External:** [Google SRE Workbook — Alerting on SLOs](https://sre.google/workbook/alerting-on-slos/) (the
+  multi-window multi-burn-rate source) · [Sloth](https://sloth.dev/) · [OpenCost docs](https://www.opencost.io/docs/) ·
+  [Prometheus Alertmanager configuration](https://prometheus.io/docs/alerting/latest/configuration/).
 - Back to the [observability orientation](orientation.md) · the terse [reference](reference.md).

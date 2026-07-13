@@ -27,8 +27,8 @@ platform-injected, so a developer gets the payoff without the plumbing. It helps
   metrics↔traces↔logs↔profiles jumps, the per-team overview dashboards, and the honest per-team-isolation story.
 - **[SLOs, alerting & cost](deep-dive-slos-alerting-and-cost.md)** — burn-rate SLOs, curated alerts +
   triage-agent owner-routing, and cost-as-a-signal (OpenCost + true-cost).
-- **[Agent observability](deep-dive-agent-observability.md)** — ADR-076, the OTel GenAI semantic conventions,
-  and the live slices.
+- **[Agent observability](deep-dive-agent-observability.md)** — the OTel GenAI semantic conventions, the agent
+  span tree, and the human-verdict eval loop.
 
 ## Then
 

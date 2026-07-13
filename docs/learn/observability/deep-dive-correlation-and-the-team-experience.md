@@ -78,8 +78,8 @@ Each field earns its place:
 
 The case-file hyperlinks run *both* directions. If you started in the logs — grepping an error, no trace
 in hand — a `trace_id` in the log line is itself clickable back to the trace. That's a Loki **derived
-field**. It used to be a regex that scraped raw log text; since [ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md)
-it matches on **Loki structured metadata** instead — first-class and robust, not a text scan. From
+field**. It used to be a regex that scraped raw log text; now it matches on **Loki structured
+metadata** instead — first-class and robust, not a text scan. From
 [`observability-loki/main.tf`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-loki/main.tf):
 
 ```hcl
@@ -87,7 +87,7 @@ loki_derived_fields = [{
   name          = "trace_id"
   matcherType   = "label"     # matches structured metadata, not the log line's text
   matcherRegex  = "trace_id"  # the FIELD NAME now, not a pattern
-  url           = "$$${__value.raw}" # THREE `$`: Grafana blanks `${...}` during provisioning env-var substitution, so the sequence must be escaped (#1269)
+  url           = "$$${__value.raw}" # THREE `$`: Grafana blanks `${...}` during provisioning env-var substitution, so the sequence must be escaped
   datasourceUid = "tempo-all"
 }]
 ```
@@ -122,8 +122,7 @@ tracesToProfiles = {
 
 The field name is the gotcha that teaches: it's `tracesToProfiles`, **not** `tracesToProfilesV2` — unlike
 logs (which really does have a `tracesToLogsV2`) there is no V2 variant for profiles, and Grafana silently
-ignores the V2 name, so the "Related profiles" link just never renders (the module comment cites
-[#1269](https://github.com/asanexample/platform/issues/1269)). Same `replace` convention (`tempo`→`pyroscope`),
+ignores the V2 name, so the "Related profiles" link just never renders. Same `replace` convention (`tempo`→`pyroscope`),
 same `service.name`→`service_name` tag mapping. And here
 is the subtle thing that makes this jump possible at all: the trace and the profile have to agree on the
 service's name, and nobody set that name by hand. Beyla labels a trace's `service.name` from the
@@ -165,7 +164,7 @@ under "…because of the 02:58 deploy of `storefront`" — the metric blip and i
 
 ![A real distributed trace in Tempo — a POST /api/checkout spanning 7 services over 2.59s, crossing from alpha-shop into bravo-dispatch.](images/screenshot-crossteam-trace.png)
 
-*A real `POST /api/checkout` in Tempo (preprod), 2026-07-12 — 7 services, 2.59s, the exact structure the four clicks above walk. Watch it **cross the team boundary**: `alpha-shop` (storefront → cart → orders → payment) calls into `bravo-dispatch` (intake → shipments → dispatch-worker) at the ServiceGrant-governed hop (ADR-101) — one trace spanning two teams.*
+*A real `POST /api/checkout` in Tempo (preprod), 2026-07-12 — 7 services, 2.59s, the exact structure the four clicks above walk. Watch it **cross the team boundary**: `alpha-shop` (storefront → cart → orders → payment) calls into `bravo-dispatch` (intake → shipments → dispatch-worker) at the ServiceGrant-governed hop — one trace spanning two teams.*
 
 ![The Grafana correlation web as a tenant×store grid — each jump between Mimir, Tempo, Loki, and Pyroscope is a replace(uid,…) string-swap rule that stays within a tenant column and replicates identically across the platform/preprod/all tenants; an off-convention datasource name links nowhere.](images/correlation-web.svg)
 
@@ -176,7 +175,7 @@ under "…because of the 02:58 deploy of `storefront`" — the metric blip and i
 Correlation is what an *engineer mid-incident* does. The other consuming question is quieter and more
 political: when a team opens Grafana, what do they see, and can they see *only* their own stuff?
 
-There are **two separate efforts** here — a *default view* and a *hard boundary* — and conflating them
+There are **two separate efforts** here — a *default view* and a *real boundary* — and conflating them
 is the mistake to avoid.
 
 ### Effort 1 (the soft need, LIVE and actually used): per-team overview dashboards
@@ -234,9 +233,9 @@ What's *on* the dashboard, and where the numbers come from — it's a RED + USE 
   the HTTP metric carries), the USE/cost panels filter `namespace=~"__TEAM__-.*"` (the label
   cAdvisor/kube-state carry). Same intent, two labels.
 - **RED** — request rate and 5xx ratio per environment off `http_server_request_duration_seconds_count`,
-  the same metric the SLOs use. It's emitted by **Beyla** (zero-code) *or* an app's **OTel SDK**; since
-  [ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md) both converge on the same
-  name and `k8s_namespace_name` label, one query works regardless of delivery path. Exemplars ride the
+  the same metric the SLOs use. It's emitted by **Beyla** (zero-code) *or* an app's **OTel SDK**; both
+  converge on the same name and `k8s_namespace_name` label, so one query works regardless of delivery
+  path. Exemplars ride the
   metrics-generator's span-metrics, per Click 1.
 - **USE**, from cAdvisor/kube-state-metrics — CPU (`container_cpu_usage_seconds_total`), memory
   (`container_memory_working_set_bytes`), running pods, restarts.
@@ -256,27 +255,16 @@ per-team-isolated one — the template's default datasource is literally `"Mimir
 > all-clusters datasource, which can see every tenant. It's the convenient lane, not a wall. That
 > distinction is the whole point of Effort 2.
 
-### Effort 2 — the hard boundary the platform built, then pulled
+### Effort 2 — the real per-team boundary: hard write-split, soft reads
 
-The *harder* goal — making `alpha` genuinely **unable** to query `bravo`'s data — is P13 (#590), and it has an
-honest arc: the write side landed and stayed; the read side was built, shipped, then **retired**. What's live
-is the **write-split into real per-team tenants** — `cortex-tenant` (a write-path router in front of Mimir
-ingest that reads the namespace label and stamps the per-team `X-Scope-OrgID`) splits each environment
-namespace's series into its own Mimir tenant (Loki the same for logs), so `alpha` and `bravo` are real,
-separate tenants, not one bucket with a label. What was *designed* on the read side (from the
-`observability-tenant-proxy` README):
+The *harder* goal — making `alpha`'s data genuinely separate from `bravo`'s — has two layers, and they are
+not equally hard. The **write side** is a real data-plane split; the **read side** is an organizational
+boundary; and the fail-closed wall around a team's data is the **network**.
 
-```text
-user → Grafana ──(query + OIDC token, oauthPassThru)──▶ tenant-proxy ──(X-Scope-OrgID=<team>)──▶ Mimir
-```
-
-— would verify the Grafana-forwarded Keycloak token, map the `groups` claim to a tenant, *overwrite*
-`X-Scope-OrgID` with the caller's own team, and deny anything unauthenticated (fail-closed: no valid token, no
-data), surfacing as a `Mimir (my team)` datasource. It was built and shipped — then **retired**
-([#1269](https://github.com/asanexample/platform/issues/1269)): OSS Grafana's `oauthPassThru` can't reliably
-forward the SSO token to a downstream proxy, so the proxy fail-closed on `no_token` and *every dashboard went
-blank for admins*. The modules stay in the repo but inert (`read_proxy_url = ""`), re-enableable if Grafana's
-token forwarding is ever fixed. The write-split, though, is genuinely running:
+**Write isolation is real (live).** A write-path router, `cortex-tenant`, sits in front of Mimir ingest: it
+reads each series' namespace label and stamps the matching per-team `X-Scope-OrgID`, so each environment
+namespace's series lands in its own Mimir tenant (Loki does the same for logs). `alpha` and `bravo` are real,
+separate tenants — not one bucket with a label:
 
 ```text
 $ kubectl --context platform -n observability get pods | grep cortex
@@ -284,44 +272,46 @@ cortex-tenant-…   1/1   Running
 cortex-tenant-…   1/1   Running
 ```
 
-So what isolates a team's *reads* today, with the proxy gone? The **soft model** — which was the actual need:
+The genuinely per-team tenants (`alpha`, `bravo`, …) are populated by the **preprod spoke's dual-write** —
+preprod, where the team apps run, ships each namespace's series into its own tenant (additive to `preprod`).
+The hub carries no environment namespaces, so the hub's own metrics stay the `platform` tenant (see the
+footnote below). The separation of the *data* is real and live end-to-end.
 
-1. **Real per-team tenants underneath (write-side, live).** The `cortex-tenant` write-split gives each team its
-   own Mimir/Loki tenant. The real per-team tenants (`alpha`, `bravo`, …) are populated by the **preprod spoke's
-   dual-write** — preprod, where the team apps run, ships each namespace's series into its own tenant (additive
-   to `preprod`; the hub carries no environment namespaces, so its own metrics stay the `platform` tenant — see
-   the footnote below). So the *separation of the data* is real and live end-to-end.
-2. **Soft read scoping on top (Grafana-side, live).** Each team reads through a `Mimir (<team>)` / `Loki
-   (<team>)` datasource pinned to its tenant, and per-team isolation is enforced by **Grafana dashboard-folder
-   permissions** plus the **namespace-filtered per-team overview dashboards** (#1157) — an organizational
-   boundary, not a fail-closed data gate. Cross-team *sharing* is soft too: share the dashboard or grant folder
-   access. (The `AccessGrant` model — [ADR-068](../../adrs/068-product-scoped-and-cross-team-access-model.md),
-   `gitops/grants/` — still governs cross-team access in general, but its enforcement as a *fail-closed
-   observability read-federation* (`X-Scope-OrgID: alpha|bravo`) went with the retired proxy.) Per-team
-   **traces**/**profiles** read scoping is a follow-up.
+**Read scoping is soft (organizational).** Each team reads through a `Mimir (<team>)` / `Loki (<team>)`
+datasource pinned to its tenant, and per-team isolation on the read path is enforced by **Grafana
+dashboard-folder permissions** plus the **namespace-filtered per-team overview dashboards** — an organizational
+boundary, *not* a fail-closed data-plane gate. Cross-team *sharing* is soft the same way: share the dashboard
+or grant folder access. The `AccessGrant` model (`gitops/grants/`) governs cross-team access in general.
+Per-team **traces**/**profiles** read scoping is a follow-up.
 
-An architectural footnote worth keeping: the write-split was flipped **hub-first** — the [platform
-`env.hcl`](https://github.com/asanexample/platform/blob/main/infra/live/aws/platform/env.hcl) says so:
+> **The read scoping is not a security boundary.** Folder permissions and per-tenant datasources shape what a
+> team *conveniently* sees; they don't fail closed the way an authenticated proxy would. The hard, fail-closed
+> wall around a team's data is the **network** — default-deny NetworkPolicy plus ClusterIP-only services — not
+> the Grafana read path.
+
+An architectural footnote worth keeping: the re-tenant splits metrics by *environment namespace* → team, and
+the **hub cluster has no environment namespaces** (tenant workloads run on **preprod**, the spoke), so the
+hub's *own* metrics resolve to the `platform` tenant. The genuinely per-team `alpha`/`bravo` tenants are fed
+from the preprod path. The [platform
+`env.hcl`](https://github.com/asanexample/platform/blob/main/infra/live/aws/platform/env.hcl) records this
+directly:
 
 ```hcl
 enable_per_team_tenants = true # …HUB flip first: hub metrics still resolve to the `platform`
 # tenant (no env namespaces here), proving the path before the spoke.
 ```
 
-The re-tenant splits metrics by *environment namespace* → team, and the **hub cluster has no environment
-namespaces** (tenant workloads run on **preprod**, the spoke), so the hub's *own* metrics still resolve to the
-`platform` tenant. The genuinely per-team `alpha`/`bravo` tenants are fed from the preprod path — now live and
-carrying data. That's exactly why the write-split is *proven*, not merely *plumbed*: real per-team data flows
-through the part that separates it.
+So the per-team data separation is real where it matters: it flows through the preprod path, where the
+environment namespaces actually live.
 
 ### Net for a team, today
 
 Open **your Team Overview dashboard** for a namespace-filtered RED/USE/cost view of your environments — the
-convenient default self-view, driven off the team registry. Underneath it, per-team separation is **soft**:
-your writes land in a real separate tenant, but your reads are scoped by Grafana folder permissions, not a
-fail-closed gate — the hard read-proxy was built and then **retired** (#1269) as unreliable in OSS Grafana.
-That's the honest, current picture: real per-team *data* separation, soft per-team *read* scoping, with
-traces/profiles read scoping still deferred.
+convenient default self-view, driven off the team registry. Underneath it, your writes land in a real,
+separate per-team tenant, while your reads are scoped by Grafana folder permissions and per-tenant
+datasources — an organizational boundary, not a fail-closed gate. That's the current picture: real per-team
+*data* separation on the write path, soft per-team *read* scoping on top, with traces/profiles read scoping
+still deferred. The fail-closed wall around a team's data is the network (default-deny + ClusterIP-only).
 
 ---
 
@@ -359,12 +349,11 @@ than silently reshaping your panels. Same discipline as pinning a chart version.
 - **Time-shifts on trace→logs aren't sloppiness — they're clock-skew insurance.** `±1h` around a span
   looks huge until you remember app-stamped span times and node-stamped log times never agree exactly; a
   zero-width window returns nothing and reads as "correlation is broken."
-- **"Namespace-filtered" ≠ "isolated" — and neither is a hard boundary anymore.** The Team Overview filter is
-  a baked-in default over the *all-clusters* datasource — convenience, not a boundary. The real separation is
-  the **write-split** (each team's data in its own tenant); read scoping on top is **soft** (Grafana
-  dashboard-folder permissions + the per-tenant datasources), not a fail-closed gate — the hard read-proxy was
-  built and then **retired** (#1269) as unreliable. So don't read the filter, or the soft read scoping, as a
-  security control.
+- **"Namespace-filtered" ≠ "isolated".** The Team Overview filter is a baked-in default over the *all-clusters*
+  datasource — convenience, not a boundary. The real separation is the **write-split** (each team's data in its
+  own tenant); read scoping on top is **soft** (Grafana dashboard-folder permissions + the per-tenant
+  datasources), not a fail-closed gate. So don't read the filter, or the soft read scoping, as a security
+  control — the fail-closed wall is the network (default-deny + ClusterIP-only).
 - **A flag being `true` is a claim about *intent*, not *effect*.** `enable_per_team_tenants` was flipped
   hub-first — but the hub carries no environment namespaces, so its own metrics still resolve to `platform`,
   and the genuinely per-team tenants are proven only where the data lands (the preprod spoke, now live and
@@ -376,24 +365,13 @@ than silently reshaping your panels. Same discipline as pinning a chart version.
 
 ## Go deeper
 
-- **Source of truth — architecture:** [`docs/architecture/observability-current-state.md`](../../architecture/observability-current-state.md)
-  — the APM-correlation section (P6), the federated-datasource section (#626), and the multi-tenancy
-  security-boundary note.
-- **Related learn modules:** [The stack & storage](deep-dive-the-stack-and-storage.md) (the
-  `X-Scope-OrgID` tenancy model the proxy enforces) · [Collection & instrumentation](deep-dive-collection-and-instrumentation.md)
-  (why Beyla and the eBPF profiler agree on `service.name`) · [SLOs, alerting & cost](deep-dive-slos-alerting-and-cost.md)
-  (the same Beyla RED metrics feed the SLOs and the team dashboards).
+- **Architecture:** [`docs/architecture/observability-current-state.md`](../../architecture/observability-current-state.md)
+  — APM-correlation, federated datasources, and the multi-tenancy model.
+- **Related learn modules:** [The stack & storage](deep-dive-the-stack-and-storage.md) (the `X-Scope-OrgID`
+  tenancy model) · [Collection & instrumentation](deep-dive-collection-and-instrumentation.md) (why Beyla and
+  the eBPF profiler agree on `service.name`) · [SLOs, alerting & cost](deep-dive-slos-alerting-and-cost.md).
 - **Code:** [`observability-mimir`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-mimir/main.tf)
   (exemplar destinations) · [`observability-tempo`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-tempo/main.tf)
   (`tracesToLogsV2` / `tracesToProfiles` / `serviceMap`) · [`observability-loki`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-loki/main.tf)
-  (the `trace_id` derived field) · [`observability-tenant-proxy`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-tenant-proxy/README.md)
-  (P13 read isolation — built, then retired #1269) · [`team-overview.json.tmpl`](https://github.com/asanexample/platform/blob/main/infra/modules/observability/dashboards/team-overview.json.tmpl).
-- **House skill:** `observability-authoring` — the dashboards-as-code ConfigMap pattern and the vendored-
-  revision-pinning rule, for when you add one.
-- **External (verified, current Grafana):**
-  [Configure the Tempo datasource](https://grafana.com/docs/grafana/latest/datasources/tempo/configure-tempo-data-source/)
-  (the traces-to-logs / traces-to-profiles / service-graph options, ~10 min) ·
-  [Introduction to exemplars](https://grafana.com/docs/grafana/latest/fundamentals/exemplars/)
-  (what an exemplar is and the metric→trace link, ~5 min) ·
-  [Tempo metrics-generator](https://grafana.com/docs/tempo/latest/metrics-generator/)
-  (span-metrics + service-graph, the *producer* side of Click 1 & the service graph, ~10 min).
+  (the `trace_id` derived field) · [`team-overview.json.tmpl`](https://github.com/asanexample/platform/blob/main/infra/modules/observability/dashboards/team-overview.json.tmpl).
+- **House skill:** `observability-authoring` — the dashboards-as-code ConfigMap pattern and vendored-revision pinning.
