@@ -21,17 +21,21 @@ spec:
   dependencies:
     - { team: bravo, product: dispatch, stage: dev, service: intake }
   # One Product, many services (ADR-067). Browse: storefront (edge — SPA + BFF, the only HTTPRoute) + catalog
-  # (internal). Buy path (P2): cart + orders + payment (internal, east-west). cart/orders own self-service AWS
-  # data (ADR-073) so each needs its OWN SA (Pod Identity binds one role per SA); the Composition mints their
-  # least-privilege DynamoDB/SQS IAM and publishes the connection info into the <svc>-resources ConfigMap
-  # (ITEMS_TABLE / ORDERS_TABLE + EVENTS_QUEUE_URL). storefront/catalog/payment are stateless → share app-alpha.
-  # 3 resources total, within the alpha envelope (allowedEngines s3/sqs/sns/dynamodb, maxPerEnvironment 10).
+  # (internal). Buy path (P2): cart + orders + payment (internal, east-west) + checkout (extracted from
+  # storefront's buypath.go — orchestrates cart+orders as its own mutual-auth-secured hop, ADR-057). cart/
+  # orders own self-service AWS data (ADR-073) so each needs its OWN SA (Pod Identity binds one role per SA);
+  # the Composition mints their least-privilege DynamoDB/SQS IAM and publishes the connection info into the
+  # <svc>-resources ConfigMap (ITEMS_TABLE / ORDERS_TABLE + EVENTS_QUEUE_URL). storefront/catalog/payment/
+  # checkout are stateless → share app-alpha. 3 resources total, within the alpha envelope (allowedEngines
+  # s3/sqs/sns/dynamodb, maxPerEnvironment 10).
   services:
     storefront:
       serviceAccount: app-alpha
     catalog:
       serviceAccount: app-alpha
     payment:
+      serviceAccount: app-alpha
+    checkout:
       serviceAccount: app-alpha
     cart:
       serviceAccount: app-alpha-cart
