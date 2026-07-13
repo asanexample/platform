@@ -1,0 +1,42 @@
+# Environment (bravo × dispatch × uat) — full-parity stage, mirroring dev's 5-service shape exactly
+# (ADR-067 v3). Namespace bravo-dispatch-uat. Synced by ArgoCD (the `environments` registry-sync app) and
+# reconciled by the Crossplane Environment Composition (v3). Promoted digests land here via the auto-promote
+# reconciler (dev -> test -> uat -> staging), then a manual, release-approver-gated hop to prod.
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata:
+  # CLUSTER-scoped XR → team-prefixed, globally unique (ADR-067).
+  name: bravo-dispatch-uat
+  annotations:
+    platform.refplat.org/requested-by: josh
+spec:
+  team: bravo # validated == Product.team at the gate + admission
+  product: dispatch
+  stage: uat
+  tier: standard
+  services:
+    tracker:
+      serviceAccount: app-bravo # Pod Identity binds this named SA; the app repo's serviceaccount.yaml creates it
+    shipments:
+      # Owns its own self-service AWS data (ADR-073) — needs its OWN SA (Pod Identity binds one role per SA);
+      # the Composition mints least-privilege DynamoDB IAM and publishes connection info into the
+      # shipments-resources ConfigMap (SHIPMENTS_TABLE). tracker is stateless → shares app-bravo.
+      serviceAccount: app-bravo-shipments
+      resources:
+        shipments: { kind: keyvalue, engine: dynamodb, access: readwrite }
+    intake:
+      # Pure HTTP orchestrator (calls shipments to create, calls dispatch-worker to kick off routing) — owns
+      # no self-service AWS data, so it shares app-bravo like tracker.
+      serviceAccount: app-bravo
+    dispatch-worker:
+      # Owns BOTH its own SQS queue (producer: POST /dispatch handler; consumer: background goroutine — same
+      # service, since the Composition scopes one resource to exactly one owning service) and its own SNS
+      # topic (publish-only proof-of-capability). Needs its OWN SA for Pod Identity.
+      serviceAccount: app-bravo-dispatch-worker
+      resources:
+        requests: { kind: stream, engine: sqs, access: readwrite }
+        events: { kind: stream, engine: sns, access: readwrite }
+    notify:
+      # Node/TS, deliberately un-instrumented (rides the Beyla eBPF baseline, ADR-100 L0) — owns no AWS
+      # resources (dispatch-worker calls it directly over HTTP), shares app-bravo.
+      serviceAccount: app-bravo
