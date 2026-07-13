@@ -30,6 +30,27 @@ pyroscope-ebpf). Data paths: metrics→Mimir, logs→Loki (via Alloy), traces→
 OTel Collector gateway), profiles→Pyroscope (via eBPF). All stores run
 `multitenancy_enabled: true`.
 
+## Collector fleet — why it's split (don't "standardize on Alloy")
+
+A recurring question: since Alloy already collects logs/events/profiles, why not
+route metrics and traces through it too and run one agent? Answer: **no — the split
+is deliberate, not sprawl.** Alloy owns the three signals where it's the best tool;
+the other three collectors are non-Alloy for concrete reasons:
+
+| Signal | Collector | Why not Alloy |
+|---|---|---|
+| Logs · events · profiles | **Alloy** | it *is* Alloy already (`observability-alloy`, `observability-pyroscope-ebpf`) |
+| Metrics (scrape+ship) | **kube-prometheus-stack** (Prometheus CR, `agentMode` on the spoke) | it's the prometheus-**operator** ecosystem, not just a scraper: `ServiceMonitor`/`PodMonitor` CRDs (every component ships them), plus Alertmanager + `PrometheusRule` evaluation + exemplar storage on the hub. Alloy can *read* ServiceMonitors but gives you none of the alerting/rules core. Canonical k8s metrics idiom — keep it. |
+| Traces (OTLP gateway) | **OTel Collector** (`otelcol-k8s` distro) | the *one* real consolidation candidate (Alloy embeds the same otelcol components), but the upstream distro is a deliberate **vendor-neutral OTLP edge** (ADR-100, SDK-first/OTLP-native). Swapping it buys fleet uniformity at the cost of that neutrality, for no operational pain today. |
+| RED + traces (zero-code) | **Beyla** (eBPF uprobes) | a different *mechanism* (auto-instrumentation), not a collector — Alloy can orchestrate Beyla but not replace it. |
+
+So "all-Alloy" is off the table the moment you reach metrics (operator territory) and
+Beyla (different tool). The realistic simplification ceiling is exactly one move —
+traces gateway → Alloy — and we don't make it. Each collector is the canonical tool
+for its signal, which on a platform meant to *demonstrate* the ecosystem is also more
+instructive than forcing one agent to do everything. Don't re-propose consolidation
+without a new operational reason.
+
 ## Add a dashboard (dashboards-as-code)
 
 Dashboards are **Grafana sidecar ConfigMaps** — JSON files under
