@@ -99,6 +99,40 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-14 (UNPARK) — ⚠️ ROUGH one: 3 compounding issues + the single most important lesson yet — during a
+  post-unpark node-churn/Cilium-throttle storm, DO NOT mass-delete pods; it FEEDS the loop. STOP and let Karpenter
+  - Cilium converge.** (Dated 07-14 by wall clock; the 07-13 park is the entry below.) Three things stacked up:
+  **(1) EXPIRED SSO.** Both `platctl up` failed instantly: `Error: AWS credentials for profile "platform" are not
+  valid ... Token has expired and refresh failed`. Overnight the SSO session lapsed; `up`'s cred pre-check caught
+  it. FIX: `aws sso login --sso-session management` (ALL profiles share one sso-session named `management` —
+  one login refreshes them), then re-run `up` (idempotent/resumable — node-group scaling had already applied).
+  **(2) CILIUM 429 ENDPOINT-THROTTLE on the loaded system node (`-57`).** Node Ready, its cilium agent `1/1` (NOT
+  wedged like 07-10) — but the post-unpark pod pile-up made the agent **rate-limit endpoint creation**
+  (`plugin cilium-cni failed (add): [429] putEndpointIdTooManyRequests`), so ~all pods on `-57` sat in
+  **`CreateContainerError`** and did NOT converge (33→32 over 3m). FIX (worked): restart THAT node's cilium agent
+  (`delete pod -n kube-system cilium-<hash-on-node>`) — the fresh agent cleared the throttle and `-57` went from a
+  pile of CreateContainerError → 56 Running in ~1m. (Same diagnosis shortcut as 07-10: many pods failing on ONE
+  node → check/​restart that node's cilium agent. Difference: 07-10 the agent was `0/1` wedged; here it was `1/1`
+  but 429-throttling. Both fixed by an agent restart. Gated action — needed the user's explicit "do whatever it
+  takes".) **(3) ⚠️⚠️ THE BIG ONE — a KARPENTER NODE-CHURN STORM I made WORSE by intervening.** After the cilium
+  fix I mass-deleted ~a dozen stuck pods to clear backoffs. That reschedule wave → pending pods → Karpenter scaled
+  preprod 3→**6 nodes** (spot) → preprod's `WhenEmptyOrUnderutilized` consolidation started tainting
+  (`karpenter.sh/disrupted`) + replacing nodes → pods evicted en masse → landed on fresh nodes → **Cilium 429
+  again** → `ContainerCreating` pile-up → MORE pending → repeat. not-ready CLIMBED (8→42) while I kept poking.
+  The descheduler was NOT the cause (`totalEvicted=0`; the #1381 change is clean). **THE FIX WAS TO STOP.** Every
+  pod-delete added another reschedule onto a 429-throttled node. I left preprod ALONE for ~10 min and it
+  self-corrected: Karpenter consolidated **6→3 stable nodes**, not-ready fell 42→12→8→3→0. **RULE: post-unpark, if
+  you see Karpenter tainting/replacing nodes (`get nodes` count changing, `karpenter.sh/disrupted` taints) AND
+  pods stuck ContainerCreating/CreateContainerError, STOP all pod-deletes and let it converge (10+ min). Restart
+  the ONE wedged cilium agent if there is one, then hands off.** Final: both healthy — platform 6 nodes (stable,
+  `WhenEmpty`, only the standing broken `triage-demo/checkout` demo), preprod 3 nodes / 0 not-ready. **Minor
+  cleanups that WERE safe (cluster already stable): deleting stale terminal pods (`Completed`/`ContainerStatusUnknown`
+  — dead evicted replicas whose Deployments were healthy 2/2; GC-pending garbage) and one `OOMKilled`
+  kyverno-background pod. Mass-deletes are only dangerous DURING active churn.** **On PR #1436 (platform
+  WhenEmpty→WhenEmptyOrUnderutilized): it did NOT cause this — it's unapplied + platform-only, and platform never
+  churned. BUT this preprod storm is a live PREVIEW of what #1436 would bring to the stateful hub → reconsidered,
+  recommending HOLD it (or use a much longer `consolidateAfter`); the 6-platform-node cost isn't worth hub churn.**
+
 - **2026-07-13 (end-of-day PARK) — routine, cost-zero.** Both parked (system→0, 0 running/pending instances both
   accounts, bastions stopped). BOTH clusters threw the softer `warning: EC2NodeClass still present after 90s
   (finalizer stuck?) — 'up' should reconcile it` (not the hard `i/o timeout` from the 07-12 park) — so the
