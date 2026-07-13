@@ -67,14 +67,11 @@ locals {
       // Same idea for the app's structured log level: Loki's own server-side detected_level heuristic (used
       // when no client-supplied value is present) is unreliable against this CRI-wrapped JSON shape - verified
       // live it correctly detects "info" but calls "error" lines "unknown". Extract the JSON "level" field
-      // directly and lowercase it (Loki's convention is lowercase: info/warn/error/...) so Loki uses OUR value
-      // instead of guessing.
+      // directly so Loki uses OUR value instead of guessing. NB: no case-normalization (stage.template has no
+      // ToLower/string-case function available - confirmed via a failed apply) - the app emits uppercase
+      // (Go's log/slog default: INFO/ERROR/WARN/DEBUG); Grafana's level-badge match is case-insensitive.
       stage.regex {
         expression = "\"level\"\\s*:\\s*\"(?P<detected_level>[A-Za-z]+)\""
-      }
-      stage.template {
-        source   = "detected_level"
-        template = "{{ ToLower .Value }}"
       }
       stage.structured_metadata {
         values = {
