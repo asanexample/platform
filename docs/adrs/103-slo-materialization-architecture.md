@@ -6,13 +6,12 @@
 
 ## Context
 
-Per-app availability SLOs today are derived at `terragrunt apply` time by the `mimir` unit: it globs `gitops/environments/**/prod.yaml`, builds raw multi-window burn-rate PromQL from `templates/app-slo-rules.yaml.tftpl`, and pushes it into the `app-slos` Mimir ruler namespace via a `mimirtool rules sync` CronJob (ADR-056 W11). It works, but the *mechanism* has five problems:
+Per-app availability + latency SLOs today are derived at `terragrunt apply` time by the `mimir` unit: it globs `gitops/environments/**/*.yaml` (every environment, any stage), builds raw multi-window burn-rate PromQL from `templates/app-slo-rules.yaml.tftpl`, and pushes it into the `app-slos` Mimir ruler namespace via a `mimirtool rules sync` CronJob (ADR-056 W11). It works, but the *mechanism* has four problems:
 
-1. **Lifecycle seam.** SLOs materialize on the `mimir` unit's apply cadence, not with the environment. A new prod `XEnvironment` can be reconciled and serving while it has no SLO; a deleted one can leave orphan rules until the next apply.
+1. **Lifecycle seam.** SLOs materialize on the `mimir` unit's apply cadence, not with the environment. A new `XEnvironment` can be reconciled and serving while it has no SLO; a deleted one can leave orphan rules until the next apply.
 2. **No self-healing / GC.** Nothing reconciles drift or cleans up removed environments.
 3. **Bespoke, duplicated downstream.** Raw PromQL + `mimirtool` runs *parallel* to the Sloth `PrometheusServiceLevel` path used for hand-authored platform SLOs (e.g. kube-apiserver). Two systems doing the same job.
-4. **Availability-only.** No latency SLO, so "up but degraded under load" is invisible to the SLO layer until it degrades enough to time out (5xx).
-5. **Objective hard-coded.** A fixed 99.9% in the template, with no tier/per-service policy.
+4. **Objective hard-coded.** A fixed 99.9%/99% in the template, with no tier/per-service policy.
 
 The obvious "fix" — folding SLO reconciliation into the **XEnvironment Composition** — is rejected here (see Alternatives): it puts observability config on the environment *provisioning critical path*, and mismatches the delivery mechanism.
 
@@ -40,7 +39,7 @@ Each generated SLO CR carries an `ownerReference` to its `XEnvironment`. The SLO
 
 ### D5 — Multi-signal by default
 
-Every prod service gets **availability and latency** SLOs from the same Beyla RED metrics (`http_server_request_duration_seconds` histogram). The latency threshold comes from tier policy, overridable per service.
+Every service, any stage, gets **availability and latency** SLOs from the same Beyla RED metrics (`http_server_request_duration_seconds` histogram). The latency threshold comes from tier policy, overridable per service.
 
 ### D6 — Tenant-aware delivery
 
@@ -66,18 +65,18 @@ SLO rules are evaluated in the tenant where the app metrics live (the spoke tena
 ### Risks
 
 - A composition function reconciling toward Mimir-ruler semantics is awkward — mitigated by emitting **K8s-native Sloth CRs** and letting the existing Sloth → `PrometheusRule` → ruler path handle delivery, rather than talking to the ruler directly.
-- CR volume at scale (one per service per signal) — bounded and cheap today (one prod product); revisit sharding/derivation if it reaches hundreds of services.
+- CR volume at scale (one per service per signal) — bounded and cheap today (a handful of environments across two products); revisit sharding/derivation if it reaches hundreds of services.
 
 ## Alternatives considered
 
-- **Keep the Terragrunt registry-derivation (status quo).** Simple and central, but carries the lifecycle seam, no GC/self-heal, a bespoke parallel pipeline, and availability-only coverage. A reasonable v1; this ADR is the v2.
+- **Keep the Terragrunt registry-derivation (status quo).** Simple and central, but carries the lifecycle seam, no GC/self-heal, and a bespoke parallel pipeline. A reasonable v1; this ADR is the v2.
 - **SLO reconciliation inside the `XEnvironment` Composition.** Rejected: couples observability config onto the provisioning critical path (a bad SLO template could block a team getting an environment), and mismatches the delivery mechanism (rules land in Mimir's ruler, not as Crossplane-reconciled resources).
 - **A purpose-built SLO controller watching `XEnvironment`s.** Most cloud-native and zero-lag, but more bespoke machinery than a composition function given the existing Crossplane/ArgoCD stack. Kept as the fallback.
 
 ## Related
 
 - ADR-056 — SLOs, canary analysis, error-budget freeze (the current consumer of these rules)
-- ADR-067 — registries-as-source (the `prod.yaml` registry this derives from)
+- ADR-067 — registries-as-source (the `gitops/environments/**/*.yaml` registry this derives from)
 - ADR-043 / ADR-044 — external `cluster` label and cross-cluster tenancy
 - ADR-100 — instrumentation & OTLP convention (the RED metrics the SLIs read)
 - `docs/plans/102-observability-stack.md` — W11 per-app SLOs

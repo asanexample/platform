@@ -12,23 +12,25 @@ terraform {
 }
 
 locals {
-  # Per-app availability + latency SLOs (ADR-056 / W11), DERIVED from the prod XEnvironment claims
-  # (registries-as-source, ADR-067) — every prod Environment gets a 99.9% HTTP success-rate SLO AND a 99%
-  # sub-500ms latency SLO over its Beyla RED metrics, evaluated in THIS hub's Mimir ruler for the spoke tenant
-  # (the app metrics live there). Auto-extends as products gain a prod Environment. Fixed objective/threshold
-  # for now, same as the availability SLO's fixed 99.9% — no per-Product/tier override yet: the XEnvironment
-  # XRD schema is strict/structural (no freeform passthrough), so adding one is a live XRD edit with real
-  # cascade-delete risk (crossplane-composition-authoring's safe-apply rule) and nobody has asked to override
-  # this threshold yet — a follow-up once a real need shows up, not built speculatively. NB the SLI filters by
-  # the env namespace = the claim's metadata.name (truncate+hash on >63 chars not handled — fine for current names).
+  # Per-app availability + latency SLOs (ADR-056 / W11), DERIVED from EVERY XEnvironment claim
+  # (registries-as-source, ADR-067) — every environment, any stage, gets a 99.9% HTTP success-rate SLO AND a
+  # 99% sub-500ms latency SLO over its Beyla RED metrics, evaluated in THIS hub's Mimir ruler for the spoke
+  # tenant (the app metrics live there — every stage runs on the single preprod spoke cluster today, so the
+  # tenant/query shape is identical regardless of stage). Auto-extends as products/environments are added.
+  # Fixed objective/threshold for now, same as the availability SLO's fixed 99.9% — no per-Product/tier
+  # override yet: the XEnvironment XRD schema is strict/structural (no freeform passthrough), so adding one is
+  # a live XRD edit with real cascade-delete risk (crossplane-composition-authoring's safe-apply rule) and
+  # nobody has asked to override this threshold yet — a follow-up once a real need shows up, not built
+  # speculatively. NB the SLI filters by the env namespace = the claim's metadata.name (truncate+hash on >63
+  # chars not handled — fine for current names).
   #
   # Latency threshold = 500ms via the `le="0.5"` bucket — verified live against Beyla's actual histogram
   # buckets (`0.0,0.005,0.01,0.025,0.05,0.075,0.1,0.25,0.5,0.75,1,...`); there is NO `le="0.3"` bucket, so a
   # 300ms threshold would silently match zero series (permanently 0% "good" — a broken SLO), not error.
   envs_dir             = "${get_repo_root()}/gitops/environments"
-  prod_envs            = [for f in fileset(local.envs_dir, "**/prod.yaml") : yamldecode(file("${local.envs_dir}/${f}"))]
+  all_envs             = [for f in fileset(local.envs_dir, "**/*.yaml") : yamldecode(file("${local.envs_dir}/${f}"))]
   latency_threshold_le = "0.5" # 500ms — must be an actual Beyla histogram bucket boundary, not an arbitrary value
-  app_slos = flatten([for e in local.prod_envs : [
+  app_slos = flatten([for e in local.all_envs : [
     {
       id              = "${e.metadata.name}-availability"
       service         = "app-${e.spec.team}-${e.spec.product}"

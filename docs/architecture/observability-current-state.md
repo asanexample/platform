@@ -148,13 +148,13 @@ provisioned as code. `slo_engine` is the seam for a future Pyrra/Grafana-SLO swa
 
 A **second, separate** SLO mechanism covers application environments, live since ADR-056 Phase 3
 (#900/#882). Unlike the Sloth SLOs above (manually authored per platform service), an app SLO is
-**derived automatically** for every `prod` `XEnvironment` claim — the `mimir` unit's Terragrunt scans
-`gitops/environments/**/prod.yaml` (`fileset`+`yamldecode`) and generates one fixed **99.9%
-HTTP-success-rate** SLO per environment from Beyla's RED metrics
+**derived automatically** for every `XEnvironment` claim, any stage — the `mimir` unit's Terragrunt scans
+`gitops/environments/**/*.yaml` (`fileset`+`yamldecode`) and generates one fixed **99.9%
+HTTP-success-rate** SLO plus one **99% sub-500ms latency** SLO per environment from Beyla's RED metrics
 (`http_server_request_duration_seconds_count{k8s_namespace_name="<env>"}`), rendered as multi-window
 burn-rate rules into an **`app-slos`** **Mimir ruler namespace** (synced by `mimirtool rules sync`, not
 Sloth's `PrometheusServiceLevel`→`PrometheusRule` path). There's no per-Product objective override
-today — the 99.9% target is a fixed template.
+today — the 99.9%/99% targets are a fixed template.
 
 **Consumer: the ADR-056 canary error-budget freeze gate.** Before any Rollout traffic shifts, a
 one-shot `AnalysisTemplate` queries `slo:current_burn_rate:ratio{sloth_id="<env>-availability"}` — if

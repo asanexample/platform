@@ -181,7 +181,7 @@ variable "app_slos" {
     burn-rate rules into an `app-slos` Mimir ruler namespace, loaded into the ruler tenant by the rules-sync. The
     `error_query`/`total_query` use a `{{window}}` placeholder (Beyla RED metrics filtered to the app's namespace).
     Produces `slo:current_burn_rate:ratio{sloth_id=...}` per app (the metric the freeze gate queries) + page/ticket
-    burn alerts → hub Alertmanager. Usually registry-derived in the unit from the prod XEnvironment claims.
+    burn alerts → hub Alertmanager. Usually registry-derived in the unit from every XEnvironment claim, any stage.
   EOT
   type = list(object({
     id              = string # unique SLO id, e.g. "alpha-shop-prod-availability"
