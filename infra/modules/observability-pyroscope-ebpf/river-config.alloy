@@ -1,6 +1,7 @@
 // Zero-code continuous profiling (#102 P8b). A privileged Alloy DaemonSet attaches eBPF on each node and
-// CPU-profiles the running processes, grouping samples by the discovered pod (service_name = ns/pod) and
-// pushing to Pyroscope. No app changes — dogfoods every platform component.
+// CPU-profiles the running processes, grouping samples by service_name (defaulting to the pod's namespace,
+// overridden by the app label when present) and pushing to Pyroscope. No app changes — dogfoods every
+// platform component.
 
 logging {
   level  = "info"
@@ -14,6 +15,10 @@ discovery.kubernetes "pods" {
 // service_name drives both the flame-graph grouping AND the Tempo tracesToProfilesV2 correlation, so it must
 // match Beyla's trace service.name (= the app.kubernetes.io/name label, e.g. "app-alpha-shop"). Default to the
 // namespace, then override with the app label when present (regex "(.+)" only matches a non-empty label).
+// k8s_namespace_name is a SEPARATE label (never overridden) mirroring Beyla/Loki/Tempo's convention — unlike
+// service_name (which is workload-scoped, e.g. "shop-storefront", and doesn't vary by stage), this is what
+// lets a query/dashboard scope profiles to one environment (a service's dev/staging/prod pods otherwise all
+// emit the same service_name and are indistinguishable in Pyroscope).
 discovery.relabel "profiles" {
   targets = discovery.kubernetes.pods.targets
 
@@ -25,6 +30,10 @@ discovery.relabel "profiles" {
     source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
     regex         = "(.+)"
     target_label  = "service_name"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_namespace"]
+    target_label  = "k8s_namespace_name"
   }
 }
 

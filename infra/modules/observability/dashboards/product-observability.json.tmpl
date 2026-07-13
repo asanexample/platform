@@ -1,7 +1,7 @@
 {
   "uid": "product-observability-__TEAM__",
   "title": "Product Observability — __TEAM__",
-  "description": "Single pane of glass for operating one of __TEAM__'s products/environments reliably: SLO burn, golden signals (RED), deploy/rollout status, resource headroom, cost, and log/trace jump-off points. Pick Product → Stage above.",
+  "description": "Single pane of glass for operating one of __TEAM__'s products/environments reliably: SLO burn, golden signals (RED), deploy/rollout status, resource headroom, cost, active alerts, and log/trace/profile jump-off points. Pick Product → Stage above.",
   "tags": [
     "product",
     "sre",
@@ -73,6 +73,12 @@
       "title": "Explore → Tempo (this namespace)",
       "type": "link",
       "url": "/explore?left=%7B%22datasource%22:%22tempo-all%22,%22queries%22:%5B%7B%22datasource%22:%7B%22type%22:%22tempo%22,%22uid%22:%22tempo-all%22%7D,%22queryType%22:%22traceqlSearch%22,%22filters%22:%5B%7B%22id%22:%22namespace%22,%22tag%22:%22k8s.namespace.name%22,%22operator%22:%22%3D%22,%22value%22:%5B%22__TEAM__-$product-$stage%22%5D%7D%5D%7D%5D,%22range%22:%7B%22from%22:%22now-6h%22,%22to%22:%22now%22%7D%7D",
+      "targetBlank": true
+    },
+    {
+      "title": "Explore → Pyroscope (this namespace, best-effort)",
+      "type": "link",
+      "url": "/explore?left=%7B%22datasource%22:%22pyroscope-preprod%22,%22queries%22:%5B%7B%22datasource%22:%7B%22type%22:%22grafana-pyroscope-datasource%22,%22uid%22:%22pyroscope-preprod%22%7D,%22queryType%22:%22profile%22,%22profileTypeId%22:%22process_cpu:cpu:nanoseconds:cpu:nanoseconds%22,%22labelSelector%22:%22%7Bk8s_namespace_name%3D%5C%22__TEAM__-$product-$stage%5C%22%7D%22%7D%5D,%22range%22:%7B%22from%22:%22now-6h%22,%22to%22:%22now%22%7D%7D",
       "targetBlank": true
     }
   ],
@@ -660,8 +666,46 @@
     },
     {
       "type": "row",
-      "title": "Logs & Traces",
+      "title": "Active alerts",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 44 }
+    },
+    {
+      "id": 23,
+      "type": "table",
+      "title": "Firing now",
+      "description": "Currently firing alerts for this environment: curated PrometheusRules (labeled `namespace`) unioned with the per-app SLO burn-rate alerts (labeled `sloth_id`, e.g. `__TEAM__-$product-$stage-availability`). Empty table = nothing firing.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 45 },
+      "fieldConfig": {
+        "defaults": { "unit": "string" },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "ALERTS{alertstate=\"firing\", namespace=\"__TEAM__-$product-$stage\"} or ALERTS{alertstate=\"firing\", sloth_id=~\"^__TEAM__-$product-$stage-.*\"}"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "Value": true, "alertstate": true, "__name__": true },
+            "renameByName": { "alertname": "Alert", "severity": "Severity", "namespace": "Namespace", "sloth_id": "SLO", "sloth_service": "Service" }
+          }
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Logs & Traces",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 52 }
     },
     {
       "id": 20,
@@ -669,7 +713,7 @@
       "title": "Recent logs",
       "description": "LogQL: `{k8s_namespace_name=\"__TEAM__-$product-$stage\"}` against `Loki (all clusters)`. Use the Explore → Loki link above for filters, live tail, or a wider time range.",
       "datasource": { "type": "loki", "uid": "loki-all" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 45 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 53 },
       "options": {
         "showTime": true,
         "showLabels": false,
@@ -694,7 +738,7 @@
       "title": "Recent traces",
       "description": "TraceQL search scoped to this namespace via `Tempo (all clusters)`. Click a Trace ID to open the full trace view, or use the Explore → Tempo link above for TraceQL filters.",
       "datasource": { "type": "tempo", "uid": "tempo-all" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 53 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 61 },
       "targets": [
         {
           "refId": "A",
