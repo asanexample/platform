@@ -130,7 +130,10 @@ latency spike → the **trace** → (tracesToLogs) → **logs**. **Log → trace
 `trace_id`/`span_id` out of the JSON log body into **Loki structured metadata**, and the Loki datasource's
 derived field links on that field directly (`matcherType: label`) rather than regex-scraping the line — a log
 line jumps straight to its trace. (Only SDK-instrumented services carry these fields; Beyla-only workloads still
-rely on trace↔metrics/service-graph correlation, not log↔trace.) The
+rely on trace↔metrics/service-graph correlation, not log↔trace.) The same `retenant` process also extracts the
+app's JSON `level` field into Loki's `detected_level` structured metadata — Loki's own server-side level-guessing
+heuristic (used when no client-supplied value is present) is unreliable against this CRI-wrapped JSON log shape,
+so the pipeline supplies the real value instead of leaving it to guess. The
 generator also runs the **`local-blocks`** processor, which powers
 Grafana's **Traces Drilldown** (TraceQL *metrics* queries — `rate()`/`quantile_over_time()` over spans).
 

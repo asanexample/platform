@@ -47,8 +47,8 @@ locals {
   retenant_rules        = var.per_team_tenant ? local.retenant_rules_raw : ""
   retenant_tenant_stage = var.per_team_tenant ? local.retenant_tenant_stage_raw : ""
 
-  # loki.process "retenant" always runs: it's the sole place trace_id/span_id are promoted to Loki
-  # structured metadata (log->trace), independent of per-team tenanting.
+  # loki.process "retenant" always runs: it's the sole place trace_id/span_id/level are promoted to Loki
+  # structured metadata (log->trace, and the Explore/Logs-panel level badge), independent of per-team tenanting.
   retenant_process = <<-PROC
 
     loki.process "retenant" {
@@ -64,10 +64,23 @@ locals {
       stage.regex {
         expression = "span_id[^0-9a-f]+(?P<span_id>[0-9a-f]{16})"
       }
+      // Same idea for the app's structured log level: Loki's own server-side detected_level heuristic (used
+      // when no client-supplied value is present) is unreliable against this CRI-wrapped JSON shape - verified
+      // live it correctly detects "info" but calls "error" lines "unknown". Extract the JSON "level" field
+      // directly and lowercase it (Loki's convention is lowercase: info/warn/error/...) so Loki uses OUR value
+      // instead of guessing.
+      stage.regex {
+        expression = "\"level\"\\s*:\\s*\"(?P<detected_level>[A-Za-z]+)\""
+      }
+      stage.template {
+        source   = "detected_level"
+        template = "{{ ToLower .Value }}"
+      }
       stage.structured_metadata {
         values = {
-          trace_id = "",
-          span_id  = "",
+          trace_id       = "",
+          span_id        = "",
+          detected_level = "",
         }
       }
       ${local.retenant_tenant_stage}
