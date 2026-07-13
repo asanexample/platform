@@ -1,7 +1,15 @@
 # Environment (alpha × checkout × dev) — the first stage, authored by the Backstage
 # New Product template (ADR-067 v1beta1). Namespace alpha-checkout-dev. Synced by
 # ArgoCD (the `environments` registry-sync app) and reconciled by the Crossplane Environment Composition (v3).
-# The image is omitted until the new repo's first CI build pins a signed digest into k8s/overlays/dev.
+#
+# DECOMMISSIONING (docs/runbooks/environment-deprovisioning.md): this scaffold was never taken past the
+# first-deploy state (no image was ever promoted into k8s/overlays/dev — see the `services.web` comment
+# below, unchanged from day one). The mTLS/east-west-zero-trust showcase this Product was created for has
+# since been rebuilt as a `checkout` SERVICE inside alpha-shop (ADR-057 Phase 2 as-built notes, ADR-101) —
+# a richer demo than the original single alpha-shop↔alpha-checkout pair, since it covers every intra-shop
+# hop plus the real cross-team orders→bravo-dispatch call. Nothing has ever run in alpha-checkout-dev, so
+# this decommission drains zero live workload; it exists purely to reverse the Backstage scaffold and let
+# the purge PR (step 2) reclaim the namespace. Reversible: flip phase back to `active` to undo.
 apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata:
@@ -9,11 +17,14 @@ metadata:
   name: alpha-checkout-dev
   annotations:
     platform.refplat.org/requested-by: user:default/dev-alpha
+    platform.refplat.org/decommissioned-at: "2026-07-13"
 spec:
   team: alpha # validated == Product.team at the gate + admission
   product: checkout
   stage: dev
   tier: standard
+  lifecycle:
+    phase: decommissioning
   services:
     web:
       serviceAccount: app-alpha # Pod Identity binds this named SA; the app repo's serviceaccount.yaml creates it
