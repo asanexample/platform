@@ -16,6 +16,6 @@ spec:
     payment:
       digest: sha256:b76b860579bbbaca2845553c4f1e7c317cac98c4eff5e2d5dacafcf8f0400d5b
     checkout:
-      digest: sha256:46677aa18bf442370f7fea0565c9ec21122044c7b1d3ce5d0a9614d42633231a
+      digest: sha256:462d60768486dc0da18e7fc0a0c85c9772eff1a28e468a9d1985899d8a13534a
     accounts:
       digest: sha256:3cf2d11c81b823fbb4d1a838f77d6d4774d0bc5da8b177573096d36d5e0ac349
