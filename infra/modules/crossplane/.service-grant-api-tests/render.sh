@@ -49,4 +49,14 @@ OUT="$(render "${here}/service-grants/l7-http.yaml")"
 [ "$(printf '%s' "$OUT" | grep -c 'port: "8080"')" -ge 2 ] || { echo "::error::L7-narrowed halves must still carry port 8080"; exit 1; }
 echo "  ✓ l7-http OK (2 CNPs; rules.http{method:POST,path:/shipments} on BOTH halves, alongside the L4 port)"
 
-echo "ServiceGrant Composition render checks passed (ADR-101 — exactly 2 CNPs; L4-only backward-compat; L7 Envoy narrowing on both halves)."
+echo "== render l4-authenticated (capability.network.authentication.mode: required) → ingress-half-only authentication =="
+OUT="$(render "${here}/service-grants/l4-authenticated.yaml")"
+[ "$(printf '%s' "$OUT" | grep -c 'kind: CiliumNetworkPolicy')" -eq 2 ] || { echo "::error::expected exactly 2 CiliumNetworkPolicy objects"; printf '%s\n' "$OUT"; exit 1; }
+# ingress half (allow-orders-alpha-ingress) carries authentication: mode: required
+printf '%s' "$OUT" | grep -A20 'name: allow-orders-alpha-ingress' | grep -q 'authentication:' || { echo "::error::ingress half must carry an authentication block"; printf '%s\n' "$OUT"; exit 1; }
+printf '%s' "$OUT" | grep -A20 'name: allow-orders-alpha-ingress' | grep -q 'mode: required'  || { echo "::error::ingress half's authentication.mode must be required"; exit 1; }
+# egress half (allow-intake-bravo-egress) must NOT carry any authentication block — auth lives on ingress only
+printf '%s' "$OUT" | grep -A20 'name: allow-intake-bravo-egress' | grep -q 'authentication:' && { echo "::error::egress half must NOT carry an authentication block"; printf '%s\n' "$OUT"; exit 1; } || true
+echo "  ✓ l4-authenticated OK (ingress half carries authentication.mode: required; egress half does not)"
+
+echo "ServiceGrant Composition render checks passed (ADR-101 — exactly 2 CNPs; L4-only backward-compat; L7 Envoy narrowing on both halves; mutual-auth on the ingress half only)."

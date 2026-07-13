@@ -131,6 +131,18 @@ spec:
                               path:
                                 type: string
                                 description: 'e.g. /shipments'
+                        authentication:
+                          type: object
+                          description: >-
+                            OPTIONAL SPIRE mutual-auth requirement (ADR-057 Phase 2) — the callee proves the
+                            caller's SPIFFE identity before admitting the connection. Rendered on the INGRESS
+                            half ONLY (the target's namespace); the egress half is unaffected. Omit for
+                            identity-match-only (today's default — backward-compatible, existing grants
+                            render unchanged).
+                          properties:
+                            mode:
+                              type: string
+                              enum: ["required"]
                 expiresAt:
                   type: string
                   description: >-
