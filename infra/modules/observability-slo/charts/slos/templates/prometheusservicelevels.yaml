@@ -34,7 +34,15 @@ spec:
         pageAlert:
           labels:
             severity: {{ .page_severity | default "critical" }}
+          {{- with .runbook_url }}
+          annotations:
+            runbook_url: {{ . }}
+          {{- end }}
         ticketAlert:
           labels:
             severity: {{ .ticket_severity | default "warning" }}
+          {{- with .runbook_url }}
+          annotations:
+            runbook_url: {{ . }}
+          {{- end }}
 {{- end }}
