@@ -89,5 +89,10 @@ inputs = {
   helm_chart_version = include.base.locals.helm_versions.otel_collector
   helm_wait          = true
 
+  # Single replica meant a spot-interrupted node briefly dropped ALL preprod trace exports fleet-wide
+  # (every instrumented service logs an OTLP connection-refused until the pod reschedules). Override the
+  # dev cost profile's default (1) for just this unit — 2 replicas, PDB auto-generated (ADR-085).
+  high_availability = true
+
   tags = include.base.locals.tags
 }
