@@ -194,6 +194,10 @@ inputs = {
   # synced into the preprod tenant's ruler (the burn-rate metric + budget alerts the freeze gate will use).
   app_slos = local.app_slos
 
+  # Spoke metrics freshness ("who watches the watcher") — a dead/stuck spoke shows zero errors under
+  # availability-only SLOs. Evaluated inside every ruler_tenants entry (currently just preprod).
+  spoke_metrics_freshness = { enabled = true }
+
   # ADR-091 A3: admit Backstage's Cost tab to query the Mimir gateway directly (the ns default-denies ingress).
   query_consumer_namespaces = ["backstage"]
 
