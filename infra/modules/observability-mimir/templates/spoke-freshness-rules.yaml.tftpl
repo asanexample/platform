@@ -1,0 +1,27 @@
+## GENERATED — spoke metrics remote-write freshness check for the Mimir ruler.
+## Evaluated INSIDE each ruler tenant (the `up` series' own last-received timestamp only exists in that
+## tenant's remote-written data, not the hub's local scrape) — so a dead/stuck spoke, which shows zero
+## errors and zero 5xx and looks healthy under availability-only SLOs, is caught here instead. Not a
+## Sloth ratio SLO: freshness is boolean ("is there a sample newer than N"), not naturally an error/total
+## ratio — this mirrors the true-cost-exporter's `time() - last_success > SLA` staleness pattern.
+groups:
+  - name: spoke-metrics-freshness
+    rules:
+      - alert: SpokeMetricsFreshnessWarning
+        expr: time() - max by (cluster) (timestamp(up)) > ${warning_stale_after_seconds}
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Spoke {{ $labels.cluster }} hasn't shipped a fresh metrics sample in over ${warning_stale_after_seconds}s."
+          description: "The newest sample received for this tenant is older than the warning freshness threshold — the spoke's Prometheus-agent may be down, WAL-stuck, or network-partitioned from the hub. Check the agent pod on the spoke cluster and the cross-cluster remote-write path."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#mimir"
+      - alert: SpokeMetricsFreshnessCritical
+        expr: time() - max by (cluster) (timestamp(up)) > ${critical_stale_after_seconds}
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Spoke {{ $labels.cluster }} has shipped NO fresh metrics in over ${critical_stale_after_seconds}s."
+          description: "The spoke has been dark for a long time — treat as an active outage of the spoke's observability pipeline (or the spoke cluster itself), not a transient blip."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#mimir"
