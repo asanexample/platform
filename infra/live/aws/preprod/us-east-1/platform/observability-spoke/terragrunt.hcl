@@ -123,9 +123,10 @@ inputs = {
   enable_crossplane_provider_pod_monitor = true
   # The default 512Mi/1Gi OOM-killed the agent within ~30s of scraping crossplane core + 5 provider pods'
   # controller-runtime metrics (11 CrashLoopBackOff restarts observed live) — bump headroom for the added
-  # scrape cardinality.
-  memory_request = "768Mi"
-  memory_limit   = "2Gi"
+  # scrape cardinality. First bump (768Mi/2Gi) stopped the crashloop but settled at ~98% of the limit
+  # (~1.95-2Gi steady-state, verified live) — too tight a margin for comfort; bumped further for real slack.
+  memory_request = "1Gi"
+  memory_limit   = "3Gi"
 
   tags = include.base.locals.tags
 }
